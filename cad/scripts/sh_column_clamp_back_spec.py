@@ -43,7 +43,7 @@ from sh_column_clamp_front_geom import (  # noqa: F401
     EAR_HOLE_Z,
 )
 
-FRONT_ARC_MATE = "MHA-SH-001"
+FRONT_ARC_MATE = "MHA-SH-01"
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  ``build_sh_column_clamp_back`` marks exactly these;

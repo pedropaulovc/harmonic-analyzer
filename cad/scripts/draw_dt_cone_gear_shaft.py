@@ -213,7 +213,7 @@ STATION_TEXT_CLEARANCE = 0.002
 # than r2's so its widest mate line ends clear of section A-A's across-flat.
 # Its text's lower-left corner is where the dimension line turns, so the
 # block stands 3.5 mm higher than r4b's: there the shelf sat on the
-# extension line and the 3 mm arrow rose into "MHA-DT-005" (machinist
+# extension line and the 3 mm arrow rose into "MHA-DT-05" (machinist
 # review r4b, 20261018T072511131Z).  A tip-end text spans
 # its right-hand neighbours' lines: the tip's text sits highest and each
 # neighbour to the right steps down, so no line rises through a text (codex,

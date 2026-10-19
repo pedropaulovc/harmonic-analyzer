@@ -55,7 +55,7 @@ def test_butt_callouts_clear_ruling_b_native_text_envelopes() -> None:
 
 
 def test_every_profile_size_is_a_model_dimension() -> None:
-    # MHA-DT-008 machinist review of 2026-10-18: the profile's sizes print as
+    # MHA-DT-08 machinist review of 2026-10-18: the profile's sizes print as
     # dimensions on the section, not in a note; the bore revolves with it.
     spec = dt_crank_handle_spec
     assert set(spec.DRAWING_DIMENSIONS) == {"HandleProfile"}
@@ -66,7 +66,7 @@ def test_every_profile_size_is_a_model_dimension() -> None:
     assert "_make_driven(adapter, reference, name)" in build_source
     assert "PivotBoreProfile" not in build_source
     assert spec.PIVOT_BORE_CALLOUT.startswith("REAM THRU")
-    assert "MHA-DT-032" in spec.PIVOT_BORE_CALLOUT
+    assert "MHA-DT-32" in spec.PIVOT_BORE_CALLOUT
     assert spec.DRAWING_PRECISION_BY_NAME["PivotBoreDia"] == 2
     assert all(
         places == 1
@@ -167,10 +167,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert drawing.DIMENSION_CALLOUTS["TenonDia"] == spec.TENON_FIT_NOTE
     assert drawing.DIMENSION_CALLOUTS["CounterboreDia"] == spec.COUNTERBORE_FIT_NOTE
     # Rule 4: a matched pair names its mate by name and number.
-    assert "MHA-DT-034" in spec.TENON_FIT_NOTE
+    assert "MHA-DT-34" in spec.TENON_FIT_NOTE
     assert spec.FERRULE_NAME in spec.TENON_FIT_NOTE
     assert "DIAMETRAL CLEARANCE" in spec.TENON_FIT_NOTE
-    assert "MHA-DT-035" in spec.COUNTERBORE_FIT_NOTE
+    assert "MHA-DT-35" in spec.COUNTERBORE_FIT_NOTE
     assert spec.CUP_NAME in spec.COUNTERBORE_FIT_NOTE
     assert spec.SCREW_NAME in spec.PIVOT_BORE_CALLOUT
     assert "<MOD-DIAM>9.9 MAX" in spec.COUNTERBORE_FIT_NOTE
@@ -204,8 +204,8 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # The reamed bore prints 4.10 +0.05/0, its two-place nominal the limit
     # itself (local review of fbf82ad96: 4.125 printed 4.13 +/-0.025).
     assert (spec.PIVOT_BORE_DIA, spec.PIVOT_BORE_BAND) == (4.10, (0.05, 0.0))
-    # No run-out: the cup cures centred on the waxed MHA-DT-032 at assembly
-    # (MHA-DT-008 machinist review of 2026-10-18 found 0.2 TIR over-spec).
+    # No run-out: the cup cures centred on the waxed MHA-DT-32 at assembly
+    # (MHA-DT-08 machinist review of 2026-10-18 found 0.2 TIR over-spec).
     assert not hasattr(spec, "BORE_RUNOUT_TIR")
     assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -322,7 +322,7 @@ def test_sheet_runs_at_4_to_1_with_1_to_1_isometric() -> None:
 
 
 def test_sheet_carries_no_gdt() -> None:
-    # User ruling 2026-09-29 (MHA-DT-008 review): a plain sheet.
+    # User ruling 2026-09-29 (MHA-DT-08 review): a plain sheet.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for helper in (
         "add_datum_feature(",
@@ -355,7 +355,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert dt_crank_handle_spec.HANDLE_MAX_DIA == 21.0
     assert dt_crank_handle_spec.CREST_DIA < dt_crank_handle_spec.HANDLE_MAX_DIA
     assert 2.0 * dt_crank_handle_spec.SHOULDER_R < dt_crank_handle_spec.HANDLE_MAX_DIA
-    # The title block's MATERIAL field prints "material" (MHA-DT-008
+    # The title block's MATERIAL field prints "material" (MHA-DT-08
     # machinist review of 2026-10-18: the grain belongs with the stock), in
     # its one-line 36-character cell (Codex P2 on #1650); the long form
     # stays in material_specification.

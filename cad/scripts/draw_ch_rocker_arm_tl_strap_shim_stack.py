@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker arm's strap shim stack (MHA-CH-006-TL-11)."""
+r"""Create the drawing for the rocker arm's strap shim stack (MHA-CH-06-TL-11)."""
 
 from __future__ import annotations
 
@@ -78,15 +78,15 @@ CALLOUTS_BELOW = {
     # the stack bears on the rocker blank's strap face. One line, so the
     # callout hangs under its shelf, clear of the dimension's vertical line.
     "ShimThick": (
-        "SHIM AT SETUP TO BEAR ON MHA-CH-006 STRAP FACE: "
+        "SHIM AT SETUP TO BEAR ON MHA-CH-06 STRAP FACE: "
         f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
     ),
 }
 # The upper fit-up bound (Codex #1448 P1): an over-height pack would lift the
 # blank off the riser blocks and bow the span, so the stack's underside, the
-# face that seats on MHA-CH-006-TL-10, must still bear with the strap snug.
+# face that seats on MHA-CH-06-TL-10, must still bear with the strap snug.
 RISER_SEAT_NOTE = (
-    "BLANK FLAT ON ALL MHA-CH-006-TL-10 SEATS: "
+    "BLANK FLAT ON ALL MHA-CH-06-TL-10 SEATS: "
     f"{part_spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
 )
 # The *Bottom edge view shows the model's +Z up, so the riser seat (Z0) is the
@@ -165,7 +165,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Strap Shim Stack Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker strap shim stack; O1 flat on steel shim; MHA-CH-006-TL-11",
+            3: "rocker strap shim stack; O1 flat on steel shim; MHA-CH-06-TL-11",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

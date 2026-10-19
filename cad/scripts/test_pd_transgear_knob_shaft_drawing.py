@@ -68,7 +68,7 @@ def test_native_stock_source_is_the_selected_12t_48dp_master() -> None:
         f"WHOLE DEPTH (mm, REF):  {spec.WHOLE_DEPTH:.3f}",
         "CUTTER:  #8, 12-13T",
         f"SPAN OVER 2 TEETH:  {lower:.4f}-{upper:.4f}",
-        "MATES WITH:  DISC MHA-PD-006, 120T",
+        "MATES WITH:  DISC MHA-PD-06, 120T",
     ]
 
 
@@ -502,7 +502,7 @@ def test_single_native_solid_volume_has_no_adapter_fallback(monkeypatch) -> None
 
 def test_part_record_and_running_finishes() -> None:
     config = _config.parts("pd-transgear-knob-shaft")
-    assert config["number"] == "MHA-PD-008"
+    assert config["number"] == "MHA-PD-08"
     assert config["material_specification"] == "SAE 1018 CF bar, ASTM A108-24"
     assert int(config["quantity"]) == 1
     faces = {control.key: control.face for control in spec.SURFACE_FINISHES}

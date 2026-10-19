@@ -1,19 +1,19 @@
-r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-005)
+r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-05)
 and its drawing.
 
 A plain O6.35 rod (user, 2026-10-10: the old turned shoulder and its reliefs
-are gone). Hub 19 bears through a MHA-VN-070 thrust washer on the north ear's
-inner face and the MHA-VN-053 spring pushes the bank north from the south ear
+are gone). Hub 19 bears through a MHA-CH-VN-56 thrust washer on the north ear's
+inner face and the MHA-CH-VN-54 spring pushes the bank north from the south ear
 (``rocker_bank_layout``); the
 shaft itself is held, axially and in rotation, by one #4-40 set screw down
-through each MHA-CH-008 ear's arch apex, each biting a FLAT milled on the
+through each MHA-CH-08 ear's arch apex, each biting a FLAT milled on the
 shaft at that ear's mid-plane, so the cup never burrs the round the ear bore
 runs on. The body carries the 20 rocker hubs and journals in both ears, and
 both ends are domed DOME_HEIGHT proud of their ears, like the cylinder
 arbor's ends.
 
 The shop faces and domes both ends to the overall length, tip to tip; its
-cylinder is the span over both installed MHA-CH-008 ears
+cylinder is the span over both installed MHA-CH-08 ears
 (``rocker_bank_layout.PIVOT_SHAFT_LENGTH``), and fit-up sets the north tip
 DOME_HEIGHT proud of the north ear, so nothing is cut at assembly. Each flat
 is stationed from its own end's tip (drawing-guidelines.md rule 11: each

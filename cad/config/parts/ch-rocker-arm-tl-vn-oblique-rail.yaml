@@ -1,0 +1,12 @@
+ch-rocker-arm-tl-vn-oblique-rail:
+  title: Oblique Trammel Linear Rail
+  number: MHA-CH-06-TL-VN-50
+  stock_name: HIWIN HGR15R linear guideway rail, cut to 440 mm (HGR15R440C)
+  supplier: Motion Constrained
+  supplier_skus: ["172270559990"]
+  material: Alloy Steel
+  material_specification: "Hardened bearing steel"
+  finish: as supplied
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

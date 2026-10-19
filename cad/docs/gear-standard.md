@@ -138,10 +138,10 @@ These are `paper_drive_mesh_check.CONTACT_RATIO_FLOOR` and
 
 ### Setting the cone mesh
 
-The cone set swings on a platform. The cone-lock knob, MHA-VN-013, sets and
-locks the engaged mesh at assembly. The swing stop screw, MHA-VN-015, only
+The cone set swings on a platform. The cone-lock knob, MHA-DT-VN-51, sets and
+locks the engaged mesh at assembly. The swing stop screw, MHA-DT-VN-53, only
 limits how far the set swings out when disengaged; it plays no part in the
-mesh. The order, from MHA-DT-000 sheet 9, step 4 (CONE SWING SET):
+mesh. The order, from MHA-DT-00 sheet 9, step 4 (CONE SWING SET):
 
 1. Ease the arbor-pedestal screws to snug-loose.
 2. Swing in on radial shims, cone tip to drum root, using the separate T012
@@ -150,7 +150,7 @@ mesh. The order, from MHA-DT-000 sheet 9, step 4 (CONE SWING SET):
    pedestal screws.
 3. Swing out and remove the alignment shims. Swing in until the T120 feeler
    specified in that step is snug between the T120 tip and the drum root,
-   hold it there, and lock MHA-VN-013.
+   hold it there, and lock MHA-DT-VN-51.
 4. Do not loosen the pedestals after the set. If you do, redo both steps.
 
 The set cannot correct a pivot that moves sideways, so the platform pivot is

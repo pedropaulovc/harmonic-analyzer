@@ -107,9 +107,9 @@ def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
     assert not hasattr(spec, "BORE_WALL_NOTE")
     # The bore's wall to a flat holds the target: the sheet states none (rule 20).
     assert "WALL" not in spec.LEVER_BORE_CALLOUT
-    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON Ø6 LEVER MHA-MG-003"
-    assert "MHA-MG-003" in spec.LEVER_BORE_CALLOUT
-    assert spec.SEAT_NOTE.startswith("MHA-MG-004 SHOULDER SEAT")
+    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON Ø6 LEVER MHA-MG-03"
+    assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
+    assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
     assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE"
     for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):

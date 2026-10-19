@@ -1,15 +1,15 @@
-r"""Create the MHA-PD-023 transgear pin manufacturing drawing.
+r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the ground shank keeps its native
-fit band and one bearing-surface finish, the MHA-VN-047 ring groove its
+fit band and one bearing-surface finish, the MHA-PD-VN-61 ring groove its
 catalogue Ø and width bands, and every other size is an ordinary model
 dimension at its part-authored places.
 
 The pin axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the domed tip on the
 left and the head on the right.  Every feature is visible, so the side view
-removes hidden lines.  The head's underside (its seat on the MHA-PD-018 arm) is
+removes hidden lines.  The head's underside (its seat on the MHA-PD-18 arm) is
 the one origin: the groove's load wall, the pin's functional station, is
 dimensioned from it, and the head land runs back from it.
 
@@ -212,7 +212,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         face_xy=CENTERLINE_PICK,
-        label="MHA-PD-023 turning axis",
+        label="MHA-PD-23 turning axis",
     )
     add_surface_finish(
         adapter,
@@ -220,7 +220,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=FINISH_PICK,
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
-        label="MHA-PD-023 shank finish",
+        label="MHA-PD-23 shank finish",
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )

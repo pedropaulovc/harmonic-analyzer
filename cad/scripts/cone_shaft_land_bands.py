@@ -1,4 +1,4 @@
-"""Diameter and across-flat bands of the cone gear shaft's lands (MHA-DT-004) and
+"""Diameter and across-flat bands of the cone gear shaft's lands (MHA-DT-04) and
 the gears on them.
 
 The shaft spec applies these bands to its model dimensions; the cone gears
@@ -21,7 +21,7 @@ from _fit_shaft_h import SHAFT_H
 #
 # The pivot journal RUNS and keeps the shared ground-shaft h band. The
 # terminal land keeps that class too; only its size changes. Both small gears
-# and the custom MHA-VN-016 collar read the same terminal diameter below.
+# and the custom MHA-DT-VN-54 collar read the same terminal diameter below.
 # Historical U40 used 1/16 in; the cutter-native 48DP redesign uses 1/32 in
 # so the current printed floor MINs retain the user's T006/T012 web guards.
 RUNNING_DIA_BAND = SHAFT_H
@@ -39,7 +39,7 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
     GEAR_SEAT_BAND,  # Sec2: T024 seat
     GEAR_SEAT_BAND,  # Sec3: T018 seat
-    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-VN-016 stack collar
+    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-DT-VN-54 stack collar
 )
 # Shared displayed precision: native drawing and physical-limit consumers
 # read the same per-section table; no unrounded-nominal acceptance mapping.
@@ -67,10 +67,10 @@ TERMINAL_DIA_PLACES = LAND_DIA_PLACES[4]
 TERMINAL_PRINTED_DIA_MM = round(TERMINAL_DIA_MM, TERMINAL_DIA_PLACES)
 TERMINAL_FINISHED_DIA_LIMITS_MM = land_finished_dia_limits_mm(TERMINAL_DIA_MM, 4)
 # The terminal D-flat: the T006/T012 D-bores are cut to this across-flat and
-# the MHA-VN-016 collar's stock set screw bears on it. Its governing limit is
+# the MHA-DT-VN-54 collar's stock set screw bears on it. Its governing limit is
 # round guidance, checked at the end of this module: at the deepest printed
 # flat on the largest printed land the round must still wrap past the axis.
-# The collar's screw landing on the flat is gated by vn_cone_tip_collar_spec.
+# The collar's screw landing on the flat is gated by dt_vn_cone_tip_collar_spec.
 FLAT_AF_BAND = (0.000, -0.010)
 TERMINAL_FLAT_AF_MM = 0.42
 # The flat's torque corners: the title block's R0.25 would leave the flat

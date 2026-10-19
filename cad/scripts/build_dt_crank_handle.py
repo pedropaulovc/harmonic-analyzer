@@ -3,8 +3,8 @@ r"""Reproduction script: crank handle (book ch. 11, pp. 12-15).
 The pear-shaped wooden handle (stained black) that rotates on the crank-arm
 pivot -- the book calls it "a smooth piece of wood ... well-suited for a firm
 grip" (p.12).  User ruling 2026-09-29 (the ch11 p.14/p.15 photographs): the
-bright ring at the crank end is a separate brass ferrule MHA-DT-034 and the
-bright disc at the butt a steel cup MHA-DT-035, so this oak body ends in a turned
+bright ring at the crank end is a separate brass ferrule MHA-DT-34 and the
+bright disc at the butt a steel cup MHA-DT-35, so this oak body ends in a turned
 tenon (the ferrule's seat) and a counterbore (the cup's seat).
 
 User rulings 2026-09-30 (ch30 eight-views-4 side view, approved CadQuery

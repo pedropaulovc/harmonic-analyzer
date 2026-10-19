@@ -1,7 +1,7 @@
 r"""McMaster 92916A250 -- brass washer for #4 screw, ID 0.120 x OD 0.281 in.
 
-Used as vn-wheel-axle-front-washer (MHA-VN-058).  The catalogue facts and the part frame
-are ``vn_wheel_axle_front_washer_spec``'s.  The model is one Top-plane ID x OD annulus
+Used as mg-vn-wheel-axle-front-washer (MHA-MG-VN-55).  The catalogue facts and the part frame
+are ``mg_vn_wheel_axle_front_washer_spec``'s.  The model is one Top-plane ID x OD annulus
 extruded blind MODEL_THICKNESS (the catalogue range's nominal) along +Y from
 the y = 0 face.  The production build turns the body so the recipe's +Y is
 the part frame's +Z.
@@ -33,7 +33,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_wheel_axle_front_washer_spec import (  # noqa: E402
+from mg_vn_wheel_axle_front_washer_spec import (  # noqa: E402
     ID,
     MODEL_THICKNESS,
     OD,

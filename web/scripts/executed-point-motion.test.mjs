@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises'
 import * as THREE from 'three'
 import { createServer, createLogger } from 'vite'
 import { createPointMotionPairCompiler, createSourcePointMotionPairCompiler, classifyPointMotion } from './executed-point-motion.mjs'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 // Real source compilation/physical solving is portable; no production GLB,
 // model-loader substitution, fixture machine, or network fetch is required.
@@ -189,7 +190,7 @@ test('real source provider plus rigid Float32 geometry moves only the off-axis p
   const id = gearIds.find(value => assembly.NATIVE_RUNTIME_INSTANCES.upperMedium.partPath === assembly.SOURCE_GEAR_PART_PATHS[value])
   const pair = sourceCompiler()(input(), sourceState(), sourceAnchor(id))
   assert(pair)
-  const inventory = JSON.parse(await readFile(new URL('../content/v39-source/native-inventory.json', import.meta.url), 'utf8'))
+  const inventory = projectCurrentNativeMetadata(JSON.parse(await readFile(new URL('../content/v39-source/native-inventory.json', import.meta.url), 'utf8')))
   const matrices = new Map(inventory.inventory.map(row => [row.path, row.world]))
   for (const instance of Object.values(assembly.NATIVE_RUNTIME_INSTANCES)) matrices.set(instance.partPath, matrices.get(instance.templatePartPath))
   const context = { readWorldMatrix(path, out) { const value = matrices.get(path); if (!value) return false; out.set(value); return true },

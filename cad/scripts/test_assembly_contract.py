@@ -161,7 +161,7 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
     try:
         def write_contract(stem, **overrides):
             values = {
-                "number": "MHA-FR-000",
+                "number": "MHA-FR-00",
                 "flip_invert": ["a"],
                 "allowed_free_stems": ["rotor"],
                 "required_free_stems": ["rotor"],
@@ -173,7 +173,7 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
 
         write_contract("valid")
         valid = _assembly_contract.assembly_contract("valid")
-        assert valid.number == "MHA-FR-000"
+        assert valid.number == "MHA-FR-00"
         assert valid.flip_invert == frozenset({"a"})
         assert valid.allowed_free_stems == ("rotor",)
         assert valid.required_free_stems == ("rotor",)
@@ -306,14 +306,14 @@ def test_seed_flip_reads_only_the_active_assembly(fresh_seed_state):
 @pytest.mark.parametrize(
     "component",
     [
-        "vn-frame-side-screw",
+        "ch-vn-frame-side-screw",
         "ch-fulcrum-shaft",
-        "vn-fulcrum-set-screw",
+        "ch-vn-fulcrum-set-screw",
         "ch-pivot-bracket",
-        "vn-bracket-hold-down-screw",
-        "vn-rocker-thrust-washer",
-        "vn-rocker-bank-spring",
-        "vn-arbor-set-screw",
+        "ch-vn-bracket-hold-down-screw",
+        "ch-vn-rocker-thrust-washer",
+        "ch-vn-rocker-bank-spring",
+        "ch-vn-arbor-set-screw",
     ],
 )
 @pytest.mark.parametrize("axis", ("x", "y", "z"))

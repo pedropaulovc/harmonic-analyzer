@@ -1,10 +1,10 @@
 r"""Pure-data contract for the oblique trammel's pivot pin
-(MHA-CH-006-TL-23; shop tooling, two off).
+(MHA-CH-06-TL-23; shop tooling, two off).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). Each
-pivot block (MHA-CH-006-TL-22) carries two 6200-2RS bearings back to back
+pivot block (MHA-CH-06-TL-22) carries two 6200-2RS bearings back to back
 about a 4 mm shoulder; this pin is pressed through both inner races for life
-and its upper section stands in one of the carrier's (MHA-CH-006-TL-21)
+and its upper section stands in one of the carrier's (MHA-CH-06-TL-21)
 Ø10 H7 pin holes, so the carrier swings about the bearing axis
 (``ch_rocker_arm_tl_oblique_trammel_spec``, imported as ``trammel``).
 
@@ -175,7 +175,7 @@ BEARING_CALLOUT = (
 )
 CARRIER_CALLOUT = (
     f"{CARRIER_CLEARANCE_MIN:.3f}-{CARRIER_CLEARANCE_MAX:.3f} DIAMETRAL\n"
-    "CLEARANCE ON\nMHA-CH-006-TL-21 PIN HOLES"
+    "CLEARANCE ON\nMHA-CH-06-TL-21 PIN HOLES"
 )
 BEARING_NOTE = " ".join(BEARING_CALLOUT.splitlines())
 CARRIER_NOTE = " ".join(CARRIER_CALLOUT.splitlines())

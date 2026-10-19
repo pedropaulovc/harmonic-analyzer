@@ -1,4 +1,4 @@
-r"""Print-only data for the MHA-DT-020 cone swing platform sheet.
+r"""Print-only data for the MHA-DT-20 cone swing platform sheet.
 
 PURE DATA.  ``build_dt_cone_swing_platform`` marks and places these dimensions on
 the part (the model owns its decimal places) and ``draw_dt_cone_swing_platform``
@@ -114,11 +114,11 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 # Feature-callout wording is specification data; the drawing owns placement.
 # Name features, not compass directions: the plan maps model north downward.
 RELIEF_WIDTH_CALLOUT = "TOP RELIEF\nCTR ON PIVOT\nOPEN THRU\nPIVOT END"
-PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-VN-014 SHOULDER",)
-POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-005 CONE PIVOT POST"
+PIVOT_BORE_CALLOUT_BELOW = ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
+POST_MOUNT_LOCATING_CALLOUT = "LOCATES MHA-DT-05 CONE PIVOT POST"
 # A drawing number identifies the hold-down's mate without lengthening its
 # leader shelf into the title block.
-HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-021")
+HOLDDOWN_CALLOUT_BELOW = ("FROM UNDERSIDE", "LOCATES MHA-DT-21")
 # The process belongs to the THRU row, not the counterbore-diameter row.
 HOLDDOWN_PROCESS = "DRILL"
 PIVOT_PROCESS = "REAM"

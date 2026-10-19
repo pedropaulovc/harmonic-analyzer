@@ -1,7 +1,7 @@
 ch-pivot-bracket-tl-ledge:
   title: Pivot Bracket Angle-Plate Ledge
-  # Shop fixture: the parent MHA-CH-008 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-008-TL-01
+  # Shop fixture: the parent MHA-CH-08 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-08-TL-01
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-finished steel flat bar, 3/4 x 1/4 in
   finish: as machined

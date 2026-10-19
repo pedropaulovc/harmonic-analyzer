@@ -1,4 +1,4 @@
-r"""Create the drawing for the pivot bracket's angle-plate ledge (MHA-CH-008-TL-01).
+r"""Create the drawing for the pivot bracket's angle-plate ledge (MHA-CH-08-TL-01).
 
 A 22.6 x 26.9 x 6 block: the face view (front) carries the width, the
 milled height and both screw-hole stations, each from the left end or the bottom
@@ -242,7 +242,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pivot Bracket Angle-Plate Ledge Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "pivot bracket angle-plate ledge; 1018 flat; MHA-CH-008-TL-01",
+            3: "pivot bracket angle-plate ledge; 1018 flat; MHA-CH-08-TL-01",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

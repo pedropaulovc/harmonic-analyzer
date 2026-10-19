@@ -23,7 +23,7 @@ from dt_crank_hub_geometry import (
 
 
 def seat_callout(mate: str) -> str:
-    """Hub-seat fit on MHA-DT-031, turned second to press into ``mate``'s bore.
+    """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
 
     Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). FACES FLUSH is the acceptance; how the hub
     gets there (an arbor press) is a method, so the sheet does not say it.
@@ -46,11 +46,11 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str, pin: str = "MHA-VN-029") -> str:
-    """MHA-VN-029 seam, match-drilled with ``mate``: size first, then the process.
+def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
+    """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
     ``pin`` names the pin as the sheet identifies it; the arm's print adds its
-    part name (MHA-DT-006 machinist review, 2026-09-29).
+    part name (MHA-DT-06 machinist review, 2026-09-29).
     """
     return "\n".join(
         (
@@ -67,26 +67,26 @@ def seam_callout(mate: str, pin: str = "MHA-VN-029") -> str:
 BORE_CALLOUT = (
     "REAM THRU\n"
     f"({SHAFT_CLEARANCE_MIN:.3f}-{SHAFT_CLEARANCE_MAX:.3f} DIAMETRAL\n"
-    "CLEARANCE ON MHA-DT-011)"
+    "CLEARANCE ON MHA-DT-11)"
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
-SEAT_CALLOUT = seat_callout("MHA-DT-006")
-SEAM_CALLOUT = seam_callout("MHA-DT-006")
+SEAT_CALLOUT = seat_callout("MHA-DT-06")
+SEAM_CALLOUT = seam_callout("MHA-DT-06")
 # The cross-hole is drilled, then taper-reamed through hub and shaft together.
 # The ream fixes the hub on the shaft for good, so the front face is set flush
 # with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
 # the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
 # arm front is already flush with the hub front from the seat press).  The
-# MHA-DT-000 hub step prints the same datum.  The prose reads under the native
+# MHA-DT-00 hub step prints the same datum.  The prose reads under the native
 # #14 drill size, in the order the work is done.
-FRONT_FACE_DATUM = "MHA-DT-011 DOME ROOT"
+FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "FRONT FACE FLUSH WITH",
         f"{FRONT_FACE_DATUM};",
         "MATCH TAPER-REAM 1:48 FOR",
-        "MHA-DT-009: LIGHT DRIVE FIT",
+        "MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 
@@ -94,8 +94,8 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
 # #25 chain wrapping it (stack A).
-HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-009"
-RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-009"
+HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-09"
+RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the

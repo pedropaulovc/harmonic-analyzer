@@ -7,26 +7,26 @@ def test_frame_package_bom_identifies_all_29_released_components() -> None:
     assert drawing.BOM_QUANTITIES == {
         "fr-harmonic-base": 1,
         "fr-tube-frame": 4,
-        "vn-tube-frame-cap": 4,
+        "fr-vn-tube-frame-cap": 4,
         "fr-rocker-arm-support": 1,
-        "vn-lag-screw": 4,
+        "fr-vn-lag-screw": 4,
         "fr-top-frame": 1,
         "fr-nameplate": 1,
-        "vn-fillister-screw": 4,
-        "vn-frame-cross-screw": 8,
-        "vn-gooseneck-set-screw": 1,
+        "fr-vn-fillister-screw": 4,
+        "fr-vn-frame-cross-screw": 8,
+        "fr-vn-gooseneck-set-screw": 1,
     }
     assert drawing.BOM_PART_NUMBERS == {
-        "fr-harmonic-base": "MHA-FR-001",
-        "fr-tube-frame": "MHA-FR-003",
-        "vn-tube-frame-cap": "MHA-VN-028",
-        "fr-rocker-arm-support": "MHA-FR-005",
-        "vn-lag-screw": "MHA-VN-009",
-        "fr-top-frame": "MHA-FR-002",
-        "fr-nameplate": "MHA-FR-004",
-        "vn-fillister-screw": "MHA-VN-006",
-        "vn-frame-cross-screw": "MHA-VN-027",
-        "vn-gooseneck-set-screw": "MHA-VN-023",
+        "fr-harmonic-base": "MHA-FR-01",
+        "fr-tube-frame": "MHA-FR-03",
+        "fr-vn-tube-frame-cap": "MHA-FR-VN-54",
+        "fr-rocker-arm-support": "MHA-FR-05",
+        "fr-vn-lag-screw": "MHA-FR-VN-51",
+        "fr-top-frame": "MHA-FR-02",
+        "fr-nameplate": "MHA-FR-04",
+        "fr-vn-fillister-screw": "MHA-FR-VN-50",
+        "fr-vn-frame-cross-screw": "MHA-FR-VN-53",
+        "fr-vn-gooseneck-set-screw": "MHA-FR-VN-52",
     }
 
 
@@ -510,11 +510,11 @@ def test_a_later_rebuild_that_moves_a_rebound_balloons_tip_fails_the_final_proof
     _short_balloon_rig(monkeypatch, window)
     balloon = window.balloon
     proof = drawing._FrameBalloonProof(
-        rebound=frozenset({"vn-lag-screw"}),
+        rebound=frozenset({"fr-vn-lag-screw"}),
         bound=(drawing._BoundBalloonProof("5", balloon, balloon.entity, balloon.tip),),
         short=(),
     )
-    landings = [SimpleNamespace(stem="vn-lag-screw"), SimpleNamespace(stem="fr-nameplate")]
+    landings = [SimpleNamespace(stem="fr-vn-lag-screw"), SimpleNamespace(stem="fr-nameplate")]
     proven = []
     monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
     monkeypatch.setattr(
@@ -570,7 +570,7 @@ def test_assembly_steps_keep_their_crowded_sheet_3_footprint() -> None:
 
 
 def test_step_8_faces_the_support_windows_toward_the_short_ends() -> None:
-    # The builder turns MHA-FR-005 so its window normal (local Z, row 2)
+    # The builder turns MHA-FR-05 so its window normal (local Z, row 2)
     # runs along machine X, the deck's length: the windows face the ends.
     import build_fr_frame_assembly as frame
     from fr_harmonic_base_spec import DECK_LENGTH, DECK_WIDTH
@@ -584,7 +584,7 @@ def test_step_8_faces_the_support_windows_toward_the_short_ends() -> None:
 
 def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> None:
     # #628: the base sheet prints the four nameplate seats as TRANSFER FROM
-    # MHA-FR-004 AT ASSEMBLY, so the step locates the plate on the deck, then
+    # MHA-FR-04 AT ASSEMBLY, so the step locates the plate on the deck, then
     # spots, drills and taps through it before the screws go in.
     import build_fr_harmonic_base as base
 
@@ -594,11 +594,11 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
     assert "INSET FROM THE NEAR DECK END PER SECTION B-B" in step
     assert not re.search(r"\d\.\d", step)
     place = step.index(
-        "SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL"
+        "SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL"
     )
-    spot = step.index("SPOT MHA-FR-001 THROUGH ITS FOUR HOLES")
+    spot = step.index("SPOT MHA-FR-01 THROUGH ITS FOUR HOLES")
     assert place < step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
-    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-VN-006 HEADS")
+    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-FR-VN-50 HEADS")
     assert len(_step_lines(9)) <= 4
 
 
@@ -629,14 +629,14 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
     assert f"{float_mm:.3f} diametral float" in entry.reason
     assert f"= {demand_mm:.3f})" in entry.reason
     # The build reads the same file and ignores the declaration.
-    assert assembly_contract("fr-frame").number == "MHA-FR-000"
+    assert assembly_contract("fr-frame").number == "MHA-FR-00"
 
 
 def test_check_3_accepts_the_caps_by_their_seats_alone() -> None:
     checks = drawing.ASSEMBLY_CHECKS.splitlines()
     start = next(i for i, line in enumerate(checks) if line.startswith("3. "))
     assert checks[start].startswith(
-        "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS"
+        "3. ALL FOUR MHA-FR-VN-54 CAPS REACH THEIR INSIDE SEATS"
     )
     assert "TOPS ARE EVEN" not in drawing.ASSEMBLY_CHECKS
 

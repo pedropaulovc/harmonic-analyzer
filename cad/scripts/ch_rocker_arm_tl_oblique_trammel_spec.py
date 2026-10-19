@@ -1,10 +1,10 @@
 r"""Oblique-trammel calculator for the rocker strap's R800/R816 edges (route v3).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). The strap
-MHA-CH-013 of the built-up rocker MHA-CH-006 has its two concentric edges cut
+MHA-CH-13 of the built-up rocker MHA-CH-06 has its two concentric edges cut
 as true circles on the PM-30MV with the table locked. Two straight HGR15 rails,
 fixed to the table, cross at the spindle axis at the acute angle ``ALPHA_DEG``.
-A carrier plate (MHA-CH-006-TL-21) rides one pivot pin on each rail. The angle
+A carrier plate (MHA-CH-06-TL-21) rides one pivot pin on each rail. The angle
 the spindle subtends between the two pins is constant, so by the
 inscribed-angle theorem the spindle traces a circle of radius
 ``R = D / (2 sin ALPHA)`` in the carrier's frame. The outer edge reuses the
@@ -12,7 +12,7 @@ same rails: the carrier is re-seated on a second pin-hole pair (A2/B2) lying
 radially outward on the same centre.
 
 This module is the one pure calculator: it derives every value marked ⚙ on
-the jig sheets (MHA-CH-006-TL-20 to TL-26 and the TL-000 jig assembly) from:
+the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
 
 * the strap's edge radii and the hub-to-top-edge aim, read from
   ``ch_rocker_arm_spec`` (R800/R816; ``TOP_EDGE_ABOVE_PIVOT`` (the strap's
@@ -57,8 +57,8 @@ Error sensitivity (printed next to the bands that carry it):
   clearance unmounted. Each pin axis can float up to that play against its
   block, so the pin spacing can open or close by up to the play, and R moves
   by ``RADIUS_FROM_BEARING_PLAY`` = 1.77 x 0.023 = 0.041 at worst, the
-  unmounted bound. Mounted, the pivot pin's k5 press (MHA-CH-006-TL-23) and
-  the pivot block's N6 seat (MHA-CH-006-TL-22) only shrink the play: at their
+  unmounted bound. Mounted, the pivot pin's k5 press (MHA-CH-06-TL-23) and
+  the pivot block's N6 seat (MHA-CH-06-TL-22) only shrink the play: at their
   loosest limits the seat takes 0.0012 off (0.039 on R), at their tightest
   the bearings run at a 0.012 preload with no play. The feed load takes the
   remainder up to one side, so the real error is smaller and repeats from
@@ -183,7 +183,7 @@ def at_arc_station(
 RISER_SCREW = "#4-40"
 RISER_SCREW_HEAD_DIA = round(0.225 * INCH, 9)
 # The riser's 82-degree countersink mouth, printed at 2 places, and the places
-# the carrier's riser taps (MHA-CH-006-TL-21) print their stations at: the
+# the carrier's riser taps (MHA-CH-06-TL-21) print their stations at: the
 # riser's holes are spotted through those taps at assembly, so the tap's
 # station band places each countersink. RISER_SCREW_WALLS judges both bands.
 RISER_CSK_DIA = 6.3

@@ -1,10 +1,10 @@
 dt-pinion-handle:
   title: Pinion Grip Cross Rod
-  number: MHA-DT-015
+  number: MHA-DT-15
   # Machinist review r1 (#1010), rule 2: the crossrod has no fit, band or
   # hardness that needs one grade, so the MATERIAL cell names the acceptable
   # cold-finished low-carbon families; the note keeps COLD-FINISHED BAR AS
-  # RECEIVED, whose drawn size bounds the MHA-DT-022 bond gap.
+  # RECEIVED, whose drawn size bounds the MHA-DT-22 bond gap.
   material: "Low-carbon steel: 1018, 1020 or 12L14"
   material_specification: low-carbon cold-finished steel rod, 6 mm, ASTM A108 (1018, 1020 or 12L14)
   finish: mill bright; protect with ISO VG 32 machine-oil film

@@ -1,4 +1,4 @@
-"""The MHA-DT-000 drive-train assembly sequence, numbered in one place.
+"""The MHA-DT-00 drive-train assembly sequence, numbered in one place.
 
 A step's number is its position in SEQUENCE, so inserting a step renumbers
 every later one and every pointer that cites a step by key follows.  Part
@@ -8,7 +8,7 @@ Pure data: no SolidWorks, no config reads.
 
 from __future__ import annotations
 
-DRAWING_NUMBER = "MHA-DT-000"
+DRAWING_NUMBER = "MHA-DT-00"
 
 SEQUENCE: tuple[str, ...] = (
     # Cone set and crank (CONE_CRANK_STEPS).
@@ -22,9 +22,9 @@ SEQUENCE: tuple[str, ...] = (
     # Cylinder bank (BANK_STEPS).
     "cylinder-stack-accepted",
     "cylinder-bank-located",
-    # #936 P1 b (user ruling, option A): the rocker bank's north MHA-CH-008 is
+    # #936 P1 b (user ruling, option A): the rocker bank's north MHA-CH-08 is
     # set on the bank's DRO zero, so it closes BANK_STEPS. Channel assembly
-    # MHA-CH-000 cites it by key (ch_channel_assembly_steps).
+    # MHA-CH-00 cites it by key (ch_channel_assembly_steps).
     "north-pivot-bracket-set",
     # Pinion rig (rig_steps; pinion_rig_fitup.ASSEMBLY_SEQUENCE in order,
     # with the hang, the cams, the locate, the seats and the base between).
@@ -54,5 +54,5 @@ def step_number(key: str) -> int:
 
 
 def step_ref(key: str) -> str:
-    """A pointer another sheet prints, e.g. ``MHA-DT-000 STEP 20``."""
+    """A pointer another sheet prints, e.g. ``MHA-DT-00 STEP 20``."""
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"

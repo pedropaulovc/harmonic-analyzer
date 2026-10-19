@@ -1,4 +1,4 @@
-number: MHA-MG-000
+number: MHA-MG-00
 # magnifier assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the magnifier
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
@@ -22,7 +22,7 @@ flip_invert:
   - mag lever depth @npn
   - mag lever knife line across @npn
 allowed_free_stems:
-  - vn-lever-wire
+  - mg-vn-lever-wire
   - mg-magnifying-bracket
   - mg-magnifying-clamp
   - mg-magnifying-lever
@@ -30,15 +30,15 @@ allowed_free_stems:
   - mg-magnifying-wheel
   - mg-wheel-drum
   - mg-output-fixture
-  - vn-magnifying-bracket-screw
-  - vn-thumb-screw
+  - mg-vn-magnifying-bracket-screw
+  - mg-vn-thumb-screw
 # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
 # wheel must read under-constrained WITH them, else the coupling died -- and
 # so must the lock-mated bracket (it AFFIXES the rod to the rocking summing
 # bar; a regression to grounded re-creates the collar clipping, codex #201).
 # The steel collar/lever joint is a press, held by the press alone (#1570);
 # press the collar onto the rod held near its end, never column-load the lever.
-# vn-thumb-screw instances ride this chain: clamp first, output fixture second.
+# mg-vn-thumb-screw instances ride this chain: clamp first, output fixture second.
 # The clamp's thumb screw pinches the lever; the vertical rod screws into the
 # clamp's bottom tap and seats on its shoulder (#1559). Lever, thumb screw,
 # rod, fixture hook and drum wire lane share one plumb plane (option A1).
@@ -46,7 +46,7 @@ allowed_free_stems:
 required_free_stems:
   - mg-magnifying-lever
   - mg-magnifying-wheel
-  - vn-lever-wire
+  - mg-vn-lever-wire
   - mg-magnifying-bracket
 # The freed lever knife-rock + the articulated lever-wire's swing/spin; the
 # wheel is COUPLED by the WIRE-1 yoke (no DOF of its own).
@@ -58,6 +58,6 @@ free_dof: 3
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "the step that screws the MHA-MG-004 vertical rod into the MHA-MG-002 clamp's bottom tap by hand until its shoulder seats, and the rod-to-clamp joint in the views"
+    where: "the step that screws the MHA-MG-04 vertical rod into the MHA-MG-02 clamp's bottom tap by hand until its shoulder seats, and the rod-to-clamp joint in the views"
     finding: "the shoulder-seated #4-40 rod thread carries no lock against the wire's torque about the rod axis (rule 23, lock threaded joints exposed to operating loads)"
     reason: "owner ruling #1559 (2026-10-15): thread the rod end into the block, which carries no rotational load; the seated shoulder is the joint's datum and the thread only holds it there, with no set screw, bonding or lock (mg_rod_clamp_joint.py); full-thread engagement stays at least 1.5D at the printed worst case"

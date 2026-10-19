@@ -1,13 +1,13 @@
-r"""Pure-data contract for the oblique-trammel jig's carrier plate (MHA-CH-006-TL-21).
+r"""Pure-data contract for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The
 carrier is the moving plate of the rocker arm's oblique-trammel mill jig
 (``ch_rocker_arm_tl_oblique_trammel_spec``, imported as ``trammel``). It rides
-on two pivot pins (MHA-CH-006-TL-23), one in each pivot block on the two
+on two pivot pins (MHA-CH-06-TL-23), one in each pivot block on the two
 rails; for the inner pass the pins sit in A1/B1, for the outer pass in A2/B2.
-The rocker blank, on its riser (MHA-CH-006-TL-24), is located on the HUB pin
-(MHA-CH-006-TL-25) and the CL dowel and clamped by the CR screw; the feed
-lever (MHA-CH-006-TL-26) bolts to the -Y edge.
+The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
+(MHA-CH-06-TL-25) and the CL dowel and clamped by the CR screw; the feed
+lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
 Material and stock: 6061-T6 aluminium plate, 12 thick (``CARRIER_THICK``,
 printed STOCK), sawn and milled to 520 x 130.
@@ -44,9 +44,9 @@ Values marked (calc) are read from ``trammel``, never retyped:
 
 Tight bands (drawing-guidelines.md rule 4). The print names each band's
 function and mate (``SPACING_CALLOUT``, ``DX_CALLOUT``, ``DY_CALLOUT``: the
-pair sets R800 or R816 on the MHA-CH-013 strap); the sensitivities stay here:
+pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
 
-* Pin holes Ø10.000 +0.015/0 (H7), REAM THRU. Mate: MHA-CH-006-TL-23 PIVOT
+* Pin holes Ø10.000 +0.015/0 (H7), REAM THRU. Mate: MHA-CH-06-TL-23 PIVOT
   PIN, upper section Ø10 h6, so 0.000-0.024 diametral clearance. That
   clearance is edge error 1:1.
 * D1 450.135 ±0.02: a spacing error x 1.77 (``trammel.RADIUS_PER_SPACING``)
@@ -147,7 +147,7 @@ PIN_HOLE_CALLOUT = (
 )
 # Rule 4: each pin band names what it sets and on which part (jig-r3 review);
 # the error sensitivities stay in the docstring.
-STRAP_NUMBER = "MHA-CH-013"
+STRAP_NUMBER = "MHA-CH-13"
 SPACING_CALLOUT = f"SETS R{trammel.R_INNER:.0f} ON\n{STRAP_NUMBER}"
 DX_CALLOUT = f"SETS R{trammel.R_OUTER:.0f} ON\n{STRAP_NUMBER}"
 DY_CALLOUT = DX_CALLOUT
@@ -237,7 +237,7 @@ RISER_SCREWS = trammel.RISER_SCREWS
 RISER_THREAD = "#4-40"
 RISER_SPEC = HoleSpec("tapped", RISER_THREAD)
 RISER_TAP_DRILL = TAP_DRILL_MM[RISER_THREAD]
-# The riser (MHA-CH-006-TL-24) is self-cut along the jig's band and its holes
+# The riser (MHA-CH-06-TL-24) is self-cut along the jig's band and its holes
 # are spotted through these taps at assembly, so their stations set the
 # screws' worst-case walls to its cut edges: trammel.RISER_SCREW_WALLS assumes
 # them at RISER_TAP_STATION_PLACES' title-block band.

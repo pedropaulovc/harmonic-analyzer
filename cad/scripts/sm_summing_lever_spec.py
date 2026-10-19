@@ -117,9 +117,9 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
+# The 20 channel-spring lower anchors (McMaster 9489T111, part ``ch-vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the supplied nut is discarded
-# and each is locked by an MHA-CH-014 jam nut on the plate underside -- so
+# and each is locked by an MHA-CH-14 jam nut on the plate underside -- so
 # each station is a through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
 # supplier change can never leave the lever tapped for the wrong screw.
@@ -139,13 +139,13 @@ HOLE_Z_OFFSET = -3.52825
 # user's ask timed out and the recommended option was auto-selected) gives
 # each tap 1.5D at the title block's .XX band
 # (``sm_summing_lever_notes`` proves it).  SPRING_SEAT_T is the tap's whole
-# length: plate top to pad underside, where each MHA-CH-014 jam nut seats.
+# length: plate top to pad underside, where each MHA-CH-14 jam nut seats.
 # The pad runs the plate's full length and in from its free +X edge past the
 # nut's O.D.
 SPRING_SEAT_T = 7.0
 SPRING_PAD_W = 10.0
 
-# The vn-counter-spring lower anchor (McMaster 9490T1, part ``vn-boss-hook``) threads
+# The sm-vn-counter-spring lower anchor (McMaster 9490T1, part ``sm-vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
 # natively AFTER the structural ribs so none of them can refill it.
 COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)
@@ -177,7 +177,7 @@ KNIFE_HOOK_ARM_SPREAD_MAX = (
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     # Ø0.15, tightened from 0.30 (owner ruling on code review
-    # C06): two neighbouring MHA-CH-014 jam nuts stand on adjacent taps, and
+    # C06): two neighbouring MHA-CH-14 jam nuts stand on adjacent taps, and
     # at Ø0.30 their worst approach leaves no O.D. both the wall floor and the
     # 0.25 neighbour clearance admit (ch_anchor_jam_nut_spec).
     "spring-hole pattern position": "0.15",

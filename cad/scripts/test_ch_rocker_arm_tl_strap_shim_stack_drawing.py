@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker strap shim stack (MHA-CH-006-TL-11)."""
+"""Offline contracts for the rocker strap shim stack (MHA-CH-06-TL-11)."""
 
 from __future__ import annotations
 
@@ -109,7 +109,7 @@ def test_notes_follow_the_simplicity_policy() -> None:
         drawing.RISER_SEAT_NOTE,
     ]
     for text in texts:
-        bare = re.sub(r"MHA-[A-Z]+-\d{3}(-TL-\d+)?", "", text.replace(feeler, ""))
+        bare = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", text.replace(feeler, ""))
         assert not re.search(r"\d", bare), text
 
 
@@ -117,12 +117,12 @@ def test_shim_fit_up_is_a_go_no_go_pair() -> None:
     # Codex #1448 P1: the strap-face feeler alone passes an over-height pack,
     # which lifts the blank off the riser blocks and bows the span. The pair is
     # the ShimThick callout (bears on the strap face) plus a leadered note on
-    # the riser seat (still bears on every MHA-CH-006-TL-10), one line each.
+    # the riser seat (still bears on every MHA-CH-06-TL-10), one line each.
     feeler = f"{spec.FIT_UP_FEELER_NO_GO:.2f} FEELER NO-GO"
     strap = drawing.CALLOUTS_BELOW["ShimThick"]
     risers = drawing.RISER_SEAT_NOTE
-    assert "MHA-CH-006 STRAP FACE" in strap and strap.endswith(feeler)
-    assert "MHA-CH-006-TL-10" in risers and risers.endswith(feeler)
+    assert "MHA-CH-06 STRAP FACE" in strap and strap.endswith(feeler)
+    assert "MHA-CH-06-TL-10" in risers and risers.endswith(feeler)
     for text in (strap, risers):
         assert "\n" not in text and len(text) <= 66, text
     # The leader lands on the riser seat: the edge view's bottom edge (Z0).

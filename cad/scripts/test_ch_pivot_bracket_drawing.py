@@ -200,7 +200,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
 
 def test_bore_callout_names_the_mating_pivot_shaft() -> None:
     number = _config.parts("ch-pivot-shaft")["number"]
-    assert number == "MHA-CH-005"
+    assert number == "MHA-CH-05"
     bore = drawing.DIMENSION_CALLOUTS["ShaftBoreDia"]
     assert bore.startswith("REAM THRU\n")
     assert bore.endswith(f"PIVOT SHAFT {number}")
@@ -217,8 +217,8 @@ def test_every_banded_length_says_what_its_band_holds() -> None:
     and names the shaft)."""
     banded = {name for _feature, name in model_toleranced_dimensions(part)}
     assert banded <= set(drawing.DIMENSION_CALLOUTS)
-    washer = _config.parts("vn-rocker-thrust-washer")["number"]
-    assert washer == "MHA-VN-070"
+    washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
+    assert washer == "MHA-CH-VN-56"
     assert drawing.DIMENSION_CALLOUTS["EarThick"] == f"THRUST FACES ON {washer}"
     shaft = _config.parts("ch-pivot-shaft")["number"]
     assert drawing.DIMENSION_CALLOUTS["SetScrewLocation"] == (
@@ -342,7 +342,7 @@ def test_apex_tap_callout_fits_above_the_plan_between_the_lanes() -> None:
     from _drawing_annotation_extent import CLEAR_GAP_M
     from _layout_geometry import estimate_text_box
 
-    # The native callout font as MHA-DT-002 printed it (cap 3.5 mm,
+    # The native callout font as MHA-DT-02 printed it (cap 3.5 mm,
     # 109.7 mm per 42 glyphs, lines 16.8 pt apart).
     drill = (
         f"Ø{blind_cut_dia_mm(spec.SET_SCREW_HOLE_SPEC):.2f} {drawing.SET_SCREW_EXTENT}"
@@ -378,7 +378,7 @@ def test_tap_note_solidworks_adds_is_removed() -> None:
 
 def test_registry_row_carries_the_title_block_material_specification() -> None:
     config = _config.parts("ch-pivot-bracket")
-    assert config["number"] == "MHA-CH-008"
+    assert config["number"] == "MHA-CH-08"
     assert config["material_specification"]
     assert int(config["quantity"]) == 2
 

@@ -1,4 +1,4 @@
-"""Ruling R9-47, parts (1) and (2): the MHA-VN-039 disc screws cut to fit and the
+"""Ruling R9-47, parts (1) and (2): the MHA-PD-VN-55 disc screws cut to fit and the
 platen's float faced to fit, each judged at the printed worst case.
 
 Each test recomputes the worst corner from the catalogue and the printed
@@ -17,7 +17,7 @@ import pd_paper_drive_assembly_steps as steps
 import pd_platen_guide_spec as guide
 import pd_rack_pinion_spec as disc
 import pd_transgear_disc_hub_spec as hub
-import vn_transgear_disc_screw_spec as screw
+import pd_vn_transgear_disc_screw_spec as screw
 
 IN = 25.4
 # 91794A055: #0-80 x 1/4 under the head; ASME B18.6.3 length band +0/-0.03 in.
@@ -25,11 +25,11 @@ SHANK_LEN = 0.25 * IN
 LENGTH_MINUS = 0.03 * IN
 MAJOR = 0.060 * IN
 PITCH = IN / 80.0
-# MHA-PD-017 flange 2.40 (title block 3-place +/-0.13); MHA-PD-006 face 3.00 +/-0.13.
+# MHA-PD-17 flange 2.40 (title block 3-place +/-0.13); MHA-PD-06 face 3.00 +/-0.13.
 FLANGE = 2.4
 FACE = 3.0
 THREE_PLACE = 0.13
-# MHA-PD-006's tap mouths: a 0.10 burr break on each, its loss counted from the
+# MHA-PD-06's tap mouths: a 0.10 burr break on each, its loss counted from the
 # tap drill (rack_pinion_spec, as printed on its sheet; R9-63).
 MOUTH_BREAK = 0.10
 
@@ -89,7 +89,7 @@ def test_assembly_places_the_cut_tip_inside_the_disc_rear_face() -> None:
 def test_a_disc_too_thin_for_the_cut_screw_is_refused(monkeypatch) -> None:
     # A 2.6 face at its printed min leaves the cut screw under 1.5D.
     monkeypatch.setattr(disc, "FACE_WIDTH_MIN", 2.6)
-    with pytest.raises(AssertionError, match="MHA-VN-039 disc screw .* worst engagement"):
+    with pytest.raises(AssertionError, match="MHA-PD-VN-55 disc screw .* worst engagement"):
         _exec_fresh(screw)
 
 
@@ -97,7 +97,7 @@ def test_a_stock_screw_stopping_short_of_the_window_is_refused(monkeypatch) -> N
     # A disc that may run 0.40 thick leaves the shortest stock 0.342 inside:
     # no cut can bring it back into the window.
     monkeypatch.setattr(disc, "FACE_WIDTH_MAX", FACE + 0.40)
-    with pytest.raises(AssertionError, match="MHA-VN-039 disc screw tip .* shortest"):
+    with pytest.raises(AssertionError, match="MHA-PD-VN-55 disc screw tip .* shortest"):
         _exec_fresh(screw)
 
 
@@ -176,7 +176,7 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     assert re.search(r"\bELSE\b.*\bSTOP\b.*\bREPORT\b", lock_step)
 
     cut_step = printed_step("disc-screws-cut")
-    assert drawing.BOM_PART_NUMBERS["vn-transgear-disc-screw"] in cut_step
+    assert drawing.BOM_PART_NUMBERS["pd-vn-transgear-disc-screw"] in cut_step
     tip_window = re.search(
         r"\bCUT\b.*\bTIPS (\d+(?:\.\d+)?)-(\d+(?:\.\d+)?) BELOW DISC REAR FACE\b",
         cut_step,

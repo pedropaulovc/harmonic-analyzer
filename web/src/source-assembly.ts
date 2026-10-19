@@ -1,6 +1,7 @@
-import nativeInventory from '../content/v39-source/native-inventory.json'
+import archivedNativeInventory from '../content/v39-source/native-inventory.json'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 import { BINDINGS } from './bindings'
-import { MECHANISM_DATA } from './mechanics-data'
+import { MECHANISM_DATA } from './current-mechanics-data'
 import type { PartOverride, Point3, Quaternion4 } from './scene'
 
 /**
@@ -8,6 +9,9 @@ import type { PartOverride, Point3, Quaternion4 } from './scene'
  * Only released v39 bodies and the two existing genuine T18 instances occur here.
  * Source: jfH-NbsmvD4 setup 43..74, service 170..230, photos 234..285,
  * pen assembly 565..649; approved CAD 81539e53 / raw 60a62a2e.
+ * Archived inventory/model bytes, transforms and identity-map hashes stay
+ * pinned. Current parent-scoped paths are an ingestion-only metadata projection,
+ * not regenerated geometry or a replacement claim about the historical model.
  *
  * Runtime contract: on EVERY view/state change, Machine.update first restores
  * every native part, performs the normal operating solve, then calls this solver
@@ -35,9 +39,9 @@ export type SourceAxialAttachment =
   | { attachment: 'withdrawing' | 'inserting'; travelMetres: number }
   | { attachment: 'held'; pose: SourceRigidPose }
 export interface SourceCrankAssembly {
-  /** MHA-024 tapered pin + its ring; NOT MHA-138 arm/hub seam key. */
+  /** MHA-DT-09 tapered pin + its ring; NOT MHA-DT-VN-59 arm/hub seam key. */
   pin: SourceAxialAttachment
-  /** MHA-137 reference; MHA-138 and the eye/anchor screw remain on this carrier. */
+  /** MHA-DT-31 reference; MHA-DT-VN-59 and the eye/anchor screw remain on this carrier. */
   carrier: SourceAxialAttachment
   /** The released keeper mesh is a monolithic drape, not 68 articulated links. */
   keeper?: { retainedAnchor: 'eye' | 'ring'; loopPose: SourceRigidPose; connectorPose: SourceRigidPose }
@@ -132,6 +136,8 @@ export interface CompiledSourceAssembly {
   /** Canonical physical descriptor, excluding support witness/provenance only. */
   readonly physicalKey: string
 }
+// Keep the archive's source/identity provenance while joining current bindings.
+const nativeInventory = projectCurrentNativeMetadata(archivedNativeInventory)
 const ROOT = 'ha-harmonic-analyzer'
 const DRIVE = `${ROOT}/dt-drive-train/`
 const PAPER = `${ROOT}/pd-paper-drive/`
@@ -150,8 +156,8 @@ const CHANNEL_STATIONS = Object.freeze(Array.from({ length: 20 }, (_, index) => 
   bar: `${CHANNEL_CHASSIS}/ch-amplitude-bar-${index + 1}`,
   lever: `${CHANNEL_CHASSIS}/ch-channel-lever-${index + 1}`,
 })))
-const MARKER = `${PEN}pn-pen-marker-1`
-const WIRE = `${PEN}pn-pen-wire-1`
+const MARKER = `${PEN}pn-vn-pen-marker-1`
+const WIRE = `${PEN}pn-vn-pen-wire-1`
 const SPARE = `${PAPER}pd-transgear-removable-3`
 const GEAR_IDS: readonly SourceGearId[] = ['T24', 'T12', 'T18-upper', 'T18-crank']
 /** Sole declaration of the two genuine existing Scene/template instances. */
@@ -182,16 +188,17 @@ function bindingGroup(id: string): readonly string[] {
   return Object.freeze(paths)
 }
 const CRANK_CARRIER = Object.freeze([
-  HUB, `${DRIVE}dt-crank-arm-1`, `${DRIVE}vn-crank-hub-pin-1`, `${DRIVE}dt-crank-pin-eye-1`,
-  `${DRIVE}vn-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
+  HUB, `${DRIVE}dt-crank-arm-1`, `${DRIVE}dt-vn-crank-hub-pin-1`, `${DRIVE}dt-crank-pin-eye-1`,
+  `${DRIVE}dt-vn-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
   `${DRIVE}dt-crank-handle-butt-cup-1`, `${DRIVE}dt-crank-handle-pivot-screw-1`,
 ])
 const CRANK_PIN = Object.freeze([PIN, `${DRIVE}dt-crank-pin-ring-1`])
-const KEEPER = Object.freeze([`${DRIVE}vn-keeper-chain-1`, `${DRIVE}vn-keeper-chain-link-1`])
+const KEEPER = Object.freeze([`${DRIVE}dt-vn-keeper-chain-1`, `${DRIVE}dt-vn-keeper-chain-link-1`])
 const HANGER = Object.freeze([...bindingGroup('paperHanger'), ...bindingGroup('paperKnob').filter(path => path !== NUT), ...bindingGroup('paperFeed')])
 const HOOK = `${PAPER}pd-latch-hook-1`
-const RIVETS = Object.freeze([`${PAPER}vn-latch-hook-rivet-1`, `${PAPER}vn-latch-hook-rivet-2`])
-const FRAME_GROUP = Object.freeze([FRAME, `${PEN}vn-pen-set-screw-1`])
+// Retired archive-only bodies retain their historical parent, not new Numbers.
+const RIVETS = Object.freeze([`${PAPER}pd-vn-latch-hook-rivet-1`, `${PAPER}pd-vn-latch-hook-rivet-2`])
+const FRAME_GROUP = Object.freeze([FRAME, `${PEN}pn-vn-pen-set-screw-1`])
 const NATIVE_LINKS = [...MECHANISM_DATA.paperDrive.chain.nativeLinks].sort((a, b) => a.restStationMm - b.restStationMm)
 export const SOURCE_CHAIN_PART_PATHS = Object.freeze(NATIVE_LINKS.map(link => link.partPath))
 if (NATIVE_LINKS.length !== 68) throw new Error('Source assembly requires exactly 68 native chain links.')
@@ -206,8 +213,8 @@ const EMPTY_OVERRIDES: readonly PartOverride[] = Object.freeze([])
 const CHORD_M = MECHANISM_DATA.paperDrive.chain.pitchMm / 1000
 /** Numerical closure tolerance only (0.1 micrometre), NOT a native/raster waiver. */
 const CONTACT_EPS_M = 1e-7
-const THREAD_PITCH_M = 0.0254 / 20 // Actual MHA-126 1/4-20 UNC.
-// Actual MHA-078 stud: tip station23.9mm, 45deg chamfer from6.22mm blank
+const THREAD_PITCH_M = 0.0254 / 20 // Actual MHA-PD-13 1/4-20 UNC.
+// Actual MHA-PD-08 stud: tip station23.9mm, 45deg chamfer from6.22mm blank
 // to the 1/4-20 basic minor diameter. Last full thread, not nut body length.
 const STUD_TIP_CHAMFER_M = (0.00622 - (0.00635 - 1.082532 * THREAD_PITCH_M)) / 2
 const NUT_THREAD_RELEASE_M = 0.0239 - STUD_TIP_CHAMFER_M
@@ -387,7 +394,7 @@ export function compileSourceAssemblyState(value: unknown): CompiledSourceAssemb
     if (hanger.attachment === 'latched' && (hanger.swingRad !== 0 || hanger.hookReleaseRad !== 0)) throw new Error('Latched hanger must use native engaged pose.')
     if (hanger.attachment !== 'latched' && hanger.hookReleaseRad === 0 && hanger.swingRad === 0) throw new Error('Unlatched hanger must release the native hook/pin contact.')
     if (hanger.swingRad !== 0 && record.chain === undefined) throw new Error('Moving the upper hanger requires an explicit native chain state.')
-    need(HANGER); need([NUT, HOOK, `${PAPER}vn-transgear-latch-pin-1`, `${PAPER}pd-transgear-pivot-spacer-1`]); need(RIVETS); need(Object.values(SOURCE_GEAR_PART_PATHS))
+    need(HANGER); need([NUT, HOOK, `${PAPER}pd-vn-transgear-latch-pin-1`, `${PAPER}pd-transgear-pivot-spacer-1`]); need(RIVETS); need(Object.values(SOURCE_GEAR_PART_PATHS))
   }
   if (record.gears !== undefined) {
     const gears = object(record.gears, ['members'], 'Gear exchange'), members = object(gears.members, GEAR_IDS, 'Gear members')
@@ -478,7 +485,7 @@ export function compileSourceAssemblyState(value: unknown): CompiledSourceAssemb
     const wire = object(pen.wire, ['attachment', 'pose'], 'Pen wire'); choice(wire.attachment, ['connected', 'released'], 'Pen wire')
     if (wire.attachment === 'released') rigid(wire.pose, 'Pen wire'); else if (wire.pose !== undefined) throw new Error('Connected wire has no free pose.')
     if ((pen.rod as SourceAxialAttachment).attachment !== 'installed' && wire.attachment !== 'released') throw new Error('Release the rod wire tie before withdrawing the square rod from its fixed hanger.')
-    need([ROD, BLOCK, MARKER, WIRE, `${PEN}pn-pen-hanger-1`, `${PEN}vn-hanger-screw-1`]); need(FRAME_GROUP)
+    need([ROD, BLOCK, MARKER, WIRE, `${PEN}pn-pen-hanger-1`, `${PEN}pn-vn-hanger-screw-1`]); need(FRAME_GROUP)
   }
   if (record.photograph !== undefined) {
     if (Object.keys(record).some(key => !['kind', 'provenance', 'photograph'].includes(key))) throw new Error('Photograph subject scope cannot masquerade as machine disassembly.')
@@ -2215,7 +2222,7 @@ const NATIVE_CONTACT_GEAR_BOUNDS: Readonly<Record<SourceGearId, NativeContactBou
 const NATIVE_CONTACT_HUB_REAR: Point3 = [0, .025200000032782555, 0]
 const NATIVE_CONTACT_SHAFT = `${DRIVE}dt-crankshaft-1`
 const NATIVE_CONTACT_STUD = `${PAPER}pd-transgear-knob-shaft-1`
-const NATIVE_CONTACT_LATCH_PIN = `${PAPER}vn-transgear-latch-pin-1`
+const NATIVE_CONTACT_LATCH_PIN = `${PAPER}pd-vn-transgear-latch-pin-1`
 const NATIVE_CONTACT_LATCH_TIP: Point3 = [0, .022224999964237213, 0]
 // Pinned raw maximum sqrt(x*x+z*z), rounded OUTWARD. A larger 1.59131mm
 // display envelope falsely rejects the native engaged fit; it is not native size.

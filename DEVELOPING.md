@@ -1425,7 +1425,8 @@ retain the hex head, cut the under-head length to 46.70 ±0.15 mm and apply
 the finished thread-tail and end-prep requirements, without new head-minimum
 inspection. The ordinary hex head seats on its SAE washer on the frame's
 whole faced top, 36.50 ±0.05 mm above the finished underside. The new
-96659A104 washer supplies MHA-VN-060; it does not revive the retired VN-026
+96659A104 washer supplies MHA-SM-VN-54 (category Number MHA-VN-060); it does not
+revive the retired MHA-VN-026
 washer. These inputs remain file-granular rather than depending on the
 obsolete production socket-head hanger route.
 
@@ -1515,7 +1516,7 @@ build):
   traces
   | where message in ("cache.miss", "cache.hit", "cache.store", "cache.provenance")
   | extend record_name=message
-  | where tostring(customDimensions["label"]) == "part:vn_counter_spring"
+  | where tostring(customDimensions["label"]) == "part:sm_vn_counter_spring"
   | project timestamp, operation_Id, record_name,
       label=tostring(customDimensions["label"]),
       key_full=tostring(customDimensions["key_full"]),
@@ -1550,13 +1551,15 @@ build):
   establish a complete baseline. All provenance emission is best-effort and
   cannot change cache outcomes.
 
-**Vendor-part builds are actionable.** An actual `part:vn_*` build emits a
+**Vendor-part builds are actionable.** An actual vendor-part `part:` build (its
+stem contains `_vn_`, such as `part:sm_vn_counter_spring` or
+`part:ch_rocker_arm_tl_vn_oblique_rail`) emits a
 `!!` / OTel `WARN` immediately before its COM execution, with structured `label`
 and `cache.key` (the 12-character prefix shared with phase spans and the console),
 plus the full `key_full` for correlation with cache events and recipe manifests.
 This happens on a local seat or the farm worker, not on the submitter's dispatch,
 a cache probe, a miss that becomes a hit while waiting for the seat, or
-`drawing:vn_*`. Vendor-part rebuilds should be rare: compare the recorded cache
+the matching `drawing:` task. Vendor-part rebuilds should be rare: compare the recorded cache
 inputs with the previous key, investigate the changed dependency, and refactor
 unnecessary dependencies rather than treating every miss as expected. The warning
 marks one build execution, including an execution that later fails; COM recovery

@@ -1,4 +1,4 @@
-"""Pure geometry of the made MHA-SM-004 counter-spring clamp screw.
+"""Pure geometry of the made MHA-SM-04 counter-spring clamp screw.
 
 Native frame: axis Z, under-head face Z=0, head +Z, shank -Z. The
 thread is represented by its basic major cylinder, not a die blank with a
@@ -43,7 +43,7 @@ RELIEF_LEAD_LOWER, RELIEF_LEAD_UPPER = printed_deviations(
     RELIEF_LEAD, 2, (-RELIEF_LEAD_TOL, RELIEF_LEAD_TOL)
 )
 TIP_CHAMFER = 0.30
-TIP_CHAMFER_BAND = (0.05, -0.10)  # (upper, lower), as on MHA-DT-032.
+TIP_CHAMFER_BAND = (0.05, -0.10)  # (upper, lower), as on MHA-DT-32.
 TIP_CHAMFER_LOWER, TIP_CHAMFER_UPPER = printed_deviations(
     TIP_CHAMFER, 2, (TIP_CHAMFER_BAND[1], TIP_CHAMFER_BAND[0])
 )

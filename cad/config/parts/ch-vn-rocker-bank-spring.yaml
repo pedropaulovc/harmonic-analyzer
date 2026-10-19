@@ -1,0 +1,16 @@
+ch-vn-rocker-bank-spring:
+  title: Rocker Bank Spring
+  number: MHA-CH-VN-54
+  stock_name: Wave Disc Spring
+  supplier: McMaster-Carr
+  supplier_skus: [9714K24]
+  material: Plain Carbon Steel
+  material_specification: "High-carbon steel wave disc spring, 0.265 ID x 0.367 OD; McMaster-Carr 9714K24"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON MHA-CH-05, BETWEEN THE MHA-CH-VN-56 WASHER AND THE
+    SOUTH MHA-CH-08 EAR, AS ASSEMBLED ON MHA-CH-00.
+    REJECT ANY SPRING THAT BINDS WHEN SLID ALONG MHA-CH-05.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

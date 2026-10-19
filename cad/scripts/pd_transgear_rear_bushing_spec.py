@@ -1,8 +1,8 @@
-r"""MHA-PD-024 transgear-rear-bushing: the brass spacer behind the disc cluster (R9-68).
+r"""MHA-PD-24 transgear-rear-bushing: the brass spacer behind the disc cluster (R9-68).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  A turned brass ring on the MHA-PD-023 pin between the MHA-PD-018 arm's
-front face and the MHA-PD-010 sleeve's rear face.  It is faced to fit at
+closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-18 arm's
+front face and the MHA-PD-10 sleeve's rear face.  It is faced to fit at
 assembly, after the front bushing, until the cluster's float reads
 ``transgear_cluster_fit.FLOAT_WINDOW`` (step 2 of the fit-up there).  It runs
 free on the pin; both faces bear.
@@ -39,7 +39,7 @@ WALL_TARGET = 2.0
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
 WALL_WORST = (OD - printed_band_mm(OD_PLACES) - BORE_DIA - BORE_DIA_BAND[0]) / 2.0
 if WALL_WORST < WALL_TARGET:
-    raise AssertionError(f"MHA-PD-024 wall {WALL_WORST:.3f} under {WALL_TARGET}")
+    raise AssertionError(f"MHA-PD-24 wall {WALL_WORST:.3f} under {WALL_TARGET}")
 
 # --- Fitted length ---------------------------------------------------------------
 GAP_MIN = FIT.REAR_BUSHING_FITTED_MIN
@@ -53,14 +53,14 @@ FACING_ALLOWANCE = 0.10
 BLANK_LENGTH_MIN = 6.85
 if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
-        f"MHA-PD-024 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
+        f"MHA-PD-24 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
         f"facing allowance over the {GAP_MAX:.3f} longest fit"
     )
 if not math.isclose(LENGTH, 6.0, abs_tol=1e-6):
-    raise AssertionError(f"MHA-PD-024 model length {LENGTH} left the rev 5 B 6.0")
+    raise AssertionError(f"MHA-PD-24 model length {LENGTH} left the rev 5 B 6.0")
 
 # The sheet: the modelled length prints as a REFERENCE; the callout under it
-# is the requirement, and the blank is the make-to size.  The MHA-PD-000 step
+# is the requirement, and the blank is the make-to size.  The MHA-PD-00 step
 # pointer is appended by the drawing (a part never reads the step registry).
 LENGTH_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nFACED TO FIT"
 DRAWING_NOTES = "\n".join(
@@ -91,7 +91,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-PD-024 dimension needs authored places")
+    raise AssertionError("every marked MHA-PD-24 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"RingLength"})
 
 ISOMETRIC_VIEW_SCALE = (4, 1)

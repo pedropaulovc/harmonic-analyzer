@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear knob cup (MHA-PD-016) drawing."""
+"""Offline contracts for the transgear knob cup (MHA-PD-16) drawing."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import _config
 import build_pd_transgear_knob_cup as part
 import draw_pd_transgear_knob_cup as drawing
 import pd_transgear_knob_cup_spec as spec
-import vn_transgear_knob_cup_pin_spec as pin
+import pd_vn_transgear_knob_cup_pin_spec as pin
 import pd_transgear_knob_shaft_spec as knob_shaft
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -163,7 +163,7 @@ def test_the_journal_end_stays_inside_the_shortest_cup() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_157() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-016"
+    assert row["number"] == "MHA-PD-16"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

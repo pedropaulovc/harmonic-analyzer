@@ -1,7 +1,7 @@
 r"""The shared build recipe of the rocker template trammel's two clamp-on
-blocks (shop tooling): the pivot block (MHA-CH-006-TL-14,
+blocks (shop tooling): the pivot block (MHA-CH-06-TL-14,
 ``build_ch_rocker_arm_tl_trammel_pivot_block``) and the scriber block
-(MHA-CH-006-TL-15, ``build_ch_rocker_arm_tl_trammel_scriber_block``). A
+(MHA-CH-06-TL-15, ``build_ch_rocker_arm_tl_trammel_scriber_block``). A
 builder may not import another builder (test_buildgraph), so the recipe lives
 here; each part spec supplies its point holes, slit end and screw stations,
 and the shared section comes from ``ch_rocker_arm_tl_trammel_pivot_block_spec``.

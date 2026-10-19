@@ -1,14 +1,14 @@
-r"""Create the curated machinist drawing for MHA-DT-035, the crank handle butt cup.
+r"""Create the curated machinist drawing for MHA-DT-35, the crank handle butt cup.
 
 A plain steel cup (user rulings 2026-09-29 and 2026-09-30, ch11 p.14/p.15 and
 ch30 eight-views-4).  The end view
 carries only its centre mark and the cutting plane; the longitudinal section
 A-A is the cup's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes every dimension, so
 the pocket and the floor hole read on cut edges rather than hidden lines (the
-MHA-DT-035 machinist review).  The body diameter and the pocket depth are the
-bands; the pocket is bored to suit the MHA-DT-032 head (a reference size whose
+MHA-DT-35 machinist review).  The body diameter and the pocket depth are the
+bands; the pocket is bored to suit the MHA-DT-32 head (a reference size whose
 callout states the fit), and the floor hole carries its drill callout.  Every
-band names its mate at the callout (MHA-DT-035 machinist ENFORCE, r1).
+band names its mate at the callout (MHA-DT-35 machinist ENFORCE, r1).
 Owner ruling B on #1375 restores the pocket-wall floor in the model, so its
 former shortfall note and property are not part of the sheet.
 
@@ -179,7 +179,7 @@ CUT_END = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
 
 def _dress_pocket_floor_radius(annotation: Any) -> None:
     """Keep the imported model radius controlling, MAX, and on its real arc."""
-    label = "MHA-DT-035 PocketFloorRadius"
+    label = "MHA-DT-35 PocketFloorRadius"
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.Diametric) or int(display.Type2) != 5:  # swRadialDimension
@@ -289,7 +289,7 @@ async def build(adapter: Any) -> dict[str, str]:
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-DT-035 {name}", diameter=True
+            adapter, by_name[name], label=f"MHA-DT-35 {name}", diameter=True
         )
     _dress_pocket_floor_radius(by_name["PocketFloorRadius"])
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):

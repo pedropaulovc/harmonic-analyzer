@@ -17,13 +17,13 @@ Actual crossed-mesh engineering acceptance remains separate from this CAD gate.
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
 
-ATTACHMENT (user ruling 2026-09-28): the 64T slides onto MHA-DT-004's
+ATTACHMENT (user ruling 2026-09-28): the 64T slides onto MHA-DT-04's
 Sec1 D-flat land with one matching flat, normal to local +X. The round
 and across-flat bore bands are derived from that land's two printed
 bands. Its south bore entry has a 1.50 x 45° chamfer across the entire
 D-profile to swallow the flat mill's runout crescent against the square
 shaft collar; the bearing annulus remains intact. Its south face butts
-against the MHA-DT-004 thrust collar; the north face touches T120 in the
+against the MHA-DT-04 thrust collar; the north face touches T120 in the
 solid cone-gear stack. The 64T has no tooth-to-flat clock requirement.
 
 Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH; the helix
@@ -137,7 +137,7 @@ def _verify_named_dimension(adapter, full_name: str, expected_mm: float) -> None
 PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
-# The 64T seats on MHA-DT-004's flatted Sec1 gear land.
+# The 64T seats on MHA-DT-04's flatted Sec1 gear land.
 BORE_DIAMETER = 0.375 * IN
 
 

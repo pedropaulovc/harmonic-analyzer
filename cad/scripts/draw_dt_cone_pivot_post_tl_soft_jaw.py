@@ -1,4 +1,4 @@
-r"""Create the drawing for the cone pivot post's tall vise soft jaw (MHA-DT-005-TL-04).
+r"""Create the drawing for the cone pivot post's tall vise soft jaw (MHA-DT-05-TL-04).
 
 A flat plate needs only the gripping-face view (front, which shows the
 counterbores as circles), the plan above it (third angle: the thickness)
@@ -252,7 +252,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Post Vise Soft Jaw Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone pivot post vise soft jaw; 6061 plate; MHA-DT-005-TL-04",
+            3: "cone pivot post vise soft jaw; 6061 plate; MHA-DT-05-TL-04",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

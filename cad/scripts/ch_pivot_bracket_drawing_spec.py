@@ -1,4 +1,4 @@
-"""Pure-data drawing contract for the rocker pivot bracket (MHA-CH-008).
+"""Pure-data drawing contract for the rocker pivot bracket (MHA-CH-08).
 
 Split from ``ch_pivot_bracket_spec`` on purpose: that module is the section
 contract ``rocker_bank_layout``, ``ch_pivot_shaft_spec``, the channel assembly

@@ -1,4 +1,4 @@
-"""Offline contracts for the wheel-axle spacer (MHA-MG-011) drawing."""
+"""Offline contracts for the wheel-axle spacer (MHA-MG-11) drawing."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import draw_mg_wheel_axle_spacer as drawing
 import mg_magnifying_wheel_geom as wheel_geom
 import mg_wheel_axle_spacer_spec as spec
 import mg_wheel_group as group
-import vn_wheel_axle_back_washer_spec as back_washer
+import mg_vn_wheel_axle_back_washer_spec as back_washer
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from mg_wheel_bar_geom import BAR_FRONT_Z
@@ -99,13 +99,13 @@ def test_each_callout_states_its_need() -> None:
     assert not hasattr(spec, "DRAWING_NOTES")
     assert drawing.DIMENSION_CALLOUTS == {
         "SpacerBore": "DRILL THRU",
-        "SpacerLength": "SETS WHEEL STACK\nON AXLE MHA-MG-007",
+        "SpacerLength": "SETS WHEEL STACK\nON AXLE MHA-MG-07",
     }
 
 
 def test_registry_row() -> None:
     row = _config.parts("mg-wheel-axle-spacer")
-    assert row["number"] == "MHA-MG-011"
+    assert row["number"] == "MHA-MG-11"
     assert int(row["quantity"]) == 1
     assert "C36000" in str(row["material_specification"])
     assert "7/16" in str(row["material_specification"])

@@ -303,7 +303,7 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     # machinist review (#1007) found the former 3.18 from the pivot-bore wall
     # ran to a hidden line (rule 9), so its hidden reference sketch is gone.
     # The callout keeps the process (rule 12), THRU and the pin it takes.
-    # Main overrode the loose-SUPPLY wording once MHA-VN-033 became a
+    # Main overrode the loose-SUPPLY wording once MHA-DT-VN-63 became a
     # modelled BOM line (2 used): supplying one per strap would double the
     # order, so the callout names the part, and its number is the parts
     # registry's.
@@ -315,7 +315,7 @@ def test_set_pin_cross_hole_is_located_by_model_dimensions() -> None:
     assert callout is dt_pinion_bracket_spec.CROSS_HOLE_CALLOUT
     assert "AXIS" not in callout and "CENTRED" not in callout
     assert "SUPPLY" not in callout and "LOOSE" not in callout
-    number = _config.parts("vn-pinion-strap-pin")["number"]
+    number = _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert callout.splitlines() == [
         "DRILL THRU",
         f"FOR {number}",
@@ -400,7 +400,7 @@ def test_every_web_and_ligament_clears_the_floor_at_the_printed_bands() -> None:
     # places or a model band), so a later tolerance or precision change that
     # thins one under the 1.5 floor fails loud.
     import dt_pinion_pivot_shaft_spec as shaft
-    import vn_pinion_strap_pin_spec as pin
+    import dt_vn_pinion_strap_pin_spec as pin
 
     geometry = dt_pinion_bracket_geometry
     thickness_min = geometry.THICKNESS - _printed_band("Depth")

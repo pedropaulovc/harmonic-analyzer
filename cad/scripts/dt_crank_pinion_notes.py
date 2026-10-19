@@ -46,6 +46,6 @@ GEAR_DATA = mate_notes.gear_data_note(
             f"{spec.TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
         ),
         ("TOOTH FORM", TOOTH_FORM_NOTE),
-        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-007, 64T RIGHT-HAND HELICAL"),
+        ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-07, 64T RIGHT-HAND HELICAL"),
     ]
 )

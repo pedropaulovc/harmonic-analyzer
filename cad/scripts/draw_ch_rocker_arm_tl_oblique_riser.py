@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's acetal riser (MHA-CH-006-TL-24)."""
+r"""Create the drawing for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24)."""
 
 from __future__ import annotations
 
@@ -336,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Riser Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel riser; acetal blank; MHA-CH-006-TL-24",
+            3: "rocker oblique trammel riser; acetal blank; MHA-CH-06-TL-24",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

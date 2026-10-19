@@ -1,4 +1,4 @@
-r"""Create the four-sheet magnifier fitter package (MHA-MG-000).
+r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
 Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
 and every assembly setting printed as the assembly's own model dimension
@@ -23,9 +23,10 @@ BOM (part number, description, vendor SKU, quantity) and one balloon per
 family. Sheet 3, LEVER GROUP: the same explode with only the lever group
 shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
-(mg_magnifier_assembly_steps) and the checks. Step text names the settings
-and never values them. This recipe never edits the source assembly or its
-explodes.
+(mg_magnifier_assembly_steps) and the checks. The instruction column uses
+the left 190 mm; the finished view is centred in the remaining right field.
+Step text names the settings and never values them. This recipe never edits
+the source assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -51,10 +52,10 @@ import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
-import vn_lever_wire_geom
-import vn_lever_wire_spec
-import vn_wheel_axle_front_washer_spec as front_washer
-import vn_wheel_axle_nut_spec as axle_nut
+import mg_vn_lever_wire_geom
+import mg_vn_lever_wire_spec
+import mg_vn_wheel_axle_front_washer_spec as front_washer
+import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
@@ -196,7 +197,7 @@ LEVER_VIEW_LABEL = "lever settings (Front)"
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
 # its caption under it (as the lever sheet's), the BOM in the top-right
 # corner, and under the BOM the collapsed whole-assembly view the BOM is
-# inserted on (the MHA-PD-000 BOM reference): the exploded views are isolated
+# inserted on (the MHA-PD-00 BOM reference): the exploded views are isolated
 # afterwards, and view-only isolation must never touch the view that owns the
 # parts list. The reference is HIDDEN once the package is laid out: machinist
 # review r2 (run 20261016T105658863Z-132a077b63f840489c527e3ef02d296d) found
@@ -269,19 +270,21 @@ if any(
     raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
 LEVER_LABEL = "lever group exploded"
-# Sheet 4: the sequence and checks down the left, the finished assembly right
-# of them above the title block, its caption centred over it. The lever wire's
-# balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
+# Sheet 4: the sequence and checks down a 190 mm left column, the finished
+# assembly centred in the remaining field above the title block, its caption
+# centred over it. The wider column keeps full parent-scoped vendor Numbers
+# intact without reducing the default text size or its line pitch.
+# The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.258)
-STEPS_LINE_WIDTH = 58  # characters; default-format note text (as MHA-MS-000)
-STEPS_RIGHT = 0.156  # 58 default-format characters from STEPS_XY
-# Default-format note line pitch (the MHA-PD-000 stake note measured 0.0045).
+STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
+# Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
 # Machinist review r2: the caption at the field's left corner sat ~40 mm left
 # of the view it names, so it is centred over the view's outline once the view
 # has settled. Its width is the character count at the r6 PDF's measured
 # pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
 CAPTION_CHAR_WIDTH = 0.00237
+STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * CAPTION_CHAR_WIDTH
 CAPTION_GAP = 0.004
 FINISHED_FIELD = (
     STEPS_RIGHT + _PAD,
@@ -299,9 +302,9 @@ FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
 # the wire's only model edges were its two end circles, so balloon 19 landed
-# on the drum end inside the wheel and read as pointing at a spoke. MHA-VN-066
+# on the drum end inside the wheel and read as pointing at a spoke. MHA-MG-VN-56
 # now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
-# (build_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
+# (build_mg_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
 # ring's point facing the *Isometric viewer (wire_facing_point). The balloon
 # then stands right of the view, its leader dropping this little from the
 # ring so it passes under the vertical rod's lower end, the one part right of
@@ -341,10 +344,10 @@ def wire_facing_point(
 
 
 WIRE_BALLOON_POINT_MM = wire_facing_point(
-    vn_lever_wire_geom.WIRE_START,
-    vn_lever_wire_geom.WIRE_END,
-    radius=vn_lever_wire_geom.WIRE_DIA / 2.0,
-    station=vn_lever_wire_spec.BALLOON_RING_FRACTION * vn_lever_wire_geom.WIRE_LEN,
+    mg_vn_lever_wire_geom.WIRE_START,
+    mg_vn_lever_wire_geom.WIRE_END,
+    radius=mg_vn_lever_wire_geom.WIRE_DIA / 2.0,
+    station=mg_vn_lever_wire_spec.BALLOON_RING_FRACTION * mg_vn_lever_wire_geom.WIRE_LEN,
 )
 
 BOM_QUANTITIES = {stem: notes.QUANTITIES[stem] for stem in notes.BOM_ORDER}
@@ -355,21 +358,21 @@ PART_ROWS = {
     "mg-wheel-bar": _config.parts("mg-wheel-bar"),
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front"),
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back"),
-    "vn-clamp-screw": _config.parts("vn-clamp-screw"),
+    "mg-vn-clamp-screw": _config.parts("mg-vn-clamp-screw"),
     "mg-wheel-drum": _config.parts("mg-wheel-drum"),
     "mg-magnifying-wheel": _config.parts("mg-magnifying-wheel"),
     "mg-wheel-axle-spacer": _config.parts("mg-wheel-axle-spacer"),
-    "vn-wheel-axle-back-washer": _config.parts("vn-wheel-axle-back-washer"),
-    "vn-wheel-axle-front-washer": _config.parts("vn-wheel-axle-front-washer"),
-    "vn-wheel-axle-nut": _config.parts("vn-wheel-axle-nut"),
+    "mg-vn-wheel-axle-back-washer": _config.parts("mg-vn-wheel-axle-back-washer"),
+    "mg-vn-wheel-axle-front-washer": _config.parts("mg-vn-wheel-axle-front-washer"),
+    "mg-vn-wheel-axle-nut": _config.parts("mg-vn-wheel-axle-nut"),
     "mg-magnifying-lever": _config.parts("mg-magnifying-lever"),
     "mg-magnifying-bracket": _config.parts("mg-magnifying-bracket"),
-    "vn-magnifying-bracket-screw": _config.parts("vn-magnifying-bracket-screw"),
+    "mg-vn-magnifying-bracket-screw": _config.parts("mg-vn-magnifying-bracket-screw"),
     "mg-magnifying-clamp": _config.parts("mg-magnifying-clamp"),
-    "vn-thumb-screw": _config.parts("vn-thumb-screw"),
+    "mg-vn-thumb-screw": _config.parts("mg-vn-thumb-screw"),
     "mg-magnifying-vertical-rod": _config.parts("mg-magnifying-vertical-rod"),
     "mg-output-fixture": _config.parts("mg-output-fixture"),
-    "vn-lever-wire": _config.parts("vn-lever-wire"),
+    "mg-vn-lever-wire": _config.parts("mg-vn-lever-wire"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -389,14 +392,14 @@ BOM_NORMALIZED_ALIASES = {
 # One balloon per family (row); each walks its family's lowest-named shown
 # instance for a visible edge, except the two rods.
 #
-# MHA-MG-003 is a revolved capsule (a hemispherical dome at each end): no
+# MHA-MG-03 is a revolved capsule (a hemispherical dome at each end): no
 # flat face, no end circle. Its only model edges are the two dome-to-cylinder
 # tangent circles at x = R from each tip, which IView's visible-entity list
 # does not report (0 listed, tangent edges shown), and every body extreme
 # point sits on a dome silhouette, which no EDGE hit test picks (r1/r2, runs
 # 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
 # 20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b: the lever walked 12
-# extremes, no ink). MHA-MG-004's top is a #4-40 thread turned down to a
+# extremes, no ink). MHA-MG-04's top is a #4-40 thread turned down to a
 # shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
 # circle, 45 below the clamp's bottom face once the explode drops the rod
 # (the bottom dome is tangent, like the lever's). Each is
@@ -444,7 +447,7 @@ LOCKNUT_BALLOON_POINT_MM = (
     _NUT_FLAT_R * math.sin(math.radians(225.0)),
     0.0,
 )
-LOCKNUT_INSTANCE = "vn-wheel-axle-nut-2"
+LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-lever": BalloonAnchor(
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
@@ -452,8 +455,8 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-vertical-rod": BalloonAnchor(
         point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
     ),
-    "vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
-    "vn-wheel-axle-nut": BalloonAnchor(
+    "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
+    "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
     explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
@@ -480,9 +483,17 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
                 width=width,
                 initial_indent=f"{number}. ",
                 subsequent_indent=" " * (len(number) + 2),
+                break_long_words=False,
+                break_on_hyphens=False,
             )
         else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
+            out += textwrap.wrap(
+                line,
+                width=width,
+                subsequent_indent="   ",
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
     return "\n".join(out)
 
 
@@ -599,11 +610,11 @@ ENDSHAKE = StackDetail(
         {
             "mg-wheel-bar",
             "mg-wheel-axle",
-            "vn-wheel-axle-back-washer",
+            "mg-vn-wheel-axle-back-washer",
             "mg-magnifying-wheel",
             "mg-wheel-drum",
-            "vn-wheel-axle-front-washer",
-            "vn-wheel-axle-nut",
+            "mg-vn-wheel-axle-front-washer",
+            "mg-vn-wheel-axle-nut",
         }
     ),
     math.sqrt(_ENDSHAKE_RADIUS**2 - (_ENDSHAKE_CENTRE_D - stack.HUB_FRONT_D) ** 2),

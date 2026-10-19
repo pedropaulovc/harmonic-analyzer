@@ -23,8 +23,8 @@ in machine coordinates (assembly origin = base origin; the output side is -Z).
   wheel rim drives the pen rod via WIRE 2 (pn-pen.SLDASM).
   Its two assembly settings, the press gauge and the endshake, are model
   dimensions of a blanked construction chain (mg_magnifier_assembly_spec)
-  that the MHA-MG-000 sheet prints; a second blanked chain carries the lever
-  group's clamp station and fixture drop. The named explode the MHA-MG-000
+  that the MHA-MG-00 sheet prints; a second blanked chain carries the lever
+  group's clamp station and fixture drop. The named explode the MHA-MG-00
   exploded sheets show (MG_MAGNIFIER_EXPLODED) is authored here too
   (_mg_magnifier_explode).
 * lever-wire -- WIRE 1's straight rest-pose run from the output fixture's
@@ -180,17 +180,17 @@ LEVER_ROD_Y = 979.7
 # lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
 # and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
 # it with no depth lean. LEVER_ROD_Z is therefore the drum lane
-# (vn_lever_wire_geom.DRUM_END_Z, asserted below). It stays a module-level
+# (mg_vn_lever_wire_geom.DRUM_END_Z, asserted below). It stays a module-level
 # literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
 # LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
 # casting's front rail imposes no depth bound (the exact-stock thumb-screw
 # reach, asserted below, keeps its head under the rail), and the Ø6 lever's
 # clearance to the front column surface (-124.7) is now ~45.8 -- trivially
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
-# vn_lever_wire_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
+# mg_vn_lever_wire_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
 # plate flange (magnifying_bracket_joint_layout).
 LEVER_ROD_Z = -173.51
-from vn_lever_wire_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
+from mg_vn_lever_wire_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
 
 assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
     f"magnifying group plane {LEVER_ROD_Z} left the drum wire lane {LEVER_WIRE_DRUM_Z}"
@@ -337,10 +337,10 @@ assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
     BAR_FRONT_Z,
 ), "mg_magnifier_assembly_spec's axle line drifted from the placed axle"
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
-# Endpoints + length live in build_vn_lever_wire.py (the part's length IS the run);
+# Endpoints + length live in build_mg_vn_lever_wire.py (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from vn_lever_wire_geom import (  # noqa: E402
+from mg_vn_lever_wire_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
     DRUM_DIA,
     RUN_GAPS,
@@ -376,7 +376,7 @@ assert math.isclose(
 ), "lever-wire end is not tangent to the drum"
 # ... inside the drum's axial span (boss front face .. spigot front end, wire
 # r inside each), and the slanted run clears the rim, spokes and boss pen-side
-# faces it passes (RUN_GAPS, asserted >= CLEARANCE in vn_lever_wire_geom).
+# faces it passes (RUN_GAPS, asserted >= CLEARANCE in mg_vn_lever_wire_geom).
 assert (
     WHEEL_MID_Z + HUB_STEP_Z - HUB_WIRE_DIA / 2.0
     > HUB_WIRE_END[2]
@@ -536,7 +536,7 @@ async def _author_axle_stack_reference(adapter) -> None:
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     mark_dimensions_for_drawing(adapter, spec.FEATURE, set(spec.DIMENSION_TOLERANCES))
     # Blanked so no view of this assembly or of the top assembly renders the
-    # chain; the MHA-MG-000 detail shows it in that view only.
+    # chain; the MHA-MG-00 detail shows it in that view only.
     blank_sketch(adapter, spec.FEATURE)
     feature = _early_bound(
         _early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.FEATURE),
@@ -675,7 +675,7 @@ async def build(adapter) -> dict[str, str]:
     seed_target = [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z]
     clamp_seed = await place_component(
         adapter,
-        "vn-clamp-screw",
+        "mg-vn-clamp-screw",
         seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -763,7 +763,7 @@ async def build(adapter) -> dict[str, str]:
         free_dof_key="lever_rock",
     )
     # The bracket affixes the lever to the rocking summing bar, not the frame.
-    # Its collar is press-fitted and bonded to MHA-MG-003 (mg_lever_press_fit_geom),
+    # Its collar is press-fitted and bonded to MHA-MG-03 (mg_lever_press_fit_geom),
     # so it is locked to the lever and stays concentric through the rock.
     # Grounding this moving fitting would constrain the mechanism incorrectly.
     bracket = await place_component(
@@ -785,7 +785,7 @@ async def build(adapter) -> dict[str, str]:
     for index, position in enumerate(BRACKET_SCREW_POSITIONS, start=1):
         screw = await place_component(
             adapter,
-            "vn-magnifying-bracket-screw",
+            "mg-vn-magnifying-bracket-screw",
             list(position),
             [-90.0, 0.0, 0.0],
             BRACKET_SCREW_ROWS,
@@ -836,7 +836,7 @@ async def build(adapter) -> dict[str, str]:
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(
         adapter,
-        "vn-thumb-screw",
+        "mg-vn-thumb-screw",
         [CLAMP_X, THUMB_SCREW_OUTER_FACE_Y, LEVER_ROD_Z],
         [180.0, 0.0, -90.0],
         _rz90_ry180,
@@ -880,7 +880,7 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, fixture, list(FIXTURE_POSITION), FIXTURE_ROWS)
     fixture_screw = await place_component(
         adapter,
-        "vn-thumb-screw",
+        "mg-vn-thumb-screw",
         list(FIXTURE_SCREW_POSITION),
         euler_from_rows(FIXTURE_SCREW_ROWS),
         FIXTURE_SCREW_ROWS,
@@ -940,7 +940,7 @@ async def build(adapter) -> dict[str, str]:
         "wheel-axle spacer locked to the axle",
     )
     await _stack_part(
-        "vn-wheel-axle-back-washer",
+        "mg-vn-wheel-axle-back-washer",
         BACK_WASHER_D,
         "wheel back washer locked to the axle",
     )
@@ -989,13 +989,13 @@ async def build(adapter) -> dict[str, str]:
     )
     # Front washer, nut and locknut close the stack at the set endshake.
     await _stack_part(
-        "vn-wheel-axle-front-washer",
+        "mg-vn-wheel-axle-front-washer",
         FRONT_WASHER_D,
         "wheel front washer locked to the axle",
     )
-    await _stack_part("vn-wheel-axle-nut", NUT_D, "wheel-axle nut locked to the axle")
+    await _stack_part("mg-vn-wheel-axle-nut", NUT_D, "wheel-axle nut locked to the axle")
     await _stack_part(
-        "vn-wheel-axle-nut", LOCKNUT_D, "wheel-axle locknut locked to the axle"
+        "mg-vn-wheel-axle-nut", LOCKNUT_D, "wheel-axle locknut locked to the axle"
     )
     # --- amplification wire 1 (fixture -> drum) ------------------------------
     # The straight rest-pose run leaves the fixture's spigot-groove front
@@ -1003,7 +1003,7 @@ async def build(adapter) -> dict[str, str]:
     # origin = the DRUM end, +Y toward the hook.
     hw = await place_component(
         adapter,
-        "vn-lever-wire",
+        "mg-vn-lever-wire",
         list(HUB_WIRE_END),
         euler_from_rows(_HW_ROWS),
         _HW_ROWS,
@@ -1069,10 +1069,10 @@ async def build(adapter) -> dict[str, str]:
     # WireYokePoint (drum pitch circle @ the wire tangency) held coincident to
     # the lever-wire's Top plane (perpendicular to the wire axis, through the
     # drum end; the coplanar A1 route puts the yoke point on it -- asserted in
-    # vn_lever_wire_geom). The wheel's
+    # mg_vn_lever_wire_geom). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
-    # and ratio from geometry (build_vn_lever_wire docstring). With every freed
+    # and ratio from geometry (build_mg_vn_lever_wire docstring). With every freed
     # DOF genuinely free, dragging the lever turns the wheel. The mate is
     # residual-free at the rest pose, so the wheel must NOT move when it
     # solves -- asserted right after.
@@ -1101,7 +1101,7 @@ async def build(adapter) -> dict[str, str]:
         required_stems=(
             "mg-magnifying-lever",
             "mg-magnifying-wheel",
-            "vn-lever-wire",
+            "mg-vn-lever-wire",
             "mg-magnifying-bracket",
         ),
     )

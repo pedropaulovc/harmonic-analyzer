@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the platen support bar (MHA-PD-007).
+r"""Create the curated machinist drawing for the platen support bar (MHA-PD-07).
 
 A 452 x 28 x 9 steel bar clamped across the frame columns. Its BACK face
 carries the transgear pivot's #8-32 through tap and the latch hook's two
@@ -19,8 +19,8 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   row locates to, and the front face's slide roughness. Each
   roughness symbol has its reason beside it; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
-  counterbore's widths and travels, the slot's width naming the MHA-SH-002
-  taps it takes up and the counterbore's the MHA-VN-021 head it holds.
+  counterbore's widths and travels, the slot's width naming the MHA-SH-02
+  taps it takes up and the counterbore's the MHA-PD-VN-53 head it holds.
   Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness and the tap's countersunk mouths on both
@@ -172,7 +172,9 @@ def _back_x(model_x: float) -> float:
 # pivot's Ø and countersink stand right of it, the Ø higher and further left
 # (its leader passes left of the countersink's text, slanting off the line);
 # the latch-hook taps' callout (high) and countersink (low) stand right of the
-# pivot's, their leaders between the two pairs.
+# pivot's, their leaders between the two pairs.  Move that pair 8 mm farther
+# right for the full pivot vendor-number row, keeping the hook leader left of
+# its own countersink text instead of widening a text/leader allowance.
 ROW_STEP = 0.013
 FRONT_KEEP = {
     "PivotTapStation": (LEFT_END + 0.042, FACE_BOTTOM - ROW_STEP),
@@ -182,9 +184,9 @@ FRONT_KEEP = {
     "HangerRowHeight": (RIGHT_END + 0.022, FACE_BOTTOM - 0.010),
     "PivotTapDrillDia": (_face_x(PIVOT_TAP_X) + 0.032, FACE_TOP + 0.030),
     "PivotCskDia": (_face_x(PIVOT_TAP_X) + 0.039, FACE_TOP + 0.014),
-    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.059, FACE_TOP + 0.014),
+    "BracketCskDia": (_face_x(BRACKET_TAP_X[0]) + 0.067, FACE_TOP + 0.014),
 }
-BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.056, FACE_TOP + 0.031)
+BRACKET_CALLOUT_XY = (_face_x(BRACKET_TAP_X[1]) + 0.064, FACE_TOP + 0.031)
 # The top face's slide roughness on its edge, left of the section line.
 TOP_FINISH_MODEL_X = -178.0
 TOP_FINISH_SYMBOL_XY = (LEFT_END + 0.030, FACE_TOP + 0.014)
@@ -200,7 +202,7 @@ FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # that end too (the BarProfile dimension's model edge), the clamp row's height
 # off the other end, where its rise is: its text stands left of its dimension
 # line, so the line hugs the bar to keep the text inside the border (r5
-# audit: outside-border). Naming the MHA-SH-002 taps makes it four lines of
+# audit: outside-border). Naming the MHA-SH-02 taps makes it four lines of
 # at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
 # extension line (122 mm) and left of detail C's letter (51 mm).
 BACK_KEEP = {
@@ -489,7 +491,7 @@ def _slot_detail(adapter: Any) -> Any:
     DETAIL_POSITION_TOL_M). Not a native detail: the r3 farm leaf's native
     detail of the front-face view imported none of the slot profiles'
     dimensions (available=[]), the refusal draw_ch_amplitude_bar and
-    draw_vn_post_mount_screw measured, while the same part's projected views
+    draw_dt_vn_post_mount_screw measured, while the same part's projected views
     import their consumed profiles' dimensions (PivotTapProfile's in the
     back-face view)."""
     draw = adapter.currentModel

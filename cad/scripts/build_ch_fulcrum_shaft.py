@@ -1,13 +1,13 @@
-r"""Reproduction script: lever fulcrum shaft (MHA-CH-004; book ch. 17; 1 used).
+r"""Reproduction script: lever fulcrum shaft (MHA-CH-04; book ch. 17; 1 used).
 
 Plain Ø6.35 (1/4") steel shaft: the top levers' common fulcrum at machine
 (x, y) = (+199.9, 1061.4) (2026-08-02 top-frame rederive: rail top 1036.2 +
 keeper axis rise 25.2). One diameter full length -- no journals, shoulders or
-steps -- through the reamed bores of the two end keepers (MHA-CH-007). Each
+steps -- through the reamed bores of the two end keepers (MHA-CH-07). Each
 end stands 1.025 past its keeper lug's outer face and finishes in a full
 hemisphere (the bright dome of the ch. 17 p. 40 closeup): 166.4 tip to tip.
 One set-screw flat per end, both on +Y, sits under the keeper's crown tap;
-the two #1-72 cup-point set screws (MHA-VN-055) bearing on them are the
+the two #1-72 cup-point set screws (MHA-CH-VN-55) bearing on them are the
 shaft's only axial and rotational location.
 
 Dimensions: ``ch_fulcrum_shaft_spec`` (derived from ``ch_fulcrum_keeper_spec``);

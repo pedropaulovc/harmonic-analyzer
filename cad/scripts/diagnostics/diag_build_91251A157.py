@@ -1,7 +1,7 @@
 r"""McMaster 91251A157 -- black-oxide alloy steel socket head screw, #6-32 x 1-1/2".
 
 Catalogue: the McMaster product page https://www.mcmaster.com/91251A157/
-(read live 2026-10 for the MHA-VN-024 knife-hanger screw): 6-32 UNC, class
+(read live 2026-10 for the MHA-SM-VN-52 knife-hanger screw): 6-32 UNC, class
 3A, right hand, 1-1/2 in (38.1) under the head ("Length is measured from under
 the head"), partially threaded with a 3/4 in (19.05) minimum thread length,
 flat tip; socket head Ø0.226 in (5.7404) x 0.138 in (3.5052) high, 7/64 in

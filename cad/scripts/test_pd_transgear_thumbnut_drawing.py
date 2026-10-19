@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear thumbnut (MHA-PD-013) part and drawing."""
+"""Offline contracts for the transgear thumbnut (MHA-PD-13) part and drawing."""
 
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def test_walls_over_the_thread_refuse_a_larger_thread(monkeypatch) -> None:
 
 
 def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
-    """R9-70: the nut seats on MHA-PD-022's faced pilot, not on the T24: its seat
+    """R9-70: the nut seats on MHA-PD-22's faced pilot, not on the T24: its seat
     bears on the pilot's annulus outside the rear countersink and its flange
     covers the pilot all round, at the printed worst case."""
     import pd_transgear_drive_collar_spec as collar
@@ -243,7 +243,7 @@ def test_the_knurl_puts_crests_on_the_section_plane() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_126() -> None:
     row = _config.parts("pd-transgear-thumbnut")
-    assert row["number"] == "MHA-PD-013"
+    assert row["number"] == "MHA-PD-13"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["tolerance_class"] == "machined_block"
@@ -262,7 +262,7 @@ def _nut_fits_stud(nut, stud) -> bool:
 
 
 def test_the_nut_thread_is_the_knob_shaft_stud_thread() -> None:
-    """R9-11: the nut runs on the MHA-PD-008 stud."""
+    """R9-11: the nut runs on the MHA-PD-08 stud."""
     import pd_transgear_knob_shaft_spec as stud
 
     assert _nut_fits_stud(spec, stud)

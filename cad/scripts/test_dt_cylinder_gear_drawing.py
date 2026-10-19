@@ -91,7 +91,7 @@ def test_tooth_system_and_reference_cutter_are_spec_owned() -> None:
         f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.3f} "
         f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
-        "SETS BACKLASH WITH CONE GEARS MHA-DT-003",
+        "SETS BACKLASH WITH CONE GEARS MHA-DT-03",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
@@ -124,13 +124,13 @@ def test_title_block_notch_depth_still_cuts_below_the_root_and_clears_the_cam() 
 
 def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
     callouts = drawing.DIMENSION_CALLOUTS
-    assert "MHA-DT-003" in callouts["OutsideDia"]
-    assert "MHA-CH-003" in callouts["CamDia"]
-    assert "MHA-CH-003" in callouts["FaceWidth"]
+    assert "MHA-DT-03" in callouts["OutsideDia"]
+    assert "MHA-CH-03" in callouts["CamDia"]
+    assert "MHA-CH-03" in callouts["FaceWidth"]
     assert "GAIN" in callouts["CamCy"]
     assert "PHASE" in callouts["NotchPhase"]
     assert "FLANKS" in callouts["NotchWidth"]
-    assert "MHA-DT-013" in notes.BORE_FIT_CALLOUT
+    assert "MHA-DT-13" in notes.BORE_FIT_CALLOUT
 
 
 def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
@@ -353,7 +353,7 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     # The bank is preloaded (#948 ruling R, PR #1292): no ring overhangs its
     # cam, so the stacking callout states no overhang bound.
     assert "OVERHANG" not in notes.STACK_FIT_CALLOUT
-    assert "MHA-DT-013" in notes.STACK_FIT_CALLOUT
+    assert "MHA-DT-13" in notes.STACK_FIT_CALLOUT
 
 
 class _RimEdge:

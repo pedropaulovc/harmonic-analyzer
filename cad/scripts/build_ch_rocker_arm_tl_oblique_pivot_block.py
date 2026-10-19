@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's pivot block (MHA-CH-006-TL-22; shop tooling).
+r"""Build the oblique-trammel jig's pivot block (MHA-CH-06-TL-22; shop tooling).
 
 A 6061 block bolted on each HGH15CA carriage, carrying the pivot pin in two
 pressed 6200-2RS bearings (``ch_rocker_arm_tl_oblique_pivot_block_spec``).

@@ -21,7 +21,7 @@ failure mode that would make the book worthless.
 | Hole patterns, reaming, tapping | M08 | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), `sm-summing-lever` 20× Ø2.0 pattern, `fr-harmonic-base` | ch. 14 Hole patterns and tapping |
 | Dividing head, indexing, co-phasing | M09 | `dt-cylinder-gear` notches ×20, every gear blank | ch. 15 Indexing |
 | Form-cutter making (ground form tool; button tool, Law ch. 12) | M10 | the T006 cone gear's DT6-FORM1 cutter, the one gear no stock cutter range covers | ch. 16 Making your own gear cutters |
-| Gear cutting and inspection | M10 | `dt-cone-gear` ×20, `dt-cylinder-gear` ×20, `dt-crank-pinion`, `dt-alignment-pinion`, `pd-rack-pinion`, `pd-transgear-*`, `vn-transgear-*`, `pd-platen-rack` | ch. 17 Cutting the gears |
+| Gear cutting and inspection | M10 | `dt-cone-gear` ×20, `dt-cylinder-gear` ×20, `dt-crank-pinion`, `dt-alignment-pinion`, `pd-rack-pinion`, `pd-transgear-*`, `pd-vn-transgear-*`, `pd-platen-rack` | ch. 17 Cutting the gears |
 | D-bore fitting, gear-stack assembly | M11 | 64T + cone gear set → D-flat shaft | ch. 18 Fitting D-bores and the cone gear stack |
 | Silver soldering | M11 | `dt-crank-pin-ring` ends | — |
 | Draw filing, polishing, blacking | M11 | every visible part | ch. 19 Finishing |
@@ -36,8 +36,8 @@ These need a decision before a module can be written for them:
 | `sm-summing-lever` | Cast, fabricate, or hog from solid? Each answer is a different skill. `cad/docs/machining-dfm.md` recommends not hogging. |
 | `sm-summing-lever` knife edge | Machine into the parent, or make a hardened tool-steel insert? |
 | `fr-rocker-arm-support`, `ch-connecting-rod` | Cast or cut from bar? (Both benign as bar.) |
-| `vn-counter-spring`, `vn-channel-spring-installed` ×20 | Wind your own (a module) or specify to a spring house (a procurement task)? |
-| `vn-chain-inner-link` / `vn-chain-outer-link` | Make the roller chain or buy it? |
+| `sm-vn-counter-spring`, `ch-vn-channel-spring-installed` ×20 | Wind your own (a module) or specify to a spring house (a procurement task)? |
+| `pd-vn-chain-inner-link` / `pd-vn-chain-outer-link` | Make the roller chain or buy it? |
 | `ms-stick` | Hand stamping — a small module of its own, or a paragraph? |
 
 ## Coverage check

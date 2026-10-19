@@ -140,7 +140,7 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
 
 def test_part_registry_row_is_a_plain_pin() -> None:
     config = _config.parts("dt-crank-pinion-pin")
-    assert config["number"] == "MHA-DT-029"
+    assert config["number"] == "MHA-DT-29"
     assert config["tolerance_class"] == "machined_block"
     assert "fit_class" not in config
     assert "drill rod" in config["process"]

@@ -1,8 +1,8 @@
-r"""Build MHA-DT-032, the crank handle pivot screw (user ruling U33).
+r"""Build MHA-DT-32, the crank handle pivot screw (user ruling U33).
 
 A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
-handle MHA-DT-008 spins on the Ø6 shoulder; the #8-32 thread screws into the
-crank arm MHA-DT-006's tapped through hole and the shoulder seats tight on the
+handle MHA-DT-08 spins on the Ø6 shoulder; the #8-32 thread screws into the
+crank arm MHA-DT-06's tapped through hole and the shoulder seats tight on the
 arm face.  Dimensions and the derived fit facts live in
 ``dt_crank_handle_pivot_screw_spec``.
 
@@ -357,7 +357,7 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
     # The under-head face located from the TIP, the one faced end every axial
-    # location reads from (MHA-DT-032 re-reviews): the seat is the thread length
+    # location reads from (MHA-DT-32 re-reviews): the seat is the thread length
     # from the tip, the under-head face this reference -- the shoulder is
     # turned to suit the bonded handle -- and the head face the overall.  It
     # runs at mid-height of the under-head annulus so its head end sits on
@@ -435,12 +435,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
-    # The head length keeps the head below the MHA-DT-035 face at the widest
+    # The head length keeps the head below the MHA-DT-35 face at the widest
     # end play (Codex P2 on #1139).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
     )
-    # The two small features the MHA-DT-032 re-review found could print as
+    # The two small features the MHA-DT-32 re-review found could print as
     # nothing at .X: the tip chamfer and the slot depth.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
@@ -461,7 +461,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Every model edit -- the material, the appearance, the drawing marks, the
     # PMI and the hidden reference sketch -- precedes the INSTALLED split, so
-    # the split copies a finished default (the MHA-DT-030 lesson: an edit after
+    # the split copies a finished default (the MHA-DT-30 lesson: an edit after
     # it touches the active configuration only and leaves the other stale).
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
@@ -478,7 +478,7 @@ async def build(adapter) -> dict[str, str]:
     # Installed configuration (user ruling 2026-09-29): the drive train places
     # the screw as assembly leaves it, its tip filed flush with the arm's
     # inboard face and the edge broken.  The default stays the as-turned
-    # screw the drawing prints; both carry one MHA-DT-032 BOM identity.  The two
+    # screw the drawing prints; both carry one MHA-DT-32 BOM identity.  The two
     # globals are set per configuration in each, so neither inherits the
     # other's value.
     default_config = active_configuration_name(adapter)
@@ -520,7 +520,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "as-turned screw (default)", V_FINAL, 0.02 * V_SLOT)
     # The configuration description wins over the drive-train BOM's written
-    # cell, so it is the text that BOM prints (the MHA-DT-030 precedent).
+    # cell, so it is the text that BOM prints (the MHA-DT-30 precedent).
     grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,

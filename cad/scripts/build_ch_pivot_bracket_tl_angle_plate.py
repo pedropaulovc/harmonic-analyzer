@@ -1,4 +1,4 @@
-r"""Build the pivot bracket's reworked angle plate (MHA-CH-008-TL-02; shop fixture).
+r"""Build the pivot bracket's reworked angle plate (MHA-CH-08-TL-02; shop fixture).
 
 A bought 4 x 5 x 3-1/2 in cast-iron angle plate, modelled at its bought
 envelope (its slots are omitted), with the four holes the shop adds to the

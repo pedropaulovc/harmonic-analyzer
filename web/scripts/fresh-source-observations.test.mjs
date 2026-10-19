@@ -7,8 +7,9 @@ import { tmpdir } from 'node:os'
 import { gunzipSync } from 'node:zlib'
 
 import { VIDEO_IDS, runTool } from './verify-reference.mjs'
+import { CURRENT_NATIVE_IDENTITY_PROJECTION } from '../current-native-identity.mjs'
 
-const { WEB_ROOT, validateCurrentObservations, loadCurrentObservations, validateCurrentTrackAssociation } = await import(
+const { WEB_ROOT, validateCurrentObservations, loadCurrentObservations, validateCurrentTrackAssociation, normalizeCurrentTrackAssemblies } = await import(
   process.env.FRESH_OBSERVATIONS_MODULE ?? './fresh-source-observations.mjs')
 const webRoot = process.env.FRESH_OBSERVATIONS_WEB_ROOT ?? WEB_ROOT
 const original = JSON.parse(gunzipSync(await readFile(
@@ -60,6 +61,29 @@ test('accepts an exact zero-to-duration partition without rewriting authored clo
   const record = recordFixture(), before = structuredClone(record)
   await validateCurrentObservations(record, { webRoot })
   assert.deepEqual(record, before, 'Validation must preserve the exact authored evidence')
+})
+
+test('current capture projection leaves archived native source records and numeric geometry untouched', async () => {
+  const track = {
+    source: original.source, model: original.model, nativeIdentity: original.nativeIdentity,
+    anchors: [
+      { partPath: 'ha-harmonic-analyzer/mg-magnifier/vn-thumb-screw-1', partLocalMetres: [0, .001, .002] },
+      { partPath: 'ha-harmonic-analyzer/ms-measuring-stick/vn-thumb-screw-1', partLocalMetres: [.003, 0, 0] },
+    ],
+    frames: [{ views: [{ id: 'main' }] }],
+  }
+  const before = structuredClone(track)
+  const current = await normalizeCurrentTrackAssemblies(track, { webRoot })
+  assert.deepEqual(current.anchors.map(anchor => anchor.partPath), [
+    'ha-harmonic-analyzer/mg-magnifier/mg-vn-thumb-screw-1',
+    'ha-harmonic-analyzer/ms-measuring-stick/ms-vn-thumb-screw-1',
+  ])
+  assert.strictEqual(current.source, track.source)
+  assert.strictEqual(current.model, track.model)
+  assert.strictEqual(current.nativeIdentity, track.nativeIdentity)
+  assert.strictEqual(current.anchors[0].partLocalMetres, track.anchors[0].partLocalMetres)
+  assert.deepEqual(current.currentIdentityProjection, CURRENT_NATIVE_IDENTITY_PROJECTION)
+  assert.deepEqual(track, before)
 })
 
 test('refuses a sub-microsecond gap even when near-integer coverage and exposure ownership are valid', async () => {

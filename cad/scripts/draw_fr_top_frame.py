@@ -15,7 +15,7 @@ underside plane one beside the UNDERSIDE detail.  A group gets
 its own sheet rather than a crowded corner of one:
 qualifiers then park clear of cutting lines, centrelines and each other.
 Projected top/front pairs stay aligned; removed and section views carry scales.
-Keeper taps transfer from MHA-CH-007 at assembly; their retained station
+Keeper taps transfer from MHA-CH-07 at assembly; their retained station
 coordinates are reference-only. Hanger station dimensions remain controlling.
 
 Run with SolidWorks open::
@@ -350,7 +350,7 @@ def hanger_center_landing() -> tuple[float, float, float]:
 # needs no words (machinist review r1: no basic in note text); the
 # qualifier names the count and the hardware the holes pass.  Z stays the
 # plain toleranced socket stations.
-HANGER_CENTER_QUALIFIER = "2X HANGER AXES ON D, FOR MHA-VN-024"
+HANGER_CENTER_QUALIFIER = "2X HANGER AXES ON D, FOR MHA-SM-VN-52"
 # The 182.0 locates D itself -- the crossbar's median, the native centreline
 # between its two side faces -- from the upper-left socket axis under the
 # general .X band; it no longer reaches a hole.
@@ -360,7 +360,7 @@ CROSSBAR_MEDIAN_DATUM_XY = (0.142, 0.095)
 # sheet coordinates are references, not independent inspection requirements.
 # The trailing newline keeps the native thread/drill/depth on separate rows
 # through _drawing_hole_callout.compose_hole_callout_prefix.
-TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n"
+TRANSFER_KEEPER_CALLOUT = "TRANSFER FROM MHA-CH-07\nAT ASSEMBLY;\n"
 # Historical RD4 envelope measured on b49e1, NOT a measurement of the new
 # transfer callout. Expand its width for a conservative 3.5 mm per prefix
 # character and its height by two estimated 5.1 mm rows: offline allowances.
@@ -466,7 +466,7 @@ BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
 
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
-# MHA-VN-027 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
+# MHA-FR-VN-53 joint. drawing-guidelines.md rule 17 (walls and webs), print-worst: the stock shank, less the most
 # outboard printed floor (16.35 + band) and the largest printed socket radius.
 _SOCKET_DIA_PLACES = DRAWING_PRECISION["BoreProfile"]["B0Dia"]
 CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
@@ -477,12 +477,12 @@ CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT = (
 )  # 14.4
 if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
     raise AssertionError(
-        "far casting wall engages MHA-VN-027 under 1.5D at the printed bands"
+        "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
     )
 # The engagement follows from the printed floor and socket and is proved
 # above; the sheet states only the requirement (machinist review r1,
 # drawing-guidelines.md rule 20: a sheet never argues for itself).
-CROSS_TAP_SECTION_NOTE = "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-VN-027"
+CROSS_TAP_SECTION_NOTE = "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-FR-VN-53"
 CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
 
 # Sheet 5: hub location, true-axis side view, removed set-screw boss section.
@@ -623,11 +623,11 @@ HANGER_GRIP_TEXT_XY = _hanger_section_xy(
 HANGER_GRIP_OFFSET_XY = (0.058, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 # Its third row names the mate the three-place station matches, the
-# MHA-SM-002 knife mount's own dowel hole (both read
-# vn_knife_mount_dowel_spec.HANGER_OFFSET; machinist review r4), so the
+# MHA-SM-02 knife mount's own dowel hole (both read
+# sm_vn_knife_mount_dowel_spec.HANGER_OFFSET; machinist review r4), so the
 # block, centred on its point, stands 5.5 mm (one row) higher than r4's.
 PIN_STATION_OFFSET_XY = (0.157, 0.1115)
-PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-002"
+PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-02"
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
 SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
@@ -653,7 +653,7 @@ HANGER_SECTION_KEEP = {
 # diameter has not reached F-F, which sees the hole edge-on, even imported
 # apart from the grip (d8fac576, leaf 20261014T212023Z-1-90af84a0).
 # The grip prints bare under the title block's .XX band (owner ruling
-# 2026-10-18: MHA-VN-024 is cut to the measured grip at SM-000).
+# 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00).
 HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
     "HangerGrip": "",
@@ -775,24 +775,26 @@ HANGER_SLOT_WIDTH_TEXT_XY = (
 # line (4.7 mm clear, 5.0 if the block hangs from its top).
 HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
 # The rear round hole's size (the hole F-F cuts and the circle that owns
-# HangerPinHoleDia), with its band and slip-fit rows.  F-F's v43 crop
-# printed the block 66.4 x 20.3 mm with the band stacked; the one-row +/-
-# band (build) takes the 4.15 mm stacked row off, so 67 x 17 rounded out,
-# centred on its text point as dimension text prints
-# (WINDOW_WIDTH_TEXT_EXTENT).  The same crop lands the native leader on the
-# underline's end facing the hole, at the block's foot.  Right of the hole,
-# the cutting line, F-F's right arrow and the rear-right boss leave no
-# leader route to a block beside the plan.  Left of it, the rear frame's
-# leader, F-F's left arrow and detail C's label leave a window (50.8 mm)
-# too narrow for the block.  The leader climbs instead, between the rear
-# frame's leader and datum C's, to the band over the plan: 23.0 mm between
-# the rail and the sheet frame, room for this block and its ink but not for
-# a stacked one.  The block parks right of datum C's tag (2.5 clear), 2.4
-# over the rear-right boss and 2.5 under the sheet frame: x 145.9..212.9,
-# y 247.2..264.2 mm.  The leader runs from the rim to (145.9, 247.2), 6.7
-# under datum C's tag, 4.7 from F-F's right arrow and 5.8 right of the rear
-# frame's leader.  Estimated from those boxes; the render measures it.
-HANGER_PIN_DIA_TEXT_XY = (0.1794, 0.2557)
+# HangerPinHoleDia), with its band and slip-fit rows.  The historical v43
+# crop printed 66.4 x 20.3 mm with the band stacked; taking off its 4.15 mm
+# stacked row gave the former 67 x 17 mm estimate.  That width predates the
+# full parent-scoped vendor number.  Scale it conservatively from the old
+# 25-character process row to the current widest row, at the same font.
+# Keep the block's lower-left corner fixed: the native leader leaves that
+# underline end toward the hole.  Extra width grows into the empty band to
+# the right, not toward datum C's tag or its leader.
+# Right of the hole, the cutting line, F-F's right arrow and the rear-right
+# boss leave no leader route to a block beside the plan.  Left of it, the
+# rear frame's leader, F-F's left arrow and detail C's label leave a window
+# too narrow for the block.  The leader climbs instead to the band over the
+# plan; its old foot at (145.9, 247.2) mm and the 17 mm height stay put.
+# These are estimates from the historical crop, not measured new-ID ink;
+# the native layout audit must still read the regenerated text and leader.
+HANGER_PIN_DIA_TEXT_WIDTH = 0.067 * max(
+    25, max(map(len, HANGER_PIN_HOLE_CALLOUT.splitlines()))
+) / 25
+HANGER_PIN_DIA_TEXT_HALF_HEIGHT = 0.0085
+HANGER_PIN_DIA_TEXT_XY = (0.1459 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0, 0.2557)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
 # left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
@@ -1068,19 +1070,19 @@ DETAIL_SECTION_KEEP = {
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
-    "B0Dia": "4X SOCKET, REF: MATCH-FIT\nTO ASSIGNED MHA-FR-003 TUBE,\nCLOSE HAND-SLIP, NO ROCK",
+    "B0Dia": "4X SOCKET, REF: MATCH-FIT\nTO ASSIGNED MHA-FR-03 TUBE,\nCLOSE HAND-SLIP, NO ROCK",
 }
 FRONT_CALLOUTS = {"CB1Dia": "4X COUNTERBORE"}
 # The recess's limits are functional both ways: its low limits clear the
-# MHA-VN-028 skirt, its high limits keep the cross-screw counterbore's 2.0
+# MHA-FR-VN-54 skirt, its high limits keep the cross-screw counterbore's 2.0
 # ligament (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT, 2.04 at
 # Ø27.70 and 16.60 deep), so each callout names the cap it serves and the
 # diameter says why it has a ceiling (machinist review r2).
 SECTION_CALLOUTS = {
     "CapRecessDia": (
-        "4X CAP RECESS, CLEARS\nMHA-VN-028 SKIRT; MAX KEEPS\nCROSS-SCREW COUNTERBORE WALL"
+        "4X CAP RECESS, CLEARS\nMHA-FR-VN-54 SKIRT; MAX KEEPS\nCROSS-SCREW COUNTERBORE WALL"
     ),
-    "CapRecessDepth": "4X RECESS,\nMHA-VN-028\nSKIRT DEPTH",
+    "CapRecessDepth": "4X RECESS,\nMHA-FR-VN-54\nSKIRT DEPTH",
 }
 
 
@@ -1300,8 +1302,8 @@ def _require_model_hanger_grip(adapter: Any, dimensions: list[Any]) -> Any:
 
     Read-only. The model owns the dimension -- the crossbar's full-height
     extrude depth, driven by RingHeight -- and authors no band on it: the
-    title block's .XX band governs (owner ruling 2026-10-18: MHA-VN-024 is
-    cut to the measured grip at SM-000).  A lost association, a drifted value
+    title block's .XX band governs (owner ruling 2026-10-18: MHA-SM-VN-52 is
+    cut to the measured grip at SM-00).  A lost association, a drifted value
     or a band of its own raises here.
     """
     grips = [
@@ -3121,7 +3123,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(COLUMN_X, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z + BORE_DIA/2),
         text_xy=(0.190, 0.0885), label="socket horizontal pitch",
         expected_mm=2*COLUMN_X, orientation="horizontal", center=True,
-        suffix="MATCHES MHA-FR-001",
+        suffix="MATCHES MHA-FR-01",
     )
     _checked_dimension(
         adapter, detail_top,
@@ -3131,7 +3133,7 @@ async def build(adapter: Any) -> dict[str, str]:
         p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
         text_xy=SOCKET_VERTICAL_PITCH_LINE_XY, label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
-        center=True, suffix="MATCHES\nMHA-FR-001",
+        center=True, suffix="MATCHES\nMHA-FR-01",
         offset_text=SOCKET_VERTICAL_PITCH_TEXT_XY,
     )
     # The plain wizard's clearance rim at the finished top identifies the

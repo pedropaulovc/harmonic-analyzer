@@ -1,4 +1,4 @@
-r"""Pure-data dimensional and drawing contract for through hub MHA-DT-031."""
+r"""Pure-data dimensional and drawing contract for through hub MHA-DT-31."""
 
 from __future__ import annotations
 
@@ -33,9 +33,9 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 if HUB_SEAT_LENGTH != ARM_THICKNESS:
     raise AssertionError("through hub cannot finish flush with both arm faces")
 if AXIAL_PIN_LENGTH != ARM_THICKNESS / 2.0:
-    raise AssertionError("MHA-VN-029 length is not half the arm thickness")
+    raise AssertionError("MHA-DT-VN-59 length is not half the arm thickness")
 if AXIAL_PIN_RADIUS_FROM_AXIS != HUB_SEAT_DIA / 2.0:
-    raise AssertionError("MHA-VN-029 axis is not on the arm/hub seam")
+    raise AssertionError("MHA-DT-VN-59 axis is not on the arm/hub seam")
 # The printed chain -- seat from the front face, the overall to the rear
 # face, the relief back from it -- leaves the barrel between the arm shoulder
 # and the relief shoulder unprinted (its length is the remainder).
@@ -60,7 +60,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
         "SeatLength": 1,
         # Two places: front face to rear face with HUB_LENGTH_TOL.  The front
-        # face is set flush with the crankshaft's dome root before the MHA-DT-009
+        # face is set flush with the crankshaft's dome root before the MHA-DT-09
         # ream, so this length places the rear face against the removable.
         "HubLength": 2,
         # Two places: printed from the rear face with RELIEF_LENGTH_TOL, the
@@ -76,7 +76,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefDia": 2,
     },
     "BoreProfile": {"BoreDia": 3},
-    # Two places: the .XX band is what keeps the MHA-DT-009 ream's ligament to
+    # Two places: the .XX band is what keeps the MHA-DT-09 ream's ligament to
     # the arm shoulder at 2.1 mm (dt_crank_hub_geometry, drawing-guidelines.md rule 17 (walls and webs)).
     "ServicePinStationReference": {"ServicePinFromShoulder": 2},
 }

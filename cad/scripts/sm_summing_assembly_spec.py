@@ -1,4 +1,4 @@
-"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-000): inventory and
+"""Pure fitting contract for sm-summing.SLDASM (MHA-SM-00): inventory and
 the two assembly settings.
 
 Builder data only: the builder (``build_sm_summing_assembly``) places
@@ -29,13 +29,13 @@ from spring_mount_geom import COUNTER_ANCHOR_XY, KNIFE, KNIFE_CONTACT_Y
 ASM_NAME = "sm-summing"
 
 KNIFE_MOUNT = "sm-knife-mount"
-HANGER_WASHER = "vn-knife-hanger-washer"
-HANGER_BOLT = "vn-knife-hanger-stud"
-DOWEL = "vn-knife-mount-dowel"
+HANGER_WASHER = "sm-vn-knife-hanger-washer"
+HANGER_BOLT = "sm-vn-knife-hanger-stud"
+DOWEL = "sm-vn-knife-mount-dowel"
 LEVER = "sm-summing-lever"
-BOSS_HOOK = "vn-boss-hook"
-BOSS_JAM_NUT = "vn-boss-hook-jam-nut"
-COUNTER_SPRING = "vn-counter-spring"
+BOSS_HOOK = "sm-vn-boss-hook"
+BOSS_JAM_NUT = "sm-vn-boss-hook-jam-nut"
+COUNTER_SPRING = "sm-vn-counter-spring"
 GOOSENECK = "sm-gooseneck"
 SPRING_SCREW = "sm-gooseneck-spring-screw"
 
@@ -55,8 +55,8 @@ QUANTITIES = {
 }
 
 # --- Knife-hanger bolt fit-up ---------------------------------------------------
-# Each MHA-VN-024 is cut at this assembly to the stack measured at its own
-# crossbar hole -- crossbar underside to the top of the MHA-VN-060 washer
+# Each MHA-SM-VN-52 is cut at this assembly to the stack measured at its own
+# crossbar hole -- crossbar underside to the top of the MHA-SM-VN-54 washer
 # seated on the faced top -- plus this reach into its knife mount's tap. The
 # frame's printed grip band and the washer's catalogue thickness spread are
 # measured out of the reach; only this cut band reaches the tap. Two places,
@@ -70,7 +70,7 @@ HANGER_FIT_REACH_PLACES = 2
 # machine X, sketch y = machine Y), each driven from globals and marked for the
 # drawing, which shows each in the one view that dimensions it.
 #
-# CounterSetting: the MHA-SM-004 axis over the counter spring, measured up the
+# CounterSetting: the MHA-SM-04 axis over the counter spring, measured up the
 # spring's own axis from the knife-edge contact level. Sliding the gooseneck
 # post in the frame hub sets it until the lever is level, so it prints as a
 # reference nominal.

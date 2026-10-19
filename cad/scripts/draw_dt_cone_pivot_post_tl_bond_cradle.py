@@ -1,4 +1,4 @@
-r"""Create the drawing for the cone pivot post's bond cradle (MHA-DT-005-TL-01)."""
+r"""Create the drawing for the cone pivot post's bond cradle (MHA-DT-05-TL-01)."""
 
 from __future__ import annotations
 
@@ -768,7 +768,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Post Bond Cradle Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone pivot post bond cradle; steel, built up and doweled; MHA-DT-005-TL-01",
+            3: "cone pivot post bond cradle; steel, built up and doweled; MHA-DT-05-TL-01",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

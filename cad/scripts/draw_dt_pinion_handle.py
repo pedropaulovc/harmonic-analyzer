@@ -1,4 +1,4 @@
-r"""Create the MHA-DT-015 pinion grip-crossrod manufacturing drawing."""
+r"""Create the MHA-DT-15 pinion grip-crossrod manufacturing drawing."""
 
 from __future__ import annotations
 
@@ -147,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pinion Grip Cross Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "pinion grip crossrod; cold-finished rod; MHA-DT-015",
+            3: "pinion grip crossrod; cold-finished rod; MHA-DT-15",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

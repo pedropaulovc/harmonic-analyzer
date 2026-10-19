@@ -33,9 +33,9 @@ JOBS = {
     "pd-platen": PANEL_BLACK,
     "pd-platen-clip": PANEL_BLACK,
     "sm-knife-mount": PANEL_BLACK,
-    "vn-counter-spring": SPRING_BLACK,
+    "sm-vn-counter-spring": SPRING_BLACK,
     "channel-spring": SPRING_BLACK,
-    "vn-channel-spring-installed": SPRING_BLACK,
+    "ch-vn-channel-spring-installed": SPRING_BLACK,
     "dt-crank-handle": STAINED_OAK,
 }
 

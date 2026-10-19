@@ -13,7 +13,7 @@ spherical crown, slot 0.135 HD wide and 1.5 widths deep from the apex, the
 committed, so this size has no replica gate; the standalone run is
 catalog-only and saves the build under cad/out/reference for inspection.
 
-2026-10-11 (R9-31's low head, made slotted): the MHA-VN-046 guide-lock screws
+2026-10-11 (R9-31's low head, made slotted): the MHA-PD-VN-60 guide-lock screws
 are slotted, as the book's guide-lock plates show (ch22 img05), not hex socket.
 
 Frame: head UP, under-head junction (bearing face) at y = 0.

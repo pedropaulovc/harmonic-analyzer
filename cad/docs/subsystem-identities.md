@@ -1,41 +1,45 @@
 # Subsystem identities
 
-Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. This guide records the identity cutover from `bfde892a5`; it does not replace either source of truth.
+Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities; [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains both cutovers; it does not replace either source of truth.
 
 ## Naming and numbering
 
 Use `<prefix>-<descriptive-name>` for native model and exported asset basenames, and `<prefix>_<descriptive_name>` for Python module and doit task stems. Assembly builders and drawing artefacts retain their `_assembly` or `-assembly` suffix. For example, `dt-drive-train.SLDASM` is built by `build_dt_drive_train_assembly.py`; its drawing artefact stem is `dt-drive-train-assembly`.
 
-Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the new family Number, such as `MHA-DT-003-T006` for a cone-gear configuration; installed channel spring stretch variants retain the unqualified base Number.
+Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the category's assembly drawing; fabricated parts start at `01`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. SH contains fabricated parts only. Numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the family Number, such as `MHA-DT-03-T006` for a cone-gear configuration: `T006` is a tooth count, not an identity sequence, so it keeps its three digits. Installed channel spring stretch variants retain the unqualified base Number.
 
-Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<nn>`, sequenced per parent from `01`: `MHA-DT-005-TL-01` is the cone pivot post's bond cradle. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-pivot-post-tl-bond-cradle`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-006-TL-000`, using the `000` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's (`MHA-CH-006-TL-30` to `MHA-CH-006-TL-51`): those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them, and they carry TL Numbers like the made fixture parts.
+Vendor parts are purchased finished parts. Supplier, SKU and commercial-process evidence decides that a part is a vendor part. Each vendor part belongs to the assembly that uses it directly. Its stem is the parent assembly's prefix, then `vn`, then the descriptive name, such as `dt-vn-cone-lock-knob`; a name that already began with the parent prefix drops the repeat, so the measuring stick's stop-plate screw is `ms-vn-stop-plate-screw`. Its Number puts `VN` after the parent's category and counts from `50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. When several assemblies use one vendor family directly, each of those assemblies has its own vendor identity, registry row and native model. The identities may share one supplier and SKU geometry recipe; see [Vendor families used by several assemblies](#vendor-families-used-by-several-assemblies). Containment through a sub-assembly or the top assembly is not direct use.
 
-Components of a built-up part are the detail parts a finished part may be made from when its own drawing notes permit it (`BUILT_UP_PERMISSION_NOTE` in its notes module). They are ordinary machine parts: each takes the next free Number in its category and its own stem, such as `ch-rocker-hub` (MHA-CH-012) and `ch-rocker-strap` (MHA-CH-013) for the rocker arm MHA-CH-006, and the table's part counts include them. The finished part stays the assembly's part, so a component never enters an assembly or BOM. Its registry row instead names its parent's stem in `component_of`, and the coverage contract (`test_part_coverage.py`) counts it reachable through that parent and refuses a `component_of` parent whose notes do not permit the built-up route. A component's drawing gives it as supplied to the joint; sizes finished after joining print on the parent's drawing only.
+Parent-scoped native parts keep separate identities even when they use the same purchased SKU. Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules, not in a helper named after one consuming parent.
 
-| Prefix | Category | Parts |
-|---|---|---:|
-| `ha` / `HA` | Harmonic analyzer | 0 |
-| `ch` / `CH` | Channel | 13 |
-| `dt` / `DT` | Drive train | 35 |
-| `fr` / `FR` | Frame | 5 |
-| `mg` / `MG` | Magnifier | 10 |
-| `pd` / `PD` | Paper drive | 23 |
-| `pn` / `PN` | Pen | 5 |
-| `ms` / `MS` | Measuring stick | 3 |
-| `sm` / `SM` | Summing | 4 |
-| `vn` / `VN` | Vendor parts | 68 |
-| `sh` / `SH` | Shared fabricated parts | 2 |
+Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-DT-05-TL-01` is the cone pivot post's bond cradle. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-pivot-post-tl-bond-cradle`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-71`.
 
-Supplier, SKU and commercial-process evidence determines VN classification before assembly sharing is considered. SH contains fabricated parts used directly by multiple assemblies, currently the front and back column clamps. Transitive containment by the top assembly does not make a part shared. Wheel axle nut is VN by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
+Components of a built-up part are the detail parts a finished part may be made from when its own drawing notes permit it (`BUILT_UP_PERMISSION_NOTE` in its notes module). They are ordinary machine parts: each takes the next free Number in its category and its own stem, such as `ch-rocker-hub` (MHA-CH-12) and `ch-rocker-strap` (MHA-CH-13) for the rocker arm MHA-CH-06, and the table's part counts include them. The finished part stays the assembly's part, so a component never enters an assembly or BOM. Its registry row instead names its parent's stem in `component_of`, and the coverage contract (`test_part_coverage.py`) counts it reachable through that parent and refuses a `component_of` parent whose notes do not permit the built-up route. A component's drawing gives it as supplied to the joint; sizes finished after joining print on the parent's drawing only.
+
+| Prefix | Category | Fabricated parts | Vendor parts |
+|---|---|---:|---:|
+| `ha` / `HA` | Harmonic analyzer | 0 | 0 |
+| `ch` / `CH` | Channel | 13 | 8 |
+| `dt` / `DT` | Drive train | 35 | 19 |
+| `fr` / `FR` | Frame | 5 | 5 |
+| `mg` / `MG` | Magnifier | 10 | 7 |
+| `pd` / `PD` | Paper drive | 23 | 18 |
+| `pn` / `PN` | Pen | 5 | 8 |
+| `ms` / `MS` | Measuring stick | 3 | 2 |
+| `sm` / `SM` | Summing | 4 | 6 |
+| `sh` / `SH` | Shared fabricated parts | 2 | 0 |
+
+SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
 
 Purchased ANSI #25 inner, outer and connecting chain links and finished ISO 2338 m6 crank
-hub dowel stock are VN, including cut-to-length modifications. Pins machined
+hub dowel stock are vendor parts, including cut-to-length modifications. Pins machined
 from raw drill rod remain owned by their subsystem.
 
 Doit selection uses the underscore stem:
 
 ```powershell
 uv run python -m doit part:dt_cone_gear
+uv run python -m doit part:dt_vn_cone_lock_knob
 uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit drawing:dt_drive_train_assembly
 ```
@@ -51,7 +55,7 @@ contract. Each part's frozen registry row, selected by canonical `part_name`,
 owns its Number; a consumer depends only on its own row.
 Configuration variants retain their qualified drawing Numbers; family grouping
 does not replace them.
-Assembly `000` Numbers are assembly references, not part Numbers.
+Assembly `00` Numbers are assembly references, not part Numbers.
 
 Assembly `allowed_free_stems` and `required_free_stems` lists use canonical
 registered part stems, including vendor families coupled to moving components.
@@ -95,274 +99,357 @@ table growth and view outlines still determine containment; offline wrapping
 budgets do not replace the native audit or complete-package visual review.
 
 
+
 ## Historical evidence
 
-Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Read their identifiers through the table below when locating a current model. Current instructions, registry references, commands and asset links use canonical identities. A migration notice on a historical document does not change the evidence or certify it against the current model.
+Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Their identifiers come from one of three epochs:
+
+- v39 release identifiers: unprefixed stems with `MHA-NNN` part and `MHA-ANN` assembly Numbers, recorded in `identity-migration-map.json`.
+- Category identifiers, current from `bfde892a5` (2026-10-02) until 2026-10-19: prefixed stems, three-digit `MHA-<CATEGORY>-<NNN>` Numbers such as `MHA-DT-005` and `MHA-DT-005-TL-01`, assembly Numbers ending `000`, and one machine-wide vendor category with `vn-` stems and `MHA-VN-<NNN>` Numbers.
+- Current identifiers, from 2026-10-19, as described above.
+
+Read older identifiers through the table below when locating a current model. Current instructions, registry references, commands and asset links use current identities. A migration notice on a historical document does not change the evidence or certify it against the current model.
 
 ## Identity migration table
 
-The migration table is a historical lookup inventory, not a live family-count assertion: its released inventory is frozen, while the section below records post-cutover additions and retirements. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
+The table translates every v39 and category identity to its current identity, including retired families, shop fixtures and assemblies. The v39 and category columns are lookup keys for historical evidence, not supported aliases for current commands or files. A family created after the v39 release has no v39 stem or Number (—). A category vendor family that several assemblies use directly has one row per current identity, so its v39 and category cells repeat. Every other category Number maps to the same sequence written with two digits: MHA-DT-005 is now MHA-DT-05, MHA-DT-000 is MHA-DT-00 and MHA-CH-006-TL-000 is MHA-CH-06-TL-00.
 
-Retired Numbers keep their rows here for historical lookup and are never reissued. MHA-PD-021 `pd-latch-hook-bracket` (MHA-170) and MHA-VN-045 `vn-latch-hook-rivet` (MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-014 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-VN-043 screws. MHA-VN-026 (MHA-131), the old 1/2-inch `vn-knife-hanger-washer`, remains retired. The new #10 18-8 washer uses the same functional canonical stem but the new Number MHA-VN-060; this does not revive VN-026. MHA-VN-024 retains `vn-knife-hanger-stud` and the drawing title **Bolt**, now made by cutting #10-24 hex-head stock 92314A253 and seated on the new washer on the MHA-FR-002 faced top. The former #6 socket-head/counterbore-floor route is obsolete. MHA-VN-037 `vn-transgear-collar-cross-pin` (MHA-154) is retired: the true D-bore of the MHA-PD-022 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains. MHA-PN-003 `pn-pen-marker` (MHA-050) is retired: the pen is a purchased Sharpie Fine Point, MHA-VN-065 `vn-pen-marker`, not a turned brass barrel.
+Retired Numbers keep their rows here for historical lookup and are never reissued; a retired machine or fixture Number stays reserved in its two-digit form. MHA-PD-21 `pd-latch-hook-bracket` (category MHA-PD-021, v39 MHA-170) and the category vendor family `vn-latch-hook-rivet` (MHA-VN-045, v39 MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-14 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-PD-VN-59 screws. The old 1/2-inch `vn-knife-hanger-washer` (MHA-VN-026, v39 MHA-131) remains retired. The #10 18-8 washer that replaced it took the new category Number MHA-VN-060 under the same functional stem and is now `sm-vn-knife-hanger-washer`, MHA-SM-VN-54; it did not revive VN-026. `sm-vn-knife-hanger-stud` (MHA-SM-VN-52, category MHA-VN-024) keeps the drawing title **Bolt**; it is made by cutting #10-24 hex-head stock 92314A253 and is seated on the new washer on the MHA-FR-02 faced top. The former #6 socket-head/counterbore-floor route is obsolete. The category vendor family `vn-transgear-collar-cross-pin` (MHA-VN-037, v39 MHA-154) is retired: the true D-bore of the MHA-PD-22 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains. MHA-PN-03 `pn-pen-marker` (category MHA-PN-003, v39 MHA-050) is retired: the pen is a purchased Sharpie Fine Point, `pn-vn-pen-marker` MHA-PN-VN-56, not a turned brass barrel. Retired category vendor Numbers (MHA-VN-008, MHA-VN-026, MHA-VN-037 and MHA-VN-045) have no current form.
 
-The measuring-stick cutover is recorded here and in the current registries, not in the sealed release identity map: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS Numbers and the HA part Numbers are never reissued. `cad/config/identity-migration-map.json` retains its released v39 bytes for provenance and release pairing; the v39 web model keeps its release-pinned identities until the next model release.
+The measuring-stick cutover is recorded here and in the current registries, not in the sealed release identity map: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS category Numbers, and the HA part Numbers (MHA-HA-01 and MHA-HA-02 in two-digit form) are never reissued. `cad/config/identity-migration-map.json` retains its released v39 bytes for provenance and release pairing; the v39 web model keeps its release-pinned identities until the next model release.
 
-| Kind | Old stem | Canonical stem | Old Number | Current Number |
-|---|---|---|---|---|
-| part | `measuring-stick` | `ms-stick` | MHA-046 | MHA-MS-001 |
-| part | `measuring-stick-stop` | `ms-stop-block` | MHA-122 | MHA-MS-002 |
-| part | — | `ms-stop-plate` | — | MHA-MS-003 |
-| part | `amplitude-bar` | `ch-amplitude-bar` | MHA-003 | MHA-CH-001 |
-| part | `channel-lever` | `ch-channel-lever` | MHA-009 | MHA-CH-002 |
-| part | `connecting-rod` | `ch-connecting-rod` | MHA-017 | MHA-CH-003 |
-| part | `fulcrum-shaft` | `ch-fulcrum-shaft` | MHA-031 | MHA-CH-004 |
-| part | `pivot-shaft` | `ch-pivot-shaft` | MHA-065 | MHA-CH-005 |
-| part | `rocker-arm` | `ch-rocker-arm` | MHA-071 | MHA-CH-006 |
-| part | `fulcrum-keeper` | `ch-fulcrum-keeper` | MHA-120 | MHA-CH-007 |
-| part | `pivot-bracket` | `ch-pivot-bracket` | MHA-123 | MHA-CH-008 |
-| retired part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 (retired; never reissued) |
-| part | — | `ch-rod-pivot-pin` | — | MHA-CH-010 |
-| part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
-| part | — | `ch-anchor-jam-nut` | — | MHA-CH-014 |
-| part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
-| part | `arbor-pedestal` | `dt-arbor-pedestal` | MHA-004 | MHA-DT-002 |
-| part | `cone-gear` | `dt-cone-gear` | MHA-013 | MHA-DT-003 |
-| part | `cone-gear-shaft` | `dt-cone-gear-shaft` | MHA-014 | MHA-DT-004 |
-| part | `cone-pivot-post` | `dt-cone-pivot-post` | MHA-016 | MHA-DT-005 |
-| part | `crank-arm` | `dt-crank-arm` | MHA-020 | MHA-DT-006 |
-| part | `crank-drive-gear` | `dt-crank-drive-gear` | MHA-021 | MHA-DT-007 |
-| part | `crank-handle` | `dt-crank-handle` | MHA-022 | MHA-DT-008 |
-| part | `crank-pin` | `dt-crank-pin` | MHA-024 | MHA-DT-009 |
-| part | `crank-pinion` | `dt-crank-pinion` | MHA-025 | MHA-DT-010 |
-| part | `crankshaft` | `dt-crankshaft` | MHA-026 | MHA-DT-011 |
-| part | `cylinder-gear` | `dt-cylinder-gear` | MHA-027 | MHA-DT-012 |
-| part | `cylinder-gear-shaft` | `dt-cylinder-gear-shaft` | MHA-028 | MHA-DT-013 |
-| part | `pinion-bracket` | `dt-pinion-bracket` | MHA-056 | MHA-DT-014 |
-| part | `pinion-handle` | `dt-pinion-handle` | MHA-058 | MHA-DT-015 |
-| part | `pinion-lever` | `dt-pinion-lever` | MHA-059 | MHA-DT-016 |
-| part | `pinion-lift-rod` | `dt-pinion-lift-rod` | MHA-060 | MHA-DT-017 |
-| part | `pinion-pivot-block` | `dt-pinion-pivot-block` | MHA-061 | MHA-DT-018 |
-| part | `pinion-pivot-shaft` | `dt-pinion-pivot-shaft` | MHA-062 | MHA-DT-019 |
-| part | `cone-swing-platform` | `dt-cone-swing-platform` | MHA-091 | MHA-DT-020 |
-| part | `cone-tip-block` | `dt-cone-tip-block` | MHA-092 | MHA-DT-021 |
-| part | `pinion-arbor` | `dt-pinion-arbor` | MHA-102 | MHA-DT-022 |
-| part | `pinion-cam` | `dt-pinion-cam` | MHA-104 | MHA-DT-023 |
-| part | `pinion-spring` | `dt-pinion-spring` | MHA-114 | MHA-DT-024 |
-| part | `pinion-cam-pin` | `dt-pinion-cam-pin` | MHA-116 | MHA-DT-025 |
-| part | `cylinder-end-disc` | `dt-cylinder-end-disc` | MHA-121 | MHA-DT-026 |
-| part | `crank-pin-ring` | `dt-crank-pin-ring` | MHA-128 | MHA-DT-027 |
-| part | `crank-pin-eye` | `dt-crank-pin-eye` | MHA-130 | MHA-DT-028 |
-| part | `crank-pinion-pin` | `dt-crank-pinion-pin` | MHA-134 | MHA-DT-029 |
-| part | `pinion-lever-pin` | `dt-pinion-lever-pin` | MHA-135 | MHA-DT-030 |
-| part | `crank-hub` | `dt-crank-hub` | MHA-137 | MHA-DT-031 |
-| part | `crank-hub-pin` | `vn-crank-hub-pin` | MHA-138 | MHA-VN-029 |
-| part | `crank-handle-pivot-screw` | `dt-crank-handle-pivot-screw` | MHA-139 | MHA-DT-032 |
-| part | `pinion-arbor-collar` | `dt-pinion-arbor-collar` | MHA-144 | MHA-DT-033 |
-| part | `crank-handle-ferrule` | `dt-crank-handle-ferrule` | MHA-152 | MHA-DT-034 |
-| part | `crank-handle-butt-cup` | `dt-crank-handle-butt-cup` | MHA-153 | MHA-DT-035 |
-| retired part | `crank-seat-washer` | `dt-crank-seat-washer` | MHA-172 | MHA-DT-036 (retired; never reissued) |
-| part | `harmonic-base` | `fr-harmonic-base` | MHA-035 | MHA-FR-001 |
-| part | `top-frame` | `fr-top-frame` | MHA-077 | MHA-FR-002 |
-| part | `tube-frame` | `fr-tube-frame` | MHA-083 | MHA-FR-003 |
-| part | `nameplate` | `fr-nameplate` | MHA-086 | MHA-FR-004 |
-| part | `rocker-arm-support` | `fr-rocker-arm-support` | MHA-089 | MHA-FR-005 |
-| part | `magnifying-bracket` | `mg-magnifying-bracket` | MHA-041 | MHA-MG-001 |
-| part | `magnifying-clamp` | `mg-magnifying-clamp` | MHA-042 | MHA-MG-002 |
-| part | `magnifying-lever` | `mg-magnifying-lever` | MHA-043 | MHA-MG-003 |
-| part | `magnifying-vertical-rod` | `mg-magnifying-vertical-rod` | MHA-044 | MHA-MG-004 |
-| part | `magnifying-wheel` | `mg-magnifying-wheel` | MHA-045 | MHA-MG-005 |
-| part | `output-fixture` | `mg-output-fixture` | MHA-047 | MHA-MG-006 |
-| part | `wheel-axle` | `mg-wheel-axle` | MHA-084 | MHA-MG-007 |
-| part | `wheel-bar` | `mg-wheel-bar` | MHA-085 | MHA-MG-008 |
-| part | `lever-wire` | `mg-lever-wire` | MHA-115 | MHA-MG-009 |
-| part | — | `mg-wheel-drum` | — | MHA-MG-010 |
-| part | — | `mg-wheel-axle-spacer` | — | MHA-MG-011 |
-| part | `chain-inner-link` | `vn-chain-inner-link` | MHA-006 | MHA-VN-002 |
-| part | `chain-outer-link` | `vn-chain-outer-link` | MHA-007 | MHA-VN-003 |
-| retired part | `chain-sprocket` | `pd-chain-sprocket` | MHA-008 | MHA-PD-001 (retired; never reissued) |
-| part | `platen` | `pd-platen` | MHA-066 | MHA-PD-002 |
-| part | `platen-clip` | `pd-platen-clip` | MHA-067 | MHA-PD-003 |
-| part | `platen-paper` | `pd-platen-paper` | MHA-068 | MHA-PD-004 |
-| part | `platen-rack` | `pd-platen-rack` | MHA-069 | MHA-PD-005 |
-| part | `rack-pinion` | `pd-rack-pinion` | MHA-070 | MHA-PD-006 |
-| part | `support-bar` | `pd-support-bar` | MHA-074 | MHA-PD-007 |
-| part | `transgear-knob-shaft` | `pd-transgear-knob-shaft` | MHA-078 | MHA-PD-008 |
-| part | `transgear-removable` | `pd-transgear-removable` | MHA-081 | MHA-PD-009 |
-| part | `transgear-feed-pinion` | `pd-transgear-feed-pinion` | MHA-110 | MHA-PD-010 |
-| part | `platen-guide` | `pd-platen-guide` | MHA-111 | MHA-PD-011 |
-| part | `guide-lock` | `pd-guide-lock` | MHA-112 | MHA-PD-012 |
-| part | `transgear-thumbnut` | `pd-transgear-thumbnut` | MHA-126 | MHA-PD-013 |
-| part | `latch-hook` | `pd-latch-hook` | MHA-127 | MHA-PD-014 |
-| part | `transgear-knob-thrust-ring` | `pd-transgear-knob-thrust-ring` | MHA-156 | MHA-PD-015 |
-| part | `transgear-knob-cup` | `pd-transgear-knob-cup` | MHA-157 | MHA-PD-016 |
-| part | `transgear-disc-hub` | `pd-transgear-disc-hub` | MHA-159 | MHA-PD-017 |
-| part | `transgear-arm` | `pd-transgear-arm` | MHA-164 | MHA-PD-018 |
-| part | `transgear-arm-plate` | `pd-transgear-arm-plate` | MHA-165 | MHA-PD-019 |
-| part | `transgear-pivot-spacer` | `pd-transgear-pivot-spacer` | MHA-167 | MHA-PD-020 |
-| part | `latch-hook-bracket` | `pd-latch-hook-bracket` | MHA-170 | MHA-PD-021 |
-| part | `transgear-drive-collar` | `pd-transgear-drive-collar` | MHA-177 | MHA-PD-022 |
-| part | `transgear-pin` | `pd-transgear-pin` | MHA-179 | MHA-PD-023 |
-| part | `transgear-rear-bushing` | `pd-transgear-rear-bushing` | MHA-180 | MHA-PD-024 |
-| part | `transgear-front-bushing` | `pd-transgear-front-bushing` | MHA-181 | MHA-PD-025 |
-| part | `pen-frame` | `pn-pen-frame` | MHA-048 | MHA-PN-001 |
-| part | `pen-hanger` | `pn-pen-hanger` | MHA-049 | MHA-PN-002 |
-| part | `pen-marker` | `pn-pen-marker` | MHA-050 | MHA-PN-003 |
-| part | `pen-rod` | `pn-pen-rod` | MHA-051 | MHA-PN-004 |
-| part | `pen-v-block` | `pn-pen-v-block` | MHA-053 | MHA-PN-005 |
-| part | `pen-wire` | `pn-pen-wire` | MHA-100 | MHA-PN-006 |
-| part | — | `pn-pen-adjust-screw` | — | MHA-PN-007 |
-| part | `gooseneck` | `sm-gooseneck` | MHA-032 | MHA-SM-001 |
-| part | `knife-mount` | `sm-knife-mount` | MHA-037 | MHA-SM-002 |
-| part | `summing-lever` | `sm-summing-lever` | MHA-073 | MHA-SM-003 |
-| part | — | `sm-gooseneck-spring-screw` | — | MHA-SM-004 |
-| part | `boss-hook` | `vn-boss-hook` | MHA-005 | MHA-VN-001 |
-| part | `channel-spring-installed` | `vn-channel-spring-installed` | MHA-011 | MHA-VN-004 |
-| part | `counter-spring` | `vn-counter-spring` | MHA-019 | MHA-VN-005 |
-| part | `fillister-screw` | `vn-fillister-screw` | MHA-030 | MHA-VN-006 |
-| part | `hanger-screw` | `vn-hanger-screw` | MHA-034 | MHA-VN-007 |
-| retired part | `hex-bolt` | `vn-hex-bolt` | MHA-036 | MHA-VN-008 (retired; never reissued) |
-| part | `lag-screw` | `vn-lag-screw` | MHA-039 | MHA-VN-009 |
-| part | `pen-set-screw` | `vn-pen-set-screw` | MHA-052 | MHA-VN-010 |
-| part | `thumb-screw` | `vn-thumb-screw` | MHA-075 | MHA-VN-011 |
-| part | `spring-hook` | `vn-spring-hook` | MHA-090 | MHA-VN-012 |
-| part | `cone-lock-knob` | `vn-cone-lock-knob` | MHA-093 | MHA-VN-013 |
-| part | `cone-pivot-screw` | `vn-cone-pivot-screw` | MHA-094 | MHA-VN-014 |
-| part | `swing-stop-screw` | `vn-swing-stop-screw` | MHA-095 | MHA-VN-015 |
-| part | `cone-tip-collar` | `vn-cone-tip-collar` | MHA-096 | MHA-VN-016 |
-| part | `cone-tip-adjuster` | `vn-cone-tip-adjuster` | MHA-097 | MHA-VN-017 |
-| part | `cone-tip-pinch-screw` | `vn-cone-tip-pinch-screw` | MHA-098 | MHA-VN-018 |
-| part | `slotted-screw` | `vn-slotted-screw` | MHA-101 | MHA-VN-019 |
-| part | `foot-screw` | `vn-foot-screw` | MHA-103 | MHA-VN-020 |
-| part | `clamp-screw` | `vn-clamp-screw` | MHA-107 | MHA-VN-021 |
-| part | `frame-side-screw` | `vn-frame-side-screw` | MHA-117 | MHA-VN-022 |
-| part | `gooseneck-set-screw` | `vn-gooseneck-set-screw` | MHA-118 | MHA-VN-023 |
-| part | `knife-hanger-stud` | `vn-knife-hanger-stud` | MHA-119 | MHA-VN-024 |
-| part | `wheel-axle-nut` | `vn-wheel-axle-nut` | MHA-129 | MHA-VN-025 |
-| retired part | `knife-hanger-washer` | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-131 | MHA-VN-026 (retired; never reissued) |
-| part | `frame-cross-screw` | `vn-frame-cross-screw` | MHA-132 | MHA-VN-027 |
-| part | `tube-frame-cap` | `vn-tube-frame-cap` | MHA-133 | MHA-VN-028 |
-| part | `cone-tip-block-screw` | `vn-cone-tip-block-screw` | MHA-140 | MHA-VN-030 |
-| part | `post-mount-screw` | `vn-post-mount-screw` | MHA-142 | MHA-VN-031 |
-| part | `pedestal-hold-down-screw` | `vn-pedestal-hold-down-screw` | MHA-143 | MHA-VN-032 |
-| part | `pinion-strap-pin` | `vn-pinion-strap-pin` | MHA-145 | MHA-VN-033 |
-| part | `arbor-set-screw` | `vn-arbor-set-screw` | MHA-147 | MHA-VN-034 |
-| part | `keeper-chain` | `vn-keeper-chain` | MHA-149 | MHA-VN-035 |
-| part | `keeper-chain-link` | `vn-keeper-chain-link` | MHA-150 | MHA-VN-036 |
-| part | `transgear-collar-cross-pin` | `vn-transgear-collar-cross-pin` | MHA-154 | MHA-VN-037 |
-| part | `transgear-knob-drive-pin` | `vn-transgear-knob-drive-pin` | MHA-155 | MHA-VN-038 |
-| part | `transgear-disc-screw` | `vn-transgear-disc-screw` | MHA-161 | MHA-VN-039 |
-| part | `transgear-arm-plate-screw` | `vn-transgear-arm-plate-screw` | MHA-166 | MHA-VN-040 |
-| part | `transgear-pivot-screw` | `vn-transgear-pivot-screw` | MHA-168 | MHA-VN-041 |
-| part | `transgear-latch-pin` | `vn-transgear-latch-pin` | MHA-169 | MHA-VN-042 |
-| part | `latch-hook-bracket-screw` | `vn-latch-hook-bracket-screw` | MHA-171 | MHA-VN-043 |
-| part | `crank-seat-drive-pin` | `vn-crank-seat-drive-pin` | MHA-173 | MHA-VN-044 |
-| part | `latch-hook-rivet` | `vn-latch-hook-rivet` | MHA-175 | MHA-VN-045 |
-| part | `guide-lock-screw` | `vn-guide-lock-screw` | MHA-176 | MHA-VN-046 |
-| part | `transgear-retaining-ring` | `vn-transgear-retaining-ring` | MHA-182 | MHA-VN-047 |
-| part | `transgear-knob-cup-pin` | `vn-transgear-knob-cup-pin` | MHA-183 | MHA-VN-048 |
-| part | `transgear-pivot-spring` | `vn-transgear-pivot-spring` | MHA-184 | MHA-VN-049 |
-| part | — | `vn-magnifying-bracket-screw` | — | MHA-VN-050 |
-| part | — | `vn-knife-mount-dowel` | — | MHA-VN-051 |
-| part | — | `vn-cylinder-bank-spring` | — | MHA-VN-052 |
-| part | — | `vn-rocker-bank-spring` | — | MHA-VN-053 |
-| part | — | `vn-ms-stop-plate-screw` | — | MHA-VN-054 |
-| part | — | `vn-fulcrum-set-screw` | — | MHA-VN-055 |
-| part | — | `vn-transgear-arm-plate-locating-pin` | — | MHA-VN-056 |
-| part | — | `vn-wheel-axle-back-washer` | — | MHA-VN-057 |
-| part | — | `vn-wheel-axle-front-washer` | — | MHA-VN-058 |
-| part | — | `vn-platen-clip-screw` | — | MHA-VN-059 |
-| part | — | `vn-pen-marker` | — | MHA-VN-065 |
-| part | — | `vn-pen-rod-set-screw` | — | MHA-VN-061 |
-| part | — | `vn-pen-adjust-nut` | — | MHA-VN-062 |
-| part | — | `vn-pen-hanger-nut` | — | MHA-VN-063 |
-| part | — | `vn-pen-hanger-jam-nut` | — | MHA-VN-064 |
-| part | — | `vn-lever-wire` | — | MHA-VN-066 |
-| part | — | `vn-pen-wire` | — | MHA-VN-067 |
-| part | — | `vn-transgear-pivot-shim` | — | MHA-VN-069 |
-| part | — | `vn-rocker-thrust-washer` | — | MHA-VN-070 |
-| part | — | `vn-bracket-hold-down-screw` | — | MHA-VN-071 |
-| part | — | `vn-boss-hook-jam-nut` | — | MHA-VN-072 |
-| part | `column-clamp-front` | `sh-column-clamp-front` | MHA-105 | MHA-SH-001 |
-| part | `column-clamp-back` | `sh-column-clamp-back` | MHA-106 | MHA-SH-002 |
-| assembly | `frame` | `fr-frame` | MHA-A04 | MHA-FR-000 |
-| assembly | `drive-train` | `dt-drive-train` | MHA-A03 | MHA-DT-000 |
-| assembly | `channel` | `ch-channel` | MHA-A02 | MHA-CH-000 |
-| assembly | `summing` | `sm-summing` | MHA-A07 | MHA-SM-000 |
-| assembly | `magnifier` | `mg-magnifier` | MHA-A05 | MHA-MG-000 |
-| assembly | `pen` | `pn-pen` | MHA-A01 | MHA-PN-000 |
-| assembly | `paper-drive` | `pd-paper-drive` | MHA-A06 | MHA-PD-000 |
-| assembly | — | `ms-measuring-stick` | — | MHA-MS-000 |
-| assembly | `harmonic-analyzer` | `ha-harmonic-analyzer` | MHA-A08 | MHA-HA-000 |
+| Kind | v39 stem | v39 Number | Category stem | Category Number | Current stem | Current Number |
+|---|---|---|---|---|---|---|
+| part | `measuring-stick` | MHA-046 | `ms-stick` | MHA-MS-001 | `ms-stick` | MHA-MS-01 |
+| part | `measuring-stick-stop` | MHA-122 | `ms-stop-block` | MHA-MS-002 | `ms-stop-block` | MHA-MS-02 |
+| part | — | — | `ms-stop-plate` | MHA-MS-003 | `ms-stop-plate` | MHA-MS-03 |
+| part | `amplitude-bar` | MHA-003 | `ch-amplitude-bar` | MHA-CH-001 | `ch-amplitude-bar` | MHA-CH-01 |
+| part | `channel-lever` | MHA-009 | `ch-channel-lever` | MHA-CH-002 | `ch-channel-lever` | MHA-CH-02 |
+| part | `connecting-rod` | MHA-017 | `ch-connecting-rod` | MHA-CH-003 | `ch-connecting-rod` | MHA-CH-03 |
+| part | `fulcrum-shaft` | MHA-031 | `ch-fulcrum-shaft` | MHA-CH-004 | `ch-fulcrum-shaft` | MHA-CH-04 |
+| part | `pivot-shaft` | MHA-065 | `ch-pivot-shaft` | MHA-CH-005 | `ch-pivot-shaft` | MHA-CH-05 |
+| part | `rocker-arm` | MHA-071 | `ch-rocker-arm` | MHA-CH-006 | `ch-rocker-arm` | MHA-CH-06 |
+| part | `fulcrum-keeper` | MHA-120 | `ch-fulcrum-keeper` | MHA-CH-007 | `ch-fulcrum-keeper` | MHA-CH-07 |
+| part | `pivot-bracket` | MHA-123 | `ch-pivot-bracket` | MHA-CH-008 | `ch-pivot-bracket` | MHA-CH-08 |
+| retired part | `rocker-thrust-washer` | MHA-148 | `ch-rocker-thrust-washer` | MHA-CH-009 | — | MHA-CH-09 (retired; never reissued) |
+| part | — | — | `ch-rod-pivot-pin` | MHA-CH-010 | `ch-rod-pivot-pin` | MHA-CH-10 |
+| part | — | — | `ch-bar-pivot-pin` | MHA-CH-011 | `ch-bar-pivot-pin` | MHA-CH-11 |
+| part | — | — | `ch-anchor-jam-nut` | MHA-CH-014 | `ch-anchor-jam-nut` | MHA-CH-14 |
+| part | — | — | `ch-rocker-hub` | MHA-CH-012 | `ch-rocker-hub` | MHA-CH-12 |
+| part | — | — | `ch-rocker-strap` | MHA-CH-013 | `ch-rocker-strap` | MHA-CH-13 |
+| part | `alignment-pinion` | MHA-002 | `dt-alignment-pinion` | MHA-DT-001 | `dt-alignment-pinion` | MHA-DT-01 |
+| part | `arbor-pedestal` | MHA-004 | `dt-arbor-pedestal` | MHA-DT-002 | `dt-arbor-pedestal` | MHA-DT-02 |
+| part | `cone-gear` | MHA-013 | `dt-cone-gear` | MHA-DT-003 | `dt-cone-gear` | MHA-DT-03 |
+| part | `cone-gear-shaft` | MHA-014 | `dt-cone-gear-shaft` | MHA-DT-004 | `dt-cone-gear-shaft` | MHA-DT-04 |
+| part | `cone-pivot-post` | MHA-016 | `dt-cone-pivot-post` | MHA-DT-005 | `dt-cone-pivot-post` | MHA-DT-05 |
+| part | `crank-arm` | MHA-020 | `dt-crank-arm` | MHA-DT-006 | `dt-crank-arm` | MHA-DT-06 |
+| part | `crank-drive-gear` | MHA-021 | `dt-crank-drive-gear` | MHA-DT-007 | `dt-crank-drive-gear` | MHA-DT-07 |
+| part | `crank-handle` | MHA-022 | `dt-crank-handle` | MHA-DT-008 | `dt-crank-handle` | MHA-DT-08 |
+| part | `crank-pin` | MHA-024 | `dt-crank-pin` | MHA-DT-009 | `dt-crank-pin` | MHA-DT-09 |
+| part | `crank-pinion` | MHA-025 | `dt-crank-pinion` | MHA-DT-010 | `dt-crank-pinion` | MHA-DT-10 |
+| part | `crankshaft` | MHA-026 | `dt-crankshaft` | MHA-DT-011 | `dt-crankshaft` | MHA-DT-11 |
+| part | `cylinder-gear` | MHA-027 | `dt-cylinder-gear` | MHA-DT-012 | `dt-cylinder-gear` | MHA-DT-12 |
+| part | `cylinder-gear-shaft` | MHA-028 | `dt-cylinder-gear-shaft` | MHA-DT-013 | `dt-cylinder-gear-shaft` | MHA-DT-13 |
+| part | `pinion-bracket` | MHA-056 | `dt-pinion-bracket` | MHA-DT-014 | `dt-pinion-bracket` | MHA-DT-14 |
+| part | `pinion-handle` | MHA-058 | `dt-pinion-handle` | MHA-DT-015 | `dt-pinion-handle` | MHA-DT-15 |
+| part | `pinion-lever` | MHA-059 | `dt-pinion-lever` | MHA-DT-016 | `dt-pinion-lever` | MHA-DT-16 |
+| part | `pinion-lift-rod` | MHA-060 | `dt-pinion-lift-rod` | MHA-DT-017 | `dt-pinion-lift-rod` | MHA-DT-17 |
+| part | `pinion-pivot-block` | MHA-061 | `dt-pinion-pivot-block` | MHA-DT-018 | `dt-pinion-pivot-block` | MHA-DT-18 |
+| part | `pinion-pivot-shaft` | MHA-062 | `dt-pinion-pivot-shaft` | MHA-DT-019 | `dt-pinion-pivot-shaft` | MHA-DT-19 |
+| part | `cone-swing-platform` | MHA-091 | `dt-cone-swing-platform` | MHA-DT-020 | `dt-cone-swing-platform` | MHA-DT-20 |
+| part | `cone-tip-block` | MHA-092 | `dt-cone-tip-block` | MHA-DT-021 | `dt-cone-tip-block` | MHA-DT-21 |
+| part | `pinion-arbor` | MHA-102 | `dt-pinion-arbor` | MHA-DT-022 | `dt-pinion-arbor` | MHA-DT-22 |
+| part | `pinion-cam` | MHA-104 | `dt-pinion-cam` | MHA-DT-023 | `dt-pinion-cam` | MHA-DT-23 |
+| part | `pinion-spring` | MHA-114 | `dt-pinion-spring` | MHA-DT-024 | `dt-pinion-spring` | MHA-DT-24 |
+| part | `pinion-cam-pin` | MHA-116 | `dt-pinion-cam-pin` | MHA-DT-025 | `dt-pinion-cam-pin` | MHA-DT-25 |
+| part | `cylinder-end-disc` | MHA-121 | `dt-cylinder-end-disc` | MHA-DT-026 | `dt-cylinder-end-disc` | MHA-DT-26 |
+| part | `crank-pin-ring` | MHA-128 | `dt-crank-pin-ring` | MHA-DT-027 | `dt-crank-pin-ring` | MHA-DT-27 |
+| part | `crank-pin-eye` | MHA-130 | `dt-crank-pin-eye` | MHA-DT-028 | `dt-crank-pin-eye` | MHA-DT-28 |
+| part | `crank-pinion-pin` | MHA-134 | `dt-crank-pinion-pin` | MHA-DT-029 | `dt-crank-pinion-pin` | MHA-DT-29 |
+| part | `pinion-lever-pin` | MHA-135 | `dt-pinion-lever-pin` | MHA-DT-030 | `dt-pinion-lever-pin` | MHA-DT-30 |
+| part | `crank-hub` | MHA-137 | `dt-crank-hub` | MHA-DT-031 | `dt-crank-hub` | MHA-DT-31 |
+| part | `crank-hub-pin` | MHA-138 | `vn-crank-hub-pin` | MHA-VN-029 | `dt-vn-crank-hub-pin` | MHA-DT-VN-59 |
+| part | `crank-handle-pivot-screw` | MHA-139 | `dt-crank-handle-pivot-screw` | MHA-DT-032 | `dt-crank-handle-pivot-screw` | MHA-DT-32 |
+| part | `pinion-arbor-collar` | MHA-144 | `dt-pinion-arbor-collar` | MHA-DT-033 | `dt-pinion-arbor-collar` | MHA-DT-33 |
+| part | `crank-handle-ferrule` | MHA-152 | `dt-crank-handle-ferrule` | MHA-DT-034 | `dt-crank-handle-ferrule` | MHA-DT-34 |
+| part | `crank-handle-butt-cup` | MHA-153 | `dt-crank-handle-butt-cup` | MHA-DT-035 | `dt-crank-handle-butt-cup` | MHA-DT-35 |
+| retired part | `crank-seat-washer` | MHA-172 | `dt-crank-seat-washer` | MHA-DT-036 | — | MHA-DT-36 (retired; never reissued) |
+| part | `harmonic-base` | MHA-035 | `fr-harmonic-base` | MHA-FR-001 | `fr-harmonic-base` | MHA-FR-01 |
+| part | `top-frame` | MHA-077 | `fr-top-frame` | MHA-FR-002 | `fr-top-frame` | MHA-FR-02 |
+| part | `tube-frame` | MHA-083 | `fr-tube-frame` | MHA-FR-003 | `fr-tube-frame` | MHA-FR-03 |
+| part | `nameplate` | MHA-086 | `fr-nameplate` | MHA-FR-004 | `fr-nameplate` | MHA-FR-04 |
+| part | `rocker-arm-support` | MHA-089 | `fr-rocker-arm-support` | MHA-FR-005 | `fr-rocker-arm-support` | MHA-FR-05 |
+| part | `magnifying-bracket` | MHA-041 | `mg-magnifying-bracket` | MHA-MG-001 | `mg-magnifying-bracket` | MHA-MG-01 |
+| part | `magnifying-clamp` | MHA-042 | `mg-magnifying-clamp` | MHA-MG-002 | `mg-magnifying-clamp` | MHA-MG-02 |
+| part | `magnifying-lever` | MHA-043 | `mg-magnifying-lever` | MHA-MG-003 | `mg-magnifying-lever` | MHA-MG-03 |
+| part | `magnifying-vertical-rod` | MHA-044 | `mg-magnifying-vertical-rod` | MHA-MG-004 | `mg-magnifying-vertical-rod` | MHA-MG-04 |
+| part | `magnifying-wheel` | MHA-045 | `mg-magnifying-wheel` | MHA-MG-005 | `mg-magnifying-wheel` | MHA-MG-05 |
+| part | `output-fixture` | MHA-047 | `mg-output-fixture` | MHA-MG-006 | `mg-output-fixture` | MHA-MG-06 |
+| part | `wheel-axle` | MHA-084 | `mg-wheel-axle` | MHA-MG-007 | `mg-wheel-axle` | MHA-MG-07 |
+| part | `wheel-bar` | MHA-085 | `mg-wheel-bar` | MHA-MG-008 | `mg-wheel-bar` | MHA-MG-08 |
+| retired part | `lever-wire` | MHA-115 | `mg-lever-wire` | MHA-MG-009 | — (replaced by `mg-vn-lever-wire`, MHA-MG-VN-56) | MHA-MG-09 (retired; never reissued) |
+| part | — | — | `mg-wheel-drum` | MHA-MG-010 | `mg-wheel-drum` | MHA-MG-10 |
+| part | — | — | `mg-wheel-axle-spacer` | MHA-MG-011 | `mg-wheel-axle-spacer` | MHA-MG-11 |
+| part | `chain-inner-link` | MHA-006 | `vn-chain-inner-link` | MHA-VN-002 | `pd-vn-chain-inner-link` | MHA-PD-VN-50 |
+| part | `chain-outer-link` | MHA-007 | `vn-chain-outer-link` | MHA-VN-003 | `pd-vn-chain-outer-link` | MHA-PD-VN-51 |
+| retired part | `chain-sprocket` | MHA-008 | `pd-chain-sprocket` | MHA-PD-001 | — | MHA-PD-01 (retired; never reissued) |
+| part | `platen` | MHA-066 | `pd-platen` | MHA-PD-002 | `pd-platen` | MHA-PD-02 |
+| part | `platen-clip` | MHA-067 | `pd-platen-clip` | MHA-PD-003 | `pd-platen-clip` | MHA-PD-03 |
+| part | `platen-paper` | MHA-068 | `pd-platen-paper` | MHA-PD-004 | `pd-platen-paper` | MHA-PD-04 |
+| part | `platen-rack` | MHA-069 | `pd-platen-rack` | MHA-PD-005 | `pd-platen-rack` | MHA-PD-05 |
+| part | `rack-pinion` | MHA-070 | `pd-rack-pinion` | MHA-PD-006 | `pd-rack-pinion` | MHA-PD-06 |
+| part | `support-bar` | MHA-074 | `pd-support-bar` | MHA-PD-007 | `pd-support-bar` | MHA-PD-07 |
+| part | `transgear-knob-shaft` | MHA-078 | `pd-transgear-knob-shaft` | MHA-PD-008 | `pd-transgear-knob-shaft` | MHA-PD-08 |
+| part | `transgear-removable` | MHA-081 | `pd-transgear-removable` | MHA-PD-009 | `pd-transgear-removable` | MHA-PD-09 |
+| part | `transgear-feed-pinion` | MHA-110 | `pd-transgear-feed-pinion` | MHA-PD-010 | `pd-transgear-feed-pinion` | MHA-PD-10 |
+| part | `platen-guide` | MHA-111 | `pd-platen-guide` | MHA-PD-011 | `pd-platen-guide` | MHA-PD-11 |
+| part | `guide-lock` | MHA-112 | `pd-guide-lock` | MHA-PD-012 | `pd-guide-lock` | MHA-PD-12 |
+| part | `transgear-thumbnut` | MHA-126 | `pd-transgear-thumbnut` | MHA-PD-013 | `pd-transgear-thumbnut` | MHA-PD-13 |
+| part | `latch-hook` | MHA-127 | `pd-latch-hook` | MHA-PD-014 | `pd-latch-hook` | MHA-PD-14 |
+| part | `transgear-knob-thrust-ring` | MHA-156 | `pd-transgear-knob-thrust-ring` | MHA-PD-015 | `pd-transgear-knob-thrust-ring` | MHA-PD-15 |
+| part | `transgear-knob-cup` | MHA-157 | `pd-transgear-knob-cup` | MHA-PD-016 | `pd-transgear-knob-cup` | MHA-PD-16 |
+| part | `transgear-disc-hub` | MHA-159 | `pd-transgear-disc-hub` | MHA-PD-017 | `pd-transgear-disc-hub` | MHA-PD-17 |
+| part | `transgear-arm` | MHA-164 | `pd-transgear-arm` | MHA-PD-018 | `pd-transgear-arm` | MHA-PD-18 |
+| part | `transgear-arm-plate` | MHA-165 | `pd-transgear-arm-plate` | MHA-PD-019 | `pd-transgear-arm-plate` | MHA-PD-19 |
+| part | `transgear-pivot-spacer` | MHA-167 | `pd-transgear-pivot-spacer` | MHA-PD-020 | `pd-transgear-pivot-spacer` | MHA-PD-20 |
+| retired part | `latch-hook-bracket` | MHA-170 | `pd-latch-hook-bracket` | MHA-PD-021 | — | MHA-PD-21 (retired; never reissued) |
+| part | `transgear-drive-collar` | MHA-177 | `pd-transgear-drive-collar` | MHA-PD-022 | `pd-transgear-drive-collar` | MHA-PD-22 |
+| part | `transgear-pin` | MHA-179 | `pd-transgear-pin` | MHA-PD-023 | `pd-transgear-pin` | MHA-PD-23 |
+| part | `transgear-rear-bushing` | MHA-180 | `pd-transgear-rear-bushing` | MHA-PD-024 | `pd-transgear-rear-bushing` | MHA-PD-24 |
+| part | `transgear-front-bushing` | MHA-181 | `pd-transgear-front-bushing` | MHA-PD-025 | `pd-transgear-front-bushing` | MHA-PD-25 |
+| part | `pen-frame` | MHA-048 | `pn-pen-frame` | MHA-PN-001 | `pn-pen-frame` | MHA-PN-01 |
+| part | `pen-hanger` | MHA-049 | `pn-pen-hanger` | MHA-PN-002 | `pn-pen-hanger` | MHA-PN-02 |
+| retired part | `pen-marker` | MHA-050 | `pn-pen-marker` | MHA-PN-003 | — (replaced by `pn-vn-pen-marker`, MHA-PN-VN-56) | MHA-PN-03 (retired; never reissued) |
+| part | `pen-rod` | MHA-051 | `pn-pen-rod` | MHA-PN-004 | `pn-pen-rod` | MHA-PN-04 |
+| part | `pen-v-block` | MHA-053 | `pn-pen-v-block` | MHA-PN-005 | `pn-pen-v-block` | MHA-PN-05 |
+| retired part | `pen-wire` | MHA-100 | `pn-pen-wire` | MHA-PN-006 | — (replaced by `pn-vn-pen-wire`, MHA-PN-VN-57) | MHA-PN-06 (retired; never reissued) |
+| part | — | — | `pn-pen-adjust-screw` | MHA-PN-007 | `pn-pen-adjust-screw` | MHA-PN-07 |
+| part | `gooseneck` | MHA-032 | `sm-gooseneck` | MHA-SM-001 | `sm-gooseneck` | MHA-SM-01 |
+| part | `knife-mount` | MHA-037 | `sm-knife-mount` | MHA-SM-002 | `sm-knife-mount` | MHA-SM-02 |
+| part | `summing-lever` | MHA-073 | `sm-summing-lever` | MHA-SM-003 | `sm-summing-lever` | MHA-SM-03 |
+| part | — | — | `sm-gooseneck-spring-screw` | MHA-SM-004 | `sm-gooseneck-spring-screw` | MHA-SM-04 |
+| part | `boss-hook` | MHA-005 | `vn-boss-hook` | MHA-VN-001 | `sm-vn-boss-hook` | MHA-SM-VN-50 |
+| part | `channel-spring-installed` | MHA-011 | `vn-channel-spring-installed` | MHA-VN-004 | `ch-vn-channel-spring-installed` | MHA-CH-VN-50 |
+| part | `counter-spring` | MHA-019 | `vn-counter-spring` | MHA-VN-005 | `sm-vn-counter-spring` | MHA-SM-VN-51 |
+| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `dt-vn-fillister-screw` | MHA-DT-VN-50 |
+| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `fr-vn-fillister-screw` | MHA-FR-VN-50 |
+| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `pd-vn-fillister-screw` | MHA-PD-VN-52 |
+| part | `hanger-screw` | MHA-034 | `vn-hanger-screw` | MHA-VN-007 | `pn-vn-hanger-screw` | MHA-PN-VN-50 |
+| retired part | `hex-bolt` | MHA-036 | `vn-hex-bolt` | MHA-VN-008 | — | — (retired; MHA-VN-008 never reissued) |
+| part | `lag-screw` | MHA-039 | `vn-lag-screw` | MHA-VN-009 | `fr-vn-lag-screw` | MHA-FR-VN-51 |
+| part | `pen-set-screw` | MHA-052 | `vn-pen-set-screw` | MHA-VN-010 | `pn-vn-pen-set-screw` | MHA-PN-VN-51 |
+| part | `thumb-screw` | MHA-075 | `vn-thumb-screw` | MHA-VN-011 | `mg-vn-thumb-screw` | MHA-MG-VN-50 |
+| part | `thumb-screw` | MHA-075 | `vn-thumb-screw` | MHA-VN-011 | `ms-vn-thumb-screw` | MHA-MS-VN-50 |
+| part | `spring-hook` | MHA-090 | `vn-spring-hook` | MHA-VN-012 | `ch-vn-spring-hook` | MHA-CH-VN-51 |
+| part | `cone-lock-knob` | MHA-093 | `vn-cone-lock-knob` | MHA-VN-013 | `dt-vn-cone-lock-knob` | MHA-DT-VN-51 |
+| part | `cone-pivot-screw` | MHA-094 | `vn-cone-pivot-screw` | MHA-VN-014 | `dt-vn-cone-pivot-screw` | MHA-DT-VN-52 |
+| part | `swing-stop-screw` | MHA-095 | `vn-swing-stop-screw` | MHA-VN-015 | `dt-vn-swing-stop-screw` | MHA-DT-VN-53 |
+| part | `cone-tip-collar` | MHA-096 | `vn-cone-tip-collar` | MHA-VN-016 | `dt-vn-cone-tip-collar` | MHA-DT-VN-54 |
+| part | `cone-tip-adjuster` | MHA-097 | `vn-cone-tip-adjuster` | MHA-VN-017 | `dt-vn-cone-tip-adjuster` | MHA-DT-VN-55 |
+| part | `cone-tip-pinch-screw` | MHA-098 | `vn-cone-tip-pinch-screw` | MHA-VN-018 | `dt-vn-cone-tip-pinch-screw` | MHA-DT-VN-56 |
+| part | `slotted-screw` | MHA-101 | `vn-slotted-screw` | MHA-VN-019 | `dt-vn-slotted-screw` | MHA-DT-VN-57 |
+| part | `foot-screw` | MHA-103 | `vn-foot-screw` | MHA-VN-020 | `dt-vn-foot-screw` | MHA-DT-VN-58 |
+| part | `clamp-screw` | MHA-107 | `vn-clamp-screw` | MHA-VN-021 | `mg-vn-clamp-screw` | MHA-MG-VN-51 |
+| part | `clamp-screw` | MHA-107 | `vn-clamp-screw` | MHA-VN-021 | `pd-vn-clamp-screw` | MHA-PD-VN-53 |
+| part | `frame-side-screw` | MHA-117 | `vn-frame-side-screw` | MHA-VN-022 | `ch-vn-frame-side-screw` | MHA-CH-VN-52 |
+| part | `gooseneck-set-screw` | MHA-118 | `vn-gooseneck-set-screw` | MHA-VN-023 | `fr-vn-gooseneck-set-screw` | MHA-FR-VN-52 |
+| part | `knife-hanger-stud` | MHA-119 | `vn-knife-hanger-stud` | MHA-VN-024 | `sm-vn-knife-hanger-stud` | MHA-SM-VN-52 |
+| part | `wheel-axle-nut` | MHA-129 | `vn-wheel-axle-nut` | MHA-VN-025 | `mg-vn-wheel-axle-nut` | MHA-MG-VN-52 |
+| retired part | `knife-hanger-washer` | MHA-131 | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | — | — (retired; MHA-VN-026 never reissued) |
+| part | `frame-cross-screw` | MHA-132 | `vn-frame-cross-screw` | MHA-VN-027 | `fr-vn-frame-cross-screw` | MHA-FR-VN-53 |
+| part | `tube-frame-cap` | MHA-133 | `vn-tube-frame-cap` | MHA-VN-028 | `fr-vn-tube-frame-cap` | MHA-FR-VN-54 |
+| part | `cone-tip-block-screw` | MHA-140 | `vn-cone-tip-block-screw` | MHA-VN-030 | `dt-vn-cone-tip-block-screw` | MHA-DT-VN-60 |
+| part | `post-mount-screw` | MHA-142 | `vn-post-mount-screw` | MHA-VN-031 | `dt-vn-post-mount-screw` | MHA-DT-VN-61 |
+| part | `pedestal-hold-down-screw` | MHA-143 | `vn-pedestal-hold-down-screw` | MHA-VN-032 | `dt-vn-pedestal-hold-down-screw` | MHA-DT-VN-62 |
+| part | `pinion-strap-pin` | MHA-145 | `vn-pinion-strap-pin` | MHA-VN-033 | `dt-vn-pinion-strap-pin` | MHA-DT-VN-63 |
+| part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `ch-vn-arbor-set-screw` | MHA-CH-VN-53 |
+| part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `dt-vn-arbor-set-screw` | MHA-DT-VN-64 |
+| part | `keeper-chain` | MHA-149 | `vn-keeper-chain` | MHA-VN-035 | `dt-vn-keeper-chain` | MHA-DT-VN-65 |
+| part | `keeper-chain-link` | MHA-150 | `vn-keeper-chain-link` | MHA-VN-036 | `dt-vn-keeper-chain-link` | MHA-DT-VN-66 |
+| retired part | `transgear-collar-cross-pin` | MHA-154 | `vn-transgear-collar-cross-pin` | MHA-VN-037 | — | — (retired; MHA-VN-037 never reissued) |
+| part | `transgear-knob-drive-pin` | MHA-155 | `vn-transgear-knob-drive-pin` | MHA-VN-038 | `pd-vn-transgear-knob-drive-pin` | MHA-PD-VN-54 |
+| part | `transgear-disc-screw` | MHA-161 | `vn-transgear-disc-screw` | MHA-VN-039 | `pd-vn-transgear-disc-screw` | MHA-PD-VN-55 |
+| part | `transgear-arm-plate-screw` | MHA-166 | `vn-transgear-arm-plate-screw` | MHA-VN-040 | `pd-vn-transgear-arm-plate-screw` | MHA-PD-VN-56 |
+| part | `transgear-pivot-screw` | MHA-168 | `vn-transgear-pivot-screw` | MHA-VN-041 | `pd-vn-transgear-pivot-screw` | MHA-PD-VN-57 |
+| part | `transgear-latch-pin` | MHA-169 | `vn-transgear-latch-pin` | MHA-VN-042 | `pd-vn-transgear-latch-pin` | MHA-PD-VN-58 |
+| part | `latch-hook-bracket-screw` | MHA-171 | `vn-latch-hook-bracket-screw` | MHA-VN-043 | `pd-vn-latch-hook-bracket-screw` | MHA-PD-VN-59 |
+| part | `crank-seat-drive-pin` | MHA-173 | `vn-crank-seat-drive-pin` | MHA-VN-044 | `dt-vn-crank-seat-drive-pin` | MHA-DT-VN-67 |
+| retired part | `latch-hook-rivet` | MHA-175 | `vn-latch-hook-rivet` | MHA-VN-045 | — | — (retired; MHA-VN-045 never reissued) |
+| part | `guide-lock-screw` | MHA-176 | `vn-guide-lock-screw` | MHA-VN-046 | `pd-vn-guide-lock-screw` | MHA-PD-VN-60 |
+| part | `transgear-retaining-ring` | MHA-182 | `vn-transgear-retaining-ring` | MHA-VN-047 | `pd-vn-transgear-retaining-ring` | MHA-PD-VN-61 |
+| part | `transgear-knob-cup-pin` | MHA-183 | `vn-transgear-knob-cup-pin` | MHA-VN-048 | `pd-vn-transgear-knob-cup-pin` | MHA-PD-VN-62 |
+| part | `transgear-pivot-spring` | MHA-184 | `vn-transgear-pivot-spring` | MHA-VN-049 | `pd-vn-transgear-pivot-spring` | MHA-PD-VN-63 |
+| part | — | — | `vn-magnifying-bracket-screw` | MHA-VN-050 | `mg-vn-magnifying-bracket-screw` | MHA-MG-VN-53 |
+| part | — | — | `vn-knife-mount-dowel` | MHA-VN-051 | `sm-vn-knife-mount-dowel` | MHA-SM-VN-53 |
+| part | — | — | `vn-cylinder-bank-spring` | MHA-VN-052 | `dt-vn-cylinder-bank-spring` | MHA-DT-VN-68 |
+| part | — | — | `vn-rocker-bank-spring` | MHA-VN-053 | `ch-vn-rocker-bank-spring` | MHA-CH-VN-54 |
+| part | — | — | `vn-ms-stop-plate-screw` | MHA-VN-054 | `ms-vn-stop-plate-screw` | MHA-MS-VN-51 |
+| part | — | — | `vn-fulcrum-set-screw` | MHA-VN-055 | `ch-vn-fulcrum-set-screw` | MHA-CH-VN-55 |
+| part | — | — | `vn-transgear-arm-plate-locating-pin` | MHA-VN-056 | `pd-vn-transgear-arm-plate-locating-pin` | MHA-PD-VN-64 |
+| part | — | — | `vn-wheel-axle-back-washer` | MHA-VN-057 | `mg-vn-wheel-axle-back-washer` | MHA-MG-VN-54 |
+| part | — | — | `vn-wheel-axle-front-washer` | MHA-VN-058 | `mg-vn-wheel-axle-front-washer` | MHA-MG-VN-55 |
+| part | — | — | `vn-platen-clip-screw` | MHA-VN-059 | `pd-vn-platen-clip-screw` | MHA-PD-VN-65 |
+| part | — | — | `vn-pen-marker` | MHA-VN-065 | `pn-vn-pen-marker` | MHA-PN-VN-56 |
+| part | — | — | `vn-pen-rod-set-screw` | MHA-VN-061 | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 |
+| part | — | — | `vn-pen-adjust-nut` | MHA-VN-062 | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 |
+| part | — | — | `vn-pen-hanger-nut` | MHA-VN-063 | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 |
+| part | — | — | `vn-pen-hanger-jam-nut` | MHA-VN-064 | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 |
+| part | — | — | `vn-lever-wire` | MHA-VN-066 | `mg-vn-lever-wire` | MHA-MG-VN-56 |
+| part | — | — | `vn-pen-wire` | MHA-VN-067 | `pn-vn-pen-wire` | MHA-PN-VN-57 |
+| part | — | — | `vn-transgear-pivot-shim` | MHA-VN-069 | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 |
+| part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
+| part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
+| part | — | — | `vn-boss-hook-jam-nut` | MHA-VN-072 | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 |
+| part | — | — | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | `sm-vn-knife-hanger-washer` | MHA-SM-VN-54 |
+| part | — | — | `vn-chain-connecting-link` | MHA-VN-068 | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 |
+| part | `column-clamp-front` | MHA-105 | `sh-column-clamp-front` | MHA-SH-001 | `sh-column-clamp-front` | MHA-SH-01 |
+| part | `column-clamp-back` | MHA-106 | `sh-column-clamp-back` | MHA-SH-002 | `sh-column-clamp-back` | MHA-SH-02 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | — | MHA-CH-06-TL-01 (retired; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-profile-fixture` | MHA-CH-006-TL-02 | — | MHA-CH-06-TL-02 (retired; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-diamond-pin` | MHA-CH-006-TL-03 | — | MHA-CH-06-TL-03 (retired; never reissued) |
+| tooling part | — | — | `ch-rocker-arm-tl-filing-button` | MHA-CH-006-TL-04 | `ch-rocker-arm-tl-filing-button` | MHA-CH-06-TL-04 |
+| tooling part | — | — | `ch-rocker-arm-tl-filing-stud` | MHA-CH-006-TL-05 | `ch-rocker-arm-tl-filing-stud` | MHA-CH-06-TL-05 |
+| retired tooling part | — | — | `ch-rocker-arm-tl-pivot-screw` | MHA-CH-006-TL-06 | — | MHA-CH-06-TL-06 (retired; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-pivot-washer` | MHA-CH-006-TL-07 | — | MHA-CH-06-TL-07 (retired; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-inspection-box` | MHA-CH-006-TL-08 | — | MHA-CH-06-TL-08 (retired; never reissued) |
+| retired tooling part | — | — | `ch-rocker-arm-tl-c-stop-bar` | MHA-CH-006-TL-09 | — | MHA-CH-06-TL-09 (retired; never reissued) |
+| tooling part | — | — | `ch-rocker-arm-tl-riser-block` | MHA-CH-006-TL-10 | `ch-rocker-arm-tl-riser-block` | MHA-CH-06-TL-10 |
+| tooling part | — | — | `ch-rocker-arm-tl-strap-shim-stack` | MHA-CH-006-TL-11 | `ch-rocker-arm-tl-strap-shim-stack` | MHA-CH-06-TL-11 |
+| tooling part | — | — | `ch-rocker-arm-tl-filing-stand` | MHA-CH-006-TL-12 | `ch-rocker-arm-tl-filing-stand` | MHA-CH-06-TL-12 |
+| tooling part | — | — | `ch-rocker-arm-tl-outline-template` | MHA-CH-006-TL-13 | `ch-rocker-arm-tl-outline-template` | MHA-CH-06-TL-13 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-pivot-block` | MHA-CH-006-TL-14 | `ch-rocker-arm-tl-trammel-pivot-block` | MHA-CH-06-TL-14 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-scriber-block` | MHA-CH-006-TL-15 | `ch-rocker-arm-tl-trammel-scriber-block` | MHA-CH-06-TL-15 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-scriber-point` | MHA-CH-006-TL-16 | `ch-rocker-arm-tl-trammel-scriber-point` | MHA-CH-06-TL-16 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-setting-bar` | MHA-CH-006-TL-17 | `ch-rocker-arm-tl-trammel-setting-bar` | MHA-CH-06-TL-17 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-pivot-point` | MHA-CH-006-TL-18 | `ch-rocker-arm-tl-trammel-pivot-point` | MHA-CH-06-TL-18 |
+| tooling part | — | — | `ch-rocker-arm-tl-trammel-pivot-plate` | MHA-CH-006-TL-19 | `ch-rocker-arm-tl-trammel-pivot-plate` | MHA-CH-06-TL-19 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-006-TL-20 | `ch-rocker-arm-tl-oblique-base-bar` | MHA-CH-06-TL-20 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-carrier` | MHA-CH-006-TL-21 | `ch-rocker-arm-tl-oblique-carrier` | MHA-CH-06-TL-21 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-block` | MHA-CH-006-TL-22 | `ch-rocker-arm-tl-oblique-pivot-block` | MHA-CH-06-TL-22 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-pivot-pin` | MHA-CH-006-TL-23 | `ch-rocker-arm-tl-oblique-pivot-pin` | MHA-CH-06-TL-23 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-riser` | MHA-CH-006-TL-24 | `ch-rocker-arm-tl-oblique-riser` | MHA-CH-06-TL-24 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-hub-pin` | MHA-CH-006-TL-25 | `ch-rocker-arm-tl-oblique-hub-pin` | MHA-CH-06-TL-25 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-006-TL-26 | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-06-TL-26 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-006-TL-28 | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-06-TL-28 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-006-TL-29 | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-06-TL-29 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-bearing` | MHA-CH-006-TL-32 | `ch-rocker-arm-tl-vn-oblique-bearing` | MHA-CH-06-TL-VN-52 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-cl-dowel` | MHA-CH-006-TL-33 | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-leadscrew` | MHA-CH-006-TL-34 | `ch-rocker-arm-tl-vn-oblique-leadscrew` | MHA-CH-06-TL-VN-54 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-rail-screw` | MHA-CH-006-TL-41 | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-bracket-screw` | MHA-CH-006-TL-42 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-block-screw` | MHA-CH-006-TL-43 | `ch-rocker-arm-tl-vn-oblique-block-screw` | MHA-CH-06-TL-VN-63 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage-screw` | MHA-CH-006-TL-44 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` | MHA-CH-06-TL-VN-64 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-kp08-screw` | MHA-CH-006-TL-45 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` | MHA-CH-06-TL-VN-65 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-screw` | MHA-CH-006-TL-46 | `ch-rocker-arm-tl-vn-oblique-nut-screw` | MHA-CH-06-TL-VN-66 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-riser-screw` | MHA-CH-006-TL-47 | `ch-rocker-arm-tl-vn-oblique-riser-screw` | MHA-CH-06-TL-VN-67 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-clamp-screw` | MHA-CH-006-TL-48 | `ch-rocker-arm-tl-vn-oblique-clamp-screw` | MHA-CH-06-TL-VN-68 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | `ch-rocker-arm-tl-vn-oblique-block-washer` | MHA-CH-06-TL-VN-70 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 |
+| tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | `ch-pivot-bracket-tl-ledge` | MHA-CH-08-TL-01 |
+| tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-08-TL-02 |
+| tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-05-TL-01 |
+| tooling part | — | — | `dt-cone-pivot-post-tl-saw-cradle` | MHA-DT-005-TL-02 | `dt-cone-pivot-post-tl-saw-cradle` | MHA-DT-05-TL-02 |
+| tooling part | — | — | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-005-TL-03 | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-05-TL-03 |
+| tooling part | — | — | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-005-TL-04 | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-05-TL-04 |
+| assembly | `frame` | MHA-A04 | `fr-frame` | MHA-FR-000 | `fr-frame` | MHA-FR-00 |
+| assembly | `drive-train` | MHA-A03 | `dt-drive-train` | MHA-DT-000 | `dt-drive-train` | MHA-DT-00 |
+| assembly | `channel` | MHA-A02 | `ch-channel` | MHA-CH-000 | `ch-channel` | MHA-CH-00 |
+| assembly | `summing` | MHA-A07 | `sm-summing` | MHA-SM-000 | `sm-summing` | MHA-SM-00 |
+| assembly | `magnifier` | MHA-A05 | `mg-magnifier` | MHA-MG-000 | `mg-magnifier` | MHA-MG-00 |
+| assembly | `pen` | MHA-A01 | `pn-pen` | MHA-PN-000 | `pn-pen` | MHA-PN-00 |
+| assembly | `paper-drive` | MHA-A06 | `pd-paper-drive` | MHA-PD-000 | `pd-paper-drive` | MHA-PD-00 |
+| assembly | — | — | `ms-measuring-stick` | MHA-MS-000 | `ms-measuring-stick` | MHA-MS-00 |
+| assembly | `harmonic-analyzer` | MHA-A08 | `ha-harmonic-analyzer` | MHA-HA-000 | `ha-harmonic-analyzer` | MHA-HA-00 |
+| tooling assembly | — | — | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-006-TL-000 | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-06-TL-00 |
 
-## Changes after the cutover
+### Vendor families used by several assemblies
 
-A retired Number is never reused. A family added after the cutover takes the
-next free Number in its category and has no old stem or old Number.
+At the 2026-10-19 cutover, four category vendor families were in direct use by more than one assembly. Each consuming assembly now has its own identity:
 
-| Change | Canonical stem | Number | Note |
+| Category stem | Category Number | Current identities |
+|---|---|---|
+| `vn-fillister-screw` | MHA-VN-006 | `dt-vn-fillister-screw` MHA-DT-VN-50 (in `dt-drive-train`); `fr-vn-fillister-screw` MHA-FR-VN-50 (in `fr-frame`); `pd-vn-fillister-screw` MHA-PD-VN-52 (in `pd-paper-drive`) |
+| `vn-thumb-screw` | MHA-VN-011 | `mg-vn-thumb-screw` MHA-MG-VN-50 (in `mg-magnifier`); `ms-vn-thumb-screw` MHA-MS-VN-50 (in `ms-measuring-stick`) |
+| `vn-clamp-screw` | MHA-VN-021 | `mg-vn-clamp-screw` MHA-MG-VN-51 (in `mg-magnifier`); `pd-vn-clamp-screw` MHA-PD-VN-53 (in `pd-paper-drive`) |
+| `vn-arbor-set-screw` | MHA-VN-034 | `ch-vn-arbor-set-screw` MHA-CH-VN-53 (in `ch-channel`); `dt-vn-arbor-set-screw` MHA-DT-VN-64 (in `dt-drive-train`) |
+
+## Changes after the category cutover
+
+A retired Number is never reused. A family added after a cutover takes the next free Number in its namespace: the next fabricated Number in its category, the next vendor Number from `50` under its direct parent assembly, or the next TL Number under its fixture's parent part. It has no v39 stem or Number. This log uses current stems and Numbers. Retired machine and fixture Numbers appear in their reserved two-digit form; retired category vendor families keep their category stem and Number, which have no current form. The table above gives each family's earlier identities.
+
+| Change | Stem | Number | Note |
 |---|---|---|---|
-| retired | `pd-chain-sprocket` | MHA-PD-001 | orphan removed from assemblies in `29025dd34`; superseded by the MHA-PD-009 `pd-transgear-removable` sprocket configurations (#68; delivery #507 retired) |
+| retired | `pd-chain-sprocket` | MHA-PD-01 | orphan removed from assemblies in `29025dd34`; superseded by the MHA-PD-09 `pd-transgear-removable` sprocket configurations (#68; delivery #507 retired) |
 | retired | `vn-hex-bolt` | MHA-VN-008 | orphan removed from the frame in `2ab7dc109`; no assembly uses this family (delivery #543 retired) |
-| retired | `pd-latch-hook-bracket` | MHA-PD-021 | replaced by the one-piece formed spring-steel MHA-PD-014 latch hook, screwed to the support bar by the two MHA-VN-043 screws |
-| retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-014 latch hook has no riveted joint |
-| retired | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | retired with the former 90126A211 washer; the new #10 washer has Number MHA-VN-060, not a revived VN-026 |
-| retired | `vn-transgear-collar-cross-pin` | MHA-VN-037 | no replacement: the MHA-PD-022 drive collar's true D-bore carries the torque on the knob shaft's D-flat |
-| retired | `ch-rocker-arm-tl-vise-stop` | MHA-CH-006-TL-01 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-profile-fixture` | MHA-CH-006-TL-02 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-diamond-pin` | MHA-CH-006-TL-03 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-pivot-screw` | MHA-CH-006-TL-06 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-pivot-washer` | MHA-CH-006-TL-07 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-inspection-box` | MHA-CH-006-TL-08 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| retired | `ch-rocker-arm-tl-c-stop-bar` | MHA-CH-006-TL-09 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
-| added | `vn-magnifying-bracket-screw` | MHA-VN-050 | screws the MHA-MG-001 magnifying bracket to the MHA-SM-003 summing lever |
-| added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |
-| added | `mg-wheel-drum` | MHA-MG-010 | brass drum pressed on the MHA-MG-005 wheel spigot; carries the lever wire |
-| added | `vn-wheel-axle-back-washer` | MHA-VN-057 | brass #10 washer between the MHA-MG-011 axle spacer and the MHA-MG-005 wheel hub |
-| added | `vn-wheel-axle-front-washer` | MHA-VN-058 | brass #4 washer between the MHA-MG-005 wheel spigot face and the first MHA-VN-025 nut; its Ø7.1 OD bears inside the Ø14.0 spigot end, clear of the MHA-MG-010 drum |
-| added | `mg-wheel-axle-spacer` | MHA-MG-011 | brass sleeve on the MHA-MG-007 axle between the MHA-MG-008 wheel bar and the MHA-VN-057 back washer; its length puts the MHA-MG-005 wheel's rim on the pen-rod line |
-| added | `sm-gooseneck-spring-screw` | MHA-SM-004 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-001's brazed, #6-32 through-tapped end plug |
-| added | `vn-platen-clip-screw` | MHA-VN-059 | four brass #2-56 fillister screws hold the MHA-PD-003 platen clip to the MHA-PD-002 platen in place of MHA-VN-006 |
-| added | `vn-knife-hanger-washer` (new #10 family) | MHA-VN-060 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-VN-024 Bolt on the MHA-FR-002 faced top; functional stem reused, retired Number never reused |
-| retired | `pn-pen-marker` | MHA-PN-003 | replaced by the purchased MHA-VN-065 Sharpie marker |
-| added | `vn-pen-marker` | MHA-VN-065 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-005 v-block groove |
-| added | `vn-pen-rod-set-screw` | MHA-VN-061 | #4-40 x 3/16 cup-point set screw in the MHA-PN-005 v-block, locking the MHA-PN-004 pen rod's pivot end |
-| added | `vn-pen-adjust-nut` | MHA-VN-062 | brass #0-80 jam nut on the MHA-PN-007 adjuster stud in the MHA-PN-004 pen rod's top |
-| added | `pn-pen-adjust-screw` | MHA-PN-007 | turned brass #0-80 eye stud in the MHA-PN-004 pen rod's top, locked by the MHA-VN-062 jam nut; the MHA-PN-006 pen wire ties through its eye |
-| added | `vn-pen-hanger-nut` | MHA-VN-063 | zinc-plated steel #8-32 hex nut on the strap front; holds the MHA-PN-002 pen hanger on the MHA-VN-007 hanger screw through the strap's clearance hole |
-| added | `vn-pen-hanger-jam-nut` | MHA-VN-064 | thin zinc-plated steel #8-32 hex nut jammed against the MHA-VN-063 nut, locking the MHA-VN-007 hanger screw |
-| retired | `mg-lever-wire` | MHA-MG-009 | replaced by the purchased MHA-VN-066 lever wire |
-| retired | `pn-pen-wire` | MHA-PN-006 | replaced by the purchased MHA-VN-067 pen wire |
-| added | `vn-lever-wire` | MHA-VN-066 | ASTM A228 music wire, 0.031 in, cut from McMaster-Carr 9666K56 coil; hooks on the MHA-MG-006 output fixture and wraps the MHA-MG-010 drum |
-| added | `vn-pen-wire` | MHA-VN-067 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-005 wheel rim groove to the MHA-PN-007 adjuster stud's eye |
-| added | `vn-chain-connecting-link` | MHA-VN-068 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-VN-003 keeps only the cut chain's 33 outer links |
-| added | `vn-transgear-pivot-shim` | MHA-VN-069 | DIN 988 spring-steel shim 98055A098 (5 x 10 x 0.5) on the MHA-VN-041 shoulder under its head, on the MHA-VN-049 spring; restores the spring room the 9.5 MHA-PD-007 bar took when it grew rearward |
-| retired | `ch-rocker-thrust-washer` | MHA-CH-009 | replaced by the purchased MHA-VN-070 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
-| added | `vn-rocker-thrust-washer` | MHA-VN-070 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-005 pivot shaft, the north one against the datum MHA-CH-008 ear |
-| retired | `dt-crank-seat-washer` | MHA-DT-036 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |
-| added | `vn-bracket-hold-down-screw` | MHA-VN-071 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-008 foot into MHA-FR-005's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-VN-032 keeps the arbor pedestals |
-| added | `ch-rocker-hub` | MHA-CH-012 | turned 1018 hub of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-013 strap's H7 hole, then the bore and length are finished on MHA-CH-006 |
-| added | `ch-rocker-strap` | MHA-CH-013 | 1018 flat strap of the built-up MHA-CH-006 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-012 hub |
-| added | `vn-boss-hook-jam-nut` | MHA-VN-072 | thin zinc-plated steel #10-24 narrow-profile hex nut jammed against the MHA-SM-003 boss top face, locking the MHA-VN-001 counter anchor |
-| added | `ch-anchor-jam-nut` | MHA-CH-014 | turned brass round #6-32 jam nut, notched across its driven face for a forked driver, jammed against the MHA-SM-003 plate underside on each MHA-VN-012 channel anchor; round because a hex overruns the 7.06 anchor pitch |
-| added | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | HIWIN HGR15R linear rail cut to 440 (Motion Constrained 172270559990, special-order 7 holes at E 40), one under each oblique trammel jig carriage; bought fixture hardware modelled vendor-checked for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | HIWIN HGH15CAZ0C linear guideway block (DigiKey/Midwest HGH-15-CA-Z0-C), one on each oblique trammel jig rail under a pivot block; bought fixture hardware modelled vendor-checked for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-bearing` | MHA-CH-006-TL-32 | McMaster 5972K41 6200-2RS bearings, a pair pressed into each oblique trammel jig pivot block; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-cl-dowel` | MHA-CH-006-TL-33 | McMaster 91595A452 Ø6 x 20 m6 dowel, pressed flush into the oblique trammel jig carrier's CL hole; locates the rocker strap blank; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-leadscrew` | MHA-CH-006-TL-34 | ZYLtech HW-SC-T8x2-600 Tr8x2 304 stainless lead screw, cut to 410; the oblique trammel jig's feed screw in two KP08 pillow blocks; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | ZYLtech HW-SC-T8x2-NUT Tr8x2 brass flange nut (ships with HW-SC-T8x2-600), screwed to the TL-29 nut bracket; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | AMPEC KP08 pillow blocks (Bearings Direct) x2, one on each TL-28 end bracket, carrying the TL-34 leadscrew; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | MISUMI HOK40-HC8 Ø40 knurled handwheel, revolving grip, Ø8 H8 through bore, 2 x M5 taps (one set screw supplied), on the TL-34 leadscrew; bought fixture hardware modelled vendor-checked for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in studs x4, holding the TL-20 base bars down to the mill table; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | Precision Matthews 52PCCK-9/16-14mm kit 14 mm T-nuts x4, tapped 1/2-13, one under each TL-38 stud; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 flange nuts x4, one on each TL-38 stud on the TL-20 base bar's top face; bought fixture hardware modelled datasheet-built for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-rail-screw` | MHA-CH-006-TL-41 | McMaster 91251A197 #8-32 X 3/4 SHCS x14: holds an HGR15R rail to its TL-20 base bar, tapped THRU; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-bracket-screw` | MHA-CH-006-TL-42 | McMaster 91251A196 #8-32 X 5/8 SHCS x8: holds a TL-28 end bracket (4 each) to the TL-20 base bar, up from the bar's underside into the bracket, tapped THRU; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-block-screw` | MHA-CH-006-TL-43 | McMaster 91251A188 #8-32 X 1-7/8 SHCS x2: holds the TL-29 nut bracket to TL-22 pivot block 1, into a blind tap, each head on a TL-50 wedge-lock pair; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-carriage-screw` | MHA-CH-006-TL-44 | McMaster 91290A168 M4 X 20 SHCS x8: holds a TL-22 pivot block to its HGH15CA carriage (the carriage's M4 x 5 holes); bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-kp08-screw` | MHA-CH-006-TL-45 | McMaster 91290A148 M4 X 12 SHCS x4: holds a KP08 pillow block to its TL-28 end bracket, tapped THRU; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-nut-screw` | MHA-CH-006-TL-46 | McMaster 91290A115 M3 X 10 SHCS x4: holds the Tr8 flanged leadscrew nut to the TL-29 nut bracket, into a blind tap; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-riser-screw` | MHA-CH-006-TL-47 | McMaster 91771A110 #4-40 X 1/2 flat head x4: holds the TL-24 riser to the TL-21 carrier, tapped THRU; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-clamp-screw` | MHA-CH-006-TL-48 | McMaster 91251A540 1/4-20 X 3/4 SHCS x1: the CR clamp, clamping the rocker-arm strap and the riser down on the TL-21 carrier, tapped THRU; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | McMaster 91251A583 5/16-18 X 1 SHCS x2: holds the TL-26 feed lever to the TL-21 carrier, tapped THRU, each head on a TL-51 wedge-lock pair; bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | McMaster 91812A215 #8 wedge-lock washer pair x2: one under each TL-43 block screw head on the floor of TL-22's counterbore, the mechanical lock for the screws that carry the leadscrew's reversing thrust (rule 23); bought fixture hardware modelled for the jig assembly |
-| added | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | McMaster 91812A230 5/16 wedge-lock washer pair x2: one under each TL-49 feed lever screw head on the TL-26 lever's top face, the mechanical lock for the screws that carry the operator's reversing push and pull on the lever (rule 23); bought fixture hardware modelled for the jig assembly |
+| retired | `pd-latch-hook-bracket` | MHA-PD-21 | replaced by the one-piece formed spring-steel MHA-PD-14 latch hook, screwed to the support bar by the two MHA-PD-VN-59 screws |
+| retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-14 latch hook has no riveted joint |
+| retired | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | retired with the former 90126A211 washer; the new #10 washer took category Number MHA-VN-060 (now MHA-SM-VN-54), not a revived VN-026 |
+| retired | `vn-transgear-collar-cross-pin` | MHA-VN-037 | no replacement: the MHA-PD-22 drive collar's true D-bore carries the torque on the knob shaft's D-flat |
+| retired | `ch-rocker-arm-tl-vise-stop` | MHA-CH-06-TL-01 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-profile-fixture` | MHA-CH-06-TL-02 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-diamond-pin` | MHA-CH-06-TL-03 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-pivot-screw` | MHA-CH-06-TL-06 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-pivot-washer` | MHA-CH-06-TL-07 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-inspection-box` | MHA-CH-06-TL-08 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| retired | `ch-rocker-arm-tl-c-stop-bar` | MHA-CH-06-TL-09 | rocker shop fixture the rocker manufacturing route no longer uses; no registry, builder or drawing |
+| added | `mg-vn-magnifying-bracket-screw` | MHA-MG-VN-53 | screws the MHA-MG-01 magnifying bracket to the MHA-SM-03 summing lever |
+| added | `sm-vn-knife-mount-dowel` | MHA-SM-VN-53 | keys each MHA-SM-02 knife mount to the MHA-FR-02 crossbar |
+| added | `mg-wheel-drum` | MHA-MG-10 | brass drum pressed on the MHA-MG-05 wheel spigot; carries the lever wire |
+| added | `mg-vn-wheel-axle-back-washer` | MHA-MG-VN-54 | brass #10 washer between the MHA-MG-11 axle spacer and the MHA-MG-05 wheel hub |
+| added | `mg-vn-wheel-axle-front-washer` | MHA-MG-VN-55 | brass #4 washer between the MHA-MG-05 wheel spigot face and the first MHA-MG-VN-52 nut; its Ø7.1 OD bears inside the Ø14.0 spigot end, clear of the MHA-MG-10 drum |
+| added | `mg-wheel-axle-spacer` | MHA-MG-11 | brass sleeve on the MHA-MG-07 axle between the MHA-MG-08 wheel bar and the MHA-MG-VN-54 back washer; its length puts the MHA-MG-05 wheel's rim on the pen-rod line |
+| added | `sm-gooseneck-spring-screw` | MHA-SM-04 | shop-turned slotted fillister screw clamps the counter spring's upper eye to MHA-SM-01's brazed, #6-32 through-tapped end plug |
+| added | `pd-vn-platen-clip-screw` | MHA-PD-VN-65 | four brass #2-56 fillister screws hold the MHA-PD-03 platen clip to the MHA-PD-02 platen in place of the MHA-PD-VN-52 fillister screws |
+| added | `sm-vn-knife-hanger-washer` (new #10 family) | MHA-SM-VN-54 | 18-8 SAE washer 96659A104 under the modified #10-24 hex-head MHA-SM-VN-52 Bolt on the MHA-FR-02 faced top; functional stem reused, retired Number never reused |
+| retired | `pn-pen-marker` | MHA-PN-03 | replaced by the purchased MHA-PN-VN-56 Sharpie marker |
+| added | `pn-vn-pen-marker` | MHA-PN-VN-56 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-05 v-block groove |
+| added | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 | #4-40 x 3/16 cup-point set screw in the MHA-PN-05 v-block, locking the MHA-PN-04 pen rod's pivot end |
+| added | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 | brass #0-80 jam nut on the MHA-PN-07 adjuster stud in the MHA-PN-04 pen rod's top |
+| added | `pn-pen-adjust-screw` | MHA-PN-07 | turned brass #0-80 eye stud in the MHA-PN-04 pen rod's top, locked by the MHA-PN-VN-53 jam nut; the MHA-PN-VN-57 pen wire ties through its eye |
+| added | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 | zinc-plated steel #8-32 hex nut on the strap front; holds the MHA-PN-02 pen hanger on the MHA-PN-VN-50 hanger screw through the strap's clearance hole |
+| added | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 | thin zinc-plated steel #8-32 hex nut jammed against the MHA-PN-VN-54 nut, locking the MHA-PN-VN-50 hanger screw |
+| retired | `mg-lever-wire` | MHA-MG-09 | replaced by the purchased MHA-MG-VN-56 lever wire |
+| retired | `pn-pen-wire` | MHA-PN-06 | replaced by the purchased MHA-PN-VN-57 pen wire |
+| added | `mg-vn-lever-wire` | MHA-MG-VN-56 | ASTM A228 music wire, 0.031 in, cut from McMaster-Carr 9666K56 coil; hooks on the MHA-MG-06 output fixture and wraps the MHA-MG-10 drum |
+| added | `pn-vn-pen-wire` | MHA-PN-VN-57 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-05 wheel rim groove to the MHA-PN-07 adjuster stud's eye |
+| added | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-PD-VN-51 keeps only the cut chain's 33 outer links |
+| added | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 | DIN 988 spring-steel shim 98055A098 (5 x 10 x 0.5) on the MHA-PD-VN-57 shoulder under its head, on the MHA-PD-VN-63 spring; restores the spring room the 9.5 MHA-PD-07 bar took when it grew rearward |
+| retired | `ch-rocker-thrust-washer` | MHA-CH-09 | replaced by the purchased MHA-CH-VN-56 rocker thrust washer (owner, 2026-10-15: every washer is a purchased part) |
+| added | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 | carbon-steel ring shim, 1/4 ID x 3/8 OD x 0.031 in, McMaster-Carr 3088A429; one each end of the rocker bank on the MHA-CH-05 pivot shaft, the north one against the datum MHA-CH-08 ear |
+| retired | `dt-crank-seat-washer` | MHA-DT-36 | deleted, owner ruling D1 2026-10-15: collar bears on the post boss |
+| added | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 | McMaster 90280A196 #8-32 x 5/8 slotted narrow fillister, zinc-plated steel; one per MHA-CH-08 foot into MHA-FR-05's top-face seat (owner Q13c), so the transferred seat stays 11.5 thread / 14.7 drill; MHA-DT-VN-62 keeps the arbor pedestals |
+| added | `ch-rocker-hub` | MHA-CH-12 | turned 1018 hub of the built-up MHA-CH-06 rocker arm (`component_of: ch-rocker-arm`); its Ø10.20 r6 land is pressed into the MHA-CH-13 strap's H7 hole, then the bore and length are finished on MHA-CH-06 |
+| added | `ch-rocker-strap` | MHA-CH-13 | 1018 flat strap of the built-up MHA-CH-06 rocker arm (`component_of: ch-rocker-arm`); finished outline and 2.5 thickness with the Ø10.20 H7 hole for the MHA-CH-12 hub |
+| added | `sm-vn-boss-hook-jam-nut` | MHA-SM-VN-55 | thin zinc-plated steel #10-24 narrow-profile hex nut jammed against the MHA-SM-03 boss top face, locking the MHA-SM-VN-50 counter anchor |
+| added | `ch-anchor-jam-nut` | MHA-CH-14 | turned brass round #6-32 jam nut, notched across its driven face for a forked driver, jammed against the MHA-SM-03 plate underside on each MHA-CH-VN-51 channel anchor; round because a hex overruns the 7.06 anchor pitch |
+| added | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 | HIWIN HGR15R linear rail cut to 440 (Motion Constrained 172270559990, special-order 7 holes at E 40), one under each oblique trammel jig carriage; bought fixture hardware modelled vendor-checked for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 | HIWIN HGH15CAZ0C linear guideway block (DigiKey/Midwest HGH-15-CA-Z0-C), one on each oblique trammel jig rail under a pivot block; bought fixture hardware modelled vendor-checked for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-bearing` | MHA-CH-06-TL-VN-52 | McMaster 5972K41 6200-2RS bearings, a pair pressed into each oblique trammel jig pivot block; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-cl-dowel` | MHA-CH-06-TL-VN-53 | McMaster 91595A452 Ø6 x 20 m6 dowel, pressed flush into the oblique trammel jig carrier's CL hole; locates the rocker strap blank; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-leadscrew` | MHA-CH-06-TL-VN-54 | ZYLtech HW-SC-T8x2-600 Tr8x2 304 stainless lead screw, cut to 410; the oblique trammel jig's feed screw in two KP08 pillow blocks; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | ZYLtech HW-SC-T8x2-NUT Tr8x2 brass flange nut (ships with HW-SC-T8x2-600), screwed to the TL-29 nut bracket; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 | AMPEC KP08 pillow blocks (Bearings Direct) x2, one on each TL-28 end bracket, carrying the TL-VN-54 leadscrew; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 | MISUMI HOK40-HC8 Ø40 knurled handwheel, revolving grip, Ø8 H8 through bore, 2 x M5 taps (one set screw supplied), on the TL-VN-54 leadscrew; bought fixture hardware modelled vendor-checked for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in studs x4, holding the TL-20 base bars down to the mill table; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 | Precision Matthews 52PCCK-9/16-14mm kit 14 mm T-nuts x4, tapped 1/2-13, one under each TL-VN-58 stud; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 flange nuts x4, one on each TL-VN-58 stud on the TL-20 base bar's top face; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | McMaster 91251A197 #8-32 X 3/4 SHCS x14: holds an HGR15R rail to its TL-20 base bar, tapped THRU; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 | McMaster 91251A196 #8-32 X 5/8 SHCS x8: holds a TL-28 end bracket (4 each) to the TL-20 base bar, up from the bar's underside into the bracket, tapped THRU; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-block-screw` | MHA-CH-06-TL-VN-63 | McMaster 91251A188 #8-32 X 1-7/8 SHCS x2: holds the TL-29 nut bracket to TL-22 pivot block 1, into a blind tap, each head on a TL-VN-70 wedge-lock pair; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-carriage-screw` | MHA-CH-06-TL-VN-64 | McMaster 91290A168 M4 X 20 SHCS x8: holds a TL-22 pivot block to its HGH15CA carriage (the carriage's M4 x 5 holes); bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-kp08-screw` | MHA-CH-06-TL-VN-65 | McMaster 91290A148 M4 X 12 SHCS x4: holds a KP08 pillow block to its TL-28 end bracket, tapped THRU; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-nut-screw` | MHA-CH-06-TL-VN-66 | McMaster 91290A115 M3 X 10 SHCS x4: holds the Tr8 flanged leadscrew nut to the TL-29 nut bracket, into a blind tap; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-riser-screw` | MHA-CH-06-TL-VN-67 | McMaster 91771A110 #4-40 X 1/2 flat head x4: holds the TL-24 riser to the TL-21 carrier, tapped THRU; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-clamp-screw` | MHA-CH-06-TL-VN-68 | McMaster 91251A540 1/4-20 X 3/4 SHCS x1: the CR clamp, clamping the rocker-arm strap and the riser down on the TL-21 carrier, tapped THRU; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 | McMaster 91251A583 5/16-18 X 1 SHCS x2: holds the TL-26 feed lever to the TL-21 carrier, tapped THRU, each head on a TL-VN-71 wedge-lock pair; bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-block-washer` | MHA-CH-06-TL-VN-70 | McMaster 91812A215 #8 wedge-lock washer pair x2: one under each TL-VN-63 block screw head on the floor of TL-22's counterbore, the mechanical lock for the screws that carry the leadscrew's reversing thrust (rule 23); bought fixture hardware modelled for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 | McMaster 91812A230 5/16 wedge-lock washer pair x2: one under each TL-VN-69 feed lever screw head on the TL-26 lever's top face, the mechanical lock for the screws that carry the operator's reversing push and pull on the lever (rule 23); bought fixture hardware modelled for the jig assembly |

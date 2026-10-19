@@ -28,11 +28,11 @@ boss-hook / counter-spring / gooseneck chain.
   Motion study. The rock is the sub's single FREED operational DOF: its
   drive spec is recorded into the DOF manifest, never authored, so the
   saved model rocks on the knife edge.
-* boss-hook (keyed to the lever's anchor eye) + its MHA-VN-072 jam nut on the
+* boss-hook (keyed to the lever's anchor eye) + its MHA-SM-VN-55 jam nut on the
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
   the east column; the post is gripped by the top-frame rail hub's set screw
   (no separate clamp part).
-* sm-gooseneck-spring-screw -- made MHA-SM-004 fillister, head outboard, clamps the
+* sm-gooseneck-spring-screw -- made MHA-SM-04 fillister, head outboard, clamps the
   supplier upper-eye band to the gooseneck plug face; locked to the fixed
   gooseneck with no additional operational DOF.
 
@@ -106,9 +106,9 @@ from _transforms import IDENTITY, ROT_X_NEG90, ROT_Y_180, ROT_Y_POS90, euler_fro
 from dt_cone_pivot_post_installation import SUMMING_Z
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
-import vn_knife_hanger_stud_spec as hanger_screw
-import vn_knife_hanger_washer_spec as hanger_washer
-import vn_knife_mount_dowel_spec as knife_dowel
+import sm_vn_knife_hanger_stud_spec as hanger_screw
+import sm_vn_knife_hanger_washer_spec as hanger_washer
+import sm_vn_knife_mount_dowel_spec as knife_dowel
 from build_sm_knife_mount import CASTING_UNDERSIDE_Y, MOUNT_GAP
 
 ASM_NAME = "sm-summing"
@@ -139,7 +139,7 @@ HANGER_WASHER_Y = CASTING_UNDERSIDE_Y + top_frame.HANGER_GRIP  # 1036.2, local Y
 HANGER_UNDERHEAD_Y = HANGER_WASHER_Y + hanger_washer.THICKNESS  # 1037.4827
 HANGER_STUD_Y = HANGER_UNDERHEAD_Y - hanger_screw.LENGTH  # 990.7827 (cut tip)
 HANGER_REACH = KNIFE_MOUNT_TOP_Y - HANGER_STUD_Y  # 8.9173, the modelled nominal
-# Worst-case stack (drawing-guidelines.md rules 18–19): MHA-SM-000 step 4
+# Worst-case stack (drawing-guidelines.md rules 18–19): MHA-SM-00 step 4
 # cuts each bolt to the crossbar-underside-to-washer-top height measured at
 # its own hole plus the fit-up reach, so the printed grip band and the
 # washer's catalogue thickness spread are measured out and only the cut's
@@ -399,17 +399,17 @@ def _assert_knife_hanger_stack() -> None:
 
 
 # --- purchased counter spring and directly threaded lower anchor -----------
-import vn_counter_spring_stock_geom as counter_stock  # noqa: E402
+import sm_vn_counter_spring_stock_geom as counter_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import sm_gooseneck_spring_screw_geom as spring_screw  # noqa: E402
 import sm_gooseneck_spring_joint as spring_joint  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
-import vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
+import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
-# MHA-VN-072 on the anchor axis, its z = 0 face on the boss top face:
+# MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
 # ROT_X_NEG90 turns the nut's local +Z thread axis to machine +Y.
 JAM_NUT_POS = (
     spring_mounts.COUNTER_ANCHOR_XY[0],
@@ -421,13 +421,13 @@ JAM_NUT_ROWS = ROT_X_NEG90
 # ``counter_seat`` before assembly creation.
 
 UPPER_EYE_CLAMP_NOTES = (
-    "MHA-SM-004: CLAMP COUNTER-SPRING UPPER EYE TO PLUG.\n"
+    "MHA-SM-04: CLAMP COUNTER-SPRING UPPER EYE TO PLUG.\n"
     "TIGHTEN UNTIL UPPER EYE IS CLAMPED AND CANNOT SWIVEL.\n"
     "NO THREADLOCKER."
 )
 
 
-# --- assembly settings as model dimensions (MHA-SM-000 sheet 1) --------------
+# --- assembly settings as model dimensions (MHA-SM-00 sheet 1) --------------
 # Blanked Front-plane construction sketches (sketch x = machine X, y = machine
 # Y), every vertex driven from a global; the drawing shows each sketch in the
 # one view that dimensions it and imports only its marked dimension.
@@ -472,7 +472,7 @@ async def _finish_setting(
 
 
 async def _author_settings(adapter) -> None:
-    """CounterSetting: the MHA-SM-004 axis above the knife contact level (the
+    """CounterSetting: the MHA-SM-04 axis above the knife contact level (the
     gooseneck height the level setting finds). KnifeRockGauge: the boss face's
     minimum travel at the free-rock floor, up the boss-hook axis."""
     for name, value in _SETTING_GLOBALS.items():
@@ -675,7 +675,7 @@ async def build(adapter) -> dict[str, str]:
         hanger_washers.append(
             await place_component(
                 adapter,
-                "vn-knife-hanger-washer",
+                "sm-vn-knife-hanger-washer",
                 [KNIFE[0], HANGER_WASHER_Y, station_z],
                 [0.0, 0.0, 0.0],
                 IDENTITY,
@@ -686,7 +686,7 @@ async def build(adapter) -> dict[str, str]:
         hanger_screws.append(
             await place_component(
                 adapter,
-                "vn-knife-hanger-stud",
+                "sm-vn-knife-hanger-stud",
                 [KNIFE[0], HANGER_STUD_Y, station_z],
                 [0.0, 0.0, 0.0],
                 IDENTITY,
@@ -698,7 +698,7 @@ async def build(adapter) -> dict[str, str]:
             knife_dowels.append(
                 await place_component(
                     adapter,
-                    "vn-knife-mount-dowel",
+                    "sm-vn-knife-mount-dowel",
                     [KNIFE[0] + x_offset, KNIFE_DOWEL_Y, station_z],
                     [0.0, 0.0, 0.0],
                     IDENTITY,
@@ -711,9 +711,9 @@ async def build(adapter) -> dict[str, str]:
     # Exactly two cut bolts, two new washers and four dowels must survive.
     live_names = component_names(adapter)
     for stem, inserted, count in (
-        ("vn-knife-hanger-stud", hanger_screws, 2),
-        ("vn-knife-hanger-washer", hanger_washers, 2),
-        ("vn-knife-mount-dowel", knife_dowels, knife_dowel.QUANTITY),
+        ("sm-vn-knife-hanger-stud", hanger_screws, 2),
+        ("sm-vn-knife-hanger-washer", hanger_washers, 2),
+        ("sm-vn-knife-mount-dowel", knife_dowels, knife_dowel.QUANTITY),
     ):
         live = [
             name for name in live_names if name == stem or name.startswith(f"{stem}-")
@@ -821,7 +821,7 @@ async def build(adapter) -> dict[str, str]:
     # Locking records that rigid threaded connection while preserving lever rock.
     bh = await place_component(
         adapter,
-        "vn-boss-hook",
+        "sm-vn-boss-hook",
         list(BOSS_HOOK_POS),
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -839,7 +839,7 @@ async def build(adapter) -> dict[str, str]:
     # over-constrain the solve.
     nut = await place_component(
         adapter,
-        "vn-boss-hook-jam-nut",
+        "sm-vn-boss-hook-jam-nut",
         list(JAM_NUT_POS),
         euler_from_rows(JAM_NUT_ROWS),
         JAM_NUT_ROWS,
@@ -856,7 +856,7 @@ async def build(adapter) -> dict[str, str]:
     # complete fixed measured pose; no seed placement or corrective move follows.
     await place_component(
         adapter,
-        "vn-counter-spring",
+        "sm-vn-counter-spring",
         [*counter_pose.centre_xy, SUMMING_Z],
         euler_from_rows(counter_pose.rotation_rows),
         counter_pose.rotation_rows,
@@ -902,7 +902,7 @@ async def build(adapter) -> dict[str, str]:
     # other structural component.  The lock-mated boss-hook and its jam nut
     # MUST read under-constrained WITH the lever -- a grounded/fixed regression
     # would freeze the counter-spring anchor while the lever still swings.
-    lever_riders = ("sm-summing-lever", "vn-boss-hook", "vn-boss-hook-jam-nut")
+    lever_riders = ("sm-summing-lever", "sm-vn-boss-hook", "sm-vn-boss-hook-jam-nut")
     assert_free_dof_necessity(
         adapter,
         1,

@@ -197,7 +197,7 @@ FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # Full-OD shoulder: OutsideDia over SHOULDER_LENGTH from the south face,
 # with the established +0/-0.30 band. The assembly retains the 0.25-mm T120
 # air floor, all axis/fit offsets, the fit-up feeler and the row contact gate.
-# The toothed south face is set directly off the restored MHA-DT-005 north
+# The toothed south face is set directly off the restored MHA-DT-05 north
 # boss face with the assembly step-4 feeler. There is no spot-face retreat
 # or eccentric sleeve in this stack.
 SEAT_FEELER_MM = 0.25
@@ -221,7 +221,7 @@ T120_SHOULDER_AIR_WORST = math.inf
 # 1.8139 exact with the cone swing set 0.20 above standard (edge slack moves
 # X_PITCH; user ruling 2026-10-10), floored to 1.81; the ordinary floor is 0.25.
 T120_TURNED_BAND_RADIAL_WORST = 1.81
-# The independent fit-up feeler check remains: MHA-DT-010 and T120 are
+# The independent fit-up feeler check remains: MHA-DT-10 and T120 are
 # pushed toward each other to take up every running play. A band that stops
 # the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
 # that stops it is faced back, never under its printed short limit. The
@@ -283,7 +283,7 @@ def floor_to_places(value: float, places: int) -> float:
     return math.floor(round(value * scale, 6)) / scale
 
 
-# USER RULING 2026-09-25, MHA-DT-010 boss option C: the boss stays at the tooth
+# USER RULING 2026-09-25, MHA-DT-10 boss option C: the boss stays at the tooth
 # root, where a form cutter runs out onto it untouched and the photo reads it;
 # a boss proud of the root is scalloped by the cutter's arc up to the pin hole.
 # Its worst wall -- the printed diameter at its general row over the bore's
@@ -336,7 +336,7 @@ PIN_LENGTH = BOSS_DIA  # flush both sides
 # --- W15: shortest boss that still protects the match-drilled pin ----------
 #
 # Owner ruling D1 (2026-10-15): the crankshaft's collar is pulled onto the
-# MHA-DT-005 boss's south face, this pinion is set on its feeler off the north
+# MHA-DT-05 boss's south face, this pinion is set on its feeler off the north
 # face and only then is the pin match-drilled, and the shaft is long enough
 # that its end stands proud of this boss's north face at every accepted part
 # set (dt_crankshaft_spec.SHAFT_END_PROUD_RANGE).  The shaft therefore fills
@@ -533,13 +533,13 @@ if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / TEETH:
 # condition ride that callout.
 # The part numbers are hard-coded, not read from ``_config.parts``.
 # test_dt_crank_pinion_drawing checks them against the registry offline.
-CRANKSHAFT_NUMBER = "MHA-DT-011"
-PINION_NUMBER = "MHA-DT-010"
-PIN_NUMBER = "MHA-DT-029"
+CRANKSHAFT_NUMBER = "MHA-DT-11"
+PINION_NUMBER = "MHA-DT-10"
+PIN_NUMBER = "MHA-DT-29"
 # The 64T this pinion meshes with, and the cone gear whose T120 the turned
-# band and the shoulder clear (MHA-DT-000's T120 check).
-MESH_GEAR_NUMBER = "MHA-DT-007"
-CONE_GEAR_NUMBER = "MHA-DT-003"
+# band and the shoulder clear (MHA-DT-00's T120 check).
+MESH_GEAR_NUMBER = "MHA-DT-07"
+CONE_GEAR_NUMBER = "MHA-DT-03"
 BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
@@ -554,7 +554,7 @@ BORE_FIT_CALLOUT = "\n".join(
 # a sheet stands alone, so each carries all four facts --
 # match drill at assembly, ream to fit the named pin, the fit's acceptance,
 # flush -- with the other part and where on this one the hole runs.
-# Four lines, no dimensions (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); MHA-DT-000 step 4 reads the shaft's.
+# Four lines, no dimensions (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); MHA-DT-00 step 4 reads the shaft's.
 PIN_FIT_LINES = (
     f"REAM TO FIT PIN {PIN_NUMBER}, LIGHT HAMMER FIT",
     "NOT REMOVABLE BY HAND, FLUSH BOTH SIDES",
@@ -577,7 +577,7 @@ CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
 ).replace("\nREAM TO FIT PIN ", " REAM TO FIT\nPIN ")
 
 # No roughness symbol: the bore is pinned to the crankshaft (match-drilled
-# pin MHA-DT-029), so it turns with the shaft and never runs, slides or
+# pin MHA-DT-29), so it turns with the shaft and never runs, slides or
 # locates against it (drawing-guidelines.md rule 6: pinned bores carry no
 # symbol; machinist review r1 of #1652). The reamed limits and the named mate
 # control the fit.
@@ -675,7 +675,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # part-specific override, not a duplicate instruction for cutting the teeth.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # The drive-train fit-up may turn the band down past its printed band (the
-# T120 feeler check, MHA-DT-000's crank step), and only when the band itself
+# T120 feeler check, MHA-DT-00's crank step), and only when the band itself
 # fails that check (a shoulder failure is the shoulder's to correct); the
 # sheet permits it only as that check directs and states the floor, so the
 # part stays conforming after the fit-up cut.  Codex P1 on #1154 (review 3).
@@ -694,7 +694,7 @@ T120_SHOULDER_CLEARANCE_TEXT = (
 TURNED_DIA_FITUP_CALLOUT = "\n".join(
     (
         f"{CONE_GEAR_NUMBER} T120 CLR",
-        "IF MHA-DT-000 T120",
+        "IF MHA-DT-00 T120",
         "FEELER CHECK FAILS,",
         "TURN AT ASSY TO CLEAR,",
         f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN",
@@ -712,8 +712,8 @@ TOOTH_RUNOUT_NOTE = (
 if not BOSS_DIA <= ROOT_DIA_MIN:
     raise AssertionError("the 16T boss must be turned to the root for the cutter runout")
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, TOOTH_RUNOUT_NOTE))
-# The MHA-DT-000 crank step's T120 check (user, 2026-09-30, #1154), printed by
-# draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-010 and T120
+# The MHA-DT-00 crank step's T120 check (user, 2026-09-30, #1154), printed by
+# draw_dt_drive_train_assembly: the pinion on its seat feeler, MHA-DT-10 and T120
 # pushed toward each other (taking up every running play), turned by hand and
 # read all round before the step's free-running revolution (it may rub until
 # the check closes: Codex P2 on #1154, review 3).  Each cut answers its own
@@ -727,7 +727,7 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
         f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
         f"SHOULDER {T120_SHOULDER_CLEARANCE_TEXT}. PUSH",
         f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
-        "TURN MHA-DT-007 SLOWLY BY HAND,",
+        "TURN MHA-DT-07 SLOWLY BY HAND,",
         f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
         "IF THE FEELER",
         "   STOPS, TURN BAND DOWN, "

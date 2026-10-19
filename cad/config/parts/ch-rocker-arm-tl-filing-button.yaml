@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-filing-button:
   title: Rocker Arm Hub Filing Button
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-04
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-04
   material: O1 tool steel
   material_specification: O1 drill rod, 11 mm, annealed (McMaster 8893K281)
   finish: hardened and tempered 58-62 HRC

@@ -175,7 +175,7 @@ CAVITY_RADIUS_CORNER = (1, 1)
 # rims) and on the cavity rims on both web faces. Its one size sits on an
 # outside corner, so the caption names everything else it governs; drawn
 # outside chamfers with no size read as breaks past the title block's 0.25
-# MAX (machinist review, MHA-FR-005). The r7 review's "delete the chamfer"
+# MAX (machinist review, MHA-FR-05). The r7 review's "delete the chamfer"
 # (over_spec) was rejected by Main: the callout stays.
 DIMENSION_CALLOUTS = {
     "PocketRadius": "8X",

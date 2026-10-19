@@ -1002,7 +1002,7 @@ bottom outline where neither mounting witnesses nor the hole leader crosses
 it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
 view's printed dimension ink.
 
-The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
+The MG-06 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.
 Its height is AF 11.1125, with one projected corner ridge through the bore
 circle. An unturned `*Right` end view instead puts Y up and shows the

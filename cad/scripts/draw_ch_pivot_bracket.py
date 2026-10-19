@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the rocker pivot bracket (MHA-CH-008).
+r"""Create the curated machinist drawing for the rocker pivot bracket (MHA-CH-08).
 
 One sheet at 2:1, third-angle: the elevation (the ear face, the reamed
 cross-bore and the arch) with the plan above it (the foot, the hold-down hole
@@ -87,7 +87,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
-THRUST_WASHER_NUMBER = str(_config.parts("vn-rocker-thrust-washer")["number"])
+THRUST_WASHER_NUMBER = str(_config.parts("ch-vn-rocker-thrust-washer")["number"])
 
 # 35 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
 # stand at the sheet scale, level with the elevation, clear of the title block

@@ -1,5 +1,5 @@
 r"""McMaster 90325A174 -- 18-8 stainless precision shoulder screw, hex socket,
-shoulder Ø3/16 x 1/2, 8-32 x 3/8 (MHA-VN-041, the transgear pivot screw).
+shoulder Ø3/16 x 1/2, 8-32 x 3/8 (MHA-PD-VN-57, the transgear pivot screw).
 
 Catalogue-only: the live page (read 2026-10-14) gives the shoulder, thread,
 head envelope and 3/32 hex drive; its CAD download was refused, so there is

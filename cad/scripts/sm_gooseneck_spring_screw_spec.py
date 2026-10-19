@@ -1,4 +1,4 @@
-"""Pure-data drawing contract for MHA-SM-004, the gooseneck spring screw.
+"""Pure-data drawing contract for MHA-SM-04, the gooseneck spring screw.
 
 PURE DATA -- no SolidWorks/COM imports.  ``sm_gooseneck_spring_screw_geom``
 owns every size and band; this module adds only what the print states: the
@@ -82,13 +82,13 @@ REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 # summing sheet prints no notes until it is built out (drawing-guidelines.md rule 22 (an assembly package is complete)), so the
 # fitter reads it here, on the screw's own sheet.
 CLAMP_INSTRUCTION = (
-    "3. AT ASSEMBLY TIGHTEN UNTIL THE MHA-VN-005 UPPER EYE IS CLAMPED\n"
+    "3. AT ASSEMBLY TIGHTEN UNTIL THE MHA-SM-VN-51 UPPER EYE IS CLAMPED\n"
     "   AND CANNOT SWIVEL; NO THREADLOCKER."
 )
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN SPHERICAL THROUGH RIM AND APEX.",
-        "2. THREAD MATES THE TAPPED END PLUG OF MHA-SM-001.",
+        "2. THREAD MATES THE TAPPED END PLUG OF MHA-SM-01.",
         CLAMP_INSTRUCTION,
     )
 )

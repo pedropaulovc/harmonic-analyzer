@@ -5,10 +5,10 @@ bottom-left closeup and p. 2 img08; ch. 30 top view corners + eight-views
 p008): a stubby straight L. The upright round-topped lug sits against the
 outermost lever hub and carries the plain Ø6.35 fulcrum shaft in a reamed
 bore, the shaft's domed end proud of its outer face; a #1-72 cup-point set
-screw (MHA-VN-055) in the crown tap bears on the shaft's flat and fixes it.
+screw (MHA-CH-VN-55) in the crown tap bears on the shaft's flat and fixes it.
 The short straight foot points OUTBOARD and is screwed down into the
 top-frame rail top face by one slotted #2-56 fillister frame-side
-screw (MHA-VN-022) seated flush in a counterbore; the foot-to-lug inside
+screw (MHA-CH-VN-52) seated flush in a counterbore; the foot-to-lug inside
 corner is filleted at its MAX radius (``CornerFillet``).
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
@@ -62,10 +62,10 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder, wizard_holes
-from vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
-from vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
-from vn_frame_side_screw_spec import SHANK_DIA as FRAME_SIDE_SHANK_DIA
-from vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
+from ch_vn_frame_side_screw_spec import HEAD_DIA as FRAME_SIDE_HEAD_DIA
+from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
+from ch_vn_frame_side_screw_spec import SHANK_DIA as FRAME_SIDE_SHANK_DIA
+from ch_vn_frame_side_screw_spec import THREAD as FRAME_SIDE_THREAD
 from ch_fulcrum_keeper_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
@@ -111,7 +111,7 @@ BORE_CUT_DEPTH = 2.0 * LUG_T
 # The keeper's foot screw is the part-owned #2 close-clearance counterbore;
 # its depth is the exact stock head height so the bearing face stays flush.
 if FOOT_SCREW_THREAD != FRAME_SIDE_THREAD:
-    raise AssertionError("keeper foot screw thread drifted from MHA-VN-022")
+    raise AssertionError("keeper foot screw thread drifted from MHA-CH-VN-52")
 if HOLE_DIA_MM <= FRAME_SIDE_SHANK_DIA:
     raise AssertionError("standard #2 keeper clearance binds on the stock screw")
 if CBORE_DIA_MM <= FRAME_SIDE_HEAD_DIA:

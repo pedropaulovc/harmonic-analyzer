@@ -1,8 +1,8 @@
-"""The MHA-MG-000 magnifier assembly settings: the builder's and the sheet's.
+"""The MHA-MG-00 magnifier assembly settings: the builder's and the sheet's.
 
 Two settings belong to no single part: the press gauge the wheel axle is pressed
 to in the bar, and the endshake the first nut sets. Each one is printed as a
-native model dimension on the MHA-MG-000 sheet. A construction chain in the
+native model dimension on the MHA-MG-00 sheet. A construction chain in the
 assembly carries both (the ms-measuring-stick ClampedSetting pattern). It runs
 along the axle centreline on the Right plane, through four stations: the bar
 front face, the shank step, the wheel's spigot face and the front washer. The
@@ -28,7 +28,7 @@ import mg_output_fixture_geom as _fixture
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
-from vn_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X
+from mg_vn_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X
 
 # The axle centreline in the machine frame: x, y of the bore; z runs from the
 # bar's front face forward (-z), station d at z = BAR_FRONT_Z - d.

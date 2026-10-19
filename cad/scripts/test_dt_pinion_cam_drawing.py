@@ -95,7 +95,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     }
     # U27 (Main, 2026-09-23): a set-screwed cam only slips over the rod.  A
     # stock 6.4 reamer at +/-0.03 (the printed band is at least +/-0.025)
-    # against the MHA-DT-017 rod's h band gives 0.02-0.10 diametral clearance.
+    # against the MHA-DT-17 rod's h band gives 0.02-0.10 diametral clearance.
     assert dt_pinion_cam_spec.BORE == 6.40
     assert dt_pinion_cam_spec.BORE_BAND == (0.03, -0.03)
     assert min(abs(d) for d in dt_pinion_cam_spec.BORE_BAND) >= 0.025
@@ -130,7 +130,7 @@ def test_cam_attachment_is_fully_released_for_manufacture() -> None:
 
 
 def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
-    # Rule 4: the OD and eccentricity bands exist for the MHA-DT-025 follower
+    # Rule 4: the OD and eccentricity bands exist for the MHA-DT-25 follower
     # pin that rides the OD, so each callout names it (ENFORCE r1 blockers).
     import _config
 
@@ -141,7 +141,7 @@ def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
 
 
 def test_od_callout_claims_the_follower_arc_the_assembly_proves() -> None:
-    # ENFORCE r8: the callout's "clear of the tap" is the DT-000 layout proof,
+    # ENFORCE r8: the callout's "clear of the tap" is the DT-00 layout proof,
     # not a free claim; keep the proof present while the sheet states it.
     import test_dt_drive_train_support_layout as layout
 
@@ -152,7 +152,7 @@ def test_od_callout_claims_the_follower_arc_the_assembly_proves() -> None:
 
 
 def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
-    # Rule 23 (#1176): the stake is performed at MHA-DT-000's cam-collars-set
+    # Rule 23 (#1176): the stake is performed at MHA-DT-00's cam-collars-set
     # step; the pointer follows the step registry, never a typed number.
     import dt_drive_train_steps as steps
 
@@ -162,7 +162,7 @@ def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
 
 def test_part_recipe_does_not_reach_the_assembly_sequence() -> None:
     # Codex P2 (#1686): the step number is sheet data; a steps import in the
-    # spec would re-key the cam (and DT-000) on every step edit.
+    # spec would re-key the cam (and DT-00) on every step edit.
     from pathlib import Path
 
     import _buildgraph

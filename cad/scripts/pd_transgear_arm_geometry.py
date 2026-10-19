@@ -1,9 +1,9 @@
-r"""Pure transgear-arm (MHA-PD-018) geometry shared by the arm, its plate, its
+r"""Pure transgear-arm (MHA-PD-18) geometry shared by the arm, its plate, its
 pivot hardware and the paper-drive assembly.
 
-Book ch. 23 (t157 / t161 / t241): a steel link that swings on the MHA-VN-041
-shoulder screw at the pivot P on the support bar, carries the MHA-PD-023 pin of
-the disc cluster (pressed into a reamed hole) at S, the MHA-PD-019 plate (and
+Book ch. 23 (t157 / t161 / t241): a steel link that swings on the MHA-PD-VN-57
+shoulder screw at the pivot P on the support bar, carries the MHA-PD-23 pin of
+the disc cluster (pressed into a reamed hole) at S, the MHA-PD-19 plate (and
 through it the knob shaft) on two #8-32 taps between them, and the 1/8 latch
 pin in its square end.
 
@@ -11,7 +11,7 @@ Local frame (the part's origin and axes; the assembly places it by a pure
 rotation about Z and a translation):
 
 * origin on the pivot axis P, on the arm's FRONT face (the face that bears on
-  the MHA-PD-020 spacer; machine z FRONT_FACE_MACHINE_Z, -124.4);
+  the MHA-PD-20 spacer; machine z FRONT_FACE_MACHINE_Z, -124.4);
 * +X along the arm centreline from P toward the square end (machine U);
 * +Y across the arm toward its upper tangent edge (machine N = U rotated
   +90 deg about +Z), the edge the plate's top edge sits flush with;
@@ -29,12 +29,12 @@ from fractions import Fraction
 
 import pd_rack_pinion_spec as DISC
 import pd_support_bar_spec as BAR
-import vn_transgear_pivot_screw_spec as PIVOT
+import pd_vn_transgear_pivot_screw_spec as PIVOT
 from _fit_close_running import measured_close_running_clearance_mm
 from _gear_quality import reducer_position_diameter_mm
 from _printed_tolerance import angular_band_deg
 import pd_transgear_pivot_spacer_spec as SPACER
-import vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN
+import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
@@ -91,8 +91,8 @@ END_HALF_WIDTH = edge_half_width(TIP_STATION)
 # bore zone or the title block's general tolerance.
 
 
-# The spot face seats the MHA-VN-049 curved disc spring's OD rim (Ø10.744) under
-# the MHA-VN-041 head; the spring's float on the shoulder still clears its rim.
+# The spot face seats the MHA-PD-VN-63 curved disc spring's OD rim (Ø10.744) under
+# the MHA-PD-VN-57 head; the spring's float on the shoulder still clears its rim.
 SPOT_FACE_DIA = 11.5
 SPOT_FACE_DIA_GROWTH = 0.10  # +0.10/0 (drilled row)
 # The floor is dimensioned from the FRONT face so the spring's room never
@@ -156,7 +156,7 @@ def require_pivot_running_fit(bore_mm: float, measured_shoulder_mm: float) -> fl
         raise ValueError("arm pivot bore does not meet its measured-shoulder running clearance")
     return bore_mm - measured_shoulder_mm
 
-# --- Pin at S: REAM THROUGH, the press for the MHA-PD-023 pin (R9-68) ---------
+# --- Pin at S: REAM THROUGH, the press for the MHA-PD-23 pin (R9-68) ---------
 # The pin (pd_transgear_pin_spec: Ø3.900 0/-0.008, ground) is pressed in from
 # the rear until its head seats on the rear face, so the hole is reamed
 # square through the ground faces.  The interference (0.010..0.026) is
@@ -236,7 +236,7 @@ PIN_HOLE_DIA = 3.175
 # nominal) holds at both limits; .XXX (±0.13) could not hold a press.  The
 # band follows the crank seat drive-pin holes' convention (R9-12).
 PIN_HOLE_DIA_BAND = (0.0, -0.010)
-# The dowel is pressed to the hole's flat floor (R9-12, the MHA-DT-011 / MHA-VN-044
+# The dowel is pressed to the hole's flat floor (R9-12, the MHA-DT-11 / MHA-DT-VN-67
 # precedent), so the depth sets the pin's proud length: 22.225 - 8.50 = 13.725.
 # R9-50: 8.50 (was 6.05 for the 3/4 pin) keeps the full diameter past the
 # latch hook's far face with the flap's bend and the pin's length grade.

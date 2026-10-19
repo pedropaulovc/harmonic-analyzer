@@ -24,7 +24,7 @@ from _session import run_build
 from _assembly import _flag, _read_member
 
 
-KEEP = ("sm-summing-lever", "vn-spring-hook", "vn-channel-spring-installed")
+KEEP = ("sm-summing-lever", "ch-vn-spring-hook", "ch-vn-channel-spring-installed")
 
 
 async def build(adapter) -> dict[str, str]:

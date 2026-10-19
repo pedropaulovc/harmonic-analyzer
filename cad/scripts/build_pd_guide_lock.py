@@ -57,7 +57,7 @@ from pd_guide_lock_spec import (
     LOCK_THICK_BAND,
     LOCK_WIDTH,
 )
-from vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
+from pd_vn_guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
 
 PART_NAME = "pd-guide-lock"
 MATERIAL = "Plain Carbon Steel"
@@ -74,11 +74,11 @@ MATERIAL = "Plain Carbon Steel"
 # out AT the bar's bottom edge and retained nothing at the bottom stations;
 # its 15.65 successor stood 9.65 over the bar at the top, toward the latch
 # hook).
-# Stock 91792A108 slotted pan head shanks (MHA-VN-046, rulings R9-31, R9-48)
+# Stock 91792A108 slotted pan head shanks (MHA-PD-VN-60, rulings R9-31, R9-48)
 # pass through the 1/16 sheet plates before threading into the guide's
 # rear-face #4-40 through taps. The part-owned 1/8 drill (R9-49) carries both
 # printed hole positions over the screw majors
-# (vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
+# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")

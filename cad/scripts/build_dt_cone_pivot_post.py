@@ -714,7 +714,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # axis to the crank boss's north face, carrying the station the print
     # locates that face by.  It is its own sketch because a drawing view that
     # dimensions only the station must not print the plan-angle rays beside it
-    # undimensioned (MHA-DT-005 sheet 2), and hiding a sketch in a view hides the
+    # undimensioned (MHA-DT-05 sheet 2), and hiding a sketch in a view hides the
     # dimensions imported from it (_drawing_hidden_sketches, r21).  The part
     # saves it hidden; the drawing shows it per view.
     station = SketchDims()
@@ -756,7 +756,7 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs += station.apply(adapter, "CrankBossStationReference")
 
     # 6c. Cone-boss north-face station reference sketch.  The shaft collar
-    # (MHA-DT-004) bears on that face, so the print locates it FROM THE POST
+    # (MHA-DT-04) bears on that face, so the print locates it FROM THE POST
     # AXIS along the cone axis, in Section A-A.  The sketch lies in A-A's
     # cutting plane (an offset of Top at the cone-axis height, driven by the
     # same global), so the section shows it as the cone axis from the post

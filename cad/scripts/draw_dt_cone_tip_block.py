@@ -149,7 +149,7 @@ TEXT_CLEARANCE = 0.0015
 ROUND_OUT = 0.0001
 
 # The adjuster's hole callout stands between the adjuster elevation and the
-# right view.  #946 / MHA-DT-021: at 9a0f50b1c it stood below-right of the hole
+# right view.  #946 / MHA-DT-21: at 9a0f50b1c it stood below-right of the hole
 # and its leader climbed ~28 mm over the front view to the rim, ~16 mm
 # further than the hole's approach from the right face, reading as an edge of
 # the part.  The short way in, from the right face, is SLOT DEPTH's: its
@@ -214,7 +214,7 @@ SLIT_TEXT_OFFSET = (
 # Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
-# above a dimension); below it, it may run to two.
+# above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
     # The slit's depth only has to break into the adjuster bore: its floor
     # stands inside the bore, so the line ends where no edge is left
@@ -222,17 +222,18 @@ DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
-    # stack).
-    "Depth": "SETS MHA-VN-017\nENGAGEMENT",
+    # stack).  Separate the full number so this left-hand block clears both
+    # the plan and the inner sheet border at the existing font size.
+    "Depth": "SETS\nMHA-DT-VN-55\nENGAGEMENT",
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
     # (build_dt_drive_train_assembly's print-worst containment): no fit, so
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
-    "Width": "WITHIN MHA-DT-020 EDGE",
+    "Width": "WITHIN MHA-DT-20 EDGE",
     # The adjuster axis across the block: the shaft tip's lateral stack.
-    "PassageCenter": "LOCATES MHA-DT-004 TIP",
+    "PassageCenter": "LOCATES MHA-DT-04 TIP",
 }
 # Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
 # print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
@@ -281,7 +282,7 @@ FRONT_KEEP = {
 PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The plan depth's
-# three rows and the 4.875's short span leave no room for inside arrows
+# value and mate rows and the 4.875's short span leave no room for inside arrows
 # (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
 # vertical dimension prints no line between them.
 ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
@@ -560,7 +561,7 @@ PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # shoulder, measured on the c4c0e848a render: SolidWorks centres the block
 # on the point, 7.8 mm over it to the shoulder 8.35 under it, and the mate
 # line prints 57.6 mm wide.
-FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-020"
+FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-20"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {

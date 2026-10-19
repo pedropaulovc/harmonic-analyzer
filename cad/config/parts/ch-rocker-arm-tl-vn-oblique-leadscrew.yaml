@@ -1,0 +1,13 @@
+ch-rocker-arm-tl-vn-oblique-leadscrew:
+  title: Rocker Oblique Trammel Leadscrew
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-54
+  stock_name: ZYLtech T8x2 Lead Screw, 600 mm pre-cut, cut to 410 mm
+  supplier: ZYLtech Engineering
+  supplier_skus: ["HW-SC-T8x2-600"]
+  material: AISI 304
+  material_specification: "304 stainless steel"
+  finish: as supplied
+  quantity: 1
+  tolerance_class: visual_noncritical
+  process: purchased

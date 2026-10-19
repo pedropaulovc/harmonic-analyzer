@@ -7,7 +7,7 @@ assembly's contract ``cad/config/assemblies/<dashed-stem>.yaml`` at top level
 BUILDING.md naming) — never in one central list:
 
     dt-crank-hub:
-      number: MHA-DT-031
+      number: MHA-DT-31
       ...
       machinist_exceptions:
         - id: RV-001

@@ -20,8 +20,8 @@ from dt_crankshaft_spec import (
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "MATCH TAPER-REAM 1:48 WITH",
-        "HUB MHA-DT-031 FOR PIN",
-        "MHA-DT-009: LIGHT DRIVE FIT",
+        "HUB MHA-DT-31 FOR PIN",
+        "MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
 
@@ -33,18 +33,18 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # drops a multi-row callout above a dimension.  The station rows are 9.5 mm
 # apart, so their stacks ride on the same line as a suffix.
 SLIDING_FIT = "SLIDING FIT"
-SHANK_MATE = "IN MHA-DT-031"
+SHANK_MATE = "IN MHA-DT-31"
 JOURNAL_FIT = "2X RUNNING FIT"
-JOURNAL_MATE = "IN MHA-DT-005"
-PINION_SEAT_MATE = "IN MHA-DT-010"
+JOURNAL_MATE = "IN MHA-DT-05"
+PINION_SEAT_MATE = "IN MHA-DT-10"
 # The spigot's diameter (under it, never over) and its length from the seat
-# face both keep the #25 chain wrapping MHA-PD-009 clear (dt_crankshaft_spec).
+# face both keep the #25 chain wrapping MHA-PD-09 clear (dt_crankshaft_spec).
 SPIGOT_AIR = "#25 CHAIN AIR"
-SPIGOT_AIR_MATE = "ON MHA-PD-009"
-CHAIN_AIR_MATE = "CHAIN AIR\nMHA-PD-009"
-COLLAR_REAR_MATE = " BEARS ON MHA-DT-005"
-COLLAR_SEAT_MATE = " MHA-PD-009 SEAT"
-SHAFT_LENGTH_MATE = " SETS MHA-DT-031 TO MHA-PD-009 AIR"
+SPIGOT_AIR_MATE = "ON MHA-PD-09"
+CHAIN_AIR_MATE = "CHAIN AIR\nMHA-PD-09"
+COLLAR_REAR_MATE = " BEARS ON MHA-DT-05"
+COLLAR_SEAT_MATE = " MHA-PD-09 SEAT"
+SHAFT_LENGTH_MATE = " SETS MHA-DT-31 TO MHA-PD-09 AIR"
 
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
@@ -59,7 +59,7 @@ DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:
 # row each keeps the callout to four rows with the REAM line's stacked limit.
 DRIVE_PIN_CALLOUT = "\n".join(
     (
-        "PRESS FIT DRIVE PIN MHA-VN-044 TO HOLE FLOOR",
+        "PRESS FIT DRIVE PIN MHA-DT-VN-67 TO HOLE FLOOR",
         DRIVE_PIN_RIM_NOTE,
     )
 )
@@ -71,7 +71,7 @@ DRIVE_PIN_CALLOUT = "\n".join(
 # callout's own format text, in mm: draw_crankshaft refuses a non-mm sheet.
 DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 
-# Under each 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-009
+# Under each 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-09
 # holes (2.5, drilled +0.10/0) slip over the pressed dowels (Ø2.389 max) with
 # 0.111 diametral clearance, which must absorb the pin-spacing error of both
 # parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
@@ -81,7 +81,7 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 # right from the dimension line beside the end view and must end before the
 # dome tip's extension lines (machinist review of 19e33c6c2: the two-row
 # form ran ~44 mm wide, across them).
-DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-PD-009"
+DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-PD-09"
 
 # The pins' knockouts (dt_crankshaft_spec DRIVE_PIN_KNOCKOUT_SPEC) print as a
 # native Hole Wizard callout on the lower hole's floor: the drill reads above

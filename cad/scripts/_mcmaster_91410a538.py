@@ -1,7 +1,7 @@
 """Pure McMaster 91410A538 dimensions for its diagnostic replica.
 
 Separate from the COM recipe and part-save wrapper to limit cache blast radius.
-MHA-VN-023 is 91410A540 since 2026-10-12 (``_mcmaster_91410a540``).
+MHA-FR-VN-52 is 91410A540 since 2026-10-12 (``_mcmaster_91410a540``).
 """
 
 from __future__ import annotations

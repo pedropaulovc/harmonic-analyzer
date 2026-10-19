@@ -1,4 +1,4 @@
-r"""McMaster 91375A105 -- alloy steel cup-tip set screw, #4-40 x 3/16 (MHA-VN-061).
+r"""McMaster 91375A105 -- alloy steel cup-tip set screw, #4-40 x 3/16 (MHA-PN-VN-52).
 
 Catalogue-only: no vendor model has been harvested, so there is no pinned
 VENDOR_* truth and no replica gate. The catalogue facts are
@@ -16,7 +16,7 @@ countersink, and the UN cutter 7P/16 past the cup end. Only the length, and
 with it the helix height (L + 1.01P), change.
 
 Frame: axis +Y, origin mid-length, socket face at y = +L/2 and cup end at
-y = -L/2; build_vn_pen_rod_set_screw lifts the cup end onto y = 0.
+y = -L/2; build_pn_vn_pen_rod_set_screw lifts the cup end onto y = 0.
 
 Run standalone (SolidWorks open); without a vendor file this is catalogue-only::
 

@@ -9,7 +9,7 @@ number, threaded length, stock price or live inventory is asserted.
 This is a catalog-only ideal native model, not vendor CAD or a measured
 replica.  The head retains the existing ASME B18.6.3 1/4 maxima (height
 0.237 in, diameter 0.414 in).  The supplied under-head length is 101.6 mm;
-MHA-VN-031's builder alone cuts it to fit.  The 90280A* family laws for the
+MHA-DT-VN-61's builder alone cuts it to fit.  The 90280A* family laws for the
 head shape, slot, tip, runout and full-shank helical thread are retained as
 modeling conventions, not verified dimensions of the supplied screw.
 

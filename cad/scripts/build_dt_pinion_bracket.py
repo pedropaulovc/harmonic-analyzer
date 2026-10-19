@@ -463,9 +463,9 @@ async def build(adapter) -> dict[str, str]:
     expected -= v_bore
     await volume_check(adapter, "strap with pin seat", expected, 0.005 * expected)
 
-    # Option E-a set-pin cross hole (vn_pinion_strap_pin_spec): along X through
+    # Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec): along X through
     # the pivot-bore axis, centred on the thickness.  Sketched on the Right
-    # Plane (normal X; sketch u = -z) like the MHA-DT-017 pin hole: the centre's
+    # Plane (normal X; sketch u = -z) like the MHA-DT-17 pin hole: the centre's
     # zero height drops out of define_circle as an on-axis relation (the hole
     # is ON the bore axis), so only its through-thickness station and diameter
     # are dimensions.  Cut mid-plane well past both edges.  The mirror station

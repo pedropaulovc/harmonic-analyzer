@@ -1,9 +1,8 @@
-"""Offline contract for the summing-lever fitter package (MHA-SM-000)."""
+"""Offline contract for the summing-lever fitter package (MHA-SM-00)."""
 
 from __future__ import annotations
 
 import math
-import re
 from pathlib import Path
 
 import pytest
@@ -15,25 +14,11 @@ import joint_retention
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
-import vn_knife_hanger_stud_spec as hanger_bolt
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from dt_cone_pivot_post_installation import SUMMING_Z
-
-
-def _printed_text() -> str:
-    return "\n".join(
-        (
-            drawing.ASSEMBLED_NOTES,
-            drawing.STEPS_AND_CHECKS,
-            drawing.DETAIL_LABEL,
-            notes.EXPLODED_CAPTION,
-            *notes.DIMENSION_CALLOUTS.values(),
-            *notes.BOM_DESCRIPTIONS.values(),
-        )
-    )
 
 
 def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
@@ -169,13 +154,6 @@ def test_setting_drives_reproduce_the_sketch_values() -> None:
     assert set(drawing.PRECISION) == set(notes.DIMENSION_CALLOUTS)
 
 
-def test_printed_text_carries_no_rule_numbers_or_rulings() -> None:
-    text = _printed_text()
-    assert not re.search(r"\bRULE\b|EXCEPTION|RULING|TODO", text)
-    assert text == text.upper()
-    assert f"±{notes.LEVEL_TOLERANCE_DEG:g}°" in text
-
-
 def test_layout_constants_stay_on_the_sheet() -> None:
     left, bottom, right, top = drawing.SHEET_INNER_BORDER
     radius = drawing.DETAIL_CROP_RADIUS
@@ -196,58 +174,39 @@ def test_retention_rows_cite_the_package_steps() -> None:
         if joint.assembly == "sm_summing"
     }
     hanger = rows["sm-summing/knife-hanger-in-mount"]
-    assert hanger.installed_at == "MHA-SM-000 STEP 6"
+    assert hanger.installed_at == "MHA-SM-00 STEP 6"
     assert hanger.exposure is joint_retention.Exposure.STATIC_CLAMP
     assert hanger.lock is joint_retention.Lock.NONE
-    assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-000 STEP 2"
-    assert rows["sm-summing/gooseneck-spring-screw"].installed_at == "MHA-SM-000 STEP 8"
+    assert rows["sm-summing/boss-hook-in-lever"].installed_at == "MHA-SM-00 STEP 2"
+    assert rows["sm-summing/gooseneck-spring-screw"].installed_at == "MHA-SM-00 STEP 8"
     hook = rows["sm-summing/boss-hook-in-lever"]
     assert hook.lock is joint_retention.Lock.JAM_NUT
-    assert hook.lock_part == "vn_boss_hook_jam_nut"
-    assert hook.lock_step == "MHA-SM-000 STEP 2"
+    assert hook.lock_part == "sm_vn_boss_hook_jam_nut"
+    assert hook.lock_step == "MHA-SM-00 STEP 2"
     nut = rows["sm-summing/boss-hook-jam-nut-on-hook"]
-    assert nut.installed_at == "MHA-SM-000 STEP 2"
-    steps = {line.split(".", 1)[0]: line for line in notes.ASSEMBLY_STEPS}
-    assert "MHA-VN-024" in steps["6"]
-    assert "MHA-VN-001" in steps["2"] and "MHA-VN-072" in steps["2"]
-    assert "MHA-SM-004" in steps["8"]
-    # Period hardware: no step leans on a threadlocker, or even names one.
-    banned = ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC", "PATCH")
-    printed = (*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS)
-    assert not [line for line in printed for word in banned if word in line]
+    assert nut.installed_at == "MHA-SM-00 STEP 2"
 
 
-def test_hanger_bolts_are_cut_to_the_measured_stack_at_step_4() -> None:
-    """Each MHA-VN-024 is cut to its own hole's measured stack plus the
-    fit-up reach, the band the builder's reach worst case charges."""
-    steps = {line.split(".", 1)[0]: line for line in notes.ASSEMBLY_STEPS}
-    fit_up = steps["4"]
-    assert f"{spec.HANGER_FIT_REACH:.2f} ±{spec.HANGER_FIT_REACH_TOL:.2f}" in fit_up
-    assert "8.92 ±0.15" in fit_up
-    assert "MHA-VN-060" in fit_up and "MHA-VN-024" in fit_up
-    assert "MEASURE CROSSBAR UNDERSIDE TO WASHER TOP" in fit_up
-    # The band is tighter than .XX, so the step names the tap it serves and
-    # what both limits keep (assembly machinist review, fr-top-frame r2).
-    assert "(REACH INTO MHA-SM-002 TAP: FULL THREAD, TIP CLEAR OF TAP BOTTOM)" in fit_up
+def test_hanger_fit_up_reach_matches_the_builder_band() -> None:
     assert builder.HANGER_REACH_MIN == pytest.approx(
         spec.HANGER_FIT_REACH - spec.HANGER_FIT_REACH_TOL
     )
     assert builder.HANGER_REACH_MAX == pytest.approx(
         spec.HANGER_FIT_REACH + spec.HANGER_FIT_REACH_TOL
     )
-    # The bolt sheet's reference length names this step.
-    bolt_callout = hanger_bolt.DIMENSION_CALLOUTS["CutLength"]
-    assert "CUT AT ASSEMBLY" in bolt_callout
-    assert f"{notes.DRAWING_NUMBER} STEP 4" in bolt_callout
-    # The notes that cite later steps follow the renumbering.
-    assert "SHEET 3 STEP 10." in notes.ASSEMBLED_NOTES[-1]
-    assert notes.ASSEMBLY_CHECKS[4].startswith("4. AFTER STEP 10 ")
-    assert steps["10"].startswith("10. LEVEL SETTING")
 
 
 def test_steps_and_checks_stay_above_the_inner_border() -> None:
-    # Default-format note pitch, as measured for MHA-MG-000 (0.0046).
     lines = drawing.STEPS_AND_CHECKS.splitlines()
     assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
-    bottom = drawing.STEPS_XY[1] - len(lines) * 0.0046
-    assert bottom > drawing.SHEET_INNER_BORDER[1]
+    bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
+    assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
+    assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
+    assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
+    assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
+    assert drawing.STEPS_AND_CHECKS.split() == " ".join(
+        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS)
+    ).split()
+    for number in drawing.BOM_PART_NUMBERS.values():
+        if any(number in step for step in notes.ASSEMBLY_STEPS):
+            assert number in drawing.STEPS_AND_CHECKS

@@ -28,7 +28,7 @@ PIN_DIA_TOL = 0.005
 # dimension origin) to the back end, and only places that end: nothing stands
 # behind the bar's back face within 10 mm of the axle (the nearest part, the
 # pen-hanger screw head, sits 56 mm along the bar), so it prints .X and the
-# back end lands in the window below. It grows with the spacer (MHA-MG-011)
+# back end lands in the window below. It grows with the spacer (MHA-MG-11)
 # exactly as the gauge does, so the back end stays put.
 SHANK_LEN = round(28.4 + _spacer.LENGTH, 6)
 SHANK_LEN_PLACES = 1
@@ -57,7 +57,7 @@ DOME_R = ((THREAD_MAJOR / 2.0) ** 2 + DOME_H**2) / (2.0 * DOME_H)  # 1.665
 
 # The press gauge: the step stands this far off the bar's front face, so the
 # bar's depth leaves the stack on the pin (mg_wheel_group). The spacer
-# (MHA-MG-011) stands between the bar and the back washer, so the gauge is its
+# (MHA-MG-11) stands between the bar and the back washer, so the gauge is its
 # length plus the rev-10 19.5 the washer, hub and nut stack need.
 PRESS_GAUGE = round(19.5 + _spacer.LENGTH, 6)
 PRESS_GAUGE_TOL = 0.05
@@ -110,13 +110,13 @@ BAR_BORE_LIMITS = (
 )
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the note says only that the axle presses to the gauge and why. The
 # gauge itself is a model dimension of the mg-magnifier assembly, printed on
-# MHA-MG-000's AXLE AS PRESSED detail (mg_magnifier_assembly_spec): its 0.10
+# MHA-MG-00's AXLE AS PRESSED detail (mg_magnifier_assembly_spec): its 0.10
 # is spent inside the thread-end window (mg_wheel_group: full thread under the
 # locknut at the thick-stack corner).
 # The back end's window, now loose, rides the bar's depth callout.
 DRAWING_NOTES = "\n".join(
     (
-        "PRESS INTO MG-WHEEL-BAR TO THE GAUGE ON MHA-MG-000 (AXLE AS PRESSED),",
+        "PRESS INTO MG-WHEEL-BAR TO THE GAUGE ON MHA-MG-00 (AXLE AS PRESSED),",
         "SO THE LOCKNUT SITS ON FULL THREAD; RED LOCTITE 271 OPTIONAL.",
     )
 )

@@ -1,4 +1,4 @@
-"""Rulings R9-48 and R9-49: the MHA-VN-046 guide-lock screw joint at the worst case.
+"""Rulings R9-48 and R9-49: the MHA-PD-VN-60 guide-lock screw joint at the worst case.
 
 Each test recomputes the worst-case corner from the catalogue and the printed
 bands, not from the specs' derived constants, then holds the spec to it; the
@@ -15,7 +15,7 @@ import re
 
 import pytest
 
-import vn_guide_lock_screw_spec as screw
+import pd_vn_guide_lock_screw_spec as screw
 import pd_guide_lock_spec as lock
 import pd_platen_guide_spec as guide
 import pd_transgear_pivot_spacer_spec as spacer
@@ -60,7 +60,7 @@ def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
     size = list(recipe.PAN_HEAD_SIZE)
     size[1] = 0.25 * IN
     monkeypatch.setattr(recipe, "PAN_HEAD_SIZE", tuple(size))
-    with pytest.raises(AssertionError, match="MHA-VN-046 guide-lock screw"):
+    with pytest.raises(AssertionError, match="MHA-PD-VN-60 guide-lock screw"):
         _reload_screw_spec()
 
 
@@ -91,13 +91,13 @@ def test_the_hole_coordinates_at_the_arm_tap_band_are_refused(monkeypatch) -> No
     """±0.065 (the hanger arm's tap band) reaches 0.092 radially: the lock's
     holes could then bear on their screws toward the bar."""
     monkeypatch.setattr(lock, "HOLE_LOCATION_BAND", 0.065)
-    with pytest.raises(AssertionError, match="MHA-PD-012 guide lock"):
+    with pytest.raises(AssertionError, match="MHA-PD-12 guide lock"):
         _reload_screw_spec()
 
 
 def test_the_close_number_4_clearance_is_refused(monkeypatch) -> None:
     monkeypatch.setattr(lock, "HOLE_SPEC", HoleSpec("clearance", "#4", fit="close"))
-    with pytest.raises(AssertionError, match="MHA-PD-012 guide lock"):
+    with pytest.raises(AssertionError, match="MHA-PD-12 guide lock"):
         _reload_screw_spec()
 
 

@@ -11,7 +11,7 @@ HUB_OD = 13.0
 HUB_LEN = 10.0
 BORE = 6.35  # nominal; the REAM_SLIDE band (dt_pinion_lever_spec) opens it 0.010-0.025
 WALL_T = 2.0
-# ENFORCE r1 of MHA-DT-016 (#1011): the end wall behind the blind bore now
+# ENFORCE r1 of MHA-DT-16 (#1011): the end wall behind the blind bore now
 # reads from two .X baselines on face B -- the bore depth and the overall
 # length to the crown apex -- instead of a tight band of its own (rule 17:
 # fix the wall with geometry, never a tighter band).  A 2.2 sagitta (was 1.5,
@@ -29,7 +29,7 @@ OVERALL_FROM_B_PLACES = 1  # OverallFromB: mouth face B to the crown apex
 GRIP_FROM_B_PLACES = 2  # GripFromB: the grip axis from face B
 ROD_DIA_PLACES = 1  # RodDia
 
-# U36 (MHA-DT-030): the retention pin crosses the hub at mid-engagement -- half the
+# U36 (MHA-DT-30): the retention pin crosses the hub at mid-engagement -- half the
 # bore depth in from the mouth face, which also puts it half the rod's
 # engagement in from the rod's front end (the rod seats on the bore floor).
 # The pin runs along the hub's local X, 3 o'clock to the +Y grip.

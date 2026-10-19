@@ -477,7 +477,7 @@ def test_part_owns_every_printed_decimal_place() -> None:
 
 
 def test_running_bores_close_the_configured_fit_class() -> None:
-    """User ruling 2026-09-28: MHA-DT-011 runs directly in the restored Ø11.438
+    """User ruling 2026-09-28: MHA-DT-11 runs directly in the restored Ø11.438
     crank bore, so both bores carry the one running band."""
     import _config
     import dt_cone_gear_shaft_spec
@@ -643,7 +643,7 @@ def test_manufacturing_notes_do_not_restate_dimensions() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert max(len(line) for line in lines) <= 64
-    stripped = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", spec.DRAWING_NOTES)
+    stripped = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", spec.DRAWING_NOTES)
     stripped = re.sub(r"INSIDE CORNERS R\d\.\d MAX\.", "", stripped)
     stripped = re.sub(r"WALL \d\.\d\d MIN,", "", stripped)
     assert not any(character.isdigit() for character in stripped)
@@ -931,7 +931,7 @@ def test_plan_names_the_ray_its_basic_angle_runs_to() -> None:
 def test_crank_bore_thru_rides_the_size_line_so_the_mate_line_stays_narrow() -> None:
     """r4 view-crowding: "THRU, RUNS ON ..." below the size reached the 38.10."""
     assert drawing.DIMENSION_SUFFIXES["CrankBoreDia"] == " THRU"
-    assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-011"
+    assert drawing.DIMENSION_CALLOUTS["CrankBoreDia"] == "RUNS ON MHA-DT-11"
 
 
 def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
@@ -955,7 +955,7 @@ def test_mounting_hole_callout_says_drill_above_its_through_row() -> None:
 def test_thrust_face_station_names_the_collar_it_bears() -> None:
     """r5 (rule 4): the ±0.25 station must say which part's collar it sets."""
     callout = drawing.DIMENSION_CALLOUTS["ConeBossNorthZ"]
-    assert "MHA-DT-004" in callout
+    assert "MHA-DT-04" in callout
     assert "COLLAR" in callout
     # Above the upper extension line, below the sheet border.
     assert drawing.SECTION_KEEP["ConeBossNorthZ"][1] > 0.250

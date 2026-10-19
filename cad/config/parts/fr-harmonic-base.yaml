@@ -1,6 +1,6 @@
 fr-harmonic-base:
   title: Two-Plate Frame Base
-  number: MHA-FR-001
+  number: MHA-FR-01
   material_family: ferrous_noncritical
   finish: "ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID"
   quantity: 1
@@ -9,6 +9,6 @@ fr-harmonic-base:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-004 AT ASSEMBLY; on the four #4-40 MHA-FR-004 seats, which print no station"
+      where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-04 AT ASSEMBLY; on the four #4-40 MHA-FR-04 seats, which print no station"
       finding: "fit-up at assembly (rule 19)"
-      reason: "the #4 close holes in MHA-FR-004 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
+      reason: "the #4 close holes in MHA-FR-04 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"

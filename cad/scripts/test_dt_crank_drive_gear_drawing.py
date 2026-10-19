@@ -290,7 +290,7 @@ def test_gear_data_block_is_the_tooth_system_and_nothing_else() -> None:
         "HELIX AT PITCH DIA",
         "LEAD (mm/rev, REF)",
         f"BASE TANGENT SPAN OVER {spec.BASE_TANGENT_SPAN_TEETH} TEETH, NORMAL (mm), ACCEPT ON THIS PART",
-        "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
+        "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY (mm)",
         "TOOTH FORM",
         "TOOTH EDGES",
         "MATES WITH",

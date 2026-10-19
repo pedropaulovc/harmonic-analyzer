@@ -1,9 +1,9 @@
-r"""Pure-data contract for the rocker arm hub filing button (MHA-CH-006-TL-04).
+r"""Pure-data contract for the rocker arm hub filing button (MHA-CH-06-TL-04).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 rocker arm's hub filing hold (traveler setup S6, inventory fixture
 ``hub-filing-buttons``) two buttons ride the headed filing
-stud (MHA-CH-006-TL-05) that locates in the arm's reamed pivot bore: one seats
+stud (MHA-CH-06-TL-05) that locates in the arm's reamed pivot bore: one seats
 on each hub face, the stud's nut clamps the arm between them, and the hub is
 filed down until the file rides on both hardened rims all round. The rim is
 the filing line, so the button O.D. is the hub O.D. Two are made, O1 drill
@@ -82,7 +82,7 @@ BORE_CHAMFER_CALLOUT = (
 # the mate by Number with its acceptance (callout above, callout below).
 BORE_FIT_CALLOUT = (
     BORE_CHAMFER_CALLOUT,
-    "SLIDES ON MHA-CH-006-TL-05 STUD BY HAND WITHOUT SHAKE",
+    "SLIDES ON MHA-CH-06-TL-05 STUD BY HAND WITHOUT SHAKE",
 )
 BORE_FIT_NOTE = " ".join(part for part in BORE_FIT_CALLOUT if part)
 
@@ -122,7 +122,7 @@ if RIM_WALL_WORST < rocker.RULE12_WALL_FLOOR:
     )
 # Round DOWN at two places; never overstate the minimum.
 RIM_WALL_MIN = math.floor(RIM_WALL_WORST * 100.0 + 1e-9) / 100.0
-# Pending exception ruling: MHA-CH-006-TL-04 rim wall under the 2.0 target (#1369).
+# Pending exception ruling: MHA-CH-06-TL-04 rim wall under the 2.0 target (#1369).
 RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # each three-place size names its mate on its own dimension (callout below);
@@ -130,9 +130,9 @@ RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 # The runout's reason rides under the O.D.'s mate: one line above (a broken
 # above-callout does not print, draw_dt_cone_gear_shaft), and in one line the
 # reason would reach the edge view and the isometric.
-OD_CALLOUT = "SETS FILED MHA-CH-006 HUB\nRUNOUT HOLDS HUB COAXIALITY"
+OD_CALLOUT = "SETS FILED MHA-CH-06 HUB\nRUNOUT HOLDS HUB COAXIALITY"
 OD_RUNOUT_CALLOUT = f"RUNOUT {OD_RUNOUT_TIR:.{OD_RUNOUT_PLACES}f} TIR TO BORE"
-THICKNESS_CALLOUT = "STACKS MHA-CH-006 HUB"
+THICKNESS_CALLOUT = "STACKS MHA-CH-06 HUB"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the
 # title block's edge break does not apply to the rim; a leadered note on the
 # rim edge says so.

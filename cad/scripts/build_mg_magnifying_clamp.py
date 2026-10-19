@@ -1,9 +1,9 @@
-r"""Reproduction script: magnifying-lever clamp (MHA-MG-002; book ch. 20 p. 48).
+r"""Reproduction script: magnifying-lever clamp (MHA-MG-02; book ch. 20 p. 48).
 
 A vertical length of 7/16 in hex brass that slides along the magnifying lever
 (#1559 owner ruling): the Ø6 lever passes through it across the corners, the
 knurled #4-40 thumb screw enters the top face on the hex axis and pinches the
-lever, and the MHA-MG-004 vertical rod screws into a blind #4-40 tap in the
+lever, and the MHA-MG-04 vertical rod screws into a blind #4-40 tap in the
 bottom face, on the same axis, until its shoulder seats on that face.
 
 Layout (part frame, ``mg_magnifying_clamp_geom``): origin at the bottom-face
@@ -192,7 +192,7 @@ async def build(adapter) -> dict[str, str]:
         ROD_TAP_SPEC,
         [[0.0, 0.0, 0.0]],
         (0.0, -1.0, 0.0),
-        f"vertical-rod tap ({ROD_TAP_SPEC.size} blind, MHA-MG-004 seat)",
+        f"vertical-rod tap ({ROD_TAP_SPEC.size} blind, MHA-MG-04 seat)",
         name="RodTap",
         expect_dia_mm=ROD_TAP_DRILL_DIA,
         placement_dims=[((None, None), (None, None))],

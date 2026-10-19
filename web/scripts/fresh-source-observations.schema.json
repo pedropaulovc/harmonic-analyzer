@@ -96,7 +96,7 @@
     },
     "assemblyRetainingNut": {
       "oneOf": [
-        {"type": "object", "additionalProperties": false, "required": ["attachment", "releaseTurns"], "properties": {"attachment": {"const": "threaded"}, "releaseTurns": {"type": "number", "minimum": 0, "maximum": 11.163466181519038, "description": "Actual MHA-078 last-full-thread release distance divided by the MHA-126 1/4-20 pitch; not retaining-nut body length."}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "releaseTurns"], "properties": {"attachment": {"const": "threaded"}, "releaseTurns": {"type": "number", "minimum": 0, "maximum": 11.163466181519038, "description": "Actual MHA-PD-08 last-full-thread release distance divided by the MHA-PD-13 1/4-20 pitch; not retaining-nut body length."}}},
         {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
       ]
     },

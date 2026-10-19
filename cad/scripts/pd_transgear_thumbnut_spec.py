@@ -1,15 +1,15 @@
-r"""MHA-PD-013 transgear-thumbnut: the knurled brass nut on the knob shaft's stud.
+r"""MHA-PD-13 transgear-thumbnut: the knurled brass nut on the knob shaft's stud.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The nut runs on the #8-32 stud of the knob shaft (MHA-PD-008) and
-seats on the drive collar's (MHA-PD-022) pilot, faced at assembly to stand
-0.05-0.15 proud of the removable chain wheel's (MHA-PD-009, T24) front face, so
+closure.  The nut runs on the #8-32 stud of the knob shaft (MHA-PD-08) and
+seats on the drive collar's (MHA-PD-22) pilot, faced at assembly to stand
+0.05-0.15 proud of the removable chain wheel's (MHA-PD-09, T24) front face, so
 the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10):
 knurled head Ø20.5 × 8.7 with a dished front face (a cone from Ø15 at the
 rim to a flat Ø9 floor 1.0 deep), a Ø11 waist × 2.4 (ruling 5), a Ø12.4
 flange to the seat face, 16.1 long, #8-32 UNC-2B through with an entry
 countersink at each end.  The stud's
-side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-PD-008's;
+side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-PD-08's;
 this module owns only the nut's side of it.
 
 Part frame: axis local +Y through the origin (``Axis1``, Front Plane ∩ Right
@@ -86,7 +86,7 @@ if (
     or KNURL_TEETH % 2
 ):
     raise AssertionError(
-        f"MHA-PD-013 knurl {KNURL_TEETH}T Ø{HEAD_DIA}/Ø{KNURL_ROOT_DIA} (pitch "
+        f"MHA-PD-13 knurl {KNURL_TEETH}T Ø{HEAD_DIA}/Ø{KNURL_ROOT_DIA} (pitch "
         f"{KNURL_CREST_PITCH:.3f}, {KNURL_TOOTH_ANGLE_DEG:.1f}° V) is not "
         f"{KNURL_DESIGNATION}"
     )
@@ -128,7 +128,7 @@ CSK_HALF_ANGLE_BAND = (
 CSK_HALF_ANGLE_PLACES = 1
 CSK_HALF_ANGLE_MIN = CSK_HALF_ANGLE_DEG + min(CSK_HALF_ANGLE_BAND)
 if CSK_DIA <= THREAD_MAJOR:
-    raise AssertionError("MHA-PD-013 countersink ends inside the thread major")
+    raise AssertionError("MHA-PD-13 countersink ends inside the thread major")
 CSK_QUALIFIER = "2X CSK, BOTH ENDS"
 # Rear countersink: a 45° break on the tap-drill edge of the seat face, its
 # cone y = CSK_DIA / 2 - r.  Front: the same break on the dish floor, its
@@ -198,7 +198,7 @@ WALLS: dict[str, tuple[float, float]] = {
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_FLOOR - 1e-9:
         raise AssertionError(
-            f"MHA-PD-013 {_name} wall {_worst:.3f} at the printed worst case is "
+            f"MHA-PD-13 {_name} wall {_worst:.3f} at the printed worst case is "
             f"under the {WALL_FLOOR} floor"
         )
 
@@ -227,18 +227,18 @@ DISH_FLOOR_MARGINS = dish_floor_margins(DISH_DIA, DISH_FLOOR_DIA, DISH_DEPTH, CS
 for _name, _margin in DISH_FLOOR_MARGINS.items():
     if _margin <= 0.0:
         raise AssertionError(
-            f"MHA-PD-013 dish: {_name} is {_margin:.3f} at the printed worst case"
+            f"MHA-PD-13 dish: {_name} is {_margin:.3f} at the printed worst case"
         )
 
 # --- The seat on the collar's pilot (R9-70) -------------------------------------
-# The bearing annulus and the flange's cover over the pilot are MHA-PD-022's
+# The bearing annulus and the flange's cover over the pilot are MHA-PD-22's
 # (``pd_transgear_drive_collar_spec``), which reads this module.
 
 # --- The nut's side of the stud engagement (contract §7) ----------------------
 # The stack subtracts the thread each countersink takes (at its printed MAX,
 # from the seat face and from the rim, the front one on the dish floor at its
 # deepest printed depth) and, after cut-to-fit, the nut's shortest printed
-# length.  The stud's tip station and chamfer are MHA-PD-008's.
+# length.  The stud's tip station and chamfer are MHA-PD-08's.
 # Smallest accepted included angle makes the largest axial thread loss.
 # Charge the printed angular row, not the nominal exactly-45-degree cone.
 REAR_THREAD_LOSS = REAR_CSK_BREAK / math.tan(math.radians(CSK_HALF_ANGLE_MIN))

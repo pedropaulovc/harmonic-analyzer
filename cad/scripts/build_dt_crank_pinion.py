@@ -11,7 +11,7 @@ through a match-drilled radial cross-hole (dt_crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. The 11.6 tooth length runs past the drive gear's 7.2244
-face; the south face stays against its restored MHA-DT-005 boss-side datum.
+face; the south face stays against its restored MHA-DT-05 boss-side datum.
 The teeth run at full OD for the shoulder length and are turned down north of
 it, so the grown end passes under the inclined T120 (dt_crank_pinion_spec).
 

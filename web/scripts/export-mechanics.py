@@ -320,8 +320,8 @@ def export_snapshot(
             "ch_channel_lever_spec",
             "ch_connecting_rod_spec",
             "dt_cylinder_gear_spec",
-            "vn_channel_spring_stock_geom",
-            "vn_counter_spring_stock_geom",
+            "ch_vn_channel_spring_stock_geom",
+            "sm_vn_counter_spring_stock_geom",
             "spring_mount_geom",
             "settled_spring_seats",
             "sm_gooseneck_geom",
@@ -358,13 +358,13 @@ def export_snapshot(
     lever = modules["ch_channel_lever_spec"]
     cyl = modules["dt_cylinder_gear_spec"]
     rod = modules["ch_connecting_rod_spec"]
-    stock = modules["vn_channel_spring_stock_geom"]
-    counter = modules["vn_counter_spring_stock_geom"]
+    stock = modules["ch_vn_channel_spring_stock_geom"]
+    counter = modules["sm_vn_counter_spring_stock_geom"]
     spring_deformation, counter_deformation = spring_deformation_contract(cad, stock, counter)
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["sm_gooseneck_geom"]
-    # Releases before MHA-SM-004 model the counter eye on the gooseneck's
+    # Releases before MHA-SM-04 model the counter eye on the gooseneck's
     # integral screw shank; later trees seat it on the separate made screw's
     # #6-32 major diameter.
     counter_screw_dia = (

@@ -2,8 +2,8 @@
 
 Every manufacturing drawing runs this from ``_drawing_common.finalize_drawing``
 on every sheet. It replaces three partial audits that each missed real
-collisions (2026-09-25: MHA-DT-021's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text
-runs, ADJUSTER ENTRY crossed by a view edge; MHA-FR-001's datum-origin axis
+collisions (2026-09-25: MHA-DT-21's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text
+runs, ADJUSTER ENTRY crossed by a view edge; MHA-FR-01's datum-origin axis
 through a callout and a leader through "TOP VIEW SCALE 1:4"):
 
 * ``_drawing_layout_check`` boxed every dimension as a +/-4 mm square with no
@@ -107,7 +107,7 @@ class FindingSeverity(Enum):
 
 # Near-contact clearance between the text of two DISTINCT annotations, as a
 # fraction of the smaller text height. drawing-guidelines.md rule 14 (keep text off the part) requires visible air: two runs
-# closer than a word space read as ONE string. Measured on MHA-DT-021's own PDF
+# closer than a word space read as ONE string. Measured on MHA-DT-21's own PDF
 # (tight pdfium glyph boxes, 3.5 mm text): the word space in "SLOT DEPTH" is
 # 1.77 mm (0.51 h), while "20.8" and "8.42" -- which print as "20.88.42" --
 # are 0.64 mm apart. A penetration test (the old 0.3 mm) passes that pair.
@@ -1388,7 +1388,7 @@ def display_box(display: Mapping[str, Any], *, advance: float = DEFAULT_ADVANCE_
     run from its lower-left along its baseline, its cap height tall and as
     wide as SolidWorks reports (``w``). A run with no reported width is
     ESTIMATED at ``advance`` per glyph (``estimated_text_runs`` counts them):
-    MHA-DT-019's "BOTH CROWNS" reported 34.1 mm, where the estimate made 23.1.
+    MHA-DT-19's "BOTH CROWNS" reported 34.1 mm, where the estimate made 23.1.
     ``None`` when the display data draws nothing.
     """
     boxes = [
@@ -2668,7 +2668,7 @@ def find_lines_through_own_text(
     """A dimension's own extension or dimension line struck through its own text.
 
     ``text-on-line`` skips an annotation's own ink, so text parked across its
-    own witness line went unreported: MHA-DT-004's "10.781", pushed outside its
+    own witness line went unreported: MHA-DT-04's "10.781", pushed outside its
     extension lines, printed with the collar-face witness through "0" and "7"
     (conegear, #916 388d1e3fb). Its own dimension line through its text had
     no finder either (Main's gate-gap sweep). The rows are shrunk by
@@ -2769,13 +2769,13 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     dimension/witness line.
 
     drawing-guidelines.md rule 14 (keep text off the part): no leader crosses a dimension line. A callout's shoulder is its
-    leader's last run under the text: MHA-DT-021's 5.56 heel-height line crossed
+    leader's last run under the text: MHA-DT-21's 5.56 heel-height line crossed
     the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
     leader landing ON a line) are not crossings -- see
     ``_drawing_layout_check._proper_crossing``.
 
     Targets are dimension, extension and frame lines (Main's ruling a) and
-    section cutting lines (``leader-crosses-section-line``, gating: the MHA-DT-010
+    section cutting lines (``leader-crosses-section-line``, gating: the MHA-DT-10
     finish leader was moved off its A-A line for this). A detail circle is no
     target: a leader to a feature inside it must cross it. A crossing on the
     stretch a leader runs past its arrow tip is inside the feature it points
@@ -3436,7 +3436,7 @@ def _near_foreign_text(
 def find_arrows_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:
     """An arrowhead, or an outside arrow's tail, nearer than ``clearance`` to
     another annotation's text: gating, the fleet's arrow-to-text rule. That
-    close the arrow reads as part of the text (MHA-DT-021 round 2: the 15.2's
+    close the arrow reads as part of the text (MHA-DT-21 round 2: the 15.2's
     tail 0.2 mm over ADJUSTER ENTRY, the 10.7's arrow inside the 3.97's
     tolerance stack)."""
     sources = [
@@ -3461,7 +3461,7 @@ def _datum_seated_on_frame(source: AnnotationGeometry, target: AnnotationGeometr
     border: the tag is attached to that frame (ASME Y14.5-2018 names a
     pattern datum by the symbol on the frame under its nX callout), so the
     frame's text is the triangle's feature, not a neighbour it crowds.  The
-    knife mount's datum B on its dowel-pair frame (MHA-SM-002,
+    knife mount's datum B on its dowel-pair frame (MHA-SM-02,
     _drawing_gdt.add_frame_datum_feature) seats its triangle's base on the
     frame's bottom border, 1.66 mm under the frame's 0.13.
 
@@ -3602,7 +3602,7 @@ def find_text_on_view(
 ) -> list[Finding]:
     """Text printed over a view its annotation does not belong to.
 
-    MHA-DT-021's adjuster callout, owned by the front view, printed across the
+    MHA-DT-21's adjuster callout, owned by the front view, printed across the
     right view's face (swing's gap diff). Text-on-line only sees text that
     touches an edge; text sitting INSIDE a foreign view, between its edges, is
     just as wrong (drawing-guidelines.md rule 14 (keep text off the part)). The outline is ``GetOutline``'s padded box,

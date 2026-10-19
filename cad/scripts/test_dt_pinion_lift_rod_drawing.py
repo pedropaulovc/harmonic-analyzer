@@ -53,10 +53,10 @@ def test_pin_hole_sits_at_the_lever_mid_engagement() -> None:
     assert lever.ROD_PIN_HOLE_FROM_END == lever.BORE_DEPTH / 2.0 == 4.0
     callout = dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT
     # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-000 step through the registry.
+    # and the sheet points at that MHA-DT-00 step through the registry.
     import dt_drive_train_steps
 
-    assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-DT-016 HUB"]
+    assert callout.split("\n") == ["MATCH-DRILL THRU AT ASSEMBLY", "IN MHA-DT-16 HUB"]
     assert dt_pinion_lift_rod_spec.LEVER_NUMBER in callout
     assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == (

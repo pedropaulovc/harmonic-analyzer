@@ -1,11 +1,11 @@
-r"""Reproduction script: latch hook (MHA-PD-014; book ch. 23 pp. 58-63; video 4/4).
+r"""Reproduction script: latch hook (MHA-PD-14; book ch. 23 pp. 58-63; video 4/4).
 
 The "small latch that allows the operator to disengage the gearing from the
 platen" (ch23 text; p.58 "latch" callout): ONE formed 0.8 (0.032 in) 1095
-spring-steel part.  A base lies on the MHA-PD-007 support bar's back face
-under two #4-40 screws (MHA-VN-043); a 90 deg ear rises at its +X end; an arm
+spring-steel part.  A base lies on the MHA-PD-07 support bar's back face
+under two #4-40 screws (MHA-PD-VN-59); a 90 deg ear rises at its +X end; an arm
 hangs from the ear's lower edge, rolled R80 flatwise until it lies square to
-the MHA-VN-042 latch pin, with the pin hole and a finger tab below it.
+the MHA-PD-VN-58 latch pin, with the pin hole and a finger tab below it.
 Geometry and frame: ``pd_latch_hook_geometry``; printed bands, walls, notes
 and the marked dimensions: ``pd_latch_hook_spec``.
 

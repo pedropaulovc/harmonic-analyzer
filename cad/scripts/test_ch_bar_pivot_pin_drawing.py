@@ -1,4 +1,4 @@
-"""Offline contracts for the bar pivot pin (MHA-CH-011) part and drawing.
+"""Offline contracts for the bar pivot pin (MHA-CH-11) part and drawing.
 
 The installed pressed pin under ``cad/docs/drawing-guidelines.md``: three
 native model dimensions whose places (and the diameter's band) the PART owns,
@@ -141,9 +141,9 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
     assert notes.DIMENSION_CALLOUTS == {
         "PinDia": "5/64 DRILL ROD, AS SUPPLIED\n"
-        "PRESS FIT IN MHA-CH-001\n"
-        "RUNS IN MHA-CH-002 #47 HOLE",
-        "PinLen": "FLUSH WITH MHA-CH-001",
+        "PRESS FIT IN MHA-CH-01\n"
+        "RUNS IN MHA-CH-02 #47 HOLE",
+        "PinLen": "FLUSH WITH MHA-CH-01",
         "BlankLen": "BLANK",
     }
     source = _source()
@@ -241,7 +241,7 @@ def test_installed_length_holds_its_arrows_inside(
 
 def test_part_registry_row() -> None:
     config = _config.parts("ch-bar-pivot-pin")
-    assert config["number"] == "MHA-CH-011"
+    assert config["number"] == "MHA-CH-11"
     assert int(config["quantity"]) == 20
     assert config["tolerance_class"] == "machined_block"
     assert "fit_class" not in config

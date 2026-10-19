@@ -1,4 +1,4 @@
-r"""Build the integral finite-stock 12T48DP knob shaft MHA-PD-008.
+r"""Build the integral finite-stock 12T48DP knob shaft MHA-PD-08.
 
 The pure source owns the actual #8/12T master, printed-span-inverted tool
 setting, contact-critical blank, D-core, conventional front neck, #8-32

@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique trammel's HUB locator pin (MHA-CH-006-TL-25)."""
+r"""Create the drawing for the oblique trammel's HUB locator pin (MHA-CH-06-TL-25)."""
 
 from __future__ import annotations
 
@@ -353,7 +353,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel HUB Locator Pin Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "oblique trammel HUB locator pin; 1144 stress-proof; MHA-CH-006-TL-25",
+            3: "oblique trammel HUB locator pin; 1144 stress-proof; MHA-CH-06-TL-25",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

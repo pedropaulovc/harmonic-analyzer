@@ -6,10 +6,10 @@ GEOMETRY ONLY: no drawing notes, no annotation contract, no drawing-spec
 imports, and no title-block reads (the ``pinion_rig_layout`` precedent), so a
 print-wording edit can never re-key the drive train.
 
-The bank is a SOLID STACK. Each MHA-DT-012 gear's overall thickness, cam face to
+The bank is a SOLID STACK. Each MHA-DT-12 gear's overall thickness, cam face to
 back face, is the station pitch, so neighbouring gears bear cam face on back
 face, as the rocker hubs do (``ch_rocker_arm_spec.HUB_LENGTH``). A turned thrust
-washer (MHA-DT-026) sits at each end between the end gear and its arbor-pedestal
+washer (MHA-DT-26) sits at each end between the end gear and its arbor-pedestal
 strap.
 
 * The BACK (north) strap is the bank's axial datum. Its inner face is
@@ -18,10 +18,10 @@ strap.
   is held back against it: g19's back face bears on the back washer, which
   bears on the back strap.
 * The arbor fills both strap bores and domes proud of each strap; a set
-  screw in each pedestal's crown apex bears on it (MHA-VN-034): the back one
+  screw in each pedestal's crown apex bears on it (MHA-CH-VN-53): the back one
   fixes the arbor, the front one is tightened once the front strap is set.
 * The FRONT (south) strap is set off the front washer by one BANK_SPRING_SET
-  blade, and the MHA-VN-052 wave spring (``vn_cylinder_bank_spring_spec``)
+  blade, and the MHA-DT-VN-68 wave spring (``dt_vn_cylinder_bank_spring_spec``)
   squeezed in that gap preloads the whole stack north onto the datum.
 * Every gear's overall thickness is +/-0.025 on its print (user ruling L20
   d'). A fit-up acceptance on the measured 20-gear stack (STACK_L20_ACCEPT,
@@ -45,9 +45,9 @@ import math
 
 import _config
 import dt_arbor_pedestal_spec as _pedestal
-import vn_arbor_set_screw_spec as _screw
+import _mcmaster_91375a106 as _screw
 import ch_connecting_rod_spec as _rod
-import vn_cylinder_bank_spring_spec as _spring
+import dt_vn_cylinder_bank_spring_spec as _spring
 import dt_cylinder_gear_shaft_spec as _shaft
 from dt_cylinder_end_disc_spec import (
     WASHER_THICK,
@@ -89,7 +89,7 @@ def station_z(j: int) -> float:
 
 # --- preload (#948 ruling R) ----------------------------------------------------
 # The front strap is set off the front washer by one blade of the metric gauge
-# set; the MHA-VN-052 wave spring in that gap holds the stack north, so the
+# set; the MHA-DT-VN-68 wave spring in that gap holds the stack north, so the
 # bank has no end play. The blade is the spring's installed height; the strap's
 # set error (re-set on its hold-downs) moves only the spring's height, and with
 # it the preload, never a gear.
@@ -184,13 +184,13 @@ BANK_SPRING_Z = (FRONT_STRAP_INNER_Z, FRONT_WASHER_Z[0])
 STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
 
 # --- pedestals, arbor and set screws (nominal, bank pushed back) ------------
-# Each MHA-DT-002 stands on its strap INNER face (U34 row 5): the front one as
+# Each MHA-DT-02 stands on its strap INNER face (U34 row 5): the front one as
 # built (local +z = machine +z), the back one turned 180 about y (local +z =
 # machine -z). Their origins follow from those faces.
 FRONT_PEDESTAL_ORIGIN_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_INNER_Z
 BACK_PEDESTAL_ORIGIN_Z = BACK_STRAP_INNER_Z + _pedestal.STRAP_INNER_Z
 STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
-# The arbor fills both strap bores end to end, so the MHA-VN-034 apex set screws
+# The arbor fills both strap bores end to end, so the MHA-CH-VN-53 apex set screws
 # (each at its strap's mid-depth) bear on it, and each end is domed
 # ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
 # over both straps, the length the fitter measures and cuts to (#743,
@@ -273,7 +273,7 @@ if RING_SLOT_MARGIN < MARGIN_SPARE:
 
 # --- datum chain for the cone-mesh and channel axial budgets ----------------
 BACK_STRAP_LOCATE_BAND = 0.10  # DRO edge-find on the strap inner face
-# Fit-up compensation (#948 ruling R): the fitter mics the back MHA-DT-026 and
+# Fit-up compensation (#948 ruling R): the fitter mics the back MHA-DT-26 and
 # offsets the back strap's DRO target by (measured - nominal), so the washer's
 # band leaves the chain and only the micrometer reading's residual stays.
 MIC_RESIDUAL = 0.013  # half a thou: one micrometer reading

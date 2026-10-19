@@ -210,7 +210,7 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
     The radius is read-only: a spherical cap of the printed dome height on the
     toleranced diameter already fixes it. Whatever radius prefix the display
     carries is kept behind the ``(S``; the readback proves it stuck (the
-    MHA-CH-005 pivot shaft's and MHA-DT-001 crankshaft's domes print the same
+    MHA-CH-05 pivot shaft's and MHA-DT-01 crankshaft's domes print the same
     way).
     """
     annotation = _early_bound(annotation, "IAnnotation")

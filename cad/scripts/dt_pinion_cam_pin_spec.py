@@ -23,12 +23,12 @@ from dt_pinion_cam_pin_geometry import (
 )
 
 # U27 (Main, 2026-09-23): no press.  The stud is stock 4 mm drill rod (h9,
-# 4.000-3.970) slipped into the MHA-DT-014 strap's reamed H7 follower seat
+# 4.000-3.970) slipped into the MHA-DT-14 strap's reamed H7 follower seat
 # (4.000-4.012) and bonded with LOCTITE 638: 0.000-0.042 diametral clearance,
 # inside the 0.25 mm bond gap the 638 data sheet allows (the U6 drum-to-arbor
 # precedent).  A novice cannot hold the old +/-0.004 press band.
 PIN_DIA_BAND = (0.0, -0.03)  # (upper, lower): h9 drill rod
-SEAT_NUMBER = "MHA-DT-014"
+SEAT_NUMBER = "MHA-DT-14"
 RETAINING_COMPOUND = "LOCTITE 638"
 RETAINING_COMPOUND_MAX_GAP_MM = 0.25
 # The length and the crown radius set nothing: the cam rides the shank about

@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's nut bracket (MHA-CH-006-TL-29; shop fixture).
+r"""Build the oblique-trammel jig's nut bracket (MHA-CH-06-TL-29; shop fixture).
 
 An 18.5 x 48 x 35.3 block from 6061-T6 3/4 x 2 in flat, screwed to pivot
 block 1's -Y face by two #8-32 SHCS; the leadscrew's flanged nut screws to

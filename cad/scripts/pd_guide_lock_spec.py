@@ -43,7 +43,7 @@ LOCK_HEIGHT = 9.6
 # precision-ground sheet, McMaster-Carr 1388K196, 1/16 in -0.005 to +0.005 in
 # (read live 2026-10-11; the family's +/-0.003 and +/-0.001 grades sit inside
 # that band).  It replaced R9-31's machined 2.0 strip, whose slotted pan heads
-# (MHA-VN-046) stood too proud for the arm plate, and a 0.25 head spot face,
+# (MHA-PD-VN-60) stood too proud for the arm plate, and a 0.25 head spot face,
 # which left no wall at the 3.5-from-edge holes.  The thickness prints .XXX
 # under the sheet's own band, which the lock-station sweep and the screw's
 # engagement spend, with LOCK_STOCK_CALLOUT above it.
@@ -65,7 +65,7 @@ CORNER_R = 1.8
 # the two stations sit x +-7 about the plate centre, on the rail's 2.5
 # mid-line past the lip). R9-49: 1/8 DRILL (Ø3.175) over the #4-40 majors
 # carries this plate's coordinate bands and the rail taps' Ø0.20 position
-# (vn_guide_lock_screw_spec.LOCK_SET_OFFSET); the #4 close Ø3.048 left too little.
+# (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET); the #4 close Ø3.048 left too little.
 HOLE_XY = ((4.0, RAIL_EDGE_LIP + 2.5), (18.0, RAIL_EDGE_LIP + 2.5))
 HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 # ± on each printed hole coordinate (drawing-guidelines.md rule 5 (avoid excessive GD&T): no frame on this plate). Its
@@ -94,7 +94,7 @@ HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 # overlaps the bar (build_pd_paper_drive_assembly._assert_lock_retention) and
 # its largest clears the latch hook and pivot spacer. The width prints .X:
 # its +0.8 lengthens the overhang the skew swings
-# (vn_guide_lock_screw_spec.CORNER_OVERHANG_MAX). The corner radius prints .X
+# (pd_vn_guide_lock_screw_spec.CORNER_OVERHANG_MAX). The corner radius prints .X
 # (±0.8), shared by all four (4X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockProfile": {"Width": 1, "Height": 1},

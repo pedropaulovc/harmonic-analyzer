@@ -45,7 +45,7 @@ each clearance station's SCREW_INSET offset from its traced screw-head mark.
 
 Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
 slotted round-head screws, one per corner, heads riding the pinstripe corners
-in the border band. They are the shared #4-40 brass ``vn-fillister-screw``
+in the border band. They are the shared #4-40 brass ``fr-vn-fillister-screw``
 (``_fastener_catalog``; stock Ø2.8448 major diameter, Ø4.6482 head), so the plate carries
 four #4 CLOSE clearance holes (wizard Ø3.048, the build_pd_guide_lock idiom) and
 the harmonic base carries four blind #4-40 taps under them. The plate envelope,

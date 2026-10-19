@@ -2,7 +2,7 @@ r"""Positive control for part-owned surface-finish PMI.
 
 The production migration must not assume that a surface-finish symbol authored
 on a ``.SLDPRT`` survives save/reopen or imports into a drawing.  This probe
-copies the already-built transgear pin (MHA-PD-023), verifies its
+copies the already-built transgear pin (MHA-PD-23), verifies its
 production-authored named Ra 1.6 journal symbol, then proves both behaviors
 without modifying released artefacts.
 

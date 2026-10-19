@@ -1,4 +1,4 @@
-r"""Build the rocker trammel setting bar (MHA-CH-006-TL-17; shop gauge).
+r"""Build the rocker trammel setting bar (MHA-CH-06-TL-17; shop gauge).
 
 A 1018 cold-finished flat bar at its supply length with three trammel-point
 seats on its centreline: H0 (pivot), H800 and H816 (scribers)

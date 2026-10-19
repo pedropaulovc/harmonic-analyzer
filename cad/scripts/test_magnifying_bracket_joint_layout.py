@@ -16,7 +16,7 @@ import dt_cone_pivot_post_installation as installation
 import magnifying_bracket_joint_layout as joint
 import sm_knife_mount_spec as knife_mount
 import sm_summing_lever_spec as lever
-import vn_magnifying_bracket_screw_spec as screw
+import mg_vn_magnifying_bracket_screw_spec as screw
 from _buildgraph import SCRIPTS_DIR, module_deps_of
 from _hole_spec import THREAD_MAJOR_MM
 from spring_mount_geom import KNIFE
@@ -257,13 +257,13 @@ def test_only_top_level_thread_overlap_is_allowed() -> None:
     pairs = interference.allowed_interference_pairs("ha-harmonic-analyzer")
     lever_path = "sm-summing-1/sm-summing-lever-1"
     expected = {
-        frozenset((f"mg-magnifier-1/vn-magnifying-bracket-screw-{index}", lever_path))
+        frozenset((f"mg-magnifier-1/mg-vn-magnifying-bracket-screw-{index}", lever_path))
         for index in (1, 2)
     }
     actual = {
         pair
         for pair in pairs
-        if any("vn-magnifying-bracket-screw-" in name for name in pair)
+        if any("mg-vn-magnifying-bracket-screw-" in name for name in pair)
     }
     assert actual == expected
     limit = interference._smooth_annulus_limit_mm3(
@@ -272,7 +272,7 @@ def test_only_top_level_thread_overlap_is_allowed() -> None:
     assert all(pairs[pair] == pytest.approx(limit) for pair in expected)
     local = interference.allowed_interference_pairs("mg-magnifier")
     assert not any(
-        "vn-magnifying-bracket-screw" in name for pair in local for name in pair
+        "mg-vn-magnifying-bracket-screw" in name for pair in local for name in pair
     )
 
 

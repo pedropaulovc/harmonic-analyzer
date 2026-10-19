@@ -1,11 +1,11 @@
-r"""Pure-data contract for the rocker template trammel's pivot plate (MHA-CH-006-TL-19).
+r"""Pure-data contract for the rocker template trammel's pivot plate (MHA-CH-06-TL-19).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). Trial route
 ``rocker-template-route.md`` section 2.1: "a 1018 offcut from the block bar,
 about 50 x 38 x 19, with a #2 centre-drilled 60 degree cone in its middle. Screw
 it to the board." The plate is screwed to the MDF scribing board
 (inventory ``fixtures.trammel-board-mdf``) and the trammel's 60 degree pivot
-point (MHA-CH-006-TL-18) runs in its cone while R800/R816 are scribed. The
+point (MHA-CH-06-TL-18) runs in its cone while R800/R816 are scribed. The
 plate is an offcut of the blocks' 3/4 x 1-1/2 in bar (``kit.BLOCK_WIDTH`` x
 ``kit.BLOCK_HEIGHT``), sawn to the blocks' length; the stock sizes stay as
 bought.
@@ -271,8 +271,8 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
         "at_mm": [0.0, 0.0, -PLATE_WIDTH],
         "size_mm": [PLATE_LENGTH, PLATE_HEIGHT, PLATE_WIDTH],
         "note": (
-            "MHA-CH-006-TL-19, 1018 3/4 x 1-1/2 bar offcut; No. 2 centre-drilled "
-            "60 degree seat on the top face for the pivot point (MHA-CH-006-TL-18)"
+            "MHA-CH-06-TL-19, 1018 3/4 x 1-1/2 bar offcut; No. 2 centre-drilled "
+            "60 degree seat on the top face for the pivot point (MHA-CH-06-TL-18)"
         ),
         "measured": dict(_MEASURED),
     },

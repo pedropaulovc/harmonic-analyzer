@@ -1,4 +1,4 @@
-r"""Crank keeper-chain anchor eye (MHA-DT-028) nominals, pure data.
+r"""Crank keeper-chain anchor eye (MHA-DT-28) nominals, pure data.
 
 No SolidWorks/COM calls and no ``build_*`` module in the import closure: the
 eye build, the keeper chain and the drive-train assembly read these here, so
@@ -23,7 +23,7 @@ from _printed_tolerance import printed_deviations
 
 # Mean loop radius (an O5.3 eye, photo-scaled, low): the Ø3.3 inside diameter
 # is the least one-place size whose title-block lower limit still admits the
-# keeper chain's bead (vn_keeper_chain_spec asserts the air).
+# keeper chain's bead (dt_vn_keeper_chain_spec asserts the air).
 LOOP_R = 2.15
 WIRE_DIA = 1.0  # brass wire (low)
 TAIL_LEN = 4.0  # straight tail from the loop's tangent point to under the screw head

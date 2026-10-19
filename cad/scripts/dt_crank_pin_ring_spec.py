@@ -1,4 +1,4 @@
-r"""Crank-pin keeper ring (MHA-DT-027) nominals, pure data.
+r"""Crank-pin keeper ring (MHA-DT-27) nominals, pure data.
 
 No SolidWorks/COM calls and no ``build_*`` module in the import closure: the
 ring build, the keeper chain and the drive-train assembly read these here, so
@@ -12,7 +12,7 @@ of that either side of the wire plus RING_HOLE_AIR (asserted below, at the
 worst printed limits of both parts). The ring lies in the pin's axial plane
 and reaches ~11.6 outboard of the hole, past the pin's big end and the crank
 arm's edge, where the keeper chain loops it (owner ruling 2026-10-15 A1;
-``vn_keeper_chain_spec`` owns the pose and its arm clearance).
+``dt_vn_keeper_chain_spec`` owns the pose and its arm clearance).
 
 Part frame: the origin is on the cross-hole axis at the pin's centre, the hole
 axis is local Z, and the ring lies in the local XZ plane hanging toward local

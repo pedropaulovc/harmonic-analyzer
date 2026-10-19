@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import _config
-import vn_boss_hook_spec
+import sm_vn_boss_hook_spec
 import sm_gooseneck_spec
 import ms_stick_spec
 import mg_output_fixture_spec
@@ -12,11 +12,11 @@ import pn_pen_frame_spec
 import pn_pen_hanger_spec
 import pn_pen_rod_spec
 import pn_pen_v_block_spec
-import vn_pen_wire_spec
+import pn_vn_pen_wire_spec
 
 
 SHEETS = (
-    ("vn-boss-hook", vn_boss_hook_spec),
+    ("sm-vn-boss-hook", sm_vn_boss_hook_spec),
     ("sm-gooseneck", sm_gooseneck_spec),
     ("ms-stick", ms_stick_spec),
     ("mg-output-fixture", mg_output_fixture_spec),
@@ -25,7 +25,7 @@ SHEETS = (
     ("pn-pen-rod", pn_pen_rod_spec),
     ("pn-pen-v-block", pn_pen_v_block_spec),
     ("pn-pen-adjust-screw", pn_pen_adjust_screw_spec),
-    ("vn-pen-wire", vn_pen_wire_spec),
+    ("pn-vn-pen-wire", pn_vn_pen_wire_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (

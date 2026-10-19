@@ -13,7 +13,7 @@ from fr_frame_attachment_spec import (
     TUBE_CUT_LENGTH,
     TUBE_TOP_Y,
 )
-from vn_tube_frame_cap_spec import INNER_CORNER_R, INNER_DIAMETER, MOUTH_INNER_DIAMETER
+from fr_vn_tube_frame_cap_spec import INNER_CORNER_R, INNER_DIAMETER, MOUTH_INNER_DIAMETER
 
 
 def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:

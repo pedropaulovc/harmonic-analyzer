@@ -1,4 +1,4 @@
-"""Offline contracts for the one-piece latch hook (MHA-PD-014) and its drawing."""
+"""Offline contracts for the one-piece latch hook (MHA-PD-14) and its drawing."""
 
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ def test_the_build_constants_sit_on_the_published_geometry() -> None:
 
 def test_registry_row_is_the_formed_spring_steel_hook() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-014"
+    assert row["number"] == "MHA-PD-14"
     assert int(row["quantity"]) == 1
     assert "1095" in row["material_specification"]
     assert "annealed" in row["material_specification"]
@@ -212,7 +212,7 @@ def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> Non
     assert [line for line in lines if len(line) > 70] == []
     assert [t for t in _TITLE_BLOCK_TEXT if t in spec.DRAWING_NOTES] == []
     assert not any(
-        ch.isdigit() for line in lines for ch in line[2:].replace("MHA-PD-007", "")
+        ch.isdigit() for line in lines for ch in line[2:].replace("MHA-PD-07", "")
     )
     # The pin hole's callout names the process; note 3 says where and when.
     assert spec.PIN_HOLE_CALLOUT == "MATCH-DRILL"
@@ -723,9 +723,9 @@ def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
 
 def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
     """Review 4: the ±0.05 positions read as unexplained.  The 2X Ø3.20
-    callout names the mate (MHA-PD-007's fixed taps); the holes are drilled
+    callout names the mate (MHA-PD-07's fixed taps); the holes are drilled
     to the print, not match-drilled."""
-    assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-007 TAPS"
+    assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-07 TAPS"
     assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
         spec.SCREW_HOLE_CALLOUT,
         spec.SCREW_HOLE_MATE,

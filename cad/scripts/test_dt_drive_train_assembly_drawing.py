@@ -26,14 +26,14 @@ BUILDER = SCRIPTS / "build_dt_drive_train_assembly.py"
 # The rig's steps at the built assembly's counts.
 RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
-# Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b),
-# offset by the miced north MHA-VN-070 washer (user, 2026-10-10).
+# Step 10 sets the channel's north MHA-CH-08 on the frame's MHA-FR-05 (#936 P1 b),
+# offset by the miced north MHA-CH-VN-56 washer (user, 2026-10-10).
 EXTERNAL_NUMBERS = frozenset(
     {
-        "MHA-FR-001",
-        "MHA-FR-005",
-        "MHA-CH-008",
-        "MHA-VN-070",
+        "MHA-FR-01",
+        "MHA-FR-05",
+        "MHA-CH-08",
+        "MHA-CH-VN-56",
         drawing.NORTH_BRACKET_SCREW,
         # Step 5's paper-drive T12, named on sheet 12's interface line.
         drawing.CRANK_CHAIN_WHEEL,
@@ -78,20 +78,20 @@ def _instances(**overrides) -> list[spec.Instance]:
             (drum_x, drum_y, interval[0])
             for interval in (bank_layout.FRONT_WASHER_Z, bank_layout.BACK_WASHER_Z)
         ],
-        "vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.FRONT_STRAP_INNER_Z)],
-        "vn-arbor-set-screw": [
+        "dt-vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.FRONT_STRAP_INNER_Z)],
+        "dt-vn-arbor-set-screw": [
             (drum_x, drum_y, z)
             for z in (bank_layout.FRONT_SET_SCREW_Z, bank_layout.BACK_SET_SCREW_Z)
         ],
         "dt-cylinder-gear": [
             (drum_x, drum_y, bank_layout.station_z(j)) for j in range(bank_layout.COUNT)
         ],
-        "vn-foot-screw": [(7.49, 52.0, 74.0)],
-        "vn-pedestal-hold-down-screw": [
+        "dt-vn-foot-screw": [(7.49, 52.0, 74.0)],
+        "dt-vn-pedestal-hold-down-screw": [
             (drum_x, 55.8, -91.652),
             (drum_x, 55.8, 94.202),
         ],
-        "vn-slotted-screw": [
+        "dt-vn-slotted-screw": [
             (-19.4, 60.0, -94.9),
             (7.6, 60.0, -94.9),
             (-19.4, 60.0, 85.1),
@@ -106,10 +106,10 @@ def _instances(**overrides) -> list[spec.Instance]:
         "dt-pinion-cam-pin": [(-8.0, 70.0, -72.0), (-8.0, 70.0, 71.0)],
         "dt-pinion-cam": [(0.4, 64.7, -72.0), (0.4, 64.7, 71.0)],
         # Two strap set pins, then the collar pin (the builder's insertion order).
-        "vn-pinion-strap-pin": [(-12.1, 62.8, -74.0), (-12.1, 62.8, 81.0), (-18.4, 90.5, -127.0)],
+        "dt-vn-pinion-strap-pin": [(-12.1, 62.8, -74.0), (-12.1, 62.8, 81.0), (-18.4, 90.5, -127.0)],
     }
     layout.update(overrides)
-    roles = {"vn-pinion-strap-pin-3": spec.COLLAR_PIN_ROLE}
+    roles = {"dt-vn-pinion-strap-pin-3": spec.COLLAR_PIN_ROLE}
     instances = []
     for stem in sorted(_builder_stems() | set(layout)):
         for index, origin in enumerate(layout.get(stem, [(0.0, 100.0, 0.0)]), start=1):
@@ -183,7 +183,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.CRANK_END_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
-    cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "\n".join(texts)))
+    cited = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "\n".join(texts)))
     bom = set(drawing.BOM_PART_NUMBERS.values())
     assert cited <= bom | EXTERNAL_NUMBERS
 
@@ -263,7 +263,7 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
 def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
     """A grouped part's configurations carry UseDescriptionInBOM, and that
     wins over the drawing's written cell: cascade-2 (2026-09-27) read back
-    MHA-DT-030's 'Pinion Lever Cross Pin' after SetText2 wrote its BOM text.  So
+    MHA-DT-30's 'Pinion Lever Cross Pin' after SetText2 wrote its BOM text.  So
     the builder stamps the registry description, and it must already be the
     text the BOM prints (cone-gear's always was)."""
     grouped = [
@@ -308,7 +308,7 @@ def test_pinion_cam_thread_matches_its_supplied_hardware() -> None:
     assert designation in description
     assert designation in fit_up
     assert "M2.5" not in description + fit_up
-    assert "(SUPPLIED WITH MHA-DT-023) LOOSE" in fit_up
+    assert "(SUPPLIED WITH MHA-DT-23) LOOSE" in fit_up
 
 
 def test_bom_descriptions_keep_one_line() -> None:
@@ -317,13 +317,13 @@ def test_bom_descriptions_keep_one_line() -> None:
 
 
 def test_same_catalogue_screws_keep_distinct_assembly_roles() -> None:
-    stop = drawing.BOM_DESCRIPTIONS["vn-swing-stop-screw"]
-    foot = drawing.BOM_DESCRIPTIONS["vn-foot-screw"]
+    stop = drawing.BOM_DESCRIPTIONS["dt-vn-swing-stop-screw"]
+    foot = drawing.BOM_DESCRIPTIONS["dt-vn-foot-screw"]
     assert "90280A108" in stop and "90280A108" in foot
     assert "SWING STOP" in stop and "SPRING FOOT" in foot
     assert (
-        drawing.BOM_PART_NUMBERS["vn-swing-stop-screw"]
-        != drawing.BOM_PART_NUMBERS["vn-foot-screw"]
+        drawing.BOM_PART_NUMBERS["dt-vn-swing-stop-screw"]
+        != drawing.BOM_PART_NUMBERS["dt-vn-foot-screw"]
     )
 
 
@@ -389,32 +389,32 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
-    """MHA-VN-015 bounds the DISENGAGE swing; the engaged mesh is set at
+    """MHA-DT-VN-53 bounds the DISENGAGE swing; the engaged mesh is set at
     assembly (cone_set_stack): pedestals snug-loose, shims at T012 and T120,
-    pedestals tightened, then the T120 feeler and MHA-VN-013 -- never the stop."""
+    pedestals tightened, then the T120 feeler and MHA-DT-VN-51 -- never the stop."""
     import cone_set_stack as set_stack
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     t012 = f"{set_stack.feeler_gap_mm(12):.2f} AT T012"
     t120 = f"{set_stack.feeler_gap_mm(120):.2f} AT T120"
     order = [
-        check.index("TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012"),
-        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
+        check.index("TO THE MHA-DT-VN-53 STOP, CLEAR OF EVERY MHA-DT-12"),
+        check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
         check.index(t012),
         check.index(t120),
-        check.index("TIGHTEN MHA-VN-032"),
+        check.index("TIGHTEN MHA-DT-VN-62"),
         # CodeRabbit on #1272: the shims block the swing, so they come out
         # before the T120 feeler set.
         check.index("SWING OUT AND REMOVE THE SHIMS"),
         check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
-        check.index("TIGHTEN MHA-VN-013"),
+        check.index("TIGHTEN MHA-DT-VN-51"),
         check.index(
-            "DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; "
+            "DO NOT LOOSEN MHA-DT-02 AFTER THIS SET; "
             "IF YOU DO, REPEAT CHECKS 4, 5 AND 7"
         ),
     ]
     assert order == sorted(order), check
-    assert "RETURN IT TO THE MHA-VN-015" not in check
+    assert "RETURN IT TO THE MHA-DT-VN-53" not in check
 
 
 def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> None:
@@ -426,9 +426,9 @@ def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> 
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     order = [
-        check.index("ZERO AN INDICATOR ON EACH MHA-DT-002 IN X"),
-        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
-        check.index("TIGHTEN MHA-VN-032"),
+        check.index("ZERO AN INDICATOR ON EACH MHA-DT-02 IN X"),
+        check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
+        check.index("TIGHTEN MHA-DT-VN-62"),
         check.index(
             f"RECORDED X (9A, 9C) PLUS ITS X READING IS {drawing.BANK_X_LIMITS}"
         ),
@@ -448,35 +448,35 @@ def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> 
     assert bank.count("RECHECK AND RECORD X") == 2
     assert "RECHECK AND RECORD X AND Y" in bank
     assert "THE Y READING IS ZERO" not in check
-    assert "MHA-DT-013 BAR" not in bank
+    assert "MHA-DT-13 BAR" not in bank
     located = steps.step_number("rig-located")
     check7 = _flat(drawing.CHECKS.split("\n7. ")[1])
     assert (
-        "IF A STATION IS OUT, EASE THE MHA-VN-019 SCREWS, RE-SET THE RIG ON THE "
+        "IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE "
         f"FEELER AT BOTH STATIONS AS STEP {located}, TIGHTEN THEM AND RECHECK."
     ) in check7
     check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
-    assert check5.endswith("TIGHTEN MHA-VN-013: THE CHECK 4 SETTING.")
+    assert check5.endswith("TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.")
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
     """The supplied thread class does not prove the assembled stop's engagement."""
-    import vn_swing_stop_screw_spec as stop_screw
+    import dt_vn_swing_stop_screw_spec as stop_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     minimum = f"{stop_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
-    assert f"VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    assert f"VERIFY MHA-DT-VN-53 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
     assert "HEAD FULLY SEATED" in check
-    assert "MHA-DT-020 REMAINS SEATED THROUGH P1" in check
+    assert "MHA-DT-20 REMAINS SEATED THROUGH P1" in check
 
 
 def test_cone_swing_check_requires_pivot_thread_engagement() -> None:
     """The seated shoulder does not establish actual full-form thread engagement."""
-    import vn_cone_pivot_screw_spec as pivot_screw
+    import dt_vn_cone_pivot_screw_spec as pivot_screw
 
     check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
     minimum = f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_MM:.2f}"
-    assert f"VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
+    assert f"VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT {minimum} MIN" in check
     assert "SHOULDER FULLY SEATED" in check
 
 
@@ -514,7 +514,7 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     # The seats are spotted after RIG SET, and drilled per the base's own
     # transfer callouts, not a second copy of their sizes.
     seats = _rig_step_body("rig-seats-transferred")
-    assert "PER ITS MHA-FR-001 TRANSFER CALLOUT" in seats
+    assert "PER ITS MHA-FR-01 TRANSFER CALLOUT" in seats
     assert not re.search(r"#\d+-\d+|#\d+ X", seats)
     assert steps.step_number("rig-set") < steps.step_number("rig-seats-transferred")
 
@@ -569,8 +569,8 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
     step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
     assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
-    assert "MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU" in step
-    assert "MHA-DT-030 SLIP FIT" in step
+    assert "MHA-DT-16'S PRINTED STATION: 1/16 IN DRILL THRU" in step
+    assert "MHA-DT-30 SLIP FIT" in step
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step
 
@@ -614,7 +614,7 @@ def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(setting: float) -> No
 
 
 def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
-    """Main's TbPB ruling Q2(2) A: MHA-DT-024's foot hole is set where the
+    """Main's TbPB ruling Q2(2) A: MHA-DT-24's foot hole is set where the
     preload gates put it, the crest on the flank (the flick's flat stays off
     it), before RIG SET's pad leaf sets it along the bank.  #1037 is the
     window a fitter must hold."""
@@ -623,10 +623,10 @@ def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE ([\d.]+) EAST OF THE MHA-DT-019 AXIS", located)
+    printed = re.search(r"FOOT HOLE CENTRE ([\d.]+) EAST OF THE MHA-DT-19 AXIS", located)
     assert printed is not None
     assert float(printed.group(1)) == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.05)
-    assert "CREST BEARING ON THE PARKED BACK MHA-DT-014 FLANK" in located
+    assert "CREST BEARING ON THE PARKED BACK MHA-DT-14 FLANK" in located
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert steps.step_number("rig-located") < steps.step_number("rig-set")
@@ -643,9 +643,9 @@ def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
     """The front strap bore is closed: a bonded drum can no longer pass it."""
     import dt_drive_train_steps as steps
 
-    assert "FRONT MHA-DT-014 ON BEHIND IT" in _rig_step_body("arbor-collar-pinned")
+    assert "FRONT MHA-DT-14 ON BEHIND IT" in _rig_step_body("arbor-collar-pinned")
     assert "BOND WITH LOCTITE 638" in _rig_step_body("drum-bonded")
-    assert "IN THE BACK MHA-DT-014 TOP BORE" in _rig_step_body("cluster-hung")
+    assert "IN THE BACK MHA-DT-14 TOP BORE" in _rig_step_body("cluster-hung")
     order = [
         steps.step_number(key)
         for key in ("arbor-collar-pinned", "drum-bonded", "cluster-hung")
@@ -660,9 +660,9 @@ def test_torque_shaft_pins_go_in_before_the_cams() -> None:
     import dt_drive_train_steps as steps
     import pinion_rig_fitup as fitup
 
-    assert "DRIVE MHA-VN-033 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
+    assert "DRIVE MHA-DT-VN-63 PINS" in _rig_step_body("straps-pinned-to-torque-shaft")
     cams = _rig_step_body("cams-and-lever-fitted")
-    assert "FIT 2X MHA-DT-023" in cams and "LOOSE" in cams and "MHA-DT-030" not in cams
+    assert "FIT 2X MHA-DT-23" in cams and "LOOSE" in cams and "MHA-DT-30" not in cams
     assert _flat(fitup.COLLAR_SET_STEP) in _rig_step_body("cam-collars-set")
     order = [
         steps.step_number(key)
@@ -682,29 +682,29 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     moved = {step.label: names for step, names in plan}
     assert moved["south pedestal"] == (
         "dt-arbor-pedestal-1",
-        "vn-arbor-set-screw-1",
-        "vn-pedestal-hold-down-screw-1",
+        "dt-vn-arbor-set-screw-1",
+        "dt-vn-pedestal-hold-down-screw-1",
     )
     assert moved["north pedestal"] == (
         "dt-arbor-pedestal-2",
-        "vn-arbor-set-screw-2",
-        "vn-pedestal-hold-down-screw-2",
+        "dt-vn-arbor-set-screw-2",
+        "dt-vn-pedestal-hold-down-screw-2",
     )
-    assert moved["apex set screws lift"] == ("vn-arbor-set-screw-1", "vn-arbor-set-screw-2")
+    assert moved["apex set screws lift"] == ("dt-vn-arbor-set-screw-1", "dt-vn-arbor-set-screw-2")
     assert moved["pedestal screws lift"] == (
-        "vn-pedestal-hold-down-screw-1",
-        "vn-pedestal-hold-down-screw-2",
+        "dt-vn-pedestal-hold-down-screw-1",
+        "dt-vn-pedestal-hold-down-screw-2",
     )
     # The bank sheet's thrust-washer balloon is pinned to the north washer.
     assert moved["north thrust washer"] == ("dt-cylinder-end-disc-2",)
     bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
     assert bank_anchors["dt-cylinder-end-disc"].instance == "dt-cylinder-end-disc-2"
-    assert moved["spring foot screw lifts"] == ("vn-foot-screw-1",)
-    assert moved["spring steps east"] == ("dt-pinion-spring-1", "vn-foot-screw-1")
-    assert moved["block screws lift"] == tuple(f"vn-slotted-screw-{i}" for i in range(1, 5))
-    # The rig sheet's MHA-VN-019 balloon is pinned to the front block's west screw.
+    assert moved["spring foot screw lifts"] == ("dt-vn-foot-screw-1",)
+    assert moved["spring steps east"] == ("dt-pinion-spring-1", "dt-vn-foot-screw-1")
+    assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
+    # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
-    assert rig_anchors["vn-slotted-screw"].instance == "vn-slotted-screw-3"
+    assert rig_anchors["dt-vn-slotted-screw"].instance == "dt-vn-slotted-screw-3"
 
 
 def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
@@ -726,9 +726,9 @@ def test_built_families_are_no_longer_pending() -> None:
 
 def test_crank_hub_families_explode_with_the_crank_arm() -> None:
     census = _instances()
-    assert {"dt-crank-hub", "vn-crank-hub-pin"} <= {i.stem for i in census}
+    assert {"dt-crank-hub", "dt-vn-crank-hub-pin"} <= {i.stem for i in census}
     moved = {step.label: names for step, names in spec.plan_explode(census)}
-    assert {"dt-crank-hub-1", "vn-crank-hub-pin-1"} <= set(moved["crank arm group"])
+    assert {"dt-crank-hub-1", "dt-vn-crank-hub-pin-1"} <= set(moved["crank arm group"])
 
 
 def test_explode_families_are_either_moved_or_stationary_never_both() -> None:
@@ -742,8 +742,8 @@ def test_clusters_partition_every_instance_once() -> None:
     members = drawing.cluster_members(census)
     flat = [name for names in members.values() for name in names]
     assert sorted(flat) == sorted(i.name for i in census)
-    assert "vn-foot-screw-1" in members["pinion-rig"]
-    assert {"vn-pedestal-hold-down-screw-1", "vn-pedestal-hold-down-screw-2"} <= set(
+    assert "dt-vn-foot-screw-1" in members["pinion-rig"]
+    assert {"dt-vn-pedestal-hold-down-screw-1", "dt-vn-pedestal-hold-down-screw-2"} <= set(
         members["cylinder-bank"]
     )
 
@@ -1217,10 +1217,10 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
 
 
 def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> None:
-    """#831 P1: MHA-DT-032 is a builder family with its BOM row, and its explode
+    """#831 P1: MHA-DT-32 is a builder family with its BOM row, and its explode
     carries it with the handle, then clear of the handle's bore."""
     assert "dt-crank-handle-pivot-screw" in _builder_stems()
-    assert drawing.BOM_PART_NUMBERS["dt-crank-handle-pivot-screw"] == "MHA-DT-032"
+    assert drawing.BOM_PART_NUMBERS["dt-crank-handle-pivot-screw"] == "MHA-DT-32"
     moved = {step.label: names for step, names in spec.plan_explode(_instances())}
     screw = "dt-crank-handle-pivot-screw-1"
     assert screw in moved["crank arm group"]
@@ -1235,7 +1235,7 @@ def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> N
 
 def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
     """With the cone gears touching, the collar on the post and the tip in
-    its block, no MHA-DT-004 face showed in place and its balloon leader landed
+    its block, no MHA-DT-04 face showed in place and its balloon leader landed
     on the tip block (run 7).  The rotor leaves along the cone axis until the
     whole journal clears the post, and the tip hardware leads it by more than
     the tip runs into the block."""
@@ -1251,18 +1251,18 @@ def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
     assert tip_in_block > 0.0
     assert tip.distance_mm - rotor.distance_mm > tip_in_block
     # The adjuster and pinch screw are threaded into the block: they go with it.
-    assert {"vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw"} <= set(tip.stems)
+    assert {"dt-vn-cone-tip-adjuster", "dt-vn-cone-tip-pinch-screw"} <= set(tip.stems)
 
 
 def test_the_cone_gears_slide_off_the_64t_gear_and_stay_on_the_stub() -> None:
-    """Unexploded, MHA-DT-007 read as the stack's first disc and balloons 35
-    and 36 met there (r15).  The gears and MHA-VN-016 slide on toward the tip
+    """Unexploded, MHA-DT-07 read as the stack's first disc and balloons 35
+    and 36 met there (r15).  The gears and MHA-DT-VN-54 slide on toward the tip
     without it; the tip gear stays on the stub, the collar short of the block."""
     import dt_cone_gear_shaft_spec as shaft
 
     steps = {step.label: step for step in spec.EXPLODE_STEPS}
     gears = steps["cone gears slide toward the tip"]
-    assert (gears.stems, gears.axis) == (("dt-cone-gear", "vn-cone-tip-collar"), "cone")
+    assert (gears.stems, gears.axis) == (("dt-cone-gear", "dt-vn-cone-tip-collar"), "cone")
     stub = shaft.T006_TIP_STATION - shaft.T006_NORTH_FACE_STATION
     assert 0.0 < gears.distance_mm < stub
     collar_end = (
@@ -1283,7 +1283,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     rounded inward so a part inside the print is inside the model band."""
     import math
 
-    import vn_rocker_thrust_washer_spec as rocker_washer
+    import ch_vn_rocker_thrust_washer_spec as rocker_washer
     import cylinder_bank_layout as bank
     import fr_harmonic_base_spec as base
     import rocker_bank_layout as rockers
@@ -1298,7 +1298,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     steps = _flat(drawing.BANK_STEPS)
     thickness = bank.OVERALL_THICKNESS
     upper, lower = bank.OVERALL_THICKNESS_BAND
-    # The gear's own thickness band is the MHA-DT-012 print's (rules 2 and 24).
+    # The gear's own thickness band is the MHA-DT-12 print's (rules 2 and 24).
     assert limits(thickness + lower, thickness + upper, 4) not in steps
     assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
     short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
@@ -1319,9 +1319,9 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
         f"Y {limits(back_y - band, back_y + band, drawing.FIT_LIMIT_PLACES)} "
         f"LESS (W - {washer})" in steps
     )
-    assert steps.index("MIC ONE MHA-DT-026, W") < steps.index("FACE TO Y")
-    # Step 10: the north MHA-CH-008 ear inner face on the same DRO zero, its
-    # target offset north by the miced north MHA-VN-070 washer's excess; the
+    assert steps.index("MIC ONE MHA-DT-26, W") < steps.index("FACE TO Y")
+    # Step 10: the north MHA-CH-08 ear inner face on the same DRO zero, its
+    # target offset north by the miced north MHA-CH-VN-56 washer's excess; the
     # plain shaft threads through the set ear, so the bracket stays down.
     ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
     ear_band = rockers.NORTH_EAR_LOCATE_BAND
@@ -1330,17 +1330,17 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
         f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
         f"LESS (W - {rocker_washer_thick})" in steps
     )
-    assert steps.index("MIC THE MHA-VN-070, W") < steps.index("EAR INNER FACE")
+    assert steps.index("MIC THE MHA-CH-VN-56, W") < steps.index("EAR INNER FACE")
     assert "LIFT IT OFF" not in steps
     assert "SHOULDER" not in steps
-    # The front MHA-DT-002 is set one spring-set blade off the front washer,
-    # the MHA-VN-052 beside it; the bank then has no end play to read.
-    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN IT AND THE FRONT MHA-DT-026" in steps
-    assert "BESIDE MHA-VN-052" in steps
+    # The front MHA-DT-02 is set one spring-set blade off the front washer,
+    # the MHA-DT-VN-68 beside it; the bank then has no end play to read.
+    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN IT AND THE FRONT MHA-DT-26" in steps
+    assert "BESIDE MHA-DT-VN-68" in steps
     assert "REMOVE THE BLADE" in steps
     for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
         assert gone not in steps, gone
-    assert "MHA-VN-034" in steps
+    assert "MHA-DT-VN-64" in steps
     dome = f"{bank.ARBOR_DOME_HEIGHT:.1f}"
     assert f"PLUS A {dome} DOME EACH END" in steps
     assert f"EACH DOME STANDS {dome} PROUD" in steps
@@ -1352,43 +1352,43 @@ def test_bank_drills_the_front_foot_with_the_loaded_mandrel_off_the_base() -> No
     hole, so it is propped, then lifted off for the drill and tap."""
     steps = " ".join(drawing.BANK_STEPS.split())
     prop = steps.index("PROP THE MANDREL FRONT END")
-    front_on = steps.index("9C. SLIDE THE FRONT MHA-DT-002 ON")
+    front_on = steps.index("9C. SLIDE THE FRONT MHA-DT-02 ON")
     spot = steps.index("SPOT AS 9A", front_on)
-    mandrel_off = steps.index("DRAW THE LOADED MANDREL OUT OF THE BACK MHA-DT-002")
+    mandrel_off = steps.index("DRAW THE LOADED MANDREL OUT OF THE BACK MHA-DT-02")
     drill = steps.index("DRILL AND TAP AS 9A", mandrel_off)
-    back_in = steps.index("PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002")
-    refit = steps.index("REFIT THE FRONT MHA-DT-002; RE-SET THE BLADE AND X")
+    back_in = steps.index("PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-02")
+    refit = steps.index("REFIT THE FRONT MHA-DT-02; RE-SET THE BLADE AND X")
     assert prop < front_on < spot < mandrel_off < drill < back_in < refit
     assert "LIFT OFF, DRILL AND TAP" not in steps
 
 
 def test_bank_preload_check_replaces_the_ring_overhang_bound() -> None:
-    """#948 ruling R (PR #1292): MHA-VN-052 preloads the bank back, so no ring
+    """#948 ruling R (PR #1292): MHA-DT-VN-68 preloads the bank back, so no ring
     overhangs its cam; check 3 proves the spring holds instead, and neither
-    check 3 nor the MHA-DT-012 callout states an overhang bound."""
+    check 3 nor the MHA-DT-12 callout states an overhang bound."""
     import dt_cylinder_gear_notes
 
     checks = " ".join(drawing.CHECKS.split())
     check3 = checks.split("3. ")[1].split(" 4. ")[0]
     assert "PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE" in check3
-    assert "SPRINGS BACK ONTO THE BACK MHA-DT-026" in check3
+    assert "SPRINGS BACK ONTO THE BACK MHA-DT-26" in check3
     assert "OVERHANG" not in checks
     assert "OVERHANG" not in dt_cylinder_gear_notes.STACK_FIT_CALLOUT
 
 
 def test_the_collar_pin_explodes_with_the_arbor_and_the_strap_pins_stay() -> None:
-    """Main's MHA-VN-033 ruling: one family serves as the two strap set pins and
-    the MHA-DT-033 collar pin.  The builder tags the collar pin by what it pins,
+    """Main's MHA-DT-VN-63 ruling: one family serves as the two strap set pins and
+    the MHA-DT-33 collar pin.  The builder tags the collar pin by what it pins,
     and only that instance leaves, with the arbor; the strap pins stay with
     the stationary strap group."""
-    assert drawing.BOM_PART_NUMBERS["vn-pinion-strap-pin"] == "MHA-VN-033"
+    assert drawing.BOM_PART_NUMBERS["dt-vn-pinion-strap-pin"] == "MHA-DT-VN-63"
     moved = {step.label: names for step, names in spec.plan_explode(_instances())}
-    assert moved["arbor collar pin"] == ("vn-pinion-strap-pin-3",)
+    assert moved["arbor collar pin"] == ("dt-vn-pinion-strap-pin-3",)
     steps = {step.label: step for step in spec.EXPLODE_STEPS}
     arbor, pin = steps["pinion arbor"], steps["arbor collar pin"]
     assert (pin.axis, pin.distance_mm) == (arbor.axis, arbor.distance_mm)
     every_moved = {name for names in moved.values() for name in names}
-    assert not {"vn-pinion-strap-pin-1", "vn-pinion-strap-pin-2"} & every_moved
+    assert not {"dt-vn-pinion-strap-pin-1", "dt-vn-pinion-strap-pin-2"} & every_moved
 
 
 def test_the_collar_pin_role_is_carried_by_exactly_one_pin() -> None:
@@ -1399,7 +1399,7 @@ def test_the_collar_pin_role_is_carried_by_exactly_one_pin() -> None:
         spec.plan_explode(untagged)
     twice = [
         spec.Instance(i.name, i.stem, i.origin_mm, spec.COLLAR_PIN_ROLE)
-        if i.stem == "vn-pinion-strap-pin"
+        if i.stem == "dt-vn-pinion-strap-pin"
         else i
         for i in _instances()
     ]
@@ -1416,7 +1416,7 @@ def test_the_collar_pin_role_is_carried_by_exactly_one_pin() -> None:
 
 
 def test_the_builder_refuses_a_mislabelled_collar_pin(monkeypatch) -> None:
-    """The builder proves the tagged MHA-VN-033 sits in the collar's pin hole
+    """The builder proves the tagged MHA-DT-VN-63 sits in the collar's pin hole
     before authoring the explode; a strap pin tagged by mistake fails loud."""
     import build_dt_drive_train_assembly as assembly
 

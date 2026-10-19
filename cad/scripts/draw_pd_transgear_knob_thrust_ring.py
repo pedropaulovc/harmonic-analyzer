@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear knob thrust ring (MHA-PD-015).
+r"""Create the manufacturing drawing for the transgear knob thrust ring (MHA-PD-15).
 
 The edge view is the ``*Right`` orientation rotated a quarter turn in the
 sheet so the ring's axis lies horizontal, as it sits in the lathe: the front

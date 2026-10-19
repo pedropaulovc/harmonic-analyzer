@@ -20,8 +20,8 @@ mg_magnifying_bracket_arm_check sets against the lever's load at the collar.
 The R3 dome is not part of the banded cylindrical zone, but the partial
 hemisphere still larger than the bore contributes press contact.
 The rod is modelled at nominal diameter; the cylinder's stock-select/lap band is
-a native (upper, lower) ``_fit_deviations`` band on MHA-MG-003. The collar bore
-is a MATCHED fit (#1570 owner ruling): MHA-MG-001 prints a reference nominal
+a native (upper, lower) ``_fit_deviations`` band on MHA-MG-03. The collar bore
+is a MATCHED fit (#1570 owner ruling): MHA-MG-01 prints a reference nominal
 and PRESS_INTERFERENCE_LIMITS on the measured press zone, so the interference
 is the bore's own band, independent of the rod's. The model bore is the
 tightest corner on the nominal rod.
@@ -78,7 +78,7 @@ if abs(COLLAR_BORE_DIA - (PRESS_ZONE_DIA - PRESS_INTERFERENCE_LIMITS[1])) > 1e-1
 # interference is the measured one less SMOOTHING_FACTOR * (Rz bore + Rz rod).
 # 0.8 is DIN 7190:1988's factor, twice DIN 7190-1:2017's 0.4. Rz is taken as
 # RZ_PER_RA x Ra. Both surfaces print Ra 0.8 (_surface_finish GROUND): the
-# MHA-MG-001 bore (reamed or honed) and the MHA-MG-003 press land, whose own
+# MHA-MG-01 bore (reamed or honed) and the MHA-MG-03 press land, whose own
 # symbol overrides the lever body's general Ra 3.2 (its screw seat); at Ra 3.2
 # the loosest press would smooth away. Each spec asserts its symbol is this.
 COLLAR_BORE_RA_UM = 0.8

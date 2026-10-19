@@ -1,4 +1,4 @@
-r"""Reproduction script: pinion lever retention pin (book ch. 25; MHA-DT-030).
+r"""Reproduction script: pinion lever retention pin (book ch. 25; MHA-DT-30).
 
 U8 ruled a match-drilled cross-pin between the engage lever's hub and the lift
 rod ("retention pin shown at 3 o'clock", ch25 p.68 ``page002_img08``: a small
@@ -185,8 +185,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, POLISHED_STEEL)
 
     # Installed configuration (Codex #858 P2): the drive train places the pin
-    # trimmed and peened flush with the MHA-DT-016 hub.  The default stays the
-    # overlength cut the drawing prints, and both carry one MHA-DT-030 BOM
+    # trimmed and peened flush with the MHA-DT-16 hub.  The default stays the
+    # overlength cut the drawing prints, and both carry one MHA-DT-30 BOM
     # identity.  PinLen is set per configuration in each, so neither inherits
     # the other's length.
     default_config = active_configuration_name(adapter)

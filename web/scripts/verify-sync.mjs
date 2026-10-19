@@ -13,6 +13,7 @@ import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-mod
 import { loadCurrentObservations, loadCurrentAuthority, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
 import { loadCurrentNativeEligibilityModule, collectCurrentNativeEligibilityEvidence, joinCurrentNativeEligibilityReport, unavailableCurrentNativeEligibilityReport } from './current-native-eligibility-report.mjs'
 import { writeJsonReport } from './json-report-writer.mjs'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
@@ -296,11 +297,21 @@ export function sourceCensus(observations, track, native, options, assemblyChang
   return { rows, selected }
 }
 
+/** The source-file identity stays archival; the browser consumes its current naming projection. */
+export function currentTrackDigests(rawTrack) {
+  return { digest: jsonDigest(rawTrack), runtimeDigest: jsonDigest(projectCurrentNativeMetadata(rawTrack)) }
+}
+
+export function requireRuntimeTrack(actual, record) {
+  assert(jsonDigest(actual) === record.runtimeDigest, 'Built runtime compact track differs from the current identity projection of the measured content file; rebuild first')
+}
+
 export async function loadRecord(id, referenceRoot, signal, { webRoot = WEB_ROOT } = {}) {
-  const observations = await loadCurrentObservations(webRoot, id)
+  const archivedObservations = await loadCurrentObservations(webRoot, id)
   const rawTrack = JSON.parse(await readFile(resolve(webRoot, `content/${id}.source-track.json`), 'utf8'))
-  await validateCurrentTrackAssociation(rawTrack, observations, webRoot)
-  const digest = jsonDigest(rawTrack)
+  await validateCurrentTrackAssociation(rawTrack, archivedObservations, webRoot)
+  const digests = currentTrackDigests(rawTrack)
+  const observations = projectCurrentNativeMetadata(archivedObservations)
   const track = await normalizeCurrentTrackAssemblies(rawTrack, { webRoot })
   assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
   const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
@@ -316,7 +327,7 @@ export async function loadRecord(id, referenceRoot, signal, { webRoot = WEB_ROOT
   }
   const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
   const native = await probeSource(sourcePath, track.source, { signal })
-  return { id, track, observations, sourcePath, native, assemblyChangeTimes, lineAuthority, digest }
+  return { id, track, observations, sourcePath, native, assemblyChangeTimes, lineAuthority, ...digests }
 }
 
 /** A bad diagnostic identity cannot erase independent successful exposures in the same decode batch. */
@@ -402,7 +413,7 @@ async function openRoute(page, url, record, player) {
   const actual = await snapshot(page)
   requireModel(actual, record.id)
   const data = await page.evaluate(() => window.harmonicAnalyzer.compactData())
-  assert(jsonDigest(data) === record.digest, 'Built runtime compact track differs from the measured content file; rebuild first')
+  requireRuntimeTrack(data, record)
   const selectors = await page.locator('#videos a').evaluateAll(links => links.map(link => new URL(link.href).searchParams.get('video')))
   assert(selectors.length === 6 && new Set(selectors).size === 6, 'All six retained direct video routes must remain available')
   if (player === 'local') {

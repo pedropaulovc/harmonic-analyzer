@@ -1,4 +1,4 @@
-r"""Reproduction script: output fixture (MHA-MG-006; book ch. 20 p. 48).
+r"""Reproduction script: output fixture (MHA-MG-06; book ch. 20 p. 48).
 
 The small brass hex block that slides on the vertical rod to set the trace's
 height on the paper (the photographed fixture): the lever wire hooks into the

@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear arm plate (MHA-PD-019).
+r"""Create the manufacturing drawing for the transgear arm plate (MHA-PD-19).
 
 The plan is ``*Front``, looking at the REAR face: the outline from the bore
 axis K (the end radius, the bar width, the top corners, the kink), the

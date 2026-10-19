@@ -95,8 +95,8 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
         "so the zone can be selected from that stock"
     )
 
-# --- the MHA-MG-002 clamp screw's seat: the Ø6 body ---------------------------
-# Owner ruling 2026-10-17: the clamp's thumb screw (MHA-VN-011) pinches the
+# --- the MHA-MG-02 clamp screw's seat: the Ø6 body ---------------------------
+# Owner ruling 2026-10-17: the clamp's thumb screw (MHA-MG-VN-50) pinches the
 # lever wherever the operator sets the clamp, so the OD it bears on is a
 # static locating seat, Ra 3.2 (drawing-guidelines.md rule 6, SEAT_UM;
 # mg-magnifying-lever.yaml machinist_exceptions RV-01).  The screw stands on
@@ -105,14 +105,14 @@ if not _stock_low <= _zone_low <= _zone_high <= _stock_high:
 # (mg_magnifying_lever_geom.clamp_radius_band), so the screw's tip can bear
 # anywhere from about 5 to 150 of the body's 3..162 straight cylinder (the
 # drawing test derives that reach from the clamp and screw geometry).  The
-# symbol qualifies that whole face, as on the MHA-MG-004 vertical rod: a zone
+# symbol qualifies that whole face, as on the MHA-MG-04 vertical rod: a zone
 # stopping where the travel runs out would add two lengths and nothing the
 # shop could act on.  The revolve's one top line makes the body ONE Ø6
 # cylindrical face from dome tangent to dome tangent, so the press zone is
 # the same face: the zone keeps its own diameter band (PRESS_ZONE_DIA_BAND),
 # and the Ra 3.2 governs the face everywhere but the press land below.
 #
-# --- the MHA-MG-001 press land: Ra 0.8 over the press zone --------------------
+# --- the MHA-MG-01 press land: Ra 0.8 over the press zone --------------------
 # #1570 PRESS ONLY (owner ruling, no bond): the matched fit's 0.007 minimum
 # diametral interference still grips after DIN 7190 smoothing only at Ra 0.8
 # on BOTH the collar bore and this land (mg_lever_press_fit_geom
@@ -129,12 +129,12 @@ SURFACE_FINISHES = (
 )
 # The seat's reason stands at its symbol (rule 7: say why, where it applies),
 # naming the clamp whose screw bears there.
-CLAMP_NUMBER = "MHA-MG-002"
+CLAMP_NUMBER = "MHA-MG-02"
 SCREW_SEAT_CALLOUT = f"{CLAMP_NUMBER} SCREW SEAT"
 
 # The mate both banded zone callouts name: the bracket whose collar the zone
 # is pressed into.
-MATE_NUMBER = "MHA-MG-001"
+MATE_NUMBER = "MHA-MG-01"
 # The land's reason stands at its symbol too (rule 7), naming the collar it is
 # pressed into; two rows, so it fits between the stock diameter and the symbol.
 PRESS_LAND_CALLOUT = f"{MATE_NUMBER}\nPRESS LAND"
@@ -142,7 +142,7 @@ PRESS_LAND_CALLOUT = f"{MATE_NUMBER}\nPRESS LAND"
 # Dimension callouts that state a manufacturing fact (the mate, the
 # interference) are derived here from the fit contract -- never typed on the
 # sheet (_drawing_contract's spec-string rule).  The mating bore reads as the
-# REFERENCE nominal the MHA-MG-001 sheet prints, under the same matched-fit
+# REFERENCE nominal the MHA-MG-01 sheet prints, under the same matched-fit
 # interference its callout states (rule 25: the two sheets agree; the bore is
 # fitted to the rod, so it carries no absolute band of its own).  <MOD-DIAM>
 # is SolidWorks' own Ø token.  Two rows, so the block stays short of the
@@ -168,7 +168,7 @@ PRESS_ZONE_START_CALLOUT = f"PRESS ZONE COVERS\n{MATE_NUMBER} COLLAR"
 
 # No note block (drawing-guidelines.md rule 7): the stock, the zone and its
 # mate are callouts at their features.  Pressing the collar on, how to hold
-# the rod and the force limit are the MHA-MG-000 assembly's step
+# the rod and the force limit are the MHA-MG-00 assembly's step
 # (mg_lever_press_fit_geom.PRESS_INSTALLATION_NOTES), not this part's.
 
 # The isometric projection uses a scale different from the sheet.

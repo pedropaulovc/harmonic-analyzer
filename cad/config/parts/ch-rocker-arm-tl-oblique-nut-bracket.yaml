@@ -1,13 +1,13 @@
 ch-rocker-arm-tl-oblique-nut-bracket:
   title: Rocker Oblique Trammel Nut Bracket
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-29
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-29
   material: 6061-T6 ALUMINUM FLAT
   material_specification: 6061-T6 aluminum flat bar, 3/4 x 2 in
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "saw and face to height; mill the +X end to length and the -Y side to depth; drill and tap the four M3 holes; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-006-TL-22, drilled and tapped at assembly"
+  process: "saw and face to height; mill the +X end to length and the -Y side to depth; drill and tap the four M3 holes; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-06-TL-22, drilled and tapped at assembly"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
@@ -16,6 +16,6 @@ ch-rocker-arm-tl-oblique-nut-bracket:
       reason: "the bought nut's Ø16.0 bolt circle fixes it; the thin zone lies only within the 2.10 counterbore depth, clamped by the nut flange; below it the wall to the screw clearance is 1.77 min (owner ruling 2026-10-17)"
     - id: "RV-02"
       kind: "minor"
-      where: "the 2X #8-32 taps (SPOT FROM MHA-CH-006-TL-22 AT ASSEMBLY) against the -X and +X end faces"
+      where: "the 2X #8-32 taps (SPOT FROM MHA-CH-06-TL-22 AT ASSEMBLY) against the -X and +X end faces"
       finding: "wall from each #8-32 tap to its end face 1.54 min, under the 2.0 target (rule 17)"
-      reason: "the bracket is set centred on MHA-CH-006-TL-22's side screws (its centre 50.000 from TL-22's -X end, at three places: the title block's ±0.13), so each spotted tap stands mid-length; the 18.50 length cannot grow without moving the leadscrew line; the wall is stated on the #8 callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+      reason: "the bracket is set centred on MHA-CH-06-TL-22's side screws (its centre 50.000 from TL-22's -X end, at three places: the title block's ±0.13), so each spotted tap stands mid-length; the 18.50 length cannot grow without moving the leadscrew line; the wall is stated on the #8 callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"

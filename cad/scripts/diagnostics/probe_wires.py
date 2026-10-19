@@ -129,7 +129,7 @@ async def main():
     adapter._attempt(lambda: doc.EditRebuild3(), default=None)
     check("calc", await _calc(adapter))
 
-    marker, _ = _find_one(adapter, "vn-pen-marker")
+    marker, _ = _find_one(adapter, "pn-vn-pen-marker")
     sl, _ = _find_one(adapter, "sm-summing-lever-1")
     wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     base = {}

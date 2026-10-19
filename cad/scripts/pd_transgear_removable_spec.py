@@ -1,8 +1,8 @@
-r"""MHA-PD-009 transgear-removable: the ANSI #25 sprocket and its seat interface.
+r"""MHA-PD-09 transgear-removable: the ANSI #25 sprocket and its seat interface.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in the import
 closure.  One authority for the numbers the removable sprocket, the two
-shafts it seats on (crankshaft MHA-DT-011, knob shaft MHA-PD-008), the drive-train
+shafts it seats on (crankshaft MHA-DT-11, knob shaft MHA-PD-08), the drive-train
 and paper-drive assemblies and the chain solver ``_chain`` all share.
 
 Evidence: ch23 p.56 (historic #25 chain and bore/drive-pin interface), p.61
@@ -240,7 +240,7 @@ CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 # --- drive-pin seat interface (both shafts carry it) -------------------------
 # Two purchased 3/32 dowels pressed into each shaft's seat face, rounded end
 # proud by DRIVE_PIN_PROUD: 1/4 long in the crank (crank-seat-drive-pin,
-# MHA-VN-044), 3/16 in the knob shaft (transgear-knob-drive-pin, MHA-VN-038).  Their
+# MHA-DT-VN-67), 3/16 in the knob shaft (transgear-knob-drive-pin, MHA-PD-VN-54).  Their
 # lengths and press depths are the shafts'; the diameter is the interface's.
 DRIVE_PIN_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125; each pin spec asserts its own
 DRIVE_PIN_PROUD = 2.4  # standing out of the seat face

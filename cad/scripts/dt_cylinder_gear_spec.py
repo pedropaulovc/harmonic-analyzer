@@ -77,7 +77,7 @@ BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
 BORE_DIA = arbor.SHAFT_DIA + sum(BORE_DIAMETRAL_CLEARANCE_MM) / 2.0
 FACE_WIDTH = 3.0
 # Face width controls mesh engagement across the mating cone-gear family and,
-# with OVERALL_THICKNESS, the cam length the MHA-CH-003 rod ring rides in
+# with OVERALL_THICKNESS, the cam length the MHA-CH-03 rod ring rides in
 # (cylinder_bank_layout.SLOT_MIN) and the gear-0 pitch stack.
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
@@ -218,7 +218,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"cam thickness reference": 2}
 
 
 def matched_bore_limits(finished_shaft_dia_mm: float) -> tuple[float, float]:
-    """Return finished bore MIN/MAX for the measured mating MHA-DT-013 arbor."""
+    """Return finished bore MIN/MAX for the measured mating MHA-DT-13 arbor."""
     minimum, maximum = BORE_DIAMETRAL_CLEARANCE_MM
     return finished_shaft_dia_mm + minimum, finished_shaft_dia_mm + maximum
 

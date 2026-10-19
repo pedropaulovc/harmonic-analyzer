@@ -4,7 +4,7 @@ must be the rows the assembly actually places each component with.
 The diagnostic executes at import (it reads a machine-local golden pose dump),
 so this reads its ``expect(DT, ...)`` calls from source and evaluates their
 rows against the SolidWorks-free assembly module.  Codex P3 on #814: 485eaf434
-phased MHA-DT-016 (``pinion-lift-rod``) by ``LIFT_ROD_ROWS`` but the validator
+phased MHA-DT-16 (``pinion-lift-rod``) by ``LIFT_ROD_ROWS`` but the validator
 still expected IDENTITY, a false ``drow`` failure. Translations are also
 cross-checked against the restored fixed crank axis.
 """
@@ -138,7 +138,7 @@ def test_the_cross_check_covers_the_crank_family_translations() -> None:
     assert {
         "dt-crankshaft-1",
         "dt-crank-hub-1",
-        "vn-crank-hub-pin-1",
+        "dt-vn-crank-hub-pin-1",
         "dt-crank-pinion-1",
         "dt-crank-arm-1",
         "dt-crank-handle-1",
@@ -267,7 +267,7 @@ def test_magnifying_bracket_screw_expectations_follow_live_placement() -> None:
     assert len(calls) == 1
     call = calls[0]
     assert ast.literal_eval(call.args[0]) == "mg-magnifier"
-    assert ast.literal_eval(call.args[4]) == "vn-magnifying-bracket-screw"
+    assert ast.literal_eval(call.args[4]) == "mg-vn-magnifying-bracket-screw"
     for index, position in enumerate(magnifier.BRACKET_SCREW_POSITIONS, start=1):
         namespace = {"m": magnifier, "index": index, "position": position}
         values = [
@@ -275,7 +275,7 @@ def test_magnifying_bracket_screw_expectations_follow_live_placement() -> None:
             for expr in call.args[1:4]
         ]
         assert values == [
-            f"vn-magnifying-bracket-screw-{index}",
+            f"mg-vn-magnifying-bracket-screw-{index}",
             list(position),
             magnifier.BRACKET_SCREW_ROWS,
         ]
@@ -296,7 +296,7 @@ def test_magnifying_bracket_screws_are_free_and_locked_to_the_bracket() -> None:
         node for node in calls
         if getattr(node.func, "id", None) == "place_component"
     )
-    assert ast.literal_eval(placement.args[1]) == "vn-magnifying-bracket-screw"
+    assert ast.literal_eval(placement.args[1]) == "mg-vn-magnifying-bracket-screw"
     assert ast.unparse(placement.args[2]) == "list(position)"
     assert ast.unparse(placement.args[4]) == "BRACKET_SCREW_ROWS"
     assert next(kw.value.value for kw in placement.keywords if kw.arg == "ground") is False

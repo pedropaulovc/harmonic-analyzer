@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker arm filing stand (MHA-CH-006-TL-12).
+r"""Pure-data contract for the rocker arm filing stand (MHA-CH-06-TL-12).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 rocker arm's S5 fitting-bench setup (prechips plan ch_rocker_arm S5) the
@@ -108,7 +108,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # what is held is its step over the end blocks, on the dimension it governs,
 # naming the face it carries. The pedestal round is stock-sized. Short lines:
 # the callout sits right of the pedestal, inside its length.
-ROCKER_NUMBER = "MHA-CH-006"
+ROCKER_NUMBER = "MHA-CH-06"
 PEDESTAL_LENGTH_CALLOUT = "\n".join(
     (
         f"{STEP_LIMITS[0]:.2f}-{STEP_LIMITS[1]:.2f} LONGER THAN",

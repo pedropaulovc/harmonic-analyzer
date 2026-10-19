@@ -56,8 +56,8 @@ def part_properties(part_name: str) -> dict[str, str]:
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
     registry_name = part_name
-    if part_name.startswith("vn-channel-spring-installed-stretch"):
-        registry_name = "vn-channel-spring-installed"
+    if part_name.startswith("ch-vn-channel-spring-installed-stretch"):
+        registry_name = "ch-vn-channel-spring-installed"
     try:
         reg = _config.parts(registry_name)
     except KeyError:

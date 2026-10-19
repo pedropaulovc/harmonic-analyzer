@@ -487,7 +487,7 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
     floor = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
     assert floor not in spec.DRAWING_NOTES
     assert floor in spec.TURNED_DIA_FITUP_CALLOUT
-    assert "MHA-DT-000" in spec.TURNED_DIA_FITUP_CALLOUT
+    assert "MHA-DT-00" in spec.TURNED_DIA_FITUP_CALLOUT
     assert len(lines) <= 4
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
@@ -496,7 +496,7 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
         Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
     ).read_text(encoding="utf-8")
     assert not any(
-        line.startswith("| MHA-DT-010 crank pinion boss |")
+        line.startswith("| MHA-DT-10 crank pinion boss |")
         for line in policy.splitlines()
     )
     notes = spec.DRAWING_NOTES
@@ -514,7 +514,7 @@ def test_notes_carry_the_tooth_edge_override_not_an_obsolete_boss_shortfall() ->
         "ROOT DIAMETER",
         "COMMISSIONING",
         "ACCEPTANCE",
-        "MHA-DT-007",
+        "MHA-DT-07",
         "N*m",
         "RPM",
         "+/-",
@@ -984,7 +984,7 @@ def _assert_no_t120_shortfall_waiver() -> None:
     rows = [
         line
         for line in policy.split("\n## Named exceptions", 1)[1].splitlines()
-        if line.startswith("| MHA-DT-010") and "T120" in line.split("|")[1]
+        if line.startswith("| MHA-DT-10") and "T120" in line.split("|")[1]
     ]
     assert not rows
 
@@ -1132,9 +1132,9 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
 
 
 def test_t120_fit_up_stops_a_band_that_would_pass_and_then_close() -> None:
-    # Codex P2 on #1154 (review 2): a check that took up only MHA-DT-011's play
+    # Codex P2 on #1154 (review 2): a check that took up only MHA-DT-11's play
     # passed a Ø16.043 band with the cone shaft centred in the post boss; once
-    # that play closed the band kept 0.018.  The check pushes MHA-DT-010 and
+    # that play closed the band kept 0.018.  The check pushes MHA-DT-10 and
     # T120 toward each other, so it reads that band as it runs.
     import build_dt_drive_train_assembly as bdt
 
@@ -1199,7 +1199,7 @@ def _t120_clearance_facts(text: str) -> dict[str, set[float]]:
     return found
 
 
-# MHA-DT-000's crank step, which carries the T120 check.  The part spec never
+# MHA-DT-00's crank step, which carries the T120 check.  The part spec never
 # reads the step registry (test_part_isolation), so the key lives here.
 _T120_CHECK_STEP_KEY = "crank-mesh-checked"
 
@@ -1216,10 +1216,10 @@ def _crank_step() -> str:
 def test_no_print_states_the_t120_design_clearances() -> None:
     # The clearances are a design-check result (build_dt_drive_train_assembly
     # asserts them). Neither print narrates them: the part sheet dropped them in
-    # Main's MHA-DT-010 eye pass, and #1695 moved the assembly crank step to the
-    # bench check and its cuts only (dt_drive_train_assembly_notes). The step
+    # Main's MHA-DT-10 eye pass, and #1695 moved the assembly crank step to the
+    # bench check and its cuts only (dt_drive_train_assembly_sheet). The step
     # still reads the fit-up feeler and both cut limits.
-    import dt_drive_train_assembly_notes as notes
+    import dt_drive_train_assembly_sheet as notes
 
     text = _crank_step()
     flat = " ".join(text.split())
@@ -1286,7 +1286,7 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
     # Both sheets give each cut its own condition: the turn-down floor is
     # stated with the band and its check only, the facing floor with the
     # shoulder only.  The part sheet states the turn-down on the turned
-    # diameter's own callout and points at the MHA-DT-000 T120 check, which
+    # diameter's own callout and points at the MHA-DT-00 T120 check, which
     # carries the band-only condition, by name and never by step number (a
     # sequence edit must not re-key the part).
     turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"

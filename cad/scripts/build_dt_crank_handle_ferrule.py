@@ -1,8 +1,8 @@
-r"""Build MHA-DT-034, the brass ferrule at the crank end of the handle.
+r"""Build MHA-DT-34, the brass ferrule at the crank end of the handle.
 
 User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the bright ring between
 the crank arm and the ebonized grip is a separate brass ferrule, epoxied on
-the MHA-DT-008 tenon and seated on its shoulder; its outer end face runs against
+the MHA-DT-08 tenon and seated on its shoulder; its outer end face runs against
 the arm.  Dimensions live in ``dt_crank_handle_ferrule_spec``.
 
 Layout: one revolve about local +X, in the handle's own frame -- the
@@ -197,17 +197,17 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the bore, which the oak tenon
-    # is turned to suit, holds both the MHA-DT-008 seat and the oak round the
-    # pivot bore; the seat mouth's chamfer clears the MHA-DT-008 tenon root
+    # is turned to suit, holds both the MHA-DT-08 seat and the oak round the
+    # pivot bore; the seat mouth's chamfer clears the MHA-DT-08 tenon root
     # and leaves the tenon its glue length.  The OD is the rod as supplied,
-    # skimmed at assembly; the handle's end play is fitted on the MHA-DT-032
+    # skimmed at assembly; the handle's end play is fitted on the MHA-DT-32
     # shoulder.
     set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "BoreDia", BORE_DIA_TOL)
     set_dimension_symmetric_tolerance(
         adapter, "FerruleProfile", "SeatMouthChamfer", SEAT_MOUTH_CHAMFER_TOL
     )
     # Every model edit precedes the INSTALLED split, so the split copies a
-    # finished default (the MHA-DT-030 lesson).
+    # finished default (the MHA-DT-30 lesson).
     await apply_material(adapter, MATERIAL)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

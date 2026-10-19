@@ -120,7 +120,7 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 # that reaches its height and under the face-width block, so its callout can
 # name the mesh its band serves (machinist review r1 of #1641: the mate was
 # named only in GEAR DATA).
-TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-010"
+TIP_DIA_CALLOUT = "FIXED-CENTRE MESH\nWITH MHA-DT-10"
 # The full mate Number makes the AF block 70.8 mm wide at the calibrated
 # dimension font. This lane leaves over 3 mm beyond the padded front-view
 # clearance guard and over 14 mm to the padded section, without moving its
@@ -165,7 +165,7 @@ SECTION_KEEP = {
 # named where the band prints. Below the value: r3 of #1641 set it above, and
 # the above lane neither broke its lines nor printed (layout audit
 # text-unmatched), while the native below lane prints on every sheet.
-FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-004"
+FACE_WIDTH_CALLOUT = "SETS CONE GEAR STACK\nON MHA-DT-04"
 
 # Native bands on both bore dimensions set the fitted clearance. The callout
 # adds extent and the mating part by name and number; it does not repeat
@@ -197,7 +197,7 @@ DIMENSION_CALLOUTS = {
     # extension lines overrun it by 1 mm: two trailing spaces on every line
     # keep that ink clear (r3 of #1641 printed RUNOUT's T on the line).
     "BoreSouthChamferSize": (
-        " X 45 DEG, THIS END  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-004  "
+        " X 45 DEG, THIS END  \nCLEARS FLAT RUNOUT  \nOF MHA-DT-04  "
     ),
 }
 

@@ -1,6 +1,6 @@
-r"""Reproduction script: transgear knob cup (MHA-PD-016; ch. 23; 1 used).
+r"""Reproduction script: transgear knob cup (MHA-PD-16; ch. 23; 1 used).
 
-The brass ring pinned on the knob shaft's rear journal by the MHA-VN-048 spring
+The brass ring pinned on the knob shaft's rear journal by the MHA-PD-VN-62 spring
 pin, pressed through a Ø1.6 hole match-drilled through cup and journal at
 assembly (not modelled); its front face runs behind the arm plate's rear
 boss, the rear stop of the knob's end float (``pd_transgear_knob_cup_spec``).

@@ -1,9 +1,9 @@
-r"""MHA-PD-025 transgear-front-bushing: the brass thrust ring in front of the cluster (R9-68).
+r"""MHA-PD-25 transgear-front-bushing: the brass thrust ring in front of the cluster (R9-68).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  A turned brass ring on the MHA-PD-023 pin between the MHA-PD-010
-sleeve's nose (steel: the hub never thrusts, R9-5) and the MHA-VN-047 retaining
-ring.  It is faced to fit at assembly, after the MHA-PD-017 hub's front face is
+closure.  A turned brass ring on the MHA-PD-23 pin between the MHA-PD-10
+sleeve's nose (steel: the hub never thrusts, R9-5) and the MHA-PD-VN-61 retaining
+ring.  It is faced to fit at assembly, after the MHA-PD-17 hub's front face is
 faced to stand ``transgear_cluster_fit.HUB_NOSE_WINDOW`` behind the nose,
 until m reads ``transgear_cluster_fit.FIT_WINDOW`` with the cluster, hub and
 disc pushed forward (step 1 of the fit-up there).  It runs free on the pin;
@@ -22,7 +22,7 @@ from __future__ import annotations
 import transgear_cluster_fit as FIT
 import pd_transgear_disc_hub_spec as HUB
 import pd_transgear_pin_spec as PIN
-import vn_transgear_retaining_ring_spec as RING
+import pd_vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _printed_tolerance import printed_band_mm
@@ -41,7 +41,7 @@ BORE_CALLOUT = (
     f"ON TRANSGEAR PIN {PIN.PIN_NUMBER})"
 )
 # 45 deg, on the ring face's O.D. edge: a single MAX limit (the MHA-160
-# precedent).  Only its largest size matters: it must leave the MHA-VN-047
+# precedent).  Only its largest size matters: it must leave the MHA-PD-VN-61
 # ring a full bearing flat (checked below).
 FRONT_CHAMFER = 0.5
 FRONT_CHAMFER_BAND = (0.0, -0.3)  # (upper, lower)
@@ -53,10 +53,10 @@ WALL_TARGET = 2.0
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
 WALL_WORST = (OD - printed_band_mm(OD_PLACES) - BORE_DIA - BORE_DIA_BAND[0]) / 2.0
 if WALL_WORST < WALL_TARGET:
-    raise AssertionError(f"MHA-PD-025 wall {WALL_WORST:.3f} under {WALL_TARGET}")
+    raise AssertionError(f"MHA-PD-25 wall {WALL_WORST:.3f} under {WALL_TARGET}")
 # The retaining ring bears wholly on the flat of the front face.
 if RING.OD >= OD - printed_band_mm(OD_PLACES) - 2.0 * FRONT_CHAMFER:
-    raise AssertionError("MHA-VN-047 ring overhangs the front bushing's chamfer")
+    raise AssertionError("MHA-PD-VN-61 ring overhangs the front bushing's chamfer")
 # The rear face reaches over the hub's front face, past the largest bore, by
 # at least a millimetre at the smallest O.D. (R9-68), so the bushing, held
 # by the ring, traps hub and disc against the sleeve's step.
@@ -66,7 +66,7 @@ HUB_FACE_OVERLAP_WORST = (OD - printed_band_mm(OD_PLACES)) / 2.0 - (
 ) / 2.0
 if HUB_FACE_OVERLAP_WORST < HUB_FACE_OVERLAP_MIN:
     raise AssertionError(
-        f"MHA-PD-025 covers the MHA-PD-017 front face by {HUB_FACE_OVERLAP_WORST:.3f} "
+        f"MHA-PD-25 covers the MHA-PD-17 front face by {HUB_FACE_OVERLAP_WORST:.3f} "
         f"past its bore, under {HUB_FACE_OVERLAP_MIN}"
     )
 
@@ -79,7 +79,7 @@ FACING_ALLOWANCE = 0.10
 BLANK_LENGTH_MIN = 6.10
 if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
-        f"MHA-PD-025 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
+        f"MHA-PD-25 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
         f"facing allowance over the {GAP_MAX:.3f} longest fit"
     )
 
@@ -117,7 +117,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-PD-025 dimension needs authored places")
+    raise AssertionError("every marked MHA-PD-25 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"RingLength"})
 
 ISOMETRIC_VIEW_SCALE = (4, 1)

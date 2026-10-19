@@ -395,22 +395,20 @@ def resolve_glb(model: str, explicit: str | None, fetch: bool, tag: str | None) 
 
 
 def release_member(member: str, tag: str | None) -> Path:
-    """Extract the actual old/new identity member and retain its cache basename."""
-    from release_diff import canonical_key, identity_inventory, load_identity_map
+    """Extract a paired historical/current member, retaining its actual basename."""
+    from release_diff import load_identity_map, paired_keys
 
     tag = tag or _gh(["release", "view", "--json", "tagName", "-q", ".tagName"]).strip()
     cache = CAD_OUT / "release-cache" / tag
     requested = Path(member)
     mapping = load_identity_map()
-    logical = canonical_key(requested.stem, mapping)
     cached = [
         path for path in (cache / requested.parent).glob("*")
         if path.is_file() and path.suffix.lower() == requested.suffix.lower()
-        and canonical_key(path.stem, mapping) == logical
     ]
-    identity_inventory((path.stem for path in cached), mapping)
-    if cached:
-        return cached[0]
+    pairs = paired_keys((path.stem for path in cached), [requested.stem], mapping)
+    if requested.stem in pairs:
+        return next(path for path in cached if path.stem == pairs[requested.stem])
     cache.mkdir(parents=True, exist_ok=True)
     asset = _gh(["release", "view", tag, "--json", "assets",
                  "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()
@@ -420,13 +418,14 @@ def release_member(member: str, tag: str | None) -> Path:
     if not bundle.exists():
         _gh(["release", "download", tag, "-p", asset, "--dir", str(cache), "--clobber"])
     with zipfile.ZipFile(bundle) as zf:
-        matches = [
+        members = [
             name for name in zf.namelist()
             if Path(name).parent.as_posix().lower() == requested.parent.as_posix().lower()
             and Path(name).suffix.lower() == requested.suffix.lower()
-            and canonical_key(Path(name).stem, mapping) == logical
         ]
-        identity_inventory((Path(name).stem for name in matches), mapping)
+        pairs = paired_keys((Path(name).stem for name in members), [requested.stem], mapping)
+        matches = [name for name in members
+                   if requested.stem in pairs and Path(name).stem == pairs[requested.stem]]
         if not matches:
             raise SystemExit(
                 f"release {tag} bundles no {member} identity member. "

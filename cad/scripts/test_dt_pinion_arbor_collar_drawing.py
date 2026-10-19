@@ -14,7 +14,7 @@ import dt_pinion_arbor_collar_geometry as geometry
 import dt_pinion_arbor_collar_spec as spec
 import dt_pinion_arbor_spec as arbor
 import dt_pinion_arbor_pin_spec as arbor_pin
-import vn_pinion_strap_pin_spec as strap_pin
+import dt_vn_pinion_strap_pin_spec as strap_pin
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -87,10 +87,10 @@ def test_the_pin_drive_keeps_a_pin_diameter_in_both_collar_walls() -> None:
 
 
 def test_collar_pin_is_the_stock_mha145_named_on_the_hole_not_a_note() -> None:
-    """#858 made the rig's spring pin the stock MHA-VN-033 (McMaster 98296A027),
+    """#858 made the rig's spring pin the stock MHA-DT-VN-63 (McMaster 98296A027),
     its own BOM line.  The collar takes a third one, so the sheet names it on
-    the pin-hole callout and carries no supply note (the MHA-DT-014 precedent)."""
-    row = _config.parts("vn-pinion-strap-pin")
+    the pin-hole callout and carries no supply note (the MHA-DT-14 precedent)."""
+    row = _config.parts("dt-vn-pinion-strap-pin")
     assert spec.PIN_NUMBER == row["number"]
     assert int(row["quantity"]) == 3  # two strap pins and the collar pin
     assert spec.PIN_HOLE_CALLOUT == (
@@ -167,11 +167,11 @@ def test_collar_never_touches_the_front_strap_at_any_band_corner() -> None:
 
 
 def test_gap_max_is_only_a_bond_failure_walk_the_rig_tolerates() -> None:
-    """GAP_MAX is how far MHA-DT-022 can walk north through the drum if its
+    """GAP_MAX is how far MHA-DT-22 can walk north through the drum if its
     Loctite 638 bond lets go before the collar stops it on the front strap.
     The drum stays trapped between the straps, so the mesh never moves.  The
     only new volume the walk sweeps is the arbor's back crown, north of where
-    it already overhangs the back MHA-DT-018 pivot block at rest; nothing stands
+    it already overhangs the back MHA-DT-18 pivot block at rest; nothing stands
     on the pinion-arbor axis there.  Its neighbours are the block below it
     and the north arbor pedestal and its dome cap on the cylinder axis beside
     it; the base's deck ends past the walk.  (A pedestal-foot z bound stood
@@ -208,7 +208,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert drawing.DIMENSION_CALLOUTS["PinHoleDia"].startswith("1/16 DRILL THRU\n")
-    assert "MHA-DT-022" in drawing.DIMENSION_CALLOUTS["BoreDia"]
+    assert "MHA-DT-22" in drawing.DIMENSION_CALLOUTS["BoreDia"]
 
 
 def test_only_the_pin_hole_carries_a_band() -> None:
@@ -271,7 +271,7 @@ def test_registry_retains_make_critical_properties() -> None:
     import _config
 
     row = _config.parts("dt-pinion-arbor-collar")
-    assert row["number"] == "MHA-DT-033"
+    assert row["number"] == "MHA-DT-33"
     assert row["material_specification"]
     assert row["finish"]
     assert int(row["quantity"]) == 1

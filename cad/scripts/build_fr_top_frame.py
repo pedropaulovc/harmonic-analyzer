@@ -50,7 +50,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   top-to-underside grip is 36.50 at the title block's .XX band: HangerGrip,
   the crossbar's own full-height extrude depth, is driven by the RingHeight
   global and carries no band of its own (owner ruling 2026-10-18: each
-  MHA-VN-024 is cut to the measured grip at MHA-SM-000).
+  MHA-SM-VN-52 is cut to the measured grip at MHA-SM-00).
   Datum D on the native crossbar width establishes BOTH-face median plane;
   the hanger axes' linear position zone centres them within +/-0.05 of it.
 * Gooseneck hub on the east rail (-X) at z +3.088: full-height rib 28 wide,
@@ -235,10 +235,10 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_SEAT_Z,
 )
 from _fit_deviations import deviations
-from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
+from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER as CAP_MAX_OUTER_DIAMETER
 import sm_knife_mount_spec as KNIFE_MOUNT
 from _printed_tolerance import angular_band_deg
-from vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
+from ch_vn_frame_side_screw_spec import SHANK_DIA as KEEPER_SCREW_MAJOR_DIA
 from _mcmaster_90280a837 import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     HEAD_H as CROSS_SCREW_HEAD_H,

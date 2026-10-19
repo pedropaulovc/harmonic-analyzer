@@ -61,7 +61,7 @@ if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
     raise AssertionError(
         f"arm stock {ARM_STOCK_THICKNESS:.3f} is outside the printed {ARM_THICKNESS:.1f}'s .X band"
     )
-# U33: the MHA-DT-032 slotted shoulder screw threads through the arm and carries
+# U33: the MHA-DT-32 slotted shoulder screw threads through the arm and carries
 # the handle.  The end arc shares the pivot's centre, so its tapped web to the
 # end is judged at the .X worst case of the end radius alone (U27).
 HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", PIVOT_SCREW_THREAD_SIZE)
@@ -73,7 +73,7 @@ if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
         f"handle-pivot thread leaves {PIVOT_END_WEB_WORST:.2f} mm to the arm end"
     )
 
-# The axial MHA-VN-029 groove is match-drilled in the assembled arm/hub.  Its
+# The axial MHA-DT-VN-59 groove is match-drilled in the assembled arm/hub.  Its
 # centre rides the hub-seat interface at six o'clock (toward the hanging handle);
 # the 4-mm length is shared as exactly half the 8-mm arm thickness.
 AXIAL_PIN_X = AXIAL_PIN_RADIUS_FROM_AXIS
@@ -87,7 +87,7 @@ FIDUCIAL_X = -_FIDUCIAL_AXIS
 FIDUCIAL_Y = _FIDUCIAL_AXIS
 
 # Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
-# face clamps the brass eyelet that once tethered removable pin MHA-DT-009.
+# face clamps the brass eyelet that once tethered removable pin MHA-DT-09.
 # Tapped THRU the 5/16 bar (drawing-guidelines.md rule 17 (walls and webs), audit W7): a blind 6.5 drill left
 # its point 0.76 from the inboard face nominal and through it at the printed
 # band; through, the screw has 7.94 of thread (2.79D) and nothing to bottom on.
@@ -95,7 +95,7 @@ ANCHOR_SCREW_X = 20.0
 ANCHOR_SCREW_Y = 4.5
 ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
-# MHA-DT-031 is a light press in MHA-DT-006 and pinned; nothing runs in this part.
+# MHA-DT-31 is a light press in MHA-DT-06 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans.
@@ -104,7 +104,7 @@ HALF_WIDTH = ARM_WIDTH / 2.0
 
 # The thickness prints as a reference, (8.0), under the stock line's "AS
 # SUPPLIED": the bar's mill tolerance governs it, not the title block's .X
-# band, which would accept a 7.2 arm and a 1.02D MHA-DT-032 engagement (Codex
+# band, which would accept a 7.2 arm and a 1.02D MHA-DT-32 engagement (Codex
 # #892; the U41 platform precedent).
 REFERENCE_DIMENSIONS = {"Depth"}
 
@@ -127,7 +127,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 
 # Decimal places are authored on the model.  The hub seat bore is a one-place
-# .X size: it is bored first, and MHA-DT-031 is turned to suit it.
+# .X size: it is bored first, and MHA-DT-31 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {"BossRadius": 1, "EndRadius": 1},
     "Arm": {"Depth": 1},

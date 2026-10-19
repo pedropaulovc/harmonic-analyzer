@@ -63,7 +63,7 @@ Z = wall thickness):
   fillet face, with tangent propagation -- i.e. the whole window rim and all
   twelve outside edges.
 * **BracketSeats** -- one Hole Wizard feature, 2x #8-32 bottoming-tapped seats
-  down from the top face on the centreline, under the MHA-CH-008 pivot
+  down from the top face on the centreline, under the MHA-CH-08 pivot
   brackets' hold-down holes, each over a window side edge: the post outboard,
   the web inboard (``rocker_bracket_seat_layout`` owns their stack; the print
   transfers them from the set brackets at assembly).
@@ -1250,7 +1250,7 @@ async def build(adapter) -> dict[str, str]:
 
     # 9. BracketSeats: the rocker brackets' two #8-32 bottoming-tapped seats,
     #    down from the top face over the window's side edges. Located at their
-    #    nominal stations; the print says TRANSFER FROM MHA-CH-008 AT ASSEMBLY.
+    #    nominal stations; the print says TRANSFER FROM MHA-CH-08 AT ASSEMBLY.
     bracket_seats = wizard_holes(
         adapter,
         SEAT_SPEC,

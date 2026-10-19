@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
-const { parseOptions, sourceCensus, finishVideo, seekSettlement, originalSeekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
-import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
+const { parseOptions, sourceCensus, finishVideo, seekSettlement, originalSeekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord, currentTrackDigests, requireRuntimeTrack } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
+import { jsonDigest, loadCanonicalObservations, VIDEO_IDS } from './verify-reference.mjs'
 import { sourceVisibilityError } from '../source-visibility.mjs'
 import { nativeLineEndpointId, fixedNativeLinePart } from '../native-line-checks.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
@@ -18,6 +18,34 @@ import { joinCurrentNativeEligibilityReport } from './current-native-eligibility
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
 const frame = (time, classification = 'machine') => ({ timeSeconds: time, decodedTimeSeconds: time, shotId: 'shot', classification, views: [{ id: 'main' }] })
 const observations = { shots: [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'machine', hasCorrespondingMachine: true }], frames: [frame(0), frame(1), frame(2)], coverage: { changeTimesSeconds: [0.1, 0.2] } }
+
+test('runtime compact identity matches the projected real tracks while preserving their raw archival digests', async () => {
+  const { createServer } = await import('vite')
+  const { fileURLToPath } = await import('node:url')
+  const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
+  try {
+    const { CompactVideoReference } = await server.ssrLoadModule('/src/source-track.ts')
+    let projectedCount = 0
+    for (const id of VIDEO_IDS) {
+      const raw = JSON.parse(await readFile(new URL(`../content/${id}.source-track.json`, import.meta.url), 'utf8'))
+      const original = JSON.stringify(raw), record = currentTrackDigests(raw)
+      const runtime = new CompactVideoReference(raw, {
+        id, sourceSha256: raw.source.sha256, durationSeconds: raw.source.durationSeconds,
+      })
+      assert.equal(record.digest, jsonDigest(raw), id + ' retains the raw source-file identity')
+      assert.equal(record.runtimeDigest, jsonDigest(runtime.data), id + ' targets the actual runtime projection')
+      assert.doesNotThrow(() => requireRuntimeTrack(runtime.data, record))
+      assert.throws(() => requireRuntimeTrack({ ...runtime.data, schemaVersion: 999 }, record), /differs from the current identity projection/)
+      if (record.digest !== record.runtimeDigest) {
+        projectedCount++
+        assert.throws(() => requireRuntimeTrack(runtime.data, { ...record, runtimeDigest: record.digest }), /differs from the current identity projection/)
+      }
+      assert.equal(JSON.stringify(raw), original, id + ' source input is not rewritten')
+    }
+    assert.equal(projectedCount, 5)
+  } finally { await server.close() }
+})
 
 test('canonical observation loading rejects missing, corrupt or invalid gzip without using plain siblings', async t => {
   const root = await mkdtemp(join(tmpdir(), 'canonical-observation-boundaries-'))

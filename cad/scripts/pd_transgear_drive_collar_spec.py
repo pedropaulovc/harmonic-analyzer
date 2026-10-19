@@ -1,4 +1,4 @@
-r"""MHA-PD-022 transgear-drive-collar: the brass drive collar on the knob shaft.
+r"""MHA-PD-22 transgear-drive-collar: the brass drive collar on the knob shaft.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
@@ -12,7 +12,7 @@ assembly until the removable T24 meets the unchanged chain-plane setting,
 with that rear face seated directly on the integral gear front F.
 The model body length is 6.2 REF, not an independently toleranced length.
 The thumbnut clamps pilot -> body -> actual gear shoulder; it carries no
-drive torque. The two existing axial MHA-VN-038 dowels still drive the
+drive torque. The two existing axial MHA-PD-VN-54 dowels still drive the
 removable wheel, and the pilot is faced to retain its .05-.15 float.
 
 The rear D-entry nominal is the actual shaft corner envelope plus one full
@@ -52,8 +52,8 @@ from dt_crankshaft_spec import (
     DRIVE_PIN_OFFSET_TOL,
     SPIGOT_DIA_BAND,
 )
-from vn_transgear_knob_drive_pin_spec import LENGTH as PIN_LENGTH
-from vn_transgear_knob_drive_pin_spec import PROUD_RANGE, THINNEST_PLATE
+from pd_vn_transgear_knob_drive_pin_spec import LENGTH as PIN_LENGTH
+from pd_vn_transgear_knob_drive_pin_spec import PROUD_RANGE, THINNEST_PLATE
 from pd_transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_DIA_BAND,
@@ -140,12 +140,12 @@ FACING_ALLOWANCE = 0.10
 PILOT_BLANK_LENGTH_MIN = 3.40
 if PILOT_BLANK_LENGTH_MIN < PILOT_LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
-        f"MHA-PD-022 pilot blank {PILOT_BLANK_LENGTH_MIN:.2f} MIN leaves no "
+        f"MHA-PD-22 pilot blank {PILOT_BLANK_LENGTH_MIN:.2f} MIN leaves no "
         f"{FACING_ALLOWANCE} facing allowance over the "
         f"{PILOT_LENGTH_FITTED_MAX:.2f} longest fit"
     )
 if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
-    raise AssertionError("MHA-PD-022's modelled pilot lies outside its fitted band")
+    raise AssertionError("MHA-PD-22's modelled pilot lies outside its fitted band")
 
 # --- True D-bore: curved H7 envelope plus a separately banded flat -----------
 BORE_DIA = CORE_DIA + 0.010
@@ -195,7 +195,7 @@ BORE_ENTRY_BREAK_ANGLE_LIMITS = (
     BORE_ENTRY_BREAK_ANGLE_DEG + BORE_ENTRY_BREAK_ANGLE_BAND_DEG,
 )
 if not 0.0 < min(BORE_ENTRY_BREAK_ANGLE_LIMITS) < max(BORE_ENTRY_BREAK_ANGLE_LIMITS) < 90.0:
-    raise AssertionError("MHA-PD-022 rear D-entry angle band must remain acute")
+    raise AssertionError("MHA-PD-22 rear D-entry angle band must remain acute")
 # At the authored 90-degree rear face/wall junction, the second leg is
 # width*tan(angle). Both width and angle increase it monotonically. Spend
 # every independent printed corner even though BOTH LEGS constrains the
@@ -257,7 +257,7 @@ FRONT_BEARING_AREA_MIN = min(
     for profile in manufactured_profiles()
 )
 
-# --- Drive-pin holes: reamed THROUGH for the MHA-VN-038 press (the crank's twin) -
+# --- Drive-pin holes: reamed THROUGH for the MHA-PD-VN-54 press (the crank's twin) -
 PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # 7.0, ±Y
 PIN_HOLE_DIA = DRIVE_PIN_HOLE_DIA  # 2.38
 PIN_HOLE_BAND = DRIVE_PIN_HOLE_BAND  # (0, -0.010)
@@ -291,7 +291,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
     DRAWING_DIMENSIONS
 ):
-    raise AssertionError("every marked MHA-PD-022 dimension needs authored places")
+    raise AssertionError("every marked MHA-PD-22 dimension needs authored places")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -299,9 +299,9 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 
 if BODY_BLANK_LENGTH_MIN < LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
-    raise AssertionError("MHA-PD-022 body blank leaves no rear-facing allowance")
+    raise AssertionError("MHA-PD-22 body blank leaves no rear-facing allowance")
 if not LENGTH_FITTED_MIN <= LENGTH <= LENGTH_FITTED_MAX:
-    raise AssertionError("MHA-PD-022 model body lies outside its fitted band")
+    raise AssertionError("MHA-PD-22 model body lies outside its fitted band")
 
 
 def floor_2(value: float) -> float:
@@ -393,7 +393,7 @@ NUT_FLANGE_OVER_PILOT_WORST = (
 KNOB_FLOAT_RANGE = PILOT_PROUD_RANGE
 
 
-# --- Drive pins pressed through to a stop (MHA-VN-038) ------------------------------
+# --- Drive pins pressed through to a stop (MHA-PD-VN-54) ------------------------------
 def pin_hole_meets_wall_floor(collar_length: float, depth: float) -> bool:
     """A pin hole either runs through the collar or leaves ``WALL_FLOOR`` of
     solid behind its floor; a thinner floor is a wall under the policy."""
@@ -413,7 +413,7 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
 )
 
 # The mating shaft, named on the sheet so the fit and the seat face are found.
-SHAFT_NUMBER = "MHA-PD-008"
+SHAFT_NUMBER = "MHA-PD-08"
 SHAFT_SEAT_FACE = f"{SHAFT_NUMBER} 12T FRONT FACE"
 
 # --- Fitted axial reaction -------------------------------------------------
@@ -470,7 +470,7 @@ for _ok, _what in (
     (BODY_REAR_FACE_FROM_F == 0.0, "the collar has no axial reaction at the 12T front face"),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-PD-022: {_what}")
+        raise AssertionError(f"MHA-PD-22: {_what}")
 
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the callout states the requirement, not a method; the
 # native +0.012/0.000 band already prints the curved portion's H7.
@@ -490,7 +490,7 @@ FIT_UP_OFFSET_SET_TOL = 0.05
 FIT_UP_OFFSET_SET_TEXT = f"{FIT_UP_OFFSET_TARGET:.2f} \u00b1{FIT_UP_OFFSET_SET_TOL:.2f}"
 # Procedure (7): a stud end standing proud of the thumbnut's rim is cut this
 # far below the rim and re-chamfered 45 degrees to the thread minor (the
-# MHA-PD-008 tip form).
+# MHA-PD-08 tip form).
 STUD_CUT_BELOW_RIM = (0.3, 1.0)
 STUD_RECHAMFER_DEG = 45
 STUD_CUT_PHRASE = (
@@ -533,7 +533,7 @@ THUMBNUT_ENGAGEMENT_WORST = min(
 )
 if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
     raise AssertionError(
-        f"MHA-PD-013 thumbnut / MHA-PD-008 stud: {THUMBNUT_ENGAGEMENT_WORST:.3f} of full "
+        f"MHA-PD-13 thumbnut / MHA-PD-08 stud: {THUMBNUT_ENGAGEMENT_WORST:.3f} of full "
         f"thread ({THUMBNUT_ENGAGEMENT_WORST / THREAD_MAJOR:.2f} D) at the worst "
         f"setting, under {ENGAGEMENT_FLOOR_D} D"
     )
@@ -543,7 +543,7 @@ if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
 NUT_CORE_STEP_AIR = LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN - _CORE_FRONT_MAX
 if NUT_CORE_STEP_AIR <= 0.0:
     raise AssertionError(
-        f"MHA-PD-013 thumbnut / MHA-PD-008 core step: at the rearward stop the nut "
+        f"MHA-PD-13 thumbnut / MHA-PD-08 core step: at the rearward stop the nut "
         f"seat {LENGTH_FITTED_MIN + PILOT_LENGTH_FITTED_MIN:.3f} reaches the core step "
         f"{_CORE_FRONT_MAX:.3f} ({NUT_CORE_STEP_AIR:+.3f})"
     )
@@ -551,7 +551,7 @@ if NUT_CORE_STEP_AIR <= 0.0:
 NUT_RELIEF_RADIAL_AIR = (NUT_MINOR_MIN - RELIEF_DIA_MAX) / 2.0
 if NUT_RELIEF_RADIAL_AIR <= 0.0:
     raise AssertionError(
-        f"MHA-PD-013 thumbnut / MHA-PD-008 thread relief: the nut's 2B minor "
+        f"MHA-PD-13 thumbnut / MHA-PD-08 thread relief: the nut's 2B minor "
         f"Ø{NUT_MINOR_MIN:.3f} reaches the relief Ø{RELIEF_DIA_MAX:.3f}"
     )
 
@@ -563,8 +563,8 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
 # thumbnut, forward only (the collar body is its rear stop), and K-1 sets the
 # knob's end float on a feeler at fit-up, so it no longer carries the
 # journal, ring and hub-to-boss bands (contract: 0..0.35).  R9-71: the
-# MHA-VN-049 spring holds the arm on the MHA-PD-020 spacer, which is pressed on the
-# MHA-VN-041 shoulder, so the hanger has no end play and its tilt is fixed in
+# MHA-PD-VN-63 spring holds the arm on the MHA-PD-20 spacer, which is pressed on the
+# MHA-PD-VN-57 shoulder, so the hanger has no end play and its tilt is fixed in
 # the bar's frame, where the fit-up reads it:
 # -0.3103 - 0.25 - 0.25 - 0.15 = -0.9603 .. +0.05.
 CHAIN_OFFSET_LIMIT = 1.0
@@ -632,7 +632,7 @@ FIT_UP_NOTE = "\n".join(
 # exception no longer exists. The drawing numbers these 1 and 2 and appends the
 # two fitted lengths as notes 3 and 4 with their assembly steps
 # (draw_pd_transgear_drive_collar.FIT_NOTES).
-# Pending exception ruling: MHA-PD-022 collar rim (#1381).
+# Pending exception ruling: MHA-PD-22 collar rim (#1381).
 DRAWING_NOTES = "\n".join(
     (
         f"1. DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",

@@ -36,7 +36,7 @@ def test_arm_is_a_matched_receiver_for_the_separate_hub() -> None:
     # one interference the hub sheet states (#984 review r1: an acceptance).
     low, high = geometry.SEAT_PRESS_INTERFERENCE
     assert f"{low:.3f}-{high:.3f}" in notes.HUB_SEAT_CALLOUT
-    assert "MHA-DT-031" in notes.HUB_SEAT_CALLOUT
+    assert "MHA-DT-31" in notes.HUB_SEAT_CALLOUT
     assert "MATCH" not in notes.HUB_SEAT_CALLOUT
     assert "FACES FLUSH" in notes.HUB_SEAT_CALLOUT
     assert not hasattr(spec, "SHAFT_BORE_DIA")
@@ -89,11 +89,11 @@ def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
 
 def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     general = spec.DRAWING_NOTES
-    assert "MHA-VN-029" not in general and "O'CLOCK" not in general
-    assert "MHA-DT-009" not in general
+    assert "MHA-DT-VN-59" not in general and "O'CLOCK" not in general
+    assert "MHA-DT-09" not in general
     assert "DIMPLE" not in general
     seam = notes.SEAM_CALLOUT
-    assert "MHA-DT-031" in seam and "MHA-VN-029" in seam and "LIGHT DRIVE FIT" in seam
+    assert "MHA-DT-31" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -137,7 +137,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
     assert drive.CRANK_ARM_ORIGIN_Z == -175.0
-    # MHA-DT-009 moved 1.6 inboard with the drawing-guidelines.md rule 17 (walls and webs) hub station (13.6).
+    # MHA-DT-09 moved 1.6 inboard with the drawing-guidelines.md rule 17 (walls and webs) hub station (13.6).
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     # The hub rear reaches the removable: 0.7 air to its front face.
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
@@ -159,7 +159,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:
     import dt_crank_pin_eye_spec as eye
-    import vn_fillister_screw_spec as screw
+    import _mcmaster_90114a511 as screw
 
     wire_front = drive.EYE_Z - eye.WIRE_DIA / 2.0
     wire_back = drive.EYE_Z + eye.WIRE_DIA / 2.0
@@ -178,7 +178,7 @@ def test_part_registry_retains_make_critical_properties() -> None:
     import _config
 
     part = _config.parts("dt-crank-arm")
-    assert part["number"] == "MHA-DT-006"
+    assert part["number"] == "MHA-DT-06"
     assert part["material"] == part["material_specification"]
     assert part["finish"]
     assert int(part["quantity"]) == 1
@@ -199,7 +199,7 @@ def test_notes_and_seat_callout_stay_inside_their_sheet_regions() -> None:
 def test_hub_end_callouts_stand_in_a_row_without_crossing_leaders() -> None:
     char_w = 0.0026  # measured on the U29 render
     scale = drawing.SHEET_SCALE[0] / 1000.0
-    # The seam pick lies on the arm's half of the MHA-VN-029 circle.
+    # The seam pick lies on the arm's half of the MHA-DT-VN-59 circle.
     seam_x = drawing._sheet_x(spec.AXIAL_PIN_X)
     x, y = drawing.SEAM_EDGE_PICK
     r = spec.AXIAL_PIN_DIA / 2.0 * scale
@@ -261,7 +261,7 @@ def test_hub_seat_keeps_its_printed_band_under_the_fit_note() -> None:
     # The 2026-09-23 review printed the bore as a reference so the note alone
     # governed.  Main 2026-09-25 (U29 follow-up): the bore is made first, so
     # its .X band is the cheek's real limit and stays printed; the note states
-    # the fit MHA-DT-031 is turned to (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): retained limits still apply).
+    # the fit MHA-DT-31 is turned to (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): retained limits still apply).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hub seat nominal" not in source
     assert spec.DRAWING_PRECISION["HubSeatProfile"]["HubSeatDia"] == 1
@@ -318,13 +318,13 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
     assert not hasattr(spec, "PIVOT_ENGAGEMENT_NOTE")
     assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
     assert spec.STOCK_NOTE in spec.DRAWING_NOTES.splitlines()
-    # The tapped mouth's limit (MHA-DT-032 shoulder seat, local review of
+    # The tapped mouth's limit (MHA-DT-32 shoulder seat, local review of
     # fbf82ad96) rides the pivot's own callout, not a general note (#984 r1).
     import dt_crank_handle_pivot_screw_spec as screw
 
     assert "MOUTH" not in spec.DRAWING_NOTES
     assert f"{screw.TAPPED_MOUTH_DIA_MAX:.1f} MAX" in notes.PIVOT_TAP_ROWS
-    assert "MHA-DT-032" in notes.PIVOT_TAP_ROWS
+    assert "MHA-DT-32" in notes.PIVOT_TAP_ROWS
 
 
 def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
@@ -348,7 +348,7 @@ def test_stock_line_comes_from_the_one_stock_constant() -> None:
 
 
 def _thinnest_accepted_arm() -> float:
-    """The thinnest MHA-DT-006 an inspector reading this sheet would accept.
+    """The thinnest MHA-DT-06 an inspector reading this sheet would accept.
 
     A toleranced 8.0 takes the title block's .X band. A reference (8.0) under
     the "AS SUPPLIED" stock line leaves the bar's own mill tolerance.

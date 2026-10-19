@@ -1,0 +1,19 @@
+sm-vn-knife-hanger-stud:
+  title: Knife-Hanger Bolt
+  number: MHA-SM-VN-52
+  stock_name: Knife-Hanger Bolt (18-8 Stainless Hex Screw, Cut to Length)
+  supplier: McMaster-Carr
+  supplier_skus: [92314A253]
+  material: 18-8 STAINLESS (AS SUPPLIED)
+  material_specification: "18-8 stainless steel, McMaster-Carr 92314A253"
+  finish: AS SUPPLIED; DEBURR CUT END
+  purchased_note: PURCHASED SCREW McMASTER 92314A253; HEAD UNMODIFIED
+  installation_notes: |-
+    INSTALLATION - MHA-FR-02 CROSSBAR FACED TOP
+    ONE MHA-SM-VN-54 FLAT WASHER BETWEEN HEX HEAD AND FACED TOP.
+    THREAD INTO THE MHA-SM-02 #10-24 TOP-SEAT TAP;
+    DRAW THE MOUNT SEAT UP TO THE CROSSBAR UNDERSIDE.
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

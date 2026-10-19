@@ -37,7 +37,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Lines kept short so the left-anchored block clears the elevation and title
 # block; it grows DOWNWARD. The plug belongs to this brazed weldment, while the
-# made MHA-SM-004 spring screw and spring-eye clamping instructions belong to
+# made MHA-SM-04 spring screw and spring-eye clamping instructions belong to
 # the assembly package.
 DRAWING_NOTES = "\n".join(
     (
@@ -61,7 +61,7 @@ DRAWING_NOTES = "\n".join(
         f"   DRILL WANDER {DRILL_WANDER_MAX:.2f} MAX; SQUARE TO END FACE.",
         f"   BREAK BOTH TAP ENDS {EDGE_BREAK:.2f} X 45 DEG.",
         f"   FULL THREAD {ENGAGEMENT_NOMINAL:.2f} NOMINAL; {ENGAGEMENT_MIN:.2f} MIN.",
-        "5. MHA-SM-004 SPRING SCREW: MADE SEPARATELY;",
+        "5. MHA-SM-04 SPRING SCREW: MADE SEPARATELY;",
         "   NOT INCLUDED IN THIS WELDMENT. SEE ASSEMBLY.",
         "6. BEND OVALITY 5% MAX; NO FLATS, KINKS OR CRACKS.",
         "7. PLATE ALL SURFACES; NO MASKING. DIMS PRE-PLATE.",

@@ -1,7 +1,7 @@
 r"""McMaster 92916A480 -- brass washer for #10 screw, ID 0.200 x OD 0.438 in.
 
-Used as vn-wheel-axle-back-washer (MHA-VN-057).  The catalogue facts and the part frame
-are ``vn_wheel_axle_back_washer_spec``'s.  The model is one Top-plane ID x OD annulus
+Used as mg-vn-wheel-axle-back-washer (MHA-MG-VN-54).  The catalogue facts and the part frame
+are ``mg_vn_wheel_axle_back_washer_spec``'s.  The model is one Top-plane ID x OD annulus
 extruded blind MODEL_THICKNESS (the catalogue range's nominal) along +Y from
 the y = 0 face.  The production build turns the body so the recipe's +Y is
 the part frame's +Z.
@@ -33,7 +33,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_wheel_axle_back_washer_spec import (  # noqa: E402
+from mg_vn_wheel_axle_back_washer_spec import (  # noqa: E402
     ID,
     MODEL_THICKNESS,
     OD,

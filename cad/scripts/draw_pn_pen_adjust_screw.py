@@ -376,7 +376,7 @@ async def build(adapter: Any) -> dict[str, str]:
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-PN-007 {name}", diameter=True
+            adapter, by_name[name], label=f"MHA-PN-07 {name}", diameter=True
         )
     _dress_shoulder_radius(adapter, drawing_model, by_name, spt)
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):

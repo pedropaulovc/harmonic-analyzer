@@ -161,7 +161,7 @@ def test_collar_press_seat_is_native_and_reads_the_press_contract() -> None:
     budget = press.PRESS_FIT_BUDGET
     assert bore_callout == (
         f"REAM OR HONE THRU: {budget['interference_min']:.3f}-"
-        f"{budget['interference_max']:.3f}\nDIAMETRAL INTERFERENCE ON\nMHA-MG-003 LEVER"
+        f"{budget['interference_max']:.3f}\nDIAMETRAL INTERFERENCE ON\nMHA-MG-03 LEVER"
     )
     assert (budget["interference_min"], budget["interference_max"]) == (
         press.PRESS_INTERFERENCE_LIMITS
@@ -368,7 +368,7 @@ def test_part_stamps_make_critical_properties() -> None:
     assert "fit_class" not in config
     assert "1018 cold-drawn solid stock" in config["process"]
     assert "reamed or honed to Ra 0.8" in config["process"]
-    assert "press seat for the MHA-MG-003 lever rod" in config["process"]
+    assert "press seat for the MHA-MG-03 lever rod" in config["process"]
 
 
 def test_pressed_bore_ra_is_a_declared_owner_exception() -> None:
@@ -481,7 +481,7 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     assert 'label="two bracket mounting holes"' in source
     assert not drawing.MOUNTING_HOLE_PROCESS.endswith("\n")
     *rows, process = drawing.MOUNTING_HOLE_PROCESS.split("\n")
-    assert rows == ["MATCHES MHA-SM-003", "SUMMING LEVER TAPS"]
+    assert rows == ["MATCHES MHA-SM-03", "SUMMING LEVER TAPS"]
     assert process == "DRILL"
     assert joint.CLEARANCE_SPEC.kind == "clearance"  # a drilled clearance hole
     # No trailing break: the process word joins the native size row with one
@@ -494,7 +494,7 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     assert joint.TAP_SPEC.size == "#2-56"
     # The mate is the summing lever, by number (its own part config).
     import _config
-    assert _config.parts("sm-summing-lever")["number"] == "MHA-SM-003"
+    assert _config.parts("sm-summing-lever")["number"] == "MHA-SM-03"
     # Two mate rows over the drilled size row: three physical rows.
     assert 1 + len(rows) == 3
     assert "MOUNTING FACE" in drawing.SECTION_CALLOUTS["SeatToAxis"]
@@ -505,7 +505,7 @@ def test_hole_callout_rides_the_aligned_bottom_view_and_names_its_mate() -> None
     # centred on the requested x, the block centred 1 mm under the requested
     # y (baselines 58.8, 53.25, 47.7 mm), the elbow on the lowest baseline
     # 1.6 mm before the WIDEST row's near end ((134.8, 47.6) mm, "MATCHES
-    # MHA-SM-003" 51.2 mm over x 136.4..187.6 mm), the leader from that
+    # MHA-SM-03" 51.2 mm over x 136.4..187.6 mm), the leader from that
     # elbow to the hole.  The mate rows print 2.85 mm per letter; the native
     # size row printed 45.1 mm and "DRILL " widens it 11.0..13.5 mm, so it is
     # the widest row now.  Two row pitches plus a cap height bound the block.
@@ -1195,7 +1195,7 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     length reads above the collar it measures (front view +Z runs down:
     collar top at y 212.1 mm pre-A1), named along the bore axis.  Machinist
     review r1 blocker: the 0/-0.05 band named no stack -- the callout names
-    the MHA-MG-003 lever's press zone, whose MIN length from the rod's tip
+    the MHA-MG-03 lever's press zone, whose MIN length from the rod's tip
     must cover the longest collar (the rod's dome tip ends flush with the
     collar's outer face, so the band bounds the press contact the force
     budget uses).
@@ -1204,7 +1204,7 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     baseline); the stack row makes four, so the value rose one row pitch.
     Machinist review r2: r3b then printed the stack's "0.00" upper limit
     against the drawable top, so the block sits 1.5 mm lower.  r4 (rule 14):
-    centred over the collar's own span the arrows sat under "MHA-MG-003" and
+    centred over the collar's own span the arrows sat under "MHA-MG-03" and
     the witnesses ran up into it; the block hangs right of the span instead,
     its near end over a text height clear of the east witness."""
     import mg_lever_press_fit_geom as press
@@ -1212,7 +1212,7 @@ def test_collar_length_reads_banded_on_its_own_feature_and_names_its_stack() -> 
     callout = drawing.DIMENSION_CALLOUTS["CollarLen"]
     assert callout is mg_magnifying_bracket_spec.COLLAR_LENGTH_CALLOUT
     assert "ALONG BORE AXIS" in callout
-    assert "MHA-MG-003 LEVER PRESS ZONE" in callout
+    assert "MHA-MG-03 LEVER PRESS ZONE" in callout
     assert (
         press.COLLAR_LENGTH + press.COLLAR_LENGTH_BAND[0] <= press.PRESS_ZONE_LENGTH
     )
@@ -1293,12 +1293,12 @@ def test_flange_depth_block_clears_the_flange_width_block() -> None:
     the flange width's callout row (bottom y 211.4 mm), and the audit reads two
     blocks within a text height (3.57 mm) as one dimension.  Machinist review
     r2: the .XXX depth named no function -- three rows now name the
-    MHA-VN-050 screws' grip it holds.  r3b measured an untoleranced block's
+    MHA-MG-VN-53 screws' grip it holds.  r3b measured an untoleranced block's
     value row (rows - 2) half pitches over the requested y (2 rows +0, 3
     rows +2.78 mm, 4 rows +5.56 mm) and the depth's rows centred with their
     near end on its column (x 53 mm)."""
     rows = drawing.DIMENSION_CALLOUTS["FlangeDepth"].splitlines()
-    assert rows == ["FLANGE DEPTH", "MHA-VN-050", "SCREW GRIP"]
+    assert rows == ["FLANGE DEPTH", "MHA-MG-VN-53", "SCREW GRIP"]
     depth_x, depth_y = drawing.FRONT_KEEP["FlangeDepth"]
     width_x, width_y = drawing.FRONT_KEEP["FlangeWidth"]
     value_y = depth_y + (1 + len(rows) - 2) * ROW_PITCH / 2.0
@@ -1326,7 +1326,7 @@ def test_flange_depth_block_clears_the_flange_width_block() -> None:
 
 def test_flange_depth_names_the_screw_grip_its_third_place_holds() -> None:
     """Machinist review r2 (over-specification): 3.175 FLANGE DEPTH printed
-    .XXX with no stated function.  The flange is the MHA-VN-050 screws'
+    .XXX with no stated function.  The flange is the MHA-MG-VN-53 screws'
     grip; its title-block .XXX band (±0.13) keeps the worst-case thread
     engagement at 1.5D and the screw tips off the tap's bottom, which the
     .XX band (±0.51) would not.  The callout names that function from the
@@ -1334,8 +1334,8 @@ def test_flange_depth_names_the_screw_grip_its_third_place_holds() -> None:
     import _config
     import magnifying_bracket_joint_layout as joint
 
-    screw = _config.parts("vn-magnifying-bracket-screw")["number"]
-    assert screw == mg_magnifying_bracket_spec.SCREW_NUMBER == "MHA-VN-050"
+    screw = _config.parts("mg-vn-magnifying-bracket-screw")["number"]
+    assert screw == mg_magnifying_bracket_spec.SCREW_NUMBER == "MHA-MG-VN-53"
     callout = drawing.DIMENSION_CALLOUTS["FlangeDepth"]
     assert callout is mg_magnifying_bracket_spec.FLANGE_DEPTH_CALLOUT
     assert callout == f"FLANGE DEPTH\n{screw}\nSCREW GRIP"

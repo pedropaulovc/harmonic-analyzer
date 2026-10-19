@@ -12,7 +12,7 @@ PR7 (review item 14): ONLY the drum is brass -- the integral
 Ø6.35 stubs are retired for a separate thicker STEEL arbor
 (build_dt_pinion_arbor.py, Ø8) bonded in the drum's slip-fit through-bore;
 the arbor rides the swing brackets' top bores and carries its integral turned
-grip head plus the separate MHA-DT-015 crossrod. The knurled end collars are simplified
+grip head plus the separate MHA-DT-15 crossrod. The knurled end collars are simplified
 away.
 
 Layout: axis Z, drum z 0..143.2, Ø8 through-bore on the axis.
@@ -88,7 +88,7 @@ MATERIAL = "Brass"  # p.67: brass drum, same finish as the cylinder train
 # drum 0.3 aft and the fit-up stack (#854) put it 0.25 further aft.  The
 # released +68.2 shaved that face (Appendix C). The retired cone-knob
 # post no longer caps the free back reach. The brass drum's bore matches the
-# separate MHA-DT-022 steel arbor.
+# separate MHA-DT-22 steel arbor.
 
 BORE_R = BORE_DIA / 2.0
 # Sketch-only length of the tip-diameter witness stub (OutsideDiaReference).

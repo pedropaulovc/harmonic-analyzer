@@ -1,4 +1,4 @@
-r"""Rocker strap (MHA-CH-013) drawing-only data: the marked-dimension and
+r"""Rocker strap (MHA-CH-13) drawing-only data: the marked-dimension and
 precision contract, the callouts, and the notes the part build stamps into
 the SLDPRT.
 
@@ -90,7 +90,7 @@ TIP_LAND_PREFIX = "2X "
 
 # The hole's two edges stay sharp, overriding the title block's R0.25 /
 # C0.25 break for this hole only: a break would leave a ring groove round the
-# pressed hub's root, where MHA-CH-006 prints the hub-to-strap root as
+# pressed hub's root, where MHA-CH-06 prints the hub-to-strap root as
 # "2X R0.2 MAX" (a corner, not a groove). Its reason row answers the r1
 # machinist review (an unexplained override on a press-fit bore reads as
 # arbitrary, rule 7); it follows the fit rows, which name the hub.

@@ -1,4 +1,4 @@
-r"""Axial stack of the gears on the cone gear shaft (MHA-DT-004).
+r"""Axial stack of the gears on the cone gear shaft (MHA-DT-04).
 
 SolidWorks-free and GEOMETRY ONLY, like ``cylinder_bank_layout``: no drawing
 notes, no title-block reads, so a print-wording edit can never re-key a part.
@@ -7,12 +7,12 @@ The cone set is a SOLID STACK (user ruling 2026-09-28).  No gear is bonded:
 each slides onto its D-flat land (``gear_seat_fit``) and bears on the one
 before it, so the stack itself sets every station.
 
-* The 64T (MHA-DT-007) bears on MHA-DT-004's thrust collar and grows NORTH to meet
+* The 64T (MHA-DT-07) bears on MHA-DT-04's thrust collar and grows NORTH to meet
   T120: its south face stays where the v36 post put it (crank_boss_rim).
-* Each cone gear (MHA-DT-003) is one seat pitch thick, grown SOUTH from the
+* Each cone gear (MHA-DT-03) is one seat pitch thick, grown SOUTH from the
   north face every station was laid out on, so T120 bears on the 64T and
   each gear on the one before it, T006 last.
-* The MHA-VN-016 stack collar is set one feeler off T006's north face and
+* The MHA-DT-VN-54 stack collar is set one feeler off T006's north face and
   locked on the shaft, retaining the stack's float (cone_stack_end_play).
 * Every gear face prints +/-0.025 (the cylinder bank's L20 d' rule, user
   ruling 2026-09-28).  A fit-up acceptance on the measured 20-gear stack

@@ -1,4 +1,4 @@
-r"""Rod pivot pin (MHA-CH-010) drawing-only data: the marked-dimension and
+r"""Rod pivot pin (MHA-CH-10) drawing-only data: the marked-dimension and
 precision contract, the journal's callout and the manufacturing note the part
 build stamps into the SLDPRT.
 
@@ -64,12 +64,12 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 PIN_DIA_CALLOUT = "\n".join(
     (
         "STOCK OK",
-        "PRESS FIT IN MHA-CH-003 FORK HOLE",
-        "RUNNING FIT IN MHA-CH-006 #47 HOLE",
+        "PRESS FIT IN MHA-CH-03 FORK HOLE",
+        "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     )
 )
 
 DRAWING_NOTES = (
-    "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"
+    "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-03"
     " FORK FACES AT ASSEMBLY, NEVER PROUD."
 )

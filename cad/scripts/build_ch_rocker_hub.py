@@ -1,11 +1,11 @@
-r"""Reproduction script: rocker hub (MHA-CH-012; 20 used, one per rocker arm).
+r"""Reproduction script: rocker hub (MHA-CH-12; 20 used, one per rocker arm).
 
-The turned 1018 hub of the built-up rocker arm MHA-CH-006
+The turned 1018 hub of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``), as SUPPLIED to the joint
 (``ch_rocker_hub_spec``): the Ø10.20 land at its finished size with the r6
-press band on the MHA-CH-013 strap's H7 hole (``ch_rocker_hub_fit``), the bore
+press band on the MHA-CH-13 strap's H7 hole (``ch_rocker_hub_fit``), the bore
 drilled under the finished ream and the length left long, both finished on the
-joined part to the MHA-CH-006 print.
+joined part to the MHA-CH-06 print.
 
 Layout: Front-plane annulus at the origin (land, bore) extruded mid-plane, so
 the hub's own mid-plane is the Front plane, as the rocker's integral hub is.

@@ -23,7 +23,7 @@ from pd_latch_hook_geometry import BAR_CENTRE_Y
 import pd_platen_spec as platen
 import pd_latch_hook_geometry as hook
 import pd_transgear_pivot_spacer_spec as spacer
-import vn_transgear_latch_pin_spec as latch_pin
+import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_latch_hook_spec as hook_spec
 import mg_magnifying_wheel_geom
 import mg_wheel_bar_geom

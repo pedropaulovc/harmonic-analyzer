@@ -1,14 +1,14 @@
 r"""Create the curated machinist drawing for the crank handle.
 
 A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
-brass ferrule MHA-DT-034 and the steel butt cup MHA-DT-035 are separate parts, so
+brass ferrule MHA-DT-34 and the steel butt cup MHA-DT-35 are separate parts, so
 this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
 flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
 round crests on a flat oak end round the cup bonded into its counterbore
 (user rulings 2026-09-30, concept v4).
 
 The sheet is plain (user ruling 2026-09-29): no datums, feature-control frames
-or basic dimensions, and no general notes (MHA-DT-008 machinist review of
+or basic dimensions, and no general notes (MHA-DT-08 machinist review of
 2026-10-18).  The longitudinal section A-A, taken on the end view's vertical
 centre line, is the handle's length view (drawing-guidelines.md rule 11
 (turned parts read like the lathe)): the profile, the reamed bore and the
@@ -116,7 +116,7 @@ VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / 1000.0
 
 # The section lays the handle axis horizontal, tenon at the left and butt at
-# the right (the part's +X to the right, as MHA-DT-035's section shows), centred
+# the right (the part's +X to the right, as MHA-DT-35's section shows), centred
 # on the oak's extent.  The end view stands on the same axis height.  The axis
 # sits low enough that the S-curve's concave centre (26.4 above it) falls
 # under the long station rows, so its radius line crosses none of them.
@@ -255,7 +255,7 @@ def _style_radius(adapter: Any, annotation: Any, *, name: str, reference: bool) 
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.Diametric):
-        raise RuntimeError(f"MHA-DT-008 {name} imported as a diameter")
+        raise RuntimeError(f"MHA-DT-08 {name} imported as a diameter")
     if reference:
         existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
         prefix = "(" + existing
@@ -264,7 +264,7 @@ def _style_radius(adapter: Any, annotation: Any, *, name: str, reference: bool) 
         applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         _telemetry.info(f"{name}: radial reference prefix {existing!r} -> {applied[0]!r}")
         if applied != (prefix, ")"):
-            raise RuntimeError(f"failed to mark MHA-DT-008 {name} as a reference: {applied}")
+            raise RuntimeError(f"failed to mark MHA-DT-08 {name} as a reference: {applied}")
     display.ArcExtensionLineOrOppositeSide = False
     display.ArrowSide = _ARROWS_OUTSIDE
     display.SolidLeader = False
@@ -273,7 +273,7 @@ def _style_radius(adapter: Any, annotation: Any, *, name: str, reference: bool) 
         or int(display.ArrowSide) != _ARROWS_OUTSIDE
         or bool(display.SolidLeader)
     ):
-        raise RuntimeError(f"MHA-DT-008 {name} kept its leader to the arc's centre")
+        raise RuntimeError(f"MHA-DT-08 {name} kept its leader to the arc's centre")
 
 
 def _dress_inside_corner(adapter: Any, annotation: Any, *, name: str) -> None:
@@ -290,24 +290,24 @@ def _dress_inside_corner(adapter: Any, annotation: Any, *, name: str) -> None:
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     if bool(display.Diametric):
-        raise RuntimeError(f"MHA-DT-008 {name} imported as a diameter")
+        raise RuntimeError(f"MHA-DT-08 {name} imported as a diameter")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if int(tolerance.Type) != INSIDE_CORNER_R_TOL_TYPE:
         raise RuntimeError(
-            f"MHA-DT-008 {name} lost its native MAX type: {int(tolerance.Type)}"
+            f"MHA-DT-08 {name} lost its native MAX type: {int(tolerance.Type)}"
         )
     if not math.isclose(
         float(dimension.SystemValue), INSIDE_CORNER_R_MAX / 1000.0, abs_tol=1e-9
     ):
-        raise RuntimeError(f"MHA-DT-008 {name} does not measure the inside corner")
+        raise RuntimeError(f"MHA-DT-08 {name} does not measure the inside corner")
     callout = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
     if callout != DIMENSION_CALLOUTS[name]:
-        raise RuntimeError(f"MHA-DT-008 {name} callout did not persist: {callout!r}")
+        raise RuntimeError(f"MHA-DT-08 {name} callout did not persist: {callout!r}")
     extension = INSIDE_CORNER_ARC_EXTENSION[name]
     display.ArcExtensionLineOrOppositeSide = extension
     if bool(display.ArcExtensionLineOrOppositeSide) is not extension:
-        raise RuntimeError(f"MHA-DT-008 {name} refused its arc extension setting")
+        raise RuntimeError(f"MHA-DT-08 {name} refused its arc extension setting")
     _telemetry.info(
         f"{name}: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
     )
@@ -387,7 +387,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter,
             front_by_name[name],
-            label=f"MHA-DT-008 {name}",
+            label=f"MHA-DT-08 {name}",
             diameter=name.endswith("Dia"),
         )
     for name in RADII:

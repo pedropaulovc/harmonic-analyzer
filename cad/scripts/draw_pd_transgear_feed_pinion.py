@@ -1,4 +1,4 @@
-r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-010).
+r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-10).
 
 An end view, a longitudinal section B-B, a rear-face view and an isometric
 at 3:1 (the section takes B: A names the bore datum). The end view carries

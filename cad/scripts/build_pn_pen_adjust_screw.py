@@ -1,7 +1,7 @@
 r"""Reproduction script: pen-height adjuster stud (engineerguy 4/4, 9:15-10:34).
 
 A turned brass stud (pn_pen_adjust_screw_spec): its #0-80 thread runs into
-the pen rod's top tap and carries the brass jam nut (vn-pen-adjust-nut); the
+the pen rod's top tap and carries the brass jam nut (pn-vn-pen-adjust-nut); the
 eye head above it is cross-drilled for the pen wire. Screwing the stud in or
 out sets the pen height against the wire.
 

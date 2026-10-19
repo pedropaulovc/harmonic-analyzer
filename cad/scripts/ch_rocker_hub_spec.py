@@ -1,13 +1,13 @@
-r"""Rocker hub (MHA-CH-012): the turned hub of the built-up rocker arm, as supplied.
+r"""Rocker hub (MHA-CH-12): the turned hub of the built-up rocker arm, as supplied.
 
-PURE DATA, no SolidWorks/COM imports. MHA-CH-006 may be built up
+PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): this hub is pressed into
-the strap MHA-CH-013 (``ch_rocker_hub_fit``), then the joined part's bore is
-reamed and its hub length faced to the MHA-CH-006 print. So this detail is
+the strap MHA-CH-13 (``ch_rocker_hub_fit``), then the joined part's bore is
+reamed and its hub length faced to the MHA-CH-06 print. So this detail is
 the hub as SUPPLIED to the joint: the land at its finished Ø with the r6
 press band, the bore and the length left with stock (drawing-guidelines.md
 rule 19: a supply size, finished later). The finished bore and length print on
-MHA-CH-006 only; this sheet never repeats them.
+MHA-CH-06 only; this sheet never repeats them.
 
 Every size derives from ``ch_rocker_arm_spec``; the two stock allowances below
 are the only new numbers.
@@ -28,9 +28,9 @@ from ch_rocker_arm_spec import (
 )
 from ch_rocker_hub_fit import HUB_LAND_BAND
 
-NUMBER = "MHA-CH-012"
-STRAP_NUMBER = "MHA-CH-013"
-ROCKER_NUMBER = "MHA-CH-006"
+NUMBER = "MHA-CH-12"
+STRAP_NUMBER = "MHA-CH-13"
+ROCKER_NUMBER = "MHA-CH-06"
 
 # The land: the finished hub O.D., pressed in the strap's H7 hole.
 LAND_DIA = HUB_DIA

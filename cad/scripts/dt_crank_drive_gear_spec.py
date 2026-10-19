@@ -45,11 +45,11 @@ TEETH = 64
 # straight 16T mate shares the configured normal-pitch cutter system.
 HELIX_ANGLE_DEG = cone_line.INCLINE_DEG
 
-# Face width.  The v36 MHA-DT-005 casting is restored: its crank boss's north
+# Face width.  The v36 MHA-DT-05 casting is restored: its crank boss's north
 # face is the collar's tangent plane again, so the 64T's SOUTH face -- seated
-# on MHA-DT-004's thrust collar -- stays where the #1126 ruling put it, 1.5 north
+# on MHA-DT-04's thrust collar -- stays where the #1126 ruling put it, 1.5 north
 # of the 8.0 face the 19.9 station was laid out on (crank_boss_rim holds every
-# MHA-DT-005 north feature off it).  The cone set is a solid stack (user ruling
+# MHA-DT-05 north feature off it).  The cone set is a solid stack (user ruling
 # 2026-09-28, dt_cone_gear_stack): the 64T grows NORTH until it bears on T120's
 # grown south face, so its face is the gap between the collar and T120,
 # floored to the four places it prints.  dt_cone_gear_stack pins the two faces
@@ -130,7 +130,7 @@ GEAR_DATA_REFERENCE_PLACES = 3
 # gears' blanks.  The mesh runs at a fixed centre with no adjustment (user
 # ruling 2026-09-28): ``crank_mesh_stack`` books this band as the tip-to-root
 # term of its closing corner (TIP_ROOT_BAND_RADIAL), and crank_boss_rim grows
-# the tip by half of it toward MHA-DT-005.
+# the tip by half of it toward MHA-DT-05.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
 # Critical tooth-cutting setup, indicated to the finished bore. This process
 # limit is shared by both shop gears; it is not an AGMA/form accuracy class.
@@ -248,7 +248,7 @@ STOCK_PROFILE_CORNERS = tuple(
     )
 )
 
-# The Ø9.525 round portion of MHA-DT-004's Sec1 gear seat. This shared spec
+# The Ø9.525 round portion of MHA-DT-04's Sec1 gear seat. This shared spec
 # owns its nominal, round slide-fit clearance and D-flat AF band without
 # pulling the part builder into drawing recipes.
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525
@@ -267,14 +267,14 @@ BORE_DIAMETRAL_CLEARANCE = (
 if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
     raise AssertionError("64T bore lost its round slide-fit clearance")
 
-# One D-flat on local +X, paired with MHA-DT-004 Sec1. Across-flat is measured
+# One D-flat on local +X, paired with MHA-DT-04 Sec1. Across-flat is measured
 # from this plane to the opposite circular wall, not from the gear centre.
 BORE_AF = cone_shaft_land_bands.SECTION_FLAT_AF[1]
 BORE_AF_BAND = gear_seat_fit.flat_bore_af_band(cone_shaft_land_bands.FLAT_AF_BAND)
 if BORE_AF is None:
     raise AssertionError("the 64T needs the flatted Sec1 gear seat")
 
-# The MHA-DT-004 Sec1 flat stops square against its collar. A flat milled with
+# The MHA-DT-04 Sec1 flat stops square against its collar. A flat milled with
 # an end mill of at least Ø8 leaves an axial crescent at the chord corners.
 # At offset y from the flat midpoint its horn height above the flat is
 # sqrt(Rshaft²-y²)-flat_offset, and the cutter's axial runout is

@@ -14,12 +14,12 @@ The keeper is the black shaft-end bracket of the top-lever fulcrum bank
 + p008): a stubby straight L. Its upright round-topped lug sits right against
 the outermost lever hub and carries the plain Ø6.35 fulcrum shaft in a reamed
 bore; the shaft's domed end stands proud of the lug's outer face (the bright
-dome of the photo). One #1-72 cup-point set screw (MHA-VN-055), tapped down
+dome of the photo). One #1-72 cup-point set screw (MHA-CH-VN-55), tapped down
 through the crown top on the lug mid-plane, bears on the shaft's set-screw
 flat and fixes the shaft axially and in rotation. The short straight foot
 points OUTBOARD, away from the lever bank, and is screwed down into the
 top-frame rail top face with one slotted #2-56 fillister screw
-(frame-side-screw, MHA-VN-022) seated flush in a counterbore. 2 required, one
+(frame-side-screw, MHA-CH-VN-52) seated flush in a counterbore. 2 required, one
 per shaft end (the second is the same part flipped Ry180 by the assembly).
 
 Part frame: +X = along the shaft, OUTBOARD (away from the lever bank); +Y up
@@ -64,7 +64,7 @@ SHAFT_AXIS_H = 25.2  # shaft bore centre above the seat
 CROWN_R = 7.0  # full-round lug top about the shaft axis: KEEPER_WIDTH / 2
 FOOT_H = 8.0  # foot height; the bracket seats on y=0
 # Owner ruling Q11-B' (2026-10-16): the foot shortens 10.5 -> 8.5 so the
-# thicker lug leaves its tip where it was, clear of MHA-FR-002's corner
+# thicker lug leaves its tip where it was, clear of MHA-FR-02's corner
 # bosses (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS); it prints
 # .XX (FOOT_LENGTH_PLACES), as the .X band no longer clears the boss.
 FOOT_L = 8.5  # foot length outboard of the lug's outer face
@@ -82,7 +82,7 @@ CROWN_TOP_Y = SHAFT_AXIS_H + CROWN_R  # 32.2: the set-screw tap's entry
 # one flat, inner lug faces KEEPER_INNER_FACE_SPAN_MM apart as KEEPERS_SET_KEY
 # sets them, the bore axis set parallel to the flat. Both
 # bores are then one straight line across the whole span, and the acceptance
-# (the actual MHA-CH-004 shaft slides freely through both, still clamped)
+# (the actual MHA-CH-04 shaft slides freely through both, still clamped)
 # gauges that line itself. A setup tilt of the line to the flat costs no
 # clearance -- on any one plane both bores keep it, so the shaft just lies at
 # that tilt -- and a span error delta moves a bore only delta x tilt off it.
@@ -127,7 +127,7 @@ if not (
     and PAIR_REAMER_RANGE_MM[1] <= BORE_DIA_BAND[0]
 ):
     raise AssertionError("the pair reamer's toleranced size is off the bore band")
-# What the bench cannot see is the rail. Both foot seats on MHA-FR-002 lie
+# What the bench cannot see is the rail. Both foot seats on MHA-FR-02 lie
 # within one common zone KEEPER_SEAT_FLATNESS_BUDGET_MM thick (the frame's
 # machined keeper-seat note, which pins this constant). Inside it the seats
 # can stand the zone apart in height, roll
@@ -166,8 +166,8 @@ if BORE_DIA_BAND[1] - SHAFT_H[0] < (
 QUANTITY_NOTE = 2
 BORE_PAIR_CALLOUT = (
     "SUPPLIED UNDRILLED; PAIR-REAM WITH\n"
-    f"THE OTHER MHA-CH-007 (NOTE {QUANTITY_NOTE}) AT\n"
-    "INSTALLED SPACING; THE MHA-CH-004\n"
+    f"THE OTHER MHA-CH-07 (NOTE {QUANTITY_NOTE}) AT\n"
+    "INSTALLED SPACING; THE MHA-CH-04\n"
     "SHAFT SLIDES THROUGH BOTH"
 )
 # The crown is a full round tangent to both side faces (Main ruling B+,
@@ -178,7 +178,7 @@ BORE_PAIR_CALLOUT = (
 # (CROWN_LEAST_R below).
 CROWN_ROUND_CALLOUT = "FULL ROUND TANGENT TO BOTH\nSIDES, CENTER AT BORE HEIGHT"
 
-# --- Fit-up on the top frame (MHA-CH-000): the pair goes on with the shaft
+# --- Fit-up on the top frame (MHA-CH-00): the pair goes on with the shaft
 # through both bores and is set by DRO, the lug centres on the fulcrum line
 # within KEEPER_FITUP_X_BAND_MM and the lug INNER faces off the front column
 # socket each within KEEPER_FITUP_LOCATION_BAND_MM; the frame's keeper taps
@@ -207,7 +207,7 @@ KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
 
 # --- Foot screw: one #2 close-clearance drill + counterbore on the foot's
 # centre line, SCREW_FROM_TIP off its tip, for the #2-56 x 7/16 fillister
-# (MHA-VN-022, McMaster 91794A080: 0.14 x 0.083 head, 18-8 stainless; no
+# (MHA-CH-VN-52, McMaster 91794A080: 0.14 x 0.083 head, 18-8 stainless; no
 # #2-56 in the 90280A steel family). #2 rather than #4 so the frame's
 # transferred tap, on the keeper's centre line 2.9 off the frame web's
 # centre, keeps the drawing-guidelines.md rule 17 (walls and webs) ligament
@@ -215,7 +215,7 @@ KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM = tuple(
 # The station off the tip is the least that keeps the tip wall at 2.0
 # (FOOT_TIP_WALL_MM); the rest of the short foot goes to the lug side. ---
 FOOT_SCREW_THREAD = "#2-56"
-FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (vn_frame_side_screw_spec)
+FOOT_SCREW_LENGTH_MM = 11.1125  # 7/16 under the head (ch_vn_frame_side_screw_spec)
 SCREW_FROM_TIP = 4.5  # printed off the foot tip
 SCREW_X = FOOT_TIP_X - SCREW_FROM_TIP  # 8.0
 SCREW_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: printed off a side face
@@ -223,8 +223,8 @@ BORE_FROM_SIDE = KEEPER_WIDTH / 2.0  # 7.0: the bore's reference station off tha
 KEEPER_SCREW_Z_OFF = KEEPER_Z_OFF + SCREW_X  # 83.0: screw off the centre
 SCREW_CLEARANCE_SPEC = HoleSpec("clearance", "#2", fit="close")
 HOLE_DIA_MM = blind_cut_dia_mm(SCREW_CLEARANCE_SPEC)
-# Ø3.8 clears the Ø3.556 stock head (the MHA-VN-050 #2 counterbore); the
-# depth is the exact stock head height (vn_frame_side_screw_spec.HEAD_H,
+# Ø3.8 clears the Ø3.556 stock head (the MHA-MG-VN-53 #2 counterbore); the
+# depth is the exact stock head height (ch_vn_frame_side_screw_spec.HEAD_H,
 # pinned by the part build), so the head is flush.
 CBORE_DIA_MM = 3.8
 CBORE_DEPTH_MM = 2.1082
@@ -292,14 +292,14 @@ CROWN_MOST_R = CROWN_R + _CROWN_R_HALF_BAND  # 7.4
 # alone leaves too little: off the least round at 0.4 + 0.51 (.XX) the tap
 # keeps 1.43D, at the old 0.4 + 0.8 (.X) 1.38D. So the print holds the bore
 # on the width's centre plane, within +-BORE_CENTRE_BAND_MM
-# (BORE_CENTRE_CALLOUT on the (7.0) reference station, naming the MHA-VN-055
+# (BORE_CENTRE_CALLOUT on the (7.0) reference station, naming the MHA-CH-VN-55
 # set screw whose full thread the band keeps: MR-fleet r10 read a bare "crown
 # tap depth" as no mate), and the crown tap's stack below spends exactly that
 # offset: it keeps 1.5D up to +-0.37.
 BORE_CENTRE_BAND_MM = 0.3
 BORE_CENTRE_CALLOUT = (
     f"ON WIDTH CENTER \u00b1{BORE_CENTRE_BAND_MM:.1f},\n"
-    "HOLDS MHA-VN-055\nTHREAD ENGAGEMENT"
+    "HOLDS MHA-CH-VN-55\nTHREAD ENGAGEMENT"
 )
 
 
@@ -483,7 +483,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # FLAT_STATION_WINDOW_MM). The foot length takes two (FOOT_LENGTH_PLACES:
 # the frame's foot-to-boss stack, owner ruling Q11-B'). Three places carry a
 # stated function (rule 4): the
-# side station centres the transferred MHA-FR-002 tap in its rail web
+# side station centres the transferred MHA-FR-02 tap in its rail web
 # (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame). The references print
 # one place; the corner round prints its single limit at CORNER_R_PLACES, the
 # crown's radial reference the width's CROWN_R_PLACES and the supplied height
@@ -505,7 +505,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }
 # The function the three-place size serves, printed under it.
-FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-002\nTAP IN RAIL WEB"
+FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-02\nTAP IN RAIL WEB"
 if {f: set(names) for f, names in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
     raise AssertionError("DRAWING_PRECISION and DRAWING_DIMENSIONS disagree")
 if DRAWING_PRECISION["LugBody"]["LugThickness"] != 2 or (
@@ -575,9 +575,9 @@ OVERALL_LENGTH = 2.0 * LUG_HALF_T + FOOT_L  # 16.5
 # (MR-fleet r7, cc1a81a) drew three findings of its own, so none is printed.
 DRAWING_NOTES = "\n".join(
     (
-        "1. CROWN TAP FOR THE MHA-VN-055 CUP-POINT SET SCREW; FOOT HOLE",
-        "   FOR THE MHA-VN-022 #2-56 FILLISTER, HEAD FLUSH.",
-        f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-004 FULCRUM-SHAFT END (SECOND",
+        "1. CROWN TAP FOR THE MHA-CH-VN-55 CUP-POINT SET SCREW; FOOT HOLE",
+        "   FOR THE MHA-CH-VN-52 #2-56 FILLISTER, HEAD FLUSH.",
+        f"{QUANTITY_NOTE}. 2 REQUIRED, ONE PER MHA-CH-04 FULCRUM-SHAFT END (SECOND",
         "   IS THIS PART FLIPPED 180 DEG ABOUT VERTICAL).",
     )
 )

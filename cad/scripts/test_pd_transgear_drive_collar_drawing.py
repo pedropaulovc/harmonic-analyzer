@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear drive collar (MHA-PD-022) and its drawing."""
+"""Offline contracts for the transgear drive collar (MHA-PD-22) and its drawing."""
 
 from __future__ import annotations
 
@@ -431,7 +431,7 @@ def test_body_rear_face_reacts_at_f_over_the_whole_fitted_domain() -> None:
     note = _note(drawing.BODY_NOTE)
     assert spec.BODY_LENGTH_CALLOUT.replace("\n", ", ") in note
     assert note.endswith(f"PER {steps.step_ref(drawing.BODY_FIT_STEP_KEY)}.")
-    assert "SEATED ON MHA-PD-008 12T FRONT FACE" in note
+    assert "SEATED ON MHA-PD-08 12T FRONT FACE" in note
     assert f"{spec.BODY_BLANK_LENGTH_MIN:.3f} MIN" in note
     assert spec.THUMBNUT_ENGAGEMENT_WORST >= shaft.ENGAGEMENT_FLOOR_D * shaft.THREAD_MAJOR
     assert spec.FRONT_BEARING_AREA_MIN > 0.0
@@ -487,7 +487,7 @@ def test_volume_gate_uses_the_true_major_arc_area() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_152() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-022"
+    assert row["number"] == "MHA-PD-22"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

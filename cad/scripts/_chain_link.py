@@ -56,31 +56,31 @@ from _visibility import blank_reference_geometry
 import _telemetry
 
 _ROWS = {
-    "vn-chain-inner-link": _config.parts("vn-chain-inner-link"),
-    "vn-chain-outer-link": _config.parts("vn-chain-outer-link"),
-    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link"),
+    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link"),
+    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link"),
+    "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link"),
 }
-(CHAIN_SKU,) = _ROWS["vn-chain-inner-link"]["supplier_skus"]
-if _ROWS["vn-chain-outer-link"]["supplier_skus"] != [CHAIN_SKU]:
+(CHAIN_SKU,) = _ROWS["pd-vn-chain-inner-link"]["supplier_skus"]
+if _ROWS["pd-vn-chain-outer-link"]["supplier_skus"] != [CHAIN_SKU]:
     raise AssertionError("outer links come only in the cut roller chain")
-(CONNECTING_LINK_SKU,) = _ROWS["vn-chain-connecting-link"]["supplier_skus"]
+(CONNECTING_LINK_SKU,) = _ROWS["pd-vn-chain-connecting-link"]["supplier_skus"]
 # Inner links per loop; the cut chain holds one outer link fewer, and the
 # connecting link closes the loop as the last outer link.
 LINKS_PER_KIND = LINK_COUNT // 2
 # The chain is sold by the foot; the loop is LINK_COUNT whole pitches of it.
 CHAIN_ORDER_FEET = math.ceil(LINK_COUNT * LINK_PITCH / 304.8)
 # One line each: the purchased sheet reserves ~0.21 m for the note. The
-# connecting link's clip orientation is an assembly fact (MHA-PD-000 step).
+# connecting link's clip orientation is an assembly fact (MHA-PD-00 step).
 DRAWING_NOTES = {
-    "vn-chain-inner-link": (
+    "pd-vn-chain-inner-link": (
         f"BREAK {CHAIN_ORDER_FEET} FT OF {CHAIN_SKU} TO {LINKS_PER_KIND} INNER + "
         f"{LINKS_PER_KIND - 1} OUTER LINKS; {CONNECTING_LINK_SKU} CLOSES "
         f"{LINK_COUNT} PITCHES."
     ),
-    "vn-chain-outer-link": (
+    "pd-vn-chain-outer-link": (
         f"{LINKS_PER_KIND - 1} PER LOOP, ALL IN THE CUT {CHAIN_SKU} CHAIN."
     ),
-    "vn-chain-connecting-link": (
+    "pd-vn-chain-connecting-link": (
         f"1 PER LOOP: JOINS THE TWO INNER-LINK ENDS OF THE CUT {CHAIN_SKU}."
     ),
 }

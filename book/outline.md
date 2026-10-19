@@ -64,7 +64,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 15 | Indexing and the dividing head | `dt-cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | the DT6-FORM1 ground form tool for the `dt-cone-gear` T006, the one gear outside the stock 48DP 20° cutter ranges; Law's button-tool method (ch. 12) for shop-made form cutters |
 | 17 | **Cutting the gears** | first `dt-cone-gear` (T120, the easy end) |
-| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-DT-004 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
+| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-DT-04 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
 | 19 | Finishing | Draw filing, stoning, polishing, blacking; matching the original's finishes |
 
 ## Part IV — Making the parts
@@ -81,9 +81,9 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
 | 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
 | 26 | The measuring stick | `ms-stick` — hand-stamped divisions, and why the original's are uneven; `ms-stop-block` + `ms-stop-plate`, the thumbscrew stop clamped at the 2.0 mark |
-| 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `vn-knife-hanger-stud`, `vn-knife-mount-dowel`, `vn-boss-hook`, `vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
-| 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm rim, ×5 via the pressed brass `mg-wheel-drum`), `mg-wheel-axle` + `mg-wheel-axle-spacer`, bracket, clamp, vertical rod, and the purchased music wire `vn-lever-wire` (McMaster 9666K56) |
-| 29 | The pen mechanism | `pn-pen-frame`, `pn-pen-v-block`, `pn-pen-rod`, the purchased music wire `vn-pen-wire` (McMaster 9666K56), `mg-output-fixture`, and the purchased Sharpie Fine Point marker `vn-pen-marker`. Note: the original was lost; this follows the 2013 reconstruction. |
+| 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `sm-vn-knife-hanger-stud`, `sm-vn-knife-mount-dowel`, `sm-vn-boss-hook`, `sm-vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
+| 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm rim, ×5 via the pressed brass `mg-wheel-drum`), `mg-wheel-axle` + `mg-wheel-axle-spacer`, bracket, clamp, vertical rod, and the purchased music wire `mg-vn-lever-wire` (McMaster 9666K56) |
+| 29 | The pen mechanism | `pn-pen-frame`, `pn-pen-v-block`, `pn-pen-rod`, the purchased music wire `pn-vn-pen-wire` (McMaster 9666K56), `mg-output-fixture`, and the purchased Sharpie Fine Point marker `pn-vn-pen-marker`. Note: the original was lost; this follows the 2013 reconstruction. |
 | 30 | The paper drive | `pd-platen`, `pd-platen-rack`, `pd-platen-guide`, `pd-platen-clip`, transgear train, `pd-transgear-removable` sprocket configurations + roller chain, `pd-transgear-arm` hanger, `pd-latch-hook` (one-piece formed spring steel, screwed to the support bar) |
 | 31 | Springs | 20 channel springs + the counter spring: winding your own, or specifying them for a spring house |
 | 32 | Fasteners and small parts | The screw families, period-appropriate heads, and what to substitute |

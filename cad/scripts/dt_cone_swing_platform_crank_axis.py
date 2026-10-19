@@ -1,4 +1,4 @@
-r"""The crank axis the MHA-DT-020 cone swing platform carries.
+r"""The crank axis the MHA-DT-20 cone swing platform carries.
 
 PURE, SolidWorks-free. The post and the crank train share the configured
 frame axis. ``build_dt_cone_swing_platform`` authors this reference and the

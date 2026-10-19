@@ -1,6 +1,6 @@
 r"""McMaster 91410A538 -- square-head cup-point set screw, 1/4"-20 x 5/8".
 
-The MHA-VN-023 gooseneck set screw until the 2026-10-12 Q5 ruling moved the
+The MHA-FR-VN-52 gooseneck set screw until the 2026-10-12 Q5 ruling moved the
 top frame to 91410A540 (the same screw 3/4 in long); this diagnostic stays
 as the replica of the harvested vendor part whose law 91410A540 reuses.
 

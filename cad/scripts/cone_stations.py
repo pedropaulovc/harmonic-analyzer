@@ -23,7 +23,7 @@ CONE_FACE_STATION_REFERENCE = 6.5
 SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
 
 # T006 is the reference gear for the tip-end stack: its north face is the
-# fixed layout reference the MHA-VN-016 stack collar is feeler-set off.
+# fixed layout reference the MHA-DT-VN-54 stack collar is feeler-set off.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
 # Extend the tip, block and pivot by the SAME northward delta that moves only

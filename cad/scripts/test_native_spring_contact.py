@@ -344,18 +344,18 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
 
     components = [
         _assembly_component(
-            "vn-channel-spring-installed-stretch00-1",
-            "vn-channel-spring-installed-stretch00",
+            "ch-vn-channel-spring-installed-stretch00-1",
+            "ch-vn-channel-spring-installed-stretch00",
             -10.0,
         ),
         _assembly_component(
-            "vn-channel-spring-installed-stretch00-2",
-            "vn-channel-spring-installed-stretch00",
+            "ch-vn-channel-spring-installed-stretch00-2",
+            "ch-vn-channel-spring-installed-stretch00",
             0.0,
         ),
-        _assembly_component("vn-spring-hook-1", "vn-spring-hook", -10.0),
+        _assembly_component("ch-vn-spring-hook-1", "ch-vn-spring-hook", -10.0),
         # A duplicated lower seat leaves the second station without its hook.
-        _assembly_component("vn-spring-hook-2", "vn-spring-hook", -10.0),
+        _assembly_component("ch-vn-spring-hook-2", "ch-vn-spring-hook", -10.0),
         _assembly_component("ch-channel-lever-1", "ch-channel-lever", -10.0),
         _assembly_component("ch-channel-lever-2", "ch-channel-lever", 0.0),
     ]
@@ -410,35 +410,35 @@ def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
     scene = _AssemblyContactScene(
         [
             (
-                "vn-channel-spring-installed-stretch01-1",
-                "vn-channel-spring-installed-stretch01",
+                "ch-vn-channel-spring-installed-stretch01-1",
+                "ch-vn-channel-spring-installed-stretch01",
                 0.0,
             ),
             ("ch-channel-lever-2", "ch-channel-lever", 0.0008),
-            ("vn-spring-hook-1", "vn-spring-hook", -10.0008),
+            ("ch-vn-spring-hook-1", "ch-vn-spring-hook", -10.0008),
             (
-                "vn-channel-spring-installed-stretch00-1",
-                "vn-channel-spring-installed-stretch00",
+                "ch-vn-channel-spring-installed-stretch00-1",
+                "ch-vn-channel-spring-installed-stretch00",
                 -10.0,
             ),
-            ("vn-spring-hook-2", "vn-spring-hook", -0.0008),
+            ("ch-vn-spring-hook-2", "ch-vn-spring-hook", -0.0008),
             ("ch-channel-lever-1", "ch-channel-lever", -9.9992),
         ],
         {
             (
-                "vn-channel-spring-installed-stretch00-1",
-                "vn-spring-hook-1",
+                "ch-vn-channel-spring-installed-stretch00-1",
+                "ch-vn-spring-hook-1",
             ): 0.004,
             (
-                "vn-channel-spring-installed-stretch00-1",
+                "ch-vn-channel-spring-installed-stretch00-1",
                 "ch-channel-lever-1",
             ): 0.0,
             (
-                "vn-channel-spring-installed-stretch01-1",
-                "vn-spring-hook-2",
+                "ch-vn-channel-spring-installed-stretch01-1",
+                "ch-vn-spring-hook-2",
             ): 0.002,
             (
-                "vn-channel-spring-installed-stretch01-1",
+                "ch-vn-channel-spring-installed-stretch01-1",
                 "ch-channel-lever-2",
             ): 0.0,
         },
@@ -477,17 +477,17 @@ def _channel_contact_scene(
     distances_mm = {}
     for index in range(channel_count):
         station_z_mm = index * 10.0
-        spring = f"vn-channel-spring-installed-stretch{index:02d}-1"
-        hook = f"vn-spring-hook-{index + 1}"
+        spring = f"ch-vn-channel-spring-installed-stretch{index:02d}-1"
+        hook = f"ch-vn-spring-hook-{index + 1}"
         lever = f"ch-channel-lever-{index + 1}"
         components.extend(
             [
                 (
                     spring,
-                    f"vn-channel-spring-installed-stretch{index:02d}",
+                    f"ch-vn-channel-spring-installed-stretch{index:02d}",
                     station_z_mm,
                 ),
-                (hook, "vn-spring-hook", station_z_mm),
+                (hook, "ch-vn-spring-hook", station_z_mm),
                 (lever, "ch-channel-lever", station_z_mm),
             ]
         )
@@ -559,8 +559,8 @@ def test_reduced_channel_override_preserves_native_overlap_rejection(
         2,
         overlaps_mm3={
             (
-                "vn-channel-spring-installed-stretch00-1-body",
-                "vn-spring-hook-1-body",
+                "ch-vn-channel-spring-installed-stretch00-1-body",
+                "ch-vn-spring-hook-1-body",
             ): _MICROSCOPIC_OVERLAP_MM3
         },
     )

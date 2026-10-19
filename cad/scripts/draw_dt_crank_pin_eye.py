@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the keeper-chain anchor eye (MHA-DT-028).
+r"""Create the manufacturing drawing for the keeper-chain anchor eye (MHA-DT-28).
 
 Under ``cad/docs/drawing-guidelines.md``: a formed brass wire eye, a closed
 loop with a straight tail running tangent off it, loop and tail in one plane.

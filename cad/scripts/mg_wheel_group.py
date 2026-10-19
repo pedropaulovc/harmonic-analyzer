@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import math
 
-import vn_lever_wire_geom as _lever
+import mg_vn_lever_wire_geom as _lever
 import mg_magnifying_wheel_geom as _wheel
 import mg_wheel_axle_spacer_spec as _spacer
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
-import vn_wheel_axle_back_washer_spec as _back
-import vn_wheel_axle_front_washer_spec as _front
-import vn_wheel_axle_nut_spec as _nut
+import mg_vn_wheel_axle_back_washer_spec as _back
+import mg_vn_wheel_axle_front_washer_spec as _front
+import mg_vn_wheel_axle_nut_spec as _nut
 from _printed_tolerance import printed_band_mm
 from paper_drive_geom import PEN_Z_MID
 
@@ -46,7 +46,7 @@ NUT_D = FRONT_WASHER_D + _front.MODEL_THICKNESS
 LOCKNUT_D = NUT_D + _nut.THICKNESS
 LOCKNUT_FACE_D = LOCKNUT_D + _nut.THICKNESS
 # The wheel's mid-plane IS the pen-rod line: the pen wire leaves the rim
-# groove plumb onto the rod (vn_pen_wire_geom).
+# groove plumb onto the rod (pn_vn_pen_wire_geom).
 WHEEL_MID_Z = PEN_Z_MID
 _SPOKE_MID_Z = _bar.BAR_FRONT_Z - SPOKE_MID_D
 if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):

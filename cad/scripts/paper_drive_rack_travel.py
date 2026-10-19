@@ -1,4 +1,4 @@
-"""Finite cut-end operating window for the purchased MHA-PD-005 rack.
+"""Finite cut-end operating window for the purchased MHA-PD-05 rack.
 
 The feed pinion's contact path, projected on the rack, comes from the
 closed-form mesh check (paper_drive_mesh_check). This contract clips that

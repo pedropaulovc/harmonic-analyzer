@@ -1,11 +1,11 @@
-r"""MHA-PD-006 rack-pinion: the 120T brass reducer disc of the translational gearing.
+r"""MHA-PD-06 rack-pinion: the 120T brass reducer disc of the translational gearing.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
 driven 12:120 by the knob shaft's finite #8/reference-12 PA20 48DP form and
-screwed to the brass hub's flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
-screws (MHA-VN-039, McMaster 91794A055; the joint is
+screwed to the brass hub's flange (MHA-PD-17, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
+screws (MHA-PD-VN-55, McMaster 91794A055; the joint is
 ``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
-Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-010)
+Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-10)
 step face; its front face, clamped by the hub's flange, stands the spigot's
 length ahead of that step, and its rear face stands in air ahead of the
 sleeve's 12T, radially clear of its tips (R9-68).
@@ -17,7 +17,7 @@ is local +X, counter-clockwise seen from +Z (``pd_transgear_disc_hub_geometry``)
 
 The #0-80 taps are TRANSFERRED at assembly (ruling R9-9): with the disc on
 the hub's spigot and the hub seated on the sleeve's step, each tap is spotted
-through its MHA-PD-017 flange hole, then drilled and tapped, and disc and
+through its MHA-PD-17 flange hole, then drilled and tapped, and disc and
 flange are match-marked.
 The model places the taps on the flange's bolt circle (the one authority);
 the sheet prints the tap, its mouth breaks and the transfer, never the
@@ -245,7 +245,7 @@ FACE_WIDTH = 3.0
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
 BORE_DIA = SPIGOT_DIA  # 13.1
-# Pilots on the hub's spigot (MHA-PD-017, pd_transgear_disc_hub_geometry): one ISO
+# Pilots on the hub's spigot (MHA-PD-17, pd_transgear_disc_hub_geometry): one ISO
 # fit, the bore reamed H7 at 10-18 mm over the spigot's h6, a locational
 # clearance that assembles by hand, so the disc never binds and sits at most
 # 0.0145 off the hub's axis while its taps are spotted.
@@ -272,7 +272,7 @@ SPIGOT_DIAMETRAL_CLEARANCE = (
 )
 if SPIGOT_DIAMETRAL_CLEARANCE[0] < 0.0:
     raise AssertionError(
-        f"MHA-PD-006 bore binds on the MHA-PD-017 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
+        f"MHA-PD-06 bore binds on the MHA-PD-17 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
     )
 DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
 # The rear face stands in air (the hub's flange locates the front face), so
@@ -285,7 +285,7 @@ BORE_FRONT_CHAMFER_NOTE = (
     f"{BORE_FRONT_CHAMFER_LIMITS[1]:.2f} X 45\u00b0."
 )
 
-# --- screw (MHA-VN-039) -------------------------------------------------------------
+# --- screw (MHA-PD-VN-55) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZE
 
 # --- #0-80 taps --------------------------------------------------------------------
@@ -294,7 +294,7 @@ TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 TAP_MAJOR = THREAD_MAJOR_MM[SCREW_THREAD]
 if abs(TAP_MAJOR - SCREW_MAJOR_DIA) > 1e-9:
     raise AssertionError(
-        "the disc tap and the MHA-VN-039 screw disagree on the #0-80 major"
+        "the disc tap and the MHA-PD-VN-55 screw disagree on the #0-80 major"
     )
 # The tapped major's allowance over basic (contract §8, "tap major 0.025" radial).
 TAP_MAJOR_ALLOWANCE = 0.05
@@ -308,15 +308,15 @@ TAP_CENTRES = screw_centres()
 MOUTH_BREAK_MAX = 0.10
 
 # --- the tap's thread losses (contract §7) -------------------------------------
-# The MHA-VN-039 screws are cut to fit at assembly (R9-47): their tips stop
+# The MHA-PD-VN-55 screws are cut to fit at assembly (R9-47): their tips stop
 # inside the rear face, so the joint's engagement, the cut window and the
-# stock's reach are judged in vn_transgear_disc_screw_spec from these losses.
+# stock's reach are judged in pd_vn_transgear_disc_screw_spec from these losses.
 ENGAGEMENT_FLOOR_D = 1.5
 MOUTH_THREAD_LOSS = MOUTH_BREAK_MAX
 
 # --- tap to bore wall (contract §8) ---------------------------------------------
 # The disc prints no tap position, so its worst case is the transfer chain:
-# the flange hole's bolt-circle band (MHA-PD-017), the spot's centring in that
+# the flange hole's bolt-circle band (MHA-PD-17), the spot's centring in that
 # hole (a Ø1.7 spotting tool in the Ø1.7 +0.10/0 hole), and the disc's offset
 # on the spigot while it is spotted.
 SPOT_CENTRING_TOL = (SCREW_HOLE_DIA + 0.10 - SCREW_HOLE_DIA) / 2.0
@@ -331,11 +331,11 @@ TAP_TO_BORE_WALL_WORST = (
 )
 if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
     raise AssertionError(
-        f"MHA-PD-006 tap to bore wall {TAP_TO_BORE_WALL_WORST:.3f} worst < {WALL_FLOOR}"
+        f"MHA-PD-06 tap to bore wall {TAP_TO_BORE_WALL_WORST:.3f} worst < {WALL_FLOOR}"
     )
 
 # --- sheet -------------------------------------------------------------------------
-HUB_NUMBER = "MHA-PD-017"
+HUB_NUMBER = "MHA-PD-17"
 HUB_NAME = "HUB"
 # Lines appended under the native "#0-80 UNF-2B THRU" hole callout.
 TAP_CALLOUT_LINES = (
@@ -384,7 +384,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in names.items()
 }
 if {f: set(n) for f, n in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
-    raise AssertionError("every marked MHA-PD-006 dimension needs its printed places")
+    raise AssertionError("every marked MHA-PD-06 dimension needs its printed places")
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -392,7 +392,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-KNOB_NUMBER = "MHA-PD-008"
+KNOB_NUMBER = "MHA-PD-08"
 # What a machinist needs to cut and check the teeth; design parameters stay
 # in this module (Main ruling 2026-10-10).
 GEAR_DATA = gear_data_note(
@@ -412,7 +412,7 @@ GEAR_DATA = gear_data_note(
 )
 
 # The teeth are stated by the gear data block; the build appends the disc
-# screw's engagement line (vn_transgear_disc_screw_spec imports this module).
+# screw's engagement line (pd_vn_transgear_disc_screw_spec imports this module).
 # A shop note states the requirement, not the measuring method or the design
 # history (Main ruling 2026-10-10).
 DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
@@ -421,7 +421,7 @@ DRAWING_NOTES = BORE_FRONT_CHAMFER_NOTE
 # every space on a radial indicator catches eccentricity and gross slips.
 # The disc's own control is to its pilot datum A, accepted at the tooth
 # cutting setup (the drive-train gears' convention). The mesh stack books
-# 0.05 TIR about the assembled running axis. MHA-PD-000's disc-transfer step
+# 0.05 TIR about the assembled running axis. MHA-PD-00's disc-transfer step
 # reaches it by tapping the disc central on the feed pinion's bore, and
 # accepts it there. That tap can only move the disc within the spigot
 # clearance, and the clearance may be zero. So a disc whose teeth run out

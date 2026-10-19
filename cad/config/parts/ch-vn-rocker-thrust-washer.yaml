@@ -1,0 +1,16 @@
+ch-vn-rocker-thrust-washer:
+  title: Rocker Thrust Washer
+  number: MHA-CH-VN-56
+  stock_name: Carbon Steel Ring Shim, 1/4 ID x 3/8 OD x 0.031
+  supplier: McMaster-Carr
+  supplier_skus: [3088A429]
+  material: CARBON STEEL (AS SUPPLIED)
+  material_specification: "Carbon steel ring shim, 1/4 ID x 3/8 OD x 0.031 in; McMaster-Carr 3088A429"
+  finish: AS SUPPLIED
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-CH-05 PIVOT SHAFT, ONE AT EACH END
+    OF THE ROCKER BANK: NORTH BETWEEN HUB 19 AND THE NORTH EAR,
+    SOUTH BETWEEN HUB 0 AND THE MHA-CH-VN-54 SPRING.
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

@@ -1,0 +1,12 @@
+ch-rocker-arm-tl-vn-oblique-carriage:
+  title: Oblique Trammel Linear Carriage
+  number: MHA-CH-06-TL-VN-51
+  stock_name: HIWIN HGH15CAZ0C linear guideway block, Z0 preload
+  supplier: DigiKey Marketplace (Midwest Machine Tool Supply)
+  supplier_skus: ["HGH-15-CA-Z0-C"]
+  material: Alloy Steel
+  material_specification: "Bearing steel, plastic end caps"
+  finish: as supplied
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-oblique-pivot-pin:
   title: Rocker Oblique Trammel Pivot Pin
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-23
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-23
   material: 1144 stress-proof steel
   material_specification: 1144 stress-proof cold-drawn round, 1/2 in
   finish: as turned

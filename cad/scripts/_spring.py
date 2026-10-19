@@ -24,7 +24,7 @@ from _stock_fastener import _blank_recipe_references
 from diagnostics.diag_build_9432K31 import build_9432K31
 
 
-_PART = _config.parts("vn-channel-spring-installed")
+_PART = _config.parts("ch-vn-channel-spring-installed")
 MATERIAL = str(_PART["material"])
 STOCK_PROPERTIES = {
     "Stock Name": str(_PART["stock_name"]),

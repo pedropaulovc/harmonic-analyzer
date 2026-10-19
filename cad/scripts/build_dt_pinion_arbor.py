@@ -1,8 +1,8 @@
-r"""Build the integral MHA-DT-022 pinion arbor and turned grip head.
+r"""Build the integral MHA-DT-22 pinion arbor and turned grip head.
 
 The head, neck, and long shaft are one turned steel part.  Their absolute
 released envelope and assembly origin are unchanged; only the unsupported
-socket/retention-pin construction is removed.  MHA-DT-015 is the separate grip
+socket/retention-pin construction is removed.  MHA-DT-15 is the separate grip
 crossrod bonded into the head's reamed hole.
 """
 
@@ -274,7 +274,7 @@ async def _add_journal_land(
     journal_z: float,
     station_expression: str,
 ) -> list[tuple[str, str]]:
-    """Split one MHA-DT-014 journal land off the Ø8 shaft and dimension it.
+    """Split one MHA-DT-14 journal land off the Ø8 shaft and dimension it.
 
     One Top-plane sketch owns the land: two real cross lines at its ends
     (projected both ways they cut the cylinder into its own face), a
@@ -792,7 +792,7 @@ async def build(adapter) -> dict[str, str]:
     expected += V_BACK_CAP
     await volume_check(adapter, "back crown", expected, 0.03 * V_BACK_CAP)
 
-    # R1a: the MHA-DT-033 collar's 1/16 in spring-pin hole, through the Ø8 on
+    # R1a: the MHA-DT-33 collar's 1/16 in spring-pin hole, through the Ø8 on
     # the crossrod's local Y (one V-block setup drills both cross holes).
     pin_hole = SketchDims()
     check("create_sketch collar pin hole", await adapter.create_sketch("Top"))

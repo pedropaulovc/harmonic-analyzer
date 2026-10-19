@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the pen adjuster stud build and dra
 
 The pen-height adjuster (engineerguy 4/4, 9:15-10:34): a turned brass stud
 threaded into the pen rod's top face, locked by a brass jam nut
-(``vn-pen-adjust-nut``) run down onto the rod top, with a cross-drilled eye
+(``pn-vn-pen-adjust-nut``) run down onto the rod top, with a cross-drilled eye
 head the pen wire ties through. Screwing the stud in or out raises or lowers
 the whole pen carriage against the wire without re-tying it.
 
@@ -40,7 +40,7 @@ from _hole_spec import HoleSpec, NUMBER_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from pn_pen_rod_spec import STUD_ENGAGEMENT, STUD_TAP_SPEC, STUD_THREAD
 from mg_magnifying_wheel_geom import PEN_WIRE_DIA
-import vn_pen_adjust_nut_spec as jam_nut
+import pn_vn_pen_adjust_nut_spec as jam_nut
 
 THREAD = STUD_THREAD  # one source: the rod's top tap names the thread
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]

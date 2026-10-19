@@ -1,10 +1,10 @@
-r"""Pure-data contract for the cone pivot post's tall vise soft jaw (MHA-DT-005-TL-04).
+r"""Pure-data contract for the cone pivot post's tall vise soft jaw (MHA-DT-05-TL-04).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 built-up cone post's vise hold (prechips S11) two of these 6061 plates replace
 the PM 6 in vise's hardened jaw plates on the vise's own M10 jaw screws. The
 jaws close on the two cone-boss caps through one cap jaw button each
-(MHA-DT-005-TL-03) while foot B sits on 1/2 in parallels on the vise bed, so
+(MHA-DT-05-TL-03) while foot B sits on 1/2 in parallels on the vise bed, so
 each plate must reach over the full caps and stay under the head shoulder and
 the crank boss. The fixed-jaw and moving-jaw plates are identical: two made.
 

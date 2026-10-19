@@ -21,13 +21,13 @@ import math
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from vn_lever_wire_geom import WHEEL_BAR_Y
+from mg_vn_lever_wire_geom import WHEEL_BAR_Y
 from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
 from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
 from pn_pen_rod_spec import ROD_SECTION, SECTION_BAND as ROD_SECTION_BAND
-from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
-from vn_pen_hanger_nut_spec import ACROSS_FLATS as NUT_ACROSS_FLATS
+from pn_vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
+from pn_vn_pen_hanger_nut_spec import ACROSS_FLATS as NUT_ACROSS_FLATS
 
 
 PEN_ROD_NUMBER = _config.parts("pn-pen-rod")["number"]
@@ -146,7 +146,7 @@ if GUIDE_ARM_COVER_MIN <= 0.0:
 
 # --- M6.10: the selected hanger screw passes through a #8 close-clearance
 # Hole Wizard hole near the strap top, on the bar's screw axis, into the
-# MHA-VN-063 hex nut on the strap front, the MHA-VN-064 jam nut jammed against
+# MHA-PN-VN-54 hex nut on the strap front, the MHA-PN-VN-55 jam nut jammed against
 # it (rule 23: the jam nut locks the joint the pen rod's reversing friction
 # loads; rule 18: the nuts, not the 3.0 strap, carry the thread). ---
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")

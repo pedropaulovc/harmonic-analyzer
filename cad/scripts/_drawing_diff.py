@@ -9,6 +9,12 @@ disable both tolerances. Low-contrast edits, one-pixel edge movements/thickness
 changes, gaps/bridges up to two pixels and dense-ink pattern changes can be
 omitted. This is a bounded visual comparison, not semantic CAD equivalence.
 
+PDFs pair by the current identity map composed with sealed historical identities,
+within their original relative directory. Each parent-specific vendor clone gets
+its own comparison against the same prior purchased drawing where applicable.
+Renames are reported separately; drawing ink, including changed identity labels,
+is still compared normally.
+
 Run from the repository root, without SolidWorks::
 
     uv run python cad/scripts/_drawing_diff.py NEW_PDF_DIR DIFF.zip \
@@ -22,6 +28,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import html
+import importlib.util
 import io
 import json
 import os
@@ -325,6 +332,33 @@ def _pdfs(directory: Path) -> dict[str, Path]:
     }
 
 
+def _drawing_pairs(old_files: dict[str, Path], new_files: dict[str, Path]) -> dict[str, str]:
+    """Reuse release identity pairing without flattening relative PDF directories."""
+    tool = Path(__file__).resolve().parents[1] / "comparisons" / "tools" / "release_diff.py"
+    spec = importlib.util.spec_from_file_location("_drawing_release_pairing", tool)
+    assert spec is not None and spec.loader is not None
+    pairing = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pairing)
+    mapping = pairing.load_identity_map()
+    old_groups, new_groups = defaultdict(list), defaultdict(list)
+    for name in old_files:
+        old_groups[Path(name).parent.as_posix()].append(name)
+    for name in new_files:
+        new_groups[Path(name).parent.as_posix()].append(name)
+    pairs = {}
+    for parent in sorted(old_groups.keys() | new_groups.keys()):
+        old_names, new_names = old_groups[parent], new_groups[parent]
+        matched = pairing.paired_keys(
+            (Path(name).stem for name in old_names),
+            (Path(name).stem for name in new_names),
+            mapping,
+        )
+        old_stems = {Path(name).stem: name for name in old_names}
+        new_stems = {Path(name).stem: name for name in new_names}
+        pairs.update({new_stems[new]: old_stems[old] for new, old in matched.items()})
+    return pairs
+
+
 def _member(archive: ZipFile, name: str, content: bytes) -> None:
     info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
     info.compress_type = ZIP_DEFLATED
@@ -393,13 +427,16 @@ def create_drawing_diff(
 
     Drawing classifications are disjoint: ``changed_drawings`` contains common
     PDFs with changed/added/removed pages; additions/removals have their own lists.
-    Names are relative PDF paths (including their extension). Page numbers are
-    one-based and pages are paired by ordinal within a PDF, never by extracted
-    text. ``asset_path`` is a string so the returned facts are JSON serializable.
+    Names use current relative PDF paths (including their extension), with
+    ``renamed_drawings`` recording the actual prior paths. Pages are paired by
+    ordinal within each paired PDF, never by extracted text. ``asset_path`` is a
+    string so the returned facts are JSON serializable.
     Corrupt/unrenderable inputs raise, without replacing a previous output ZIP.
     """
     old_files = {} if old_pdf_dir is None else _pdfs(old_pdf_dir)
     new_files = _pdfs(new_pdf_dir)
+    pairs = _drawing_pairs(old_files, new_files)
+    removed = sorted(old_files.keys() - set(pairs.values()))
     summary: dict[str, Any] = {
         "schema_version": 1,
         "old_label": old_label,
@@ -422,8 +459,9 @@ def create_drawing_diff(
         ],
         "images": [],
         "changed_drawings": [],
-        "added_drawings": sorted(new_files.keys() - old_files.keys()),
-        "removed_drawings": sorted(old_files.keys() - new_files.keys()),
+        "renamed_drawings": {new: old for new, old in sorted(pairs.items()) if new != old},
+        "added_drawings": sorted(new_files.keys() - pairs.keys()),
+        "removed_drawings": removed,
         "unchanged_drawings": [],
         "page_counts": dict.fromkeys(("changed", "added", "removed", "unchanged"), 0),
         "pages": [],
@@ -434,8 +472,9 @@ def create_drawing_diff(
     temporary_path = Path(temporary)
     try:
         with ZipFile(temporary_path, "w") as archive:
-            for name in sorted(old_files.keys() | new_files.keys()):
-                old_path, new_path = old_files.get(name), new_files.get(name)
+            for name in sorted(new_files.keys() | set(removed)):
+                old_name = pairs.get(name) if name in new_files else name
+                old_path, new_path = old_files.get(old_name), new_files.get(name)
                 # Explicitly nest renderer ownership; neither a page nor a
                 # bitmap may outlive its document or retain a shared buffer.
                 with ExitStack() as stack:
@@ -464,6 +503,8 @@ def create_drawing_diff(
                         summary["pages"].append(
                             {
                                 "drawing": name,
+                                "old_drawing": old_name,
+                                "new_drawing": name if new_path is not None else None,
                                 "page": index + 1,
                                 "status": status,
                                 "image": member,

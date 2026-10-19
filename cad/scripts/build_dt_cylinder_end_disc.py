@@ -128,7 +128,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # MHA-DT-026's title block reads Material Specification / Finish / Quantity
+    # MHA-DT-26's title block reads Material Specification / Finish / Quantity
     # from its registry row (test_source_properties_drawing).
     apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)

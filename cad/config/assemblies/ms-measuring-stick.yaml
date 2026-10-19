@@ -1,4 +1,4 @@
-number: MHA-MS-000
+number: MHA-MS-00
 # measuring-stick assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the
 # measuring-stick closure (its assembly leaf, its verify_soundness leaf, and

@@ -1,4 +1,4 @@
-r"""Build the rocker arm's outline template (MHA-CH-006-TL-13; shop gauge).
+r"""Build the rocker arm's outline template (MHA-CH-06-TL-13; shop gauge).
 
 An annealed O1 plate cut to the rocker arm's finished outline about its pivot
 hole, aimed at the middle of the rocker's arc zone, with a radial slot at the

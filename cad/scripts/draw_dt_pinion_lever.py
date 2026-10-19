@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion engage lever.
 
-A turned hub slipped over the MHA-DT-017 lift rod's front end, with a straight Ø6
-grip rod rising out of it; the MHA-DT-030 pin (U36) match-drilled through hub and rod at
+A turned hub slipped over the MHA-DT-17 lift rod's front end, with a straight Ø6
+grip rod rising out of it; the MHA-DT-30 pin (U36) match-drilled through hub and rod at
 assembly carries the drive.  The 1:1 front view carries the hub and grip sizes,
 the projected top view the crown, and section A-A (in the side view's place)
 cuts the lever down the grip axis so the blind bore, its flat floor and the
@@ -167,7 +167,7 @@ DIMENSION_CALLOUTS = {
     "BoreDepthFromB": "FLAT BOTTOM",
     "RodTipY": "FROM HUB AXIS",
     "GripFromB": "GRIP AXIS",
-    # Drilled at MHA-DT-000's LEVER PIN SET; the pointer comes from the registry.
+    # Drilled at MHA-DT-00's LEVER PIN SET; the pointer comes from the registry.
     "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
 }
 

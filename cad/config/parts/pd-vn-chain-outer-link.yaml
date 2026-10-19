@@ -1,0 +1,14 @@
+pd-vn-chain-outer-link:
+  title: "ANSI #25 Roller Chain Outer Link"
+  number: MHA-PD-VN-51
+  stock_name: Steel Roller Chain, ANSI Number 25, Single Strand
+  supplier: McMaster-Carr
+  supplier_skus: [6261K171]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 6261K171
+  finish: as supplied; supplier states no coating
+  quantity: 33
+  tolerance_class: machined_block
+  process: purchased
+  # Every outer link of the cut 6261K171 chain; the loop's closing outer link
+  # is the separate MHA-PD-VN-66 connecting link.

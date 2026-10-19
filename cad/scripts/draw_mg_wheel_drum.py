@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the magnifying-wheel drum (MHA-MG-010).
+r"""Create the manufacturing drawing for the magnifying-wheel drum (MHA-MG-10).
 
 Run with SolidWorks open::
 

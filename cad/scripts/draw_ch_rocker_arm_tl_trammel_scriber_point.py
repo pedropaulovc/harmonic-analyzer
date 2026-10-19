@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker template trammel's scriber point (MHA-CH-006-TL-16)."""
+r"""Create the drawing for the rocker template trammel's scriber point (MHA-CH-06-TL-16)."""
 
 from __future__ import annotations
 
@@ -262,7 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Template Trammel Scriber Point Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker template trammel scriber point; O1 drill rod; MHA-CH-006-TL-16",
+            3: "rocker template trammel scriber point; O1 drill rod; MHA-CH-06-TL-16",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

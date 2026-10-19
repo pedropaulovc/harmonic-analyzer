@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear drive collar (MHA-PD-022).
+r"""Create the manufacturing drawing for the transgear drive collar (MHA-PD-22).
 
 The end view shows the actual D opening and the two axial drive holes.
 An axial section through the D-flat shows the controlled rear entry break,

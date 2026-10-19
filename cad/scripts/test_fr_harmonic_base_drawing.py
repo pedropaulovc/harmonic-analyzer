@@ -15,8 +15,8 @@ import dt_cone_swing_platform_geometry as platform
 from dt_drive_train_steps import step_ref
 import fr_harmonic_base_fasteners
 import fr_harmonic_base_spec
-from vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
-from vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
+from dt_vn_cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
+from dt_vn_swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
 
 
 @pytest.mark.parametrize(
@@ -150,7 +150,7 @@ def test_pivot_drill_keeps_its_point_inside_the_pad_and_clear_of_cavities() -> N
 
 
 def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
-    import vn_cone_lock_knob_spec as knob
+    import dt_vn_cone_lock_knob_spec as knob
     from _holes import DRILL_POINT_H, blind_hole_volume_mm3
 
     knob.require_seat_fit(part.LOCK_SEAT_SPEC, platform.PLATE_T, knob.STUD_LEN)
@@ -174,14 +174,14 @@ def test_cone_lock_seats_on_plate_and_bare_base_with_useful_threads() -> None:
 
 
 def test_cone_lock_rejects_short_stock_even_in_a_deep_receiver() -> None:
-    import vn_cone_lock_knob_spec as knob
+    import dt_vn_cone_lock_knob_spec as knob
 
     with pytest.raises(AssertionError, match="useful thread engagement"):
         knob.require_seat_fit(part.LOCK_SEAT_SPEC, platform.PLATE_T, 7.9375)
 
 
 def test_cone_lock_rejects_a_receiver_that_only_clears_the_plate_pose() -> None:
-    import vn_cone_lock_knob_spec as knob
+    import dt_vn_cone_lock_knob_spec as knob
     from dataclasses import replace
 
     seat = replace(
@@ -193,7 +193,7 @@ def test_cone_lock_rejects_a_receiver_that_only_clears_the_plate_pose() -> None:
 
 
 def test_cone_lock_requires_plug_tap_lead_beyond_full_thread_depth() -> None:
-    import vn_cone_lock_knob_spec as knob
+    import dt_vn_cone_lock_knob_spec as knob
     from dataclasses import replace
 
     seat = replace(
@@ -205,8 +205,8 @@ def test_cone_lock_requires_plug_tap_lead_beyond_full_thread_depth() -> None:
 
 
 def test_stop_head_seats_on_the_base_inside_the_platform_edge() -> None:
-    import vn_foot_screw_spec as foot
-    import vn_swing_stop_screw_spec as stop
+    import dt_vn_foot_screw_spec as foot
+    import dt_vn_swing_stop_screw_spec as stop
 
     stop.require_seat_fit(part.STOP_SEAT_SPEC, platform.PLATE_T)
     # One SKU with the foot screw, screwed fully home so the head is the stop
@@ -223,7 +223,7 @@ def test_stop_head_seats_on_the_base_inside_the_platform_edge() -> None:
 
 def test_shared_stop_rejects_the_former_shallow_receiver() -> None:
     from dataclasses import replace
-    import vn_swing_stop_screw_spec as stop
+    import dt_vn_swing_stop_screw_spec as stop
 
     seat = replace(part.STOP_SEAT_SPEC, depth_mm=13.0, overrides_mm={"ThreadDepth": 9.6})
     with pytest.raises(AssertionError, match="bottoms"):
@@ -234,7 +234,7 @@ def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:
     """The four #4-40 taps sit under the plate's corner holes carried through
     its mount transform (nameplate_spec), cut from the deck the plate lies on."""
     import fr_nameplate_spec
-    from vn_fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
+    from _mcmaster_90114a511 import HEAD_DIA, SHANK_DIA, SHANK_LEN, THREAD
     from build_fr_nameplate import SCREW_HOLE_DIA
 
     assert part.NAMEPLATE_SEAT_SPEC.kind == "tapped_bottoming"
@@ -461,7 +461,7 @@ def test_socket_bore_leader_lands_on_bore_clear_of_the_cross_tap() -> None:
 
 
 def test_transferred_pinion_block_seats_print_no_station() -> None:
-    # Codex #855 P1: the four block seats are spotted THROUGH MHA-DT-018 at
+    # Codex #855 P1: the four block seats are spotted THROUGH MHA-DT-18 at
     # assembly (U28 corollary; the drive-train rig-set step, "BEFORE SPOTTING
     # THE TRANSFER SEATS"), so they leave the hole table and their one callout
     # names the transfer.  Codex #854 P1: the model seats themselves sit at the
@@ -477,7 +477,7 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     # until the fitter sets it, so both rig callouts cite the drive-train step
     # that sets it (the drum's back end on leaf D off the north gear).
     assert sheet.TRANSFER_BLOCK_CALLOUT == (
-        f"TRANSFER FROM MHA-DT-018\nAFTER {step_ref('rig-set')};\n"
+        f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"
     )
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
@@ -486,7 +486,7 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
 
 def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     # U34c (I27): each arbor pedestal is stood on the base with the arbor in
-    # both straps and its #8-32 seat is spotted through the MHA-DT-002 ledge
+    # both straps and its #8-32 seat is spotted through the MHA-DT-02 ledge
     # hole, so the pair leaves the hole table like the pinion-block seats. The
     # spring-foot seat, now alone on its #4-40 feature, takes a native callout
     # instead of a note naming a table row that no longer exists.
@@ -498,16 +498,16 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert set(sheet.TRANSFER_PEDESTAL_HOLES) == pedestal_seats
     assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
     assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
+    assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"
     assert sheet.TRANSFER_SPRING_CALLOUT == (
-        f"TRANSFER FROM MHA-DT-024\nAFTER {step_ref('rig-set')};\n"
+        f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"
     )
     assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
 
 
 def test_nameplate_transfer_is_the_declared_fit_up() -> None:
     # Owner ruling 2026-10-15 (#1468): the nameplate taps are spotted through
-    # the actual MHA-FR-004 plate at assembly, declared as RV-01. Its `where`
+    # the actual MHA-FR-04 plate at assembly, declared as RV-01. Its `where`
     # must quote the callout the sheet prints, and the taps must stay out of
     # the hole table (a printed station would reopen the stack).
     import draw_fr_harmonic_base as sheet
@@ -523,7 +523,7 @@ def test_nameplate_transfer_is_the_declared_fit_up() -> None:
     assert fit_up.finding == "fit-up at assembly (rule 19)"
     assert fit_up.reason.endswith("(owner-accepted)")
     assert " ".join(sheet.TRANSFER_NAMEPLATE_CALLOUT.split()) in fit_up.where
-    assert sheet.TRANSFER_NAMEPLATE_CALLOUT.startswith("TRANSFER FROM MHA-FR-004\n")
+    assert sheet.TRANSFER_NAMEPLATE_CALLOUT.startswith("TRANSFER FROM MHA-FR-04\n")
     nameplate_seats = {
         (x, z, part.NAMEPLATE_SCREW_HOLE_DIA) for x, z in part.NAMEPLATE_SCREW_XZ
     }
@@ -711,43 +711,43 @@ def test_callout_clash_check_names_overlaps_and_crowding() -> None:
 # The display data the hb-callout-cal leaf logged for e0e287c83's sheet 2:
 # (anchor, [shoulder/leader lines], [(text, lower-left, height)]), sheet metres.
 E0E287C83_CALLOUTS = {
-    "MHA-DT-018 block transfer": (
+    "MHA-DT-18 block transfer": (
         [0.262, 0.252],
         [(0.278818, 0.216872, 0.304252, 0.243612), (0.278222, 0.216247, 0.278818, 0.216872),
          (0.304252, 0.243612, 0.221335, 0.243612)],
         [("4X ", [0.241215, 0.254832], 0.0035), ("<MOD-DIAM>", [0.247938, 0.254778], 0.0035),
          (" 3.45 ", [0.253216, 0.254832], 0.0035), ("<HOLE-DEPTH>", [0.264854, 0.254778], 0.0035),
-         (" 15.00", [0.269854, 0.254832], 0.0035), ("TRANSFER FROM MHA-DT-018", [0.233047, 0.249222], 0.0035),
+         (" 15.00", [0.269854, 0.254832], 0.0035), ("TRANSFER FROM MHA-DT-18", [0.233047, 0.249222], 0.0035),
          ("AT ASSEMBLY; 8-32 UNC - 2B ", [0.221335, 0.243666], 0.0035),
          ("<HOLE-DEPTH>", [0.284734, 0.243612], 0.0035), (" 12.75", [0.289734, 0.243666], 0.0035)],
     ),
-    "MHA-DT-002 pedestal transfer": (
+    "MHA-DT-02 pedestal transfer": (
         [0.2, 0.252],
         [(0.264616, 0.218237, 0.242252, 0.243612), (0.265187, 0.217589, 0.264616, 0.218237),
          (0.242252, 0.243612, 0.159335, 0.243612)],
         [("2X ", [0.179215, 0.254832], 0.0035), ("<MOD-DIAM>", [0.185938, 0.254778], 0.0035),
          (" 3.45 ", [0.191216, 0.254832], 0.0035), ("<HOLE-DEPTH>", [0.202854, 0.254778], 0.0035),
-         (" 19.50", [0.207854, 0.254832], 0.0035), ("TRANSFER FROM MHA-DT-002", [0.171047, 0.249222], 0.0035),
+         (" 19.50", [0.207854, 0.254832], 0.0035), ("TRANSFER FROM MHA-DT-02", [0.171047, 0.249222], 0.0035),
          ("AT ASSEMBLY; 8-32 UNC - 2B ", [0.159335, 0.243666], 0.0035),
          ("<HOLE-DEPTH>", [0.222734, 0.243612], 0.0035), (" 16.00", [0.227734, 0.243666], 0.0035)],
     ),
-    "MHA-DT-024 spring transfer": (
+    "MHA-DT-24 spring transfer": (
         [0.269, 0.1575],
         [(0.271627, 0.175879, 0.309959, 0.149112), (0.271163, 0.176202, 0.271627, 0.175879),
          (0.309959, 0.149112, 0.229628, 0.149112)],
         [("<MOD-DIAM>", [0.251576, 0.160278], 0.0035), (" 2.26 ", [0.256855, 0.160332], 0.0035),
          ("<HOLE-DEPTH>", [0.268492, 0.160278], 0.0035), (" 11.30", [0.273493, 0.160332], 0.0035),
-         ("TRANSFER FROM MHA-DT-024", [0.240047, 0.154722], 0.0035),
+         ("TRANSFER FROM MHA-DT-24", [0.240047, 0.154722], 0.0035),
          ("AT ASSEMBLY; 4-40 UNC - 2B ", [0.229628, 0.149166], 0.0035),
          ("<HOLE-DEPTH>", [0.293027, 0.149112], 0.0035), (" 9.28", [0.298027, 0.149166], 0.0035)],
     ),
-    "MHA-VN-027 cross-tap": (
+    "MHA-FR-VN-53 cross-tap": (
         [0.285, 0.13],
         [(0.329577, 0.098247, 0.342356, 0.113278), (0.328923, 0.097478, 0.329577, 0.098247),
          (0.342356, 0.113278, 0.229232, 0.113278)],
         [("4X ", [0.262404, 0.141166], 0.0035), ("<MOD-DIAM>", [0.269127, 0.141113], 0.0035),
          (" 4.04 ", [0.274406, 0.141166], 0.0035), ("<HOLE-DEPTH>", [0.286043, 0.141113], 0.0035),
-         (" 48 MIN", [0.291044, 0.141166], 0.0035), ("MHA-VN-027 TUBE CROSS-SCREWS", [0.250907, 0.135556], 0.0035),
+         (" 48 MIN", [0.291044, 0.141166], 0.0035), ("MHA-FR-VN-53 TUBE CROSS-SCREWS", [0.250907, 0.135556], 0.0035),
          ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", [0.230711, 0.13], 0.0035),
          ("DEPTHS FROM SPOTFACE FLOOR", [0.248979, 0.124444], 0.0035),
          ("ON A1-A4 X CENTRES", [0.261375, 0.118888], 0.0035),
@@ -776,11 +776,11 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
         for label, (anchor, lines, texts) in E0E287C83_CALLOUTS.items()
     }
     # The block spans the shoulder and rises to the top row's lower-left plus height.
-    assert callouts["MHA-DT-024 spring transfer"] == pytest.approx((0.229628, 0.149112, 0.309959, 0.163832))
+    assert callouts["MHA-DT-24 spring transfer"] == pytest.approx((0.229628, 0.149112, 0.309959, 0.163832))
     assert sheet.find_callout_clashes(callouts, E0E287C83_OBSTACLES) == [
-        "callout MHA-DT-002 pedestal transfer vs callout MHA-DT-018 block transfer: clearance -14.7 mm",
-        "callout MHA-DT-002 pedestal transfer vs table DetailItem460: clearance -3.4 mm",
-        "callout MHA-DT-024 spring transfer vs view holes top: clearance -4.7 mm",
+        "callout MHA-DT-02 pedestal transfer vs callout MHA-DT-18 block transfer: clearance -14.7 mm",
+        "callout MHA-DT-02 pedestal transfer vs table DetailItem460: clearance -3.4 mm",
+        "callout MHA-DT-24 spring transfer vs view holes top: clearance -4.7 mm",
     ]
 
 
@@ -869,7 +869,7 @@ def test_leader_check_fails_e533ef6fd_leader_through_the_top_view_label() -> Non
     texts["label 'TOP VIEW SCALE 1:4'"] = (x, y - height, x + width, y)
     assert sheet.find_leader_crossings(leaders, texts) == []
     assert sheet.find_callout_clashes(
-        {"MHA-DT-002 pedestal transfer": E533EF6FD_PEDESTAL_BOX},
+        {"MHA-DT-02 pedestal transfer": E533EF6FD_PEDESTAL_BOX},
         {"label": texts["label 'TOP VIEW SCALE 1:4'"]},
     ) == []
 
@@ -879,14 +879,14 @@ def test_leader_check_skips_its_own_callout_box_among_foreign_texts() -> None:
 
     # Among foreign texts a callout's own whole box is skipped (its rows are
     # checked separately, below); a foreign note on the leader's path is not.
-    leaders = {"MHA-DT-024 spring transfer": sheet.leader_segments(E533EF6FD_SPRING_LINES)}
+    leaders = {"MHA-DT-24 spring transfer": sheet.leader_segments(E533EF6FD_SPRING_LINES)}
     texts = {
-        "callout MHA-DT-024 spring transfer": E533EF6FD_SPRING_BOX,
+        "callout MHA-DT-24 spring transfer": E533EF6FD_SPRING_BOX,
         "note on the path": (0.285, 0.160, 0.295, 0.165),
         "note beside it": (0.300, 0.170, 0.310, 0.175),
     }
     assert sheet.find_leader_crossings(leaders, texts) == [
-        "leader of callout MHA-DT-024 spring transfer crosses note on the path"
+        "leader of callout MHA-DT-24 spring transfer crosses note on the path"
     ]
 
 
@@ -895,7 +895,7 @@ E533EF6FD_SPRING_TEXTS = [
     (" 2.26 ", [0.256855, 0.151332], 0.0035),
     ("<HOLE-DEPTH>", [0.268492, 0.151278], 0.0035),
     (" 11.30", [0.273493, 0.151332], 0.0035),
-    ("TRANSFER FROM MHA-DT-024", [0.240047, 0.145722], 0.0035),
+    ("TRANSFER FROM MHA-DT-24", [0.240047, 0.145722], 0.0035),
     ("AT ASSEMBLY; 4-40 UNC - 2B ", [0.229628, 0.140166], 0.0035),
     ("<HOLE-DEPTH>", [0.293027, 0.140112], 0.0035),
     (" 9.28", [0.298027, 0.140166], 0.0035),
@@ -909,10 +909,10 @@ def test_callout_text_rows_centre_each_row_on_the_shoulder() -> None:
     centre = (0.229628 + 0.309959) / 2.0
     assert list(rows) == [
         "<MOD-DIAM> 2.26 <HOLE-DEPTH> 11.30",
-        "TRANSFER FROM MHA-DT-024",
+        "TRANSFER FROM MHA-DT-24",
         "AT ASSEMBLY; 4-40 UNC - 2B <HOLE-DEPTH> 9.28",
     ]
-    assert rows["TRANSFER FROM MHA-DT-024"] == pytest.approx(
+    assert rows["TRANSFER FROM MHA-DT-24"] == pytest.approx(
         (0.240047, 0.145722, 2.0 * centre - 0.240047, 0.149222)
     )
     # The widest row spans the shoulder.
@@ -924,14 +924,14 @@ def test_leader_check_flags_a_leader_through_its_own_rows() -> None:
     through "9.28" of its own thread row (hb-render-2 eye pass)."""
     import draw_fr_harmonic_base as sheet
 
-    leaders = {"MHA-DT-024 spring transfer": sheet.leader_segments(E533EF6FD_SPRING_LINES)}
+    leaders = {"MHA-DT-24 spring transfer": sheet.leader_segments(E533EF6FD_SPRING_LINES)}
     own = {
-        "MHA-DT-024 spring transfer": sheet.callout_text_rows(
+        "MHA-DT-24 spring transfer": sheet.callout_text_rows(
             E533EF6FD_SPRING_LINES, E533EF6FD_SPRING_TEXTS, "spring"
         )
     }
     assert sheet.find_leader_crossings(leaders, {}, own) == [
-        "leader of callout MHA-DT-024 spring transfer crosses its own row "
+        "leader of callout MHA-DT-24 spring transfer crosses its own row "
         "'AT ASSEMBLY; 4-40 UNC - 2B <HOLE-DEPTH> 9.28'"
     ]
     # The same block right of the hole, its leader leaving the near (left)
@@ -943,12 +943,12 @@ def test_leader_check_flags_a_leader_through_its_own_rows() -> None:
         (0.309959 + shift, 0.140112, 0.229628 + shift, 0.140112),
     ]
     moved_texts = [(text, [x + shift, y], h) for text, (x, y), h in E533EF6FD_SPRING_TEXTS]
-    leaders = {"MHA-DT-024 spring transfer": sheet.leader_segments(moved_lines)}
-    own = {"MHA-DT-024 spring transfer": sheet.callout_text_rows(moved_lines, moved_texts, "spring")}
+    leaders = {"MHA-DT-24 spring transfer": sheet.leader_segments(moved_lines)}
+    own = {"MHA-DT-24 spring transfer": sheet.callout_text_rows(moved_lines, moved_texts, "spring")}
     assert sheet.find_leader_crossings(leaders, {}, own) == []
     # A transfer leader drops away from its rows: no finding.
-    pedestal = {"MHA-DT-002 pedestal transfer": sheet.leader_segments(E533EF6FD_PEDESTAL_LINES)}
-    assert sheet.find_leader_crossings(pedestal, {}, {"MHA-DT-002 pedestal transfer": {
+    pedestal = {"MHA-DT-02 pedestal transfer": sheet.leader_segments(E533EF6FD_PEDESTAL_LINES)}
+    assert sheet.find_leader_crossings(pedestal, {}, {"MHA-DT-02 pedestal transfer": {
         "8-32 UNC - 2B <HOLE-DEPTH> 16.00": (0.174589, 0.240888, 0.227000, 0.244388),
     }}) == []
 
@@ -1142,8 +1142,8 @@ def test_datum_origin_boxes_pad_each_axis_for_its_labels() -> None:
     assert boxes["origin X axis"] == pytest.approx((0.2189, 0.1425, 0.2453, 0.1495))
     assert boxes["origin Y axis"] == pytest.approx((0.2055, 0.1555, 0.2125, 0.1775))
     # e533ef6fd's spring callout sat on the X axis and its "X" label.
-    assert sheet.find_callout_clashes({"MHA-DT-024 spring transfer": E533EF6FD_SPRING_BOX}, boxes) == [
-        "callout MHA-DT-024 spring transfer vs origin X axis: clearance -9.4 mm"
+    assert sheet.find_callout_clashes({"MHA-DT-24 spring transfer": E533EF6FD_SPRING_BOX}, boxes) == [
+        "callout MHA-DT-24 spring transfer vs origin X axis: clearance -9.4 mm"
     ]
     with pytest.raises(RuntimeError, match="not 4"):
         sheet.datum_origin_boxes([0.0] * 6)
@@ -1219,9 +1219,9 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
 @pytest.mark.parametrize(
     ("process_name", "expected_process_rows"),
     [
-        ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-018\nAFTER {step_ref('rig-set')};\n"),
-        ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"),
-        ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-024\nAFTER {step_ref('rig-set')};\n"),
+        ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"),
+        ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"),
+        ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"),
         ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
     ],
 )
@@ -1273,7 +1273,7 @@ HB_RENDER_4_CROSS_TAP = (
      (0.342356, 0.103278, 0.229232, 0.103278)],
     [("4X ", [0.262404, 0.131166], 0.0035), ("<MOD-DIAM>", [0.269127, 0.131113], 0.0035),
      (" 4.04 ", [0.274406, 0.131166], 0.0035), ("<HOLE-DEPTH>", [0.286043, 0.131113], 0.0035),
-     (" 48 MIN", [0.291044, 0.131166], 0.0035), ("MHA-VN-027 TUBE CROSS-SCREWS", [0.250907, 0.125556], 0.0035),
+     (" 48 MIN", [0.291044, 0.131166], 0.0035), ("MHA-FR-VN-53 TUBE CROSS-SCREWS", [0.250907, 0.125556], 0.0035),
      ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", [0.230711, 0.12], 0.0035),
      ("DEPTHS FROM SPOTFACE FLOOR", [0.248979, 0.114444], 0.0035),
      ("ON A1-A4 X CENTRES", [0.261375, 0.108888], 0.0035),
@@ -1281,10 +1281,10 @@ HB_RENDER_4_CROSS_TAP = (
      ("<HOLE-DEPTH>", [0.322837, 0.103278], 0.0035), (" 46.00", [0.327838, 0.103331], 0.0035)],
 )
 HB_RENDER_4_BOXES = {
-    "MHA-DT-018 block transfer": (0.233047, 0.240834, 0.292540, 0.261110),
-    "MHA-DT-002 pedestal transfer": (0.171047, 0.240834, 0.230540, 0.261110),
-    "MHA-DT-024 spring transfer": (0.274041, 0.136412, 0.354372, 0.151132),
-    "MHA-VN-027 cross-tap": (0.229232, 0.103278, 0.342356, 0.134666),
+    "MHA-DT-18 block transfer": (0.233047, 0.240834, 0.292540, 0.261110),
+    "MHA-DT-02 pedestal transfer": (0.171047, 0.240834, 0.230540, 0.261110),
+    "MHA-DT-24 spring transfer": (0.274041, 0.136412, 0.354372, 0.151132),
+    "MHA-FR-VN-53 cross-tap": (0.229232, 0.103278, 0.342356, 0.134666),
 }
 
 
@@ -1295,12 +1295,12 @@ def test_callout_rules_fail_the_hb_render_4_cross_tap_block() -> None:
     import draw_fr_harmonic_base as sheet
 
     anchor, lines, texts = HB_RENDER_4_CROSS_TAP
-    rows = sheet.callout_text_rows(lines, texts, "MHA-VN-027 cross-tap")
-    assert sheet.find_tall_callouts({"MHA-VN-027 cross-tap": rows}) == [
-        "callout MHA-VN-027 cross-tap runs 6 rows, over the 4-row note rule"
+    rows = sheet.callout_text_rows(lines, texts, "MHA-FR-VN-53 cross-tap")
+    assert sheet.find_tall_callouts({"MHA-FR-VN-53 cross-tap": rows}) == [
+        "callout MHA-FR-VN-53 cross-tap runs 6 rows, over the 4-row note rule"
     ]
     assert sheet.find_merged_blocks(HB_RENDER_4_BOXES) == [
-        "callout MHA-DT-024 spring transfer over callout MHA-VN-027 cross-tap: "
+        "callout MHA-DT-24 spring transfer over callout MHA-FR-VN-53 cross-tap: "
         "1.7 mm apart, under the 5.6 mm row pitch"
     ]
     assert sheet.find_tall_callouts({"four rows": dict(list(rows.items())[:4])}) == []
@@ -1543,13 +1543,13 @@ def test_no_seat_engages_under_one_and_a_half_d() -> None:
 
 
 def test_hold_down_is_the_specified_screw() -> None:
-    import build_vn_lag_screw as screw
+    import build_fr_vn_lag_screw as screw
 
     assert screw.SKU == screw.SPECIFIED_SKU
 
 
 def test_specified_hold_down_screw_fits_a_derived_seat_without_the_blocker() -> None:
-    from vn_lag_screw_spec import LENGTH_MM
+    from fr_vn_lag_screw_spec import LENGTH_MM
 
     length = LENGTH_MM
     assert length == 19.05  # 3/4 in under the head
@@ -1804,8 +1804,8 @@ def test_underside_round_boss_diameters_name_their_level_and_holes() -> None:
         *part.NAMEPLATE_SCREW_XZ,
     )
     callouts = sheet.UNDERSIDE_BOTTOM_CALLOUTS
-    assert callouts["HangingBossDia"] == "5X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
-    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, MHA-FR-004\nTO SHALLOW LEVEL"
+    assert callouts["HangingBossDia"] == "5X BOSSES UNDER\nE1-E4, MHA-DT-24\nTO DEEP LEVEL"
+    assert callouts["ShallowBoss4Dia"] == "6X BOSSES UNDER\nB1, D1, MHA-FR-04\nTO SHALLOW LEVEL"
     assert sheet.UNDERSIDE_SECTION_CALLOUTS == {
         "DeepBossBottom": "DEEP\nLEVEL",
         "ShallowBossBottom": "SHALLOW\nLEVEL",
@@ -2020,7 +2020,7 @@ def _pads_printed() -> dict[str, float]:
 def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
     # Codex P2 on #1310: the 33 mm block pads, 26 mm pedestal pads, cone-lock
     # pad and 27 x 37 mm lugs printed no size or place; the bp3 machinist
-    # review: nor did the ribs or the MHA-DT-024 foot boss. Sheet 4 prints
+    # review: nor did the ribs or the MHA-DT-24 foot boss. Sheet 4 prints
     # them from the hole table's X0 Y0, shortest baseline innermost.
     import draw_fr_harmonic_base as sheet
 
@@ -2073,7 +2073,7 @@ def test_underside_pads_sheet_prints_each_pad_and_lug_from_x0_y0() -> None:
 
 
 def test_underside_pads_sheet_locates_the_nameplate_bosses_from_x0_y0() -> None:
-    # plate-r1 review (blocker): the four MHA-FR-004 bosses had no location
+    # plate-r1 review (blocker): the four MHA-FR-04 bosses had no location
     # anywhere -- their taps are transferred, so the hole table holds none.
     # Two Xs and two Ys pin the rectangle: k2 is rear-west, k0 rear-east and
     # k3 front-west, and the four taps square up.
@@ -2332,7 +2332,7 @@ def test_underside_pads_texts_fit_the_border_clear_of_each_other_and_every_line(
 
 def test_nameplate_seats_are_transferred_through_the_plate() -> None:
     # #628 (Main ruling, option A): the four #4-40 taps are spotted through
-    # the finished MHA-FR-004 plate at assembly, so they leave the hole table
+    # the finished MHA-FR-04 plate at assembly, so they leave the hole table
     # (the former F rows) and their one callout names the plate.
     import draw_fr_harmonic_base as sheet
 
@@ -2340,7 +2340,7 @@ def test_nameplate_seats_are_transferred_through_the_plate() -> None:
     assert set(sheet.TRANSFER_NAMEPLATE_HOLES) == seats
     assert seats <= set(sheet.TRANSFER_HOLES)
     assert not seats & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_NAMEPLATE_CALLOUT == "TRANSFER FROM MHA-FR-004\nAT ASSEMBLY;"
+    assert sheet.TRANSFER_NAMEPLATE_CALLOUT == "TRANSFER FROM MHA-FR-04\nAT ASSEMBLY;"
     assert not any(tag.startswith("F") for tag in sheet.HOLE_TAG_POSITIONS)
     # The leader lands on the plan's right, upper (rear-east) tap.
     taps = [sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z, _ in seats]
@@ -2359,7 +2359,7 @@ def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() 
     import draw_fr_harmonic_base as sheet
 
     spring = sheet.callout_text_box(
-        *E0E287C83_CALLOUTS["MHA-DT-024 spring transfer"], "spring"
+        *E0E287C83_CALLOUTS["MHA-DT-24 spring transfer"], "spring"
     )
     half_w = (spring[2] - spring[0]) / 2.0
     half_h = (spring[3] - spring[1]) / 2.0
@@ -2394,7 +2394,7 @@ def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() 
 def test_rig_callouts_cite_the_drive_train_rig_set_step() -> None:
     # User ruling P1-2: the rig seats are spotted only after the rig is set.
     # plate-r1 review (over-specification): the five-line RIG SET procedure
-    # was an assembly set-up for other parts, so it lives on MHA-DT-000 and
+    # was an assembly set-up for other parts, so it lives on MHA-DT-00 and
     # each rig callout cites that step by key, never a typed number. The
     # pedestal seats are not rig seats.
     import inspect
@@ -2403,7 +2403,7 @@ def test_rig_callouts_cite_the_drive_train_rig_set_step() -> None:
     import dt_drive_train_steps as steps
 
     cite = f"AFTER {step_ref('rig-set')};"
-    assert cite == f"AFTER MHA-DT-000 STEP {steps.step_number('rig-set')};"
+    assert cite == f"AFTER MHA-DT-00 STEP {steps.step_number('rig-set')};"
     assert steps.step_number("rig-set") < steps.step_number("rig-seats-transferred")
     for text in (sheet.TRANSFER_BLOCK_CALLOUT, sheet.TRANSFER_SPRING_CALLOUT):
         lines = text.rstrip("\n").split("\n")
@@ -2431,7 +2431,7 @@ def _pivot_seat_note_box(xy: tuple[float, float]) -> tuple[float, float, float, 
 
 
 def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
-    """The pivot seat is held +-0.05 to the MHA-DT-002 seats, in one setup with
+    """The pivot seat is held +-0.05 to the MHA-DT-02 seats, in one setup with
     them (cone_set_stack); the note's offsets are the model's, measured from
     the nearer seat in table axes (X right, Y = -z). plate-r1 review: the note
     names its table tag, D1 (r4), and says its table location is reference,
@@ -2454,7 +2454,7 @@ def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
     assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
     assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>{band:.2f}" in sheet.PIVOT_SEAT_STEP
     assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
-    assert "MHA-DT-002" in sheet.PIVOT_SEAT_STEP
+    assert "MHA-DT-02" in sheet.PIVOT_SEAT_STEP
     lines = sheet.PIVOT_SEAT_STEP.split("\n")
     assert sheet.PIVOT_SEAT_TAG == "D1"
     assert lines[0].startswith("D1 PIVOT SEAT:")

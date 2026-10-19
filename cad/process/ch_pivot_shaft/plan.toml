@@ -1,5 +1,5 @@
 # Adapted from https://github.com/pedropaulovc/prechips/blob/55cae713860a491b8925aed1ad8a24fb30502fe0/examples/pivot-shaft/plan.toml
-# Hand-authored reference plan for MHA-CH-005 (pivot shaft), rev 9: a PLAIN
+# Hand-authored reference plan for MHA-CH-05 (pivot shaft), rev 9: a PLAIN
 # Ø6.35 rod with two set-screw flats, finished to its overall length on the
 # part (machinist review, fleet pass: nothing is cut to fit at assembly).
 # Owner ruling 2026-10-16: the shaft is MACHINED FROM ROUGH STOCK, not used as
@@ -24,7 +24,7 @@ construction = "one_piece"   # author's route: all shaft geometry cut from the d
 quantity = 1                 # harmonic-analyzer/cad/config/parts/ch-pivot-shaft.yaml:ch-pivot-shaft.quantity
 
 [drawing]
-number = "MHA-CH-005"        # parts/ch-pivot-shaft.yaml:ch-pivot-shaft.number
+number = "MHA-CH-05"        # parts/ch-pivot-shaft.yaml:ch-pivot-shaft.number
 revision = "unknown"         # release/operator matching pending
 
 [paths]

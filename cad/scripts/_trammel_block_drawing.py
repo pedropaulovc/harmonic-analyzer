@@ -1,7 +1,7 @@
 """Sheet layout and view helpers shared by the two trammel block drawings.
 
-``draw_ch_rocker_arm_tl_trammel_pivot_block`` (MHA-CH-006-TL-14) and
-``draw_ch_rocker_arm_tl_trammel_scriber_block`` (MHA-CH-006-TL-15) draw the
+``draw_ch_rocker_arm_tl_trammel_pivot_block`` (MHA-CH-06-TL-14) and
+``draw_ch_rocker_arm_tl_trammel_scriber_block`` (MHA-CH-06-TL-15) draw the
 same 50 x 38.1 x 19.05 block at 2:1 in the same four views plus section A-A
 through a pinch screw; a drawing script may not import another, so the
 layout lives here.

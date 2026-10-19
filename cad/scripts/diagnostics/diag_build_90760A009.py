@@ -1,7 +1,7 @@
 r"""McMaster 90760A009 -- zinc-plated steel small-pattern hex nut, #8-32.
 
-Used as vn-pen-hanger-jam-nut (MHA-VN-064), the thin nut jammed against the
-MHA-VN-063 nut on the pen-hanger screw.  The catalogue facts are
+Used as pn-vn-pen-hanger-jam-nut (MHA-PN-VN-55), the thin nut jammed against the
+MHA-PN-VN-54 nut on the pen-hanger screw.  The catalogue facts are
 ``_mcmaster_90760a009``'s.  The model is the 92671A115 recipe at this size:
 one Top-plane profile -- the hexagon (flats normal to the sketch X) with the
 bore circle inside it -- extruded blind THICKNESS along +Y from the y = 0

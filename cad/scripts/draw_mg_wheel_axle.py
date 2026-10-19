@@ -69,7 +69,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # Every view prints at the sheet scale, so none needs a caption. 3:1 lays the
-# pin (about 56 with the MHA-MG-011 spacer's length in it) about 168 mm long,
+# pin (about 56 with the MHA-MG-11 spacer's length in it) about 168 mm long,
 # its 3/16 shank 14 mm across, and keeps the isometric (model +Y up the sheet,
 # about 137 mm tall) inside the border; 4:1 ran both off the sheet.
 SHEET_SCALE = (3.0, 1.0)

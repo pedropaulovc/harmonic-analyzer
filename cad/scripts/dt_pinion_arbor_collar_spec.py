@@ -2,10 +2,10 @@ r"""Pure-data dimensional contract shared by the pinion-arbor collar and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  R1a (user, 2026-09-24): the collar is
-bench-drilled and slides on MHA-DT-022 from its back crown end before the arbor
+bench-drilled and slides on MHA-DT-22 from its back crown end before the arbor
 is journaled; the rig's 1/16 in slotted spring pin, driven through both at
 the arbor's printed pin station, fixes it there.  Its inboard face then
-stands clear of the front MHA-DT-014 strap's outer face at every corner of the
+stands clear of the front MHA-DT-14 strap's outer face at every corner of the
 printed bands, so it never locates anything: if the drum's Loctite 638 bond
 ever let go, it stops the arbor walking north (toward the back) after the
 gap closes.  U27: the gap grows to absorb the .X bands, none is tightened.
@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 from itertools import product
 
-import vn_pinion_strap_pin_spec as _pin
+import dt_vn_pinion_strap_pin_spec as _pin
 from dt_pinion_arbor_collar_geometry import (
     BORE as BORE,
     COLLAR_LEN as COLLAR_LEN,
@@ -40,7 +40,7 @@ from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
 from dt_pinion_bracket_geometry import THICKNESS_BAND as STRAP_T_BAND
 from pinion_rig_layout import RIG_MARGIN_SPARE
 
-# The rig's one pin family (vn_pinion_strap_pin_spec): a 1/16 x 1/2 slotted
+# The rig's one pin family (dt_vn_pinion_strap_pin_spec): a 1/16 x 1/2 slotted
 # spring pin in a 1/16 drilled hole carrying its own functional band.
 PIN_HOLE = _pin.HOLE_DIA
 PIN_HOLE_BAND = _pin.HOLE_BAND
@@ -48,8 +48,8 @@ PIN_HOLE_MAX = _pin.HOLE_MAX
 PIN_LEN = _pin.PIN_LEN  # 1/2 in: 1.15 sub-flush each side of the Ø15 OD
 PIN_LEN_TOL = _pin.PIN_LEN_BAND
 
-ARBOR_NUMBER = "MHA-DT-022"
-STRAP_NUMBER = "MHA-DT-014"
+ARBOR_NUMBER = "MHA-DT-22"
+STRAP_NUMBER = "MHA-DT-14"
 # Drilled Ø8 slide fit over the arbor (Ø8 -0.01/-0.10, lands -0.01/-0.03).
 # The title block's DRILLED HOLES row (+0.10/0) governs it and is NOT printed
 # on the dimension (drawing-guidelines.md rule 2 (the title block is the general specification)); the band is restated here only for the
@@ -93,7 +93,7 @@ def collar_strap_gaps() -> tuple[float, float]:
     """Least and greatest air between the collar's inboard face and the front
     strap's outer face, over every corner of the printed bands.
 
-    Stations run from MHA-DT-022's head rear face toward the back.  The strap's
+    Stations run from MHA-DT-22's head rear face toward the back.  The strap's
     outer face sits DRUM_STATION less the drum's front air and the strap
     thickness; the collar's inboard face sits one pin-to-face distance past
     the pin, and that distance runs over the length AND pin-station bands
@@ -151,7 +151,7 @@ PIN_SUB_FLUSH_WORST = (COLLAR_OD - OD_BAND - (PIN_LEN + PIN_LEN_TOL)) / 2.0
 # under the floor.  So the acceptance bounds the difference between the two
 # end depths: with it under D, the deeper end sits at most D / 2 past centred,
 # and the far wall keeps (L - D - bore) / 2 at any OD.  D is the loosest 0.1
-# step that holds the rig's one-pin-diameter grip (vn_pinion_strap_pin_spec).
+# step that holds the rig's one-pin-diameter grip (dt_vn_pinion_strap_pin_spec).
 PIN_WALL_ENGAGEMENT_FLOOR = _pin.PIN_WALL_ENGAGEMENT_FLOOR
 _PIN_LEN_MIN = PIN_LEN - PIN_LEN_TOL
 _BORE_MAX = BORE + BORE_BAND[0]
@@ -194,10 +194,10 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked collar dimension needs authored places")
 
-# The pin is the stock MHA-VN-033 (McMaster 98296A027): its own BOM line and a
+# The pin is the stock MHA-DT-VN-63 (McMaster 98296A027): its own BOM line and a
 # modelled drive-train component.  So the collar sheet carries no supply note
-# (the MHA-DT-014 strap precedent); the hole callout names the pin it takes,
-# the same callout MHA-DT-022 prints for the same pin (PIN_NUMBER and
+# (the MHA-DT-14 strap precedent); the hole callout names the pin it takes,
+# the same callout MHA-DT-22 prints for the same pin (PIN_NUMBER and
 # PIN_HOLE_CALLOUT come from dt_pinion_arbor_pin_spec).
 BORE_CALLOUT = f"DRILL THRU\nSLIDES ON {ARBOR_NUMBER}"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
@@ -207,7 +207,7 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 # Ø8 bore passes neither the Ø15 head nor a drum already bonded at the drum
 # station.  The front strap, journaled between the collar and the drum, is
 # trapped the same way, so it follows the collar on before the bond.
-COLLAR_NUMBER = "MHA-DT-033"
+COLLAR_NUMBER = "MHA-DT-33"
 ASSEMBLY_STEP = "\n".join(
     (
         f"BEFORE THE DRUM BOND: SLIDE {COLLAR_NUMBER} ONTO {ARBOR_NUMBER} FROM ITS",

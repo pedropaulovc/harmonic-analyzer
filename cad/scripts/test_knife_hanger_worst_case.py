@@ -1,5 +1,5 @@
-"""Worst case of the cut #10-24 plain hex knife hanger (MHA-VN-024
-in MHA-SM-002, new SAE washer, keyed by MHA-VN-051), from real spec constants.
+"""Worst case of the cut #10-24 plain hex knife hanger (MHA-SM-VN-52
+in MHA-SM-02, new SAE washer, keyed by MHA-SM-VN-53), from real spec constants.
 
 The retired 1/2-13 hanger broke its tap-drill point into the knife bore crown
 and needed a drawing exception. The current proof charges the printed depth,
@@ -21,9 +21,9 @@ import build_sm_summing_assembly as asm
 import fr_top_frame_spec as top_frame
 import sm_knife_mount_spec as knife_mount
 import sm_summing_lever_spec as lever
-import vn_knife_hanger_stud_spec as screw
-import vn_knife_hanger_washer_spec as washer
-import vn_knife_mount_dowel_spec as dowel
+import sm_vn_knife_hanger_stud_spec as screw
+import sm_vn_knife_hanger_washer_spec as washer
+import sm_vn_knife_mount_dowel_spec as dowel
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import drilled_oversize_mm
 
@@ -167,7 +167,7 @@ def test_the_screw_reach_holds_engagement_and_stays_in_the_thread() -> None:
     assert asm.HANGER_UNDERHEAD_Y == pytest.approx(1037.4827)
     assert asm.HANGER_STUD_Y == pytest.approx(990.7827)
     assert asm.HANGER_REACH == pytest.approx(8.9173)
-    # MHA-SM-000 cuts each bolt to its measured stack plus 8.92 +/-0.15.
+    # MHA-SM-00 cuts each bolt to its measured stack plus 8.92 +/-0.15.
     assert asm.HANGER_REACH_MIN == pytest.approx(8.77)
     assert asm.HANGER_REACH_MAX == pytest.approx(9.07)
     # Cut-tip lead costs one incomplete pitch: 7.7116667 >= 1.5D =7.239.

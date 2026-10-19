@@ -12,10 +12,10 @@ MM_PER_IN = 25.4
 SHAFT_DIA = 0.375 * MM_PER_IN  # ch13: = cam bore (legacy parameters.kcl)
 SHAFT_RADIUS = SHAFT_DIA / 2.0
 # #743 (supersedes U34b's "span less 6.0"): the arbor runs the FULL depth of
-# both pedestal straps, where the MHA-VN-034 apex set screws bear on it, and each
+# both pedestal straps, where the MHA-DT-VN-64 apex set screws bear on it, and each
 # end stands a dome proud of its strap's outer face -- the bright dome the
 # photographs show on each pedestal (ch13 p.23/25, ch25 p.67). So the
-# cylindrical length IS the span over both installed MHA-DT-002 straps, which the
+# cylindrical length IS the span over both installed MHA-DT-02 straps, which the
 # fitter measures; the stock is cut two domes longer and both ends are domed
 # into it. The span is a REFERENCE value, not a machining target, and its
 # nominal and the dome height are the bank's own geometry
@@ -23,19 +23,19 @@ SHAFT_RADIUS = SHAFT_DIA / 2.0
 # import the layout, which reaches it through dt_cylinder_gear_spec).
 SHAFT_DIA_BAND = SHAFT_H
 # The print's one statement of how the length is set: the fitter measures the
-# span over both installed MHA-DT-002 straps (drive-train assembly steps 8-9 carry
+# span over both installed MHA-DT-02 straps (drive-train assembly steps 8-9 carry
 # the same measurement) and that span is the cylinder, so its acceptance is
 # that both dome roots (the cylinder's ends) finish at the straps' outer
 # faces, each dome standing proud beyond (r1 machinist review: "span over"
 # alone left the end condition open; PR #1658 Codex review: a bare "ENDS
 # FLUSH" reads as the dome tips, 3 mm short).
-LENGTH_CALLOUT = "CUT TO FIT: DOME ROOTS AT MHA-DT-002 OUTER FACES"
+LENGTH_CALLOUT = "CUT TO FIT: DOME ROOTS AT MHA-DT-02 OUTER FACES"
 DOME_CALLOUT = "BOTH ENDS"
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the O.D. band exists for the 20 MHA-DT-012 gears that run on it (their
-# bores are matched to this finished bar) and the two MHA-DT-002 strap bores
+# the O.D. band exists for the 20 MHA-DT-12 gears that run on it (their
+# bores are matched to this finished bar) and the two MHA-DT-02 strap bores
 # it fills, so the callout names both at the dimension.
-SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-012 AND MHA-DT-002 BORES"
+SHAFT_DIA_CALLOUT = "RUNNING FIT IN MHA-DT-12 AND MHA-DT-02 BORES"
 ARBOR_BEARING_PROBE_Y_MM = 10.0
 
 # The arbor is one plain cylinder extruded +Y from the origin (y 0..ARBOR_LENGTH,
@@ -63,7 +63,7 @@ SURFACE_FINISHES = (
 # arc over the same dome's silhouette carries its spherical radius, which the
 # sheet prints as a reference: the height on the toleranced diameter already
 # fixes it, but a bare height did not say the end is a spherical cap (r1
-# machinist review; the MHA-CH-005 and MHA-DT-001 domes print the same way).
+# machinist review; the MHA-CH-05 and MHA-DT-01 domes print the same way).
 REFERENCE_SKETCHES = ("DomeReference",)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

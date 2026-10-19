@@ -1,7 +1,7 @@
-r"""Pure-data contract for the oblique-trammel jig's acetal riser (MHA-CH-006-TL-24).
+r"""Pure-data contract for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The riser
-is screwed flat on the carrier top (MHA-CH-006-TL-21) under the strap blank,
+is screwed flat on the carrier top (MHA-CH-06-TL-21) under the strap blank,
 so the cutter that profiles the strap runs out into acetal rather than the
 aluminium carrier.
 
@@ -19,7 +19,7 @@ the carrier's, so every hole position is its carrier-frame position minus
 
 Hole locations come from the carrier at assembly: the riser is cut in place
 on the carrier, so its seven holes are spotted through the carrier's finished
-holes and taps (the TL-000 assembly sequence). The sheet prints every station
+holes and taps (the TL-00 assembly sequence). The sheet prints every station
 as a REFERENCE value in parentheses at 2 places, with one note naming the
 mate; the model holds the stations rounded to 0.01 (under 0.005 from the
 calculator). Only the hole sizes carry bands.
@@ -40,7 +40,7 @@ Holes, all THRU from the top face:
   countersink's edges of each hole, so a native hole callout there is not the
   wizard's (farm runs jig-r3/r4).
 * HUB clearance Ø12 at ``HUB`` ⚙ = (0, 45.526): passes the HUB locator pin's
-  Ø10.20 g6 section (MHA-CH-006-TL-25).
+  Ø10.20 g6 section (MHA-CH-06-TL-25).
 * CL and CR clearance Ø6.60 at ``CL`` / ``CR`` ⚙ = (∓160.895, 29.350): pass
   the CL Ø6 m6 dowel (6.012 max, 0.29 radial) and the CR 1/4-20 clamp screw
   (6.35 major, 0.125 radial), and leave ``CLAMP_BAND_WALLS`` (2.52 inner, 2.02

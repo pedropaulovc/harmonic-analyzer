@@ -1,4 +1,4 @@
-r"""Pure-data dimensional contract for the rocker pivot bracket (MHA-CH-008).
+r"""Pure-data dimensional contract for the rocker pivot bracket (MHA-CH-08).
 
 PURE DATA, no SolidWorks/COM imports: ``build_ch_pivot_bracket`` builds from it,
 and ``rocker_bank_layout`` / the channel assembly read the ear and foot from
@@ -11,10 +11,10 @@ EAR_T thick (Z), centred on the origin, rising from the foot top and ARCHED
 with radius EAR_W/2 over the O BORE_DIA cross-bore, its apex EAR_TOP_Y over
 the seat (the arch's centre ARCH_LIFT above the bore axis). The ear is as
 wide as the foot, so their sides are one flat each side. Each ear's inner
-face bears on a MHA-VN-070 thrust washer: hub 19's at the north ear (the
+face bears on a MHA-CH-VN-56 thrust washer: hub 19's at the north ear (the
 bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
 
-One MHA-VN-034 #4-40 cup-point set screw drops through the arch apex, on the
+One MHA-CH-VN-53 #4-40 cup-point set screw drops through the arch apex, on the
 ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
 2026-10-10). EAR_T is 8.0 (was 6.0) so the tap keeps its walls to both ear
 faces; the apex stands 35.00 over the seat, 9.80 over the bore (was the R8
@@ -54,7 +54,7 @@ HEIGHT_BAND = 0.508  # title-block .XX: the overall and the bore heights
 APEX_ABOVE_BORE = EAR_TOP_Y - BORE_H  # 9.80
 ARCH_LIFT = APEX_ABOVE_BORE - EAR_ARCH_R  # 1.80: the arch centre over the bore
 BORE_LIGAMENT = APEX_ABOVE_BORE - BORE_DIA / 2.0  # 6.55: drawing-guidelines.md rule 17 (walls and webs) web over the bore
-# The MHA-VN-071 hold-down passes here: #8 close clearance, the hole MHA-DT-002
+# The MHA-CH-VN-57 hold-down passes here: #8 close clearance, the hole MHA-DT-02
 # gives its #8-32 fillister of the same head. The old #19 (0.025 radial over the thread major)
 # caught the screw's under-head junction fillet on its mouth (r743-3C).
 HOLD_DOWN_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
@@ -124,7 +124,7 @@ ARCH_R_BAND = 0.508
 BORE_RADIUS_MAX = (BORE_DIA + DRILL_GROWTH) / 2.0
 
 # --- apex set screw (user, 2026-10-10) ----------------------------------------
-# One MHA-VN-034 #4-40 x 1/4 cup-point set screw drops radially through the
+# One MHA-CH-VN-53 #4-40 x 1/4 cup-point set screw drops radially through the
 # arch apex on the ear's mid-plane, onto the pivot shaft's flat. The tap runs
 # THROUGH to the bore and stops there (through-next), the arbor pedestal's
 # idiom (dt_arbor_pedestal_spec), never into the ear below the bore.
@@ -133,7 +133,7 @@ SET_SCREW_PITCH = 25.4 / 40.0
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]
 # The cup end the flat must take: the vendor's 45 deg x one-pitch point
-# chamfer off the major (vn_arbor_set_screw_spec.POINT_LENGTH).
+# chamfer off the major (_mcmaster_91375a106.POINT_LENGTH).
 SET_SCREW_POINT_DIA = SET_SCREW_MAJOR_DIA - 2.0 * SET_SCREW_PITCH  # 1.575
 # The tap sits on the ear's mid-plane, held +/-0.10 from the inboard face;
 # that face's mid-plane is itself half the thickness band off, so the tap
@@ -181,7 +181,7 @@ SET_SCREW_ENGAGEMENT_PRINTED = int(SET_SCREW_ENGAGEMENT_D * 100.0) / 100.0
 SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # drawing-guidelines.md rule 18 (thread engagement)
 if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     raise AssertionError(
-        f"MHA-CH-008 apex set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full"
+        f"MHA-CH-08 apex set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full"
         f" thread, under {SET_SCREW_MIN_ENGAGEMENT_D}D"
     )
 # The engagement as a plain fact. The bracket sheet no longer prints it (it

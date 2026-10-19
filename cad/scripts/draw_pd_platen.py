@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the platen plate (MHA-PD-002).
+r"""Create the curated machinist drawing for the platen plate (MHA-PD-02).
 
 The platen is a 269.64 x 134.82 brass plate, 3.85 thick, with four Ø7 bosses
 standing proud of its back face round the #2-56 clip-screw through taps and
@@ -230,7 +230,7 @@ SECTION_KEEP_NAMES = frozenset(SECTION_TEXT_MODEL_MM)
 # disc, by number: r7 review); the floor is a reference dimension (the
 # user-accepted exception) that also states its printed worst case
 # (pd_platen_spec.CBORE_FLOOR_CALLOUT); the bosses say what they are.
-DISC_NUMBER = "MHA-PD-006"
+DISC_NUMBER = "MHA-PD-06"
 DIMENSION_CALLOUTS_ABOVE = {"Depth": f"SETS AIR TO {DISC_NUMBER} DISC"}
 DIMENSION_CALLOUTS_BELOW = {
     "CboreFloor": CBORE_FLOOR_CALLOUT,  # pd-platen RV-02
@@ -273,7 +273,7 @@ GUIDE_CALLOUT_XY = (0.128, 0.248)
 # Four rows at most (r4 tall-block): the drill, the far-side counterbore and
 # the screw whose heads it sinks share one (r5 asked for the process word).
 GUIDE_CALLOUT_PROCESS = (
-    "PATTERN MATCHES MHA-PD-011\nDRILL, C'BORE FAR SIDE FOR MHA-VN-006\n"
+    "PATTERN MATCHES MHA-PD-11\nDRILL, C'BORE FAR SIDE FOR MHA-PD-VN-52\n"
 )
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S
@@ -282,7 +282,7 @@ SOCKET_EDGE_XY = (
     _front_y(_SOCKET_HIGH_Y) + SOCKET_DRILL_R_SHEET * _DIAG,
 )
 SOCKET_CALLOUT_XY = (0.215, 0.252)
-SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-003\nTAP"  # pd-platen RV-01
+SOCKET_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-03\nTAP"  # pd-platen RV-01
 # The template centre-marks every hole as the view is placed (an explicit
 # AutoInsertCenterMarks2 printed all 28 marks twice in r1); the front view
 # proves exactly one mark per hole.

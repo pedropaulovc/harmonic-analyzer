@@ -1,5 +1,5 @@
 pd-guide-lock:
-  number: MHA-PD-012
+  number: MHA-PD-12
   # 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied; the
   # sheet's +/-0.005 in mill band is the one the lock-station sweep and the
   # screw engagement spend (pd_guide_lock_spec.LOCK_THICK_BAND).

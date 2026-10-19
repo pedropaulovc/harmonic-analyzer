@@ -18,13 +18,13 @@ import _config
 import _drawing_sections
 import build_fr_frame_assembly as frame
 import build_fr_rocker_arm_support as support
-import build_vn_lag_screw as stock_screw
+import build_fr_vn_lag_screw as stock_screw
 import draw_fr_rocker_arm_support as drawing
 import fr_rocker_arm_support_drawing_spec as drawing_spec
 import fr_rocker_arm_support_section_spec as section
 import fr_rocker_arm_support_spec as placement
 import rocker_bracket_seat_layout as seats
-import vn_lag_screw_spec as screw
+import fr_vn_lag_screw_spec as screw
 
 
 def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
@@ -62,7 +62,7 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
         "PocketEndStation": "BOTH SIDES",
         "PocketBottomStation": "BOTH SIDES",
-        "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-008\nSEAT TAPS IN WEB",
+        "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB",
     }
     part_owned = {
         "PocketFloorRadius",
@@ -602,7 +602,7 @@ def test_bracket_seats_sit_under_the_bracket_holes() -> None:
 
 
 def test_bracket_screw_stack_holds_at_the_printed_worst_case() -> None:
-    # MHA-VN-071 #8-32 x 5/8 through MHA-CH-008's 6.0 (.XX) foot (owner Q13c).
+    # MHA-CH-VN-57 #8-32 x 5/8 through MHA-CH-08's 6.0 (.XX) foot (owner Q13c).
     assert seats.SCREW_REACH_MIN == pytest.approx(15.875 - 0.76 - 6.508)
     assert seats.SCREW_REACH_MAX == pytest.approx(15.875 - 5.492)
     assert seats.ENGAGEMENT_MIN >= 1.5 * seats.SCREW_MAJOR_DIA
@@ -1248,7 +1248,7 @@ def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_cor
     assert radius[1] < corner_y < radius[3] + 0.003
 
 
-FLAT_PLUS_TEXT = "2.12\nBOTH SIDES\nKEEPS MHA-CH-008\nSEAT TAPS IN WEB"
+FLAT_PLUS_TEXT = "2.12\nBOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB"
 # The sheet's left inner border (r7 layout audit: the 6.35's block at 11.1 mm
 # crossed it by 1.58 mm).
 SHEET_LEFT_INNER_BORDER_X = 0.0127
@@ -1368,7 +1368,7 @@ def _boxes_clear(a: tuple[float, ...], b: tuple[float, ...], gap: float) -> bool
 # One chamfer feature (RimChamfer) breaks every outside edge, both pocket rims
 # and the cavity rims on both web faces, so the size's caption names them all:
 # outside chamfers drawn with no size contradict the title block's 0.25 MAX
-# edge break (machinist review, MHA-FR-005 blocker).
+# edge break (machinist review, MHA-FR-05 blocker).
 RIM_CHAMFER_CALLOUT = " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS"
 RIM_CHAMFER_TEXT = "1.3\n" + RIM_CHAMFER_CALLOUT.strip()
 

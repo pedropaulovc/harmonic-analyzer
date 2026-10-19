@@ -1,4 +1,4 @@
-"""Offline release contracts for separate through hub MHA-DT-031."""
+"""Offline release contracts for separate through hub MHA-DT-31."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
 
 def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
     """Codex P2 on 16146c26f: the arm is pressed to the barrel's front face,
-    and the seat is turned to whatever MHA-DT-006 bore it meets.  At the printed
+    and the seat is turned to whatever MHA-DT-06 bore it meets.  At the printed
     limits the largest bore (.X) plus the tightest press stands inside the
     smallest barrel the sheet allows; after the arm bore's and the barrel
     corner's edge breaks a land at least one edge break wide must be left."""
@@ -66,7 +66,7 @@ def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
 
 
 def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
-    # CONTRACT-crank MHA-DT-031: 8 seat + 17.2 of hub behind the shoulder (19
+    # CONTRACT-crank MHA-DT-31: 8 seat + 17.2 of hub behind the shoulder (19
     # until the seat face moved 1.8 forward, ruling 2026-09-30), the ream
     # station unchanged 5.6 from the shoulder at .XX.  The rear 3.85 is the
     # chain-plate relief (Main, 2026-09-30; lengthened from 3.6 for the
@@ -125,7 +125,7 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     # drawing-guidelines.md rule 17 (walls and webs) wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
     assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.705, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
-    # The MHA-DT-009 ream stays on the full barrel.
+    # The MHA-DT-09 ream stays on the full barrel.
     assert (
         geometry.SERVICE_PIN_STATION + geometry.SERVICE_PIN_REAM_RADIUS_MAX
         < geometry.RELIEF_STATION
@@ -253,11 +253,11 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): no general notes; each matched fit sits on its feature.
     assert not hasattr(dt_crank_hub_spec, "DRAWING_NOTES")
     seat = dt_crank_hub_notes.SEAT_CALLOUT
-    # B1 (Main 2026-09-25): turned to suit the MHA-DT-006 bore, with the press
+    # B1 (Main 2026-09-25): turned to suit the MHA-DT-06 bore, with the press
     # interference printed from the notes constant.
     low, high = dt_crank_hub_notes.SEAT_PRESS_INTERFERENCE
     assert seat.splitlines() == [
-        "TURN TO SUIT MHA-DT-006 BORE",
+        "TURN TO SUIT MHA-DT-06 BORE",
         f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
         "DIAMETRAL INTERFERENCE;",
         "FACES FLUSH",
@@ -267,7 +267,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # nominal prints as a reference.
     assert dt_crank_hub_spec.REFERENCE_DIMENSIONS == {"SeatDia"}
     seam = dt_crank_hub_notes.SEAM_CALLOUT
-    assert "MHA-DT-006" in seam and "MHA-VN-029" in seam and "LIGHT DRIVE FIT" in seam
+    assert "MHA-DT-06" in seam and "MHA-DT-VN-59" in seam and "LIGHT DRIVE FIT" in seam
     assert "AT ASSEMBLY" in seam and "SEAM" in seam
     # Size first, then the process, in the order the work is done.
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
@@ -275,7 +275,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     # The taper-pin cross-hole names both mates and the fit on its callout,
     # after the front face is set flush with the datum it is reamed at.
     cross_hole = dt_crank_hub_notes.CROSS_HOLE_CALLOUT
-    assert "MHA-DT-009" in cross_hole and "MHA-DT-011" in cross_hole
+    assert "MHA-DT-09" in cross_hole and "MHA-DT-11" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
     flush = cross_hole.index("FRONT FACE FLUSH")
     assert flush < cross_hole.index("TAPER-REAM")
@@ -289,7 +289,7 @@ def _flat(text: str) -> str:
 
 def _names_the_dome_root(datum: str) -> bool:
     words = datum.split()
-    return datum.endswith("DOME ROOT") and "MHA-DT-011" in words and "END" not in words
+    return datum.endswith("DOME ROOT") and "MHA-DT-11" in words and "END" not in words
 
 
 def _sets_hub_on(text: str, datum: str) -> bool:
@@ -302,7 +302,7 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     shaft part's origin, CRANK_FACE_Z); the dome tip stands proud of it.  Set
     flush with the shaft END, the hub would sit a dome height forward and open
     the hub/T12 air past the drive pins' proud length.  Both texts that place
-    the hub -- its cross-hole callout and the MHA-DT-000 hub step -- print the
+    the hub -- its cross-hole callout and the MHA-DT-00 hub step -- print the
     one datum, and the callout sets it before the taper-ream."""
     import build_dt_drive_train_assembly as assembly
     import draw_dt_drive_train_assembly as package
@@ -317,11 +317,11 @@ def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None
     assert _flat(cross_hole).index(_flat(datum)) < _flat(cross_hole).index("TAPER-REAM")
     # Negative controls: the shaft-END texts both once printed name no dome root.
     for old in (
-        "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-DT-011 END;\nMATCH TAPER-REAM 1:48 FOR",
+        "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-DT-11 END;\nMATCH TAPER-REAM 1:48 FOR",
         "SET THE HUB FRONT FACE FLUSH WITH THE\n   SHAFT END, PUNCH MARKS ALIGNED;",
     ):
         assert not _sets_hub_on(old, datum), old
-    assert not _names_the_dome_root("CRANKSHAFT MHA-DT-011 END")
+    assert not _names_the_dome_root("CRANKSHAFT MHA-DT-11 END")
 
 
 def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:
@@ -454,7 +454,7 @@ def test_callout_prose_stays_out_of_every_part_recipe() -> None:
     for stem in (
         "build_dt_crank_hub",
         "build_dt_crank_arm",
-        "build_vn_crank_hub_pin",
+        "build_dt_vn_crank_hub_pin",
         "build_dt_crankshaft",
         "build_dt_crank_handle_pivot_screw",
         "build_dt_drive_train_assembly",
@@ -478,7 +478,7 @@ CALLOUT_LINE_CAP = 4
         ("SEAM_CALLOUT", dt_crank_hub_notes.SEAM_CALLOUT),
         ("BORE_CALLOUT", dt_crank_hub_notes.BORE_CALLOUT),
         ("CROSS_HOLE_CALLOUT", dt_crank_hub_notes.CROSS_HOLE_CALLOUT),
-        ("seat_bore_callout", dt_crank_hub_notes.seat_bore_callout("MHA-DT-031")),
+        ("seat_bore_callout", dt_crank_hub_notes.seat_bore_callout("MHA-DT-31")),
     ],
 )
 def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -> None:
@@ -488,8 +488,8 @@ def test_every_generated_callout_stays_within_four_lines(name: str, text: str) -
 def test_u29_walls_hold_at_the_seat_bores_printed_limits() -> None:
     # Main 2026-09-25: the arm is 1-in CF flat, held to 0.004 in on width
     # (OnlineMetals, Speedy Metals), not 0.003; and the cheek must come from
-    # the seat bore's REAL limits. MHA-DT-006 bores the seat first at .X; the
-    # MHA-DT-031 seat is turned to suit it for a press, so it is never smaller.
+    # the seat bore's REAL limits. MHA-DT-06 bores the seat first at .X; the
+    # MHA-DT-31 seat is turned to suit it for a press, so it is never smaller.
     mm = 25.4
     assert geometry.ARM_WIDTH_STOCK_MINUS == pytest.approx(0.004 * mm)
     bore_max = geometry.HUB_SEAT_DIA + geometry.GENERAL_1PL_TOL_MM

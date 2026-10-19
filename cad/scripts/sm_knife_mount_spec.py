@@ -25,7 +25,7 @@ from __future__ import annotations
 import math
 
 import _config
-import vn_knife_mount_dowel_spec as DOWEL
+import sm_vn_knife_mount_dowel_spec as DOWEL
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
@@ -58,7 +58,7 @@ _X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # The Ø12 bore is REAMED through (Ra 1.6 on its knife seat is a reamed
-# finish, not a drilled one) to an explicit +0.03/0 band (the MHA-DT-016
+# finish, not a drilled one) to an explicit +0.03/0 band (the MHA-DT-16
 # arbor-pedestal running-bore precedent, ``dt_arbor_pedestal_spec``): the
 # rock budget takes the smallest bore, the webs the largest.
 BORE_DIA_BAND = (0.03, 0.0)
@@ -152,13 +152,13 @@ def free_rock_deg(
 # ``build_sm_summing_assembly.KNIFE_FREE_ROCK_WORST_DEG`` (>= 5.0, 6.64 in
 # the reamed bore), which owns the
 # crossbar's slip terms.  The top seat clamps to the frame's faced Ra 3.2
-# underside plane (MHA-FR-002, user ruling 2026-10-12), so no bedding term
+# underside plane (MHA-FR-02, user ruling 2026-10-12), so no bedding term
 # enters: seat form tilts the block, it cannot yaw the bore off the dowel
 # line.
 KNIFE_FREE_ROCK_DEG = free_rock_deg(0.0)
 # The bore crown (its upper inner wall) below the top seat: 14.62.
 BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
-# MHA-VN-024, a #10-24 plain hex bolt cut from stock at MHA-SM-000 to its
+# MHA-SM-VN-52, a #10-24 plain hex bolt cut from stock at MHA-SM-00 to its
 # hole's measured stack plus the 8.92 +/-0.15 fit-up reach
 # (``sm_summing_assembly_spec.HANGER_FIT_REACH``), drops through a washer on
 # the crossbar's faced top and its #10 clearance hole and threads into a
@@ -176,7 +176,7 @@ BORE_CROWN_DEPTH = BLK_TOP - (BORE_CY + R_BORE)
 # deepest limit, with the pilot the web charges ground to the sharpest
 # accepted point (below), must still leave the 2.0 crown web: so the drill
 # prints 11.24 with an explicit +/-0.05 band on the sheet's hole callout (the
-# MHA-SM-003 bracket-tap precedent).  Both depths print at two places.
+# MHA-SM-03 bracket-tap precedent).  Both depths print at two places.
 STUD_THREAD = "#10-24"
 STUD_TAP_DRILL_DEPTH = 11.24
 STUD_TAP_DRILL_DEPTH_PLACES = 2
@@ -342,22 +342,22 @@ if STUD_TAP_THREAD_DEPTH_MIN < STUD_TAP_ENGAGEMENT_MIN_D * STUD_THREAD_MAJOR:
 # native size token's place.  Three rows -- drill, thread, reason -- keep the
 # callout inside the layout audit's four-row limit (tall-block, farm build
 # 20261013T225639.450330Z: five rows failed it).
-BOLT_NUMBER = "MHA-VN-024"
+BOLT_NUMBER = "MHA-SM-VN-52"
 TAP_DRILL_CALLOUT = f"{STUD_TAP_DRILL} DRILL"
 TAP_CALLOUT_REASON = f"SETS {BOLT_NUMBER} TIP CLEARANCE"
 
-# MHA-VN-051 dowels: two blind flat-bottom reamed holes in the top seat at
+# MHA-SM-VN-53 dowels: two blind flat-bottom reamed holes in the top seat at
 # DOWEL.HANGER_OFFSET either side of the tap axis along local X, at mid-depth.
 # The pair is the sheet's datum B (the orientation that keys the block against
 # turning about its screw); the crossbar takes one in a round slip hole, the
 # other in a slot along the dowel line, so the pattern never overconstrains.
-# The reamed holes hold the press of the stock dowel, as the MHA-PD-018
+# The reamed holes hold the press of the stock dowel, as the MHA-PD-18
 # latch-pin hole holds the same 1/8 series' (``pd_transgear_arm_geometry``).
 PIN_HOLE_X = DOWEL.HANGER_OFFSET  # 7.632
 PIN_HOLE_XS = (-PIN_HOLE_X, PIN_HOLE_X)
 PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
-    raise AssertionError("the knife mount reams one hole per MHA-VN-051 dowel")
+    raise AssertionError("the knife mount reams one hole per MHA-SM-VN-53 dowel")
 # The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
 # pattern datum B (the datum feature symbol on that frame; drawing-guidelines.md rule 5 (avoid excessive GD&T)); the
 # frame itself prints 2X under it too, so B is plainly the two-hole pattern,
@@ -377,7 +377,7 @@ PIN_HOLE_DIA_BAND = (0.0, -0.010)
 PIN_HOLE_DIA_PLACES = 3
 PIN_HOLE_DEPTH = DOWEL.PRESS_DEPTH  # 9.5
 PIN_HOLE_DEPTH_PLACES = DOWEL.PRESS_DEPTH_PLACES
-DOWEL_NUMBER = "MHA-VN-051"
+DOWEL_NUMBER = "MHA-SM-VN-53"
 if PIN_HOLE_SPAN_TOL != DOWEL.SPAN_TOL or PIN_HOLE_SPAN_PLACES != 3:
     raise AssertionError(
         "the dowel pattern's zone must be the span variation the stacks take"
@@ -389,8 +389,8 @@ PIN_PRESS_INTERFERENCE = (
     round(DOWEL.DIA_MAX - (PIN_HOLE_DIA + min(PIN_HOLE_DIA_BAND)), 6),
 )
 if PIN_PRESS_INTERFERENCE[0] <= 0.0:
-    raise AssertionError("the knife-mount dowel ream loses MHA-VN-051's press")
-# The press the sheet prints, rounded outward to four places (the MHA-PD-018
+    raise AssertionError("the knife-mount dowel ream loses MHA-SM-VN-53's press")
+# The press the sheet prints, rounded outward to four places (the MHA-PD-18
 # latch-pin precedent, ``pd_transgear_arm_spec.LATCH_PIN_PRESS_PRINTED``).
 PIN_PRESS_PRINTED = (
     math.floor(PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
@@ -537,7 +537,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "hole row from front face": HOLE_ROW_FACE_PLACES,
 }
 # The pair's count above the dowel holes' Ø and three short lines under it
-# (the MHA-PD-018 PIN_HOLE_CALLOUT precedent): the operation, the mating
+# (the MHA-PD-18 PIN_HOLE_CALLOUT precedent): the operation, the mating
 # dowel, the press.  The pair is datum B.
 PIN_HOLE_PAIR_CALLOUT = f"{PIN_HOLE_COUNT}X"
 PIN_HOLE_CALLOUT = "\n".join(

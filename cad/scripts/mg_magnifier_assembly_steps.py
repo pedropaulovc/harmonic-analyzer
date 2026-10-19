@@ -1,4 +1,4 @@
-"""The MHA-MG-000 magnifier fit-up sequence, numbered in one place.
+"""The MHA-MG-00 magnifier fit-up sequence, numbered in one place.
 
 The ch_channel_assembly_steps pattern: a step's number is its position in
 SEQUENCE, so inserting a step renumbers every later one and every pointer
@@ -8,12 +8,12 @@ Pure data: no SolidWorks, no config reads.
 
 The bench builds the wheel group and the lever group apart. The wheel bar is
 clamped to the front column, and the bracket screwed to the summing lever, at
-MHA-HA-000; the lever wire goes on after both, so its two steps come last.
+MHA-HA-00; the lever wire goes on after both, so its two steps come last.
 """
 
 from __future__ import annotations
 
-DRAWING_NUMBER = "MHA-MG-000"
+DRAWING_NUMBER = "MHA-MG-00"
 
 AXLE_PRESSED_KEY = "axle-pressed"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
@@ -49,5 +49,5 @@ def step_number(key: str) -> int:
 
 
 def step_ref(key: str) -> str:
-    """A pointer another sheet prints, e.g. ``MHA-MG-000 STEP 11``."""
+    """A pointer another sheet prints, e.g. ``MHA-MG-00 STEP 11``."""
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"

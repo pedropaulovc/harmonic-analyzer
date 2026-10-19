@@ -1,7 +1,7 @@
-r"""MHA-PD-015 transgear-knob-thrust-ring: the loose brass ring in front of the plate hub.
+r"""MHA-PD-15 transgear-knob-thrust-ring: the loose brass ring in front of the plate hub.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The ring rides the knob shaft's (MHA-PD-008) Ø6 g6 journal between the
+closure.  The ring rides the knob shaft's (MHA-PD-08) Ø6 g6 journal between the
 12T's rear face and the arm plate's front hub face (contract §1.7, round 6
 K5: the journal runs straight in the steel plate, no bushing).  It is loose:
 located by the journal, it rotates with the shaft or not.  Its length is the
@@ -54,7 +54,7 @@ WALL_NOMINAL = (OD - ID) / 2.0
 WALL_WORST = worst_wall()
 if WALL_WORST < WALL_FLOOR - 1e-9:
     raise AssertionError(
-        f"MHA-PD-015 wall {WALL_WORST:.3f} at the printed worst case is under "
+        f"MHA-PD-15 wall {WALL_WORST:.3f} at the printed worst case is under "
         f"the {WALL_FLOOR} floor"
     )
 

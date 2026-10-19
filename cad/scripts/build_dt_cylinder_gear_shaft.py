@@ -8,7 +8,7 @@ the 20 gears all spin at DIFFERENT speeds and cannot be keyed to a
 common shaft -- they run free on this fixed arbor (DIMENSIONS.md ch. 13,
 "M6.2 keyway refutation"; the legacy keyseat was fiction, removed in
 M6.2). The arbor fills both pedestal strap bores and is held by one cup-point
-set screw in each pedestal's crown apex (#743, MHA-VN-034); each end is domed
+set screw in each pedestal's crown apex (#743, MHA-DT-VN-64); each end is domed
 proud of its strap -- the bright dome the photographs show on each pedestal.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 13" - dia legacy (med), length

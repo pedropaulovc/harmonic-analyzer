@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker template trammel pivot block (MHA-CH-006-TL-14)."""
+"""Offline contracts for the rocker template trammel pivot block (MHA-CH-06-TL-14)."""
 
 from __future__ import annotations
 
@@ -93,8 +93,8 @@ def test_thread_class_strip_keeps_every_hole_wizard_variable() -> None:
 def test_point_hole_is_the_reamed_fit_named_on_the_pivot_point() -> None:
     hole = _features()["point_hole"]
     assert hole["dia"] == [6.375, 6.388]
-    assert "MHA-CH-006-TL-18" in hole["note"]
-    assert "MHA-CH-006-TL-18" in spec.POINT_HOLE_CALLOUT
+    assert "MHA-CH-06-TL-18" in hole["note"]
+    assert "MHA-CH-06-TL-18" in spec.POINT_HOLE_CALLOUT
     # The shop's 0.251 in reamer (tools.reamers), three places.
     assert spec.POINT_HOLE_DIA == round(0.251 * kit.INCH, 3)
     assert spec.POINT_CLEARANCE_MIN > 0.0

@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker arm hub filing button (MHA-CH-006-TL-04)."""
+r"""Create the drawing for the rocker arm hub filing button (MHA-CH-06-TL-04)."""
 
 from __future__ import annotations
 
@@ -206,7 +206,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Arm Hub Filing Button Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm hub filing button; hardened lapped O1; MHA-CH-006-TL-04",
+            3: "rocker arm hub filing button; hardened lapped O1; MHA-CH-06-TL-04",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

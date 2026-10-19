@@ -25,7 +25,7 @@ from _check import check  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
 from _sketch import add_line_chain  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference, replica_main  # noqa: E402
-from vn_tube_frame_cap_spec import (  # noqa: E402
+from fr_vn_tube_frame_cap_spec import (  # noqa: E402
     FLARE_CENTER_RADIUS,
     FLARE_HEIGHT,
     FLARE_INNER_RADIUS,

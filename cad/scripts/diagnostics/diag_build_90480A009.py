@@ -1,6 +1,6 @@
 r"""McMaster 90480A009 -- zinc-plated steel hex nut, #8-32.
 
-Used as vn-pen-hanger-nut (MHA-VN-063), the nut on the pen-hanger screw at
+Used as pn-vn-pen-hanger-nut (MHA-PN-VN-54), the nut on the pen-hanger screw at
 the strap's front face.  The catalogue facts are ``_mcmaster_90480a009``'s.
 The model is the 92671A115 recipe at this size: one Top-plane profile -- the
 hexagon (flats normal to the sketch X) with the bore circle inside it --

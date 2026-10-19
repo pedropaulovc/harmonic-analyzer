@@ -1,4 +1,4 @@
-"""Offline contracts for the removable #25 sprocket (MHA-PD-009) drawing."""
+"""Offline contracts for the removable #25 sprocket (MHA-PD-09) drawing."""
 
 from __future__ import annotations
 
@@ -321,11 +321,11 @@ def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> Non
 
 def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
     """The holes slip over pins pressed into a host part; the sheet names
-    each host by number.  Hosts are the assemblies' press-fit pairs: MHA-VN-044
-    in the crankshaft, MHA-VN-038 in the knob's drive collar (not the shaft)."""
+    each host by number.  Hosts are the assemblies' press-fit pairs: MHA-DT-VN-67
+    in the crankshaft, MHA-PD-VN-54 in the knob's drive collar (not the shaft)."""
     from _interference_contracts import allowed_interference_pairs
 
-    pins = {"vn-crank-seat-drive-pin", "vn-transgear-knob-drive-pin"}
+    pins = {"dt-vn-crank-seat-drive-pin", "pd-vn-transgear-knob-drive-pin"}
     hosts: set[str] = set()
     for assembly in ("dt-drive-train", "pd-paper-drive"):
         for pair in allowed_interference_pairs(assembly):
@@ -334,7 +334,7 @@ def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
                 hosts |= stems - pins
     assert hosts == {"dt-crankshaft", "pd-transgear-drive-collar"}
     numbers = {_config.parts(host)["number"] for host in hosts}
-    assert set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", notes.DRAWING_NOTES)) == numbers
+    assert set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", notes.DRAWING_NOTES)) == numbers
 
 
 def test_gears_carry_no_frames_or_datums() -> None:
@@ -349,7 +349,7 @@ def test_gears_carry_no_frames_or_datums() -> None:
 
 def test_registry_row_is_mha_081_one_of_each() -> None:
     row = _config.parts("pd-transgear-removable")
-    assert row["number"] == "MHA-PD-009"
+    assert row["number"] == "MHA-PD-09"
     assert int(row["quantity"]) == 1
     assert "1 EACH" in row["description"]
 

@@ -40,7 +40,7 @@ from _com import _early_bound
 from _session import run_build
 import _telemetry
 import build_mg_magnifier_assembly as m
-import vn_counter_spring_spec
+import sm_vn_counter_spring_spec
 import error_budget as eb
 import mg_magnifying_wheel_geom
 import mg_wheel_drum_geom
@@ -49,10 +49,10 @@ import spring_mount_geom as s
 ROOT = Path(__file__).resolve().parents[3]
 
 STEMS = (
-    "vn-channel-spring-installed",
-    "vn-counter-spring",
-    "vn-spring-hook",
-    "vn-boss-hook",
+    "ch-vn-channel-spring-installed",
+    "sm-vn-counter-spring",
+    "ch-vn-spring-hook",
+    "sm-vn-boss-hook",
     "sm-summing-lever",
     "sm-gooseneck",
     "mg-magnifying-lever",
@@ -60,29 +60,29 @@ STEMS = (
     "mg-magnifying-clamp",
     "mg-magnifying-vertical-rod",
     "mg-output-fixture",
-    "vn-thumb-screw",
-    "vn-lever-wire",
+    "mg-vn-thumb-screw",
+    "mg-vn-lever-wire",
     "mg-magnifying-wheel",
     "pn-pen-rod",
     "pn-pen-v-block",
-    "vn-pen-marker",
+    "pn-vn-pen-marker",
     "pn-pen-frame",
-    "vn-pen-set-screw",
-    "vn-pen-rod-set-screw",
+    "pn-vn-pen-set-screw",
+    "pn-vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
-    "vn-pen-adjust-nut",
-    "vn-pen-wire",
+    "pn-vn-pen-adjust-nut",
+    "pn-vn-pen-wire",
 )
 PEN_STEMS = (
     "pn-pen-rod",
     "pn-pen-v-block",
-    "vn-pen-marker",
+    "pn-vn-pen-marker",
     "pn-pen-frame",
-    "vn-pen-set-screw",
-    "vn-pen-rod-set-screw",
+    "pn-vn-pen-set-screw",
+    "pn-vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
-    "vn-pen-adjust-nut",
-    "vn-pen-wire",
+    "pn-vn-pen-adjust-nut",
+    "pn-vn-pen-wire",
 )
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"
 
@@ -168,8 +168,8 @@ async def build(adapter):
             )
 
         weight("sm-summing-lever", (s.KNIFE[0], s.KNIFE[1], 0), m.IDENTITY)
-        weight("vn-spring-hook", (*s.CHANNEL_ANCHOR_XY, 0), m.IDENTITY, 20)
-        weight("vn-boss-hook", (*s.COUNTER_ANCHOR_XY, 0), m.IDENTITY)
+        weight("ch-vn-spring-hook", (*s.CHANNEL_ANCHOR_XY, 0), m.IDENTITY, 20)
+        weight("sm-vn-boss-hook", (*s.COUNTER_ANCHOR_XY, 0), m.IDENTITY)
         weight(
             "mg-magnifying-lever", (m.LEVER_X0, m.LEVER_ROD_Y, m.LEVER_ROD_Z), m.ROT_Y_180
         )
@@ -181,14 +181,14 @@ async def build(adapter):
         weight("mg-magnifying-clamp", m.CLAMP_POS, m.IDENTITY)
         rotation = m.compose_rows(m.rot_z_rows(-90), m.ROT_Y_180)
         weight(
-            "vn-thumb-screw",
+            "mg-vn-thumb-screw",
             (m.CLAMP_X, m.THUMB_SCREW_OUTER_FACE_Y, m.LEVER_ROD_Z),
             rotation,
         )
         weight("mg-magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
         weight("mg-output-fixture", m.FIXTURE_POSITION, m.FIXTURE_ROWS)
         weight(
-            "vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
+            "mg-vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
         )
         positive = sum(max(0, row["gravity_torque_n_mm"]) for row in rows)
         negative = sum(min(0, row["gravity_torque_n_mm"]) for row in rows)
@@ -219,9 +219,9 @@ async def build(adapter):
             s.COUNTER_ANCHOR_XY[1] - s.KNIFE_CONTACT_Y,
         )
         flexible_bound = 9.80665 * (
-            20 * parts["vn-channel-spring-installed"]["mass_kg"] * channel_radius
-            + parts["vn-counter-spring"]["mass_kg"] * counter_radius
-            + parts["vn-lever-wire"]["mass_kg"] * hook_radius
+            20 * parts["ch-vn-channel-spring-installed"]["mass_kg"] * channel_radius
+            + parts["sm-vn-counter-spring"]["mass_kg"] * counter_radius
+            + parts["mg-vn-lever-wire"]["mass_kg"] * hook_radius
         )
         arm = -s.COUNTER_REFERENCE_POSE.moment_arm_mm
         reference = s.counter_force_n(s.COUNTER_REFERENCE_POSE.length_mm)
@@ -231,8 +231,8 @@ async def build(adapter):
         )
         high = reference + (positive + wheel_bound + flexible_bound) / arm
         catalog = [
-            vn_counter_spring_spec.INITIAL_TENSION_N,
-            vn_counter_spring_spec.MAXIMUM_LOAD_N,
+            sm_vn_counter_spring_spec.INITIAL_TENSION_N,
+            sm_vn_counter_spring_spec.MAXIMUM_LOAD_N,
         ]
         within_catalog = catalog[0] <= low <= high <= catalog[1]
         report = {
@@ -243,9 +243,9 @@ async def build(adapter):
             "fixed_parts_excluded_from_moving_torque": ["sm-gooseneck"],
             "pen_parts_one_each": PEN_STEMS,
             "flexible_part_counts": {
-                "vn-channel-spring-installed": 20,
-                "vn-counter-spring": 1,
-                "vn-lever-wire": 1,
+                "ch-vn-channel-spring-installed": 20,
+                "sm-vn-counter-spring": 1,
+                "mg-vn-lever-wire": 1,
             },
             "pen_mass_kg": pen_mass,
             "pen_gravity_torque_bound_n_mm": pen_torque_bound,

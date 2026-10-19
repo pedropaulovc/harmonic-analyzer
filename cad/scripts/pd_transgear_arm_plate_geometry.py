@@ -1,8 +1,8 @@
-r"""Pure transgear-arm-plate (MHA-PD-019) geometry shared by the plate, its
+r"""Pure transgear-arm-plate (MHA-PD-19) geometry shared by the plate, its
 screws, the knob-shaft stack and the paper-drive assembly.
 
 Book ch. 23 (t157 / p.63; ruling 3): a piece of steel bar screwed across the
-MHA-PD-018 arm by two 8-32 oval-head screws.  The book's 1-1/4 in bar is
+MHA-PD-18 arm by two 8-32 oval-head screws.  The book's 1-1/4 in bar is
 widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
 bar centred on K leaves the -X countersink under the wall target).  It
 carries the knob shaft's running bore on axis K, a front hub (the thrust

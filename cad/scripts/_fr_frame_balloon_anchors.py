@@ -61,12 +61,12 @@ from _drawing_balloons import BalloonAnchor
 FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "fr-harmonic-base": BalloonAnchor((90.360, 50.800, -62.873)),
     "fr-tube-frame": BalloonAnchor(),
-    "vn-tube-frame-cap": BalloonAnchor(),
+    "fr-vn-tube-frame-cap": BalloonAnchor(),
     "fr-rocker-arm-support": BalloonAnchor(),
-    "vn-lag-screw": BalloonAnchor(instance="vn-lag-screw-2"),
+    "fr-vn-lag-screw": BalloonAnchor(instance="fr-vn-lag-screw-2"),
     "fr-top-frame": BalloonAnchor(),
     "fr-nameplate": BalloonAnchor(),
-    "vn-fillister-screw": BalloonAnchor(instance="vn-fillister-screw-2"),
-    "vn-frame-cross-screw": BalloonAnchor(),
-    "vn-gooseneck-set-screw": BalloonAnchor(),
+    "fr-vn-fillister-screw": BalloonAnchor(instance="fr-vn-fillister-screw-2"),
+    "fr-vn-frame-cross-screw": BalloonAnchor(),
+    "fr-vn-gooseneck-set-screw": BalloonAnchor(),
 }

@@ -11,6 +11,7 @@ from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _mcmaster_91375a106 import THREAD as SET_SCREW_THREAD
 from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 
@@ -36,7 +37,7 @@ FOOT_NEAR_Z = STRAP_INNER_Z - FOOT_DEPTH  # outboard end of the ledge, -20
 FOOT_MID_Z = (STRAP_INNER_Z + FOOT_NEAR_Z) / 2.0  # plan centre of the foot, -6
 LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
 # Dome radius = strap half-width at the top. R11, not the photographed R10:
-# the crown carries the MHA-VN-034 apex set screw (#743, below), and only R11
+# the crown carries the MHA-DT-VN-64 apex set screw (#743, below), and only R11
 # leaves it 1.5D of full thread at the printed worst case.
 TOP_RADIUS = 11.0
 BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
@@ -54,7 +55,7 @@ TAPER_TANGENT_Y = (
     + (-(TOP_RADIUS**2) * _CENTER_RISE + TOP_RADIUS * _ROOT_HALF_WIDTH * _TANGENT_DISC)
     / _TANGENT_DENOM
 )
-# #8 close clearance (Ø4.572, 0.180 in) for the MHA-VN-032 #8-32 fillister. The
+# #8 close clearance (Ø4.572, 0.180 in) for the MHA-DT-VN-62 #8-32 fillister. The
 # base seat is transfer-punched through this hole at assembly, so the close
 # fit keeps an 11/64 punch centred to about 0.1 while the Ø6.86 head still
 # bears on a 1.1 annulus.
@@ -67,14 +68,13 @@ SCREW_Z = STRAP_ROOT_Z - LEDGE_DEPTH / 2.0
 
 # --- apex set screw (#743, user ruling Q3: "set screw located at apex of
 # straps") ---------------------------------------------------------------
-# One #4-40 x 1/4 cup-point set screw (MHA-VN-034) drops radially through the
+# One #4-40 x 1/4 cup-point set screw (MHA-DT-VN-64) drops radially through the
 # crown apex onto the arbor, at the strap's mid-depth. The back pedestal's
 # screw fixes the arbor; the front one is tightened after the bank's end-play
 # leaf is set. The cup bears in a spot drilled into the arbor at fit-up
 # through this tapped hole with the #43 tap drill, so the arbor print keeps
 # "no flats". The tap runs THROUGH to the bore and stops there
 # (through-next), never into the strap below it.
-SET_SCREW_THREAD = "#4-40"
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 SET_SCREW_Z = STRAP_INNER_Z - STRAP_T / 2.0  # local z +3: strap mid-depth
 SET_SCREW_PITCH = 25.4 / 40.0

@@ -15,28 +15,28 @@ The screws, and the small parts that do not belong anywhere else.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `vn-fillister-screw` | TODO | TODO | TODO |
-| `vn-guide-lock-screw` | TODO | TODO | TODO |
-| `vn-slotted-screw` | TODO | TODO | TODO |
-| `vn-thumb-screw` | TODO | TODO | TODO |
-| `vn-lag-screw` | TODO | TODO | TODO |
-| `vn-hanger-screw` | TODO | TODO | TODO |
-| `vn-clamp-screw` | TODO | TODO | TODO |
-| `vn-transgear-arm-plate-screw` | TODO | TODO | TODO |
-| `vn-transgear-pivot-screw` | TODO | TODO | TODO |
-| `vn-transgear-pivot-spring` | TODO | TODO | TODO |
-| `vn-cylinder-bank-spring` | TODO | TODO | TODO |
-| `vn-rocker-bank-spring` | TODO | TODO | TODO |
-| `vn-transgear-latch-pin` | TODO | TODO | TODO |
-| `vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
-| `vn-transgear-disc-screw` | TODO | TODO | TODO |
-| `vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
-| `vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
-| `vn-gooseneck-set-screw` | TODO | TODO | TODO |
-| `vn-wheel-axle-nut` | 2 | brass | McMaster 92671A005, #4-40 hex (nut + jam nut) |
-| `vn-wheel-axle-back-washer` | 1 | brass | McMaster 92916A480, #10 |
-| `vn-wheel-axle-front-washer` | 1 | brass | McMaster 92916A250, #4 |
-| `sm-gooseneck-spring-screw` (MHA-SM-004) | 1 | AISI 12L14 cold-finished steel | Ø12.7 mm (1/2") round; shop-turned slotted fillister with die-cut #6-32 thread; dimensions: `sm_gooseneck_spring_screw_geom.py` |
+| `dt-vn-fillister-screw`, `fr-vn-fillister-screw`, `pd-vn-fillister-screw` | TODO | TODO | TODO |
+| `pd-vn-guide-lock-screw` | TODO | TODO | TODO |
+| `dt-vn-slotted-screw` | TODO | TODO | TODO |
+| `mg-vn-thumb-screw`, `ms-vn-thumb-screw` | TODO | TODO | TODO |
+| `fr-vn-lag-screw` | TODO | TODO | TODO |
+| `pn-vn-hanger-screw` | TODO | TODO | TODO |
+| `mg-vn-clamp-screw`, `pd-vn-clamp-screw` | TODO | TODO | TODO |
+| `pd-vn-transgear-arm-plate-screw` | TODO | TODO | TODO |
+| `pd-vn-transgear-pivot-screw` | TODO | TODO | TODO |
+| `pd-vn-transgear-pivot-spring` | TODO | TODO | TODO |
+| `dt-vn-cylinder-bank-spring` | TODO | TODO | TODO |
+| `ch-vn-rocker-bank-spring` | TODO | TODO | TODO |
+| `pd-vn-transgear-latch-pin` | TODO | TODO | TODO |
+| `pd-vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
+| `pd-vn-transgear-disc-screw` | TODO | TODO | TODO |
+| `pd-vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
+| `pd-vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
+| `fr-vn-gooseneck-set-screw` | TODO | TODO | TODO |
+| `mg-vn-wheel-axle-nut` | 2 | brass | McMaster 92671A005, #4-40 hex (nut + jam nut) |
+| `mg-vn-wheel-axle-back-washer` | 1 | brass | McMaster 92916A480, #10 |
+| `mg-vn-wheel-axle-front-washer` | 1 | brass | McMaster 92916A250, #4 |
+| `sm-gooseneck-spring-screw` (MHA-SM-04) | 1 | AISI 12L14 cold-finished steel | Ø12.7 mm (1/2") round; shop-turned slotted fillister with die-cut #6-32 thread; dimensions: `sm_gooseneck_spring_screw_geom.py` |
 | `pd-guide-lock` | TODO | TODO | TODO |
 | `sh-column-clamp-front` | TODO | TODO | TODO |
 | `sh-column-clamp-back` | TODO | TODO | TODO |

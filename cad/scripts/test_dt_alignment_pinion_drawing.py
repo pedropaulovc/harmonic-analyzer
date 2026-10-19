@@ -61,7 +61,7 @@ def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
 
 def test_only_the_bore_carries_a_finish_symbol() -> None:
     """Machinist review of the pc-r7 sheet: Ra 1.6 on both end faces was
-    over-specified.  The ends bear on the MHA-DT-014 straps at the float's two
+    over-specified.  The ends bear on the MHA-DT-14 straps at the float's two
     stops, but no friction or end-play budget asks for a grade, so they take
     the title-block finish.  "End faces polished" stays retired too."""
     import draw_dt_alignment_pinion as drawing
@@ -84,7 +84,7 @@ def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
         spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
     )
-    # The drum bonds onto MHA-DT-022's bond zone, not its journal lands (U39).
+    # The drum bonds onto MHA-DT-22's bond zone, not its journal lands (U39).
     assert arbor.SHAFT_DIA_BAND != arbor.JOURNAL_DIA_BAND
     assert bore_limits == pytest.approx((8.00, 8.10))
     # A stock 8 mm H7 reamer (8.000-8.015) lands inside the band.
@@ -109,14 +109,14 @@ def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
 
     notes = spec.DRAWING_NOTES
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (R3): one note.  The drum is symmetric, so no orientation note;
-    # its axial station is stated once, on MHA-DT-022.  The MHA-DT-022 bond-zone
-    # band is MHA-DT-022's own native dimension (Codex P1 on #814), the hand
+    # its axial station is stated once, on MHA-DT-22.  The MHA-DT-22 bond-zone
+    # band is MHA-DT-22's own native dimension (Codex P1 on #814), the hand
     # slide rides the bore callout (Codex P2 on #832), and the bond itself is
-    # the pinion fit-up step MHA-DT-022's spec owns (Main's drawing-guidelines.md rule 7 (notes: few, flagged, never a method) sweep).
+    # the pinion fit-up step MHA-DT-22's spec owns (Main's drawing-guidelines.md rule 7 (notes: few, flagged, never a method) sweep).
     assert "BOND ZONE" not in notes
     assert "ARBOR JOURNAL" not in notes
     assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
-    assert "MHA-DT-001" in arbor_spec.ASSEMBLY_STEP
+    assert "MHA-DT-01" in arbor_spec.ASSEMBLY_STEP
     assert spec.RETAINING_COMPOUND in arbor_spec.ASSEMBLY_STEP
     assert "j=19" not in notes and "LOCATED FROM" not in notes
     assert "MATES WITH CYLINDER-GEAR BANK" not in notes
@@ -268,7 +268,7 @@ def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
     arbor = _config.parts("dt-pinion-arbor")
     assert arbor["number"] in callout
     assert arbor["title"].upper() in callout
-    assert arbor["number"] == "MHA-DT-022"
+    assert arbor["number"] == "MHA-DT-22"
     assert "PINION ARBOR" in callout
     for line in spec.DRAWING_NOTES.splitlines():
         assert "SLIDE" not in line and "BY HAND" not in line, line
@@ -355,5 +355,5 @@ def test_no_note_line_carries_a_dimension() -> None:
     """drawing-guidelines.md rule 7 (notes: few, flagged, never a method): once part numbers and the named retaining compound are set
     aside, no note line carries a digit (Codex P1 on #814)."""
     for line in spec.DRAWING_NOTES.splitlines():
-        text = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", line).replace(spec.RETAINING_COMPOUND, "")
+        text = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", line).replace(spec.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line

@@ -141,7 +141,7 @@ test('native spring bounds follow transformed owners and source visibility/lever
     assertContained(mesh, evaluator, moved.clone().multiply(mesh.matrixWorld), Math.max(1, Math.floor(mesh.geometry.getAttribute('position').count / 128)))
   }
   const leverPath = 'ha-harmonic-analyzer/ch-channel/ch-channel-lever-1'
-  const springPath = 'ha-harmonic-analyzer/ch-channel/vn-channel-spring-installed-stretch00-1'
+  const springPath = 'ha-harmonic-analyzer/ch-channel/ch-vn-channel-spring-installed-stretch00-1'
   assert.ok(machine.partPaths.includes(springPath))
   const intended = springs.filter(({ mesh }) => model.identity(mesh).nodePath === springPath)
   assert.ok(intended.length > 0, 'Station 1 must resolve to its actual canonical native spring owner')

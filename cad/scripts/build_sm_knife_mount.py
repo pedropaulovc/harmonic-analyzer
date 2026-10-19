@@ -1,10 +1,10 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
-top-frame casting's integral crossbar (clamped to its underside by the MHA-VN-024
+top-frame casting's integral crossbar (clamped to its underside by the MHA-SM-VN-52
 #10-24 plain hex bolt, through a washer on the crossbar's faced top, threaded into
 a bottoming tap in the block top, and keyed against turning by the two
-MHA-VN-051 dowels pressed into the top seat).
+MHA-SM-VN-53 dowels pressed into the top seat).
 The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
@@ -161,7 +161,7 @@ if _TAP_WEB_WORST < sm_knife_mount_spec.STUD_TAP_WEB_MIN:
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- the MHA-VN-051 dowel holes: blind, flat-floored, reamed in the top seat -
+# --- the MHA-SM-VN-53 dowel holes: blind, flat-floored, reamed in the top seat -
 _R_PIN = PIN_HOLE_DIA / 2.0
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
 V_PINS = len(PIN_HOLE_XS) * V_PIN
@@ -182,7 +182,7 @@ async def _mass(adapter) -> tuple[float, list[float]]:
 def _open_top_seat_sketch(adapter) -> tuple[list[tuple[float, float]], bool]:
     """Open a sketch ON the top seat; map the dowel-hole centres into it.
 
-    The MHA-PD-018 latch-pin precedent (``build_pd_transgear_arm``
+    The MHA-PD-18 latch-pin precedent (``build_pd_transgear_arm``
     ``_open_end_face_sketch``): a face sketch anchors the blind depth on the
     real seat edge.  The face's sketch axes are SolidWorks' choice, so the
     centres map through ``ModelToSketchTransform``.  Returns each hole's
@@ -275,7 +275,7 @@ async def build(adapter) -> dict[str, str]:
     #    the anchor dims (x, then z).  The height dim is on the -X face, the
     #    side the drawing prints it: on the +X face its extension lines ran
     #    across the front view to the left, under the bore's position-frame
-    #    leader (layout audit leader-crosses-line, MHA-SM-002).
+    #    leader (layout audit leader-crosses-line, MHA-SM-02).
     block_dims = SketchDims()
     check("create_sketch block", await adapter.create_sketch("Front"))
     block_rect = [
@@ -389,8 +389,8 @@ async def build(adapter) -> dict[str, str]:
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
 
-    # MHA-VN-051 dowel holes (the datum-B pattern): blind along -Y from the
-    # top seat, PIN_HOLE_X either side of the tap axis along X (the MHA-PD-018
+    # MHA-SM-VN-53 dowel holes (the datum-B pattern): blind along -Y from the
+    # top seat, PIN_HOLE_X either side of the tap axis along X (the MHA-PD-18
     # latch-pin hole precedent).  One sketch, one plain cut-extrude, so both
     # floors are flat at one depth: each dowel is pressed onto its floor (a
     # wizard drill point would leave a cone under the pressed end).  The +X

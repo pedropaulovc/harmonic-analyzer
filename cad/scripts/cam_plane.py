@@ -1,6 +1,6 @@
 r"""The channel cam plane: the rocker bank's datum (PR #1292 review F3).
 
-Each MHA-DT-012 gear's integral cam spans FACE_WIDTH/2 .. FACE_WIDTH/2 +
+Each MHA-DT-12 gear's integral cam spans FACE_WIDTH/2 .. FACE_WIDTH/2 +
 CAM_THICKNESS south of its gear's station, and each connecting rod is flat
 -- its ring rides the cam and its fork straddles the arm in that one plane --
 so the arm plane IS the cam plane. A leaf over ``dt_cylinder_gear_spec``:

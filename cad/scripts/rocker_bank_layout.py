@@ -7,15 +7,15 @@ specs, no title-block reads. It reads the channel stations and ONE datum it
 shares with the cylinder bank: the arm plane IS the cam plane
 (``cam_plane.CAM_MID_DZ``), because each connecting rod is flat -- its ring
 rides the cam and its fork straddles the arm in that one plane. That leaf
-reads only the MHA-DT-012 gear spec (and the gear-train config it reads), so
+reads only the MHA-DT-12 gear spec (and the gear-train config it reads), so
 a cylinder-gear spec change re-keys the pivot parts; the cylinder bank's
 pedestals, arbor, washers, spring and bank pitch do not reach them.
 
-The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
+The bank is a SOLID STACK: each MHA-CH-06 arm's integral hub is one station
 pitch long, and neighbouring hubs bear face on face. #948 ruling R (PR #1292)
 preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
 
-* Hub 19 bears on a MHA-VN-070 thrust washer (McMaster 3088A429, a 0.031
+* Hub 19 bears on a MHA-CH-VN-56 thrust washer (McMaster 3088A429, a 0.031
   ring shim) against the NORTH bracket ear's inner face (user, 2026-10-10:
   the shaft's shoulder is gone and the washer, kept, goes at both ends).
   That ear is the bank's axial datum:
@@ -23,8 +23,8 @@ preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
   from nominal (MIC_RESIDUAL is what is left of that band), as the cylinder
   bank does for its back washer.
 * The SOUTH bracket is set off the thrust washer on hub 0 by one
-  ROCKER_SPRING_SET blade, and the MHA-VN-053 wave spring
-  (``vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack north
+  ROCKER_SPRING_SET blade, and the MHA-CH-VN-54 wave spring
+  (``ch_vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack north
   on the datum ear: the bank has no end play.
 * Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
   measured 20-arm stack caps the cumulative excess (STACK_L20_ACCEPT,
@@ -48,8 +48,8 @@ from cam_plane import CAM_MID_DZ
 import ch_amplitude_bar_spec as _bar
 import ch_pivot_bracket_spec as _bracket
 import ch_pivot_shaft_spec as _shaft
-import vn_rocker_bank_spring_spec as _spring
-import vn_rocker_thrust_washer_spec as _washer
+import ch_vn_rocker_bank_spring_spec as _spring
+import ch_vn_rocker_thrust_washer_spec as _washer
 from ch_rocker_arm_spec import HUB_DIA, HUB_LENGTH, HUB_LENGTH_BAND
 
 COUNT = 20  # the full bank (the brackets never follow active_count)

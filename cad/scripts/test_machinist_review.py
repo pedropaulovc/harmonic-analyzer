@@ -1211,7 +1211,7 @@ def _write_exceptions_config(root: Path, name: str, section: Any) -> Path:
     import yaml
 
     path.write_text(
-        yaml.safe_dump({dashed: {"number": "MHA-XX-000", "machinist_exceptions": section}}),
+        yaml.safe_dump({dashed: {"number": "MHA-XX-01", "machinist_exceptions": section}}),
         encoding="utf-8",
     )
     return path
@@ -1269,7 +1269,7 @@ def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) 
     (directory / "xx-bank.yaml").write_text(
         yaml.safe_dump(
             {
-                "number": "MHA-XX-000",
+                "number": "MHA-XX-00",
                 "flip_invert": [],
                 "allowed_free_stems": [],
                 "required_free_stems": [],

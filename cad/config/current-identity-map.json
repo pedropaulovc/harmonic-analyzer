@@ -6,6 +6,9 @@
     "machine_vendor_pattern": "MHA-<PARENT_CATEGORY>-VN-<NN>",
     "tooling_vendor_pattern": "MHA-<PARENT_CATEGORY>-<PARENT_NN>-TL-VN-<NN>",
     "machine_vendor_stem_pattern": "<parent-prefix>-vn-<old-stem-with-leading-vn-removed>",
+    "machine_vendor_stem_exceptions": {
+      "vn-ms-stop-plate-screw": "ms-vn-stop-plate-screw"
+    },
     "tooling_vendor_stem_pattern": "<fixture-parent-stem>-tl-vn-<old-tool-stem-after-tl->",
     "allocation": "Within each direct-parent namespace, assign NN from 50 upward in ascending previous vendor Number (MHA-VN-NN); for tool purchases, ascending prior TL-NN. Sequences reset per parent namespace.",
     "identity_segments": "Shrink every numeric identity segment, including parent 005->05 and assembly 000->00. Do not treat configuration qualifier T006 as an identity sequence; retain it.",
@@ -27,7 +30,7 @@
       "old_number": "MHA-CH-006-TL-46",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-nut-screw",
           "number": "MHA-CH-06-TL-VN-66"
         }
@@ -38,7 +41,7 @@
       "old_number": "MHA-CH-006-TL-36",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-pillow-block",
           "number": "MHA-CH-06-TL-VN-56"
         }
@@ -49,7 +52,7 @@
       "old_number": "MHA-CH-006-TL-38",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
           "number": "MHA-CH-06-TL-VN-58"
         }
@@ -70,7 +73,7 @@
       "old_number": "MHA-CH-006-TL-45",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-kp08-screw",
           "number": "MHA-CH-06-TL-VN-65"
         }
@@ -81,7 +84,7 @@
       "old_number": "MHA-CH-006-TL-35",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
           "number": "MHA-CH-06-TL-VN-55"
         }
@@ -92,7 +95,7 @@
       "old_number": "MHA-CH-006-TL-34",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-leadscrew",
           "number": "MHA-CH-06-TL-VN-54"
         }
@@ -103,7 +106,7 @@
       "old_number": "MHA-CH-006-TL-49",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-lever-screw",
           "number": "MHA-CH-06-TL-VN-69"
         }
@@ -114,7 +117,7 @@
       "old_number": "MHA-CH-006-TL-51",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-lever-washer",
           "number": "MHA-CH-06-TL-VN-71"
         }
@@ -135,7 +138,7 @@
       "old_number": "MHA-CH-006-TL-40",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-flange-nut",
           "number": "MHA-CH-06-TL-VN-60"
         }
@@ -146,7 +149,7 @@
       "old_number": "MHA-CH-006-TL-37",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-handwheel",
           "number": "MHA-CH-06-TL-VN-57"
         }
@@ -157,7 +160,7 @@
       "old_number": "MHA-CH-006-TL-33",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-cl-dowel",
           "number": "MHA-CH-06-TL-VN-53"
         }
@@ -168,7 +171,7 @@
       "old_number": "MHA-CH-006-TL-48",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-clamp-screw",
           "number": "MHA-CH-06-TL-VN-68"
         }
@@ -189,7 +192,7 @@
       "old_number": "MHA-CH-006-TL-44",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-carriage-screw",
           "number": "MHA-CH-06-TL-VN-64"
         }
@@ -200,7 +203,7 @@
       "old_number": "MHA-CH-006-TL-31",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-carriage",
           "number": "MHA-CH-06-TL-VN-51"
         }
@@ -231,7 +234,7 @@
       "old_number": "MHA-CH-006-TL-42",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-bracket-screw",
           "number": "MHA-CH-06-TL-VN-62"
         }
@@ -252,7 +255,7 @@
       "old_number": "MHA-CH-006-TL-32",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-bearing",
           "number": "MHA-CH-06-TL-VN-52"
         }
@@ -263,7 +266,7 @@
       "old_number": "MHA-CH-006-TL-43",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-block-screw",
           "number": "MHA-CH-06-TL-VN-63"
         }
@@ -274,7 +277,7 @@
       "old_number": "MHA-CH-006-TL-50",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-block-washer",
           "number": "MHA-CH-06-TL-VN-70"
         }
@@ -2108,7 +2111,7 @@
       "old_number": "MHA-CH-006-TL-39",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-t-nut",
           "number": "MHA-CH-06-TL-VN-59"
         }
@@ -2179,7 +2182,7 @@
       "old_number": "MHA-CH-006-TL-30",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-rail",
           "number": "MHA-CH-06-TL-VN-50"
         }
@@ -2190,7 +2193,7 @@
       "old_number": "MHA-CH-006-TL-47",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-riser-screw",
           "number": "MHA-CH-06-TL-VN-67"
         }
@@ -2231,7 +2234,7 @@
       "old_number": "MHA-CH-006-TL-41",
       "new_identities": [
         {
-          "parent": "ch-rocker-arm",
+          "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-rail-screw",
           "number": "MHA-CH-06-TL-VN-61"
         }

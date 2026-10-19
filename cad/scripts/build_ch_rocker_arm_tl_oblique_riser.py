@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's acetal riser (MHA-CH-006-TL-24; shop fixture).
+r"""Build the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24; shop fixture).
 
 The supplied 6 x 40 x 340 acetal blank with its seven through holes
 (``ch_rocker_arm_tl_oblique_riser_spec``). The self-cut band is not modelled.

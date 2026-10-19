@@ -163,7 +163,7 @@ def test_preload_setting_formed_features_carry_the_formed_band() -> None:
     assert banded == set(geometry.FORMED_CONTACT_BANDS)
     assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     for name in banded:
-        assert "MHA-DT-014" in drawing.DIMENSION_CALLOUTS[name]
+        assert "MHA-DT-14" in drawing.DIMENSION_CALLOUTS[name]
     formed = set().union(*dt_pinion_spring_spec.FORMED_DIMENSIONS.values())
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
     linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
@@ -269,9 +269,9 @@ def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> No
 
 
 def test_screw_head_still_bears_on_the_shortened_wing() -> None:
-    from vn_foot_screw_spec import HEAD_DIA
+    from dt_vn_foot_screw_spec import HEAD_DIA
 
-    # The pad's working contact is the MHA-VN foot screw's head clamping it;
+    # The pad's working contact is the MHA-DT-VN-58 foot screw's head clamping it;
     # past the strip's forward edge the head lands on the wing.  At the worst
     # case (wing short, the hole nearest the strip edge) the head's rim stays
     # well inside the wing's edge.

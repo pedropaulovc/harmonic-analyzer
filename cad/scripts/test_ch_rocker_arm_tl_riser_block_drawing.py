@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker riser blocks (MHA-CH-006-TL-10)."""
+"""Offline contracts for the rocker riser blocks (MHA-CH-06-TL-10)."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def test_every_configuration_gets_a_labelled_view_with_its_quantity() -> None:
         spec.QUANTITY == _config.parts("ch-rocker-arm-tl-riser-block")["quantity"] == 6
     )
     number = _config.parts("ch-rocker-arm-tl-riser-block")["number"]
-    assert drawing.configuration_label(number, "L045") == "MHA-CH-006-TL-10-L045  QTY 2"
+    assert drawing.configuration_label(number, "L045") == "MHA-CH-06-TL-10-L045  QTY 2"
 
 
 def test_every_other_length_reads_its_depth_and_height_on_the_sheet() -> None:

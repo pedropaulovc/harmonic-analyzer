@@ -4,7 +4,7 @@ McMaster 91375A105 product page read live on 2026-10-13:
 https://www.mcmaster.com/91375A105/. Alloy steel cup-tip set screw, black
 oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
 ASME B18.3 / ASTM F912. Only a 2-D PDF is offered; no vendor solid was
-harvested. It is the 1/4 in long 91375A106 (MHA-VN-034, vendor-verified
+harvested. It is the 1/4 in long 91375A106 (MHA-CH-VN-53, vendor-verified
 replica) cut 1/16 in shorter, so the recipe takes that replica's laws.
 
 Frame of the recipe: axis +Y, origin mid-length; the stock part lifts the

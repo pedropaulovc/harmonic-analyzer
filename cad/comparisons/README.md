@@ -42,7 +42,7 @@ from the first `--` is retained, not just three-digit tooth counts. Thus
 `dt-crank-handle-ferrule--installed`, and `cone-gear--t006` with
 `dt-cone-gear--t006`. Generated `-stretchN` qualifiers are also retained, for
 example `channel-spring-installed-stretch07` becomes
-`vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
+`ch-vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
 precedence over that generated suffix rule. Geometry verdicts and red highlights
 remain per exact qualified mesh. The changed-part summary groups only trailing
 `--t<digits>` and `-stretch<digits>` variants by base stem; other configuration

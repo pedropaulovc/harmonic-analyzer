@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-vn-oblique-rail-screw:
+  title: Rocker Oblique Trammel Rail Screw
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-61
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A197"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A197"
+  finish: black oxide
+  # The fastener table's RAIL_TO_BAR count (#8-32 X 3/4 SHCS).
+  quantity: 14
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

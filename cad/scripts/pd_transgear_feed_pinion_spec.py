@@ -1,16 +1,16 @@
 r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its drawing.
 
-The transgear pinion sleeve (MHA-PD-010, R9-68): one turned steel sleeve that
-runs on the MHA-PD-023 pin's Ø3.9 shank and carries, rear to front, the
+The transgear pinion sleeve (MHA-PD-10, R9-68): one turned steel sleeve that
+runs on the MHA-PD-23 pin's Ø3.9 shank and carries, rear to front, the
 independent 12T 32DP PA20 finite stock-form feed pinion and the Ø8.2 h6 boss.
 The pinion meshes the purchased standard platen rack. The brass hub
 slides on the boss; its rear spigot passes through
-the 120T disc's (MHA-PD-006) bore, which pilots on it, and seats its end on the
+the 120T disc's (MHA-PD-06) bore, which pilots on it, and seats its end on the
 step face, so the step is the rear stop of hub and disc; the hub drives
 through the boss's D-flat, which is drive only (its end wall stands behind
 the hub's own flat and never touches it).  The hub's front face is faced to
-stand just behind the nose, so the MHA-PD-025 front bushing bears on the nose
-and traps hub and disc against the step.  The rear face runs on the MHA-PD-024
+stand just behind the nose, so the MHA-PD-25 front bushing bears on the nose
+and traps hub and disc against the step.  The rear face runs on the MHA-PD-24
 rear bushing; both bushings and the hub are faced to fit
 (``transgear_cluster_fit``, which reads this module).
 
@@ -60,11 +60,11 @@ MM_PER_IN = 25.4
 # (dt_crank_pinion_spec's precedent: a registry read would make the part rows
 # rebuild inputs of every importer); test_pd_transgear_feed_pinion_drawing checks
 # them against the registry offline.
-SLEEVE_NUMBER = "MHA-PD-010"
+SLEEVE_NUMBER = "MHA-PD-10"
 PIN_NUMBER = pd_transgear_pin_spec.PIN_NUMBER
-HUB_NUMBER = "MHA-PD-017"
-DISC_NUMBER = "MHA-PD-006"
-RACK_NUMBER = "MHA-PD-005"
+HUB_NUMBER = "MHA-PD-17"
+DISC_NUMBER = "MHA-PD-06"
+RACK_NUMBER = "MHA-PD-05"
 if pd_rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
     raise AssertionError("the disc's fit note names another hub than this sheet")
 
@@ -286,7 +286,7 @@ FLAT_CUTTER_FLUTE_MIN = 12.0
 if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
 
-# G7 bore on the preserved MHA-PD-023 h6 pin: +0.016/+0.004 over 0/-0.008
+# G7 bore on the preserved MHA-PD-23 h6 pin: +0.016/+0.004 over 0/-0.008
 # gives 0.004..0.024 diametral clearance. The true finite root at every
 # radial-setting corner retains the 2.0 mm wall.
 BORE_DIA = pd_transgear_pin_spec.DIA
@@ -602,7 +602,7 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
 # and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-# Pending exception ruling: MHA-PD-010 flat wall (#1378).
+# Pending exception ruling: MHA-PD-10 flat wall (#1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."

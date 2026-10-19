@@ -33,7 +33,7 @@ _MATE_NAME = {
 
 FOCUS = (
     "dt-cone-swing-platform", "dt-cone-pivot-post", "dt-cone-tip-block",
-    "vn-cone-tip-collar", "vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw",
+    "dt-vn-cone-tip-collar", "dt-vn-cone-tip-adjuster", "dt-vn-cone-tip-pinch-screw",
 )
 
 

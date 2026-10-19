@@ -453,7 +453,7 @@ async def _sweep_tooth_sketch(
 
 
     # Path: a fully-defined line up the gear axis (origin coincidence +
-    # vertical + one length dim -- the build_vn_boss_hook recipe).
+    # vertical + one length dim -- the build_sm_vn_boss_hook recipe).
     check("create_sketch tooth path", await adapter.create_sketch("Top"))
     line = check(
         "tooth path line",

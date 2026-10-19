@@ -2,7 +2,7 @@ r"""Reproduction script: magnifying wheel (book ch. 21, pp. 50-53).
 
 A gray cast-iron spider: a turned Ø100 rim on six tapered cast spokes and a
 turned Ø25 hub boss. The boss carries an integral Ø14.0 spigot on its front
-(pen) side, on which the MHA-MG-010 brass drum is pressed. The lever wire wraps
+(pen) side, on which the MHA-MG-10 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
 hole through the boss on the drum's wire-centre radius; TIE 2 (pen wire) is a
@@ -120,10 +120,10 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # wire radius) at the lever-wire's tangency azimuth, in the wheel mid-plane. The
 # magnifier assembly holds it COINCIDENT to the lever-wire's Top plane, tying the
 # wheel's spin to the lever group's travel along the wire (the linearized
-# inextensible-wire constraint -- see build_vn_lever_wire's docstring). The azimuth
-# is layout-derived, so it is imported from vn_lever_wire_geom: a layout move
+# inextensible-wire constraint -- see build_mg_vn_lever_wire's docstring). The azimuth
+# is layout-derived, so it is imported from mg_vn_lever_wire_geom: a layout move
 # re-tangents the wire AND re-stamps this point in one rebuild.
-from vn_lever_wire_geom import (  # noqa: E402
+from mg_vn_lever_wire_geom import (  # noqa: E402
     WHEEL_BAR_Y as _YOKE_WHEEL_Y,
     WHEEL_X as _YOKE_WHEEL_X,
     YOKE_POINT as _YOKE_POINT,
@@ -574,7 +574,7 @@ async def build(adapter) -> dict[str, str]:
     # Pen-wire U-groove, revolve-cut on the Right plane: two quarter arcs meet
     # at the groove bottom (a vertex the bottom diameter dimensions to), then
     # straight walls run out past the OD. The axis is the crimp idiom
-    # (build_vn_keeper_chain_link): a short centerline from the origin.
+    # (build_dt_vn_keeper_chain_link): a short centerline from the origin.
     groove_sd = SketchDims()
     check("create_sketch groove", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)

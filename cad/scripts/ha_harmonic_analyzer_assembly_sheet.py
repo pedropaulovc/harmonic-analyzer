@@ -1,4 +1,4 @@
-"""Drawing-only text of the complete-machine fitter package (MHA-HA-000).
+"""Drawing-only text of the complete-machine fitter package (MHA-HA-00).
 
 The BOM descriptions, balloon targets, setting callouts, integration steps
 and checks the sheets print. Only draw_ha_harmonic_analyzer_assembly (and its
@@ -12,7 +12,7 @@ from __future__ import annotations
 import dt_drive_train_steps
 import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
-import vn_spring_hook_spec
+import ch_vn_spring_hook_spec
 from ha_harmonic_analyzer_assembly_spec import (
     BAR_HEIGHT_DIMENSION,
     BOM_ORDER,
@@ -82,7 +82,7 @@ def _n(key: str) -> int:
 
 _STEP_TEXT: dict[str, str] = {
     "frame-built": (
-        "FRAME: BUILD MHA-FR-000 COMPLETE ON A FLAT BENCH. MHA-VN-023 STAYS "
+        "FRAME: BUILD MHA-FR-00 COMPLETE ON A FLAT BENCH. MHA-FR-VN-52 STAYS "
         f"BACKED CLEAR IN THE GOOSENECK HUB UNTIL STEP {_n('summing-levelled')}."
     ),
     "drive-train-built": (
@@ -90,65 +90,65 @@ _STEP_TEXT: dict[str, str] = {
         f"STEPS 1-{len(dt_drive_train_steps.SEQUENCE)} IN ORDER."
     ),
     "summing-hung": (
-        "SUMMING LEVER: HANG MHA-SM-000 UNDER THE TOP-FRAME CROSSBAR AND CLAMP "
-        "THE COUNTER SPRING'S UPPER LOOP TO THE MHA-SM-001 POST, PER ITS STEPS "
+        "SUMMING LEVER: HANG MHA-SM-00 UNDER THE TOP-FRAME CROSSBAR AND CLAMP "
+        "THE COUNTER SPRING'S UPPER LOOP TO THE MHA-SM-01 POST, PER ITS STEPS "
         "BEFORE FINAL ASSEMBLY. THE POST STAYS OUT OF ITS HUB."
     ),
     "channel-built": (
-        "CHANNEL BANK: BUILD MHA-CH-000 COMPLETE ON THE FRAME PER ITS STEPS. "
-        "EACH MHA-VN-004 SPRING HANGS FROM ITS LEVER WITH ITS BOTTOM LOOP FREE."
+        "CHANNEL BANK: BUILD MHA-CH-00 COMPLETE ON THE FRAME PER ITS STEPS. "
+        "EACH MHA-CH-VN-50 SPRING HANGS FROM ITS LEVER WITH ITS BOTTOM LOOP FREE."
     ),
     # The anchor's install and jam-nut lock are the anchor spec's own text
-    # (vn_spring_hook_spec, owned with the part), printed here unforked.
+    # (ch_vn_spring_hook_spec, owned with the part), printed here unforked.
     "channel-anchors-set": (
         f"CHANNEL ANCHORS ({CHANNEL_ANCHORS} OFF): DISCARD THE HEX NUT SUPPLIED "
-        f"WITH EACH MHA-VN-012. {vn_spring_hook_spec.ANCHOR_INSTALL_STEP} "
+        f"WITH EACH MHA-CH-VN-51. {ch_vn_spring_hook_spec.ANCHOR_INSTALL_STEP} "
         "HOOK THE SPRING'S BOTTOM LOOP INTO THE EYE."
     ),
     "summing-levelled": (
-        "GOOSENECK AND LEVEL, PER MHA-SM-000 FINAL-ASSEMBLY STEPS: DROP THE "
-        "MHA-SM-001 POST INTO THE TOP FRAME'S GOOSENECK HUB AND HOOK THE "
-        "MHA-VN-005 LOWER LOOP INTO THE MHA-VN-001 EYE. WITH EVERY CHANNEL "
-        "AMPLITUDE AT ZERO, SLIDE THE POST UNTIL THE MHA-SM-003 PLATE TOP READS "
-        "LEVEL, THEN TIGHTEN MHA-VN-023 ON THE POST (NO LOCK; RE-SET IF IT "
+        "GOOSENECK AND LEVEL, PER MHA-SM-00 FINAL-ASSEMBLY STEPS: DROP THE "
+        "MHA-SM-01 POST INTO THE TOP FRAME'S GOOSENECK HUB AND HOOK THE "
+        "MHA-SM-VN-51 LOWER LOOP INTO THE MHA-SM-VN-50 EYE. WITH EVERY CHANNEL "
+        "AMPLITUDE AT ZERO, SLIDE THE POST UNTIL THE MHA-SM-03 PLATE TOP READS "
+        "LEVEL, THEN TIGHTEN MHA-FR-VN-52 ON THE POST (NO LOCK; RE-SET IF IT "
         "DRIFTS)."
     ),
     "paper-drive-built": (
-        f"PAPER DRIVE: BUILD MHA-PD-000 STEPS 1-{len(pd_steps.SEQUENCE)} IN "
+        f"PAPER DRIVE: BUILD MHA-PD-00 STEPS 1-{len(pd_steps.SEQUENCE)} IN "
         f"ORDER; ITS STEP {pd_steps.step_number('bar-clamped')} SETS THE "
         "SUPPORT BAR ON THE FRONT COLUMNS. ITS CHAIN STEPS NEED THE CRANK SIDE "
         f"OF STEP {_n('drive-train-built')}."
     ),
     "magnifier-bar-clamped": (
-        "MAGNIFIER BAR: CLOSE THE MHA-SH-001/MHA-SH-002 CLAMP ARCS (STARTED "
-        "LOOSE AT MHA-MG-000) ROUND THE WEST FRONT COLUMN, WHEEL TOWARD THE PEN "
-        "ROD. SET THE MHA-MG-008 BAR TOP TO ITS HEIGHT ABOVE THE DECK (SHEET 1) "
+        "MAGNIFIER BAR: CLOSE THE MHA-SH-01/MHA-SH-02 CLAMP ARCS (STARTED "
+        "LOOSE AT MHA-MG-00) ROUND THE WEST FRONT COLUMN, WHEEL TOWARD THE PEN "
+        "ROD. SET THE MHA-MG-08 BAR TOP TO ITS HEIGHT ABOVE THE DECK (SHEET 1) "
         "AND "
-        "LEVEL ALONG ITS LENGTH, THEN TIGHTEN BOTH MHA-VN-021 CLAMP SCREWS "
+        "LEVEL ALONG ITS LENGTH, THEN TIGHTEN BOTH MHA-MG-VN-51 CLAMP SCREWS "
         "EVENLY."
     ),
     "magnifier-bracket-screwed": (
-        "MAGNIFIER BRACKET: SEAT THE MHA-MG-001 BRACKET FLANGE ON ITS SEATS ON "
-        "MHA-SM-003 AND DRIVE BOTH MHA-VN-050 #2-56 SCREWS UNTIL THE HEADS SEAT "
+        "MAGNIFIER BRACKET: SEAT THE MHA-MG-01 BRACKET FLANGE ON ITS SEATS ON "
+        "MHA-SM-03 AND DRIVE BOTH MHA-MG-VN-53 #2-56 SCREWS UNTIL THE HEADS SEAT "
         "ON THE FLANGE."
     ),
-    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-000 SHEET 4.",
+    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-00 SHEET 4.",
     "pen-hung": (
-        "PEN: HANG MHA-PN-000 FROM THE MHA-MG-008 BAR AND LOCK THE HANGER SCREW "
-        "PER ITS HANGER SCREW LOCK STEP (MHA-VN-007, MHA-VN-063 NUT, "
-        "MHA-VN-064 JAM NUT)."
+        "PEN: HANG MHA-PN-00 FROM THE MHA-MG-08 BAR AND LOCK THE HANGER SCREW "
+        "PER ITS HANGER SCREW LOCK STEP (MHA-PN-VN-50, MHA-PN-VN-54 NUT, "
+        "MHA-PN-VN-55 JAM NUT)."
     ),
     # The wrap follows mg_wheel_group (PEN_WIRE_WRAP_DEG: from the 3 o'clock
     # tangent counter-clockwise, up over the top, to TIE 2 at about 4:30, under
-    # one turn); TIE 2 is the radial hole drawn on the MHA-MG-005 sheet.
+    # one turn); TIE 2 is the radial hole drawn on the MHA-MG-05 sheet.
     "pen-wire-tied": (
         f"PEN WIRE, WITH THE PLATE TOP LEVEL (STEP {_n('summing-levelled')}): "
-        "LEAD THE UPPER END OF MHA-VN-067 INTO THE MHA-MG-005 RIM GROOVE AT "
+        "LEAD THE UPPER END OF MHA-PN-VN-57 INTO THE MHA-MG-05 RIM GROOVE AT "
         "THE 3 O'CLOCK TANGENT (FRONT VIEW), WRAP IT COUNTER-CLOCKWISE UP OVER "
-        "THE TOP (UNDER ONE TURN) TO THE TIE 2 HOLE SHOWN ON THE MHA-MG-005 "
+        "THE TOP (UNDER ONE TURN) TO THE TIE 2 HOLE SHOWN ON THE MHA-MG-05 "
         "DRAWING, PASS IT THROUGH AND TIE IT OFF INSIDE THE RIM, SET SO THE "
-        "MHA-PN-007 STUD HEAD TOP HANGS THE SHEET 1 STEP "
-        f"{_n('pen-wire-tied')} DROP BELOW THE MHA-MG-008 BAR TOP. TRIM THE TAIL."
+        "MHA-PN-07 STUD HEAD TOP HANGS THE SHEET 1 STEP "
+        f"{_n('pen-wire-tied')} DROP BELOW THE MHA-MG-08 BAR TOP. TRIM THE TAIL."
     ),
     # The parked, as-modelled nib: the views show it here, a feeler's gap
     # off the paper (PEN_PAPER_CLEARANCE_MM). Nothing on the carriage brings
@@ -156,20 +156,20 @@ _STEP_TEXT: dict[str, str] = {
     # guided -- so "nib-on-paper" closes the gap by sliding the marker on in
     # the V (code review C08).
     "nib-set": (
-        "NIB PARKED, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-VN-010 "
-        "THUMB SCREW, SLIDE THE MHA-VN-065 MARKER UNTIL A "
+        "NIB PARKED, WITH PAPER CLIPPED ON THE PLATEN: SLACKEN THE MHA-PN-VN-51 "
+        "THUMB SCREW, SLIDE THE MHA-PN-VN-56 MARKER UNTIL A "
         f"{NIB_CLEARANCE_TEXT} FEELER JUST DRAGS BETWEEN NIB AND PAPER, THEN "
-        "RE-TIGHTEN THE THUMB SCREW FINGER-TIGHT. THE MHA-PN-007 STUD KEEPS "
-        "ITS MHA-PN-000 SETTING."
+        "RE-TIGHTEN THE THUMB SCREW FINGER-TIGHT. THE MHA-PN-07 STUD KEEPS "
+        "ITS MHA-PN-00 SETTING."
     ),
     "nib-on-paper": (
-        "NIB ON PAPER, BEFORE RUNNING: SLACKEN THE MHA-VN-010 THUMB SCREW, "
-        "PUSH THE MHA-VN-065 MARKER ON ALONG ITS AXIS UNTIL THE NIB JUST "
+        "NIB ON PAPER, BEFORE RUNNING: SLACKEN THE MHA-PN-VN-51 THUMB SCREW, "
+        "PUSH THE MHA-PN-VN-56 MARKER ON ALONG ITS AXIS UNTIL THE NIB JUST "
         "TOUCHES THE PAPER, NO FEELER, THEN RE-TIGHTEN THE THUMB SCREW "
         f"FINGER-TIGHT. TO PARK THE PEN, REPEAT STEP {_n('nib-set')}."
     ),
     "stick-parked": (
-        "MEASURING STICK: PARK MHA-MS-000 ON THE MHA-FR-001 AS-CAST TOP BETWEEN "
+        "MEASURING STICK: PARK MHA-MS-00 ON THE MHA-FR-01 AS-CAST TOP BETWEEN "
         "THE RAISED DECK'S EAST EDGE AND THE EAST COLUMNS, AS SHOWN ON SHEET 2: "
         "STICK FRONT TO REAR, GRADUATIONS UP, CENTRED FRONT TO REAR."
     ),
@@ -184,7 +184,7 @@ ASSEMBLY_STEPS: tuple[str, ...] = tuple(
 ASSEMBLY_CHECKS: tuple[str, ...] = (
     "1. THE SHEET 1 BAR TOP AND STUD DROP READ AS DIMENSIONED; THE NIB "
     "TOUCHES THE PAPER.",
-    f"2. {vn_spring_hook_spec.ANCHOR_INSTALL_CHECK}",
+    f"2. {ch_vn_spring_hook_spec.ANCHOR_INSTALL_CHECK}",
     "3. WITH EVERY CHANNEL AMPLITUDE AT ZERO THE PLATE TOP READS LEVEL, AND "
     "TWO CRANK TURNS DRAW A STRAIGHT LINE ALONG THE PAPER.",
     "4. THROUGH TWO CRANK TURNS NOTHING BINDS OR RUBS, THE CHAIN STAYS ON BOTH "

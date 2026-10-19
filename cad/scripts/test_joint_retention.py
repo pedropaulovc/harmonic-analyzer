@@ -2,7 +2,7 @@
 
 The fixture is the case that exposed the gap: a #10-32 stud screwed into an
 arm until its shim seats, carrying an oiled rotating gear cluster that a front
-cap retains axially (the paper drive's MHA-082 stud in MHA-PD-018, retired by
+cap retains axially (the paper drive's MHA-082 stud in MHA-PD-18, retired by
 R9-68 for a pressed pin). SolidWorks-free.
 """
 
@@ -89,7 +89,7 @@ def test_magnifying_bracket_joint_is_a_two_screw_static_clamp() -> None:
         if joint.id == "ha-harmonic-analyzer/magnifying-bracket-screws"
     )
     assert row.assembly == "ha_harmonic_analyzer"
-    assert row.member == "vn_magnifying_bracket_screw"
+    assert row.member == "mg_vn_magnifying_bracket_screw"
     assert row.receiver == "sm_summing_lever"
     assert row.quantity == 2
     assert row.thread == "#2-56 UNC"
@@ -246,13 +246,13 @@ def test_a_ruling_waives_only_the_joint_it_names() -> None:
 
 
 def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> None:
-    """Machinist review of 6c385465d: the free T24 rocks against the MHA-PD-013
+    """Machinist review of 6c385465d: the free T24 rocks against the MHA-PD-13
     flange through its pin backlash, so the nut is an exposed joint; the
-    user's U-MHA-PD-013-no-lock ruling (2026-10-03) waives it, with the backlash
+    user's U-MHA-PD-13-no-lock ruling (2026-10-03) waives it, with the backlash
     the specs give."""
     import math
 
-    import vn_transgear_knob_drive_pin_spec as pin
+    import pd_vn_transgear_knob_drive_pin_spec as pin
     import pd_transgear_removable_spec as wheel
     from _printed_tolerance import drilled_oversize_mm
 
@@ -297,13 +297,13 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     assert row.thread == "#10-24 UNC"
     assert row.exposure is Exposure.STATIC_CLAMP
     assert row.lock is Lock.NONE
-    notes = jr._config.parts("vn-knife-hanger-stud")["installation_notes"]
+    notes = jr._config.parts("sm-vn-knife-hanger-stud")["installation_notes"]
     assert "THREADLOCK" not in notes.upper()
-    assert "vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
-    assert jr.UNTHREADED_STOCK["vn_knife_mount_dowel"] == (
+    assert "sm_vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
+    assert jr.UNTHREADED_STOCK["sm_vn_knife_mount_dowel"] == (
         "dowel pin pressed into a reamed hole"
     )
-    washer = "vn_knife_hanger_washer"
+    washer = "sm_vn_knife_hanger_washer"
     assert washer in jr.UNTHREADED_PARTS
     assert washer not in jr.THREADED_PARTS
     assert jr.UNTHREADED_STOCK[washer] == (
@@ -311,14 +311,14 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     )
     assert row.quantity == 2
     assert not row.lock_part and not row.lock_binds
-    assert "two pressed MHA-VN-051 dowels" in row.exposure_reason
+    assert "two pressed MHA-SM-VN-53 dowels" in row.exposure_reason
     assert "92314A253" in row.axial_capture
     assert "96659A104" in row.axial_capture
     assert "crossbar's faced top" in row.axial_capture
     assert "spotface" not in row.axial_capture
-    # The length is cut at MHA-SM-000 to the measured stack, not banded on
+    # The length is cut at MHA-SM-00 to the measured stack, not banded on
     # the bolt or carried by the frame's grip band.
-    assert "MHA-SM-000 step 4 cuts each bolt" in row.axial_capture
+    assert "MHA-SM-00 step 4 cuts each bolt" in row.axial_capture
     assert "measured at its own hole plus 8.92 +/-0.15" in row.axial_capture
     assert "46.70 +/-0.15" not in row.axial_capture
     assert "36.50 +/-0.05" not in row.axial_capture
@@ -332,7 +332,7 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
 
 
 def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None:
-    """PR #1317 Codex review: the MHA-VN-034 cups hold the rocked MHA-CH-005
+    """PR #1317 Codex review: the MHA-CH-VN-53 cups hold the rocked MHA-CH-05
     shaft, an exposed joint. Its Loctite 222 waiver was retired (2026-10-16,
     the user's standing no-threadlocker rule): each is snugged and its tap
     mouth staked at 2 points, as the fulcrum keeper set screws are."""
@@ -344,7 +344,7 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
     assert row.lock is Lock.STAKED
     assert row.lock_step == row.installed_at == "set-screws-driven"
     assert row.exception == ""
-    assert "U-MHA-VN-034-channel-threadlocker" not in jr.RULINGS
+    assert "U-MHA-CH-VN-53-channel-threadlocker" not in jr.RULINGS
     assert not [r for r in jr.RULINGS.values() if r.joint == joint_id]
     (keeper,) = [
         j for j in jr.JOINTS if j.id == "ch-channel/fulcrum-shaft-set-screw-in-keeper"
@@ -356,7 +356,7 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
     for banned in ("LOCTITE", "THREADLOCK"):
         assert banned not in rocker_fitup.upper()
         assert banned not in row.evidence.upper()
-    assert jr._config.parts("vn-arbor-set-screw")["number"] not in fulcrum_fitup
+    assert jr._config.parts("ch-vn-arbor-set-screw")["number"] not in fulcrum_fitup
 
     findings = jr.audit(
         jr.JOINTS,
@@ -372,7 +372,7 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
 
 
 def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
-    """Q5 on PR #1348: the MHA-VN-023 cup point is the gooseneck post's only
+    """Q5 on PR #1348: the MHA-FR-VN-52 cup point is the gooseneck post's only
     retention, an oscillating joint with no jam nut. The user waived drawing-guidelines.md rule 23 (lock threaded joints exposed to operating loads)
     for it (2026-10-12): adjustable by design and re-set periodically."""
     joint_id = "ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame"
@@ -380,7 +380,7 @@ def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
     assert "91410A540" in row.evidence
-    assert jr._config.parts("vn-gooseneck-set-screw")["supplier_skus"] == ["91410A540"]
+    assert jr._config.parts("fr-vn-gooseneck-set-screw")["supplier_skus"] == ["91410A540"]
     ruling = jr.RULINGS[row.exception]
     assert ruling.joint == joint_id
     assert "adjustable by design, periodic re-set; user 2026-10-12" in ruling.granted
@@ -405,7 +405,7 @@ def test_the_gooseneck_set_screw_is_waived_only_by_its_ruling() -> None:
 
 
 def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
-    """PR #1436: the MHA-VN-061 cup point is the v-block's only retention on
+    """PR #1436: the MHA-PN-VN-52 cup point is the v-block's only retention on
     the rod, an oscillating joint with no room for a jam screw. The user
     waived drawing-guidelines.md rule 23 for it (2026-10-14): an operator
     adjustment and light clamp, period-faithful and plain."""
@@ -414,7 +414,7 @@ def test_the_pen_rod_set_screw_is_waived_only_by_its_ruling() -> None:
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
     assert "91375A105" in row.evidence
-    assert jr._config.parts("vn-pen-rod-set-screw")["supplier_skus"] == ["91375A105"]
+    assert jr._config.parts("pn-vn-pen-rod-set-screw")["supplier_skus"] == ["91375A105"]
     ruling = jr.RULINGS[row.exception]
     assert ruling.joint == joint_id
     assert "2026-10-14" in ruling.granted and "PR #1436" in ruling.granted
@@ -613,7 +613,7 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
 
 def test_every_joint_the_table_names_places_its_hardware() -> None:
     # The last unplaced row (the pen v-block's rod set screw) became the
-    # placed MHA-VN-061; a new UNMODELLED row must be a deliberate change here.
+    # placed MHA-PN-VN-52; a new UNMODELLED row must be a deliberate change here.
     unmodelled = {
         f.subject for f in jr.audit_table() if f.kind is Kind.HARDWARE_UNMODELLED
     }
@@ -651,11 +651,11 @@ def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
     assert anchor.exposure is Exposure.ADJUSTER
     assert anchor.lock is Lock.JAM_NUT
     assert anchor.lock_part == "ch_anchor_jam_nut"
-    assert set(anchor.lock_binds) == {"vn_spring_hook", "sm_summing_lever"}
+    assert set(anchor.lock_binds) == {"ch_vn_spring_hook", "sm_summing_lever"}
     assert anchor.exception == ""
     nut = rows["ha-harmonic-analyzer/channel-anchor-jam-nut-on-anchor"]
     assert nut.member == "ch_anchor_jam_nut"
-    assert nut.receiver == "vn_spring_hook"
+    assert nut.receiver == "ch_vn_spring_hook"
     assert nut.exposure is Exposure.STATIC_CLAMP
     for row in (anchor, nut):
         text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))

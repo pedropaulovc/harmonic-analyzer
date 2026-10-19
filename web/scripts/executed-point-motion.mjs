@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline'
 import * as THREE from 'three'
 import { createServer, createLogger } from 'vite'
 import { completeInput } from './verify-reference.mjs'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const finitePoint = value => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)
@@ -206,6 +207,8 @@ export async function createPointMotionClassifier({ webRoot = WEB_ROOT, modelPat
 
     function classify(request) {
       if (disposed) throw new Error('Executed point-motion classifier is disposed')
+      // Bridge requests may retain sealed archive names; identity hashes stay original.
+      request = projectCurrentNativeMetadata(request)
       const inputPairs = [], groups = new Map()
       const results = (request.cases ?? []).map(({ anchor }) => ({ id: anchor?.id, motion: null, reason: 'unsupported native point association' }))
       const identityMatches = machine.availability === 'available'

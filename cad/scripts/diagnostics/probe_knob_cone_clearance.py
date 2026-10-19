@@ -119,7 +119,7 @@ async def build(adapter) -> dict[str, str]:
     knob_position = [knob_x, dta.Y_BASE_TOP + dta.PLAT_T, knob_z]
     knob = await place_component(
         adapter,
-        "vn-cone-lock-knob",
+        "dt-vn-cone-lock-knob",
         knob_position,
         [0.0, 0.0, 0.0],
         dta.IDENTITY,

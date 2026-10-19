@@ -1,4 +1,4 @@
-r"""Create the three-sheet measuring-stick fitter package (MHA-MS-000).
+r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
 Sheet 1 shows the stick clamped at its stop mark (front and top at full size)
 with a reference overall and controlled near-face setting dimension, a section through
@@ -179,8 +179,8 @@ PART_ROWS = {
     "ms-stick": _config.parts("ms-stick"),
     "ms-stop-block": _config.parts("ms-stop-block"),
     "ms-stop-plate": _config.parts("ms-stop-plate"),
-    "vn-ms-stop-plate-screw": _config.parts("vn-ms-stop-plate-screw"),
-    "vn-thumb-screw": _config.parts("vn-thumb-screw"),
+    "ms-vn-stop-plate-screw": _config.parts("ms-vn-stop-plate-screw"),
+    "ms-vn-thumb-screw": _config.parts("ms-vn-thumb-screw"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")

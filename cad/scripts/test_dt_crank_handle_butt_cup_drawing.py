@@ -1,4 +1,4 @@
-"""Offline contracts for MHA-DT-035, the crank handle butt cup, and its drawing."""
+"""Offline contracts for MHA-DT-35, the crank handle butt cup, and its drawing."""
 
 from __future__ import annotations
 
@@ -63,11 +63,11 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
 
 def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
     # Owner ruling A on #1661: 0.3-0.5 X 45 DEG, so its smallest leg still
-    # clears the MHA-DT-008 counterbore floor's R0.3 MAX corner.
+    # clears the MHA-DT-08 counterbore floor's R0.3 MAX corner.
     assert (spec.BODY_CHAMFER_MIN, spec.BODY_CHAMFER_MAX) == (0.3, 0.5)
     assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
         "X 45 DEG",
-        "CLEARS MHA-DT-008",
+        "CLEARS MHA-DT-08",
         "COUNTERBORE CORNER",
     ]
 
@@ -142,19 +142,19 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
     assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
     assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
-    # MHA-DT-035 machinist ENFORCE r1: each band names its mate at the callout
-    # (rule 4), the matched pocket fit states name, number, diametral
+    # Historical MHA-DT-035 machinist ENFORCE r1: each band names its mate
+    # at the callout (rule 4); the matched pocket fit states name, number, diametral
     # clearance and its hard limit.  The floor corner's maximum is a separate
     # model-owned radial dimension, not an unrelated axial callout.
-    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-008"
+    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-08"
     assert notes.POCKET_FIT_CALLOUT.splitlines() == [
-        "BORE TO SUIT MHA-DT-032",
+        "BORE TO SUIT MHA-DT-32",
         "PIVOT SCREW HEAD, 0.2-0.4",
         "DIAMETRAL CLEARANCE,",
         "<MOD-DIAM>6.5 MAX",
     ]
     assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
-        "KEEPS MHA-DT-032 HEAD",
+        "KEEPS MHA-DT-32 HEAD",
         "BELOW FACE",
     ]
     assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
@@ -165,7 +165,7 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["PocketFloorRadius"] == 1
     assert "PocketFloorRadius" not in spec.REFERENCE_DIMENSIONS
     assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
-    # The DT-008 and DT-032 specs import the cup spec; its prose lives in the
+    # The DT-08 and DT-32 specs import the cup spec; its prose lives in the
     # notes module so a wording edit never re-keys those parts.
     for name in ("DRAWING_NOTES", "ISOMETRIC_VIEW_NOTE", "FLOOR_HOLE_CALLOUT"):
         assert not hasattr(spec, name)
@@ -173,7 +173,7 @@ def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
 
 def test_registry_row_is_the_title_block_source() -> None:
     row = _config.parts("dt-crank-handle-butt-cup")
-    assert row["number"] == "MHA-DT-035"
+    assert row["number"] == "MHA-DT-35"
     assert row["title"] == "Crank Handle Butt Cup"
     assert len(str(row["material"])) <= 36
     assert int(row["quantity"]) == 1
@@ -505,7 +505,7 @@ def test_imported_floor_radius_refuses_changed_native_semantics(monkeypatch, fau
     else:
         display.dimension.Tolerance.GetMaxValue.return_value = 0.00005
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    with pytest.raises(RuntimeError, match="MHA-DT-035 PocketFloorRadius"):
+    with pytest.raises(RuntimeError, match="MHA-DT-35 PocketFloorRadius"):
         drawing._dress_pocket_floor_radius(
             SimpleNamespace(GetSpecificAnnotation=lambda: display)
         )

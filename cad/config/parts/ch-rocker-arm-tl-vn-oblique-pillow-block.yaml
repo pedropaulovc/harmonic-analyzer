@@ -1,0 +1,14 @@
+ch-rocker-arm-tl-vn-oblique-pillow-block:
+  title: Rocker Oblique Trammel Pillow Block
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-56
+  stock_name: KP08 Mini Zinc Pillow Block, Set-Screw Insert Bearing, 8 mm Bore
+  supplier: Bearings Direct (AMPEC)
+  supplier_skus: [KP08]
+  # SOLIDWORKS library stand-in for the envelope (the jig uses no mass from it).
+  material: Plain Carbon Steel
+  material_specification: "Zinc alloy, 52100 insert bearing"
+  finish: as supplied
+  quantity: 2
+  tolerance_class: visual_noncritical
+  process: purchased

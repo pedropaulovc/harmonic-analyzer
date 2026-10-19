@@ -1,4 +1,4 @@
-"""The removable #25 sprocket's seat interface (MHA-PD-009 on MHA-DT-011 / MHA-PD-022)."""
+"""The removable #25 sprocket's seat interface (MHA-PD-09 on MHA-DT-11 / MHA-PD-22)."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ import _config
 import build_dt_drive_train_assembly as bdt
 import dt_crank_hub_geometry as hub
 import dt_crank_hub_spec
-import vn_crank_seat_drive_pin_spec as crank_pin
+import dt_vn_crank_seat_drive_pin_spec as crank_pin
 import dt_crankshaft_spec as crank
 import pd_transgear_drive_collar_spec as collar
-import vn_transgear_knob_drive_pin_spec as knob_pin
-import vn_transgear_latch_pin_spec as dowel_spec
+import pd_vn_transgear_knob_drive_pin_spec as knob_pin
+import pd_vn_transgear_latch_pin_spec as dowel_spec
 import pd_transgear_removable_spec as spec
 
 
@@ -223,7 +223,7 @@ def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
 
 def test_knob_pin_sheet_prints_the_press_stop_range() -> None:
     notes = " ".join(
-        _config.parts("vn-transgear-knob-drive-pin")["installation_notes"].split()
+        _config.parts("pd-vn-transgear-knob-drive-pin")["installation_notes"].split()
     )
     low, high = knob_pin.PROUD_RANGE
     assert f"{low:.2f}-{high:.2f} PROUD OF THE SEAT FACE" in notes

@@ -325,7 +325,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("pd_platen_guide", "vn_frame_side_screw", "pn_pen_assembly")
+    stems = ("pd_platen_guide", "ch_vn_frame_side_screw", "pn_pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
@@ -509,7 +509,7 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
     )
     after = snapshot()
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
-    for stem in ("vn_frame_side_screw", "pn_pen_assembly"):
+    for stem in ("ch_vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem]
 
 
@@ -521,12 +521,12 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     # A renumbering: no geometry input moves, only the printed registry value.
     row = dodo.CONFIG_DIR / "parts" / "pd-platen-guide.yaml"
     text = row.read_text(encoding="utf-8")
-    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-PD-999", text, count=1)
+    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-PD-99", text, count=1)
     assert renumbered != text
     row.write_text(renumbered, encoding="utf-8")
     after = snapshot()
     assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
-    for stem in ("vn_frame_side_screw", "pn_pen_assembly"):
+    for stem in ("ch_vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem], stem
 
 
@@ -934,8 +934,8 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
         "sm_gooseneck": {"sm_summing"},
         "fr_harmonic_base": {"fr_frame"},
         "dt_cylinder_gear": {"dt_drive_train"},
-        "vn_frame_side_screw": {"ch_channel"},
-        "vn_frame_cross_screw": {"fr_frame"},
+        "ch_vn_frame_side_screw": {"ch_channel"},
+        "fr_vn_frame_cross_screw": {"fr_frame"},
     }
     for source, expected in cases.items():
         part_tokens[source].write_text("b" * 64 + "\n")
@@ -1756,13 +1756,21 @@ def test_vendor_warning_capture_restores_jsonl_sink(tmp_path, monkeypatch, faile
 @pytest.mark.parametrize(
     "stem,executor,restores,worker,expected",
     [
-        pytest.param("vn_bearing", "local", (False, False), False, True, id="local-build"),
-        pytest.param("vn_bearing", "local", (False, False), True, True, id="worker-build"),
-        pytest.param("vn_bearing", "local", (True,), False, False, id="initial-hit"),
-        pytest.param("vn_bearing", "local", (False, True), False, False, id="hit-after-wait"),
-        pytest.param("vn_bearing", "farm", (False,), False, False, id="submitter-dispatch"),
+        pytest.param("dt_vn_bearing", "local", (False, False), False, True, id="local-build"),
+        pytest.param("dt_vn_bearing", "local", (False, False), True, True, id="worker-build"),
+        pytest.param("dt_vn_bearing", "local", (True,), False, False, id="initial-hit"),
+        pytest.param("dt_vn_bearing", "local", (False, True), False, False, id="hit-after-wait"),
+        pytest.param("dt_vn_bearing", "farm", (False,), False, False, id="submitter-dispatch"),
         pytest.param("pn_pen_rod", "local", (False, False), False, False, id="ordinary-part"),
-        pytest.param("vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
+        pytest.param("dt_vn_bearing", "drawing", (False, False), False, False, id="vendor-drawing"),
+        pytest.param(
+            "ch_rocker_arm_tl_vn_oblique_bearing", "local", (False, False),
+            False, True, id="tooling-vendor-build",
+        ),
+        pytest.param(
+            "ch_rocker_arm_tl_oblique_carrier", "local", (False, False),
+            False, False, id="fabricated-tooling-build",
+        ),
     ],
 )
 def test_vendor_part_warning_only_at_actual_build(
@@ -2221,7 +2229,7 @@ def test_unknown_artefact_falls_back_to_byte_md5(tmp_path):
     from doit.dependency import get_file_md5
 
     dodo = _load_dodo()
-    orphan = tmp_path / "vn-channel-spring-installed-stretch07.SLDPRT"
+    orphan = tmp_path / "ch-vn-channel-spring-installed-stretch07.SLDPRT"
     orphan.write_bytes(b"\x00solidworks-bytes\x01")
     assert dodo._stable_artefact_digest(str(orphan)) is None
     assert dodo.ContentChecker._digest(str(orphan)) == get_file_md5(str(orphan))
@@ -2310,10 +2318,10 @@ def test_config_deps_are_fine_grained():
     # on its own row + shared defaults + title_block.yaml + release.yaml, nothing
     # else.
     screw = dodo._config_deps(
-        scripts / "build_vn_fillister_screw.py", "vn_fillister_screw", "part"
+        scripts / "build_dt_vn_fillister_screw.py", "dt_vn_fillister_screw", "part"
     )
     assert _rel(screw, cfg) == {
-        "parts/vn-fillister-screw.yaml",
+        "parts/dt-vn-fillister-screw.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
@@ -2342,7 +2350,7 @@ def test_config_deps_are_fine_grained():
     assert "title_block.yaml" in frame_recipe, frame_recipe
     assert "release.yaml" in frame_recipe, frame_recipe
     channel_recipe = _rel(dodo._recipe_files("ch_channel"), cfg)
-    assert "parts/vn-channel-spring-installed.yaml" in channel_recipe, channel_recipe
+    assert "parts/ch-vn-channel-spring-installed.yaml" in channel_recipe, channel_recipe
     assert "release.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
     # The part TEMPLATE narrows identically: channel GENERATES its stretch
@@ -2395,7 +2403,7 @@ def test_config_deps_recipe_digest_skips_unread_yaml():
     frame_modules = {Path(path).name for path in dodo._recipe_files("fr_frame")}
     assert "dt_post_mount_stack.py" in frame_modules, frame_modules
     assert not frame_modules & {
-        "vn_post_mount_screw_spec.py",
+        "dt_vn_post_mount_screw_spec.py",
         "dt_cone_swing_platform_spec.py",
         "cone_line.py",
     }, frame_modules
@@ -2410,7 +2418,7 @@ def test_shared_post_mount_interference_depth_matches_the_part():
     import dt_post_mount_stack as stack
     import dt_cone_pivot_post_spec as post
     import dt_cone_swing_platform_spec as platform
-    import vn_post_mount_screw_spec as screw
+    import dt_vn_post_mount_screw_spec as screw
 
     assert stack.POST_BODY_HEIGHT_MM == post.BLOCK_HEIGHT
     assert stack.POST_MOUNT_COUNTERBORE_DEPTH_MM == post.ATTACHMENT_CBORE_DEPTH
@@ -2761,6 +2769,8 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "_holes.py",
         "build_pd_platen_guide.py",
         "test_pen_summing_drawing_batch_contract.py",
+        "identity-migration-map.json",
+        "current-identity-map.json",
     } <= deps
     assert {
         str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
@@ -2770,6 +2780,11 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "test_drawing_marks.py",
         "test_cone_drawing_batch_contract.py",
         "test_fastener_catalog.py",
+        "test_grouped_bom_properties.py",
+        "test_ch_vn_arbor_set_screw.py",
+        "test_dt_vn_fillister_screw.py",
+        "test_mg_vn_clamp_screw.py",
+        "test_mg_vn_thumb_screw.py",
         "test_drawing_specification_purity.py",
         "test_drawing_surface_finish_validation.py",
         "test_gtol_contracts.py",
@@ -3183,13 +3198,13 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     dodo = _load_dodo()
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(
-        dodo.SCRIPTS_DIR / "build_vn_frame_side_screw.py", "vn_frame_side_screw"
+        dodo.SCRIPTS_DIR / "build_ch_vn_frame_side_screw.py", "ch_vn_frame_side_screw"
     )
-    drawing = dodo._drawing_file_deps("vn_frame_side_screw")
+    drawing = dodo._drawing_file_deps("ch_vn_frame_side_screw")
     assembly = dodo._recipe_files("pn_pen")
     for label, deps in (
-        ("part-vn_frame_side_screw", part),
-        ("drawing-vn_frame_side_screw", drawing),
+        ("part-ch_vn_frame_side_screw", part),
+        ("drawing-ch_vn_frame_side_screw", drawing),
     ):
         assert catalog not in deps, label
         assert any(
@@ -3197,8 +3212,8 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
             and Path(dep).parent.name == ".fastener-catalog"
             for dep in deps
         ), label
-    assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
-    assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
+    assert dodo._fastener_rows_env("part:ch_vn_frame_side_screw") == "ch-vn-frame-side-screw"
+    assert dodo._fastener_rows_env("drawing:ch_vn_frame_side_screw") == "ch-vn-frame-side-screw"
     # The pen reads the pure SKU dimensions, not the stock builder's catalogue row.
     assert catalog not in assembly
     assert not any(Path(dep).parent.name == ".fastener-catalog" for dep in assembly)
@@ -3217,9 +3232,9 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
     monkeypatch.setenv("HARMONIC_FIT_GROUPS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
-    assert dodo._run_subprocess(["x"], "part:vn_frame_side_screw") == 0
-    assert seen["HARMONIC_FASTENER_ROWS"] == "vn-frame-side-screw"
-    assert seen["HARMONIC_FIT_GROUPS"] == dodo._fit_groups_env("part:vn_frame_side_screw")
+    assert dodo._run_subprocess(["x"], "part:ch_vn_frame_side_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "ch-vn-frame-side-screw"
+    assert seen["HARMONIC_FIT_GROUPS"] == dodo._fit_groups_env("part:ch_vn_frame_side_screw")
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
@@ -3240,7 +3255,7 @@ def test_fit_guard_uses_task_recipe_config_dependencies():
             ),
         ),
         ("assembly:dt_drive_train", dodo._recipe_files("dt_drive_train")),
-        ("drawing:vn_frame_side_screw", dodo._drawing_file_deps("vn_frame_side_screw")),
+        ("drawing:ch_vn_frame_side_screw", dodo._drawing_file_deps("ch_vn_frame_side_screw")),
         (
             "package:features:ch_rocker_arm",
             dodo._feature_export_file_deps("ch_rocker_arm"),
@@ -3389,7 +3404,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     # explode-tier plan (the pen's explode qualifies since #1603, so its FULL
     # path first probes an explode base); the row is a stand-in.
     monkeypatch.setitem(
-        dodo._FASTENER_ROWS, "assembly:ms_measuring_stick", frozenset({"vn-pen-set-screw"})
+        dodo._FASTENER_ROWS, "assembly:ms_measuring_stick", frozenset({"pn-vn-pen-set-screw"})
     )
     fit_groups = dodo._fit_groups_env("assembly:ms_measuring_stick")
     launched = _assembly_subprocess_envs(
@@ -3402,7 +3417,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     else:
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
-        assert env.get("HARMONIC_FASTENER_ROWS") == "vn-pen-set-screw", name
+        assert env.get("HARMONIC_FASTENER_ROWS") == "pn-vn-pen-set-screw", name
         assert env.get("HARMONIC_FIT_GROUPS") == fit_groups, name
 
 
@@ -3554,7 +3569,7 @@ def test_explode_base_key_ignores_only_the_explode_closure(monkeypatch):
         "REFRESH channel",
         "hook hook_probe.py",
         "check math",
-        "release documents part:vn_frame_side_screw",
+        "release documents part:ch_vn_frame_side_screw",
         "part:no_such_part",
         "assembly:no_such_assembly",
         "drawing:no_such_drawing",

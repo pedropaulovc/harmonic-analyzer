@@ -1083,7 +1083,7 @@ async def build(adapter) -> dict[str, str]:
                 # The title block's DWG. NO. reads $PRPSHEET:"Number", and a
                 # configuration property wins over the file one, so each sheet
                 # names its own gear (Fable, 2026-09-23: twenty sheets carried
-                # one number).  The grouped BOM keeps MHA-DT-003 (AlternateName).
+                # one number).  The grouped BOM keeps MHA-DT-03 (AlternateName).
                 "Number": configuration_number(part_number, teeth),
                 "Gear Data": gear_data(teeth),
                 "Manufacturing Notes": drawing_notes(teeth),

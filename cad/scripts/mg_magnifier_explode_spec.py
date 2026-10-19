@@ -1,6 +1,6 @@
 """Pure contract shared by the magnifier builder's explode and its drawing.
 
-MHA-MG-000 shows the wheel group and the lever group on their own exploded
+MHA-MG-00 shows the wheel group and the lever group on their own exploded
 sheets, each an isometric of ``MG_MAGNIFIER_EXPLODED`` with only its own
 families shown. This module names that presentation, the ordered native steps
 that open it, and the two family sets. Positions come from the opened model;
@@ -73,17 +73,17 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # 57-75.6, back washer 84, wheel mid-plane 100.6, then the drum, front
     # washer and nuts each at least 43 past the wheel mid-plane, where the
     # wheel no longer hides them.
-    ExplodeStep("locknut off the axle", ("vn-wheel-axle-nut:2",), "z", -152.0),
-    ExplodeStep("nut off the axle", ("vn-wheel-axle-nut:1",), "z", -141.0),
-    ExplodeStep("front washer off", ("vn-wheel-axle-front-washer",), "z", -131.0),
+    ExplodeStep("locknut off the axle", ("mg-vn-wheel-axle-nut:2",), "z", -152.0),
+    ExplodeStep("nut off the axle", ("mg-vn-wheel-axle-nut:1",), "z", -141.0),
+    ExplodeStep("front washer off", ("mg-vn-wheel-axle-front-washer",), "z", -131.0),
     ExplodeStep(
         "wheel off the axle", ("mg-magnifying-wheel", "mg-wheel-drum"), "z", -77.0
     ),
     ExplodeStep("drum off the spigot", ("mg-wheel-drum",), "z", -38.0),
-    ExplodeStep("back washer off", ("vn-wheel-axle-back-washer",), "z", -65.0),
+    ExplodeStep("back washer off", ("mg-vn-wheel-axle-back-washer",), "z", -65.0),
     ExplodeStep("spacer off", ("mg-wheel-axle-spacer",), "z", -57.0),
     # The column clamp: the screws forward out of the bar, the arcs rearward.
-    ExplodeStep("clamp screws forward", ("vn-clamp-screw",), "z", -45.0),
+    ExplodeStep("clamp screws forward", ("mg-vn-clamp-screw",), "z", -45.0),
     ExplodeStep(
         "clamp arcs rearward",
         ("sh-column-clamp-front", "sh-column-clamp-back"),
@@ -94,10 +94,10 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # Lever group: the clamp's thumb screw up, the rod down out of the clamp
     # with the fixture still on it, the fixture's screw out of its spigot, the
     # bracket off the lever's east end and its screws forward off the flange.
-    ExplodeStep("clamp thumb screw up", ("vn-thumb-screw:1",), "y", 25.0),
+    ExplodeStep("clamp thumb screw up", ("mg-vn-thumb-screw:1",), "y", 25.0),
     ExplodeStep(
         "rod and fixture down",
-        ("mg-magnifying-vertical-rod", "mg-output-fixture", "vn-thumb-screw:2"),
+        ("mg-magnifying-vertical-rod", "mg-output-fixture", "mg-vn-thumb-screw:2"),
         "y",
         -45.0,
     ),
@@ -106,25 +106,25 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # it in two world steps; one -X step left it 8 mm off its tap's line.
     ExplodeStep(
         "fixture screw out",
-        ("vn-thumb-screw:2",),
+        ("mg-vn-thumb-screw:2",),
         "x",
         -FIXTURE_SCREW_TRAVEL * math.cos(FIXTURE_YAW_RAD),
     ),
     ExplodeStep(
         "fixture screw out, back",
-        ("vn-thumb-screw:2",),
+        ("mg-vn-thumb-screw:2",),
         "z",
         FIXTURE_SCREW_TRAVEL * math.sin(FIXTURE_YAW_RAD),
     ),
     ExplodeStep(
         "bracket off the lever",
-        ("mg-magnifying-bracket", "vn-magnifying-bracket-screw"),
+        ("mg-magnifying-bracket", "mg-vn-magnifying-bracket-screw"),
         "x",
         -30.0,
     ),
     # Forward alone leaves the screws behind the bracket's arm on the sheet.
-    ExplodeStep("bracket screws forward", ("vn-magnifying-bracket-screw",), "z", -40.0),
-    ExplodeStep("bracket screws up", ("vn-magnifying-bracket-screw",), "y", 20.0),
+    ExplodeStep("bracket screws forward", ("mg-vn-magnifying-bracket-screw",), "z", -40.0),
+    ExplodeStep("bracket screws up", ("mg-vn-magnifying-bracket-screw",), "y", 20.0),
 )
 
 # The families each exploded sheet shows and balloons; the stationary ones
@@ -134,29 +134,29 @@ WHEEL_GROUP_STEMS = frozenset(
         "mg-wheel-bar",
         "sh-column-clamp-front",
         "sh-column-clamp-back",
-        "vn-clamp-screw",
+        "mg-vn-clamp-screw",
         "mg-wheel-axle",
         "mg-wheel-axle-spacer",
-        "vn-wheel-axle-back-washer",
+        "mg-vn-wheel-axle-back-washer",
         "mg-magnifying-wheel",
         "mg-wheel-drum",
-        "vn-wheel-axle-front-washer",
-        "vn-wheel-axle-nut",
+        "mg-vn-wheel-axle-front-washer",
+        "mg-vn-wheel-axle-nut",
     }
 )
 LEVER_GROUP_STEMS = frozenset(
     {
         "mg-magnifying-lever",
         "mg-magnifying-bracket",
-        "vn-magnifying-bracket-screw",
+        "mg-vn-magnifying-bracket-screw",
         "mg-magnifying-clamp",
-        "vn-thumb-screw",
+        "mg-vn-thumb-screw",
         "mg-magnifying-vertical-rod",
         "mg-output-fixture",
     }
 )
 # Shown on the finished isometric only: it spans both groups.
-WIRE_STEM = "vn-lever-wire"
+WIRE_STEM = "mg-vn-lever-wire"
 SHOWN_STEMS = WHEEL_GROUP_STEMS | LEVER_GROUP_STEMS | {WIRE_STEM}
 _moved = {member_stem(member) for step in EXPLODE_STEPS for member in step.members}
 if not _moved <= WHEEL_GROUP_STEMS | LEVER_GROUP_STEMS:

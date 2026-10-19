@@ -16,7 +16,7 @@ SUPPORT_WORLD_X = 72.9
 SUPPORT_WORLD_SEAT_Y = 139.7
 SUPPORT_WORLD_Z = ROCKER_SUPPORT_Z
 # Half the casting's length along machine Z: 180.5, the source's 7 in widened
-# by 1.35 an end so the MHA-CH-008 feet, flush with its south end face, keep
+# by 1.35 an end so the MHA-CH-08 feet, flush with its south end face, keep
 # their hold-down hole's 2.0 end wall, head clearance and seat wall at
 # title-block bands on the foot length and hole station
 # (ch_pivot_bracket_sides derives and checks it; user ruling 2026-10-14,

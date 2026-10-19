@@ -1,5 +1,5 @@
-# ch_rocker_arm (MHA-CH-006) prechips route, authored from scratch (trial T4, ported from
-# cad/prechips-shop 6d5991c9b onto the merged shop fixtures MHA-CH-006-TL-04/05 and TL-10..19).
+# ch_rocker_arm (MHA-CH-06) prechips route, authored from scratch (trial T4, ported from
+# cad/prechips-shop 6d5991c9b onto the merged shop fixtures MHA-CH-06-TL-04/05 and TL-10..19).
 # Coordinates: the model frame is the manifest's (pivot axis at model X0 Y8, hub centred
 # on Z0). Setup frames are plan frames below; every number is derived from features.toml.
 # Face references are bare HAF labels; _process_plans.bind_plan binds them to the exported
@@ -11,7 +11,7 @@ quantity = 1
 quantity_cite = "AUTHOR'S CHOICE: one arm per traveler run"
 
 [drawing]
-number = "MHA-CH-006"
+number = "MHA-CH-06"
 revision = "v44"
 cite = ["harmonic-analyzer/cad/config/parts/ch-rocker-arm.yaml:ch-rocker-arm.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
 
@@ -616,7 +616,7 @@ contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep
 # ---------------------------------------------------------------------------------------
 # S5: fitting bench, the work on the shop-made filing stand (two end blocks under the raw
 # blank ends, a pedestal under the lower hub face), a clamp across each blank end and one on
-# the upper hub face. The template (MHA-CH-006-TL-13) is laid on the work pinned in the
+# the upper hub face. The template (MHA-CH-06-TL-13) is laid on the work pinned in the
 # reamed bore by the 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus)
 # and clocked by the 0.0780 in Class ZZ minus pin gauge (gauges.pin-gauges) through its
 # radial rod slot into the #47 rod-pin hole, whenever it scribes (ops 10-20) or gauges (ops

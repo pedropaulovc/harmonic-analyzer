@@ -1,4 +1,4 @@
-"""Offline contract for the channel assembly drawing (MHA-CH-000)."""
+"""Offline contract for the channel assembly drawing (MHA-CH-00)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # A drive-train or frame sequence head, sub-steps included ("9F. ").
 ANY_STEP_HEAD = re.compile(r"^(\d+[A-Z]?)\. ", re.MULTILINE)
-STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000) STEP (\d+[A-Z]?)")
+STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-00)\b STEP (\d+[A-Z]?)")
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
 # 20260926T112244Z-1-a884759d); #945 moves these into _drawing_common.
 NOTE_CHAR_WIDTH = 0.00276
@@ -82,7 +82,7 @@ def test_step_numbers_follow_the_sequence_and_unknown_steps_are_refused() -> Non
 def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mRlAE): step 2 sent the fitter to an A03
     step that did not exist. The user ruled option A: an A03 step sets the
-    north bracket by DRO, after MHA-FR-000 step 8 has screwed the support down.
+    north bracket by DRO, after MHA-FR-00 step 8 has screwed the support down.
     Each pointer must land on a printed step that does what it cites, and the
     A02 pointer is the A03 registry's, never a typed number."""
     import draw_dt_drive_train_assembly as drive_train
@@ -128,7 +128,7 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         (fitup_number, steps.step_ref("north-ear-datum")): "PUSH THE",
     }
     found = set()
-    # MHA-HA-000's sequence is not on this branch's base: its one pointer is
+    # MHA-HA-00's sequence is not on this branch's base: its one pointer is
     # checked by value against steps.HA_ANCHORS_SET_REF instead.
     foreign = set()
     for sheet, bodies in sheets.items():
@@ -149,9 +149,9 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # and the channel sheet threads the shaft and the washer measured there
     # from the north.
     assert "LIFT IT OFF" not in north
-    assert "MIC THE MHA-VN-070, W" in north
+    assert "MIC THE MHA-CH-VN-56, W" in north
     north_ear = _step_body("north-ear-datum")
-    washer = _config.parts("vn-rocker-thrust-washer")["number"]
+    washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
     assert "FLATS UP" in north_ear and "SOUTH THROUGH THE EAR" in north_ear
     # Machinist review (PR #1605): "MICED AND KEPT" read as a second, unstated
     # measurement; the washer is the one measured at the drive-train step.
@@ -194,11 +194,11 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
-    """#948 ruling R (PR #1292): the south bracket is set off the MHA-VN-070
-    washer by the spring's set blade, beside the MHA-VN-053 spring, which is
+    """#948 ruling R (PR #1292): the south bracket is set off the MHA-CH-VN-56
+    washer by the spring's set blade, beside the MHA-CH-VN-54 spring, which is
     first run along the shaft (its catalogue ID can bind). drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the blade
     comes from rocker_bank_layout, never typed; the acceptance is the preload."""
-    spring = _config.parts("vn-rocker-bank-spring")["number"]
+    spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
     setting = _step_body("south-bracket-spring-set")
     assert f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS." in setting
@@ -210,7 +210,7 @@ def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> N
     assert "THE BANK SPRINGS BACK ONTO THE NORTH WASHER" in setting
     assert "ELSE UNCLAMP AND REPEAT THIS STEP." in setting
     support = _config.parts("fr-rocker-arm-support")["number"]
-    hold_down = _config.parts("vn-bracket-hold-down-screw")["number"]
+    hold_down = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
     bracket = _config.parts("ch-pivot-bracket")["number"]
     assert support not in setting and hold_down not in setting
     # r10 machinist review: worded as step 10's keeper transfer.
@@ -282,7 +282,7 @@ def test_each_step_block_fits_the_field_right_of_its_bank_view() -> None:
     )
     assert "TIGHTEN" not in rocker
     assert "TIGHTEN" in lever and "STAKE" in lever
-    assert _config.parts("vn-arbor-set-screw")["number"] not in lever
+    assert _config.parts("ch-vn-arbor-set-screw")["number"] not in lever
 
 
 def test_the_package_sheets_and_settings_contract() -> None:
@@ -459,8 +459,8 @@ def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     import ch_fulcrum_keeper_spec as keeper
     import ch_pivot_bracket_sides as sides
     import ch_pivot_bracket_spec as bracket
-    import vn_bracket_hold_down_screw_spec as hold_down
-    import vn_frame_side_screw_spec as foot_screw
+    import ch_vn_bracket_hold_down_screw_spec as hold_down
+    import ch_vn_frame_side_screw_spec as foot_screw
 
     explode = drawing.explode
     root2, root5, root6 = 2.0**0.5, 5.0**0.5, 6.0**0.5
@@ -521,7 +521,7 @@ def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
     offsets cancel apart from the lift, which moves v only)."""
     import ch_pivot_bracket_sides as sides
     import ch_pivot_bracket_spec as bracket
-    import vn_bracket_hold_down_screw_spec as hold_down
+    import ch_vn_bracket_hold_down_screw_spec as hold_down
 
     x, y, z = drawing.BRACKET_BALLOON_POINT_MM
     assert x == -bracket.FOOT_W / 2.0
@@ -551,7 +551,7 @@ def test_the_bom_covers_every_family_once_with_its_sku() -> None:
         assert drawing.BOM_DESCRIPTIONS[stem]
     assert drawing.BOM_QUANTITIES[drawing.SPRING_STEM] == drawing.CHANNELS
     assert sum(drawing.BOM_QUANTITIES.values()) == 2 + 7 * 2 + 1 + 9 * drawing.CHANNELS
-    # The anchor's jam nut (MHA-CH-014, made) is its own row, one per anchor.
+    # The anchor's jam nut (MHA-CH-14, made) is its own row, one per anchor.
     nut = drawing.explode.ANCHOR_NUT
     assert drawing.BOM_QUANTITIES[nut] == drawing.BOM_QUANTITIES[drawing.explode.HOOK]
     assert drawing.BOM_SKUS[nut] == drawing.MADE_PART_SKU
@@ -566,7 +566,7 @@ def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
     monkeypatch,
 ) -> None:
     """Code review C07: the square preset builds 11 spring variants (one per
-    distinct amplitude), each its own SLDPRT under MHA-VN-004, so its BOM
+    distinct amplitude), each its own SLDPRT under MHA-CH-VN-50, so its BOM
     would print 11 rows of one part number. The drawing refuses that preset
     when it runs, not at import, so collection and the neutral contract hold."""
     import asyncio
@@ -576,7 +576,7 @@ def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
     assert len(square) == drawing.CHANNELS == 20
     assert len(stems) == len(set(square)) == 11
     neutral = drawing.spring_stems([0.0] * drawing.CHANNELS, drawing.CHANNELS)
-    assert neutral == ("vn-channel-spring-installed-stretch00",)
+    assert neutral == ("ch-vn-channel-spring-installed-stretch00",)
     drawing.require_single_spring_variant(neutral, "neutral")
 
     real_machine = _config.machine
@@ -590,7 +590,7 @@ def test_a_preset_with_several_spring_lengths_is_refused_at_drawing_time(
         asyncio.run(drawing.build(object()))
     message = str(refused.value)
     assert "'square' amplitude preset builds 11 spring variants" in message
-    assert "MHA-VN-004" in message
+    assert "MHA-CH-VN-50" in message
     assert drawing.SPRING_VARIANT_ISSUE in message
     assert drawing.SPRING_VARIANT_ISSUE.endswith("/issues/1610")
 
@@ -834,10 +834,10 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
 def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
     """The rod ring is captured in its closed cam slot during the cylinder
     stack, and a pressed pin needs its far tine backed on the press, so the
-    MHA-CH-010 pin goes in at the bench, before that drive-train step -- after
+    MHA-CH-10 pin goes in at the bench, before that drive-train step -- after
     the hub stack is proved on the shaft and the rockers come off in order.
     User ruling 2026-10-09 (PR #1292 review F1): pressed, ends dressed flush,
-    removable with a punch, as the MHA-CH-011 bar pin."""
+    removable with a punch, as the MHA-CH-11 bar pin."""
     from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
 
     assert steps.SEQUENCE[:2] == ("rocker-stack-accepted", steps.RODS_PINNED_KEY)
@@ -868,7 +868,7 @@ def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
 
 
 def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
-    """Machinist review (fleet pass): MHA-CH-005 comes finished, domed both
+    """Machinist review (fleet pass): MHA-CH-05 comes finished, domed both
     ends to its overall length, so nothing is cut at assembly. Between the
     south bracket's setting and the set screws one step sets the shaft's
     north tip DOME_HEIGHT proud of the north ear, within the layout's band."""
@@ -896,14 +896,14 @@ def test_the_finished_shaft_is_set_by_its_north_tip_before_the_screws() -> None:
 
 
 def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fact() -> None:
-    """User, 2026-10-10: one MHA-VN-034 down each ear's apex tap onto the
+    """User, 2026-10-10: one MHA-CH-VN-53 down each ear's apex tap onto the
     plain shaft's flat, once the shaft is set. The preload is accepted before
     (machinist review, PR #1605: a failed check after staking could not be
     re-set). The step prints the bracket spec's engagement fact from the
     spec, never typed."""
     import ch_pivot_bracket_spec as bracket_spec
 
-    set_screw = _config.parts("vn-arbor-set-screw")["number"]
+    set_screw = _config.parts("ch-vn-arbor-set-screw")["number"]
     key = "set-screws-driven"
     number = steps.step_number(key)
     assert steps.step_number("shaft-set") < number
@@ -946,7 +946,7 @@ def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
     )
     assert _step_body("set-screws-driven").endswith(fact)
     assert bracket_spec.SET_SCREW_ENGAGEMENT_PRINTED >= 1.5
-    assert assembly_contract("ch-channel").number == "MHA-CH-000"
+    assert assembly_contract("ch-channel").number == "MHA-CH-00"
 
 
 def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
@@ -955,7 +955,7 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     bracket spec's, and the screws' thread its apex tap's."""
     import _interference_contracts as ic
     import ch_pivot_bracket_spec as bracket_spec
-    import vn_arbor_set_screw_spec as screw_spec
+    import _mcmaster_91375a106 as screw_spec
 
     assert ic.PIVOT_EAR_APEX_AND_BORE == (
         bracket_spec.APEX_ABOVE_BORE,
@@ -964,5 +964,5 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     assert screw_spec.THREAD == bracket_spec.SET_SCREW_THREAD
     pairs = ic.allowed_interference_pairs("ch-channel")
     for n in (1, 2):
-        pair = frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
+        pair = frozenset((f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT

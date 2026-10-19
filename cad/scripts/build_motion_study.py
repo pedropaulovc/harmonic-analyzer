@@ -126,9 +126,9 @@ RIGID, FLEXIBLE = "rigid", "flexible"
 # Purchased-spring catalogue rates (N/mm -> N/m). Supplier display-coil
 # turn counts are not physical active-coil counts and cannot define stiffness.
 STOCK_KCH = (
-    float(_config.parts("vn-channel-spring-installed")["spring_rate_n_per_mm"]) * 1000.0
+    float(_config.parts("ch-vn-channel-spring-installed")["spring_rate_n_per_mm"]) * 1000.0
 )
-STOCK_KCT = float(_config.parts("vn-counter-spring")["spring_rate_n_per_mm"]) * 1000.0
+STOCK_KCT = float(_config.parts("sm-vn-counter-spring")["spring_rate_n_per_mm"]) * 1000.0
 
 # Only explicit positive environment overrides replace the catalogue rates.
 # Unset, zero or negative => catalogue rate (the normal stock-spring study).
@@ -1102,7 +1102,7 @@ async def _sample_pen(adapter, study_name=""):
 
     samples = []
     steps = 24
-    marker, _ = _find_one(adapter, "vn-pen-marker")  # enumerate ONCE, not per step
+    marker, _ = _find_one(adapter, "pn-vn-pen-marker")  # enumerate ONCE, not per step
     if marker is None:
         log("    pen-marker not found")
         return samples

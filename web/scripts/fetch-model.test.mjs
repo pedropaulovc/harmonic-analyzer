@@ -69,6 +69,9 @@ async function fixture(t) {
   await mkdir(join(webRoot, 'src'), { recursive: true })
   await mkdir(join(webRoot, 'public/models'), { recursive: true })
   await mkdir(join(webRoot, 'content'), { recursive: true })
+  await copyFile(new URL('../current-native-identity.mjs', import.meta.url), join(webRoot, 'current-native-identity.mjs'))
+  await copyFile(new URL('../content/current-native-identities.json', import.meta.url), join(webRoot, 'content/current-native-identities.json'))
+  await copyFile(new URL('../src/current-mechanics-data.ts', import.meta.url), join(webRoot, 'src/current-mechanics-data.ts'))
   const sourcePath = join(directory, 'original.glb'), bytes = rawFixture()
   await writeFile(sourcePath, bytes)
   const modelSha256 = digest(bytes)
@@ -91,7 +94,6 @@ async function releaseFixture(t, editSource = null) {
   // making a future release. Keep historical filenames/imports immutable.
   const archive = join(f.directory, 'cad-source.tar')
   execFileSync('git', ['-c', 'core.autocrlf=false', 'archive', '--format=tar', `--output=${archive}`, f.native.provenance.sourceCommit, 'cad/scripts', 'cad/config'], { cwd: repository })
-  const archivedPaths = new Set(execFileSync('tar', ['-tf', 'cad-source.tar'], { cwd: f.directory, encoding: 'utf8' }).trim().split(/\r?\n/))
   execFileSync('tar', ['-xf', 'cad-source.tar'], { cwd: f.directory })
   await rm(archive)
   for (const { path, sha256 } of f.native.provenance.sourceFiles) {
@@ -100,17 +102,16 @@ async function releaseFixture(t, editSource = null) {
   // The exporter reads today's pinned map outside the historical archive.
   const identityMapPath = join(f.directory, 'cad/config/identity-migration-map.json')
   await copyFile(join(repository, 'cad/config/identity-migration-map.json'), identityMapPath)
-  const originalPaths = new Map(Object.entries(JSON.parse(await readFile(identityMapPath, 'utf8')).file_renames).map(([original, canonical]) => [canonical, original]))
   await mkdir(join(f.webRoot, 'scripts'))
-  for (const name of ['export-mechanics.py', 'native_identity_source.py', 'released-models.json', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
+  for (const name of ['export-mechanics.py', 'native_identity_source.py', 'current_native_identity.py', 'released-models.json', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
   await copyFile(join(web, 'model-representation.mjs'), join(f.webRoot, 'model-representation.mjs'))
   for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
   if (editSource) {
-    // Resolve canonical test names exactly as CadIdentityMap.source_file does:
-    // one original/current filename must exist, never a renamed source tree.
-    const paths = [...new Set([originalPaths.get(editSource.path) ?? editSource.path, editSource.path])].filter(path => archivedPaths.has(path))
-    assert.equal(paths.length, 1, `Expected exactly one archived source for ${editSource.path}`)
-    const path = join(f.directory, paths[0])
+    // Exercise the production composed current -> sealed -> exact archived
+    // filename resolver; never mutate a renamed/current stand-in source tree.
+    const path = execFileSync('uv', ['run', '--isolated', '--no-project', 'python', '-c',
+      'import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); from native_identity_source import CadIdentityMap; root = Path(sys.argv[2]); print(CadIdentityMap(root).source_file(root / "cad", sys.argv[3][4:]))',
+      join(f.webRoot, 'scripts'), f.directory, editSource.path], { cwd: repository, encoding: 'utf8' }).trim()
     const before = await readFile(path, 'utf8')
     const after = before.replace(editSource.from, editSource.to)
     assert.notEqual(after, before, 'release mutation must change the native source parameter')
@@ -219,6 +220,7 @@ test('unavailable exact CAD archive preserves all previous live artifacts and na
   await mkdir(join(f.webRoot, 'scripts'))
   await copyFile(new URL('./export-mechanics.py', import.meta.url), join(f.webRoot, 'scripts/export-mechanics.py'))
   await copyFile(new URL('./native_identity_source.py', import.meta.url), join(f.webRoot, 'scripts/native_identity_source.py'))
+  await copyFile(new URL('./current_native_identity.py', import.meta.url), join(f.webRoot, 'scripts/current_native_identity.py'))
   await copyFile(new URL('./released-models.json', import.meta.url), join(f.webRoot, 'scripts/released-models.json'))
   await copyFile(new URL('./native-identity-map.mjs', import.meta.url), join(f.webRoot, 'scripts/native-identity-map.mjs'))
   await copyFile(new URL('../model-representation.mjs', import.meta.url), join(f.webRoot, 'model-representation.mjs'))
@@ -454,11 +456,11 @@ test('staged fixed feed and spring-shape changes are refused before any live mod
     // manufacturing assertions before the intended runtime pitch guard.
     ['rack pitch', 'cad/scripts/pd_transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 29.0', 'paperDrive.feedPitchDiameterMm'],
     ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
-    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/vn_counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
-    ['counter coil axial correction', 'cad/scripts/vn_counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
+    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/sm_vn_counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
+    ['counter coil axial correction', 'cad/scripts/sm_vn_counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
     ['channel transition polar', 'cad/scripts/diagnostics/diag_build_9432K31.py', 'VENDOR_HANDLE_POLAR_RAD = -0.00014851266501942706', 'VENDOR_HANDLE_POLAR_RAD = -0.00024851266501942706', 'spring.deformation.transitionHandlePolarRad'],
-    ['channel transition handle', 'cad/scripts/vn_channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
-    ['channel coil length law with unchanged hook seats', 'cad/scripts/vn_channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
+    ['channel transition handle', 'cad/scripts/ch_vn_channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
+    ['channel coil length law with unchanged hook seats', 'cad/scripts/ch_vn_channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
     ['channel transition hook anchor', 'cad/scripts/diagnostics/diag_build_9432K31.py', '(-22.225, 2.844799999999999, 0.0)', '(-22.325, 2.844799999999999, 0.0)', 'spring.deformation.profiles[0].transitionControlPointsMm'],
   ]) await t.test(name, async child => {
     const f = await releaseFixture(child, { path, from, to })

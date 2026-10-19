@@ -4,7 +4,7 @@ THE bar the platen rides on (book p.62 caption, singular): one rectangular
 steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
-transgear hanger (pivot screw MHA-VN-041) and the latch hook (MHA-PD-014).
+transgear hanger (pivot screw MHA-PD-VN-57) and the latch hook (MHA-PD-14).
 Cross-section 28 tall x 9 deep (it fills the platen's guide channel to a
 1.0 bottom-rail clearance; ``pd_support_bar_spec.BAR_HEIGHT`` carries the
 photo chain); 452 long so the ends run ~29 past each column (ch30 p002).
@@ -76,9 +76,9 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_dev
 from sh_column_clamp_fit import BORE_DIAMETRAL_CLEARANCE
 from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
 from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND
-from vn_clamp_screw_spec import HEAD_DIA as CLAMP_HEAD_DIA
-from vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
-from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
+from _mcmaster_90280a201 import HEAD_DIA as CLAMP_HEAD_DIA
+from _mcmaster_90280a201 import HEAD_H as CLAMP_HEAD_H
+from _mcmaster_90280a201 import SHANK_DIA as CLAMP_SCREW_MAJOR
 from pd_support_bar_spec import (
     BACK_FACE_Z,
     BAR_DEPTH,
@@ -157,7 +157,7 @@ CLAMP_ROW_X = tuple(sorted(CLAMP_HOLE_X))
 CLAMP_STATIONS = tuple(x - CLAMP_ROW_START_X for x in CLAMP_ROW_X)
 
 # The clamp holes' position band: a fixed-fastener stack, as the latch hook's
-# on this bar's own taps. Each #8-32 screw stands in its MHA-SH-002 back-arc
+# on this bar's own taps. Each #8-32 screw stands in its MHA-SH-02 back-arc
 # tap, which the clamp pair holds to ±BACK_ARC_TAP_STATION_BAND along the bar
 # and ±BACK_ARC_TAP_HEIGHT_BAND in height (sh_column_clamp_fit), and passes
 # the bar's #8 clearance hole, whose least size (DRILLED HOLES minus 0) clears
@@ -202,7 +202,7 @@ CLAMP_POSITION_BAND = round(
 )
 if CLAMP_POSITION_BAND <= 0.0:
     raise AssertionError(
-        "MHA-VN-021 screws in the MHA-SH-002 taps through the support bar: no "
+        "MHA-PD-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
         f".XX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
     )
 
@@ -316,12 +316,12 @@ CLAMP_HEAD_BEARING_MIN = clamp_head_bearing(
 )
 if clamp_east_pair_margin() < 0.0:
     raise AssertionError(
-        "MHA-VN-021 screws in one MHA-SH-002 clamp: the round east holes' "
+        "MHA-PD-VN-53 screws in one MHA-SH-02 clamp: the round east holes' "
         f"spacing over-runs their float by {-clamp_east_pair_margin():.3f}"
     )
 if clamp_slot_closure_margin(max(COLUMN_PITCH_DEVIATIONS.values())) < 0.0:
     raise AssertionError(
-        "MHA-VN-021 screws in the two MHA-SH-002 clamps: the west slots do not "
+        "MHA-PD-VN-53 screws in the two MHA-SH-02 clamps: the west slots do not "
         "take up the worst column pitch "
         f"({max(COLUMN_PITCH_DEVIATIONS.values()):.2f})"
     )
@@ -333,10 +333,10 @@ if (
     )
     < CLAMP_HEAD_BEARING_MIN
 ):
-    raise AssertionError("MHA-VN-021 heads bear less beside a slot than a round hole")
+    raise AssertionError("MHA-PD-VN-53 heads bear less beside a slot than a round hole")
 if clamp_slot_head_clearance() < 0.0:
     raise AssertionError(
-        "MHA-VN-021 heads reach past the slot counterbores' walls by "
+        "MHA-PD-VN-53 heads reach past the slot counterbores' walls by "
         f"{-clamp_slot_head_clearance():.3f}"
     )
 
@@ -818,7 +818,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bracket-tap countersinks", expected, 0.03 * v_bracket_csk + 0.05
     )
 
-    # Hanger pivot: the #8-32 tap runs THROUGH, so the MHA-VN-041 tip can be
+    # Hanger pivot: the #8-32 tap runs THROUGH, so the MHA-PD-VN-57 tip can be
     # faced below the front face and staked at its mouth. A plain cut from the
     # back face, mid-plane past both faces, keeps the print's own TAP callout
     # on the drill diameter.
@@ -933,7 +933,7 @@ async def build(adapter) -> dict[str, str]:
     # The rest of the print's places, then its bands and limits: the hanger
     # holes' row and stations carry the pivot and hook positions'
     # HOLE_POSITION_BAND (paper_drive_geom, transgear_hanger_joints), the
-    # clamp holes' row and stations the MHA-SH-002 taps' CLAMP_POSITION_BAND;
+    # clamp holes' row and stations the MHA-SH-02 taps' CLAMP_POSITION_BAND;
     # the countersinks their single MAX limits.
     apply_drawing_precision(adapter, SHEET_PRECISION)
     for name in ("HangerRowHeight", *HANGER_STATION_NAMES):

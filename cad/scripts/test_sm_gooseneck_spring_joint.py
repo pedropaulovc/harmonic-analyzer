@@ -7,7 +7,7 @@ import pytest
 import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spring_joint as joint
 import sm_gooseneck_spring_screw_geom as screw
-import vn_counter_spring_stock_geom as spring
+import sm_vn_counter_spring_stock_geom as spring
 
 
 def test_through_plug_keeps_full_engagement_at_both_broken_edges() -> None:

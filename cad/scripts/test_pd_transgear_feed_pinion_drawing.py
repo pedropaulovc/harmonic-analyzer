@@ -1,4 +1,4 @@
-"""Offline contracts for the feed-pinion sleeve (MHA-PD-010) and its drawing."""
+"""Offline contracts for the feed-pinion sleeve (MHA-PD-10) and its drawing."""
 
 from __future__ import annotations
 

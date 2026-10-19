@@ -18,11 +18,11 @@ x=0), profile revolved 360 deg about a centerline on the axis. The profile
 dimensions the overall length tip to tip (what a caliper picks up), not to the
 far dome centre.
 
-``PressZone`` (blanked, on the Front plane): the cylinder the MHA-MG-001
+``PressZone`` (blanked, on the Front plane): the cylinder the MHA-MG-01
 bracket collar grips -- PRESS_ZONE_LENGTH back from the east dome TIP to its
 start, running to the dome tangent (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT,
 the R3 dome's shrinking diameter is not banded engagement). The collar is
-pressed on at the MHA-MG-000 assembly step. The rod is modelled at its nominal
+pressed on at the MHA-MG-00 assembly step. The rod is modelled at its nominal
 Ø6 end to end -- the zone is a band, not a step -- so no model edge bounds it:
 a solid line across the bar at the zone's start marks it on the print (the
 zone reads between that line and the dome's tangent edge) and carries the
@@ -43,7 +43,7 @@ short construction lines ON the top and bottom outlines, the diameter between
 them. The front view shows both sketches.
 
 The Ø6 body's one cylindrical face carries the part's only finish, the
-MHA-MG-002 clamp screw's Ra 3.2 seat (mg_magnifying_lever_spec), as model PMI
+MHA-MG-02 clamp screw's Ra 3.2 seat (mg_magnifying_lever_spec), as model PMI
 (SURFACE_FINISHES); the drawing's symbol consumes the same control.
 
 Run (SolidWorks already open)::
@@ -178,7 +178,7 @@ def _make_construction(adapter, entity: str) -> None:
 
 
 def _press_zone_start_min_limit(adapter) -> None:
-    """PressZoneStart as the single limit "10.0 MIN" (build_vn_knife_hanger_stud's
+    """PressZoneStart as the single limit "10.0 MIN" (build_sm_vn_knife_hanger_stud's
     ThreadLengthMin recipe, with the bracket's _arm_root_radius_max_limit
     readback): swTolMIN prints the model value then MIN, so the nominal IS the
     limit and carries no deviations; the readback proves the type and the zero

@@ -1,4 +1,4 @@
-r"""Create the MHA-DT-032 crank handle pivot screw manufacturing drawing.
+r"""Create the MHA-DT-32 crank handle pivot screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
@@ -277,16 +277,16 @@ async def build(adapter: Any) -> dict[str, str]:
             if dimension_name(adapter, annotation) == name
         ]
         if len(matches) != 1:
-            raise RuntimeError(f"expected one MHA-DT-032 {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"MHA-DT-032 {name}")
+            raise RuntimeError(f"expected one MHA-DT-32 {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"MHA-DT-32 {name}")
 
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to MHA-DT-032 head-end view")
+        raise RuntimeError("failed to add ASME center mark to MHA-DT-32 head-end view")
     add_view_centerline(
         adapter,
         side,
         face_xy=CENTERLINE_PICK,
-        label="MHA-DT-032 turning axis",
+        label="MHA-DT-32 turning axis",
     )
     add_attached_note(
         adapter,
@@ -294,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=THREAD_CALLOUT,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
-        label="MHA-DT-032 thread callout",
+        label="MHA-DT-32 thread callout",
     )
     add_surface_finish(
         adapter,
@@ -302,7 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=FINISH_PICK,
         symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "pivot_shoulder"),
-        label="MHA-DT-032 pivot-shoulder finish",
+        label="MHA-DT-32 pivot-shoulder finish",
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )

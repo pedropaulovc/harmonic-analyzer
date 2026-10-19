@@ -7,10 +7,10 @@ hole, the gooseneck's arm end, the summing lever's tap stations, or a supplier
 end loop. This driver re-measures it with the same native predicates the gate
 uses, on the same native fixtures as the production seats:
 
-* channel: ``ch-channel-lever`` (at the station's solved tilt) + ``vn-spring-hook``
+* channel: ``ch-channel-lever`` (at the station's solved tilt) + ``ch-vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
-* counter: ``vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``sm-gooseneck`` + made ``sm-gooseneck-spring-screw`` (MHA-SM-004), per preset
+* counter: ``sm-vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
+  ``sm-gooseneck`` + made ``sm-gooseneck-spring-screw`` (MHA-SM-04), per preset
   (the gooseneck and screw move together; the screw is the upper contact surface).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
@@ -29,7 +29,7 @@ Every seed comes from ``spring_mount_geom`` (the catalogue-nominal poses),
 never from the table being replaced, so a stale table cannot bias the new one.
 
 Run on a licensed farm/native seat (the parts must already be built):
-``ch-channel-lever``, ``vn-spring-hook``, ``vn-boss-hook``, ``sm-gooseneck``
+``ch-channel-lever``, ``ch-vn-spring-hook``, ``sm-vn-boss-hook``, ``sm-gooseneck``
 and ``sm-gooseneck-spring-screw``. The counter refuses support parts that doit
 would rebuild (``_require_current_support_parts``), so build those two through
 doit first. The driver builds the supplier spring length variants itself; no
@@ -57,7 +57,7 @@ import dodo  # noqa: E402
 import _config  # noqa: E402
 import _telemetry  # noqa: E402
 import channel_kinematics  # noqa: E402
-import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
+import ch_vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import settled_spring_seats  # noqa: E402
@@ -180,7 +180,7 @@ async def _calibrate_channel(
     z_mid = z_station(station) + ARM_MID_DZ
     pose = spring_mounts.channel_pose(amplitude)
     seed = pose
-    variant = f"vn-channel-spring-calib{variant_index:02d}"
+    variant = f"ch-vn-channel-spring-calib{variant_index:02d}"
     state = channel_kinematics.solve_state(amplitude)
     lever_rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
     ux, uy = pose.axis_xy
@@ -220,7 +220,7 @@ async def _calibrate_channel(
                         "ground": True,
                     },
                     {
-                        "part": "vn-spring-hook",
+                        "part": "ch-vn-spring-hook",
                         "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
                         "rotation": [0.0, 0.0, 0.0],
                         "rows": IDENTITY,
@@ -317,7 +317,7 @@ async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
             delattr(adapter, "_mcm_com_map")
     _blank_recipe_references(adapter)
     await force_rebuild(adapter)
-    await apply_material(adapter, str(_config.parts("vn-counter-spring")["material"]))
+    await apply_material(adapter, str(_config.parts("sm-vn-counter-spring")["material"]))
     await apply_color(adapter, SPRING_BLACK)
     await save_part_and_images(adapter, name, [])
     _close_active_part(adapter)
@@ -379,7 +379,7 @@ async def _calibrate_counter(
         + spring_mounts.counter_upper_support_offset(seed.axis_xy)
         - sm_gooseneck_geom.ARM_Y
     )
-    variant = f"vn-counter-spring-calib-{preset}"
+    variant = f"sm-vn-counter-spring-calib-{preset}"
     await _build_counter_variant(adapter, variant, seed.length_mm)
     lower_direction = (-ux, -uy, 0.0)
     upper_direction = (0.0, -1.0, 0.0)
@@ -393,7 +393,7 @@ async def _calibrate_counter(
             adapter,
             [
                 {
-                    "part": "vn-boss-hook",
+                    "part": "sm-vn-boss-hook",
                     "position": [*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z],
                     "rotation": [0.0, 0.0, 0.0],
                     "rows": IDENTITY,

@@ -1,4 +1,4 @@
-r"""Pure-data dimensional contract for the integral MHA-DT-022 pinion arbor.
+r"""Pure-data dimensional contract for the integral MHA-DT-22 pinion arbor.
 
 The turned head, neck, and long shaft are deliberately one piece.  This is an
 approved photo-derived reconstruction choice, not proof of the historical
@@ -111,7 +111,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Head": {"HeadLen"},
     "Neck": {"NeckLen"},
     "BondZoneReference": {"BondZoneDia"},
-    # Where the MHA-DT-001 drum's front end is bonded, from the Ø15 head rear
+    # Where the MHA-DT-01 drum's front end is bonded, from the Ø15 head rear
     # face at the general .X band (ruling A); an assembly station, not a
     # turned feature, so the note names it and the sheet dimensions it.
     "DrumStationReference": {"DrumStationFromHeadRear"},
@@ -197,15 +197,15 @@ if abs(CROSS_HOLE_FROM_HEAD_REAR - CROSS_HOLE_STATION) > 1e-9:
 
 # Mating parts the callouts name (drawing-guidelines.md rule 4: every tight
 # band names its mate and fit).
-CROSSROD_NUMBER = "MHA-DT-015"
-STRAP_NUMBER = "MHA-DT-014"
-DRUM_NUMBER = "MHA-DT-001"
+CROSSROD_NUMBER = "MHA-DT-15"
+STRAP_NUMBER = "MHA-DT-14"
+DRUM_NUMBER = "MHA-DT-01"
 
 # Machinist review of 7f7fc1717 (blocker): "HEAD LENGTH" did not say whether
 # it meant the straight Ø15 cylinder or the whole crowned head, which put the
 # hole in two places.  It names the cylinder the HeadLen dimension measures.
 # Machinist review r1 of #1685 (blocker): the +0.1/0.0 band named no mate, so
-# the callout names the bonded MHA-DT-015 crossrod.  Machinist review r3: the
+# the callout names the bonded MHA-DT-15 crossrod.  Machinist review r3: the
 # hole's station is a toleranced dimension (CrossHoleFromHeadRear), so the
 # callout no longer says CENTRED.
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT\nON {CROSSROD_NUMBER} CROSSROD"
@@ -240,13 +240,13 @@ if min(DRUM_FRONT_END_ON_JOURNAL_MIN, DRUM_BACK_END_ON_JOURNAL_MIN) <= 0.0:
 # Notes never carry dimensions (Codex P1 on #814): the drum station is the
 # model's DrumStationFromHeadRear, printed on the profile with its .X band.
 # Machinist review r1 of #1685 (clarity): it ended on no feature of this part,
-# so its callout names what it locates -- the MHA-DT-001 drum's front end,
+# so its callout names what it locates -- the MHA-DT-01 drum's front end,
 # set when the drum is bonded on (drawing-guidelines.md rule 19).
 DRUM_STATION_CALLOUT = f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET AT ASSEMBLY"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): assembly requirements belong on the feature callout or the
 # assembly step, never in a part's general notes.  ASSEMBLY_STEP is the
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
-# The drum joint's one step covers MHA-DT-001 too (dt_alignment_pinion_spec).
+# The drum joint's one step covers MHA-DT-01 too (dt_alignment_pinion_spec).
 # The journals' bore moved onto their callouts (JOURNAL_CALLOUT), so the one
 # note is the inside-corner ceiling at the Ø8/Ø10.5 and Ø10.5/Ø15 shoulders
 # (machinist review r1 of #1685; the dt-crankshaft precedent: the title
@@ -254,7 +254,7 @@ DRUM_STATION_CALLOUT = f"DRUM STATION:\n{DRUM_NUMBER} FRONT END,\nSET AT ASSEMBL
 INSIDE_CORNER_R_MAX = 0.25
 DRAWING_NOTES = f"INSIDE CORNERS R{INSIDE_CORNER_R_MAX:.2f} MAX."
 ASSEMBLY_STEP = (
-    f"SLIDE MHA-DT-022 INTO MHA-DT-001 AND BOND WITH {RETAINING_COMPOUND}, DRUM FRONT "
-    "END AT MHA-DT-022 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
+    f"SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH {RETAINING_COMPOUND}, DRUM FRONT "
+    "END AT MHA-DT-22 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

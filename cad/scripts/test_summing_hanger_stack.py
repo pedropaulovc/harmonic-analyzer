@@ -11,8 +11,8 @@ import _interference_contracts
 import build_sm_summing_assembly as asm
 import fr_top_frame_spec as top_frame
 import sm_summing_assembly_spec as asm_spec
-import vn_knife_hanger_stud_spec as hanger_screw
-import vn_knife_hanger_washer_spec as hanger_washer
+import sm_vn_knife_hanger_stud_spec as hanger_screw
+import sm_vn_knife_hanger_washer_spec as hanger_washer
 from build_sm_knife_mount import CASTING_UNDERSIDE_Y
 from build_sm_summing_assembly import _assert_hanger_axis_positive_y
 
@@ -33,7 +33,7 @@ def _transform(rotation_rows: list[list[float]]) -> list[float]:
 def test_cut_hex_bolt_seats_on_the_new_washer_and_faced_crossbar_top() -> None:
     assert hanger_screw.CATALOG_LENGTH == pytest.approx(50.8)
     assert hanger_screw.LENGTH == hanger_screw.UNDERHEAD_LEN == pytest.approx(46.70)
-    # The length is cut at MHA-SM-000, not banded on the purchased part.
+    # The length is cut at MHA-SM-00, not banded on the purchased part.
     for retired in ("LENGTH_BAND", "LENGTH_MIN", "LENGTH_MAX"):
         assert not hasattr(hanger_screw, retired)
     assert hanger_washer.THICKNESS == pytest.approx(
@@ -119,8 +119,8 @@ def test_instance_readback_seats_both_bearing_faces_at_each_station(
     station_z: float,
 ) -> None:
     origin = asm._assert_hanger_seat_placement(
-        "vn-knife-hanger-stud-1",
-        "vn-knife-hanger-washer-1",
+        "sm-vn-knife-hanger-stud-1",
+        "sm-vn-knife-hanger-washer-1",
         station_z,
         _placed_transform(asm.HANGER_STUD_Y, station_z),
         _placed_transform(asm.HANGER_WASHER_Y, station_z),
@@ -149,8 +149,8 @@ def test_instance_readback_rejects_drifted_hardware(
     transforms[part][9 + axis] += 0.0001  # 0.1 mm physical displacement
     with pytest.raises(RuntimeError, match=message):
         asm._assert_hanger_seat_placement(
-            "vn-knife-hanger-stud-1",
-            "vn-knife-hanger-washer-1",
+            "sm-vn-knife-hanger-stud-1",
+            "sm-vn-knife-hanger-washer-1",
             station_z,
             screw_transform,
             washer_transform,
@@ -200,18 +200,18 @@ def test_new_washers_add_two_instances_to_the_thirteen_component_recipe() -> Non
     Placements().visit(builds[0])
     assert counts == {
         "sm-knife-mount": 2,
-        "vn-knife-hanger-stud": 2,
-        "vn-knife-hanger-washer": 2,
-        "vn-knife-mount-dowel": 4,
+        "sm-vn-knife-hanger-stud": 2,
+        "sm-vn-knife-hanger-washer": 2,
+        "sm-vn-knife-mount-dowel": 4,
         "sm-summing-lever": 1,
-        "vn-boss-hook": 1,
-        "vn-boss-hook-jam-nut": 1,
-        "vn-counter-spring": 1,
+        "sm-vn-boss-hook": 1,
+        "sm-vn-boss-hook-jam-nut": 1,
+        "sm-vn-counter-spring": 1,
         "sm-gooseneck": 1,
         "sm-gooseneck-spring-screw": 1,
     }
     assert sum(counts.values()) == 16
-    added = counts["vn-knife-hanger-washer"] + counts["vn-boss-hook-jam-nut"]
+    added = counts["sm-vn-knife-hanger-washer"] + counts["sm-vn-boss-hook-jam-nut"]
     assert sum(counts.values()) - added == 13
 
 
@@ -222,13 +222,13 @@ def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:
     )
     for number in (1, 2):
         pair = frozenset(
-            (f"vn-knife-hanger-stud-{number}", f"vn-knife-hanger-washer-{number}")
+            (f"sm-vn-knife-hanger-stud-{number}", f"sm-vn-knife-hanger-washer-{number}")
         )
         assert summing[pair] == 0.0
         assert harmonic[frozenset(f"sm-summing-1/{part}" for part in pair)] == 0.0
         seat_pair = frozenset(
             (
-                f"sm-summing-1/vn-knife-hanger-washer-{number}",
+                f"sm-summing-1/sm-vn-knife-hanger-washer-{number}",
                 "fr-frame-1/fr-top-frame-1",
             )
         )
@@ -237,7 +237,7 @@ def test_washer_seat_pairs_allow_exact_contacts_but_no_solid_overlap() -> None:
 
 def test_hanger_axis_validation_accepts_authored_positive_y_axis() -> None:
     _assert_hanger_axis_positive_y(
-        "vn-knife-hanger-stud-1",
+        "sm-vn-knife-hanger-stud-1",
         _transform([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]),
     )
 
@@ -254,6 +254,6 @@ def test_hanger_axis_validation_rejects_transverse_or_reversed_axis(
 ) -> None:
     with pytest.raises(RuntimeError, match=r"local \+Y fastener axis.*assembly \+Y"):
         _assert_hanger_axis_positive_y(
-            "vn-knife-mount-dowel-1",
+            "sm-vn-knife-mount-dowel-1",
             _transform(rotation_rows),
         )

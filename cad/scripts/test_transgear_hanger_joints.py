@@ -17,11 +17,11 @@ import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
 import transgear_hanger_joints as joints
 import paper_drive_arm_registration as registration
-import vn_transgear_latch_pin_spec as latch_pin
-import vn_transgear_pivot_screw_spec as pivot
-import vn_transgear_pivot_shim_spec as shim
+import pd_vn_transgear_latch_pin_spec as latch_pin
+import pd_vn_transgear_pivot_screw_spec as pivot
+import pd_vn_transgear_pivot_shim_spec as shim
 import pd_transgear_pivot_spacer_spec as spacer
-import vn_transgear_pivot_spring_spec as spring
+import pd_vn_transgear_pivot_spring_spec as spring
 
 
 def _reload_joints():
@@ -68,7 +68,7 @@ def test_the_bar_tap_countersink_is_charged_to_the_tap_drill(monkeypatch) -> Non
 def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     monkeypatch,
 ) -> None:
-    """R9-71: the MHA-VN-049 spring holds the arm on the spacer at every printed
+    """R9-71: the MHA-PD-VN-63 spring holds the arm on the spacer at every printed
     corner, never pressed past its catalogue working height.  The old floor
     (7.00, the free pivot's 0.10..0.35 head play) leaves the spring loose."""
     assert joints.SPRING_ROOM_MIN == pytest.approx(0.70, abs=1e-9)
@@ -84,7 +84,7 @@ def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
 
 def test_the_shim_restores_the_spring_room_the_rearward_bar_took(monkeypatch) -> None:
     """Ruling B (2026-10-15): the 9.5 bar grew 0.5 rearward and the spacer
-    gave it up (5.5 -> 5.0); the MHA-VN-069 shim under the head takes the 0.5
+    gave it up (5.5 -> 5.0); the MHA-PD-VN-67 shim under the head takes the 0.5
     back, so the room keeps its 0.80 nominal and the spring its preload."""
     assert spacer.LENGTH + shim.THICKNESS == pytest.approx(5.5)
     assert joints.SPRING_ROOM_NOMINAL == pytest.approx(spring.MODEL_HEIGHT)
@@ -159,7 +159,7 @@ def test_plate_weight_input_is_the_native_recipe_volume() -> None:
 
 def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -> None:
     """Reference datum pose only, not an ISO pin-end whole-body certificate."""
-    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_vn_transgear_arm_plate_screw_spec as screw
     angle = (math.atan(arm.REDUCER_POSITION_DIAMETER / arm.CLAMP_TAP_PROJECTED_HEIGHT_MM)
              + registration.ARM_PLATE_TILT_MAX_RAD)
     required = (screw.THREAD_MAJOR / 2.0 + screw.UNDER_HEAD_FILLET_RADIUS_MAX_MM) / math.cos(angle)
@@ -169,7 +169,7 @@ def test_reference_entry_pays_published_fillet_and_independent_critical_axes() -
 
 
 def test_published_standard_stock_and_entire_head_bounds_do_not_use_receiving_caps(monkeypatch) -> None:
-    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_vn_transgear_arm_plate_screw_spec as screw
     assert screw.HEAD_DIA_MAX_MM == pytest.approx(0.312 * 25.4)
     assert screw.HEAD_PROTRUSION_MAX_MM == pytest.approx(0.091 * 25.4)
     assert screw.HEAD_PROTRUSION_GAGE_DIA_MM == pytest.approx(0.267 * 25.4)
@@ -211,7 +211,7 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
 ) -> None:
     """Pay published two-pitch under-head runout, true head eccentricity,
     both seat signs and the distinct entry/exit/cut-end overlap."""
-    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_vn_transgear_arm_plate_screw_spec as screw
     internal_span = (arm.THICKNESS - arm.THICKNESS_BAND - arm.PLATE_TAP_ENTRY_LOSS_MAX_MM
                      - max(arm.PLATE_TAP_EXIT_LOSS_MAX_MM, screw.CUT_END_BREAK_MAX))
     assert joints.PLATE_SCREW_INTERNAL_THREAD_SPAN_MIN_MM == pytest.approx(internal_span)
@@ -223,7 +223,7 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
     # A cut-end break past the arm's 1.5 D margin starves the joint.
     monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 1.7)
-    with pytest.raises(AssertionError, match="MHA-VN-040 worst engagement"):
+    with pytest.raises(AssertionError, match="MHA-PD-VN-56 worst engagement"):
         _reload_joints()
 
 
@@ -294,7 +294,7 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.15)
     with pytest.raises(
         AssertionError,
-        match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.\d+ short",
+        match=r"MHA-PD-VN-58 pin / MHA-PD-14 strip far face.* 0\.\d+ short",
     ):
         _reload_joints()
 

@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique trammel's pivot pin (MHA-CH-006-TL-23)."""
+"""Offline contracts for the oblique trammel's pivot pin (MHA-CH-06-TL-23)."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def test_fit_limits_match_the_printed_callouts() -> None:
     )
     assert spec.CARRIER_NOTE.startswith(
         f"{clearance[0]:.3f}-{clearance[1]:.3f} DIAMETRAL CLEARANCE ON "
-        "MHA-CH-006-TL-21 PIN HOLES"
+        "MHA-CH-06-TL-21 PIN HOLES"
     )
     assert spec.DIMENSION_CALLOUTS["BearingDia"] == spec.BEARING_CALLOUT
     assert spec.DIMENSION_CALLOUTS["CarrierDia"] == spec.CARRIER_CALLOUT
@@ -172,7 +172,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts(DASHED)["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-23"
+    assert number == "MHA-CH-06-TL-23"
     assert _config.parts(DASHED)["quantity"] == 2
 
 

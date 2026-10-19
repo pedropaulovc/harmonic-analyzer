@@ -21,8 +21,8 @@ import dt_pinion_lever_spec
 import dt_pinion_pivot_shaft_spec
 import dt_pinion_pivot_block_geometry
 import dt_pinion_spring_spec
-import vn_post_mount_screw_spec
-import vn_slotted_screw_spec
+import dt_vn_post_mount_screw_spec
+import dt_vn_slotted_screw_spec
 from _buildgraph import module_deps_of
 
 
@@ -57,7 +57,7 @@ TITLE_BLOCK_OWNED_NOTE_TEXT = (
 
 def test_notes_do_not_repeat_title_block_metadata() -> None:
     for part_name, spec in SHEETS:
-        # A sheet with no notes (MHA-DT-030, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) has nothing to repeat.
+        # A sheet with no notes (MHA-DT-30, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)) has nothing to repeat.
         notes = getattr(spec, "DRAWING_NOTES", "").upper()
         for duplicate in TITLE_BLOCK_OWNED_NOTE_TEXT:
             assert duplicate not in notes, f"{part_name}: {duplicate}"
@@ -93,8 +93,8 @@ def test_complete_parts_registry_returns_independent_rows() -> None:
 
 
 def test_new_pin_and_spring_numbers_use_reserved_unique_allocations() -> None:
-    assert _config.parts("dt-pinion-cam-pin")["number"] == "MHA-DT-025"
-    assert _config.parts("dt-pinion-spring")["number"] == "MHA-DT-024"
+    assert _config.parts("dt-pinion-cam-pin")["number"] == "MHA-DT-25"
+    assert _config.parts("dt-pinion-spring")["number"] == "MHA-DT-24"
 
 
 def test_drawing_notes_do_not_change_the_drive_train_recipe() -> None:
@@ -215,7 +215,7 @@ def test_intentional_fit_allowance_bounds_the_pair_total(monkeypatch) -> None:
     compared alone against the pair limit; a split pair whose every body is
     under the limit but whose sum is over it passed.
     """
-    pair = ("dt-cone-tip-block-1", "vn-cone-tip-adjuster-1")
+    pair = ("dt-cone-tip-block-1", "dt-vn-cone-tip-adjuster-1")
     monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
     events: list[tuple[str, dict]] = []
     monkeypatch.setattr(
@@ -277,11 +277,11 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     clamp_receivers = {1: 2, 2: 2, 3: 1, 4: 1}
     for screw_number, back_number in clamp_receivers.items():
         pair = frozenset(
-            (f"vn-clamp-screw-{screw_number}", f"sh-column-clamp-back-{back_number}")
+            (f"pd-vn-clamp-screw-{screw_number}", f"sh-column-clamp-back-{back_number}")
         )
         assert paper_drive[pair] == pytest.approx(39.87518418692443)
 
-    # The MHA-VN-006 guide screws alone: seed -1, then the grid -2..-10.
+    # The MHA-PD-VN-52 guide screws alone: seed -1, then the grid -2..-10.
     guide_receivers_and_limits = {
         1: (1, 13.951902256034774),
         2: (2, 13.951902256034774),
@@ -296,16 +296,16 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     }
     for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
         pair = frozenset(
-            (f"vn-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
+            (f"pd-vn-fillister-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(limit)
-    # R9-31: the lock-plate screws are MHA-VN-046 slotted pan heads, not
+    # R9-31: the lock-plate screws are MHA-PD-VN-60 slotted pan heads, not
     # fillisters; R9-48: 3/8 long through the 1/16 lock sheet, so 7.9375 of
     # each sits in the guide's through tap.
     lock_receivers = {1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 2, 7: 1, 8: 2}
     for screw_number, guide_number in lock_receivers.items():
         pair = frozenset(
-            (f"vn-guide-lock-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
+            (f"pd-vn-guide-lock-screw-{screw_number}", f"pd-platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(20.440626113418)
 
@@ -313,35 +313,35 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     assert summing == pytest.approx(
         {
             # Cut 92314A253 #10-24 in the #25 drill over 8.9173 nominal reach.
-            frozenset(("vn-knife-hanger-stud-1", "sm-knife-mount-1")): _annulus_limit(
+            frozenset(("sm-vn-knife-hanger-stud-1", "sm-knife-mount-1")): _annulus_limit(
                 4.826, 3.797, 8.9173
             ),
-            frozenset(("vn-knife-hanger-stud-2", "sm-knife-mount-2")): _annulus_limit(
+            frozenset(("sm-vn-knife-hanger-stud-2", "sm-knife-mount-2")): _annulus_limit(
                 4.826, 3.797, 8.9173
             ),
             # Exact head-to-washer bearing contacts: no solid overlap allowed.
-            frozenset(("vn-knife-hanger-stud-1", "vn-knife-hanger-washer-1")): 0.0,
-            frozenset(("vn-knife-hanger-stud-2", "vn-knife-hanger-washer-2")): 0.0,
+            frozenset(("sm-vn-knife-hanger-stud-1", "sm-vn-knife-hanger-washer-1")): 0.0,
+            frozenset(("sm-vn-knife-hanger-stud-2", "sm-vn-knife-hanger-washer-2")): 0.0,
             # 98381A473 at its largest (3.18262) in the smallest Ø3.165 ream,
             # pressed 9.5 deep (the models are line to line); two per mount,
             # the front mount's pair first.
-            frozenset(("vn-knife-mount-dowel-1", "sm-knife-mount-1")): _annulus_limit(
+            frozenset(("sm-vn-knife-mount-dowel-1", "sm-knife-mount-1")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
-            frozenset(("vn-knife-mount-dowel-2", "sm-knife-mount-1")): _annulus_limit(
+            frozenset(("sm-vn-knife-mount-dowel-2", "sm-knife-mount-1")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
-            frozenset(("vn-knife-mount-dowel-3", "sm-knife-mount-2")): _annulus_limit(
+            frozenset(("sm-vn-knife-mount-dowel-3", "sm-knife-mount-2")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
-            frozenset(("vn-knife-mount-dowel-4", "sm-knife-mount-2")): _annulus_limit(
+            frozenset(("sm-vn-knife-mount-dowel-4", "sm-knife-mount-2")): _annulus_limit(
                 3.18262, 3.165, 9.5
             ),
             # 9490T1 #10-24 through the 0.75-in boss; #25 tap drill.
-            frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
+            frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-004 #6-32 major in the #36 drill through the 8.0 end plug.
+            # MHA-SM-04 #6-32 major in the #36 drill through the 8.0 end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
                 3.505, 2.705, 8.0
             ),
@@ -354,37 +354,37 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         "dt-drive-train": {
             # mha092-r3-8b1b drive-train leaf: 16.4412 and 7.8008 observed,
             # plus ten percent.
-            frozenset(("vn-cone-tip-adjuster-1", "dt-cone-tip-block-1")): 18.08532,
-            frozenset(("vn-cone-tip-pinch-screw-1", "dt-cone-tip-block-1")): 8.58088,
+            frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-tip-block-1")): 18.08532,
+            frozenset(("dt-vn-cone-tip-pinch-screw-1", "dt-cone-tip-block-1")): 8.58088,
             # First prism-block drive-train leaf: 5.6585 observed, plus ten
             # percent.
-            frozenset(("vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
+            frozenset(("dt-vn-cone-tip-block-screw-1", "dt-cone-tip-block-1")): 6.22435,
             # 1/16 in tip land: 0.13 observed at Ø0.79, scaled by r^3 (x8).
-            frozenset(("vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
-            frozenset(("vn-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
+            frozenset(("dt-vn-cone-tip-adjuster-1", "dt-cone-gear-shaft-1")): 1.144,
+            frozenset(("dt-vn-fillister-screw-1", "dt-crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
-            # MHA-DT-032 #4-40 major 2.845 in the #43 tap drill 2.261: 6.5 of
+            # MHA-DT-32 #4-40 major 2.845 in the #43 tap drill 2.261: 6.5 of
             # full thread past the 1.5 relief plus the lead cone, within 7.0.
             frozenset(("dt-crank-handle-pivot-screw-1", "dt-crank-arm-1")): _annulus_limit(
                 2.845, 2.261, 7.0
             ),
-            # U30 I22: each MHA-VN-031 1/4-20 in its #7 MHA-DT-020 tap, its cut
+            # U30 I22: each MHA-DT-VN-61 1/4-20 in its #7 MHA-DT-20 tap, its cut
             # length past the post's grip deep.
             **_expected_numbered_pairs(
-                "vn-post-mount-screw",
+                "dt-vn-post-mount-screw",
                 (1, 2),
                 "dt-cone-swing-platform",
                 6.35,
                 5.105,
-                vn_post_mount_screw_spec.CUT_LENGTH_MM - vn_post_mount_screw_spec.GRIP_MM,
+                dt_vn_post_mount_screw_spec.CUT_LENGTH_MM - dt_vn_post_mount_screw_spec.GRIP_MM,
             ),
-            # R1: MHA-DT-015 is a bonded slip fit modelled line to line in the
-            # MHA-DT-022 cross-hole, so the pair needs no interference allowance.
-            # #743 Q3: MHA-VN-034 #4-40 x 1/4 in each pedestal crown tap (the
+            # R1: MHA-DT-15 is a bonded slip fit modelled line to line in the
+            # MHA-DT-22 cross-hole, so the pair needs no interference allowance.
+            # #743 Q3: MHA-DT-VN-64 #4-40 x 1/4 in each pedestal crown tap (the
             # _hole_spec major 2.845 in the #43 tap drill, over its length).
             **_expected_numbered_pairs(
-                "vn-arbor-set-screw",
+                "dt-vn-arbor-set-screw",
                 range(1, 3),
                 "dt-arbor-pedestal",
                 2.845,
@@ -392,10 +392,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 6.35,
                 second_number=None,
             ),
-            # CONTRACT-crank: 2x MHA-VN-044 3/32 dowel (2.38125) pressed into
-            # MHA-DT-011's 2.38 reamed collar holes, 3.95 deep.
+            # CONTRACT-crank: 2x MHA-DT-VN-67 3/32 dowel (2.38125) pressed into
+            # MHA-DT-11's 2.38 reamed collar holes, 3.95 deep.
             **_expected_numbered_pairs(
-                "vn-crank-seat-drive-pin",
+                "dt-vn-crank-seat-drive-pin",
                 range(1, 3),
                 "dt-crankshaft",
                 2.38125,
@@ -405,19 +405,19 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         },
         "fr-frame": {
             **_expected_numbered_pairs(
-                "vn-lag-screw",
+                "fr-vn-lag-screw",
                 range(1, 5),
                 "fr-harmonic-base",
                 6.35,
                 5.105,
                 12.4221875,
             ),
-            # MHA-VN-027 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
+            # MHA-FR-VN-53 / 90280A837: #10-32 major 4.826, #21 drill 4.0386.
             # The 44.45-mm shank crosses a 25.5-mm socket. Its shortest
             # socket chord is 25.039163803929238 mm at the major envelope,
             # leaving at most 19.410836196070765 mm in both casting walls.
             **_expected_numbered_pairs(
-                "vn-frame-cross-screw",
+                "fr-vn-frame-cross-screw",
                 range(1, 5),
                 "fr-harmonic-base",
                 4.826,
@@ -425,20 +425,20 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 19.410836196070765,
             ),
             **_expected_numbered_pairs(
-                "vn-frame-cross-screw",
+                "fr-vn-frame-cross-screw",
                 range(5, 9),
                 "fr-top-frame",
                 4.826,
                 4.0386,
                 19.410836196070765,
             ),
-            # MHA-VN-023 / 91410A540: spot face 21.0 from the bore axis to the
+            # MHA-FR-VN-52 / 91410A540: spot face 21.0 from the bore axis to the
             # cup tip 8.15 from it (12.5 to the O17 bore wall + 0.35).
-            frozenset(("vn-gooseneck-set-screw-1", "fr-top-frame-1")): _annulus_limit(
+            frozenset(("fr-vn-gooseneck-set-screw-1", "fr-top-frame-1")): _annulus_limit(
                 6.35, 5.105, 12.85
             ),
             **_expected_numbered_pairs(
-                "vn-fillister-screw",
+                "fr-vn-fillister-screw",
                 range(1, 5),
                 "fr-harmonic-base",
                 2.8448,
@@ -448,14 +448,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         },
         "mg-magnifier": {
             **_expected_numbered_pairs(
-                "vn-clamp-screw",
+                "mg-vn-clamp-screw",
                 range(1, 3),
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
                 4.35,
             ),
-            frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
+            frozenset(("mg-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
                 2.8448, 2.261, 5.9
             ),
             # #1559: the vertical rod's #4-40 end (2.845 major) in the clamp's
@@ -463,12 +463,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
             ): _annulus_limit(2.845, 2.261, 6.0),
-            # MHA-MG-007 3/16 drill-rod pin pressed through the wheel bar's
+            # MHA-MG-07 3/16 drill-rod pin pressed through the wheel bar's
             # reamed .1865 bore, the bar's 9.0 depth.
             frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _annulus_limit(
                 4.7625, 4.7371, 9.0
             ),
-            frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
+            frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")): _annulus_limit(
                 2.8448, 2.261, 10.1
             ),
             frozenset(
@@ -482,7 +482,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         "sm-summing": {
             # Cut 92314A253: #10-24 major, #25 drill, 8.9173 nominal reach.
             **_expected_numbered_pairs(
-                "vn-knife-hanger-stud",
+                "sm-vn-knife-hanger-stud",
                 range(1, 3),
                 "sm-knife-mount",
                 4.826,
@@ -490,12 +490,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 8.9173,
                 second_number=None,
             ),
-            frozenset(("vn-knife-hanger-stud-1", "vn-knife-hanger-washer-1")): 0.0,
-            frozenset(("vn-knife-hanger-stud-2", "vn-knife-hanger-washer-2")): 0.0,
+            frozenset(("sm-vn-knife-hanger-stud-1", "sm-vn-knife-hanger-washer-1")): 0.0,
+            frozenset(("sm-vn-knife-hanger-stud-2", "sm-vn-knife-hanger-washer-2")): 0.0,
             # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream,
             # two per knife mount.
             **_expected_numbered_pairs(
-                "vn-knife-mount-dowel",
+                "sm-vn-knife-mount-dowel",
                 range(1, 3),
                 "sm-knife-mount",
                 3.18262,
@@ -503,7 +503,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 9.5,
             ),
             **_expected_numbered_pairs(
-                "vn-knife-mount-dowel",
+                "sm-vn-knife-mount-dowel",
                 range(3, 5),
                 "sm-knife-mount",
                 3.18262,
@@ -512,21 +512,21 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.
-            frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
+            frozenset(("sm-vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
             ),
-            # MHA-SM-004 #6-32 major, #36 drill, 8.0 through-tapped end plug.
+            # MHA-SM-04 #6-32 major, #36 drill, 8.0 through-tapped end plug.
             frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1")): _annulus_limit(
                 3.505, 2.705, 8.0
             ),
         },
         "pn-pen": {
             # #4-40 thumb screw through the stirrup's 6.0 bottom rail.
-            frozenset(("vn-pen-set-screw-1", "pn-pen-frame-1")): _annulus_limit(
+            frozenset(("pn-vn-pen-set-screw-1", "pn-pen-frame-1")): _annulus_limit(
                 2.8448, 2.261, 6.0
             ),
             # #4-40 x 3/16 rod set screw wholly in the v-block tap.
-            frozenset(("vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _annulus_limit(
+            frozenset(("pn-vn-pen-rod-set-screw-1", "pn-pen-v-block-1")): _annulus_limit(
                 2.8448, 2.261, 4.7625
             ),
             # #0-80 adjuster stud 3.2 into the rod top (code review C05).
@@ -536,7 +536,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         },
         "pd-paper-drive": {
             **_expected_numbered_pairs(
-                "vn-clamp-screw",
+                "pd-vn-clamp-screw",
                 range(1, 3),
                 "sh-column-clamp-back",
                 4.1656,
@@ -545,16 +545,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             **_expected_numbered_pairs(
-                "vn-clamp-screw",
+                "pd-vn-clamp-screw",
                 range(3, 5),
                 "sh-column-clamp-back",
                 4.1656,
                 3.454,
                 8.5124,
             ),
-            # MHA-VN-059 #2-56 clip screws, 5.55 in the platen's through tap.
+            # MHA-PD-VN-65 #2-56 clip screws, 5.55 in the platen's through tap.
             **_expected_numbered_pairs(
-                "vn-platen-clip-screw",
+                "pd-vn-platen-clip-screw",
                 range(1, 5),
                 "pd-platen",
                 2.184,
@@ -562,7 +562,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 5.55,
             ),
             **_expected_numbered_pairs(
-                "vn-fillister-screw",
+                "pd-vn-fillister-screw",
                 range(1, 11, 2),
                 "pd-platen-guide",
                 2.8448,
@@ -570,7 +570,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 5.4178,
             ),
             **_expected_numbered_pairs(
-                "vn-fillister-screw",
+                "pd-vn-fillister-screw",
                 range(2, 11, 2),
                 "pd-platen-guide",
                 2.8448,
@@ -579,7 +579,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             **_expected_numbered_pairs(
-                "vn-guide-lock-screw",
+                "pd-vn-guide-lock-screw",
                 (1, 2, 4, 7),
                 "pd-platen-guide",
                 2.8448,
@@ -587,7 +587,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 7.9375,
             ),
             **_expected_numbered_pairs(
-                "vn-guide-lock-screw",
+                "pd-vn-guide-lock-screw",
                 (3, 5, 6, 8),
                 "pd-platen-guide",
                 2.8448,
@@ -596,22 +596,22 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
-            # MHA-PD-023 pin's press in the arm, and the MHA-PD-013 1/4-20 nut.
+            # MHA-PD-23 pin's press in the arm, and the MHA-PD-13 1/4-20 nut.
             **_expected_numbered_pairs(
-                "vn-transgear-arm-plate-screw",
+                "pd-vn-transgear-arm-plate-screw",
                 range(1, 3),
                 "pd-transgear-arm",
                 4.1656,
                 3.454,
                 7.9375,
             ),
-            # MHA-VN-041 through the bar's through tap: the fitted 9.15 thread
+            # MHA-PD-VN-57 through the bar's through tap: the fitted 9.15 thread
             # less the 1.1938 neck flat.
-            frozenset(("vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
+            frozenset(("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")): _annulus_limit(
                 4.1656, 3.454, 7.9562
             ),
             **_expected_numbered_pairs(
-                "vn-latch-hook-bracket-screw",
+                "pd-vn-latch-hook-bracket-screw",
                 range(1, 3),
                 "pd-support-bar",
                 2.8448,
@@ -621,29 +621,29 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375
             ),
-            # MHA-VN-056 Ø2.0 dowels pressed into the arm's Ø1.995 blind reams,
+            # MHA-PD-VN-64 Ø2.0 dowels pressed into the arm's Ø1.995 blind reams,
             # 6.0 long less 1.70 proud.
             **_expected_numbered_pairs(
-                "vn-transgear-arm-plate-locating-pin",
+                "pd-vn-transgear-arm-plate-locating-pin",
                 range(1, 3),
                 "pd-transgear-arm",
                 2.0,
                 1.995,
                 6.0 - 1.70,
             ),
-            # R9-71: MHA-PD-020's Ø4.727 ream pressed on MHA-VN-041's Ø4.7625
+            # R9-71: MHA-PD-20's Ø4.727 ream pressed on MHA-PD-VN-57's Ø4.7625
             # shoulder over its 5.0 length.
-            frozenset(("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")): (
+            frozenset(("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")): (
                 _annulus_limit(4.7625, 4.727, 5.0)
             ),
-            # MHA-VN-047's three prong arcs, atan(3/4) of the turn each, at the
-            # Ø2.8956 free diameter inside the MHA-PD-023 Ø2.9464 groove floor.
-            frozenset(("vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): (
+            # MHA-PD-VN-61's three prong arcs, atan(3/4) of the turn each, at the
+            # Ø2.8956 free diameter inside the MHA-PD-23 Ø2.9464 groove floor.
+            frozenset(("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")): (
                 3.0 * math.atan(0.75) / (2.0 * math.pi)
             )
             * _annulus_limit(2.9464, 2.8956, 0.635),
             **_expected_numbered_pairs(
-                "vn-transgear-disc-screw",
+                "pd-vn-transgear-disc-screw",
                 range(1, 4),
                 "pd-rack-pinion",
                 1.524,
@@ -651,10 +651,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.9,
             ),
             # R9-35: flush-head seat slivers, observed + 10 %.
-            frozenset(("vn-transgear-arm-plate-screw-1", "pd-transgear-arm-plate-1")): (
+            frozenset(("pd-vn-transgear-arm-plate-screw-1", "pd-transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
-            frozenset(("vn-transgear-arm-plate-screw-2", "pd-transgear-arm-plate-1")): (
+            frozenset(("pd-vn-transgear-arm-plate-screw-2", "pd-transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
             # #8-32 nut on the collar's pilot, with its rear face on actual F:
@@ -662,9 +662,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("pd-transgear-thumbnut-1", "pd-transgear-knob-shaft-1")
             ): _annulus_limit(4.070, 3.454, 14.8),
-            # MHA-VN-038 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-022's 2.38 reams.
+            # MHA-PD-VN-54 3/32 x 3/16 dowels pressed 2.3625 into MHA-PD-22's 2.38 reams.
             **_expected_numbered_pairs(
-                "vn-transgear-knob-drive-pin",
+                "pd-vn-transgear-knob-drive-pin",
                 range(1, 3),
                 "pd-transgear-drive-collar",
                 2.38125,
@@ -676,20 +676,20 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # Exact nested bearing contacts, NOT manufactured interference.
             **{
                 frozenset((
-                    f"sm-summing-1/vn-knife-hanger-stud-{number}",
-                    f"sm-summing-1/vn-knife-hanger-washer-{number}",
+                    f"sm-summing-1/sm-vn-knife-hanger-stud-{number}",
+                    f"sm-summing-1/sm-vn-knife-hanger-washer-{number}",
                 )): 0.0
                 for number in (1, 2)
             },
             **{
                 frozenset((
-                    f"sm-summing-1/vn-knife-hanger-washer-{number}",
+                    f"sm-summing-1/sm-vn-knife-hanger-washer-{number}",
                     "fr-frame-1/fr-top-frame-1",
                 )): 0.0
                 for number in (1, 2)
             },
             **_expected_numbered_pairs(
-                "mg-magnifier-1/vn-magnifying-bracket-screw",
+                "mg-magnifier-1/mg-vn-magnifying-bracket-screw",
                 range(1, 3),
                 "sm-summing-1/sm-summing-lever",
                 2.1844,
@@ -699,7 +699,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             # Twenty stock 9489T111 #6-32 anchors engage only the summing
             # lever's 7.00 padded tap; #36 tap drill, not the full stock shank.
             **_expected_numbered_pairs(
-                "ch-channel-1/vn-spring-hook",
+                "ch-channel-1/ch-vn-spring-hook",
                 range(1, 21),
                 "sm-summing-1/sm-summing-lever",
                 3.5052,
@@ -709,11 +709,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 (
                     "fr-frame-1/fr-harmonic-base-1",
-                    "dt-drive-train-1/vn-cone-pivot-screw-1",
+                    "dt-drive-train-1/dt-vn-cone-pivot-screw-1",
                 )
             ): _annulus_limit(4.826, 3.797, 9.525),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/vn-cone-lock-knob",
+                "dt-drive-train-1/dt-vn-cone-lock-knob",
                 range(1, 2),
                 "fr-frame-1/fr-harmonic-base",
                 6.35,
@@ -721,7 +721,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 12.7,
             ),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/vn-swing-stop-screw",
+                "dt-drive-train-1/dt-vn-swing-stop-screw",
                 range(1, 2),
                 "fr-frame-1/fr-harmonic-base",
                 2.8448,  # the foot screw's #4-40 SKU, seated full length
@@ -729,24 +729,24 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 9.525,
             ),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/vn-slotted-screw",
+                "dt-drive-train-1/dt-vn-slotted-screw",
                 range(1, 5),
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                vn_slotted_screw_spec.SHANK_LEN - dt_pinion_pivot_block_geometry.BLOCK_HEIGHT,
+                dt_vn_slotted_screw_spec.SHANK_LEN - dt_pinion_pivot_block_geometry.BLOCK_HEIGHT,
             ),
             **_expected_numbered_pairs(
-                "dt-drive-train-1/vn-foot-screw",
+                "dt-drive-train-1/dt-vn-foot-screw",
                 range(1, 2),
                 "fr-frame-1/fr-harmonic-base",
                 2.8448,
                 2.261,
                 8.725,
             ),
-            # U34c: MHA-VN-032 #8-32 x 3/4 through the 5.0 pedestal ledge.
+            # U34c: MHA-DT-VN-62 #8-32 x 3/4 through the 5.0 pedestal ledge.
             **_expected_numbered_pairs(
-                "dt-drive-train-1/vn-pedestal-hold-down-screw",
+                "dt-drive-train-1/dt-vn-pedestal-hold-down-screw",
                 range(1, 3),
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
@@ -754,17 +754,17 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 14.05,
             ),
             **_expected_numbered_pairs(
-                "ch-channel-1/vn-frame-side-screw",
+                "ch-channel-1/ch-vn-frame-side-screw",
                 range(1, 3),
                 "fr-frame-1/fr-top-frame",
                 2.1844,
                 1.778,
                 5.2207,
             ),
-            # Owner Q13c: MHA-VN-071 #8-32 x 5/8 through the 6.0 rocker-bracket
+            # Owner Q13c: MHA-CH-VN-57 #8-32 x 5/8 through the 6.0 rocker-bracket
             # foot, one per bracket since the 2026-10-09 flip.
             **_expected_numbered_pairs(
-                "ch-channel-1/vn-bracket-hold-down-screw",
+                "ch-channel-1/ch-vn-bracket-hold-down-screw",
                 range(1, 3),
                 "fr-frame-1/fr-rocker-arm-support",
                 4.1656,
@@ -776,7 +776,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # The new magnifier joints are also checked across the top assembly.
     # Qualify the independent leaf oracles instead of duplicating their budgets.
     for pair in (
-        frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")),
+        frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")),
         frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
         frozenset(("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")),
     ):
@@ -795,15 +795,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("dt-crank-pin-1", "dt-crank-hub-1")),
         frozenset(("dt-crank-pin-1", "dt-crankshaft-1")),
     }
-    # MHA-VN-048's retained tube pin across the hole match-drilled through
-    # MHA-PD-016 and the journal.
+    # MHA-PD-VN-62's retained tube pin across the hole match-drilled through
+    # MHA-PD-16 and the journal.
     cup_pin_pairs = {
-        frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")),
-        frozenset(("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")),
+        frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")),
+        frozenset(("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")),
     }
-    # MHA-VN-068's chain mesh on the T24 at the closing station (#1457).
+    # MHA-PD-VN-66's chain mesh on the T24 at the closing station (#1457).
     connecting_link_pair = frozenset(
-        ("pd-transgear-removable-1", "vn-chain-connecting-link-1")
+        ("pd-transgear-removable-1", "pd-vn-chain-connecting-link-1")
     )
     special_pairs = {
         "dt-drive-train": crank_pairs,
@@ -824,24 +824,24 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     crank_allowed = _interference_contracts.allowed_interference_pairs("dt-drive-train")
     hub_pair = frozenset(("dt-crank-pin-1", "dt-crank-hub-1"))
     shaft_pair = frozenset(("dt-crank-pin-1", "dt-crankshaft-1"))
-    # The CONTRACT-crank hub barrel (Ø22.25 since R9-38) sets the MHA-DT-009
+    # The CONTRACT-crank hub barrel (Ø22.25 since R9-38) sets the MHA-DT-09
     # pilot spans: a longer hub chord, and the shaft crossing further down
     # the taper. #1140 stood the pin 0.6 further proud (PIN_PROUD 4.45,
     # keeper-ring hole at 3.7), so a thinner stretch of the taper sits in
     # both receivers.
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
-    # MHA-CH-011: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
+    # MHA-CH-11: each 5/64 bar pivot pin pressed into its bar's Ø1.968 ream
     # through both top-notch cheeks (6.35 bar less the 3.15 notch), and
-    # MHA-CH-010: the same pin pressed into its rod's Ø1.968 fork ream through
+    # MHA-CH-10: the same pin pressed into its rod's Ø1.968 fork ream through
     # both tines (6.075 fork less the 2.675 slot); channel j's pin with
-    # channel j's bar or rod only. MHA-VN-034: each #4-40 apex set screw's
-    # thread in its MHA-CH-008 ear's tap, over the 9.80 apex (R8 arch lifted
+    # channel j's bar or rod only. MHA-CH-VN-53: each #4-40 apex set screw's
+    # thread in its MHA-CH-08 ear's tap, over the 9.80 apex (R8 arch lifted
     # 1.80, #1371) less the Ø6.5 bore's height at the Ø2.845 envelope's edge;
     # screw n in bracket n.
-    # MHA-VN-055: each #1-72 x 5/32 keeper set screw in its own keeper's
-    # crown tap (#53 drill). MHA-VN-012: each #6-32 anchor's thread in its
-    # MHA-CH-014 jam nut's #36 tap drill over the nut's thickness.
+    # MHA-CH-VN-55: each #1-72 x 5/32 keeper set screw in its own keeper's
+    # crown tap (#53 drill). MHA-CH-VN-51: each #6-32 anchor's thread in its
+    # MHA-CH-14 jam nut's #36 tap drill over the nut's thickness.
     channel_allowed = _interference_contracts.allowed_interference_pairs("ch-channel")
     assert channel_allowed == pytest.approx(
         {
@@ -859,7 +859,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             },
             **{
                 frozenset(
-                    (f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
+                    (f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")
                 ): _annulus_limit(
                     2.845, 2.261, 9.8 - math.sqrt(3.25**2 - (2.845 / 2.0) ** 2)
                 )
@@ -867,13 +867,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             },
             **{
                 frozenset(
-                    (f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}")
+                    (f"ch-vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}")
                 ): _annulus_limit(1.854, 1.511, 3.96875)
                 for n in range(1, 3)
             },
             **{
                 frozenset(
-                    (f"vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
+                    (f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}")
                 ): _annulus_limit(3.505, 2.705, 3.60)
                 for n in range(1, 21)
             },

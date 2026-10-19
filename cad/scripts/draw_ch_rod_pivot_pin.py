@@ -1,4 +1,4 @@
-r"""Create the curated manufacturing drawing for the rod pivot pin (MHA-CH-010).
+r"""Create the curated manufacturing drawing for the rod pivot pin (MHA-CH-10).
 
 Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the connecting rod's reamed fork pin hole and
@@ -7,7 +7,7 @@ on three native model dimensions, all on the side view where a turned part's
 diameter sits beside its length (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø with the drill rod's own
 grind band, STOCK OK and its two fits named below it (rules 4 and 7: the
 mates are flagged where they apply), the installed length as REFERENCE
-(the fork's thickness; the MHA-CH-003 print owns it), and the blank's cut
+(the fork's thickness; the MHA-CH-03 print owns it), and the blank's cut
 length as a single MIN limit from the part's blanked ``BlankReference``
 sketch. An axis centerline, a bare end view with its center mark, the
 isometric, and the property-linked note (installed state, flush ends,

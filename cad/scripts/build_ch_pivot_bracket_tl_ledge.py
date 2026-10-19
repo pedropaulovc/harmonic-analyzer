@@ -1,4 +1,4 @@
-r"""Build the pivot bracket's angle-plate ledge (MHA-CH-008-TL-01; shop fixture).
+r"""Build the pivot bracket's angle-plate ledge (MHA-CH-08-TL-01; shop fixture).
 
 A 1018 block screwed to the reworked angle plate's upright: the bracket's
 foot free end rests on its top in the bracket's S4 setup

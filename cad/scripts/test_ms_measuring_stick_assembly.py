@@ -1,4 +1,4 @@
-"""Offline contracts for the ms-measuring-stick sub-assembly (MHA-MS-000).
+"""Offline contracts for the ms-measuring-stick sub-assembly (MHA-MS-00).
 
 The clamped pose, the park pose under the top assembly, the thread
 allowances and the fitter package all derive from
@@ -156,7 +156,7 @@ def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
     assert thumb.COLLAR_H == pytest.approx(row["collar_h"])
     assert thumb.HEAD_DIA == pytest.approx(2.0 * row["head_r"])
     assert thumb.HEAD_H == pytest.approx(row["head_h"])
-    assert _config.parts("vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
+    assert _config.parts("ms-vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
 
 
 def test_every_rotation_is_proper() -> None:
@@ -242,9 +242,9 @@ def test_thread_allowances_are_the_spec_values() -> None:
     )
     pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
     assert set(pairs) == {
-        frozenset(("vn-thumb-screw-1", "ms-stop-block-1")),
-        frozenset(("vn-ms-stop-plate-screw-1", "ms-stop-block-1")),
-        frozenset(("vn-ms-stop-plate-screw-2", "ms-stop-block-1")),
+        frozenset(("ms-vn-thumb-screw-1", "ms-stop-block-1")),
+        frozenset(("ms-vn-stop-plate-screw-1", "ms-stop-block-1")),
+        frozenset(("ms-vn-stop-plate-screw-2", "ms-stop-block-1")),
     }
 
 
@@ -341,7 +341,7 @@ def test_fitter_package_covers_rule_9() -> None:
     assert drawing.BOM_COMPONENTS == sheet.BOM_ORDER
     assert set(drawing.BOM_DESCRIPTIONS) == set(spec.QUANTITIES)
     assert set(drawing.BALLOON_ANCHORS) == set(spec.QUANTITIES)
-    assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-VN-054"
+    assert drawing.BOM_PART_NUMBERS[spec.PLATE_SCREW] == "MHA-MS-VN-51"
     for stem in spec.QUANTITIES:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
     for text in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS, drawing.SETUP_NOTE):

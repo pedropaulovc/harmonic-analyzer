@@ -1,7 +1,7 @@
-r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-020).
+r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
 A turned brass ring: Ø8.600 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
-press on the MHA-VN-041 shoulder), 5.500 long under its explicit band.  The
+press on the MHA-PD-VN-57 shoulder), 5.500 long under its explicit band.  The
 profile lies as it sits in the lathe (axis horizontal): the ``*Top`` view
 turned a quarter turn, so model +Z runs LEFT and the bar-side front face
 (z 0) is the profile's right end, the rear face (on the arm) its left end.

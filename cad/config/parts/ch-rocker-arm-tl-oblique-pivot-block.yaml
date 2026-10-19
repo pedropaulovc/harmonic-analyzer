@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-oblique-pivot-block:
   title: Rocker Oblique Trammel Pivot Block
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-22
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-22
   material: 6061-T6 aluminium
   material_specification: 6061-T6 aluminum flat bar, 1 x 2 in, machined to a 70 x 40 x 24 block
   finish: as machined
@@ -33,4 +33,4 @@ ch-rocker-arm-tl-oblique-pivot-block:
       kind: "accept"
       where: "View C, the 2X Ø7.940 x 4.400 side-screw counterbores from the +Y face"
       finding: "three-place counterbore Ø7.940 and depth 4.400, holding side counterbore walls 1.67 min to each other and 1.83 min to the carriage-screw holes, under the 2.0 target (rule 17), over the 1.5 floor"
-      reason: "MHA-CH-006-TL-29's #8 screw positions on the 24 block set the spacing; at two places the counterbore-to-counterbore wall would fall to 1.29, under the 1.5 floor, so the three-place bands hold the walls the side callout states (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+      reason: "MHA-CH-06-TL-29's #8 screw positions on the 24 block set the spacing; at two places the counterbore-to-counterbore wall would fall to 1.29, under the 1.5 floor, so the three-place bands hold the walls the side callout states (owner ruling 2026-10-17, via coordinator, RockerV3 session)"

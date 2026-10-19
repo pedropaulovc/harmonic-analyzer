@@ -16,8 +16,8 @@ import build_pd_platen_guide as guide
 import paper_drive_geom as paper_geometry
 import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
-import vn_fillister_screw_spec as fillister
-import vn_platen_clip_screw_spec as clip_screw
+import _mcmaster_90114a511 as fillister
+import pd_vn_platen_clip_screw_spec as clip_screw
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 
@@ -29,7 +29,7 @@ def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
 
 
 def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> None:
-    """Codex P2 (724f78f26): MHA-PD-000 solders the rack ends flush with the
+    """Codex P2 (724f78f26): MHA-PD-00 solders the rack ends flush with the
     platen's, so the model places it flush, and the mesh phasing (a rack gap
     centre on the feed pinion's +90-deg tooth over the stud) moves the platen
     off its photo x by the least shift instead of the rack along the platen."""
@@ -450,7 +450,7 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
     # Both selected wheels sit on the one band: front face at
     # the band front, rear face on the seat face (the knob side's is the
-    # MHA-PD-022 drive collar's front face, set in front of the 12T's face F).
+    # MHA-PD-22 drive collar's front face, set in front of the 12T's face F).
     knob_seat_z = assembly.KNOB_COLLAR_Z0
     assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
     assert math.isclose(assembly.KNOB_SHAFT_Z0 - collar.SET_NOMINAL, knob_seat_z)
@@ -474,7 +474,7 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
 def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The separate MHA-PD-022 collar is faced at fit-up so its rear face
+    # The separate MHA-PD-22 collar is faced at fit-up so its rear face
     # seats on the 12T's front face F; the disc's front face stands behind F.
     assert collar.LENGTH == collar.SET_NOMINAL
     assert collar.SEAT_MIN_FROM_F <= collar.LENGTH <= collar.SEAT_MAX_FROM_F

@@ -1,7 +1,7 @@
 """Pure contract shared by the measuring-stick builder's explode and its drawing.
 
 Names the MS_EXPLODED presentation and the ordered native steps that open it:
-the disassembly order, MHA-MS-000's assembly sequence read back to front --
+the disassembly order, MHA-MS-00's assembly sequence read back to front --
 the cover and its screws off the open side, the screws clear of the cover, the
 bar out of the opened window, then the thumbscrew down its axis. Each step is
 (label, families, axis, signed distance mm) along the assembly's global axes.
@@ -20,8 +20,8 @@ from __future__ import annotations
 EXPLODED_VIEW_NAME = "MS_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 EXPLODE_STEPS = (
-    ("cover comes off", ("ms-stop-plate", "vn-ms-stop-plate-screw"), "z", -24.0),
-    ("plate screws withdraw", ("vn-ms-stop-plate-screw",), "z", -26.0),
+    ("cover comes off", ("ms-stop-plate", "ms-vn-stop-plate-screw"), "z", -24.0),
+    ("plate screws withdraw", ("ms-vn-stop-plate-screw",), "z", -26.0),
     ("stick leaves window", ("ms-stick",), "z", -12.0),
-    ("thumbscrew backs out", ("vn-thumb-screw",), "y", -22.0),
+    ("thumbscrew backs out", ("ms-vn-thumb-screw",), "y", -22.0),
 )

@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel jig's feed lever (MHA-CH-006-TL-26)."""
+"""Offline contracts for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26)."""
 
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-oblique-feed-lever")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-26"
+    assert number == "MHA-CH-06-TL-26"
 
 
 def test_sheet_carries_no_notes() -> None:

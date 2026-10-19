@@ -191,7 +191,7 @@ def create_drive_train_explode(
     and restore the free working model.
 
     ``roles`` maps a component name to the role the builder tagged it with at
-    insertion (the MHA-VN-033 that pins the arbor collar). The builder runs this
+    insertion (the MHA-DT-VN-63 that pins the arbor collar). The builder runs this
     in Default and in Default Simplified
     (``_assembly.author_in_drawing_configurations``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout

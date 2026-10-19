@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear front bushing (MHA-PD-025) and its drawing."""
+"""Offline contracts for the transgear front bushing (MHA-PD-25) and its drawing."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import transgear_cluster_fit as fit
 import pd_transgear_disc_hub_spec as hub
 import pd_transgear_front_bushing_spec as spec
 import pd_transgear_pin_spec as pin
-import vn_transgear_retaining_ring_spec as ring
+import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm
@@ -42,7 +42,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 def test_the_chamfer_prints_a_max_the_ring_never_reaches() -> None:
     """The O.D. break prints as a single MAX limit (swTolMAX prints the
-    nominal, so the nominal is the max); the MHA-VN-047 ring bears wholly on the
+    nominal, so the nominal is the max); the MHA-PD-VN-61 ring bears wholly on the
     flat inside the largest chamfer on the smallest O.D."""
     assert spec.FRONT_CHAMFER_TOL_TYPE == 6  # swTolType_e.swTolMAX
     assert spec.FRONT_CHAMFER_BAND[0] == 0.0 > spec.FRONT_CHAMFER_BAND[1]
@@ -223,7 +223,7 @@ def test_sheet_text_stays_short() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_181() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-025"
+    assert row["number"] == "MHA-PD-25"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

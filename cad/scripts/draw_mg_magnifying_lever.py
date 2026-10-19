@@ -8,14 +8,14 @@ full hemisphere on the selected bar) plus two blanked reference sketches the
 FRONT view shows and dimensions: ``RodStock`` (the Ø6 as plain bar stock at
 mid-length, at the title block's .X) and ``PressZone`` (the cylinder the
 bracket collar grips -- its start back from the east tip a single MIN limit
-covering the MHA-MG-001 collar, its length to the dome tangent as a
-reference, and its banded diameter, tied to the MHA-MG-001 bore it enters).
+covering the MHA-MG-01 collar, its length to the dome tangent as a
+reference, and its banded diameter, tied to the MHA-MG-01 bore it enters).
 The zone's start is a solid line across the bar, so the zone reads between it
 and the dome's tangent edge; every other reference entity lies on the
 silhouette.  The Ø6 body's general finish, the part-owned Ra 3.2 seat of the
-MHA-MG-002 clamp's screw, and the press land's stricter Ra 0.8 are native
+MHA-MG-02 clamp's screw, and the press land's stricter Ra 0.8 are native
 symbols, each with its reason standing at it.
-The sheet carries no note block: pressing the collar on is the MHA-MG-000
+The sheet carries no note block: pressing the collar on is the MHA-MG-00
 assembly's step.  The rod axis is local +X, so the FRONT view is the long
 side elevation; an end view of a plain round would show nothing the Ø does
 not, so there is none.

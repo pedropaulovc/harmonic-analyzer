@@ -1,0 +1,15 @@
+pn-vn-pen-hanger-jam-nut:
+  title: Pen Hanger Jam Nut
+  number: MHA-PN-VN-55
+  stock_name: Zinc-Plated Steel Narrow-Profile Hex Nut
+  supplier: McMaster-Carr
+  supplier_skus: [90760A009]
+  material: Plain Carbon Steel
+  material_specification: "Zinc-plated steel narrow-profile hex nut, #8-32, 1/4 AF x 3/32; McMaster-Carr 90760A009"
+  finish: zinc plated
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-PN-VN-50 HANGER SCREW, JAMMED AGAINST THE
+    OUTBOARD FACE OF THE MHA-PN-VN-54 NUT.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

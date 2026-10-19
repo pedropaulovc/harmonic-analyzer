@@ -26,7 +26,7 @@ The mechanism that sets the machine for sines or cosines, and the reason the con
 | `dt-pinion-pivot-block` | TODO | TODO | TODO |
 | `dt-pinion-pivot-shaft` | TODO | TODO | TODO |
 | `dt-pinion-spring` | TODO | TODO | TODO |
-| `vn-swing-stop-screw` | TODO | TODO | TODO |
+| `dt-vn-swing-stop-screw` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

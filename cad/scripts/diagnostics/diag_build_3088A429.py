@@ -1,7 +1,7 @@
 r"""McMaster 3088A429 -- carbon-steel ring shim, ID 1/4 x OD 3/8 x 0.031 in.
 
-Used as vn-rocker-thrust-washer (MHA-VN-070).  The catalogue facts and the part
-frame are ``vn_rocker_thrust_washer_spec``'s.  The model is one Top-plane ID x
+Used as ch-vn-rocker-thrust-washer (MHA-CH-VN-56).  The catalogue facts and the part
+frame are ``ch_vn_rocker_thrust_washer_spec``'s.  The model is one Top-plane ID x
 OD annulus extruded blind THICKNESS (the catalogue's 0.031 in nominal) along +Y
 from the y = 0 face.  The production build turns the body so the recipe's +Y
 is the part frame's +Z.
@@ -33,7 +33,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_rocker_thrust_washer_spec import (  # noqa: E402
+from ch_vn_rocker_thrust_washer_spec import (  # noqa: E402
     ID,
     OD,
     SKU,

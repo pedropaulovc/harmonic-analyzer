@@ -1,14 +1,14 @@
-r"""Reproduction script: rocker strap (MHA-CH-013; 20 used, one per rocker arm).
+r"""Reproduction script: rocker strap (MHA-CH-13; 20 used, one per rocker arm).
 
-The flat 1018 strap of the built-up rocker arm MHA-CH-006
+The flat 1018 strap of the built-up rocker arm MHA-CH-06
 (``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the finished part's outline
 -- the R800 top edge, the concentric R816 bottom edge, the tip lands radial to
 their shared centre and the tapered end faces (``build_ch_rocker_arm``'s strap
 profile) -- at the finished 2.5 thickness, with the Ø10.20 H7 hole the
-MHA-CH-012 hub is pressed into (``ch_rocker_hub_fit``). The #47 rod-pin hole is
+MHA-CH-12 hub is pressed into (``ch_rocker_hub_fit``). The #47 rod-pin hole is
 drilled after joining, so it is not here (``ch_rocker_strap_spec``).
 
-Layout: the MHA-CH-006 frame (origin on the bottom arc's midpoint, +X the rod
+Layout: the MHA-CH-06 frame (origin on the bottom arc's midpoint, +X the rod
 side, the hub hole PIVOT_MID_Y up), extruded mid-plane in Z. ONE sketch,
 ``StrapProfile``, holds the outline and the hole, so every printed location
 runs from the hole's centre: a construction line on the mirror axis, from the

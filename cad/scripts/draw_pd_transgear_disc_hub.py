@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear disc hub (MHA-PD-017).
+r"""Create the manufacturing drawing for the transgear disc hub (MHA-PD-17).
 
 The edge view is the ``*Top`` orientation turned a quarter turn so the hub's
 axis lies horizontal, as it sits in the lathe (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the hub front
@@ -127,7 +127,7 @@ SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
 
-# Faced to fit at MHA-PD-000's hub step; the pointer comes from the step
+# Faced to fit at MHA-PD-00's hub step; the pointer comes from the step
 # registry.
 FIT_STEP_KEY = "hub-faced-to-nose"
 

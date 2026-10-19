@@ -51,12 +51,12 @@ from dt_pinion_pivot_block_geometry import (
 )
 
 # One fit per shaft (Main R2, converged-r7 review): the same REAM_SLIDE band
-# MHA-DT-014 holds on the same Ø6.35 h shafts, never a line-to-line limit on a
+# MHA-DT-14 holds on the same Ø6.35 h shafts, never a line-to-line limit on a
 # bore that must turn or slide by hand.
 BORE_DIA_BAND = REAM_SLIDE
 
-# Both reamed bores are running faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-019 turns in the pivot
-# bore and MHA-DT-017 in the lift bore (Main, MHA-DT-018 eye pass: the lift bore
+# Both reamed bores are running faces (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-19 turns in the pivot
+# bore and MHA-DT-17 in the lift bore (Main, MHA-DT-18 eye pass: the lift bore
 # had none).  They share a diameter.  The harvested pivot-bore cylinder
 # spans y=-BORE_DIA/2..+BORE_DIA/2, while the raised lift bore does not reach
 # the pivot bore's lower generator; that point makes the pivot selector
@@ -101,7 +101,7 @@ def _registry_mate(row: dict) -> tuple[str, str]:
 
 # Each running bore's mate is named from the registry, so the callout cannot
 # drift from that part's own title block (Main, pc-r7 eye pass: the note said
-# "TORQUE SHAFT" where MHA-DT-019's title reads PINION PIVOT SHAFT).  Each row is
+# "TORQUE SHAFT" where MHA-DT-19's title reads PINION PIVOT SHAFT).  Each row is
 # read by its literal name so the drawing's config deps carry those two rows
 # (a computed name reads as the part's own row only).
 PIVOT_SHAFT_MATE = _registry_mate(_config.parts("dt-pinion-pivot-shaft"))
@@ -122,7 +122,7 @@ def _ream_callout(mate: tuple[str, str]) -> str:
 # applies), the hold-downs are fully defined by their DRILL callout, and
 # assembly operations (the front block's feeler setting, spotting the base seats
 # through the block holes) live on the drive-train assembly's step list and the
-# harmonic base's "TRANSFER FROM MHA-DT-018" callout.
+# harmonic base's "TRANSFER FROM MHA-DT-18" callout.
 BORE_CALLOUTS = {
     "PivotBoreDia": _ream_callout(PIVOT_SHAFT_MATE),
     "LiftBoreDia": _ream_callout(LIFT_ROD_MATE),

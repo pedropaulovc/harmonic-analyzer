@@ -1,12 +1,12 @@
 r"""McMaster 93075A199 -- low-strength zinc-plated steel hex head screw, #8-32 x 1".
 
-Used as vn-hanger-screw (MHA-VN-007): from behind the wheel bar through the
-pen-hanger strap's clearance hole into the MHA-VN-063 nut and MHA-VN-064 jam nut.
+Used as pn-vn-hanger-screw (MHA-PN-VN-50): from behind the wheel bar through the
+pen-hanger strap's clearance hole into the MHA-PN-VN-54 nut and MHA-PN-VN-55 jam nut.
 The catalogue facts are ``_mcmaster_93075a199``'s.  Geometry: the 93075A*
 family laws of ``diag_mcmaster_hex_head.py`` -- the laws
 ``diag_build_93075A194.py`` reads off the vendor 93075A194 model and proves in
 the replica gate -- at this size's five catalogue dimensions;
-``test_vn_hanger_screw.py`` proves the family builder replays 93075A194's
+``test_pn_vn_hanger_screw.py`` proves the family builder replays 93075A194's
 recipe call for call.
 
 Run standalone (SolidWorks open)::

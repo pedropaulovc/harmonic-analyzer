@@ -1,10 +1,10 @@
-r"""Pure-data contract for the pivot bracket's reworked angle plate (MHA-CH-008-TL-02).
+r"""Pure-data contract for the pivot bracket's reworked angle plate (MHA-CH-08-TL-02).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). A bought
 4 x 5 x 3-1/2 in cast-iron angle plate holds the rocker pivot bracket for its
 S4 setup (prechips bracket plan S4 hold): the bracket's finished seat face
 lies flat on the upright's front face, its foot free end rests on the
-shop-made ledge (MHA-CH-008-TL-01) screwed to the upright, and the clamping
+shop-made ledge (MHA-CH-08-TL-01) screwed to the upright, and the clamping
 kit's bridge presses the foot toward the plate on two 3/8-16 studs through
 the upright. The plate is modelled at its bought envelope (slots omitted);
 the shop adds four holes only: two tapped holes for the ledge screws and two

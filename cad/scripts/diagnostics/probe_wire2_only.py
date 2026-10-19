@@ -92,7 +92,7 @@ async def main():
     _, out_doc = _sub_model(adapter, "output-1")
     top = adapter.currentModel
     adapter.currentModel = out_doc
-    marker, _ = _find_one(adapter, "vn-pen-marker")
+    marker, _ = _find_one(adapter, "pn-vn-pen-marker")
     y0 = _world(_comp_xform(adapter, marker), [0, 0, 0])[1] if marker else None
     try:
         rr = _entity_ref("pn-pen-rod-1", "Axis1", "AXIS")
@@ -112,7 +112,7 @@ async def main():
         name="mg-magnifying-wheel-1", angle=30.0, axis_vector=[a[6], a[7], a[8]],
         axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0], mode="exact"))
     adapter._attempt(lambda: out_doc.ForceRebuild3(False), default=None)
-    marker2, _ = _find_one(adapter, "vn-pen-marker")
+    marker2, _ = _find_one(adapter, "pn-vn-pen-marker")
     y1 = _world(_comp_xform(adapter, marker2), [0, 0, 0])[1] if marker2 else None
     if y0 is not None and y1 is not None:
         log(f"  pen-marker Y: {y0:.3f} -> {y1:.3f}  delta={y1 - y0:.3f} mm "

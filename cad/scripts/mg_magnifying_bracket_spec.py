@@ -17,7 +17,7 @@ FLANGE whose +Z face butts the plate's front face.  The two plan rectangles
 carry the auto-importable marked dimensions (the flange thickness at the
 title block's .XXX band, the screws' grip); the collar's end-view circles
 carry the OD and the bore, a REFERENCE nominal whose callout states the
-matched fit on the MHA-MG-003 lever, and its extrude the banded length,
+matched fit on the MHA-MG-03 lever, and its extrude the banded length,
 which names the lever's press zone it matches; the blanked ``ArmSection``
 witness carries the arm's section and the bore axis's one datum chain (the
 mounting face and the arm's end, both from the axis) in the side view.  A
@@ -140,14 +140,14 @@ DRAWING_POSITION_BAND = POSITION_BAND
 # derived here from the fit contract, never typed on the sheet
 # (_drawing_contract's spec-string rule).
 #
-# The bore is a matched fit to the finished MHA-MG-003 lever's press zone
+# The bore is a matched fit to the finished MHA-MG-03 lever's press zone
 # (drawing-guidelines.md rule 4, matched pairs): its nominal prints as a
 # REFERENCE and the callout states the acceptance -- the fit budget's own
 # diametral interference range.  The lever's press zone keeps its printed
 # limits, so a pair made to the stated interference is one the budget bounds:
 # at the tightest interference, on either limit of the lever's zone, the
 # matched pair's press force and collar stress stay inside the budget the
-# MHA-MG-000 assembly's press step is bounded by.
+# MHA-MG-00 assembly's press step is bounded by.
 for _rod in (
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[1],
     PRESS_ZONE_DIA + PRESS_ZONE_DIA_BAND[0],
@@ -168,7 +168,7 @@ COLLAR_BORE_CALLOUT = (
     f"REAM OR HONE THRU: {PRESS_FIT_BUDGET['interference_min']:.3f}-"
     f"{PRESS_FIT_BUDGET['interference_max']:.3f}\n"
     "DIAMETRAL INTERFERENCE ON\n"
-    "MHA-MG-003 LEVER"
+    "MHA-MG-03 LEVER"
 )
 # The bore's printed Ra is the one the press budget's DIN 7190 smoothing takes
 # (mg_lever_press_fit_geom.COLLAR_BORE_RA_UM); the bore is the part's only
@@ -185,9 +185,9 @@ SURFACE_FINISHES = (
 # that zone.
 if not COLLAR_LENGTH + COLLAR_LENGTH_BAND[0] <= PRESS_ZONE_LENGTH:
     raise AssertionError("the lever's MIN press zone must cover the longest collar")
-COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-003 LEVER PRESS ZONE"
+COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-03 LEVER PRESS ZONE"
 
-# The flange's thickness is the bracket screws' (MHA-VN-050) grip: it sets how
+# The flange's thickness is the bracket screws' (MHA-MG-VN-53) grip: it sets how
 # far each screw reaches into the summing lever's blind #2-56 thread.  It
 # prints three places so the title block's .XXX band (FLANGE_THICKNESS_BAND,
 # ±0.13) holds the grip: worst-case engagement ENGAGEMENT_MIN 3.305 >= 1.5D
@@ -195,7 +195,7 @@ COLLAR_LENGTH_CALLOUT = "COLLAR LENGTH\nALONG BORE AXIS =\nMHA-MG-003 LEVER PRES
 # thick flange would leave 2.925 engagement (< 1.5D) and the thin one would
 # bottom the screws 0.3725 deep, so the third place is the function, named
 # at the dimension (machinist review r2: a .XXX size with no stated job).
-SCREW_NUMBER = _config.parts("vn-magnifying-bracket-screw")["number"]
+SCREW_NUMBER = _config.parts("mg-vn-magnifying-bracket-screw")["number"]
 _XX_GRIP_LOSS = LINEAR_BAND - GRIP_BAND
 if GRIP_BAND != FLANGE_THICKNESS_BAND or not _XX_GRIP_LOSS > 0.0:
     raise AssertionError("the flange's .XXX band must be the screws' grip band")
@@ -208,6 +208,6 @@ FLANGE_DEPTH_CALLOUT = f"FLANGE DEPTH\n{SCREW_NUMBER}\nSCREW GRIP"
 
 # No note block (drawing-guidelines.md rule 7): every requirement is a native
 # dimension or a callout at its feature.  The press and its force limit are
-# assembly steps, carried by the MHA-MG-000 assembly
+# assembly steps, carried by the MHA-MG-00 assembly
 # (mg_lever_press_fit_geom.PRESS_INSTALLATION_NOTES), not this part.
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

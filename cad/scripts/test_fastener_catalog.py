@@ -7,92 +7,97 @@ from _fastener_catalog import FASTENERS
 
 
 _EXPECTED = {
-    # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
-    "vn-arbor-set-screw": (("91375A106",), "MHA-VN-034", 4),  # 2 arbor, 2 pivot ear
-    "vn-boss-hook": (("9490T1",), "MHA-VN-001", 1),
-    "vn-bracket-hold-down-screw": (("90280A196",), "MHA-VN-071", 2),
-    "vn-clamp-screw": (("90280A201",), "MHA-VN-021", 6),
-    "vn-cone-lock-knob": (("93585A190",), "MHA-VN-013", 1),
-    "vn-cone-pivot-screw": (("91829A560",), "MHA-VN-014", 1),
-    "vn-cone-tip-adjuster": (("94025A164",), "MHA-VN-017", 1),
-    "vn-cone-tip-block-screw": (("91251A108",), "MHA-VN-030", 1),
-    "vn-cone-tip-pinch-screw": (("91794A112",), "MHA-VN-018", 1),
-    "vn-crank-seat-drive-pin": (("98381A434",), "MHA-VN-044", 2),
-    "vn-fillister-screw": (("90114A511",), "MHA-VN-006", 15),
-    "vn-foot-screw": (("90280A108",), "MHA-VN-020", 1),
-    "vn-guide-lock-screw": (("91792A108",), "MHA-VN-046", 8),
-    "vn-frame-side-screw": (("91794A080",), "MHA-VN-022", 2),
-    "vn-fulcrum-set-screw": (("91375A942",), "MHA-VN-055", 2),
-    "vn-frame-cross-screw": (("90280A837",), "MHA-VN-027", 8),
-    "vn-gooseneck-set-screw": (("91410A540",), "MHA-VN-023", 1),
-    "vn-hanger-screw": (("93075A199",), "MHA-VN-007", 1),
-    "vn-knife-hanger-stud": (("92314A253",), "MHA-VN-024", 2),
-    "vn-knife-hanger-washer": (("96659A104",), "MHA-VN-060", 2),
-    "vn-knife-mount-dowel": (("98381A473",), "MHA-VN-051", 4),
-    "vn-latch-hook-bracket-screw": (("90280A108",), "MHA-VN-043", 2),
-    "vn-magnifying-bracket-screw": (("91794A078",), "MHA-VN-050", 2),
-    "vn-ms-stop-plate-screw": (("90114A124",), "MHA-VN-054", 2),
-    "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),
-    "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 2),
-    "vn-pen-set-screw": (("99607A213",), "MHA-VN-010", 1),
-    "vn-pen-rod-set-screw": (("91375A105",), "MHA-VN-061", 1),
-    "vn-pen-adjust-nut": (("92671A115",), "MHA-VN-062", 1),
-    "vn-pen-hanger-nut": (("90480A009",), "MHA-VN-063", 1),
-    "vn-pen-hanger-jam-nut": (("90760A009",), "MHA-VN-064", 1),
-    "vn-boss-hook-jam-nut": (("90760A140",), "MHA-VN-072", 1),
-    "vn-platen-clip-screw": (("92446A077",), "MHA-VN-059", 4),
-    "vn-pinion-strap-pin": (("98296A027",), "MHA-VN-033", 3),
-    "vn-post-mount-screw": (("40923906",), "MHA-VN-031", 2),
-    "vn-slotted-screw": (("90280A203",), "MHA-VN-019", 4),
-    "vn-swing-stop-screw": (("90280A108",), "MHA-VN-015", 1),
-    "vn-thumb-screw": (("91882A221",), "MHA-VN-011", 3),
-    "vn-transgear-arm-plate-screw": (("91790A199",), "MHA-VN-040", 2),
-    "vn-transgear-arm-plate-locating-pin": (("93600A189",), "MHA-VN-056", 2),
-    "vn-transgear-knob-drive-pin": (("98381A433",), "MHA-VN-038", 2),
-    "vn-transgear-knob-cup-pin": (("98296A031",), "MHA-VN-048", 1),
-    "vn-transgear-disc-screw": (("91794A055",), "MHA-VN-039", 3),
-    "vn-transgear-latch-pin": (("98381A474",), "MHA-VN-042", 1),
-    "vn-transgear-pivot-screw": (("90325A174",), "MHA-VN-041", 1),
-    "vn-transgear-retaining-ring": (("97431A260",), "MHA-VN-047", 1),
-    "vn-transgear-pivot-spring": (("9715K43",), "MHA-VN-049", 1),
-    "vn-transgear-pivot-shim": (("98055A098",), "MHA-VN-069", 1),
-    "vn-cylinder-bank-spring": (("9714K392",), "MHA-VN-052", 1),
-    "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
-    "vn-rocker-thrust-washer": (("3088A429",), "MHA-VN-070", 2),
-    "vn-wheel-axle-nut": (("92671A005",), "MHA-VN-025", 2),
-    "vn-wheel-axle-back-washer": (("92916A480",), "MHA-VN-057", 1),
-    "vn-wheel-axle-front-washer": (("92916A250",), "MHA-VN-058", 1),
-    "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
-    "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
+    # Parent-specific production stem: (supplier SKU(s), MHA number, quantity).
+    "ch-vn-arbor-set-screw": (("91375A106",), "MHA-CH-VN-53", 2),
+    "dt-vn-arbor-set-screw": (("91375A106",), "MHA-DT-VN-64", 2),
+    "sm-vn-boss-hook": (("9490T1",), "MHA-SM-VN-50", 1),
+    "ch-vn-bracket-hold-down-screw": (("90280A196",), "MHA-CH-VN-57", 2),
+    "mg-vn-clamp-screw": (("90280A201",), "MHA-MG-VN-51", 2),
+    "pd-vn-clamp-screw": (("90280A201",), "MHA-PD-VN-53", 4),
+    "dt-vn-cone-lock-knob": (("93585A190",), "MHA-DT-VN-51", 1),
+    "dt-vn-cone-pivot-screw": (("91829A560",), "MHA-DT-VN-52", 1),
+    "dt-vn-cone-tip-adjuster": (("94025A164",), "MHA-DT-VN-55", 1),
+    "dt-vn-cone-tip-block-screw": (("91251A108",), "MHA-DT-VN-60", 1),
+    "dt-vn-cone-tip-pinch-screw": (("91794A112",), "MHA-DT-VN-56", 1),
+    "dt-vn-crank-seat-drive-pin": (("98381A434",), "MHA-DT-VN-67", 2),
+    "dt-vn-fillister-screw": (("90114A511",), "MHA-DT-VN-50", 1),
+    "fr-vn-fillister-screw": (("90114A511",), "MHA-FR-VN-50", 4),
+    "pd-vn-fillister-screw": (("90114A511",), "MHA-PD-VN-52", 10),
+    "dt-vn-foot-screw": (("90280A108",), "MHA-DT-VN-58", 1),
+    "pd-vn-guide-lock-screw": (("91792A108",), "MHA-PD-VN-60", 8),
+    "ch-vn-frame-side-screw": (("91794A080",), "MHA-CH-VN-52", 2),
+    "ch-vn-fulcrum-set-screw": (("91375A942",), "MHA-CH-VN-55", 2),
+    "fr-vn-frame-cross-screw": (("90280A837",), "MHA-FR-VN-53", 8),
+    "fr-vn-gooseneck-set-screw": (("91410A540",), "MHA-FR-VN-52", 1),
+    "pn-vn-hanger-screw": (("93075A199",), "MHA-PN-VN-50", 1),
+    "sm-vn-knife-hanger-stud": (("92314A253",), "MHA-SM-VN-52", 2),
+    "sm-vn-knife-hanger-washer": (("96659A104",), "MHA-SM-VN-54", 2),
+    "sm-vn-knife-mount-dowel": (("98381A473",), "MHA-SM-VN-53", 4),
+    "pd-vn-latch-hook-bracket-screw": (("90280A108",), "MHA-PD-VN-59", 2),
+    "mg-vn-magnifying-bracket-screw": (("91794A078",), "MHA-MG-VN-53", 2),
+    "ms-vn-stop-plate-screw": (("90114A124",), "MHA-MS-VN-51", 2),
+    "fr-vn-lag-screw": (("92240A540",), "MHA-FR-VN-51", 4),
+    "dt-vn-pedestal-hold-down-screw": (("90280A197",), "MHA-DT-VN-62", 2),
+    "pn-vn-pen-set-screw": (("99607A213",), "MHA-PN-VN-51", 1),
+    "pn-vn-pen-rod-set-screw": (("91375A105",), "MHA-PN-VN-52", 1),
+    "pn-vn-pen-adjust-nut": (("92671A115",), "MHA-PN-VN-53", 1),
+    "pn-vn-pen-hanger-nut": (("90480A009",), "MHA-PN-VN-54", 1),
+    "pn-vn-pen-hanger-jam-nut": (("90760A009",), "MHA-PN-VN-55", 1),
+    "sm-vn-boss-hook-jam-nut": (("90760A140",), "MHA-SM-VN-55", 1),
+    "pd-vn-platen-clip-screw": (("92446A077",), "MHA-PD-VN-65", 4),
+    "dt-vn-pinion-strap-pin": (("98296A027",), "MHA-DT-VN-63", 3),
+    "dt-vn-post-mount-screw": (("40923906",), "MHA-DT-VN-61", 2),
+    "dt-vn-slotted-screw": (("90280A203",), "MHA-DT-VN-57", 4),
+    "dt-vn-swing-stop-screw": (("90280A108",), "MHA-DT-VN-53", 1),
+    "mg-vn-thumb-screw": (("91882A221",), "MHA-MG-VN-50", 2),
+    "ms-vn-thumb-screw": (("91882A221",), "MHA-MS-VN-50", 1),
+    "pd-vn-transgear-arm-plate-screw": (("91790A199",), "MHA-PD-VN-56", 2),
+    "pd-vn-transgear-arm-plate-locating-pin": (("93600A189",), "MHA-PD-VN-64", 2),
+    "pd-vn-transgear-knob-drive-pin": (("98381A433",), "MHA-PD-VN-54", 2),
+    "pd-vn-transgear-knob-cup-pin": (("98296A031",), "MHA-PD-VN-62", 1),
+    "pd-vn-transgear-disc-screw": (("91794A055",), "MHA-PD-VN-55", 3),
+    "pd-vn-transgear-latch-pin": (("98381A474",), "MHA-PD-VN-58", 1),
+    "pd-vn-transgear-pivot-screw": (("90325A174",), "MHA-PD-VN-57", 1),
+    "pd-vn-transgear-retaining-ring": (("97431A260",), "MHA-PD-VN-61", 1),
+    "pd-vn-transgear-pivot-spring": (("9715K43",), "MHA-PD-VN-63", 1),
+    "pd-vn-transgear-pivot-shim": (("98055A098",), "MHA-PD-VN-67", 1),
+    "dt-vn-cylinder-bank-spring": (("9714K392",), "MHA-DT-VN-68", 1),
+    "ch-vn-rocker-bank-spring": (("9714K24",), "MHA-CH-VN-54", 1),
+    "ch-vn-rocker-thrust-washer": (("3088A429",), "MHA-CH-VN-56", 2),
+    "mg-vn-wheel-axle-nut": (("92671A005",), "MHA-MG-VN-52", 2),
+    "mg-vn-wheel-axle-back-washer": (("92916A480",), "MHA-MG-VN-54", 1),
+    "mg-vn-wheel-axle-front-washer": (("92916A250",), "MHA-MG-VN-55", 1),
+    "ch-vn-spring-hook": (("9489T111",), "MHA-CH-VN-51", 20),
+    "fr-vn-tube-frame-cap": (("9275K141",), "MHA-FR-VN-54", 4),
     # The oblique trammel jig's modelled bought hardware (shop fixture, TL Numbers).
-    "ch-rocker-arm-tl-oblique-bearing": (("5972K41",), "MHA-CH-006-TL-32", 4),
-    "ch-rocker-arm-tl-oblique-cl-dowel": (("91595A452",), "MHA-CH-006-TL-33", 1),
-    "ch-rocker-arm-tl-oblique-rail-screw": (("91251A197",), "MHA-CH-006-TL-41", 14),
-    "ch-rocker-arm-tl-oblique-bracket-screw": (("91251A196",), "MHA-CH-006-TL-42", 8),
-    "ch-rocker-arm-tl-oblique-block-screw": (("91251A188",), "MHA-CH-006-TL-43", 2),
-    "ch-rocker-arm-tl-oblique-carriage-screw": (("91290A168",), "MHA-CH-006-TL-44", 8),
-    "ch-rocker-arm-tl-oblique-kp08-screw": (
+    "ch-rocker-arm-tl-vn-oblique-bearing": (("5972K41",), "MHA-CH-06-TL-VN-52", 4),
+    "ch-rocker-arm-tl-vn-oblique-cl-dowel": (("91595A452",), "MHA-CH-06-TL-VN-53", 1),
+    "ch-rocker-arm-tl-vn-oblique-rail-screw": (("91251A197",), "MHA-CH-06-TL-VN-61", 14),
+    "ch-rocker-arm-tl-vn-oblique-bracket-screw": (("91251A196",), "MHA-CH-06-TL-VN-62", 8),
+    "ch-rocker-arm-tl-vn-oblique-block-screw": (("91251A188",), "MHA-CH-06-TL-VN-63", 2),
+    "ch-rocker-arm-tl-vn-oblique-carriage-screw": (("91290A168",), "MHA-CH-06-TL-VN-64", 8),
+    "ch-rocker-arm-tl-vn-oblique-kp08-screw": (
         ("91290A148",),
-        "MHA-CH-006-TL-45",
+        "MHA-CH-06-TL-VN-65",
         4,
     ),
-    "ch-rocker-arm-tl-oblique-nut-screw": (("91290A115",), "MHA-CH-006-TL-46", 4),
-    "ch-rocker-arm-tl-oblique-riser-screw": (("91771A110",), "MHA-CH-006-TL-47", 4),
-    "ch-rocker-arm-tl-oblique-clamp-screw": (("91251A540",), "MHA-CH-006-TL-48", 1),
-    "ch-rocker-arm-tl-oblique-lever-screw": (("91251A583",), "MHA-CH-006-TL-49", 2),
-    "ch-rocker-arm-tl-oblique-block-washer": (
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91290A115",), "MHA-CH-06-TL-VN-66", 4),
+    "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A110",), "MHA-CH-06-TL-VN-67", 4),
+    "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A540",), "MHA-CH-06-TL-VN-68", 1),
+    "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
+    "ch-rocker-arm-tl-vn-oblique-block-washer": (
         ("91812A215",),
-        "MHA-CH-006-TL-50",
+        "MHA-CH-06-TL-VN-70",
         2,
     ),
-    "ch-rocker-arm-tl-oblique-lever-washer": (
+    "ch-rocker-arm-tl-vn-oblique-lever-washer": (
         ("91812A230",),
-        "MHA-CH-006-TL-51",
+        "MHA-CH-06-TL-VN-71",
         2,
     ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
-_SUPPLIERS = {"vn-post-mount-screw": "MSC Industrial Supply"}
+_SUPPLIERS = {"dt-vn-post-mount-screw": "MSC Industrial Supply"}
 
 
 def _supplier(stem: str) -> str:
@@ -140,12 +145,12 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
 
     # Raised pinion blocks use #8-32 x 1-1/2; clamp screws retain x 1-1/4.
     # The swing stop and paper-drive latch hook share the foot screw SKU,
-    # while the magnifying bracket takes two #2-56 x 1/4 (MHA-VN-050). The
+    # while the magnifying bracket takes two #2-56 x 1/4 (MHA-MG-VN-53). The
     # four platen-clip screws left the brass #4-40 x 1/4 for a brass #2-56
-    # x 1/4 (MHA-VN-059), whose head fits inside the clip's rail, and then
+    # x 1/4 (MHA-PD-VN-65), whose head fits inside the clip's rail, and then
     # the #2-56 fillister for the pan head, whose least head bears on the
     # clip around its loose hole; the measuring stick's stop plate keeps the
-    # brass #2-56 fillister (MHA-VN-054).
+    # brass #2-56 fillister (MHA-MS-VN-51).
     assert fleet_quantity("90280A199") == 0
     assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("91794A078") == 2
@@ -154,13 +159,35 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
     assert fleet_quantity("90114A511") == 15
     assert fleet_quantity("90114A124") == 2
     assert fleet_quantity("92446A077") == 4
+    assert fleet_quantity("91375A106") == 4
+    assert fleet_quantity("91882A221") == 3
+
+
+def test_shared_skus_have_distinct_parent_specific_specs() -> None:
+    families = (
+        ("dt-vn-fillister-screw", "fr-vn-fillister-screw", "pd-vn-fillister-screw"),
+        ("mg-vn-clamp-screw", "pd-vn-clamp-screw"),
+        ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"),
+        ("mg-vn-thumb-screw", "ms-vn-thumb-screw"),
+    )
+    assert sum(len(stems) for stems in families) == 9
+    for stems in families:
+        specs = [FASTENERS[stem] for stem in stems]
+        assert tuple(spec.part_name for spec in specs) == stems
+        assert len({id(spec) for spec in specs}) == len(stems)
+        assert len(
+            {
+                (spec.stock_name, spec.skus, spec.material, spec.supplier)
+                for spec in specs
+            }
+        ) == 1
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:
-    assert _config.parts("vn-knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
-    assert _config.parts("vn-knife-hanger-washer")["title"] == "Knife-Hanger Washer"
-    assert _config.parts("vn-knife-mount-dowel")["title"] == "Knife-Mount Dowel"
-    assert _config.parts("vn-lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
+    assert _config.parts("sm-vn-knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
+    assert _config.parts("sm-vn-knife-hanger-washer")["title"] == "Knife-Hanger Washer"
+    assert _config.parts("sm-vn-knife-mount-dowel")["title"] == "Knife-Mount Dowel"
+    assert _config.parts("fr-vn-lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
 
 
 def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
@@ -170,15 +197,17 @@ def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
 
     from _fastener_catalog import fastener
 
-    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "vn-frame-side-screw,vn-clamp-screw")
-    assert fastener("vn-clamp-screw").part_name == "vn-clamp-screw"
+    monkeypatch.setenv(
+        "HARMONIC_FASTENER_ROWS", "ch-vn-frame-side-screw,mg-vn-clamp-screw"
+    )
+    assert fastener("mg-vn-clamp-screw").part_name == "mg-vn-clamp-screw"
     with pytest.raises(KeyError, match="outside this build's cache key"):
-        fastener("vn-lag-screw")
+        fastener("fr-vn-lag-screw")
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "")
     with pytest.raises(KeyError, match="outside this build's cache key"):
-        fastener("vn-frame-side-screw")
+        fastener("ch-vn-frame-side-screw")
     monkeypatch.delenv("HARMONIC_FASTENER_ROWS")
-    assert fastener("vn-lag-screw").part_name == "vn-lag-screw"
+    assert fastener("fr-vn-lag-screw").part_name == "fr-vn-lag-screw"
 
 
 def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
@@ -189,30 +218,32 @@ def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
 
 
 def test_arbor_set_screw_is_the_verified_black_oxide_cup_point() -> None:
-    """#743: MHA-VN-034 is McMaster 91375A106 (alloy, C45, black oxide, plain
-    cup), which bites the spotted steel arbor where an 18-8 cup would not.
-    No "PN TO VERIFY" survives in its identity."""
-    row = _config.parts("vn-arbor-set-screw")
-    assert FASTENERS["vn-arbor-set-screw"].material == "Alloy Steel"
-    assert "91375A106" in row["material_specification"]
-    for value in row.values():
-        assert "TO VERIFY" not in str(value).upper()
+    """#743: both parent identities use McMaster 91375A106 (alloy, C45,
+    black oxide, plain cup), which bites the spotted steel arbor where an
+    18-8 cup would not. No "PN TO VERIFY" survives in either identity."""
+    for stem in ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"):
+        row = _config.parts(stem)
+        assert FASTENERS[stem].material == "Alloy Steel"
+        assert "91375A106" in row["material_specification"]
+        for value in row.values():
+            assert "TO VERIFY" not in str(value).upper()
 
 
 def test_every_catalog_fastener_has_a_reference_sheet() -> None:
-    """Main on #743: every catalogue fastener ships a purchased reference
-    sheet, MHA-VN-034 included, and a plain set screw's sheet is the shared
-    purchased-fastener builder's."""
+    """Every catalogue fastener ships a purchased reference sheet, including
+    both parent-specific arbor set screws; each plain set-screw sheet uses
+    the shared purchased-fastener builder."""
     from pathlib import Path
 
     from _drawing_registry import DRAWINGS
 
     sheets = {spec.artifact_stem: spec for spec in DRAWINGS}
     assert set(FASTENERS) <= set(sheets)
-    spec = sheets["vn-arbor-set-screw"]
-    assert (spec.name, spec.part) == ("vn_arbor_set_screw", "vn_arbor_set_screw")
-    script = Path(__file__).resolve().parent / spec.script_name
-    assert "build_purchased_fastener_drawing" in script.read_text(encoding="utf-8")
+    for stem in ("ch-vn-arbor-set-screw", "dt-vn-arbor-set-screw"):
+        spec = sheets[stem]
+        assert (spec.name, spec.part) == (stem.replace("-", "_"),) * 2
+        script = Path(__file__).resolve().parent / spec.script_name
+        assert "build_purchased_fastener_drawing" in script.read_text(encoding="utf-8")
 
 
 def test_every_catalog_fastener_stamps_its_supplier_identity() -> None:

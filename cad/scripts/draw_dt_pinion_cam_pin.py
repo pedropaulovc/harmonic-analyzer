@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the pinion cam-follower pin.
 
 A short Ø4 drill-rod stud with a shallow domed outer end, bonded into the
-MHA-DT-014 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
+MHA-DT-14 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a

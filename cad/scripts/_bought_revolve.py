@@ -1,6 +1,6 @@
 """Revolved bought-part bodies, shared by the oblique jig's datasheet builders.
 
-The pen-marker idiom (``build_vn_pen_marker``) generalised for the bought
+The pen-marker idiom (``build_pn_vn_pen_marker``) generalised for the bought
 leadscrew, nut and handwheel: sketch a closed line chain, fully define it
 semantically, revolve it 360° (boss or cut), and name the sketch and feature.
 """

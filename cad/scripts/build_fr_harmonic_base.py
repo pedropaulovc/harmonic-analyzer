@@ -127,11 +127,11 @@ from cylinder_bank_layout import (
     BACK_STRAP_INNER_Z as BANK_BACK_STRAP_INNER_Z,
     FRONT_STRAP_INNER_Z as BANK_FRONT_STRAP_INNER_Z,
 )
-from vn_cone_pivot_screw_spec import (
+from dt_vn_cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
 )
-from vn_cone_lock_knob_spec import (
+from dt_vn_cone_lock_knob_spec import (
     HEAD_DIA as LOCK_HEAD_DIA,
     PLUG_TAP_LEAD as LOCK_PLUG_TAP_LEAD,
     STUD_BOTTOM_CLEARANCE as LOCK_STUD_BOTTOM_CLEARANCE,
@@ -139,14 +139,14 @@ from vn_cone_lock_knob_spec import (
     THREAD as LOCK_THREAD,
 )
 from dt_cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
-from vn_swing_stop_screw_spec import (
+from dt_vn_swing_stop_screw_spec import (
     CONTACT_DIA as STOP_CONTACT_DIA,
     THREAD as STOP_THREAD,
 )
-from vn_slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
-from vn_foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
-from vn_fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
-from vn_swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
+from dt_vn_slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
+from dt_vn_foot_screw_spec import SHANK_LEN as FOOT_SCREW_LEN
+from _mcmaster_90114a511 import SHANK_LEN as NAMEPLATE_SCREW_LEN
+from dt_vn_swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
 from dt_pinion_pivot_block_geometry import (
     BLOCK_HEIGHT,
     BLOCK_HEIGHT_BAND,
@@ -246,7 +246,7 @@ IN = 25.4
 # live in fr_harmonic_base_spec: the sheet may only source a surface-finish
 # control from a part SPEC, and the bore size reaches that spec through the
 # leaf module frame_column_stations. Bore diameters remain nominal CAD
-# geometry -- match-fit production sockets to their assigned actual MHA-FR-003
+# geometry -- match-fit production sockets to their assigned actual MHA-FR-03
 # tubes, not to a fixed diameter band.
 BASE_SPOTFACE_PLANE_Z = TOP_WIDTH / 2.0
 BASE_SPOTFACE_DEPTH = BASE_SPOTFACE_PLANE_Z - BASE_SCREW_SEAT_Z
@@ -1725,13 +1725,13 @@ async def build(adapter) -> dict[str, str]:
 
     # The rect pads, the lugs, the ribs, the spring-foot boss and the
     # nameplate bosses stand under seats the hole table does not locate
-    # (transfer seats, cross taps, the MHA-FR-004 taps) or under none, so the
+    # (transfer seats, cross taps, the MHA-FR-04 taps) or under none, so the
     # drawing places them from the table's own X0 Y0: the
     # flange's rear-west theoretical sharp corner, one datum per view (drawing
     # drawing-guidelines.md rule 10 (dimension from a real feature)). Each sketch carries that corner as a point, and every
     # such feature is dimensioned FROM it, so the printed locations are these
     # sketches' own driving dims (Codex P2 on #1310: the pads printed no size
-    # or place; machinist review: nor did the ribs or the MHA-DT-024 boss).
+    # or place; machinist review: nor did the ribs or the MHA-DT-24 boss).
     async def _table_origin(dims: SketchDims, tag: str) -> str:
         """Add and anchor this sketch's X0 Y0 point; return its entity id."""
         manager = adapter.currentSketchManager
@@ -1964,7 +1964,7 @@ async def build(adapter) -> dict[str, str]:
                     drives=(None, None, '"HangingBossDia"'),
                 )
                 continue
-            # Under the transferred MHA-DT-024 foot hole, which the table does
+            # Under the transferred MHA-DT-24 foot hole, which the table does
             # not hold: the boss's own centre is placed from X0 Y0 (FootBossX,
             # FootBossY).
             await _boss_from_origin(
@@ -2027,7 +2027,7 @@ async def build(adapter) -> dict[str, str]:
                     drives=(None, None, '"HangingBossDia"'),
                 )
                 continue
-            # Under an MHA-FR-004 nameplate tap, which the table no longer
+            # Under an MHA-FR-04 nameplate tap, which the table no longer
             # holds: the boss's centre is placed from X0 Y0, named in
             # NAMEPLATE_SCREW_XZ order (fr_harmonic_base_spec marks one
             # diagonal pair, each value printed 2X).
@@ -2274,7 +2274,7 @@ async def build(adapter) -> dict[str, str]:
         after = after_cut
 
     # Four blind column sockets from the green land beside the deck, nominal
-    # Ø25.50: production bores are matched to their assigned actual MHA-FR-003
+    # Ø25.50: production bores are matched to their assigned actual MHA-FR-03
     # tubes, so the drawing prints the size as reference only. Each bottoms
     # inside its full-height socket boss.
     socket_plane = check(

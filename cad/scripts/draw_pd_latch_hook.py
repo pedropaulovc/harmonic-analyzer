@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the latch hook (MHA-PD-014).
+r"""Create the manufacturing drawing for the latch hook (MHA-PD-14).
 
 One formed spring-steel part, all orthographic views at 3:2 (each pinned so
 the part origin -- the ear's outer face, the base's underside and its low-Y
@@ -417,7 +417,7 @@ async def build(adapter: Any) -> dict[str, str]:
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-PD-014 far face {name}"
+            adapter, by_name[name], label=f"MHA-PD-14 far face {name}"
         )
     _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):

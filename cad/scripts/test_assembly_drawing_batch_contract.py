@@ -60,7 +60,7 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
     # sheet left it when it became three sheets with its own fit-up steps; the
     # measuring-stick sheet is a full fitter package (BOM, explode, steps), as
-    # is the rocker's oblique-trammel jig (TL-000, a shop fixture); the
+    # is the rocker's oblique-trammel jig (TL-00, a shop fixture); the
     # magnifier left it with the axle-stack details (Codex PR #1330) and is
     # now a four-sheet fitter package (BOM, explode, steps); the pen sheet is a
     # full fitter package (settings details, BOM, explode, steps); the summing
@@ -106,8 +106,8 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             frame_dir = Path(draw_fr_frame_assembly.__file__).resolve().parent
             assert {
                 str(frame_dir / "fr_frame_attachment_spec.py"),
-                str(frame_dir / "vn_frame_cross_screw_spec.py"),
-                str(frame_dir / "vn_tube_frame_cap_spec.py"),
+                str(frame_dir / "fr_vn_frame_cross_screw_spec.py"),
+                str(frame_dir / "fr_vn_tube_frame_cap_spec.py"),
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         elif drawing is draw_ch_channel_assembly:
@@ -130,7 +130,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "dt_crank_drive_gear_spec.py",
                     "dt_crank_pinion_spec.py",
                     "dt_cylinder_gear_spec.py",
-                    "vn_post_mount_screw_spec.py",
+                    "dt_vn_post_mount_screw_spec.py",
                     "cylinder_bank_layout.py",
                     "cone_line.py",
                     "fr_harmonic_base_spec.py",
@@ -139,7 +139,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
             } <= set(deps)
             assert (
                 str(
-                    scripts_dir.parent / "config" / "parts" / "vn-post-mount-screw.yaml"
+                    scripts_dir.parent / "config" / "parts" / "dt-vn-post-mount-screw.yaml"
                 )
                 in deps
             )
@@ -154,8 +154,8 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "pd_paper_drive_assembly_steps.py",
                     "dt_drive_train_steps.py",
                     "pd_transgear_drive_collar_spec.py",
-                    "vn_transgear_disc_screw_spec.py",
-                    "vn_transgear_pivot_screw_spec.py",
+                    "pd_vn_transgear_disc_screw_spec.py",
+                    "pd_vn_transgear_pivot_screw_spec.py",
                     "pd_transgear_knob_shaft_spec.py",
                     "transgear_hanger_joints.py",
                     "pd_latch_hook_geometry.py",
@@ -249,7 +249,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "ha_harmonic_analyzer_assembly_steps.py",
                     "dt_drive_train_steps.py",
                     "pd_paper_drive_assembly_steps.py",
-                    "vn_pen_wire_geom.py",
+                    "pn_vn_pen_wire_geom.py",
                     "pn_pen_carriage_geom.py",
                 )
             } <= set(deps)

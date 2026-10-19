@@ -1,4 +1,4 @@
-r"""MHA-PD-018 transgear-arm: the drawing contract of the made steel arm.
+r"""MHA-PD-18 transgear-arm: the drawing contract of the made steel arm.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Every number is ``pd_transgear_arm_geometry``'s (the numbers authority
@@ -19,7 +19,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_spec import blind_cut_dia_mm
 
-import vn_transgear_latch_pin_spec as LATCH_PIN
+import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
 import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
@@ -84,14 +84,14 @@ for _label, _places, _band in (
 ):
     if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
         raise AssertionError(
-            f"MHA-PD-018 {_label} prints {_places} places (±{BAND_BY_PLACES[_places]}),"
+            f"MHA-PD-18 {_label} prints {_places} places (±{BAND_BY_PLACES[_places]}),"
             f" not the ±{_band} its walls assume"
         )
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
 # The counterbore only cuts oversize (drilled-hole row).
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
-# Floor from the FRONT face: the MHA-VN-049 spring's room under the head (R9-71).
+# Floor from the FRONT face: the MHA-PD-VN-63 spring's room under the head (R9-71).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
 # The blind end-face latch hole is not a reducer locating-hole control.
 LATCH_PIN_HEIGHT_TOLERANCE = LATCH_PIN_HEIGHT_BAND
@@ -153,7 +153,7 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
     ),
 )
-# The press and its proud set are assembly (MHA-PD-000 "arm-plate-located");
+# The press and its proud set are assembly (MHA-PD-00 "arm-plate-located");
 # the callout keeps the hole's own requirements only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 LOCATOR_CALLOUT = (
     "2X REAM, FLAT BOTTOM\n"
@@ -172,7 +172,7 @@ PLATE_TAP_EDGE_BREAK_CALLOUT = (
 SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
 # Where each projected zone starts and which way it runs. Both start at
 # front face A (z = 0): the plate taps' run rearward through the arm into
-# the MHA-PD-019 plate to the seated screw-head contact
+# the MHA-PD-19 plate to the seated screw-head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
 # the pin bore's runs forward to the chain plane
 # (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
@@ -194,13 +194,13 @@ PIVOT_BORE_CALLOUT = "\n".join((
     f"BORE AXIS {PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG:.0f}° TO FRONT FACE",
 ))
 
-# --- The MHA-PD-023 pin's press in the reamed bore at S (R9-68) -----------------
+# --- The MHA-PD-23 pin's press in the reamed bore at S (R9-68) -----------------
 # The pin spec owns the press (it imports the arm geometry, so the geometry
 # cannot import it back); the arm prints it under the bore.
 PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
 if PIN_PRESS_INTERFERENCE != (0.010, 0.026):
     raise AssertionError(
-        f"MHA-PD-018 pin bore press on MHA-PD-023 is {PIN_PRESS_INTERFERENCE}, "
+        f"MHA-PD-18 pin bore press on MHA-PD-23 is {PIN_PRESS_INTERFERENCE}, "
         "not 0.010..0.026"
     )
 # Three short lines under the Ø: the operation, the mating pin, the press.
@@ -228,11 +228,11 @@ def engagement_line(worst_mm: float, worst_d: float) -> str:
 OVERALL_LENGTH = PIVOT_END_R + TIP_STATION
 DRAWING_REFERENCE_PRECISION = 1
 
-# --- The MHA-VN-042 latch pin's press in the blind ream -------------------------
+# --- The MHA-PD-VN-58 latch pin's press in the blind ream -------------------------
 # (loosest, tightest) from the printed ream band and the dowel's catalogue
 # band: 0.00254..0.01762.  The callout rounds both outward to four places,
 # so the range it names holds every pin and hole the two bands accept.
-LATCH_PIN_NUMBER = "MHA-VN-042"
+LATCH_PIN_NUMBER = "MHA-PD-VN-58"
 LATCH_PIN_PRESS_INTERFERENCE = (
     round(
         LATCH_PIN.DIA + min(LATCH_PIN.DIA_BAND) - PIN_HOLE_DIA - max(PIN_HOLE_DIA_BAND),
@@ -244,13 +244,13 @@ LATCH_PIN_PRESS_INTERFERENCE = (
     ),
 )
 if LATCH_PIN_PRESS_INTERFERENCE[0] <= 0.0:
-    raise AssertionError("the MHA-PD-018 latch-pin ream loses MHA-VN-042's press")
+    raise AssertionError("the MHA-PD-18 latch-pin ream loses MHA-PD-VN-58's press")
 LATCH_PIN_PRESS_PRINTED = (
     math.floor(LATCH_PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
     math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
 )  # 0.0025, 0.0177
 # Three lines as the pin bore's: the operation, the mating pin, the press.
-# Pressing it to the floor is MHA-PD-000's latch-pin-pressed step (policy
+# Pressing it to the floor is MHA-PD-00's latch-pin-pressed step (policy
 # option (c)); the callout stands below the end view, inside the border.
 PIN_HOLE_CALLOUT = "\n".join(
     (
@@ -318,4 +318,4 @@ if {
 } != {
     (feature, name) for feature, names in DRAWING_DIMENSIONS.items() for name in names
 }:
-    raise AssertionError("MHA-PD-018 marked dimensions and authored places disagree")
+    raise AssertionError("MHA-PD-18 marked dimensions and authored places disagree")

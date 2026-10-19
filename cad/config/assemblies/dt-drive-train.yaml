@@ -1,4 +1,4 @@
-number: MHA-DT-000
+number: MHA-DT-00
 # drive-train assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the drive-train
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
@@ -42,49 +42,49 @@ allowed_free_stems:
   - dt-cone-gear-shaft
   - dt-cone-pivot-post
   - dt-cone-swing-platform
-  - vn-cone-tip-adjuster
+  - dt-vn-cone-tip-adjuster
   - dt-cone-tip-block
-  - vn-cone-tip-block-screw
-  - vn-cone-tip-collar
-  - vn-cone-tip-pinch-screw
+  - dt-vn-cone-tip-block-screw
+  - dt-vn-cone-tip-collar
+  - dt-vn-cone-tip-pinch-screw
   - dt-crank-arm
   - dt-crank-drive-gear
   - dt-crank-handle
-  # MHA-DT-034/MHA-DT-035: bonded to the handle, they ride its crank spin.
+  # MHA-DT-34/MHA-DT-35: bonded to the handle, they ride its crank spin.
   - dt-crank-handle-butt-cup
   - dt-crank-handle-ferrule
   - dt-crank-handle-pivot-screw
   - dt-crank-hub
-  - vn-crank-hub-pin
+  - dt-vn-crank-hub-pin
   - dt-crank-pin
   - dt-crank-pin-eye
   - dt-crank-pin-ring
   - dt-crank-pinion
   - dt-crank-pinion-pin
-  # MHA-VN-044: closed on the crankshaft, they turn with the freed crank spin.
-  - vn-crank-seat-drive-pin
+  # MHA-DT-VN-67: closed on the crankshaft, they turn with the freed crank spin.
+  - dt-vn-crank-seat-drive-pin
   - dt-crankshaft
   - dt-cylinder-gear
-  - vn-fillister-screw
-  # MHA-VN-035/150: lock-mated to the arm, they ride the crank spin.
-  - vn-keeper-chain
-  - vn-keeper-chain-link
+  - dt-vn-fillister-screw
+  # MHA-DT-VN-65/150: lock-mated to the arm, they ride the crank spin.
+  - dt-vn-keeper-chain
+  - dt-vn-keeper-chain-link
   - dt-pinion-arbor
-  # MHA-DT-033: lock-mated to MHA-DT-022, it rides the freed engage swing.
+  # MHA-DT-33: lock-mated to MHA-DT-22, it rides the freed engage swing.
   - dt-pinion-arbor-collar
   - dt-pinion-bracket
   - dt-pinion-cam
   - dt-pinion-cam-pin
   - dt-pinion-handle
   - dt-pinion-lever
-  - vn-post-mount-screw
-  # MHA-DT-030: locked to the lift rod, it turns with the freed rod spin.
+  - dt-vn-post-mount-screw
+  # MHA-DT-30: locked to the lift rod, it turns with the freed rod spin.
   - dt-pinion-lever-pin
   - dt-pinion-lift-rod
   # Option E-a: pinned to both straps, the torque shaft swings with them.
   - dt-pinion-pivot-shaft
-  # MHA-VN-033: locked in each strap's cross hole, it swings with the strap.
-  - vn-pinion-strap-pin
+  # MHA-DT-VN-63: locked in each strap's cross hole, it swings with the strap.
+  - dt-vn-pinion-strap-pin
 # One family per freed DOF that must ITSELF read under-constrained.
 required_free_stems:
   - dt-crankshaft
@@ -98,9 +98,9 @@ free_dof: 4
 #   (drawing-simplicity-policy.md "Named exceptions"); read by
 #   machinist_exceptions.load_exceptions for dt_drive_train_assembly.
 machinist_exceptions:
-  # TODO(#1179): remove DT-01 when MHA-FR-001 carries a lock for MHA-VN-014.
+  # TODO(#1179): remove DT-01 when MHA-FR-01 carries a lock for MHA-DT-VN-52.
   - id: "DT-01"
     kind: "minor"
-    where: "sheet 10 step 23 and sheet 12 check 4: MHA-VN-014 shoulder screw run into its blind #10-24 MHA-FR-001 pivot seat, shoulder seated hard, MHA-DT-020 swinging on its oiled shoulder"
+    where: "sheet 10 step 23 and sheet 12 check 4: MHA-DT-VN-52 shoulder screw run into its blind #10-24 MHA-FR-01 pivot seat, shoulder seated hard, MHA-DT-20 swinging on its oiled shoulder"
     finding: "threaded joint under operating load without a lock (rule 23)"
-    reason: "temporary, pending owner confirmation (#1179): the receiver is the MHA-FR-001 base (joint_retention.py ha-harmonic-analyzer/cone-pivot-screw-in-base), whose blind seat under a bottomed shoulder leaves nothing this assembly can stake, nut or pin; every lock #1179 lists (a through tap with a jam nut or staked mouth underneath, a cross pin through the base boss, a keyed washer pinned to the base) is a base change. MHA-VN-013 clamps the swing in the saved and running pose; it is loosened only for checks 4 and 5"
+    reason: "temporary, pending owner confirmation (#1179): the receiver is the MHA-FR-01 base (joint_retention.py ha-harmonic-analyzer/cone-pivot-screw-in-base), whose blind seat under a bottomed shoulder leaves nothing this assembly can stake, nut or pin; every lock #1179 lists (a through tap with a jam nut or staked mouth underneath, a cross pin through the base boss, a keyed washer pinned to the base) is a base change. MHA-DT-VN-51 clamps the swing in the saved and running pose; it is loosened only for checks 4 and 5"

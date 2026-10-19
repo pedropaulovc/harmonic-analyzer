@@ -1,8 +1,8 @@
-r"""Reproduction script: transgear arm (MHA-PD-018; ch. 23; 1 used).
+r"""Reproduction script: transgear arm (MHA-PD-18; ch. 23; 1 used).
 
-The steel link of the paper-drive hanger: it swings on the MHA-VN-041 shoulder
-screw at the pivot P, carries the disc cluster's MHA-PD-023 pin at S, the
-MHA-PD-019 plate on two #8-32 taps between them, and the MHA-VN-042 latch pin in
+The steel link of the paper-drive hanger: it swings on the MHA-PD-VN-57 shoulder
+screw at the pivot P, carries the disc cluster's MHA-PD-23 pin at S, the
+MHA-PD-19 plate on two #8-32 taps between them, and the MHA-PD-VN-58 latch pin in
 its square end (``pd_transgear_arm_geometry``; the sheet's contract is
 ``pd_transgear_arm_spec``).
 
@@ -13,7 +13,7 @@ face, +X to the square end, +Z to the rear face):
   tangent to it, cut square at the tip station by the 14-wide end face;
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
-* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-023
+* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-PD-23
   pin, cut normal to the faces (the pin's head seats on the rear face).
 * ``PlateTaps``: native Hole Wizard taps through from the rear face, with
   ``PlateTapRearEntryBreaks`` and ``PlateTapFrontExitBreaks`` at 0.10 MAX.
@@ -400,7 +400,7 @@ async def build(adapter: Any) -> dict[str, str]:
     expected -= V_BORE
     await volume_check(adapter, "arm with pivot bore", expected, 0.01 * V_BORE)
 
-    # --- Pin bore through at S: the MHA-PD-023 press, reamed square to the faces
+    # --- Pin bore through at S: the MHA-PD-23 press, reamed square to the faces
     pin_bore = SketchDims()
     check("create_sketch pin bore", await adapter.create_sketch("Front"))
     await define_circle(

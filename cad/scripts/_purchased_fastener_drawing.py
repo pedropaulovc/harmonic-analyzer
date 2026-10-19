@@ -455,7 +455,7 @@ async def build_purchased_fastener_drawing(
 
     ``item`` is the catalogue designation printed on the ITEM row, e.g.
     ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``; without one the row prints
-    the registry stock name (vn_transgear_pivot_screw, reworked in PR #1477).
+    the registry stock name (pd_vn_transgear_pivot_screw, reworked in PR #1477).
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.
     """

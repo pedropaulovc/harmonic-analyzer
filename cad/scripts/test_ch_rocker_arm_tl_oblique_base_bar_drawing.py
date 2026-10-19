@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique trammel's base bar (MHA-CH-006-TL-20)."""
+"""Offline contracts for the oblique trammel's base bar (MHA-CH-06-TL-20)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 import _config
 import _drawing_contract
 import ch_rocker_arm_tl_oblique_base_bar_spec as spec
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_base_bar as drawing
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM
@@ -437,8 +437,8 @@ def test_bracket_pattern_holds_the_tl28_float_and_names_it() -> None:
     ):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 3
     lines = spec.BRACKET_CALLOUT_PROCESS.split("\n")
-    assert lines == ["MATCHES MHA-CH-006-TL-28", "DRILL, C'BORE FAR SIDE", ""]
-    assert "MHA-CH-006-TL-28" == spec.BRACKET_MATE
+    assert lines == ["MATCHES MHA-CH-06-TL-28", "DRILL, C'BORE FAR SIDE", ""]
+    assert "MHA-CH-06-TL-28" == spec.BRACKET_MATE
     assert spec.BRACKET_CALLOUT_PRECISION == {
         "hw-thruholedia": 2,
         "hw-cbdia": 2,
@@ -496,7 +496,7 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
     # 6.400 text.
     hole = (sx(centre, 428.0), drawing._sheet_y(centre, -82.5))
     cx, cy = drawing.BRACKET_CALLOUT_XY
-    half_w, half_h = 0.027, 0.010  # "MATCHES MHA-CH-006-TL-28", four rows
+    half_w, half_h = 0.027, 0.010  # "MATCHES MHA-CH-06-TL-28", four rows
     land = (cx - half_w, cy)
     slope = (land[1] - hole[1]) / (land[0] - hole[0])
     at_right = hole[1] + slope * (drawing._RIGHT - hole[0])
@@ -514,7 +514,7 @@ def test_bracket_dimensions_and_callout_lay_out_clear() -> None:
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-oblique-base-bar")["number"]
-    assert number == "MHA-CH-006-TL-20"
+    assert number == "MHA-CH-06-TL-20"
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
 
 

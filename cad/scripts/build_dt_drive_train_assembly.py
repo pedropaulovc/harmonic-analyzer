@@ -27,8 +27,8 @@ drive plane; crank height is re-solved against the unrelieved platform:
   removable crank chain wheel -- ch. 23, the roller chain rides its m2 teeth
   -- is NOT placed here: paper-drive now owns the whole crank->paper chain
   drive, so the single crank wheel lives there, avoiding a duplicate at the
-  top level -- codex #189 :605.  Removable MHA-DT-009 crosses hub MHA-DT-031 and
-  shaft MHA-DT-011 behind the arm; axial MHA-VN-029 keys only the arm/hub seam at
+  top level -- codex #189 :605.  Removable MHA-DT-09 crosses hub MHA-DT-31 and
+  shaft MHA-DT-11 behind the arm; axial MHA-DT-VN-59 keys only the arm/hub seam at
   six o'clock.)
 * alignment pinion (ch. 25): the 32T zeroing drum + its swing rig, parked
   DISENGAGED, inboard of the drum and level with the drive axis (GT).
@@ -361,7 +361,7 @@ for _j in range(20):
     if abs(_p[0] - _x) > 1e-9 or abs(_p[2] - _z) > 1e-9:
         raise AssertionError(f"cone seat {_j} off the shaft line: {(_x, _z)} vs {_p}")
 
-# The 64T's SOUTH face stays on MHA-DT-004's collar, 1.5 north of the 8.0 layout
+# The 64T's SOUTH face stays on MHA-DT-04's collar, 1.5 north of the 8.0 layout
 # face's (#1126), and the gear grew NORTH until it bears on T120's grown south
 # face (dt_crank_drive_gear_spec, user ruling 2026-09-28): the solid stack's
 # first joint.  GEAR64_STATION is the 19.9 layout station.
@@ -494,7 +494,7 @@ from dt_crank_arm_spec import (  # noqa: E402
 )
 from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
-import vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
+import dt_vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
     COLLAR_DIA,
@@ -539,7 +539,7 @@ CRANK_HUB_PIN_ORIGIN = [
 if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
     raise AssertionError("arm inboard face left the hub shoulder station")
 
-# The selected crank sprocket MHA-PD-009 is the front chain wheel: its plate
+# The selected crank sprocket MHA-PD-09 is the front chain wheel: its plate
 # spans BAND_FRONT_Z..SEAT_FACE_Z, the rear face on the crankshaft's integral
 # collar, one chain plane with the selected knob sprocket (ch. 23 p.56).
 # The sprocket itself lives in paper-drive; this module owns its seat.
@@ -672,10 +672,10 @@ for _what, _air in (
 ):
     if _air <= 0.0:
         raise AssertionError(f"{_what} axial air closes at print-worst: {_air:.4f}")
-# The two MHA-VN-044 drive pins stand in blind holes drilled from the seat face
+# The two MHA-DT-VN-67 drive pins stand in blind holes drilled from the seat face
 # to DrivePinFloor, on the removable's pin circle.  Each pin's pressed end
 # bears on the hole floor; its rounded lead end points machine front.
-# MHA-VN-044 is crank-only; the knob carries its own MHA-VN-038 pins.
+# MHA-DT-VN-67 is crank-only; the knob carries its own MHA-PD-VN-54 pins.
 CRANK_DRIVE_PIN_Z0 = CRANKSHAFT_Z0 + DRIVE_PIN_FLOOR  # pressed end face
 if abs(DRIVE_PIN_DEPTH - (SEAT_PIN.LENGTH - REMOVABLE.DRIVE_PIN_PROUD)) > 1e-9:
     raise AssertionError("crank drive-pin depth left the pin length less its proud")
@@ -687,16 +687,16 @@ from build_dt_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
 # The cylinder bank is a SOLID STACK (#743, cylinder_bank_layout): each
-# MHA-DT-012 is one station pitch thick, cam face to back face, and a turned
-# MHA-DT-026 thrust washer closes each end. The back (north) strap is the bank's
+# MHA-DT-12 is one station pitch thick, cam face to back face, and a turned
+# MHA-DT-26 thrust washer closes each end. The back (north) strap is the bank's
 # axial datum and the bank is modelled held back against it; the front strap
-# stands one BANK_SPRING_SET blade off the front washer, and the MHA-VN-052
+# stands one BANK_SPRING_SET blade off the front washer, and the MHA-DT-VN-68
 # wave spring in that gap preloads the stack north (#948 ruling R, PR #1292).
 # Every station below is the layout module's, so the ladder, the washers, the
 # spring, the straps, the arbor and the apex set screws cannot drift apart.
 # (Supersedes U34's END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
 import cylinder_bank_layout as _bank  # noqa: E402
-import vn_cylinder_bank_spring_spec as BANK_SPRING  # noqa: E402
+import dt_vn_cylinder_bank_spring_spec as BANK_SPRING  # noqa: E402
 
 if abs(Z_DRUM0 - _bank.STATION_Z0) > 1e-9 or abs(Z_PITCH - _bank.BANK_PITCH) > 1e-9:
     raise AssertionError("drive-train drum ladder left the cylinder-bank stations")
@@ -716,7 +716,7 @@ if abs(_bank.BANK_SPRING_Z[1] - END_DISC_SOUTH_Z0) > 1e-9:
 # casting twice -- south as built, north rotated 180 about Y so its strap looks
 # south at the drum (PR8, ch12 img09). Each is anchored on its strap INNER face
 # (#743 stations); the foot grows 28 outboard of that face and carries one
-# MHA-VN-032 hold-down in a base seat transferred from the pedestal.
+# MHA-DT-VN-62 hold-down in a base seat transferred from the pedestal.
 from dt_arbor_pedestal_spec import (  # noqa: E402
     FOOT_NEAR_Z as ARBOR_PED_FOOT_NEAR_Z,
     STRAP_INNER_Z as ARBOR_PED_STRAP_INNER_Z,
@@ -745,7 +745,7 @@ if (
 ):
     raise AssertionError("a pedestal origin no longer puts its strap on the bank face")
 
-# The cylinder arbor (MHA-DT-013) fills both strap bores and domes
+# The cylinder arbor (MHA-DT-13) fills both strap bores and domes
 # ARBOR_DOME_HEIGHT proud of each strap's outer face (#743, superseding
 # U34b's "span less 6.0" and the MHA-125 dome cap screws: the dome IS the
 # arbor end). Its part origin is the cylinder's south end.
@@ -760,9 +760,9 @@ for _label, _end, _outer in (
 ):
     if abs(_end - _outer) > 1e-9:
         raise AssertionError(f"arbor {_label} end is not flush with its strap face")
-# The apex set screws (MHA-VN-034), one per crown at the strap's mid-depth, cup
+# The apex set screws (MHA-DT-VN-64), one per crown at the strap's mid-depth, cup
 # point down on the arbor's top.
-from vn_arbor_set_screw_spec import LENGTH as SET_SCREW_LEN  # noqa: E402
+from _mcmaster_91375a106 import LENGTH as SET_SCREW_LEN  # noqa: E402
 
 SET_SCREW_SOUTH_Z = _bank.FRONT_SET_SCREW_Z
 SET_SCREW_NORTH_Z = _bank.BACK_SET_SCREW_Z
@@ -826,7 +826,7 @@ from dt_crankshaft_spec import (  # noqa: E402
 )
 
 # Crank taper pin + keeper ring (ch11 p.14): pin axis along machine X through
-# MHA-DT-031's rear barrel and the crankshaft at station 12, behind the arm.
+# MHA-DT-31's rear barrel and the crankshaft at station 12, behind the arm.
 from dt_crank_pin_spec import (  # noqa: E402
     PIN_LENGTH as CRANK_PIN_LENGTH,
     RING_HOLE_DIA as PIN_RING_HOLE_DIA,
@@ -841,11 +841,11 @@ from dt_crank_pin_eye_spec import (  # noqa: E402
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
-from vn_fillister_screw_spec import (  # noqa: E402
+from _mcmaster_90114a511 import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
-import vn_keeper_chain_spec  # noqa: E402
+import dt_vn_keeper_chain_spec  # noqa: E402
 
 CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
@@ -859,11 +859,11 @@ CRANK_RING_ROWS = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
 if (PIN_RING_HOLE_DIA - CRANK_RING_WIRE_DIA) / 2.0 < 0.1:
     raise AssertionError("keeper-ring wire does not clear the crank-pin cross-hole")
 if abs((CRANKSHAFT_Z0 + PIN_HOLE_HEIGHT) - CRANK_PIN_Z) > 1e-6:
-    raise AssertionError("shaft and hub MHA-DT-009 stations do not coincide")
+    raise AssertionError("shaft and hub MHA-DT-09 stations do not coincide")
 if CRANK_PIN_X0 + CRANK_PIN_LENGTH < X_CRANK + HUB_BARREL_DIA / 2.0 + 2.0:
     raise AssertionError("crank pin does not run out the far side of the hub")
 if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
-    raise AssertionError("MHA-VN-029 no longer has half-arm-thickness engagement")
+    raise AssertionError("MHA-DT-VN-59 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
 # placed rows: local +x -> -Y, local +y -> -X). The brass eyelet's tail lies
@@ -881,28 +881,28 @@ EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
 EYE_ROOT_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN
 )
-# Keeper chain (MHA-VN-035) + loop link (MHA-VN-036): authored in the crank
+# Keeper chain (MHA-DT-VN-65) + loop link (MHA-DT-VN-66): authored in the crank
 # frame, whose origin is the crank axis on the arm's outboard face. The spec
 # derives the eye and ring poses from the part specs alone; they must be the
 # ones placed here.
 CRANK_FRAME_ORIGIN = (X_CRANK, Y_CRANK, CRANK_ARM_Z0)
 for _got, _want, _what in (
-    (vn_keeper_chain_spec.EYE_ROOT, (ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z), "eye root"),
+    (dt_vn_keeper_chain_spec.EYE_ROOT, (ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z), "eye root"),
     (
-        (vn_keeper_chain_spec.RING_X, 0.0, vn_keeper_chain_spec.PIN_Z),
+        (dt_vn_keeper_chain_spec.RING_X, 0.0, dt_vn_keeper_chain_spec.PIN_Z),
         (CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z),
         "keeper-ring through leg",
     ),
 ):
     _placed = tuple(g + o for g, o in zip(_got, CRANK_FRAME_ORIGIN))
     if max(abs(p - w) for p, w in zip(_placed, _want)) > 1e-9:
-        raise AssertionError(f"vn_keeper_chain_spec {_what} {_placed} != placed {_want}")
-if tuple(CRANK_RING_ROWS[0]) != vn_keeper_chain_spec.RING_HANG:
+        raise AssertionError(f"dt_vn_keeper_chain_spec {_what} {_placed} != placed {_want}")
+if tuple(CRANK_RING_ROWS[0]) != dt_vn_keeper_chain_spec.RING_HANG:
     raise AssertionError(
         f"keeper ring placed hanging along {CRANK_RING_ROWS[0]}, "
-        f"vn_keeper_chain_spec hangs it along {vn_keeper_chain_spec.RING_HANG}"
+        f"dt_vn_keeper_chain_spec hangs it along {dt_vn_keeper_chain_spec.RING_HANG}"
     )
-if min(vn_keeper_chain_spec.clearance_report().values()) < 0.0:
+if min(dt_vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
 # The #4-40 is tapped THRU the arm (drawing-guidelines.md rule 17 (walls and webs), W7): nothing to bottom on; the
@@ -976,7 +976,7 @@ _SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH
 # north of the shaft's rear end, so on disengage the BIG end -- where the
 # gears need the most working-depth separation -- swings the farthest
 # (throw ~ distance from pivot).
-# T006 is the reference gear for the tip-end stack.  The MHA-VN-016 stack collar
+# T006 is the reference gear for the tip-end stack.  The MHA-DT-VN-54 stack collar
 # is set one COLLAR_FEELER off its north face (cone_stack_end_play). The collar
 # and pivot stations come from the current tip-stack law; the tip block's
 # north face is TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot, growing
@@ -1037,18 +1037,18 @@ from dt_cone_swing_platform_pivot_spec import (  # noqa: E402
     PIVOT_HOLE_BAND as PLAT_PIVOT_HOLE_BAND,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
 )
-from vn_post_mount_screw_spec import (  # noqa: E402
+from dt_vn_post_mount_screw_spec import (  # noqa: E402
     CUT_LENGTH_MM as POST_SCREW_LEN,
     THREAD as POST_SCREW_THREAD,
 )
-from vn_cone_lock_knob_spec import (  # noqa: E402
+from dt_vn_cone_lock_knob_spec import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
     STUD_DIA as KNOB_STUD_DIA,
     STUD_LEN as KNOB_STUD_LEN,
     THREAD as KNOB_THREAD,
     require_seat_fit as require_lock_seat_fit,
 )
-from vn_cone_pivot_screw_spec import (  # noqa: E402
+from dt_vn_cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_DIA_BAND as PSCREW_SHOULDER_DIA_BAND,
@@ -1056,7 +1056,7 @@ from vn_cone_pivot_screw_spec import (  # noqa: E402
     THREAD as PSCREW_THREAD,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
 )
-from vn_swing_stop_screw_spec import (  # noqa: E402
+from dt_vn_swing_stop_screw_spec import (  # noqa: E402
     EMBED_LEN as STOP_EMBED_LEN,
     HEAD_DIA as STOP_HEAD_DIA,
     PROUD_LEN as STOP_PROUD_LEN,
@@ -1226,18 +1226,18 @@ from dt_pinion_spring_section import (  # noqa: E402
     WIDTH as SPRING_W,
     WIDTH_PLACES as SPRING_W_PLACES,
 )
-from vn_slotted_screw_spec import (  # noqa: E402
+from dt_vn_slotted_screw_spec import (  # noqa: E402
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
     THREAD as BSCREW_THREAD,
 )
 
-from vn_foot_screw_spec import (  # noqa: E402
+from dt_vn_foot_screw_spec import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
 )
-from vn_pedestal_hold_down_screw_spec import (  # noqa: E402
+from dt_vn_pedestal_hold_down_screw_spec import (  # noqa: E402
     HEAD_DIA as HDSCREW_HEAD_DIA,
     SHANK_DIA as HDSCREW_SHANK_DIA,
     SHANK_LEN as HDSCREW_SHANK_LEN,
@@ -1288,14 +1288,14 @@ from dt_cone_tip_block_spec import (  # noqa: E402
     WORST_PINCH_FAR_WALL_MM as TIP_WORST_PINCH_FAR_WALL_MM,
     printed_band_mm as tip_printed_band_mm,
 )
-from vn_cone_tip_block_screw_spec import (  # noqa: E402
+from dt_vn_cone_tip_block_screw_spec import (  # noqa: E402
     HEAD_DIA as HOLDDOWN_HEAD_DIA,
     HEAD_H as HOLDDOWN_HEAD_H,
     SHANK_DIA as HOLDDOWN_SHANK_DIA,
     SHANK_LEN as HOLDDOWN_SHANK_LEN,
     THREAD as HOLDDOWN_THREAD,
 )
-from vn_cone_tip_collar_spec import (  # noqa: E402
+from dt_vn_cone_tip_collar_spec import (  # noqa: E402
     BORE_DIA as COLLAR_BORE_DIA,
     INSTALLED_BORE_AXIS_OFFSET_MM as COLLAR_LOADED_OFFSET,
     WIDTH as COLLAR_WIDTH,
@@ -1363,7 +1363,7 @@ def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
 # south from it.  The platform's hole, cone_line and the shaft spec's own copy
 # of the stack must agree, and the hole sits as far off the cone line as the
 # block's foot tap sits off its adjuster axis, so the block stands centred on
-# the line.  The MHA-VN-016 collar sits one COLLAR_FEELER off T006.
+# the line.  The MHA-DT-VN-54 collar sits one COLLAR_FEELER off T006.
 if (
     abs(TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - (PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)) > 1e-9
     or abs(TIP_BLOCK_STATION - (PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET)) > 1e-9
@@ -1385,7 +1385,7 @@ if (
     or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
-# The hold-down (MHA-VN-030): the placed part is the screw the block and the
+# The hold-down (MHA-DT-VN-60): the placed part is the screw the block and the
 # platform were sized for, and the platform's printed ledge range is the one
 # the block's engagement/reach stack reads.
 _require_tapped_thread("cone-tip hold-down", HOLDDOWN_THREAD, TIP_FOOT_BORE_SPEC)
@@ -1395,9 +1395,9 @@ if (
     or abs(HOLDDOWN_HEAD_DIA - PLAT_HOLDDOWN_SCREW_HEAD_DIA) > 1e-9
     or abs(HOLDDOWN_HEAD_H - PLAT_HOLDDOWN_SCREW_HEAD_H) > 1e-9
 ):
-    raise AssertionError("MHA-VN-030 is not the screw the tip block and platform were sized for")
+    raise AssertionError("MHA-DT-VN-60 is not the screw the tip block and platform were sized for")
 if PLAT_HOLDDOWN_HOLE_SPEC.size != HOLDDOWN_THREAD.split("-", 1)[0]:
-    raise AssertionError("platform hold-down counterbore is not sized for MHA-VN-030")
+    raise AssertionError("platform hold-down counterbore is not sized for MHA-DT-VN-60")
 if any(
     abs(_have - _want) > 1e-9
     for _have, _want in zip(PLAT_HOLDDOWN_LEDGE_RANGE, TIP_HOLDDOWN_LEDGE_RANGE, strict=True)
@@ -1406,21 +1406,21 @@ if any(
         f"platform hold-down ledge {PLAT_HOLDDOWN_LEDGE_RANGE} differs from the "
         f"range the tip block's engagement stack reads {TIP_HOLDDOWN_LEDGE_RANGE}"
     )
-# U30 post mount (I22): each MHA-VN-031 seats on the MHA-DT-005 counterbore floor and
-# is cut to fit into the MHA-DT-020 tap: never proud of the plate underside, and
+# U30 post mount (I22): each MHA-DT-VN-61 seats on the MHA-DT-05 counterbore floor and
+# is cut to fit into the MHA-DT-20 tap: never proud of the plate underside, and
 # at least 0.90D of thread (pending exception ruling #1019) both at the
 # modelled cut length and at the platform spec's printed worst case.
 _require_tapped_thread("cone-post mount", POST_SCREW_THREAD, POST_MOUNT_SPEC)
 POST_SCREW_SEAT = POST_BLOCK_HEIGHT - POST_CBORE_DEPTH  # above PlateTop
 POST_SCREW_INTO_PLATE = POST_SCREW_LEN - POST_SCREW_SEAT
 if POST_SCREW_INTO_PLATE > PLAT_T:
-    raise AssertionError("MHA-VN-031 stands proud of the MHA-DT-020 underside")
+    raise AssertionError("MHA-DT-VN-61 stands proud of the MHA-DT-20 underside")
 if (
     POST_SCREW_INTO_PLATE - 2.0 * POST_MOUNT_TAP_EDGE_BREAK
     < 0.90 * POST_MOUNT_THREAD_DIA
     or POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS < 0.90
 ):
-    raise AssertionError("MHA-VN-031 engages the MHA-DT-020 tap under 0.90D")
+    raise AssertionError("MHA-DT-VN-61 engages the MHA-DT-20 tap under 0.90D")
 # The shaft is placed by its front stub end; keep the station in lockstep with
 # the part's FRONT_STUB.
 if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
@@ -1514,7 +1514,7 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
 
 
 # --- where the hold-down puts the tip block (user ruling 2026-09-29) --------
-# The block is located by its foot tap on MHA-VN-030 in the platform's hold-down
+# The block is located by its foot tap on MHA-DT-VN-60 in the platform's hold-down
 # hole, not slid to the shaft at fit-up, so every station it used to take up
 # closes by print tolerance.  The screw floats in its drilled close-clearance
 # hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
@@ -1573,7 +1573,7 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # through the graphics ray), and one 0.33 mm outside the collar selected the
 # collar's OD on some seats (#916).
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
-# Along the axis, south to north: T006 gear | feeler gap | MHA-VN-016 stack
+# Along the axis, south to north: T006 gear | feeler gap | MHA-DT-VN-54 stack
 # collar, locked on the Sec4 D-flat | air | block | shaft tip | the 94025A164
 # adjuster's conical cup, its #10-32 thread tapped through the block
 # (drawing-guidelines.md rule 18 (thread engagement) E11/W1). The shaft's terminal D-flat end cannot reach the cup apex:
@@ -1600,9 +1600,9 @@ if not (
     _STUB_START + 1.0 <= COLLAR_STATION
     and COLLAR_STATION + COLLAR_WIDTH <= TIP_SOUTH_STATION
 ):
-    raise AssertionError("MHA-VN-016 stack collar rides off the Sec4 land or into the block")
+    raise AssertionError("MHA-DT-VN-54 stack collar rides off the Sec4 land or into the block")
 if abs(COLLAR_BORE_DIA - _STUB_DIA) > 0.05:
-    raise AssertionError("MHA-VN-016 collar bore does not match the tip land dia")
+    raise AssertionError("MHA-DT-VN-54 collar bore does not match the tip land dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
 # adjuster_cup_in_working_window: the embed is the block spec's; the nominal
 # engagement sits in the working window here, and the print-worst stack
@@ -1688,7 +1688,7 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
 # post.z - (start + length) to post.z - start.  Owner ruling D1 (2026-10-15):
 # no crank-seat washer -- the crankshaft's integral collar is pulled hard onto
 # the cast south face, the 16T is set on its feeler off the north face and
-# only then is its pin match-drilled (MHA-DT-000 step 4), so the shaft's end
+# only then is its pin match-drilled (MHA-DT-00 step 4), so the shaft's end
 # play is the 16T's gap to the north face.
 # The 16T follows the translated 64T contact row to the boss's north.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
@@ -1696,7 +1696,7 @@ _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
 CRANK_COLLAR_REAR_Z = CRANKSHAFT_Z0 + COLLAR_REAR
 CRANK_COLLAR_BOSS_AIR = _POST_BOSS_SOUTH - CRANK_COLLAR_REAR_Z
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
-# The feeler sets the south face directly off the restored boss (MHA-DT-000).
+# The feeler sets the south face directly off the restored boss (MHA-DT-00).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
 # (1) The modelled collar bears on the cast south face: the spec floors its
@@ -2250,7 +2250,7 @@ CRANK_SHAFT_END_Z_MAX = (
     + sum(
         nominal + upper
         for name, (nominal, _lower, upper) in CS_SHAFT_END_PROUD_LINKS.items()
-        if name in ("MHA-DT-011 CollarRearStation", "MHA-DT-005 crank boss length")
+        if name in ("MHA-DT-11 CollarRearStation", "MHA-DT-05 crank boss length")
     )
 )
 if CRANK_SHAFT_END_Z_MAX < _SHAFT_NORTH_END - 1e-9:
@@ -2297,16 +2297,16 @@ if CRANK_SHAFT_END_NORTH_AIR_WORST < T120_TURNED_BAND_RADIAL_FLOOR:
 
 # The fit-up check (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK) reads the
 # pair with the 16T on its seat feeler (its end play's north end) and the
-# stack resting at its model pose, MHA-DT-010 and T120 pushed toward each other.
+# stack resting at its model pose, MHA-DT-10 and T120 pushed toward each other.
 # Each running play that can still move after the check is taken up by one of
-# those pushes: MHA-DT-010 takes up its own bore and MHA-DT-011's journal, T120 the
+# those pushes: MHA-DT-10 takes up its own bore and MHA-DT-11's journal, T120 the
 # cone shaft in the post boss.  The rest of T120_POSE_TERMS are fixed once
 # assembled, and the check's full turn sweeps them.  Codex P2 on #1154: a
-# check that pushed only MHA-DT-011 passed a Ø16.043 band that then closed to
+# check that pushed only MHA-DT-11 passed a Ø16.043 band that then closed to
 # 0.018 when the cone shaft moved.
 T120_RUNNING_PLAY = {
-    "crank journal float": "MHA-DT-010",
-    "16T bore on the crankshaft": "MHA-DT-010",
+    "crank journal float": "MHA-DT-10",
+    "16T bore on the crankshaft": "MHA-DT-10",
     "cone shaft float in the post boss": "T120",
 }
 
@@ -2504,7 +2504,7 @@ require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN
 # adjuster sets the shaft's end play at assembly; every other stack closes at
 # the printed limits.
 #
-# The post rides its two MHA-VN-031 screws in drilled clearance holes, on the
+# The post rides its two MHA-DT-VN-61 screws in drilled clearance holes, on the
 # plate's post-mount taps (explicit +/-0.10 stations).  Its journal runs at the
 # incline to its mount-hole line, so the mount holes' .XX stations move it
 # along the cone axis by sin(I); the shaft collar bears on the boss's north
@@ -2579,7 +2579,7 @@ def tip_embed_worst_mm(band_mm: float) -> tuple[float, float]:
 
 
 TIP_EMBED_WORST_MM = tip_embed_worst_mm(TIP_EMBED_BAND_MM)
-# Collar air: the MHA-VN-016 stack collar is set one COLLAR_FEELER off T006's
+# Collar air: the MHA-DT-VN-54 stack collar is set one COLLAR_FEELER off T006's
 # north face at assembly, so its north face is T006's station (post band, the
 # shaft collar web, the gear stack's face band, the set end play) plus the
 # feeler's reading band and the machined collar's width band. The block's south
@@ -2606,7 +2606,7 @@ def tip_collar_worst_air_mm(band_mm: float) -> float:
     air = TIP_COLLAR_NOMINAL_AIR - band_mm
     if air < 0.0:
         raise AssertionError(
-            f"MHA-VN-016 stack collar can reach the tip block at the printed limits "
+            f"MHA-DT-VN-54 stack collar can reach the tip block at the printed limits "
             f"(air {air:.3f})"
         )
     return air
@@ -2712,7 +2712,7 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 1e-6:
 
 # The collarless knurled head controls both notch-exit travel and external
 # clearance. The stock stop (the foot screw's #4-40 SKU) seats its head on the
-# base top; vn_swing_stop_screw_spec owns the embed/proud split.
+# base top; dt_vn_swing_stop_screw_spec owns the embed/proud split.
 DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
 # Keep nominal mates/stop locations distinct from the conditional, fully
 # seated manufacturing-corner sweep used by clearance consumers.
@@ -2938,7 +2938,7 @@ if abs(ENGAGED_C2C - _CONFIG_ENGAGED_C2C) > 1e-6:
 # Ruling (c) (user, 2026-09-24): the blocks locate the swing cluster -- every
 # rig z station is pinion_rig_layout's fit-up stack (the cluster hard on the
 # back block, the drum hard on the back strap and one shim off the front one:
-# MHA-DT-000's SHAFT DRILL SET), shared with the base's transferred seats.
+# MHA-DT-00's SHAFT DRILL SET), shared with the base's transferred seats.
 APINION_DRUM_LEN = RIG.DRUM_LEN  # build_dt_alignment_pinion FACE_WIDTH
 APINION_Z_FRONT = RIG.DRUM_FRONT_Z
 APINION_Z_BACK = RIG.DRUM_BACK_Z
@@ -2983,11 +2983,11 @@ LEVER_LEN = LEVER_ROD_LEN  # 86: hub centre -> tip (img07 @9.37 px/mm,
 LEVER_Z = LIFT_ROD_Z0 + LEVER_HUB_LEN / 2.0 - LEVER_WALL_T
 # seats on the translated lift-rod front end; north face stays 2 off the block.
 HANDLE_TILT_DEG = 65.0  # grip crossrod from vertical
-# The drum is bonded on MHA-DT-022 at the printed DRUM_STATION from the head
+# The drum is bonded on MHA-DT-22 at the printed DRUM_STATION from the head
 # shoulder, so the arbor rides wherever the fit-up stack puts the drum.
 ARBOR_Z0 = APINION_Z_FRONT - ARBOR_DRUM_STATION - ARBOR_HEAD_REAR_Z
-# Preserve the released MHA-DT-015 component origin at the head/cross-hole axis.
-# The head is now integral with MHA-DT-022, whose local head centre is z=-6.5.
+# Preserve the released MHA-DT-15 component origin at the head/cross-hole axis.
+# The head is now integral with MHA-DT-22, whose local head centre is z=-6.5.
 HANDLE_Z = ARBOR_Z0 + ARBOR_HEAD_CENTER_Z
 _HANDLE_C = math.cos(math.radians(HANDLE_TILT_DEG))
 _HANDLE_S = math.sin(math.radians(HANDLE_TILT_DEG))
@@ -2996,11 +2996,11 @@ HANDLE_ROWS = [
     [-_HANDLE_S, _HANDLE_C, 0.0],
     [0.0, 0.0, 1.0],
 ]
-# MHA-DT-022's grip bore and MHA-DT-015's rod both run along local +Y.  They share
+# MHA-DT-22's grip bore and MHA-DT-15's rod both run along local +Y.  They share
 # one Rz pose; the circular arbor shaft stays on the same machine-Z journal
 # axis while its cross-hole clocks onto the rod.
 ARBOR_ROWS = HANDLE_ROWS
-# R1a (user, 2026-09-24): the MHA-DT-033 collar is spring-pinned to MHA-DT-022 at its
+# R1a (user, 2026-09-24): the MHA-DT-33 collar is spring-pinned to MHA-DT-22 at its
 # printed pin station.  Both pin holes run along their parts' local +Y, so the
 # collar shares the arbor's pose and its centred hole lands on the arbor's.
 ARBOR_COLLAR_Z0 = ARBOR_Z0 + ARBOR_PIN_Z - ARBOR_COLLAR_PIN_Z
@@ -3256,7 +3256,7 @@ if _S_CAM - _FPIN_S0 < 2.0:
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
 # Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
-# U28 deleted the set-pin boss; DT-023 now has a sub-flush #2-56 set screw at
+# U28 deleted the set-pin boss; DT-23 now has a sub-flush #2-56 set screw at
 # its geometry-owned SET_SCREW_Z, so the collar is a bare cylinder throughout
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
 # block's inner face (0.25 feeler) -- flush with the strap's outer face, so
@@ -3392,7 +3392,7 @@ if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
 # sits furthest west.  The base seat is spotted through the pad hole, so
 # the screw's float in that hole and the formed profile's band move it.
 SPRING_WEST_SHIFT_STACK = {
-    "MHA-DT-024 formed profile band": SPR_FORMED_BAND,
+    "MHA-DT-24 formed profile band": SPR_FORMED_BAND,
     "#4 screw float in the pad's clearance hole": (
         blind_cut_dia_mm(SPR_HOLE_SPEC) - THREAD_MAJOR_MM[FSCREW_THREAD]
     )
@@ -3426,7 +3426,7 @@ if SPRING_TO_LIFT_ROD < 0.25:
 # moments 1.0% parked, 4.5% engaged against the 2026-10-08 basis (fb97437).
 # Re-measured 2026-10-19 from farm run
 # 20261019T010353049Z-33ed7b8ae8d041f1950e4c49a3be18cd (b7e92cb29, #1685):
-# the MHA-DT-022 head grew forward 11.5 -> 12.2 (+124 mm^3), and the moments
+# the MHA-DT-22 head grew forward 11.5 -> 12.2 (+124 mm^3), and the moments
 # rose 0.26% parked and engaged.
 # The 1e-5 mm KD-tree seam weld preserves every face; watertightness and winding
 # are checked separately. Centroids use this module's analytic transforms;
@@ -3617,7 +3617,7 @@ for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
 # at y ~390+, far above both sweeps.)
 # The separate Ø6 crossrod sweeps a radius set by its 32/33 mm asymmetric
 # reaches.  Its thin axial band remains centred at the released HANDLE_Z.
-# MHA-DT-022's integral Ø15 head, front crown, and Ø10.5 neck stay on the arbor
+# MHA-DT-22's integral Ø15 head, front crown, and Ø10.5 neck stay on the arbor
 # axis; their wider axial band is the exact former handle-body envelope.
 _GRIP_ROD_Z = (
     HANDLE_Z - HANDLE_ROD_DIA / 2.0,
@@ -3689,7 +3689,7 @@ for _lo, _hi, _dia, _what in CRANK_COLUMN_BANDS:
 if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
     raise AssertionError("integral grip-head band reaches the crank hub")
 
-# MHA-DT-032 handle pivot screw (U33): the shoulder seats on the arm's outboard
+# MHA-DT-32 handle pivot screw (U33): the shoulder seats on the arm's outboard
 # face and its thread runs inboard through the arm's tapped hole.  User ruling
 # 2026-09-29 (ch11 p.14): the tip is filed flush with the arm's inboard face
 # at assembly, so the drive train places the INSTALLED configuration and
@@ -3697,16 +3697,16 @@ if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
 HANDLE_SCREW_Z0 = CRANK_ARM_Z0 - HANDLE_SCREW_SEAT_STATION  # slotted head face
 HANDLE_SCREW_TIP_Z = CRANK_ARM_Z0 + HANDLE_SCREW_INSTALLED_THREAD
 if abs(HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z) > 1e-9:
-    raise AssertionError("MHA-DT-032's filed tip is not flush with the arm's inboard face")
+    raise AssertionError("MHA-DT-32's filed tip is not flush with the arm's inboard face")
 for _lo, _what in (
     (REMOVABLE.BAND_FRONT_Z, "crank chain wheel"),
     (_GRIP_HEAD_Z[0], "integral grip head"),
     (_GRIP_ROD_Z[0], "grip crossrod"),
 ):
     if HANDLE_SCREW_TIP_Z > _lo - 0.25:
-        raise AssertionError(f"MHA-DT-032's filed tip reaches the {_what}")
+        raise AssertionError(f"MHA-DT-32's filed tip reaches the {_what}")
 if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
-    raise AssertionError("MHA-DT-032 thread reaches the crank hub barrel")
+    raise AssertionError("MHA-DT-32 thread reaches the crank hub barrel")
 
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
@@ -3758,48 +3758,48 @@ def _lower(value: float, places: int) -> float:
 
 ARBOR_SOUTH_TRAVEL_STACK = {
     **RIG.DRUM_BACK_ADVANCE_STACK,
-    "MHA-DT-001 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
-    "MHA-DT-022 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
+    "MHA-DT-01 drum length .X (longest)": _upper(RIG.DRUM_LEN, RIG.DRUM_LEN_PLACES),
+    "MHA-DT-22 drum station .X (deepest)": ARBOR_DRUM_STATION_BAND,
 }
 ARBOR_NORTH_TRAVEL_STACK = {
     **RIG.DRUM_FRONT_RETREAT_STACK,
-    "MHA-DT-022 drum station .X (shallowest)": ARBOR_DRUM_STATION_BAND,
+    "MHA-DT-22 drum station .X (shallowest)": ARBOR_DRUM_STATION_BAND,
 }
 
 
 LEVER_SOUTH_TRAVEL_STACK = RIG.LEVER_SOUTH_TRAVEL_STACK
 LEVER_NORTH_TRAVEL_STACK = RIG.LEVER_NORTH_TRAVEL_STACK
 SHAFT_FRONT_SOUTH_TRAVEL_STACK = RIG.SHAFT_FRONT_SOUTH_TRAVEL_STACK
-# The rig layout sizes MHA-DT-017 from the lever's nominal throw plane; the pose
+# The rig layout sizes MHA-DT-17 from the lever's nominal throw plane; the pose
 # must put it there.
 if abs(_LEV_Z[1] - (LIFT_ROD_Z0 + RIG.LEVER_PLANE_NORTH_FROM_ROD_END)) > 1e-9:
     raise AssertionError("the lever throw plane drifted from the rig layout's")
 GRIP_ROD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-022 head length .X, half (crossrod centred)": _upper(
+    "MHA-DT-22 head length .X, half (crossrod centred)": _upper(
         ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES
     )
     / 2.0,
-    "MHA-DT-015 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
+    "MHA-DT-15 crossrod dia, half": HANDLE_ROD_DIA_BAND[0] / 2.0,
 }
 GRIP_HEAD_SOUTH_TRAVEL_STACK = {
     **ARBOR_SOUTH_TRAVEL_STACK,
-    "MHA-DT-022 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
-    "MHA-DT-022 front crown sag .X": _upper(
+    "MHA-DT-22 head length .X": _upper(ARBOR_HEAD_LEN, ARBOR_HEAD_LEN_PLACES),
+    "MHA-DT-22 front crown sag .X": _upper(
         ARBOR_HEAD_CAP_SAG, ARBOR_HEAD_CAP_SAG_PLACES
     ),
 }
 GRIP_HEAD_NORTH_TRAVEL_STACK = {
     **ARBOR_NORTH_TRAVEL_STACK,
-    "MHA-DT-022 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
+    "MHA-DT-22 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
 }
-# TODO(#743): the bank retention replaces the Ø55 end discs (MHA-DT-026) with
+# TODO(#743): the bank retention replaces the Ø55 end discs (MHA-DT-26) with
 # Ø25 x 1.50 steel thrust washers, so this row changes or retires with it
 # (retention743 owns the update).
 # Radial: the widest drum tip against the largest end disc, which has no
 # sheet and so carries the title block's general .X row on its diameter.
 DRUM_TIP_TO_END_DISC_STACK = {
-    "MHA-DT-001 critical tip, half": (
+    "MHA-DT-01 critical tip, half": (
         _ALIGNMENT_PINION.outside_dia_limits_mm()[1] / 2.0 - TIP_APINION
     ),
     "end disc dia, general .X, half": _upper(END_DISC_DIA, 1) / 2.0,
@@ -3813,9 +3813,9 @@ DRUM_TIP_TO_END_DISC_STACK = {
 # strip's front edge south, toward the gear.
 SPRING_TO_J19_STACK = {
     "rig-set leaf D, thinnest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-014 strap thickness .X, thinnest": _lower(STRAP_T, STRAP_T_PLACES),
+    "MHA-DT-14 strap thickness .X, thinnest": _lower(STRAP_T, STRAP_T_PLACES),
     "spring pad leaf, thickest setting": RIG.FEELER_SET_ERROR,
-    "MHA-DT-024 strip width .XX, widest": _upper(SPRING_W, SPRING_W_PLACES),
+    "MHA-DT-24 strip width .XX, widest": _upper(SPRING_W, SPRING_W_PLACES),
 }
 
 
@@ -3843,7 +3843,7 @@ RIG_MARGINS = {
         RIG.LEVER_SEAT_MIN,
     ),
     "drum end play": (ARBOR_DRUM_TOTAL_AIR()[0], ARBOR_MIN_END_PLAY),
-    "MHA-DT-022 journal land over its strap": (
+    "MHA-DT-22 journal land over its strap": (
         min(min(stop.values()) for stop in ARBOR_LAND_MARGINS_AT_STOPS.values()),
         ARBOR_MIN_LAND_OVER_STRAP,
     ),
@@ -3924,7 +3924,7 @@ if _THIN:
 # (The PR5 rod-pin throw checks died with the pins; the cam block above
 # bounds the collar sweep against the base and shaft.)
 
-# The MHA-DT-033 collar rides the arbor outboard of the front strap.  It must
+# The MHA-DT-33 collar rides the arbor outboard of the front strap.  It must
 # stand clear of the strap's outer face (the printed-band stack lives in
 # dt_pinion_arbor_collar_spec) and of every rig body whose z band it shares:
 # the lift rod and pivot shaft by radial distance between parallel axes (the
@@ -3953,12 +3953,12 @@ for _lo, _hi, _axis_xy, _r, _what in (
 
 # --- pinion arbor + rig fasteners (PR7 items 2/11/12/14) ---------------------
 # The steel Ø8 arbor slips through the drum (bonded) and journals in both
-# straps' top bores.  Its turned head/neck are integral; MHA-DT-015 is only the
+# straps' top bores.  Its turned head/neck are integral; MHA-DT-15 is only the
 # separate crossrod, bonded into the head's reamed hole at the unchanged
 # head/cross-hole station.
 if abs(HANDLE_Z - (ARBOR_Z0 + ARBOR_HEAD_CENTER_Z)) > 1e-9:
     raise AssertionError("grip crossrod is not centred in the integral head")
-# MHA-DT-022 runs in the straps on its two journal lands, so each land must
+# MHA-DT-22 runs in the straps on its two journal lands, so each land must
 # cover its strap in the pose, past both faces (the worst case over every
 # printed band and both drum stops is dt_pinion_arbor_geometry's own stack).
 for _land_z, _strap_faces, _which in (
@@ -3969,7 +3969,7 @@ for _land_z, _strap_faces, _which in (
     if min(_strap_faces[0] - _land[0], _land[1] - _strap_faces[1]) < (
         ARBOR_MIN_LAND_OVER_STRAP - 1e-9
     ):
-        raise AssertionError(f"MHA-DT-022's {_which} journal land misses its strap")
+        raise AssertionError(f"MHA-DT-22's {_which} journal land misses its strap")
 if not (ARBOR_DIA == DRUM_BORE_DIA == STRAP_ARBOR_BORE):
     raise AssertionError("arbor dia disagrees with drum and strap bores")
 # R1: the crossrod is a bonded slip fit, modelled line to line.  Its printed
@@ -4178,7 +4178,7 @@ SWING_OCCUPANT_CLEARANCE = require_swing_clearance(SWING_FOOTPRINTS, SWING_ROUND
 SWING_NEAREST_OCCUPANT: tuple[float, str] = min(
     (gap, name) for name, (gap, _swing) in SWING_OCCUPANT_CLEARANCE.items()
 )
-# The MHA-DT-033 collar can share the front pivot block's z band; its underside
+# The MHA-DT-33 collar can share the front pivot block's z band; its underside
 # must then clear the block's flat top.
 if (
     BLOCK_FRONT_Z0 < ARBOR_COLLAR_Z[1] + 0.25
@@ -4197,7 +4197,7 @@ _require_tapped_thread(
 if BASE_FOOT_HOLE_DEPTH - (FSCREW_SHANK_LEN - _SPR_T_LO) < 0.25 - 1e-9:
     raise AssertionError("foot screw bottoms out in the base spring seat")
 _FOOT_SCREW_XZ = ((SPRING_HOLE_X, RIG.SPRING_PAD_Z),)
-# U34c: one MHA-VN-032 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
+# U34c: one MHA-DT-VN-62 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
 # #8 close clearance into a base seat transferred from the fitted pedestal.
 _require_clearance_size("arbor pedestal ledge", HDSCREW_THREAD, ARBOR_PED_HOLE_SPEC)
 _require_tapped_thread(
@@ -4229,7 +4229,7 @@ _PEDESTAL_SCREW_XZ = (
 
 # Both machine-handed: the base holes agree directly.
 for _label, _derived, _base in (
-    ("vn-foot-screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
+    ("dt-vn-foot-screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
     ("pedestal hold-down", _PEDESTAL_SCREW_XZ, BASE_PEDESTAL_XZ),
 ):
     for _want, _have in zip(_derived, _base, strict=True):
@@ -4283,7 +4283,7 @@ ROT_PINCH_WEST = [  # +Y (head) -> plate-frame +X (west)
     [-SIN_I, 0.0, -COS_I],
 ]
 PINCH_WEST_EULER = euler_from_rows(ROT_PINCH_WEST)
-# MHA-VN-030 is authored head up along +Y; Rx(180) turns it head down under the
+# MHA-DT-VN-60 is authored head up along +Y; Rx(180) turns it head down under the
 # platform (it is a revolved screw, so its spin is immaterial).
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 HOLDDOWN_HEAD_DOWN_EULER = euler_from_rows(ROT_X_180)
@@ -4294,7 +4294,7 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
-# MHA-DT-030 is match-drilled through the lever hub and the lift rod at assembly,
+# MHA-DT-30 is match-drilled through the lever hub and the lift rod at assembly,
 # so both pin holes share one axis.  Each part cuts its hole along its own
 # local X; the lever is photographed at LEVER_TILT_DEG, so the ROD is phased to
 # the lever (the rod is round: its phase is free and never printed) and the
@@ -4308,7 +4308,7 @@ TORQUE_SHAFT_ROWS = rot_z_rows(STRAP_LEAN_DEG)
 # Ry(180) with the lean, and each part origin sits on the strap's north face.
 STRAP_ROWS = compose_rows(ROT_Y_180, rot_z_rows(STRAP_LEAN_DEG))
 STRAP_ORIGIN_Z = (RIG.STRAP_Z_INNER[0], RIG.STRAP_Z_OUTER[1])  # (front, back)
-# Option E-a set pins (MHA-VN-033, pinion-strap-pin): each strap cuts its cross
+# Option E-a set pins (MHA-DT-VN-63, pinion-strap-pin): each strap cuts its cross
 # hole along its local X through the pivot-bore axis, CROSS_HOLE_CZ from its
 # part origin (build_dt_pinion_bracket).  The torque shaft's holes are
 # match-drilled through those cross holes at the fit-up stack, which this pose
@@ -4328,8 +4328,8 @@ for _z_strap, _z_hole in zip(
     if abs(PIVOT_SHAFT_Z0 + _z_hole * TORQUE_SHAFT_ROWS[2][2] - _z_strap) > 1e-9:
         raise AssertionError("a strap cross hole is not coaxial with its torque-shaft hole")
 LEVER_ROWS = rot_z_rows(LEVER_TILT_DEG)
-# R1a: the MHA-DT-033 collar's spring pin is the stock MHA-VN-033, whose axis is its
-# local X.  The collar's and MHA-DT-022's pin holes run along their local +Y
+# R1a: the MHA-DT-33 collar's spring pin is the stock MHA-DT-VN-63, whose axis is its
+# local X.  The collar's and MHA-DT-22's pin holes run along their local +Y
 # under ARBOR_ROWS, so the pin turns a further 90 about Z; its centre is the
 # arbor's printed pin station, where the collar's centred hole lands.
 COLLAR_PIN_ROWS = rot_z_rows(HANDLE_TILT_DEG + 90.0)
@@ -4512,8 +4512,8 @@ async def _place_on_shaft(
 
 
 def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
-    """The MHA-VN-033 tagged as the collar pin for the explode must be the one in
-    the MHA-DT-033 collar's pin hole: its axis (local X) along the hole's (the
+    """The MHA-DT-VN-63 tagged as the collar pin for the explode must be the one in
+    the MHA-DT-33 collar's pin hole: its axis (local X) along the hole's (the
     collar's local +Y) and its centre on that axis.  A mislabelled instance
     fails here instead of leaving a strap pin with the arbor."""
     pin_t = component_transform(adapter, pin)
@@ -4632,7 +4632,7 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     await _lock_static(adapter, north_pedestal, arbor)
-    # Thrust washers (MHA-DT-026, #743): the front one on gear 0's cam face, the
+    # Thrust washers (MHA-DT-26, #743): the front one on gear 0's cam face, the
     # back one on gear 19's back face against the datum strap -- the bank
     # modelled held back. They turn with nothing, so each is held like the
     # pedestals: one lock to the fixed seed arbor.
@@ -4647,12 +4647,12 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
-    # Bank spring (MHA-VN-052, #948 ruling R, PR #1292): its installed envelope
+    # Bank spring (MHA-DT-VN-68, #948 ruling R, PR #1292): its installed envelope
     # fills the front-strap gap, south face on the strap, north face on the
     # front washer, coaxial with the arbor; static like the washers.
     bank_spring = await place_component(
         adapter,
-        "vn-cylinder-bank-spring",
+        "dt-vn-cylinder-bank-spring",
         [X_DRUM, Y_DRIVE, BANK_SPRING_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -4660,12 +4660,12 @@ async def build(adapter) -> dict[str, str]:
         label=f"cylinder bank spring z0={BANK_SPRING_Z0:.3f}",
     )
     await _lock_static(adapter, bank_spring, arbor)
-    # Apex set screws (MHA-VN-034, #743 Q3): point down through each crown onto
+    # Apex set screws (MHA-DT-VN-64, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):
         set_screw = await place_component(
             adapter,
-            "vn-arbor-set-screw",
+            "dt-vn-arbor-set-screw",
             [X_DRUM, SET_SCREW_TIP_Y, _screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -4699,7 +4699,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-pivot-post (v2 Ry180, big-end journal, on the plate)",
     )
-    # I22: the two MHA-VN-031 fillisters, head up on the post's counterbore
+    # I22: the two MHA-DT-VN-61 fillisters, head up on the post's counterbore
     # floors. The post is turned Ry180, so its local +X "mount west" axis
     # lands at machine -X of the post origin.
     post_screws: list[str] = []
@@ -4707,12 +4707,12 @@ async def build(adapter) -> dict[str, str]:
         post_screws.append(
             await place_component(
                 adapter,
-                "vn-post-mount-screw",
+                "dt-vn-post-mount-screw",
                 [ppost[0] + dx, Y_BASE_TOP + PLAT_T + POST_SCREW_SEAT, ppost[2]],
                 [0.0, 0.0, 0.0],
                 IDENTITY,
                 ground=False,
-                label=f"post-mount-screw {tag} (MHA-VN-031 on the post counterbore)",
+                label=f"post-mount-screw {tag} (MHA-DT-VN-61 on the post counterbore)",
             )
         )
     ptip = cone_station(TIP_BLOCK_STATION)
@@ -4729,7 +4729,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-tip-block (end-play adjuster support, on the plate)",
     )
-    # MHA-VN-030 (#4-40 x 3/8 SHCS) rises from under the plate: head down on the
+    # MHA-DT-VN-60 (#4-40 x 3/8 SHCS) rises from under the plate: head down on the
     # hold-down counterbore's floor, HOLDDOWN_CBORE_DEPTH above the plate's
     # underside, shank up into the block foot's blind tap.  The hole sits
     # TIP_BLOCK_PIVOT_OFFSET south of the pivot (the block's station) and
@@ -4740,14 +4740,14 @@ async def build(adapter) -> dict[str, str]:
     )
     tip_holddown = await place_component(
         adapter,
-        "vn-cone-tip-block-screw",
+        "dt-vn-cone-tip-block-screw",
         [tip_tap_xz[0], Y_BASE_TOP + PLAT_HOLDDOWN_CBORE_DEPTH, tip_tap_xz[1]],
         HOLDDOWN_HEAD_DOWN_EULER,
         ROT_X_180,
         ground=False,
-        label="cone-tip-block-screw (MHA-VN-030 up through the plate into the block foot)",
+        label="cone-tip-block-screw (MHA-DT-VN-60 up through the plate into the block foot)",
     )
-    # Tip end-play stack (item 5, v4_t00471): the MHA-VN-016 stack collar on the
+    # Tip end-play stack (item 5, v4_t00471): the MHA-DT-VN-54 stack collar on the
     # tip land, the axial adjuster screw in the block's tapped bore, and the
     # pinch screw across the block's top slit. Stations derived at import
     # (COLLAR_STATION / ADJ_HEAD_STATION); all three ride the swing family.
@@ -4756,7 +4756,7 @@ async def build(adapter) -> dict[str, str]:
     pcollar = cone_station(COLLAR_STATION)
     tip_collar = await place_component(
         adapter,
-        "vn-cone-tip-collar",
+        "dt-vn-cone-tip-collar",
         [pcollar[0] + COLLAR_LOADED_OFFSET * ROT_SHAFT_NORTH[0][0],
          Y_DRIVE + COLLAR_LOADED_OFFSET * ROT_SHAFT_NORTH[0][1],
          pcollar[2] + COLLAR_LOADED_OFFSET * ROT_SHAFT_NORTH[0][2]],
@@ -4768,7 +4768,7 @@ async def build(adapter) -> dict[str, str]:
     padj = cone_station(ADJ_HEAD_STATION)
     tip_adjuster = await place_component(
         adapter,
-        "vn-cone-tip-adjuster",
+        "dt-vn-cone-tip-adjuster",
         [padj[0], Y_DRIVE, padj[2]],
         [-90.0, INCLINE_DEG, 0.0],
         ROT_SHAFT_SOUTH,
@@ -4777,7 +4777,7 @@ async def build(adapter) -> dict[str, str]:
     )
     pinch_screw = await place_component(
         adapter,
-        "vn-cone-tip-pinch-screw",
+        "dt-vn-cone-tip-pinch-screw",
         [
             ptip[0] + (TIP_BLOCK_X / 2.0) * COS_I,
             tip_foot_y + TIP_PINCH_Y,
@@ -4794,7 +4794,7 @@ async def build(adapter) -> dict[str, str]:
     # stud without changing the assembly's operational swing DOF.
     lock_knob = await place_component(
         adapter,
-        "vn-cone-lock-knob",
+        "dt-vn-cone-lock-knob",
         [KNOB_X, Y_BASE_TOP + PLAT_T, KNOB_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -4808,7 +4808,7 @@ async def build(adapter) -> dict[str, str]:
     # matching blind #10-24 UNC-2B seat.
     pivot_screw = await place_component(
         adapter,
-        "vn-cone-pivot-screw",
+        "dt-vn-cone-pivot-screw",
         [ppivot[0], Y_BASE_TOP + PSCREW_SHOULDER_LEN, ppivot[2]],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -4821,7 +4821,7 @@ async def build(adapter) -> dict[str, str]:
     # at the one shared contact station exported with the base hole.
     stop_screw = await place_component(
         adapter,
-        "vn-swing-stop-screw",
+        "dt-vn-swing-stop-screw",
         [STOP_X, Y_BASE_TOP, STOP_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -4836,8 +4836,8 @@ async def build(adapter) -> dict[str, str]:
     # (locked to the fixed seed arbor below); the lift rod is a REVOLUTE in
     # the blocks' raised west bores carrying the two eccentric cams and the
     # lever (PR8 -- all semantically mated, spinning as one family on the
-    # freed pinion_cam DOF). The separate MHA-DT-015 grip crossrod is LOCKED to
-    # MHA-DT-022's integral head in the joints section, so the freed p2 swing
+    # freed pinion_cam DOF). The separate MHA-DT-15 grip crossrod is LOCKED to
+    # MHA-DT-22's integral head in the joints section, so the freed p2 swing
     # carries it with the rig instead of leaving it base-fixed in space
     # (Codex catch, 2026-07-05).
     align_pinion = await place_component(
@@ -4866,7 +4866,7 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             label=f"pinion-bracket {tag} (leaning, arbor bore up top)",
         )
-    # Option E-a set pins (MHA-VN-033): the purchased 1/16 x 1/2 spring pin in
+    # Option E-a set pins (MHA-DT-VN-63): the purchased 1/16 x 1/2 spring pin in
     # each strap's cross hole, inserted with the strap's own rows so its axis
     # (local X) is the hole's and its principal planes parallel the strap's.
     # Front first: the interference contract keys the front pin as -1.
@@ -4874,12 +4874,12 @@ async def build(adapter) -> dict[str, str]:
     for tag, z_pin in zip(("front", "back"), STRAP_PIN_Z, strict=True):
         strap_pins[tag] = await place_component(
             adapter,
-            "vn-pinion-strap-pin",
+            "dt-vn-pinion-strap-pin",
             [PIVOT_X, PIVOT_Y, z_pin],
             _strap_euler,
             _strap_rows,
             ground=False,
-            label=f"pinion-strap-pin {tag} (MHA-VN-033 in the strap cross hole)",
+            label=f"pinion-strap-pin {tag} (MHA-DT-VN-63 in the strap cross hole)",
         )
     pinion_blocks: list[str] = []
     for tag, z0 in (("front", BLOCK_FRONT_Z0), ("back", BLOCK_BACK_Z0)):
@@ -4910,7 +4910,7 @@ async def build(adapter) -> dict[str, str]:
         "dt-pinion-lift-rod",
         [LIFT_X, LIFT_Y, LIFT_ROD_Z0],
         [0.0, 0.0, LEVER_TILT_DEG],
-        LIFT_ROD_ROWS,  # phased to the lever: coaxial MHA-DT-030 pin holes
+        LIFT_ROD_ROWS,  # phased to the lever: coaxial MHA-DT-30 pin holes
         ground=False,
         label="pinion-lift-rod (in the blocks' raised west bores)",
     )
@@ -4956,7 +4956,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-lever (clamp hub on the lift rod front end)",
     )
-    # MHA-DT-030: the 1/16 pin driven through the match-drilled hub and rod holes.
+    # MHA-DT-30: the 1/16 pin driven through the match-drilled hub and rod holes.
     # Its axis is its local X, so it takes the rod's phase and sits centred on
     # the rod's "lever pin" station.  The INSTALLED configuration is the pin
     # trimmed and peened flush with the hub (Codex #858 P2), not the overlength
@@ -4969,7 +4969,7 @@ async def build(adapter) -> dict[str, str]:
         LIFT_ROD_ROWS,
         ground=False,
         configuration=LEVER_PIN_INSTALLED_CONFIG,
-        label="pinion-lever-pin (MHA-DT-030 through hub and rod)",
+        label="pinion-lever-pin (MHA-DT-30 through hub and rod)",
     )
     grip_crossrod = await place_component(
         adapter,
@@ -4980,10 +4980,10 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-handle (separate grip crossrod through integral head)",
     )
-    # MHA-DT-022 is pressed through the brass drum and journaled in both straps'
+    # MHA-DT-22 is pressed through the brass drum and journaled in both straps'
     # Ø8 top bores.  Its turned grip head and neck are part of this same solid.
     # Rotate only about the circular shaft axis so its local-Y cross-hole is
-    # coaxial with MHA-DT-015's local-Y rod; every world centre and Z station stays
+    # coaxial with MHA-DT-15's local-Y rod; every world centre and Z station stays
     # unchanged.
     pinion_arbor = await place_component(
         adapter,
@@ -5003,22 +5003,22 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="pinion-arbor-collar (spring-pinned walk-out backstop)",
     )
-    # Its MHA-VN-033 spring pin through collar and arbor.
+    # Its MHA-DT-VN-63 spring pin through collar and arbor.
     collar_pin = await place_component(
         adapter,
-        "vn-pinion-strap-pin",
+        "dt-vn-pinion-strap-pin",
         [APINION_X, APINION_Y, COLLAR_PIN_Z],
         euler_from_rows(COLLAR_PIN_ROWS),
         COLLAR_PIN_ROWS,
         ground=False,
-        label="pinion-strap-pin collar (MHA-VN-033 through MHA-DT-033 and MHA-DT-022)",
+        label="pinion-strap-pin collar (MHA-DT-VN-63 through MHA-DT-33 and MHA-DT-22)",
     )
     # Rig hold-downs (PR7 items 2/11/12): physically located seeds are patterned
     # across the repeated block/pedestal stations in the joints section below.
     sx, sz = _BLOCK_SCREW_XZ[0]
     block_screw = await place_component(
         adapter,
-        "vn-slotted-screw",
+        "dt-vn-slotted-screw",
         [sx, BLOCK_TOP_Y, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -5028,19 +5028,19 @@ async def build(adapter) -> dict[str, str]:
     sx, sz = _FOOT_SCREW_XZ[0]
     spring_foot_screw = await place_component(
         adapter,
-        "vn-foot-screw",
+        "dt-vn-foot-screw",
         [sx, Y_BASE_TOP + SPRING_T, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
         label="foot-screw (spring foot)",
     )
-    # U34c: the south pedestal's MHA-VN-032 is the seed; the north one is its
-    # linear pattern instance below (vn-pedestal-hold-down-screw-1 / -2).
+    # U34c: the south pedestal's MHA-DT-VN-62 is the seed; the north one is its
+    # linear pattern instance below (dt-vn-pedestal-hold-down-screw-1 / -2).
     sx, sz = _PEDESTAL_SCREW_XZ[0]
     pedestal_screw = await place_component(
         adapter,
-        "vn-pedestal-hold-down-screw",
+        "dt-vn-pedestal-hold-down-screw",
         [sx, Y_BASE_TOP + ARBOR_PED_FLANGE_T, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -5139,30 +5139,30 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
         ground=False,
-        label="MHA-DT-031 through hub",
+        label="MHA-DT-31 through hub",
     )
     seam_pin = await place_component(
         adapter,
-        "vn-crank-hub-pin",
+        "dt-vn-crank-hub-pin",
         CRANK_HUB_PIN_ORIGIN,
         [0.0, 0.0, 0.0],
         CRANK_HUB_PIN_ROWS,
         ground=False,
-        label="MHA-VN-029 six-o'clock axial seam pin",
+        label="MHA-DT-VN-59 six-o'clock axial seam pin",
     )
-    # The two MHA-VN-044 drive pins stand in the collar's blind holes, pressed
+    # The two MHA-DT-VN-67 drive pins stand in the collar's blind holes, pressed
     # end on DrivePinFloor and rounded lead end forward (local +Y -> machine
     # -Z).  DrivePinAxis1 lies on the shaft's local +Z (machine -Y),
     # DrivePinAxis2 opposite.
     seat_pins = [
         await place_component(
             adapter,
-            "vn-crank-seat-drive-pin",
+            "dt-vn-crank-seat-drive-pin",
             [X_CRANK, Y_CRANK + side * REMOVABLE.PIN_CIRCLE_RADIUS, CRANK_DRIVE_PIN_Z0],
             euler_from_rows(ROT_X_NEG90),
             ROT_X_NEG90,
             ground=False,
-            label=f"MHA-VN-044 drive pin in DrivePinAxis{k}",
+            label=f"MHA-DT-VN-67 drive pin in DrivePinAxis{k}",
         )
         for k, side in ((1, -1.0), (2, 1.0))
     ]
@@ -5186,7 +5186,7 @@ async def build(adapter) -> dict[str, str]:
         compose_rows(rot_z_rows(-90.0), ROT_Y_180),
         ground=False,
     )
-    # Taper pin MHA-DT-009 crosses the separate hub's rear barrel and crankshaft
+    # Taper pin MHA-DT-09 crosses the separate hub's rear barrel and crankshaft
     # at station -169.4, behind the arm.  Its big end stands PIN_PROUD outside
     # the hub's -X face; the brass keeper ring hangs from the head cross-hole.
     # The hub #14 and shaft #9 pilots are match-reamed together to the pin's
@@ -5205,7 +5205,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Front Plane@{pin}", "PLANE"),
         named_ref(f"Front Plane@{hub}", "PLANE"),
-        label="MHA-DT-009 locked to the crank hub",
+        label="MHA-DT-09 locked to the crank hub",
     )
     ring = await place_component(
         adapter,
@@ -5261,7 +5261,7 @@ async def build(adapter) -> dict[str, str]:
     )
     anchor = await place_component(
         adapter,
-        "vn-fillister-screw",
+        "dt-vn-fillister-screw",
         [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -5274,14 +5274,14 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="anchor screw locked to the arm",
     )
-    # Keeper chain (MHA-VN-035): one loop through the eye and the pin's ring,
-    # closed by the MHA-VN-036 loop link. Both lock to the arm: the eye, the pin
+    # Keeper chain (MHA-DT-VN-65): one loop through the eye and the pin's ring,
+    # closed by the MHA-DT-VN-66 loop link. Both lock to the arm: the eye, the pin
     # and the ring all turn with the crank, so the loop's rest drape rides
     # with it.
     chain = await place_component(
         adapter,
-        "vn-keeper-chain",
-        [c + o for c, o in zip(CRANK_FRAME_ORIGIN, vn_keeper_chain_spec.CHAIN_PART_ORIGIN)],
+        "dt-vn-keeper-chain",
+        [c + o for c, o in zip(CRANK_FRAME_ORIGIN, dt_vn_keeper_chain_spec.CHAIN_PART_ORIGIN)],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
@@ -5296,12 +5296,12 @@ async def build(adapter) -> dict[str, str]:
     # The link is authored along local X; its axis runs along machine z
     # beside the arm edge (ROT_Y_POS90: local X -> machine -Z; the link is
     # symmetric end for end, and its +Y seam stays up).
-    if vn_keeper_chain_spec.LINK_AXIS != (0.0, 0.0, 1.0):
+    if dt_vn_keeper_chain_spec.LINK_AXIS != (0.0, 0.0, 1.0):
         raise AssertionError("keeper-chain link placement assumes an axis along machine z")
     link = await place_component(
         adapter,
-        "vn-keeper-chain-link",
-        [o + c for o, c in zip(vn_keeper_chain_spec.LINK_ORIGIN, CRANK_FRAME_ORIGIN)],
+        "dt-vn-keeper-chain-link",
+        [o + c for o, c in zip(dt_vn_keeper_chain_spec.LINK_ORIGIN, CRANK_FRAME_ORIGIN)],
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
@@ -5323,8 +5323,8 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
     )
-    # User ruling 2026-09-29 (ch11 p.14/p.15): the brass ferrule MHA-DT-034 and the
-    # steel butt cup MHA-DT-035 are bonded to the oak, each authored in the
+    # User ruling 2026-09-29 (ch11 p.14/p.15): the brass ferrule MHA-DT-34 and the
+    # steel butt cup MHA-DT-35 are bonded to the oak, each authored in the
     # handle's own frame -- the ferrule from the arm face at x=0, the cup from
     # its face at the basic overall length -- so both take the handle's
     # transform and lock to it.
@@ -5335,7 +5335,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
-        label="crank-handle-ferrule (MHA-DT-034, on the handle tenon)",
+        label="crank-handle-ferrule (MHA-DT-34, on the handle tenon)",
         # As assembly leaves it: skimmed to the grip contour with the oak
         # shoulder (user ruling 2026-10-01).
         configuration=HANDLE_FERRULE_INSTALLED_CONFIG,
@@ -5347,9 +5347,9 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
-        label="crank-handle-butt-cup (MHA-DT-035, in the handle butt)",
+        label="crank-handle-butt-cup (MHA-DT-35, in the handle butt)",
     )
-    # MHA-DT-032 carries the handle: head outboard, local +Z (head -> tip) along
+    # MHA-DT-32 carries the handle: head outboard, local +Z (head -> tip) along
     # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
     # Its INSTALLED configuration is the tip filed flush with the arm's
     # inboard face, not the long as-turned thread the part's drawing prints.
@@ -5361,7 +5361,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
         configuration=HANDLE_SCREW_INSTALLED_CONFIG,
-        label="crank-handle-pivot-screw (MHA-DT-032, tip filed flush)",
+        label="crank-handle-pivot-screw (MHA-DT-32, tip filed flush)",
     )
 
     # =================== joints ================================================
@@ -5424,8 +5424,8 @@ async def build(adapter) -> dict[str, str]:
         verify=(pinion, pn_o),
     )
 
-    # MHA-DT-031 seats directly on the shaft's common outboard plane.  The
-    # through bore leaves the service pair removable after MHA-DT-009 is tapped
+    # MHA-DT-31 seats directly on the shaft's common outboard plane.  The
+    # through bore leaves the service pair removable after MHA-DT-09 is tapped
     # out; the Right-plane anti-spin represents that installed taper pin.
     hub_o = _org(adapter, hub)
     hub_axis = named_ref(f"Axis1@{hub}", "AXIS")
@@ -5433,14 +5433,14 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         hub_axis,
         crank_axis,
-        label="MHA-DT-031 coaxial on crankshaft",
+        label="MHA-DT-31 coaxial on crankshaft",
         verify=(hub, hub_o),
     )
     await coincident_mate(
         adapter,
         named_ref(f"Top Plane@{hub}", "PLANE"),
         named_ref(f"Top Plane@{crankshaft}", "PLANE"),
-        label="MHA-DT-031 flush on shaft cylinder face",
+        label="MHA-DT-31 flush on shaft cylinder face",
         alignment="aligned",
         verify=(hub, hub_o),
     )
@@ -5448,11 +5448,11 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{hub}", "PLANE"),
         cs_right,
-        label="MHA-DT-031 anti-spin (MHA-DT-009)",
+        label="MHA-DT-31 anti-spin (MHA-DT-09)",
         verify=(hub, hub_o),
     )
 
-    # MHA-DT-006 is a matched light press fit onto the 15-mm hub seat and butts
+    # MHA-DT-06 is a matched light press fit onto the 15-mm hub seat and butts
     # against ArmShoulder at local station 8.  Its local +x hangs machine -Y,
     # putting the seam at six o'clock.
     arm_o = _org(adapter, arm)
@@ -5460,7 +5460,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Axis1@{arm}", "AXIS"),
         hub_axis,
-        label="crank arm matched on MHA-DT-031 seat",
+        label="crank arm matched on MHA-DT-31 seat",
         verify=(arm, arm_o),
     )
     await coincident_mate(
@@ -5479,21 +5479,21 @@ async def build(adapter) -> dict[str, str]:
         verify=(arm, arm_o),
     )
 
-    # MHA-VN-029 runs axially from the common outboard face for 4 mm and keys only
+    # MHA-DT-VN-59 runs axially from the common outboard face for 4 mm and keys only
     # the arm/hub seam; it never crosses the shaft bore.
     seam_o = _org(adapter, seam_pin)
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{seam_pin}", "AXIS"),
         named_ref(f"Axis2@{hub}", "AXIS"),
-        label="MHA-VN-029 coaxial with six-o'clock seam",
+        label="MHA-DT-VN-59 coaxial with six-o'clock seam",
         verify=(seam_pin, seam_o),
     )
     await coincident_mate(
         adapter,
         named_ref(f"Front Plane@{seam_pin}", "PLANE"),
         named_ref(f"Top Plane@{hub}", "PLANE"),
-        label="MHA-VN-029 seated at outboard face",
+        label="MHA-DT-VN-59 seated at outboard face",
         alignment="aligned",
         verify=(seam_pin, seam_o),
     )
@@ -5501,11 +5501,11 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Right Plane@{seam_pin}", "PLANE"),
         named_ref(f"Right Plane@{hub}", "PLANE"),
-        label="MHA-VN-029 rotational closure",
+        label="MHA-DT-VN-59 rotational closure",
         verify=(seam_pin, seam_o),
     )
 
-    # Each MHA-VN-044 is pressed to the hole floor; its axis is the collar's
+    # Each MHA-DT-VN-67 is pressed to the hole floor; its axis is the collar's
     # drilled pin axis, and the parallel closes the revolved pin's spin.
     for k, seat_pin in enumerate(seat_pins, start=1):
         seat_pin_o = _org(adapter, seat_pin)
@@ -5513,21 +5513,21 @@ async def build(adapter) -> dict[str, str]:
             adapter,
             named_ref(f"ScrewAxis@{seat_pin}", "AXIS"),
             named_ref(f"DrivePinAxis{k}@{crankshaft}", "AXIS"),
-            label=f"MHA-VN-044 #{k} coaxial in DrivePinAxis{k}",
+            label=f"MHA-DT-VN-67 #{k} coaxial in DrivePinAxis{k}",
             verify=(seat_pin, seat_pin_o),
         )
         await coincident_mate(
             adapter,
             named_ref(f"Top Plane@{seat_pin}", "PLANE"),
             named_ref(f"DrivePinFloor@{crankshaft}", "PLANE"),
-            label=f"MHA-VN-044 #{k} pressed to DrivePinFloor",
+            label=f"MHA-DT-VN-67 #{k} pressed to DrivePinFloor",
             verify=(seat_pin, seat_pin_o),
         )
         await parallel_mate(
             adapter,
             named_ref(f"Right Plane@{seat_pin}", "PLANE"),
             cs_right,
-            label=f"MHA-VN-044 #{k} rotational closure",
+            label=f"MHA-DT-VN-67 #{k} rotational closure",
             verify=(seat_pin, seat_pin_o),
         )
 
@@ -5571,8 +5571,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # The bonded ferrule and butt cup ride the handle rigidly (epoxy).
     for bonded, what in (
-        (handle_ferrule, "MHA-DT-034 ferrule"),
-        (handle_cup, "MHA-DT-035 butt cup"),
+        (handle_ferrule, "MHA-DT-34 ferrule"),
+        (handle_cup, "MHA-DT-35 butt cup"),
     ):
         await lock_mate(
             adapter,
@@ -5580,7 +5580,7 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Front Plane@{handle}", "PLANE"),
             label=f"{what} bonded to the handle",
         )
-    # MHA-DT-032 mirrors the handle's pin joint on the same arm datums: coaxial
+    # MHA-DT-32 mirrors the handle's pin joint on the same arm datums: coaxial
     # on the arm pivot, shoulder seated on HandleSeat (ArmSeat's normal is
     # machine +z, HandleSeat's reads -z), and a parallel holding the slot's
     # clocking (immaterial, like the handle's grip spin).  The arm's Right
@@ -5590,14 +5590,14 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Axis1@{handle_screw}", "AXIS"),
         named_ref(f"Axis2@{arm}", "AXIS"),
-        label="MHA-DT-032 coaxial on arm pivot",
+        label="MHA-DT-32 coaxial on arm pivot",
         verify=(handle_screw, hs_o),
     )
     await coincident_mate(
         adapter,
         named_ref(f"ArmSeat@{handle_screw}", "PLANE"),
         named_ref(f"HandleSeat@{arm}", "PLANE"),
-        label="MHA-DT-032 shoulder seated on arm outboard face",
+        label="MHA-DT-32 shoulder seated on arm outboard face",
         alignment="anti_aligned",
         verify=(handle_screw, hs_o),
     )
@@ -5605,7 +5605,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Top Plane@{handle_screw}", "PLANE"),
         named_ref(f"Right Plane@{arm}", "PLANE"),
-        label="MHA-DT-032 slot clocking",
+        label="MHA-DT-32 slot clocking",
         verify=(handle_screw, hs_o),
     )
 
@@ -5686,7 +5686,7 @@ async def build(adapter) -> dict[str, str]:
         label="cone-post local-west to platform-east mounting axis",
         verify=(pivot_post, post_o),
     )
-    # I22: each MHA-VN-031 clamps the post to the plate.
+    # I22: each MHA-DT-VN-61 clamps the post to the plate.
     for screw in post_screws:
         await lock_mate(
             adapter,
@@ -5754,7 +5754,7 @@ async def build(adapter) -> dict[str, str]:
         label="tip-block anti-spin (rides the plate)",
         verify=(tip_block, tb_o),
     )
-    # MHA-VN-030 clamps the block to the plate: locked to the platform, whose
+    # MHA-DT-VN-60 clamps the block to the plate: locked to the platform, whose
     # hold-down hole is the block's station.  Its origin (the head's bearing
     # face) must sit on the counterbore floor, under the block's foot tap.
     await lock_mate(
@@ -5779,7 +5779,7 @@ async def build(adapter) -> dict[str, str]:
             f"tip block's foot tap (x, z) {_tap}"
         )
     # --- tip end-play stack (item 5): collar | adjuster | pinch screw ---------
-    # MHA-VN-016 is locked one unchanged feeler off T006. Its FINISHED round
+    # MHA-DT-VN-54 is locked one unchanged feeler off T006. Its FINISHED round
     # bore has positive clearance: the bore axis is displaced toward +X and
     # seats on both retained -X BACK arcs, never concentric zero-clearance.
     # InstalledShaftAxis is the named parallel axis -loaded_offset from the
@@ -6649,7 +6649,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"cam follower {tag} anti-spin (a={cp_phase:.2f})",
             verify=(cpin, cp_o),
         )
-    # Option E-a set pins (MHA-VN-033): each is inserted on its strap's cross
+    # Option E-a set pins (MHA-DT-VN-63): each is inserted on its strap's cross
     # hole -- coaxial with its shaft hole -- and locked to that strap, so it
     # rides the freed swing.
     for tag in ("front", "back"):
@@ -6729,7 +6729,7 @@ async def build(adapter) -> dict[str, str]:
         )
     # Lever: clamped on the rod's front end -- coaxial + axial + a parallel
     # tie to the ROD (the rod carries the photographed 10-degree parked phase,
-    # so the match-drilled MHA-DT-030 holes stay coaxial) -- so it spins WITH the
+    # so the match-drilled MHA-DT-30 holes stay coaxial) -- so it spins WITH the
     # rod: dragging the lever in the saved free model turns the cams.
     lev_o = _org(adapter, lever)
     await coincident_mate(
@@ -6755,7 +6755,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(lever, lev_o),
         witness_local=[0.0, LEVER_LEN, 0.0],
     )
-    # MHA-DT-030 locked to the rod: on the rod's pin-hole axis (Axis2), centred
+    # MHA-DT-30 locked to the rod: on the rod's pin-hole axis (Axis2), centred
     # across it (Right planes coincident -- both contain the rod axis), and
     # anti-spun about its own axis by a Top-plane parallel.  Rigid with the
     # rod, it turns with the freed lift-rod spin.
@@ -6764,21 +6764,21 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Axis1@{lever_pin}", "AXIS"),
         named_ref(f"Axis2@{lift_rod}", "AXIS"),
-        label="MHA-DT-030 on the lift rod's pin-hole axis",
+        label="MHA-DT-30 on the lift rod's pin-hole axis",
         verify=(lever_pin, lp_o),
     )
     await coincident_mate(
         adapter,
         named_ref(f"Right Plane@{lever_pin}", "PLANE"),
         named_ref(f"Right Plane@{lift_rod}", "PLANE"),
-        label="MHA-DT-030 centred across the lift rod",
+        label="MHA-DT-30 centred across the lift rod",
         verify=(lever_pin, lp_o),
     )
     await parallel_mate(
         adapter,
         named_ref(f"Top Plane@{lever_pin}", "PLANE"),
         named_ref(f"Top Plane@{lift_rod}", "PLANE"),
-        label="MHA-DT-030 anti-spin (parallel to the rod)",
+        label="MHA-DT-30 anti-spin (parallel to the rod)",
         verify=(lever_pin, lp_o),
         witness_local=[0.0, 0.0, 1.0],
     )
@@ -6846,7 +6846,7 @@ async def build(adapter) -> dict[str, str]:
         verify=(pinion_arbor, arb_o),
         witness_local=[0.0, ARBOR_HEAD_DIA / 2.0, ARBOR_HEAD_CENTER_Z],
     )
-    # The separate grip crossrod is bonded in MHA-DT-022's reamed integral head
+    # The separate grip crossrod is bonded in MHA-DT-22's reamed integral head
     # (R1).  A LOCK records that authored relative pose with no
     # branches or added DOF, so the engage swing carries the complete crank.
     await lock_mate(
@@ -6968,7 +6968,7 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # The collar's MHA-VN-033 leaves with the arbor it pins; the strap pins stay.
+    # The collar's MHA-DT-VN-63 leaves with the arbor it pins; the strap pins stay.
     # The explode is authored in both drawing configurations: the package's
     # small exploded views reference Default Simplified.
     _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)

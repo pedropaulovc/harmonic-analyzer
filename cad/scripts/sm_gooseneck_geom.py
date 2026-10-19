@@ -7,7 +7,7 @@ part X. Sliding the post sets spring tension, not the part's dimensions.
 
 from __future__ import annotations
 
-from vn_counter_spring_stock_geom import END_OCCUPIED_WIDTH_MM
+from sm_vn_counter_spring_stock_geom import END_OCCUPIED_WIDTH_MM
 
 TUBE_DIA = 16.0  # DIMENSIONS.md ch19: scaled vs frame anchors (med)
 WALL_T = 2.0  # tube wall: O16 x 2.0 WALL tube stock (codex review #361)

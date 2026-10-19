@@ -1,0 +1,17 @@
+ch-rocker-arm-tl-vn-oblique-bearing:
+  title: Rocker Oblique Trammel Pivot Bearing
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-52
+  stock_name: Steel Ball Bearing, Sealed, Trade No. 6200-2RS
+  supplier: McMaster-Carr
+  supplier_skus: ["5972K41"]
+  material: Alloy Steel
+  material_specification: "Steel rings and balls, Buna-N seals; 6200-2RS 10 x 30 x 9, ABEC 1, C3 (McMaster 5972K41)"
+  finish: as supplied
+  quantity: 4
+  tolerance_class: machined_block
+  process: purchased
+  installation_notes: |-
+    INSTALLATION - PIVOT BLOCK, TWO PER BLOCK
+    PRESS INTO THE N6 SEAT ON THE OUTER RING ONLY.
+    PRESS THE PIVOT PIN THROUGH ON THE INNER RING ONLY.

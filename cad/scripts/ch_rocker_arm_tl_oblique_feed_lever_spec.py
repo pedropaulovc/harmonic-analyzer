@@ -1,7 +1,7 @@
-r"""Pure-data contract for the oblique-trammel jig's feed lever (MHA-CH-006-TL-26).
+r"""Pure-data contract for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The
-operator swings the carrier plate (MHA-CH-006-TL-21) on its two pivot pins by
+operator swings the carrier plate (MHA-CH-06-TL-21) on its two pivot pins by
 this lever while the spindle cuts the strap's R800/R816 edges. The lever is
 bolted flat on the carrier's top face at the middle of its -Y edge and runs
 out toward the operator (carrier -Y), held by two 5/16-18 UNC SHCS into the
@@ -175,8 +175,8 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
         "at_mm": [0.0, 0.0, -LEVER_WIDTH],
         "size_mm": [LEVER_LENGTH, LEVER_THICK, LEVER_WIDTH],
         "note": (
-            "MHA-CH-006-TL-26, 6061-T6 1/2 x 1 flat; bolted on the carrier "
-            "(MHA-CH-006-TL-21) top by 2 x 5/16-18 SHCS"
+            "MHA-CH-06-TL-26, 6061-T6 1/2 x 1 flat; bolted on the carrier "
+            "(MHA-CH-06-TL-21) top by 2 x 5/16-18 SHCS"
         ),
         "measured": dict(_MEASURED),
     },

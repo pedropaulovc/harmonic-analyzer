@@ -1,12 +1,12 @@
-r"""Build crankshaft MHA-DT-011 with the photographed integral domed nose.
+r"""Build crankshaft MHA-DT-11 with the photographed integral domed nose.
 
 The cylindrical shaft starts at local y=0, the common outboard plane where
-MHA-DT-006 and through hub MHA-DT-031 finish flush.  Only the shaft's same-diameter
+MHA-DT-06 and through hub MHA-DT-31 finish flush.  Only the shaft's same-diameter
 spherical dome projects outboard (negative Y), so the crank can still withdraw
-through the hub bore after removable taper pin MHA-DT-009 is removed.  The shared
+through the hub bore after removable taper pin MHA-DT-09 is removed.  The shared
 8-mm face shift preserves the established bearing interfaces.  Behind the
-hub, an integral collar's front spigot seats the removable sprocket MHA-PD-009,
-driven by two MHA-VN-044 dowels pressed into blind reamed holes in its face
+hub, an integral collar's front spigot seats the removable sprocket MHA-PD-09,
+driven by two MHA-DT-VN-67 dowels pressed into blind reamed holes in its face
 (ch. 23; dt_crankshaft_spec owns the seat).  Near
 the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
@@ -118,7 +118,7 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 # Dimensions live in dt_crankshaft_spec / dt_crank_hub_geometry. The crank face,
 # collar seat and restored post bore stay fixed; the collar runs back to the
 # post boss's south face and the shaft's north end stands proud of the 16T
-# (owner ruling D1, dt_crankshaft_spec.SHAFT_END_PROUD_RANGE); MHA-DT-009 still
+# (owner ruling D1, dt_crankshaft_spec.SHAFT_END_PROUD_RANGE); MHA-DT-09 still
 # crosses the separate hub behind the arm.
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
@@ -667,7 +667,7 @@ async def build(adapter) -> dict[str, str]:
     )
     drive_jobs += [(pin_station_dim[0], '"PinHoleHeight"')]
 
-    # Tapered MHA-DT-009 cross-hole through the shaft and MHA-DT-031 rear barrel.
+    # Tapered MHA-DT-09 cross-hole through the shaft and MHA-DT-31 rear barrel.
     # It sits behind the arm at the shared station plane; Front Plane fixes the
     # radial clocking while the host face follows ShaftDia.
     pin_hole_dia = blind_cut_dia_mm(PIN_HOLE_SPEC)
@@ -784,7 +784,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "shaft + seat collar", v_final, 0.005 * v_final)
 
     # Two blind, flat-bottomed holes reamed into the seat face for the pressed
-    # MHA-VN-044 dowels, on the wheel's pin circle at local +Z (#1) and -Z (#2);
+    # MHA-DT-VN-67 dowels, on the wheel's pin circle at local +Z (#1) and -Z (#2);
     # the Top-parallel sketch reads (u, v) = (x, -z).  A cut from a mid-body
     # plane runs back toward Top by default -- into air in front of the seat --
     # so it takes reverse_direction, and the volume gate fails loud on the
@@ -1015,7 +1015,7 @@ async def build(adapter) -> dict[str, str]:
     assert_signed_circle_center(
         adapter,
         "ShaftFiducialProfile",
-        label="MHA-DT-011 punched fiducial",
+        label="MHA-DT-11 punched fiducial",
         expected_sketch_xy_mm=(FIDUCIAL_MODEL_X, -FIDUCIAL_MODEL_Z),
         expected_model_xyz_mm=(
             FIDUCIAL_MODEL_X,

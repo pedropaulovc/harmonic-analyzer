@@ -72,7 +72,7 @@ TOP_NOTCH_WIDTH_BAND = (0.20, 0.0)  # (upper, lower) deviations, native
 # 2026-10-15 deepened the lever to 11.0), so the notch is cut 14.0 deep.
 TOP_NOTCH_HEIGHT = 14.0
 TOP_PIN_DROP = 0.25 * MM_PER_IN  # 6.35 hole centre below the bar top
-# The MHA-CH-011 bar pivot pin presses into this hole through both top-notch
+# The MHA-CH-11 bar pivot pin presses into this hole through both top-notch
 # cheeks and runs in the lever's #47 hole (user ruling 2026-10, press fit;
 # ch_bar_pivot_pin_spec holds the fit budget). Reamed to H7 under the 5/64
 # drill rod: the 0.0775 in stock reamer cuts inside the band.

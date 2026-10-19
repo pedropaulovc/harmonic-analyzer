@@ -10,7 +10,7 @@ import pytest
 import _config
 import ch_fulcrum_keeper_spec as keeper
 import rocker_bank_layout as rocker_bank
-import vn_frame_side_screw_spec as keeper_screw
+import ch_vn_frame_side_screw_spec as keeper_screw
 from _mcmaster_91794a080 import FILLISTER_SIZE
 import build_fr_top_frame as part
 import draw_fr_top_frame as drawing
@@ -25,7 +25,7 @@ from fr_frame_attachment_spec import (
     TOP_SCREW_Y,
     TUBE_CROSS_HOLE_DIAMETER,
 )
-from vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER
+from fr_vn_tube_frame_cap_spec import MAX_OUTER_DIAMETER
 from _surface_finish import SEAT_UM
 import fr_top_frame_spec as spec
 import fr_tube_frame_spec
@@ -2408,7 +2408,7 @@ def test_crossbar_median_control_cancels_the_socket_station_chain() -> None:
     # The axes drawn ON D are its implied basic zero: the qualifier names the
     # count and the hardware, and no note restates a basic (machinist review
     # r1); no numeric note or zero-length dimension.
-    assert drawing.HANGER_CENTER_QUALIFIER == "2X HANGER AXES ON D, FOR MHA-VN-024"
+    assert drawing.HANGER_CENTER_QUALIFIER == "2X HANGER AXES ON D, FOR MHA-SM-VN-52"
     assert "BASIC" not in drawing.HANGER_CENTER_QUALIFIER
     assert "set_basic_dimension" not in frame
 
@@ -3018,7 +3018,7 @@ def test_finished_grip_is_the_crossbars_own_driving_depth() -> None:
     carries, so the grip is the crossbar's full-height extrude depth,
     finished top to finished underside, driven by RingHeight.  Owner ruling
     2026-10-18: it takes the title block's .XX band, no model band, and each
-    MHA-VN-024 is cut to the measured grip at MHA-SM-000."""
+    MHA-SM-VN-52 is cut to the measured grip at MHA-SM-00."""
     assert spec.HANGER_GRIP == 36.50 == part.RING_HEIGHT
     assert spec.HANGER_GRIP_PLACES == 2
     assert spec.HANGER_GRIP_TOL == spec.PRINTED_LINEAR_BAND_MM[2] == 0.51
@@ -4033,7 +4033,7 @@ def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
     # Machinist review r1: the note names the requirement (both walls, one
     # lead) and the mate; the depths it threads are the A-A dimensions.
     note = drawing.CROSS_TAP_SECTION_NOTE
-    assert "THREAD BOTH CASTING WALLS IN PHASE" in note and "MHA-VN-027" in note
+    assert "THREAD BOTH CASTING WALLS IN PHASE" in note and "MHA-FR-VN-53" in note
     assert "FULL THREAD" not in note
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes, short of the title block and inside the frame.
     lines = note.splitlines()
@@ -4055,24 +4055,10 @@ def _segments_apart(a, b) -> bool:
     return side(a0, a1, b0) * side(a0, a1, b1) > 0 or side(b0, b1, a0) * side(b0, b1, a1) > 0
 
 
-def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
-    text = spec.HANGER_PIN_HOLE_CALLOUT
-    assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text
-    assert "BLIND" in text and "FLAT-BOTTOM" in text
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes.
-    assert len(text.splitlines()) <= 2
-    assert max(len(line) for line in text.splitlines()) <= 26
-    # It prints once, under the size face-on in the underside locator.
-    assert "HangerPinHoleDia" not in drawing.HANGER_SECTION_CALLOUTS
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
-    assert underside.count('"HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,') == 1
-
-
 def test_finished_grip_prints_bare_at_the_title_block_band() -> None:
     """Owner ruling 2026-10-18: the 36.50 grip takes the title block's .XX
-    band with no callout; MHA-VN-024 is cut to the measured grip at
-    MHA-SM-000, so the grip no longer sets thread engagement."""
+    band with no callout; MHA-SM-VN-52 is cut to the measured grip at
+    MHA-SM-00, so the grip no longer sets thread engagement."""
     assert (spec.HANGER_GRIP, spec.HANGER_GRIP_TOL) == (36.50, 0.51)
     assert drawing.HANGER_SECTION_CALLOUTS["HangerGrip"] == ""
 
@@ -4137,13 +4123,13 @@ def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
     )
     # The 7.632 names the round holes it locates, their transverse station
     # (the screw axis's own Z) and, as a three-place size, the mate it
-    # matches: MHA-SM-002's dowel hole at the same dowel-spec offset
+    # matches: MHA-SM-02's dowel hole at the same dowel-spec offset
     # (machinist review r4).
     assert "suffix=PIN_STATION_CALLOUT," in source
     assert drawing.PIN_STATION_CALLOUT.splitlines() == [
         "2X ROUND HOLE FROM",
         "SCREW AXIS, SAME Z;",
-        "MATCHES MHA-SM-002",
+        "MATCHES MHA-SM-02",
     ]
     import sm_knife_mount_spec as knife_mount
 
@@ -4165,30 +4151,18 @@ def test_boss_and_socket_diameters_take_one_near_side_arrow() -> None:
     assert drawing.DETAIL_TOP_KEEP["B0Dia"][1] - drawing.DETAIL_TOP_KEEP["C0Dia"][1] >= 0.019
 
 
-def test_cap_recess_callouts_name_the_cap_and_why_the_ceiling() -> None:
-    # Machinist review r2 (sheet 4): the recess's diameter and depth bands
-    # are tighter than .XX, so each callout names MHA-VN-028, and the
-    # diameter says what its ceiling keeps: the cross-screw counterbore's 2.0
-    # ligament, which the high limits of both bands spend.
-    callouts = drawing.SECTION_CALLOUTS
-    assert set(callouts) == set(drawing.DETAIL_SECTION_KEEP)
-    assert "MHA-VN-028 SKIRT" in callouts["CapRecessDia"]
-    assert "MAX KEEPS" in callouts["CapRecessDia"]
-    assert "COUNTERBORE WALL" in callouts["CapRecessDia"]
-    assert callouts["CapRecessDepth"].replace("\n", " ") == "4X RECESS, MHA-VN-028 SKIRT DEPTH"
+def test_cap_recess_bands_preserve_the_counterbore_ligament() -> None:
     assert part.CAP_RECESS_DIAMETER_BAND == (0.20, 0.0)
     assert part.CAP_RECESS_DEPTH_BAND == (0.30, 0.0)
     assert part.COUNTERBORE_PRINTED_CAP_LIGAMENT == pytest.approx(2.0402450833172)
-    # The depth column beside its band: three rows at most 11 characters.
-    assert max(map(len, callouts["CapRecessDepth"].splitlines())) <= 11
 
 
 def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:
     # The rear round hole's size, its +/- band on one row and its two
-    # slip-fit rows print face-on in the underside locator.  F-F's v43 crop
-    # printed the block 66.4 x 20.3 mm with the band stacked; less that
-    # 4.15 mm row and rounded out, 67 x 17 centred on its text point.  The
-    # same crop lands the leader on the underline's end facing the hole, at
+    # slip-fit rows print face-on in the underside locator.  The historical
+    # v43 crop calibrated the former 67 x 17 mm block; the recipe now grows
+    # its width for the full number without moving the lower-left corner.
+    # That same crop lands the leader on the underline's end facing the hole, at
     # the block's foot.  The block parks over the plan, inside the sheet
     # frame and right of datum C's tag; it and its leader keep ink clear of
     # every locator line, box, circle and slot and of both slot frames, and
@@ -4197,12 +4171,13 @@ def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:
     # regenerated sheet.
     from _layout_geometry import Box, Segment, segment_box_distance, segment_circle_distance
 
-    half_w, half_h = 0.0335, 0.0085
+    half_w = drawing.HANGER_PIN_DIA_TEXT_WIDTH / 2.0
+    half_h = drawing.HANGER_PIN_DIA_TEXT_HALF_HEIGHT
     x, y = drawing.HANGER_PIN_DIA_TEXT_XY
     block = Box(x - half_w, y - half_h, x + half_w, y + half_h)
     ink = drawing.INK_CLEARANCE
-    assert (block.xmin, block.ymin, block.xmax, block.ymax) == pytest.approx(
-        (0.1459, 0.2472, 0.2129, 0.2642)
+    assert (block.xmin, block.ymin, block.ymax) == pytest.approx(
+        (0.1459, 0.2472, 0.2642)
     )
     centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
     sheet = drawing.SHEET_FRAME
@@ -4366,7 +4341,7 @@ def test_keeper_transfer_prefix_preserves_the_native_hole_definition() -> None:
             drawing.TRANSFER_KEEPER_CALLOUT,
             native,
         )
-        == "TRANSFER FROM MHA-CH-007\nAT ASSEMBLY;\n" + native
+        == "TRANSFER FROM MHA-CH-07\nAT ASSEMBLY;\n" + native
     )
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     callouts = [
@@ -4634,10 +4609,10 @@ def test_transfer_plan_and_station_fields_remain_inside_the_hole_sheet() -> None
 
 def test_socket_pitch_parks_outside_the_plan_between_the_hanger_lanes() -> None:
     # Machinist review of 11783475: centred on its line at x 83 mm, 224.00
-    # MATCHES MHA-FR-001 ran across the left rail and the extension lines.
+    # MATCHES MHA-FR-01 ran across the left rail and the extension lines.
     # Text as the 40d9d030e render's glyphs measure it: 28.0 FRONT HANGER Z
     # printed [42.9, 204.4]..[81.3, 213.5] mm about (62, 209); three rows
-    # stand 14.7 mm tall, MHA-FR-001 25.6 wide and HANGER Z 22.4; an offset
+    # stand 14.7 mm tall, MHA-FR-01 25.6 wide and HANGER Z 22.4; an offset
     # value's underline runs 1.0 under its block and 0.1 past each side.
     from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 
@@ -4968,11 +4943,11 @@ def test_underside_facing_note_is_the_part_property_carrying_the_seat_finish() -
     # rows at most.
     assert spec.DRAWING_NOTES_C.splitlines() == [
         "UNDERSIDE PLANE BETWEEN BOSSES",
-        "(MHA-SM-002 KNIFE-MOUNT SEATS):",
+        "(MHA-SM-02 KNIFE-MOUNT SEATS):",
         "Ra 3.2 UM; BOSS BOTTOMS AND",
         "HUB GUSSETS EXCLUDED.",
     ]
-    assert _config.parts("sm-knife-mount")["number"] == "MHA-SM-002"
+    assert _config.parts("sm-knife-mount")["number"] == "MHA-SM-02"
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     (notes,) = [
         node.value

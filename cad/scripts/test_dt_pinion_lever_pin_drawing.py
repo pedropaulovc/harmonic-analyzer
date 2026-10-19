@@ -1,4 +1,4 @@
-"""Offline contracts for the pinion lever retention pin (MHA-DT-030) drawing."""
+"""Offline contracts for the pinion lever retention pin (MHA-DT-30) drawing."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def test_required_drawing_paths_and_registry_row() -> None:
     )
     assert "draw_dt_pinion_lever_pin.py" in PRECISION_MIGRATED_DRAWINGS
     row = _config.parts("dt-pinion-lever-pin")
-    assert row["number"] == "MHA-DT-030"
+    assert row["number"] == "MHA-DT-30"
     assert row["material"] == row["material_specification"]
     assert "1/16" in row["material_specification"]
     assert int(row["quantity"]) == 1
@@ -103,7 +103,7 @@ def test_the_pin_sheet_has_no_notes_and_the_mates_carry_the_match_drill() -> Non
         dt_pinion_lift_rod_spec.PIN_HOLE_CALLOUT,
     ):
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY")
-        assert "MHA-DT-030" not in callout
+        assert "MHA-DT-30" not in callout
     for script in (pin, drawing):
         assert "Manufacturing Notes" not in Path(script.__file__).read_text(
             encoding="utf-8"
@@ -146,7 +146,7 @@ class _MaterialPart:
 
 def test_every_configuration_must_carry_the_pin_material() -> None:
     # apply_material sets the active configuration only; a configuration
-    # without it gives drive-train the wrong MHA-DT-030 mass.
+    # without it gives drive-train the wrong MHA-DT-30 mass.
     from types import SimpleNamespace
 
     import build_dt_pinion_lever_pin as part

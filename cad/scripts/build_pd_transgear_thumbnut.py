@@ -1,4 +1,4 @@
-r"""Reproduction script: transgear thumbnut (MHA-PD-013; ch. 23 pp. 58-59; 1 used).
+r"""Reproduction script: transgear thumbnut (MHA-PD-13; ch. 23 pp. 58-59; 1 used).
 
 The custom knurled #8-32 UNC-2B brass nut seats on the collar's front pilot.
 The T24 chain wheel floats under it; the collar's rear face reacts on F

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import printed_band_mm
-from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
+from _mcmaster_90114a511 import HEAD_H as FILLISTER_HEAD_H
 
 PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
 PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2
@@ -22,7 +22,7 @@ PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2
 PLATE_THICKNESS = 3.85
 
 # Clip-screw receivers: the stock 92446A077 brass #2-56 slotted pan head
-# (vn-platen-clip-screw) sits directly on the clip's flat 0.8 brass sheet
+# (pd-vn-platen-clip-screw) sits directly on the clip's flat 0.8 brass sheet
 # (ch22 img03: no raised seat, small heads), and its shank reaches through a
 # #2-56 tap through the plate and a Ø7 boss standing SOCKET_BOSS_H proud of the
 # back face at each station, so the thread engages >= 1.5D (drawing-guidelines.md rule 18 (thread engagement)) and the

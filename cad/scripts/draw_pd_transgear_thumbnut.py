@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-013).
+r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 
 The face view is the ``*Top`` orientation, looking at the dished front face:
 it carries the native #8-32 UNC-2B through-thread callout. Both actual entry

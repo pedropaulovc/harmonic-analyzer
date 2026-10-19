@@ -195,7 +195,7 @@ async def _author_reference_dimension(
     one driving dimension between them.  Points, not a construction line:
     the drawing shows each reference sketch in the view it dimensions, and
     a line under a face's edge printed grey over the object line (machinist
-    review of cd1153854; #1688; the TL-22 nut bracket's and MHA-DT-016's
+    review of cd1153854; #1688; the TL-22 nut bracket's and MHA-DT-16's
     points-only idiom)."""
     check(
         f"create_sketch {feature_name}",

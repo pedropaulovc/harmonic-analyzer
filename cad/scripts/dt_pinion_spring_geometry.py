@@ -1,4 +1,4 @@
-r"""Geometry-only contract for the pinion return leaf spring (MHA-DT-024).
+r"""Geometry-only contract for the pinion return leaf spring (MHA-DT-24).
 
 The drive-train assembly imports this module directly so drawing-note edits do
 not become assembly recipe changes.

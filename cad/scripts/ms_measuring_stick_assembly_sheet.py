@@ -1,4 +1,4 @@
-"""MHA-MS-000 fitter-drawing data: the BOM, the captions and the assembly text.
+"""MHA-MS-00 fitter-drawing data: the BOM, the captions and the assembly text.
 
 Drawing-only: nothing here reaches ms-measuring-stick.SLDASM, so no assembly
 builder imports this module (``test_assembly_sheet_isolation`` pins it) and a
@@ -17,7 +17,7 @@ import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import _mcmaster_91882a221 as thumb
 
-DRAWING_NUMBER = "MHA-MS-000"
+DRAWING_NUMBER = "MHA-MS-00"
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
 

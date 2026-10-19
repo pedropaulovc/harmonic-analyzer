@@ -1,13 +1,13 @@
-r"""Transgear pivot spacer (MHA-PD-020) dimensional contract.
+r"""Transgear pivot spacer (MHA-PD-20) dimensional contract.
 
-PURE DATA, no SolidWorks/COM imports.  A turned brass ring on the MHA-VN-041
-shoulder screw between the MHA-PD-007 support bar's back face and the MHA-PD-018
-arm's front face (contract §3.4).  Its length sets the MHA-VN-049 spring's
+PURE DATA, no SolidWorks/COM imports.  A turned brass ring on the MHA-PD-VN-57
+shoulder screw between the MHA-PD-07 support bar's back face and the MHA-PD-18
+arm's front face (contract §3.4).  Its length sets the MHA-PD-VN-63 spring's
 room with the arm's spot-face floor and the screw's shoulder, so it prints
 ±0.05; it is fitted as made, never faced (R9-6).  It is a light press on
 the shoulder, pressed flush with the shoulder's end, so screw and spacer
 seat on the bar as one body and the ring cannot index its wedge; the
-screw's one MHA-VN-049 curved disc spring preloads the arm onto the rear
+screw's one MHA-PD-VN-63 curved disc spring preloads the arm onto the rear
 face.  The hanger's out-of-plane tilt is then both faces' perpendicularity
 to the bore (datum A) over the face the arm seats on: the sheet carries
 those two frames.
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 
-import vn_transgear_pivot_screw_spec as SCREW
+import pd_vn_transgear_pivot_screw_spec as SCREW
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -38,7 +38,7 @@ BORE_DIA_MAX = round(BORE_DIA + BORE_DIA_BAND[0], 6)
 BORE_DIA_MIN = round(BORE_DIA + BORE_DIA_BAND[1], 6)
 BORE_CALLOUT = "REAM THRU"
 # 5.0: the bar grew 0.5 rearward under the arm (user ruling 2026-10-15), so
-# the ring gives it up and the hanger stays put; the MHA-VN-069 shim under the
+# the ring gives it up and the hanger stays put; the MHA-PD-VN-67 shim under the
 # screw head restores the spring room (transgear_hanger_joints).
 LENGTH = 5.0
 LENGTH_BAND = 0.05  # spring room 0.70..1.00 with the floor, shoulder and shim
@@ -52,7 +52,7 @@ PRESS_INTERFERENCE = (
 )  # 0.0021, 0.0355
 if not 0.0 < PRESS_INTERFERENCE[0] <= PRESS_INTERFERENCE[1]:
     raise AssertionError(
-        f"MHA-PD-020 bore leaves the shoulder press: {PRESS_INTERFERENCE}"
+        f"MHA-PD-20 bore leaves the shoulder press: {PRESS_INTERFERENCE}"
     )
 
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
@@ -61,7 +61,7 @@ WALL_WORST = (OD - OD_BAND - BORE_DIA_MAX) / 2.0
 WALL_WORST_PRINTED = math.floor(WALL_WORST * 100.0 + 1e-9) / 100.0
 if not 1.5 <= WALL_WORST_PRINTED < 2.0:
     raise AssertionError(
-        f"MHA-PD-020 wall {WALL_WORST:.3f} left the approved 1.5..2.0 shortfall"
+        f"MHA-PD-20 wall {WALL_WORST:.3f} left the approved 1.5..2.0 shortfall"
     )
 
 # --- geometric control --------------------------------------------------------
@@ -84,7 +84,7 @@ FRONT_FACE_PERPENDICULARITY = float(
 FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND
 
 # Sheet text (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# Pending exception ruling: MHA-PD-020 wall (#1380).
+# Pending exception ruling: MHA-PD-20 wall (#1380).
 WALL_NOTE = f"WALL {WALL_WORST_PRINTED:.2f} MIN."
 
 # The sheet's general notes: the worst-case wall, a fact the views cannot
@@ -111,7 +111,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-PD-020 dimension needs authored places")
+    raise AssertionError("every marked MHA-PD-20 dimension needs authored places")
 
 ISOMETRIC_VIEW_SCALE = (4, 1)
 ISOMETRIC_VIEW_NOTE = (

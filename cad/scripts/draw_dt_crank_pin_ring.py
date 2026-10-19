@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the crank-pin keeper ring (MHA-DT-027).
+r"""Create the manufacturing drawing for the crank-pin keeper ring (MHA-DT-27).
 
 Under ``cad/docs/drawing-guidelines.md``: a round brass wire ring, its ends
 butted and silver-soldered, closed through the taper pin's cross-hole. The

@@ -1,4 +1,4 @@
-r"""Build the rocker arm's strap shim stack (MHA-CH-006-TL-11; shop fixture).
+r"""Build the rocker arm's strap shim stack (MHA-CH-06-TL-11; shop fixture).
 
 One of four supports the rocker blank stands on in S1 and S4: a piece of O1
 ground flat stock on a steel shim pack at the nominal gap

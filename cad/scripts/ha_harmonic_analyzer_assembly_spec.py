@@ -1,6 +1,6 @@
 """Pure contract shared by the complete-machine builder and its fitter package.
 
-MHA-HA-000 is the integration sheet: every subassembly arrives built and
+MHA-HA-00 is the integration sheet: every subassembly arrives built and
 checked to its own drawing, so the BOM lists the eight subassemblies (one row
 each, top level only) and the steps are the joints between them, their locks
 and consumables, and the settings only the complete machine can make.
@@ -27,7 +27,7 @@ import fr_harmonic_base_spec as base
 from frame_column_stations import COLUMN_X
 from mg_wheel_bar_geom import BAR_LENGTH, BAR_SIDE, WHEEL_BAR_X0
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
-from vn_pen_wire_geom import WHEEL_BAR_Y, WIRE_X
+from pn_vn_pen_wire_geom import WHEEL_BAR_Y, WIRE_X
 
 ASM_NAME = "ha-harmonic-analyzer"
 SOURCE_CONFIGURATION = "Default"

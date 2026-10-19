@@ -119,7 +119,7 @@ ISO_CENTER = (0.350, 0.150)
 # native detail's targeted import of SpringProfile brought FlatLen in pc-r11
 # and pc-r12 but only KinkR in pc-r13 (leaf 20260927T001822Z-1-ba1f4546),
 # with the same script and a dimensionally identical part; a cropped model
-# view takes a targeted import like any principal view (MHA-DT-022's detail A,
+# view takes a targeted import like any principal view (MHA-DT-22's detail A,
 # 522920510; draw_crank_arm's top view).  Its crop circle's centre is where
 # pc-r12 printed the native detail's.
 DETAIL_CENTER = (0.240, 0.184)
@@ -178,14 +178,14 @@ _HOLE_AXIS_X = _front_x(FOOT_END[0] - HOLE_FROM_END)
 # axis's extension line, which the FootLen and FreeKinkH rows share:
 # centred between the extension lines, pc-r12 printed those lines through
 # FREE, BEND and TANGENT.
-PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-014"
+PRELOAD_REASON = "SETS PRELOAD ON MHA-DT-14"
 QUALIFIER_HALF_WIDTH = {
     "FREE, TO KINK TANGENT": 0.026,
     "TO BEND TANGENT": 0.021,
     PRELOAD_REASON: 0.033,
     PAD_LEN_CALLOUT: 0.024,
 }
-# The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-014 strap
+# The dimensions banded +/-0.5 set the crest's preload on the MHA-DT-14 strap
 # (dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS), so each names that mate
 # (drawing-guidelines.md rule 4); the kink angle and FlatLen ride the
 # title-block rows, bare.  The wing, located from the hole's axis at .XX,

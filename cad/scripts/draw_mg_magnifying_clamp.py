@@ -496,7 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, top_by_name[name], label=f"MHA-MG-002 {name} stock reference"
+            adapter, top_by_name[name], label=f"MHA-MG-02 {name} stock reference"
         )
 
     # The template marks each end view's tap; a second, scripted mark doubled
@@ -545,7 +545,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=SEAT_NOTE,
         entity_xy=(SECTION_CENTER[0] + _PICK_DX, _elev_y(SECTION_CENTER, 0.0)),
         note_xy=SEAT_NOTE_XY,
-        label="MHA-MG-004 shoulder seat",
+        label="MHA-MG-04 shoulder seat",
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

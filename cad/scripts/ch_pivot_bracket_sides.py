@@ -1,4 +1,4 @@
-r"""MHA-CH-008 on both sides: one bracket, placed south and north.
+r"""MHA-CH-08 on both sides: one bracket, placed south and north.
 
 PURE DATA, no SolidWorks/COM imports. ``build_ch_pivot_bracket`` authors the
 one bracket from it, the support's seat layout and the channel assembly place
@@ -14,7 +14,7 @@ support end faces lie at different distances from them; one part serves both
 sides (#1341, option A): its foot ``FOOT_Z1`` ends flush with the nearer end
 face -- the south one -- and 1.61 short of the north one. The support is
 as long as that foot needs (``SUPPORT_LENGTH_MIN``). The bracket has
-one MHA-VN-071 hold-down hole in its foot's free run from the ear's outboard
+one MHA-CH-VN-57 hold-down hole in its foot's free run from the ear's outboard
 face to the foot end, its station ``HOLE_Z`` given at the title block's .XX
 from the ear's inboard face, the face fit-up sets (``ch_pivot_bracket_spec``
 holds the bands). The hole lies in both sides' windows between two
@@ -32,8 +32,8 @@ import ch_pivot_bracket_spec as _bracket
 from _hole_spec import THREAD_MAJOR_MM
 from fr_rocker_arm_support_spec import SUPPORT_HALF_MACHINE_Z, SUPPORT_WORLD_Z
 from rocker_bank_layout import PIVOT_BRACKET_Z, STACK_MID_Z
-from vn_bracket_hold_down_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
-from vn_bracket_hold_down_screw_spec import THREAD as SCREW_THREAD
+from ch_vn_bracket_hold_down_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
+from ch_vn_bracket_hold_down_screw_spec import THREAD as SCREW_THREAD
 
 SIDES = ("S", "N")  # south first, as PIVOT_BRACKET_Z
 MOUNT_Z = dict(zip(SIDES, PIVOT_BRACKET_Z, strict=True))

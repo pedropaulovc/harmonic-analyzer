@@ -1,4 +1,4 @@
-r"""Build the oblique trammel's base bar (MHA-CH-006-TL-20; shop fixture).
+r"""Build the oblique trammel's base bar (MHA-CH-06-TL-20; shop fixture).
 
 A 6061-T6511 1/2 x 6 in flat bar, rail-length long, with the HIWIN rail's
 seven #8-32 tapped holes on the rail axis (off the bar's centreline, the
@@ -84,7 +84,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     TOLERANCES,
     bracket_hole_walls,
 )
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 PART_NAME = "ch-rocker-arm-tl-oblique-base-bar"

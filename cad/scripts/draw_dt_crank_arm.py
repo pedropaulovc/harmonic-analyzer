@@ -1,11 +1,11 @@
-r"""Create the curated machinist drawing for crank arm MHA-DT-006.
+r"""Create the curated machinist drawing for crank arm MHA-DT-06.
 
-Separate through hub MHA-DT-031 is a light press in the arm's seat bore, turned
+Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
 to suit it.  Its outboard face
-shows the simple punched alignment witness and the axial seam for MHA-VN-029,
+shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
-depth.  The handle pivot is tapped for the MHA-DT-032 shoulder screw.
-The MHA-DT-009 taper-pin cross-hole belongs to the hub and shaft drawings.
+depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.
+The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
 roughness symbols.  Every controlling value is imported from the part; matched
@@ -252,7 +252,7 @@ ARM_SILHOUETTE = (
     _sheet_x(ARM_END_X),
     FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0,
 )
-# The arm's half of the MHA-VN-029 seam is the arc bulging from the seat edge
+# The arm's half of the MHA-DT-VN-59 seam is the arc bulging from the seat edge
 # toward the arm end; the callout attaches 45 degrees up its flank.
 SEAM_EDGE_PICK = (
     _sheet_x(AXIAL_PIN_X + AXIAL_PIN_DIA / 2.0 * math.cos(math.pi / 4.0)),
@@ -292,7 +292,7 @@ def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
     """Land the hub seat bore on its near rim, clear of R12.7.
 
     The bore is made first and keeps the title block's .X band: its limits
-    are the U29 cheek's real limits (crank_hub_geometry).  MHA-DT-031 is turned
+    are the U29 cheek's real limits (crank_hub_geometry).  MHA-DT-31 is turned
     to suit it for a light press, and the note under the value states that
     fit; the band bounds the bore, the note the fit (drawing-guidelines.md rule 4 (tighten only for function, and name the mate): "any
     retained dimensional limits still apply").
@@ -390,7 +390,7 @@ async def build(adapter: Any) -> dict[str, str]:
     imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
-    # is a one-place .X size: MHA-DT-031 is turned to suit it.
+    # is a one-place .X size: MHA-DT-31 is turned to suit it.
     assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
     # The thickness is the supplied stock's (the stock note governs it).
     for name in sorted(REFERENCE_DIMENSIONS):
@@ -449,7 +449,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _set_reference_precision(adapter, overall, "overall length reference")
 
-    # MHA-VN-029's axial seam is match-drilled in the assembled arm and hub; its
+    # MHA-DT-VN-59's axial seam is match-drilled in the assembled arm and hub; its
     # callout names the mate, the fit and the pin's nominal size and depth.
     add_attached_note(
         adapter,
@@ -457,7 +457,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=SEAM_CALLOUT,
         entity_xy=SEAM_EDGE_PICK,
         note_xy=SEAM_CALLOUT_XY,
-        label="MHA-VN-029 seam callout",
+        label="MHA-DT-VN-59 seam callout",
     )
     # The punched fiducial is flagged at the mark itself, from the clear
     # band above the boss end.
@@ -469,7 +469,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=FIDUCIAL_CALLOUT_XY,
         label="punched fiducial callout",
     )
-    # Handle pivot tap (MHA-DT-032): above and just right of the arm, arrow on
+    # Handle pivot tap (MHA-DT-32): above and just right of the arm, arrow on
     # the hole's top rim, clear of the full principal view.  Thread and tap
     # drill ride the native callout; the class is the title block's.  The
     # mate and mouth limit follow the thread row, so the callout names this

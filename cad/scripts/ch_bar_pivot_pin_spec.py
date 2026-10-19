@@ -1,4 +1,4 @@
-r"""Bar pivot pin (MHA-CH-011) and the amplitude-bar-to-channel-lever joint it
+r"""Bar pivot pin (MHA-CH-11) and the amplitude-bar-to-channel-lever joint it
 closes.
 
 PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the
@@ -14,7 +14,7 @@ moving member) and is PRESSED into holes reamed through both cheeks, its ends
 dressed flush with the bar's faces: the bar-to-bar side gap leaves no room
 for anything proud (issue #1038). Press-fit retention is the user's choice
 (2026-10): the bar's 1.60 cheeks leave no bearing land under a countersink,
-and a pressed pin drives out with a punch. The MHA-CH-010 rod-fork pin
+and a pressed pin drives out with a punch. The MHA-CH-10 rod-fork pin
 (``ch_rod_pivot_pin_spec``) follows it (user ruling 2026-10-09, PR #1292
 review F1).
 

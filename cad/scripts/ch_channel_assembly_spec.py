@@ -1,4 +1,4 @@
-"""MHA-CH-000 fitter-package data: the settings chains and the keeper plan.
+"""MHA-CH-00 fitter-package data: the settings chains and the keeper plan.
 
 Builder data only, no SolidWorks: build_ch_channel_assembly authors the
 settings reference sketches from it, and draw_ch_channel_assembly reads the
@@ -17,7 +17,7 @@ inner faces. The spring set and the closed-up stack length are the fit-up's
 two settings (rocker_bank_layout); the lug span is shown as a reference, the
 pair being set off the top frame. ``KEEPER_PLAN_FEATURE``, on the Top plane
 (sketch x is machine x, sketch y machine -z), is that setting: the
-MHA-FR-002 features it is set from, in phantom (the frame is not in this
+MHA-FR-02 features it is set from, in phantom (the frame is not in this
 assembly) -- its west front upper socket (bore and boss), the line of the
 upper socket centres through it, and the west rail's web faces leaving the
 boss with the web centre line splitting them -- and the lug centre line,

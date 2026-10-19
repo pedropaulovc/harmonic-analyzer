@@ -1,4 +1,4 @@
-r"""Reproduction script: magnifying-wheel drum (MHA-MG-010; 1 used).
+r"""Reproduction script: magnifying-wheel drum (MHA-MG-10; 1 used).
 
 The brass ring the lever wire wraps (book ch. 21, p.53 shows the wheel's brass
 hub drum): pressed on the wheel's Ø14.0 spigot up to the boss, its front face

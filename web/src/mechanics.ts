@@ -12,7 +12,7 @@
  * buffer. Renderer-owned wheel/pen closure consumes magnifierHookM; this module
  * does not substitute the CAD's rest-linearized yoke for an actual wire law.
  */
-import { MECHANISM_DATA } from './mechanics-data'
+import { MECHANISM_DATA } from './current-mechanics-data'
 import {
   CHANNELS, physicalChannelAngle, coneShaftAngle, paperTravelM,
   MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_BUILT, MAGNIFIER_RATIO_MAX,
@@ -20,7 +20,7 @@ import {
 } from './kinematics'
 import { createMagnifierPose, solveMagnifier, type MagnifierPose } from './magnifier'
 
-export { MECHANISM_DATA } from './mechanics-data'
+export { MECHANISM_DATA } from './current-mechanics-data'
 
 const C = MECHANISM_DATA.channel
 const S = MECHANISM_DATA.spring

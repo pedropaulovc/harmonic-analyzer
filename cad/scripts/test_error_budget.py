@@ -134,8 +134,8 @@ def test_loaded_anchor_geometry_sets_pen_gain_and_hole_sensitivity(nom):
     """Independent force-distance finite differences include initial-tension
     stiffness and distinguish the manufactured hole X from the loaded arm."""
     import channel_kinematics
-    import vn_channel_spring_stock_geom as channel_stock
-    import vn_counter_spring_stock_geom as counter_stock
+    import ch_vn_channel_spring_stock_geom as channel_stock
+    import sm_vn_counter_spring_stock_geom as counter_stock
     import spring_mount_geom as mounts
 
     knife = (mounts.KNIFE[0], mounts.KNIFE_CONTACT_Y)
@@ -523,7 +523,7 @@ def test_knife_load_cases_include_configured_and_scaled_reference_vectors(
         forces = [
             nom.spring_initial_tension
             + nom.spring_rate
-            * (pose.length_mm - eb.vn_channel_spring_installed_spec.FREE_LENGTH_MM)
+            * (pose.length_mm - eb.ch_vn_channel_spring_installed_spec.FREE_LENGTH_MM)
             for pose in poses
         ]
         assert case["channel_moment_N_mm"] == pytest.approx(
@@ -603,7 +603,7 @@ def test_counter_spring_catalog_range_gates_every_station_case(
     rejects the configured case instead of extrapolating a counter pose beyond
     the catalog range.
     """
-    import vn_counter_spring_stock_geom as counter_stock
+    import sm_vn_counter_spring_stock_geom as counter_stock
     import spring_mount_geom as mounts
 
     neutral_stations = np.zeros(eb.N_ELEMENTS)
@@ -742,8 +742,8 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     builds -- only the as-built station is gated: the report names those
     inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
-    reproduces vn_lever_wire_geom's own numbers at the as-built pose."""
-    import vn_lever_wire_geom
+    reproduces mg_vn_lever_wire_geom's own numbers at the as-built pose."""
+    import mg_vn_lever_wire_geom
 
     mag = report["closed_form"]["mg-magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
@@ -764,10 +764,10 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
-    assert built["hook_x_mm"] == pytest.approx(vn_lever_wire_geom.HOOK_X)
-    assert built["wire_length_mm"] == pytest.approx(vn_lever_wire_geom.WIRE_LEN, abs=1e-3)
+    assert built["hook_x_mm"] == pytest.approx(mg_vn_lever_wire_geom.HOOK_X)
+    assert built["wire_length_mm"] == pytest.approx(mg_vn_lever_wire_geom.WIRE_LEN, abs=1e-3)
     assert built["wire_arm_mm"] == pytest.approx(mag["wire_arm_built_mm"])
-    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < vn_lever_wire_geom.HOOK_X
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_vn_lever_wire_geom.HOOK_X
     assert mag["minimum_pose_wire_estimate"]["wire_arm_mm"] == mag["wire_arm_min_mm"]
 
 
@@ -777,7 +777,7 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
     drum tangent determine that arm. Independent endpoint and finite-rotation
     calculations agree at minimum, built and maximum stations, while full-band
     monotonicity makes the setup's inverse solve well posed."""
-    import vn_lever_wire_geom
+    import mg_vn_lever_wire_geom
     import mg_output_fixture_geom
     import spring_mount_geom
 
@@ -786,14 +786,14 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
     assert nom.hook_offset_x < 0.0
     assert eb.KNIFE_AXIS_XY == (spring_mount_geom.KNIFE[0], spring_mount_geom.KNIFE_CONTACT_Y)
     assert eb.KNIFE_AXIS_XY[0] + nom.lever_r_built + nom.hook_offset_x == pytest.approx(
-        vn_lever_wire_geom.HOOK_X
+        mg_vn_lever_wire_geom.HOOK_X
     )
     hook, end = eb.wire_rest_run(nom, nom.lever_r_built)
-    assert tuple(hook) == pytest.approx(vn_lever_wire_geom.WIRE_START)
-    assert tuple(end) == pytest.approx(vn_lever_wire_geom.WIRE_END)
+    assert tuple(hook) == pytest.approx(mg_vn_lever_wire_geom.WIRE_START)
+    assert tuple(end) == pytest.approx(mg_vn_lever_wire_geom.WIRE_END)
 
     # the arm at the built station, from the module's own endpoints
-    start, stop = np.array(vn_lever_wire_geom.WIRE_START), np.array(vn_lever_wire_geom.WIRE_END)
+    start, stop = np.array(mg_vn_lever_wire_geom.WIRE_START), np.array(mg_vn_lever_wire_geom.WIRE_END)
     u = (stop - start) / np.linalg.norm(stop - start)
     rx = start[0] - eb.KNIFE_AXIS_XY[0]
     ry = start[1] - eb.KNIFE_AXIS_XY[1]
@@ -810,11 +810,11 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
         start = np.array(
             [
                 eb.KNIFE_AXIS_XY[0] + radius + mg_output_fixture_geom.HOOK_OFFSET_X,
-                vn_lever_wire_geom.HOOK_Y,
-                vn_lever_wire_geom.HOOK_Z,
+                mg_vn_lever_wire_geom.HOOK_Y,
+                mg_vn_lever_wire_geom.HOOK_Z,
             ]
         )
-        stop = np.array(vn_lever_wire_geom.tangent_end(float(start[0]), float(start[1])))
+        stop = np.array(mg_vn_lever_wire_geom.tangent_end(float(start[0]), float(start[1])))
         pivot = np.array([*eb.KNIFE_AXIS_XY, start[2]])
         radial = start - pivot
         direction = (stop - start) / np.linalg.norm(stop - start)
@@ -1494,7 +1494,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
 
 
 def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
-    """MHA-DT-004's four flats share one clock by section A-A's callout, at the title block's
+    """MHA-DT-04's four flats share one clock by section A-A's callout, at the title block's
     angle, and the budget draws that angle once per land: gears on one land
     turn together, and the Ø9.525 land (the 64T and T030..T120) is the
     reference its own clock cannot move."""

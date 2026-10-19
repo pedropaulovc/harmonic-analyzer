@@ -1,4 +1,4 @@
-r"""Pure-data contract for the cone pivot post's cap jaw button (MHA-DT-005-TL-03).
+r"""Pure-data contract for the cone pivot post's cap jaw button (MHA-DT-05-TL-03).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 built-up cone post's vise hold (prechips S11) one button sits between each soft

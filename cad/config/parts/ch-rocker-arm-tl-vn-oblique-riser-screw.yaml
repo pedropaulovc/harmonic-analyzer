@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-vn-oblique-riser-screw:
+  title: Rocker Oblique Trammel Riser Screw
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-67
+  stock_name: Stainless Steel Phillips Flat Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91771A110"]
+  material: AISI 304
+  material_specification: "18-8 stainless steel, passivated, ASME B18.6.3, Rockwell B80; McMaster-Carr 91771A110"
+  finish: passivated
+  # The fastener table's RISER_TO_CARRIER count (#4-40 X 1/2 FLAT HEAD).
+  quantity: 4
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

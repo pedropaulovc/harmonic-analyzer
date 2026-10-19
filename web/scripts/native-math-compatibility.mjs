@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import ts from 'typescript'
 import * as THREE from 'three'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 function incompatible(parameter, actual, expected) {
   throw new Error(`Unsupported native runtime parameter ${parameter}: staged ${JSON.stringify(actual) ?? 'missing'}, supported ${JSON.stringify(expected)}. Update and requalify the runtime mathematics before adopting this CAD release. No live outputs replaced.`)
@@ -16,12 +17,13 @@ function arrayLength(parameter, value, expected) {
 }
 
 async function runtimeMagnifierRest(staged, webRoot) {
+  staged = projectCurrentNativeMetadata(staged)
   const text = await readFile(join(webRoot, 'src/magnifier.ts'), 'utf8')
   const source = ts.createSourceFile('magnifier.ts', text, ts.ScriptTarget.Latest, true)
   const imports = source.statements.filter(ts.isImportDeclaration)
   const declaration = imports[0]
   if (imports.length !== 1 || !ts.isStringLiteral(declaration.moduleSpecifier)
-    || declaration.moduleSpecifier.text !== './mechanics-data'
+    || declaration.moduleSpecifier.text !== './current-mechanics-data'
     || declaration.importClause?.name
     || !declaration.importClause?.namedBindings
     || !ts.isNamedImports(declaration.importClause.namedBindings)

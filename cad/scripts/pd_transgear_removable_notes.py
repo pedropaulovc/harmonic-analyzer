@@ -1,4 +1,4 @@
-"""Drawing-only text for the MHA-PD-009 removable sprocket sheet.
+"""Drawing-only text for the MHA-PD-09 removable sprocket sheet.
 
 Kept out of ``transgear_removable_spec``: the spec is imported by the chain
 solver and the assemblies, and the web's printed worst case reads the title
@@ -34,11 +34,11 @@ if abs(BORE_PIN_WEB_WORST - 0.47) > 1e-9:
 
 # The shortfall prints as a plain fact; its governance is the
 # pending ruling issue #1377 and this tag, never the sheet.
-# Pending exception ruling: MHA-PD-009 web (#1377).
+# Pending exception ruling: MHA-PD-09 web (#1377).
 BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_WORST:.2f} MIN."
 
-CRANKSHAFT_NUMBER = "MHA-DT-011"
-KNOB_COLLAR_NUMBER = "MHA-PD-022"
+CRANKSHAFT_NUMBER = "MHA-DT-11"
+KNOB_COLLAR_NUMBER = "MHA-PD-22"
 
 
 def _per_configuration(render: Callable[[int], str]) -> str:

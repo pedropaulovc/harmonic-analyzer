@@ -1,10 +1,10 @@
-r"""Create the curated manufacturing drawing for the rack-pinion reduction disc (MHA-PD-006).
+r"""Create the curated manufacturing drawing for the rack-pinion reduction disc (MHA-PD-06).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 120 physical teeth use the finite 48DP stock #2/reference-55 master.
 The face view (``*Front``, the rear face) prints the controlling native
 13-tooth actual-flank span, supported blank and bore with its reamed limits.
-The fit note names the MHA-PD-017 hub's spigot, and the native #0-80 tap
+The fit note names the MHA-PD-17 hub's spigot, and the native #0-80 tap
 callout carries its unchanged mouth-break and assembly-transfer lines (no
 bolt-circle position). The edge view prints the disc thickness, the front
 (clamped) face as datum B and the rear face's parallelism to it.
@@ -276,7 +276,7 @@ async def build(adapter: Any) -> dict[str, str]:
         stability_tolerance_m=0.0001,
     )
     # The tooth-space control reads datum A above, the 13.1 pilot, at the
-    # cutting setup; the assembled control is MHA-PD-000's transfer step.
+    # cutting setup; the assembled control is MHA-PD-00's transfer step.
     add_toothspace_callout(
         adapter,
         front,

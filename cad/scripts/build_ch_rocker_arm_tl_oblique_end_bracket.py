@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's end bracket (MHA-CH-006-TL-28; shop fixture).
+r"""Build the oblique-trammel jig's end bracket (MHA-CH-06-TL-28; shop fixture).
 
 A 6061-T6 1/2 x 3/4 in flat, 68.9 long, two off: each carries one of the
 leadscrew feed's KP08 pillow blocks on base bar 1's top

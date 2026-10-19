@@ -2,6 +2,7 @@ import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
+import { CURRENT_NATIVE_IDENTITY_PROJECTION } from '../current-native-identity.mjs'
 
 // Runtime decision controls, not source-fidelity or recovered-camera evidence.
 // SSR loads the real mechanics and source-track modules without a browser or GLB.
@@ -131,6 +132,39 @@ function assemblyState(controls) {
     ...controls,
   }
 }
+
+test('source-track ingestion projects archived native paths without rewriting source/model evidence', () => {
+  const track = fixture()
+  const aliases = [
+    ['mg-magnifier/mg-lever-wire-1', 'mg-magnifier/mg-vn-lever-wire-1'],
+    ['pn-pen/pn-pen-wire-1', 'pn-pen/pn-vn-pen-wire-1'],
+    ['pn-pen/pn-pen-marker-1', 'pn-pen/pn-vn-pen-marker-1'],
+    ['dt-drive-train/vn-fillister-screw-1', 'dt-drive-train/dt-vn-fillister-screw-1'],
+    ['pd-paper-drive/vn-fillister-screw-1', 'pd-paper-drive/pd-vn-fillister-screw-1'],
+    ['pd-paper-drive/vn-transgear-collar-cross-pin-1', 'pd-paper-drive/pd-vn-transgear-collar-cross-pin-1'],
+    ['pd-paper-drive/vn-latch-hook-rivet-1', 'pd-paper-drive/pd-vn-latch-hook-rivet-1'],
+  ]
+  track.anchors = aliases.map(([archived], index) => ({
+    id: `archive-anchor-${index}`, kind: 'physical-feature',
+    partPath: `ha-harmonic-analyzer/${archived}`, partLocalMetres: [0, .001, .002],
+    description: 'Synthetic native path projection control.',
+    correspondenceEvidence: 'Metadata-only control, not source correspondence evidence.',
+  }))
+  const original = JSON.stringify(track)
+  const reference = new CompactVideoReference(track, video)
+  assert.deepEqual(reference.data.anchors.map(anchor => anchor.partPath),
+    aliases.map(([, current]) => `ha-harmonic-analyzer/${current}`))
+  assert.deepEqual(reference.landmarkProbeAnchors, reference.data.anchors)
+  assert.strictEqual(reference.data.model, track.model)
+  assert.strictEqual(reference.data.source, track.source)
+  reference.data.anchors.forEach((anchor, index) => {
+    assert.strictEqual(anchor.partLocalMetres, track.anchors[index].partLocalMetres)
+  })
+  assert.deepEqual(reference.currentIdentityProjection, CURRENT_NATIVE_IDENTITY_PROJECTION)
+  assert.ok(Object.isFrozen(reference.currentIdentityProjection))
+  assert.equal(JSON.stringify(track), original)
+  assert.equal(reference.prepareAt(.5).state, 'approximate')
+})
 
 test('both chosen endpoints opt in to continuous position, rotation, zoom and principal point without claiming matched history', () => {
   for (const time of [0.25, 0.5]) {

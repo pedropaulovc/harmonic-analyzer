@@ -162,7 +162,7 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
+    ("pd_vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
     ),
@@ -189,23 +189,23 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "half the title block's angular band on the 90 deg countersink, for the "
         "seat-cone corners; not a size fit"
     ),
-    ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
+    ("pd_vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
-    ("vn_cylinder_bank_spring_spec", "ID_BAND"): (
+    ("dt_vn_cylinder_bank_spring_spec", "ID_BAND"): (
         "McMaster 9714K392's catalogue ID tolerance (plus, minus): indexed for "
         "the tightest spring against the largest arbor"
     ),
-    ("vn_cylinder_bank_spring_spec", "OD_BAND"): (
+    ("dt_vn_cylinder_bank_spring_spec", "OD_BAND"): (
         "McMaster 9714K392's catalogue OD tolerance (plus, minus): indexed for "
         "its seat on the washer and strap faces"
     ),
-    ("vn_rocker_bank_spring_spec", "ID_BAND"): (
+    ("ch_vn_rocker_bank_spring_spec", "ID_BAND"): (
         "McMaster 9714K24's catalogue ID tolerance (plus, minus): indexed to show "
         "it reaches under the pivot shaft (the slide-free check at fit-up)"
     ),
-    ("vn_rocker_bank_spring_spec", "OD_BAND"): (
+    ("ch_vn_rocker_bank_spring_spec", "OD_BAND"): (
         "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
         "the largest spring under the hub's O10.2"
     ),
@@ -222,11 +222,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
-    ("vn_cone_pivot_screw_spec", "SHOULDER_DIA_BAND"): (
+    ("dt_vn_cone_pivot_screw_spec", "SHOULDER_DIA_BAND"): (
         "McMaster 91829A560 supplied shoulder diameter +0/-0.0254 mm; "
         "upper/lower deviations used by the platform's stock pivot fit"
     ),
-    ("vn_cone_pivot_screw_spec", "SHOULDER_LEN_BAND"): (
+    ("dt_vn_cone_pivot_screw_spec", "SHOULDER_LEN_BAND"): (
         "McMaster 91829A560 supplied shoulder length +0.0508/0 mm; "
         "upper/lower deviations used by the platform's stock axial stack"
     ),
@@ -280,7 +280,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the Hole Wizard diameter tolerance, the cone set stack's and support "
         "pose's pivot float and the assembly's pivot air"
     ),
-    ("vn_cone_tip_collar_spec", "BORE_DIA_BAND"): (
+    ("dt_vn_cone_tip_collar_spec", "BORE_DIA_BAND"): (
         "the finished bore's seat band, indexed to re-centre the modelled bore "
         "(BORE_MODEL_DIA_BAND, the band the build sets natively)"
     ),
@@ -288,15 +288,15 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
+    ("pd_vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
         "the retained cup pin's hole match-drilled through cup and journal: "
         "indexed for HOLE_MAX against the B18.8.2 catalogue window"
     ),
-    ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
+    ("pd_vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
-    ("vn_knife_mount_dowel_spec", "DIA_BAND"): (
+    ("sm_vn_knife_mount_dowel_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the knife mount's reamed blind hole"
     ),

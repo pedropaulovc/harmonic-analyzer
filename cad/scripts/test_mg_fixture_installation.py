@@ -7,7 +7,7 @@ import math
 import pytest
 
 import build_mg_magnifier_assembly as assembly
-import vn_lever_wire_geom as wire
+import mg_vn_lever_wire_geom as wire
 import mg_output_fixture_geom as fixture
 from _mcmaster_91882a221 import HEAD_STACK_LEN, SHANK_LEN, THUMB_SPEC
 from mg_magnifying_vertical_rod_geom import ROD_DIA
@@ -151,7 +151,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     expected = {
         pair: 1.10 * math.pi * (major**2 - bore**2) * length / 4.0
         for pair, (major, bore, length) in (
-            (frozenset(("vn-thumb-screw-2", "mg-output-fixture-1")), owned_thread),
+            (frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")), owned_thread),
             (
                 frozenset(("mg-magnifying-lever-1", "mg-magnifying-bracket-1")),
                 owned_press,
@@ -162,7 +162,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
             ),
         )
     }
-    clamp_thumb = frozenset(("vn-thumb-screw-1", "mg-magnifying-clamp-1"))
+    clamp_thumb = frozenset(("mg-vn-thumb-screw-1", "mg-magnifying-clamp-1"))
     major, bore, length = owned_clamp_thumb
     assert math.isclose(
         pairs[clamp_thumb], 1.10 * math.pi * (major**2 - bore**2) * length / 4.0, abs_tol=1e-12
@@ -179,7 +179,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
     assert top[top_press_pair] == pytest.approx(
         1.0449337917515231, rel=0.0, abs=1e-12
     )
-    assert frozenset(("vn-thumb-screw-2", "mg-magnifying-vertical-rod-1")) not in pairs
+    assert frozenset(("mg-vn-thumb-screw-2", "mg-magnifying-vertical-rod-1")) not in pairs
 
 
 _PRESS_BUDGET_KEYS = {

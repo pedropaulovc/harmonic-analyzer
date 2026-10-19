@@ -15,7 +15,7 @@ the set screw (which enters from the body's front face, z BODY_Z0).
 Re-derived from the engineerguy 4/4 video (9:15-10:34) and the 2026-10 design
 brief (``balance_options.png`` panel C):
 
-* The marker's grip (``vn_pen_marker_spec.BARREL_DIA``, a regular-size
+* The marker's grip (``pn_vn_pen_marker_spec.BARREL_DIA``, a regular-size
   Sharpie Fine Point) seats in a 90 degree V-groove along the bottom of the
   neck, pressed up by the stirrup's thumb screw; the V centres the barrel
   whatever its diameter tolerance.
@@ -52,8 +52,8 @@ import _config
 from _hole_spec import HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import angular_band_deg, printed_band_mm
 import pn_pen_rod_spec as rod
-import vn_pen_marker_spec as marker
-import vn_pen_rod_set_screw_spec as rod_set_screw
+import pn_vn_pen_marker_spec as marker
+import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 
 # X, along the marker: the CG solve (pn_pen_carriage_geom) puts the carriage's
 # plan CG 0.013 off the rod axis at 27.3, the .X step nearest it.

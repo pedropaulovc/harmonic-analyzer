@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's carrier plate (MHA-CH-006-TL-21; shop fixture).
+r"""Build the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21; shop fixture).
 
 The plate the rocker blank rides on, carried on two pivot pins
 (``ch_rocker_arm_tl_oblique_carrier_spec``; every (calc) value is the

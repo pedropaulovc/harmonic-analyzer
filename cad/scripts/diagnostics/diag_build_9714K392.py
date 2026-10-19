@@ -1,7 +1,7 @@
 r"""McMaster 9714K392 -- steel wave disc spring, ID 0.385 x OD 0.5 in.
 
-Used as vn-cylinder-bank-spring (MHA-VN-052).  The catalogue facts and the
-part frame are ``vn_cylinder_bank_spring_spec``'s.  The model is the
+Used as dt-vn-cylinder-bank-spring (MHA-DT-VN-68).  The catalogue facts and the
+part frame are ``dt_vn_cylinder_bank_spring_spec``'s.  The model is the
 spring's installed envelope: one Top-plane ID x OD annulus extruded blind
 MODEL_HEIGHT along +Y from the south bearing face (y = 0).  [INFERENCE: the
 waves are not modelled; the envelope is what the bank layout and the
@@ -35,7 +35,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_cylinder_bank_spring_spec import (  # noqa: E402
+from dt_vn_cylinder_bank_spring_spec import (  # noqa: E402
     ID,
     MODEL_HEIGHT,
     OD,

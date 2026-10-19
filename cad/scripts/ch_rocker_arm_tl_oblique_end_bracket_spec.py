@@ -1,14 +1,14 @@
-r"""Pure-data contract for the oblique-trammel jig's end bracket (MHA-CH-006-TL-28).
+r"""Pure-data contract for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). Two
 identical brackets carry the leadscrew feed's two KP08 pillow blocks (bought,
 shop inventory ``fixtures.trammel-kp08-blocks``) on base bar 1's top
-(MHA-CH-006-TL-20). Each lifts its block's base off the bar by the plate's
+(MHA-CH-06-TL-20). Each lifts its block's base off the bar by the plate's
 thickness and stands wholly on the bar, its outer end flush with the bar's
 column-side edge (the user's 2026-10-17 ruling A′: the bar widened to 1/2 x 6
 so the bracket no longer cantilevers past it). The layout (axis, stations
 and every bought dimension) belongs to
-``ch_rocker_arm_tl_oblique_leadscrew_spec``, imported as ``leadscrew``; this
+``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers.
 
 Material and stock: 6061-T6 aluminium flat bar 1/2 x 3/4 in (12.70 x 19.05),
@@ -67,7 +67,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -129,8 +129,8 @@ if not _TWO_PLACE_RADIUS > max(KP08_SCREW_FLOAT, BAR_SCREW_FLOAT):
 # Every tight band names its mate (drawing-guidelines rule 4): each station
 # and the row, which serves both patterns.
 KP08_MATE_CALLOUT = "MATCHES KP08 BLOCK HOLES"
-BAR_MATE_CALLOUT = "MATCHES MHA-CH-006-TL-20"
-ROW_CALLOUT = "\n".join(("HOLES IN LINE FOR KP08", "AND MHA-CH-006-TL-20"))
+BAR_MATE_CALLOUT = "MATCHES MHA-CH-06-TL-20"
+ROW_CALLOUT = "\n".join(("HOLES IN LINE FOR KP08", "AND MHA-CH-06-TL-20"))
 
 # --- The KP08 base lands on the bracket ------------------------------------------
 _KP08_CENTRE_X = (KP08_TAP_X[0] + KP08_TAP_X[1]) / 2.0
@@ -259,7 +259,7 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
         "size_mm": [BRACKET_LENGTH, BRACKET_WIDTH, BRACKET_THICK],
         "note": (
             f"{NUMBER}, 6061-T6 1/2 x 3/4 flat; carries a {KP08_ID} block on "
-            "base bar MHA-CH-006-TL-20 by 4 x #8-32 SHCS"
+            "base bar MHA-CH-06-TL-20 by 4 x #8-32 SHCS"
         ),
         "measured": dict(_MEASURED),
     },

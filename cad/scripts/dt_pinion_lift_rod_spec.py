@@ -24,8 +24,8 @@ CAP_SAG = 1.2
 CAP_R = round((ROD_DIA**2 / 4.0 + CAP_SAG**2) / (2.0 * CAP_SAG), 2)  # 4.80
 ROD_DIA_BAND = SHAFT_H
 
-LEVER_NUMBER = "MHA-DT-016"
-PIVOT_BLOCK_NUMBER = "MHA-DT-018"
+LEVER_NUMBER = "MHA-DT-16"
+PIVOT_BLOCK_NUMBER = "MHA-DT-18"
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the rod turns in the pivot blocks' west bores -- the one running
 # surface on the part.
@@ -38,7 +38,7 @@ SURFACE_FINISHES = (
 # (drawing-guidelines.md rule 11 (turned parts read like the lathe)).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"RodDia", "RodBody", "CapR", "RodOverall"},
-    # U36: the MHA-DT-030 pin hole, located from the flat front end face -- the
+    # U36: the MHA-DT-30 pin hole, located from the flat front end face -- the
     # part origin sits on that face, so the circle's own anchor IS the
     # front-end baseline (drawing-guidelines.md rule 10 (dimension from a real feature)).
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
@@ -69,7 +69,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# the h band rides the diameter because the rod turns in the two MHA-DT-018
+# the h band rides the diameter because the rod turns in the two MHA-DT-18
 # blocks' reamed lift bores (+0.025/+0.010 slide band); ground 1/4 in shafting
 # already holds it, so the stock is good enough as supplied (machinist review
 # r1: the band and Ra named no mate).

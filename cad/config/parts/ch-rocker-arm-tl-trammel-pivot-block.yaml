@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-trammel-pivot-block:
   title: Rocker Template Trammel Pivot Block
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-14
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-14
   # The block needs only a flat, free-machining low-carbon bar: any grade
   # serves (SolidWorks material Plain Carbon Steel); the shop stock is the
   # 1018 cold-rolled flat bar below.

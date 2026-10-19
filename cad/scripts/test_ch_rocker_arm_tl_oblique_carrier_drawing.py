@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel carrier plate (MHA-CH-006-TL-21)."""
+"""Offline contracts for the oblique-trammel carrier plate (MHA-CH-06-TL-21)."""
 
 from __future__ import annotations
 
@@ -78,8 +78,8 @@ def test_pin_chain_runs_from_a1_b1_with_banded_mates() -> None:
         assert math.isclose(high - low, 0.04)
     # Rule 4 (jig-r3): each band names what it sets and on which part, not
     # its sensitivity.
-    assert spec.SPACING_CALLOUT == "SETS R800 ON\nMHA-CH-013"
-    assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-013"
+    assert spec.SPACING_CALLOUT == "SETS R800 ON\nMHA-CH-13"
+    assert spec.DX_CALLOUT == spec.DY_CALLOUT == "SETS R816 ON\nMHA-CH-13"
     for text in spec.CALLOUTS_BELOW.values():
         assert "ERROR" not in text and "1:1" not in text
     # A1 is located from the HUB axis (the X datum) at the .XX band.
@@ -97,7 +97,7 @@ def test_pin_holes_are_h7_and_name_the_pin() -> None:
     hole = _features()["pin_hole_a1"]
     assert hole["dia"] == [10.0, 10.015]
     assert (spec.PIN_CLEARANCE_MIN, round(spec.PIN_CLEARANCE_MAX, 3)) == (0.0, 0.024)
-    assert "MHA-CH-006-TL-23 PIVOT PIN" in hole["note"]
+    assert "MHA-CH-06-TL-23 PIVOT PIN" in hole["note"]
     assert "REAM THRU" in hole["note"]
 
 
@@ -164,7 +164,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-oblique-carrier")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-21"
+    assert number == "MHA-CH-06-TL-21"
 
 
 def test_jig_does_not_import_the_retiring_trammel_kit() -> None:
@@ -339,7 +339,7 @@ def test_riser_tap_stations_print_their_walls_band_and_name_the_riser() -> None:
         assert tap["station_nominal"] == round(x, places)
         assert tap["height_nominal"] == round(y, places)
     riser = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
-    assert riser == "MHA-CH-006-TL-24"
+    assert riser == "MHA-CH-06-TL-24"
     assert spec.RISER_TAP_CALLOUT == (f"HOLDS {riser} SCREWS\nCLEAR OF ITS CUT EDGES")
     # Rule 4 (carrier r11): each 3-place station names what it locates.
     assert set(spec.RISER_STATIONS) == spec.DRAWING_DIMENSIONS["RiserTaps"]

@@ -2,8 +2,8 @@
 
 A leader that runs through a hole's centre, or across another annotation's
 leader, is a clarity defect a render shows but no dimension gate catches
-(eye pass of w15-301f4bf4e: MHA-DT-006's hub-seat leader crossed R12.7 at the
-bore centre; on MHA-DT-007 the tip diameter, bore diameter and bore finish
+(eye pass of w15-301f4bf4e: MHA-DT-06's hub-seat leader crossed R12.7 at the
+bore centre; on MHA-DT-07 the tip diameter, bore diameter and bore finish
 leaders met at the bore). This module reads each annotation's ink as sheet
 segments so a drawing can fail its build on such a crossing.
 

@@ -1,4 +1,4 @@
-"""MHA-CH-000 named explode (CHANNEL_EXPLODED): the builder-owned plan.
+"""MHA-CH-00 named explode (CHANNEL_EXPLODED): the builder-owned plan.
 
 Pure data, no SolidWorks: ``_ch_channel_explode`` authors the named explode
 from it and draw_ch_channel_assembly reads the same names back. Every channel
@@ -27,24 +27,24 @@ BANK_MID_Z = STACK_MID_Z
 
 KEEPER = "ch-fulcrum-keeper"
 FULCRUM_SHAFT = "ch-fulcrum-shaft"
-KEEPER_SET_SCREW = "vn-fulcrum-set-screw"
-KEEPER_FOOT_SCREW = "vn-frame-side-screw"
+KEEPER_SET_SCREW = "ch-vn-fulcrum-set-screw"
+KEEPER_FOOT_SCREW = "ch-vn-frame-side-screw"
 BRACKET = "ch-pivot-bracket"
-BRACKET_SET_SCREW = "vn-arbor-set-screw"
-BRACKET_HOLD_DOWN = "vn-bracket-hold-down-screw"
-WASHER = "vn-rocker-thrust-washer"
-BANK_SPRING = "vn-rocker-bank-spring"
+BRACKET_SET_SCREW = "ch-vn-arbor-set-screw"
+BRACKET_HOLD_DOWN = "ch-vn-bracket-hold-down-screw"
+WASHER = "ch-vn-rocker-thrust-washer"
+BANK_SPRING = "ch-vn-rocker-bank-spring"
 ROD = "ch-connecting-rod"
 BAR = "ch-amplitude-bar"
 BAR_PIN = "ch-bar-pivot-pin"
-HOOK = "vn-spring-hook"
+HOOK = "ch-vn-spring-hook"
 ANCHOR_NUT = "ch-anchor-jam-nut"
 ARM = "ch-rocker-arm"
 ROD_PIN = "ch-rod-pivot-pin"
 LEVER = "ch-channel-lever"
 # The installed spring's family: the model holds its built variants
 # (``-stretchNN``, build_ch_channel_assembly), each one family here.
-CHANNEL_SPRING = "vn-channel-spring-installed"
+CHANNEL_SPRING = "ch-vn-channel-spring-installed"
 
 
 def family(stem: str) -> str:
@@ -137,7 +137,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # line (lever spring hole x 24.85) and hid the spring (r2 balloon pick);
     # 50 east put bar 3 over the bank spring (r4 balloon pick, shared edge).
     ExplodeStep("bars up", (BAR, BAR_PIN), "y", 50.0),
-    # Each anchor's MHA-CH-014 jam nut goes down with it, then a further 30
+    # Each anchor's MHA-CH-14 jam nut goes down with it, then a further 30
     # off the shank's bottom. On the shank, the 6.66-diameter nut is under 1 mm
     # at 1:7 and shares the anchor's outline. 30 (3.5 mm on the sheet) orders
     # its balloon round the ring clear of the anchor's (ring replay).

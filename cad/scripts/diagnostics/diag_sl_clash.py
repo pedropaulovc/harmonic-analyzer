@@ -88,7 +88,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._attempt(lambda: mgr.Done(), default=None)
 
     # --- isolate summing-lever + the stretch00 springs, render the clash -----
-    keep = ("sm-summing-lever", "vn-channel-spring-installed-stretch00")
+    keep = ("sm-summing-lever", "ch-vn-channel-spring-installed-stretch00")
     model = adapter.currentModel
 
     def _leaves(comp):

@@ -2,7 +2,7 @@
 
 The pinion drum's parked station, the strap pivot it swings on, the strap's
 lean and the follower pin's line, and the lift axis the eccentric cams turn
-on.  build_drive_train_assembly places the rig from these, and the MHA-DT-000 fit-up
+on.  build_drive_train_assembly places the rig from these, and the MHA-DT-00 fit-up
 text (pinion_rig_tip_gap) derives the bench rest gap from the same numbers,
 so neither reads the other and no library module reaches a build script (#880).
 

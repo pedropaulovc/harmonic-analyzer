@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear arm (MHA-PD-018) drawing."""
+"""Offline contracts for the transgear arm (MHA-PD-18) drawing."""
 
 from __future__ import annotations
 
@@ -22,9 +22,9 @@ import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as geometry
 import pd_transgear_arm_spec as spec
 import transgear_hanger_joints as joints
-import vn_transgear_latch_pin_spec as pin
+import pd_vn_transgear_latch_pin_spec as pin
 import pd_transgear_pin_spec as cluster_pin
-import vn_transgear_pivot_screw_spec as pivot_screw
+import pd_vn_transgear_pivot_screw_spec as pivot_screw
 from _drawing_registry import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -172,7 +172,7 @@ def _worst_far_face_margin(
 ) -> float:
     """Least axial distance by which the latch pin's full diameter passes
     the hook strip's far face, over every corner of the coupled stack: the
-    MHA-PD-014 ear bent to either end of its angular row, turning the arm it
+    MHA-PD-14 ear bent to either end of its angular row, turning the arm it
     carries about the bend line (machine Y through the ear's outer face at
     the bar's back face).  The pin is carried into the unbent hook's frame by
     the inverse turn, where the far face is the plane square to U at the
@@ -340,7 +340,7 @@ def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None
 
 def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     """R9-68: the #10-32 stud tap at S became a reamed bore that holds the
-    MHA-PD-023 pin by a press at both limit pairs, and its ream band only cuts
+    MHA-PD-23 pin by a press at both limit pairs, and its ream band only cuts
     oversize."""
     loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
     tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
@@ -368,7 +368,7 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert (loosest, tightest) == pytest.approx((0.00254, 0.01762))
     assert spec.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert joints.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
-    assert _config.parts("vn-transgear-latch-pin")["number"] == spec.LATCH_PIN_NUMBER
+    assert _config.parts("pd-vn-transgear-latch-pin")["number"] == spec.LATCH_PIN_NUMBER
     low, high = spec.LATCH_PIN_PRESS_PRINTED
     assert 0.0 < low <= loosest < tightest <= high < tightest + 1e-4
     lines = spec.PIN_HOLE_CALLOUT.splitlines()
@@ -606,7 +606,7 @@ def test_the_overall_reference_spans_the_pivot_round_to_the_square_end() -> None
 
 def test_registry_row_is_the_made_steel_mha_164() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-018"
+    assert row["number"] == "MHA-PD-18"
     assert int(row["quantity"]) == 1
     assert "ASTM A108" in row["material_specification"]
     assert row["tolerance_class"] == "machined_block"

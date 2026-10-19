@@ -1,5 +1,5 @@
 r"""Pure placement, BOM and clearance contract for ch-rocker-arm-tl-oblique-jig.SLDASM
-(MHA-CH-006-TL-000).
+(MHA-CH-06-TL-00).
 
 Shop fixture, not a machine assembly (cad/docs/subsystem-identities.md): the
 rocker arm's oblique-trammel mill jig, set up on the PM-30MV table. It never
@@ -9,7 +9,7 @@ read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
 Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-30 to TL-51). Overall envelope at the modelled pose,
+bought items' (TL-VN-50 to TL-VN-71). Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
@@ -30,7 +30,7 @@ the table, carriage tops at ``CARRIAGE_TOP_Z`` 40.7, pivot blocks to 64.7, the
 carrier from ``CARRIER_UNDERSIDE_Z`` 67.7 to ``CARRIER_TOP_Z`` 79.7; riser and
 feed lever on the carrier top; the HUB pin's head under the carrier.
 
-Leadscrew feed (``ch_rocker_arm_tl_oblique_leadscrew_spec``, imported as
+Leadscrew feed (``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as
 ``leadscrew``): two TL-28 end brackets screwed up from bar 1's
 underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
 1's column-side face and carries the flanged nut, so it rides with carriage
@@ -38,7 +38,7 @@ underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
 with the nut bracket's block screws out; the handwheel feeds the finish pass.
 
 Every bought item is modelled and inserted, each family its own TL part
-(TL-30 to TL-51, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
+(TL-VN-50 to TL-VN-71, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
 the four 6200-2RS bearings, the CL dowel, the leadscrew, its flanged nut, the
 two KP08 blocks and the handwheel, the four hold-down studs with their
 T-nuts and flange nuts, every screw, and the wedge-lock washer pair under
@@ -80,41 +80,41 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
-import ch_rocker_arm_tl_oblique_bearing_spec as bearing
-import ch_rocker_arm_tl_oblique_block_washer_spec as block_washer
-import ch_rocker_arm_tl_oblique_block_screw_spec as block_screw
-import ch_rocker_arm_tl_oblique_bracket_screw_spec as bracket_screw
-import ch_rocker_arm_tl_oblique_carriage_screw_spec as carriage_screw
-import ch_rocker_arm_tl_oblique_carriage_spec as carriage
+import ch_rocker_arm_tl_vn_oblique_bearing_spec as bearing
+import ch_rocker_arm_tl_vn_oblique_block_washer_spec as block_washer
+import ch_rocker_arm_tl_vn_oblique_block_screw_spec as block_screw
+import ch_rocker_arm_tl_vn_oblique_bracket_screw_spec as bracket_screw
+import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as carriage_screw
+import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
-import ch_rocker_arm_tl_oblique_cl_dowel_spec as cl_dowel
-import ch_rocker_arm_tl_oblique_clamp_screw_spec as clamp_screw
+import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
+import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
-import ch_rocker_arm_tl_oblique_flange_nut_spec as flange_nut
-import ch_rocker_arm_tl_oblique_handwheel_spec as handwheel
-import ch_rocker_arm_tl_oblique_hold_down_stud_spec as hold_down_stud
+import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as flange_nut
+import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
+import ch_rocker_arm_tl_vn_oblique_hold_down_stud_spec as hold_down_stud
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
-import ch_rocker_arm_tl_oblique_leadscrew_nut_spec as leadscrew_nut
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as leadscrew_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
-import ch_rocker_arm_tl_oblique_leadscrew_stock_spec as leadscrew_stock
-import ch_rocker_arm_tl_oblique_lever_screw_spec as lever_screw
-import ch_rocker_arm_tl_oblique_lever_washer_spec as lever_washer
-import ch_rocker_arm_tl_oblique_nut_screw_spec as nut_screw
-import ch_rocker_arm_tl_oblique_kp08_screw_spec as kp08_screw
-import ch_rocker_arm_tl_oblique_pillow_block_spec as pillow_block
+import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
+import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as lever_screw
+import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
+import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
+import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
+import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as pillow_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
-import ch_rocker_arm_tl_oblique_rail_screw_spec as rail_screw
-import ch_rocker_arm_tl_oblique_rail_spec as guide_rail
-import ch_rocker_arm_tl_oblique_riser_screw_spec as riser_screw
+import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as rail_screw
+import ch_rocker_arm_tl_vn_oblique_rail_spec as guide_rail
+import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_oblique_t_nut_spec as t_nut
+import ch_rocker_arm_tl_vn_oblique_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
-DRAWING_NUMBER = "MHA-CH-006-TL-000"
+DRAWING_NUMBER = "MHA-CH-06-TL-00"
 
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
@@ -125,33 +125,33 @@ HUB_PIN = "ch-rocker-arm-tl-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 NUT_BRACKET = leadscrew.NUT_BRACKET
-# Bought hardware (TL-30..50), every item modelled and mated.
-RAIL = "ch-rocker-arm-tl-oblique-rail"
-CARRIAGE = "ch-rocker-arm-tl-oblique-carriage"
-BEARING = "ch-rocker-arm-tl-oblique-bearing"
-CL_DOWEL = "ch-rocker-arm-tl-oblique-cl-dowel"
-LEADSCREW = "ch-rocker-arm-tl-oblique-leadscrew"
-LEADSCREW_NUT = "ch-rocker-arm-tl-oblique-leadscrew-nut"
-PILLOW_BLOCK = "ch-rocker-arm-tl-oblique-pillow-block"
-HANDWHEEL = "ch-rocker-arm-tl-oblique-handwheel"
-HOLD_DOWN_STUD = "ch-rocker-arm-tl-oblique-hold-down-stud"
-T_NUT = "ch-rocker-arm-tl-oblique-t-nut"
-FLANGE_NUT = "ch-rocker-arm-tl-oblique-flange-nut"
-RAIL_SCREW = "ch-rocker-arm-tl-oblique-rail-screw"
-BRACKET_SCREW = "ch-rocker-arm-tl-oblique-bracket-screw"
-BLOCK_SCREW = "ch-rocker-arm-tl-oblique-block-screw"
-CARRIAGE_SCREW = "ch-rocker-arm-tl-oblique-carriage-screw"
-PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-oblique-kp08-screw"
-NUT_SCREW = "ch-rocker-arm-tl-oblique-nut-screw"
-RISER_SCREW = "ch-rocker-arm-tl-oblique-riser-screw"
-CLAMP_SCREW = "ch-rocker-arm-tl-oblique-clamp-screw"
-LEVER_SCREW = "ch-rocker-arm-tl-oblique-lever-screw"
-BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-oblique-block-washer"
-LEVER_LOCK_WASHER = "ch-rocker-arm-tl-oblique-lever-washer"
+# Bought hardware (TL-VN-50..71), every item modelled and mated.
+RAIL = "ch-rocker-arm-tl-vn-oblique-rail"
+CARRIAGE = "ch-rocker-arm-tl-vn-oblique-carriage"
+BEARING = "ch-rocker-arm-tl-vn-oblique-bearing"
+CL_DOWEL = "ch-rocker-arm-tl-vn-oblique-cl-dowel"
+LEADSCREW = "ch-rocker-arm-tl-vn-oblique-leadscrew"
+LEADSCREW_NUT = "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
+PILLOW_BLOCK = "ch-rocker-arm-tl-vn-oblique-pillow-block"
+HANDWHEEL = "ch-rocker-arm-tl-vn-oblique-handwheel"
+HOLD_DOWN_STUD = "ch-rocker-arm-tl-vn-oblique-hold-down-stud"
+T_NUT = "ch-rocker-arm-tl-vn-oblique-t-nut"
+FLANGE_NUT = "ch-rocker-arm-tl-vn-oblique-flange-nut"
+RAIL_SCREW = "ch-rocker-arm-tl-vn-oblique-rail-screw"
+BRACKET_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
+BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-block-screw"
+CARRIAGE_SCREW = "ch-rocker-arm-tl-vn-oblique-carriage-screw"
+PILLOW_BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-kp08-screw"
+NUT_SCREW = "ch-rocker-arm-tl-vn-oblique-nut-screw"
+RISER_SCREW = "ch-rocker-arm-tl-vn-oblique-riser-screw"
+CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
+LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
+BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-block-washer"
+LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory, in registry order
-# TL-20..51. The bought counts are the part specs' own.
+# TL-20..29 and TL-VN-50..71. The bought counts are the part specs' own.
 QUANTITIES = {
     BASE_BAR: base_bar.QUANTITY,
     CARRIER: 1,
@@ -586,7 +586,7 @@ BRACKET_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     )
     for hole in leadscrew.BASE_BAR_HOLES
 )
-# Each block screw's wedge-lock pair (TL-50) on the floor of TL-22's
+# Each block screw's wedge-lock pair (TL-VN-70) on the floor of TL-22's
 # counterbore, the screw's head on the pair: both along the block's +Y.
 BLOCK_LOCK_WASHER_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
@@ -618,7 +618,7 @@ CARRIAGE_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in pivot_block.BOLT_POINTS
 )
 # On the carrier: the riser's flat heads flush with its top, the CR clamp
-# screw's head on the strap, each lever screw's wedge-lock pair (TL-51) on the
+# screw's head on the strap, each lever screw's wedge-lock pair (TL-VN-71) on the
 # feed lever and the screw's head on the pair.
 RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     _carried(point, trammel.CARRIER_TOP_Z + trammel.RISER_THICK)
@@ -792,7 +792,6 @@ BOM_DESCRIPTIONS = {
     BLOCK_LOCK_WASHER: f"{block_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
     LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
 }
-BOM_DESCRIPTION_CHARS = 41  # the drawing's description cell prints one line
 # BOM item n is BOM_ORDER position n: the builder inserts each family's first
 # instance in BOM_ORDER sequence (SolidWorks numbers a top-level BOM in
 # FeatureManager order), and the steps cite items by these numbers.
@@ -1199,7 +1198,7 @@ if not BLOCK_JOINT_SLIP_N >= 1.25 * FEED_THRUST_N:
     )
 
 # --- The nut screws: their torque; the nut's flange a static clamp ---------------
-# LOAD_CASES (owner ruling 2026-10-17, TL-000 review jbf-r17, rule 23): the 4
+# LOAD_CASES (owner ruling 2026-10-17, TL-00 review jbf-r17, rule 23): the 4
 # M3 screws clamp the Tr8 nut's brass flange to TL-29. The nut's reaction to
 # the screw's turning reverses with the handwheel; the flange's clamp friction
 # carries it with margin, so the flange never slips and no operating torque
@@ -1275,9 +1274,9 @@ _NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
 # that band (END_WALL_MIN 1.544), and the jig's exception RV-02 states it.
 
 # --- The feed lever screws: their tightening torque -----------------------------------
-# Rule 23 (C3 r6 TL-000 review): the 2 5/16-18 lever screws carry the
+# Rule 23 (C3 r6 TL-00 review): the 2 5/16-18 lever screws carry the
 # operator's push and pull on the TL-26 lever, reversing through every pass.
-# Wedge-lock pairs (TL-51) under the heads keep them from backing off. The
+# Wedge-lock pairs (TL-VN-71) under the heads keep them from backing off. The
 # torque takes the block screws' basis: the TL-21 6061-T6 tap's strip load
 # at the worst-case engagement (lever_washer.ENGAGEMENT_MIN 9.14: the
 # shortest screw through the thickest lever and pair, inside the 12 plate's
@@ -1427,7 +1426,7 @@ ASSEMBLY_STEPS = (
     "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
     "TAGGED ON SHEET 1) ON THE COLLARS.",
     "10. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "
-    "THEIR SPOTS (LOCATED ON MHA-CH-006-TL-21 FROM THE A1-B1 PIN AXES), EACH "
+    "THEIR SPOTS (LOCATED ON MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH "
     "IN ONE SETUP SQUARE TO THE CARRIER TOP: "
     f"{_HUB_HOLE}; {_CL_HOLE}; BREAK THE HUB HOLE BELOW "
     f"{hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN:.1f} MIN X 45°.",
@@ -1436,7 +1435,7 @@ ASSEMBLY_STEPS = (
     f"{riser.SCREW_SIZE} COUNTERSUNK, HUB Ø{riser.HUB_DIA:.0f}, CL DOWEL, CR SCREW "
     f"Ø{riser.CLAMP_DIA:.2f}) FROM BELOW THROUGH THE CARRIER'S FINISHED AND "
     "TAPPED HOLES; DRILL AND COUNTERSINK THEM TO "
-    "MHA-CH-006-TL-24, THEN SCREW IT DOWN WITH "
+    "MHA-CH-06-TL-24, THEN SCREW IT DOWN WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
     "ONLY NOW PRESS THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL "
     f"{_item(CL_DOWEL)} FLUSH UNDERNEATH; FACE THE "

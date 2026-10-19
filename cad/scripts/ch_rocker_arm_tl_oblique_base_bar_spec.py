@@ -1,4 +1,4 @@
-r"""Pure-data contract for the oblique trammel's base bars (MHA-CH-006-TL-20).
+r"""Pure-data contract for the oblique trammel's base bars (MHA-CH-06-TL-20).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). Two bars
 lie on the PM-30MV table, one under each HGR15R rail (bought, shop inventory
@@ -214,7 +214,7 @@ if SLOT_LATERAL - SLOT_RUN / 2.0 - _R_MAX <= trammel.RAIL_WIDTH / 2.0:
 
 # --- End bracket holes (PR C4) -------------------------------------------
 # The two TL-28 brackets' #8-32 x 5/8 SHCS, fitted up through the bar before it
-# goes on the table. Positions: ``ch_rocker_arm_tl_oblique_leadscrew_spec``'s
+# goes on the table. Positions: ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``'s
 # BASE_BAR_HOLES, which imports this module; only the build, drawing and test
 # read them, and pass them to ``bracket_hole_walls``.
 BRACKET_SCREW = "#8"
@@ -243,7 +243,7 @@ BRACKET_CALLOUT_PRECISION = {
     "hw-cbdia": BRACKET_CBORE_PLACES,
     "hw-cbdepth": BRACKET_CBORE_PLACES,
 }
-BRACKET_MATE = "MHA-CH-006-TL-28"
+BRACKET_MATE = "MHA-CH-06-TL-28"
 # The plan looks at the top face; the counterbores open on the underside.
 BRACKET_CALLOUT_PROCESS = f"MATCHES {BRACKET_MATE}\nDRILL, C'BORE FAR SIDE\n"
 _XXX = printed_band_mm(BRACKET_HOLE_PLACES)

@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's nut bracket (MHA-CH-006-TL-29).
+r"""Create the drawing for the oblique-trammel jig's nut bracket (MHA-CH-06-TL-29).
 
 An 18.5 x 48 x 35.3 block at 2:1, three projected views about the nut face.
 The nut face (*Left, from -X: the Y = 0 face at its top edge, the bottom
@@ -692,7 +692,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Nut Bracket Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel nut bracket; 6061-T6 flat; MHA-CH-006-TL-29",
+            3: "rocker oblique trammel nut bracket; 6061-T6 flat; MHA-CH-06-TL-29",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

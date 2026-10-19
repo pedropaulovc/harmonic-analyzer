@@ -1,5 +1,5 @@
 dt-cone-gear:
-  number: MHA-DT-003
+  number: MHA-DT-03
   description: "CONE GEAR, T006-T120 BY 6; 1 EACH"
   material: Brass
   material_specification: C36000 free-machining brass
@@ -21,18 +21,18 @@ dt-cone-gear:
   # journal; it is the named contact-ratio exception (dt_cone_gear_spec,
   # test_standard_mesh_checks). The R1.491 tool with root MIN 2.346 is retired.
   # TODO(#1649): RV-01 is pending owner confirmation. The geometry follows
-  # from two owner rulings, and changing it changes MHA-DT-004. #1649 lists
+  # from two owner rulings, and changing it changes MHA-DT-04. #1649 lists
   # the options (two-piece tip, integral pinion, keep, push-broach, 1/16 land,
   # round pinned/soldered bore); one owner pick there closes this RV-01 and
-  # MHA-DT-004's (#1644). Remove RV-01 when that pick lands.
+  # MHA-DT-04's (#1644). Remove RV-01 when that pick lands.
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "sheets T006 and T012, BORE PROFILE: the Ø0.794 +0.055/+0.025 bore (BoreCutDia) with 0.420 +0.02/+0.01 across the flat (BoreAF), through the face"
       finding: "the T006/T012 D-bore, ~0.8 mm across with its flat ~0.02 past the centre and held to 0.01 through the face, has no plausible hobby-shop route to cut or check"
-      reason: "the bore is fixed by owner rulings, not chosen on this sheet: the 1/32 in terminal land of MHA-DT-004 that T012 and T006 slide on (user ruling U40, 2026-09-23, https://github.com/pedropaulovc/harmonic-analyzer/issues/971#issuecomment-6151646064; DT6-FORM1 option (a), 2026-10-10) and one D-flat on every gear land, run out through the tip, phasing every gear to the shaft (user ruling 2026-09-28, recorded in dt_cone_gear_shaft_spec FLAT_OFFSETS); the sliding fit is 0.025-0.075 diametral and 0.010-0.030 across the flat on that land; the geometry decision is open with the owner at https://github.com/pedropaulovc/harmonic-analyzer/issues/1649"
+      reason: "the bore is fixed by owner rulings, not chosen on this sheet: the 1/32 in terminal land of MHA-DT-04 that T012 and T006 slide on (user ruling U40, 2026-09-23, https://github.com/pedropaulovc/harmonic-analyzer/issues/971#issuecomment-6151646064; DT6-FORM1 option (a), 2026-10-10) and one D-flat on every gear land, run out through the tip, phasing every gear to the shaft (user ruling 2026-09-28, recorded in dt_cone_gear_shaft_spec FLAT_OFFSETS); the sliding fit is 0.025-0.075 diametral and 0.010-0.030 across the flat on that land; the geometry decision is open with the owner at https://github.com/pedropaulovc/harmonic-analyzer/issues/1649"
     - id: "RV-02"
       kind: "accept"
       where: "every gear sheet, BORE PROFILE: the D-bore diameter callout 'Ø… THRU' (BoreCutDia)"
       finding: "the bore callout gives no process word such as REAM or BORE (rule 12)"
-      reason: "owner ruling 2026-09-29 took the process word off both D-bores (MHA-DT-003 and MHA-DT-007): a through reamer would cut away the flat, the dimensions define the D-profile, and the route belongs in the book, not on the print (https://github.com/pedropaulovc/harmonic-analyzer/commit/7b9ed689199b72c7b0b9db70bfee9ca4fd497e4f)"
+      reason: "owner ruling 2026-09-29 took the process word off both D-bores (MHA-DT-03 and MHA-DT-07): a through reamer would cut away the flat, the dimensions define the D-profile, and the route belongs in the book, not on the print (https://github.com/pedropaulovc/harmonic-analyzer/commit/7b9ed689199b72c7b0b9db70bfee9ca4fd497e4f)"

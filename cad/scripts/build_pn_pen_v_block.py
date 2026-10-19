@@ -1,4 +1,4 @@
-r"""Reproduction script: pen v-block (MHA-PN-005), re-derived per
+r"""Reproduction script: pen v-block (MHA-PN-05), re-derived per
 ``pn_pen_v_block_spec``.
 
 The bright brass block that hangs on the pen rod and carries the marker, a

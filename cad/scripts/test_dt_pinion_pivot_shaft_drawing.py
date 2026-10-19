@@ -149,7 +149,7 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert not any(name.startswith("PinHole") and name.endswith("Z") for name in marked)
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     # The hole specification only (Main's re-ruling, 2026-09-26): the
-    # drilling pose is MHA-DT-000's SHAFT DRILL SET, and the sheet points at
+    # drilling pose is MHA-DT-00's SHAFT DRILL SET, and the sheet points at
     # that step through the registry, so a renumbered sequence carries it
     # (Codex #858, PRRT_kwDOPHDy386mTbPB).  The pointer is sheet text: the
     # part's spec never reads the registry (Main's TbPB ruling 1).
@@ -160,9 +160,9 @@ def test_set_pin_holes_print_only_size_and_the_match_drill() -> None:
     assert key == "straps-pinned-to-torque-shaft"
     assert dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT.split("\n") == [
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-DT-014 CROSS HOLES, 2 PL",
+        "IN MHA-DT-14 CROSS HOLES, 2 PL",
     ]
-    pin = _config.parts("vn-pinion-strap-pin")["number"]
+    pin = _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert callout == (
         f"{dt_pinion_pivot_shaft_spec.PIN_HOLE_CALLOUT},\n"
         f"PRESS FIT FOR {pin} SPRING PIN,\n"
@@ -223,7 +223,7 @@ def test_the_callout_moves_above_the_ra_lane_and_right_of_the_end_view_frames(
     placed = extent.place_callout_clear(
         None,
         None,
-        label="MHA-DT-019 match-drill callout",
+        label="MHA-DT-19 match-drill callout",
         below={"Ra 1.6": ra},
         beside={"cylindricity frame": frame, "crown profile frame": crown},
     )
@@ -269,7 +269,7 @@ def test_a_move_that_reads_back_a_hair_short_still_clears(monkeypatch) -> None:
         return extent.place_callout_clear(
             None,
             None,
-            label="MHA-DT-019 match-drill callout",
+            label="MHA-DT-19 match-drill callout",
             below={},
             beside={"cylindricity frame": frame},
         )
@@ -344,7 +344,7 @@ def test_a_callout_too_long_to_fit_fails_loud_instead_of_re_colliding(
         extent.place_callout_clear(
             None,
             None,
-            label="MHA-DT-019 match-drill callout",
+            label="MHA-DT-19 match-drill callout",
             below={},
             beside={"crown profile frame": (0.2455, 0.214, 0.262, 0.265)},
         )

@@ -8,6 +8,7 @@ import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIde
 import type { Video } from './video-catalog'
 import { requiredSourceViews, sourceVisibilityError, physicalSourceFrameRequired, type SourceVisibilityQualification } from '../source-visibility.mjs'
 import { NATIVE_LINE_STATIONS, nativeLineEndpointId } from '../native-line-checks.mjs'
+import { CURRENT_NATIVE_IDENTITY_PROJECTION, projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 export const SOURCE_WIDTH = 1920
 export const SOURCE_HEIGHT = 1080
@@ -213,6 +214,9 @@ function buffer(): TrackBuffer {
  */
 export class CompactVideoReference {
   readonly kind = 'compact-source-track' as const
+  readonly data: CompactSourceTrack
+  /** Naming projection only; data.model still identifies the exact archived CAD. */
+  readonly currentIdentityProjection = CURRENT_NATIVE_IDENTITY_PROJECTION
   readonly coverageMessage: string
   readonly approximationMessage: string
   readonly stageStatus = UNMEASURED_STAGES
@@ -226,7 +230,10 @@ export class CompactVideoReference {
   private readonly qi = new Quaternion()
   private readonly pose = createMechanismPose()
 
-  constructor(readonly data: CompactSourceTrack, video: Video) {
+  constructor(data: CompactSourceTrack, video: Video) {
+    // Source-track bytes/evidence remain historical. Project native paths once
+    // at ingestion, separately from the unchanged source/model identity hashes.
+    this.data = data = projectCurrentNativeMetadata(data)
     if (data.kind !== 'compact-source-track' || data.schemaVersion !== 1 || data.source?.videoId !== video.id || data.source.sha256 !== video.sourceSha256) throw new Error('Compact track footage identity does not match this video.')
     if (data.source.width !== SOURCE_WIDTH || data.source.height !== SOURCE_HEIGHT || Math.abs(data.source.durationSeconds - video.durationSeconds) > 0.05) throw new Error('Compact track dimensions or duration do not match the footage.')
     if (data.model?.sha256 !== MECHANISM_DATA.provenance.modelSha256 || data.model.sourceCommit !== MECHANISM_DATA.provenance.sourceCommit || data.model.units !== 'metres') throw new Error('Compact track targets a different native CAD export.')

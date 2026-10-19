@@ -125,7 +125,7 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert source.count("create_section_view(") == 1
     assert "_look_section_along_minus_z(adapter, section)" in source
     assert "set_hidden_lines_removed(adapter, section)" in source
-    # Section before top: the MHA-PD-018 import order.
+    # Section before top: the MHA-PD-18 import order.
     assert source.index("keep=SECTION_KEEP") < source.index("keep=TOP_KEEP")
     # The depth text stands right of the cut block, level with the hole.
     x, y = drawing.SECTION_KEEP["PinHoleDepth"]
@@ -178,7 +178,7 @@ def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
     assert drawing.TAP_DRILL_CALLOUT is sm_knife_mount_spec.TAP_DRILL_CALLOUT
     assert drawing.TAP_DRILL_CALLOUT == "#25 DRILL"
     assert drawing.TAP_CALLOUT_REASON is sm_knife_mount_spec.TAP_CALLOUT_REASON
-    assert drawing.TAP_CALLOUT_REASON == "SETS MHA-VN-024 TIP CLEARANCE"
+    assert drawing.TAP_CALLOUT_REASON == "SETS MHA-SM-VN-52 TIP CLEARANCE"
     assert drawing.TAPPED_HOLE_NOTE == "Tapped Hole"
     assert "remove_notes_matching(adapter, TAPPED_HOLE_NOTE)" in source
     assert "redundant_note_substrings=(TAPPED_HOLE_NOTE,)" in source
@@ -269,7 +269,7 @@ def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
         **seat,
         5: f"BOTTOMING TAP - FULL THREAD\n{thread_row}",
         7: f"{drill_row} X <hw-drlang>",
-        8: "FOR MHA-VN-024 HEX BOLT",
+        8: "FOR MHA-SM-VN-52 HEX BOLT",
     }
     assert printed_rows(run, 1) == TEXT_ROW_LIMIT + 1
     assert stacked_band_rows == 0
@@ -277,7 +277,7 @@ def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
     assert printed_rows(wanted, stacked_band_rows) == 3 <= TEXT_ROW_LIMIT
     assert wanted[7] == "#25 DRILL <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>"
     assert wanted[5] == "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
-    assert wanted[8] == "SETS MHA-VN-024 TIP CLEARANCE"
+    assert wanted[8] == "SETS MHA-SM-VN-52 TIP CLEARANCE"
     joined = "".join(wanted.values())
     assert "threadclass" not in joined
     assert "<MOD-DIAM>" not in joined and "<hw-tapdrldia>" not in joined
@@ -310,7 +310,7 @@ def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
     assert frame_bottom > drawing._front_y(sm_knife_mount_spec.BLK_TOP) + 0.010
     # Rule 13: the block stays inside the inner border.
     assert x - drawing.TAP_CALLOUT_HALF_WIDTH > SHEET_INNER_BORDER_LEFT + 0.001
-    # The widest row is now the reason, "SETS MHA-VN-024 TIP CLEARANCE":
+    # The widest row is now the reason, "SETS MHA-SM-VN-52 TIP CLEARANCE":
     # 16.13 em of Century Gothic at the 4.83 mm an em the run's drill row gave
     # (15.97 em printed 77.1 mm, its +0.10 stack included), ~78 mm, inside the
     # half width's 88.  The drill row, "#25 DRILL" in Ø3.797's place and no
@@ -517,11 +517,11 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
     # The dowel holes' count rides above their Ø and the press below it
-    # (MHA-PD-018 precedent); their position frame hangs under the callout.
+    # (MHA-PD-18 precedent); their position frame hangs under the callout.
     assert drawing.CALLOUTS_ABOVE == {"PinHoleDia": "2X"}
     assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
         "BLIND FLAT-BOTTOM REAM",
-        "PRESS MHA-VN-051 DOWEL TO FLOOR",
+        "PRESS MHA-SM-VN-53 DOWEL TO FLOOR",
         "0.0025/0.0177 INTERFERENCE",
     ]
 
@@ -876,7 +876,7 @@ def test_tap_point_rides_the_native_definitions_and_the_reason_names_the_mate() 
             "#25 DRILL <HOLE-DEPTH> <hw-tapdrldepth> X <hw-drlang>\n"
             "<hw-threaddesc> <HOLE-DEPTH> <hw-threaddepth>"
         ),
-        8: "SETS MHA-VN-024 TIP CLEARANCE",
+        8: "SETS MHA-SM-VN-52 TIP CLEARANCE",
     }
     assert drawing.tap_callout_definitions(
         {**before, 5: before[5].replace(" <hw-threadclass>", "-<hw-threadclass>")}
@@ -886,7 +886,7 @@ def test_tap_point_rides_the_native_definitions_and_the_reason_names_the_mate() 
     ) == wanted
     # Rule 4: the full thread's band names its function and its mate, the
     # registry's bolt, once, on the row under the thread.
-    assert sm_knife_mount_spec.BOLT_NUMBER == _config.parts("vn-knife-hanger-stud")[
+    assert sm_knife_mount_spec.BOLT_NUMBER == _config.parts("sm-vn-knife-hanger-stud")[
         "number"
     ]
     assert sm_knife_mount_spec.TAP_CALLOUT_REASON == (
@@ -907,7 +907,7 @@ def test_tap_point_rides_the_native_definitions_and_the_reason_names_the_mate() 
         {**before, 6: "<MOD-DIAM> <hw-tapdrldia>"},
         {**before, 6: drawing.TAP_DRILL_CALLOUT},
         {**before, 6: drawing.TAP_CALLOUT_REASON},
-        {**before, 8: "FOR MHA-VN-024 HEX BOLT"},
+        {**before, 8: "FOR MHA-SM-VN-52 HEX BOLT"},
         {**before, 6: "<hw-threadclass>"},
         {**before, 5: before[5].replace(" <hw-threadclass>", "")},
         wanted,

@@ -1,8 +1,8 @@
-r"""MHA-CH-014 channel-anchor jam nut: dimensional contract.
+r"""MHA-CH-14 channel-anchor jam nut: dimensional contract.
 
 PURE DATA, no SolidWorks/COM and no drawing imports.  A turned brass round
-nut, #6-32 tapped through, one on each MHA-VN-012 channel anchor: it runs up
-the anchor's protruding shank from below and is jammed against the MHA-SM-003
+nut, #6-32 tapped through, one on each MHA-CH-VN-51 channel anchor: it runs up
+the anchor's protruding shank from below and is jammed against the MHA-SM-03
 coefficient plate's underside while the anchor's eye is held at its clocking
 (drawing-guidelines.md rule 23; owner ruling 2026-10-17, option A).
 
@@ -86,11 +86,11 @@ NEIGHBOUR_GAP = CHANNEL_PITCH - OD
 NEIGHBOUR_GAP_WORST = CENTRE_SPACING_WORST - OD_MAX
 
 if WALL_WORST < MIN_WALL:
-    raise AssertionError(f"MHA-CH-014 wall {WALL_WORST:.3f} < {MIN_WALL}")
+    raise AssertionError(f"MHA-CH-14 wall {WALL_WORST:.3f} < {MIN_WALL}")
 if UNDER_SLOT_WORST < MIN_WALL:
-    raise AssertionError(f"MHA-CH-014 ring under the cut {UNDER_SLOT_WORST:.3f}")
+    raise AssertionError(f"MHA-CH-14 ring under the cut {UNDER_SLOT_WORST:.3f}")
 if NEIGHBOUR_GAP_WORST < NEIGHBOUR_CLEARANCE:
-    raise AssertionError(f"MHA-CH-014 neighbour gap {NEIGHBOUR_GAP_WORST:.3f}")
+    raise AssertionError(f"MHA-CH-14 neighbour gap {NEIGHBOUR_GAP_WORST:.3f}")
 
 # Marked model dimensions and the places the part authors on them
 # (drawing-simplicity-policy.md): every size takes the title block's row for
@@ -120,7 +120,7 @@ SLOT_CALLOUT = "SLOT THRU ACROSS"
 # the neighbouring nut, named with its pitch below it -- twenty nuts stand
 # side by side and the 0.25 gap holds only inside the explicit band.
 OD_WALL_CALLOUT = f"WALL {math.floor(WALL_WORST * 10) / 10:.1f} MIN"
-OD_CALLOUT = f"CLEARS ADJACENT MHA-CH-014 AT {CHANNEL_PITCH:.2f} PITCH"
+OD_CALLOUT = f"CLEARS ADJACENT MHA-CH-14 AT {CHANNEL_PITCH:.2f} PITCH"
 # A jam nut is thin by kind, and the stock anchor's shank caps it: the full
 # thread it carries at its thinnest, less the incomplete thread a through tap
 # leaves, falls short of 1.5D and the sheet states it as a fact.

@@ -1,4 +1,4 @@
-r"""Amplitude bar (MHA-CH-001) drawing-only data: the marked-dimension and
+r"""Amplitude bar (MHA-CH-01) drawing-only data: the marked-dimension and
 precision contract and the dimension callouts.
 
 Split OUT of ``ch_amplitude_bar_spec`` (the ``ch_rocker_arm_notes`` treatment,
@@ -17,9 +17,9 @@ from _printed_tolerance import printed_band_mm
 
 # Mating parts the callouts name (test_ch_amplitude_bar_drawing pins each to
 # the part registry).
-TOP_PIN_NUMBER = "MHA-CH-011"  # pressed into the top pin hole
-LEVER_NUMBER = "MHA-CH-002"  # the channel lever the top notch straddles
-ROCKER_ARM_NUMBER = "MHA-CH-006"  # the rocker arm whose strap the foot notch rides
+TOP_PIN_NUMBER = "MHA-CH-11"  # pressed into the top pin hole
+LEVER_NUMBER = "MHA-CH-02"  # the channel lever the top notch straddles
+ROCKER_ARM_NUMBER = "MHA-CH-06"  # the rocker arm whose strap the foot notch rides
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`: the PART owns places and bands). ---

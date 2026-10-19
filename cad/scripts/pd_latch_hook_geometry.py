@@ -1,4 +1,4 @@
-r"""MHA-PD-014 latch hook: one formed spring-steel piece, as pure data.
+r"""MHA-PD-14 latch hook: one formed spring-steel piece, as pure data.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The part build, its sheet, the paper-drive assembly and the hanger
@@ -8,9 +8,9 @@ One 0.8 (0.032 in) 1095 spring-steel blank, formed annealed, then hardened
 and tempered blue.  It replaces the old edgewise strip, its riveted L
 bracket and the two rivets:
 
-* the BASE lies flat on the MHA-PD-007 support bar's back face (machine z
+* the BASE lies flat on the MHA-PD-07 support bar's back face (machine z
   -129.4) in the bar's lock-free band (y 299.2..307.2) and takes the two
-  MHA-VN-043 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
+  MHA-PD-VN-59 #4-40 screws into the bar's through taps (x 65.0 / 72.0,
   y 303.234);
 * at the base's +X end a 90 deg bend (inside R1.2) raises the EAR rearward
   (+Z) in the machine YZ plane, x 76.8305..77.6305, to z -113.9;
@@ -29,7 +29,7 @@ bracket and the two rivets:
   Above TAPER_Y[0] the front edge stays 1.5 clear of the guide-lock
   screw heads' z -125.40.
 
-Latch action.  Latched, the MHA-VN-042 pin on the hanger arm's end stands
+Latch action.  Latched, the MHA-PD-VN-58 pin on the hanger arm's end stands
 through the pin hole and the hanger RESTS on the hole's lower (-N) edge with
 the feed pinion in the rack: the hole is drilled PIN_BEARING_LIFT up N from
 the pin's axis, so the largest pin bears on its lower edge.  To release, the
@@ -65,7 +65,7 @@ from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
 from sh_column_clamp_front_geom import ARC_DEPTH
 from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
-from vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
+from pd_vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 
 # --- Stock ---------------------------------------------------------------------
 SHEET_T = 0.8  # 0.032 in 1095 spring steel, bought annealed

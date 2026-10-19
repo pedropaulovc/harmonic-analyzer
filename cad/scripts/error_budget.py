@@ -46,14 +46,14 @@ import yaml
 import _config
 import ch_amplitude_bar_spec
 import ch_channel_lever_spec
-import vn_channel_spring_installed_spec
+import ch_vn_channel_spring_installed_spec
 import ch_connecting_rod_spec
-import vn_counter_spring_spec
+import sm_vn_counter_spring_spec
 import dt_cylinder_gear_spec
 import dt_cone_gear_spec
 import cone_shaft_land_bands
 import gear_seat_fit
-import vn_lever_wire_geom
+import mg_vn_lever_wire_geom
 import mg_magnifying_clamp_geom
 import mg_magnifying_lever_geom
 import mg_output_fixture_geom
@@ -155,10 +155,10 @@ def nominal() -> Nominal:
         contact_dx=ch_amplitude_bar_spec.BAR_WIDTH / 2.0,
         contact_dy=ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
         - float(_config.fit("cam_follower_contact", "contact_gap_mm")),
-        spring_rate=vn_channel_spring_installed_spec.SPRING_RATE_N_PER_MM,
-        counter_rate=vn_counter_spring_spec.SPRING_RATE_N_PER_MM,
-        spring_initial_tension=vn_channel_spring_installed_spec.INITIAL_TENSION_N,
-        counter_initial_tension=vn_counter_spring_spec.INITIAL_TENSION_N,
+        spring_rate=ch_vn_channel_spring_installed_spec.SPRING_RATE_N_PER_MM,
+        counter_rate=sm_vn_counter_spring_spec.SPRING_RATE_N_PER_MM,
+        spring_initial_tension=ch_vn_channel_spring_installed_spec.INITIAL_TENSION_N,
+        counter_initial_tension=sm_vn_counter_spring_spec.INITIAL_TENSION_N,
         sum_hole_x=sm_summing_lever_spec.HOLE_X,
         d_max=float(_config.machine("amplitude", "max_travel_mm")),
         lever_r_min=lever_band[0],
@@ -170,7 +170,7 @@ def nominal() -> Nominal:
     )
 
 
-# The knife axis in the machine frame vn_lever_wire_geom solves wire 1 in: the
+# The knife axis in the machine frame mg_vn_lever_wire_geom solves wire 1 in: the
 # magnifying lever's KnifeAxis lands on the summing chain's knife line
 # (build_mg_magnifier_assembly asserts it), the axis spring_force_model takes
 # its torques about, so a clamp at knife radius R sits at machine x KNIFE + R.
@@ -186,11 +186,11 @@ def wire_rest_run(nom: Nominal, lever_r: float) -> tuple[np.ndarray, np.ndarray]
     hook = np.array(
         [
             KNIFE_AXIS_XY[0] + lever_r + nom.hook_offset_x,
-            vn_lever_wire_geom.HOOK_Y,
-            vn_lever_wire_geom.HOOK_Z,
+            mg_vn_lever_wire_geom.HOOK_Y,
+            mg_vn_lever_wire_geom.HOOK_Z,
         ]
     )
-    end = np.array(vn_lever_wire_geom.tangent_end(float(hook[0]), float(hook[1])))
+    end = np.array(mg_vn_lever_wire_geom.tangent_end(float(hook[0]), float(hook[1])))
     return hook, end
 
 
@@ -998,7 +998,7 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     The D-flat's AF clearance turns each gear by c / lever, where the lever is
     how far along the flat the gear's bore can bear before contact runs out.
     Every term is bounded at the print's worst, not averaged: the lever is
-    the shortest shaft flat MHA-DT-004 accepts (land at its smallest diameter
+    the shortest shaft flat MHA-DT-04 accepts (land at its smallest diameter
     and largest AF) less the title block's edge break on its torque corner
     (``flat_edge_break_mm``), or the shortest bore flat if that is shorter.
     The bore flat's corner is an inside corner, which the title block does
@@ -1341,8 +1341,8 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     in error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
     hook, end = wire_rest_run(nom, nom.lever_r_min)
-    gaps = vn_lever_wire_geom.run_gaps(hook, end)
-    cx, cy = vn_lever_wire_geom.WHEEL_X, vn_lever_wire_geom.WHEEL_BAR_Y
+    gaps = mg_vn_lever_wire_geom.run_gaps(hook, end)
+    cx, cy = mg_vn_lever_wire_geom.WHEEL_X, mg_vn_lever_wire_geom.WHEEL_BAR_Y
     ts = np.linspace(0.0, 1.0, 2001)
     pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)

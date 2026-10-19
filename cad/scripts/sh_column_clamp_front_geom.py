@@ -21,9 +21,9 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 # --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
 # rework.md E2). ---
-# The two clamped bars (MHA-PD-007 support bar, the magnifier's wheel bar)
+# The two clamped bars (MHA-PD-07 support bar, the magnifier's wheel bar)
 # are one stock section deep: the user's 2026-10-15 ruling thickened it to 9.5
-# (rule 18 engagement for the MHA-VN-041 pivot screw), growing REARWARD so
+# (rule 18 engagement for the MHA-PD-VN-57 pivot screw), growing REARWARD so
 # both front faces stay on the platen-back plane.  pd_support_bar_spec and
 # mg_wheel_bar_geom read BAR_DEPTH here.
 BAR_DEPTH = 9.5

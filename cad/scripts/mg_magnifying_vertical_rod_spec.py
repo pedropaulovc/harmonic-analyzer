@@ -4,7 +4,7 @@ manufacturing drawing (``draw_mg_magnifying_vertical_rod.py``).
 
 PURE DATA, no SolidWorks/COM imports. Sizes live in the drawing-free geometry
 module because the magnifier assembly and the fixture installation consume
-them; the threaded joint to MHA-MG-002 lives in ``mg_rod_clamp_joint`` (#1559).
+them; the threaded joint to MHA-MG-02 lives in ``mg_rod_clamp_joint`` (#1559).
 Drawing notes and marks stay out of the magnifier assembly recipe closure.
 The offline lockstep test asserts part marks and drawing keeps.
 
@@ -130,32 +130,32 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 RELIEF_ROOTS_CALLOUT = "2X"
 
 # The fixture's thumb-screw seat (owner ruling 2026-10-17; drawing-guidelines.md
-# rule 6, a static seat that locates, Ra 3.2). MHA-MG-006's axial #4-40 knurled
-# thumb screw (MHA-VN-011) locks the fixture to the rod, and the operator sets
+# rule 6, a static seat that locates, Ra 3.2). MHA-MG-06's axial #4-40 knurled
+# thumb screw (MHA-MG-VN-50) locks the fixture to the rod, and the operator sets
 # the fixture anywhere along the body (ch. 20 p. 46: "sliding a fixture up and
 # down on the vertical rod"). Its tip reaches from where the fixture's top hex
-# corner meets MHA-MG-002's bottom face down to where its bore reaches the
+# corner meets MHA-MG-02's bottom face down to where its bore reaches the
 # dome tangent: at the nominal model 5.0 under the shoulder to 7.5 over the
 # dome tip, 92% of the body's one Ø5 cylinder (the drawing test derives the
 # reach from the fixture and screw geometry). The symbol qualifies that whole
 # face: a zone stopping only where the fixture runs out of rod would add two
 # lengths and nothing the shop could act on. No clamp screw bears on the rod:
-# MHA-MG-002's thumb screw enters its top face and pinches the lever; the rod
+# MHA-MG-02's thumb screw enters its top face and pinches the lever; the rod
 # is threaded into its bottom face (mg_rod_clamp_joint).
 SURFACE_FINISHES = (SurfaceFinishControl("screw_seat", SEAT_UM, CylinderFace(ROD_DIA)),)
 # The seat's reason stands beside its symbol (rule 7: say why, where it applies).
 SEAT_FINISH_REASON = "THUMB-SCREW SEAT"
 
 # No general notes (drawing-guidelines.md rule 7): the overall, the seat on
-# MHA-MG-002, the hemisphere and the screw seat each ride their own callout.
+# MHA-MG-02, the hemisphere and the screw seat each ride their own callout.
 ISO_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 if (
     abs(SHOULDER_X - ROD_THREAD_LEN) > 1e-9
     or abs(ROD_LENGTH - SHOULDER_X - BODY_LENGTH) > 1e-9
 ):
-    raise AssertionError("MHA-MG-004 printed lengths do not sum to the overall")
+    raise AssertionError("MHA-MG-04 printed lengths do not sum to the overall")
 if not 0.0 < TIP_CHAMFER < FULL_THREAD_START_X < FULL_THREAD_END_X < SHOULDER_X:
-    raise AssertionError("MHA-MG-004 full-thread stations out of order")
+    raise AssertionError("MHA-MG-04 full-thread stations out of order")
 if abs(SHOULDER_X - RELIEF_START_X - RELIEF_WIDTH) > 1e-9:
-    raise AssertionError("MHA-MG-004 relief does not end on the shoulder")
+    raise AssertionError("MHA-MG-04 relief does not end on the shoulder")

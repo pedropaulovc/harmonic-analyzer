@@ -1,4 +1,4 @@
-r"""Build the rocker arm's riser block (MHA-CH-006-TL-10; shop fixture).
+r"""Build the rocker arm's riser block (MHA-CH-06-TL-10; shop fixture).
 
 Six 1018 blocks the rocker blank or its strap shim stacks stand on in the S1-S4
 mill setups, faced together to one height (``ch_rocker_arm_tl_riser_block_spec``).

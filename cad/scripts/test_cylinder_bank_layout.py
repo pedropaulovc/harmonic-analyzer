@@ -83,7 +83,7 @@ def test_the_bank_spring_fits_its_arbor_and_faces() -> None:
     import dt_arbor_pedestal_spec as ped
     import dt_cylinder_end_disc_spec as washer
     import dt_cylinder_gear_shaft_spec as arbor
-    import vn_cylinder_bank_spring_spec as spring
+    import dt_vn_cylinder_bank_spring_spec as spring
 
     # Catalogue worst case: the tightest spring still passes the largest arbor
     # (with no clearance to spare: the DT-000 step checks it slides free).
@@ -197,7 +197,7 @@ def test_arbor_spans_both_straps_and_domes_proud_of_each() -> None:
 
 
 def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
-    """The drive train stands each MHA-DT-002 on its strap inner face (U34 row 5),
+    """The drive train stands each MHA-DT-02 on its strap inner face (U34 row 5),
     and the #743 stack is what fixes those faces."""
     import dt_arbor_pedestal_spec as ped
 
@@ -236,7 +236,7 @@ def test_apex_set_screw_socket_and_cup_point_are_named() -> None:
     named layout constant (the drive train places it exactly), and the cup
     point, not the thread, spans the running clearance with the arbor pushed
     to the bottom of a largest bore on a smallest arbor."""
-    import vn_arbor_set_screw_spec as screw
+    import _mcmaster_91375a106 as screw
     import dt_cylinder_gear_shaft_spec as shaft
 
     assert bank.SET_SCREW_SOCKET_PROUD == pytest.approx(

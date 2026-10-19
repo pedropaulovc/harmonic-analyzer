@@ -12,7 +12,7 @@ quantity = 1 # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.quantity
 quantity_cite = ["harmonic-analyzer/cad/config/parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.quantity"]
 
 [drawing]
-number = "MHA-DT-005" # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.number
+number = "MHA-DT-05" # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.number
 revision = "unknown"
 
 [paths]

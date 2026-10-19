@@ -103,6 +103,22 @@ is released with the viewer.
 through `cad/config/identity-migration-map.json`, preserving configuration and
 instance qualifiers. Raw release bytes remain immutable. An independent check
 rejects any other glTF JSON change or binary payload change.
+That sealed map and its historical output are not rewritten by the current
+two-digit, parent-scoped naming migration. `current-native-identity.mjs` applies
+the separate frozen `content/current-native-identities.json` only at current
+consumer ingestion: `dt-vn-fillister-screw` / `MHA-DT-VN-50`, assembly
+`MHA-DT-00`, and tooling `MHA-DT-05-TL-VN-50`. Configuration qualifiers such as
+`T006` are not identity digits and remain unchanged. Shared vendors resolve
+through the immediate parent, never one arbitrary global rename.
+The browser verifies the imported table's semantic digest before its glTF
+`beforeRoot` identity projection. Node current-source authority re-reads and
+hashes the real historical map, current projection table and current CAD map,
+then compares all active mapping contents; three explicitly historical-only
+occurrences are excluded from active inventory and expose null current Number,
+registry and builder fields. Their exact archived source lookup remains available.
+Raw model/evidence digests remain archival; runtime track comparison instead uses
+the digest of the current projected metadata. No identity projection refits,
+recomputes or regenerates geometry.
 `optimize-model.mjs` then performs exact buffer/accessor/mesh/image deduplication
 and Meshopt 0.22.0 compression. Quantization, simplification, node pruning, index
 reordering and instancing are excluded.

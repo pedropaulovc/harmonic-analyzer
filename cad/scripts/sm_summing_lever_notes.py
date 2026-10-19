@@ -78,9 +78,9 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
 # line over the Ø25.40, machinist review r11).
 CYLINDER_REFERENCE_Z = 45.6
 
-KNIFE_MOUNT_NUMBER = "MHA-SM-002"  # sm-knife-mount: the knife-edge seat
-BRACKET_NUMBER = "MHA-MG-001"  # mg-magnifying-bracket
-BRACKET_SCREW_NUMBER = "MHA-VN-050"  # vn-magnifying-bracket-screw
+KNIFE_MOUNT_NUMBER = "MHA-SM-02"  # sm-knife-mount: the knife-edge seat
+BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
+BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 
 # Drawing-side callout text keyed on the parametric dimension name: each tight
 # band names its mate and function (drawing-guidelines rule 4), and the rib

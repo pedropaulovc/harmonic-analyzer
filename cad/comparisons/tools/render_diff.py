@@ -8,8 +8,8 @@ highlighted in red over an x-ray ghost of the unchanged body.
 Each side is a *source* -- either a published GitHub release (read over HTTP
 range requests, no full-asset download) or a local staged bundle directory
 (``<dir>/stl/*.STL`` + ``<dir>/boxes/<top-assembly>.json``). The top-assembly
-scene is resolved from the sealed identity map and the actual inventory on either
-side of the cutover. The local form is what ``cut_release.py`` uses: the new
+scene is resolved from the composed historical/current identity maps and the
+actual inventory. The local form is what ``cut_release.py`` uses: the new
 release is still on disk and only the previous release is fetched from GitHub.
 
 Pipeline:
@@ -23,9 +23,10 @@ Pipeline:
   3. render N camera angles to PNG with an offscreen VTK context and write a
      diff_summary.json (changed parts + per-mesh deviation + image names).
 
-The committed schema-2 identity map pairs actual STL inventory members across
-the cutover, retaining configuration qualifiers. Renames are reported separately
-from geometry changes; unmatched files remain new/deleted.
+The current identity map, composed with the sealed historical map, pairs actual
+STL inventory members while retaining configuration qualifiers. Every current
+vendor clone is compared with its own prior physical source; clones keep separate
+geometry verdicts. Renames are separate from new/deleted files and geometry changes.
 
     # release vs release
     uv run cad/comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
@@ -57,7 +58,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
-from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys
+from release_diff import IDENTITY_MAP, canonical_keys, identity_inventory, load_identity_map, paired_keys
 
 enable_offscreen_gl()
 
@@ -82,15 +83,11 @@ def base_part(key):
 # sources
 # --------------------------------------------------------------------------- #
 def _scene_member(names, mapping):
-    """Resolve the historical/current top-assembly scene from actual members."""
-    top_assembly = mapping.get("harmonic-analyzer", "ha-harmonic-analyzer")
-    scene_names = {
-        "boxes/harmonic-analyzer.json",
-        f"boxes/{top_assembly}.json",
-    }
+    """Resolve a top-assembly scene without merging distinct current identities."""
+    top_assemblies = {"harmonic-analyzer", *canonical_keys("harmonic-analyzer", mapping)}
+    scene_names = {f"boxes/{stem}.json" for stem in top_assemblies}
     matches = [name for name in names if name.lower() in scene_names]
-    identity_inventory((Path(name).stem for name in matches),
-                       {"harmonic-analyzer": top_assembly})
+    identity_inventory((Path(name).stem for name in matches), mapping)
     return matches[0] if matches else None
 
 
@@ -379,7 +376,7 @@ def main():
     ap.add_argument("--new-release")
     ap.add_argument("--new-local")
     ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
-                    help="schema-2 diff-only identity rename table")
+                    help="current schema-1 identity table (composed with sealed historical identities)")
     ap.add_argument("--out", default="/tmp/render_diff", type=Path)
     ap.add_argument("--summary-json", type=Path)
     ap.add_argument("--res", type=int, default=1600)

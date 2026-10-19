@@ -1,4 +1,4 @@
-"""Drawing-only data of the pen-carriage fitter package (MHA-PN-000).
+"""Drawing-only data of the pen-carriage fitter package (MHA-PN-00).
 
 The BOM item numbers and descriptions, the settings' display on the sheet
 (which is a reference, the nominals and bands it reads back, tolerance
@@ -17,11 +17,11 @@ import pn_pen_adjust_screw_spec as stud
 import pn_pen_carriage_geom as carriage
 import pn_pen_hanger_spec as hanger
 import pn_pen_v_block_spec as v_block
-import vn_hanger_screw_spec as hanger_screw
-import vn_pen_adjust_nut_spec as stud_nut
-import vn_pen_hanger_jam_nut_spec as hanger_jam_nut
-import vn_pen_hanger_nut_spec as hanger_nut
-import vn_pen_rod_set_screw_spec as rod_set_screw
+import pn_vn_hanger_screw_spec as hanger_screw
+import pn_vn_pen_adjust_nut_spec as stud_nut
+import pn_vn_pen_hanger_jam_nut_spec as hanger_jam_nut
+import pn_vn_pen_hanger_nut_spec as hanger_nut
+import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
@@ -57,7 +57,7 @@ from pn_pen_assembly_spec import (
 )
 from pn_pen_explode_spec import EXPLODE_STEPS
 
-DRAWING_NUMBER = "MHA-PN-000"
+DRAWING_NUMBER = "MHA-PN-00"
 # A top-level BOM numbers its rows in the builder's insertion order
 # (pn_pen_assembly_spec.BOM_ORDER); the drawing proves each row against this
 # and the steps cite it.
@@ -316,15 +316,15 @@ ASSEMBLY_STEPS = (
     "6. INTO THE GUIDES: ENTER THE ROD'S SQUARE INTO BOTH U GUIDES OF THE "
     f"HANGER (ITEM {ITEM[HANGER]}) FROM THEIR OPEN FRONT ENDS, CARRIAGE BELOW "
     "THE LOWER GUIDE.",
-    "AT MHA-HA-000:",
+    "AT MHA-HA-00:",
     f"7. HANGER SCREW LOCK: HANGER SCREW (ITEM {ITEM[HANGER_SCREW]}) FROM "
-    "BEHIND THE MHA-MG-008 WHEEL BAR THROUGH THE BAR AND THE STRAP HOLE. RUN "
+    "BEHIND THE MHA-MG-08 WHEEL BAR THROUGH THE BAR AND THE STRAP HOLE. RUN "
     f"THE HEX NUT (ITEM {ITEM[HANGER_NUT]}) ON AGAINST THE STRAP FRONT AND "
     f"HOLD IT ({HANGER_NUT_WRENCH} WRENCH) WHILE TIGHTENING THE SCREW "
     f"({HANGER_SCREW_WRENCH} WRENCH). HOLD THAT NUT STILL AND TIGHTEN THE "
     f"JAM NUT (ITEM {ITEM[HANGER_JAM_NUT]}, {HANGER_JAM_NUT_WRENCH} WRENCH) "
     "AGAINST IT (DETAIL B): THE SCREW'S LOCK.",
-    "8. PEN WIRE TO RIM, NIB TO PAPER: PER MHA-HA-000. THE STUD STAYS AT ITS "
+    "8. PEN WIRE TO RIM, NIB TO PAPER: PER MHA-HA-00. THE STUD STAYS AT ITS "
     "STEP 1 SETTING; MOVE THE MARKER ONLY WITH THE THUMB SCREW SLACKENED, "
     "THEN RE-TIGHTEN IT FINGER-TIGHT.",
 )

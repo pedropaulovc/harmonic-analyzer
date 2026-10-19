@@ -210,7 +210,7 @@ def test_counter_rejects_nonfinite_gooseneck_origin(isolated_calibration, goosen
 
 def test_counter_record_without_support_certificate_is_rejected(isolated_calibration):
     # A record measured before the made support existed carries no
-    # upper_support at all; it must not certify the MHA-SM-004 clamp.
+    # upper_support at all; it must not certify the MHA-SM-04 clamp.
     _, counter_record = isolated_calibration
     del counter_record["upper_support"]
 
@@ -223,7 +223,7 @@ def test_counter_record_tagged_for_another_support_is_rejected(isolated_calibrat
     counter_record["upper_support"] = {
         **counter_upper_support_geometry(),
         "component": "sm-gooseneck",
-        "number": "MHA-SM-001",
+        "number": "MHA-SM-01",
     }
 
     with pytest.raises(ValueError, match="Stale counter native calibration"):
@@ -236,7 +236,7 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     _, record = isolated_calibration
     support = record["upper_support"]
     assert support["component"] == "sm-gooseneck-spring-screw"
-    assert support["number"] == "MHA-SM-004"
+    assert support["number"] == "MHA-SM-04"
     assert "sku" not in support
     assert support["major_dia_mm"] == pytest.approx(3.5052)
     assert support["underhead_length_mm"] == 16.0

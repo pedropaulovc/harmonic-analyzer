@@ -1,8 +1,8 @@
-r"""Pure-data contract for MHA-DT-035, the crank handle's steel butt cup.
+r"""Pure-data contract for MHA-DT-35, the crank handle's steel butt cup.
 
 User ruling 2026-09-29 (ch11 p.14 and p.15 photographs): the butt of the
 ebonized handle carries a bright steel cup, and the slotted head of the pivot
-screw MHA-DT-032 sits recessed inside it with a visible ring of clearance.  The
+screw MHA-DT-32 sits recessed inside it with a visible ring of clearance.  The
 body is epoxied into a counterbore in the oak, and the screw head bears on
 the cup's floor, steel on steel, instead of on end-grain wood.
 
@@ -11,15 +11,15 @@ concept v4): the cup is a plain cup, no flange, seated flush with the oak's
 end; after the epoxy cures the handle's end round is turned on the oak, clear of the
 cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
 the cup together, so wood and steel read as one rounded butt.  The smaller
-MHA-DT-032 head (Ø6) sets the pocket's matched fit.  Owner ruling B on #1375
+MHA-DT-32 head (Ø6) sets the pocket's matched fit.  Owner ruling B on #1375
 enlarges the body to retain a 1.5 pocket wall at the smallest body and largest
 pocket, with the existing +/-0.10 body band.  The head, pocket, floor, axial
 sizes, corner radius and bottom chamfer remain unchanged.
 
-The pocket is bored to suit the MHA-DT-032 head; the handle's end play is fitted
+The pocket is bored to suit the MHA-DT-32 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
 body diameter keeps a +/-0.10 band because it sets the pocket wall and the
-MHA-DT-008 counterbore bored to suit it (that handle's butt wall); the pocket
+MHA-DT-08 counterbore bored to suit it (that handle's butt wall); the pocket
 depth keeps one because it sets how far the head sits below the face (Codex P2
 on #1139, user ruling 2026-09-30).
 
@@ -35,17 +35,17 @@ from __future__ import annotations
 
 WALL_FLOOR_MM = 1.5
 BODY_DIA_TOL = 0.10
-# Every axial size reads from the outer face, the one faced end (MHA-DT-035
+# Every axial size reads from the outer face, the one faced end (MHA-DT-35
 # re-review): overall and pocket depth.  The floor is what remains, so the
 # overall carries enough that its .X worst case, over the deepest banded
 # pocket, still leaves 1.5.
 OVERALL_LENGTH = 8.1
-# Deep enough that the longest banded MHA-DT-032 head, at the widest fitted end
+# Deep enough that the longest banded MHA-DT-32 head, at the widest fitted end
 # play, still sits below the face (Codex P2 on #1139: at 5.0 .X against a 4.0
 # .X head it could stand 1.6 proud).  User ruling 2026-09-30.
 POCKET_DEPTH = 5.5
 POCKET_DEPTH_TOL = 0.10
-# Bored to suit the MHA-DT-032 head (reference size); POCKET_CLEARANCE is the
+# Bored to suit the MHA-DT-32 head (reference size); POCKET_CLEARANCE is the
 # diametral clearance the note asks for, and POCKET_DIA_MAX its hard limit
 # (the largest head plus the widest clearance).
 POCKET_DIA = 6.3
@@ -57,15 +57,15 @@ POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
 BODY_DIA = round(POCKET_DIA_MAX + 2.0 * POCKET_WALL_FLOOR_MM + BODY_DIA_TOL, 6)
 # The head bears on the floor: the floor-to-wall corner may round no more than
 # the tightest radial clearance, so a sharp-edged, centred head still seats on
-# the flat (rule 16: the largest radius acceptable; MHA-DT-035 r1 finding 5).
+# the flat (rule 16: the largest radius acceptable; MHA-DT-35 r1 finding 5).
 POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
 POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
 POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
-# The floor hole passes the MHA-DT-032 shoulder: a drilled hole under the title
+# The floor hole passes the MHA-DT-32 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 4.2
 # The body's bottom edge, broken 45 degrees (owner ruling A on #1661): the
-# MHA-DT-008 counterbore floor's corner is rounded up to R0.3, so the leg's
+# MHA-DT-08 counterbore floor's corner is rounded up to R0.3, so the leg's
 # lower limit clears it and the cup still seats on the floor, face flush.
 # Modelled at the middle; printed as BODY_CHAMFER +/- its tolerance.
 BODY_CHAMFER = 0.4
@@ -92,7 +92,7 @@ for _ok, _what in (
     (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-DT-035: {_what}")
+        raise AssertionError(f"MHA-DT-35: {_what}")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CupProfile": {
@@ -125,5 +125,5 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-DT-035 dimension needs authored places")
+    raise AssertionError("every marked MHA-DT-35 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"PocketDia"})

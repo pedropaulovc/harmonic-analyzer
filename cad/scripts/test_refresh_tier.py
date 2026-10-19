@@ -187,7 +187,7 @@ class _Selection:
         return _explode_refresh.SW_SEL_EXPLVIEWS
 
 
-PIN = "vn-transgear-knob-drive-pin-1"
+PIN = "pd-vn-transgear-knob-drive-pin-1"
 # A rotation with a signed zero, as the paper drive's knob drive pins report.
 PIN_POSE = (0.99863, -0.052336, 0.0, 0.0, -0.0, -1.0, 0.052336, 0.99863, -0.0)
 PIN_POSE += (0.01, 0.2, -0.1, 1.0, 0.0, 0.0, 0.0)

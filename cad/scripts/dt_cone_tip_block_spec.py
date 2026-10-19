@@ -35,7 +35,7 @@ BLOCK_X = 17.0  # plan width across the shaft
 # screw's head gap off the pivot (cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
 # and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
 # adjuster's embed window (below) open over the tip's axial stack, and stay
-# short enough that the MHA-VN-016 stack collar never reaches the south face
+# short enough that the MHA-DT-VN-54 stack collar never reaches the south face
 # (build_dt_drive_train_assembly's collar-to-block air).  9.75 sits between the
 # two at print-worst.
 BLOCK_Z = 9.75
@@ -347,11 +347,11 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
 # ADJUSTER_EMBED; build_dt_drive_train_assembly asserts that band stays inside
 # this window.
 #
-# Pending exception ruling: MHA-VN-017 engagement (#975).
+# Pending exception ruling: MHA-DT-VN-55 engagement (#975).
 # The cup adjuster engages 1.0D at the worst case. It carries only
 # the shaft's end-play thrust -- the cone set's running push, no clamp load;
 # the pinch screw across the slit locks it -- and 1.5D would need a block deep
-# enough to push the MHA-VN-016 stack collar into the block's south face at
+# enough to push the MHA-DT-VN-54 stack collar into the block's south face at
 # print-worst (the collar-to-block air in build_dt_drive_train_assembly).
 ADJUSTER_MIN_ENGAGEMENT_D = 1.0
 ADJUSTER_EMBED_WINDOW = (
@@ -360,7 +360,7 @@ ADJUSTER_EMBED_WINDOW = (
 )
 if ADJUSTER_MIN_ENGAGEMENT_D != 1.0:
     raise AssertionError(
-        "the MHA-VN-017 engagement baseline pending ruling #975 is 1.0D; "
+        "the MHA-DT-VN-55 engagement baseline pending ruling #975 is 1.0D; "
         "any other value needs the user's ruling"
     )
 if not (
@@ -375,15 +375,15 @@ ADJUSTER_ENGAGEMENT_MIN_MM = (
     / 100.0
 )
 # The assembly sheet states the shortfall as a plain fact at the step that
-# sets the adjuster, worded like MHA-VN-031's.
-# Pending exception ruling: MHA-VN-017 engagement (#975).
+# sets the adjuster, worded like MHA-DT-VN-61's.
+# Pending exception ruling: MHA-DT-VN-55 engagement (#975).
 ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT = (
     f"ENGAGEMENT {ADJUSTER_ENGAGEMENT_MIN_MM:.2f} MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
 )
 
 # --- hold-down (user ruling 2026-09-29) --------------------------------------
 # One McMaster 91251A108 #4-40 x 3/8 black-oxide alloy socket head cap screw
-# (MHA-VN-030) rises from the swing platform's underside counterbore through a
+# (MHA-DT-VN-60) rises from the swing platform's underside counterbore through a
 # #4 close-clearance hole into a blind #4-40 tap in the foot, on the block's
 # centre (under the adjuster axis, at mid-depth).  A #4 rather than a #6: the
 # #6 head's counterbore would leave a 1.59 ledge in the 1/4 plate.

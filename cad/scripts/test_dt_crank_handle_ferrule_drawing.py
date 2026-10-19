@@ -1,4 +1,4 @@
-"""Offline contracts for MHA-DT-034, the crank handle ferrule, and its drawing."""
+"""Offline contracts for MHA-DT-34, the crank handle ferrule, and its drawing."""
 
 from __future__ import annotations
 
@@ -40,10 +40,10 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
 
 
 def test_bore_and_seat_mouth_are_banded_the_od_is_stock() -> None:
-    # User ruling 2026-09-29 (MHA-DT-034 review): the tenon is turned to suit this
-    # bore and the end play is fitted on the MHA-DT-032 shoulder.  The bore keeps
+    # User ruling 2026-09-29 (MHA-DT-34 review): the tenon is turned to suit this
+    # bore and the end play is fitted on the MHA-DT-32 shoulder.  The bore keeps
     # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
-    # tenon could outgrow the MHA-DT-008 seat shoulder or thin the oak over the
+    # tenon could outgrow the MHA-DT-08 seat shoulder or thin the oak over the
     # pivot bore to 1.45.  Local review of 1f3067ef2: the bore grows to 7.7
     # for the bore's eccentricity.  User ruling 2026-10-01 (local review of
     # 47cb8a46b): the OD is the 9/16-in rod as supplied, a reference, skimmed
@@ -105,7 +105,7 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     # rulings 2026-09-30 and 2026-10-01), so the seat is the whole face over
     # the tenon; the Ø7.7 bore keeps 1.5 of oak over the Ø4.1 pivot bore with
     # 0.10 of eccentricity.  The Ø12.5 holds the title block's .X band
-    # (MHA-DT-008 machinist review of 2026-10-18); off the bore by 0.175, the
+    # (MHA-DT-08 machinist review of 2026-10-18); off the bore by 0.175, the
     # skimmed ring keeps 1.675 of brass, and the smallest stock still cleans up.
     # Owner ruling B on #1375 enlarges the cup fit and butt contour only;
     # the ferrule's shoulder, fitted tenon and running bore stay unchanged.
@@ -152,24 +152,24 @@ def test_note_names_the_mating_tenon() -> None:
     # The operation, not the machine (machinist review of crank-v4-22).
     assert flat.startswith("BORE THRU.") and "LATHE" not in flat
     assert "BAND" not in flat
-    assert "OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>12.5 WITH MHA-DT-008 AFTER CURE." in flat
+    assert "OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>12.5 WITH MHA-DT-08 AFTER CURE." in flat
     assert "TURNED TO SUIT THIS BORE" in spec.DRAWING_NOTES
 
 
 def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
     import dt_crank_handle_spec as handle
 
-    # Owner ruling A on #1661: the MHA-DT-008 tenon root is R0.3 MAX, so the
+    # Owner ruling A on #1661: the MHA-DT-08 tenon root is R0.3 MAX, so the
     # bore's mouth at the seat face is chamfered 45 degrees, its shortest leg
     # no smaller than the root, for the ring to seat on the shoulder.  Its
     # callout names the end and the root it clears (rule 4); the R it quotes
-    # is MHA-DT-008's own, which this spec cannot import.
+    # is MHA-DT-08's own, which this spec cannot import.
     assert (spec.SEAT_MOUTH_CHAMFER, spec.SEAT_MOUTH_CHAMFER_TOL) == (0.35, 0.05)
     assert spec.HANDLE_ROOT_R_MAX == handle.INSIDE_CORNER_R_MAX
     assert spec.SEAT_MOUTH_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
     assert spec.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines() == [
         "X 45 DEG SEAT END",
-        "CLEARS MHA-DT-008",
+        "CLEARS MHA-DT-08",
         "TENON ROOT R0.3",
     ]
     # The callout carries the chamfer; the notes do not repeat it.
@@ -209,7 +209,7 @@ def test_seat_mouth_maximum_comes_from_the_glue_length_budget() -> None:
 
 def test_registry_row_is_the_title_block_source() -> None:
     row = _config.parts("dt-crank-handle-ferrule")
-    assert row["number"] == "MHA-DT-034"
+    assert row["number"] == "MHA-DT-34"
     assert row["title"] == "Crank Handle Ferrule"
     assert len(str(row["material"])) <= 36
     assert int(row["quantity"]) == 1

@@ -1,6 +1,6 @@
-r"""Build removable crank taper pin MHA-DT-009.
+r"""Build removable crank taper pin MHA-DT-09.
 
-The custom 1:48 pin secures separate hub MHA-DT-031 to crankshaft MHA-DT-011 and is
+The custom 1:48 pin secures separate hub MHA-DT-31 to crankshaft MHA-DT-11 and is
 removed to release the matched arm/hub assembly for gear service.  Its brass
 keeper ring passes through the small cross-hole near the big end.
 

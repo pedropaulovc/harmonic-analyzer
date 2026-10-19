@@ -1,4 +1,4 @@
-r"""Create the drawing for the cone pivot post's cap jaw button (MHA-DT-005-TL-03)."""
+r"""Create the drawing for the cone pivot post's cap jaw button (MHA-DT-05-TL-03)."""
 
 from __future__ import annotations
 
@@ -177,7 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Post Cap Jaw Button Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone pivot post cap jaw button; turned aluminium; MHA-DT-005-TL-03",
+            3: "cone pivot post cap jaw button; turned aluminium; MHA-DT-05-TL-03",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

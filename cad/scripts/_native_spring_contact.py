@@ -324,15 +324,15 @@ class _AssemblySpringInstance:
     station_z_mm: float
 
 
-_CHANNEL_SPRING_FAMILY = "vn-channel-spring-installed"
+_CHANNEL_SPRING_FAMILY = "ch-vn-channel-spring-installed"
 _CHANNEL_CONTACT_FAMILIES = (
     _CHANNEL_SPRING_FAMILY,
-    "vn-spring-hook",
+    "ch-vn-spring-hook",
     "ch-channel-lever",
 )
 _SUMMING_CONTACT_FAMILIES = (
-    "vn-counter-spring",
-    "vn-boss-hook",
+    "sm-vn-counter-spring",
+    "sm-vn-boss-hook",
     "sm-gooseneck-spring-screw",
 )
 _STATION_LOOKUP_TOLERANCE_MM = 1e-3
@@ -508,8 +508,8 @@ def assert_assembly_spring_contacts(
         )
         hooks = _match_station_family(
             springs,
-            "vn-spring-hook",
-            _ordered_family("vn-spring-hook", found["vn-spring-hook"], count),
+            "ch-vn-spring-hook",
+            _ordered_family("ch-vn-spring-hook", found["ch-vn-spring-hook"], count),
         )
         levers = _match_station_family(
             springs,
@@ -547,11 +547,11 @@ def assert_assembly_spring_contacts(
 
         seat, _gooseneck_y = settled_spring_seats.counter_seat()
         found = _assembly_spring_instances(adapter, _SUMMING_CONTACT_FAMILIES)
-        counter = _ordered_family("vn-counter-spring", found["vn-counter-spring"], 1)
+        counter = _ordered_family("sm-vn-counter-spring", found["sm-vn-counter-spring"], 1)
         boss = _match_station_family(
             counter,
-            "vn-boss-hook",
-            _ordered_family("vn-boss-hook", found["vn-boss-hook"], 1),
+            "sm-vn-boss-hook",
+            _ordered_family("sm-vn-boss-hook", found["sm-vn-boss-hook"], 1),
         )
         screw = _match_station_family(
             counter,

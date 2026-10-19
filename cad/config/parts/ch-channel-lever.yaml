@@ -1,5 +1,5 @@
 ch-channel-lever:
-  number: MHA-CH-002
+  number: MHA-CH-02
   # Owner ruling 2026-10-15: the book's levers are cast iron, so gray iron is
   # the material, not an alternative. Hot alkaline black oxide (MIL-DTL-13924
   # Class 1) covers cast irons and adds no build-up on the banded faces.

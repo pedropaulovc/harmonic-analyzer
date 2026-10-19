@@ -65,7 +65,7 @@ from _check import check  # noqa: E402
 from _com import _early_bound  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
-from vn_channel_spring_stock_geom import (  # noqa: E402
+from ch_vn_channel_spring_stock_geom import (  # noqa: E402
     COIL_MEAN_RADIUS_MM,
     COIL_TURNS,
     FREE_LENGTH_MM,

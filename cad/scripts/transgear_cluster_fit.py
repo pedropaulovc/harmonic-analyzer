@@ -1,10 +1,10 @@
-"""The disc cluster on the MHA-PD-023 pin, faced to fit (R9-68): the hub's
+"""The disc cluster on the MHA-PD-23 pin, faced to fit (R9-68): the hub's
 fitted length, the knob chain, the two bushings' fitted bands and the
 model's stations.
 
-The cluster (the MHA-PD-010 sleeve with the disc, hub and screws on it) runs on
-the pin between the MHA-PD-024 rear bushing, on the arm's front face, and the
-MHA-PD-025 front bushing, held by the MHA-VN-047 ring on the groove's front (load)
+The cluster (the MHA-PD-10 sleeve with the disc, hub and screws on it) runs on
+the pin between the MHA-PD-24 rear bushing, on the arm's front face, and the
+MHA-PD-25 front bushing, held by the MHA-PD-VN-61 ring on the groove's front (load)
 wall.  The hub and disc are trapped axially between the sleeve's step face
 (rearward: the hub's spigot seats on it and passes the disc's bore; the
 hub's flange clamps the disc's front face, the spigot's length ahead of the
@@ -15,12 +15,12 @@ sleeve, before the hub meets the front bushing: the disc's end float is the
 sleeve's float plus the recess.  Three windows are set at assembly, in this
 order:
 
-0. With the MHA-PD-017 hub's spigot on the step and the disc on the spigot, the
+0. With the MHA-PD-17 hub's spigot on the step and the disc on the spigot, the
    hub's front face is faced until it stands ``HUB_NOSE_WINDOW`` behind the
    sleeve's nose, so the front bushing bears on the steel nose (the hub never
    thrusts, R9-5) and traps hub and disc against the step.
-1. m, the air from F (the MHA-PD-008 knob shaft's 12T front face) to the
-   MHA-PD-006 disc's front face with the knob shaft rearward and the cluster,
+1. m, the air from F (the MHA-PD-08 knob shaft's 12T front face) to the
+   MHA-PD-06 disc's front face with the knob shaft rearward and the cluster,
    hub and disc pushed FORWARD, is set to ``FIT_WINDOW`` by facing the FRONT
    bushing.  Pushed forward, the cluster bears through the front bushing on
    the ring and the hub on the bushing, so neither the rear bushing nor the
@@ -35,7 +35,7 @@ m from 0.00 to 0.30 and the disc can touch F.  (The cq-sketch rev 5 proposal
 had the bushings' roles the other way round; this order supersedes it.)
 
 Both chains run from the arm's REAR face, where the pin's head and the
-MHA-PD-019 plate both seat, so the arm's thickness drops out of m:
+MHA-PD-19 plate both seat, so the arm's thickness drops out of m:
 
     front bushing = m + recess + groove station - ring thickness
                     - (sleeve length - tooth length - spigot length) - F
@@ -61,7 +61,7 @@ import pd_transgear_feed_pinion_spec as SLEEVE
 import pd_transgear_knob_shaft_spec as KNOB_SHAFT
 import pd_transgear_knob_thrust_ring_spec as KNOB_RING
 import pd_transgear_pin_spec as PIN
-import vn_transgear_retaining_ring_spec as RING
+import pd_vn_transgear_retaining_ring_spec as RING
 from _printed_tolerance import printed_band_mm
 
 # m: F to the disc's front face, cluster forward (R9-47's window, unchanged).
@@ -93,13 +93,13 @@ SLEEVE_FLOAT_WINDOW_CENTRE = round(sum(SLEEVE_FLOAT_WINDOW) / 2.0, 6)
 # (term, nominal, band): F = sum(nominal), spread sum(band).
 F_TERMS: tuple[tuple[str, float, float], ...] = (
     (
-        "MHA-PD-019 hub face station",
+        "MHA-PD-19 hub face station",
         ARM_PLATE.HUB_FACE_TO_MOUNTING,
         ARM_PLATE.HUB_FACE_TO_MOUNTING_BAND,
     ),
-    ("MHA-VN-046 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL),
+    ("MHA-PD-VN-60 thrust ring length", KNOB_RING.LENGTH, KNOB_RING.LENGTH_TOL),
     (
-        "MHA-PD-008 12T face width",
+        "MHA-PD-08 12T face width",
         KNOB_SHAFT.FACE_WIDTH,
         printed_band_mm(KNOB_SHAFT.FACE_WIDTH_PLACES),
     ),
@@ -112,8 +112,8 @@ F_BAND = round(sum(band for _, _, band in F_TERMS), 6)  # 0.31
 # spigot's seat) to the nose, H = sum(sign * nominal); hub length = H - the
 # nose window.
 HUB_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
-    ("MHA-PD-010 overall length", SLEEVE.OVERALL_LENGTH, SLEEVE.STATION_TOL, 1),
-    ("MHA-PD-010 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, -1),
+    ("MHA-PD-10 overall length", SLEEVE.OVERALL_LENGTH, SLEEVE.STATION_TOL, 1),
+    ("MHA-PD-10 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, -1),
 )
 HUB_CHAIN_NOMINAL = round(
     sum(sign * value for _, value, _, sign in HUB_CHAIN_TERMS), 6
@@ -132,12 +132,12 @@ HUB_LENGTH_MODEL = round(HUB_CHAIN_NOMINAL - HUB_NOSE_WINDOW_CENTRE, 6)  # 13.70
 # (term, nominal, band, sign): K = sum(sign * nominal); front bushing = K + m
 # + the hub's recess (m is read with hub and disc forward on the bushing).
 FRONT_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
-    ("MHA-PD-023 groove station", PIN.GROOVE_STATION, PIN.GROOVE_STATION_BAND, 1),
-    ("MHA-VN-047 ring thickness", RING.THICKNESS, RING.THICKNESS_TOL, -1),
-    ("MHA-PD-010 overall length", SLEEVE.OVERALL_LENGTH, SLEEVE.STATION_TOL, -1),
-    ("MHA-PD-010 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, 1),
+    ("MHA-PD-23 groove station", PIN.GROOVE_STATION, PIN.GROOVE_STATION_BAND, 1),
+    ("MHA-PD-VN-61 ring thickness", RING.THICKNESS, RING.THICKNESS_TOL, -1),
+    ("MHA-PD-10 overall length", SLEEVE.OVERALL_LENGTH, SLEEVE.STATION_TOL, -1),
+    ("MHA-PD-10 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, 1),
     (
-        "MHA-PD-017 spigot length",
+        "MHA-PD-17 spigot length",
         HUB_JOINT.SPIGOT_LENGTH,
         HUB_JOINT.SPIGOT_LENGTH_BAND,
         1,
@@ -158,14 +158,14 @@ FRONT_BUSHING_FITTED_MAX = round(
 # --- Rear bushing: the float ------------------------------------------------------
 REAR_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
     ("F from the arm's rear face", F_FROM_ARM_REAR, F_BAND, 1),
-    ("MHA-PD-010 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, -1),
+    ("MHA-PD-10 tooth length", SLEEVE.FACE_WIDTH, SLEEVE.FACE_WIDTH_BAND, -1),
     (
-        "MHA-PD-017 spigot length",
+        "MHA-PD-17 spigot length",
         HUB_JOINT.SPIGOT_LENGTH,
         HUB_JOINT.SPIGOT_LENGTH_BAND,
         -1,
     ),
-    ("MHA-PD-018 arm thickness", ARM.THICKNESS, ARM.THICKNESS_BAND, -1),
+    ("MHA-PD-18 arm thickness", ARM.THICKNESS, ARM.THICKNESS_BAND, -1),
 )
 REAR_CHAIN_NOMINAL = round(
     sum(sign * value for _, value, _, sign in REAR_CHAIN_TERMS), 6

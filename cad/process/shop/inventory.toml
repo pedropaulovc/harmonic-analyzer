@@ -3625,7 +3625,7 @@ present = false
 verify = true
 purchase = "1 x ZYLtech HW-SC-T8x2-600, select 600 mm pre-cut length; USD 14.95 and in stock in the live variant response 2026-10-17 UTC. Includes one regular brass flange nut recorded at fixtures.trammel-tr8-flange-nut; do not buy a second nut. Houston, Texas vendor with domestic shipping and will-call pickup."
 note = "Read live 2026-10-17 UTC: nominal diameter 8 mm, T8x2 single-start right-hand trapezoidal thread, pitch 2 mm and lead 2 mm/revolution, 304 stainless steel. Ordered stock length is 600 mm, not the installed length; vendor length tolerance and straightness are unpublished. Owner's C4 layout retains 410 mm +/-0.5 mm installed total length. Shop step: confirm the matching C4 support positions and wheel engagement, cut the stock screw to 410 mm +/-0.5 mm, deburr and lightly chamfer the cut end, and check that the brass nut runs freely over it before assembly. Do not turn end journals; the KP08 and wheel set screws grip the threaded ends. Keep nut travel off set-screw-marked end threads; inspect for raised crest damage before passing the nut over a previously clamped end. Receipt checks of crest fit, runout, installed travel and bidirectional axial retention remain required."
-cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
+cite = ["ZYLtech pre-cut screw/regular nut kit https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC: T8x2 single start, pitch/lead 2 mm, right hand, 304 stainless; product 197 length variant HW-SC-T8x2-600 USD 14.95 in stock", "Owner/C4 layout decision 2026-10-16 (not vendor tolerance): cut to 410 mm +/-0.5 mm; SCREW_LENGTH = 410.0 in cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py, rocker/trammel-jig-4 branch stacked on PR #1583"]
 # McMaster alternatives considered, not chosen: M8 pitch 2 / lead 4 screws
 # 97783A170/97783A180 are only 200/300 mm; too short for the final 410 mm order.
 # McMaster 2391N25 is 500 mm but pitch 2.5 / lead 10, unnecessarily coarse
@@ -3662,10 +3662,10 @@ note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the Z
 # Lubrication and backlash acceptance remain shop checks, not catalogue proof.
 # Four plain 3.5 mm holes suit M3 clearance mounting; a shop-made nut bracket
 # is a separate jig part, not a claim of direct mounting to M4 carriage threads.
-# C4 owner identifies TL-29 (MHA-CH-006-TL-29), defined in
+# C4 owner identifies TL-29 (MHA-CH-06-TL-29), defined in
 # cad/scripts/ch_rocker_arm_tl_oblique_nut_bracket_spec.py, as that bracket.
 # Interface authority: NUT_ID and NUT_* in
-# cad/scripts/ch_rocker_arm_tl_oblique_leadscrew_spec.py, in-flight
+# cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py, in-flight
 # rocker/trammel-jig-4 branch; this sourcing branch adds no CAD geometry.
 cite = ["ZYLtech kit regular-nut geometry https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC; nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ T8x2 single-start option resolves to HW-SC-T8x2-NUT", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
 # McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
@@ -3740,7 +3740,7 @@ cite = ["MISUMI HOK40-HC8 https://us.misumi-ec.com/vona2/detail/110300515660/?Hi
 # face by two #10-24 x 5/8 in socket-head cap screws at X +/-5, Z -33.2, 9 mm below
 # the part; the upright's taps are spotted through the ledge's #5 holes, then drilled
 # and tapped #10-24 (illustrative example). Ledge width, screws, holes, 10.0 pitch,
-# spotting and the one-place bands follow the final HA prints MHA-CH-008-TL-01 (ledge)
+# spotting and the one-place bands follow MHA-CH-08-TL-01 (ledge; historical print MHA-CH-008-TL-01)
 # and TL-02 (angle plate), HA main d4b977a58 (fixture-cad/delivery-changes.md section 5).
 # DataBracket7: the ledge is 17.9 high so that, standing on a 1-2-3 block's 2 in
 # (50.8 mm) side on the table (TC Z -92.9), its top lands at TC Z -24.2 (68.7 above
@@ -3779,7 +3779,7 @@ solids = [
   { name = "right-ledge-screw", supply = "bought", shape = "cylinder", at_mm = [5.0, -6.0, -33.2], axis = [0.0, 1.0, 0.0], dia_mm = 4.826, length_mm = 15.875, fastener = "#10-24 x 5/8 in SHCS", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # Basis: fixtures.angle-plate.solids.right-ledge-screw-head: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1231 (fixtures.angle-plate.solids.right-ledge-screw-head) authored cylinder envelope; authored physical-size model {"dia_mm":7.938,"length_mm":4.826} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "right-ledge-screw-head", supply = "existing", shape = "cylinder", at_mm = [5.0, -10.826, -33.2], axis = [0.0, 1.0, 0.0], dia_mm = 7.938, length_mm = 4.826, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
-  # Ledge clearance: #5 drill 0.2055 in (5.22 mm), the HA print MHA-CH-008-TL-01's size (looser than Machinery's Handbook 27th ed. Table 4 p.1934's #7 free fit for #10); upright tap drill for #10-24: #25, 0.1495 in (3.80 mm), Table 4, p.1934.
+  # Ledge clearance: #5 drill 0.2055 in (5.22 mm), the HA print MHA-CH-08-TL-01's size (looser than Machinery's Handbook 27th ed. Table 4 p.1934's #7 free fit for #10); upright tap drill for #10-24: #25, 0.1495 in (3.80 mm), Table 4, p.1934.
   # Basis: fixtures.angle-plate.solids.left-ledge-clearance-hole: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1233 (fixtures.angle-plate.solids.left-ledge-clearance-hole) #5 (0.2055 in) drilled clearance hole for a #10-24 screw; authored physical-size model {"dia_mm":5.22,"length_mm":6.2} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
   { name = "left-ledge-clearance-hole", shape = "cylinder", at_mm = [-5.0, -6.1, -33.2], axis = [0.0, 1.0, 0.0], dia_mm = 5.22, length_mm = 6.2, void = true, cuts = ["bolted foot-end ledge"], fastener = "#5 (0.2055 in) drilled clearance hole for a #10-24 screw", measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "digital calipers, height gauge and indicator; physical component sizes/fit only" } },
   # Basis: fixtures.angle-plate.solids.right-ledge-clearance-hole: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1234 (fixtures.angle-plate.solids.right-ledge-clearance-hole) #5 (0.2055 in) drilled clearance hole for a #10-24 screw; authored physical-size model {"dia_mm":5.22,"length_mm":6.2} mm, offsets zero. at_mm/axis are unchanged design coordinates, not surveyed measurements; void overrun lengths remain model extents, not physical depth.
@@ -3797,7 +3797,7 @@ solids = [
 
 # DataBracket7 (r9): a bench toolmaker's clamp that holds the pivot-bracket ledge to the
 # angle-plate upright while the upright's taps are spotted through the ledge's holes
-# (HA print MHA-CH-008-TL-02: "clamp the ledge over the tap locations and spot the taps
+# (HA print MHA-CH-08-TL-02: "clamp the ledge over the tap locations and spot the taps
 # through its holes"). Not used by any setup, so it carries no solids.
 
 [fixtures.drill-press-vise]
@@ -4384,10 +4384,10 @@ body_depth_mm = { value = 32, measured = { status = "measured", by = "placeholde
 
 # Shop-made gauge arbor for the S6 bond cradle: it beds in both matched seats as the S5 post
 # does, so its crown carries the post axis for the pin-top readings (from the post axis,
-# harmonic-analyzer MHA-DT-005-TL-01); the relief between the sections clears the pins.
+# harmonic-analyzer MHA-DT-05-TL-01); the relief between the sections clears the pins.
 
 # Shop-made jaw buttons for the cone S11 vise hold: one between each soft jaw and a cone-sleeve
-# cap, its spigot in the reamed Ø12.27 journal bore. HA print MHA-DT-005-TL-03: face Ø15.0 (.X,
+# cap, its spigot in the reamed Ø12.27 journal bore. HA print MHA-DT-05-TL-03: face Ø15.0 (.X,
 # 14.2-15.8) and spigot Ø12.2 +0/-0.05; the largest face shifted by the largest spigot float
 # (0.135) stays under the Ø17.26 socket mouth and the smallest still covers the bore edge, so a
 # button bears on the cap annulus only; the 3 mm face holds each jaw off the body.
@@ -4395,7 +4395,7 @@ body_depth_mm = { value = 32, measured = { status = "measured", by = "placeholde
 
 
 # S10 saw cradle (illustrative example shop-made item, cone-pivot-post only), to the
-# harmonic-analyzer print MHA-DT-005-TL-02 (HA #1249, 3219f2698): one milled 1018 block, no
+# harmonic-analyzer MHA-DT-05-TL-02 (HA #1249; historical print MHA-DT-005-TL-02 at 3219f2698): one milled 1018 block, no
 # screws or dowels. Local frame = cone plan frame B6: post axis along -X (head top X0, foot B
 # X86), cone cross-bore axis vertical (+Z, south cap up), so the post's body axis is Y0 Z0.
 # Two saddles, milled from the solid, carry the body at X28.5..41.5 and X66..80 (clear of the
@@ -4891,7 +4891,7 @@ cite = [
 ]
 
 # --- ch_rocker_arm (trial T4) additions ---
-# Outline template for MHA-CH-006: the arm's finished outline (R800 top edge, R816
+# Outline template for MHA-CH-06: the arm's finished outline (R800 top edge, R816
 # bottom, tapers, tip lands) with a Ø6.5 pivot hole and a radial slot at the arm's rod-pin
 # hole, laid on the part to scribe the outline and held against it to check the filed
 # edges. Shop-made (Pedro 2026-10-11), not bought:
@@ -4907,7 +4907,7 @@ cite = [
 # 2026-10-11, see local://rocker-measurement-checklist.md B3): the template is assumed made
 # and accepted as above; set verify = true again until it really is.
 [gauges.arm-outline-template]
-name = "arm outline template (MHA-CH-006), shop-made: ch_rocker_arm_tl_outline_template"
+name = "arm outline template (MHA-CH-06), shop-made: ch_rocker_arm_tl_outline_template"
 kind = "profile_gauge"
 cad = "ch_rocker_arm_tl_outline_template"
 # Basis: gauges.arm-outline-template.range_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1920 (gauges.arm-outline-template.range_mm) authored profile_gauge geometry baseline [8, 817] mm, offset [+0, +0] mm = [8, 817] mm. Range endpoints are not extended beyond the declared source span; lower endpoint is a minimum, upper endpoint a maximum.
@@ -4947,7 +4947,7 @@ solids = [
   { name = "slot-plus-undercut", void = true, cuts = ["table"], shape = "box", at_mm = [-420.1, 51.0, -24.0], size_mm = [840.2, 25.0, 10.0], measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-17", instrument = "manual nominal; verify slot section and centre spacing with calipers and depth gauge" } },
 ]
 
-# Per-blank shim stack for MHA-CH-006 S4. Turned over onto the raw blank ends, the S3-faced
+# Per-blank shim stack for MHA-CH-06 S4. Turned over onto the raw blank ends, the S3-faced
 # strap face (datum B) hangs (measured raw thickness M - 5.219) above the table, nominal
 # 2.719, over a 312 mm span. Four stacks under the arm's strap band carry it while S4 faces
 # the other side. Each stack: one 3/32 in ground flat (2.381) plus steel shim to
@@ -4955,16 +4955,16 @@ solids = [
 # Purchase approved by Pedro 2026-10-11 (ground flat and shim assortment), so no presence
 # verify; each stack's height is set per blank from the measured M (shim = true).
 [fixtures.strap-shim-stack]
-name = "strap shim stack (3/32 in ground flat + shim), MHA-CH-006 S4"
+name = "strap shim stack (3/32 in ground flat + shim), MHA-CH-06 S4"
 kind = "custom"
 shop_made = true
 purchase = "O1 precision ground flat stock 3/32 x 3/4 x 18 in (cut into 20 mm pieces, one per stack) and a 0.001-0.031 in steel shim stock assortment (purchase approved by Pedro 2026-10-11)"
 source = "Abrams Industries O1 3/32 x 3/4 x 18 reg, $12.05 (https://us.abrams-industries.com/buy/precision-ground-flat-stock); Precision Brand 15-piece 0.001-0.031 in steel shim sheet assortment 6 x 12 in, MSC 86798816, $136.56 web price (https://www.mscdirect.com/product/details/86798816); prices read 2026-10-11"
 cad = "ch_rocker_arm_tl_strap_shim_stack"
 
-# Hub filing buttons for MHA-CH-006 (Pedro 2026-10-11: the rotary table cannot swing the
+# Hub filing buttons for MHA-CH-06 (Pedro 2026-10-11: the rotary table cannot swing the
 # 336 mm blank, so the hub OD is stair-milled and filed to buttons). Two hardened O1 buttons
-# (MHA-CH-006-TL-04) on a headed stud (MHA-CH-006-TL-05) through the reamed pivot bore. The
+# (MHA-CH-06-TL-04) on a headed stud (MHA-CH-06-TL-05) through the reamed pivot bore. The
 # stud tail is gripped in the bench vise and a #10-24 hex coupling nut (McMaster 90264A425,
 # 3/4 in long, 5/16 in across flats) clamps the stack. The solids come from the TL specs.
 # Local frame: stud axis Z, Z0 on the upper hub face (P02), lower hub face at Z-7.0565.
@@ -4991,7 +4991,7 @@ cad = "ch_rocker_arm_tl_strap_shim_stack"
 # measurement (authorized 2026-10-11, see local://rocker-measurement-checklist.md B1): the
 # kit is assumed made and measured inside the limits below; set verify = true until it is.
 [fixtures.hub-filing-buttons]
-name = "hub filing buttons and stud, MHA-CH-006 (TL parts)"
+name = "hub filing buttons and stud, MHA-CH-06 (TL parts)"
 kind = "filing_buttons"
 cad = "ch_rocker_arm_tl_filing_stud"
 shop_made = true
@@ -5005,9 +5005,9 @@ pin_dia_limits_mm = { value = [6.486, 6.489], measured = { status = "measured", 
 # Basis: fixtures.hub-filing-buttons.button_runout_mm: no nominal; estimate from b757b5a76 cad/process/shop/inventory.toml:1995 (fixtures.hub-filing-buttons.button_runout_mm), authored filing_buttons geometry baseline 0.02 mm, offset +0 mm = 0.02 mm, inside the TL-04 printed runout 0.025 TIR. The original runout bound is retained; no improved concentricity is asserted.
 button_runout_mm = { value = 0.02, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "0.001 mm test indicator, one revolution on a close-fitting mandrel" } }
 source = "buttons: Abrams Industries O1 drill rod 7/16 in x 36 in, $17.97 (https://us.abrams-industries.com/steel/tool-steel/o1/dr-36, read 2026-10-11); stud: 4140 pre-hardened rod 7/16 in, HRC 32 (McMaster 6818T119); nut: McMaster 90264A425 #10-24 zinc-plated steel hex coupling nut, 3/4 in long, 5/16 in across flats (verified live 2026-10-14); hardening: tools.map-torch-kit + consumables.quench-oil-canola (purchase approved by Pedro 2026-10-11)"
-note = "Shop-made TL parts MHA-CH-006-TL-04 (two buttons: O1, hardened, tempered and lapped) and MHA-CH-006-TL-05 (stud: 4140 HRC 32, left unhardened), with a bought #10-24 coupling nut (McMaster 90264A425). Check each button OD with the 0-1 in micrometer and each bore and the stud with pin gauges. Check OD runout with the DTI with each button on a close-fitting mandrel (the largest pin gauge that enters its bore) in V-blocks, not on the stud, whose fit is too loose to show 0.025 TIR."
+note = "Shop-made TL parts MHA-CH-06-TL-04 (two buttons: O1, hardened, tempered and lapped) and MHA-CH-06-TL-05 (stud: 4140 HRC 32, left unhardened), with a bought #10-24 coupling nut (McMaster 90264A425). Check each button OD with the 0-1 in micrometer and each bore and the stud with pin gauges. Check OD runout with the DTI with each button on a close-fitting mandrel (the largest pin gauge that enters its bore) in V-blocks, not on the stud, whose fit is too loose to show 0.025 TIR."
 
-# Filing stand for MHA-CH-006 S5: when the hacksaw parts the taper/land tabs, the arm and
+# Filing stand for MHA-CH-06 S5: when the hacksaw parts the taper/land tabs, the arm and
 # the blank-end frame must each stay pressed onto a support (prechips held split). Two end
 # blocks carry the raw blank ends; a pedestal carries the lower hub face (0.4405 above the
 # raw underside), so one clamp on the 7.06 thick hub holds the arm and the 2.5 strap is
@@ -5017,14 +5017,14 @@ note = "Shop-made TL parts MHA-CH-006-TL-04 (two buttons: O1, hardened, tempered
 # ASSUMED placeholder pending Pedro's measurement (authorized 2026-10-11, see
 # local://rocker-measurement-checklist.md B2): assumed made from offcuts as drawn.
 [fixtures.rocker-filing-stand]
-name = "rocker filing stand (end blocks + hub pedestal), MHA-CH-006 S5"
+name = "rocker filing stand (end blocks + hub pedestal), MHA-CH-06 S5"
 kind = "custom"
 shop_made = true
 verify = false
 note = "Shop-made from steel offcuts (material not yet chosen: shop gap); end blocks 20 x 38.1 x 30, pedestal Ø9.5 x 30.44 (its top 0.4405 above the end blocks), all set on the fitting bench and clamped to it; check the pedestal top against the end blocks with the height gauge before use"
 cad = "ch_rocker_arm_tl_filing_stand"
 
-# Riser blocks for MHA-CH-006 S1-S4. With the example spindle-to-table minimum (2.4 in,
+# Riser blocks for MHA-CH-06 S1-S4. With the example spindle-to-table minimum (2.4 in,
 # 60.96) the 3/8 in end mill in its collet cannot reach a 7.94 bar lying on the PM-30MV
 # table (run15: short by 9.5 to 11.7 mm), so the bar is lifted 18.50 on six blocks clamped
 # to the table. Local frame: Z0 = block tops, X along the bar, Y as the rocker's frame `top`
@@ -5038,7 +5038,7 @@ cad = "ch_rocker_arm_tl_filing_stand"
 # ASSUMED placeholders pending Pedro's measurement (authorized 2026-10-11, see
 # local://rocker-measurement-checklist.md B4): assumed made and measured as drawn.
 [fixtures.rocker-riser-blocks]
-name = "rocker riser blocks (six, 18.50 high), MHA-CH-006 S1-S4"
+name = "rocker riser blocks (six, 18.50 high), MHA-CH-06 S1-S4"
 kind = "custom"
 fits = "PM-30MV"
 shop_made = true
@@ -5056,7 +5056,7 @@ width_mm = { value = 38.16, measured = { status = "measured", by = "placeholder 
 note = "Shop-made from the approved 1018 CR 3/4 x 1-1/2 bar: six blocks lying flat (38.1 across the bar), faced together to 18.50, equal within 0.01; each clamped to the table with a T-slot strap or set against the work strap's own clamp. The blank (S2, S3) or the strap shim stacks (S1, S4) stand on them."
 cad = "ch_rocker_arm_tl_riser_block"
 
-# Template make-route kit for MHA-CH-006 (local://rocker-template-route.md). Approved by
+# Template make-route kit for MHA-CH-06 (local://rocker-template-route.md). Approved by
 # Pedro 2026-10-11 unless marked PROPOSED; none is used by an op in the plan, so no rule
 # reads them. Prices read 2026-10-11; "search listing" prices are not confirmed on the
 # vendor page. The owned flat bench (about 1.0 x 0.65 m, Pedro 2026-10-11) carries the
@@ -5145,7 +5145,7 @@ shop_made = true
 cad = "ch_rocker_arm_tl_trammel_pivot_plate"
 verify = true
 material = "1018 cold-rolled steel"
-note = "Template-making extra (CAD part ch_rocker_arm_tl_trammel_pivot_plate, MHA-CH-006-TL-19): screwed to the MDF scribing board; the trammel pivot point (MHA-CH-006-TL-18) runs in its 60 degree centre-drilled cone while R800/R816 are scribed. Not yet made."
+note = "Template-making extra (CAD part ch_rocker_arm_tl_trammel_pivot_plate, MHA-CH-06-TL-19): screwed to the MDF scribing board; the trammel pivot point (MHA-CH-06-TL-18) runs in its 60 degree centre-drilled cone while R800/R816 are scribed. Not yet made."
 
 [fixtures.trammel-board-mdf]
 name = "MDF scribing board 3/4 in, 2 x 4 ft, cut to 1000 x 610 on the owned bench"
@@ -5911,7 +5911,7 @@ dia_in = { value = 0.0782, measured = { status = "measured", by = "placeholder (
 # Basis: gauges.vermont-class-x-0782-plus.length_in: catalogue-valued placeholder; source nominal 2 in, offset +0 in = 2 in. Source b757b5a76 cad/process/shop/inventory.toml:2673 (gauges.vermont-class-x-0782-plus.length_in); retained item source https://www.judgetool.com/products/vermomt-class-x-pin-gages-in-0001-increments-000040-tolerance/. No invented catalogue deviation or actual installed-machine/gauge metrology is claimed.
 length_in = { value = 2, measured = { status = "measured", by = "placeholder (realistic, remeasure: #1413)", date = "2026-10-12", instrument = "calipers" } }
 
-# Bought gauge pin that locates the arm outline template (MHA-CH-006-TL-13) in the
+# Bought gauge pin that locates the arm outline template (MHA-CH-06-TL-13) in the
 # rocker's pivot bore (ch_rocker_arm_tl_outline_template_spec PIN_GAUGE_*): the 0.2550 Class
 # ZZ pin from gauges.pin-gauges left 0.0505 of registration play across both bores.
 # Auto-selected 2026-10-15 after review timeout (Codex 4280365386); Pedro may revisit.
@@ -6326,7 +6326,7 @@ cite = ["Online Metals pid 24273 https://www.onlinemetals.com/en/buy/aluminum/0-
 [[stock]]
 form = "flat_bar"
 material = "1018 cold-finish carbon steel"
-note = "MHA-CH-013 strap: 3 x 40 mm, 60 in +/-2 in; vendor title 1005/1018, product information alloy 1018. Require 1018 material certification on purchase. Four 350 mm blanks fit even at the 58 in low length limit; mill to drawing thickness after receipt."
+note = "MHA-CH-13 strap: 3 x 40 mm, 60 in +/-2 in; vendor title 1005/1018, product information alloy 1018. Require 1018 material certification on purchase. Four 350 mm blanks fit even at the 58 in low length limit; mill to drawing thickness after receipt."
 # Basis: OnlineMetals 22381 catalogue nominal [40, 3] mm and 60 x 25.4 = 1524 mm, zero offsets; not metrology.
 section_mm = [40.0, 3.0]
 length_mm = 1524.0
@@ -6336,7 +6336,7 @@ cite = ["OnlineMetals part 22381 https://www.onlinemetals.com/en/buy/carbon-stee
 [[stock]]
 form = "round_bar"
 material = "1018 cold-finish carbon steel"
-note = "MHA-CH-012 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing."
+note = "MHA-CH-12 hub: 7/16 in (11.1125 mm) round, closest listed OnlineMetals standard diameter >=11 mm (10 mm below, 12 mm above). Order 12 in length; turn the joint land and leave finish allowance per hub drawing."
 # Basis: OnlineMetals 20743 catalogue nominal 0.4375 x 25.4 = 11.1125 mm; 12 x 25.4 = 304.8 mm, zero offsets; not metrology.
 dia_mm = 11.1125
 length_mm = 304.8

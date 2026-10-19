@@ -143,8 +143,8 @@ def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:
 
 
 def test_post_mount_screw_prints_no_installation_notes() -> None:
-    row = yaml.safe_load((PARTS / "vn-post-mount-screw.yaml").read_text(encoding="utf-8"))
-    assert "installation_notes" not in row["vn-post-mount-screw"]
+    row = yaml.safe_load((PARTS / "dt-vn-post-mount-screw.yaml").read_text(encoding="utf-8"))
+    assert "installation_notes" not in row["dt-vn-post-mount-screw"]
 
 
 def test_knife_mount_prints_its_heat_treatment_in_finish_only() -> None:

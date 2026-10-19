@@ -62,7 +62,7 @@ if not BAR_TALL < HUB_DIA:
 
 # --- Bands (upper, lower), native on the model dimensions. ---
 # The fulcrum bore is reamed: it runs on the h-band 6.35 fulcrum shaft
-# (MHA-CH-004), the same O6.5 +0.03/0 pivot the rocker arm runs on its shaft.
+# (MHA-CH-04), the same O6.5 +0.03/0 pivot the rocker arm runs on its shaft.
 PIVOT_HOLE_BAND = (0.03, 0.0)
 # The plate is straddled by the amplitude bar's top notch, whose 3.15 minimum
 # is this band's maximum plus the running floor (ch_amplitude_bar_spec). The

@@ -99,7 +99,7 @@ async def main():
     # plane) (the spin angle) -- compare against the recorded spec scalars.
     import math
     from _assembly import component_transform
-    arr = component_transform(adapter, "vn-lever-wire-1")
+    arr = component_transform(adapter, "mg-vn-lever-wire-1")
     zrow = arr[6:9]  # part z-axis image = Front@hw normal
     org_z = arr[11] * 1000.0
     log(f"=== MEASURED at pose: hub z={org_z:.4f} (spec 142.77); "

@@ -3,13 +3,65 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import _purchased_fastener_drawing as purchased
-from _drawing_registry import DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+
+
+@pytest.mark.parametrize(
+    ("names", "item"),
+    [
+        (
+            ("dt_vn_fillister_screw", "fr_vn_fillister_screw", "pd_vn_fillister_screw"),
+            "#4-40 x 1/4 FILLISTER HEAD SLOTTED SCREW",
+        ),
+        (
+            ("mg_vn_clamp_screw", "pd_vn_clamp_screw"),
+            "#8-32 x 1-1/4 NARROW FILLISTER HEAD SLOTTED SCREW",
+        ),
+        (
+            ("ch_vn_arbor_set_screw", "dt_vn_arbor_set_screw"),
+            "#4-40 x 1/4 SOCKET SET SCREW, CUP POINT",
+        ),
+        (
+            ("mg_vn_thumb_screw", "ms_vn_thumb_screw"),
+            "#4-40 x 7/16 RAISED KNURLED-HEAD THUMB SCREW",
+        ),
+    ],
+)
+def test_shared_purchases_draw_each_parent_native_identity(
+    monkeypatch: pytest.MonkeyPatch, names: tuple[str, ...], item: str
+) -> None:
+    """The same purchased geometry draws distinct native models, never aliases."""
+    specs = [DRAWINGS_BY_NAME[name] for name in names]
+    assert len({spec.source for spec in specs}) == len(names)
+    assert len({spec.artifact_stem for spec in specs}) == len(names)
+    adapter = object()
+    result = {"pdf": "parent-owned purchase"}
+    calls: list[tuple[object, object, str]] = []
+
+    async def purchased_drawing(given_adapter, spec, *, item):
+        calls.append((given_adapter, spec, item))
+        return result
+
+    for name, spec in zip(names, specs, strict=True):
+        stem = name.replace("_", "-")
+        assert spec.part == name
+        assert spec.artifact_stem == stem
+        assert spec.source_kind == "part"
+        assert spec.source.name == f"{stem}.SLDPRT"
+        assert spec.script_name == f"draw_{name}.py"
+        recipe = importlib.import_module(spec.script.stem)
+        assert recipe.SPEC is spec
+        assert recipe.ITEM == item
+        monkeypatch.setattr(recipe, "build_purchased_fastener_drawing", purchased_drawing)
+        assert asyncio.run(recipe.build(adapter)) is result
+    assert calls == [(adapter, spec, item) for spec in specs]
 
 
 class _Model:

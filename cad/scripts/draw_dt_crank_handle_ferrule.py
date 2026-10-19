@@ -1,11 +1,11 @@
-r"""Create the curated machinist drawing for MHA-DT-034, the crank handle ferrule.
+r"""Create the curated machinist drawing for MHA-DT-34, the crank handle ferrule.
 
 A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore, length
 and the 45-degree chamfer at the bore's seat-end mouth.  The end view carries
 only its centre mark and the cutting plane; the longitudinal section A-A is
 the ring's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes
 every dimension, so the bore reads on cut edges rather than hidden lines (the
-MHA-DT-034 machinist review).  Every size but the bore and the chamfer is
+MHA-DT-34 machinist review).  Every size but the bore and the chamfer is
 routine (.X): the oak tenon is turned to suit this bore.
 
 Run with SolidWorks open::
@@ -180,7 +180,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The chamfer's band names its end and the MHA-DT-008 tenon root it clears.
+    # The chamfer's band names its end and the MHA-DT-08 tenon root it clears.
     set_dimension_callouts(
         adapter,
         annotations,
@@ -191,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
     by_name = {dimension_name(adapter, a): a for a in annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-DT-034 {name}", diameter=name.endswith("Dia")
+            adapter, by_name[name], label=f"MHA-DT-34 {name}", diameter=name.endswith("Dia")
         )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ferrule end view")

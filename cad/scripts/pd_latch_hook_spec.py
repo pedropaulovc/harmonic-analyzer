@@ -1,13 +1,13 @@
-r"""MHA-PD-014 latch hook: the printed bands, the walls and the screw-head
+r"""MHA-PD-14 latch hook: the printed bands, the walls and the screw-head
 clearance they hold, and the sheet's marked dimensions.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Geometry and frame: ``pd_latch_hook_geometry``.
 
 One formed 0.8 (0.032 in) 1095 spring-steel part: a base on the support
-bar's back face under two #4-40 screws (MHA-VN-043), a 90 deg ear at its +X
+bar's back face under two #4-40 screws (MHA-PD-VN-59), a 90 deg ear at its +X
 end, and an arm hanging from the ear's lower edge, rolled R80 flatwise to
-lie square to the MHA-VN-042 latch pin, with a pin hole and a finger tab.
+lie square to the MHA-PD-VN-58 latch pin, with a pin hole and a finger tab.
 Latching: pull the tab along +U, the arm flexes flatwise and the strip slides
 off the pin; lift the hanger and the pin's crowned end rides up the tab and
 the strip until it snaps into the hole.
@@ -23,7 +23,7 @@ How the sheet locates things:
 
 * screw-hole X from the ear's outer face (x = 0), Y from the base's low-Y
   edge (y = 0), both ±POSITION_TOL at .XX: the Ø3.2 drilled hole's float
-  over the basic #4-40 major, less the MHA-PD-007 bar taps' own ±0.065, is
+  over the basic #4-40 major, less the MHA-PD-07 bar taps' own ±0.065, is
   what each printed position may spend (the fixed-fastener stack, as the
   guide lock's on its screws); the hole callout names that mate
   (SCREW_HOLE_MATE), so the band reads as the taps' and not as arbitrary;
@@ -78,7 +78,7 @@ from pd_latch_hook_geometry import (
     WIDTH,
 )
 from pd_support_bar_spec import HOLE_POSITION_BAND as BAR_TAP_BAND
-from vn_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
+from pd_vn_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 
 # --- Printed bands -----------------------------------------------------------
 HOLE_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower): drilled, never under
@@ -147,7 +147,7 @@ _POSITION_STEPS = max(
 POSITION_TOL = round(_POSITION_STEPS * _POSITION_STEP, POSITION_PLACES)
 if POSITION_TOL <= 0.0:
     raise AssertionError(
-        "MHA-VN-043 screws in the MHA-PD-007 bar taps through the MHA-PD-014 hook: "
+        "MHA-PD-VN-59 screws in the MHA-PD-07 bar taps through the MHA-PD-14 hook: "
         f"no .XX position band fits the radial clearance {CLEARANCE_RADIAL_MIN:.4f}"
     )
 SCREW_POSITION_RADIAL = _position_radial(POSITION_TOL)
@@ -217,7 +217,7 @@ WALLS: dict[str, tuple[float, float]] = {
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
-            f"MHA-PD-014 {_name} wall {_worst:.3f} at the printed worst case is "
+            f"MHA-PD-14 {_name} wall {_worst:.3f} at the printed worst case is "
             f"under the {WALL_TARGET} target"
         )
 
@@ -262,7 +262,7 @@ MATERIAL_TITLE = f"{SHEET_T:.1f} (0.032) 1095 spring steel"
 DRAWING_NOTES = "\n".join(
     (
         "1. FLAT PATTERN: THIN OUTLINE RIGHT OF SIDE VIEW. FORM ANNEALED.",
-        "2. FIT ANNEALED ON MHA-PD-007; CLAMP HANGER AT FULL MESH.",
+        "2. FIT ANNEALED ON MHA-PD-07; CLAMP HANGER AT FULL MESH.",
         "3. SET ARM SQUARE ON PIN, FACE AT DRAWN STATION; MATCH-DRILL PIN HOLE.",
         "4. REMOVE FOR HEAT TREATMENT, REINSTALL. RADII TO INSIDE SURFACE.",
     )
@@ -275,7 +275,7 @@ PAIR_CALLOUT = "2X"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 # Under the drill line: the mate the ±POSITION_TOL bands serve (review 4).
 # Plain drilled to the print, not match-drilled: the taps are fixed.
-SCREW_HOLE_MATE = "LOCATE TO MHA-PD-007 TAPS"
+SCREW_HOLE_MATE = "LOCATE TO MHA-PD-07 TAPS"
 # One line: an above-callout (note 3 says where and when it is drilled).
 PIN_HOLE_CALLOUT = "MATCH-DRILL"
 ROUND_CALLOUT = "FULL ROUND"
