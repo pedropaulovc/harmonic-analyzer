@@ -145,8 +145,9 @@ unblock a queue.
 `check:recipe` retains eight internal pytest workers; other offline checks
 remain serial internally. Remote farm leaves and cached machinist reviews do
 not take this lock. Doit still owns dependency checks and success stamps.
-Wait and execution durations appear separately as `local.check.wait` and
-`local.check.run`; info-level logs report admission, release, and a wait every
+The `local.check.wait` span measures admission latency; the release log's
+`held_s` measures execution. The runner leaves the check's top-level telemetry
+context unchanged. Info-level logs report admission, release, and a wait every
 30 seconds. There is no queue deadline and no retry of a failed check.
 
 `HARMONIC_LOCAL_CHECK_LOCK` overrides the path for isolated tests. All production

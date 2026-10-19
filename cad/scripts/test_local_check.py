@@ -139,3 +139,35 @@ def test_failure_preserves_exit_status_and_does_not_stamp_success(tmp_path, chec
     assert result.returncode == 7, result.stderr
     with FileLock(_local_check.lock_path()).acquire(timeout=1):
         pass
+
+
+def test_successful_check_keeps_top_level_span_depth(tmp_path, check_env, monkeypatch):
+    """Farm log attribution requires process-root spans to stay at depth zero."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    import dodo
+
+    script = tmp_path / "traced_check.py"
+    script.write_text(
+        "import json, pathlib\n"
+        "from opentelemetry import trace\n"
+        "from opentelemetry.sdk.trace.export import SimpleSpanProcessor\n"
+        "from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter\n"
+        "import _telemetry\n"
+        "exporter = InMemorySpanExporter()\n"
+        "trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))\n"
+        "with _telemetry.span('operation'):\n"
+        "    pass\n"
+        "span = exporter.get_finished_spans()[0]\n"
+        "pathlib.Path('trace.json').write_text(json.dumps({\n"
+        "    'depth': span.attributes['harmonic.depth'],\n"
+        "    'parent': None if span.parent is None else span.parent.span_id,\n"
+        "}))\n"
+        "raise SystemExit(0)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dodo, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
+    stamp = tmp_path / "check.ok"
+    dodo._run_stamped([sys.executable, str(script)], "check fixture", str(stamp), "check:fixture")
+    assert stamp.is_file()
+    assert json.loads((tmp_path / "trace.json").read_text()) == {"depth": 0, "parent": None}

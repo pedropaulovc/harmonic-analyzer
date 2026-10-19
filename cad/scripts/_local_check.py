@@ -33,19 +33,14 @@ def lock_path() -> Path:
 
 
 def _execute(args: list[str]) -> None:
-    try:
-        if args[0] == "-m":
-            sys.argv = args[1:]
-            sys.path[0] = os.getcwd()
-            runpy.run_module(args[1], run_name="__main__", alter_sys=True)
-            return
-        sys.argv = args
-        sys.path[0] = str(Path(args[0]).resolve().parent)
-        runpy.run_path(args[0], run_name="__main__")
-    except SystemExit as exc:
-        # Python entry points conventionally exit(0); that is a successful span.
-        if exc.code not in (None, 0):
-            raise
+    if args[0] == "-m":
+        sys.argv = args[1:]
+        sys.path[0] = os.getcwd()
+        runpy.run_module(args[1], run_name="__main__", alter_sys=True)
+        return
+    sys.argv = args
+    sys.path[0] = str(Path(args[0]).resolve().parent)
+    runpy.run_path(args[0], run_name="__main__")
 
 
 def main() -> None:
@@ -69,8 +64,9 @@ def main() -> None:
             f"[local.check] {task} admitted after {acquired - started:.1f}s",
             label=task, wait_s=acquired - started, service=service,
         )
-        with _telemetry.span("local.check.run", label=task, wait_s=acquired - started):
-            _execute(args)
+        # Preserve the entry point's top-level telemetry context. An ambient
+        # wrapper span would change every operation's process-relative depth.
+        _execute(args)
     finally:
         lock.release()
         _telemetry.info(
