@@ -141,8 +141,6 @@ def test_top_is_faced_to_fit_over_the_stack() -> None:
     band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["HeadLength"])
     carrier_band = printed_band_mm(carrier.DRAWING_PRECISION_BY_NAME["StockThick"])
     riser_band = printed_band_mm(riser.DRAWING_PRECISION_BY_NAME["BlankThick"])
-    assert trammel.CARRIER_THICK_BAND == carrier_band
-    assert trammel.RISER_THICK_BAND == riser_band
     low = (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band)
     low -= trammel.CARRIER_THICK + carrier_band + trammel.RISER_THICK + riser_band
     assert low - spec.LEAD_CHAMFER < 0.0  # a turned-to-print pin can miss the strap

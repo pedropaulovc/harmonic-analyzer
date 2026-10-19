@@ -13,8 +13,8 @@ from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_riser_screw"]
-# The footer's ITEM row: the fastener table's callout for the screw.
-ITEM = "#4-40 X 1/2 B18.6.3 FLAT HEAD"
+# The footer's ITEM row: the fastener table's callout for the bought screw.
+ITEM = "#4-40 X 5/8 B18.6.3 FLAT HEAD"
 
 
 async def build(adapter: Any) -> dict[str, str]:

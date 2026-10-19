@@ -38,12 +38,12 @@ Features:
 - The nut seat, on the -X face, on the screw axis: a counterbore for the
   nut's short spigot (``NUT_BODY_SHORT``) and a THRU clearance for the
   leadscrew. The nut is flipped, its long body standing proud on -X
-  (JigAssembly; Main's ruling on the M3 wall). A bore for the body would
-  hold the M3 taps' sub-floor wall for their full depth.
-- Four metric taps on the -X face, on the nut's bolt circle, for the M3 SHCS
-  through the flange (``leadscrew.NUT_SCREW``). Metric, because the bought
-  nut fixes the thread (Main's ruling); thread ``NUT_SCREW_TAP_DEPTH``, drill
-  with the five-pitch lead.
+  (JigAssembly; Main's ruling on the tap-to-bore wall). A bore for the body
+  would hold the #4-40 taps' sub-floor wall for their full depth.
+- Four #4-40 UNC taps on the -X face, on the nut's bolt circle, for the
+  #4-40 SHCS through the flange's plain Ø3.5 holes (``leadscrew.NUT_SCREW``;
+  shop-chosen US-customary, fastener policy); thread ``NUT_SCREW_TAP_DEPTH``,
+  drill with the five-pitch lead.
 
 Bands. The #8 pair is spotted from TL-22 (rule 19, fit-up at assembly), so
 it carries no band of its own: each spot lands within TL-22's three-place
@@ -51,17 +51,17 @@ station band, the X set's ``X_SET_BAND`` and the transfer punch's float in
 TL-22's Ø4.978 hole (``SPOT_FLOAT``). The nut seat's stations, from the
 Y = 0 face and the bottom face, print at two places (title block ±0.51):
 the bracket's place on TL-22 is set at assembly by the match-drill, so the
-edges carry only walls. The M3 taps are located from the seat's axis, not
+edges carry only walls. The #4-40 taps are located from the seat's axis, not
 the edges: ``NUT_HOLE_OFFSET`` each way at three places (±0.13), on the
 hidden reference sketch ``NutPatternReference``. Each tap's centre sits in
 a 0.13 half-side square about its nominal offset from the seat,
-``POSITION_RADIUS`` 0.184. Each M3 floats in the flange's holes
+``POSITION_RADIUS`` 0.184. Each #4-40 floats in the flange's holes
 (``NUT_SCREW_FLOAT``) and the spigot in the counterbore (``SPIGOT_FLOAT``);
 with every tap within 0.184 of nominal from the seat, the nut seated on its
 spigot clears all four screws by ``NUT_PATTERN_ALLOWANCE``, which is left for
 the nut's own hole and spigot positions (not published). At two places
 (±0.51, 0.72 radial) the pattern does not fit, so the seat callout states
-the offsets' function: the counterbore locates the nut's spigot on the M3
+the offsets' function: the counterbore locates the nut's spigot on the #4-40
 pattern. Against the edges each tap stacks both bands (±0.51 + ±0.13). The
 counterbore Ø carries a model band (``CBORE_BAND``, 0 / +0.10): the title
 block's two-place ±0.51 would admit a counterbore under the spigot. No band
@@ -69,23 +69,22 @@ is set by the leadscrew axis: the screw passes a 0.5 radial clearance, and
 the KP08s' alignment to the nut is the fit-up in the jig's assembly step.
 
 Rule 17 (walls, 2.0 target, 1.5 floor) at worst case: the seat at its
-two-place band, each M3 tap at its three-place offset from the seat (and
+two-place band, each #4-40 tap at its three-place offset from the seat (and
 both bands to an edge), each #8 spot off by TL-22's band, the X set and the
 punch's float, the finished length at its two-place ±0.51, the depth and
 height at one place (±0.8), each thread at its major diameter, the
 counterbore at its +0.10 and the clearance at the drilled +0.1.
 ``WALLS_MM`` holds the nominal values, ``WORST_WALLS`` the worst. The binding
-wall is the M3 taps' to the spigot counterbore: the nut's bolt circle fixes
+wall is the #4-40 taps' to the spigot counterbore: the nut's bolt circle fixes
 it under the floor, only within the counterbore's depth, where the flange
 clamps. The owner accepted it (``RULE_17_FLOOR_EXCEPTIONS``; the part YAML's
 machinist exception RV-01, 2026-10-17), and the seat callout states it (rule
-20). Below the counterbore, the M3 taps' wall to the clearance is also
+20). Below the counterbore, the #4-40 taps' wall to the clearance is also
 stated (rule 20), and so is each #8 tap's wall to its end face (1.54, in the
 #8 callout; RV-02).
 
-UNVERIFIED: the nut's own tolerances (spigot Ø and length, hole positions),
-the M3x0.5 tap drill 2.5 (ASME B1.13M, not re-proved by a live Hole Wizard
-probe), and the counterbore-depth margin over the spigot.
+UNVERIFIED: the nut's own tolerances (spigot Ø and length, hole positions)
+and the counterbore-depth margin over the spigot.
 """
 
 from __future__ import annotations
@@ -98,7 +97,6 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 from _hole_spec import (
     CLEARANCE_MM,
     DRILL_POINT_H,
-    TAP_DRILL_MM,
     THREAD_MAJOR_MM,
     HoleSpec,
     blind_cut_dia_mm,
@@ -169,9 +167,7 @@ def _ceil_step(value: float, step: float) -> float:
 
 
 def _pitch_mm(thread: str) -> float:
-    """Pitch of a ``#8-32`` (TPI) or ``M3x0.5`` (mm) thread key."""
-    if thread.startswith("M"):
-        return float(thread.split("x")[1])
+    """Pitch of a ``#8-32`` (TPI) thread key."""
     return 25.4 / float(thread.split("-")[1])
 
 
@@ -192,26 +188,22 @@ BLOCK_TAP_SPEC = HoleSpec(
 BLOCK_TAP_DRILL = blind_cut_dia_mm(BLOCK_TAP_SPEC)  # 3.454
 
 # --- The nut: every number from leadscrew's bought block -----------------------
-# The metric coarse thread the bought nut's screw fixes (Main's ruling).
-_METRIC = [key for key in TAP_DRILL_MM if key.startswith(f"{leadscrew.NUT_SCREW}x")]
-if len(_METRIC) != 1:
-    raise AssertionError(f"no single metric tap row for {leadscrew.NUT_SCREW}")
-NUT_THREAD = _METRIC[0]  # "M3x0.5"
-NUT_TAP_THREAD_DEPTH = round(leadscrew.NUT_SCREW_TAP_DEPTH, 9)  # 7.3
+NUT_THREAD = leadscrew.NUT_SCREW  # "#4-40"
+NUT_TAP_THREAD_DEPTH = round(leadscrew.NUT_SCREW_TAP_DEPTH, 9)  # 8.4125
 NUT_TAP_DRILL_DEPTH = _ceil_step(
     NUT_TAP_THREAD_DEPTH
     + 2.0 * printed_band_mm(2)
     + _PLUG_LEAD_PITCHES * _pitch_mm(NUT_THREAD),
     0.05,
-)  # 10.85
+)  # 12.65
 NUT_TAP_SPEC = HoleSpec(
-    "tapped_metric",
+    "tapped",
     NUT_THREAD,
     end="blind",
     depth_mm=NUT_TAP_DRILL_DEPTH,
     overrides_mm={"ThreadDepth": NUT_TAP_THREAD_DEPTH},
 )
-NUT_TAP_DRILL = blind_cut_dia_mm(NUT_TAP_SPEC)  # 2.5
+NUT_TAP_DRILL = blind_cut_dia_mm(NUT_TAP_SPEC)  # 2.261
 
 # The nut seat: Y from the Y = 0 face, Z from the bottom face, at two places
 # (module docstring): the edges carry only walls, since the bracket's place
@@ -250,9 +242,9 @@ if not (
 if CBORE_DEPTH - printed_band_mm(CALLOUT_PLACES) <= leadscrew.NUT_BODY_SHORT:
     raise AssertionError("the nut's spigot bottoms in its counterbore")
 
-# The M3 taps on the nut's circle: a square pattern at 45 deg, so two Y and
+# The #4-40 taps on the nut's circle: a square pattern at 45 deg, so two Y and
 # two Z stations, each NUT_HOLE_OFFSET either side of the seat's centre. The
-# sheet locates them from the seat's axis at three places (the M3 pattern's
+# sheet locates them from the seat's axis at three places (the #4-40 pattern's
 # fit to the nut, module docstring), on NUT_PATTERN_REFERENCE, a hidden
 # sketch of points: the Hole Wizard's own placement dimensions run from the
 # edges, so they stay unprinted.
@@ -280,14 +272,14 @@ NUT_HOLE_POINTS = tuple(
 for _x, _y, _z in NUT_HOLE_POINTS:
     _radius = math.hypot(-_y - BORE_Y, _z - BORE_Z)
     if abs(2.0 * _radius - leadscrew.NUT_HOLE_PCD) > 0.002:
-        raise AssertionError("an M3 tap is off the nut's bolt circle")
+        raise AssertionError("a #4-40 tap is off the nut's bolt circle")
 
 # --- The fits ----------------------------------------------------------------
 _B3 = printed_band_mm(PATTERN_PLACES)  # ±0.13, each tap from the seat's axis
 _B2 = printed_band_mm(2)  # ±0.51
 _B1 = printed_band_mm(SIZE_PLACES)  # ±0.8
 _SEAT_BAND = printed_band_mm(SEAT_PLACES)  # ±0.51, the seat from the edges
-# Each M3 tap from the edges: the seat's band plus its offset's.
+# Each #4-40 tap from the edges: the seat's band plus its offset's.
 _TAP_BAND = _SEAT_BAND + _B3  # ±0.64
 POSITION_RADIUS = math.hypot(_B3, _B3)  # 0.184
 _BLOCK_R = THREAD_MAJOR_MM[BLOCK_THREAD] / 2.0
@@ -304,7 +296,7 @@ if not SPOT_FLOAT > 0.0:
 _TL22_BAND = printed_band_mm(pivot_block.SIDE_STATION_PLACES)  # ±0.13
 _SPOT_OFF_X = _TL22_BAND + X_SET_BAND + SPOT_FLOAT
 _SPOT_OFF_Z = _TL22_BAND + SPOT_FLOAT
-NUT_SCREW_FLOAT = (leadscrew.NUT_HOLE_DIA - THREAD_MAJOR_MM[NUT_THREAD]) / 2.0  # 0.25
+NUT_SCREW_FLOAT = (leadscrew.NUT_HOLE_DIA - THREAD_MAJOR_MM[NUT_THREAD]) / 2.0  # 0.328
 SPIGOT_FLOAT = (CBORE_DIA - leadscrew.NUT_BODY_DIA) / 2.0  # 0.25
 NUT_PATTERN_ALLOWANCE = min(NUT_SCREW_FLOAT, SPIGOT_FLOAT) - POSITION_RADIUS  # 0.066
 if not NUT_PATTERN_ALLOWANCE > 0.0:
@@ -352,15 +344,15 @@ def _point_h(dia: float) -> float:
 
 
 WALLS_MM: dict[str, float] = {
-    "M3 tap to nut-seat counterbore": _DIAGONAL - CBORE_DIA / 2.0 - _NUT_R,
-    "M3 tap to screw clearance": _DIAGONAL - SCREW_CLEARANCE_DIA / 2.0 - _NUT_R,
+    "#4-40 tap to nut-seat counterbore": _DIAGONAL - CBORE_DIA / 2.0 - _NUT_R,
+    "#4-40 tap to screw clearance": _DIAGONAL - SCREW_CLEARANCE_DIA / 2.0 - _NUT_R,
     "#8 tap to +X face": BRACKET_LENGTH - SCREW_X[1] - _BLOCK_R,
 }
 
 # --- Rule 17 at the printed bands' worst case -----------------------------------
 _CBORE_R_MAX = (CBORE_DIA + CBORE_BAND[0]) / 2.0
 _CLEAR_R_MAX = (SCREW_CLEARANCE_DIA + DRILLED_BAND[0]) / 2.0
-# Each M3 tap from the seat's axis: one three-place offset per axis.
+# Each #4-40 tap from the seat's axis: one three-place offset per axis.
 _DIAGONAL_MIN = math.hypot(NUT_HOLE_OFFSET - _B3, NUT_HOLE_OFFSET - _B3)
 _LENGTH_MIN = BRACKET_LENGTH - printed_band_mm(LENGTH_PLACES)
 # The #8 taps: the shortest bracket set centred on TL-22's holes, each spot
@@ -370,12 +362,14 @@ _LENGTH_MIN = BRACKET_LENGTH - printed_band_mm(LENGTH_PLACES)
 _HALF_PITCH = (SCREW_X[1] - SCREW_X[0]) / 2.0  # 5
 _END_WALL = _LENGTH_MIN / 2.0 - _HALF_PITCH - _SPOT_OFF_X - _BLOCK_R
 WORST_WALLS: dict[str, float] = {
-    "M3 tap to nut-seat counterbore": _DIAGONAL_MIN - _CBORE_R_MAX - _NUT_R,
-    "M3 tap to screw clearance": _DIAGONAL_MIN - _CLEAR_R_MAX - _NUT_R,
-    "M3 tap to M3 tap": 2.0 * NUT_HOLE_OFFSET - 2.0 * _B3 - 2.0 * _NUT_R,
-    "M3 tap to bottom face": NUT_HOLE_Z[0] - _TAP_BAND - _NUT_R,
-    "M3 tap to -Y side": (BRACKET_DEPTH - _B1) - (NUT_HOLE_Y[1] + _TAP_BAND) - _NUT_R,
-    "M3 tap drill to +X face": _LENGTH_MIN
+    "#4-40 tap to nut-seat counterbore": _DIAGONAL_MIN - _CBORE_R_MAX - _NUT_R,
+    "#4-40 tap to screw clearance": _DIAGONAL_MIN - _CLEAR_R_MAX - _NUT_R,
+    "#4-40 tap to #4-40 tap": 2.0 * NUT_HOLE_OFFSET - 2.0 * _B3 - 2.0 * _NUT_R,
+    "#4-40 tap to bottom face": NUT_HOLE_Z[0] - _TAP_BAND - _NUT_R,
+    "#4-40 tap to -Y side": (BRACKET_DEPTH - _B1)
+    - (NUT_HOLE_Y[1] + _TAP_BAND)
+    - _NUT_R,
+    "#4-40 tap drill to +X face": _LENGTH_MIN
     - (NUT_TAP_DRILL_DEPTH + _B2)
     - _point_h(NUT_TAP_DRILL),
     "counterbore to bottom face": BORE_Z - _SEAT_BAND - _CBORE_R_MAX,
@@ -388,14 +382,14 @@ WORST_WALLS: dict[str, float] = {
     - 2.0 * _BLOCK_R,
     "#8 tap to +X face": _END_WALL,
     "#8 tap to top face": (BRACKET_HEIGHT - _B1) - (SCREW_Z + _SPOT_OFF_Z) - _BLOCK_R,
-    "#8 tap drill to M3 tap": (NUT_HOLE_Y[0] - _TAP_BAND - _NUT_R)
+    "#8 tap drill to #4-40 tap": (NUT_HOLE_Y[0] - _TAP_BAND - _NUT_R)
     - (BLOCK_TAP_DRILL_DEPTH + _B2 + _point_h(BLOCK_TAP_DRILL)),
 }
-# The nut's own circle leaves the M3 taps under the floor to their spigot's
+# The nut's own circle leaves the #4-40 taps under the floor to their spigot's
 # counterbore, only within its depth: inherent in the bought nut, accepted by
 # the owner (part YAML machinist exception RV-01, 2026-10-17). Every other
 # wall holds the floor.
-RULE_17_FLOOR_EXCEPTIONS = frozenset({"M3 tap to nut-seat counterbore"})
+RULE_17_FLOOR_EXCEPTIONS = frozenset({"#4-40 tap to nut-seat counterbore"})
 for _wall, _mm in WORST_WALLS.items():
     if _mm < WALL_FLOOR and _wall not in RULE_17_FLOOR_EXCEPTIONS:
         raise AssertionError(
@@ -406,8 +400,8 @@ RULE_20_SHORTFALLS = {
     name: wall for name, wall in WORST_WALLS.items() if wall < WALL_TARGET
 }
 NUT_WALL_MIN = min(
-    WORST_WALLS["M3 tap to nut-seat counterbore"],
-    WORST_WALLS["M3 tap to screw clearance"],
+    WORST_WALLS["#4-40 tap to nut-seat counterbore"],
+    WORST_WALLS["#4-40 tap to screw clearance"],
 )
 # Both end walls, equal under the centred X set: the shortest length's half,
 # less the half pitch, the spot's offset chain (TL-22's station band, the X
@@ -419,7 +413,7 @@ if END_WALL_MIN < WALL_FLOOR:
     raise AssertionError("the X set leaves a #8 tap's end wall under the floor")
 
 # --- Marked dimensions -----------------------------------------------------------
-# The seat's stations from the edges on its own placement sketch; the M3
+# The seat's stations from the edges on its own placement sketch; the #4-40
 # pattern from the seat's axis on NUT_PATTERN_REFERENCE (the NutTaps wizard's
 # edge placements stay unprinted).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -479,24 +473,24 @@ BLOCK_TAP_PROCESS = f"SPOT FROM {PIVOT_BLOCK_NUMBER} AT ASSEMBLY;\n"
 # rule 4: "NUT" alone named no part), on its own row: the block's widest.
 NUT_TAP_PROCESS = f"MATCHES FLANGE HOLES OF\n{NUT_ID}\n"
 # The seat's callout: DRILL in its THRU row, then three rows under the native
-# ones: the counterbore's locating fit, which the M3 pattern's three-place
+# ones: the counterbore's locating fit, which the #4-40 pattern's three-place
 # offsets from the seat's axis serve (c4 review: at three places the seat's
 # own 13.000 and 35.000 served nothing at the edges; they print two), the
-# mate, and rule 20's wall statement (the M3 taps' least wall to the seat).
+# mate, and rule 20's wall statement (the #4-40 taps' least wall to the seat).
 NUT_SEAT_PROCESS = "DRILL"
-NUT_SEAT_LOCATES_CALLOUT = "LOCATES NUT SPIGOT ON M3 PATTERN"
+NUT_SEAT_LOCATES_CALLOUT = "LOCATES NUT SPIGOT ON #4-40 PATTERN"
 NUT_SEAT_MATE_CALLOUT = "\n".join(
     (
         NUT_SEAT_LOCATES_CALLOUT,
         f"FOR {NUT_ID}",
-        f"WALL TO M3 TAPS {NUT_WALL_MIN:.2f} MIN",
+        f"WALL TO #4-40 TAPS {NUT_WALL_MIN:.2f} MIN",
     )
 )
 # Rule 20: both #8 taps' end walls, the last row of the #8 taps' own callout
 # (the length's two places and the X set fix them). On the length dimension
 # the row sat across its extension lines (c4-r3).
 BLOCK_TAP_WALL_CALLOUT = f"WALL TO EACH END FACE {END_WALL_MIN:.2f} MIN"
-# Each M3 offset serves two taps.
+# Each #4-40 offset serves two taps.
 DIMENSION_PREFIXES = {
     "NutPatternY1": "2X ",
     "NutPatternY2": "2X ",

@@ -89,10 +89,10 @@ is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
 (``WALLS_MM``). Rule 18 (engagement): every tap runs THRU the 12 plate, so its
 full thread at the worst case is the plate at its .X low limit less the tap
 mouth's title-block edge break and one pitch of incomplete lead
-(``ENGAGEMENT_MM``, build_pd_platen_clip's count). #4-40 keeps 10.31 of the
-4.27 it needs, 1/4-20 9.68 of 9.53. The 5/16-18 feed-lever taps keep 9.53 of
-11.91 (1.20D): a finished 12 plate cannot hold 1.5D of that thread, so their
-callout states the shortfall (rule 20, ``LEVER_TAP_CALLOUT``).
+(``ENGAGEMENT_MM``, build_pd_platen_clip's count). These are the carrier's
+available full threads, not the screws' actual engagement: #4-40 offers
+10.31 and 1/4-20 offers 9.68. The 5/16-18 feed-lever tap offers 9.53 of the
+11.91 needed (1.20D); its existing RV-01 callout states that shortfall.
 """
 
 from __future__ import annotations
@@ -212,7 +212,7 @@ SPOTS = {"Hub": HUB, "Cl": CL}
 # so the spot planes and cones are driven from this sketch instead.
 SPOT_REFERENCE = "SpotReference"
 REFERENCE_SKETCHES = (SECTION_REFERENCE, SPOT_REFERENCE)
-# The CL dowel, pressed flush with the underside once CL is finished in place:
+# The CL dowel is press-set from the actual riser once CL is finished in place:
 # a bought Ø6 m6 dowel in an N7 hole (ISO 286, 3-6 mm row).
 CL_DOWEL_DIA = 6.0
 CL_DOWEL_BAND = (0.012, 0.004)  # m6

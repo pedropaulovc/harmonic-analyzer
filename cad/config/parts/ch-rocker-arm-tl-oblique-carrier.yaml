@@ -5,7 +5,7 @@ ch-rocker-arm-tl-oblique-carrier:
   # The pin holes are reamed and the plate must stay flat on two pins:
   # a stable, free-machining plate grade.
   material: 6061-T651 aluminium
-  material_specification: 1/2 in 6061-T651 aluminium plate, ASTM B209, OnlineMetals 1250 custom cut 5.5 x 21 in
+  material_specification: 1/2 in 6061-T651 aluminium plate, ASTM B209
   finish: as machined
   quantity: 1
   tolerance_class: machined_block

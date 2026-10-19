@@ -6,7 +6,7 @@ leadscrew feed's KP08 pillow blocks on base bar 1's top
 
 Layout (the spec's model frame, +Z up): ONE Front-plane rectangle from the
 inner end face (model x 0) about the mid-width line, extruded +Z by the stock
-thickness; the four #8-32 UNC base-bar taps and the two M4x0.7 KP08 taps are
+thickness; the four #8-32 UNC base-bar taps and the two #6-32 UNC KP08 taps are
 two native Hole Wizard features tapped THRU from the top face on the row y 0.
 The row's printed station (9.525 from the -Y side face) lives on a hidden
 reference sketch, ``HoleRowReference`` (build_ch_rocker_arm_tl_oblique_base_bar's
@@ -172,14 +172,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "bracket with base-bar taps", volume - V_BAR_TAPS, _V_TOL
     )
 
-    # --- KP08 taps: ONE M4x0.7 metric wizard feature, THRU from the top -----
+    # --- KP08 taps: ONE #6-32 UNC wizard feature, THRU from the top ---------
     # The size token is checked by the cut diameter (a wrong token fails).
     kp08_taps = wizard_holes(
         adapter,
         KP08_TAP_SPEC,
         [[x, 0.0, BRACKET_THICK] for x in KP08_TAP_X],
         (0.0, 0.0, 1.0),
-        "KP08 screw taps (M4x0.7 through)",
+        "KP08 screw taps (#6-32 through)",
         name="KP08Taps",
         expect_dia_mm=KP08_TAP_DRILL,
         placement_dims=[

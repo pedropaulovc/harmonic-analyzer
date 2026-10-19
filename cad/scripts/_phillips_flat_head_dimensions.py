@@ -27,9 +27,10 @@ per-SKU module labels each such value):
   ``entry_r`` and below it by a ``recess_cone_semi_deg`` cone whose apex is
   ``recess_depth`` below the top.
 
-Frame: axis +Y, head up, the flat top (the face that sits flush in the
-countersink) at y = 0, the tip at y = -length.  McMaster measures a flat
-head's length overall, top to tip, so ``length`` is that.
+Frame: axis +Y, head up, the flat top at y = 0 (``seated_recess`` gives its
+nominal depth below a matching countersink's mouth), the tip at y = -length.
+McMaster measures a flat head's length overall, top to tip, so ``length`` is
+that.
 
 Profiles are pure tuples, (radius, y) in mm on the Front sketch, ``(p0, p1)``
 line pairs listed in order (``revolved_volume`` integrates them).  The recess
@@ -138,6 +139,26 @@ class PhillipsFlatHeadScrew:
     @property
     def junction_y(self) -> float:
         return self.top_y - self.junction_depth
+
+    def seated_recess(self, mouth_dia: float, csk_angle_deg: float) -> float:
+        """Nominal depth of the flat top below a countersink's sharp mouth.
+
+        The head cone bears on a countersink of the same included angle, so
+        the flat top sits where that countersink is ``head_dia`` across.
+        Nominal geometry only: it assumes no head-angle or countersink-angle
+        tolerance, which the catalogue does not state.
+        """
+        if csk_angle_deg != self.head_angle_deg:
+            raise ValueError(
+                f"{self.part_no}: a {csk_angle_deg} deg countersink does not "
+                f"match the {self.head_angle_deg} deg head"
+            )
+        if mouth_dia < self.head_dia:
+            raise ValueError(
+                f"{self.part_no}: the head stands proud of a Ø{mouth_dia} mouth"
+            )
+        half = math.radians(self.head_angle_deg / 2.0)
+        return (mouth_dia - self.head_dia) / (2.0 * math.tan(half))
 
     # --- thread -------------------------------------------------------------------
     @property

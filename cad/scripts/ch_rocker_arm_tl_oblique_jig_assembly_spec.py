@@ -102,6 +102,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as lever_screw
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
+import ch_rocker_arm_tl_vn_oblique_nut_washer_spec as nut_washer
 import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
 import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as pillow_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
@@ -125,7 +126,7 @@ HUB_PIN = "ch-rocker-arm-tl-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 NUT_BRACKET = leadscrew.NUT_BRACKET
-# Bought hardware (TL-VN-50..71), every item modelled and mated.
+# Bought hardware (TL-VN-50..72), every item modelled and mated.
 RAIL = "ch-rocker-arm-tl-vn-oblique-rail"
 CARRIAGE = "ch-rocker-arm-tl-vn-oblique-carriage"
 BEARING = "ch-rocker-arm-tl-vn-oblique-bearing"
@@ -148,6 +149,7 @@ CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
 LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
 BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-block-washer"
 LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
+NUT_WASHER = "ch-rocker-arm-tl-vn-oblique-nut-washer"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory, in registry order
@@ -184,6 +186,7 @@ QUANTITIES = {
     LEVER_SCREW: lever_screw.QUANTITY,
     BLOCK_LOCK_WASHER: block_washer.QUANTITY,
     LEVER_LOCK_WASHER: lever_washer.QUANTITY,
+    NUT_WASHER: nut_washer.QUANTITY,
 }
 # SolidWorks numbers a top-level BOM in FeatureManager order, so BOM_ORDER is
 # the builder's insertion order (the builder asserts it) and the steps' item
@@ -220,6 +223,7 @@ BOM_ORDER = (
     LEVER_SCREW,
     BLOCK_LOCK_WASHER,
     LEVER_LOCK_WASHER,
+    NUT_WASHER,
 )
 
 Rows = tuple[tuple[float, float, float], ...]
@@ -384,9 +388,13 @@ STUD_DIA = base_bar.HOLD_DOWN_STUD_DIA  # 1/2-13
 STUD_LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM  # the kit's 3 in stud only
 STUD_TOP_Z = STUD_BOTTOM_Z + STUD_LENGTH  # 54.2
 # The longest stud the carrier clears: its underside, which swings over the
-# studs, less the stud's bottom; step 2 states it. The modelled 3 in studs are
-# proved clear by the native sweep gate (verify.py).
-STUD_LENGTH_MAX = trammel.CARRIER_UNDERSIDE_Z - STUD_BOTTOM_Z  # 89.7
+# studs, less the most that stands below it (the CR clamp screw's worst-case
+# stand-out; the CL dowel's lower end stays within it) and the stud's bottom;
+# step 2 states it. The modelled 3 in studs are proved clear by the native
+# sweep gate (verify.py).
+STUD_LENGTH_MAX = (
+    trammel.CARRIER_UNDERSIDE_Z - clamp_screw.STAND_OUT_MAX - STUD_BOTTOM_Z
+)  # 86.35
 
 
 def inch_eighths_down(mm: float) -> str:
@@ -483,8 +491,9 @@ BEARING_PLACEMENTS: tuple[Placement, ...] = tuple(
     for block in PIVOT_BLOCK_PLACEMENTS
     for z in BEARING_SEAT_Z
 )
-# The CL dowel, chamfered end flush with the carrier's underside.
-CL_DOWEL_PLACEMENTS = (_carried(trammel.CL, trammel.CARRIER_UNDERSIDE_Z),)
+# The CL dowel, pressed chamfered end first from the top, its round tip set
+# above the riser (cl_dowel spec); its chamfered end's height follows.
+CL_DOWEL_PLACEMENTS = (_carried(trammel.CL, cl_dowel.TIP_BASE_Z),)
 # The leadscrew feed (leadscrew_spec): the screw from its near end and the
 # handwheel from its hub end, both along rail 1 away from the spindle (local
 # +Y), the handwheel's grip up (local +X).
@@ -513,7 +522,8 @@ HANDWHEEL_PLACEMENTS = (
 )
 # The flanged nut in the nut bracket's frame: its flange face on the bracket's
 # spindle-side face, spigot in the counterbore, body toward the spindle (local
-# +Y = the bracket's -X); its four screws from the flange's free face.
+# +Y = the bracket's -X); a flat washer on the flange's free face at each
+# hole, each screw's head on its washer.
 NUT_BRACKET_PLACEMENT: Placement = (NUT_BRACKET_ORIGIN, NUT_BRACKET_ROWS)
 NUT_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
 LEADSCREW_NUT_PLACEMENTS = (
@@ -523,11 +533,25 @@ LEADSCREW_NUT_PLACEMENTS = (
         NUT_ROWS,
     ),
 )
-NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+NUT_WASHER_PLACEMENTS: tuple[Placement, ...] = tuple(
     compose(
         NUT_BRACKET_PLACEMENT,
         (
             leadscrew.NUT_FLANGE_X[0],
+            leadscrew.NUT_BORE_YZ[0]
+            + leadscrew_nut.HOLE_PCD / 2.0 * math.cos(math.radians(angle)),
+            leadscrew.NUT_BORE_YZ[1]
+            + leadscrew_nut.HOLE_PCD / 2.0 * math.sin(math.radians(angle)),
+        ),
+        NUT_ROWS,
+    )
+    for angle in leadscrew_nut.HOLE_ANGLES_DEG
+)
+NUT_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(
+        NUT_BRACKET_PLACEMENT,
+        (
+            leadscrew.NUT_FLANGE_X[0] - nut_washer.TOP_Y,
             leadscrew.NUT_BORE_YZ[0]
             + leadscrew_nut.HOLE_PCD / 2.0 * math.cos(math.radians(angle)),
             leadscrew.NUT_BORE_YZ[1]
@@ -617,11 +641,16 @@ CARRIAGE_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for block in PIVOT_BLOCK_PLACEMENTS
     for point in pivot_block.BOLT_POINTS
 )
-# On the carrier: the riser's flat heads flush with its top, the CR clamp
-# screw's head on the strap, each lever screw's wedge-lock pair (TL-VN-71) on the
-# feed lever and the screw's head on the pair.
+# On the carrier: the riser's flat heads seated nominally 0.53 below its top,
+# the CR clamp screw's head on the strap, each lever screw's wedge-lock pair
+# (TL-VN-71) on the feed lever and the screw's head on the pair.
 RISER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
-    _carried(point, trammel.CARRIER_TOP_Z + trammel.RISER_THICK)
+    _carried(
+        point,
+        trammel.CARRIER_TOP_Z
+        + trammel.RISER_THICK
+        - riser_screw.HEAD_TOP_BELOW_RISER_TOP,
+    )
     for point in trammel.RISER_SCREWS
 )
 CLAMP_SCREW_PLACEMENTS = (_carried(trammel.CR, PART_TOP_Z),)
@@ -668,6 +697,7 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     LEVER_SCREW: LEVER_SCREW_PLACEMENTS,
     BLOCK_LOCK_WASHER: BLOCK_LOCK_WASHER_PLACEMENTS,
     LEVER_LOCK_WASHER: LEVER_LOCK_WASHER_PLACEMENTS,
+    NUT_WASHER: NUT_WASHER_PLACEMENTS,
 }
 
 
@@ -705,6 +735,7 @@ LOCKED_TO: dict[str, tuple[str, int]] = {
     CLAMP_SCREW: (CARRIER, 1),
     BLOCK_LOCK_WASHER: (PIVOT_BLOCK, len(pivot_block.SIDE_SCREW_X)),
     LEVER_LOCK_WASHER: (CARRIER, len(carrier.LEVER_HOLES)),
+    NUT_WASHER: (NUT_BRACKET, len(leadscrew_nut.HOLE_ANGLES_DEG)),
 }
 # Every family that rides the sweep, in BOM order: the contract's allowed and
 # required free stems.
@@ -791,6 +822,7 @@ BOM_DESCRIPTIONS = {
     LEVER_SCREW: lever_screw.CALLOUT,
     BLOCK_LOCK_WASHER: f"{block_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
     LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
+    NUT_WASHER: f"{nut_washer.SCREW_SIZE} FLAT WASHER",
 }
 # BOM item n is BOM_ORDER position n: the builder inserts each family's first
 # instance in BOM_ORDER sequence (SolidWorks numbers a top-level BOM in
@@ -808,10 +840,13 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # its carriage with its bearings pressed out beneath it, its carriage screws
 # and its pivot pin above it, as it is pressed in; block 1 carries the nut
 # bracket and the nut, their screws backed out along the axes they are
-# driven on, each block screw's wedge-lock pair halfway out to its head;
-# then the carrier, its HUB pin and its CL dowel dropped out beneath it (step
-# 11 presses both up from below once the riser is down), and the riser and the feed lever over it with their screws
-# above them, each lever screw's wedge-lock pair halfway out to its head.
+# driven on, each block screw's wedge-lock pair and each nut screw's washer
+# halfway out to its head;
+# then the carrier, its HUB pin dropped out beneath it (step 11 presses it up
+# from below once the riser is down) and its CL dowel lifted out above the
+# riser (step 11 presses it down through the riser), and the riser and the
+# feed lever over it with their screws above them, each lever screw's
+# wedge-lock pair halfway out to its head.
 # Each step's families move by a signed distance along a machine
 # axis; a family's displacement along an axis is the sum of the steps naming
 # it (``explode_shift``; ``explode_lift`` along Z). The rail 1 axis runs
@@ -837,6 +872,7 @@ _BLOCK_RIDERS = (
     LEADSCREW_NUT,
     NUT_SCREW,
     BLOCK_LOCK_WASHER,
+    NUT_WASHER,
 )
 EXPLODE_STEPS = (
     ("lever screws lift out", (LEVER_SCREW,), "z", 40.0),
@@ -857,11 +893,11 @@ EXPLODE_STEPS = (
         230.0,
     ),
     ("hub pin presses out down", (HUB_PIN,), "z", -150.0),
-    # Review bought-tl000-r2: the dowel goes in from beneath like the HUB pin,
-    # and drops as far, clear of the carrier's and the lever's outline (farm
-    # r3: at -60 the carrier hid it).
-    ("cl dowel presses out down", (CL_DOWEL,), "z", -150.0),
+    # The dowel goes in from above, down through the riser (step 11), so it
+    # lifts out as the clamp screw does, clear above the lifted riser.
+    ("cl dowel lifts out", (CL_DOWEL,), "z", 100.0),
     ("nut screws back out", (NUT_SCREW,), "x", 30.0),
+    ("nut washers back out", (NUT_WASHER,), "x", 15.0),
     ("block screws back out", (BLOCK_SCREW,), "y", -40.0),
     ("wedge-lock pairs back out", (BLOCK_LOCK_WASHER,), "y", -20.0),
     ("pivot blocks lift off", (PIVOT_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
@@ -997,6 +1033,33 @@ for _name, (_right, _up, _sight) in VIEW_AXES.items():
         raise AssertionError(f"{_name}: not a right-handed orthonormal frame")
 PLAN_VIEW_LABEL = "PLAN, FROM ABOVE"
 ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
+
+# --- CL dowel tip setting (sheet 1 elevation, native REFERENCE) -------------------
+# The CL dowel's round tip above the riser top: a hidden construction line on
+# the assembly Top plane (machine X-Z, the plane the operator's elevation
+# looks at) up the dowel axis, from the riser top to the modelled round tip.
+# Its length is the nominal cl_dowel.TIP_HEIGHT the model is placed at; the
+# fitter sets the tip TIP_SET_MIN..TIP_SET_MAX above the ACTUAL riser (step
+# 11), so the elevation prints it as a reference, parenthesised, no band.
+CL_TIP_FEATURE = "ClTipSetting"
+CL_TIP_DIMENSION = "ClTipAboveRiser"
+CL_TIP_PRECISION = 1
+CL_TIP_RISER_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK
+# The round tip: the dowel's local +Y end (cl_dowel frame) in the machine frame.
+_CL_TIP = frame_point(CL_DOWEL_PLACEMENTS[0], (0.0, cl_dowel.LENGTH, 0.0))
+# Machine (X, Z) of the line's riser-top end, then its tip end.
+CL_TIP_LINE = ((_CL_TIP[0], CL_TIP_RISER_TOP_Z), (_CL_TIP[0], _CL_TIP[2]))
+# The builder marks exactly these for the drawing, at these places.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {CL_TIP_FEATURE: {CL_TIP_DIMENSION}}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    CL_TIP_FEATURE: {CL_TIP_DIMENSION: CL_TIP_PRECISION}
+}
+if abs(_CL_TIP[2] - CL_TIP_RISER_TOP_Z - cl_dowel.TIP_HEIGHT) > 1e-9:
+    raise AssertionError(
+        "the modelled CL tip does not stand TIP_HEIGHT above the riser"
+    )
+if not cl_dowel.TIP_SET_MIN <= cl_dowel.TIP_HEIGHT <= cl_dowel.TIP_SET_MAX:
+    raise AssertionError("the CL tip reference lies outside the fitter's setting band")
 
 
 # --- Sheet 1 plan tags ---------------------------------------------------------------
@@ -1198,48 +1261,61 @@ if not BLOCK_JOINT_SLIP_N >= 1.25 * FEED_THRUST_N:
     )
 
 # --- The nut screws: their torque; the nut's flange a static clamp ---------------
-# LOAD_CASES (owner ruling 2026-10-17, TL-00 review jbf-r17, rule 23): the 4
-# M3 screws clamp the Tr8 nut's brass flange to TL-29. The nut's reaction to
-# the screw's turning reverses with the handwheel; the flange's clamp friction
-# carries it with margin, so the flange never slips and no operating torque
-# reaches the screws: a static clamp (rule 23's last bullet). A wedge-lock
-# pair cannot seat there: an M3 pair's OD 7.0 on the Ø16 circle reaches R4.5,
-# into the nut's Ø10.2 body. The jig's machinist_exceptions record the ruling.
-# Engagement: the shortest screw (ISO 4762 length js15, ±0.29 at 10) past
-# the flange, in TL-29's 6061-T6 tap.
-_ISO4762_LENGTH_TOL_MM = 0.29  # STANDARD: ISO 4762 / ISO 4759-1 js15, l = 10
-_NUT_SCREW_ENGAGEMENT_MIN = leadscrew.NUT_SCREW_ENGAGEMENT - _ISO4762_LENGTH_TOL_MM
+# LOAD_CASES: the 4 #4-40 screws clamp the Tr8 nut's brass flange to TL-29.
+# The nut's reaction to the screw's turning reverses with the handwheel; the
+# flange's clamp friction carries it with margin, so the flange never slips
+# and no operating torque reaches the screws: a static clamp (rule 23's last
+# bullet). The owner ruled the static clamp on the M3 joint (2026-10-17,
+# TL-00 review jbf-r17) and accepted it again for the #4-40 joint (issue
+# #1630, 2026-10-19; the jig's exception RV-01): plain flat washers, no lock,
+# each head on a TL-VN-72 washer under the OD 5.8 the Ø16 circle less the nut's
+# Ø10.2 body leaves.
+# Engagement: rule 18's worst-case full thread in TL-29's tap
+# (leadscrew.NUT_SCREW_FULL_THREAD_MIN).
 _NUT_SCREW_STRIP_N = (
     0.75
     * math.pi
     * fasteners.NUT_TO_NUT_BRACKET.major_mm
-    * _NUT_SCREW_ENGAGEMENT_MIN
+    * leadscrew.NUT_SCREW_FULL_THREAD_MIN
     * _AL_SHEAR_ULTIMATE_MPA
 )
-# The head bears on the brass flange round its Ø3.5 hole. The vendor gives no
-# temper, so the softest: C36000 free-cutting brass, O60 soft anneal, yield
-# 18 ksi = 124 MPa (SOURCED: Copper Development Association C36000 data).
+# The washer spreads the head on the brass flange round its Ø3.5 hole. The
+# vendor gives no temper, so the softest: C36000 free-cutting brass, O60 soft
+# anneal, yield 18 ksi = 124 MPa (SOURCED: Copper Development Association
+# C36000 data). The ring on the brass is the head's least diameter (ASME
+# B18.3) spread 45° through the thinnest washer, inside the washer's OD,
+# outside the hole at its nominal: the vendor gives the hole no band
+# (UNVERIFIED); a larger hole shrinks the ring. The head on the washer: its
+# least diameter outside the washer's ID, under 18-8's annealed yield, 205 MPa
+# (SOURCED: ASTM A240 type 304 minimum).
 _BRASS_YIELD_MPA = 124.0
+_STAINLESS_YIELD_MPA = 205.0
+_NUT_WASHER_SPREAD_DIA = min(
+    nut_washer.OD, nut_screw.HEAD_DIA_MIN + 2.0 * nut_washer.THICKNESS_MIN
+)  # 5.23
+_NUT_SCREW_FLANGE_BEARING_MM2 = (
+    math.pi / 4.0 * (_NUT_WASHER_SPREAD_DIA**2 - leadscrew_nut.HOLE_DIA**2)
+)  # 11.9
 _NUT_SCREW_HEAD_BEARING_MM2 = (
-    math.pi / 4.0 * (nut_screw.DIMS.head_dia**2 - leadscrew_nut.HOLE_DIA**2)
-)
+    math.pi / 4.0 * (nut_screw.HEAD_DIA_MIN**2 - nut_washer.ID**2)
+)  # 9.0
 _NUT_SCREW_PRELOAD_CAP_N = min(
     _NUT_SCREW_STRIP_N / _STRIP_SAFETY,
-    _BRASS_YIELD_MPA * _NUT_SCREW_HEAD_BEARING_MM2,
+    _BRASS_YIELD_MPA * _NUT_SCREW_FLANGE_BEARING_MM2,
+    _STAINLESS_YIELD_MPA * _NUT_SCREW_HEAD_BEARING_MM2,
 )
-NUT_SCREW_TORQUE_NM = (
-    math.floor(
-        10.0
-        * _NUT_FACTOR
-        * _NUT_SCREW_PRELOAD_CAP_N
-        * fasteners.NUT_TO_NUT_BRACKET.major_mm
-        / 1000.0
-    )
-    / 10.0
-)  # rounded down to 0.1 N·m
+# The owner's torque (2026-10-19, issue #1630): 0.4 N·m, kept at the bare
+# head's value; the washer roughly doubles the brass's bearing margin there
+# rather than raising the torque.
+NUT_SCREW_TORQUE_NM = 0.4
 NUT_SCREW_PRELOAD_N = NUT_SCREW_TORQUE_NM / (
     _NUT_FACTOR * fasteners.NUT_TO_NUT_BRACKET.major_mm / 1000.0
-)
+)  # 703
+if NUT_SCREW_PRELOAD_N > _NUT_SCREW_PRELOAD_CAP_N:
+    raise ValueError(
+        f"nut screws at {NUT_SCREW_TORQUE_NM} N·m preload {NUT_SCREW_PRELOAD_N:.0f} N, "
+        f"over the {_NUT_SCREW_PRELOAD_CAP_N:.0f} N the tap and the brass carry"
+    )
 # The nut's torque at the 1 kN hand-abuse thrust (leadscrew LOAD_CASES):
 # T = F d2/2 tan(lead + friction), the oiled thread above.
 NUT_ABUSE_TORQUE_NM = (
@@ -1277,7 +1353,7 @@ _NUT_TORQUE = f"{NUT_SCREW_TORQUE_NM:.1f} N·m"
 # Rule 23 (C3 r6 TL-00 review): the 2 5/16-18 lever screws carry the
 # operator's push and pull on the TL-26 lever, reversing through every pass.
 # Wedge-lock pairs (TL-VN-71) under the heads keep them from backing off. The
-# torque takes the block screws' basis: the TL-21 6061-T6 tap's strip load
+# torque takes the block screws' basis: the TL-21 6061-T651 tap's strip load
 # at the worst-case engagement (lever_washer.ENGAGEMENT_MIN 9.14: the
 # shortest screw through the thickest lever and pair, inside the 12 plate's
 # RV-01 1.20D full thread), a third of it as preload, T = K F d.
@@ -1394,7 +1470,8 @@ ASSEMBLY_STEPS = (
     f"7A. SCREW A KP08 BLOCK {_item(PILLOW_BLOCK)} ON EACH END BRACKET WITH 2 "
     f"{_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)} AND THE FLANGED NUT "
     f"{_item(LEADSCREW_NUT)} ON THE NUT BRACKET WITH 4 {_NUT_SCREW} "
-    f"{_item(NUT_SCREW)}, FLANGE TOWARD THE SPINDLE, SNUG.",
+    f"{_item(NUT_SCREW)} ON FLAT WASHERS {_item(NUT_WASHER)}, FLANGE TOWARD THE "
+    "SPINDLE, SNUG.",
     f"7B. THREAD THE LEADSCREW {_item(LEADSCREW)}, OILED WITH ISO VG 32 OIL, IN "
     "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT.",
     "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
@@ -1425,9 +1502,9 @@ ASSEMBLY_STEPS = (
     "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER.",
     "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
     "TAGGED ON SHEET 1) ON THE COLLARS.",
-    "10. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "
-    "THEIR SPOTS (LOCATED ON MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH "
-    "IN ONE SETUP SQUARE TO THE CARRIER TOP: "
+    "10. DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS (LOCATED ON "
+    "MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH IN ONE SETUP SQUARE TO THE "
+    "CARRIER TOP: "
     f"{_HUB_HOLE}; {_CL_HOLE}; BREAK THE HUB HOLE BELOW "
     f"{hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN:.1f} MIN X 45°.",
     "11. CLAMP THE RISER ON THE CARRIER TOP AND SPOT ITS "
@@ -1438,9 +1515,13 @@ ASSEMBLY_STEPS = (
     "MHA-CH-06-TL-24, THEN SCREW IT DOWN WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
     "ONLY NOW PRESS THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL "
-    f"{_item(CL_DOWEL)} FLUSH UNDERNEATH; FACE THE "
-    f"HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-{hub_pin.LOCATOR_SET_MAX:.2f} "
-    f"ABOVE THE RISER AND RECHAMFER IT {hub_pin.LEAD_CHAMFER:.1f} X 45° MAX.",
+    f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN THROUGH THE RISER UNTIL ITS "
+    f"ROUND TIP IS {cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE "
+    "THE RISER; CHECK THE STRAP SEATS FLAT, LOCATES AND SLIDES ON AND OFF, AND "
+    "THE TIP IS NOT ABOVE IT. "
+    f"FACE THE HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-"
+    f"{hub_pin.LOCATOR_SET_MAX:.2f} ABOVE THE RISER AND RECHAMFER IT "
+    f"{hub_pin.LEAD_CHAMFER:.1f} X 45° MAX.",
     f"12. BOLT THE FEED LEVER ON THE CARRIER WITH 2 {_LEVER_SCREW} "
     f"{_item(LEVER_SCREW)} ON WEDGE-LOCK PAIRS {_item(LEVER_LOCK_WASHER)}, "
     f"TIGHTENED TO {_LEVER_TORQUE}, GRIP END TOWARD THE OPERATOR. IN USE THE "
@@ -1456,10 +1537,9 @@ ASSEMBLY_STEPS = (
 # nut bracket's block screws out; the handwheel feeds the finish pass.
 ASSEMBLY_CHECKS = (
     f"CHECK: EVERY ALIGNMENT READING WITHIN ±{ALIGNMENT_BAND:.2f} OF ITS TARGET.",
-    "CHECK: WITH THE NUT BRACKET'S 2 BLOCK SCREWS OUT, SWING THE CARRIER BY THE "
-    "LEVER THROUGH EACH PASS'S SWEEP (SHEET 1); IT TURNS FREELY, NOTHING "
-    "TOUCHES THE STUDS, NUTS OR COLUMN COVER AND BOTH CARRIAGES STAY ON THEIR "
-    "RAILS.",
+    "CHECK: WITH THE 2 BLOCK SCREWS OUT, SWING THE CARRIER BY THE LEVER THROUGH "
+    "EACH PASS'S SWEEP (SHEET 1); IT TURNS FREELY, CLEAR OF THE STUDS, NUTS AND "
+    "COLUMN COVER, BOTH CARRIAGES ON THEIR RAILS.",
     # Review bought-tl000-r3: the check that takes the block screws out puts
     # them back to step 13's ship state.
     f"CHECK: REFIT THE BLOCK SCREWS {_item(BLOCK_SCREW)} ON THEIR WEDGE-LOCK "

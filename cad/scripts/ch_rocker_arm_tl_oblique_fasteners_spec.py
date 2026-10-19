@@ -9,31 +9,39 @@ Every value comes from the part specs and the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as ``trammel``); no
 dimension is retyped here.
 
-Engagement is length minus grip. Protrusion is engagement minus the receiving
-thread's depth: past the far face for a THRU tap, past the full thread for a
-blind one. Every row has protrusion below zero, so no screw stands out of the
-part it threads into or bottoms in its hole.
+The table's engagement is nominal screw/receiver overlap, capped by receiver
+depth, not full-thread engagement at tolerance limits. Protrusion is bought
+length minus grip minus receiver depth: past the far face for a THRU tap,
+past the full thread for a blind one. A through-tip may project only into
+the stated free clearance. Individual screw/washer specs own tolerance
+bands, incomplete threads and neighboring geometry; the nominal table
+alone does not certify worst-case fit.
 
-Engagement is at least 1.5 diameters, except on two joints, each recorded in
-the row:
+Nominal engagement is at least 1.5 diameters except on two joints:
 
 * Carriage (M4 x 20): the HGH15CA's M4 x 5 holes limit it to 4.4 (1.1 D).
-* Feed lever (5/16-18 x 1): the 12 carrier limits it to 10.4 (1.3 D) with
-  nothing below the carrier; the screw ends inside the plate (a 1-1/8 in
-  screw would stand 1.6 out of the underside).
+* Feed lever (5/16-18 x 1): nominal engagement is 10.4 (1.3 D).
+  The lever-washer spec records the worst-case engagement and possible
+  stand-out; the nominal table alone does not bound either.
 
-Washers: a wedge-lock pair under each head of two joints (``WASHERS``), each
-screw carrying a reversing load, so rule 23 wants a mechanical lock: the two
+Threads are US-customary UNC except the bought HGH15CA carriage's vendor-cut
+M4 holes, which fix the carriage screw's thread (the fastener policy's
+exception: a bought part's own threads; a bought part's plain holes take a UNC
+screw sized to float).
+
+Washers (``WASHERS``): a wedge-lock pair under each head of two joints whose
+screws carry a reversing load, so rule 23 wants a mechanical lock: the two
 TL-29 block screws (the leadscrew's reversing thrust, TL-VN-70) and the two
-feed lever screws (the operator's push and pull on the lever, TL-VN-71). Each
-pair's stack adds to its row's grip. Every other head seats in a counterbore
-or countersink, or on a flat face. Hold-down studs: 1/2-13 x 3 in only, from
-the clamping kit. A longer stud reaches the swinging carrier (the jig spec's
-``STUD_LENGTH_MAX``).
+feed lever screws (the operator's push and pull on the lever, TL-VN-71). A
+plain flat washer (TL-VN-72) under each of the four nut screw heads spreads the
+head's clamp on the Tr8 nut's brass flange. Each washer's stack adds to its
+row's grip. Every other head seats in a counterbore or countersink, or on a
+flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit. A
+longer stud reaches the swinging carrier (the jig spec's ``STUD_LENGTH_MAX``).
 
 Each joint's screw is its own bought part and BOM row (TL-VN-61 to TL-VN-69, the
-wedge-lock pairs TL-VN-70 and TL-VN-71); the assembly steps name each by its
-callout (``callout``) and its item number.
+wedge-lock pairs TL-VN-70 and TL-VN-71, the flat washer TL-VN-72); the assembly steps
+name each by its callout (``callout``) and its item number.
 """
 
 from __future__ import annotations
@@ -49,6 +57,7 @@ import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _hole_spec import THREAD_MAJOR_MM
+from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
@@ -78,6 +87,9 @@ class Fastener:
     thread_depth_mm: float  # receiving full thread: part thickness if THRU
     min_engagement_d: float = 1.5  # in diameters; lower only with a reason
     note: str = ""
+    # Free space past a THRU tap's far face that the tip may stand into; 0:
+    # the tip stops inside the receiving thread.
+    tip_clearance_mm: float = 0.0
 
     @property
     def metric(self) -> bool:
@@ -98,11 +110,12 @@ class Fastener:
 
     @property
     def engagement_mm(self) -> float:
-        return self.length_mm - self.grip_mm
+        # A tip standing past a THRU tap engages only the tap's depth.
+        return min(self.length_mm - self.grip_mm, self.thread_depth_mm)
 
     @property
     def protrusion_mm(self) -> float:
-        return self.engagement_mm - self.thread_depth_mm
+        return self.length_mm - self.grip_mm - self.thread_depth_mm
 
 
 @dataclass(frozen=True)
@@ -116,7 +129,7 @@ class Washer:
     thickness_mm: float  # the installed stack under one head
 
 
-_METRIC_PITCH = {"M3": "0.5", "M4": "0.7"}
+_METRIC_PITCH = {"M4": "0.7"}  # the carriage's vendor-cut M4 only
 
 
 def callout(fastener: Fastener) -> str:
@@ -168,38 +181,40 @@ KP08_TO_BRACKET = Fastener(
     "KP08 pillow block to TL-28 end bracket",
     leadscrew.KP08_SCREW,
     SHCS,
-    "12",
+    leadscrew.KP08_SCREW_LENGTH,
     2 * leadscrew.END_BRACKET_QUANTITY,
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
     leadscrew.BRACKET_THICK,  # tapped THRU
-    note="KP08 foot thickness unverified: verify the length on receipt",
 )
 NUT_TO_NUT_BRACKET = Fastener(
     "Tr8 flanged nut to TL-29 nut bracket",
     leadscrew.NUT_SCREW,
     SHCS,
-    f"{leadscrew.NUT_SCREW_LENGTH:.0f}",
+    leadscrew.NUT_SCREW_LENGTH,
     len(leadscrew.NUT_HOLE_ANGLES_DEG),
-    leadscrew.NUT_FLANGE_THICK,
+    leadscrew.NUT_SCREW_GRIP,  # head on the TL-VN-72 washer, on the flange
     leadscrew.NUT_SCREW_TAP_DEPTH,  # blind
 )
 RISER_TO_CARRIER = Fastener(
     "TL-24 riser to TL-21 carrier",
     trammel.RISER_SCREW,
     FLAT_HEAD,
-    "1/2",
+    "5/8",
     len(trammel.RISER_SCREWS),
-    riser.THICKNESS,  # head flush in the countersink
+    # head seated nominally in the countersink
+    riser.THICKNESS - _RISER_SCREW.seated_recess(riser.CSK_DIA, riser.CSK_ANGLE),
     carrier.THICKNESS,  # tapped THRU
 )
 CR_CLAMP = Fastener(
     "CR clamp: rocker-arm strap and riser to TL-21 carrier",
     carrier.CR_THREAD,
     SHCS,
-    "3/4",
+    "7/8",
     1,
     trammel.RISER_THICK + trammel.STRAP_THICK,
     carrier.THICKNESS,  # tapped THRU
+    # the full bought screw: its tip stands into the free space above the rail
+    tip_clearance_mm=trammel.CARRIER_TO_RAIL_GAP,
 )
 LEVER_TO_CARRIER = Fastener(
     "TL-26 feed lever to TL-21 carrier",
@@ -211,7 +226,7 @@ LEVER_TO_CARRIER = Fastener(
     feed_lever.LEVER_THICK + LEVER_LOCK_STACK,
     carrier.THICKNESS,  # tapped THRU
     min_engagement_d=1.3,
-    note="the 12 carrier limits the engagement; nothing stands below it",
+    note="the 12 carrier limits engagement; see the lever washer's worst-case stack",
 )
 FASTENERS: tuple[Fastener, ...] = (
     RAIL_TO_BAR,
@@ -238,7 +253,14 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER)
+NUT_WASHER = Washer(
+    NUT_TO_NUT_BRACKET.joint,
+    "#4",
+    "FLAT WASHER",
+    NUT_TO_NUT_BRACKET.count,
+    leadscrew.NUT_WASHER_THICK,
+)
+WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER, NUT_WASHER)
 
 # Hold-down studs, from the clamping kit (fixtures.clamping-kit-pm-52pcck-14mm).
 HOLD_DOWN_STUD_THREAD = "1/2-13"
@@ -250,7 +272,7 @@ HOLD_DOWN_STUD_COUNT = RAILS * len(trammel.HOLD_DOWN_STUDS)  # near + far a bar
 for _f in FASTENERS:
     if round(_f.engagement_mm / _f.major_mm, 2) < _f.min_engagement_d:
         raise AssertionError(f"{_f.joint}: engagement under {_f.min_engagement_d} D")
-    if _f.protrusion_mm >= 0.0:
+    if _f.protrusion_mm >= _f.tip_clearance_mm:
         raise AssertionError(f"{_f.joint}: the screw stands out or bottoms")
     if _f.min_engagement_d < 1.5 and not _f.note:
         raise AssertionError(f"{_f.joint}: a short engagement needs its reason")

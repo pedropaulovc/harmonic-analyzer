@@ -35,9 +35,10 @@ Sections, bottom to top (⚙ marks calculator values):
    and the seal) and stands 3 above the block; the carrier rests on it. It
    prints at two places, so even the title block's low limit (12.19) seats
    on the race's abutment.
-3. Carrier section Ø10 h6 (9.991/10.000), 11 long (⚙ ``CARRIER_THICK`` less
-   1, so the pin never stands proud of the carrier top), in the carrier's
-   Ø10 H7 pin hole (10.000/10.015): 0.000-0.024 diametral clearance.
+3. Carrier section Ø10 h6 (9.991/10.000), nominally 11 long
+   (⚙ ``CARRIER_THICK`` less 1), in the carrier's Ø10 H7 pin hole
+   (10.000/10.015): 0.000-0.024 diametral clearance. Its .X length and the
+   carrier's .X thickness allow 0.6 stand-out, not a guaranteed recess.
    Sensitivity: the clearance is carrier edge error 1:1.
 
 0.5 x 45 degree lead chamfers finish both ends. Both shoulder corners carry
@@ -123,7 +124,7 @@ BEARING_BORE_CHAMFER_MIN = 0.6  # 6200 r1,2 min
 if COLLAR_HEIGHT != trammel.BEARING_RECESS + trammel.PIN_COLLAR_PROUD:
     raise AssertionError("the collar does not stand PIN_COLLAR_PROUD above the block")
 if not 0.0 < CARRIER_LENGTH < trammel.CARRIER_THICK:
-    raise AssertionError("the pivot pin stands proud of the carrier top")
+    raise AssertionError("the pivot pin's nominal carrier section is not recessed")
 if not LEAD_CHAMFER < min(BEARING_LENGTH, CARRIER_LENGTH):
     raise AssertionError("a lead chamfer eats a fit section")
 if not SHOULDER_FILLET_RADIUS < BEARING_BORE_CHAMFER_MIN:

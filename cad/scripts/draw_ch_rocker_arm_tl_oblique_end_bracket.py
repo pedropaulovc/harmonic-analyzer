@@ -66,6 +66,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     HOLE_ROW_Y,
     KP08_MATE_CALLOUT,
     KP08_TAP_DRILL,
+    KP08_TAP_SPEC,
     KP08_TAP_X,
     ROW_CALLOUT,
 )
@@ -214,8 +215,8 @@ END_KEEP: dict[str, tuple[float, float, float]] = {
 # left, +1 right) whose upper rim the edge pick takes.
 TAP_DRILLS = {"bar": BAR_TAP_DRILL, "kp08": KP08_TAP_DRILL}
 # Each callout's two rows, about this wide (glyphs): "Ø3.45 THRU ALL" /
-# "8-32 UNC THRU ALL" and "Ø3.30 THRU ALL" / "M4x0.7 - 6H THRU ALL".
-CALLOUT_GLYPHS = {"bar": 17, "kp08": 20}
+# "8-32 UNC THRU ALL" and "Ø2.71 THRU ALL" / "6-32 UNC THRU ALL".
+CALLOUT_GLYPHS = {"bar": 17, "kp08": 17}
 _TIER_PITCH = 2.0 * text_half_high(2) + STACK_PITCH + 0.1  # 7.46
 TAP_TIERS = tuple(
     _HW + 1.0 + text_half_high(2) + 0.2 + k * _TIER_PITCH for k in range(3)
@@ -370,8 +371,10 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
         fields={
             "at": ([_x, 0.0, part_spec.BRACKET_THICK], ("KP08_TAP_X", "BRACKET_THICK")),
             "axis": _INTO_BRACKET,
-            # Metric: the wizard carries no thread class (ANSI-inch only).
-            "thread": (part_spec.KP08_THREAD, ("KP08_TAP_SPEC", "KP08_THREAD")),
+            "thread": (
+                f"{part_spec.KP08_THREAD} UNC-{part_spec.KP08_TAP_SPEC.thread_class}",
+                ("KP08_TAP_SPEC", "KP08_THREAD"),
+            ),
             "tap_drill_mm": (part_spec.KP08_TAP_DRILL, ("KP08_TAP_SPEC",)),
             "dia": (
                 limits(_drill, 2, part_spec.DRILLED_BAND),
@@ -418,17 +421,16 @@ def _view_mapper(adapter: Any, view: Any):
     return to_sheet
 
 
-def _omit_tap_thread_class(display: Any) -> None:
-    """The title block's THREADS row owns the UNC class (rule 2): the #8 row
-    reads ``8-32 UNC THRU ALL``, not ``... - 2B ...``. The metric callout
-    keeps whatever the wizard prints: the row covers UNC/UNF only."""
-    omit_title_block_thread_class(display, label="base-bar screw taps")
+def _omit_tap_thread_class(display: Any, *, label: str) -> None:
+    """The title block's THREADS row owns the UNC class (rule 2): the #8 rows
+    read ``8-32 UNC THRU ALL`` and the KP08 rows ``6-32 UNC THRU ALL``, not
+    ``... - 2B ...``."""
+    omit_title_block_thread_class(display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
-    if any(BAR_TAP_SPEC.thread_class in text for text in resolved):
-        raise RuntimeError(
-            f"base-bar screw taps: callout still prints its class: {resolved!r}"
-        )
+    classes = {BAR_TAP_SPEC.thread_class, KP08_TAP_SPEC.thread_class}
+    if any(cls in text for text in resolved for cls in classes):
+        raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
 _COUNT = re.compile(r"<NUM_INST>X\s*")
@@ -554,8 +556,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
         )
         _call_out_one_hole(callout, label=label)
-        if kind == "bar":
-            _omit_tap_thread_class(callout)
+        _omit_tap_thread_class(callout, label=label)
 
     # The property-linked blocks land in the active view: the plan.
     _activate_view(adapter, plan, label="plan")

@@ -1,7 +1,7 @@
-r"""Purchased MHA-CH-06-TL-VN-68 oblique-trammel clamp screw: McMaster 91251A540.
+r"""Purchased MHA-CH-06-TL-VN-68 oblique-trammel clamp screw: McMaster 91251A541.
 
-The ``1/4-20 X 3/4 SHCS`` (``ch_rocker_arm_tl_vn_oblique_clamp_screw_spec``) that is the CR clamp: it clamps the rocker-arm strap and the riser down on the TL-21 carrier, tapped THRU.
-The stock recipe ``diagnostics/diag_build_91251A540.py`` builds the catalogue screw on
+The ``1/4-20 X 7/8 SHCS`` (``ch_rocker_arm_tl_vn_oblique_clamp_screw_spec``) that is the CR clamp: it clamps the rocker-arm strap and the riser down on the TL-21 carrier, tapped THRU, used full length (its tip stands below the carrier, clear of the pivot blocks).
+The stock recipe ``diagnostics/diag_build_91251A541.py`` builds the catalogue screw on
 the 91251A family recipe (``diag_mcmaster_socket_head.build_socket_head``);
 the recipe's standalone run is catalog-only (no replica gate, user ruling
 2026-10-17).
@@ -24,7 +24,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
 from ch_rocker_arm_tl_vn_oblique_clamp_screw_spec import SKU
-from diagnostics.diag_build_91251A540 import build_91251A540
+from diagnostics.diag_build_91251A541 import build_91251A541
 
 PART_NAME = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
 SPEC = fastener(PART_NAME)
@@ -35,7 +35,7 @@ async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_91251A540),),
+        components=(StockComponent(sku=SKU, author=build_91251A541),),
         material=MATERIAL,
         save_threaded_part=save_simplified_part,
         screw_axis_planes=("Front Plane", "Right Plane"),

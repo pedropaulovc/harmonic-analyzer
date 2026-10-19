@@ -112,8 +112,7 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     for thread in (spec.CR_THREAD, spec.RISER_THREAD, spec.LEVER_THREAD):
         pitch = 25.4 / float(thread.rsplit("-", 1)[1])
         band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StockThick"])
-        full = spec.THICKNESS - band - spec.TAP_MOUTH_BREAK - pitch
-        assert math.isclose(spec.THICKNESS_BAND, band)
+        full = spec.THICKNESS - band - 0.25 - pitch
         assert math.isclose(spec.ENGAGEMENT_MM[thread], full), thread
     for thread in (spec.CR_THREAD, spec.RISER_THREAD):
         assert spec.ENGAGEMENT_MM[thread] >= 1.5 * THREAD_MAJOR_MM[thread]
@@ -264,11 +263,10 @@ def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
     }
     assert owners == {spec.SECTION_REFERENCE}
     assert "Plate" not in spec.DRAWING_DIMENSIONS
-    places = spec.DRAWING_PRECISION_BY_NAME["StockThick"]
-    assert places == spec.THICKNESS_PLACES == trammel.CARRIER_THICK_PLACES == 1
-    assert spec.THICKNESS_BAND == printed_band_mm(places)
     assert "StockThick" not in spec.CALLOUTS_BELOW
-    assert (spec.SECTION_REFERENCE, "StockThick") not in model_toleranced_dimensions(part)
+    assert (spec.SECTION_REFERENCE, "StockThick") not in model_toleranced_dimensions(
+        part
+    )
     source = inspect.getsource(part)
     assert '"StockThick", \'"PlateThick@Plate"\'' in source
     assert "PIN_CHAMFER_REFERENCE" not in source

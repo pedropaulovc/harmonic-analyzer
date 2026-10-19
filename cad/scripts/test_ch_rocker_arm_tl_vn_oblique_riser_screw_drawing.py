@@ -1,22 +1,25 @@
-"""Offline contracts for the MHA-CH-06-TL-VN-67 riser screw (McMaster 91771A110)."""
+"""Offline contracts for the MHA-CH-06-TL-VN-67 riser screw (McMaster 91771A112)."""
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
 
 import _config
-import _mcmaster_91771a110 as dims
+import _mcmaster_91771a112 as dims
 import build_ch_rocker_arm_tl_vn_oblique_riser_screw as part
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_jig_assembly_spec as assembly
+import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as spec
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
-from diagnostics import diag_build_91771A110 as recipe
+from diagnostics import diag_build_91771A112 as recipe
 from diagnostics.diag_mcmaster_phillips_flat_head import chain_segments
 from diagnostics.sketch_profile import closed_loops, endpoint_merges
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -30,7 +33,7 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     stock = FASTENERS[STEM]
     assert part.SPEC is stock
     assert part.PART_NAME == STEM
-    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("91771A110",)
+    assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("91771A112",)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
     assert stock.material == row["material"]
@@ -40,9 +43,9 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert "installation_notes" not in row
     for key in ("title", "stock_name", "supplier", "finish"):
         assert not any(ch.isdigit() for ch in row[key]), key
-    metadata = recipe_declaration(spec.SKU, recipe.build_91771A110)
+    metadata = recipe_declaration(spec.SKU, recipe.build_91771A112)
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_91771A110
+    assert getattr(recipe, metadata.callable_name) is recipe.build_91771A112
     assert metadata.threaded is True
 
 
@@ -56,33 +59,92 @@ def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
         row.head,
     )
     assert dims.DIMS.length == pytest.approx(row.length_mm)
-    assert dims.DIMS.major_dia == pytest.approx(row.major_mm, abs=1e-3)
-    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 1/2 B18.6.3 FLAT HEAD"
+    assert row.length_mm == pytest.approx(0.625 * IN)
+    assert spec.CALLOUT == fasteners.callout(row) == "#4-40 X 5/8 B18.6.3 FLAT HEAD"
+    # Installed as bought: the tip stops inside the carrier's tap.
+    assert row.protrusion_mm < 0.0
 
 
-def test_faced_plate_bands_keep_the_riser_screw_engaged_and_inside_the_carrier() -> None:
-    # Recheck #1619's changed stock declaration at the existing catalogue
-    # screw length and the model's flush head seat, not invented vendor
-    # length tolerances. Both finished plate thicknesses take their .X band.
-    length = spec.ROW.length_mm
-    projection_min = length - (riser.THICKNESS + riser.THICKNESS_BAND)
-    projection_max = length - (riser.THICKNESS - riser.THICKNESS_BAND)
-    full_thread_min = min(
-        projection_min - carrier.TAP_MOUTH_BREAK - dims.DIMS.pitch,
-        carrier.ENGAGEMENT_MM[carrier.RISER_THREAD],
+def test_head_seats_nominally_below_the_riser_top() -> None:
+    # Equal 82 deg cones: the Ø0.212 flat top sits where the Ø6.3 countersink
+    # narrows to it, not flush with the riser top.  Nominal seat only: no
+    # head-angle tolerance is sourced or assumed.
+    recess = (riser.CSK_DIA - 0.212 * IN) / (2.0 * math.tan(math.radians(41.0)))
+    assert spec.HEAD_RECESS_NOMINAL == pytest.approx(recess)
+    assert spec.HEAD_TOP_BELOW_RISER_TOP == spec.HEAD_RECESS_NOMINAL
+    assert 0.0 < spec.HEAD_RECESS_NOMINAL < dims.DIMS.junction_depth
+    assert spec.ROW.grip_mm == pytest.approx(riser.THICKNESS - spec.HEAD_RECESS_NOMINAL)
+    with pytest.raises(ValueError):
+        dims.DIMS.seated_recess(riser.CSK_DIA, 100.0)
+    with pytest.raises(ValueError):
+        dims.DIMS.seated_recess(dims.DIMS.head_dia - 0.01, riser.CSK_ANGLE)
+
+
+def test_assembly_places_each_head_at_its_nominal_seat() -> None:
+    z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK - spec.HEAD_TOP_BELOW_RISER_TOP
+    assert assembly.RISER_SCREW_PLACEMENTS == tuple(
+        assembly._carried(point, z) for point in trammel.RISER_SCREWS
     )
-    assert projection_min == pytest.approx(5.9)
-    assert full_thread_min == pytest.approx(5.015)
-    assert full_thread_min >= 1.5 * spec.ROW.major_mm
-    stand_out_max = projection_max - (carrier.THICKNESS - carrier.THICKNESS_BAND)
-    assert stand_out_max == pytest.approx(-3.7)
-    assert stand_out_max < 0.0
+    # The bought tip stops inside the nominal faced carrier.
+    assert spec.TIP_BELOW_RISER_TOP_NOMINAL == pytest.approx(
+        spec.HEAD_RECESS_NOMINAL + 0.625 * IN
+    )
+    assert spec.TIP_ABOVE_CARRIER_UNDERSIDE_NOMINAL == pytest.approx(
+        riser.THICKNESS + carrier.THICKNESS - spec.TIP_BELOW_RISER_TOP_NOMINAL
+    )
+    assert spec.TIP_ABOVE_CARRIER_UNDERSIDE_NOMINAL > 0.0
+
+
+def test_riser_screw_keeps_rule_18_full_thread() -> None:
+    # Shortest catalogue screw, flush seat (no recess credit), thickest riser,
+    # the carrier mouth break and the B18.6.3 2P maximum point.
+    required = 1.5 * spec.ROW.major_mm
+    assert spec.ENGAGEMENT_REQUIRED == pytest.approx(required)
+    assert spec.LENGTH_MIN == pytest.approx((0.625 - 0.03) * IN)
+    assert spec.POINT_CHAMFER_LENGTH_MAX == pytest.approx(2.0 * IN / 40.0)
+    assert riser.THICKNESS + riser.THICKNESS_BAND == pytest.approx(6.8)
+    assert spec.SCREW_FULL_THREAD_REACH_MIN == pytest.approx(
+        spec.LENGTH_MIN - 6.8 - carrier.TAP_MOUTH_BREAK - spec.POINT_CHAMFER_LENGTH_MAX
+    )
+    assert spec.RECEIVER_FULL_THREAD_MIN == carrier.ENGAGEMENT_MM[carrier.RISER_THREAD]
+    assert spec.ENGAGEMENT_MIN == min(
+        spec.SCREW_FULL_THREAD_REACH_MIN, spec.RECEIVER_FULL_THREAD_MIN
+    )
+    assert spec.ENGAGEMENT_MIN >= required
+
+
+def test_factory_tip_stays_clear_below_the_carrier_at_the_plate_bands() -> None:
+    # The longest screw at the nominal seat in the thinnest plates: whatever
+    # it stands past the underside stays above the pivot-block tops and the
+    # rails, and in plan no pivot block reaches a riser axis about any pin.
+    stand_out = (
+        dims.DIMS.length
+        + spec.HEAD_RECESS_NOMINAL
+        - (riser.THICKNESS - riser.THICKNESS_BAND)
+        - (carrier.THICKNESS - carrier.THICKNESS_BAND)
+    )
+    assert spec.STAND_OUT_MAX_NOMINAL_SEAT == pytest.approx(stand_out)
+    assert trammel.CARRIER_UNDERSIDE_Z - trammel.PIVOT_BLOCK_TOP_Z == pytest.approx(
+        trammel.PIN_COLLAR_PROUD
+    )
+    assert stand_out < trammel.PIN_COLLAR_PROUD
+    assert stand_out < trammel.CARRIER_TO_RAIL_GAP
+    radius = max(
+        math.dist((x, y), (pivot_block.BORE_X, 0.0))
+        for x in (pivot_block.BLOCK_X0, pivot_block.BLOCK_X1)
+        for y in (-pivot_block.BLOCK_WIDTH / 2.0, pivot_block.BLOCK_WIDTH / 2.0)
+    )
+    assert spec.PIVOT_BLOCK_PLAN_RADIUS == pytest.approx(radius)
+    for axis in trammel.RISER_SCREWS:
+        for pin in trammel.PIN_HOLES.values():
+            assert math.dist(axis, pin) > radius + dims.DIMS.major_dia / 2.0
+    assert spec.PIVOT_BLOCK_PLAN_CLEARANCE > 0.0
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
     from diagnostics.diag_build_mcmaster import REGISTRY
 
-    assert REGISTRY[spec.SKU] is recipe.build_91771A110
+    assert REGISTRY[spec.SKU] is recipe.build_91771A112
     source = Path(recipe.__file__).read_text(encoding="utf-8")
     assert "sys.exit(run_build(build_catalog))" in source
     assert "replica_main" not in source
@@ -91,7 +153,7 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
 
 def test_no_vendor_model_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
-    assert not list(root.glob("cad/references/**/91771A110*.SLDPRT"))
+    assert not list(root.glob("cad/references/**/91771A11*.SLDPRT"))
 
 
 def test_recipe_is_the_catalogue_screw() -> None:
@@ -99,7 +161,7 @@ def test_recipe_is_the_catalogue_screw() -> None:
     assert d.part_no == spec.SKU
     assert d.major_dia == pytest.approx(0.112 * IN)
     assert d.pitch == pytest.approx(IN / 40.0)
-    assert d.length == pytest.approx(0.5 * IN)
+    assert d.length == pytest.approx(0.625 * IN)
     assert d.head_dia == pytest.approx(0.212 * IN)
     assert d.head_dia <= trammel.RISER_SCREW_HEAD_DIA
     assert d.head_angle_deg == 82.0
@@ -109,7 +171,8 @@ def test_recipe_is_the_catalogue_screw() -> None:
 
 def test_recess_volume_matches_an_occ_boolean() -> None:
     # FreeCAD 1.1 boolean of the drafted cross-and-notch prism with the entry
-    # cylinder and bottom cone: 5.086111 mm^3 (2026-10-17).
+    # cylinder and bottom cone, on the same-family 91771A110 recess form:
+    # 5.086111 mm^3 (2026-10-17).
     assert dims.DIMS.recess_volume() == pytest.approx(5.086111, abs=1e-3)
 
 

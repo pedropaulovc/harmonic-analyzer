@@ -29,7 +29,7 @@ Holes, all THRU from the top face:
 * 4 x #4 flat-head countersunk clearance (``RISER_SCREW`` ⚙ #4-40): a native
   Hole Wizard #4 normal-fit clearance (the repo's UNC policy,
   memory/fastener-policy-us-customary.md) with an 82 degree countersink for
-  the ASME B18.6.3 #4-40 x 1/2 flat-head machine screw (Ø0.225 in max,
+  the ASME B18.6.3 #4-40 x 5/8 flat-head machine screw (Ø0.225 in max,
   ``RISER_SCREW_HEAD_DIA`` ⚙; a B18.3 socket flat head, Ø0.255 in, does not
   fit), at ``RISER_SCREWS`` ⚙ = (±39.984, 44.287) and (±119.559, 36.382).
   They take the screws into the carrier's #4-40 tapped holes at the same
@@ -49,7 +49,7 @@ Holes, all THRU from the top face:
 The self-cut band (not modelled): the jig cuts the riser in place on its first
 passes with the 9/16 riser cutter, leaving an arc band between
 ``RISER_INNER_RADIUS`` R802.381 ⚙ and ``RISER_OUTER_RADIUS`` R813.619 ⚙ about the
-arc centre. This part models the supplied blank only. The screws lie on the
+arc centre. This part models the faced and milled blank only. The screws lie on the
 band's centreline ``RISER_SCREW_RADIUS`` R808.0 ⚙; the rule-17 walls from
 each countersink mouth (``RISER_CSK_DIA`` ⚙ at its band's top, the carrier tap
 at its station band's edges) to the band edges are ``RISER_SCREW_WALLS`` ⚙

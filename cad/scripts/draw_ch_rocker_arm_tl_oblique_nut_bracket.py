@@ -3,7 +3,7 @@ r"""Create the drawing for the oblique-trammel jig's nut bracket (MHA-CH-06-TL-2
 An 18.5 x 48 x 35.3 block at 2:1, three projected views about the nut face.
 The nut face (*Left, from -X: the Y = 0 face at its top edge, the bottom
 face at its left edge) carries the nut seat's stations from those two faces
-and the four M3 taps' offsets from the seat's axis (the hidden reference
+and the four #4-40 taps' offsets from the seat's axis (the hidden reference
 sketch NutPatternReference) outside its outline, the seat's native callout
 under it and the taps' over its upper right.
 The view over it (*Top, from +Y: the block face, turned so +X runs up, the
@@ -78,6 +78,7 @@ from ch_rocker_arm_tl_oblique_nut_bracket_spec import (
     NUT_SEAT_MATE_CALLOUT,
     NUT_SEAT_PROCESS,
     NUT_TAP_DRILL,
+    NUT_TAP_SPEC,
     NUT_TAP_PROCESS,
     SCREW_X,
     SCREW_Z,
@@ -95,9 +96,9 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 # Outlines at 2:1 (sheet mm): the nut face (*Left) x 66..137, y 50..146,
-# the seat's Z station and the M3 Z offsets in three lanes over it, its Y
-# station and the M3 Y offsets left of it (lines x 24 and 58), the seat's
-# callout under it and the M3 taps' over the plan, right of it; the block
+# the seat's Z station and the #4-40 Z offsets in three lanes over it, its Y
+# station and the #4-40 Y offsets left of it (lines x 24 and 58), the seat's
+# callout under it and the #4-40 taps' over the plan, right of it; the block
 # face (*Top, turned so +X runs up) in projection over it, x 66..137, y
 # 198..235, its height hanging under it, its length right of it, its #8
 # callout over it; the plan (*Front) right of the nut face, x 166..204, y
@@ -132,7 +133,7 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketLength": (0.0, 0.0, _H + 5.0),
 }
 LEFT_KEEP: dict[str, tuple[float, float, float]] = {
-    # The M3 offsets from the seat's axis (c4 review: located from the seat,
+    # The #4-40 offsets from the seat's axis (c4 review: located from the seat,
     # not the edges), outside the outline (c4-r8/r9, rule 14: inside it all
     # four texts and lines sat on the part). Each 11.3 mm span is narrower
     # than its text, so each text stands outboard. Over the view, three lanes
@@ -176,7 +177,7 @@ BLOCK_TAP_EDGE_MODEL = (
     SCREW_Z + 0.8 * _BLOCK_R,
 )
 BLOCK_TAP_CALLOUT_XY = (0.0720, 0.2492)
-# The M3 block's widest row is the mate's inventory id (c4-r9, rule 4), about
+# The #4-40 block's widest row is the mate's inventory id (c4-r9, rule 4), about
 # 69 wide: under the view its shelf would end right of every tap and the
 # leader rise up-left through the rows (c4-r7 struck "HOLES" so). Over the
 # plan, right of the nut face (x ~142..213, y ~152..175), its shelf's left
@@ -192,7 +193,7 @@ NUT_TAP_EDGE_MODEL = (
 NUT_TAP_CALLOUT_XY = (0.1775, 0.1635)
 # The seat's five rows run x ~120..198, y ~15..45; its leader rises from the
 # shelf's left end (x ~120, y ~15) to the bore (x 92, y 76), crossing y 64.7
-# at x ~97: left of the lower-right M3 tap (x 103.3).
+# at x ~97: left of the lower-right #4-40 tap (x 103.3).
 _CBORE_R = CBORE_DIA / 2.0
 NUT_SEAT_EDGE_MODEL = (FACE_X, -BORE_Y - 0.8 * _CBORE_R, BORE_Z + 0.6 * _CBORE_R)
 NUT_SEAT_CALLOUT_XY = (0.159, 0.030)
@@ -351,8 +352,10 @@ for _index, (_x, _y, _z) in enumerate(part_spec.NUT_HOLE_POINTS, start=1):
         fields={
             "at": ([_x, _y, _z], ("NUT_HOLE_POINTS",)),
             "axis": _INTO_NUT_FACE,
-            # Metric: the wizard carries no thread class (ANSI-inch only).
-            "thread": (part_spec.NUT_THREAD, ("NUT_TAP_SPEC", "NUT_THREAD")),
+            "thread": (
+                f"{part_spec.NUT_THREAD} UNC-{NUT_TAP_SPEC.thread_class}",
+                ("NUT_TAP_SPEC", "NUT_THREAD"),
+            ),
             "tap_drill_mm": (NUT_TAP_DRILL, ("NUT_TAP_SPEC",)),
             "dia": (
                 limits(_NUT_DRILL, _CALLOUT, part_spec.DRILLED_BAND),
@@ -504,17 +507,15 @@ def _set_nut_seat_callout(display: Any) -> None:
     _telemetry.info(f"nut-seat callout: {resolved!r}")
 
 
-def _omit_block_tap_thread_class(display: Any) -> None:
+def _omit_tap_thread_class(display: Any, *, label: str) -> None:
     """The title block's THREADS row owns the UNC class (rule 2): the #8 row
-    reads ``8-32 UNC``, not ``... - 2B``. The metric callout keeps whatever
-    the wizard prints: the row covers UNC/UNF only."""
-    omit_title_block_thread_class(display, label="block-screw taps")
+    reads ``8-32 UNC`` and the nut row ``4-40 UNC``, not ``... - 2B``."""
+    omit_title_block_thread_class(display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
-    if any(BLOCK_TAP_SPEC.thread_class in text for text in resolved):
-        raise RuntimeError(
-            f"block-screw taps: callout still prints its class: {resolved!r}"
-        )
+    classes = {BLOCK_TAP_SPEC.thread_class, NUT_TAP_SPEC.thread_class}
+    if any(cls in text for text in resolved for cls in classes):
+        raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
 def block_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -718,7 +719,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=view_label,
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-    # The M3 offsets live on NutPatternReference, a sketch the part saves
+    # The #4-40 offsets live on NutPatternReference, a sketch the part saves
     # hidden: the nut face shows it per view (_drawing_hidden_sketches).
     on_left = _view_mapper(adapter, left)
     annotations += hidden_sketches.curate_view_dimensions(
@@ -746,9 +747,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-screw taps",
         process=BLOCK_TAP_PROCESS,
     )
-    _omit_block_tap_thread_class(block_taps)
+    _omit_tap_thread_class(block_taps, label="block-screw taps")
     _set_block_tap_wall_row(block_taps)
-    add_native_hole_callout(
+    nut_taps = add_native_hole_callout(
         adapter,
         left,
         edge_xy=on_left(NUT_TAP_EDGE_MODEL),
@@ -756,6 +757,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="nut-screw taps",
         process=NUT_TAP_PROCESS,
     )
+    _omit_tap_thread_class(nut_taps, label="nut-screw taps")
     _set_nut_seat_callout(
         add_native_hole_callout(
             adapter,
@@ -777,7 +779,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # carrying a hole callout (base bar, end bracket: one per
         # callout). c4-r2's "#8-32 Tapped Hole" (DetailItem349) sat across
         # the #8 leader; each callout already states its thread. Two tap
-        # features with callouts (#8-32, M3x0.5), two notes.
+        # features with callouts (#8-32, #4-40), two notes.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=2,
     )

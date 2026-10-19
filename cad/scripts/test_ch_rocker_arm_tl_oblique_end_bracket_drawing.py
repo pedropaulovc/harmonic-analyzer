@@ -17,7 +17,7 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_end_bracket as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _hole_spec import METRIC_KINDS, THREAD_MAJOR_MM
+from _hole_spec import THREAD_MAJOR_MM
 
 STEM = "ch_rocker_arm_tl_oblique_end_bracket"
 ARTIFACT = "ch-rocker-arm-tl-oblique-end-bracket"
@@ -64,10 +64,10 @@ def test_kp08_taps_land_on_the_blocks_bolt_spacing_about_the_screw() -> None:
     )
     assert spec.KP08_TAP_X == (14.0, 56.0)
     assert all(h["at"][1] == 0.0 for h in holes)  # the row on the screw's KP08_S
-    assert spec.KP08_TAP_SPEC.kind in METRIC_KINDS
-    assert spec.KP08_TAP_SPEC.size == "M4x0.7"
+    assert spec.KP08_TAP_SPEC.kind == "tapped"  # UNC: the block's holes are plain
+    assert spec.KP08_TAP_SPEC.size == leadscrew.KP08_SCREW == "#6-32"
     assert spec.KP08_TAP_SPEC.end == "through_all"
-    assert spec.KP08_TAP_DRILL == pytest.approx(3.3)
+    assert spec.KP08_TAP_DRILL == pytest.approx(2.705)
 
 
 def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
@@ -85,8 +85,8 @@ def test_bar_taps_land_on_the_base_bars_bracket_holes() -> None:
 
 def test_both_patterns_fit_their_mates_at_three_places() -> None:
     assert spec.POSITION_RADIUS == pytest.approx(math.hypot(0.13, 0.13))
-    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.25)
-    assert spec.KP08_PATTERN_ALLOWANCE == pytest.approx(0.0662, abs=1e-4)
+    assert spec.KP08_SCREW_FLOAT == pytest.approx(0.4975)
+    assert spec.KP08_PATTERN_ALLOWANCE == pytest.approx(0.3137, abs=1e-4)
     assert spec.BAR_HOLE_DIA == pytest.approx(4.978)
     assert spec.BAR_PATTERN_ALLOWANCE == pytest.approx(0.2222, abs=1e-4)
     stations = {*drawing.STATION_ORDER, "HoleRowY"}
@@ -130,16 +130,16 @@ def test_no_vendor_sku_on_the_sheet() -> None:
 def test_walls_hold_rule_17_at_worst_case() -> None:
     walls = spec.WALLS_MM
     assert min(walls.values()) >= spec.WALL_TARGET == 2.0
-    # Ruling A′: the outer #8s' walls to the M4s are the rule-17 window's
+    # Ruling A′: the outer #8s' walls to the #6s are the rule-17 window's
     # lower bound; the 62.5's to the outer end holds at the length's one place.
     assert {k: v for k, v in walls.items() if "tap" in k} == pytest.approx(
         {
             "#8 tap at 7.5 to inner end": 5.287,
-            "#8 tap at 7.5 to M4 tap at 14": 2.157,
-            "M4 tap at 14 to #8 tap at 24": 5.657,
+            "#8 tap at 7.5 to #6 tap at 14": 2.405,
+            "#6 tap at 14 to #8 tap at 24": 5.905,
             "#8 tap at 24 to #8 tap at 46": 17.574,
-            "#8 tap at 46 to M4 tap at 56": 5.657,
-            "M4 tap at 56 to #8 tap at 62.5": 2.157,
+            "#8 tap at 46 to #6 tap at 56": 5.905,
+            "#6 tap at 56 to #8 tap at 62.5": 2.405,
             "#8 tap at 62.5 to outer end": 3.387,
         },
         abs=1e-3,
@@ -167,7 +167,7 @@ def test_holes_carry_the_title_block_band_only() -> None:
     assert model_toleranced_dimensions(part) == {}
     holes = _features()
     assert holes["bar_tap_1"]["dia"] == [3.45, 3.55]
-    assert holes["kp08_tap_1"]["dia"] == [3.3, 3.4]
+    assert holes["kp08_tap_1"]["dia"] == [2.71, 2.81]
     assert holes["kp08_tap_2"]["station"] == [55.87, 56.13]
     assert holes["bar_tap_1"]["height"] == [9.395, 9.655]
     assert holes["bar_tap_1"]["height_from"] == "bracket_low_side"
@@ -212,18 +212,11 @@ def test_row_is_located_from_the_faced_low_side() -> None:
     assert drawing._FROM_LOW_SIDE[0] == "bracket_low_side"
 
 
-def test_every_tap_has_its_own_callout_and_the_bar_ones_drop_the_class() -> None:
+def test_every_tap_has_its_own_callout() -> None:
     called = sorted((kind, x) for kind, x, _xy, _side in drawing.TAP_CALLOUTS)
     assert called == sorted(
         [("bar", x) for x in spec.BAR_TAP_X] + [("kp08", x) for x in spec.KP08_TAP_X]
     )
-    sheet = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert sheet.count("add_native_hole_callout(\n") == 1  # in the per-tap loop
-    assert "for kind, x, (text_x, text_y), side in TAP_CALLOUTS:" in sheet
-    assert "_call_out_one_hole(callout, label=label)" in sheet
-    assert 'if kind == "bar":\n            _omit_tap_thread_class(callout)' in sheet
-    # Two tap features in the plan, two auto notes (module comment).
-    assert "expected_redundant_notes=2" in sheet
 
 
 def test_single_hole_definitions_drop_exactly_the_count() -> None:
@@ -242,7 +235,7 @@ def test_single_hole_definitions_drop_exactly_the_count() -> None:
     with pytest.raises(RuntimeError):
         drawing.single_hole_definitions({5: "", 6: "", 7: ""})
     assert drawing._PRINTED_COUNT.search("x\n2X Ø3.45 THRU ALL")
-    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\nM4x0.7 - 6H THRU ALL")
+    assert not drawing._PRINTED_COUNT.search("Ø3.45 THRU ALL\n6-32 UNC THRU ALL")
 
 
 # --- Sheet layout (model mm in the plan, sheet m around it) -----------------------

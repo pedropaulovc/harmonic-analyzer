@@ -15,6 +15,7 @@ import json
 import math
 import re
 import types
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ import ch_rocker_arm_tl_vn_oblique_block_washer_spec as block_washer
 import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
+import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
 import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as flange_nut
@@ -41,6 +43,8 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
 import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
+import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
+import ch_rocker_arm_tl_vn_oblique_nut_washer_spec as nut_washer
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
@@ -198,7 +202,7 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
 
 
 def test_end_brackets_stand_on_bar_1_under_the_screw() -> None:
-    """Each TL-28 stands on bar 1's top at its KP08 station: its M4 pair
+    """Each TL-28 stands on bar 1's top at its KP08 station: its #6-32 pair
     straddles the screw axis, its two tapped holes land on the bar's
     counterbored #8 holes."""
     assert leadscrew.RAIL == 1 and not spec.TURNED_OVER[leadscrew.RAIL]
@@ -300,15 +304,16 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.BEARING: 55.0,
         spec.FLANGE_NUT: 60.0,
         spec.HUB_PIN: 80.0,
-        # Review bought-tl000-r2: dropped out beneath the carrier with the HUB
-        # pin, as step 11 presses both up from below.
-        spec.CL_DOWEL: 80.0,
+        # The CL dowel goes down through the riser (step 11), so it lifts out
+        # above the lifted riser, as the clamp screw does.
+        spec.CL_DOWEL: 330.0,
         spec.PIVOT_BLOCK: 90.0,
         spec.NUT_BRACKET: 90.0,
         spec.LEADSCREW_NUT: 90.0,
         spec.BLOCK_SCREW: 90.0,
         spec.NUT_SCREW: 90.0,
         spec.BLOCK_LOCK_WASHER: 90.0,
+        spec.NUT_WASHER: 90.0,
         spec.PIVOT_PIN: 150.0,
         spec.CARRIAGE_SCREW: 150.0,
         spec.CARRIER: 230.0,
@@ -321,8 +326,8 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     }
     # Sideways only where a part leaves sideways: rail 1 runs along -X, so the
     # nut screws back out along +X and the handwheel slides off along -X; the
-    # block screws back out of pivot block 1's -Y face, their wedge-lock pairs
-    # halfway out to the heads.
+    # block screws back out of pivot block 1's -Y face; the wedge-lock pairs
+    # and the nut screws' washers halfway out to the heads.
     sideways = {
         (family, axis): spec.explode_shift(family, axis)
         for family in spec.QUANTITIES
@@ -331,6 +336,7 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     }
     assert sideways == {
         (spec.NUT_SCREW, "x"): 30.0,
+        (spec.NUT_WASHER, "x"): 15.0,
         (spec.BLOCK_SCREW, "y"): -40.0,
         (spec.BLOCK_LOCK_WASHER, "y"): -20.0,
         (spec.HANDWHEEL, "x"): -50.0,
@@ -458,8 +464,9 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.LEVER_SCREW: 2,
         spec.BLOCK_LOCK_WASHER: 2,
         spec.LEVER_LOCK_WASHER: 2,
+        spec.NUT_WASHER: 4,
     }
-    assert sum(spec.QUANTITIES.values()) == 90
+    assert sum(spec.QUANTITIES.values()) == 94
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert spec.QUANTITIES[spec.NUT_BRACKET] == leadscrew.NUT_BRACKET_QUANTITY
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
@@ -485,7 +492,7 @@ def test_builder_places_exactly_the_inventory() -> None:
         )
     ]
     assert set(bg.references_of(JIG)) == PART_STEMS
-    assert len(PART_STEMS) == 31
+    assert len(PART_STEMS) == 32
 
 
 def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
@@ -518,6 +525,7 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
         spec.LEVER_SCREW,
         spec.BLOCK_LOCK_WASHER,
         spec.LEVER_LOCK_WASHER,
+        spec.NUT_WASHER,
     }
     # Nothing that moves stays put in the explode, and nothing fixed rides.
     assert not set(spec.MOVING) & set(spec.EXPLODE_STATIC)
@@ -566,6 +574,7 @@ def test_interference_contracts_are_the_press_fits_and_threads() -> None:
     assert contracts.JIG_HUB_PIN_SEAT == (hub_pin.FIT_DIA, hub_pin.SEAT_LENGTH)
     assert hub_pin.SEAT_LENGTH == trammel.CARRIER_THICK
     assert contracts.JIG_CL_DOWEL_PRESS == (cl_dowel.DIA, carrier.THICKNESS)
+    assert hub_pin.SHOULDER_FILLET_RADIUS <= hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN
     for envelope, expected in (
         (
             contracts.JIG_RAIL_SCREW_THREAD,
@@ -767,12 +776,15 @@ def test_sweep_extents_and_rail_margins(report) -> None:
 def test_studs_stop_under_the_swinging_carrier() -> None:
     # The longest stud the carrier's underside clears; verify.py's native
     # sweep proves the modelled 3 in studs clear of everything that moves.
-    assert spec.STUD_LENGTH_MAX == pytest.approx(89.7, abs=1e-6)
+    assert spec.STUD_LENGTH_MAX == pytest.approx(
+        trammel.CARRIER_UNDERSIDE_Z - clamp_screw.STAND_OUT_MAX - spec.STUD_BOTTOM_Z
+    )
     # The 1/2-13 x 3 in stud is the only stud; step 2 states the limit,
     # rounded down to 1/8 in.
     assert spec.STUD_LENGTH == fasteners.HOLD_DOWN_STUD_LENGTH_MM
     assert spec.STUD_LENGTH == pytest.approx(3.0 * trammel.INCH)
     assert spec.STUD_LENGTH < spec.STUD_LENGTH_MAX
+
 
 
 def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
@@ -859,6 +871,7 @@ def test_inch_eighths_down() -> None:
     assert spec.inch_eighths_down(0.25 * trammel.INCH) == "1/4"
 
 
+
 def test_sweep_table_edge_margins(report) -> None:
     edges = report.table_edge_margins
     assert edges["carrier"] == pytest.approx(
@@ -920,17 +933,18 @@ def test_sweep_table_edge_margins(report) -> None:
 
 
 # Fastener table: (callout, count, engagement, protrusion). Protrusion is the
-# engagement less the receiving thread's depth; below zero, the screw stops
-# inside the part (THRU tap) or short of the full thread (blind tap).
+# screw's length past the grip less the receiving thread's depth; below zero,
+# the screw stops inside the part (THRU tap) or short of the full thread
+# (blind tap). Engagement is never more than the receiving thread's depth.
 FASTENER_TABLE = {
     "RAIL_TO_BAR": ("#8-32 X 3/4 SHCS", 14, 9.35, -3.35),
     "BRACKET_TO_BAR": ("#8-32 X 5/8 SHCS", 8, 7.975, -4.725),
     "NUT_BRACKET_TO_BLOCK": ("#8-32 X 1-7/8 SHCS", 2, 9.485, -2.515),
     "BLOCK_TO_CARRIAGE": ("M4 X 20 SHCS", 8, 4.4, -0.6),
-    "KP08_TO_BRACKET": ("M4 X 12 SHCS", 4, 7.0, -5.7),
-    "NUT_TO_NUT_BRACKET": ("M3 X 10 SHCS", 4, 6.5, -0.8),
-    "RISER_TO_CARRIER": ("#4-40 X 1/2 B18.6.3 FLAT HEAD", 4, 6.7, -5.3),
-    "CR_CLAMP": ("1/4-20 X 3/4 SHCS", 1, 10.55, -1.45),
+    "KP08_TO_BRACKET": ("#6-32 X 5/8 SHCS", 4, 10.875, -1.825),
+    "NUT_TO_NUT_BRACKET": ("#4-40 X 1/2 SHCS", 4, 8.7428, -0.8),
+    "RISER_TO_CARRIER": ("#4-40 X 5/8 B18.6.3 FLAT HEAD", 4, 10.4014, -1.5986),
+    "CR_CLAMP": ("1/4-20 X 7/8 SHCS", 1, 12.0, 1.725),
     "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, -1.586),
 }
 
@@ -944,14 +958,20 @@ def test_fastener_table_engagement_and_protrusion() -> None:
         assert row.count == count, name
         assert row.engagement_mm == pytest.approx(engagement, abs=1e-3), name
         assert row.protrusion_mm == pytest.approx(protrusion, abs=1e-3), name
+    # Only the CR clamp, installed full length as bought, stands past its
+    # THRU tap: into the free space between the carrier and the rail top.
+    proud = [row for row in fasteners.FASTENERS if row.protrusion_mm > 0.0]
+    assert proud == [fasteners.CR_CLAMP]
+    assert fasteners.CR_CLAMP.tip_clearance_mm == trammel.CARRIER_TO_RAIL_GAP
+    assert 0.0 < fasteners.CR_CLAMP.protrusion_mm < fasteners.CR_CLAMP.tip_clearance_mm
     # Counts follow the parts: 7 rail holes on each of 2 rails, a 4-hole
     # pattern on each carriage, 2 KP08 screws on each of 2 brackets.
     assert fasteners.RAIL_TO_BAR.count == trammel.RAIL_HOLE_COUNT * 2
     assert fasteners.BLOCK_TO_CARRIAGE.count == 4 * 2
     assert fasteners.KP08_TO_BRACKET.count == 2 * leadscrew.END_BRACKET_QUANTITY
     assert fasteners.LEVER_TO_CARRIER.count == len(carrier.LEVER_HOLES)
-    # Metric only where the bought part is metric; the rest ANSI UNC.
-    assert {row.thread for row in fasteners.FASTENERS if row.metric} == {"M3", "M4"}
+    # Metric only into the bought carriage's vendor-cut M4 holes; the rest UNC.
+    assert {row.thread for row in fasteners.FASTENERS if row.metric} == {"M4"}
     # Under 1.5 D only where the carriage's or the carrier's thread limits it.
     short = {
         row.joint
@@ -980,6 +1000,11 @@ def test_fastener_table_engagement_and_protrusion() -> None:
     assert fasteners.WASHERS == (
         fasteners.BLOCK_LOCK_WASHER,
         fasteners.LEVER_LOCK_WASHER,
+        fasteners.NUT_WASHER,
+    )
+    assert fasteners.NUT_WASHER.count == fasteners.NUT_TO_NUT_BRACKET.count
+    assert fasteners.NUT_TO_NUT_BRACKET.grip_mm == pytest.approx(
+        leadscrew.NUT_FLANGE_THICK + fasteners.NUT_WASHER.thickness_mm
     )
     assert fasteners.BLOCK_LOCK_WASHER.count == fasteners.NUT_BRACKET_TO_BLOCK.count
     assert fasteners.NUT_BRACKET_TO_BLOCK.grip_mm == pytest.approx(
@@ -1013,10 +1038,10 @@ def test_turned_over_bar_counterbores_clear_the_flange_nuts() -> None:
 
 def test_bracket_bar_screws_sit_in_their_rule_17_window() -> None:
     # Ruling A′ (2026-10-17): two pairs about the screw axis, the outer
-    # half-span the round value between TL-28's #8-to-M4 wall and TL-20's
+    # half-span the round value between TL-28's #8-to-#6 wall and TL-20's
     # counterbore-to-edge wall, both at the 2.0 target at worst case.
     assert leadscrew.BAR_SCREW_LATERALS == (27.5, 44.0, 66.0, 82.5)
-    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MIN == pytest.approx(27.343, abs=1e-3)
+    assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MIN == pytest.approx(27.096, abs=1e-3)
     assert leadscrew.BAR_SCREW_OUTER_HALF_SPAN_MAX == pytest.approx(27.545, abs=1e-3)
     assert leadscrew.BRACKET_LENGTH == pytest.approx(
         trammel.BASE_BAR_COLUMN_EDGE - leadscrew.BRACKET_INNER_LATERAL
@@ -1071,7 +1096,14 @@ def _nut_interface_follows(feed: types.ModuleType) -> None:
         feed.NUT_BRACKET_X[0] - feed.NUT_FLANGE_THICK - feed.NUT_BODY_LONG
     )
     assert feed.NUT_BORE_DIA == pytest.approx(feed.NUT_BODY_DIA + 0.5)
-    assert feed.NUT_SCREW_ENGAGEMENT >= 2.0 * feed.NUT_SCREW_MAJOR
+    target = 2.0 * feed.NUT_SCREW_MAJOR
+    assert feed.NUT_SCREW_FULL_THREAD_MIN >= target
+    selected = Fraction(feed.NUT_SCREW_LENGTH)
+    assert all(
+        feed.full_thread_min(length, feed.NUT_SCREW_GRIP, feed.NUT_SCREW) < target
+        for length in feed.INCH_SCREW_LENGTHS
+        if Fraction(length) < selected
+    )
     assert feed.NUT_SCREW_TAP_DEPTH > feed.NUT_SCREW_ENGAGEMENT
     assert feed.NUT_BRACKET_DEPTH == pytest.approx(
         feed.SCREW_LATERAL
@@ -1102,10 +1134,6 @@ def test_vendor_swap_moves_no_drilled_part() -> None:
     _nut_interface_follows(leadscrew)
     assert leadscrew.NUT_BODY_LONG == pytest.approx(10.0)
     assert leadscrew.NUT_BORE_DIA == pytest.approx(10.7)
-    assert (leadscrew.NUT_SCREW_LENGTH, leadscrew.NUT_SCREW_TAP_DEPTH) == (
-        10.0,
-        pytest.approx(7.3),
-    )
     # Swaps the layout absorbs: a shorter nut, a bigger flange, a longer hub.
     for bought in (
         {"NUT_LENGTH": 13.5, "NUT_BODY_DIA": 10.0, "NUT_HOLE_PCD": 16.1},
@@ -1120,7 +1148,6 @@ def test_vendor_swap_moves_no_drilled_part() -> None:
     short_nut = _leadscrew_with(NUT_LENGTH=13.5, NUT_BODY_DIA=10.0)
     assert short_nut.NUT_BORE_DIA == pytest.approx(10.5)
     big_flange = _leadscrew_with(NUT_FLANGE_DIA=25.0, NUT_FLANGE_THICK=5.0)
-    assert big_flange.NUT_SCREW_LENGTH == 12.0
     assert big_flange.NUT_BRACKET_DEPTH == pytest.approx(
         leadscrew.NUT_BRACKET_DEPTH + 1.5
     )
@@ -1199,21 +1226,30 @@ def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
 
 
 def test_nut_flange_is_a_static_clamp() -> None:
-    # Owner ruling 2026-10-17 (review jbf-r17, rule 23): the nut's flange
-    # carries the nut's torque by clamp friction with margin, so its 4 M3
-    # screws see no operating torque; step 8 prints their torque, the brass
-    # flange's bearing under the head capping it, and the jig's exception
-    # quotes the spec's numbers.
-    assert spec.NUT_SCREW_TORQUE_NM == 1.0
-    assert spec.NUT_SCREW_PRELOAD_N == pytest.approx(1667, abs=1)
+    # The nut's flange carries the nut's torque by clamp friction with margin,
+    # so its 4 #4-40 screws see no operating torque; step 8 prints their
+    # torque. Each head sits on a TL-VN-72 flat washer (owner ruling 2026-10-19,
+    # issue #1630), the owner's 0.4 N·m within what the tap and brass carry.
     assert spec.NUT_SCREW_PRELOAD_N <= spec._NUT_SCREW_STRIP_N / 3.0
-    head_area = math.pi / 4.0 * (5.5**2 - 3.5**2)
-    assert spec.NUT_SCREW_PRELOAD_N / head_area < spec._BRASS_YIELD_MPA
-    assert spec.NUT_ABUSE_TORQUE_NM == pytest.approx(0.874, abs=0.001)
-    assert spec.NUT_FLANGE_SLIP_NM == pytest.approx((8.0, 10.67), abs=0.01)
-    assert spec.NUT_FLANGE_SLIP_MARGIN >= 1.5
-    # The wedge-lock pair the ruling rules out: OD 7.0 at R8 reaches the body.
-    assert 16.0 / 2.0 - 7.0 / 2.0 < 10.2 / 2.0
+    # The ring on the brass: the head's least diameter (ASME B18.3) spread
+    # 45° through the thinnest washer, inside its OD.
+    assert nut_screw.HEAD_DIA_MIN < nut_screw.DIMS.head_dia
+    spread = min(nut_washer.OD, nut_screw.HEAD_DIA_MIN + 2.0 * nut_washer.THICKNESS_MIN)
+    flange_area = math.pi / 4.0 * (spread**2 - leadscrew_nut.HOLE_DIA**2)
+    assert spec.NUT_SCREW_PRELOAD_N / flange_area < spec._BRASS_YIELD_MPA
+    head_area = math.pi / 4.0 * (nut_screw.HEAD_DIA_MIN**2 - nut_washer.ID**2)
+    assert spec.NUT_SCREW_PRELOAD_N / head_area < spec._STAINLESS_YIELD_MPA
+    assert spec.NUT_SCREW_TORQUE_NM == 0.4
+    assert spec.NUT_SCREW_PRELOAD_N <= spec._NUT_SCREW_PRELOAD_CAP_N
+    assert spec.NUT_FLANGE_SLIP_MARGIN >= leadscrew.SLIP_MARGIN_MIN
+    # The washer stays under OD 5.8: the Ø16 circle less the nut's Ø10.2 body.
+    assert nut_washer.OD < 16.0 - 10.2
+    exceptions = machinist_exceptions.load_exceptions(
+        _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+    )
+    flange = [e for e in exceptions if "nut-flange" in e.finding]
+    assert [e.id for e in flange] == ["RV-01"]
+    assert "#4-40" in flange[0].where and "0.4 N·m" in flange[0].where
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

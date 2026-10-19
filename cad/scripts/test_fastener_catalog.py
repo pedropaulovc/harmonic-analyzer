@@ -77,13 +77,13 @@ _EXPECTED = {
     "ch-rocker-arm-tl-vn-oblique-block-screw": (("91251A188",), "MHA-CH-06-TL-VN-63", 2),
     "ch-rocker-arm-tl-vn-oblique-carriage-screw": (("91290A168",), "MHA-CH-06-TL-VN-64", 8),
     "ch-rocker-arm-tl-vn-oblique-kp08-screw": (
-        ("91290A148",),
+        ("91251A150",),
         "MHA-CH-06-TL-VN-65",
         4,
     ),
-    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91290A115",), "MHA-CH-06-TL-VN-66", 4),
-    "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A110",), "MHA-CH-06-TL-VN-67", 4),
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A540",), "MHA-CH-06-TL-VN-68", 1),
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91251A110",), "MHA-CH-06-TL-VN-66", 4),
+    "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 4),
+    "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
     "ch-rocker-arm-tl-vn-oblique-block-washer": (
         ("91812A215",),
@@ -94,6 +94,11 @@ _EXPECTED = {
         ("91812A230",),
         "MHA-CH-06-TL-VN-71",
         2,
+    ),
+    "ch-rocker-arm-tl-vn-oblique-nut-washer": (
+        ("90945A710",),
+        "MHA-CH-06-TL-VN-72",
+        4,
     ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.

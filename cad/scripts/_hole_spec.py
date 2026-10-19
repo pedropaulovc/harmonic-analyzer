@@ -30,10 +30,6 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "3/8-16": 7.938,  # 5/16 drill
     "1/2-13": 10.716,
     "9/16-12": 12.304,
-    # ANSI Metric coarse taps (ASME B1.13M tap drills), only where bought
-    # metric hardware fixes the thread; not yet re-proved by a live probe.
-    "M3x0.5": 2.5,
-    "M4x0.7": 3.3,
 }
 THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
     "#0-80": 1.524,
@@ -50,7 +46,8 @@ THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
     "3/8-16": 9.525,
     "1/2-13": 12.700,
     "9/16-12": 14.288,
-    "M3x0.5": 3.0,  # basic major diameter (ASME B1.13M)
+    # Basic major diameter (ASME B1.13M): the jig's carriage screw, into the
+    # bought HGH15CA carriage's vendor-cut M4 holes. No shop part taps metric.
     "M4x0.7": 4.0,
 }
 CLEARANCE_MM = {  # (size, fit) -> hole diameter (CLOSE/NORMAL/LOOSE_FIT)
@@ -112,12 +109,9 @@ LETTER_DRILL_MM = {  # letter drills cut diameter exactly
     "X": 10.084,  # 0.397in: 3/8 free clearance
 }
 
-# Wizard kinds that cut a tap drill and carry thread metadata. Metric taps are
-# reserved for bought metric hardware (the leadscrew KP08 blocks and flange
-# nut); everything shop-chosen stays ANSI inch. ThreadClass (1B/2B/3B) is an
-# ANSI-inch-only wizard property, so metric kinds never write or verify it.
-TAPPED_KINDS = ("tapped", "tapped_bottoming", "tapped_metric")
-METRIC_KINDS = ("tapped_metric",)
+# Wizard kinds that cut a tap drill and carry thread metadata: every shop tap
+# is ANSI inch (memory/fastener-policy-us-customary.md).
+TAPPED_KINDS = ("tapped", "tapped_bottoming")
 
 # 118-degree drill point: tip height = r * cot(59 deg). A blind wizard hole's
 # depth runs to the flat shoulder; the point extends beyond it.

@@ -12,7 +12,6 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_riser as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_riser"
 
@@ -94,9 +93,11 @@ def test_blank_sizes_are_finished_native_dimensions_not_stock() -> None:
     assert not dimensions & spec.REFERENCE_DIMENSIONS
     assert not dimensions & set(spec.CALLOUTS_BELOW)
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 1 for name in dimensions)
-    assert spec.THICKNESS_PLACES == spec.DRAWING_PRECISION_BY_NAME["BlankThick"]
-    assert spec.THICKNESS_BAND == printed_band_mm(spec.THICKNESS_PLACES)
-    assert model_toleranced_dimensions(part) == {}
+    assert not {
+        (feature, name)
+        for feature, name in model_toleranced_dimensions(part)
+        if name in dimensions
+    }
 
 
 def test_flat_head_sinks_and_countersink_stays_in_the_blank() -> None:

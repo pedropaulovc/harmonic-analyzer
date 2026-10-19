@@ -28,6 +28,12 @@ not "fix" hole sizes back toward BSW.
   number-drill sizes rather than inventing a diameter.
 - Screw parts' cosmetic threads switch from `ansi_metric` to `ansi_inch`
   UNC tokens so hole and screw designations agree.
+- **Vendor-cut metric exception:** a screw goes metric only into a thread a
+  bought part's vendor already cut — e.g. the oblique-trammel jig's HGH15CA
+  carriage M4 holes (`BLOCK_TO_CARRIAGE`, M4
+  SHCS). Every shop-cut tap is UNC, even where a bought part's plain holes
+  were sized for a metric screw: TL-28's KP08 taps are #6-32 and TL-29's
+  Tr8-nut taps #4-40 (issue #1630); the Hole Wizard has no metric tap kind.
 - A screw that THREADS INTO a tapped hole models its shank at the thread's
   **tap-drill − ~0.3 mm** (lag precedent Ø12.0 in Ø12.304; #8-32 → 3.15,
   #4-40 → 2.0, #6-32 → 2.4, #3-48 → 1.7), so interference gates pass while

@@ -2,8 +2,8 @@ r"""Purchased MHA-CH-06-TL-VN-53 oblique-trammel CL locator dowel: McMaster 9159
 
 A Ø6 x 20 m6 alloy-steel dowel (``ch_rocker_arm_tl_vn_oblique_cl_dowel_spec``),
 pressed chamfered end first into the carrier's CL hole (finished in place to
-Ø6 N7) until that end is flush with the carrier's underside; its proud 8 passes
-the riser's clamp hole and locates the rocker strap blank's CL hole.  The stock
+Ø6 N7), with the round tip set above the actual installed riser. It passes
+the riser's clamp hole and locates the rocker strap blank's CL hole. The stock
 recipe ``diagnostics/diag_build_91595A452.py`` models the vendor model's
 crowned-chamfer and domed ends, read for dimensions only (not replica-gated,
 user ruling 2026-10-17); its standalone run is catalog-only.

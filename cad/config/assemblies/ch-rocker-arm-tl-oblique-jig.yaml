@@ -43,6 +43,7 @@ allowed_free_stems:
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-nut-washer
 # One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
 # moving family rides it, so each must read under-constrained: a rider whose
 # lock mate silently fixed it to the ground would otherwise pass.
@@ -66,6 +67,7 @@ required_free_stems:
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-nut-washer
 # The sweep; verify's pass-sweep-interference-free gate replays the recorded
 # slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1
@@ -74,11 +76,19 @@ free_dof: 1
 #   machinist_exceptions.load_exceptions for ch_rocker_arm_tl_oblique_jig_assembly,
 #   ignored by the build.
 machinist_exceptions:
+  # RV-01, re-accepted for issue #1630's #4-40 joint (owner ruling 2026-10-19,
+  # via coordinator: the bought nut, #4-40 screws on plain flat washers TL-VN-72,
+  # no lock, no receipt limits, 0.4 N·m). Jig spec numbers; the brass flange's
+  # hole and thickness carry no vendor band, taken at nominal. Superseded
+  # provenance, the owner-accepted M3 entry (2026-10-17), verbatim:
+  #   where: "steps 7A and 8 (sheet 6) and sheet 4 balloons 15 and 26: the TR8X2 flanged nut's 4 M3 X 10 SHCS into the nut bracket, tightened to 1.0 N·m"
+  #   finding: "no mechanical lock on the nut-flange screws under the reversing nut torque (rule 23)"
+  #   reason: "static clamp, rule 23's last bullet: the 4 M3 SHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 8.0 to 10.7 N·m (4 x M3 at 1.67 kN preload from 1.0 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 9 to 12x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). A wedge-lock pair cannot seat: an M3 pair's OD 7.0 on the 16 bolt circle overlaps the nut's 10.2 body by 0.6 (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
   - id: "RV-01"
     kind: "accept"
-    where: "steps 7A and 8 (sheet 6) and sheet 4 balloons 15 and 26: the TR8X2 flanged nut's 4 M3 X 10 SHCS into the nut bracket, tightened to 1.0 N·m"
+    where: "steps 7A and 8 (sheet 6) and sheet 4 balloons 15, 26 and 32: the TR8X2 flanged nut's 4 #4-40 X 1/2 SHCS on #4 flat washers into the nut bracket, tightened to 0.4 N·m"
     finding: "no mechanical lock on the nut-flange screws under the reversing nut torque (rule 23)"
-    reason: "static clamp, rule 23's last bullet: the 4 M3 SHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 8.0 to 10.7 N·m (4 x M3 at 1.67 kN preload from 1.0 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 9 to 12x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). A wedge-lock pair cannot seat: an M3 pair's OD 7.0 on the 16 bolt circle overlaps the nut's 10.2 body by 0.6 (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
+    reason: "static clamp, rule 23's last bullet: the 4 #4-40 SHCS clamp the Tr8 nut's flange to TL-29 and no operating torque reaches them. The nut's worst-case torque is 0.87 N·m (1 kN hand-abuse thrust, oiled Tr8x2 thread); the flange's clamp slip torque is 3.4 to 4.5 N·m (4 x #4-40 at 0.70 kN preload from 0.4 N·m, mu 0.15 to 0.20, on the 16 bolt circle), a 3.9 to 5.1x margin, so the flange never slips (jig spec NUT_FLANGE_SLIP_MARGIN, self-checked >= 1.5). Each head bears on a 5.31 OD flat washer, which holds the brass flange at about half its yield. A lock washer seats only under OD 5.8: the 16 bolt circle less the nut's 10.2 body leaves 2.9 radially (owner ruling 2026-10-19, via coordinator) (owner-accepted)"
   - id: "RV-02"
     kind: "accept"
     where: "step 7C (sheet 6): CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS), the nut bracket's set on pivot block 1 before its taps are spotted"

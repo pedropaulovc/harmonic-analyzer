@@ -7,13 +7,13 @@ ch-rocker-arm-tl-oblique-nut-bracket:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "saw and face to height; mill the +X end to length and the -Y side to depth; drill and tap the four M3 holes; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-06-TL-22, drilled and tapped at assembly"
+  process: "saw and face to height; mill the +X end to length and the -Y side to depth; drill and tap the four #4-40 holes; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-06-TL-22, drilled and tapped at assembly"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
-      where: "the 4X M3 taps against the nut seat's spigot counterbore (Ø10.70 x 2.10) on the -X face"
-      finding: "wall from the M3 taps to the spigot counterbore 0.92 min, under the 1.5 floor (rule 17)"
-      reason: "the bought nut's Ø16.0 bolt circle fixes it; the thin zone lies only within the 2.10 counterbore depth, clamped by the nut flange; below it the wall to the screw clearance is 1.77 min (owner ruling 2026-10-17)"
+      where: "the 4X #4-40 taps against the nut seat's spigot counterbore (Ø10.70 x 2.10) on the -X face"
+      finding: "wall from the #4-40 taps to the spigot counterbore 0.99 min, under the 1.5 floor (rule 17)"
+      reason: "the bought nut's Ø16.0 bolt circle fixes it; the thin zone lies only within the 2.10 counterbore depth, clamped by the nut flange; below it the wall to the screw clearance is 1.84 min (owner ruling 2026-10-17, on 0.92 with M3 taps; issue #1630's #4-40 taps raise it)"
     - id: "RV-02"
       kind: "minor"
       where: "the 2X #8-32 taps (SPOT FROM MHA-CH-06-TL-22 AT ASSEMBLY) against the -X and +X end faces"

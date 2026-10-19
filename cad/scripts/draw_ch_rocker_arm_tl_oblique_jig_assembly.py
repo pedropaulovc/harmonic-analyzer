@@ -4,8 +4,10 @@ Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
 the plan tagging the carrier's pass holes A1-B2, both rails and the spindle
 origin, beside the pose caption and the rail-alignment targets the fitter
-indicates the pivot pins to. Sheet 2 is the BOM: every fabricated TL family and
-purchased TL-VN family from the part registry, numbered in the spec's BOM order
+indicates the pivot pins to; the elevation carries the one native dimension,
+the CL dowel's round tip above the riser top as a reference (the builder's
+hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated TL family
+and purchased TL-VN family from the part registry, numbered in the spec's BOM order
 with its full description and total quantity, one line a row, beside its
 parent view, the jig collapsed. Full parent-scoped vendor Numbers have their
 own 56 mm column; the descriptive column gives it 8 mm without changing the
@@ -61,6 +63,9 @@ from _drawing_balloons import (
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_reference_dimension
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -74,7 +79,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_leader_notes import add_leader_note
-from _drawing_projection import model_points_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _simplified_names import simplified_name
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -154,6 +159,7 @@ CLUSTERS = (
             spec.PILLOW_BLOCK_SCREW,
             spec.NUT_SCREW,
             spec.BLOCK_LOCK_WASHER,
+            spec.NUT_WASHER,
         ),
         (1.0, 3.0),
         # Review full-bought (owner ruling 2026-10-18): the nut bracket and its
@@ -285,7 +291,20 @@ ELEVATION_LABEL_XY = _label_under(
     ELEVATION_CENTER, _EZ1 - _EZ0, spec.ELEVATION_VIEW_LABEL
 )
 
-# Sheet 2: the BOM right, four columns to the inner border. All 31 families
+# The elevation's one dimension: the CL dowel's round tip above the riser top
+# (``spec.CL_TIP_LINE``), imported from the builder's hidden CL_TIP_FEATURE
+# and parenthesised as a reference; step 11 sets the tip against the actual
+# riser. Its 1.6 is 0.4 mm on the sheet at 1:4, too short to hold its text, so
+# the text stands outboard (-X) of the riser's end, 44 model mm (11 sheet mm)
+# left of the dowel and 10 above its tip: over the carrier's bare top, left of
+# the plan's title. Model mm; the machine Y is the sketch's (the Top plane).
+CL_TIP_TEXT_MODEL_MM = (
+    spec.CL_TIP_LINE[1][0] - 44.0,
+    0.0,
+    spec.CL_TIP_LINE[1][1] + 10.0,
+)
+
+# Sheet 2: the BOM right, four columns to the inner border. All 32 families
 # fit above the title block at one line a row. Reallocate 8 mm of the former
 # 118 mm description column to the Number column: full 18-character vendor
 # Numbers need 52.2 mm at the unchanged default format. Both text columns
@@ -457,6 +476,9 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-nut-washer": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-nut-washer"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
@@ -951,9 +973,60 @@ def _add_plan_tags(adapter: Any, plan: Any) -> None:
         )
 
 
-def _place_assembled_sheet(adapter: Any) -> None:
+def _cl_tip_setting(adapter: Any, elevation: Any) -> Callable[[], None]:
+    """Import the builder's CL tip-above-riser dimension into the elevation at
+    ``CL_TIP_TEXT_MODEL_MM``, parenthesise it as a reference and prove its
+    nominal, places and that it carries no band; returns the same proof for
+    the settled drawing."""
+    label = "jig elevation CL tip above riser"
+    name = spec.CL_TIP_DIMENSION
+    text_xy = model_point_in_view(
+        adapter,
+        elevation,
+        tuple(value / 1000.0 for value in CL_TIP_TEXT_MODEL_MM),
+        label=f"{label} text",
+    )
+    _show_base_view_sketches(adapter, elevation, (spec.CL_TIP_FEATURE,), label=label)
+    annotations = curate_view_dimensions(
+        adapter,
+        elevation,
+        keep={name: text_xy},
+        view_label=label,
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
+    )
+    if len(annotations) != 1:
+        raise RuntimeError(f"{label} must import exactly one dimension")
+    assert_imported_precision(adapter, annotations, {name: spec.CL_TIP_PRECISION})
+    display = _early_bound(
+        set_reference_dimension(adapter, annotations[0], label=label),
+        "IDisplayDimension",
+    )
+
+    def proven(when: str) -> None:
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        value_mm = abs(float(dimension.SystemValue)) * 1000.0
+        brackets = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        places = int(display.GetPrimaryPrecision2())
+        if (
+            abs(value_mm - spec.cl_dowel.TIP_HEIGHT) > 1e-6
+            or brackets != ("(", ")")
+            or int(tolerance.Type) != 0  # swTolNONE: a reference carries no band
+            or places != spec.CL_TIP_PRECISION
+        ):
+            raise RuntimeError(
+                f"{when} {label}: {value_mm!r} mm, brackets {brackets!r}, "
+                f"tolerance type {int(tolerance.Type)}, {places} places"
+            )
+
+    proven("placed")
+    return lambda: proven("settled")
+
+
+def _place_assembled_sheet(adapter: Any) -> Callable[[], None]:
     """Plan over the operator's elevation at the modelled pose, each titled,
-    the plan's tags, the pose caption, and the rail-alignment targets."""
+    the plan's tags, the pose caption, the rail-alignment targets, and the
+    elevation's CL tip reference; returns that reference's settled proof."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     plan = _place_named_view(
         adapter, spec.PLAN_VIEW, PLAN_CENTER, ASSEMBLED_SCALE, label="jig plan"
@@ -985,6 +1058,7 @@ def _place_assembled_sheet(adapter: Any) -> None:
         ALIGNMENT_XY,
         label="rail-alignment targets",
     )
+    return _cl_tip_setting(adapter, elevation)
 
 
 @contextmanager
@@ -1786,9 +1860,9 @@ def _create_package_sheets(adapter: Any) -> None:
 
 def _place_package(
     adapter: Any,
-) -> tuple[dict[str, tuple[float, float]], Callable[[], None]]:
-    """Every sheet; returns the sheets' fitted scales and the check that
-    proves every balloon again after the last rebuild.
+) -> tuple[dict[str, tuple[float, float]], tuple[Callable[[], None], ...]]:
+    """Every sheet; returns the sheets' fitted scales and the checks that
+    prove every balloon and the CL tip reference again after the last rebuild.
 
     Every view is configured, then exploded or collapsed, before the BOM is
     inserted; after it only BOM links and balloons
@@ -1799,7 +1873,7 @@ def _place_package(
         scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(scale[0]), float(scale[1]), False, False):
             raise RuntimeError(f"failed to set jig sheet scale: {sheet_name}")
-    _place_assembled_sheet(adapter)
+    cl_tip_settled = _place_assembled_sheet(adapter)
     reference = _place_reference_view(adapter)
     _place_finished_view(adapter)
     placed = [(cluster, *_place_cluster_view(adapter, cluster)) for cluster in CLUSTERS]
@@ -1834,7 +1908,7 @@ def _place_package(
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )
-    return scales, lambda: assert_balloon_landings(adapter, landings)
+    return scales, (lambda: assert_balloon_landings(adapter, landings), cl_tip_settled)
 
 
 @_telemetry.traced("drawing.ch_rocker_arm_tl_oblique_jig_assembly")
@@ -1878,7 +1952,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts=SHEET_LAYOUTS,
         sheet_scales=sheet_scales,
-        settled_checks=(settled,),
+        settled_checks=settled,
     )
 
 

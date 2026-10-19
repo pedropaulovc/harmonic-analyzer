@@ -22,22 +22,22 @@ X 0 .. 68.9, Y -9.525 .. 9.525, Z 0 .. 12.7.
 
 Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
 
-- Two M4x0.7 metric tapped holes at X 14 and 56: the KP08's two base screws
-  at its 42 bolt spacing, about the screw axis. They are metric because the
-  bought block is (Main's ruling); every shop-chosen thread stays ANSI inch.
+- Two #6-32 UNC tapped holes at X 14 and 56: the KP08's two base screws
+  at its 42 bolt spacing, about the screw axis. The bought block's holes
+  are plain, so the screw is shop-chosen US-customary (fastener policy).
 - Four #8-32 UNC tapped holes at X 7.5, 24, 46 and 62.5: the base-bar
   screws, #8-32 SHCS fitted up through the bar's counterbored clearance holes
   (``leadscrew.BASE_BAR_HOLE_SPEC``) into these taps; two pairs symmetric
   about the screw axis (ruling A′), the outer pair's half-span set by the
   rule-17 window in the leadscrew spec. A counterbore from the top would
-  leave no wall to the M4s, so the screws come from underneath (JigAssembly
+  leave no wall to the #6-32 taps, so the screws come from underneath (JigAssembly
   ruling).
 
 Bands. Both patterns are fixed-fastener fits, so every station and the row
 print at three places (title block ±0.13): each hole then sits in a 0.13
-half-side square, ``POSITION_RADIUS`` 0.184 from nominal. An M4 (major Ø4.0)
-floats 0.25 in the KP08's Ø4.5 holes (``leadscrew.KP08_HOLE_DIA``,
-UNVERIFIED), leaving ``KP08_PATTERN_ALLOWANCE`` 0.066 for the block's own hole
+half-side square, ``POSITION_RADIUS`` 0.184 from nominal. A #6 (major Ø3.505)
+floats 0.498 in the KP08's Ø4.5 holes (``leadscrew.KP08_HOLE_DIA``,
+UNVERIFIED), leaving ``KP08_PATTERN_ALLOWANCE`` 0.314 for the block's own hole
 positions. A #8 (major Ø4.166) floats 0.406 in the bar's Ø4.978 normal-fit
 clearance, leaving ``BAR_PATTERN_ALLOWANCE`` 0.222 for the bar's pattern. At
 two places (±0.51) the corner would be 0.72 out and neither pattern would fit.
@@ -52,8 +52,8 @@ above, so the edge stations keep three places and carry the mates.
 Rule 17 (walls, 2.0 target, 1.5 floor) at worst case: every station and the
 row at ±0.13, the length at its one-place ±0.8, the stock width at its
 two-place ±0.51, each thread at its major diameter: #8 at 7.5 to the inner
-end 5.29; #8 at 7.5 to M4 at 14 2.16; M4 at 14 to #8 at 24 5.66; #8 at 24 to
-#8 at 46 17.57; #8 at 46 to M4 at 56 5.66; M4 at 56 to #8 at 62.5 2.16; #8 at
+end 5.29; #8 at 7.5 to #6 at 14 2.40; #6 at 14 to #8 at 24 5.90; #8 at 24 to
+#8 at 46 17.57; #8 at 46 to #6 at 56 5.90; #6 at 56 to #8 at 62.5 2.40; #8 at
 62.5 to the outer end 3.39 (the length's one place suffices); the row to the
 -Y side 7.31, to the +Y side 6.80. No rule-20 shortfall.
 
@@ -95,15 +95,13 @@ BAR_SCREW = leadscrew.BAR_SCREW  # "#8-32"
 BAR_TAP_X: tuple[float, ...] = tuple(round(x, 9) for x in leadscrew.BRACKET_BAR_HOLES_X)
 BAR_TAP_SPEC = HoleSpec("tapped", BAR_SCREW, end="through_all")
 BAR_TAP_DRILL = blind_cut_dia_mm(BAR_TAP_SPEC)  # 3.454
-# The KP08's M4 base screws: the coarse M4x0.7 metric tap.
-if leadscrew.KP08_SCREW != "M4":
-    raise AssertionError("the KP08 tap size no longer matches its screw")
-KP08_THREAD = "M4x0.7"
+# The KP08's base screws: #6-32 UNC through the block's plain holes.
+KP08_THREAD = leadscrew.KP08_SCREW  # "#6-32"
 KP08_TAP_X: tuple[float, ...] = tuple(
     round(x, 9) for x in leadscrew.BRACKET_KP08_HOLES_X
 )
-KP08_TAP_SPEC = HoleSpec("tapped_metric", KP08_THREAD, end="through_all")
-KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # 3.3
+KP08_TAP_SPEC = HoleSpec("tapped", KP08_THREAD, end="through_all")
+KP08_TAP_DRILL = blind_cut_dia_mm(KP08_TAP_SPEC)  # 2.705
 
 _BAND = printed_band_mm(HOLE_PLACES)  # ±0.13
 _LENGTH_BAND = printed_band_mm(LENGTH_PLACES)  # ±0.8
@@ -114,7 +112,7 @@ _KP08_R = THREAD_MAJOR_MM[KP08_THREAD] / 2.0
 # --- The two fixed-fastener fits ------------------------------------------------
 POSITION_RADIUS = math.hypot(_BAND, _BAND)  # 0.184
 KP08_SCREW_FLOAT = (leadscrew.KP08_HOLE_DIA - THREAD_MAJOR_MM[KP08_THREAD]) / 2.0
-KP08_PATTERN_ALLOWANCE = KP08_SCREW_FLOAT - POSITION_RADIUS  # 0.066
+KP08_PATTERN_ALLOWANCE = KP08_SCREW_FLOAT - POSITION_RADIUS  # 0.314
 BAR_HOLE_DIA = CLEARANCE_MM[
     (leadscrew.BASE_BAR_HOLE_SPEC.size, leadscrew.BASE_BAR_HOLE_SPEC.fit)
 ]  # 4.978
@@ -152,9 +150,9 @@ for _thread in (BAR_SCREW, KP08_THREAD):
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
 # Every tap to its row neighbours and the end taps to the ends, in row order
-# (ruling A′'s six taps interleave #8 and M4: 7.5/14/24/46/56/62.5).
+# (ruling A′'s six taps interleave #8 and #6: 7.5/14/24/46/56/62.5).
 _TAPS = sorted(
-    [(x, "#8", _BAR_R) for x in BAR_TAP_X] + [(x, "M4", _KP08_R) for x in KP08_TAP_X]
+    [(x, "#8", _BAR_R) for x in BAR_TAP_X] + [(x, "#6", _KP08_R) for x in KP08_TAP_X]
 )
 _FIRST, _LAST = _TAPS[0], _TAPS[-1]
 WALLS_MM: dict[str, float] = {
