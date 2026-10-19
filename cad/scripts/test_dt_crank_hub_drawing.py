@@ -17,6 +17,16 @@ import draw_dt_crank_hub as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
+def test_title_block_names_material_families_not_required_grades() -> None:
+    row = _config.parts("dt-crank-hub")
+    families = {"MILD STEEL", "FREE-CUTTING STEEL"}
+    material = str(row["material"]).upper()
+    assert set(material.split(" OR ")) == families
+    assert len(material) <= 36  # the measured one-row material cell
+    specification = str(row["material_specification"]).upper()
+    assert all(family in specification for family in families)
+
+
 def test_outboard_proportions_follow_the_u29_enlargement() -> None:
     unit = geometry.SHAFT_DIA / geometry.PHOTO_SHAFT
     scale = geometry.OUTBOARD_SCALE

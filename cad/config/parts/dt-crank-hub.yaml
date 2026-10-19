@@ -1,9 +1,9 @@
 dt-crank-hub:
   number: MHA-DT-31
-  # Explicit alternatives (drawing-guidelines.md rule 2): a pressed, pinned
-  # hub needs no single grade (machinist review r1 of 114fa71c1).
-  material: AISI 1018 or 12L14 cold-finished steel bar
-  material_specification: AISI 1018 or 12L14 cold-finished steel bar
+  # Rule 2 calls for material families, not an arbitrary list of grades.
+  # This pressed, pinned hub needs no single grade (review r1 of 114fa71c1).
+  material: MILD STEEL OR FREE-CUTTING STEEL
+  material_specification: mild steel or free-cutting steel, cold-finished bar
   finish: bright machined, oiled
   quantity: 1
   tolerance_class: machined_block
