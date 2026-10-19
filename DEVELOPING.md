@@ -851,8 +851,8 @@ no `.done`. Liveness uses native `System.Diagnostics.Process` PID lookup and
 run start is not the launcher; inability to read the process identity remains
 an error (exit 2), never evidence of launcher death. Thus `-Status`, `-Watch`
 and `-List` keep working for a live launcher during WMI query failures when
-native identity is readable. Restart only the tracked `-Watch` command with
-the updated script; the existing launcher and remote leaves need no restart.
+native identity is readable. A process that exits between PID lookup and
+creation-time inspection is treated as absent.
 
 `-Cancel` and a dead launcher's orphan reporting still use `Win32_Process`
 CIM queries for descendant ownership. A transient WMI fault (`Call cancelled`,

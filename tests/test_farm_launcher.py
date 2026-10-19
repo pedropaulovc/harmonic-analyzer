@@ -2316,6 +2316,7 @@ def test_status_ignores_persistent_wmi_failure_for_launcher_liveness(
         ("equal", "False"),
         ("lookup-denied", "ERROR"),
         ("start-time-denied", "ERROR"),
+        ("exited", "False"),
     ],
 )
 def test_native_launcher_identity_is_fail_closed(case: str, expected: str) -> None:
@@ -2351,19 +2352,31 @@ switch ({_ps_quote(case)}) {{
     'lookup-denied' {{
         function Get-LauncherProcess {{ throw [System.ComponentModel.Win32Exception]::new(5) }}
     }}
-    'start-time-denied' {{
+    {{ $_ -in @('start-time-denied', 'exited') }} {{
         function Get-LauncherProcess {{
+            $script:identityCase = {_ps_quote(case)}
             $fake = [pscustomobject]@{{}}
-            $fake | Add-Member ScriptProperty StartTime {{ throw 'identity access denied' }}
+            $fake | Add-Member ScriptMethod get_StartTime {{
+                if ($script:identityCase -eq 'exited') {{
+                    throw [System.InvalidOperationException]::new('process has exited')
+                }}
+                throw [System.ComponentModel.Win32Exception]::new(5)
+            }}
             $fake | Add-Member ScriptMethod Dispose {{ $script:disposed = $true }}
             return $fake
         }}
     }}
 }}
 try {{ [Console]::WriteLine((Test-LauncherAlive -Record $record)) }}
-catch {{ [Console]::WriteLine('ERROR') }}
-if ({_ps_quote(case)} -eq 'start-time-denied' -and -not $script:disposed) {{
-    throw 'process handle was not disposed after identity failure'
+catch {{
+    if ({_ps_quote(case)} -eq 'start-time-denied' -and
+        $_.Exception.GetBaseException() -isnot [System.ComponentModel.Win32Exception]) {{
+        throw 'start-time access failure lost its original diagnostic'
+    }}
+    [Console]::WriteLine('ERROR')
+}}
+if ({_ps_quote(case)} -in @('start-time-denied', 'exited') -and -not $script:disposed) {{
+    throw 'process handle was not disposed after identity read'
 }}
 """
     result = subprocess.run(
@@ -2374,6 +2387,35 @@ if ({_ps_quote(case)} -eq 'start-time-denied' -and -not $script:disposed) {{
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == expected, (result.stdout, result.stderr)
+
+
+@pytest.mark.parametrize("faults", [2, 1000])
+def test_dead_launcher_status_preserves_cim_retry_contract(
+    tmp_path: Path, faults: int
+) -> None:
+    """Read-only orphan inspection still retries and fails closed on WMI faults."""
+    fixture = _launcher_fixture(tmp_path)
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited.wait(timeout=HANG_GUARD_S)
+    _write_run_record(
+        fixture, pid=exited.pid, tag="dead-cim", workflow=None, argv=[], hexdigit="d"
+    )
+    result = _run_launcher(
+        fixture,
+        _tracking_with_cim_faults(fixture, faults, "-Status", "-Tag", "dead-cim"),
+        fixture["environment"],
+    )
+    if faults == 2:
+        assert result.returncode == 0, result.stderr
+        report = json.loads(result.stdout)
+        assert report["state"] == "launcher-died"
+        assert report["launcher"]["alive"] is False
+        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 2, result.stderr
+    else:
+        assert result.returncode == 2, (result.stdout, result.stderr)
+        assert "launcher-died" not in result.stdout
+        assert "Call cancelled" in result.stderr
+        assert result.stderr.count("WBEM_E_CALL_CANCELLED") == 4, result.stderr
 
 
 def test_a_pre_registration_dead_run_breaks_neither_status_nor_cancel(

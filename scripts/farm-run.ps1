@@ -793,9 +793,17 @@ function Test-LauncherAlive {
     try {
         # The launcher started before it wrote started_at; a process with this
         # PID created at or after it is an unrelated process that reused it.
-        # StartTime access failures are unknown identity, never launcher death.
+        # Invoke the getter explicitly: PowerShell can silently turn property
+        # getter exceptions into null. Only an exited-process race is absence;
+        # access failures must propagate with their original diagnostic.
         $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-        return $holder.StartTime.ToUniversalTime() -lt $startedAt
+        try {
+            $created = $holder.get_StartTime()
+        }
+        catch [System.InvalidOperationException] {
+            return $false
+        }
+        return $created.ToUniversalTime() -lt $startedAt
     }
     finally {
         $holder.Dispose()
