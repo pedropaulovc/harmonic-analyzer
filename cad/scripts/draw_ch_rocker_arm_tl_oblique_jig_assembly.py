@@ -986,7 +986,7 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
     """Make the exploded view's configuration the source's active one.
 
     The balloons read the explode's steps from that configuration
-    (``_drawing_balloons._view_explode_offsets``). A non-active one read all
+    (``_drawing_balloons._view_explode_transforms``). A non-active one read all
     of them on the first jig drawing but none on jig-r6, and that reader
     refuses a non-active configuration that reads none; an active one's
     steps are made readable by showing its named explode on the source, the

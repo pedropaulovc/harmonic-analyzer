@@ -36,9 +36,13 @@ import pn_pen_rod_spec as rod
 import vn_pen_wire_geom as wire
 from _check import check
 from _com import _early_bound
+from _explode_transforms import IDENTITY, RigidTransform
 from _session import run_build
 from _drawing_balloons import (
     BalloonAnchor,
+    _shown_instances,
+    _view_component_leaves,
+    _view_explode_transforms,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -757,29 +761,34 @@ def _sketch_view_circle(
 def _add_explode_trail(
     adapter: Any,
     view: Any,
-    trail: tuple[tuple[float, ...], tuple[float, ...]],
+    trail: tuple[tuple[float, ...], ...],
     *,
     label: str,
 ) -> None:
-    """A black phantom line on the exploded ``view`` between two exploded
-    model points (machine mm), read back as styled."""
+    """A styled phantom polyline through exploded machine-mm points.
+
+    A rotating part's trail retains its turn and withdrawal waypoint rather
+    than falsely drawing a diagonal extraction through its receiving part.
+    """
     ends = tuple(
         model_point_in_view(
             adapter, view, tuple(value / 1000.0 for value in point), label=label
         )
         for point in trail
     )
-    segment = _early_bound(
-        _sketch_in_view(adapter, view, ends, "line", label=label), "ISketchSegment"
-    )
-    segment.Style = TRAIL_LINE_STYLE
-    segment.Color = BOUNDARY_COLOR
-    adapter.currentModel.ClearSelection2(True)
-    adapter.currentModel.EditRebuild3()
-    style, color = int(segment.Style), int(segment.Color)
-    if (style, color) != (TRAIL_LINE_STYLE, BOUNDARY_COLOR):
-        raise RuntimeError(f"{label}: trail reads style {style}, colour {color}")
-    _telemetry.info(f"{label}: {ends[0]!r} -> {ends[1]!r}")
+    for index, pair in enumerate(zip(ends, ends[1:]), 1):
+        segment = _early_bound(
+            _sketch_in_view(adapter, view, pair, "line", label=f"{label} {index}"),
+            "ISketchSegment",
+        )
+        segment.Style = TRAIL_LINE_STYLE
+        segment.Color = BOUNDARY_COLOR
+        adapter.currentModel.ClearSelection2(True)
+        adapter.currentModel.EditRebuild3()
+        style, color = int(segment.Style), int(segment.Color)
+        if (style, color) != (TRAIL_LINE_STYLE, BOUNDARY_COLOR):
+            raise RuntimeError(f"{label}: trail reads style {style}, colour {color}")
+        _telemetry.info(f"{label}: {pair[0]!r} -> {pair[1]!r}")
 
 
 def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
@@ -1174,13 +1183,38 @@ def _fit_exploded(adapter: Any, view: Any, *, label: str) -> tuple[float, float]
     raise RuntimeError(f"{label}: no scale fits: " + " | ".join(findings))
 
 
+def _assert_native_explode_plan(adapter: Any, view: Any, *, label: str) -> None:
+    """Tie the referenced configuration's native anchor mapping to the mm trails.
+
+    This reads the drawing's actual configuration (including non-active
+    Default Simplified), not merely the builder's shown presentation.
+    """
+    native = _view_explode_transforms(adapter, view, label=label)
+    leaves = _view_component_leaves(adapter, view, label=label)
+    for stem in spec.BOM_ORDER:
+        expected = IDENTITY
+        for step in explode.EXPLODE_STEPS:
+            if stem in step.stems:
+                expected = expected.then(step.transform)
+        expected_m = RigidTransform(
+            (*expected.values[:9], *(value / 1000.0 for value in expected.values[9:12]))
+        )
+        for leaf in _shown_instances(leaves, stem, BalloonAnchor(), label=label):
+            actual = native.for_component(leaf.path)
+            if any(abs(a - b) > 1e-7 for a, b in zip(actual.values, expected_m.values)):
+                raise RuntimeError(
+                    f"{label}: {leaf.path} native explode differs from the trail plan; "
+                    f"{actual.values!r} != {expected_m.values!r}"
+                )
+
+
 def _make_explode_readable(
     view: Any, configuration: str, *, label: str
 ) -> Callable[[], None]:
     """Leave the exploded view's ``configuration`` readable by the balloon
     walker; return the call that restores the source's active configuration.
 
-    ``_drawing_balloons._view_explode_offsets`` reads a NON-active
+    ``_drawing_balloons._view_explode_transforms`` reads a NON-active
     configuration's steps directly, and makes an ACTIVE one readable by showing
     its explode on the model. Placed from the octant named view, the source's
     non-active Default Simplified read zero steps (farm run
@@ -1259,6 +1293,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     items = _validate_bom(adapter, table)
     restore = _make_explode_readable(exploded, configuration, label=label)
     try:
+        _assert_native_explode_plan(adapter, exploded, label=label)
         landings = add_component_bom_balloons(
             adapter,
             exploded,

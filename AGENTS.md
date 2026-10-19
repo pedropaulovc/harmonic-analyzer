@@ -801,7 +801,7 @@ save leaves the proof and ledger that chose EXPLODE in place. The proof is
 republished from the re-saved model, and the saved renders and `.dof.json` are
 kept. Only a builder whose sole use of that module is
 `author_in_drawing_configurations(adapter, ASM_NAME, lambda configuration:
-<fn>(adapter, configuration))` qualifies (on main: `pd_paper_drive`); an explode
+<fn>(adapter, configuration))` qualifies (including `pd_paper_drive` and `pn_pen`); an explode
 that takes other build state (`dt_drive_train`'s collar-pin roles) or lives inline
 (`fr_frame`, `ms_measuring_stick`) declines to FULL, as does any explode change
 that lands together with a recipe or referenced-part change. Each build of a
@@ -809,6 +809,34 @@ qualifying stem also publishes its archive under an *explode base* key (the cach
 key without the explode closure), so a clean farm leaf restores that base and
 takes the EXPLODE tier. To qualify, move the explode and its data into
 `_<stem>_explode.py` / an explode-only spec.
+
+**Rigid explode points.** `_drawing_balloons._view_explode_transforms` reads
+the referenced configuration's native step matrices, composes them in step
+order with `_explode_transforms`, and maps part-local anchor points through the
+collapsed component placement before the explode. Keys are full, casefolded
+instance paths, resolved on demand without relying on a complete component-tree
+walk; enclosing subassembly moves apply once, in the same chronology as leaf
+moves. A turn is not a translation offset: its pivot contributes translation
+too. Malformed, nonfinite, scaled, sheared or reflected step matrices fail
+closed, as do per-member transforms differing from the common regular step
+(radial explodes are not supported). Paper-drive rim/pivot projections use this
+same mapping without changing their authored presentation. Balloon hit-test redraw retries,
+screenshots and physical-ink/attachment verification remain independent of
+this point mapping and must not be bypassed to accommodate a rotated part.
+
+The pen stirrup first slides clear with its withdrawn thumb screw, then both
+turn about one hidden native vertical reference axis through the detached window.
+`AddExplodeStep2` selects the moved components with mark 1, the common rotation
+axis with mark 32, uses radians, and sets both `RotateAboutOrigin` and autospace
+false for the turn (translation-step settings are unchanged). Its author
+verifies each step matrix, the native step order while shown and collapsed,
+and every component's full native presentation pose, then proves collapsed
+presentation AND operational transforms unchanged. The drawing checks its
+referenced configuration's native transforms against the same rigid plan as
+its mm-space trails, including a slide-clear waypoint before the turn;
+Detail D remains an assembled joint detail. Re-authoring updates/reuses the
+hidden pivot geometry, so explode-only
+changes remain eligible for the EXPLODE tier.
 
 **Focused helper imports.** Import helpers directly from their owning modules:
 `_session` for build sessions, `_paths` for paths/constants, `_com` for COM access,

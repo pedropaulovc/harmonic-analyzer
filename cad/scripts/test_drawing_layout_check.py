@@ -51,6 +51,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
 import _drawing_scan
 import _drawing_view_display
 import _layout_audit
+from _explode_transforms import ExplodeTransforms, RigidTransform
 import _seat_forensics
 import _telemetry
 
@@ -3265,6 +3266,8 @@ class _ExplodedModel:
             )
             for index, (t, names) in enumerate(steps)
         ]
+        for step in self.steps:
+            step.GetSpecificComponentXForm = lambda member, step=step: step.GetComponentXform()
         root = SimpleNamespace(GetChildren=lambda: _model_tree(instances))
         self.configuration = SimpleNamespace(
             Name=referenced,
@@ -3519,13 +3522,137 @@ def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
     assert sheet.hits == [] and sheet.balloons == []
 
 
-def test_a_rotating_explode_step_is_refused_not_summed(monkeypatch):
-    view = _exploded_view(_instances("dt-cone-gear-1"), [((0.0, 0.1, 0.0), ["dt-cone-gear-1"])])
-    configuration = view.ReferencedDocument.GetConfigurationByName("Default")
-    step = configuration.GetExplodeStep(0)
-    step.GetComponentXform = lambda: (0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-    with pytest.raises(RuntimeError, match="not a pure translation"):
-        _balloon(monkeypatch, _AnchorSheet({}), view, {"dt-cone-gear": _ANCHOR})
+@pytest.mark.parametrize("turn_first", [False, True])
+@pytest.mark.parametrize(
+    ("referenced", "shown_only"),
+    [("Default", False), ("Default", True), ("Default Simplified", False)],
+)
+def test_rotating_explode_maps_frozen_anchor_after_placement_in_step_order(
+    monkeypatch, turn_first, referenced, shown_only
+):
+    children = _instances("dt-cone-gear-1")
+    children[0].Component.Transform2.ArrayData = (
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.2, 0, 1, 0, 0, 0
+    )
+    view = _exploded_view(
+        children,
+        [
+            ((0.03, 0.0, 0.0), ["dt-cone-gear-1"]),
+            ((0.0, 0.0, 0.0), ["dt-cone-gear-1"]),
+        ],
+        referenced=referenced,
+        shown_only=shown_only,
+    )
+    configuration = view.ReferencedDocument.configuration
+    # +90 degrees about Z through (100, 200, 0) mm; not through the origin.
+    rotation = (0, 1, 0, -1, 0, 0, 0, 0, 1, 0.3, 0.1, 0, 1, 0, 0, 0)
+    configuration.GetExplodeStep(1).GetComponentXform = lambda: rotation
+    if turn_first:
+        view.ReferencedDocument.steps.reverse()
+    xy = (0.128, 0.201) if turn_first else (0.098, 0.231)
+    sheet = _AnchorSheet({xy: _AnchorEdge("dt-cone-gear-1")})
+    balloons, _projected, _anchors = _balloon(
+        monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR}
+    )
+    assert len(balloons) == 1 and sheet.hits == [xy]
+    assert not view.ReferencedDocument.exploded
+
+
+def test_rotated_component_placement_precedes_the_explode_rotation(monkeypatch):
+    children = _instances("dt-cone-gear-1")
+    # Local +X -> machine +Y, local +Y -> machine -X, then translated.
+    children[0].Component.Transform2.ArrayData = (
+        0, 1, 0, -1, 0, 0, 0, 0, 1, 0.1, 0.2, 0, 1, 0, 0, 0
+    )
+    view = _exploded_view(children, [((0.0, 0.0, 0.0), ["dt-cone-gear-1"])])
+    # +90 around Y at the component's placed origin.
+    native = (0, 0, -1, 0, 1, 0, 1, 0, 0, 0.1, 0, 0.1, 1, 0, 0, 0)
+    view.ReferencedDocument.configuration.GetExplodeStep(0).GetComponentXform = lambda: native
+    sheet = _AnchorSheet({(0.103, 0.201): _AnchorEdge("dt-cone-gear-1")})
+    balloons, projected, _anchors = _balloon(
+        monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR}
+    )
+    assert len(balloons) == 1 and sheet.hits == [(0.103, 0.201)]
+    assert projected[0][0][0] == pytest.approx((0.103, 0.201, 0.002))
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        (1, 0, 0),
+        (1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0),
+        (-1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+        (1, 0.1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0),
+        (1, 0, 0, 0, 1, 0, 0, 0, 1, float("nan"), 0, 0, 1, 0, 0, 0),
+        (1, 0, 0, 0, 1, 0, 0, 0, 1, 0, float("inf"), 0, 1, 0, 0, 0),
+    ],
+    ids=["truncated", "scaled", "reflected", "sheared", "nan", "infinite"],
+)
+def test_invalid_explode_transform_fails_before_hit_testing(monkeypatch, values):
+    view = _exploded_view(_instances("dt-cone-gear-1"), [
+        ((0.0, 0.1, 0.0), ["dt-cone-gear-1"])
+    ])
+    view.ReferencedDocument.configuration.GetExplodeStep(0).GetComponentXform = lambda: values
+    sheet = _AnchorSheet({})
+    with pytest.raises(RuntimeError, match="explode transform|not rigid"):
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    assert sheet.hits == [] and sheet.balloons == []
+
+
+def test_radial_member_transform_is_refused_before_balloon_hit_testing(monkeypatch):
+    view = _exploded_view(_instances("dt-cone-gear-1"), [
+        ((0.0, 0.1, 0.0), ["dt-cone-gear-1"])
+    ])
+    step = view.ReferencedDocument.configuration.GetExplodeStep(0)
+    step.GetSpecificComponentXForm = lambda member: (
+        1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 0, 1, 0, 0, 0
+    )
+    sheet = _AnchorSheet({})
+    with pytest.raises(RuntimeError, match="not a common rigid operation"):
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
+    assert sheet.hits == [] and sheet.balloons == []
+
+
+def test_direct_explode_members_do_not_depend_on_a_complete_configuration_walk(monkeypatch):
+    view = _exploded_view(
+        _instances("dt-cone-gear-1"),
+        [((0.03, 0.0, 0.0), ["dt-cone-gear-1"])],
+        instances=[],
+    )
+    # Direct members are available even when the configuration's tree is not.
+    view.ReferencedDocument.configuration.GetRootComponent3 = lambda resolve: None
+    sheet = _AnchorSheet({(0.031, 0.002): _AnchorEdge("dt-cone-gear-1")})
+    balloons, _projected, _anchors = _balloon(
+        monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR}
+    )
+    assert len(balloons) == 1 and sheet.hits == [(0.031, 0.002)]
+
+
+def test_nested_rigid_steps_preserve_ancestor_order_and_full_instance_paths():
+    translate = RigidTransform.translation((0.03, 0.0, 0.0))
+    rotate = RigidTransform.rotation((0.0, 0.0, 1.0), _math.pi / 2.0, (0.1, 0.2, 0.0))
+    paths = ("sub-1/gear-1", "SUB-1\\nested-1\\gear-1", "sub-2/gear-1")
+    steps = [
+        {"sub-1/nested-1/gear-1": translate},
+        {"sub-1": rotate},
+        {"sub-1/nested-1": translate},
+    ]
+    transforms = ExplodeTransforms(tuple(steps))
+    point = (0.101, 0.202, 0.003)
+    assert transforms.for_component(paths[0]).point(point) == pytest.approx((0.098, 0.201, 0.003))
+    assert transforms.for_component(paths[1]).point(point) == pytest.approx((0.128, 0.231, 0.003))
+    assert transforms.for_component(paths[2]).point(point) == point
+    # Direct composition must agree with replay and must not commute.
+    assert translate.then(rotate).point(point) == pytest.approx((0.098, 0.231, 0.003))
+    assert rotate.then(translate).point(point) == pytest.approx((0.128, 0.201, 0.003))
+
+
+def test_same_step_selecting_an_ancestor_and_child_applies_its_move_only_once():
+    translation = RigidTransform.translation((0.03, 0.0, 0.0))
+    transforms = ExplodeTransforms(
+        ({"sub-1": translation, "sub-1/gear-1": translation},)
+    )
+    assert transforms.for_component("sub-1/gear-1").point((0.0, 0.0, 0.0)) == (0.03, 0.0, 0.0)
 
 
 def _pair_of_subassemblies(**view_kwargs):
@@ -3561,7 +3688,7 @@ _SUBASSEMBLY_EXPLODE = [((0.0, 0.25, 0.0), ["sub-1/dt-cone-gear-1"]), ((0.03, 0.
     ],
     ids=["active", "active-reads-steps-once-shown", "non-active-reads-no-components"],
 )
-def test_explode_offsets_are_keyed_by_full_path_and_include_the_subassembly(
+def test_explode_transforms_are_keyed_by_full_path_and_include_the_subassembly(
     monkeypatch, referenced, shown_only, shown
 ):
     """sub-1's cone-gear-1 moves +250 mm Y; sub-2 moves +30 mm X as a whole.
@@ -3591,7 +3718,7 @@ def test_a_non_active_explode_member_naming_no_instance_of_its_configuration_fai
     with pytest.raises(
         RuntimeError, match=r"moves 'sub-2', which .* names no instance of 'Default Simplified'"
     ):
-        _drawing_balloons._view_explode_offsets(_FakeAdapter(None), view, label="t")
+        _drawing_balloons._view_explode_transforms(_FakeAdapter(None), view, label="t")
 
 
 @pytest.mark.parametrize(
@@ -3606,7 +3733,7 @@ def test_an_exploded_view_whose_configuration_reads_no_steps_is_refused(referenc
     view = _exploded_view(_pair_of_subassemblies(), _SUBASSEMBLY_EXPLODE, referenced=referenced)
     view.ReferencedDocument.configuration.GetNumberOfExplodeSteps = lambda: 0
     with pytest.raises(RuntimeError, match=why):
-        _drawing_balloons._view_explode_offsets(_FakeAdapter(None), view, label="t")
+        _drawing_balloons._view_explode_transforms(_FakeAdapter(None), view, label="t")
 
 
 @pytest.mark.parametrize(

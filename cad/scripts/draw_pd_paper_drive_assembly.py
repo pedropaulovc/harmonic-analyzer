@@ -57,7 +57,7 @@ from _drawing_balloons import (
     _shown_instances,
     _spread_balloons,
     _view_component_leaves,
-    _view_explode_offsets,
+    _view_explode_transforms,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -2110,7 +2110,7 @@ def _balloon_collar_on_its_rear_rim(
     leaf = _shown_instances(
         leaves, COLLAR_STEM, BalloonAnchor(instance=COLLAR_INSTANCE), label=label
     )[0]
-    offsets = _view_explode_offsets(adapter, view, label=label)
+    transforms = _view_explode_transforms(adapter, view, label=label)
     minus_end, plus_end, plus_x, minus_x = model_points_in_view(
         adapter,
         view,
@@ -2121,7 +2121,7 @@ def _balloon_collar_on_its_rear_rim(
                 tuple(value / 1000.0 for value in point)
                 for point in COLLAR_RIM_VIEW_POINTS_MM
             ),
-            offsets,
+            transforms,
             stem=COLLAR_STEM,
             label=label,
         ),
@@ -2323,7 +2323,7 @@ def _pivot_sheet_points(
             adapter,
             leaf,
             tuple(tuple(value / 1000.0 for value in point) for point in points_mm),
-            _view_explode_offsets(adapter, view, label=label),
+            _view_explode_transforms(adapter, view, label=label),
             stem="vn-transgear-pivot-screw",
             label=label,
         ),

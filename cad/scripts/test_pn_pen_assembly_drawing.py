@@ -1,21 +1,26 @@
 """Offline contract for the pen fitter package (MHA-PN-000)."""
 
+import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import build_pn_pen_assembly as builder
+import _pn_pen_explode as native_explode
 import draw_pn_pen_assembly as drawing
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_sheet as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
+import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
 import vn_pen_rod_set_screw_spec as rod_set_screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
+from _explode_transforms import IDENTITY, ExplodeTransforms, RigidTransform
 from _hole_spec import THREAD_MAJOR_MM
 from _named_views import octant_axes, octant_view_name
 from _printed_tolerance import printed_band_mm
@@ -164,9 +169,9 @@ def test_explode_names_match_the_builder() -> None:
 def _moves(stems: tuple[str, ...]) -> list[float]:
     """The summed world move of the explode steps that move exactly ``stems``."""
     moves = [0.0, 0.0, 0.0]
-    for _label, step_stems, key, distance in explode.EXPLODE_STEPS:
-        if step_stems == stems:
-            moves["xyz".index(key)] += distance
+    for step in explode.EXPLODE_STEPS:
+        if isinstance(step, explode.TranslationStep) and step.stems == stems:
+            moves["xyz".index(step.axis)] += step.distance_mm
     return moves
 
 
@@ -222,9 +227,9 @@ def test_stirrup_slides_off_the_paper_end_with_its_thumb_screw_on_its_tap() -> N
     # Off the block, the stirrup moves in one step with its thumb screw, so the
     # screw stays on the rail's tap axis; no step moves the stirrup alone.
     frame_steps = {
-        stems
-        for _label, stems, _key, _d in explode.EXPLODE_STEPS
-        if spec.FRAME in stems and spec.V_BLOCK not in stems
+        step.stems
+        for step in explode.EXPLODE_STEPS
+        if spec.FRAME in step.stems and spec.V_BLOCK not in step.stems
     }
     assert frame_steps == {(spec.FRAME, spec.THUMB_SCREW)}
     off = _along(_moves((spec.FRAME, spec.THUMB_SCREW)), _block_axis(0, -1.0))
@@ -235,9 +240,227 @@ def test_stirrup_slides_off_the_paper_end_with_its_thumb_screw_on_its_tap() -> N
     viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
     assert abs(sum(a * v for a, v in zip(_block_axis(0), viewer))) < 1e-12
     assert _block_axis(0, -1.0)[0] * sz + _block_axis(0, -1.0)[2] * -sx > 0.0
-    face, end = notes.STIRRUP_TRAIL
+    face, end = notes.STIRRUP_TRAIL[-2:]
     trail = [b - a for a, b in zip(face, end)]
     assert _along(trail, _block_axis(0)) == pytest.approx(explode.STIRRUP_CLEAR)
+    # The circular portion ends at the actual slide-clear waypoint, not at
+    # a false diagonal from the rotated face to the receiving block.
+    assert notes.STIRRUP_TRAIL[0] != pytest.approx(face)
+    pivot = explode.STIRRUP_TURN.pivot_mm
+    radii = [math.hypot(p[0] - pivot[0], p[2] - pivot[2]) for p in notes.STIRRUP_TRAIL[:-1]]
+    assert radii == pytest.approx([radii[0]] * len(radii))
+
+
+def test_stirrup_turn_is_after_clearance_and_preserves_the_withdrawn_screw_axis() -> None:
+    turn = explode.STIRRUP_TURN
+    assert explode.EXPLODE_STEPS[-1] is turn
+    assert turn.stems == (spec.FRAME, spec.THUMB_SCREW)
+    assert turn.axis == "y"
+    # Even the full swept horizontal envelope is clear of the block's paper end.
+    radius = math.hypot(frame.FRAME_DEPTH / 2.0, frame.OUTER_WIDTH / 2.0)
+    assert explode.STIRRUP_OFF - carriage.FRAME_X_CENTER_LOCAL > radius
+    assert turn.transform.point(turn.pivot_mm) == pytest.approx(turn.pivot_mm)
+    # The window starts edge-on; its normal after the turn faces the camera.
+    viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
+    origin = turn.transform.point((0.0, 0.0, 0.0))
+    rotated = turn.transform.point(_block_axis(0))
+    normal = tuple(a - b for a, b in zip(rotated, origin))
+    assert abs(sum(a * b for a, b in zip(normal, viewer))) > 0.8
+    tip, mouth = notes.THUMB_SCREW_TRAIL
+    assert tip[0] == pytest.approx(turn.pivot_mm[0])
+    assert tip[2] == pytest.approx(turn.pivot_mm[2])
+    assert (mouth[0], mouth[2]) == pytest.approx((tip[0], tip[2]))
+    assert mouth[1] - tip[1] == pytest.approx(explode.THUMB_SCREW_TRAIL_GAP)
+
+
+def test_pen_sheet_points_replay_the_same_rigid_moves_in_mm() -> None:
+    point = carriage.FRAME_POS
+    transform = IDENTITY
+    for step in explode.EXPLODE_STEPS:
+        if spec.FRAME in step.stems:
+            transform = transform.then(step.transform)
+    assert notes.exploded_point(spec.FRAME, point) == pytest.approx(transform.point(point))
+    # Unmoved hanger points and all other families retain their authored poses.
+    assert notes.exploded_point(spec.HANGER, point) == point
+    for stem in spec.BOM_ORDER:
+        if stem in (spec.FRAME, spec.THUMB_SCREW):
+            continue
+        assert notes.exploded_point(stem, point) == pytest.approx(
+            notes.exploded_point(stem, point, steps=explode.EXPLODE_STEPS[:-1])
+        )
+
+
+@pytest.mark.parametrize("defect", ["", "missing-turn", "wrong-pivot-units", "wrong-order"])
+def test_drawing_checks_native_referenced_explode_against_its_trail_plan(monkeypatch, defect):
+    native_steps = []
+    for step in explode.EXPLODE_STEPS:
+        transform = step.transform
+        native = RigidTransform((
+            *transform.values[:9], *(value / 1000.0 for value in transform.values[9:12])
+        ))
+        if defect == "wrong-pivot-units" and isinstance(step, explode.RotationStep):
+            native = transform
+        native_steps.append({f"{stem}-1": native for stem in step.stems})
+    if defect == "missing-turn":
+        native_steps.pop()
+    elif defect == "wrong-order":
+        native_steps.reverse()
+    monkeypatch.setattr(drawing, "_view_explode_transforms", lambda *a, **k: ExplodeTransforms(tuple(native_steps)))
+    monkeypatch.setattr(drawing, "_view_component_leaves", lambda *a, **k: [])
+    monkeypatch.setattr(
+        drawing, "_shown_instances",
+        lambda leaves, stem, anchor, **kw: [SimpleNamespace(path=f"{stem}-1")],
+    )
+    if defect:
+        with pytest.raises(RuntimeError, match="native explode differs from the trail plan"):
+            drawing._assert_native_explode_plan(None, None, label="pen")
+    else:
+        drawing._assert_native_explode_plan(None, None, label="pen")
+
+
+def _native_pen_presentation(monkeypatch, defect=""):
+    """A small native-state model with independently specified poses/readback."""
+    stems = (spec.FRAME, spec.THUMB_SCREW, spec.V_BLOCK)
+    state = SimpleNamespace(selected=[], axis=None, steps=[], exploded=False, collapses=0)
+    identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    turned = (0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
+
+    def array(rows, position):
+        return (*rows, *position, 1.0, 0.0, 0.0, 0.0)
+
+    baseline = (
+        array(identity, (0.004, 0.0, 0.003)),
+        array(identity, (0.005, 0.02, 0.001)),
+        array(identity, (0.1, 0.0, 0.0)),
+    )
+    components = []
+    for stem, values in zip(stems, baseline):
+        component = SimpleNamespace(
+            Name2=f"{stem}-1", Transform2=SimpleNamespace(ArrayData=values), current=values
+        )
+        component.GetPathName = lambda stem=stem: f"C:/parts/{stem}.SLDPRT"
+        component.GetTotalTransform = lambda presentation, c=component: SimpleNamespace(ArrayData=c.current)
+
+        def select(append, data, show, c=component):
+            if data.Mark == 1:
+                state.selected.append(c)
+            return True
+
+        component.Select4 = select
+        components.append(component)
+
+    def show(exploded, name):
+        state.exploded = exploded
+        if not exploded:
+            state.collapses += 1
+            for component, values in zip(components, baseline):
+                component.current = values
+            if defect == "collapse-operational":
+                components[0].Transform2.ArrayData = array(identity, (1.0, 0.0, 0.0))
+        return True
+
+    native_positions = (
+        ((-0.036, 0.0, 0.003), (-0.035, 0.02, 0.001), (0.1, 0.0, 0.0)),
+        ((-0.036, 0.0, 0.003), (-0.035, 0.0, 0.001), (0.1, 0.0, 0.0)),
+        ((-0.037, 0.0, -0.004), (-0.039, 0.0, -0.005), (0.1, 0.0, 0.0)),
+    )
+    native_operations = (
+        array(identity, (-0.04, 0.0, 0.0)),
+        array(identity, (0.0, -0.02, 0.0)),
+        array(turned, (-0.04, 0.0, -0.04)),
+    )
+
+    def add(distance, direction, reverse, angle, ring, reverse_angle, own_origins, autospace):
+        index = len(state.steps)
+        selected = tuple(state.selected)
+        operation = native_operations[index]
+        step = SimpleNamespace(
+            Name="", ExplodeDistance=distance, RotationAngle=angle,
+            RotateAboutEachComponentOrigin=own_origins or defect == "individual-origins",
+            AutoSpaceComponentsOnDrag=autospace,
+            GetComponents=lambda: selected,
+            GetComponentXform=lambda: operation,
+        )
+        state.steps.append(step)
+        for ordinal, (component, position) in enumerate(zip(components, native_positions[index])):
+            rows = turned if index == 2 and ordinal < 2 else identity
+            component.current = array(rows, position)
+        if index == 2 and (state.axis != ("turn", 32) or reverse_angle or own_origins):
+            components[0].current = baseline[0]
+        if index == 2 and defect == "unmoved-instance":
+            components[2].current = array(identity, (0.101, 0.0, 0.0))
+        if index == 2 and defect == "cumulative-step":
+            step.GetComponentXform = lambda: components[0].current
+        if index == 2 and defect == "opposite-sign":
+            negative = (0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0)
+            step.GetComponentXform = lambda: array(negative, (-0.04, 0.0, 0.04))
+        return step, 0
+
+    def read_step(index):
+        reversed_order = defect == "step-order" or (
+            defect == "collapsed-order" and not state.exploded
+        )
+        if reversed_order and len(state.steps) == 3:
+            return state.steps[-1 - index]
+        return state.steps[index]
+
+    configuration = SimpleNamespace(
+        Name="Default", GetNumberOfExplodeSteps=lambda: len(state.steps),
+        AddExplodeStep2=add, GetExplodeStep=read_step,
+    )
+
+    def select_axis(name, kind, x, y, z, append, mark, callout, option):
+        state.axis = (name, mark)
+        return True
+
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=configuration),
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace(Mark=0)),
+        Extension=SimpleNamespace(SelectByID2=select_axis),
+        GetExplodedViewCount2=lambda name: 0,
+        GetComponents=lambda top: components, EditRebuild3=lambda: True,
+        ClearSelection2=lambda all: state.selected.clear(), ShowExploded2=show,
+        GetExplodedViewNames2=lambda name: ("PN_EXPLODED",),
+        GetExplodedViewConfigurationName=lambda name: "Default",
+    )
+    monkeypatch.setattr(native_explode, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(native_explode, "_global_axes", lambda *args: {"x": ("x", True), "y": ("y", True)})
+    monkeypatch.setattr(native_explode, "_ensure_turn_axis", lambda *args: ("turn", True))
+    monkeypatch.setattr(native_explode, "_create_named_view", lambda *args: None)
+    monkeypatch.setattr(native_explode, "QUANTITIES", {stem: 1 for stem in stems})
+    monkeypatch.setattr(native_explode, "EXPLODE_STEPS", (
+        explode.TranslationStep("withdraw", stems[:2], "x", -40.0),
+        explode.TranslationStep("screw clear", (spec.THUMB_SCREW,), "y", -20.0),
+        explode.RotationStep("turn", stems[:2], "y", math.pi / 2.0, (-40.0, 0.0, 0.0)),
+    ))
+    return SimpleNamespace(currentModel=model), state, components, baseline
+
+
+def test_native_pen_authoring_accepts_rigid_readback_and_restores_operational_pose(monkeypatch):
+    adapter, state, components, baseline = _native_pen_presentation(monkeypatch)
+    native_explode.create_pn_explode(adapter, "Default")
+    assert len(state.steps) == 3 and state.collapses == 1 and not state.exploded
+    assert [component.current for component in components] == list(baseline)
+    assert [component.Transform2.ArrayData for component in components] == list(baseline)
+
+
+@pytest.mark.parametrize("defect", [
+    "individual-origins", "unmoved-instance", "cumulative-step",
+    "collapse-operational", "step-order", "collapsed-order",
+])
+def test_native_pen_authoring_refuses_bad_readback_and_still_collapses(monkeypatch, defect):
+    adapter, state, components, baseline = _native_pen_presentation(monkeypatch, defect)
+    with pytest.raises(RuntimeError, match="readback mismatch|native rigid pose|world-space|operational transform|step order"):
+        native_explode.create_pn_explode(adapter, "Default")
+    assert state.collapses == 1 and not state.exploded
+    assert [component.current for component in components] == list(baseline)
+
+
+def test_native_opposite_rotation_is_diagnosed_without_another_native_run(monkeypatch):
+    adapter, state, _components, _baseline = _native_pen_presentation(monkeypatch, "opposite-sign")
+    with pytest.raises(RuntimeError, match="opposite_rotation_matches=True"):
+        native_explode.create_pn_explode(adapter, "Default")
+    assert state.collapses == 1 and not state.exploded
 
 
 def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
@@ -265,6 +488,7 @@ def test_explode_module_qualifies_for_the_explode_tier() -> None:
         "_pn_pen_explode.py",
         "pn_pen_explode_spec.py",
         "_assembly_patterns.py",
+        "_explode_transforms.py",
     }
 
 

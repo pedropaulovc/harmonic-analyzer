@@ -24,6 +24,7 @@ import vn_pen_hanger_nut_spec as hanger_nut
 import vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
+from _explode_transforms import RigidTransform
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
     BOM_ORDER,
@@ -55,7 +56,7 @@ from pn_pen_assembly_spec import (
     YAW_DIMENSION,
     YAW_TOLERANCE_DEG,
 )
-from pn_pen_explode_spec import EXPLODE_STEPS
+from pn_pen_explode_spec import EXPLODE_STEPS, STIRRUP_TURN, ExplodeStep
 
 DRAWING_NUMBER = "MHA-PN-000"
 # A top-level BOM numbers its rows in the builder's insertion order
@@ -73,14 +74,17 @@ TOLERANCE_PRECISION = {NIB_DIMENSION: 1, YAW_DIMENSION: 0}
 DIMENSION_NOMINALS = {STUD_DIMENSION: STUD_HEIGHT, NIB_DIMENSION: NIB_PROTRUSION}
 
 
-def exploded_point(stem: str, point: tuple[float, float, float]) -> tuple[float, ...]:
-    """``point`` (machine mm, assembled) carried by every
-    ``pn_pen_explode_spec.EXPLODE_STEPS`` step that moves ``stem``."""
-    moved = list(point)
-    for _label, stems, key, distance in EXPLODE_STEPS:
-        if stem in stems:
-            moved["xyz".index(key)] += distance
-    return tuple(moved)
+def exploded_point(
+    stem: str,
+    point: tuple[float, float, float],
+    *,
+    steps: tuple[ExplodeStep, ...] = EXPLODE_STEPS,
+) -> tuple[float, float, float]:
+    """An assembled machine-mm point carried by the ordered rigid presentation."""
+    for step in steps:
+        if stem in step.stems:
+            point = step.transform.point(point)
+    return point
 
 
 def _inch(mm: float) -> str:
@@ -154,16 +158,26 @@ THUMB_SCREW_TRAIL = (
         ),
     ),
 )
-# The stirrup: from its exploded rod-side face, at the block's mid-height on
-# the section's centre line, back along the slide-on axis to the block's
-# paper-end face, which it seats flush with (step 3).
+# Preserve the real slide-off waypoint: the final turn is a sampled circular
+# trail back to the withdrawn face, followed by the straight extraction line.
+# Joining the final rotated face directly to the block would imply a diagonal
+# slide through the neck. All turn samples use the SAME pivot as the native step.
 _STIRRUP_TRAIL_Y = v_block.BLOCK_HEIGHT / 2.0
+_STIRRUP_WITHDRAWN = exploded_point(
+    FRAME,
+    carriage.block_to_machine(
+        (carriage.FRAME_ORIGIN_LOCAL[0], _STIRRUP_TRAIL_Y, v_block.DEPTH_MID_Z)
+    ),
+    steps=EXPLODE_STEPS[:-1],
+)
 STIRRUP_TRAIL = (
-    exploded_point(
-        FRAME,
-        carriage.block_to_machine(
-            (carriage.FRAME_ORIGIN_LOCAL[0], _STIRRUP_TRAIL_Y, v_block.DEPTH_MID_Z)
-        ),
+    *(
+        RigidTransform.rotation(
+            (0.0, 1.0, 0.0),
+            STIRRUP_TURN.angle_rad * fraction / 6.0,
+            STIRRUP_TURN.pivot_mm,
+        ).point(_STIRRUP_WITHDRAWN)
+        for fraction in range(6, -1, -1)
     ),
     exploded_point(
         V_BLOCK,

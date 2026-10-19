@@ -28,6 +28,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_scan import _HIT_ZOOM_HALF, _span_scan_attrs, _zoomed_on
 from _drawing_selection import _activate_and_select_view, _select_view_entity
 import _seat_forensics
+from _explode_transforms import ExplodeTransforms, RigidTransform
 import _telemetry
 
 
@@ -694,28 +695,16 @@ def _shown_instances(
     return shown
 
 
-def _path_prefixes(path: str) -> list[str]:
-    """``sub-1/dt-cone-gear-2`` -> ``["sub-1", "sub-1/dt-cone-gear-2"]``."""
-    parts = path.split("/")
-    return ["/".join(parts[: count + 1]) for count in range(len(parts))]
-
-
-@_telemetry.traced("drawing.explode_offsets", label_param="label")
-def _view_explode_offsets(
+@_telemetry.traced("drawing.explode_transforms", label_param="label")
+def _view_explode_transforms(
     adapter: Any, view: Any, *, label: str
-) -> dict[str, tuple[float, float, float]]:
-    """Each exploded component's explode translation, in model metres, keyed
-    by its casefolded full instance path (:func:`_component_path`).
+) -> ExplodeTransforms:
+    """Rigid operations in model metres, resolved by each full instance path.
 
-    A drawing view shows its model exploded without exploding the model, so
-    every component transform (``Transform2``, ``GetSpecificTransform``,
-    ``GetTotalTransform``) still reads the collapsed position -- measured on
-    the farm: points projected through them landed on the neighbour each
-    part had been exploded away from. The explode itself lives in the
-    referenced configuration's steps; both explode builders
-    (``build_frame_assembly``, ``_drive_train_explode``) author pure
-    translations, and a step that rotates is refused rather than summed wrong.
-
+    A drawing shows its model exploded while component transforms still read
+    collapsed. Replay native step transforms chronologically AFTER component
+    placement, including a step moving an enclosing subassembly. Rotation about
+    an offset pivot includes translation and cannot be reduced to an offset.
     Each moved component is read as a component (``IExplodeStep::GetComponent``)
     and keyed by the same ``Name2`` the view's leaves carry: the step's own
     name string is an undocumented format, and cutting it to its last segment
@@ -736,7 +725,7 @@ def _view_explode_offsets(
     """
     bound = _early_bound(view, "IView")
     if not bool(bound.IsExploded()):
-        return {}
+        return ExplodeTransforms()
     model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
     configuration_name = str(bound.ReferencedConfiguration)
     configuration = model.GetConfigurationByName(configuration_name)
@@ -758,20 +747,25 @@ def _view_explode_offsets(
         raise RuntimeError(
             f"{label}: exploded view's configuration {configuration_name!r} reads no explode steps"
         )
-    offsets: dict[str, list[float]] = {}
+    steps: list[dict[str, RigidTransform]] = []
     instances: dict[str, str] | None = None
     by_name = 0
     for index in range(count):
         step = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
-        xform = tuple(float(value) for value in (step.GetComponentXform() or ()))
-        if len(xform) < 13 or any(
-            abs(xform[k] - (1.0 if k in (0, 4, 8) else 0.0)) > 1e-9 for k in range(9)
-        ):
-            raise RuntimeError(
-                f"{label}: explode step {step.Name!r} is not a pure translation: "
-                f"{xform!r}"
-            )
+        transform = RigidTransform.from_sw(
+            step.GetComponentXform() or (), label=f"{label}: explode step {step.Name!r}"
+        )
+        members: dict[str, RigidTransform] = {}
         for member in range(int(step.GetNumOfComponents())):
+            specific = RigidTransform.from_sw(
+                step.GetSpecificComponentXForm(member) or (),
+                label=f"{label}: explode step {step.Name!r} member {member}",
+            )
+            if any(abs(a - b) > 1e-9 for a, b in zip(specific.values, transform.values)):
+                raise RuntimeError(
+                    f"{label}: explode step {step.Name!r} is not a common rigid "
+                    f"operation (radial/per-member moves are unsupported)"
+                )
             path = _component_path(adapter, step.GetComponent(member))
             if not path:
                 if instances is None:
@@ -784,12 +778,13 @@ def _view_explode_offsets(
                         f"as no component and names no instance of {configuration_name!r}"
                     )
                 by_name += 1
-            row = offsets.setdefault(path.casefold(), [0.0, 0.0, 0.0])
-            for axis in range(3):
-                row[axis] += xform[9 + axis]
-    _span_scan_attrs(steps=count, moved=len(offsets), by_name=by_name)
+            members[path.casefold()] = transform
+        steps.append(members)
+    _span_scan_attrs(
+        steps=count, moved=len({path for step in steps for path in step}), by_name=by_name
+    )
     _telemetry.annotate(explode_read=read)
-    return {name: (row[0], row[1], row[2]) for name, row in offsets.items()}
+    return ExplodeTransforms(tuple(steps))
 
 
 def _shown_explode_step_count(
@@ -836,22 +831,12 @@ def _configuration_instance_paths(adapter: Any, configuration: Any) -> dict[str,
     return paths
 
 
-def _explode_offset(
-    offsets: Mapping[str, tuple[float, float, float]], path: str
-) -> tuple[float, float, float]:
-    """``path``'s own explode plus every enclosing sub-assembly's."""
-    total = [0.0, 0.0, 0.0]
-    for prefix in _path_prefixes(path):
-        for axis, value in enumerate(offsets.get(prefix.casefold(), (0.0, 0.0, 0.0))):
-            total[axis] += value
-    return (total[0], total[1], total[2])
-
 
 def _anchor_model_points(
     adapter: Any,
     leaf: _ComponentLeaf,
     points_m: Sequence[Sequence[float]],
-    offsets: Mapping[str, tuple[float, float, float]],
+    transforms: ExplodeTransforms,
     *,
     stem: str,
     label: str,
@@ -871,12 +856,14 @@ def _anchor_model_points(
     if len(values) < 13:
         raise RuntimeError(f"{label}: {stem} instance {leaf.path} has no transform")
     scale = values[12]
-    dx, dy, dz = _explode_offset(offsets, leaf.path)
+    explode = transforms.for_component(leaf.path)
     return [
-        (
-            scale * (x * values[0] + y * values[3] + z * values[6]) + values[9] + dx,
-            scale * (x * values[1] + y * values[4] + z * values[7]) + values[10] + dy,
-            scale * (x * values[2] + y * values[5] + z * values[8]) + values[11] + dz,
+        explode.point(
+            (
+                scale * (x * values[0] + y * values[3] + z * values[6]) + values[9],
+                scale * (x * values[1] + y * values[4] + z * values[7]) + values[10],
+                scale * (x * values[2] + y * values[5] + z * values[8]) + values[11],
+            )
         )
         for x, y, z in points_m
     ]
@@ -1127,7 +1114,7 @@ def _scan_points(
     view: Any,
     leaf: _ComponentLeaf,
     points: Sequence[tuple[float, float, float]],
-    offsets: Mapping[str, tuple[float, float, float]],
+    transforms: ExplodeTransforms,
     tried: list[tuple[float, float]],
     *,
     stem: str,
@@ -1143,7 +1130,7 @@ def _scan_points(
     projected = model_points_in_view(
         adapter,
         view,
-        _anchor_model_points(adapter, leaf, points, offsets, stem=stem, label=label),
+        _anchor_model_points(adapter, leaf, points, transforms, stem=stem, label=label),
         label=f"{label} {stem} {what}",
         names=[f"{stem} {what} {index}" for index in range(len(points))],
     )
@@ -1171,7 +1158,7 @@ def _select_balloon_anchor(
     stem: str,
     anchor: BalloonAnchor,
     candidates: Sequence[_ComponentLeaf],
-    offsets: Mapping[str, tuple[float, float, float]],
+    transforms: ExplodeTransforms,
     sheet_xy: tuple[float, float] | None,
     label: str,
 ) -> _AnchorChoice:
@@ -1303,7 +1290,7 @@ def _select_balloon_anchor(
             view,
             first,
             walk_points,
-            offsets,
+            transforms,
             tried,
             stem=stem,
             what="walk",
@@ -1325,7 +1312,7 @@ def _select_balloon_anchor(
                 view,
                 first,
                 [point for point, _edge in edge_points],
-                offsets,
+                transforms,
                 tried,
                 stem=stem,
                 what="edge",
@@ -1572,7 +1559,7 @@ def add_component_bom_balloons(
         stem: _shown_instances(leaves, stem, anchors[stem], label=label)
         for stem in stems
     }
-    offsets = _view_explode_offsets(adapter, view, label=label)
+    transforms = _view_explode_transforms(adapter, view, label=label)
     frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
     projected = (
         model_points_in_view(
@@ -1583,7 +1570,7 @@ def add_component_bom_balloons(
                     adapter,
                     candidates[stem][0],
                     [tuple(value / 1000.0 for value in anchors[stem].point_mm or ())],
-                    offsets,
+                    transforms,
                     stem=stem,
                     label=label,
                 )[0]
@@ -1611,7 +1598,7 @@ def add_component_bom_balloons(
             stem=stem,
             anchor=anchors[stem],
             candidates=candidates[stem],
-            offsets=offsets,
+            transforms=transforms,
             sheet_xy=sheet_points.get(stem),
             label=label,
         )

@@ -15,16 +15,21 @@ U guides' open front ends, the stud and its jam nut up off the rod top, the
 carriage down off the rod's pivot, the rod set screw back out along its tap,
 the marker back out along its own axis, the thumb screw down out of the
 stirrup's bottom-rail tap, and the stirrup, its thumb screw on that tap's
-axis, off the block's paper end along the neck it slides on. Every native
-step runs along one global axis; a move along the yawed block's horizontal
-axes is a pair of global X/Z steps (:func:`_along`).
+axis, off the block's paper end along the neck it slides on. Only after
+withdrawal do the stirrup and screw turn together about the detached window's
+vertical centreline, revealing its opening without implying an in-place hinge.
+Translations along the yawed block's axes use paired global X/Z steps.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 
 import pn_pen_carriage_geom as carriage
+import pn_pen_frame_spec as frame
+import pn_pen_v_block_spec as v_block
+from _explode_transforms import RigidTransform
 from _simplified_names import simplified_name
 from pn_pen_assembly_spec import (
     BOM_ORDER,
@@ -46,8 +51,37 @@ from pn_pen_assembly_spec import (
 EXPLODED_VIEW_NAME = "PN_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 
-# (label, families, global axis, signed distance mm).
-ExplodeStep = tuple[str, tuple[str, ...], str, float]
+
+@dataclass(frozen=True)
+class TranslationStep:
+    label: str
+    stems: tuple[str, ...]
+    axis: str
+    distance_mm: float
+
+    @property
+    def transform(self) -> RigidTransform:
+        return RigidTransform.translation(
+            tuple(self.distance_mm if key == self.axis else 0.0 for key in "xyz")
+        )
+
+
+@dataclass(frozen=True)
+class RotationStep:
+    label: str
+    stems: tuple[str, ...]
+    axis: str
+    angle_rad: float
+    pivot_mm: tuple[float, float, float]
+
+    @property
+    def transform(self) -> RigidTransform:
+        return RigidTransform.rotation(
+            tuple(float(key == self.axis) for key in "xyz"), self.angle_rad, self.pivot_mm
+        )
+
+
+ExplodeStep = TranslationStep | RotationStep
 
 # The block's axes in machine coordinates (pn_pen_carriage_geom's rows): X
 # along the block from its paper end, Y up, Z out of its back face; -Z is the
@@ -70,7 +104,7 @@ def _along(
     stems: tuple[str, ...],
     direction: tuple[float, ...],
     distance: float,
-) -> tuple[ExplodeStep, ...]:
+) -> tuple[TranslationStep, ...]:
     """``distance`` mm along the unit ``direction``, one native step per global
     axis it has a component on (suffixed with that axis when it has two)."""
     if not math.isclose(math.hypot(*direction), 1.0, abs_tol=1e-12):
@@ -81,8 +115,8 @@ def _along(
         if abs(component) > 1e-12
     ]
     if len(parts) == 1:
-        return ((label, stems, parts[0][0], parts[0][1]),)
-    return tuple((f"{label} {key}", stems, key, value) for key, value in parts)
+        return (TranslationStep(label, stems, parts[0][0], parts[0][1]),)
+    return tuple(TranslationStep(f"{label} {key}", stems, key, value) for key, value in parts)
 
 
 def _negated(direction: tuple[float, ...]) -> tuple[float, ...]:
@@ -110,34 +144,52 @@ THUMB_SCREW_DOWN = (
 STIRRUP_CLEAR = 32.0
 STIRRUP_OFF = carriage.FRAME_ORIGIN_LOCAL[0] + STIRRUP_CLEAR
 
-EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
-    ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
-    ("hanger nut off", (HANGER_NUT,), "z", -14.0),
-    ("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
+_WITHDRAWAL_STEPS: tuple[TranslationStep, ...] = (
+    TranslationStep("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
+    TranslationStep("hanger nut off", (HANGER_NUT,), "z", -14.0),
+    TranslationStep("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
     # Up off the eye, then an equal +X/-Z pair: straight to the reader's left
-    # in the REAR-TOP-LEFT view, clear of the rod and stud. Left in place, its
-    # run read through hanger nut 13 (machinist review r3); lifted 60 instead,
-    # its balloons crossed the sheet's top border and its leader lay on the
-    # stud's ray and crossed balloon 8's.
-    ("wire off the stud eye", (WIRE,), "y", 26.0),
-    ("wire aside x", (WIRE,), "x", WIRE_ASIDE),
-    ("wire aside z", (WIRE,), "z", -WIRE_ASIDE),
-    ("rod out of the guides", (ROD, STUD, STUD_NUT, *_CARRIAGE), "z", -48.0),
-    ("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
-    ("jam nut off the stud", (STUD,), "y", 10.0),
-    ("carriage off the pivot", _CARRIAGE, "y", -24.0),
+    # in the REAR-TOP-LEFT view, clear of the rod and stud.
+    # Left in place, its run read through hanger nut 13 (machinist review r3);
+    # lifted 60 instead, its balloons crossed the sheet's top border and its
+    # leader lay on the stud's ray and crossed balloon 8's.
+    TranslationStep("wire off the stud eye", (WIRE,), "y", 26.0),
+    TranslationStep("wire aside x", (WIRE,), "x", WIRE_ASIDE),
+    TranslationStep("wire aside z", (WIRE,), "z", -WIRE_ASIDE),
+    TranslationStep("rod out of the guides", (ROD, STUD, STUD_NUT, *_CARRIAGE), "z", -48.0),
+    TranslationStep("stud out of the rod", (STUD, STUD_NUT), "y", 12.0),
+    TranslationStep("jam nut off the stud", (STUD,), "y", 10.0),
+    TranslationStep("carriage off the pivot", _CARRIAGE, "y", -24.0),
     *_along("rod set screw out", (ROD_SET_SCREW,), _negated(BLOCK_Z), ROD_SET_SCREW_OUT),
     *_along("marker back", (MARKER,), BLOCK_X, MARKER_BACK),
     *_along("thumb screw down", (THUMB_SCREW,), _negated(BLOCK_Y), THUMB_SCREW_DOWN),
-    # The thumb screw rides on in the stirrup's tap, as it does off the bench.
+    # The withdrawn thumb screw stays on the stirrup's tap axis during slide-off.
     *_along("stirrup off", (FRAME, THUMB_SCREW), _negated(BLOCK_X), STIRRUP_OFF),
 )
 
+# The axis passes through the detached window, not through the world origin
+# or each part's own origin. The +90-degree Y turn makes the formerly edge-on
+# window face the exploded octant while keeping the screw vertical/on its tap.
+_pivot = carriage.block_to_machine(
+    (
+        carriage.FRAME_X_CENTER_LOCAL,
+        carriage.FRAME_ORIGIN_LOCAL[1] + frame.OUTER_HEIGHT / 2.0,
+        v_block.DEPTH_MID_Z,
+    )
+)
+for _step in _WITHDRAWAL_STEPS:
+    if FRAME in _step.stems:
+        _pivot = _step.transform.point(_pivot)
+STIRRUP_TURN = RotationStep(
+    "stirrup window turns", (FRAME, THUMB_SCREW), "y", math.pi / 2.0, _pivot
+)
+EXPLODE_STEPS: tuple[ExplodeStep, ...] = (*_WITHDRAWAL_STEPS, STIRRUP_TURN)
+
 
 # --- contract asserts ---------------------------------------------------------
-assert {stem for _label, stems, _key, _d in EXPLODE_STEPS for stem in stems} == set(
+assert {stem for step in EXPLODE_STEPS for stem in step.stems} == set(
     BOM_ORDER
 ) - {HANGER}, "every family but the ground hanger moves in the explode"
-assert all(key in "xyz" and distance != 0.0 for _l, _s, key, distance in EXPLODE_STEPS)
-assert len({label for label, _s, _k, _d in EXPLODE_STEPS}) == len(EXPLODE_STEPS)
+assert all(step.axis in "xyz" and step.distance_mm != 0.0 for step in _WITHDRAWAL_STEPS)
+assert len({step.label for step in EXPLODE_STEPS}) == len(EXPLODE_STEPS)
 assert THUMB_SCREW_DOWN > 0.0 and STIRRUP_CLEAR > 0.0
