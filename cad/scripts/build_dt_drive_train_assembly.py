@@ -496,6 +496,7 @@ from _fit_deviations import deviations  # noqa: E402
 import _chain  # noqa: E402
 import dt_vn_crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
+import _sprocket_seat_geometry as seat_geometry  # noqa: E402
 from dt_crankshaft_spec import (  # noqa: E402
     COLLAR_DIA,
     COLLAR_REAR,
@@ -506,7 +507,6 @@ from dt_crankshaft_spec import (  # noqa: E402
     SEAT_COLLAR_BAND,
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
     SPIGOT_DIA,
-    SPIGOT_DIA_BAND,
     SPIGOT_END,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_TOL,
@@ -543,13 +543,13 @@ if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
 # spans BAND_FRONT_Z..SEAT_FACE_Z, the rear face on the crankshaft's integral
 # collar, one chain plane with the selected knob sprocket (ch. 23 p.56).
 # The sprocket itself lives in paper-drive; this module owns its seat.
-if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - REMOVABLE.SEAT_FACE_Z) > 1e-9:
+if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - seat_geometry.SEAT_FACE_Z) > 1e-9:
     raise AssertionError("crankshaft SeatCollar datum off the removable's SEAT_FACE_Z")
 # The hub rear face is what stops the removable walking forward once the
 # taper pin is in: the contract's 0.7 axial air, derived from both parts.
 # The seat station's functional band moves the wheel against the hub; at its
 # most-forward limit the air must still be open.
-CRANK_HUB_SPROCKET_AIR = REMOVABLE.BAND_FRONT_Z - CRANK_HUB_REAR_Z
+CRANK_HUB_SPROCKET_AIR = seat_geometry.BAND_FRONT_Z - CRANK_HUB_REAR_Z
 CRANK_HUB_SPROCKET_AIR_WORST = CRANK_HUB_SPROCKET_AIR + min(SEAT_COLLAR_BAND)
 if abs(CRANK_HUB_SPROCKET_AIR - 0.7) > 1e-9:
     raise AssertionError(
@@ -605,7 +605,7 @@ def chain_radial_air(
     return air
 
 
-_SPIGOT_DIA_MAX = SPIGOT_DIA + max(SPIGOT_DIA_BAND)
+_SPIGOT_DIA_MAX = SPIGOT_DIA + max(seat_geometry.SPIGOT_DIA_BAND)
 _RELIEF_OFFSET = WHEEL_SEAT_FLOAT + HUB_SHAFT_FLOAT
 CHAIN_SPIGOT_RADIAL_AIR_CAD = chain_radial_air(
     "CAD link / seat spigot", _chain.PLATE_HEIGHT, _SPIGOT_DIA_MAX, WHEEL_SEAT_FLOAT
@@ -629,15 +629,15 @@ CHAIN_RELIEF_RADIAL_AIR_ANSI = chain_radial_air(
 # (CRANK_FACE_Z) before the match-ream, so the hub rear face is CRANK_FACE_Z
 # + the printed hub length; the arm's stock thickness is out of the stack.
 _HUB_REAR_Z_WORST = CRANK_HUB_REAR_Z + HUB_LENGTH_TOL
-_SEAT_FACE_Z_WORST = REMOVABLE.SEAT_FACE_Z + min(SEAT_COLLAR_BAND)
-_CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST
+_SEAT_FACE_Z_WORST = seat_geometry.SEAT_FACE_Z + min(SEAT_COLLAR_BAND)
+_CHAIN_REACH_REAR_WORST = seat_geometry.CHAIN_REACH_REAR_WORST
 # A: chain floated frontmost against the relief shoulder, in both wheel
 # poses (dt_crank_hub_geometry): seated (seat forward, hub long, relief short)
 # and floated forward onto the hub rear face (thinnest wheel, relief short).
 # Local stations from the dome root, where the hub's front face is set.
 _STACK_A = chain_shoulder_axial_air(
     relief_length=HUB_RELIEF_LENGTH,
-    seat_face=REMOVABLE.SEAT_FACE_Z - CRANK_HUB_Z0,
+    seat_face=seat_geometry.SEAT_FACE_Z - CRANK_HUB_Z0,
     seat_face_band=SEAT_COLLAR_BAND,
 )
 CHAIN_BARREL_AXIAL_AIR = _STACK_A["seated"]  # 1.0635
@@ -645,18 +645,18 @@ CHAIN_BARREL_AXIAL_AIR_WORST = _STACK_A["seated_worst"]  # 0.4135
 CHAIN_BARREL_AXIAL_AIR_FLOATED = _STACK_A["floated"]  # 0.3635
 CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST = _STACK_A["floated_worst"]  # 0.2135
 _STACK_A_MODELLED = (
-    REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT - CRANK_HUB_BARREL_REAR_Z
+    seat_geometry.SEAT_FACE_Z - seat_geometry.CHAIN_REACH_FRONT - CRANK_HUB_BARREL_REAR_Z
 )
 if abs(CHAIN_BARREL_AXIAL_AIR - _STACK_A_MODELLED) > 1e-9:
     raise AssertionError("stack A left the modelled hub shoulder station")
 # B: thickest wheel, seat forward, hub long.
 CRANK_HUB_SPROCKET_AIR_PRINT_WORST = (
-    _SEAT_FACE_Z_WORST - (REMOVABLE.PLATE + max(REMOVABLE.PLATE_BAND))
+    _SEAT_FACE_Z_WORST - (seat_geometry.PLATE + max(seat_geometry.PLATE_BAND))
 ) - _HUB_REAR_Z_WORST  # 0.10
 # C: chain floated rearmost on the thinnest wheel, spigot short; the chain
 # and the body front face both ride the seat, so the seat band cancels.
-CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - REMOVABLE.chain_reach_rear(
-    REMOVABLE.PLATE
+CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - seat_geometry.chain_reach_rear(
+    seat_geometry.PLATE
 )  # 2.3135 on nominal spigot and plate
 CHAIN_SPIGOT_AXIAL_AIR_WORST = (
     SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
@@ -677,11 +677,11 @@ for _what, _air in (
 # bears on the hole floor; its rounded lead end points machine front.
 # MHA-DT-VN-67 is crank-only; the knob carries its own MHA-PD-VN-54 pins.
 CRANK_DRIVE_PIN_Z0 = CRANKSHAFT_Z0 + DRIVE_PIN_FLOOR  # pressed end face
-if abs(DRIVE_PIN_DEPTH - (SEAT_PIN.LENGTH - REMOVABLE.DRIVE_PIN_PROUD)) > 1e-9:
+if abs(DRIVE_PIN_DEPTH - (SEAT_PIN.LENGTH - seat_geometry.DRIVE_PIN_PROUD)) > 1e-9:
     raise AssertionError("crank drive-pin depth left the pin length less its proud")
-if abs(CRANK_DRIVE_PIN_Z0 - SEAT_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
+if abs(CRANK_DRIVE_PIN_Z0 - SEAT_PIN.LENGTH - seat_geometry.DRIVE_PIN_TIP_Z) > 1e-9:
     raise AssertionError("crank drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
-if abs(SEAT_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
+if abs(SEAT_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("crank-seat-drive-pin is not the removable's drive pin")
 from build_dt_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
@@ -3646,12 +3646,12 @@ _SWING_RIG_BANDS = (
 CRANK_SPROCKET_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.CRANK_TEETH)
 CRANK_COLUMN_BANDS = (
     (
-        REMOVABLE.BAND_FRONT_Z,
-        REMOVABLE.SEAT_FACE_Z,
+        seat_geometry.BAND_FRONT_Z,
+        seat_geometry.SEAT_FACE_Z,
         CRANK_SPROCKET_TIP_DIA,
         "crank chain wheel",
     ),
-    (REMOVABLE.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
+    (seat_geometry.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
     (CRANK_SPIGOT_FRONT_Z, CRANK_COLLAR_Z1, COLLAR_DIA, "crank collar body"),
 )
 _CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
@@ -3699,7 +3699,7 @@ HANDLE_SCREW_TIP_Z = CRANK_ARM_Z0 + HANDLE_SCREW_INSTALLED_THREAD
 if abs(HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z) > 1e-9:
     raise AssertionError("MHA-DT-32's filed tip is not flush with the arm's inboard face")
 for _lo, _what in (
-    (REMOVABLE.BAND_FRONT_Z, "crank chain wheel"),
+    (seat_geometry.BAND_FRONT_Z, "crank chain wheel"),
     (_GRIP_HEAD_Z[0], "integral grip head"),
     (_GRIP_ROD_Z[0], "grip crossrod"),
 ):
@@ -3864,7 +3864,7 @@ RIG_MARGINS = {
     # travel does enter the collar/washer band behind it; those are cleared
     # radially instead (CRANK_COLUMN_BANDS above).
     "grip crossrod to the crank chain wheel": (
-        _worst(_GRIP_ROD_Z[0] - REMOVABLE.SEAT_FACE_Z, GRIP_ROD_SOUTH_TRAVEL_STACK),
+        _worst(_GRIP_ROD_Z[0] - seat_geometry.SEAT_FACE_Z, GRIP_ROD_SOUTH_TRAVEL_STACK),
         0.25,
     ),
     "grip head to the crank arm": (
@@ -5158,7 +5158,7 @@ async def build(adapter) -> dict[str, str]:
         await place_component(
             adapter,
             "dt-vn-crank-seat-drive-pin",
-            [X_CRANK, Y_CRANK + side * REMOVABLE.PIN_CIRCLE_RADIUS, CRANK_DRIVE_PIN_Z0],
+            [X_CRANK, Y_CRANK + side * seat_geometry.PIN_CIRCLE_RADIUS, CRANK_DRIVE_PIN_Z0],
             euler_from_rows(ROT_X_NEG90),
             ROT_X_NEG90,
             ground=False,

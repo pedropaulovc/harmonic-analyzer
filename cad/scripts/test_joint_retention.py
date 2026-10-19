@@ -253,7 +253,7 @@ def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> N
     import math
 
     import pd_vn_transgear_knob_drive_pin_spec as pin
-    import pd_transgear_removable_spec as wheel
+    import _sprocket_seat_geometry as wheel
     from _printed_tolerance import drilled_oversize_mm
 
     joint_id = "pd-paper-drive/thumbnut-on-knob-shaft"

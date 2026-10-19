@@ -11,6 +11,7 @@ import _chain as visual
 import paper_drive_chain_fit as physical
 import paper_drive_geom as law
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 
 
 @cache
@@ -49,7 +50,7 @@ def test_real_source_centres_have_a_closed_standard_pitch_pinned_cycle(side: int
     assert fit.plate_air_mm >= -1e-7
     assert fit.backbend_air_mm >= -1e-7
     assert fit.strand_air_mm >= -1e-7
-    assert sprocket.ANSI_ROLLER_WIDTH > sprocket.PLATE
+    assert seat_geometry.ANSI_ROLLER_WIDTH > seat_geometry.PLATE
     x0, y0, x1, y1 = fit.envelope_mm
     assert all(x0 < x < x1 and y0 < y < y1 for x, y in fit.pins)
 

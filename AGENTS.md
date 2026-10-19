@@ -1030,6 +1030,11 @@ coordinates. Rod specs, rocker builders and geometry consumers import it
 directly; manufacturing limits and fit checks stay in the rocker and rod specs.
 Feature citations for these shared dimensions name `_rocker_interface`, not the
 full rocker-arm spec or a builder.
+`_sprocket_seat_geometry` owns the shared ANSI #25 plate/chain envelope and
+shaft-seat/drive-pin interface used by the crank hub, both shafts and their
+dowels. Keep sprocket tooth geometry and manufacturing checks in
+`pd_transgear_removable_spec`, and crank wall/stack checks in the crank specs;
+neither subsystem should import the other's spec merely to read seat dimensions.
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).

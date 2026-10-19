@@ -34,7 +34,7 @@ import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 from _mcmaster_90325a174 import NECK_FLAT_END
 import pd_transgear_pivot_spacer_spec as spacer
-import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as removable
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut

@@ -1,9 +1,9 @@
 r"""MHA-PD-09 transgear-removable: the ANSI #25 sprocket and its seat interface.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in the import
-closure.  One authority for the numbers the removable sprocket, the two
-shafts it seats on (crankshaft MHA-DT-11, knob shaft MHA-PD-08), the drive-train
-and paper-drive assemblies and the chain solver ``_chain`` all share.
+closure.  The sprocket tooth model and manufacturing checks live here; the
+shaft seats, crank hub and drive dowels read their shared interface from
+``_sprocket_seat_geometry`` without importing this part specification.
 
 Evidence: ch23 p.56 (historic #25 chain and bore/drive-pin interface), p.61
 and video frame f_0215/f_0210; purchased blanks verified 2026-10-08 below.
@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import math
 
+import _sprocket_seat_geometry as seat
+
 MM_PER_IN = 25.4
 
 # --- ANSI #25 roller chain ---------------------------------------------------
@@ -51,15 +53,6 @@ MM_PER_IN = 25.4
 # drawn lower (``_chain.PLATE_HEIGHT``), so a seat that clears only the CAD
 # link could still foul a bought chain: the clearance checks use both.
 ANSI_PLATE_HEIGHT = 0.230 * MM_PER_IN  # 5.842
-# A bought chain's axial envelope (PEER Chain 25R size chart, read
-# 2026-09-30, https://www.peerchain.com/chain-pitches/): roller width W, the
-# width between the inner plates, 0.125 in; chain centreline to the riveted
-# pin head F 0.154 in and to the connecting link's clip G 0.185 in.  The
-# CAD links (``_chain.PIN_HALF_LEN``) are narrower.  The clearance stacks take
-# G on both sides (the clip may face either way) at every radius the plates
-# reach, which also covers the riveted heads.
-ANSI_ROLLER_WIDTH = 0.125 * MM_PER_IN  # 3.175
-ANSI_HALF_WIDTH = 0.185 * MM_PER_IN  # 4.699
 CHAIN_PITCH = 0.25 * MM_PER_IN  # 6.35
 ROLLER_DIA = 3.30  # 0.130 in
 # Catalogue .130 in diameter used for purchased-chain air; the CAD roller
@@ -108,53 +101,15 @@ def caliper_minus_tol(teeth: int) -> float:
 
 
 # --- plate and mounting interface (all three configurations) -----------------
-PLATE = 2.8  # supplied 0.110 in plate (2.794 mm), hub removed flush
-# Incoming inspection of the supplied plate: never over nominal.  Facing the
-# hub flush must not cut below the plate face or change the existing z stack.
-PLATE_BAND = (0.0, -0.10)  # (upper, lower) deviations
 # Vendor tooth side relief on BOTH plate faces: 0.075 in radial, 16.172 deg
 # to the face (73.828 deg cone semi-angle), measured from the STEPs below.
 CHAMFER_RADIAL = 0.075 * MM_PER_IN  # 1.905
 CHAMFER_FACE_ANGLE_DEG = 16.172
 CHAMFER_AXIAL = CHAMFER_RADIAL * math.tan(math.radians(CHAMFER_FACE_ANGLE_DEG))
-if 2.0 * CHAMFER_AXIAL >= PLATE + min(PLATE_BAND):
+if 2.0 * CHAMFER_AXIAL >= seat.PLATE + min(seat.PLATE_BAND):
     raise AssertionError("the supplied tooth chamfers must leave a mid-plate land")
-# Float model: the chain rides the 2.8 wheel and floats axially until an
-# inner plate's inner face meets a wheel face.  Measured from the SEAT face
-# (the wheel's rear face): frontmost, the rear inner plate lies on the seat
-# face; rearmost, the front inner plate lies on the front face of the
-# thinnest wheel the band allows.
-CHAIN_REACH_FRONT = ANSI_ROLLER_WIDTH / 2.0 + ANSI_HALF_WIDTH  # 6.286
-
-
-def chain_reach_rear(plate: float) -> float:
-    """How far behind the seat face the chain's envelope reaches on a wheel
-    ``plate`` thick."""
-    return ANSI_ROLLER_WIDTH / 2.0 + ANSI_HALF_WIDTH - plate
-
-
-CHAIN_REACH_REAR_WORST = chain_reach_rear(PLATE + min(PLATE_BAND))  # 3.587
-if PLATE + max(PLATE_BAND) >= ANSI_ROLLER_WIDTH:
+if seat.PLATE + max(seat.PLATE_BAND) >= seat.ANSI_ROLLER_WIDTH:
     raise AssertionError("the #25 inner plates must straddle the thickest wheel")
-BORE_DIA = 10.3  # 13/32 in, 0.39 radial clear of the Ø9.525 shaft/pilot
-PIN_HOLE_DIA = 2.5  # slip over the Ø2.38 drive pins (0.06 radial)
-PIN_CIRCLE_DIA = 14.0
-PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
-# Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
-PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
-# Each drive pin (in either shaft's seat) and each of these holes is located
-# +/-0.025 from the axis, printed at .XXX: the holes slip over the pins with
-# 0.119 diametral clearance, which absorbs the spacing error of both parts,
-# each spending half of it.  The shafts read these (dt_crankshaft_spec).
-DRIVE_PIN_OFFSET_PLACES = 3
-DRIVE_PIN_OFFSET_TOL = 0.025
-
-# Bore <-> pin-hole web.  Photo-faithful to the p.56 catalog view, where the
-# holes nearly touch the bore; under the 1.5 wall floor, pending a ruling
-# in #1377. Its printed worst
-# case is sheet text (pd_transgear_removable_notes.BORE_PIN_WEB_WORST): it reads
-# the title block's drilled-hole row, which this module's importers must not.
-BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.60
 
 CONFIGS: tuple[tuple[str, int], ...] = (("T12", 12), ("T18", 18), ("T24", 24))
 TEETH = dict(CONFIGS)
@@ -215,8 +170,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BorePinsProfile": {
         "BoreDiaDim": 2,
         "PinPosDia": 2,
-        "PinPosY": DRIVE_PIN_OFFSET_PLACES,
-        "PinNegY": DRIVE_PIN_OFFSET_PLACES,
+        "PinPosY": seat.DRIVE_PIN_OFFSET_PLACES,
+        "PinNegY": seat.DRIVE_PIN_OFFSET_PLACES,
     },
 }
 if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
@@ -230,40 +185,14 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 DRAWING_REFERENCE_DIMENSIONS = frozenset({"BlankDia"})
 
-# --- shared machine z band (both shafts) -------------------------------------
-# User ruling 2026-09-30: 1.8 forward of the first seat (-152.5); the chain
-# plane, both wheels and both shafts' seat faces moved with it.
-SEAT_FACE_Z = -154.3  # wheel rear face = shaft seat face (the stack datum)
-BAND_FRONT_Z = SEAT_FACE_Z - PLATE  # -157.1, wheel front face
-CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 
-# --- drive-pin seat interface (both shafts carry it) -------------------------
-# Two purchased 3/32 dowels pressed into each shaft's seat face, rounded end
-# proud by DRIVE_PIN_PROUD: 1/4 long in the crank (crank-seat-drive-pin,
-# MHA-DT-VN-67), 3/16 in the knob shaft (transgear-knob-drive-pin, MHA-PD-VN-54).  Their
-# lengths and press depths are the shafts'; the diameter is the interface's.
-DRIVE_PIN_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125; each pin spec asserts its own
-DRIVE_PIN_PROUD = 2.4  # standing out of the seat face
-DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
-DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
-
-# --- shaft seat face (both shafts carry the same seat) -----------------------
-# The flat face the wheel's rear face beds on: a Ø17.5 spigot on the crank
-# collar, the whole Ø17.5 collar on the knob shaft.  Small enough that the
-# #25 plates wrapping the T12 clear it (Main's ruling, 2026-09-30).
-SEAT_SPIGOT_DIA = 17.5
-# Pin hole to the spigot's rim: under the 1.5 wall floor (pending ruling #991).
-SEAT_SPIGOT_RIM = (
-    SEAT_SPIGOT_DIA / 2.0 - PIN_CIRCLE_RADIUS - DRIVE_PIN_HOLE_DIA / 2.0
-)  # 0.56
-
-if not BAND_FRONT_Z < DRIVE_PIN_TIP_Z < SEAT_FACE_Z:
+if not seat.BAND_FRONT_Z < seat.DRIVE_PIN_TIP_Z < seat.SEAT_FACE_Z:
     raise AssertionError("drive-pin tips must end inside the wheel's plate")
-if PIN_HOLE_DIA <= DRIVE_PIN_DIA:
+if seat.PIN_HOLE_DIA <= seat.DRIVE_PIN_DIA:
     raise AssertionError("the wheel's pin holes must slip over the drive pins")
-if abs(BORE_PIN_WEB - 0.6) > 1e-9:
+if abs(seat.BORE_PIN_WEB - 0.6) > 1e-9:
     raise AssertionError("bore/pin-hole web moved off the contracted 0.60")
-if SEAT_SPIGOT_RIM <= 0.0:
+if seat.SEAT_SPIGOT_RIM <= 0.0:
     raise AssertionError("the seat spigot must enclose the drive-pin holes")
 
 
@@ -405,13 +334,14 @@ def gap_area(teeth: int) -> float:
 
 # Static cross-section the bore and two pin holes remove (mm^2).
 BORE_PINS_AREA = (
-    math.pi * (BORE_DIA / 2.0) ** 2 + 2.0 * math.pi * (PIN_HOLE_DIA / 2.0) ** 2
+    math.pi * (seat.BORE_DIA / 2.0) ** 2
+    + 2.0 * math.pi * (seat.PIN_HOLE_DIA / 2.0) ** 2
 )
 
 
 def blank_volume(teeth: int) -> float:
     """Volume (mm^3) of the untoothed OD disc."""
-    return math.pi * (outside_dia(teeth) / 2.0) ** 2 * PLATE
+    return math.pi * (outside_dia(teeth) / 2.0) ** 2 * seat.PLATE
 
 
 def chamfer_volume(teeth: int) -> float:
@@ -483,21 +413,21 @@ def chamfer_volume(teeth: int) -> float:
 
 def toothed_volume(teeth: int) -> float:
     """Supplied tooth profile and both face chamfers, before the shop holes."""
-    return blank_volume(teeth) - teeth * gap_area(teeth) * PLATE - chamfer_volume(teeth)
+    return blank_volume(teeth) - teeth * gap_area(teeth) * seat.PLATE - chamfer_volume(teeth)
 
 
 def part_volume(teeth: int) -> float:
     """Finished part volume (mm^3) of one configuration."""
-    return toothed_volume(teeth) - BORE_PINS_AREA * PLATE
+    return toothed_volume(teeth) - BORE_PINS_AREA * seat.PLATE
 
 
 def root_to_pin_hole(teeth: int) -> float:
     """Radial ligament from the ANSI bottom circle to a pin hole's outer edge."""
-    return bottom_dia(teeth) / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0
+    return bottom_dia(teeth) / 2.0 - seat.PIN_CIRCLE_RADIUS - seat.PIN_HOLE_DIA / 2.0
 
 
 for _name, _n in CONFIGS:
-    if seat_bottom_dia(_n) / 2.0 <= PIN_CIRCLE_RADIUS + PIN_HOLE_DIA / 2.0:
+    if seat_bottom_dia(_n) / 2.0 <= seat.PIN_CIRCLE_RADIUS + seat.PIN_HOLE_DIA / 2.0:
         raise AssertionError(f"{_name}: seating curve breaks into the pin holes")
     if not 0.0 <= bottom_dia(_n) - seat_bottom_dia(_n) <= caliper_minus_tol(_n):
         raise AssertionError(f"{_name}: seat bottom outside the ANSI caliper tolerance")

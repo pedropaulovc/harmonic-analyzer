@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 import _config
 import pd_transgear_removable_spec as spec
+import _sprocket_seat_geometry as seat_geometry
 
 # A drilled hole may open by the title block's DRILLED HOLES row; it never
 # closes (minus 0).
@@ -20,10 +21,10 @@ _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 # Thinnest bore/pin-hole web the printed limits allow: both holes at their
 # drilled maximum, the pin centre moved its full location band toward the bore.
 _WEB_WORST = (
-    spec.PIN_CIRCLE_RADIUS
-    - spec.DRIVE_PIN_OFFSET_TOL
-    - (spec.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
-    - (spec.BORE_DIA + _DRILL_OVERSIZE) / 2.0
+    seat_geometry.PIN_CIRCLE_RADIUS
+    - seat_geometry.DRIVE_PIN_OFFSET_TOL
+    - (seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
+    - (seat_geometry.BORE_DIA + _DRILL_OVERSIZE) / 2.0
 )
 # Rounded DOWN, so the sheet never states more web than the limits give.
 BORE_PIN_WEB_WORST = math.floor(_WEB_WORST * 100.0 + 1e-9) / 100.0

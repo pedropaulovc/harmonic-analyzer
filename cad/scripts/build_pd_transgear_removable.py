@@ -35,8 +35,8 @@ pending exception ruling (#1377); the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
 Drawing marks (``draw_pd_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
-``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_BAND``
-and each pin centre +/-``spec.DRIVE_PIN_OFFSET_TOL``; the outside diameter
+``spec.DRAWING_PRECISION``, the plate thickness banded ``seat_geometry.PLATE_BAND``
+and each pin centre +/-``seat_geometry.DRIVE_PIN_OFFSET_TOL``; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints
 its own.  The sheet's SPROCKET DATA and notes are file properties.
 
@@ -63,6 +63,7 @@ import sys
 import _config
 import _telemetry
 import pd_transgear_removable_spec as spec
+import _sprocket_seat_geometry as seat_geometry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -111,10 +112,10 @@ DRAWING_DIMENSIONS = spec.DRAWING_DIMENSIONS
 # (Top Plane offset): both constructions assume the spec's angles are +/-Y.
 PIN_HOLE_CENTRES = tuple(
     (
-        spec.PIN_CIRCLE_RADIUS * math.cos(math.radians(angle)),
-        spec.PIN_CIRCLE_RADIUS * math.sin(math.radians(angle)),
+        seat_geometry.PIN_CIRCLE_RADIUS * math.cos(math.radians(angle)),
+        seat_geometry.PIN_CIRCLE_RADIUS * math.sin(math.radians(angle)),
     )
-    for angle in spec.PIN_HOLE_ANGLES_DEG
+    for angle in seat_geometry.PIN_HOLE_ANGLES_DEG
 )
 if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
@@ -128,9 +129,9 @@ def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
     """``(feature, dimension) -> (tolerance type, lower, upper)`` in mm: the
     bands the sheet prints once for T12, T18 and T24 (they share the plate
     and the pin holes), as the build sets them below."""
-    pin = (_TOL_SYMMETRIC, -spec.DRIVE_PIN_OFFSET_TOL, spec.DRIVE_PIN_OFFSET_TOL)
+    pin = (_TOL_SYMMETRIC, -seat_geometry.DRIVE_PIN_OFFSET_TOL, seat_geometry.DRIVE_PIN_OFFSET_TOL)
     return {
-        ("BlankProfile", "BlankWidth"): (_TOL_BILAT, *deviations(spec.PLATE_BAND)),
+        ("BlankProfile", "BlankWidth"): (_TOL_BILAT, *deviations(seat_geometry.PLATE_BAND)),
         ("BorePinsProfile", "PinPosY"): pin,
         ("BorePinsProfile", "PinNegY"): pin,
     }
@@ -514,13 +515,13 @@ def chamfer_points(teeth: int) -> dict[str, Point]:
     outer = spec.outside_dia(teeth) / 2.0 + spec.CHAMFER_RADIAL
     return {
         "origin": (0.0, 0.0),
-        "axis_rear": (0.0, -spec.PLATE),
+        "axis_rear": (0.0, -seat_geometry.PLATE),
         "front_inner": (inner, 0.0),
         "front_outer": (outer, 0.0),
         "front_tip": (outer, -2.0 * spec.CHAMFER_AXIAL),
-        "rear_inner": (inner, -spec.PLATE),
-        "rear_outer": (outer, -spec.PLATE),
-        "rear_tip": (outer, -spec.PLATE + 2.0 * spec.CHAMFER_AXIAL),
+        "rear_inner": (inner, -seat_geometry.PLATE),
+        "rear_outer": (outer, -seat_geometry.PLATE),
+        "rear_tip": (outer, -seat_geometry.PLATE + 2.0 * spec.CHAMFER_AXIAL),
     }
 
 
@@ -676,10 +677,10 @@ async def build(adapter) -> dict[str, str]:
     # document, so a bare number would be read as inches and blow the part up
     # 25.4x. The blank's outside diameter is NOT a knob here: it is
     # config-driven by the "Ra" equation link below.
-    await set_global_mm(adapter, "Plate", f"{spec.PLATE}mm")
-    await set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
-    await set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
-    await set_global_mm(adapter, "PinCircleRadius", f"{spec.PIN_CIRCLE_RADIUS}mm")
+    await set_global_mm(adapter, "Plate", f"{seat_geometry.PLATE}mm")
+    await set_global_mm(adapter, "BoreDia", f"{seat_geometry.BORE_DIA}mm")
+    await set_global_mm(adapter, "PinHoleDia", f"{seat_geometry.PIN_HOLE_DIA}mm")
+    await set_global_mm(adapter, "PinCircleRadius", f"{seat_geometry.PIN_CIRCLE_RADIUS}mm")
 
     # Drive equations are recorded per sketch as the dims are created and applied
     # in one deferred batch once the whole single-config model exists (every
@@ -699,15 +700,15 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     axis = check(
         "add_centerline axis",
-        await adapter.add_centerline(0.0, 0.0, 0.0, -spec.PLATE),
+        await adapter.add_centerline(0.0, 0.0, 0.0, -seat_geometry.PLATE),
     )
     blank_lines = await add_line_chain(
         adapter,
         [
             (0.0, 0.0),
             (ra_default_mm, 0.0),
-            (ra_default_mm, -spec.PLATE),
-            (0.0, -spec.PLATE),
+            (ra_default_mm, -seat_geometry.PLATE),
+            (0.0, -seat_geometry.PLATE),
         ],
     )
     set_sketch_direct_db(adapter, False)
@@ -730,7 +731,7 @@ async def build(adapter) -> dict[str, str]:
     blank.record("BlankDia", None)
     check(
         "blank width dim",
-        await adapter.add_sketch_dimension(side_line, None, "linear", spec.PLATE),
+        await adapter.add_sketch_dimension(side_line, None, "linear", seat_geometry.PLATE),
     )
     blank.record("BlankWidth", '"Plate"')
     # Pin the (0, 0) corner to the origin explicitly: the h/v relations + the
@@ -753,9 +754,9 @@ async def build(adapter) -> dict[str, str]:
     if not mass.is_success:
         raise RuntimeError(f"blank mass properties failed: {mass.error}")
     com_z = float(mass.data.center_of_mass[2])
-    if abs(com_z - spec.PLATE / 2.0) > 0.1:
+    if abs(com_z - seat_geometry.PLATE / 2.0) > 0.1:
         raise RuntimeError(
-            f"blank centre of mass z = {com_z:.2f}, expected {spec.PLATE / 2.0:.2f}"
+            f"blank centre of mass z = {com_z:.2f}, expected {seat_geometry.PLATE / 2.0:.2f}"
         )
     blank_volume = float(mass.data.volume)
     expected_blank = spec.blank_volume(DEFAULT_TEETH)
@@ -797,7 +798,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += gap_dims.apply(adapter, gap_profile)
     check(
         "cut tooth gap",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.PLATE + 1.0)),
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 1.0)),
     )
     gap_cut = name_last_feature(adapter, "ToothGap")
 
@@ -813,11 +814,11 @@ async def build(adapter) -> dict[str, str]:
     adapter._zoom_to_fit(adapter.currentModel)
     # The seed gap spans angles Half - Corner..Half + Corner (under 15 deg at
     # T24); the OD candidates below stay on uncut blank.
-    candidates = [[0.0, 0.0, spec.PLATE / 2.0]]
+    candidates = [[0.0, 0.0, seat_geometry.PLATE / 2.0]]
     for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
         a = math.radians(angle_deg)
         candidates.append(
-            [ra_default_mm * math.cos(a), ra_default_mm * math.sin(a), spec.PLATE / 2.0]
+            [ra_default_mm * math.cos(a), ra_default_mm * math.sin(a), seat_geometry.PLATE / 2.0]
         )
     pattern = None
     for point in candidates:
@@ -903,7 +904,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         0.0,
         0.0,
-        spec.BORE_DIA / 2.0,
+        seat_geometry.BORE_DIA / 2.0,
         "bore",
         dims=bore_pins,
         names=("BoreCx", "BoreCy", "BoreDiaDim"),
@@ -915,7 +916,7 @@ async def build(adapter) -> dict[str, str]:
             adapter,
             x,
             y,
-            spec.PIN_HOLE_DIA / 2.0,
+            seat_geometry.PIN_HOLE_DIA / 2.0,
             f"pin hole {label}",
             dims=bore_pins,
             names=(f"{label}X", f"{label}Y", f"{label}Dia"),
@@ -928,7 +929,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += bore_pins.apply(adapter, "BorePinsProfile")
     check(
         "cut bore+pins",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.PLATE + 2.0)),
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=seat_geometry.PLATE + 2.0)),
     )
     name_last_feature(adapter, "BorePinsCut")
 
@@ -940,7 +941,7 @@ async def build(adapter) -> dict[str, str]:
         "create_plane RearFace (Front Plane + Plate)",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Front Plane", offset=spec.PLATE
+                mode="offset", base_plane="Front Plane", offset=seat_geometry.PLATE
             )
         ),
     )
@@ -1094,13 +1095,13 @@ async def build(adapter) -> dict[str, str]:
     # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
     # row governs them). The places are the part's (drawing-simplicity-policy.md `How the repository implements the guidelines`).
     set_dimension_bilateral_tolerance(
-        adapter, "BlankProfile", "BlankWidth", *deviations(spec.PLATE_BAND)
+        adapter, "BlankProfile", "BlankWidth", *deviations(seat_geometry.PLATE_BAND)
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BorePinsProfile", "PinPosY", spec.DRIVE_PIN_OFFSET_TOL
+        adapter, "BorePinsProfile", "PinPosY", seat_geometry.DRIVE_PIN_OFFSET_TOL
     )
     set_dimension_symmetric_tolerance(
-        adapter, "BorePinsProfile", "PinNegY", spec.DRIVE_PIN_OFFSET_TOL
+        adapter, "BorePinsProfile", "PinNegY", seat_geometry.DRIVE_PIN_OFFSET_TOL
     )
     await assert_bands_in_every_configuration(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)

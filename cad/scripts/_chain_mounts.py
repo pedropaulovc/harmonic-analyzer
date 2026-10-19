@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import _chain
 import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as seat_geometry
 
 
 @dataclass(frozen=True)
@@ -35,8 +36,8 @@ def mounted_wheels() -> WheelMounts:
             (_chain.CRANK_CENTRE, removable.CRANK_CONFIG),
             (_chain.KNOB_CENTRE, removable.KNOB_CONFIG),
         ),
-        band_front_z=removable.BAND_FRONT_Z,
-        seat_face_z=removable.SEAT_FACE_Z,
-        plate=removable.PLATE,
+        band_front_z=seat_geometry.BAND_FRONT_Z,
+        seat_face_z=seat_geometry.SEAT_FACE_Z,
+        plate=seat_geometry.PLATE,
         configuration_teeth=removable.configuration_teeth,
     )

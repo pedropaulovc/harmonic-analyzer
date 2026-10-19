@@ -47,7 +47,7 @@ DIA_MAX = DIA + max(DIA_BAND)
 CHAMFER_LEN = ENDS.chamfer_len(DIA)  # 0.443
 # The lead end's round: where the full diameter stops short of the tip.
 CROWN_R = ENDS.crown_r  # 0.406
-# The family's length grade, +/-0.010 in (``dt_crankshaft_spec``'s
+# The family's length grade, +/-0.010 in (``_sprocket_seat_geometry``'s
 # DRIVE_PIN_LENGTH_GRADE for the same 98381A family): it moves the pressed
 # pin's lead end by as much.
 LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254

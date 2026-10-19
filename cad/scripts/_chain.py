@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 
 import pd_transgear_removable_spec as _removable
+import _sprocket_seat_geometry as seat_geometry
 from paper_drive_chain_fit import source_nominal_chain_centres_mm
 
 
@@ -224,7 +225,7 @@ PIN_R = PIN_DIA / 2.0  # 0.65
 OUTER_PLATE_HOLE_R = PIN_R + FLOAT  # 0.95: pin floats inside; web 1.45
 
 # z stack (pin axis), symmetric about the chain mid-plane:
-INNER_PLATE_INNER_Z = _removable.PLATE / 2.0 + SPROCKET_CLEAR  # 1.65
+INNER_PLATE_INNER_Z = seat_geometry.PLATE / 2.0 + SPROCKET_CLEAR  # 1.65
 BUSH_HALF_LEN = INNER_PLATE_INNER_Z  # bushing spans between the inner plates
 INNER_PLATE_Z = INNER_PLATE_INNER_Z + PLATE_THICK / 2.0  # 2.05 (faces 1.65..2.45)
 OUTER_PLATE_Z = INNER_PLATE_Z + PLATE_THICK + PLATE_GAP  # 3.15 (faces 2.75..3.55)

@@ -11,6 +11,7 @@ import pytest
 
 import build_pd_transgear_removable as part
 import pd_transgear_removable_spec as spec
+import _sprocket_seat_geometry as seat_geometry
 
 
 _TEETH = [teeth for _name, teeth in spec.CONFIGS]
@@ -51,8 +52,8 @@ def test_vendor_section_uses_face_angle_not_cone_semi_angle() -> None:
 def _assert_sections(points: dict[str, part.Point], teeth: int) -> None:
     radius = spec.outside_dia(teeth) / 2.0
     assert points["origin"] == (0.0, 0.0)
-    assert points["axis_rear"] == (0.0, -spec.PLATE)
-    for face, face_y, direction in (("front", 0.0, -1.0), ("rear", -spec.PLATE, 1.0)):
+    assert points["axis_rear"] == (0.0, -seat_geometry.PLATE)
+    for face, face_y, direction in (("front", 0.0, -1.0), ("rear", -seat_geometry.PLATE, 1.0)):
         inner, outer, tip = (
             points[f"{face}_{key}"] for key in ("inner", "outer", "tip")
         )
@@ -68,7 +69,7 @@ def _assert_sections(points: dict[str, part.Point], teeth: int) -> None:
         assert math.degrees(
             math.atan(abs((tip[1] - inner[1]) / (tip[0] - inner[0])))
         ) == pytest.approx(spec.CHAMFER_FACE_ANGLE_DEG)
-        assert inner[0] > spec.PIN_CIRCLE_RADIUS + spec.PIN_HOLE_DIA / 2.0
+        assert inner[0] > seat_geometry.PIN_CIRCLE_RADIUS + seat_geometry.PIN_HOLE_DIA / 2.0
     # The overrun triangles themselves remain disjoint, not just their in-part portions.
     assert points["rear_tip"][1] < points["front_tip"][1]
 
@@ -97,7 +98,7 @@ def test_every_chamfer_dimension_equation_matches_its_native_section(
     for name, expression, expected in part.gap_globals(teeth) + part.chamfer_globals():
         values[name] = _equation(expression, values)
         assert values[name] == pytest.approx(expected, rel=1e-9, abs=1e-12), name
-    values["Plate"] = spec.PLATE / part.IN
+    values["Plate"] = seat_geometry.PLATE / part.IN
     points = part.chamfer_points(teeth)
     dimension_names = set()
     for name, kind, first, second, expression in part.CHAMFER_DIMENSIONS:
@@ -146,7 +147,7 @@ def test_section_contract_rejects_geometry_negative_controls(mutation: str) -> N
         points["front_tip"] = (x, -y)
     elif mutation == "outward_rear":
         x, y = points["rear_tip"]
-        points["rear_tip"] = (x, -2.0 * spec.PLATE - y)
+        points["rear_tip"] = (x, -2.0 * seat_geometry.PLATE - y)
     elif mutation == "wrong_face":
         x, _y = points["rear_inner"]
         points["rear_inner"] = (x, 0.0)
@@ -228,7 +229,7 @@ def _section_toothed_volume(teeth: int, faces: int = 2) -> float:
     slope = abs(tip[1]) / (tip[0] - inner) * faces
 
     def primitive(radius: float) -> float:
-        full = spec.PLATE * radius * radius / 2.0
+        full = seat_geometry.PLATE * radius * radius / 2.0
         if radius <= inner:
             return full
         return full - slope * (
@@ -247,10 +248,10 @@ def _section_toothed_volume(teeth: int, faces: int = 2) -> float:
 def test_native_sections_and_teeth_match_both_volume_gates(teeth: int) -> None:
     native = _section_toothed_volume(teeth)
     assert native == pytest.approx(spec.toothed_volume(teeth), rel=2e-5, abs=0.005)
-    holes = math.pi / 4.0 * (spec.BORE_DIA**2 + 2.0 * spec.PIN_HOLE_DIA**2) * spec.PLATE
+    holes = math.pi / 4.0 * (seat_geometry.BORE_DIA**2 + 2.0 * seat_geometry.PIN_HOLE_DIA**2) * seat_geometry.PLATE
     assert native - holes == pytest.approx(spec.part_volume(teeth), rel=2e-5, abs=0.005)
     assert spec.blank_volume(teeth) == pytest.approx(
-        math.pi * (spec.outside_dia(teeth) / 2.0) ** 2 * spec.PLATE
+        math.pi * (spec.outside_dia(teeth) / 2.0) ** 2 * seat_geometry.PLATE
     )
     assert (
         native

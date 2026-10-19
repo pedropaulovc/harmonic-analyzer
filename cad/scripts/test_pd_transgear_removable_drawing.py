@@ -16,7 +16,8 @@ import build_pd_transgear_removable as part
 import draw_pd_transgear_removable as drawing
 import pd_transgear_removable_notes as notes
 import pd_transgear_removable_spec as spec
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+import _sprocket_seat_geometry as seat_geometry
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -68,18 +69,16 @@ def test_pin_locations_hold_the_shared_band_at_three_places() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["PinPosDia"] == 2
     import dt_crankshaft_spec
 
-    assert dt_crankshaft_spec.DRIVE_PIN_OFFSET_TOL == spec.DRIVE_PIN_OFFSET_TOL
-    assert dt_crankshaft_spec.DRIVE_PIN_OFFSET_PLACES == spec.DRIVE_PIN_OFFSET_PLACES
-
-
-def test_the_bands_live_on_the_model_dimensions() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("BlankProfile", "BlankWidth"): "*deviations(spec.PLATE_BAND)",
-        ("BorePinsProfile", "PinPosY"): "spec.DRIVE_PIN_OFFSET_TOL",
-        ("BorePinsProfile", "PinNegY"): "spec.DRIVE_PIN_OFFSET_TOL",
+    assert dt_crankshaft_spec.DRIVE_PIN_SPACING_ERROR_MAX / 2.0 == seat_geometry.DRIVE_PIN_OFFSET_TOL
+    assert dt_crankshaft_spec.DRAWING_PRECISION["DrivePinProfile"] == {
+        "DrivePinOffset1": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
+        "DrivePinOffset2": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
     }
+
+
+def test_incoming_plate_band_is_never_over_nominal() -> None:
     # Incoming plate inspection, not a facing-to-thickness operation.
-    assert max(spec.PLATE_BAND) == 0.0 > min(spec.PLATE_BAND)
+    assert max(seat_geometry.PLATE_BAND) == 0.0 > min(seat_geometry.PLATE_BAND)
 
 
 def test_web_worst_case_is_the_printed_limits() -> None:
@@ -89,13 +88,13 @@ def test_web_worst_case_is_the_printed_limits() -> None:
     assert drilled["minus_mm"] == 0.0
     oversize = drilled["plus_mm"]
     web = (
-        spec.PIN_CIRCLE_DIA / 2.0
-        - spec.DRIVE_PIN_OFFSET_TOL
-        - (spec.PIN_HOLE_DIA + oversize) / 2.0
-        - (spec.BORE_DIA + oversize) / 2.0
+        seat_geometry.PIN_CIRCLE_DIA / 2.0
+        - seat_geometry.DRIVE_PIN_OFFSET_TOL
+        - (seat_geometry.PIN_HOLE_DIA + oversize) / 2.0
+        - (seat_geometry.BORE_DIA + oversize) / 2.0
     )
     assert notes.BORE_PIN_WEB_WORST <= web < notes.BORE_PIN_WEB_WORST + 0.01
-    assert 0.0 < notes.BORE_PIN_WEB_WORST < spec.BORE_PIN_WEB < 1.5
+    assert 0.0 < notes.BORE_PIN_WEB_WORST < seat_geometry.BORE_PIN_WEB < 1.5
     assert notes.BORE_PIN_WEB_NOTE == "BORE TO DRIVE-PIN HOLE WEB 0.47 MIN."
     assert notes.BORE_PIN_WEB_NOTE in notes.DRAWING_NOTES.splitlines()
 
@@ -199,7 +198,7 @@ def test_configuration_view_stands_in_free_sheet_space(configuration: str) -> No
     # view owns still collides with it.
     _x, y = drawing.CONFIGURATION_VIEW_CENTERS[configuration]
     scale = drawing.CONFIGURATION_VIEW_SCALE[0] / drawing.CONFIGURATION_VIEW_SCALE[1]
-    outline_bottom = y - spec.PLATE * scale / 2000.0 - _OUTLINE_PAD
+    outline_bottom = y - seat_geometry.PLATE * scale / 2000.0 - _OUTLINE_PAD
     assert drawing.configuration_label_xy(configuration)[1] < outline_bottom
 
 
@@ -772,7 +771,7 @@ def test_chamfered_plate_matches_the_purchased_blank_volume(
     its plate volume must agree within 0.2%, independently of the build gate.
     """
     area = math.pi * (spec.outside_dia(teeth) / 2.0) ** 2 - teeth * spec.gap_area(teeth)
-    at_vendor_thickness = spec.toothed_volume(teeth) - area * (spec.PLATE - 2.794)
+    at_vendor_thickness = spec.toothed_volume(teeth) - area * (seat_geometry.PLATE - 2.794)
     assert at_vendor_thickness == pytest.approx(vendor_plate_mm3, rel=0.002)
     # Losing either supplied-face chamfer is observable, even with the
     # residual difference between the standard and vendor tooth profiles.

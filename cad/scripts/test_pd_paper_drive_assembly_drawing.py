@@ -38,6 +38,7 @@ import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
 from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
@@ -289,7 +290,7 @@ def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> No
     driving = "pd-vn-transgear-knob-drive-pin"
     assert plate_locating_pin.ASSEMBLY_QUANTITY == 2
     assert drawing.TRANSGEAR_QUANTITIES[locating] == plate_locating_pin.ASSEMBLY_QUANTITY
-    assert drawing.TRANSGEAR_QUANTITIES[driving] == len(sprocket.PIN_HOLE_ANGLES_DEG)
+    assert drawing.TRANSGEAR_QUANTITIES[driving] == len(seat_geometry.PIN_HOLE_ANGLES_DEG)
     assert _number(locating) != _number(driving)
     assert "PLATE LOCATING DOWEL" in drawing.BOM_DESCRIPTIONS[locating]
     assert "WHEEL DRIVE DOWEL" in drawing.BOM_DESCRIPTIONS[driving]
@@ -1375,9 +1376,9 @@ def _spare_world_point(monkeypatch, local):
 def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
     # The spec's plate is local Z=0..PLATE, identical in all tooth configs.
     underside = _spare_world_point(monkeypatch, [0.0, 0.0, 0.0])
-    top = _spare_world_point(monkeypatch, [0.0, 0.0, sprocket.PLATE])
+    top = _spare_world_point(monkeypatch, [0.0, 0.0, seat_geometry.PLATE])
     assert underside[1] == pytest.approx(base.STACK_HEIGHT, rel=0, abs=1e-9)
-    assert top[1] == pytest.approx(base.STACK_HEIGHT + sprocket.PLATE, rel=0, abs=1e-9)
+    assert top[1] == pytest.approx(base.STACK_HEIGHT + seat_geometry.PLATE, rel=0, abs=1e-9)
     assert (underside[0], underside[2]) == (140.0, -75.0)
     assert (top[0], top[2]) == (140.0, -75.0)
 
@@ -1386,7 +1387,7 @@ def test_spare_t18_footprint_is_on_the_flat_deck(monkeypatch):
     # The deck's flat ends at its edge break (user ruling 2026-10-09: the
     # black deck x +-167.0, z +-130.25 stands DECK_RISE above the green land).
     radius = sprocket.outside_dia(sprocket.TEETH["T18"]) / 2.0
-    for x, y, z in product((-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)):
+    for x, y, z in product((-radius, radius), (-radius, radius), (0.0, seat_geometry.PLATE)):
         world = _spare_world_point(monkeypatch, [x, y, z])
         assert abs(world[0]) < base.DECK_HALF_X - base.DECK_EDGE_BREAK
         assert abs(world[2]) < base.DECK_HALF_Z - base.DECK_EDGE_BREAK
@@ -1407,7 +1408,7 @@ def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
     spare_max_z = max(
         _spare_world_point(monkeypatch, [x, y, z])[2]
         for x, y, z in product(
-            (-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)
+            (-radius, radius), (-radius, radius), (0.0, seat_geometry.PLATE)
         )
     )
     assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0
@@ -1590,7 +1591,7 @@ def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
     accepted = _step_body("fitup-accepted")
     assert accepted.startswith(f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}")
     low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
-    half_plate_spread = (max(sprocket.PLATE_BAND) - min(sprocket.PLATE_BAND)) / 2.0
+    half_plate_spread = (max(seat_geometry.PLATE_BAND) - min(seat_geometry.PLATE_BAND)) / 2.0
     assert (low, high) == pytest.approx(
         (
             -(collar.FIT_UP_OFFSET_TARGET + steps.OFFSET_ACCEPT_TOL)

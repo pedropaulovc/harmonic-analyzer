@@ -525,6 +525,7 @@ if abs(CLUSTER.RING_FRONT_Z - (PIN_Z0 - PIN.GROOVE_STATION)) > 1e-9:
 
 import pd_vn_transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
+import _sprocket_seat_geometry as seat_geometry  # noqa: E402
 import pd_transgear_knob_shaft_spec as KNOB_SPEC  # noqa: E402
 from pd_transgear_thumbnut_spec import (  # noqa: E402
     FLANGE_DIA as THUMBNUT_FLANGE_DIA,
@@ -544,8 +545,8 @@ THIRD_FACE = KNOB_SPEC.FACE_WIDTH
 # the crankshaft's seat collar), and the chain mid-plane between
 # (pd_transgear_removable_spec). Each is placed on its FRONT face (the part's
 # Front Plane), identity: holes on machine +/-Y.
-REMOVABLE_Z0 = REMOVABLE.BAND_FRONT_Z  # -157.1
-CHAIN_MID_Z = REMOVABLE.CHAIN_MID_Z  # both selected wheels coplanar
+REMOVABLE_Z0 = seat_geometry.BAND_FRONT_Z  # -157.1
+CHAIN_MID_Z = seat_geometry.CHAIN_MID_Z  # both selected wheels coplanar
 REMOVABLE_TIP_R = {
     name: REMOVABLE.outside_dia(teeth) / 2.0 for name, teeth in REMOVABLE.CONFIGS
 }
@@ -554,24 +555,24 @@ REMOVABLE_TIP_R = {
 CHAIN_PULLEY_DIA = {
     name: teeth * REMOVABLE.CHAIN_PITCH / math.pi for name, teeth in REMOVABLE.CONFIGS
 }
-if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
+if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("identity-placed removables expect pin holes on +/-Y")
 
 # Knob stack on K (front -> back): thumbnut | knob wheel | drive collar | the
 # shaft's 12T | thrust ring | arm-plate hub | plate | boss | knob cup.
 # The front collar seat stays on the wheel rear; its actual rear face is on
 # gear front F. Its fitted body length is a saved native REF, not a front pin.
-KNOB_COLLAR_Z0 = REMOVABLE.SEAT_FACE_Z  # -154.3
+KNOB_COLLAR_Z0 = seat_geometry.SEAT_FACE_Z  # -154.3
 KNOB_SHAFT_Z0 = KNOB_COLLAR_Z0 + COLLAR.SET_NOMINAL  # F = -148.1
 KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # actual rear on F
 # The two MHA-PD-VN-54 dowels pressed through the collar's holes (Rx-90: pin +Y ->
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
-KNOB_DRIVE_PIN_Z0 = REMOVABLE.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
-if abs(KNOB_COLLAR_Z0 - REMOVABLE.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD) > 1e-9:
+KNOB_DRIVE_PIN_Z0 = seat_geometry.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
+if abs(KNOB_COLLAR_Z0 - seat_geometry.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD) > 1e-9:
     raise AssertionError("knob drive-pin tips are off the collar's DRIVE_PIN_PROUD")
-if abs(KNOB_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
+if abs(KNOB_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("transgear-knob-drive-pin is not the removable's drive pin")
-if COLLAR.PIN_CIRCLE_RADIUS != REMOVABLE.PIN_CIRCLE_RADIUS:
+if COLLAR.PIN_CIRCLE_RADIUS != seat_geometry.PIN_CIRCLE_RADIUS:
     raise AssertionError("the collar's pin circle is not the removable's")
 # Behind the 12T: the thrust ring to the plate hub's face, the knob cup on the
 # journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
@@ -745,9 +746,9 @@ if BUSHING_RACK_AIR_WORST < 0.0:
 # Stack D: a bought #25 chain floated REARMOST on the thinnest knob-wheel plate
 # reaches chain_reach_rear() behind the seat face; it must keep air to the
 # 120T disc's front face.
-CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST  # 3.587
+CHAIN_REACH_REAR_WORST = seat_geometry.CHAIN_REACH_REAR_WORST  # 3.587
 CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
-    REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
+    seat_geometry.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
 )  # 3.0635 = 6.65 - 3.5865
 if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     raise AssertionError(
@@ -793,11 +794,11 @@ if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z < THUMBNUT_Z0):
     )
 # The flange must still RETAIN the wheel: cover its bore with a shoulder.
 # The drive-pin tips end inside the wheel's plate, behind the flange's seat.
-if THUMBNUT_FLANGE_DIA < REMOVABLE.BORE_DIA + 1.0:
+if THUMBNUT_FLANGE_DIA < seat_geometry.BORE_DIA + 1.0:
     raise AssertionError(
         "thumbnut flange slips into the removable's bore -- retains nothing"
     )
-if REMOVABLE.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
+if seat_geometry.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
     raise AssertionError("knob drive-pin tips reach the thumbnut flange")
 # Front furniture: nothing in this sub sits in front of the knob wheel but the
 # chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
@@ -809,7 +810,7 @@ if THUMBNUT_HEAD_DIA / 2.0 > _chain_inner_wrap_r:
 # seat face (-160.59). The whole nut (and the shaft) lies radially inside the
 # ANSI plates' inner edge, so no axial stack exists there; assert the radial
 # one.
-CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -160.5865
+CHAIN_FRONT_Z_WORST = seat_geometry.SEAT_FACE_Z - seat_geometry.CHAIN_REACH_FRONT  # -160.5865
 if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 > KNOB_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
@@ -1037,7 +1038,7 @@ CHAIN_PLANE_ENVELOPES = (
             "knob drive pin",
             xy,
             KNOB_PIN.DIA / 2.0,
-            REMOVABLE.DRIVE_PIN_TIP_Z,
+            seat_geometry.DRIVE_PIN_TIP_Z,
             KNOB_DRIVE_PIN_Z0,
         )
         for xy in KNOB_DRIVE_PIN_XY
@@ -1923,7 +1924,7 @@ def _assert_knob_shaft_clearance() -> None:
     if bushing_air < 1.0:
         raise RuntimeError(f"front bushing to knob stack air {bushing_air:.2f} < 1.0")
     # The knob wheel overlaps the disc rim in XY -- they must stay z-separated.
-    z_gap = DISC_Z0 - REMOVABLE.SEAT_FACE_Z  # 6.9
+    z_gap = DISC_Z0 - seat_geometry.SEAT_FACE_Z  # 6.9
     if z_gap < 2.0:
         raise RuntimeError(f"knob wheel/disc z gap {z_gap:.2f} < 2.0")
     # End float: the knob cup's front face behind the arm plate's boss.
@@ -2006,7 +2007,7 @@ def _assert_chain_slack_clearance() -> None:
     physical closure is checked separately by paper_drive_chain_fit.
     """
     z_front = CHAIN_FRONT_Z_WORST
-    z_back = REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
+    z_back = seat_geometry.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
     half_h = max(CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT / 2.0)
     run = _slack_run_points()
     report = []

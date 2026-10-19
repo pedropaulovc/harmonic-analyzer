@@ -106,6 +106,7 @@ import pd_transgear_drive_collar_spec as collar
 import pd_transgear_knob_cup_spec as knob_cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
@@ -677,7 +678,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
-    "pd-vn-transgear-knob-drive-pin": len(sprocket.PIN_HOLE_ANGLES_DEG),
+    "pd-vn-transgear-knob-drive-pin": len(seat_geometry.PIN_HOLE_ANGLES_DEG),
     "pd-transgear-removable": 3,  # two mounted wheels plus the loose T18 spare
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,

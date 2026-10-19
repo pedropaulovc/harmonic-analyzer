@@ -24,7 +24,7 @@ from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
 import dt_vn_crank_seat_drive_pin_spec
-import pd_transgear_removable_spec
+import _sprocket_seat_geometry as seat_geometry
 from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
@@ -271,11 +271,11 @@ PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 # plates wrapping the T12 pass over the spigot and in front of the body's
 # front face: long enough that a bought chain's
 # envelope, floated rearmost on the thinnest wheel
-# (pd_transgear_removable_spec.chain_reach_rear, 3.59 behind the seat), keeps
+# (_sprocket_seat_geometry.chain_reach_rear, 3.59 behind the seat), keeps
 # air to the body at the spigot's print-worst length (the drive train asserts
 # it, with the radial air for the CAD link and a real ANSI plate).  The seat
-# diameter is the interface both shafts share, so it is the removable spec's.
-SPIGOT_DIA = pd_transgear_removable_spec.SEAT_SPIGOT_DIA
+# diameter is the interface both shafts share, so the pure provider owns it.
+SPIGOT_DIA = seat_geometry.SEAT_SPIGOT_DIA
 # User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
 # band and the Ø20.6 body's front face stayed put, so the spigot grew
 # 4.0 -> 5.8.  Owner ruling D1 (2026-10-15) deleted the crank-seat washer and
@@ -289,10 +289,10 @@ SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set
 # by the proud length the wheel needs.
-if pd_transgear_removable_spec.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
+if seat_geometry.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("the drive-pin holes are laid out on local +/-Z only")
-DRIVE_PIN_CIRCLE_RADIUS = pd_transgear_removable_spec.PIN_CIRCLE_RADIUS
-DRIVE_PIN_HOLE_DIA = pd_transgear_removable_spec.DRIVE_PIN_HOLE_DIA
+DRIVE_PIN_CIRCLE_RADIUS = seat_geometry.PIN_CIRCLE_RADIUS
+DRIVE_PIN_HOLE_DIA = seat_geometry.DRIVE_PIN_HOLE_DIA
 DRIVE_PIN_DEPTH = dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH  # 3.95
 DRIVE_PIN_FLOOR = SEAT_COLLAR + DRIVE_PIN_DEPTH
 if not SEAT_COLLAR < SPIGOT_END < COLLAR_REAR:
@@ -327,10 +327,7 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 # - Pressed to the floor, the pin stands PROUD = LENGTH - depth: the depth
 #   band plus the dowel's +/-0.010 in length grade must keep the tip clear
 #   of the crank hub and engaged in the wheel.  +/-0.10 at .XX.
-SPIGOT_DIA_BAND = (0.0, -0.10)
 SPIGOT_LENGTH_TOL = 0.05
-DRIVE_PIN_OFFSET_PLACES = pd_transgear_removable_spec.DRIVE_PIN_OFFSET_PLACES
-DRIVE_PIN_OFFSET_TOL = pd_transgear_removable_spec.DRIVE_PIN_OFFSET_TOL
 DRIVE_PIN_DEPTH_TOL = 0.10
 # Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own band plus the Depth's.  The drive
@@ -339,19 +336,13 @@ SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[0] + COLLAR_STATION_TOL,
     SHAFT_LENGTH_BAND[1] - COLLAR_STATION_TOL,
 )
-# Reamed for a light press of the stock hardened 3/32 dowel (its catalogue
-# diameter tolerance is dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN).
-DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
 _DOWEL_OD = tuple(
     dt_vn_crank_seat_drive_pin_spec.DIA + inch * dt_vn_crank_seat_drive_pin_spec.MM_PER_IN
     for inch in dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN
 )
-# The stock dowel's length grade, +/-0.010 in (the knob shaft's MHA-PD-VN-54 is the
-# same 98381A family and reads it here too).
-DRIVE_PIN_LENGTH_GRADE = 0.010 * pd_transgear_removable_spec.MM_PER_IN
 DRIVE_PIN_PRESS_INTERFERENCE = (
-    _DOWEL_OD[0] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]),
-    _DOWEL_OD[1] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1]),
+    _DOWEL_OD[0] - (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[0]),
+    _DOWEL_OD[1] - (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[1]),
 )
 if min(DRIVE_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the drive-pin hole band loses the press at its upper limit")
@@ -370,36 +361,36 @@ _KNOCKOUT_DIA_MAX = DRIVE_PIN_KNOCKOUT_DIA + float(
     _config.title_block("drilled_hole")["plus_mm"]
 )
 DRIVE_PIN_FLOOR_LAND_WORST = (
-    DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1] - _KNOCKOUT_DIA_MAX
+    DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[1] - _KNOCKOUT_DIA_MAX
 ) / 2.0
 if DRIVE_PIN_FLOOR_LAND_WORST < 0.4:
     raise AssertionError("the knockout leaves the pressed pin no floor to bottom on")
 if (
-    DRIVE_PIN_CIRCLE_RADIUS - DRIVE_PIN_OFFSET_TOL - _KNOCKOUT_DIA_MAX / 2.0
+    DRIVE_PIN_CIRCLE_RADIUS - seat_geometry.DRIVE_PIN_OFFSET_TOL - _KNOCKOUT_DIA_MAX / 2.0
     <= JOURNAL_BORE_DIA / 2.0 + JOURNAL_BORE_BAND[0] + BORE_MOUTH_BREAK_MAX
-    or DRIVE_PIN_CIRCLE_RADIUS + DRIVE_PIN_OFFSET_TOL + _KNOCKOUT_DIA_MAX / 2.0
+    or DRIVE_PIN_CIRCLE_RADIUS + seat_geometry.DRIVE_PIN_OFFSET_TOL + _KNOCKOUT_DIA_MAX / 2.0
     >= COLLAR_DIA / 2.0 - BORE_MOUTH_BREAK_MAX
 ):
     raise AssertionError("the knockout must leave the rear face on its bearing ring")
-_SPIGOT_R_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1]) / 2.0
+_SPIGOT_R_WORST = (SPIGOT_DIA + seat_geometry.SPIGOT_DIA_BAND[1]) / 2.0
 _PIN_HOLE_OUTER_R_WORST = (
     DRIVE_PIN_CIRCLE_RADIUS
-    + DRIVE_PIN_OFFSET_TOL
-    + (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]) / 2.0
+    + seat_geometry.DRIVE_PIN_OFFSET_TOL
+    + (DRIVE_PIN_HOLE_DIA + seat_geometry.DRIVE_PIN_HOLE_BAND[0]) / 2.0
 )
 # Pin hole to the spigot rim: under the 1.5 floor at nominal (0.56) and at
 # the printed worst case, rounded DOWN so a sheet never states more rim than
 # the limits give.
-DRIVE_PIN_SPIGOT_RIM = pd_transgear_removable_spec.SEAT_SPIGOT_RIM
+DRIVE_PIN_SPIGOT_RIM = seat_geometry.SEAT_SPIGOT_RIM
 DRIVE_PIN_SPIGOT_RIM_WORST = (
     math.floor((_SPIGOT_R_WORST - _PIN_HOLE_OUTER_R_WORST) * 100.0 + 1e-9) / 100.0
 )
 if DRIVE_PIN_SPIGOT_RIM_WORST <= 0.0:
     raise AssertionError("the drive-pin holes break out of the spigot at print-worst")
-DRIVE_PIN_SPACING_ERROR_MAX = 2.0 * DRIVE_PIN_OFFSET_TOL
+DRIVE_PIN_SPACING_ERROR_MAX = 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 if (
     2.0 * DRIVE_PIN_SPACING_ERROR_MAX
-    >= pd_transgear_removable_spec.PIN_HOLE_DIA - _DOWEL_OD[1]
+    >= seat_geometry.PIN_HOLE_DIA - _DOWEL_OD[1]
 ):
     raise AssertionError("shaft + wheel pin spacing error exceeds the slip clearance")
 # The wheel rides its seat on the two pins alone; nothing else centres it.
@@ -413,18 +404,18 @@ if (
 # takes this off.
 _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WHEEL_PIN_FLOAT = (
-    pd_transgear_removable_spec.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
-) / 2.0 + 2.0 * DRIVE_PIN_OFFSET_TOL
+    seat_geometry.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
+) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 _WHEEL_BORE_FLOAT = (
-    pd_transgear_removable_spec.BORE_DIA
+    seat_geometry.BORE_DIA
     + _DRILL_OVERSIZE
     - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 ) / 2.0
 WHEEL_SEAT_FLOAT = min(_WHEEL_PIN_FLOAT, _WHEEL_BORE_FLOAT)  # 0.158
 _PROUD = dt_vn_crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 DRIVE_PIN_PROUD_RANGE = (
-    _PROUD - DRIVE_PIN_DEPTH_TOL - DRIVE_PIN_LENGTH_GRADE,
-    _PROUD + DRIVE_PIN_DEPTH_TOL + DRIVE_PIN_LENGTH_GRADE,
+    _PROUD - DRIVE_PIN_DEPTH_TOL - seat_geometry.DRIVE_PIN_LENGTH_GRADE,
+    _PROUD + DRIVE_PIN_DEPTH_TOL + seat_geometry.DRIVE_PIN_LENGTH_GRADE,
 )  # 2.046 .. 2.754
 if not 0.0 < DRIVE_PIN_PROUD_RANGE[0] < DRIVE_PIN_PROUD_RANGE[1]:
     raise AssertionError("a pressed drive pin sinks below the seat face at print-worst")
@@ -473,7 +464,7 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     seat_face_band=SEAT_COLLAR_BAND,
     hub_rear=HUB_LENGTH,
     hub_rear_tol=HUB_LENGTH_TOL,
-    plate_min=pd_transgear_removable_spec.PLATE + min(pd_transgear_removable_spec.PLATE_BAND),
+    plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
 )  # 0.146, 1.046
 # The bare land behind the collar keeps the bore mouth's edge break at both
 # print limits (JOURNAL_START above).
@@ -571,8 +562,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SpigotProfile": {"SpigotDiaDim": 2},
     "Spigot": {"SpigotLength": 2},
     "DrivePinProfile": {
-        "DrivePinOffset1": DRIVE_PIN_OFFSET_PLACES,
-        "DrivePinOffset2": DRIVE_PIN_OFFSET_PLACES,
+        "DrivePinOffset1": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
+        "DrivePinOffset2": seat_geometry.DRIVE_PIN_OFFSET_PLACES,
     },
     "StationReference": {
         "OverallLength": 1,

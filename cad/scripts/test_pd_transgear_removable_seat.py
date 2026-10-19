@@ -16,6 +16,7 @@ import pd_transgear_drive_collar_spec as collar
 import pd_vn_transgear_knob_drive_pin_spec as knob_pin
 import pd_vn_transgear_latch_pin_spec as dowel_spec
 import pd_transgear_removable_spec as spec
+import _sprocket_seat_geometry as seat_geometry
 
 
 @pytest.mark.parametrize(("configuration", "teeth"), spec.CONFIGS)
@@ -38,12 +39,12 @@ def test_mounted_selections_resolve_through_the_part_configurations() -> None:
 
 def test_seat_spigot_rim_is_the_recorded_shortfall() -> None:
     rim = (
-        spec.SEAT_SPIGOT_DIA / 2.0
-        - spec.PIN_CIRCLE_RADIUS
-        - spec.DRIVE_PIN_HOLE_DIA / 2.0
+        seat_geometry.SEAT_SPIGOT_DIA / 2.0
+        - seat_geometry.PIN_CIRCLE_RADIUS
+        - seat_geometry.DRIVE_PIN_HOLE_DIA / 2.0
     )
     assert 0.0 < rim < 1.5
-    assert spec.SEAT_SPIGOT_RIM == pytest.approx(rim)
+    assert seat_geometry.SEAT_SPIGOT_RIM == pytest.approx(rim)
 
 
 @pytest.mark.parametrize(
@@ -100,7 +101,7 @@ def _wheel_float(hole_dia: float) -> float:
     ways along the pins' line."""
     hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
     dowel_min = crank_pin.DIA + dowel_spec.DIA_BAND_IN[0] * dowel_spec.MM_PER_IN
-    return (hole_max - dowel_min) / 2.0 + 2.0 * spec.DRIVE_PIN_OFFSET_TOL
+    return (hole_max - dowel_min) / 2.0 + 2.0 * seat_geometry.DRIVE_PIN_OFFSET_TOL
 
 
 def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
@@ -110,12 +111,12 @@ def test_chain_on_the_floated_crank_wheel_keeps_its_radial_air() -> None:
     diameter at its largest printed size and the hub at the far side of its
     bore clearance; the gate must report that corner's air, and it must stay
     positive."""
-    wheel = _wheel_float(spec.PIN_HOLE_DIA)
+    wheel = _wheel_float(seat_geometry.PIN_HOLE_DIA)
     assert wheel == pytest.approx(0.1581, abs=1e-4)
     # The bore is no stop: its tightest clearance on the pilot is wider.
-    assert (spec.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
+    assert (seat_geometry.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
     hub_float = (hub.HUB_BORE_DIA_MAX - (hub.SHAFT_DIA + hub.SHAFT_DIA_BAND[1])) / 2.0
-    spigot_max = crank.SPIGOT_DIA + max(crank.SPIGOT_DIA_BAND)
+    spigot_max = crank.SPIGOT_DIA + max(seat_geometry.SPIGOT_DIA_BAND)
     relief_places = dt_crank_hub_spec.DRAWING_PRECISION_BY_NAME["ReliefDia"]
     relief_max = hub.RELIEF_DIA + _printed_band(relief_places)
     for height, spigot_air, relief_air in (
@@ -156,11 +157,11 @@ def test_bought_chain_reach_about_the_seat_face() -> None:
     # the connecting link's clip.  Floated frontmost the rear inner plate lies
     # on the seat face; rearmost the front one lies on the wheel's front face.
     w, g = 0.125 * 25.4, 0.185 * 25.4
-    assert spec.CHAIN_REACH_FRONT == pytest.approx(w / 2.0 + g)
-    thinnest = spec.PLATE + min(spec.PLATE_BAND)
-    assert spec.chain_reach_rear(thinnest) == pytest.approx(w / 2.0 + g - 2.7)
+    assert seat_geometry.CHAIN_REACH_FRONT == pytest.approx(w / 2.0 + g)
+    thinnest = seat_geometry.PLATE + min(seat_geometry.PLATE_BAND)
+    assert seat_geometry.chain_reach_rear(thinnest) == pytest.approx(w / 2.0 + g - 2.7)
     # The inner plates straddle even the thickest wheel.
-    assert spec.PLATE + max(spec.PLATE_BAND) < w
+    assert seat_geometry.PLATE + max(seat_geometry.PLATE_BAND) < w
 
 
 def test_knob_pin_holes_obey_the_wall_floor_or_run_through() -> None:
@@ -170,7 +171,7 @@ def test_knob_pin_holes_obey_the_wall_floor_or_run_through() -> None:
     # Negative control: the old blind hole, reamed to the pin's press depth
     # (4.7625 - 2.4 = 2.3625) in the first 3.6 collar, left a 1.2375 floor.
     # The old guard only refused a breakthrough (floor > 0) and passed it.
-    old_depth = knob_pin.LENGTH - spec.DRIVE_PIN_PROUD
+    old_depth = knob_pin.LENGTH - seat_geometry.DRIVE_PIN_PROUD
     assert old_depth == pytest.approx(2.3625)
     first_collar = 3.6
     assert 0.0 < first_collar - old_depth < collar.WALL_FLOOR
@@ -195,10 +196,10 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
     # The old check held that against the NOMINAL 2.8 plate and passed it; on
     # the thinnest wheel the tip stands out under the thumbnut's neck.
     floor_pressed_max = (
-        spec.DRIVE_PIN_PROUD + crank.DRIVE_PIN_DEPTH_TOL + crank.DRIVE_PIN_LENGTH_GRADE
+        seat_geometry.DRIVE_PIN_PROUD + crank.DRIVE_PIN_DEPTH_TOL + seat_geometry.DRIVE_PIN_LENGTH_GRADE
     )
     assert floor_pressed_max == pytest.approx(2.754)
-    assert floor_pressed_max < spec.PLATE
+    assert floor_pressed_max < seat_geometry.PLATE
     with pytest.raises(AssertionError, match="thumbnut"):
         knob_pin.checked_tip_inset(floor_pressed_max, knob_pin.THINNEST_PLATE)
     with pytest.raises(AssertionError):
@@ -216,7 +217,7 @@ def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
     # same shortest collar would stand out of its rear face toward the 12T.
     assert collar.pin_rear_inset(
         collar.LENGTH_FITTED_MIN,
-        crank_pin.LENGTH + crank.DRIVE_PIN_LENGTH_GRADE,
+        crank_pin.LENGTH + seat_geometry.DRIVE_PIN_LENGTH_GRADE,
         min(knob_pin.PROUD_RANGE),
     ) == pytest.approx(-0.434)
 
@@ -233,7 +234,7 @@ _CRANK_SEAT = dict(
     seat_face=crank.SEAT_COLLAR,
     seat_face_band=crank.SEAT_COLLAR_BAND,
     hub_rear_tol=crank.HUB_LENGTH_TOL,
-    plate_min=spec.PLATE + min(spec.PLATE_BAND),
+    plate_min=seat_geometry.PLATE + min(seat_geometry.PLATE_BAND),
 )
 
 
@@ -252,14 +253,14 @@ def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
         crank.DRIVE_PIN_ENGAGEMENT_WORST,
     )
     # The longest pin standing past the thinnest wheel is not a contact.
-    assert max(crank.DRIVE_PIN_PROUD_RANGE) > spec.PLATE + min(spec.PLATE_BAND)
+    assert max(crank.DRIVE_PIN_PROUD_RANGE) > seat_geometry.PLATE + min(seat_geometry.PLATE_BAND)
 
 
 def test_crank_pin_check_refuses_a_hub_the_old_plate_check_passed() -> None:
     proud = crank.DRIVE_PIN_PROUD_RANGE
     # The old check: both limits inside the NOMINAL plate.  It never looked at
     # the hub, so it passes these pins whatever the hub does.
-    assert 0.0 < proud[0] < proud[1] < spec.PLATE
+    assert 0.0 < proud[0] < proud[1] < seat_geometry.PLATE
     # Negative control: a hub 0.2 longer closes the tip's air.
     with pytest.raises(AssertionError, match="hub's rear face"):
         crank.drive_pin_front_clearances(

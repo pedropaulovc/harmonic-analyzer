@@ -9,7 +9,7 @@ import pytest
 import _chain as chain
 import build_pd_paper_drive_assembly as assembly
 import pd_transgear_drive_collar_spec as collar
-import pd_transgear_removable_spec as band
+import _sprocket_seat_geometry as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide

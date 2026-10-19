@@ -17,7 +17,7 @@ import pd_transgear_arm_plate_geometry as PLATE
 import pd_transgear_drive_collar_spec as COLLAR
 import pd_transgear_knob_shaft_spec as SHAFT
 import pd_transgear_knob_thrust_ring_spec as RING
-import pd_transgear_removable_spec as WHEEL
+import _sprocket_seat_geometry as WHEEL
 from _gear_quality import (
     arm_opposite_face_parallelism_mm,
     arm_plate_loaded_normal_change_mm,

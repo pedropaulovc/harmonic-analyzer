@@ -16,6 +16,7 @@ import pytest
 import _assembly
 import _chain
 import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as seat_geometry
 from _chain_mounts import mounted_wheels
 
 
@@ -176,7 +177,7 @@ def _mount_values(role: str, *, angle: float = 0.0) -> list[float]:
         0.0, 0.0, 1.0,
         -centre[0] / 1000.0,
         centre[1] / 1000.0,
-        removable.BAND_FRONT_Z / 1000.0,
+        seat_geometry.BAND_FRONT_Z / 1000.0,
         1.0, 0.0, 0.0, 0.0,
     ]
 
@@ -393,7 +394,7 @@ def test_right_family_and_configuration_still_require_the_physical_mount(
     else:
         # A rigid flipped plate does not have the authored front origin/+Z band.
         values[:9] = [1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0]
-        values[11] = removable.SEAT_FACE_Z / 1000.0
+        values[11] = seat_geometry.SEAT_FACE_Z / 1000.0
     with pytest.raises(RuntimeError, match="interference"):
         _check(_mesh_adapter(_wheel("knob", values=values)))
 
@@ -449,8 +450,8 @@ def test_mounts_follow_shared_centre_band_and_selection_cells_lazily(
         _chain, centre_key, (old_centre[0] + 2.0, old_centre[1] + 3.0)
     )
     monkeypatch.setattr(removable, selection_key, "T18")
-    monkeypatch.setattr(removable, "BAND_FRONT_Z", removable.BAND_FRONT_Z - 1.0)
-    monkeypatch.setattr(removable, "SEAT_FACE_Z", removable.SEAT_FACE_Z - 1.0)
+    monkeypatch.setattr(seat_geometry, "BAND_FRONT_Z", seat_geometry.BAND_FRONT_Z - 1.0)
+    monkeypatch.setattr(seat_geometry, "SEAT_FACE_Z", seat_geometry.SEAT_FACE_Z - 1.0)
 
     _check(_mesh_adapter(_wheel(role)))
     with pytest.raises(RuntimeError, match="interference"):
