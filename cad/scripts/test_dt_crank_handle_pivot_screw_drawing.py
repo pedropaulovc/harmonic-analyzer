@@ -497,9 +497,10 @@ async def test_builder_uses_the_supported_tangent_arc_and_associative_radius(cor
         assert drawing.DETAIL_RADIUS_MM - math.hypot(
             -u - drawing.DETAIL_STATION, v
         ) >= 0.2
+    assert state.lines["Line7"][2:] == state.arcs[0][4:6]
+    assert state.lines["Line8"][:2] == state.arcs[0][2:4]
+    assert state.lines["Line12"][2:] == state.lines["Line0"][:2]
     for connection in (
-        ("Line7.end", "Corner.end", "coincident"),
-        ("Corner.start", "Line8.start", "coincident"),
         ("Line7", "Corner", "tangent"),
         ("Line8", "Corner", "tangent"),
     ):

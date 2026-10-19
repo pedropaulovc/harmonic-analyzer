@@ -303,13 +303,9 @@ async def build(adapter) -> dict[str, str]:
     head_outline, shoulder_outline = lines[1], lines[3]
     seat_edge_break = lines[4]
     relief_lead, relief_floor = lines[6], lines[7]
-    relief_flank, thread_outline, tip_chamfer, _, closure = thread_lines
-    for label, first, second in (
-        ("floor-corner", f"{relief_floor}.end", f"{relief_corner}.end"),
-        ("corner-flank", f"{relief_corner}.start", f"{relief_flank}.start"),
-        ("closure-head", f"{closure}.end", f"{lines[0]}.start"),
-    ):
-        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+    relief_flank, thread_outline, tip_chamfer, _, _ = thread_lines
+    # Exact-coordinate endpoints merge in the sketch DB, as in _chain_link.
+    # Do not constrain those already-shared vertices a second time.
     for label, line in (("floor", relief_floor), ("flank", relief_flank)):
         check(
             f"screw relief corner tangent to {label}",
