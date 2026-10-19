@@ -23,6 +23,7 @@ SPEC = DRAWINGS_BY_NAME["vn_thumb_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#4-40 x 7/16 RAISED KNURLED-HEAD THUMB SCREW"
 
+
 def _station_circle(edges: Any, station_mm: float, *, label: str) -> Any:
     """A physical rim in a finished axial face, including a chamfered rim.
 
@@ -109,7 +110,9 @@ def _diameter_flanks(
     result = {}
     for name, sides in flanks.items():
         if set(sides) != {-1, 1}:
-            raise RuntimeError(f"{name}: missing actual upper/lower cylindrical envelope")
+            raise RuntimeError(
+                f"{name}: missing actual upper/lower cylindrical envelope"
+            )
         result[name] = (sides[-1][1], sides[1][1])
     return result
 
@@ -121,9 +124,10 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
     axis = model_points_in_view(
         adapter,
         view,
-        [(x / 1000.0, 0.0, 0.0) for x in (
-            0.0, thumb.HEAD_H, thumb.HEAD_STACK_LEN, thumb.OVERALL_LEN
-        )],
+        [
+            (x / 1000.0, 0.0, 0.0)
+            for x in (0.0, thumb.HEAD_H, thumb.HEAD_STACK_LEN, thumb.OVERALL_LEN)
+        ],
         label="thumb supplier axial stations",
     )
     if max(point[1] for point in axis) - min(point[1] for point in axis) > 1e-7:
@@ -134,10 +138,21 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
     left, right = min(point[0] for point in axis), max(point[0] for point in axis)
     # Explicit annotation lanes around the unchanged largest-fitting view.
     # The lower caption remains at its cell floor, not under the body.
-    outline = (left - 0.020, center_y - radius - 0.014,
-               right + 0.031, center_y + radius + 0.023)
-    if outline[0] < 0.025 or outline[1] < 0.077 or outline[2] > 0.205 or outline[3] > 0.182:
-        raise RuntimeError("thumb supplier annotation lanes do not fit; relayout without downscaling")
+    outline = (
+        left - 0.020,
+        center_y - radius - 0.014,
+        right + 0.031,
+        center_y + radius + 0.023,
+    )
+    if (
+        outline[0] < 0.025
+        or outline[1] < 0.077
+        or outline[2] > 0.205
+        or outline[3] > 0.182
+    ):
+        raise RuntimeError(
+            "thumb supplier annotation lanes do not fit; relayout without downscaling"
+        )
     edges = scan_view_edges(view, label="thumb supplier finished-face rims")
     stations = (0.0, thumb.HEAD_H, thumb.HEAD_STACK_LEN, thumb.OVERALL_LEN)
     rims = [
@@ -151,15 +166,24 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
     ):
         entities = (rims[start], rims[end])
         display = add_edge_dimension(
-            adapter, view, p0=axis[start], p1=axis[end],
+            adapter,
+            view,
+            p0=axis[start],
+            p1=axis[end],
             text_xy=((axis[start][0] + axis[end][0]) / 2.0, y),
-            label=name, orientation="horizontal", entities=entities,
+            label=name,
+            orientation="horizontal",
+            entities=entities,
         )
         assert_dimension_measures(
             adapter, display, expected_mm=value, label=name, entities=entities
         )
         supplier_reference_dimension(
-            adapter, display, label=name, expected_mm=value, units=thumb.SUPPLIER_UNITS,
+            adapter,
+            display,
+            label=name,
+            expected_mm=value,
+            units=thumb.SUPPLIER_UNITS,
             precision=thumb.SUPPLIER_PRECISION[name],
         )
     flanks = _diameter_flanks(adapter, view, center_y=center_y)
@@ -170,21 +194,34 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
     ):
         entities = flanks[name]
         display = add_edge_dimension(
-            adapter, view, p0=(x, center_y - value / 2000.0),
-            p1=(x, center_y + value / 2000.0), text_xy=(x, center_y),
-            label=name, orientation="vertical", entity_type="SILHOUETTE",
+            adapter,
+            view,
+            p0=(x, center_y - value / 2000.0),
+            p1=(x, center_y + value / 2000.0),
+            text_xy=(x, center_y),
+            label=name,
+            orientation="vertical",
+            entity_type="SILHOUETTE",
             entities=entities,
         )
         assert_dimension_measures(
-            adapter, display, expected_mm=value, label=name,
-            entities=entities, entity_types=("SILHOUETTE", "SILHOUETTE"),
+            adapter,
+            display,
+            expected_mm=value,
+            label=name,
+            entities=entities,
+            entity_types=("SILHOUETTE", "SILHOUETTE"),
         )
         supplier_reference_dimension(
-            adapter, display, label=name, expected_mm=value, units=thumb.SUPPLIER_UNITS,
-            precision=thumb.SUPPLIER_PRECISION[name], presentation="diameter",
+            adapter,
+            display,
+            label=name,
+            expected_mm=value,
+            units=thumb.SUPPLIER_UNITS,
+            precision=thumb.SUPPLIER_PRECISION[name],
+            presentation="diameter",
             callout=thumb.SUPPLIER_THREAD if name == "thread_diameter" else None,
         )
-
 
 
 async def build(adapter: Any) -> dict[str, str]:

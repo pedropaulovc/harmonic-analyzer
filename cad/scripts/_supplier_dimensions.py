@@ -11,6 +11,7 @@ import math
 from typing import Any, Literal
 
 from _com import _early_bound
+import _telemetry
 
 # swDimensionType_e; reject angle/radius/ordinate values before interpreting SI.
 _LINEAR_TYPES = (2, 11, 12)
@@ -34,16 +35,22 @@ def _measured_supplier_value(
         if expected_mm is not None:
             raise ValueError(f"{label}: an angle cannot specify expected_mm")
     else:
-        allowed = _LINEAR_TYPES + (_DIAMETER_TYPES if presentation == "diameter" else ())
+        allowed = _LINEAR_TYPES + (
+            _DIAMETER_TYPES if presentation == "diameter" else ()
+        )
         expected = expected_mm
         factor = 1000.0
         unit = "mm"
         if expected_degrees is not None:
             raise ValueError(f"{label}: a length cannot specify expected_degrees")
     if expected is None or not math.isfinite(expected) or expected <= 0.0:
-        raise ValueError(f"{label}: expected native {unit} value must be finite and positive")
+        raise ValueError(
+            f"{label}: expected native {unit} value must be finite and positive"
+        )
     if kind not in allowed:
-        raise RuntimeError(f"{label}: native dimension type {kind} is not {presentation}")
+        raise RuntimeError(
+            f"{label}: native dimension type {kind} is not {presentation}"
+        )
     raw = display.GetDimension2(0)
     if raw is None:
         raise RuntimeError(f"{label}: supplier reference has no native dimension")
@@ -57,6 +64,7 @@ def _measured_supplier_value(
     return measured
 
 
+@_telemetry.traced("drawing.supplier_reference_dimension", label_param="label")
 def supplier_reference_dimension(
     adapter: Any,
     dimension: Any,
@@ -82,7 +90,9 @@ def supplier_reference_dimension(
     (for example a thread designation), never a replacement numeric dimension.
     """
     if units not in ("in", "mm", "deg") or presentation not in (
-        "length", "diameter", "angle"
+        "length",
+        "diameter",
+        "angle",
     ):
         raise ValueError(f"{label}: unsupported supplier units/presentation")
     if (units == "deg") != (presentation == "angle"):
@@ -104,10 +114,14 @@ def supplier_reference_dimension(
         expected_degrees=expected_degrees,
     )
     if display.GetOverride() or not display.ShowDimensionValue:
-        raise RuntimeError(f"{label}: supplier reference hides or overrides its native value")
+        raise RuntimeError(
+            f"{label}: supplier reference hides or overrides its native value"
+        )
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     if annotation.IsDangling() or not any(annotation.GetAttachedEntities3() or ()):
-        raise RuntimeError(f"{label}: supplier reference has no sound native attachment")
+        raise RuntimeError(
+            f"{label}: supplier reference has no sound native attachment"
+        )
     unit = {"mm": 0, "in": 3, "deg": 0}[units]  # swLengthUnit_e / swAngleUnit_e
     fraction = 2 if fraction_denominator is not None else 1  # swFractionDisplay_e
     denominator = fraction_denominator or 0
@@ -116,7 +130,9 @@ def supplier_reference_dimension(
         if not math.isclose(
             inches * denominator, round(inches * denominator), rel_tol=0.0, abs_tol=1e-8
         ):
-            raise ValueError(f"{label}: exact geometry cannot display that inch fraction")
+            raise ValueError(
+                f"{label}: exact geometry cannot display that inch fraction"
+            )
     # swUnitsDecimalRounding_HalfAway=0 matches supplier decimal rounding.
     if display.SetUnits2(False, unit, fraction, denominator, False, 0) != 0:
         raise RuntimeError(f"{label}: supplier units were rejected")
@@ -146,7 +162,9 @@ def supplier_reference_dimension(
         or str(display.GetText(2) or "") != suffix
         or (callout is not None and str(display.GetText(4) or "") != callout)
     ):
-        raise RuntimeError(f"{label}: native supplier presentation did not survive rebuild")
+        raise RuntimeError(
+            f"{label}: native supplier presentation did not survive rebuild"
+        )
     if fraction_denominator is not None and (
         int(display.GetFractionValue()) != fraction_denominator
         or display.GetRoundToFraction()

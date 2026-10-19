@@ -58,3 +58,23 @@ BODY_DIA_BAND = None  # Unknown supplier tolerance, not a zero-width band.
 BODY_LEN_BAND = None
 CUP_DIA_BAND = None
 CUP_DEPTH_BAND = None
+
+# Final VN frame: slot face y=0, cup rim y=SS_LEN after the stock transform.
+# McMaster engineering drawing inspected 2026-10-19; no cup/slot size printed.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260604/C16BBF25/"
+    "94025A164_18-8%20Stainless%20Steel%20Slotted%20Cup-Tip%20Set%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierLength", SS_LEN, "vertical"),
+    ("SupplierThreadDiameter", 2.0 * SS_MAJOR_R, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierLength": (SS_MAJOR_R, 0.0),
+    "SupplierThreadDiameter": (-SS_MAJOR_R, SS_LEN / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierLength": (3, "length", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "10-32"),
+}

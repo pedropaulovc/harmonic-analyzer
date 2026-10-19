@@ -405,7 +405,9 @@ def test_supplier_native_type_is_checked_before_reading_si_value(
         Type2 = kind
 
         def GetDimension2(self, _index):
-            raise AssertionError("an incompatible dimension must not be read as a length")
+            raise AssertionError(
+                "an incompatible dimension must not be read as a length"
+            )
 
     with pytest.raises(RuntimeError, match="native dimension type"):
         supplier._measured_supplier_value(

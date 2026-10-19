@@ -43,6 +43,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _session import run_build  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _stock_recipe import stock_recipe  # noqa: E402
+from _mcmaster_91375a942 import HEX_AF, IN, LENGTH, MAJOR_DIA, PITCH  # noqa: E402
 from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     OUT_DIR,
     _rev_frustum,
@@ -57,13 +58,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut_modern,
 )
 
-IN = 25.4
-# Catalogue (live 2026-10-09).
-MAJOR_DIA = 0.073 * IN  # 1.8542, the 2-D PDF's 0.073in
-PITCH = IN / 72.0  # 0.352778
-LENGTH = 5.0 / 32.0 * IN  # 3.96875, cup end to socket face
 HALF = LENGTH / 2.0
-HEX_AF = 0.035 * IN  # 0.889
 # Family assumptions (the 91375A106 laws).
 SOCKET_DEPTH = 1.4 * HEX_AF  # 1.2446
 SOCKET_CHAMFER = 0.75 * PITCH  # 0.264583, 45 deg

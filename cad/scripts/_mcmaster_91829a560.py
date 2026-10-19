@@ -35,3 +35,41 @@ ROOT_FLAT = PITCH / 8.0  # 0.132292 == vendor D2@Sketch10
 CUT_TOP_W = 15.0 * PITCH / 16.0  # 0.992187 (vendor: 0.9922)
 CUT_TOP_R = ROOT_R + (CUT_TOP_W - ROOT_FLAT) / 2.0 * math.sqrt(3.0)  # 2.470292
 CUT_CENTRE_Y = -UNDERHEAD_LEN - 7.0 * PITCH / 16.0  # -16.338 (vendor, in air)
+
+# McMaster engineering drawing inspected 2026-10-19. Exact 3/16-in head
+# height remains 4.7625 mm; only its supplier display rounds to 0.188 in.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260602/EA381BF9/"
+    "91829A560_Slotted%2018-8%20Stainless%20Steel%20Precision%20Shoulder%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = (
+    ("SupplierHeadHeight", HEAD_T, "vertical"),
+    ("SupplierHeadDiameter", HEAD_DIA, "horizontal"),
+    ("SupplierShoulderLength", -SHOULDER_LEN, "vertical"),
+    ("SupplierShoulderDiameter", SHOULDER_DIA, "horizontal"),
+    ("SupplierThreadLength", -THREAD_LEN, "vertical"),
+    ("SupplierThreadDiameter", THREAD_MAJOR, "horizontal"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierHeadHeight": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierHeadDiameter": (-HEAD_DIA / 2.0, 0.0),
+    "SupplierShoulderLength": (SHOULDER_DIA / 2.0, 0.0),
+    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2.0, -SHOULDER_LEN / 2.0),
+    "SupplierThreadLength": (THREAD_MAJOR / 2.0, -SHOULDER_LEN),
+    "SupplierThreadDiameter": (-THREAD_MAJOR / 2.0, -SHOULDER_LEN - THREAD_LEN / 2.0),
+}
+SUPPLIER_REFERENCE_PLANES = {"SupplierHeadDiameter": "Top"}
+SUPPLIER_REFERENCE_FORMATS = {
+    "SupplierHeadHeight": (3, "length", None, None),
+    "SupplierHeadDiameter": (3, "diameter", None, None),
+    "SupplierShoulderLength": (3, "length", None, None),
+    "SupplierShoulderDiameter": (3, "diameter", None, None),
+    "SupplierThreadLength": (3, "length", None, None),
+    "SupplierThreadDiameter": (3, "diameter", None, "10-24"),
+}
+# Signed lower/upper supplier deviations, inches. These are NOT project
+# fabrication controls; the sheet's dimensions remain native references.
+SUPPLIER_REFERENCE_TOLERANCES_IN = {
+    "SupplierShoulderLength": (0.0, 0.002),
+    "SupplierShoulderDiameter": (-0.001, 0.0),
+}
