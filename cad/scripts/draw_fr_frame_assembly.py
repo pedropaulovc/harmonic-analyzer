@@ -1167,11 +1167,13 @@ def _upper_frame_balloon_edges(
     return {stem: row[1] for stem, row in winners.items()}
 
 
+@_telemetry.traced("drawing.frame_balloon.bind_column", label_param="item")
 def _bind_left_column_balloon(
     adapter: Any, view: Any, note: Any, item: str,
     components: Sequence[tuple[Any, Any]],
 ) -> tuple[Any, Any, Any]:
     """Bind to an actual outer tube rim on the open left side of the view."""
+    _telemetry.annotate(component_count=len(components))
     candidates = []
     for component, _full in components:
         rims = []
@@ -1193,6 +1195,7 @@ def _bind_left_column_balloon(
         )[2]
         note, _annotation, point = _bind_frame_balloon(adapter, view, note, rim, item)
         candidates.append((point[:2], rim))
+    _telemetry.annotate(candidate_count=len(candidates), binding_attempt_count=len(candidates) + 1)
     if not candidates:
         raise RuntimeError("no visible outer column rim for the BOM balloon")
     rim = min(candidates, key=lambda row: row[0])[1]
@@ -1412,6 +1415,7 @@ def _position_moved(state: dict[str, Any], placed: dict[str, Any]) -> bool:
     return len(moved) != 2 or max(moved) > _SHORT_BALLOON_POSITION_TOL_M
 
 
+@_telemetry.traced("drawing.frame_balloon.short_repair", label_param="item")
 def _short_frame_balloon(
     adapter: Any, view: Any, note: Any, item: str, offset: tuple[float, float]
 ) -> _ShortBalloonProof:
@@ -1537,6 +1541,7 @@ class _FrameBalloonProof:
     short: tuple[_ShortBalloonProof, ...]
 
 
+@_telemetry.traced("drawing.frame_balloon.settled_proof")
 def _assert_frame_balloons_settled(
     adapter: Any, landings: Sequence[BalloonLanding], proof: _FrameBalloonProof
 ) -> None:
@@ -1549,6 +1554,9 @@ def _assert_frame_balloons_settled(
     binding and arrowtip, the short-leader ones their ring, arrowtip and
     anchor (:func:`_settled_short_balloon_failures`). Every failure is named.
     """
+    _telemetry.annotate(
+        landing_count=len(landings), bound_count=len(proof.bound), short_count=len(proof.short)
+    )
     _activate_sheet(adapter, SHEET_NAMES[1])
     failures = []
     try:
@@ -1575,65 +1583,77 @@ def _assert_frame_balloons_settled(
         )
 
 
+@_telemetry.traced("drawing.frame_balloon.reattach")
 def _reattach_frame_balloons(
     adapter: Any, view: Any, balloons: Sequence[Any], items: Sequence[tuple[str, str]]
 ) -> _FrameBalloonProof:
-    families = _frame_visible_components(view)
-    anchors = _upper_frame_balloon_edges(adapter, view, families)
-    item_by_stem = dict(items)
-    notes = {
-        _balloon_item_number(adapter, note, label="frame balloon"): note
-        for note in balloons
-    }
-    anchors["fr-top-frame"] = _exposed_top_casting_edge(
-        adapter, view, families["fr-top-frame"]
-    )
-    bound = {}
-    for stem, entity in anchors.items():
-        item = item_by_stem[stem]
-        notes[item], annotation, _point = _bind_frame_balloon(
-            adapter, view, notes[item], entity, item
+    _telemetry.annotate(balloon_count=len(balloons), item_count=len(items))
+    with _telemetry.span("drawing.frame_balloon.candidate_scan"):
+        families = _frame_visible_components(view)
+        anchors = _upper_frame_balloon_edges(adapter, view, families)
+        item_by_stem = dict(items)
+        notes = {
+            _balloon_item_number(adapter, note, label="frame balloon"): note
+            for note in balloons
+        }
+        anchors["fr-top-frame"] = _exposed_top_casting_edge(
+            adapter, view, families["fr-top-frame"]
         )
-        bound[item] = (annotation, entity)
-
-    item = item_by_stem["fr-tube-frame"]
-    notes[item], _annotation, _rim = _bind_left_column_balloon(
-        adapter, view, notes[item], item, families["fr-tube-frame"]
-    )
-
-    item = item_by_stem["fr-vn-frame-cross-screw"]
-    shanks = []
-    for component, full in families["fr-vn-frame-cross-screw"]:
-        if (
-            abs(
-                _component_point_in_assembly(full, (0.0, 0.0, 0.0))[1] * 1000.0
-                - TOP_SCREW_Y
+        _telemetry.annotate(
+            family_count=len(families),
+            component_count=sum(len(components) for components in families.values()),
+            anchor_count=len(anchors),
+        )
+    with _telemetry.span("drawing.frame_balloon.bind", anchor_count=len(anchors)):
+        bound = {}
+        for stem, entity in anchors.items():
+            item = item_by_stem[stem]
+            notes[item], annotation, _point = _bind_frame_balloon(
+                adapter, view, notes[item], entity, item
             )
-            > 1e-5
-        ):
-            continue
-        for raw_face in visible_component_entities(view, component, 3):
-            face = _early_bound(raw_face, "IFace2")
-            surface = _early_bound(face.GetSurface(), "ISurface")
+            bound[item] = (annotation, entity)
+
+        item = item_by_stem["fr-tube-frame"]
+        notes[item], _annotation, _rim = _bind_left_column_balloon(
+            adapter, view, notes[item], item, families["fr-tube-frame"]
+        )
+
+        item = item_by_stem["fr-vn-frame-cross-screw"]
+        shanks = []
+        for component, full in families["fr-vn-frame-cross-screw"]:
             if (
-                not surface.IsCylinder()
-                or abs(
-                    float(surface.CylinderParams[6]) - CROSS_SCREW_SHANK_DIA / 2000.0
+                abs(
+                    _component_point_in_assembly(full, (0.0, 0.0, 0.0))[1] * 1000.0
+                    - TOP_SCREW_Y
                 )
-                > 1e-7
+                > 1e-5
             ):
                 continue
-            notes[item], _annotation, point = _bind_frame_balloon(
-                adapter, view, notes[item], face, item
-            )
-            shanks.append(((point[0], point[1]), face))
-    if not shanks:
-        raise RuntimeError("no visibly exposed upper cross-screw shank")
-    # The leftmost native attachment is outside the casting/column silhouettes.
-    face = min(shanks, key=lambda row: row[0])[1]
-    notes[item], _annotation, _point = _bind_frame_balloon(
-        adapter, view, notes[item], face, item
-    )
+            for raw_face in visible_component_entities(view, component, 3):
+                face = _early_bound(raw_face, "IFace2")
+                surface = _early_bound(face.GetSurface(), "ISurface")
+                if (
+                    not surface.IsCylinder()
+                    or abs(
+                        float(surface.CylinderParams[6]) - CROSS_SCREW_SHANK_DIA / 2000.0
+                    )
+                    > 1e-7
+                ):
+                    continue
+                notes[item], _annotation, point = _bind_frame_balloon(
+                    adapter, view, notes[item], face, item
+                )
+                shanks.append(((point[0], point[1]), face))
+        _telemetry.annotate(
+            shank_candidate_count=len(shanks), shank_binding_attempt_count=len(shanks) + 1
+        )
+        if not shanks:
+            raise RuntimeError("no visibly exposed upper cross-screw shank")
+        # The leftmost native attachment is outside the casting/column silhouettes.
+        face = min(shanks, key=lambda row: row[0])[1]
+        notes[item], _annotation, _point = _bind_frame_balloon(
+            adapter, view, notes[item], face, item
+        )
 
     # Offsets are sheet metres from each balloon's native attachment. Items 2
     # and 9 attach 7 mm apart on the upper-left column/casting corner: at
@@ -1656,16 +1676,23 @@ def _reattach_frame_balloons(
         _short_frame_balloon(adapter, view, notes[item], item, offset)
         for item, offset in short.items()
     )
-    adapter.currentModel.EditRebuild3()
-    held = []
-    for item, (annotation, entity) in bound.items():
-        if item in short:
-            continue
-        state = _frame_balloon_binding_readback(adapter, annotation, entity, item)
-        if state["failed_checks"]:
-            raise RuntimeError(f"frame balloon {item} lost its binding: {state!r}")
-        tip = state["actual_leader_points"][-3:-1]
-        held.append(_BoundBalloonProof(item=item, annotation=annotation, entity=entity, tip=tip))
+    with _telemetry.span(
+        "drawing.frame_balloon.final_proof",
+        bound_count=len(bound),
+        short_count=len(proofs),
+        shank_candidate_count=len(shanks),
+    ):
+        adapter.currentModel.EditRebuild3()
+        held = []
+        for item, (annotation, entity) in bound.items():
+            if item in short:
+                continue
+            state = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+            if state["failed_checks"]:
+                raise RuntimeError(f"frame balloon {item} lost its binding: {state!r}")
+            tip = state["actual_leader_points"][-3:-1]
+            held.append(_BoundBalloonProof(item=item, annotation=annotation, entity=entity, tip=tip))
+        _telemetry.annotate(held_count=len(held))
     return _FrameBalloonProof(
         rebound=frozenset((*anchors, "fr-tube-frame", "fr-vn-frame-cross-screw")),
         bound=tuple(held),
