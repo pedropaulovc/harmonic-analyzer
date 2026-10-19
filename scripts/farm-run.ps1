@@ -739,10 +739,10 @@ function Get-Win32Process {
         [string[]]$Property
     )
 
-    # Every Win32_Process query goes through here. A query that fails is never
-    # an empty result: read as one, it turns a live launcher into a dead one
-    # (exit 21) or hides a run's processes from -Cancel. A transient fault is
-    # retried; anything else, or the last transient one, is thrown as is.
+    # Process-tree queries (cancellation and orphan reporting) go through
+    # here. A failed query is never an empty result, which could hide a run's
+    # processes. Transient faults are retried; anything else, or the last
+    # transient one, is thrown as is.
     $arguments = @{ ClassName = 'Win32_Process'; ErrorAction = 'Stop' }
     if ($Filter) {
         $arguments['Filter'] = $Filter
@@ -770,20 +770,36 @@ function Get-Win32Process {
     }
 }
 
+function Get-LauncherProcess {
+    param([Parameter(Mandatory)][int]$ProcessId)
+
+    # GetProcessById is native: status/watch must not depend on WMI health.
+    # Only an absent PID is a negative result; access/query failures propagate.
+    try {
+        return [System.Diagnostics.Process]::GetProcessById($ProcessId)
+    }
+    catch [System.ArgumentException] {
+        return $null
+    }
+}
+
 function Test-LauncherAlive {
     param([Parameter(Mandatory)]$Record)
 
-    # CIM reports CreationDate even for a protected process, where
-    # Process.StartTime throws; Get-RunProcessTree reads the same field.
-    $holder = Get-Win32Process -Filter "ProcessId=$([int]$Record['pid'])"
-    if ($null -eq $holder -or $null -eq $holder.CreationDate) {
-        # Gone, or its identity cannot be read: not confirmed as the launcher.
+    $holder = Get-LauncherProcess -ProcessId ([int]$Record['pid'])
+    if ($null -eq $holder) {
         return $false
     }
-    # The launcher started before it wrote started_at; a process with this PID
-    # created at or after it is an unrelated process that reused it.
-    $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-    return $holder.CreationDate.ToUniversalTime() -lt $startedAt
+    try {
+        # The launcher started before it wrote started_at; a process with this
+        # PID created at or after it is an unrelated process that reused it.
+        # StartTime access failures are unknown identity, never launcher death.
+        $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
+        return $holder.StartTime.ToUniversalTime() -lt $startedAt
+    }
+    finally {
+        $holder.Dispose()
+    }
 }
 
 function Read-SharedText {
