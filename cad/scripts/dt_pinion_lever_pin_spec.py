@@ -69,7 +69,8 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "PinDia": "\n".join(
         (
             "1/16 DRILL ROD, STOCK OK",
-            f"SLIP FIT IN {LEVER_NUMBER} AND {LIFT_ROD_NUMBER} PIN HOLE",
+            f"SLIP FIT IN {LEVER_NUMBER}",
+            f"AND {LIFT_ROD_NUMBER} PIN HOLE",
         )
     ),
     "PinLen": "\n".join(
