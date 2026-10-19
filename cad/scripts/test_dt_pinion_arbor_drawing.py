@@ -2132,5 +2132,11 @@ def test_cross_hole_station_text_clears_the_shared_rear_face_witness() -> None:
     face, where the 11.5's witness drops (text-on-line, blocking)."""
     rear_face = drawing._detail_x(spec.HEAD_REAR_Z)
     assert drawing.DETAIL_REAR_FACE_X == pytest.approx(rear_face)
-    x, _y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
-    assert rear_face - (x + drawing.CROSS_HOLE_STATION_TEXT_RIGHT) >= 0.002
+    x, y = drawing.DETAIL_KEEP["CrossHoleFromHeadRear"]
+    # r4: the reason line centres on the position, one pitch under the value.
+    callout = drawing.DIMENSION_CALLOUTS["CrossHoleFromHeadRear"]
+    assert callout is spec.CROSS_HOLE_STATION_CALLOUT
+    width = drawing._callout_width(callout)
+    assert rear_face - (x + width / 2.0) >= 0.002
+    # The value stays 3 mm under the Ø10.5's lower witness (y 0.2245).
+    assert 0.2245 - (y + 0.0035) >= 0.003

@@ -209,6 +209,11 @@ DRUM_NUMBER = "MHA-DT-001"
 # hole's station is a toleranced dimension (CrossHoleFromHeadRear), so the
 # callout no longer says CENTRED.
 CROSS_HOLE_CALLOUT = f"REAM THRU, BONDED FIT\nON {CROSSROD_NUMBER} CROSSROD"
+# Machinist review r4 of #1685 (over-specification): the .XXX station gave no
+# function.  Its band is what holds the wall to each head face at the
+# novice-machinist target (CROSS_HOLE_WEB_WORST), so the line under its value
+# says so (drawing-guidelines.md rule 4: a tight band names its reason).
+CROSS_HOLE_STATION_CALLOUT = "FOR WALL EACH SIDE"
 # Machinist review r1 of #1685 (clarity): each land's callout names the bore
 # it runs in, where the general note used to.
 JOURNAL_CALLOUT = f"JOURNAL,\nRUNS IN {STRAP_NUMBER}"

@@ -57,6 +57,7 @@ from dt_pinion_arbor_spec import (
     BOND_ZONE_CALLOUT,
     BOND_ZONE_DIA_Z,
     CROSS_HOLE_CALLOUT,
+    CROSS_HOLE_STATION_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRUM_STATION,
@@ -384,17 +385,20 @@ NECK_DIA_XY = (0.140, 0.2575)
 # The cross hole's 5.750 station in detail A (a (5.75) reference at r2,
 # toleranced since r3 of #1685).  Its witnesses drop from the axis at the
 # head rear face (shared with the 11.50's) and the hole centre; the text sits
-# left of the rear-face witness.  r2 boxed " (5.75) " at 7.5 mm left to
-# 12.8 mm right of its position, and at x 0.1425 the head length's witness
-# crossed it (text-on-line), so the position now follows from that witness
-# with 2.5 mm of air; the shorter "5.750" only adds to it.
-CROSS_HOLE_STATION_TEXT_RIGHT = 0.0128
+# left of the rear-face witness.  At r2 the head length's witness crossed
+# the text (text-on-line), so the block's right end follows from that
+# witness with 2.5 mm of air.  r4 measured the layout: both lines centre on
+# the position, the value on its y and the callout line (r4's reason) one
+# pitch under it, where the dimension line runs.  That puts the line 2 mm
+# under the r4 line (y 0.2135) and the value 3.9 mm under the neck's lower
+# witness (y 0.2245).
+CROSS_HOLE_STATION_WIDTH = _callout_width(CROSS_HOLE_STATION_CALLOUT)
 DETAIL_REAR_FACE_X = (
     DETAIL_CENTER[0] + DETAIL_RATIO * (HEAD_CENTER_Z - HEAD_REAR_Z) / 1000.0
 )
 CROSS_HOLE_STATION_TEXT_XY = (
-    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_TEXT_RIGHT,
-    0.2163,
+    DETAIL_REAR_FACE_X - 0.0025 - CROSS_HOLE_STATION_WIDTH / 2.0,
+    0.2171,
 )
 # Every dimension detail A carries, imported by feature straight into the
 # cropped view (DRAWING_DIMENSIONS names the owners: Head, FrontCapProfile,
@@ -467,6 +471,7 @@ DIMENSION_CALLOUTS = {
     "BackJournalDia": JOURNAL_CALLOUT,
     "BondZoneDia": BOND_ZONE_CALLOUT,
     "PinStationFromHeadRear": "COLLAR PIN",
+    "CrossHoleFromHeadRear": CROSS_HOLE_STATION_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The turning axis runs the full part and this far past each crown.
