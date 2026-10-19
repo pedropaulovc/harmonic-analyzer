@@ -357,7 +357,7 @@ from mg_magnifying_wheel_geom import (  # noqa: E402
 )
 
 # The lever wire, the pen wire and the wheel stack all take the wheel plane
-# from paper_drive_geom.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
+# from _recording_geometry.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
 DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # drum centre (drum frame mid-plane)
 
 # Transform the model-owned groove front tangent, rather than assuming an

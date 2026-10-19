@@ -38,7 +38,7 @@ def source_nominal_chain_centres_mm() -> tuple[Point, Point]:
     tilt and arbitrary P1 states need their own 3D proof, not this nominal one.
     """
     from dt_cone_swing_platform_crank_axis import crank_axis_nominal_xy_mm
-    from paper_drive_geom import KNOB_SHAFT_XY
+    from _paper_drive_placement import KNOB_SHAFT_XY
     return KNOB_SHAFT_XY, crank_axis_nominal_xy_mm(seat_geometry.CHAIN_MID_Z)
 
 

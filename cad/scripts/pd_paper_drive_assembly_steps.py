@@ -29,6 +29,7 @@ import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
 import paper_drive_geom as paper_geometry
+import _paper_drive_placement as paper_placement
 
 DRAWING_NUMBER = "MHA-PD-00"
 
@@ -197,7 +198,7 @@ BAR_TOP_ABOVE_DECK = 266.934
 # hanger puts the pin, but a rack set off this band swings the latched hanger
 # and moves the pin along the hook's straight run, so the band is held at the
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
-RACK_CREST_DROP = paper_geometry.RACK_CREST_DROP
+RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.05
 # The feed rack's datum setup band and its gates are the builder's too:
 # paper_drive_rack_setup owns them; this module only prints them.

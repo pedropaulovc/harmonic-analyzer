@@ -435,7 +435,7 @@ def test_incoming_stock_uncertainty_cannot_be_omitted(synthetic_stock_section_re
 @pytest.fixture
 def synthetic_full_form_receipt():
     """Analytical fixture only; neither stock measurement nor shop capability."""
-    from paper_drive_geom import (
+    from _platen_rack_receiving import (
         feed_rack_receiving_boundary_uncertainty_mm,
         feed_rack_receiving_constraint_uncertainty_mm,
         feed_rack_receiving_root_uncertainty_mm,
@@ -522,7 +522,7 @@ def _replace_synthetic_feature(receipt, index, replacement):
 def test_whole_point_envelope_returns_paid_data_not_a_hardware_boolean(
     synthetic_full_form_receipt,
 ):
-    from paper_drive_geom import (
+    from _platen_rack_receiving import (
         feed_rack_receiving_boundary_uncertainty_mm,
         feed_rack_receiving_constraint_uncertainty_mm,
         feed_rack_receiving_root_uncertainty_mm,
@@ -569,7 +569,7 @@ def test_uniform_tooth_width_error_rejects_even_when_all_index_spans_pass(
 def test_each_active_point_boundary_pays_its_own_uncertainty(
     synthetic_full_form_receipt, index,
 ):
-    from paper_drive_geom import feed_rack_form_admission_controls
+    from _platen_rack_receiving import feed_rack_form_admission_controls
 
     enclosure = synthetic_full_form_receipt.enclosures[index]
     controls = feed_rack_form_admission_controls()

@@ -11,9 +11,9 @@ constants so the two can never drift.
 from __future__ import annotations
 
 from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
-from mg_magnifying_wheel_geom import PEN_WIRE_DIA, RIM_WIRE_R
+from _mg_wheel_rim_geometry import PEN_WIRE_DIA, RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_X
-from paper_drive_geom import PEN_ROD_X, PEN_Z_MID
+from _recording_geometry import PEN_ROD_X, PEN_Z_MID
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 
 # Ø0.8 design nominal: inside the purchased 9666K56 0.031 +/-0.001 in band.

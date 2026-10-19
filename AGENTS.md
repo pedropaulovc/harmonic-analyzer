@@ -1011,7 +1011,12 @@ the spec, never in a family table or recipe module imported by unrelated specs.
 Shared parameterized geometry belongs in its own helper (for example
 `_shoulder_screw_geometry`), not in another SKU's decorated recipe module.
 Assemblies and drawings read dimensions from specs or these pure providers, not
-from part builders. `_platen_rack_geometry` owns the shared rack section;
+from part builders. `pd_platen_rack_spec` owns the rack section and receiving
+contract; `_platen_rack_receiving` supplies its source receiving controls without
+importing the feed-law and loaded-geometry checks in `paper_drive_geom`.
+`_paper_drive_placement` owns the pivot, stud, knob-axis and rack placements;
+`_recording_geometry` owns the paper and pen anchors. Pen-side consumers read the
+wheel rim/wire interface from `_mg_wheel_rim_geometry`, not the wheel's solvers.
 `_cone_gear_geometry` and `_cone_gear_readback` share cone calculations and saved
 topology checks without importing cone-part derivation.
 `_column_clamp_interface` owns the shared bar depth and column-clamp seating

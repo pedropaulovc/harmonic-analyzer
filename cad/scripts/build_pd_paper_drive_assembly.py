@@ -293,6 +293,8 @@ from pd_platen_rack_spec import (  # noqa: E402
     PITCH as RACK_PITCH,
 )
 import paper_drive_geom as PAPER_GEOMETRY  # noqa: E402
+import _paper_drive_placement as PAPER_PLACEMENT  # noqa: E402
+import _recording_geometry as RECORDING_GEOMETRY  # noqa: E402
 
 PLATE_X0_PHOTO = -33.213
 # ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
@@ -301,7 +303,7 @@ PLATE_X0_PHOTO = -33.213
 # that top edge puts the resized plate bottom here. The fit's z delta remains
 # ignored: a near-front view does not constrain depth. The placed PLATE_X0 is
 # this photo x snapped to the rack's mesh phasing (below, after the stud).
-PLATE_Y0 = PAPER_GEOMETRY.PLATEN_BOTTOM_Y
+PLATE_Y0 = PAPER_PLACEMENT.PLATEN_BOTTOM_Y
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
@@ -324,8 +326,8 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.7: lock plates on the guide backs,
 
 # Relocate the rack/backer on the platen to the shifted pitch-line distance,
 # retaining the pressed stud, pivot and latch pose.
-RACK_TIP_Y = PAPER_GEOMETRY.RACK_TIP_Y
-RACK_PITCH_Y = PAPER_GEOMETRY.RACK_PITCH_Y
+RACK_TIP_Y = PAPER_PLACEMENT.RACK_TIP_Y
+RACK_PITCH_Y = PAPER_PLACEMENT.RACK_PITCH_Y
 RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # Rx180: local +Y maps downward
 RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS
 RACK_TEETH_BACK_Z = RACK_BACK_Z - RACK_TEETH_Z_INSET
@@ -375,7 +377,7 @@ RACK_MESH_EXT = FEED.RACK_MESH_EXTENSION
 # The pressed stud preserves the latch fixture; the rack's loaded pitch-line
 # setting comes from the feed contact law, independently of the reducer centre.
 STUD_X = ARM.STUD_MACHINE_X
-STUD_XY = PAPER_GEOMETRY.STUD_XY
+STUD_XY = PAPER_PLACEMENT.STUD_XY
 PIVOT_XY = (BAR.PIVOT_TAP_X, BAR_CY + BAR.HANGER_TAP_Y)  # (-58, 303.234)
 if (
     abs(math.dist(STUD_XY, PIVOT_XY) - ARM.PIN_STATION)
@@ -404,7 +406,7 @@ def _on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
 
 # The reducer's knob bearing follows the shared physical mounting centre.
 MESH_ANGLE_DEG = DISC_SPEC.MESH_ANGLE_DEG
-KNOB_SHAFT_XY = PAPER_GEOMETRY.KNOB_SHAFT_XY
+KNOB_SHAFT_XY = PAPER_PLACEMENT.KNOB_SHAFT_XY
 _PLATE_BORE_XY = _on_arm(ARM_PLATE.BORE_STATION, ARM_PLATE.BORE_OFFSET)
 if math.dist(KNOB_SHAFT_XY, _PLATE_BORE_XY) > 1e-3:
     raise AssertionError(
@@ -1185,16 +1187,16 @@ def _assert_fastener_stacks() -> None:
         raise AssertionError("clip screw tip is not flush with the socket boss")
 
     # The raised heads remain wholly outside the recording-paper side margins
-    # (the sheet sits off centre: paper_drive_geom.RECORDING_PAPER_LEFT_INSET_MM).
+    # (the sheet sits off centre: _recording_geometry.RECORDING_PAPER_LEFT_INSET_MM).
     left_head_extent = PLATEN_SOCKET_XY[0][0] + CLIP_SCREW_HEAD_DIA / 2.0
     right_head_extent = PLATE_WIDTH - PLATEN_SOCKET_XY[2][0] + CLIP_SCREW_HEAD_DIA / 2.0
     nonnegative(
         "left clip head-to-paper clearance",
-        PAPER_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM - left_head_extent,
+        RECORDING_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM - left_head_extent,
     )
     nonnegative(
         "right clip head-to-paper clearance",
-        PAPER_GEOMETRY.RECORDING_PAPER_RIGHT_INSET_MM - right_head_extent,
+        RECORDING_GEOMETRY.RECORDING_PAPER_RIGHT_INSET_MM - right_head_extent,
     )
 
     # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
@@ -2653,7 +2655,7 @@ async def build(adapter) -> dict[str, str]:
     # Recording paper over the platen front face: front 0.5 proud, clear of the
     # edge clips, with the fitted side/top margins. The 0.25-thick sheet leaves 0.25 air
     # behind it (build_pd_platen_paper) so no face lands coplanar on the platen.
-    paper_left_margin = PAPER_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM
+    paper_left_margin = RECORDING_GEOMETRY.RECORDING_PAPER_LEFT_INSET_MM
     paper_top_margin = (
         3.0  # ch30-p002: the sheet's top edge sits just under the plate top
     )
@@ -2662,7 +2664,7 @@ async def build(adapter) -> dict[str, str]:
         "pd-platen-paper",
         [
             PLATE_X0 + paper_left_margin,
-            PLATE_Y0 + PLATE_HEIGHT - PAPER_GEOMETRY.RECORDING_PAPER_HEIGHT_MM - paper_top_margin,
+            PLATE_Y0 + PLATE_HEIGHT - RECORDING_GEOMETRY.RECORDING_PAPER_HEIGHT_MM - paper_top_margin,
             PLATE_FRONT_Z - 0.5,
         ],
         [0.0, 0.0, 0.0],

@@ -125,8 +125,8 @@ from pn_vn_pen_hanger_jam_nut_spec import (
 from pn_vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
 from pn_vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
 from pn_vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
-from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
-from mg_magnifying_wheel_geom import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
+from _mg_wheel_rim_geometry import RIM_AXIAL as WHEEL_RIM_AXIAL
+from _mg_wheel_rim_geometry import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
 from mg_wheel_bar_geom import HANGER_SCREW_MACHINE_X
 from mg_wheel_bar_geom import WHEEL_X

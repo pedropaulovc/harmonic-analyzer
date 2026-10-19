@@ -63,6 +63,7 @@ from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
 from _surface_finish import surface_finish_by_key
+from _mg_wheel_rim_geometry import RIM_AXIAL, RIM_INNER_DIA, RIM_OUTER_DIA
 from mg_magnifying_wheel_geom import (
     DRUM_PRESS,
     HUB_BACK_Z,
@@ -79,10 +80,7 @@ from mg_magnifying_wheel_spec import (
     HUB_DIA,
     HUB_FILLET_R,
     REFERENCE_DIMENSIONS,
-    RIM_AXIAL,
     RIM_FILLET_R,
-    RIM_INNER_DIA,
-    RIM_OUTER_DIA,
     ROUND_TEXT_SUFFIX,
     SPIGOT_DIA,
     SURFACE_FINISHES,

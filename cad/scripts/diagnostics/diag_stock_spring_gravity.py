@@ -42,7 +42,7 @@ import _telemetry
 import build_mg_magnifier_assembly as m
 import sm_vn_counter_spring_spec
 import error_budget as eb
-import mg_magnifying_wheel_geom
+import _mg_wheel_rim_geometry
 import mg_wheel_drum_geom
 import spring_mount_geom as s
 
@@ -195,7 +195,7 @@ async def build(adapter):
         hook = m.HUB_WIRE_START
         hook_radius = math.hypot(hook[0] - s.KNIFE[0], hook[1] - s.KNIFE_CONTACT_Y)
         physical_ratio = (
-            mg_magnifying_wheel_geom.RIM_WIRE_R / mg_wheel_drum_geom.DRUM_WIRE_R
+            _mg_wheel_rim_geometry.RIM_WIRE_R / mg_wheel_drum_geom.DRUM_WIRE_R
         )
         cad_ratio = eb.nominal().wheel_ratio
         ratio = max(physical_ratio, cad_ratio)

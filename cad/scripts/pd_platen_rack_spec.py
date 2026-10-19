@@ -384,7 +384,7 @@ def require_rack_working_side_secant_angle_band_rad(
     upper Y. A common actual radius is NOT corrected twice with nominal wire
     data: its fixed normal-offset vector cancels in the difference.
     """
-    from paper_drive_geom import feed_rack_working_side_angle_band_rad
+    from _platen_rack_receiving import feed_rack_working_side_angle_band_rad
 
     quality.purchased_rack_working_side_form_model_premise()
     if (not isinstance(readings, tuple) or len(readings) != 2
@@ -441,9 +441,9 @@ def require_rack_form_admission_mm(
     every physically manifested station. The report is conditional on
     truthful external evidence, not a claim that purchased stock was measured.
     """
-    # Deferred pure import avoids Spec <-> Geom initialization cycles. Neither
-    # caller-supplied limits nor a missing-source nominal fallback is allowed.
-    from paper_drive_geom import (
+    # Receiving limits are independent of the installed paper-drive geometry.
+    # Caller-supplied limits and missing-source nominal fallbacks are not allowed.
+    from _platen_rack_receiving import (
         feed_rack_form_admission_controls,
         feed_rack_receiving_boundary_uncertainty_mm,
         feed_rack_receiving_constraint_uncertainty_mm,

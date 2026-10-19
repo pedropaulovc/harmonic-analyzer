@@ -12,6 +12,8 @@ import paper_drive_mesh_check as mesh
 import paper_drive_rack_setup as rack_setup
 import paper_drive_rack_travel as travel
 import pd_platen_rack_spec as rack
+import _recording_geometry as recording
+import pd_platen_spec as platen
 
 
 @pytest.fixture(scope="module")
@@ -78,9 +80,9 @@ def test_paper_inset_is_the_most_centred_grid_value_with_a_1mm_sweep_margin(doma
     centre would not."""
     _low, high = domain.axis_from_left_end_limits_mm
     bands = geometry.recording_paper_sweep_bands_mm()
-    nominal = geometry.RECORDING_PAPER_LEFT_INSET_MM
+    nominal = recording.RECORDING_PAPER_LEFT_INSET_MM
     assert nominal * 10 == pytest.approx(round(nominal * 10))
-    centred = (geometry.platen.PLATE_WIDTH - geometry.RECORDING_PAPER_WIDTH_MM) / 2.0
+    centred = (platen.PLATE_WIDTH - recording.RECORDING_PAPER_WIDTH_MM) / 2.0
     assert nominal <= centred
 
     def far_edge(inset: float) -> float:

@@ -28,7 +28,8 @@ import mg_output_fixture_geom as _fixture
 import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
-from mg_vn_lever_wire_geom import WHEEL_BAR_Y, WHEEL_X
+from mg_vn_lever_wire_geom import WHEEL_X
+from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 # The axle centreline in the machine frame: x, y of the bore; z runs from the
 # bar's front face forward (-z), station d at z = BAR_FRONT_Z - d.

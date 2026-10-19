@@ -22,24 +22,26 @@ import math
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
-import mg_vn_lever_wire_geom as _lever
-from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
-    BORE_DIA,
-    CAST_ROUND_R,
+from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
     GROOVE_R_BAND,
+    PEN_WIRE_DIA,
+    RIM_AXIAL,
+    RIM_INNER_DIA,
+    RIM_OUTER_DIA,
+)
+import mg_vn_lever_wire_geom as _lever
+from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
+    BORE_DIA,
+    CAST_ROUND_R,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_DIA_BAND,
     HUB_FILLET_R,
     HUB_FRONT_Z,
-    PEN_WIRE_DIA,
-    RIM_AXIAL,
     RIM_FILLET_R,
-    RIM_INNER_DIA,
-    RIM_OUTER_DIA,
     SPIGOT_DIA,
     SPIGOT_DIA_MIN,
     SPOKE_AXIAL,

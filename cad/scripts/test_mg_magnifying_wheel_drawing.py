@@ -12,6 +12,7 @@ import build_mg_magnifying_wheel as part
 import draw_mg_magnifying_wheel as drawing
 import mg_vn_lever_wire_geom
 import mg_magnifying_wheel_geom as geom
+import _mg_wheel_rim_geometry as rim
 import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
 from _printed_tolerance import printed_band_mm
@@ -129,7 +130,7 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # The hub stations the assembly imports live in the drawing-FREE geom
     # module, so a print-note edit cannot enter the assembly recipe.
-    assert (geom.RIM_OUTER_DIA, geom.HUB_DIA, geom.SPOKE_COUNT) == (100.0, 25.0, 6)
+    assert (rim.RIM_OUTER_DIA, geom.HUB_DIA, geom.SPOKE_COUNT) == (100.0, 25.0, 6)
     assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
         encoding="utf-8"
     )
@@ -143,9 +144,9 @@ def test_feature_volumes_are_consistent() -> None:
     assert part.V_HUB_FILLETS + part.V_RIM_FILLETS == pytest.approx(
         geom.fillets_volume()
     )
-    floor = geom.GROOVE_BOTTOM_DIA / 2.0 - geom.RIM_INNER_DIA / 2.0
+    floor = rim.GROOVE_BOTTOM_DIA / 2.0 - rim.RIM_INNER_DIA / 2.0
     hole = 3.141592653589793 / 4.0 * geom.TIE_HOLE_DIA**2
-    assert hole * floor < part.V_TIE2 < hole * (floor + 2.0 * geom.GROOVE_R)
+    assert hole * floor < part.V_TIE2 < hole * (floor + 2.0 * rim.GROOVE_R)
     assert part.V_GROOVE == pytest.approx(399.45, abs=0.05)
     assert part.V_SPOKE_FREE > part.V_SPOKE_WEB > 0.0
 
@@ -156,8 +157,8 @@ def test_tie2_profile_runs_radially_and_ends_in_air() -> None:
     assert cross == pytest.approx(0.0, abs=1e-9)  # the axis passes the origin
     assert q_in[1] == pytest.approx(p_in[1])  # the inner end runs horizontal
     assert part._TIE2_ANGLE == pytest.approx(43.0)
-    assert (p_out[0] ** 2 + p_out[1] ** 2) ** 0.5 > geom.GROOVE_BOTTOM_DIA / 2.0
-    assert (q_out[0] ** 2 + q_out[1] ** 2) ** 0.5 < geom.RIM_OUTER_DIA / 2.0
+    assert (p_out[0] ** 2 + p_out[1] ** 2) ** 0.5 > rim.GROOVE_BOTTOM_DIA / 2.0
+    assert (q_out[0] ** 2 + q_out[1] ** 2) ** 0.5 < rim.RIM_OUTER_DIA / 2.0
     # The driven Tie2Angle reads the ACUTE angle: its text point lies between
     # the axis ray and the horizontal ray (same x side) from P_in.
     tx, ty = part._TIE2_ANGLE_TEXT

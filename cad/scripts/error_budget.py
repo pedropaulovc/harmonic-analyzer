@@ -61,6 +61,8 @@ import ms_stick_geom
 import paper_drive_geom
 import mg_magnifying_wheel_geom
 import _rocker_interface as rocker_interface
+import _mg_wheel_rim_geometry
+import mg_wheel_bar_geom
 import sm_summing_lever_spec
 import spring_mount_geom
 import spring_force_model
@@ -1342,7 +1344,7 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     magnifier at that pose (#748)."""
     hook, end = wire_rest_run(nom, nom.lever_r_min)
     gaps = mg_vn_lever_wire_geom.run_gaps(hook, end)
-    cx, cy = mg_vn_lever_wire_geom.WHEEL_X, mg_vn_lever_wire_geom.WHEEL_BAR_Y
+    cx, cy = mg_vn_lever_wire_geom.WHEEL_X, mg_wheel_bar_geom.WHEEL_BAR_Y
     ts = np.linspace(0.0, 1.0, 2001)
     pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
@@ -1351,7 +1353,7 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
         "wire_length_mm": float(math.dist(hook, end)),
         "wire_arm_mm": wire_moment_arm(nom, nom.lever_r_min),
         "min_radial_to_wheel_axis_mm": float(np.min(radial)),
-        "rim_outer_radius_mm": mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0,
+        "rim_outer_radius_mm": _mg_wheel_rim_geometry.RIM_OUTER_DIA / 2.0,
         # surface gaps to the pen-side faces the run passes (+ = clear)
         "rim_face_gap_mm": gaps["rim"],
         "spoke_face_gap_mm": gaps["spokes"],

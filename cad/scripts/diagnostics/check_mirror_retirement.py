@@ -26,7 +26,7 @@ GOLD = REPO / "cad" / "out" / "reports" / "pose-golden"
 
 import _telemetry  # status goes through telemetry, not bare print (AGENTS.md)
 import spring_mount_geom
-import paper_drive_geom
+import _recording_geometry as paper_drive_geom
 
 fails = []
 

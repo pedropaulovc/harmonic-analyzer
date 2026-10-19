@@ -18,7 +18,7 @@ import mg_vn_wheel_axle_back_washer_spec as back_washer
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from mg_wheel_bar_geom import BAR_FRONT_Z
-from paper_drive_geom import PEN_Z_MID
+from _recording_geometry import PEN_Z_MID
 
 
 def test_required_drawing_paths() -> None:

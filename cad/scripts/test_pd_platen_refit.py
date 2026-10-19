@@ -13,7 +13,8 @@ import _sprocket_seat_geometry as band
 import pd_platen_spec as platen
 import build_pd_platen_clip as clip
 import build_pd_platen_guide as guide
-import paper_drive_geom as paper_geometry
+import _recording_geometry as paper_geometry
+import paper_drive_geom as feed_geometry
 import pd_platen_rack_spec as rack
 import build_pd_support_bar as support
 import _mcmaster_90114a511 as fillister
@@ -266,7 +267,7 @@ def test_wider_platen_clip_stays_on_the_platen_and_off_the_recording_paper() -> 
     inboard_edge_max = (
         socket_x + band3 - (clip.HOLE_Y - band3) + clip.CLIP_WIDTH + band2
     )
-    paper_inset_min = paper_geometry.recording_paper_sweep_bands_mm()[
+    paper_inset_min = feed_geometry.recording_paper_sweep_bands_mm()[
         "paper_left_inset_band_mm"
     ][0]
     # The pen records only on the paper, so a clip short of it is off the

@@ -13,7 +13,7 @@ independent ``paper_drive_chain_fit`` solver checks discrete pinned links,
 free sprocket phase, gravity slack and the actual ANSI tooth boundaries.
 
 Local frame: knob wrap centre at the origin, machine xy pre-mirror. Centres
-come from cone_line and paper_drive_geom; mounted tooth counts, standard
+come from cone_line and _paper_drive_placement; mounted tooth counts, standard
 pitch and the FIXED installed count come from pd_transgear_removable_spec.
 The continuous guide's slack arc is solved inside its internal-tangency
 domain. This preserves the inherited native representation without silently

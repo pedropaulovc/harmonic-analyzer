@@ -37,6 +37,7 @@ CLAMP_STATION_PLACES = 1
 # Fixed photographic registration, shared by the bar placement and hanger tap
 # (build_pn_pen_hanger places its strap tap on this machine x).
 WHEEL_BAR_X0 = 109.0
+WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 
 # Wheel-axle bore: reamed .1865 through at the wheel station; the 3/16

@@ -7,7 +7,7 @@ edit that breaks the stack fails the assembly at import.
 
 Axial stations ``d`` run from the wheel bar's FRONT face toward the pen
 (machine z = BAR_FRONT_Z - d): bar -9..0, spacer, back washer, wheel hub
-(spokes' mid-plane on the pen-rod line ``paper_drive_geom.PEN_Z_MID``),
+(spokes' mid-plane on the pen-rod line ``_recording_geometry.PEN_Z_MID``),
 endshake, front washer, nut, locknut, then the pin's thread end and domed tip.
 The pin is pressed to a gauge from the bar's front face, its back end about
 flush with the back face. The spacer's length is derived from the pen line
@@ -28,7 +28,8 @@ import mg_vn_wheel_axle_back_washer_spec as _back
 import mg_vn_wheel_axle_front_washer_spec as _front
 import mg_vn_wheel_axle_nut_spec as _nut
 from _printed_tolerance import printed_band_mm
-from paper_drive_geom import PEN_Z_MID
+from _recording_geometry import PEN_Z_MID
+from _mg_wheel_rim_geometry import RIM_WIRE_R
 
 # --- the endshake: set at assembly with the nut, by feeler ------------------------
 ENDSHAKE = 0.10  # modelled
@@ -161,8 +162,8 @@ PEN_DOWN_MAX = MARKER_TIP_REST_Y - PAPER_BOTTOM_Y  # 40.151
 PEN_UP_MAX = PAPER_TOP_Y - MARKER_TIP_REST_Y  # 40.349
 # Seen from the front, pen down turns the wheel clockwise (the pen wire leaves
 # the groove at 3 o'clock and hangs down); pen up, counter-clockwise.
-CW_MAX_DEG = math.degrees(PEN_DOWN_MAX / _wheel.RIM_WIRE_R)  # 46.8
-CCW_MAX_DEG = math.degrees(PEN_UP_MAX / _wheel.RIM_WIRE_R)  # 47.0
+CW_MAX_DEG = math.degrees(PEN_DOWN_MAX / RIM_WIRE_R)  # 46.8
+CCW_MAX_DEG = math.degrees(PEN_UP_MAX / RIM_WIRE_R)  # 47.0
 
 WRAP_MARGIN_DEG = 30.0  # wire left on its wheel at either end of the travel
 # Pen wire: from the 3 o'clock tangent counter-clockwise, up over the top, to

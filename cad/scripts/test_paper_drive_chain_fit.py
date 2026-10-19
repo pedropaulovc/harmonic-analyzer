@@ -9,7 +9,7 @@ import pytest
 
 import _chain as visual
 import paper_drive_chain_fit as physical
-import paper_drive_geom as law
+import _paper_drive_placement as law
 import pd_transgear_removable_spec as sprocket
 import _sprocket_seat_geometry as seat_geometry
 

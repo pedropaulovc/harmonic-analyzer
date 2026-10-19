@@ -28,21 +28,9 @@ from mg_wheel_drum_geom import (
     DRUM_WIRE_R,
 )
 
-# --- rim (DIMENSIONS.md ch21: Ø100 annotated) ----------------------------------
-RIM_OUTER_DIA = 100.0
-RIM_RING_RADIAL = 6.0
-RIM_AXIAL = 8.0  # centred on the spokes' mid-plane
-RIM_INNER_DIA = RIM_OUTER_DIA - 2 * RIM_RING_RADIAL  # 88
-# Pen-wire U-groove on the rim's mid-plane: a R0.6 bottom with straight walls.
-GROOVE_R = 0.6
-GROOVE_DEPTH = 1.2
-GROOVE_BOTTOM_DIA = RIM_OUTER_DIA - 2 * GROOVE_DEPTH  # 97.6
-# Printed bands, (upper, lower): the seat proof is mg_magnifying_wheel_spec's.
-GROOVE_R_BAND = (0.10, -0.10)
-GROOVE_BOTTOM_BAND = (0.10, -0.10)
-PEN_WIRE_DIA = 0.8  # the pen wire the groove carries (pn_vn_pen_wire_geom)
-RIM_WIRE_R = round(GROOVE_BOTTOM_DIA / 2.0 + PEN_WIRE_DIA / 2.0, 6)  # 49.2
-WIRE_RATIO = RIM_WIRE_R / DRUM_WIRE_R  # 4.995, the wheel's magnification
+import _mg_wheel_rim_geometry as _rim
+
+WIRE_RATIO = _rim.RIM_WIRE_R / DRUM_WIRE_R  # 4.995, the wheel's magnification
 
 # --- hub: Ø25 boss, then the drum spigot -----------------------------------------
 HUB_DIA = 25.0
@@ -92,7 +80,7 @@ SPOKE_OVERLAP = 1.0  # the sketched spoke runs this far into the hub and rim
 SPOKE_ROOT_WIDTH = 6.5
 SPOKE_TIP_WIDTH = 5.0
 SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 11.5
-SPOKE_X1 = RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 45.0
+SPOKE_X1 = _rim.RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 45.0
 HUB_FILLET_R = 3.0
 RIM_FILLET_R = 4.0
 # The rim bore's two edges (the spoke faces stay sharp). TIE 2 breaks into the
@@ -213,12 +201,12 @@ def fillet_area(circle_r: float, fillet_r: float, outside: bool) -> float:
 def fillets_volume() -> float:
     """Material the 2 x 6 hub fillets and 2 x 6 rim fillets add."""
     per_side = fillet_area(HUB_DIA / 2.0, HUB_FILLET_R, True) + fillet_area(
-        RIM_INNER_DIA / 2.0, RIM_FILLET_R, False
+        _rim.RIM_INNER_DIA / 2.0, RIM_FILLET_R, False
     )
     return 2 * SPOKE_COUNT * SPOKE_AXIAL * per_side
 
 
 if not SPOKE_X0 < side_meets_circle(HUB_DIA / 2.0)[0]:
     raise AssertionError("spoke root does not start inside the hub")
-if not side_meets_circle(RIM_INNER_DIA / 2.0)[0] < SPOKE_X1 < GROOVE_BOTTOM_DIA / 2.0:
+if not side_meets_circle(_rim.RIM_INNER_DIA / 2.0)[0] < SPOKE_X1 < _rim.GROOVE_BOTTOM_DIA / 2.0:
     raise AssertionError("spoke tip must end inside the rim, short of the groove")

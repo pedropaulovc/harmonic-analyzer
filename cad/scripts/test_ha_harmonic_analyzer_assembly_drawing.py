@@ -148,7 +148,7 @@ def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     carriage closes that gap, yet check 3 needs a drawn line. The fitter
     slides the marker on in its V until the nib touches, after the parking
     step and before any check; sheet 1 says the views show it parked."""
-    from paper_drive_geom import PEN_PAPER_CLEARANCE_MM
+    from _recording_geometry import PEN_PAPER_CLEARANCE_MM
 
     parked, contact = steps.step_number("nib-set"), steps.step_number("nib-on-paper")
     assert contact == parked + 1
