@@ -47,8 +47,12 @@ def _start(cmd, cwd, env):
         # Keep diagnostics separate from stdout's readiness protocol.
         errors.put(proc.stderr.read())
 
-    threading.Thread(target=drain, daemon=True).start()
-    threading.Thread(target=drain_errors, daemon=True).start()
+    proc._capture_readers = (
+        threading.Thread(target=drain, name="local-check-stdout", daemon=True),
+        threading.Thread(target=drain_errors, name="local-check-stderr", daemon=True),
+    )
+    for reader in proc._capture_readers:
+        reader.start()
     return proc, lines, errors
 
 
@@ -59,6 +63,14 @@ def _stop(proc):
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=30)
+    # A process exit does not mean its readers have consumed EOF yet.
+    # Join before closing either stream, including when a reader started late.
+    deadline = time.monotonic() + 30
+    for reader in proc._capture_readers:
+        reader.join(timeout=max(0, deadline - time.monotonic()))
+    assert not any(reader.is_alive() for reader in proc._capture_readers), (
+        "local-check capture readers did not stop after process exit"
+    )
     for stream in (proc.stdin, proc.stdout, proc.stderr):
         stream.close()
 
