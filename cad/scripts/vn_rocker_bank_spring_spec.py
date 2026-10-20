@@ -12,9 +12,10 @@ Catalogue (mcmaster.com/9714K24, read live 2026-10-09): Wave Disc Spring,
 high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD 0.367 in
 -0.02/+0.01, thickness 0.006 in, height 0.03 in (free); compressed height
 0.015 in and deflection 0.015 in at the 3 lb working load; pack of 25,
-$16.31.  The page states no rate, no wave count and no shaft size.  A 3-D
-SolidWorks model is offered but none was fetched, so the part is
-catalogue-only.
+$16.31. The page states no rate, no wave count and no shaft size. The
+read-only native source inspection on 2026-10-19 established the nominal
+diagram datums, not a physical free-state recipe. The zero-solid
+``Supplier-Dimensions`` state carries only nominal dimensions.
 
 The OD at its catalogue maximum stays under the rocker hub's O10.2, so the
 ch0 amplitude bar's foot passes over the spring as it does over the hubs.
@@ -60,6 +61,29 @@ INSTALLED_HEIGHT = 0.60
 MODEL_HEIGHT = INSTALLED_HEIGHT
 # Nominal radial clearance a side on the O6.35 pivot shaft.
 SHAFT_CLEARANCE_NOMINAL = (ID - 0.25 * MM_PER_IN) / 2.0  # 0.1905
+
+# Supplier engineering drawing inspected 2026-10-19. Display precision never
+# rounds the native source values or changes the installed envelope.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260115/21A4CCD6/"
+    "9714K24_Wave%20Disc%20SpringX.GIF"
+)
+SUPPLIER_DRAWING_UNITS = "in"
+SUPPLIER_NATIVE_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260115/0671B8A7/"
+    "9714K24_Wave%20Disc%20Spring.SLDPRT"
+)
+SUPPLIER_NATIVE_SHA256 = (
+    "24e8c9b1408cbf980b55c97458546e8b4e16c2ebe3618e984f1f1c83d55dc0cf"
+)
+SUPPLIER_DRAWING_PRECISION = {
+    "ID": 3,
+    "OD": 3,
+    "FREE_HEIGHT": 2,
+    "THICKNESS": 3,
+}
+# The inspected drawing has no application gauge; catalogue facts stay off it.
+SUPPLIER_APPLICATION_DIMENSIONS = ()
 
 if not math.isclose(FREE_HEIGHT - WORKING_DEFLECTION, WORKING_HEIGHT):
     raise AssertionError("9714K24 free height, deflection and working height disagree")

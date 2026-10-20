@@ -18,13 +18,15 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+from functools import wraps
 import sys
 
 from _appearance import POLISHED_STEEL
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from vn_crank_seat_drive_pin_spec import SKU
+from _supplier_pin_model import author_supplier_dowel_references
+from vn_crank_seat_drive_pin_spec import SKU, SUPPLIER_REFERENCE
 from diagnostics.diag_build_98381A434 import build_98381A434
 
 PART_NAME = "vn-crank-seat-drive-pin"
@@ -32,11 +34,19 @@ SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 
 
+@wraps(build_98381A434)
+async def _build_pin_with_supplier_references(adapter, truth=None):
+    await build_98381A434(adapter, truth)
+    await author_supplier_dowel_references(adapter, SUPPLIER_REFERENCE)
+
+
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_98381A434),),
+        components=(
+            StockComponent(sku=SKU, author=_build_pin_with_supplier_references),
+        ),
         material=MATERIAL,
         color=POLISHED_STEEL,
         screw_axis_planes=("Front Plane", "Right Plane"),

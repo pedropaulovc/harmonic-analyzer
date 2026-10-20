@@ -12,8 +12,9 @@ Catalogue (mcmaster.com/9714K392, read live 2026-10-09): Wave Disc Spring,
 steel, stackable; ID 0.385 in -0.01/+0.01, OD 0.5 in -0.01/+0.01, thickness
 0.005 in, height 0.05 in (free); compressed height 0.024 in and deflection
 0.026 in at the 1.5 lb working load; pack of 10, $11.18.  The page states no
-rate and no wave count.  A 3-D SolidWorks model is offered but none was
-fetched, so the part is catalogue-only.
+rate and no wave count. Read-only source inspection on 2026-10-19 established
+the nominal diagram datums, not a physical free-state recipe. The zero-solid
+``Supplier-Dimensions`` state carries only nominal dimensions and gauges.
 
 Part frame: spring axis local +Z.  The model is the spring's installed
 envelope: the ID x OD annulus from its south bearing face (on the front
@@ -50,6 +51,32 @@ RATE_N_PER_MM = WORKING_LOAD_N / WORKING_DEFLECTION  # 10.10
 INSTALLED_HEIGHT = 0.95
 # The model shows the installed state.
 MODEL_HEIGHT = INSTALLED_HEIGHT
+
+# Supplier drawing ink is independent of the exact metric model values.
+# The nominal diagram dimensions must never be attached to MODEL_HEIGHT's
+# installed envelope. McMaster engineering drawing inspected 2026-10-19:
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260323/3100F2B3/"
+    "9714K392_Wave%20Disc%20SpringX.GIF"
+)
+SUPPLIER_DRAWING_UNITS = "in"
+SUPPLIER_NATIVE_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260323/2E7D4C94/"
+    "9714K392_Wave%20Disc%20Spring.SLDPRT"
+)
+SUPPLIER_NATIVE_SHA256 = (
+    "5597d77be331b24286107f0337bbabe25477a35d8255f1c67f2791f74572508e"
+)
+SUPPLIER_DRAWING_PRECISION = {
+    "ID": 3,
+    "OD": 3,
+    "FREE_HEIGHT": 3,
+    "THICKNESS": 3,
+    "WORKING_HEIGHT": 3,
+    "WORKING_DEFLECTION": 3,
+}
+# Associative application gauges, not a claimed compressed spring solid.
+SUPPLIER_APPLICATION_DIMENSIONS = ("WORKING_HEIGHT", "WORKING_DEFLECTION")
 
 if not math.isclose(FREE_HEIGHT - WORKING_DEFLECTION, WORKING_HEIGHT):
     raise AssertionError("9714K392 free height, deflection and working height disagree")

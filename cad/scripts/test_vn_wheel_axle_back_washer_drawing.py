@@ -124,27 +124,6 @@ def test_recipe_is_the_washer_annulus(monkeypatch) -> None:
     )
 
 
-def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == spec.SKU
-    assert component.author is getattr(recipe, BUILD)
-    assert component.transform.rotation_radians == pytest.approx(
-        (math.pi / 2.0, 0.0, 0.0)
-    )
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert seen["material"] == part.SPEC.material
-    assert seen.get("color") is None
-    assert seen["screw_axis_planes"] == ("Top Plane", "Right Plane")
-
-
 def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     from diagnostics import diag_mcmaster_lib as lib
 

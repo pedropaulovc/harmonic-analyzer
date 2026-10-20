@@ -159,3 +159,86 @@ DIMENSION_CALLOUTS = {
         "ALL REMAINING TAIL FULL FORM"
     ),
 }
+
+# Supplier engineering drawing inspected 2026-10-19. Its .313/.156/.188
+# spellings do not replace the exact 5/16, 5/32 and 3/16 inch native geometry.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260701/7DFBF7EB/"
+    "90325A174_18-8%20Stainless%20Steel%20Precision%20Shoulder%20ScrewX.GIF"
+)
+SUPPLIER_REFERENCE_DIMENSIONS = {
+    "SupplierHeadDiameter": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": HEAD_DIA,
+        "presentation": "diameter",
+        "callout": "HEAD",
+    },
+    "SupplierHeadHeight": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": HEAD_H,
+        "callout": "HEAD HEIGHT",
+    },
+    "SupplierSocketAF": {
+        "units": "in",
+        "precision": 0,
+        "fraction_denominator": 32,
+        "expected_mm": SOCKET_AF,
+        "callout": "HEX SOCKET AF",
+    },
+    "SupplierShoulderDiameter": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": SHOULDER_DIA,
+        "presentation": "diameter",
+        "callout": "AS-SUPPLIED SHOULDER",
+    },
+    "SupplierShoulderLength": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": SHOULDER_LEN,
+        "callout": "AS-SUPPLIED SHOULDER",
+    },
+    "SupplierThreadMajor": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": THREAD_MAJOR,
+        "presentation": "diameter",
+        "callout": f"{PRINTED_THREAD}\nTHREAD MAJOR NOMINAL",
+    },
+    "SupplierStockThreadLength": {
+        "units": "in",
+        "precision": 3,
+        "expected_mm": THREAD_LEN,
+        "callout": "AS SUPPLIED\nSTOCK THREAD",
+    },
+}
+# Source bands need separate native reference carriers; neither is applied to
+# a stock geometry-driving dimension or to a finished-tip acceptance control.
+SUPPLIER_REFERENCE_BANDS = {
+    "SupplierShoulderDiameter": SHOULDER_DIA_LIMITS,
+    "SupplierShoulderLength": SHOULDER_LEN_LIMITS,
+}
+SUPPLIER_REFERENCE_SKETCH = (
+    ("SupplierThreadMajor", THREAD_MAJOR, "horizontal"),
+    ("SupplierShoulderDiameter", SHOULDER_DIA, "horizontal"),
+    ("SupplierShoulderLength", SHOULDER_LEN, "vertical"),
+)
+SUPPLIER_REFERENCE_STARTS = {
+    "SupplierThreadMajor": (
+        -THREAD_MAJOR / 2,
+        SHOULDER_END_Y - (FULL_THREAD_START + FITTED_THREAD_LEN) / 2,
+    ),
+    "SupplierShoulderDiameter": (-SHOULDER_DIA / 2, -SHOULDER_LEN / 2),
+    "SupplierShoulderLength": (SHOULDER_DIA / 2, SHOULDER_END_Y),
+}
+SUPPLIER_DRAWING_DIMENSIONS = {
+    "SupplierReference": {
+        name for name, _value, _orientation in SUPPLIER_REFERENCE_SKETCH
+    },
+}
+# The source-stock view restores the actual untrimmed solid, not a witness
+# length on the faced geometry. Its factory thread/chamfer remain intact.
+SUPPLIER_STOCK_CONFIGURATION = "AS SUPPLIED STOCK"
+SUPPLIER_STOCK_SUPPRESSED_FEATURES = ("StockDeburr", "StockTrim")

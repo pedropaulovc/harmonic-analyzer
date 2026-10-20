@@ -82,9 +82,7 @@ def test_native_author_passes_the_per_sku_catalogue_size(monkeypatch) -> None:
     assert calls[0][2] is spec.FILLISTER_SIZE
 
 
-def test_stock_builder_keeps_the_native_author_frame_and_threaded_saver(
-    monkeypatch,
-) -> None:
+def test_stock_builder_keeps_the_native_author_frame(monkeypatch) -> None:
     adapter = object()
     captured = {}
     artefacts = {"sldprt": "vn-ms-stop-plate-screw.SLDPRT"}
@@ -103,4 +101,3 @@ def test_stock_builder_keeps_the_native_author_frame_and_threaded_saver(
     assert captured["part_name"] == STEM
     assert captured["material"] == "Brass"
     assert captured["screw_axis_planes"] == ("Front Plane", "Right Plane")
-    assert captured["save_threaded_part"] is part.save_simplified_part

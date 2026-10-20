@@ -36,6 +36,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
+from _supplier_wire_stock_drawing import STOCK_KEEP as STOCK_KEEP
+from _supplier_wire_stock_drawing import add_nominal_stock_cross_section
+from vn_pen_wire_spec import DRAWING_DIMENSIONS
 import _telemetry
 
 
@@ -59,8 +62,8 @@ SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin ~60 mm wire)
 FRONT_CENTER = (0.110, 0.155)
 ISO_CENTER = (0.300, 0.170)
 
-# Per-view survivor of the marked-dimension import: the run length only (the
-# Ø0.8 diameter is a note -- a 0.8 mm circle is below the view's ink width).
+# The installed run keeps only its length. STOCK_KEEP is imported exclusively
+# into the separate nominal supplier cross-section, not onto this silhouette.
 FRONT_KEEP = {
     "Depth": (0.078, 0.155),
 }
@@ -113,7 +116,14 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_settled_stock = add_nominal_stock_cross_section(adapter, SOURCE)
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.086)
     add_property_linked_note(adapter, "Elevation View Note", 0.040, 0.036)
@@ -125,6 +135,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Wire Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_settled_stock,),
     )
 
 

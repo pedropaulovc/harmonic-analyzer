@@ -84,6 +84,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91794A112",
         material="AISI 304",
     ),
+    "vn-crank-hub-pin": _stock(
+        "vn-crank-hub-pin",
+        "18-8 Stainless Steel ISO 2338-m6 Dowel Pin",
+        "91585A377",
+        material="AISI 304",
+    ),
     "vn-crank-seat-drive-pin": _stock(
         "vn-crank-seat-drive-pin",
         "Alloy Steel Dowel Pin",

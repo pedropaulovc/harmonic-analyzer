@@ -176,6 +176,38 @@ DRAWING_NOTES = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 3:1"
 
+# McMaster 9489T111 engineering drawing (2026-04-08):
+# https://www.mcmaster.com/mvC/Library/CAD2/20260408/6323B365/9489T111_Routing%20Eyebolt%20with%20Nut%20-%20Not%20for%20LiftingX.GIF
+# Eye sizes survive the trim. Original shank/thread/overall sizes belong only
+# to the as-supplied bolt-body configuration, not the finished solid. The
+# source does not independently dimension wire diameter.
+SUPPLIER_EYE_MM = {
+    "EyeOD": ANCHOR_9489T111.eye_od_mm,
+    "EyeID": ANCHOR_9489T111.eye_id_mm,
+}
+SUPPLIER_REFERENCE_PRECISION = {
+    "EyeOD": 1, "EyeID": 2,
+    "SupplierStockShank": 2, "SupplierStockThread": 3, "SupplierStockOverall": 2,
+}
+SUPPLIER_STOCK_CONFIGURATION = "AsSuppliedStock"
+SUPPLIER_STOCK_FEATURE = "SupplierStockAxis"
+# Saved hidden; drawing views opt in to these reference dimensions.
+REFERENCE_SKETCHES = (SUPPLIER_STOCK_FEATURE,)
+SUPPLIER_STOCK_AXIS_MM = (
+    (0.0, ANCHOR_9489T111.eye_od_mm / 2.0),
+    (0.0, ANCHOR_9489T111.advertised_shank_start_y_mm),
+    (0.0, ANCHOR_9489T111.thread_start_y_mm),
+    (0.0, ANCHOR_9489T111.shank_end_y_mm),
+)
+SUPPLIER_STOCK_MM = {
+    "SupplierStockShank": ANCHOR_9489T111.shank_length_mm,
+    "SupplierStockThread": ANCHOR_9489T111.thread_length_mm,
+    "SupplierStockOverall": ANCHOR_9489T111.overall_length_mm,
+}
+SUPPLIER_STOCK_DIMENSIONS = {SUPPLIER_STOCK_FEATURE: set(SUPPLIER_STOCK_MM)}
+SUPPLIER_THREAD = ANCHOR_9489T111.thread_size
+SUPPLIER_THREAD_MAJOR_MM = ANCHOR_9489T111.thread_major_dia_mm
+
 _ANCHOR_NUMBER = _config.parts("vn-spring-hook")["number"]
 _LEVER_NUMBER = _config.parts("sm-summing-lever")["number"]
 # The top-level (MHA-HA-000) step that installs and locks the 20 anchors,

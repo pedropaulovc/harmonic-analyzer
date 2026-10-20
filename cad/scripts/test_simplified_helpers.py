@@ -988,6 +988,7 @@ class FakeFeature:
         self.Name = name
         self.part = part
         self.suppressed = set(suppressed_in)
+        self.suppression_reads = set()
 
     def IsSuppressed2(self, option: int, names) -> tuple[bool, ...]:
         """Answers in the PART's configuration order, not the requested one:
@@ -995,6 +996,7 @@ class FakeFeature:
         Default's missing teeth against T006)."""
         assert option == 3  # swSpecifyConfiguration
         asked = set(_names(names))
+        self.suppression_reads.update(asked)
         return tuple(
             name in self.suppressed for name in self.part.GetConfigurationNames() if name in asked
         )
@@ -1141,6 +1143,8 @@ class FakeLocalToothPart(FakePart):
         self.Extension.CustomPropertyManager = self._properties
         self.mutations = []
         self.refuse = None
+        self.bad_saved_configurations = set()
+        self.plain_rebuilds = []
 
     def _properties(self, name):
         return self.properties.setdefault(name, FakeProperties())
@@ -1153,11 +1157,25 @@ class FakeLocalToothPart(FakePart):
 
     def ShowConfiguration2(self, name):
         self.mutations.append(("activate", name))
-        return False if self.refuse == "activate" else super().ShowConfiguration2(name)
+        if (
+            self.refuse == "activate"
+            or self.ConfigurationManager.ActiveConfiguration.Name == name
+        ):
+            return False
+        return super().ShowConfiguration2(name)
 
     def ForceRebuild3(self, _top_only):
-        self.mutations.append(("rebuild", self.ConfigurationManager.ActiveConfiguration.Name))
-        return self.refuse != "rebuild"
+        active = self.ConfigurationManager.ActiveConfiguration.Name
+        self.mutations.append(("rebuild", active))
+        if self.refuse == "rebuild":
+            return False
+        self.bad_saved_configurations.discard(active)
+        return True
+
+    def EditRebuild3(self):
+        active = self.ConfigurationManager.ActiveConfiguration.Name
+        self.plain_rebuilds.append(active)
+        return active not in self.bad_saved_configurations
 
     def GetTitle(self):
         return "local-teeth.SLDPRT"
@@ -1301,9 +1319,9 @@ def test_local_derivation_retains_hard_fault_gate(monkeypatch):
         )
 
 
-def _saved_local_adapter(*, save_ok=True):
+def _saved_local_adapter(*, save_ok=True, authoring=None):
     """Distinct authoring, reopened, persisted and readback document objects."""
-    authoring = FakeLocalToothPart()
+    authoring = authoring or FakeLocalToothPart()
     disk = deepcopy(authoring)
     events = []
     adapter = _part_adapter(authoring)
@@ -1459,3 +1477,111 @@ def test_direct_save_rejects_invalid_mapping_before_save_or_export(monkeypatch, 
     assert adapter.currentModel is part
     assert part.GetConfigurationNames() == ["Default", *LOCAL_TEETH]
     assert part.detailed_state() == before
+
+
+def _complete_simplified_save(monkeypatch, *, failure=None):
+    authoring = FakeLocalToothPart()
+    # Give the blank its own detail so this public API can simplify every parent.
+    authoring.features["BlankDetail"] = FakeFeature(
+        "BlankDetail", authoring, set(LOCAL_TEETH)
+    )
+    mapping = {**LOCAL_TEETH, "Default": ("BlankDetail",)}
+    adapter, authoring, events = _saved_local_adapter(authoring=authoring)
+    artefacts = {"part": "fixture.SLDPRT"}
+
+    async def initial_save(_adapter, _name, _views):
+        # The fixture's disk starts with this detailed authoring state. The
+        # ordinary part-save boundary is exercised in test_part_save_rebuild.
+        return artefacts
+
+    monkeypatch.setattr(_simplified_part, "save_part_and_images", initial_save)
+    open_saved = adapter.open_model
+    opened = []
+
+    async def open_model(path):
+        result = await open_saved(path)
+        model = adapter.currentModel
+        model.mutations.clear()
+        model.plain_rebuilds.clear()
+        for feature in model.features.values():
+            feature.suppression_reads.clear()
+        opened.append(model)
+        if len(opened) == 2:
+            if failure == "reopen":
+                return SimpleNamespace(is_success=False, error="saved file unreadable")
+            if failure == "cache":
+                model.bad_saved_configurations.add("T006 Simplified")
+            elif failure == "suppression":
+                model.features[LOCAL_TEETH["T006"][0]].suppressed.remove(
+                    "T006 Simplified"
+                )
+        return result
+
+    adapter.open_model = open_model
+    return adapter, authoring, events, mapping, opened
+
+
+def test_public_simplified_save_reopens_and_regenerates_every_persisted_configuration(
+    monkeypatch,
+):
+    adapter, authoring, events, mapping, opened = _complete_simplified_save(monkeypatch)
+    before = authoring.detailed_state()
+    artefacts = asyncio.run(
+        _simplified_part.save_simplified_part(adapter, "local-teeth", mapping)
+    )
+    assert artefacts["part"] == "fixture.SLDPRT"
+    reopened = adapter.currentModel
+    assert reopened is opened[-1]
+    assert reopened is not opened[0] and reopened is not authoring
+    expected = set(mapping) | {simplified_name(parent) for parent in mapping}
+    assert set(reopened.GetConfigurationNames()) == expected
+    assert set(reopened.plain_rebuilds) == expected
+    assert not any(operation == "rebuild" for operation, _name in reopened.mutations)
+    assert reopened.detailed_state() == before
+    assert reopened.ConfigurationManager.ActiveConfiguration.Name == "T120"
+    assert all(
+        configuration.AddRebuildSaveMark
+        for configuration in reopened.configurations.values()
+    )
+    for parent, names in mapping.items():
+        for name in names:
+            feature = reopened.features[name]
+            assert parent not in feature.suppressed
+            assert simplified_name(parent) in feature.suppressed
+    assert not authoring.mutations
+    assert events[-1][0] == "open"  # The proof must not be saved back over its input.
+
+
+@pytest.mark.parametrize("failure", ["reopen", "cache", "suppression"])
+def test_public_simplified_save_propagates_saved_configuration_failures(
+    monkeypatch, failure
+):
+    adapter, authoring, events, mapping, opened = _complete_simplified_save(
+        monkeypatch, failure=failure
+    )
+    before = authoring.detailed_state()
+    with pytest.raises(RuntimeError):
+        asyncio.run(
+            _simplified_part.save_simplified_part(adapter, "local-teeth", mapping)
+        )
+    assert len(opened) == 2
+    reopened = opened[-1]
+    assert reopened is adapter.currentModel
+    assert not any(operation == "rebuild" for operation, _name in reopened.mutations)
+    if failure == "reopen":
+        assert reopened.plain_rebuilds == []
+        assert reopened.mutations == []
+    else:
+        assert reopened.ConfigurationManager.ActiveConfiguration.Name == "T120"
+        if failure == "cache":
+            assert "T006 Simplified" in reopened.plain_rebuilds
+            assert "T006 Simplified" in reopened.bad_saved_configurations
+        else:
+            expected = set(mapping) | {simplified_name(parent) for parent in mapping}
+            assert set(reopened.plain_rebuilds) == expected
+            feature = reopened.features[LOCAL_TEETH["T006"][0]]
+            assert "T006 Simplified" in feature.suppression_reads
+            assert "T006 Simplified" not in feature.suppressed
+    assert authoring.detailed_state() == before
+    assert not authoring.mutations
+    assert events[-1][0] == "open"

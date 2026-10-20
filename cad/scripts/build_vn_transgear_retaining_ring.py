@@ -22,7 +22,10 @@ from _appearance import PANEL_BLACK
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_97431A260 import build_97431A260
+from vn_transgear_retaining_ring_supplier_refs import (
+    author_thickness_reference,
+    build_97431A260,
+)
 from vn_transgear_retaining_ring_spec import SKU, THICKNESS
 
 PART_NAME = "vn-transgear-retaining-ring"
@@ -46,6 +49,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         material=MATERIAL,
         color=PANEL_BLACK,
+        before_save=author_thickness_reference,
     )
 
 

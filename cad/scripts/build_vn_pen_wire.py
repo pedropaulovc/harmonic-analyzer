@@ -44,6 +44,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
+from _supplier_wire_stock import author_nominal_stock_cross_section
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -112,6 +113,9 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven pen wire (equations neutral)", v_wire, 0.005 * v_wire)
+    await author_nominal_stock_cross_section(
+        adapter, installed_features=("WireProfile", "Wire")
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

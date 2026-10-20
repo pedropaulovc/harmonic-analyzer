@@ -8,7 +8,7 @@ canonical installed part and the assembly's no-render length variants.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from typing import Any
 
 import _config
@@ -18,7 +18,7 @@ from _check import check
 from _custom_properties import apply_custom_properties
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
-from _rebuild import force_rebuild
+from _rebuild import active_configuration_name, force_rebuild
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _stock_fastener import _blank_recipe_references
 from diagnostics.diag_build_9432K31 import build_9432K31
@@ -33,6 +33,28 @@ STOCK_PROPERTIES = {
 }
 
 
+async def run_before_save(
+    adapter: Any,
+    part_name: str,
+    before_save: Callable[[Any], Awaitable[None]],
+) -> None:
+    """Run a reference hook only when it preserves the installed active state.
+
+    Both spring lifecycles must reject missing or changed configuration
+    identities before their save/export pipeline can begin.
+    """
+    installed_configuration = active_configuration_name(adapter)
+    if not installed_configuration:
+        raise RuntimeError(
+            f"{part_name}: installed configuration identity is unavailable"
+        )
+    await before_save(adapter)
+    if active_configuration_name(adapter) != installed_configuration:
+        raise RuntimeError(
+            f"{part_name}: before_save changed the installed active configuration"
+        )
+
+
 @_telemetry.traced("spring.build_variant", label_param="part_name")
 async def build_spring(
     adapter: Any,
@@ -41,6 +63,7 @@ async def build_spring(
     *,
     views: Iterable[str] | None = None,
     drawing_properties: Mapping[str, str] | None = None,
+    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
     """Build and save one 9432K31 at a catalogue inside-hook length.
 
@@ -48,6 +71,8 @@ async def build_spring(
     are saved but no per-part PNG views are rendered.  The canonical wrapper
     passes ``drawing_properties`` so its purchased-reference-sheet properties
     are applied before the single save/export operation.
+    ``before_save`` adds canonical reference-only configurations after all
+    installed geometry/property work; assembly length variants leave it unset.
     """
     check("create_part", await adapter.create_part())
     try:
@@ -67,6 +92,9 @@ async def build_spring(
         apply_drawing_properties(adapter, part_name, drawing_properties)
 
     await report_mass_properties(adapter)
+    if before_save is not None:
+        await run_before_save(adapter, part_name, before_save)
+
     if views is None:
         return await save_part_and_images(adapter, part_name)
     return await save_part_and_images(adapter, part_name, views)

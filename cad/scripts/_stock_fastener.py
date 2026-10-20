@@ -15,7 +15,7 @@ from _custom_properties import apply_custom_properties
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
-from _rebuild import force_rebuild
+from _rebuild import active_configuration_name, force_rebuild
 from _stock_recipe import RecipeAuthor, recipe_declaration
 from _visibility import FeatureWalk
 
@@ -349,6 +349,7 @@ async def build_stock_fastener(
     color: tuple[float, float, float] | None = None,
     screw_axis_planes: tuple[str, str] | None = None,
     save_threaded_part: ThreadedPartSaver | None = None,
+    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
     """Create, normalize, finish, and save one production stock part.
 
@@ -358,6 +359,8 @@ async def build_stock_fastener(
 
     Threaded callers supply their statically imported simplified saver through
     ``save_threaded_part``. Unthreaded leaves never import that part machinery.
+    ``before_save`` may add source-reference configurations after normalization
+    and installed-body checks, and must leave the installed configuration active.
     """
 
     check("create_part", await adapter.create_part())
@@ -453,6 +456,17 @@ async def build_stock_fastener(
     }
     apply_custom_properties(adapter, properties)
     await report_mass_properties(adapter)
+    if before_save is not None:
+        installed_configuration = active_configuration_name(adapter)
+        if not installed_configuration:
+            raise RuntimeError(
+                f"{part_name}: installed configuration identity is unavailable"
+            )
+        await before_save(adapter)
+        if active_configuration_name(adapter) != installed_configuration:
+            raise RuntimeError(
+                f"{part_name}: before_save changed the installed active configuration"
+            )
     return await _save_stock_part(
         adapter, part_name, threaded=threaded, save_threaded_part=save_threaded_part
     )

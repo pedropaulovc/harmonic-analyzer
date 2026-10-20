@@ -24,6 +24,8 @@ publishes as ``ScrewAxis`` (Front Plane x Top Plane).
 
 from __future__ import annotations
 
+from _supplier_pin_data import SupplierPinReference
+
 from _mcmaster_98296a031 import SPRING_PIN_SIZE
 from _mcmaster_98296a031 import WALL_T as _CATALOGUE_WALL
 
@@ -52,3 +54,19 @@ if not HOLE_WINDOW[0] <= PIN_DIA <= HOLE_WINDOW[1]:
     raise AssertionError("the pin's nominal diameter leaves its own hole window")
 if not HOLE_MAX < FREE_DIA_MIN:
     raise AssertionError("the cup pin hole no longer compresses the spring pin")
+
+# Inspected McMaster engineering drawing, 2026-10-19. Keep nominal 1/16
+# geometry exact; .063 is its native three-place supplier presentation.
+SUPPLIER_REFERENCE = SupplierPinReference(
+    sku=SKU,
+    units="in",
+    diameter_mm=PIN_DIA,
+    length_mm=PIN_LEN,
+    diameter_nominal=0.063,
+    diameter_precision=3,
+    length_precision=3,
+    wall_mm=WALL_T,
+    wall_precision=3,
+    application_hole_limits=(0.062, 0.065),
+    application_hole_precision=3,
+)

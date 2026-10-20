@@ -13,14 +13,18 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+from functools import wraps
 import math
 import sys
 
 from _fastener_catalog import fastener
 from _session import run_build
+from _sketch import blank_reference_sketches
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
+from _supplier_washer_model import author_supplier_washer_references
 from diagnostics.diag_build_3088A429 import build_3088A429
-from vn_rocker_thrust_washer_spec import SKU
+from vn_rocker_thrust_washer_spec import REFERENCE_SKETCHES, SKU
+import vn_rocker_thrust_washer_spec as part
 
 PART_NAME = "vn-rocker-thrust-washer"
 SPEC = fastener(PART_NAME)
@@ -31,11 +35,24 @@ MATERIAL = SPEC.material
 TRANSFORM = RigidTransform(rotation_radians=(math.pi / 2.0, 0.0, 0.0))
 
 
+@wraps(build_3088A429)
+async def _build_with_supplier_references(adapter, truth=None):
+    await build_3088A429(adapter, truth)
+    await author_supplier_washer_references(
+        adapter, axis="z", bore_mm=part.ID, outer_mm=part.OD,
+        thickness_mm=part.THICKNESS, units=part.SUPPLIER_UNITS,
+        precision=part.DRAWING_REFERENCE_PRECISION, bands=part.SUPPLIER_TOLERANCES,
+    )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+
+
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku=SKU, author=build_3088A429, transform=TRANSFORM),),
+        components=(
+            StockComponent(sku=SKU, author=_build_with_supplier_references, transform=TRANSFORM),
+        ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),
     )

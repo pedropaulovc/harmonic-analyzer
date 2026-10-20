@@ -26,6 +26,11 @@ from _mcmaster_90760a009 import (
     nut_volume,
 )
 
+# The inspected supplier drawing spells the exact 3/32 in model height as
+# 0.094 in. Presentation must never round THICKNESS or the solid geometry.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 4
+
 # Full screw thread standing past the jam nut's outer face, in pitches, the
 # screw's tip chamfer excluded: both nuts then run on full thread.
 THREAD_PAST_MIN_PITCHES = 2
@@ -34,8 +39,10 @@ __all__ = [
     "ACROSS_CORNERS",
     "ACROSS_FLATS",
     "BORE_DIA",
+    "DRAWING_REFERENCE_PRECISION",
     "MASS_G",
     "SKU",
+    "SUPPLIER_FRACTION_DENOMINATOR",
     "THICKNESS",
     "THREAD",
     "THREAD_PAST_MIN_PITCHES",

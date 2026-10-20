@@ -566,6 +566,183 @@ def _helper_blanked_parameters(module: str, function: str) -> dict[str, str | No
         return blanked
     return {}
 
+def _literal_named_value(path: Path, name: str, visited=None):
+    """Read a literal constant through explicit imports; never execute source."""
+    visited = set() if visited is None else visited
+    key = (path, name)
+    if key in visited or not path.is_file():
+        raise LookupError(f"cannot resolve literal {name} from {path}")
+    visited.add(key)
+    for node in _tree(path).body:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                if (alias.asname or alias.name) == name:
+                    return _literal_named_value(
+                        _SCRIPTS / f"{node.module}.py", alias.name, visited
+                    )
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        ):
+            value = node.value
+            if isinstance(value, ast.Name):
+                return _literal_named_value(path, value.id, visited)
+            if (
+                isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name)
+                and isinstance(value.slice, ast.Constant)
+            ):
+                return _literal_named_value(path, value.value.id, visited)[value.slice.value]
+            try:
+                return ast.literal_eval(value)
+            except (ValueError, TypeError) as error:
+                raise LookupError(f"nonliteral declaration {name} in {path}") from error
+    raise LookupError(f"cannot resolve literal {name} from {path}")
+
+
+def _loop_bound_names(path: Path, owner: ast.AST, call: ast.Call, name: str) -> set[str]:
+    """Resolve a dict items()/values() loop's actual string-value binding."""
+    for loop in ast.walk(owner):
+        if not isinstance(loop, ast.For) or call not in ast.walk(loop):
+            continue
+        iterator = loop.iter
+        if not (
+            isinstance(iterator, ast.Call) and isinstance(iterator.func, ast.Attribute)
+            and isinstance(iterator.func.value, ast.Name)
+        ):
+            continue
+        target = loop.target
+        values = None
+        if iterator.func.attr == "values" and isinstance(target, ast.Name) and target.id == name:
+            values = _literal_named_value(path, iterator.func.value.id).values()
+        elif iterator.func.attr == "items" and isinstance(target, (ast.Tuple, ast.List)):
+            for index, item in enumerate(target.elts):
+                if isinstance(item, ast.Name) and item.id == name:
+                    mapping = _literal_named_value(path, iterator.func.value.id)
+                    values = mapping.keys() if index == 0 else mapping.values()
+        if values is not None:
+            result = set(values)
+            if not all(isinstance(value, str) for value in result):
+                raise LookupError(f"non-string hidden sketch binding {name}")
+            return result
+    return set()
+
+def _literal_reference(path: Path, expression: ast.AST):
+    if isinstance(expression, ast.Name):
+        return _literal_named_value(path, expression.id)
+    if (
+        isinstance(expression, ast.Subscript) and isinstance(expression.value, ast.Name)
+        and isinstance(expression.slice, ast.Constant)
+    ):
+        return _literal_named_value(path, expression.value.id)[expression.slice.value]
+    if isinstance(expression, (ast.Tuple, ast.List)):
+        return [_literal_reference(path, item) for item in expression.elts]
+    if isinstance(expression, ast.Attribute) and isinstance(expression.value, ast.Name):
+        for statement in _tree(path).body:
+            if isinstance(statement, ast.Import):
+                for alias in statement.names:
+                    if (alias.asname or alias.name) == expression.value.id:
+                        return _literal_named_value(
+                            _SCRIPTS / f"{alias.name}.py", expression.attr
+                        )
+    try:
+        return ast.literal_eval(expression)
+    except (ValueError, TypeError) as error:
+        raise LookupError(f"unresolved literal reference {ast.unparse(expression)}") from error
+
+
+def _tuple_blanked_sketches(path: Path, owner: ast.AST, call: ast.Call) -> set[str] | None:
+    """Names from tuple(mapping) or a local literal list with explicit appends."""
+    expression = call.args[1]
+    if not (
+        isinstance(expression, ast.Call) and isinstance(expression.func, ast.Name)
+        and expression.func.id == "tuple" and len(expression.args) == 1
+    ):
+        return None
+    source = expression.args[0]
+    try:
+        value = _literal_reference(path, source)
+    except LookupError:
+        if not isinstance(source, ast.Name):
+            raise
+        initializers = [
+            node.value for node in ast.walk(owner)
+            if isinstance(node, ast.Assign) and node.lineno < call.lineno
+            and any(isinstance(target, ast.Name) and target.id == source.id for target in node.targets)
+        ]
+        if len(initializers) != 1 or not isinstance(initializers[0], ast.List):
+            raise LookupError(f"unresolved hidden sketch collection {source.id}")
+        value = list(_literal_reference(path, initializers[0]))
+        for node in ast.walk(owner):
+            if not (
+                isinstance(node, ast.Call) and node.lineno < call.lineno
+                and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == source.id
+            ):
+                continue
+            if node.func.attr != "append" or len(node.args) != 1:
+                raise LookupError(f"unsupported hidden sketch collection mutation {ast.unparse(node)}")
+            value.append(_literal_reference(path, node.args[0]))
+    if not isinstance(value, (dict, tuple, list, set)):
+        raise LookupError(f"hidden sketch collection is not a collection: {ast.unparse(source)}")
+    names = set(value)
+    if not all(isinstance(name, str) for name in names):
+        raise LookupError(f"non-string hidden sketch collection: {ast.unparse(source)}")
+    return names
+
+
+
+
+def _helper_fixed_blanked_sketches(module: str, function: str) -> set[str]:
+    try:
+        return _fixed_blanked_sketches(module, function)
+    except LookupError as error:
+        raise LookupError(f"{_SCRIPTS / f'{module}.py'}:{function}: {error}") from error
+
+
+def _fixed_blanked_sketches(module: str, function: str) -> set[str]:
+    """Names a called author blanks directly, excluding its name parameters."""
+    path = _SCRIPTS / f"{module}.py"
+    if not path.is_file():
+        return set()
+    tree = _tree(path)
+    names: set[str] = set()
+    for owner in tree.body:
+        if not isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)) or owner.name != function:
+            continue
+        parameters = {
+            arg.arg for arg in owner.args.posonlyargs + owner.args.args + owner.args.kwonlyargs
+        }
+        for call in ast.walk(owner):
+            if not isinstance(call, ast.Call) or _called_name(call) != "blank_reference_sketches":
+                continue
+            sketches = call.args[1]
+            if not isinstance(sketches, (ast.Tuple, ast.List)):
+                resolved = _tuple_blanked_sketches(path, owner, call)
+                names |= resolved if resolved is not None else _reference_sketches(tree)
+                continue
+            for item in sketches.elts:
+                if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                    names.add(item.value)
+                elif isinstance(item, ast.Name) and item.id in parameters:
+                    continue  # Resolved against the author call by the parameter guard.
+                elif isinstance(item, ast.Name):
+                    try:
+                        value = _literal_named_value(path, item.id)
+                    except LookupError:
+                        values = _loop_bound_names(path, owner, call, item.id)
+                        names |= values if values else _reference_sketches(tree)
+                    else:
+                        if not isinstance(value, str):
+                            raise LookupError(f"{module}.{function}: non-string sketch {item.id}")
+                        names.add(value)
+                elif isinstance(item, ast.Attribute) and isinstance(item.value, ast.Name):
+                    value = _literal_reference(path, item)
+                    if not isinstance(value, str):
+                        raise LookupError(f"{module}.{function}: non-string sketch {item.attr}")
+                    names.add(value)
+                else:
+                    names |= _reference_sketches(tree)
+    return names
+
 
 def _blanked_sketches(build: Path) -> set[str]:
     """Every sketch a part build hides with _sketch.blank_sketch, or with
@@ -595,6 +772,7 @@ def _blanked_sketches(build: Path) -> set[str]:
             continue
         if called != "blank_sketch":
             if isinstance(node.func, ast.Name) and node.func.id in helpers:
+                names |= _helper_fixed_blanked_sketches(*helpers[node.func.id])
                 passed = {k.arg: k.value for k in node.keywords if k.arg}
                 for parameter, default in _helper_blanked_parameters(*helpers[node.func.id]).items():
                     value = passed.get(parameter)
@@ -613,11 +791,54 @@ def _blanked_sketches(build: Path) -> set[str]:
             names.add(imported)
             continue
         names |= _reference_sketches(tree)
+    for path, owner, _nodes, _imports in _reachable_functions(build):
+        names |= _helper_fixed_blanked_sketches(path.stem, owner.name)
     return names
 
 
+def _declared_strings(
+    path: Path, name: str, visited: set[tuple[Path, str]]
+) -> set[str]:
+    """Follow only a named constant's declaration, not an imported module's API."""
+    key = (path, name)
+    if key in visited or not path.is_file():
+        return set()
+    visited.add(key)
+    tree = _tree(path)
+    for node in tree.body:
+        value = None
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
+        ):
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            value = node.value
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                if (alias.asname or alias.name) == name:
+                    return _declared_strings(_SCRIPTS / f"{node.module}.py", alias.name, visited)
+        if value is not None:
+            if isinstance(value, ast.Subscript):
+                try:
+                    selected = _literal_named_value(path, name)
+                except LookupError:
+                    pass  # Nonliteral data still contributes its explicit string references below.
+                else:
+                    if isinstance(selected, str):
+                        return {selected}
+            strings = {
+                child.value for child in ast.walk(value)
+                if isinstance(child, ast.Constant) and isinstance(child.value, str)
+            }
+            for child in ast.walk(value):
+                if isinstance(child, ast.Name):
+                    strings |= _declared_strings(path, child.id, visited)
+            return strings
+    return set()
+
+
 def _strings_read_by(draw: Path) -> set[str]:
-    """String constants in a drawing script and the repo modules it imports."""
+    """Drawing/helper strings, including constants those helpers import by name."""
     trees = [_tree(draw)]
     for node in trees[0].body:
         if isinstance(node, ast.ImportFrom):
@@ -627,35 +848,371 @@ def _strings_read_by(draw: Path) -> set[str]:
         else:
             continue
         trees += [_tree(_SCRIPTS / f"{m}.py") for m in modules if m and (_SCRIPTS / f"{m}.py").exists()]
-    return {
+    strings = {
         node.value
         for tree in trees
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     }
+    for tree in trees:
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and node.module:
+                for alias in node.names:
+                    strings |= _declared_strings(
+                        _SCRIPTS / f"{node.module}.py", alias.name, set()
+                    )
+    return strings
+
+
+def _reachable_functions(path: Path):
+    """Called repo functions, including named callbacks and partial's first arg."""
+    visited: set[tuple[Path, int]] = set()
+
+    def follows(path: Path, scope: ast.AST, enclosing: dict[str, ast.AST]):
+        key = (path, scope.lineno)
+        if key in visited:
+            return
+        visited.add(key)
+        pending = list(ast.iter_child_nodes(scope))
+        nodes = []
+        while pending:
+            node = pending.pop()
+            nodes.append(node)
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                pending.extend(ast.iter_child_nodes(node))
+        functions = {
+            **enclosing,
+            **{node.name: node for node in nodes
+               if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))},
+        }
+        imports: dict[str, tuple[str, str | None]] = {}
+        for node in [*_tree(path).body, *nodes]:
+            if isinstance(node, ast.ImportFrom) and node.module:
+                imports.update((alias.asname or alias.name, (node.module, alias.name))
+                               for alias in node.names)
+            elif isinstance(node, ast.Import):
+                imports.update((alias.asname or alias.name, (alias.name, None))
+                               for alias in node.names)
+        yield path, scope, nodes, imports
+        for call in nodes:
+            if not isinstance(call, ast.Call):
+                continue
+            for reference in (call.func, *call.args, *(kw.value for kw in call.keywords)):
+                if isinstance(reference, ast.Name) and reference.id in functions:
+                    yield from follows(path, functions[reference.id], functions)
+                    continue
+                target = _import_target(reference, imports)
+                if target is None:
+                    continue
+                module, name = target
+                # These are terminal APIs, not additional drawing/model owners.
+                if module in {"_drawing_hidden_sketches", "_drawing_dimension_import", "_sketch"}:
+                    continue
+                helper = _SCRIPTS / f"{module}.py"
+                if not helper.is_file():
+                    continue
+                definitions = {
+                    node.name: node for node in _tree(helper).body
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                if name in definitions:
+                    yield from follows(helper, definitions[name], definitions)
+
+    definitions = {
+        node.name: node for node in _tree(path).body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    if "build" in definitions:
+        yield from follows(path, definitions["build"], definitions)
+
+
+def _import_target(reference: ast.AST, imports):
+    if isinstance(reference, ast.Name):
+        return imports.get(reference.id)
+    if isinstance(reference, ast.Attribute) and isinstance(reference.value, ast.Name):
+        imported = imports.get(reference.value.id)
+        if imported and imported[1] is None:
+            return imported[0], reference.attr
+    return None
 
 
 def _curates_through_hidden_sketches(draw: Path) -> bool:
-    tree = _tree(draw)
-    aliases: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "_drawing_hidden_sketches":
-            if any(alias.name == "curate_view_dimensions" for alias in node.names):
-                return True
-        if isinstance(node, ast.Import):
-            aliases |= {
-                alias.asname or alias.name
-                for alias in node.names
-                if alias.name == "_drawing_hidden_sketches"
-            }
+    """Require an actual canonical call in a reachable drawing owner."""
     return any(
         isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "curate_view_dimensions"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id in aliases
-        for node in ast.walk(tree)
+        and _import_target(node.func, imports)
+        == ("_drawing_hidden_sketches", "curate_view_dimensions")
+        for _path, _scope, nodes, imports in _reachable_functions(draw)
+        for node in nodes
     )
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            "from supplier import annotate as owned\n"
+            "async def build(adapter):\n"
+            "    owned(adapter)\n",
+            True,
+        ),
+        (
+            "import supplier as owned\n"
+            "async def build(adapter):\n"
+            "    owned.annotate(adapter)\n",
+            True,
+        ),
+        (
+            "from supplier import annotate\n"
+            "def supplier_dimensions(adapter):\n"
+            "    annotate(adapter)\n"
+            "async def build(adapter):\n"
+            "    export(adapter, supplier_dimensions=supplier_dimensions)\n",
+            True,
+        ),
+        (
+            "from _drawing_hidden_sketches import curate_view_dimensions\n"
+            "from supplier import bypass\n"
+            "async def build(adapter):\n"
+            "    bypass(adapter)\n",
+            False,
+        ),
+        (
+            "from supplier import annotate, bypass\n"
+            "def unused(adapter):\n"
+            "    annotate(adapter)\n"
+            "async def build(adapter):\n"
+            "    bypass(adapter)\n",
+            False,
+        ),
+        (
+            "from supplier import cycle\n"
+            "async def build(adapter):\n"
+            "    cycle(adapter)\n",
+            False,
+        ),
+    ],
+    ids=("called-helper", "module-alias", "callback", "unused-import", "unused-helper", "cycle"),
+)
+def test_hidden_routing_follows_only_reachable_curators(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str, expected: bool
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    (tmp_path / "supplier.py").write_text(
+        "from _drawing_hidden_sketches import curate_view_dimensions as hidden\n"
+        "from _drawing_dimension_import import curate_view_dimensions as direct\n"
+        "def annotate(adapter):\n"
+        "    hidden(adapter, view, keep={}, view_label='stock', dimensions_by_feature={})\n"
+        "def bypass(adapter):\n"
+        "    direct(adapter, view, keep={}, view_label='stock')\n"
+        "def cycle(adapter):\n"
+        "    cycle(adapter)\n",
+        encoding="utf-8",
+    )
+    drawing = tmp_path / "draw_fixture.py"
+    drawing.write_text(body, encoding="utf-8")
+    assert _curates_through_hidden_sketches(drawing) is expected
+
+
+def test_hidden_inventory_follows_the_called_authors_imported_constants(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    (tmp_path / "source_names.py").write_text(
+        "REFERENCE_SKETCHES = ('SupplierDiameterReference', 'SupplierWallReference')\n"
+        "DIAMETER = REFERENCE_SKETCHES[0]\n"
+        "WALL = REFERENCE_SKETCHES[1]\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "author.py").write_text(
+        "from source_names import DIAMETER\n"
+        "import source_names as source\n"
+        "def dowel(adapter):\n"
+        "    blank_reference_sketches(adapter, (DIAMETER,))\n"
+        "def spring(adapter):\n"
+        "    blank_reference_sketches(adapter, (source.WALL,))\n",
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_fixture.py"
+    build.write_text(
+        "from author import dowel\n"
+        "async def build(adapter):\n"
+        "    dowel(adapter)\n",
+        encoding="utf-8",
+    )
+    assert _blanked_sketches(build) == {"SupplierDiameterReference"}
+    assert _helper_fixed_blanked_sketches("author", "spring") == {"SupplierWallReference"}
+    (tmp_path / "drawing_helper.py").write_text(
+        "from source_names import DIAMETER\n"
+        "DIMENSIONS = {DIAMETER: {'Diameter'}}\n",
+        encoding="utf-8",
+    )
+    draw = tmp_path / "draw_fixture.py"
+    draw.write_text("from drawing_helper import DIMENSIONS\n", encoding="utf-8")
+    read = _strings_read_by(draw)
+    assert "SupplierDiameterReference" in read
+    assert "SupplierWallReference" not in read
+
+
+@pytest.mark.parametrize("registered", (False, True))
+def test_computed_helper_blanking_requires_a_reference_declaration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, registered: bool
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    declaration = "REFERENCE_SKETCHES = ('DeclaredReference',)\n" if registered else ""
+    (tmp_path / "author.py").write_text(
+        declaration
+        + "def author(adapter):\n"
+        "    feature = make_reference_name()\n"
+        "    blank_reference_sketches(adapter, (feature,))\n",
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_fixture.py"
+    build.write_text(
+        "from author import author\n"
+        "async def build(adapter):\n"
+        "    author(adapter)\n",
+        encoding="utf-8",
+    )
+    if registered:
+        assert _blanked_sketches(build) == {"DeclaredReference"}
+    else:
+        with pytest.raises(LookupError, match="no REFERENCE_SKETCHES"):
+            _blanked_sketches(build)
+
+
+@pytest.mark.parametrize("binding", ("_, feature in FEATURES.items()", "feature in FEATURES.values()"))
+def test_computed_author_loop_resolves_actual_values_without_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, binding: str
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    (tmp_path / "names.py").write_text(
+        "FEATURES = {'Front': 'FrontReference', 'Top': 'TopReference'}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "author.py").write_text(
+        "from names import FEATURES\n"
+        "def author(adapter):\n"
+        f"    for {binding}:\n"
+        "        blank_reference_sketches(adapter, (feature,))\n"
+        "async def save(adapter):\n"
+        "    author(adapter)\n",
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_fixture.py"
+    build.write_text(
+        "from functools import partial\n"
+        "from author import save\n"
+        "async def build(adapter):\n"
+        "    export(adapter, saver=partial(save, adapter))\n",
+        encoding="utf-8",
+    )
+    assert _blanked_sketches(build) == {"FrontReference", "TopReference"}
+
+
+@pytest.mark.parametrize("collection", ("local-appends", "mapping-keys"))
+@pytest.mark.parametrize("include_second", (False, True))
+def test_tuple_blanking_uses_actual_collection_not_declared_superset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    collection: str, include_second: bool,
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    mapping = {"FirstReference": ("Size",)}
+    if include_second:
+        mapping["SecondReference"] = ("OtherSize",)
+    (tmp_path / "source_names.py").write_text(
+        "FIRST = 'FirstReference'\nSECOND = 'SecondReference'\n"
+        f"FEATURES = {mapping!r}\n",
+        encoding="utf-8",
+    )
+    if collection == "local-appends":
+        body = (
+            "    features = [names.FIRST]\n"
+            + ("    if application:\n        features.append(names.SECOND)\n" if include_second else "")
+            + "    blank_reference_sketches(adapter, tuple(features))\n"
+        )
+    else:
+        body = "    blank_reference_sketches(adapter, tuple(names.FEATURES))\n"
+    (tmp_path / "author.py").write_text(
+        "import source_names as names\n"
+        "REFERENCE_SKETCHES = ('UnrelatedDeclaredReference',)\n"
+        "def author(adapter):\n" + body,
+        encoding="utf-8",
+    )
+    build = tmp_path / "build_fixture.py"
+    build.write_text(
+        "from author import author\n"
+        "async def build(adapter):\n    author(adapter)\n",
+        encoding="utf-8",
+    )
+    assert _blanked_sketches(build) == set(mapping)
+
+
+def test_unknown_collection_binding_reports_its_source_and_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(globals(), "_SCRIPTS", tmp_path)
+    (tmp_path / "author.py").write_text(
+        "REFERENCE_SKETCHES = ('NotEvidenceForTheComputedName',)\n"
+        "def author(adapter):\n"
+        "    features = []\n"
+        "    features.append(computed_name())\n"
+        "    blank_reference_sketches(adapter, tuple(features))\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(LookupError, match=r"author\.py:author:.*computed_name"):
+        _helper_fixed_blanked_sketches("author", "author")
+
+
+def test_supplier_authors_blank_exactly_their_declared_reference_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from _supplier_pin_data import DIAMETER_FEATURE, MATING_HOLE_FEATURE, WALL_FEATURE
+    from _supplier_screw_reference_names import FEATURE_BY_PLANE, REFERENCE_SKETCHES
+
+    dowel = _helper_fixed_blanked_sketches(
+        "_supplier_pin_model", "author_supplier_dowel_references"
+    )
+    spring = _helper_fixed_blanked_sketches(
+        "_supplier_pin_model", "author_supplier_spring_pin_references"
+    )
+    assert dowel == {DIAMETER_FEATURE}
+    assert spring == {MATING_HOLE_FEATURE, WALL_FEATURE}
+    # Both directions: no unowned declaration and no undeclared hidden source.
+    assert dowel | spring == _reference_sketches(_tree(_SCRIPTS / "_supplier_pin_model.py"))
+    def no_declaration_fallback(_tree):
+        raise AssertionError("actual author binding must resolve without metadata fallback")
+
+    monkeypatch.setitem(globals(), "_reference_sketches", no_declaration_fallback)
+    screw = _helper_fixed_blanked_sketches(
+        "_supplier_screw_reference", "add_supplier_reference_sketch"
+    )
+    assert screw == set(REFERENCE_SKETCHES) == set(FEATURE_BY_PLANE.values())
+
+
+def test_clamp_screw_inventory_and_routing_reject_a_wrong_curator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    build = _SCRIPTS / "build_vn_clamp_screw.py"
+    draw = _SCRIPTS / "draw_vn_clamp_screw.py"
+    assert "SupplierReference" in _blanked_sketches(build) & _strings_read_by(draw)
+    assert _curates_through_hidden_sketches(draw)
+
+    original_tree = _tree
+
+    class WrongCurator(ast.NodeTransformer):
+        def visit_ImportFrom(self, node):
+            if node.module == "_drawing_hidden_sketches":
+                node.module = "_drawing_dimension_import"
+            return node
+
+    def wrong_tree(path: Path):
+        if path.name == "_supplier_screw_dimensions.py":
+            return WrongCurator().visit(ast.parse(path.read_text(encoding="utf-8")))
+        return original_tree(path)
+
+    monkeypatch.setitem(globals(), "_tree", wrong_tree)
+    assert not _curates_through_hidden_sketches(draw)
 
 
 @functools.cache
@@ -703,6 +1260,12 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert found["pd_rack_pinion"] == {"SpanProfile", "RootInspectionProfile"}
     assert found["pd_transgear_feed_pinion"] == {"SpanProfile"}
     assert found["pd_transgear_knob_shaft"] == {"SpanProfile", "RootInspectionProfile"}
+    # Separate supplier stock views must route their hidden reference dimensions
+    # through the same per-view visibility handling as fabricated-part references.
+    assert found["vn_boss_hook"] == {"SupplierNominalStockProfile"}
+    assert found["vn_spring_hook"] == {"SupplierStockAxis"}
+    assert "SupplierMaxLimitProfile" in found["vn_post_mount_screw"]
+    assert "SupplierReference" in found["vn_clamp_screw"]
 
 
 def test_a_drawing_of_a_part_hidden_sketch_curates_through_this_module() -> None:

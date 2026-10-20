@@ -197,10 +197,10 @@ HUB_BORE_BAND = (
     0.0,
 )
 
-# MHA-VN-029 is an axial seam pin at six o'clock in the outboard view, cut from
-# Ø4 m6 dowel stock (1.3x the photograph's 3.405 is 4.43; 4 mm is the stock
-# size below it).  It is match-drilled/reamed through both parts with its axis
-# on the nominal hub-seat seam, parallel to the crankshaft.
+# MHA-VN-029 is the McMaster 91585A377 ISO 2338-m6 axial seam pin at six o'clock:
+# Ø4 x 4 stock (1.3x the photograph's 3.405 is 4.43; 4 mm is the stock size
+# below it). It is match-drilled/reamed through both parts with its axis on
+# the nominal hub-seat seam, parallel to the crankshaft.
 AXIAL_PIN_DIA = 4.0
 AXIAL_PIN_DIA_STOCK_MAX = 4.012
 AXIAL_PIN_LENGTH = ARM_THICKNESS / 2.0

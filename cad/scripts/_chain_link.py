@@ -14,14 +14,16 @@ gaps >= 0.25 mm; the links float as disconnected multibody solids).
 
 All three links are bought: McMaster-Carr ANSI #25 roller chain cut to the
 loop's pitch count with an inner link at each end, closed by one connecting
-link (the OUTER-link stand-in; its spring clip is not modelled). Each part
-stamps its registry stock identity and a one-line note for its
-purchased-part reference sheet (``_purchased_part_drawing``).
+link (the installed OUTER-link stand-in, without a spring clip). Each part
+stamps its registry purchase identity and unchanged cut/installed notes.
+The pre-save hook adds isolated source-derived stock identification, including
+the connector's clip, without changing these installed clearance bodies.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import _config
@@ -49,6 +51,7 @@ from _extrude import extrude_at_offset
 from _part_checks import report_mass_properties
 from _part_save import save_part_and_images
 from _saved_part_guard import require_saved_drawing_properties
+from _rebuild import active_configuration_name
 from _sketch import ensure_fully_defined, set_sketch_direct_db
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
@@ -172,6 +175,22 @@ async def _sketch_round_bodies(adapter: Any, outer_r: float, bore_r: float | Non
     check("exit_sketch bodies", await adapter.exit_sketch())
 
 
+async def _run_before_save(
+    adapter: Any, before_save: Callable[[Any], Awaitable[None]]
+) -> None:
+    """Keep a source-stock author from changing the canonical installed state."""
+    model = adapter.currentModel
+    installed = active_configuration_name(adapter, model)
+    if not installed:
+        raise RuntimeError("chain source callback has no original installed configuration")
+    await before_save(adapter)
+    if (
+        int(adapter.swApp.IsSame(adapter.currentModel, model)) != 1
+        or active_configuration_name(adapter) != installed
+    ):
+        raise RuntimeError("chain source callback changed the installed document/configuration")
+
+
 async def build_link(
     adapter: Any,
     *,
@@ -182,6 +201,7 @@ async def build_link(
     body_outer_r: float,
     body_bore_r: float | None,
     body_half_len: float,
+    before_save: Callable[[Any], Awaitable[None]] | None = None,
 ) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreateAxisParameters, CreatePlaneParameters
 
@@ -238,6 +258,8 @@ async def build_link(
         adapter, part_name, {"Manufacturing Notes": DRAWING_NOTES[part_name]}
     )
     await report_mass_properties(adapter)
+    if before_save is not None:
+        await _run_before_save(adapter, before_save)
     artefacts = await save_part_and_images(adapter, part_name)
     require_saved_drawing_properties(adapter, DRAWING_PROPERTIES)
     return artefacts

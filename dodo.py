@@ -3560,6 +3560,14 @@ def task_check():
         # No part or assembly saves construction geometry shown, and the
         # per-part sketch allowances only shrink (#880).
         SCRIPTS_DIR / "test_reference_visibility.py",
+        # Supplier stock isolation, settled dimensions and application geometry.
+        SCRIPTS_DIR / "test_supplier_extension_spring.py",
+        SCRIPTS_DIR / "test_supplier_spring_reference.py",
+        SCRIPTS_DIR / "test_supplier_wire_stock.py",
+        SCRIPTS_DIR / "test_supplier_reference_before_save.py",
+        SCRIPTS_DIR / "test_supplier_chain_dimensions.py",
+        SCRIPTS_DIR / "test_vn_transgear_retaining_ring_supplier_refs.py",
+        SCRIPTS_DIR / "test_supplier_screw_b_sources.py",
         # Fleet-wide manufacturing ownership/validation contracts are standalone
         # tests rather than one-file-per-drawing tests, so the glob below cannot
         # discover them.  They must execute under the required recipe gate: these

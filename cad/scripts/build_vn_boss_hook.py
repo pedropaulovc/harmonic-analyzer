@@ -29,11 +29,35 @@ import math
 import sys
 
 from _com import _early_bound, _read_member
+from _check import check
+from solidworks_mcp.adapters.com_variant import null_variant
+from solidworks_mcp.adapters.solidworks.sketch import _resolve_entity_ref
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from _simplified_part import save_simplified_part
+from _part_save import save_part_and_images
+from _simplified_part import (
+    assert_simplified_configurations,
+    _hard_faults,
+    derive_simplified_on_saved_part,
+)
+from _configuration_material import require_material_in_every_configuration
+from _dimensions import drive_dimension
 from _drawing_precision import _named_dimension
+from _feature_tree import _feature_by_name, name_last_feature
+from _rebuild import (
+    active_configuration_name,
+    assert_saved_configurations_regenerate,
+    force_rebuild,
+)
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    blank_reference_sketches,
+    dimension_between,
+    ensure_fully_defined,
+)
+from _sketch_circle import define_circle
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -55,6 +79,18 @@ from vn_boss_hook_spec import (
     DIMENSION_PRECISION,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    REFERENCE_SKETCHES,
+    SUPPLIER_EYE_ID_MM,
+    SUPPLIER_NOMINAL_EYE_OD_MM,
+    SUPPLIER_NOMINAL_WIRE_MM,
+    SUPPLIER_STOCK_CONFIGURATION,
+    SUPPLIER_STOCK_DIMENSIONS,
+    SUPPLIER_STOCK_FEATURE,
+    SUPPLIER_STOCK_WIRE_CENTER_MM,
+    SUPPLIER_STOCK_AXIS_MM,
+    SUPPLIER_STOCK_OVERALL_MM,
+    SUPPLIER_STOCK_SHANK_OUTLINE_MM,
+    SUPPLIER_STOCK_SHANK_MM,
 )
 from diagnostics.diag_build_9490T1 import build_9490T1
 from stock_anchor_geom import ANCHOR_9490T1
@@ -63,6 +99,15 @@ PART_NAME = "vn-boss-hook"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
 ANCHOR = ANCHOR_9490T1
+FINISHED_FEATURES = (
+    "Shank",
+    "Wire",
+    "ThreadGroove",
+    "Dome1",
+    "EndChamfer",
+    "StockTrim",
+    "StockDeburr",
+)
 
 
 def _manufacturing_controls(adapter) -> None:
@@ -130,11 +175,277 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
+def _stock_construction(adapter, entity):
+    segment = _early_bound(adapter._sketch_entities[entity], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("supplier stock outline must remain construction-only")
+
+
+def _stock_overall_reference(adapter, first, last, dims):
+    """Read the full envelope's crown-to-end axis, without driving it twice."""
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    try:
+        for ref in (first, last):
+            if _resolve_entity_ref(adapter, ref).Select4(True, None) is not True:
+                raise RuntimeError(f"cannot select supplier stock endpoint {ref}")
+        extension = _early_bound(model.Extension, "IModelDocExtension")
+        display, status = extension.AddSpecificDimension(0.015, 0.0, 0.0, 12, 0)
+    finally:
+        model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"cannot dimension supplier stock overall ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) != 12:
+        raise RuntimeError("supplier stock overall must be a vertical dimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1
+    if (
+        int(dimension.DrivenState) != 1
+        or abs(float(dimension.SystemValue) * 1000.0 - SUPPLIER_STOCK_OVERALL_MM) > 1e-5
+    ):
+        raise RuntimeError("supplier stock overall is not the native envelope span")
+    dims.record("SupplierStockOverall")
+
+
+async def _supplier_nominal_stock_profile(adapter) -> None:
+    """One associative source eye, shank envelope and wire section."""
+    dims = SketchDims()
+    check("create nominal supplier stock diagram", await adapter.create_sketch("Front"))
+    circles = {}
+    for name, center, diameter in (
+        ("SupplierNominalEyeOD", (0.0, 0.0), SUPPLIER_NOMINAL_EYE_OD_MM),
+        ("SupplierNominalEyeID", (0.0, 0.0), SUPPLIER_EYE_ID_MM),
+        (
+            "SupplierNominalWire",
+            SUPPLIER_STOCK_WIRE_CENTER_MM,
+            SUPPLIER_NOMINAL_WIRE_MM,
+        ),
+    ):
+        circle = await define_circle(
+            adapter,
+            *center,
+            diameter / 2.0,
+            name,
+            dims=dims,
+            names=(None, None, name),
+        )
+        _stock_construction(adapter, circle)
+        circles[name] = circle
+    outline = await add_line_chain(adapter, list(SUPPLIER_STOCK_SHANK_OUTLINE_MM))
+    for entity in outline:
+        _stock_construction(adapter, entity)
+    for index, entity in enumerate(outline):
+        check(
+            "rectilinear source shank",
+            await adapter.add_sketch_constraint(
+                entity, None, "horizontal" if index % 2 == 0 else "vertical"
+            ),
+        )
+    await dimension_between(
+        adapter,
+        f"{outline[0]}.start",
+        f"{outline[0]}.end",
+        "horizontal_distance",
+        SUPPLIER_NOMINAL_WIRE_MM,
+        "source shank width",
+    )
+    dims.record(
+        "SupplierStockWireWidth",
+        f'"SupplierNominalWire@{SUPPLIER_STOCK_FEATURE}"',
+    )
+    # The crown and root lie ON the actual nominal eye circle. The root and
+    # end are the outline's edge midpoints, so the driven overall follows an
+    # eye-OD edit and the one source shank dimension rather than copied numbers.
+    axis = await add_line_chain(adapter, list(SUPPLIER_STOCK_AXIS_MM), close=False)
+    for entity in axis:
+        _stock_construction(adapter, entity)
+    # The rectangle's parallel sides and two midpoints supply axis[1]'s
+    # vertical relation; adding it again would over-constrain the profile.
+    check(
+        "vertical stock eye axis",
+        await adapter.add_sketch_constraint(axis[0], None, "vertical"),
+    )
+    for ref in (f"{axis[0]}.start", f"{axis[0]}.end"):
+        check(
+            "source axis endpoint on nominal eye",
+            await adapter.add_sketch_constraint(
+                ref, circles["SupplierNominalEyeOD"], "coincident"
+            ),
+        )
+    check(
+        "source eye axis through origin",
+        await adapter.add_sketch_constraint(
+            f"{axis[0]}.start", "origin", "vertical_points"
+        ),
+    )
+    for ref, edge in (
+        (f"{axis[0]}.end", outline[0]),
+        (f"{axis[-1]}.end", outline[2]),
+    ):
+        check(
+            "source axis endpoint on shank midpoint",
+            await adapter.add_sketch_constraint(ref, edge, "midpoint"),
+        )
+    await dimension_between(
+        adapter,
+        f"{axis[1]}.start",
+        f"{axis[1]}.end",
+        "vertical_distance",
+        SUPPLIER_STOCK_SHANK_MM,
+        "as-supplied shank",
+    )
+    dims.record("SupplierStockShank")
+    _stock_overall_reference(adapter, f"{axis[0]}.start", f"{axis[-1]}.end", dims)
+    await ensure_fully_defined(adapter, SUPPLIER_STOCK_FEATURE)
+    check("close nominal supplier stock diagram", await adapter.exit_sketch())
+    name_last_feature(adapter, SUPPLIER_STOCK_FEATURE)
+    drive_jobs = dims.apply(adapter, SUPPLIER_STOCK_FEATURE)
+    await force_rebuild(adapter)
+    for dimension, expression in drive_jobs:
+        await drive_dimension(adapter, dimension, expression)
+    await force_rebuild(adapter)
+    mark_dimensions_for_drawing(
+        adapter,
+        SUPPLIER_STOCK_FEATURE,
+        SUPPLIER_STOCK_DIMENSIONS[SUPPLIER_STOCK_FEATURE],
+    )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+
+
+async def _supplier_nominal_stock(adapter) -> None:
+    """Keep the complete source diagram separate from the finished solid."""
+    await _supplier_nominal_stock_profile(adapter)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    original = active_configuration_name(adapter, model)
+    if not original or original == SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("counter anchor has no finished configuration")
+    original_states = {
+        name: tuple(
+            _feature_by_name(adapter, name).IsSuppressed2(1, null_variant()) or ()
+        )
+        for name in FINISHED_FEATURES
+    }
+    if any(state != (False,) for state in original_states.values()):
+        raise RuntimeError("finished counter anchor has a suppressed solid feature")
+    primary: BaseException | None = None
+    created = manager.AddConfiguration2(
+        SUPPLIER_STOCK_CONFIGURATION,
+        "McMaster 9490T1 supplier nominal full stock envelope and wire section",
+        "",
+        0,
+        original,
+        "Supplier nominal stock diagram only; not finished geometry",
+        False,
+    )
+    if created is None:
+        raise RuntimeError("cannot create nominal supplier stock configuration")
+    try:
+        parent = _early_bound(created, "IConfiguration").GetParent()
+        if (
+            parent is None
+            or str(_early_bound(parent, "IConfiguration").Name) != original
+        ):
+            raise RuntimeError(
+                "nominal supplier stock must derive from the finished configuration"
+            )
+        if active_configuration_name(adapter, model) != SUPPLIER_STOCK_CONFIGURATION:
+            if model.ShowConfiguration2(SUPPLIER_STOCK_CONFIGURATION) is not True:
+                raise RuntimeError(
+                    "cannot activate nominal supplier stock configuration"
+                )
+        if active_configuration_name(adapter, model) != SUPPLIER_STOCK_CONFIGURATION:
+            raise RuntimeError("nominal supplier stock configuration is not active")
+        # Suppress the explicit solid-feature set, not just generators: cuts
+        # based on independent plane sketches need not follow Shank or Wire.
+        for feature_name in reversed(FINISHED_FEATURES):
+            feature = _feature_by_name(adapter, feature_name)
+            if feature.SetSuppression2(0, 1, null_variant()) is not True:
+                raise RuntimeError(f"cannot suppress {feature_name} in stock diagram")
+        await force_rebuild(adapter)
+        for feature_name in FINISHED_FEATURES:
+            state = _feature_by_name(adapter, feature_name).IsSuppressed2(
+                1, null_variant()
+            )
+            if tuple(state or ()) != (True,):
+                raise RuntimeError(
+                    f"{feature_name}: source diagram retained a solid feature"
+                )
+        if part.GetBodies2(0, False):
+            raise RuntimeError("nominal stock diagram still contains finished solids")
+        states = _feature_by_name(adapter, SUPPLIER_STOCK_FEATURE).IsSuppressed2(
+            1, null_variant()
+        )
+        if tuple(states or ()) != (False,):
+            raise RuntimeError("nominal stock diagram sketch became suppressed")
+        faults = _hard_faults(adapter, model)
+        if faults:
+            raise RuntimeError(f"nominal supplier stock rebuilt with faults {faults}")
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        try:
+            if active_configuration_name(adapter, model) != original:
+                if model.ShowConfiguration2(original) is not True:
+                    raise RuntimeError(
+                        "cannot restore finished counter anchor configuration"
+                    )
+            if active_configuration_name(adapter, model) != original:
+                raise RuntimeError(
+                    "finished counter anchor configuration is not active"
+                )
+            for name, expected in original_states.items():
+                feature = _feature_by_name(adapter, name)
+                if tuple(feature.IsSuppressed2(1, null_variant()) or ()) != expected:
+                    if feature.SetSuppression2(1, 1, null_variant()) is not True:
+                        raise RuntimeError(f"cannot restore finished {name}")
+            await force_rebuild(adapter)
+            for name, expected in original_states.items():
+                state = _feature_by_name(adapter, name).IsSuppressed2(1, null_variant())
+                if tuple(state or ()) != expected:
+                    raise RuntimeError(
+                        f"{name}: stock suppression leaked into finished configuration"
+                    )
+            if len(tuple(part.GetBodies2(0, False) or ())) != 1:
+                raise RuntimeError(
+                    "finished counter anchor did not retain its one solid"
+                )
+        except Exception as error:
+            if primary is None:
+                raise
+            primary.add_note(f"restoration also failed: {error}")
+    require_material_in_every_configuration(
+        adapter, PART_NAME, MATERIAL, (original, SUPPLIER_STOCK_CONFIGURATION)
+    )
+
+
 @wraps(build_9490T1)
 async def _modified_anchor(adapter, truth=None, **parameters):
     receipt = await build_9490T1(adapter, truth, **parameters)
     _manufacturing_controls(adapter)
     return receipt
+
+
+async def _save_anchor(adapter, part_name, suppressed_features):
+    """Simplify the finished configuration, not the sketch-only stock diagram."""
+    finished = active_configuration_name(adapter, adapter.currentModel)
+    if finished == SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("cannot save counter anchor with the stock diagram active")
+    parents = (finished,)
+    artefacts = await save_part_and_images(adapter, part_name)
+    await derive_simplified_on_saved_part(
+        adapter, part_name, suppressed_features, artefacts["part"], parents=parents
+    )
+    check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
+    assert_saved_configurations_regenerate(adapter, part_name)
+    assert_simplified_configurations(
+        adapter, part_name, suppressed_features, parents=parents
+    )
+    return artefacts
 
 
 async def build(adapter) -> dict[str, str]:
@@ -149,10 +460,11 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=_save_anchor,
         # Shank axis = the vendor -Y axis through the eye centre (Front n Right),
         # the stable mate reference the old sketched part named "shank axis".
         screw_axis_planes=("Front Plane", "Right Plane"),
+        before_save=_supplier_nominal_stock,
     )
 
 

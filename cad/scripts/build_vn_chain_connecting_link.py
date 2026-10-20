@@ -8,6 +8,10 @@ two solid pins, without the vendor's spring clip. The assembly
 after the connected-linkage chain pattern of inner and outer links.
 Geometry and clearances: _chain.py / _chain_link.py.
 
+An isolated Supplier-Free state adds the supplier-derived five-body connector
+WITH spring clip for identification dimensions. It does not alter the installed
+stand-in, its original configurations or the two chain-pattern axes.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_vn_chain_connecting_link.py
@@ -19,14 +23,23 @@ import sys
 
 from _chain_link import CONNECTING_LINK, build_link
 from _session import run_build
+from _supplier_chain_stock import add_chain_stock_references
 
 PART_NAME = "vn-chain-connecting-link"
 MATERIAL = "Plain Carbon Steel"
 
 
+async def _stock_references(adapter) -> None:
+    await add_chain_stock_references(adapter, connecting=True)
+
+
 async def build(adapter) -> dict[str, str]:
     return await build_link(
-        adapter, part_name=PART_NAME, material=MATERIAL, **CONNECTING_LINK
+        adapter,
+        part_name=PART_NAME,
+        material=MATERIAL,
+        **CONNECTING_LINK,
+        before_save=_stock_references,
     )
 
 

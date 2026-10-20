@@ -53,6 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
+from _mcmaster_91375a106 import HEX_AF, IN, LENGTH, MAJOR_DIA, PITCH  # noqa: E402
 
 if __package__:
     from . import _script_paths  # noqa: F401
@@ -71,12 +72,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     thread_sweep_cut_modern,
 )
 
-IN = 25.4
-MAJOR_DIA = 0.112 * IN  # 2.8448
-PITCH = IN / 40.0  # 0.635
-LENGTH = 0.25 * IN  # 6.35, cup end to socket face
 HALF = LENGTH / 2.0
-HEX_AF = 0.050 * IN  # 1.27
 SOCKET_DEPTH = 0.070 * IN  # 1.778, their "Drive Depth"
 SOCKET_CHAMFER = 0.75 * PITCH  # 0.47625, 45 deg
 POINT_CHAMFER = PITCH  # 0.635, 45 deg (their Chamfer1)

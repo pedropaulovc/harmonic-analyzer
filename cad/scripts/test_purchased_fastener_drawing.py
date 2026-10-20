@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _supplier_dimensions as supplier
 import _purchased_fastener_drawing as purchased
 from _drawing_registry import DrawingLayout
 
@@ -233,7 +234,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "sheet_drawable_region", drawable_region)
 
-    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
+    async def finalize(
+        _adapter, actual_outputs, *, layout, pdf_title, scale, settled_checks=()
+    ):
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
         assert actual_outputs.pdf == outputs["pdf"]
@@ -248,8 +251,8 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
         )
     )
 
-    # Every view is hidden-lines-removed (rule 9: no dimension names a
-    # hidden edge on a purchased reference sheet).
+    # Reference dimensions attach to visible geometry; no hidden-edge
+    # identification is needed on these four purchased views.
     assert modes == dict.fromkeys(("*Front", "*Top", "*Right", "*Isometric"), "HLR")
     printed = [call[1] for call in calls if call[0] == "note"]
     assert "#4-40 x 1/4 TEST SCREW" in printed
@@ -391,3 +394,100 @@ def test_center_marks_lose_their_extension_lines(monkeypatch):
     views[0] = MarkedView(StuckMark())
     with pytest.raises(RuntimeError, match="extension lines"):
         purchased._center_marks_without_lines(views, cells)
+
+
+@pytest.mark.parametrize(
+    "kind, expected_mm, expected_degrees",
+    [(3, 11.1125, None), (6, 11.1125, None), (2, None, 82.0)],
+)
+def test_supplier_native_type_is_checked_before_reading_si_value(
+    kind, expected_mm, expected_degrees
+):
+    class UnreadableValue:
+        Type2 = kind
+
+        def GetDimension2(self, _index):
+            raise AssertionError(
+                "an incompatible dimension must not be read as a length"
+            )
+
+    with pytest.raises(RuntimeError, match="native dimension type"):
+        supplier._measured_supplier_value(
+            UnreadableValue(),
+            label="supplier size",
+            presentation="angle" if expected_degrees is not None else "length",
+            expected_mm=expected_mm,
+            expected_degrees=expected_degrees,
+        )
+
+
+def test_supplier_display_rounding_cannot_replace_exact_model_geometry(monkeypatch):
+    monkeypatch.setattr(supplier, "_early_bound", lambda value, _kind: value)
+
+    def display(mm):
+        return SimpleNamespace(
+            Type2=11,
+            GetDimension2=lambda _index: SimpleNamespace(SystemValue=mm / 1000.0),
+        )
+
+    assert supplier._measured_supplier_value(
+        display(11.1125),
+        label="7/16 inch thread length",
+        presentation="length",
+        expected_mm=11.1125,
+        expected_degrees=None,
+    ) == pytest.approx(11.1125)
+    # .438 is the supplier's displayed rounding, not its exact 7/16 inch size.
+    with pytest.raises(RuntimeError, match="exact expected"):
+        supplier._measured_supplier_value(
+            display(0.438 * 25.4),
+            label="7/16 inch thread length",
+            presentation="length",
+            expected_mm=11.1125,
+            expected_degrees=None,
+        )
+
+
+def test_supplier_fit_reserves_only_planned_views_above_actual_note_band():
+    cells = purchased.fastener_view_cells(
+        purchased.view_band_bottom("FIRST\nSECOND", label="supplier fit")
+    )
+    fitted = purchased.supplier_fit_cells(
+        cells, {"*Front": (0.034, 0.014, 0.045, 0.023)}, label="supplier fit"
+    )
+    original = {name: (center, bounds) for name, center, bounds in cells}
+    actual = {name: (center, bounds) for name, center, bounds in fitted}
+    bounds = original["*Front"][1]
+    # Two footer lines raise the real cell floor; a fixed .077 check misses it.
+    assert bounds[1] == pytest.approx(0.0805)
+    inset = (
+        bounds[0] + 0.034,
+        bounds[1] + 0.014,
+        bounds[2] - 0.045,
+        bounds[3] - 0.023,
+    )
+    assert actual["*Front"][1] == pytest.approx(inset)
+    assert actual["*Front"][0] == pytest.approx(
+        ((inset[0] + inset[2]) / 2.0, (inset[1] + inset[3]) / 2.0)
+    )
+    for name in ("*Top", "*Right", "*Isometric"):
+        assert actual[name] == original[name]
+
+
+@pytest.mark.parametrize(
+    "margins",
+    [
+        {},
+        {"*Missing": (0.01, 0.01, 0.01, 0.01)},
+        {"*Isometric": (0.01, 0.01, 0.01, 0.01)},
+        {"*Front": (0.0, 0.0, 0.0, 0.0)},
+        {"*Front": (-0.01, 0.0, 0.0, 0.0)},
+        {"*Front": (float("nan"), 0.0, 0.0, 0.0)},
+        {"*Front": (0.01, 0.01, 0.01)},
+        {"*Front": (0.20, 0.0, 0.0, 0.0)},
+    ],
+)
+def test_supplier_fit_rejects_invalid_or_unusable_annotation_plans(margins):
+    cells = purchased.fastener_view_cells(purchased.view_band_bottom("", label="fit"))
+    with pytest.raises(ValueError, match="supplier margins"):
+        purchased.supplier_fit_cells(cells, margins, label="fit")

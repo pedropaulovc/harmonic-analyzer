@@ -22,16 +22,32 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*vn_lever_wire_spec.DRAWING_DIMENSIONS.values()) if (
         vn_lever_wire_spec.DRAWING_DIMENSIONS
     ) else set()
-    kept = set(drawing.FRONT_KEEP)
-    # Note-based wire: nothing is marked, nothing is kept.
-    assert marked == set()
+    kept = set(drawing.FRONT_KEEP) | set(drawing.STOCK_KEEP)
+    assert not drawing.FRONT_KEEP
+    assert marked == {"SupplierStockDia"}
     assert kept == marked
 
 
+def test_supplier_nominal_is_separate_from_installed_envelope() -> None:
+    import _mcmaster_9666k56 as stock
+    import _mcmaster_9666k56_reference as reference
+    from _supplier_wire_stock_drawing import STOCK_CAPTION, STOCK_SCALE
+
+    assert part.WIRE_DIA == 0.8
+    assert stock.DIA == 0.031 * 25.4
+    assert stock.DIA_MIN <= part.WIRE_DIA <= stock.DIA_MAX
+    assert stock.DIA != part.WIRE_DIA
+    assert reference.SUPPLIER_DIAMETER_PRECISION == 4
+    assert reference.SUPPLIER_REFERENCE_DIMENSIONS == {
+        "SupplierStockCrossSection": {"SupplierStockDia"},
+    }
+    assert STOCK_SCALE == (20, 1)
+    assert "AS-SUPPLIED NOMINAL STOCK" in STOCK_CAPTION
+
+
 def test_form_and_finish_are_note_based_on_the_unpickable_wire() -> None:
-    # A Ø0.8 silhouette cylinder has no dependable pick, so the sheet carries no
-    # datum / FCF / surface-finish symbol / coordinate-picked dimension -- only
-    # the auto-imported (empty) set + property-linked notes.
+    # The installed envelope is not assigned the supplier nominal diameter.
+    # Its only diameter import is in the isolated source-stock cross-section.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 0
     assert source.count("add_feature_control_frame(") == 0

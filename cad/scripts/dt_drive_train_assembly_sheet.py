@@ -1,11 +1,14 @@
-"""Assembly-only fit-up instructions for MHA-DT-000.
+"""Drawing-only assembly fit-up instructions for MHA-DT-000.
 
 Part specifications own permitted cuts, limits and pin fits. The assembly
 prints their bench checks and remedies, without design-clearance narration.
-Kept separate from the explode contract so text changes do not rebuild CAD.
+The assembly-sheet name keeps this text in the drawing-only isolation guards,
+separate from the explode contract so text changes do not rebuild CAD.
 """
 
 import dt_crank_pinion_spec as pinion
+import dt_pinion_lever_pin_spec as lever_pin
+from _inch_fraction import inch_fraction
 
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
     (
@@ -24,7 +27,8 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
 # specifies a stock 1/16 in slip fit retained by peening, not a reamed press fit.
 LEVER_PIN_HOLE_FIT = "\n".join(
     (
-        "HOLE AT MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU;",
-        "MHA-DT-030 SLIP FIT.",
+        f"HOLE AT {lever_pin.LEVER_NUMBER}'S PRINTED STATION: "
+        f"{inch_fraction(lever_pin.PIN_DIA, what='lever pin hole')} IN DRILL THRU;",
+        f"{lever_pin.PIN_NUMBER} SLIP FIT.",
     )
 )

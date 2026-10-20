@@ -25,12 +25,19 @@ from _mcmaster_90760a140 import (
     nut_volume,
 )
 
+# The inspected supplier drawing spells the exact 7/64 in model height as
+# 0.109 in. Presentation must never round THICKNESS or the solid geometry.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 16
+
 __all__ = [
     "ACROSS_CORNERS",
     "ACROSS_FLATS",
     "BORE_DIA",
+    "DRAWING_REFERENCE_PRECISION",
     "MASS_G",
     "SKU",
+    "SUPPLIER_FRACTION_DENOMINATOR",
     "THICKNESS",
     "THREAD",
     "nut_volume",

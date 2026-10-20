@@ -7,7 +7,11 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    set_view_position,
+)
 
 import _telemetry
 from _check import check
@@ -20,14 +24,19 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import property_link
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
+from _supplier_dimensions import (
+    assert_supplier_reference_dimension,
+    supplier_reference_dimension,
+)
 from vn_transgear_pivot_screw_spec import (
     CHAMFER_ANGLE,
     CHAMFER_ANGLE_TOLERANCE,
@@ -40,8 +49,15 @@ from vn_transgear_pivot_screw_spec import (
     HEAD_DIA,
     HEAD_H,
     SHOULDER_END_Y,
+    SHOULDER_DIA,
     SKU,
+    SOCKET_AF,
+    SUPPLIER_DRAWING_DIMENSIONS,
+    SUPPLIER_REFERENCE_BANDS,
+    SUPPLIER_REFERENCE_DIMENSIONS,
+    SUPPLIER_STOCK_CONFIGURATION,
     THREAD_LENGTH_MIN,
+    THREAD_LEN,
     THREAD_MAJOR,
     TIP_Y,
 )
@@ -102,7 +118,10 @@ HEAD_PICK_MM = (HEAD_DIA / 4, HEAD_H, 0.0)
 PURCHASED_NOTE_XY = (0.150, 0.245)
 # Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
-ISO_CENTER = (0.360, 0.165)
+ISO_CENTER = (0.300, 0.155)
+STOCK_CENTER = (0.365, 0.150)
+# The head-end view makes the surviving hex socket readable in solid lines.
+TOP_CENTER = (0.295, 0.245)
 # The cutting controls verify_machining_controls re-reads. CutLength, the
 # fit-up length, still drives the facing cut but prints as a reference.
 EXPECTED_CONTROLS = {
@@ -137,6 +156,175 @@ def _verify_reference_length(adapter: Any, annotation: Any) -> None:
         raise RuntimeError("CutLength: reference display did not persist")
 
 
+def _format_supplier_reference(adapter: Any, display: Any, name: str) -> Any:
+    """Read the model-authored source bands without changing any tolerance."""
+    display = _early_bound(display, "IDisplayDimension")
+    supplier_reference_dimension(
+        adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
+    )
+    _assert_supplier_tolerance(display, name)
+    return _early_bound(display.GetAnnotation(), "IAnnotation")
+
+
+def _assert_supplier_tolerance(display: Any, name: str) -> None:
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    band = SUPPLIER_REFERENCE_BANDS.get(name)
+    if band is not None:
+        lower, upper = (value / 1000 for value in band)
+    if int(tolerance.Type) != (2 if band is not None else 0):
+        raise RuntimeError(f"{name}: native supplier tolerance type changed")
+    if band is not None and (
+        not math.isclose(float(tolerance.GetMinValue()), lower, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper, abs_tol=1e-12)
+        or int(display.GetPrimaryTolPrecision2())
+        != SUPPLIER_REFERENCE_DIMENSIONS[name]["precision"]
+    ):
+        raise RuntimeError(f"{name}: source supplier band did not persist")
+
+
+def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, Any]:
+    """Measure head/socket geometry and import separate native stock references."""
+    head_r, shoulder_r = HEAD_DIA / 2, SHOULDER_DIA / 2
+    bearing_pick = (head_r + shoulder_r) / 2
+    authored = {}
+    rows = (
+        (
+            "SupplierHeadDiameter",
+            front,
+            (-head_r, HEAD_H / 2, 0.0),
+            (head_r, HEAD_H / 2, 0.0),
+            (0.140, 0.225),
+            "horizontal",
+            "SILHOUETTE",
+        ),
+        (
+            "SupplierHeadHeight",
+            front,
+            (bearing_pick, 0.0, 0.0),
+            (bearing_pick, HEAD_H, 0.0),
+            (0.224, 0.201),
+            "vertical",
+            "EDGE",
+        ),
+        (
+            "SupplierSocketAF",
+            top,
+            (-SOCKET_AF / 2, HEAD_H, 0.0),
+            (SOCKET_AF / 2, HEAD_H, 0.0),
+            (TOP_CENTER[0], 0.212),
+            "horizontal",
+            "EDGE",
+        ),
+    )
+    for name, view, first, second, text_xy, orientation, entity_type in rows:
+        picks = model_points_in_view(
+            adapter,
+            view,
+            [tuple(value / 1000 for value in point) for point in (first, second)],
+            label=name,
+        )
+        # These coordinate picks are checked by the exact measured nominal,
+        # native type and non-dangling attachments in the supplier formatter.
+        display = add_edge_dimension(
+            adapter,
+            view,
+            p0=picks[0],
+            p1=picks[1],
+            text_xy=text_xy,
+            label=name,
+            orientation=orientation,
+            entity_type=entity_type,
+        )
+        authored[name] = _format_supplier_reference(adapter, display, name)
+    references = curate_view_dimensions(
+        adapter,
+        front,
+        keep={
+            "SupplierThreadMajor": (0.239, 0.119),
+            "SupplierShoulderDiameter": (0.202, 0.172),
+            "SupplierShoulderLength": (0.065, 0.170),
+        },
+        view_label="supplier nominal envelopes and model-owned source bands",
+        dimensions_by_feature=SUPPLIER_DRAWING_DIMENSIONS,
+    )
+    for annotation in references:
+        name = dimension_name(adapter, annotation)
+        if name in authored:
+            raise RuntimeError(f"{name}: duplicate supplier reference")
+        authored[name] = _format_supplier_reference(
+            adapter, annotation.GetSpecificAnnotation(), name
+        )
+    return authored
+
+
+def _add_stock_reference(adapter: Any) -> tuple[Any, Any]:
+    """Dimension the complete stock thread on its restored supplier solid."""
+    stock = place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=SHEET_SCALE)
+    bound = _early_bound(stock, "IView")
+    bound.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("source-stock view did not rebuild")
+    if str(bound.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError("source-stock view references the faced screw")
+    if not set_view_position(adapter, stock, *STOCK_CENTER):
+        raise RuntimeError("cannot position source-stock view")
+    set_hidden_lines_removed(adapter, stock)
+    end_pick = (SHOULDER_DIA + THREAD_MAJOR) / 4
+    picks = model_points_in_view(
+        adapter,
+        stock,
+        (
+            (end_pick / 1000, SHOULDER_END_Y / 1000, 0.0),
+            (0.0, (SHOULDER_END_Y - THREAD_LEN) / 1000, 0.0),
+        ),
+        label="as-supplied stock thread length",
+    )
+    display = add_edge_dimension(
+        adapter,
+        stock,
+        p0=picks[0],
+        p1=picks[1],
+        text_xy=(0.399, 0.118),
+        label="SupplierStockThreadLength",
+        orientation="vertical",
+    )
+    return stock, _format_supplier_reference(
+        adapter, display, "SupplierStockThreadLength"
+    )
+
+
+def _assert_supplier_references(
+    adapter: Any,
+    references: dict[str, Any],
+    stock: Any,
+    finished_views: tuple[Any, ...],
+) -> None:
+    """Check settled native source values, bands, attachments and configurations."""
+    if set(references) != set(SUPPLIER_REFERENCE_DIMENSIONS):
+        raise RuntimeError("supplier reference coverage changed before saving")
+    if (
+        str(_early_bound(stock, "IView").ReferencedConfiguration)
+        != SUPPLIER_STOCK_CONFIGURATION
+    ):
+        raise RuntimeError("source-stock view lost its stock configuration")
+    if any(
+        str(_early_bound(view, "IView").ReferencedConfiguration)
+        == SUPPLIER_STOCK_CONFIGURATION
+        for view in finished_views
+    ):
+        raise RuntimeError("a finished view switched to source stock")
+    for name, annotation in references.items():
+        annotation = _early_bound(annotation, "IAnnotation")
+        if int(annotation.Visible) != 1:
+            raise RuntimeError(f"{name}: supplier reference is no longer visible")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        assert_supplier_reference_dimension(
+            adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name]
+        )
+        _assert_supplier_tolerance(display, name)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -167,9 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    # A new view may already appear shaded; force both to hidden lines removed
-    # so the cosmetic thread prints at drawing quality.
-    for view in (front, iso):
+    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
+    # Force every view to HLR so the cosmetic thread prints at drawing quality.
+    for view in (front, iso, top):
         set_hidden_lines_removed(adapter, view)
     # The consumed deburr sketch, the trim sketch and the hidden thread-tail
     # acceptance sketch all lie on the Front plane, so the main view carries
@@ -207,6 +395,7 @@ async def build(adapter: Any) -> dict[str, str]:
         annotations,
         {"ChamferWidth": CHAMFER_TEXT_XY, "CutLength": CUT_LENGTH_TEXT_XY},
     )
+    supplier_refs = _add_supplier_references(adapter, front, top)
     head_edge = model_point_in_view(
         adapter,
         front,
@@ -228,12 +417,19 @@ async def build(adapter: Any) -> dict[str, str]:
         "Purchased Screw Note"
     ) or printed != properties["Purchased Screw Note"].replace("\r", ""):
         raise RuntimeError("Purchased Screw Note: linked head note did not persist")
+    stock, stock_annotation = _add_stock_reference(adapter)
+    supplier_refs["SupplierStockThreadLength"] = stock_annotation
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Screw — Modified Stock Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_supplier_references(
+                adapter, supplier_refs, stock, (front, iso, top)
+            ),
+        ),
     )
 
 

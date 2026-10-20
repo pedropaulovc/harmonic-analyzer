@@ -98,7 +98,7 @@ from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
-from dt_drive_train_assembly_notes import (
+from dt_drive_train_assembly_sheet import (
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_ASSEMBLY_CHECK,
 )
@@ -504,9 +504,9 @@ BOM_DESCRIPTIONS = {
     "dt-crank-handle-butt-cup": "CRANK HANDLE BUTT CUP",
     "dt-crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "dt-crank-hub": "CRANK HUB",
-    # Ø4 m6 (ISO 2338), not "4 M6": the machinist review of 82158b1bb read
-    # four M6 pins against QTY 1.
-    "vn-crank-hub-pin": "4 MM DOWEL PIN ISO 2338 m6, CUT TO PRINT",
+    # Diameter x length, not "4 M6": the machinist review of 82158b1bb read
+    # four M6 pins against QTY 1. Keep the real stock identity on one line.
+    "vn-crank-hub-pin": "4 X 4 MM DOWEL PIN, MCMASTER 91585A377",
     "vn-crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "dt-alignment-pinion": "ALIGNMENT PINION",
     "dt-pinion-bracket": "PINION BRACKET STRAP",

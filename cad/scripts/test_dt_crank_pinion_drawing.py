@@ -1217,9 +1217,9 @@ def test_no_print_states_the_t120_design_clearances() -> None:
     # The clearances are a design-check result (build_dt_drive_train_assembly
     # asserts them). Neither print narrates them: the part sheet dropped them in
     # Main's MHA-DT-010 eye pass, and #1695 moved the assembly crank step to the
-    # bench check and its cuts only (dt_drive_train_assembly_notes). The step
+    # bench check and its cuts only (dt_drive_train_assembly_sheet). The step
     # still reads the fit-up feeler and both cut limits.
-    import dt_drive_train_assembly_notes as notes
+    import dt_drive_train_assembly_sheet as notes
 
     text = _crank_step()
     flat = " ".join(text.split())

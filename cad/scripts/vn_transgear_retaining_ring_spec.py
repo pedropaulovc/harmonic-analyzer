@@ -32,7 +32,7 @@ from __future__ import annotations
 MM_PER_IN = 25.4
 
 SKU = "97431A260"
-SHAFT_DIA = 5.0 / 32.0 * MM_PER_IN  # 3.969, the catalogue's shaft size
+SHAFT_DIA = 5.0 / 32.0 * MM_PER_IN  # exact 3.96875 mm catalogue shaft size
 
 # --- groove (the pin's sheet prints these as its groove) ----------------------
 GROOVE_DIA = 0.116 * MM_PER_IN  # 2.9464
@@ -47,6 +47,26 @@ THICKNESS = 0.025 * MM_PER_IN  # 0.635
 THICKNESS_TOL = 0.002 * MM_PER_IN  # ±0.0508
 THRUST_LBF = 170
 HARDNESS_HRC_MIN = 47
+
+# Supplier drawing 97431A260: only these three sizes describe the ring.
+# Shaft/groove sizes above describe its mating pin, not the free ring.
+SUPPLIER_REFERENCE_PRECISION = 3
+
+# Supplier application gauges reuse the exact existing mating-pin geometry
+# above: the 5/32-in shaft remains .15625 in, displayed .156 at three places.
+SUPPLIER_SUITABILITY_PRECISION = 3
+SUPPLIER_APPLICATION_SKETCH = "SupplierApplicationGauges"
+SUPPLIER_APPLICATION_DIMENSIONS = {
+    SUPPLIER_APPLICATION_SKETCH: (
+        "ApplicationShaftOD",
+        "ApplicationGrooveDiameter",
+        "ApplicationGrooveWidth",
+    ),
+}
+# Only the drawing's schematic gauge envelope uses this offset/axial span;
+# neither value defines purchased ring or installed mating-pin geometry.
+SUPPLIER_GAUGE_CENTER_U = 7.0
+SUPPLIER_GAUGE_AXIAL_SPAN = 3.0
 
 # Axial play of the ring in its groove: 0.102 nominal, 0.051 .. 0.229.
 GROOVE_PLAY = (

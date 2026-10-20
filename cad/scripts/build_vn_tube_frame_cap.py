@@ -7,7 +7,7 @@ import sys
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
-from diagnostics.diag_build_9275K141 import build_9275K141
+from vn_tube_frame_cap_supplier_refs import build_9275K141
 
 PART_NAME = "vn-tube-frame-cap"
 SPEC = fastener(PART_NAME)

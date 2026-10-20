@@ -25,12 +25,19 @@ from _mcmaster_90480a009 import (
     nut_volume,
 )
 
+# Supplier identification uses native 11/32 in across flats and 0.125 in
+# height; these display settings do not alter either exact model constant.
+DRAWING_REFERENCE_PRECISION = {"AcrossFlats": 0, "Height": 3}
+SUPPLIER_FRACTION_DENOMINATOR = 32
+
 __all__ = [
     "ACROSS_CORNERS",
     "ACROSS_FLATS",
     "BORE_DIA",
+    "DRAWING_REFERENCE_PRECISION",
     "MASS_G",
     "SKU",
+    "SUPPLIER_FRACTION_DENOMINATOR",
     "THICKNESS",
     "THREAD",
     "nut_volume",

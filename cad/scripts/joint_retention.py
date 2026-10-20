@@ -668,7 +668,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crank_handle_butt_cup",  # bonded in the handle butt; pocket bored for the MHA-DT-032 head, no thread
         "dt_crank_handle_ferrule",  # bonded (epoxy) to the handle tenon
         "dt_crank_hub",  # pressed into crank_arm, seam-pinned, taper-pinned to crankshaft
-        "vn_crank_hub_pin",  # 4 m6 dowel, ISO 2338
+        "vn_crank_hub_pin",  # McMaster 91585A377 ISO 2338-m6 stock; matched light-drive seam
         "dt_crank_pin",  # 1:48 taper pin, light drive
         "dt_crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
         "vn_crank_seat_drive_pin",  # MHA-VN-044 dowel pressed into match-drilled holes, no thread
@@ -753,6 +753,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_chain_outer_link": "roller-chain link; pins only, no thread",
     "vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
+    "vn_crank_hub_pin": "dowel pin driven into a match-reamed light-drive seam hole",
     "vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "vn_keeper_chain_link": "plain chain link",
     "vn_knife_mount_dowel": "dowel pin pressed into a reamed hole",

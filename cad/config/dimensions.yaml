@@ -232,9 +232,9 @@ sections:
         - derived construction
         - med
       - - Axial seam pin MHA-VN-029
-        - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.7'
+        - 'McMaster 91585A377 ISO 2338-m6 18-8 stainless dowel, Ø4 × 4, parallel to shaft at six o’clock, centre radius 9.7'
         - —
-        - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.05 worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore.'
+        - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.004-mm worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore. Live supplier PDF and STEP inspected 2026-10-19: 4.000 mm +0.012/+0.004 diameter, 4 mm overall; equal 0.630-mm axial end leads at 15 degrees leave 2.740 mm at full diameter. The longitudinal section is 15.7873 mm² versus the prior ideal cylinder’s 16 mm² (1.33% less), a geometry comparison, not a strength or retention rating. Same nominal interface and matched light-drive fit; no source-backed carbon-steel or flat-end requirement.'
         - scaled + stated topology
         - med
       - - Crankshaft diameter
@@ -668,7 +668,7 @@ sections:
       - - '`vn-post-mount-screw` ×2 (modified purchased post hold-downs)'
         - 'MSC 40923906 slotted fillister steel/zinc, SAE J82 / ASME B18.6.3, 1/4-20 ×4 in / 101.6 mm supplied stock. Current reference cut length 94.9 mm; deburr cut end 0.1 MAX. Cut each screw to its own matched hole, end flush to 0.3 mm short of the platform underside, NEVER PROUD, engagement 0.90D MIN. Former 90.2 mm reference belonged to the lower post.'
         - 'Head seated on the post counterbore floor; shank passes through the post and threads into the 6.35 mm platform. No single fixed cut length covers all accepted post/plate bands.'
-        - 'vn_post_mount_screw_spec consumes dt_post_mount_stack''s nominal/cut-to-fit law and supplier identity. Old 3.5 in / 88.9 mm stock cannot reach this post. Catalog-dimension CAD is not a supplied vendor solid or a measured screw; exact supplier thread length is not established by the reference cut.'
+        - 'vn_post_mount_screw_spec consumes dt_post_mount_stack''s nominal/cut-to-fit law. Old 3.5 in / 88.9 mm stock cannot reach this post. The user-supplied MSC 40923906 engineering drawing (2026-10-19, CDS, INCH) establishes six three-decimal-inch limit groups and 1.500 in distal partial thread. The canonical diagnostic author retains maximum OD/head height/stock length, user-selected midband skirt/slot, and representative crown/under-head round/tip/thread form; it is not a supplied vendor solid or measured screw. Native source limits remain on a separate max-limit schematic, not the midpoint solid.'
         - high stock identity; med derived cut-to-fit geometry
       - - '`dt-cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
         - 'Selected nominal black steel straight prism 17 ×9.750 ×52.66, standing directly on the platform. #10-32 UNF-2B through tap at raised cone axis 38.1 ±0.10 above the foot, 90° countersinks to Ø5.0 both mouths; cup adjuster enters from north, 1/32 in terminal shaft from south. Slit 1.2 wide, floor 0.65 below axis; #4-40 pinch joint 46.95 above foot / 8.85 above axis (91794A112 head on +X west). One #4-40 ×3/8 socket screw MHA-VN-030 / 91251A108 enters from under the platform into the blind foot tap, 1.00 east of the cone line (both stations ±0.10). Width/depth print .XXX. No shim, flange, slot or heel.'

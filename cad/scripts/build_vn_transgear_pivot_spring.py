@@ -3,8 +3,9 @@ r"""Purchased MHA-VN-049 transgear pivot spring: McMaster 9715K43.
 A curved disc spring for a 0.190 shaft (``vn_transgear_pivot_spring_spec``); on
 the MHA-VN-041 pivot screw's shoulder, between its head and the MHA-PD-018 arm's
 spot-face floor, it preloads the arm onto the MHA-PD-020 spacer.  The stock
-recipe ``diagnostics/diag_build_9715K43.py`` models the catalogue sizes; no
-vendor model was fetched, so its standalone run is catalog-only.
+recipe ``diagnostics/diag_build_9715K43.py`` remains the installed cone
+approximation. The separate zero-solid ``Supplier-Dimensions`` configuration
+carries nominal dimension diagrams, never a bowed spring or an assembly state.
 
 Frame: the recipe is built about +Y and turned so its axis is +Z, the OD
 rim's bearing face on z = 0 (the Front Plane) and the ID rim's at
@@ -19,6 +20,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+from functools import partial
 import sys
 
 from _session import run_build
@@ -26,6 +28,8 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_9715K43 import build_9715K43
 from vn_transgear_pivot_spring_spec import SKU
+import vn_transgear_pivot_spring_spec as spring_spec
+from vn_disc_spring_supplier_stock import add_supplier_disc_diagram
 
 PART_NAME = "vn-transgear-pivot-spring"
 SPEC = fastener(PART_NAME)
@@ -45,6 +49,7 @@ async def build(adapter) -> dict[str, str]:
         ),
         material=MATERIAL,
         screw_axis_planes=("Top Plane", "Right Plane"),
+        before_save=partial(add_supplier_disc_diagram, spec=spring_spec),
     )
 
 

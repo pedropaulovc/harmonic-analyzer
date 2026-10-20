@@ -30,3 +30,20 @@ MAXIMUM_LOAD_N = float(_PART["maximum_load_n"])
 # 20-spring common-set matching requirement used by the analyzer.
 SPRING_RATE_TOLERANCE_FRACTION = float(_PART["spring_rate_tolerance_fraction"])
 INITIAL_TENSION_TOLERANCE_N = float(_PART["initial_tension_tolerance_n"])
+
+# Supplier drawing spelling is independent of the exact native geometry.
+# The maximum remains the native 138.3792 mm (5.448 in), not catalogue 5.45.
+SUPPLIER_DRAWING_URL = (
+    "https://www.mcmaster.com/mvC/Library/CAD2/20260617/4210389D/"
+    "9432K31_Music-Wire%20Steel%20Extension%20Springs%20with%20Hook%20EndsX.GIF"
+)
+SUPPLIER_PRECISION = {
+    "SupplierFreeLength": 3,
+    "SupplierMaximumLength": 3,
+    "SupplierCoilOD": 2,
+    "SupplierWireDiameter": 3,
+}
+SUPPLIER_COIL_OD_MM = stock.COIL_OD_MM
+SUPPLIER_WIRE_DIA_MM = stock.WIRE_DIA_MM
+SUPPLIER_COIL_OD_TOLERANCE_MM = 0.008 * 25.4
+SUPPLIER_COIL_OD_TOLERANCE_PRECISION = 3

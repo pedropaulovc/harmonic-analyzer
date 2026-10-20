@@ -15,4 +15,6 @@ vn-post-mount-screw:
   # vn_post_mount_screw_spec owns the raised post's 94.9 mm reference cut length.
   # Cut each screw to its matched post/platform hole, never proud;
   # a fixed 94.9 mm batch cut is not the acceptance rule.
-  # Supplier thread length is not established; check actual engagement.
+  # User-supplied MSC 40923906 drawing: partially threaded, 1.500 in factory thread.
+  # Representative native geometry uses mid-band supplier skirt and slot sizes.
+  # The supplier-limit sheet preserves source bands; fit/acceptance is unchanged.

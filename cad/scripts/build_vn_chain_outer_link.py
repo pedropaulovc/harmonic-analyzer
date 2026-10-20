@@ -10,6 +10,10 @@ the loop's closing outer link is the separate connecting link
 (build_vn_chain_connecting_link.py).
 Geometry and clearances: _chain.py / _chain_link.py.
 
+Installed geometry is a clearance stand-in. The isolated Supplier-Free state
+is source-derived stock identification, not a replacement for the installed
+solid, its original configurations or the two chain path axes.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_vn_chain_outer_link.py
@@ -21,6 +25,7 @@ import sys
 
 from _chain_link import OUTER_LINK, build_link
 from _session import run_build
+from _supplier_chain_stock import add_chain_stock_references
 
 PART_NAME = "vn-chain-outer-link"
 MATERIAL = "Plain Carbon Steel"
@@ -28,7 +33,11 @@ MATERIAL = "Plain Carbon Steel"
 
 async def build(adapter) -> dict[str, str]:
     return await build_link(
-        adapter, part_name=PART_NAME, material=MATERIAL, **OUTER_LINK
+        adapter,
+        part_name=PART_NAME,
+        material=MATERIAL,
+        **OUTER_LINK,
+        before_save=add_chain_stock_references,
     )
 
 

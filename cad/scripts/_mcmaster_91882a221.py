@@ -34,3 +34,17 @@ HEAD_STACK_LEN = COLLAR_H + HEAD_H
 SHANK_DIA = 2.0 * THUMB_SPEC["major_r"]
 SHANK_LEN = THUMB_SPEC["length"]
 OVERALL_LEN = HEAD_STACK_LEN + SHANK_LEN
+
+# Exact nominal envelope carriers for the native purchased-part drawing.
+# These are construction-only references in the final production frame;
+# they do not replace or alter any solid/thread/knurl feature.
+DIAMETER_REFERENCES = (
+    ("SupplierHeadDiameter", HEAD_DIA, "vertical"),
+    ("SupplierCollarDiameter", COLLAR_DIA, "vertical"),
+    ("SupplierThreadDiameter", SHANK_DIA, "vertical"),
+)
+DIAMETER_REFERENCE_STARTS = {
+    "SupplierHeadDiameter": (HEAD_H / 2.0, -HEAD_DIA / 2.0),
+    "SupplierCollarDiameter": (HEAD_H + COLLAR_H / 2.0, -COLLAR_DIA / 2.0),
+    "SupplierThreadDiameter": (HEAD_STACK_LEN + SHANK_LEN / 2.0, -SHANK_DIA / 2.0),
+}

@@ -5,6 +5,8 @@ at mid-length, double-loop axes +Z) and intentionally preserves the vendor's
 two touching solid bodies.  Assembly placement owns the vendor-to-machine
 transform.  ``INSTALLED_LENGTH_MM`` is the actual reference mount pose's
 catalogue inside-loop length.
+Reference-only supplier configurations must restore that installed active
+configuration before the shared save/export pipeline is allowed to run.
 
 Run with SolidWorks open::
 
@@ -14,6 +16,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import sys
+from functools import partial
 
 import _config
 from _appearance import SPRING_BLACK, apply_color, apply_material
@@ -26,8 +29,10 @@ from _session import run_build
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _saved_part_guard import require_saved_drawing_properties
 from _stock_fastener import _blank_recipe_references
+from _spring import run_before_save
 from vn_counter_spring_notes import DRAWING_NOTES
-from vn_counter_spring_spec import INSTALLED_LENGTH_MM
+import vn_counter_spring_spec as spec
+from _supplier_extension_spring import add_extension_spring_references
 from diagnostics.diag_build_1330K524 import build_1330K524
 
 
@@ -44,7 +49,7 @@ STOCK_PROPERTIES = {
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
     try:
-        await build_1330K524(adapter, None, length_mm=INSTALLED_LENGTH_MM)
+        await build_1330K524(adapter, None, length_mm=spec.INSTALLED_LENGTH_MM)
     finally:
         if hasattr(adapter, "_mcm_com_map"):
             delattr(adapter, "_mcm_com_map")
@@ -65,6 +70,19 @@ async def build(adapter) -> dict[str, str]:
         },
     )
     await report_mass_properties(adapter)
+    await run_before_save(
+        adapter,
+        PART_NAME,
+        partial(
+            add_extension_spring_references,
+            author=build_1330K524,
+            free_length_mm=spec.FREE_LENGTH_MM,
+            max_length_mm=spec.MAX_LENGTH_MM,
+            coil_od_mm=spec.SUPPLIER_COIL_OD_MM,
+            wire_dia_mm=spec.SUPPLIER_WIRE_DIA_MM,
+            body_count=2,
+        ),
+    )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

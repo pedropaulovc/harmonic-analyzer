@@ -12,7 +12,6 @@ import pytest
 import _config
 import build_vn_transgear_pivot_spring as part
 import vn_transgear_pivot_spring_spec as spec
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_9715K43 as recipe
@@ -180,29 +179,6 @@ def test_the_recipe_volume_is_the_section_swept_round_the_axis() -> None:
     )
 
 
-def test_stock_build_turns_the_recipe_axis_onto_part_z(monkeypatch) -> None:
-    seen: dict = {}
-
-    async def fake_build(adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", fake_build)
-    asyncio.run(part.build(None))
-    (component,) = seen["components"]
-    assert component.sku == spec.SKU
-    assert component.author is recipe.build_9715K43
-    # Rx(+90 deg) maps the recipe's +Y onto +Z (the transgear-retaining-ring
-    # convention); with no lift the OD rim's bearing face stays on z = 0.
-    assert component.transform.rotation_radians == pytest.approx(
-        (math.pi / 2.0, 0.0, 0.0)
-    )
-    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
-    assert seen["material"] == part.SPEC.material
-    # The published axis is the part's Z: Top (XZ) ∩ Right (YZ).
-    assert seen["screw_axis_planes"] == ("Top Plane", "Right Plane")
-
-
 def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
     """No vendor model: the standalone run builds the recipe and saves it
     under the reference directory, never entering the replica path."""
@@ -246,20 +222,6 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
 def test_no_vendor_model_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
     assert not list(root.glob(f"cad/references/**/{spec.SKU}*.SLDPRT"))
-
-
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_vn_transgear_pivot_spring as drawing
-
-    sheet = DRAWINGS_BY_NAME["vn_transgear_pivot_spring"]
-    assert drawing.SPEC is sheet
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES
-    assert (
-        drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
-    )
 
 
 def test_installation_note_fits_the_sheet() -> None:

@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import math
 import sys
+from functools import partial
 
 from _session import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from _simplified_part import save_simplified_part
+from _supplier_screw_reference import save_supplier_reference_part
 from diagnostics.diag_build_91882A221 import build_91882A221
-from _mcmaster_91882a221 import HEAD_STACK_LEN
+from _mcmaster_91882a221 import (
+    DIAMETER_REFERENCES,
+    DIAMETER_REFERENCE_STARTS,
+    HEAD_STACK_LEN,
+)
 
 PART_NAME = "vn-thumb-screw"
 SPEC = fastener(PART_NAME)
@@ -33,7 +38,11 @@ async def build(adapter) -> dict[str, str]:
             ),
         ),
         material=MATERIAL,
-        save_threaded_part=save_simplified_part,
+        save_threaded_part=partial(
+            save_supplier_reference_part,
+            dimensions=DIAMETER_REFERENCES,
+            starts=DIAMETER_REFERENCE_STARTS,
+        ),
     )
 
 

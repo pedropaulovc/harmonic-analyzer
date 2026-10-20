@@ -1,9 +1,19 @@
 vn-crank-hub-pin:
+  title: Crank Hub Axial Seam Pin
   number: MHA-VN-029
-  material: 4 mm m6 steel dowel pin, ISO 2338
-  material_specification: 4 mm m6 steel dowel pin, ISO 2338
-  finish: ends faced, deburred, oiled
+  stock_name: 18-8 Stainless Steel ISO 2338-m6 Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [91585A377]
+  material: 18-8 stainless steel
+  material_specification: "18-8 stainless steel dowel pin, ISO 2338-m6; McMaster-Carr 91585A377"
+  finish: passivated
+  # Live product, engineering PDF and vendor STEP inspected 2026-10-19.
+  # https://www.mcmaster.com/91585A377/
+  installation_notes: |-
+    MATCH-DRILL/REAM MHA-DT-006 ARM AND MHA-DT-031 HUB AT SIX O'CLOCK TO
+    LIGHT DRIVE FIT ON ACTUAL MHA-VN-029 PIN; DRIVE AXIALLY FROM OUTBOARD FACE;
+    OUTER END FLUSH. PIN SHALL NOT ENTER HUB BORE.
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "dowel stock cut to length; match-reamed axial seam fit"
+  process: purchased

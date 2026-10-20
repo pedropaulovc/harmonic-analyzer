@@ -6,17 +6,16 @@ is lost. It is reconstructed with purchased McMaster-Carr bead chain:
 
 * 3606T118 -- unfinished brass bead chain, trade size 3, 3/32 in beads,
   20 lbf, cut to BEAD_COUNT beads.
-* 3606T811 -- brass loop link for trade-size-3 chain: the capsule coupler that
-  snaps over an end bead at each end and closes the cut length into a loop.
+* 3606T811 -- brass loop link for trade-size-3 chain.
 
 The chain is one closed loop through the eye and the ring, with a single
-joint. McMaster publishes no CAD, and no dimension beyond the bead diameter,
-for either item (read 2026-09-29). The pitch is the trade-size-3 average of 94
-beads per foot (Ball Chain Mfg. and Frank Winne size charts). The link is
-9 mm long, as #3 connectors are listed, and its proportions are read off
-McMaster's 3606T811 photograph. The rod and the link's wall, crimps, tip holes
-and mouths are assumptions named below; each only decides clearances the
-functions here prove.
+joint. The 3606T118 catalogue gives the bead diameter, but no engineering
+drawing/CAD was available; 3606T811 gives no numeric dimensions at all
+(rechecked 2026-10-19). Its photographed loop link is not the generic
+capsule model used here. The pitch is the trade-size-3 average of 94 beads
+per foot (Ball Chain Mfg. and Frank Winne size charts). The 9 mm capsule,
+rod, wall, crimps, tip holes and mouths are project clearance assumptions,
+not McMaster dimensions; they only decide the clearances proved below.
 
 Frame ("crank frame"): machine axes, origin on the crank axis at the arm's
 front (outboard) face, machine z -183. The arm fills z 0..ARM_THICKNESS and
@@ -77,14 +76,18 @@ CHAIN_SKU = "3606T118"
 LINK_SKU = "3606T811"
 BEAD_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125, the catalogue bead diameter
 BEAD_R = BEAD_DIA / 2.0
+# The existing SeedProfile arc drives the actual spherical bead. Only this
+# catalogue-backed size is exposed as a supplier drawing reference.
+CATALOGUE_BEAD_DIMENSION = "CatalogueBeadDiameter"
+DRAWING_DIMENSIONS = {"SeedProfile": {CATALOGUE_BEAD_DIMENSION}}
+DRAWING_REFERENCE_PRECISION = {CATALOGUE_BEAD_DIMENSION: 0}  # exact 3/32 in fraction
 PITCH = 12.0 * MM_PER_IN / 94.0  # 3.2426, trade size 3 average
 # Assumption: the connecting rod. It is hidden inside the beads except for
 # the ~0.9 mm between them.
 ROD_DIA = 0.5
 ROD_R = ROD_DIA / 2.0
-# The loop link: a rolled capsule, domed at both ends, the end beads caught in
-# the domes behind a crimp. LINK_LENGTH is the listed #3 size; LINK_OD is the
-# 0.37 diameter-to-length read off the photograph; the rest are assumptions.
+# The loop-link model is a generic rolled capsule, not the supplier's pictured
+# loop link. All dimensions below are clearance assumptions, not catalogue data.
 LINK_LENGTH = 9.0
 LINK_OD = 3.3
 LINK_WALL = 0.3

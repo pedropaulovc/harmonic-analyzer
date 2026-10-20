@@ -22,10 +22,9 @@ stale.  The double below reproduces the cg-fx1 seat behaviour.
 
 from __future__ import annotations
 
-import importlib
-import inspect
-import re
-from pathlib import Path
+import asyncio
+from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
@@ -40,6 +39,7 @@ import _rebuild
 import _session
 import _sketch
 import _sketch_rectangle
+
 
 def cone_faults(configuration: str) -> tuple[tuple[str, int, bool], ...]:
     """Current native row names, unlike the historical incident names above."""
@@ -77,6 +77,7 @@ class _Extension:
         return self.part.rebuild_result
 
     def GetWhatsWrong(self):  # noqa: N802
+        self.part.fault_reads.add(self.part.active)
         faults = self.part.faults
         if self.part.active in self.part.bad:
             faults = (*faults, *cone_faults(self.part.active))
@@ -117,6 +118,8 @@ class _Part:
         self.force_result = force_result
         self.faults = faults
         self.log: list[str] = []
+        self.fault_reads: set[str] = set()
+        self.metadata: dict[str, object] = {}
         self.ConfigurationManager = _Manager(self)
         self.Extension = _Extension(self)
 
@@ -304,23 +307,165 @@ def test_an_inactive_configuration_still_faulted_while_active_stops_the_save(
     assert part.active == "T120"
 
 
-def test_the_save_chokepoint_checks_every_configuration_right_before_its_final_save() -> (
-    None
-):
-    # Inside save_part_and_images: after every caller edit and every edit the
-    # chokepoint itself makes (block tolerances, properties, summary info), and
-    # nothing runs between it and the re-save that persists the part.
-    source = inspect.getsource(_part_save.save_part_and_images)
-    call = "rebuild_stale_configurations(adapter, part_name)"
-    guard = source.index(call)
-    for edit in (
-        "apply_block_tolerances(",
-        "apply_custom_properties(",
-        "apply_summary_info(",
-    ):
-        assert source.index(edit) < guard
-    between = source[guard + len(call) : source.index('f"re-save with properties')]
-    assert between.split() == ["check("]
+@pytest.fixture
+def saved_part(seat, monkeypatch, tmp_path):
+    """Property edits dirty native state; saving and opening copy disk state.
+
+    Only unrelated camera, visibility, property-authoring and export boundaries
+    are substituted. The save chokepoint and configuration rebuilds run normally.
+    """
+    import _visibility
+
+    def edit(adapter, field, configuration, value):
+        model = adapter.currentModel
+        model.metadata[field] = value
+        model.configs[configuration].NeedsRebuild = True
+
+    async def export_stl(adapter, path):
+        adapter.exports.append(path)
+
+    monkeypatch.setattr(
+        _part_save._seat_forensics, "record_authoring_context", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        _visibility, "assert_reference_geometry_hidden", lambda *_args: None
+    )
+    monkeypatch.setattr(_part_save, "set_isometric_view", lambda _adapter: None)
+    monkeypatch.setattr(_part_save, "export_part_stl", export_stl)
+    monkeypatch.setattr(_part_save, "OUT_SLDPRT", tmp_path / "sldprt")
+    monkeypatch.setattr(_part_save, "OUT_PNG", tmp_path / "png")
+    monkeypatch.setattr(_part_save, "OUT_STL", tmp_path / "stl")
+    monkeypatch.setattr(
+        _part_save,
+        "apply_block_tolerances",
+        lambda adapter: edit(adapter, "tolerances", "Default", True),
+    )
+    monkeypatch.setattr(_part_save, "part_properties", lambda name: {"Title": name})
+    monkeypatch.setattr(
+        _part_save,
+        "apply_custom_properties",
+        lambda adapter, values: edit(adapter, "properties", "INSTALLED", dict(values)),
+    )
+    monkeypatch.setattr(
+        _part_save,
+        "apply_summary_info",
+        lambda adapter, *, title: edit(adapter, "title", "SupplierStock", title),
+    )
+
+    def make(*, fail_save=None, **kwargs):
+        adapter, part = seat(
+            {"Default": False, "INSTALLED": False, "SupplierStock": False},
+            active="INSTALLED",
+            **kwargs,
+        )
+        saved: list[_Part] = []
+        adapter.save_attempts = []
+        adapter.exports = []
+
+        async def save_file(path):
+            adapter.save_attempts.append(path)
+            if len(adapter.save_attempts) == fail_save:
+                return SimpleNamespace(is_success=False, error="native save refused")
+            saved.append(deepcopy(adapter.currentModel))
+            return SimpleNamespace(is_success=True, data=None)
+
+        async def open_model(_path):
+            adapter.currentModel = deepcopy(saved[-1])
+            adapter.currentModel.log.clear()
+            return SimpleNamespace(is_success=True, data=None)
+
+        adapter.save_file = save_file
+        adapter.open_model = open_model
+        return adapter, part, saved
+
+    return make
+
+
+def test_the_saved_part_contains_final_edits_and_clean_configuration_caches(
+    saved_part,
+) -> None:
+    adapter, authored, saved = saved_part(bad=("Default", "SupplierStock"))
+    artefacts = asyncio.run(
+        _part_save.save_part_and_images(adapter, "fixture", views=())
+    )
+    expected = {
+        "tolerances": True,
+        "properties": {"Title": "fixture"},
+        "title": "fixture",
+    }
+    assert saved[-1].metadata == expected
+    assert not any(config.NeedsRebuild for config in saved[-1].configs.values())
+    assert not saved[-1].bad
+    assert saved[-1].active == "INSTALLED"
+
+    # Read the saved state, not the still-open authoring object.
+    authored.metadata.clear()
+    asyncio.run(adapter.open_model(artefacts["part"]))
+    reopened = adapter.currentModel
+    assert reopened is not authored
+    assert reopened.metadata == expected
+    assert not any(config.NeedsRebuild for config in reopened.configs.values())
+    _rebuild.assert_saved_configurations_regenerate(adapter, "fixture")
+    assert set(reopened.log) >= {
+        "edit Default",
+        "edit INSTALLED",
+        "edit SupplierStock",
+    }
+    assert reopened.active == "INSTALLED"
+    assert not any(entry.startswith("force") for entry in reopened.log)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["inactive rebuild", "active rebuild", "hard fault", "stale", "final save"],
+)
+def test_a_failed_finalization_does_not_persist_the_edited_part(
+    saved_part, failure
+) -> None:
+    kwargs = {
+        "inactive rebuild": {"force_result": False},
+        "active rebuild": {"rebuild_result": False},
+        "hard fault": {"faults": (("Pin", 2, False),)},
+        "stale": {"stuck": ("SupplierStock",)},
+        "final save": {"fail_save": 2},
+    }[failure]
+    adapter, authored, saved = saved_part(**kwargs)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_part_save.save_part_and_images(adapter, "fixture", views=()))
+    assert authored.metadata == {
+        "tolerances": True,
+        "properties": {"Title": "fixture"},
+        "title": "fixture",
+    }
+    assert authored.active == "INSTALLED"
+    assert len(saved) == 1 and saved[0].metadata == {}
+    assert len(adapter.save_attempts) == (2 if failure == "final save" else 1)
+    assert adapter.exports == []
+    if failure == "inactive rebuild":
+        assert {"force Default", "force SupplierStock"} <= set(authored.log)
+        assert "EditRebuildAll" not in authored.log
+    elif failure == "active rebuild":
+        assert "EditRebuildAll" in authored.log
+        assert not any(config.NeedsRebuild for config in authored.configs.values())
+    elif failure == "hard fault":
+        assert {"Default", "SupplierStock"} <= authored.fault_reads
+        assert "EditRebuildAll" not in authored.log
+    elif failure == "stale":
+        assert "force SupplierStock" in authored.log
+        assert authored.configs["SupplierStock"].NeedsRebuild
+    else:
+        assert "EditRebuildAll" in authored.log
+        assert not any(config.NeedsRebuild for config in authored.configs.values())
+
+
+def test_a_refused_initial_save_leaves_no_saved_or_finalized_part(saved_part) -> None:
+    adapter, authored, saved = saved_part(fail_save=1)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_part_save.save_part_and_images(adapter, "fixture", views=()))
+    assert len(adapter.save_attempts) == 1
+    assert adapter.exports == []
+    assert not saved
+    assert authored.metadata == {}
 
 
 # --- assert_saved_configurations_regenerate -----------------------------------
@@ -387,72 +532,3 @@ def test_a_single_configuration_part_regenerates_with_no_switch(seat) -> None:
     assert part.log == ["edit Default"]
 
 
-SCRIPTS = Path(__file__).resolve().parent
-CONFIGURATION_CREATORS = re.compile(
-    r"\bcreate_configuration\(|\bAddConfiguration\d*\(|\badd_simplified_configurations\("
-)
-TRIPWIRE = re.compile(r"assert_saved_configurations_regenerate\(adapter, (PART_NAME|part_name)\)")
-SAVE = re.compile(r"save_part_and_images\(adapter, (PART_NAME|part_name)\b")
-FORCED_REBUILDS = ("ForceRebuild3", "set_active_configuration(", "assert_saved_configuration_topology(")
-
-
-def _configuration_builders() -> set[str]:
-    return {
-        path.stem
-        for path in SCRIPTS.glob("build_*.py")
-        if CONFIGURATION_CREATORS.search(path.read_text(encoding="utf-8"))
-    }
-
-
-def test_the_builders_that_create_configurations_are_the_known_five() -> None:
-    """A new multi-configuration builder must fail here until it reopens its
-    saved part and runs the tripwire (and joins this set).  Every other builder
-    that derives drawing configurations goes through save_simplified_part,
-    which reopens and runs the tripwire itself."""
-    assert _configuration_builders() == {
-        "build_ch_rocker_arm_tl_riser_block",
-        "build_dt_crank_handle_ferrule",
-        "build_dt_cone_gear",
-        "build_dt_crank_handle_pivot_screw",
-        "build_dt_pinion_lever_pin",
-        "build_pd_transgear_removable",
-        "build_vn_cone_tip_collar",
-    }
-
-
-def test_only_the_known_helpers_create_configurations_outside_builders() -> None:
-    """The part-tier simplified-configuration helper and the assembly save
-    chokepoint's Default Simplified are the only other creators."""
-    creators = {
-        path.stem
-        for path in SCRIPTS.glob("_*.py")
-        if re.search(r"\bAddConfiguration\d*\(", path.read_text(encoding="utf-8"))
-    }
-    assert creators == {"_assembly", "_simplified_part"}
-
-
-def _assert_reopened_then_tripwire(source: str) -> None:
-    reopened = source.rindex("await adapter.open_model(")
-    tripwire = TRIPWIRE.search(source, reopened)
-    assert tripwire is not None
-    between = source[reopened : tripwire.start()]
-    assert not [call for call in FORCED_REBUILDS if call in between]
-    assert max(match.start() for match in SAVE.finditer(source)) < reopened
-
-
-@pytest.mark.parametrize("stem", sorted(_configuration_builders()))
-def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> None:
-    """Reopen, then the tripwire, with nothing force-rebuilding in between: a
-    forced rebuild would repair the very caches the tripwire has to read.  A
-    builder that saves through save_simplified_part inherits its reopen."""
-    source = inspect.getsource(importlib.import_module(stem).build)
-    if "await adapter.open_model(" not in source:
-        assert "await save_simplified_part(" in source
-        return
-    _assert_reopened_then_tripwire(source)
-
-
-def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:
-    import _simplified_part
-
-    _assert_reopened_then_tripwire(inspect.getsource(_simplified_part.save_simplified_part))

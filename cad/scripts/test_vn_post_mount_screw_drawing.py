@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +22,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_40923906 as recipe
+from _stock_recipe import recipe_declaration
 from _msc_40923906 import FILLISTER_SIZE
 
 IN = 25.4
@@ -55,9 +58,10 @@ def test_nominal_end_sits_short_of_the_platform_underside() -> None:
 def test_supplied_stock_reaches_longest_raised_post_corner() -> None:
     assert spec.LONGEST_FITTED_LENGTH_MM == spec.FLOOR_HIGH_MM + spec.PLATE_THICK_MM
     assert spec.STOCK_REACH_MARGIN_MM == (
-        spec.STOCK_LENGTH_MM - spec.FACTORY_TIP_CHAMFER_MM - spec.LONGEST_FITTED_LENGTH_MM
+        spec.SUPPLIER_STOCK_LENGTH.lower_in * IN
+        - spec.FACTORY_TIP_CHAMFER_MM - spec.LONGEST_FITTED_LENGTH_MM
     )
-    assert spec.STOCK_REACH_MARGIN_MM > 0.0
+    assert spec.STOCK_REACH_MARGIN_MM == pytest.approx(1.955)
     assert spec.CUT_LENGTH_MM < spec.LONGEST_FITTED_LENGTH_MM
 
 
@@ -100,12 +104,14 @@ def test_cut_length_prints_as_a_reference_without_a_band() -> None:
     assert not hasattr(spec, "CUT_LENGTH_BAND")
     assert not hasattr(drawing, "EXPECTED_CONTROLS")
     builder = Path(part.__file__).read_text(encoding="utf-8")
-    # The one tolerance in the builder is the cut end's break (a single MAX
-    # limit), never the length.
+    # Finished cut controls stay unbanded; the separate source envelope now
+    # also owns six supplier LIMITS bands, none of them a finished cut band.
     assert "set_dimension_bilateral_tolerance(" not in builder
     helper = builder.split("def _single_limit_break", 1)[1].split("\ndef ", 1)[0]
     assert "CUT_END_BREAK_SKETCH, CUT_END_BREAK_DIMENSION" in helper
-    assert builder.count("tolerance.Type = ") == 1
+    assert spec.CUT_LENGTH_DIMENSION not in {
+        row.name for row in spec.SUPPLIER_PROFILE_DIMENSIONS
+    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_reference_dimension(" in source
     assert "swTolNONE" in source
@@ -234,7 +240,7 @@ def test_cut_length_is_a_model_owned_drawing_dimension() -> None:
         "CutLengthReference": {"CutLength"},
         "CutEndDeburrProfile": {"CutEndBreak"},
     }
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
+    assert spec.REFERENCE_SKETCHES == ("CutLengthReference", "SupplierMaxLimitProfile")
     assert spec.DRAWING_PRECISION_BY_NAME == {"CutLength": 1, "CutEndBreak": 1}
     assert set(drawing.FRONT_KEEP) == {"CutLength"}
     builder = Path(part.__file__).read_text(encoding="utf-8")
@@ -458,8 +464,10 @@ def test_sheet_layout_keeps_notes_clear_of_the_view() -> None:
 
 def test_stock_build_uses_its_registered_recipe() -> None:
     metadata = discovered_recipes()[spec.SKU]
-    assert metadata.module == recipe.__name__
+    assert metadata.module == recipe.__name__ == "diagnostics.diag_build_40923906"
     assert metadata.callable_name == recipe.build_40923906.__name__
+    assert part.build_40923906 is recipe.build_40923906
+    assert recipe_declaration(spec.SKU, part._cut_to_length) == metadata
     assert part.SPEC.skus == (spec.SKU,)
     assert part.SPEC.supplier == "MSC Industrial Supply"
     assert part.MATERIAL == "Plain Carbon Steel"
@@ -491,15 +499,45 @@ def test_sheet_passes_the_drawing_owned_precision_rule() -> None:
     assert violations == ()
 
 
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    # Codex #857 P2: MSC publishes no CAD, so the standalone command must not
-    # enter the McMaster replica path (vendor SLDPRT + harvest).  It builds the
-    # recipe and saves it; the documented command is that entry point.
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
-    assert Path(recipe.__file__).name in (recipe.__doc__ or "")
-    assert "catalog-only" in (recipe.__doc__ or "")
+def test_standalone_recipe_authors_source_stock_without_vendor_truth(monkeypatch, tmp_path) -> None:
+    """The real entry point builds the same author and saves its result."""
+    from diagnostics import diag_mcmaster_lib as lib
+
+    events = []
+
+    async def create():
+        events.append("create")
+        return True
+
+    async def author(adapter, truth=None):
+        assert truth is None
+        events.append("source-author")
+
+    async def save(path):
+        events.append(("save", Path(path)))
+        return True
+
+    async def exports(adapter, stem):
+        return {"image": f"{stem}.png"}
+
+    async def close(adapter):
+        events.append("close")
+
+    monkeypatch.setattr(recipe, "build_40923906", author)
+    monkeypatch.setattr(recipe, "check", lambda label, result: None if result is True else pytest.fail(label))
+    monkeypatch.setattr(lib, "assert_seat_sketch_baseline", lambda *args: None)
+    monkeypatch.setattr(lib, "mass_properties", lambda adapter: {"volume_mm3": 3341.4})
+    monkeypatch.setattr(lib, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(lib, "export_views", exports)
+    monkeypatch.setattr(lib, "close_all", close)
+    # build_catalog imports check locally from its canonical helper.
+    monkeypatch.setattr("_check.check", recipe.check)
+    result = asyncio.run(recipe.build_catalog(SimpleNamespace(create_part=create, save_file=save)))
+    assert events == [
+        "create", "source-author", ("save", tmp_path / "40923906-catalog.SLDPRT"), "close",
+    ]
+    assert result["sldprt"] == str(tmp_path / "40923906-catalog.SLDPRT")
+    assert result["image"] == "40923906-catalog.png"
 
 
 def test_break_is_smaller_than_the_allowed_trim_volume_residual() -> None:
@@ -632,7 +670,7 @@ def test_break_is_owned_by_the_deburr_cutter_not_a_hidden_reference_sketch() -> 
     The agreed fallback is the boss hook's pattern: the break is a driving
     dimension of the deburr cutter's own (consumed) profile."""
     assert spec.CUT_END_BREAK_SKETCH == part.DEBURR_PROFILE == "CutEndDeburrProfile"
-    assert spec.REFERENCE_SKETCHES == ("CutLengthReference",)
+    assert spec.CUT_END_BREAK_SKETCH not in spec.REFERENCE_SKETCHES
     assert not hasattr(spec, "DETAIL_SKETCHES")
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "part_sketches_shown(" not in source
@@ -1230,3 +1268,849 @@ def test_a_circle_the_seat_moved_raises(monkeypatch) -> None:
     seat.honours_add_to_db = False
     with pytest.raises(RuntimeError, match="tip view crop circle"):
         drawing.cropped_tip_view(seat)
+
+
+def test_source_matrix_retains_all_seven_printed_groups() -> None:
+    """User-supplied engineering limits, not a guessed supplier nominal."""
+    expected = {
+        "SupplierHeadOD": (0.414, 0.389),
+        "SupplierHeadHeight": (0.237, 0.207),
+        "SupplierStraightSkirt": (0.170, 0.155),
+        "SupplierSlotWidth": (0.075, 0.064),
+        "SupplierSlotDepth": (0.109, 0.087),
+        "SupplierStockLength": (4.000, 3.910),
+        "SupplierThreadLength": (1.500, None),
+    }
+    rows = spec.SUPPLIER_PROFILE_DIMENSIONS
+    assert len(rows) == len(expected) == 7
+    assert {row.name for row in rows} == set(expected)
+    for row in rows:
+        upper, lower = expected[row.name]
+        assert (row.source.upper_in, row.source.lower_in) == (upper, lower)
+        assert row.source.envelope_mm == upper * IN
+        contract = drawing._supplier_contract(row)
+        assert contract["units"] == "in"
+        assert contract["precision"] == 3
+        assert contract["expected_mm"] == upper * IN
+        if lower is None:
+            assert row.source.deviations_mm is None
+        else:
+            assert row.source.deviations_mm == pytest.approx(((lower - upper) * IN, 0.0))
+            low, high = row.source.deviations_mm
+            assert (upper * IN + low, upper * IN + high) == pytest.approx((lower * IN, upper * IN))
+    thread = next(row for row in rows if row.name == "SupplierThreadLength")
+    assert spec.SUPPLIER_THREAD == "1/4-20 UNC"
+    assert spec.SUPPLIER_THREAD in thread.callout
+    assert "FACTORY PARTIAL THREAD" in thread.callout
+
+
+def test_source_dimensions_measure_one_complete_stock_profile() -> None:
+    points = spec.SUPPLIER_PROFILE_MM
+    # Every perimeter edge is real, nonzero and axis-aligned, including the
+    # U-shaped slot, full original shank and split factory thread region.
+    for start, end in zip(points, points[1:] + points[:1], strict=True):
+        assert (start[0] == end[0]) != (start[1] == end[1])
+    for row in spec.SUPPLIER_PROFILE_DIMENSIONS:
+        first, last = (points[index] for index in row.vertices)
+        coordinate = 0 if row.native_type == 11 else 1
+        span = abs(last[coordinate] - first[coordinate])
+        assert span == pytest.approx(row.source.envelope_mm)
+    by_name = {row.name: row for row in spec.SUPPLIER_PROFILE_DIMENSIONS}
+    length = by_name["SupplierStockLength"]
+    thread = by_name["SupplierThreadLength"]
+    assert length.vertices[1] == thread.vertices[1]  # the same original tip
+    assert points[length.vertices[0]][0] == 0.0  # actual under-head junction
+    assert points[length.vertices[1]][0] == 4.000 * IN
+    assert points[thread.vertices[0]][0] == pytest.approx((4.000 - 1.500) * IN)
+    assert (11, 14) in spec.SUPPLIER_PROFILE_SECTIONS  # factory thread boundary
+    assert (1, 8) in spec.SUPPLIER_PROFILE_SECTIONS  # crown/skirt boundary
+    assert all(points[index][0] == -0.170 * IN for index in (1, 8))
+    assert all(points[index][0] == -0.237 * IN for index in (2, 7))
+    assert by_name["SupplierHeadOD"].presentation == "diameter"
+    assert set(drawing.STOCK_KEEP).isdisjoint(drawing.STOCK_HEAD_KEEP)
+    assert set(drawing.STOCK_KEEP) | set(drawing.STOCK_HEAD_KEEP) == set(by_name)
+
+
+def test_representative_sizes_are_midbands_not_supplier_nominals() -> None:
+    by_name = {row.name: row for row in spec.SUPPLIER_PROFILE_DIMENSIONS}
+    for name, actual, selected_in in (
+        ("SupplierStraightSkirt", spec.MODEL_STRAIGHT_SKIRT_MM, 0.1625),
+        ("SupplierSlotWidth", spec.MODEL_SLOT_WIDTH_MM, 0.0695),
+        ("SupplierSlotDepth", spec.MODEL_SLOT_DEPTH_MM, 0.098),
+    ):
+        source = by_name[name].source
+        assert actual == pytest.approx(selected_in * IN)
+        assert actual == pytest.approx((source.upper_in + source.lower_in) * IN / 2.0)
+        assert source.lower_in * IN < actual < source.upper_in * IN
+        assert actual != source.envelope_mm  # never clamp to the upper envelope
+    assert FILLISTER_SIZE == (6.35, 4.0 * IN, 0.237 * IN, 0.414 * IN, IN / 20.0)
+    assert spec.CUT_LENGTH_MM < by_name["SupplierStockLength"].source.lower_in * IN
+    assert set(spec.DRAWING_DIMENSIONS) == {"CutLengthReference", "CutEndDeburrProfile"}
+    assert spec.SUPPLIER_STOCK_FEATURE not in spec.DRAWING_DIMENSIONS
+    assert "NOT REPRESENTATIVE SOLID" in spec.SUPPLIER_STOCK_TITLE
+    assert spec.SUPPLIER_MODEL_NOTE in spec.MANUFACTURING_NOTES
+
+
+def test_partial_thread_retains_tip_phase_and_all_finished_cut_controls() -> None:
+    assert spec.MODEL_THREAD_LENGTH_MM == pytest.approx(1.500 * IN)
+    assert spec.MODEL_PLAIN_SHANK_MM == pytest.approx(2.500 * IN)
+    assert spec.MODEL_PLAIN_SHANK_MM / part.THREAD_PITCH == pytest.approx(50.0)
+    assert spec.MODEL_THREAD_LENGTH_MM + spec.MODEL_PLAIN_SHANK_MM == spec.STOCK_LENGTH_MM
+    assert spec.MODEL_PLAIN_SHANK_MM < spec.CUT_LENGTH_MM - spec.CUT_END_BREAK_MM
+    assert spec.MODEL_PLAIN_SHANK_MM < spec.FLOOR_LOW_MM
+    assert spec.MODEL_PLAIN_SHANK_MM < spec.GRIP_MM
+    # Existing geometric removal integrals still apply: the entire trimmed
+    # region is distal to the source factory boundary, not plain shank.
+    trim, deburr = _independent_removal()
+    assert spec.TRIM_REMOVED_MM3 == pytest.approx(trim, rel=1e-4)
+    assert spec.CUT_END_DEBURR_REMOVED_MM3 == pytest.approx(deburr, rel=1e-3)
+
+
+def test_representative_crown_joins_the_selected_skirt_without_source_radius_claim() -> None:
+    radius = part.HEAD_DIA / 2.0
+    cap_radius = spec.MODEL_DOME_RADIUS_MM
+    center = part.HEAD_H - cap_radius
+    assert spec.MODEL_DOME_HEIGHT_MM == pytest.approx(part.HEAD_H - spec.MODEL_STRAIGHT_SKIRT_MM)
+    assert math.hypot(radius, spec.MODEL_STRAIGHT_SKIRT_MM - center) == pytest.approx(cap_radius)
+    assert part.HEAD_H - center == pytest.approx(cap_radius)
+    assert "CURVATURE UNSPECIFIED" in spec.SUPPLIER_MODEL_NOTE
+    assert spec.SUPPLIER_MODEL_NOTE in spec.MANUFACTURING_NOTES
+
+
+def test_source_slot_mass_matches_independent_circular_segment_integration() -> None:
+    # Integrate in X, unlike the production contract's Y-slice strip integral.
+    count = 4096
+    width = spec.MODEL_SLOT_WIDTH_MM / count
+    radius = part.HEAD_DIA / 2.0
+    sphere = spec.MODEL_DOME_RADIUS_MM
+    center = part.HEAD_H - sphere
+    cap_start = spec.MODEL_STRAIGHT_SKIRT_MM - center
+    floor = part.HEAD_H - spec.MODEL_SLOT_DEPTH_MM
+    removed = 0.0
+    for index in range(count):
+        x = -spec.MODEL_SLOT_WIDTH_MM / 2.0 + (index + 0.5) * width
+        section = math.sqrt(sphere**2 - x**2)
+        cap_area = (
+            section**2 * math.acos(cap_start / section)
+            - cap_start * math.sqrt(section**2 - cap_start**2)
+        )
+        skirt_area = 2.0 * math.sqrt(radius**2 - x**2) * (spec.MODEL_STRAIGHT_SKIRT_MM - floor)
+        removed += (cap_area + skirt_area) * width
+    assert spec.MODEL_SLOT_REMOVED_MM3 == pytest.approx(removed, rel=1e-4)
+
+
+def test_source_partial_thread_mass_counts_only_the_factory_region() -> None:
+    # Radial shell integration: at each radius the factory tip cone removes
+    # some available axial length. This is independent of the axial integral.
+    major, pitch = part.SHANK_DIA / 2.0, part.THREAD_PITCH
+    root = major - 0.75 * pitch * math.sqrt(3.0) / 2.0
+    count = 5000
+    width = (major - root) / count
+    removed = 0.0
+    for index in range(count):
+        radius = root + (index + 0.5) * width
+        groove_width = pitch / 8.0 + 2.0 / math.sqrt(3.0) * (radius - root)
+        available = spec.MODEL_THREAD_LENGTH_MM - (radius - major + spec.FACTORY_TIP_CHAMFER_MM)
+        removed += 2.0 * math.pi * radius * groove_width / pitch * available * width
+    assert spec.MODEL_THREAD_REMOVED_MM3 == pytest.approx(removed, rel=1e-5)
+    full_shank_extra = spec._groove_per_mm_mm3(major) * spec.MODEL_PLAIN_SHANK_MM
+    assert full_shank_extra > 0.0
+    assert spec.MODEL_THREAD_REMOVED_MM3 < removed + full_shank_extra
+    assert spec.MODEL_STOCK_VOLUME_MM3 == pytest.approx(
+        spec.MODEL_REVOLVED_VOLUME_MM3 - spec.MODEL_SLOT_REMOVED_MM3 - removed
+        + spec.MODEL_JUNCTION_FILLET_ADDED_MM3, rel=1e-5,
+    )
+
+
+def _source_profile_state(row) -> dict:
+    """Plain readback data for the source-specific pure invariant, not COM mocks."""
+    return {
+        "qualified_name": f"{row.name}@{spec.SUPPLIER_STOCK_FEATURE}@part.SLDPRT",
+        "native_type": row.native_type,
+        "driven_state": 1,
+        "tolerance_type": 0 if row.source.lower_in is None else 3,
+        "tolerance_band_mm": row.source.deviations_mm or (0.0, 0.0),
+        "tolerance_precision": 3,
+        "attachment_points_mm": [
+            (*spec.SUPPLIER_PROFILE_MM[index], 0.0) for index in row.vertices
+        ],
+    }
+
+
+def test_source_state_accepts_limits_and_unbanded_factory_thread() -> None:
+    for row in spec.SUPPLIER_PROFILE_DIMENSIONS:
+        state = _source_profile_state(row)
+        drawing.assert_supplier_profile_state(row, **state)
+        state["attachment_points_mm"].reverse()  # native selection order is immaterial
+        drawing.assert_supplier_profile_state(row, **state)
+
+
+@pytest.mark.parametrize(
+    "change, reason",
+    [
+        ({"qualified_name": "SupplierHeadOD@BodyProfile@part"}, "ownership"),
+        ({"native_type": 5}, "type"),  # a radius must never masquerade as OD
+        ({"driven_state": 2}, "ownership"),
+        ({"tolerance_type": 2}, "limit type"),  # bilateral text is not native LIMITS
+        ({"tolerance_band_mm": (-0.025, 0.0)}, "limit band"),  # inches mistaken for mm
+        ({"tolerance_band_mm": (-0.635, 0.1)}, "limit band"),
+        ({"tolerance_precision": 2}, "precision"),
+        ({"attachment_points_mm": []}, "physical"),
+        ({"attachment_points_mm": [(0.0, 0.0, 0.0), (0.0, 10.5156, 0.0)]}, "physical"),
+        ({"attachment_points_mm": [(float("nan"), 0.0, 0.0)] * 2}, "physical"),
+    ],
+)
+def test_source_state_rejects_changed_bands_types_or_witness_lines(change, reason) -> None:
+    row = next(row for row in spec.SUPPLIER_PROFILE_DIMENSIONS if row.name == "SupplierHeadOD")
+    state = _source_profile_state(row)
+    state.update(change)
+    with pytest.raises(RuntimeError, match=reason):
+        drawing.assert_supplier_profile_state(row, **state)
+
+
+def test_factory_thread_must_not_invent_a_source_tolerance() -> None:
+    row = next(row for row in spec.SUPPLIER_PROFILE_DIMENSIONS if row.name == "SupplierThreadLength")
+    state = _source_profile_state(row)
+    state["tolerance_type"] = 3
+    state["tolerance_band_mm"] = (-0.001 * IN, 0.0)
+    with pytest.raises(RuntimeError, match="limit type"):
+        drawing.assert_supplier_profile_state(row, **state)
+
+
+def _supplier_dimension_fixture(monkeypatch, *, point_refused=False, status=0, type_delta=0, value_scale=1.0):
+    """Registry contains only segments; dimensions measure selected endpoint geometry."""
+    from solidworks_mcp.adapters import sw_type_info
+
+    selected = []
+    measured_pairs = []
+    names = []
+
+    class Point:
+        def __init__(self, xy):
+            self.xy = xy
+
+        def Select4(self, append, data):
+            assert append is True and data is None
+            if point_refused:
+                return False
+            selected.append(self)
+            return True
+
+    class Line:
+        def __init__(self, xy):
+            self.start = Point(xy)
+
+        def GetStartPoint2(self):
+            return self.start
+
+        def Select4(self, *args):
+            pytest.fail("a source vertex must not select its segment")
+
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, low, high):
+            self.low, self.high = low, high
+            return True
+
+        def GetMinValue(self):
+            return self.low
+
+        def GetMaxValue(self):
+            return self.high
+
+    class Display:
+        def __init__(self, native_type, value):
+            self.Type2 = native_type + type_delta
+            self.native = SimpleNamespace(SystemValue=value * value_scale, DrivenState=2, Tolerance=Tolerance())
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return self.native
+
+        def SetPrecision3(self, primary, dual, tolerance, dual_tolerance):
+            self.precision = primary, tolerance
+            return 0
+
+        def GetPrimaryPrecision2(self):
+            return self.precision[0]
+
+        def GetPrimaryTolPrecision2(self):
+            return self.precision[1]
+
+    class Extension:
+        def AddSpecificDimension(self, x, y, z, native_type, error):
+            assert len(selected) == 2 and error == 0
+            first, last = selected
+            measured_pairs.append((first.xy, last.xy))
+            coordinate = 0 if native_type == 11 else 1
+            value = abs(last.xy[coordinate] - first.xy[coordinate]) / 1000.0
+            return Display(native_type, value), status
+
+    model = SimpleNamespace(ClearSelection2=lambda all: selected.clear(), Extension=Extension())
+    lines = [f"Line_{index + 1}" for index in range(len(spec.SUPPLIER_PROFILE_MM))]
+    adapter = SimpleNamespace(
+        currentModel=model,
+        _sketch_entities={name: Line(xy) for name, xy in zip(lines, spec.SUPPLIER_PROFILE_MM, strict=True)},
+        _attempt=lambda callback, default=None: callback(),
+    )
+    monkeypatch.setattr(sw_type_info, "concrete_sketch_segment", lambda entity: entity)
+    monkeypatch.setattr(sw_type_info, "early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(part, "_early_bound", lambda entity, interface: entity)
+    return adapter, lines, SimpleNamespace(record=names.append), measured_pairs, names
+
+
+def test_all_supplier_dimensions_select_real_segment_endpoints(monkeypatch) -> None:
+    adapter, lines, dims, measured, names = _supplier_dimension_fixture(monkeypatch)
+    for row in spec.SUPPLIER_PROFILE_DIMENSIONS:
+        part._supplier_profile_dimension(adapter, row, lines, dims)
+    assert names == [row.name for row in spec.SUPPLIER_PROFILE_DIMENSIONS]
+    assert measured == [
+        tuple(spec.SUPPLIER_PROFILE_MM[index] for index in row.vertices)
+        for row in spec.SUPPLIER_PROFILE_DIMENSIONS
+    ]
+    assert all("." not in key for key in adapter._sketch_entities)
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"point_refused": True}, "cannot select source vertex"),
+        ({"status": 1}, "cannot dimension source profile"),
+        ({"type_delta": 1}, "exact upper-limit extent"),
+        ({"value_scale": 0.999}, "exact upper-limit extent"),
+    ],
+)
+def test_supplier_point_selection_and_native_measurement_fail_closed(monkeypatch, change, reason) -> None:
+    adapter, lines, dims, measured, names = _supplier_dimension_fixture(monkeypatch, **change)
+    with pytest.raises(RuntimeError, match=reason):
+        part._supplier_profile_dimension(adapter, spec.SUPPLIER_PROFILE_DIMENSIONS[0], lines, dims)
+    assert not names
+    if change.get("point_refused"):
+        assert not measured
+
+
+def test_inherited_underhead_round_has_exact_added_toroidal_volume() -> None:
+    """Independent axial slices of the fillet, not the stock formula copied."""
+    radius, fillet = part.SHANK_DIA / 2.0, part.THREAD_PITCH / 10.0
+    count = 8192
+    dy = fillet / count
+    added = 0.0
+    for index in range(count):
+        y = -fillet + (index + 0.5) * dy
+        outer = radius + fillet - math.sqrt(fillet**2 - (y + fillet)**2)
+        added += math.pi * (outer**2 - radius**2) * dy
+    assert spec.MODEL_JUNCTION_FILLET_MM == pytest.approx(0.127)
+    assert spec.MODEL_JUNCTION_FILLET_ADDED_MM3 == pytest.approx(added, rel=1e-5)
+    assert 0.069 < added < 0.071
+    # The original annular seating plane and slot do not intersect this patch.
+    assert radius + fillet < part.HEAD_DIA / 2.0
+    assert radius + fillet < post.ATTACHMENT_THRU_DIA / 2.0
+    assert part.HEAD_H - spec.MODEL_SLOT_DEPTH_MM > 0.0
+    assert fillet < spec.MODEL_PLAIN_SHANK_MM
+
+
+def test_canonical_stock_restores_junction_round_before_the_existing_mass_gate(monkeypatch) -> None:
+    events = []
+
+    def stage(name):
+        async def run(adapter):
+            events.append(name)
+        return run
+
+    async def fillet(radius, points):
+        assert events == ["revolve", "slot", "partial-thread"]
+        assert radius == pytest.approx(part.THREAD_PITCH / 10.0)
+        assert points == [[part.SHANK_DIA / 2.0, 0.0, 0.0]]
+        events.append("underhead-fillet")
+        return True
+
+    async def volume(adapter, label, expected, allowance):
+        assert events[-1] == "underhead-fillet"
+        assert expected == spec.MODEL_STOCK_VOLUME_MM3
+        assert allowance == 0.005 * spec.MODEL_THREAD_REMOVED_MM3
+        events.append("stock-volume-gate")
+
+    monkeypatch.setattr(recipe, "_revolved_stock", stage("revolve"))
+    monkeypatch.setattr(recipe, "_driver_slot", stage("slot"))
+    monkeypatch.setattr(recipe, "_partial_thread", stage("partial-thread"))
+    monkeypatch.setattr(recipe, "check", lambda label, result: None if result is True else pytest.fail(label))
+    monkeypatch.setattr(recipe, "name_last_feature", lambda adapter, name: None)
+    monkeypatch.setattr(recipe, "volume_check", volume)
+    asyncio.run(recipe.build_40923906(SimpleNamespace(add_fillet=fillet)))
+    assert events[-2:] == ["underhead-fillet", "stock-volume-gate"]
+
+
+def _source_configuration_fixture(monkeypatch, *, refused=None, faults=False, restore_refused=False, volume_drift=0.0):
+    """Independent feature states per configuration; suppressing Body does NOT hide cuts."""
+    solid_names = (
+        "Body", "DriverSlot", "FactoryThreadSplit", "ThreadGroove", "BodyUnion",
+        "JunctionFillet", "CutToLength", "CutEndDeburr",
+    )
+    model = SimpleNamespace(active="Default", states={"Default": dict.fromkeys(solid_names, False)}, activations=[])
+    model.states["Default"][spec.SUPPLIER_STOCK_FEATURE] = False
+
+    class Feature:
+        def __init__(self, name):
+            self.name = name
+
+        def IsSuppressed2(self, config, names):
+            assert config == 1
+            return (model.states[model.active][self.name],)
+
+        def SetSuppression2(self, action, config, names):
+            assert config == 1 and action in (0, 1)
+            if self.name == refused:
+                return False
+            model.states[model.active][self.name] = action == 0
+            return True
+
+    def add(name, comment, alternate, options, parent, description, rebuild):
+        assert options == 0 and parent == "Default"
+        model.states[name] = model.states[parent].copy()
+        model.active = name
+        return SimpleNamespace()
+
+    def activate(name):
+        model.activations.append(name)
+        if name == model.active or restore_refused:
+            return False
+        model.active = name
+        return True
+
+    async def rebuild(adapter):
+        pass
+
+    def hard_faults(adapter, native_model):
+        states = model.states[model.active]
+        if model.active == spec.SUPPLIER_STOCK_CONFIGURATION:
+            if faults:
+                return ["deliberate source rebuild fault"]
+            if states["Body"] and any(not states[name] for name in solid_names[1:]):
+                return ["independent cut has no body"]
+        return []
+
+    model.ConfigurationManager = SimpleNamespace(AddConfiguration2=add)
+    model.ShowConfiguration2 = activate
+    model.GetBodies2 = lambda kind, hidden: () if model.states[model.active]["Body"] else (object(),)
+    adapter = SimpleNamespace(currentModel=model)
+    features = {name: Feature(name) for name in model.states["Default"]}
+    monkeypatch.setattr(part, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(part, "null_variant", lambda: None)
+    monkeypatch.setattr(part, "active_configuration_name", lambda adapter, native_model: model.active)
+    monkeypatch.setattr(part, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(part, "force_rebuild", rebuild)
+    monkeypatch.setattr(part, "_hard_fault_names", hard_faults)
+
+    async def volume(adapter):
+        return 100.0 + volume_drift
+
+    monkeypatch.setattr(part, "_volume_mm3", volume)
+    return adapter, model, solid_names
+
+
+def test_zero_body_source_suppresses_every_independent_solid_feature_and_restores_finished(monkeypatch) -> None:
+    adapter, model, names = _source_configuration_fixture(monkeypatch)
+    asyncio.run(part._add_supplier_stock_configuration(adapter, 100.0))
+    assert model.active == "Default"
+    assert model.activations == ["Default"]  # newly added source config was already active
+    assert all(model.states[spec.SUPPLIER_STOCK_CONFIGURATION][name] for name in names)
+    assert not any(model.states["Default"].values())
+    assert model.states[spec.SUPPLIER_STOCK_CONFIGURATION][spec.SUPPLIER_STOCK_FEATURE] is False
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"refused": "DriverSlot"}, "cannot suppress DriverSlot"),
+        ({"faults": True}, "has hard faults"),
+        ({"restore_refused": True}, "cannot restore installed"),
+        ({"volume_drift": 0.00001}, "changed the representative volume"),
+    ],
+)
+def test_source_isolation_and_restore_gates_fail_closed(monkeypatch, change, reason) -> None:
+    adapter, model, names = _source_configuration_fixture(monkeypatch, **change)
+    with pytest.raises(RuntimeError, match=reason):
+        asyncio.run(part._add_supplier_stock_configuration(adapter, 100.0))
+    if not change.get("restore_refused"):
+        assert model.active == "Default"
+        assert not any(model.states["Default"][name] for name in names)
+
+
+def test_source_failure_remains_primary_when_configuration_restore_also_fails(monkeypatch) -> None:
+    adapter, model, names = _source_configuration_fixture(
+        monkeypatch, refused="DriverSlot", restore_refused=True,
+    )
+    with pytest.raises(RuntimeError, match="cannot suppress DriverSlot") as error:
+        asyncio.run(part._add_supplier_stock_configuration(adapter, 100.0))
+    assert any("cannot restore installed representative" in note for note in error.value.__notes__)
+
+
+def test_supplier_sheet_geometry_labels_and_dimension_anchors_fit_actual_border() -> None:
+    """Geometry-derived view bounds plus ink estimates, not a coordinate echo."""
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    margin = 0.0127
+    border = (margin, margin, template.width_m - margin, template.height_m - margin)
+    assert border[3] == pytest.approx(0.2667)
+
+    def contained(bounds):
+        assert drawing._inside(bounds, border)
+        assert bounds[2] <= template.title_block_left_m or bounds[1] >= template.title_block_top_m
+
+    xs, ys = zip(*spec.SUPPLIER_PROFILE_MM, strict=True)
+    full_ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1] / 1000.0
+    cx, cy = drawing.STOCK_CENTER
+    full_bounds = (
+        cx - (max(xs) - min(xs)) * full_ratio / 2.0,
+        cy + min(ys) * full_ratio,
+        cx + (max(xs) - min(xs)) * full_ratio / 2.0,
+        cy + max(ys) * full_ratio,
+    )
+    head_ratio = drawing.STOCK_HEAD_SCALE[0] / drawing.STOCK_HEAD_SCALE[1] / 1000.0
+    radius = drawing.STOCK_HEAD_RADIUS_MM * head_ratio
+    hx, hy = drawing.STOCK_HEAD_CENTER
+    head_bounds = (hx - radius, hy - radius, hx + radius, hy + radius)
+    assert drawing._inside(full_bounds, drawing.STOCK_VIEW_CELL)
+    assert drawing._inside(head_bounds, drawing.STOCK_HEAD_CELL)
+    for bounds in (full_bounds, head_bounds, drawing.STOCK_VIEW_CELL, drawing.STOCK_HEAD_CELL):
+        contained(bounds)
+    for x, y in (*drawing.STOCK_KEEP.values(), *drawing.STOCK_HEAD_KEEP.values()):
+        contained((x - 0.006, y - 0.005, x + 0.006, y + 0.005))
+    for text, x, y, cell in drawing.STOCK_NOTES:
+        box = drawing.estimate_text_box(text, anchor=(x, y), height=0.003, line_spacing=1.5)
+        assert box is not None
+        bounds = (box.xmin, box.ymin, box.xmax, box.ymax)
+        assert drawing._inside(bounds, cell), text
+        contained(bounds)
+
+
+def _settled_supplier_layout_fixture(monkeypatch, *, overflow=None, note_owner=1, unreadable=False):
+    """Full dimension ink is synthetic native readback; model extents are derived."""
+    import _drawing_layout_audit as collector
+    import _purchased_fastener_drawing as purchased
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(purchased, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.row.name)
+    monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.name)
+
+    class Annotation:
+        def __init__(self, row, xy):
+            self.row, self.xy = row, xy
+            self.Visible = 1
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+        def GetAttachedEntityTypes(self):
+            return (11, 11)
+
+        def GetAttachedEntities3(self):
+            return tuple(
+                SimpleNamespace(X=spec.SUPPLIER_PROFILE_MM[index][0] / 1000.0,
+                                Y=spec.SUPPLIER_PROFILE_MM[index][1] / 1000.0, Z=0.0)
+                for index in self.row.vertices
+            )
+
+        def GetType(self):
+            return 4
+
+    class Display:
+        def __init__(self, annotation):
+            self.annotation = annotation
+            row = annotation.row
+            self.Type2 = row.native_type
+            lower, upper = row.source.deviations_mm or (0.0, 0.0)
+            self.native = SimpleNamespace(
+                FullName=f"{row.name}@{spec.SUPPLIER_STOCK_FEATURE}@part",
+                DrivenState=1,
+                Tolerance=SimpleNamespace(
+                    Type=0 if row.source.lower_in is None else 3,
+                    GetMinValue=lambda: lower / 1000.0,
+                    GetMaxValue=lambda: upper / 1000.0,
+                ),
+            )
+            self.next = None
+
+        def GetDimension2(self, index):
+            return self.native
+
+        def GetAnnotation(self):
+            return self.annotation
+
+        def GetPrimaryTolPrecision2(self):
+            return 3
+
+        def GetNext5(self):
+            return self.next
+
+    class View:
+        def __init__(self, name, keep, scale, cropped):
+            self.name, self.keep, self.ScaleRatio, self.cropped = name, keep, scale, cropped
+            self.ReferencedConfiguration = spec.SUPPLIER_STOCK_CONFIGURATION
+            self.updates = 0
+            self.annotations = []
+            for row in spec.SUPPLIER_PROFILE_DIMENSIONS:
+                if row.name in keep:
+                    annotation = Annotation(row, keep[row.name])
+                    annotation.display = Display(annotation)
+                    if self.annotations:
+                        self.annotations[-1].display.next = annotation.display
+                    self.annotations.append(annotation)
+
+        def GetOutline(self):
+            if self.cropped:
+                x, y = drawing.STOCK_HEAD_CENTER
+                radius = drawing.STOCK_HEAD_RADIUS_MM * self.ScaleRatio[0] / self.ScaleRatio[1] / 1000.0
+                return (x - radius, y - radius, x + radius, y + radius)
+            xs, ys = zip(*spec.SUPPLIER_PROFILE_MM, strict=True)
+            x, y = drawing.STOCK_CENTER
+            scale = self.ScaleRatio[0] / self.ScaleRatio[1] / 1000.0
+            return (x - (max(xs) - min(xs)) * scale / 2.0, y + min(ys) * scale,
+                    x + (max(xs) - min(xs)) * scale / 2.0, y + max(ys) * scale)
+
+        def GetFirstDisplayDimension6(self):
+            return self.annotations[0].display
+
+        def GetAnnotations(self):
+            return tuple(self.annotations)
+
+        def IsCropped(self):
+            return self.cropped
+
+        def UpdateViewDisplayGeometry(self):
+            self.updates += 1
+
+    full = View("source-full", drawing.STOCK_KEEP, drawing.STOCK_SCALE, False)
+    head = View("source-head", drawing.STOCK_HEAD_KEEP, drawing.STOCK_HEAD_SCALE, True)
+    monkeypatch.setattr(drawing, "iter_views", lambda adapter: iter((full, head)))
+
+    def ink(adapter, annotation):
+        if unreadable:
+            return {}, ["display data unavailable"]
+        x, y = annotation.xy
+        if overflow == annotation.row.name:
+            y = 0.267  # text starts INSIDE sheet but spills beyond its inner border
+        return {"texts": [{"t": "SOURCE", "pos": (x - 0.006, y - 0.003),
+                           "h": 0.006, "w": 0.012}]}, []
+
+    monkeypatch.setattr(collector, "annotation_display", ink)
+    sheet = SimpleNamespace(GetZoneMargin=lambda side: 0.0127)
+    ddoc = SimpleNamespace(ActivateSheet=lambda name: name == drawing.SHEET_NAMES[1],
+                           GetCurrentSheet=lambda: sheet)
+    adapter = SimpleNamespace(currentModel=ddoc, _attempt=lambda callback: callback())
+    notes = []
+    for text, x, y, cell in drawing.STOCK_NOTES:
+        box = drawing.estimate_text_box(text, anchor=(x, y), height=0.003, line_spacing=1.5)
+        bounds = (box.xmin, box.ymin, 0.0, box.xmax, box.ymax, 0.0)
+        if overflow == "title" and text == spec.SUPPLIER_STOCK_TITLE:
+            bounds = (x, 0.283, 0.0, x + 0.100, 0.286, 0.0)
+        note = SimpleNamespace(
+            GetAnnotation=lambda: SimpleNamespace(OwnerType=note_owner),
+            GetExtent=lambda bounds=bounds: bounds,
+        )
+        notes.append((note, text, cell))
+    return adapter, full, head, notes
+
+
+def test_last_rebuild_source_layout_reads_all_native_dimension_ink_and_sheet_notes(monkeypatch) -> None:
+    adapter, full, head, notes = _settled_supplier_layout_fixture(monkeypatch)
+    drawing._verify_supplier_stock(adapter, full.name, head.name, notes)
+    assert (full.updates, head.updates) == (1, 1)
+
+
+@pytest.mark.parametrize(
+    "change,reason",
+    [
+        ({"overflow": "SupplierHeadHeight"}, "dimension leaves its cell"),
+        ({"overflow": "title"}, "label leaves usable sheet space"),
+        ({"note_owner": 2}, "label leaves usable sheet space"),
+        ({"unreadable": True}, "unreadable settled native dimension ink"),
+    ],
+)
+def test_settled_source_layout_refuses_border_spill_or_unmeasured_ink(monkeypatch, change, reason) -> None:
+    adapter, full, head, notes = _settled_supplier_layout_fixture(monkeypatch, **change)
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._verify_supplier_stock(adapter, full.name, head.name, notes)
+
+
+def test_finished_sheet_refuses_duplicate_cut_end_breaks(monkeypatch) -> None:
+    cut_native = SimpleNamespace(
+        FullName=f"{spec.CUT_LENGTH_DIMENSION}@{spec.CUT_LENGTH_SKETCH}@part",
+        SystemValue=spec.CUT_LENGTH_MM / 1000.0, Tolerance=SimpleNamespace(Type=0),
+    )
+    cut_display = SimpleNamespace(
+        GetDimension2=lambda index: cut_native,
+        GetText=lambda kind: {1: "(", 2: ")", 4: spec.CUT_TO_FIT_CALLOUT}[kind],
+        GetOverride=lambda: False, ShowDimensionValue=True,
+    )
+    cut = SimpleNamespace(name=spec.CUT_LENGTH_DIMENSION, GetSpecificAnnotation=lambda: cut_display,
+                          IsDangling=lambda: False, GetAttachedEntities3=lambda: (object(),))
+    brk = SimpleNamespace(name=spec.CUT_END_BREAK_DIMENSION)
+    front = SimpleNamespace(ReferencedConfiguration="Default", GetAnnotations=lambda: (cut,))
+    tip = SimpleNamespace(ReferencedConfiguration="Default", GetAnnotations=lambda: (brk, brk))
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: None)
+    monkeypatch.setattr(drawing, "_verify_tip_view", lambda *args: None)
+    with pytest.raises(RuntimeError, match="one cut-end break dimension"):
+        drawing._verify_finished_controls(object(), front, tip, "Default")
+
+
+@pytest.mark.parametrize("cropped", [False, True], ids=["full-stock", "cropped-head"])
+def test_source_profile_is_revealed_and_rebuilt_before_initial_fit_and_dimensions(monkeypatch, cropped) -> None:
+    """A zero-body view refuses any scale/outline/projection while hidden."""
+    events = []
+    model = SimpleNamespace(selected=False)
+    owner = SimpleNamespace(
+        Visible=1, GetTypeName2=lambda: "ProfileFeature", GetChildren=lambda: (),
+    )
+    source = SimpleNamespace(GetType=lambda: 1, FeatureByName=lambda name: owner)
+
+    class View:
+        ReferencedDocument = source
+
+        def __init__(self):
+            self.visible = False
+            self.rebuilt_visible = False
+            self.dimensions_imported = False
+            self.Position = (0.100, 0.200) if cropped else (0.235, 0.110)
+            self._configuration = "Default"
+            self._scale = (1.0, 1.0)
+            self._sheet_scale = 1
+
+        @property
+        def ReferencedConfiguration(self):
+            return self._configuration
+
+        @ReferencedConfiguration.setter
+        def ReferencedConfiguration(self, name):
+            events.append("configuration")
+            self._configuration = name
+
+        @property
+        def UseSheetScale(self):
+            return self._sheet_scale
+
+        @UseSheetScale.setter
+        def UseSheetScale(self, value):
+            assert self.visible and self.rebuilt_visible
+            self._sheet_scale = value
+
+        @property
+        def ScaleRatio(self):
+            return self._scale
+
+        @ScaleRatio.setter
+        def ScaleRatio(self, values):
+            assert self.visible and self.rebuilt_visible
+            events.append("scale")
+            self._scale = tuple(values)
+
+        def GetName2(self):
+            return "source-prepared"
+
+        def GetOrientationName(self):
+            return "*Front"
+
+        def UpdateViewDisplayGeometry(self):
+            assert self.visible and self.rebuilt_visible and self.UseSheetScale == 0
+            events.append("geometry-update")
+
+        def GetOutline(self):
+            assert self.visible and self.rebuilt_visible and not self.dimensions_imported
+            events.append("outline")
+            xs, ys = zip(*spec.SUPPLIER_PROFILE_MM, strict=True)
+            scale = self.ScaleRatio[0] / self.ScaleRatio[1] / 1000.0
+            return (
+                self.Position[0] + min(xs) * scale, self.Position[1] + min(ys) * scale,
+                self.Position[0] + max(xs) * scale, self.Position[1] + max(ys) * scale,
+            )
+
+        def SetViewPosition(self, values, update):
+            assert self.visible and not self.dimensions_imported
+            events.append("position")
+            self.Position = tuple(values)
+            return True
+
+        def Crop2(self, jagged, no_outline, intensity):
+            assert self.visible and not self.dimensions_imported
+            events.append("crop")
+            return 1
+
+        def IsCropped(self):
+            return "crop" in events
+
+    view = View()
+
+    def place(adapter, path, orientation, x, y, **kwargs):
+        assert "scale" not in kwargs  # initial creation must not fit hidden geometry
+        events.append("create")
+        return view
+
+    def select(name, kind, *args):
+        assert name == f"{spec.SUPPLIER_STOCK_FEATURE}@component@source-prepared"
+        assert kind == "SKETCH"
+        model.selected = True
+        return True
+
+    def unblank():
+        assert model.selected and view.ReferencedConfiguration == spec.SUPPLIER_STOCK_CONFIGURATION
+        events.append("reveal")
+        view.visible = True
+
+    def rebuild():
+        assert view.visible  # no initial source fit rebuild precedes preparation
+        events.append("rebuild")
+        view.rebuilt_visible = True
+        return True
+
+    def projection(adapter, native_view, point, **kwargs):
+        assert view.visible and "outline" in events and not view.dimensions_imported
+        events.append("projection")
+        scale = view.ScaleRatio[0] / view.ScaleRatio[1]
+        return tuple(view.Position[index] + point[index] * scale for index in range(2))
+
+    def dimensions(adapter, native_view, **kwargs):
+        assert view.visible and "position" in events
+        assert ("crop" in events) is cropped
+        events.append("dimensions")
+        view.dimensions_imported = True
+        return []
+
+    def member(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+    model.Extension = SimpleNamespace(SelectByID2=select)
+    model.ClearSelection2 = lambda all: setattr(model, "selected", False)
+    model.UnblankSketch = unblank  # actual void-returning native shape
+    model.EditRebuild3 = rebuild
+    model.ActivateView = lambda name: name == view.GetName2()
+    adapter = SimpleNamespace(currentModel=model, _get_attr_or_call=member)
+    monkeypatch.setattr(drawing, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(drawing.hidden_sketches, "_early_bound", lambda entity, interface: entity)
+    monkeypatch.setattr(drawing.hidden_sketches, "null_callout", lambda: None)
+    monkeypatch.setattr(drawing._drawing_dimension_import, "_model_item_paths",
+                        lambda adapter, native_view: (("component", view.GetName2()),))
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *args: None)
+    monkeypatch.setattr(drawing, "model_point_in_view", projection)
+    monkeypatch.setattr(drawing, "_activate", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "_sketch_circle", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", dimensions)
+    monkeypatch.setattr(drawing, "curate_dimensions", lambda adapter, annotations, **kwargs: annotations)
+    center = drawing.STOCK_HEAD_CENTER if cropped else drawing.STOCK_CENTER
+    scale = drawing.STOCK_HEAD_SCALE if cropped else drawing.STOCK_SCALE
+    keep = drawing.STOCK_HEAD_KEEP if cropped else drawing.STOCK_KEEP
+    assert drawing._supplier_stock_view(
+        adapter, center=center, scale=scale, keep=keep, label="prepared source", crop_head=cropped,
+    ) is view
+    assert events.index("configuration") < events.index("reveal") < events.index("scale")
+    assert events.index("scale") < events.index("outline") < events.index("projection")
+    assert events.index("position") < events.index("dimensions")
+    if cropped:
+        assert events.index("crop") < events.index("dimensions")
+    assert owner.Visible == 1  # only the drawing-view override changed; part stays hidden
