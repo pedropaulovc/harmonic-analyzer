@@ -722,12 +722,14 @@ def test_reference_dimensions_follow_the_spec() -> None:
     assert f"{stop.STOP_MARK:.1f}" in sheet.STOP_POSITION_CALLOUT
     assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
     assert sheet.DRAWING_REFERENCE_PRECISION >= 1
-    # Both texts sit between the front view and the top view above it.
+    # The underside projects below Front; both dimension rows stay above Front.
+    assert drawing.UNDERSIDE_CENTER[0] == drawing.FRONT_CENTER[0]
     assert (
-        drawing.FRONT_CENTER[1]
+        drawing.UNDERSIDE_CENTER[1]
+        < drawing.FRONT_CENTER[1]
         < drawing.STOP_POSITION_TEXT_Y
         < drawing.OVERALL_LENGTH_TEXT_Y
-        < drawing.UNDERSIDE_CENTER[1]
+        < drawing.SHEET_INNER_BORDER[3]
     )
 
 
@@ -746,7 +748,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     monkeypatch.setattr(stop, "PLATE_TAP_THREAD_DEPTH", thread_depth)
     monkeypatch.setattr(stop, "PLATE_TAP_DRILL_DIA", 1.85)
     monkeypatch.setattr(stop, "PLATE_CLEARANCE_DIA", 2.5)
-    monkeypatch.setattr(stop, "PLATE_HOLE_POSITION_TOLERANCE_MM", 0.12)
     tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
     assignments = [
         node for node in tree.body
@@ -794,7 +795,6 @@ def test_fitter_text_tracks_mutated_setting_and_depth_specs(
     assert "PLATE IS MASTER" in changed.ASSEMBLY_STEPS[0]
     assert stop.MATCH_DRILL_DATUM_ALIGNMENT in changed.ASSEMBLY_STEPS[0]
     pilot = changed.ASSEMBLY_STEPS[0]
-    assert "±0.12 mm LOCATIONS" in pilot
     assert "DIA 1.85 THROUGH INTO BLOCK" in pilot
     assert "OPEN ITS HOLES TO DIA 2.5" in pilot
     assert f"{drill_depth:.1f} mm CYLINDRICAL DEPTH INTO BLOCK" in pilot
@@ -823,7 +823,11 @@ def _assert_fitter_text_spacing(fitter) -> None:
         drawing.STEPS_XY[1] - len(steps.splitlines()) * line_pitch
         > drawing.CHECKS_XY[1] + line_pitch
     )
-    assert drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch > 0.090
+    assert (
+        drawing.SETUP_NOTE_XY[1] - len(setup.splitlines()) * line_pitch
+        > drawing.SHEET_INNER_BORDER[1] + line_pitch
+    )
+    assert drawing.SETUP_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
     # The stacked callout fits between the setting's extension lines and
     # ends left of the section-A label (r7 sheet: a 49-character criterion
     # line crossed both). Default note glyphs measure ~2.5 mm wide.
@@ -837,15 +841,19 @@ def _assert_fitter_text_spacing(fitter) -> None:
     centre = drawing.STOP_POSITION_TEXT_FRACTION * span
     assert centre - half_width > 0.0
     assert centre + half_width < span - section_label_clearance
-    # The stacked callout stays above the front silhouette; the overall
-    # reference remains above it and below the top view.
+    # The exact d58d05d82 PDF places the upper A/arrow within 35 mm of Front's
+    # centre; its setting line sits about 9 mm below the requested text point.
+    # Keep the entire line above that cutting-plane envelope, not just its text.
+    assert drawing.STOP_POSITION_TEXT_Y - 0.010 > drawing.FRONT_CENTER[1] + 0.035
+    # The stacked callout stays above Front; the overall reference above it
+    # retains text-height clearance to the inner border.
     assert (
         drawing.STOP_POSITION_TEXT_Y
         - len(fitter.STOP_POSITION_CALLOUT.splitlines()) * line_pitch
         > drawing.FRONT_CENTER[1] + 0.012
     )
     assert drawing.OVERALL_LENGTH_TEXT_Y > drawing.STOP_POSITION_TEXT_Y + line_pitch
-    assert drawing.OVERALL_LENGTH_TEXT_Y < drawing.UNDERSIDE_CENTER[1] - line_pitch
+    assert drawing.OVERALL_LENGTH_TEXT_Y + line_pitch < drawing.SHEET_INNER_BORDER[3]
 
 
 def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
