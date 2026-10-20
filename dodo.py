@@ -3465,7 +3465,7 @@ def _cached_machinist_review_action(
                                 f"{label}: lost cache publication but canonical reports "
                                 "could not be restored"
                             )
-                        aggregate = _read_machinist_aggregate(stem)
+                        aggregate = _read_machinist_aggregate(stem, settings)
                     except (OSError, ValueError) as error:
                         # LEARN may soften a review verdict, never failed adoption.
                         raise RuntimeError(
