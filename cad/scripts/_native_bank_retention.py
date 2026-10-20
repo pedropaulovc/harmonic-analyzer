@@ -222,13 +222,23 @@ def _annulus(body, outer, bore, thickness, label):
 
 
 def _material(component):
-    part = _early_bound(component.GetModelDoc2(), "IPartDoc")
-    if part is None:
+    model = _early_bound(component.GetModelDoc2(), "IModelDoc2")
+    part = _early_bound(model, "IPartDoc")
+    if model is None or part is None:
         raise RuntimeError("bank retention: saved disc part is not resolved for material readback")
     config = component.ReferencedConfiguration
     if type(config) is not str:
         raise RuntimeError("bank retention: disc referenced configuration unavailable")
-    result = part.GetMaterialPropertyName2(config)
+    configurations = model.GetConfigurationNames()
+    if (not isinstance(configurations, (tuple, list)) or not configurations
+            or any(type(name) is not str for name in configurations)
+            or config not in configurations):
+        raise RuntimeError("bank retention: saved disc configuration inventory unavailable/mismatched")
+    # IPartDoc's documented sole-default contract requires the empty name.
+    # Multi-configuration parts must query the occurrence's exact saved config,
+    # not whichever configuration its shared model document happens to show.
+    query_config = "" if len(configurations) == 1 else config
+    result = part.GetMaterialPropertyName2(query_config)
     if not isinstance(result, tuple) or len(result) != 2:
         raise RuntimeError("bank retention: GetMaterialPropertyName2 did not return material/database")
     material, database = result
