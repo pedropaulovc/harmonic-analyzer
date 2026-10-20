@@ -4022,27 +4022,14 @@ def test_pocket_length_dimension_stands_outside_the_plan() -> None:
     )
 
 
-def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
+def test_far_wall_print_worst_engagement_meets_thread_rule() -> None:
     import build_fr_frame_assembly as assembly
     from _mcmaster_90280a837 import SHANK_DIA
 
     engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
-    # drawing-guidelines.md rule 17 (walls and webs): the printed bands only shorten the far-wall engagement, and
+    # Rule 18 (thread engagement): the printed bands only shorten the far-wall engagement, and
     # the shortest still holds 1.5D.
     assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
-    # Machinist review r1: the note names the requirement (both walls, one
-    # lead) and the mate; the depths it threads are the A-A dimensions.
-    note = drawing.CROSS_TAP_SECTION_NOTE
-    assert "THREAD BOTH CASTING WALLS IN PHASE" in note and "MHA-FR-VN-53" in note
-    assert "FULL THREAD" not in note
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes, short of the title block and inside the frame.
-    lines = note.splitlines()
-    x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
-    assert len(lines) <= 4
-    assert x + 0.0027 * max(len(line) for line in lines) < TITLE_BLOCK[0]
-    # Rows print 5.56 mm apart (farm c75ac06, sheet 6 callout rows).
-    bottom = y - 0.00556 * len(lines)
-    assert bottom > drawing.SHEET_FRAME[1] + drawing.INK_CLEARANCE
 
 
 def _segments_apart(a, b) -> bool:

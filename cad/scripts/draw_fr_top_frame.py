@@ -479,11 +479,15 @@ if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
     raise AssertionError(
         "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
     )
-# The engagement follows from the printed floor and socket and is proved
-# above; the sheet states only the requirement (machinist review r1,
-# drawing-guidelines.md rule 20: a sheet never argues for itself).
-CROSS_TAP_SECTION_NOTE = "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-FR-VN-53"
-CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
+# The phase requirement and its mate belong on the native cross-tap leader
+# (drawing-guidelines.md rule 7), not in a detached section note. The
+# engagement follows from the printed floor and socket and is proved above.
+CROSS_TAP_CALLOUT = (
+    "SAME AT OPPOSITE END, 4X TOTAL\n"
+    "DEPTHS FROM COUNTERBORE FLOOR\n"
+    "IN PHASE FOR MHA-FR-VN-53\n"
+    "THREAD NEAR AND FAR WALL"
+)
 
 # Sheet 5: hub location, true-axis side view, removed set-screw boss section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -3538,7 +3542,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # face shown); the process states the total once and where every
         # depth starts.  The 46.0 thread and 49.2 drill depths are the
         # requirement, no tool named (machinist review r1).
-        process="SAME AT OPPOSITE END, 4X TOTAL\nDEPTHS FROM COUNTERBORE FLOOR\nTHREAD NEAR AND FAR WALL",
+        process=CROSS_TAP_CALLOUT,
     )
     set_hole_callout_precision(
         cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
@@ -3563,15 +3567,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_section, label="A-A corner section",
         cut_surface_only=False,
     )
-    if (
-        add_note(
-            adapter,
-            CROSS_TAP_SECTION_NOTE,
-            *CROSS_TAP_SECTION_NOTE_XY,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to identify section cross-screw relation")
     if not ddoc.ActivateSheet("HUB-SET-SCREW"):
         raise RuntimeError("failed to activate top-frame hub sheet")
     hub_top = place_view(

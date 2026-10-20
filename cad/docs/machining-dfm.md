@@ -175,6 +175,12 @@ whole faced top, except the four corner bosses that remain 4.5 mm proud.
 The builder authors no band on it and section F-F imports it bare under the
 title block's .XX **±0.51 mm** band (owner ruling 2026-10-18); there is no
 hanger spotface, separate floor driver or cleanup-stock offset.
+
+On the MHA-FR-002 CROSS-TAPS sheet, the native 10-32 hole-callout leader
+states that the near and far casting walls are threaded **in phase for
+MHA-VN-027**. The requirement travels with the feature, not a detached A-A
+note; the Hole Wizard still owns the thread and tap-drill depths.
+
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores
 align. The finished underside and knife-mount pose remain unchanged.
