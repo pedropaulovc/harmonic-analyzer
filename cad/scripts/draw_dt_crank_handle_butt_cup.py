@@ -22,6 +22,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import contextlib
 import math
 import sys
 from typing import Any
@@ -63,6 +64,7 @@ from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import create_section_axis_centerline, position_section_caption
 from _session import run_build
+import _seat_forensics
 import _telemetry
 import _drawing_layout_audit
 import _layout_audit
@@ -302,7 +304,7 @@ def _assert_floor_hole_mouth_chamfer(annotation: Any) -> None:
 def _mouth_model_reference(adapter: Any, section: Any) -> tuple[float, float, float]:
     """Use the real CupProfile frame, not an assumed global axis convention."""
     document = _early_bound(
-        _early_bound(section, "IView").ReferencedDocument, "IModelDoc2"
+        _early_bound(section, "IView").ReferencedDocument, "IPartDoc"
     )
     feature = document.FeatureByName("CupProfile")
     if feature is None:
@@ -788,7 +790,7 @@ def assert_final_mouth_detail(adapter: Any, section: Any, detail: Any) -> None:
     )
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def _build_drawing(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -892,6 +894,30 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         settled_checks=(lambda: assert_final_mouth_detail(adapter, section, detail),),
     )
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    """Capture the still-open native drawing before propagating its refusal."""
+    try:
+        return await _build_drawing(adapter)
+    except Exception as original:
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter,
+                f"{PART_STEM}-drawing-build",
+                str(original),
+                api="MHA-DT-35 drawing build",
+                exception=original,
+                sheet_png=True,
+                phase="drawing-build",
+            )
+        except Exception as capture_exc:  # noqa: BLE001 - retain the original refusal
+            if capture_exc is not original:
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(
+                        f"MHA-DT-35 drawing secondary capture failure: {capture_exc!r}"
+                    )
+        raise
 
 
 def _parse_args() -> argparse.Namespace:

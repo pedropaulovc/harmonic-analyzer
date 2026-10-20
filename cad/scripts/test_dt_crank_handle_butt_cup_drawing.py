@@ -983,15 +983,40 @@ def test_mouth_model_reference_uses_the_actual_profile_frame(monkeypatch) -> Non
     transform = SimpleNamespace(Inverse=MagicMock(return_value=inverse))
     sketch = SimpleNamespace(ModelToSketchTransform=transform)
     feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
-    document = SimpleNamespace(FeatureByName=MagicMock(return_value=feature))
-    section = SimpleNamespace(ReferencedDocument=document)
+    class ModelDocument:
+        __slots__ = ()  # IModelDoc2 does not declare FeatureByName.
+
+    class PartDocument:
+        __slots__ = ("FeatureByName",)
+
+        def __init__(self):
+            self.FeatureByName = MagicMock(return_value=feature)
+
+    model_document, part_document = ModelDocument(), PartDocument()
+    section = SimpleNamespace(ReferencedDocument=model_document)
     point = SimpleNamespace(MultiplyTransform=MagicMock(return_value=SimpleNamespace(ArrayData=(0.0, 0.002225, 0.005625))))
     utility = SimpleNamespace(CreatePoint=MagicMock(return_value=point))
     adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda: utility))
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    bindings = []
+
+    def bind(value, interface):
+        bindings.append((value, interface))
+        if value is model_document:
+            if interface == "IPartDoc":
+                return part_document
+            if interface == "IModelDoc2":
+                return model_document
+            raise AssertionError(f"unexpected document interface {interface}")
+        return value
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
     assert drawing._mouth_model_reference(adapter, section) == (0.0, 0.002225, 0.005625)
-    document.FeatureByName.assert_called_once_with("CupProfile")
+    part_document.FeatureByName.assert_called_once_with("CupProfile")
+    assert (model_document, "IPartDoc") in bindings
+    assert (model_document, "IModelDoc2") not in bindings
+    with pytest.raises(AttributeError):
+        model_document.FeatureByName("CupProfile")
     assert utility.CreatePoint.call_args.args[0] == pytest.approx((-0.005625, 0.002225, 0.0))
     point.MultiplyTransform.assert_called_once_with(inverse)
 
@@ -1276,3 +1301,90 @@ def test_settled_collector_keeps_limit_and_ink_checks_after_crop_refusal(collect
     drawing._assert_floor_hole_mouth_chamfer.assert_called_once_with(f.detail_rows[0])
     assert "crop changed" in str(failure.value)
     assert "unreadable actual texts" in str(failure.value)
+
+
+def test_drawing_build_capture_wrapper_passes_success_through(monkeypatch) -> None:
+    adapter = object()
+    result = {"slddrw": "native drawing", "png": "approved sheet"}
+    inner = AsyncMock(return_value=result)
+    capture = MagicMock()
+    monkeypatch.setattr(drawing, "_build_drawing", inner)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    assert asyncio.run(drawing.build(adapter)) is result
+    inner.assert_awaited_once_with(adapter)
+    capture.assert_not_called()
+
+
+@pytest.mark.parametrize("exception_type", [AttributeError, RuntimeError])
+@pytest.mark.parametrize("capture_behavior", ["original", "secondary", "returns"])
+@pytest.mark.parametrize("warning_refuses", [False, True])
+def test_drawing_build_captures_before_seat_close_and_preserves_original(
+    monkeypatch, exception_type, capture_behavior, warning_refuses,
+) -> None:
+    adapter = object()
+    original = exception_type("native drawing operation refused")
+    events, warnings = [], []
+
+    async def refuse(_adapter):
+        assert _adapter is adapter
+        events.append("build-refusal")
+        raise original
+
+    def capture(captured_adapter, label, message, **context):
+        events.append("capture")
+        assert captured_adapter is adapter
+        assert label == f"{drawing.PART_STEM}-drawing-build"
+        assert message == str(original)
+        assert context == {
+            "api": "MHA-DT-35 drawing build",
+            "exception": original,
+            "sheet_png": True,
+            "phase": "drawing-build",
+        }
+        if capture_behavior == "original":
+            raise original  # the real capture helper's normal NoReturn contract
+        if capture_behavior == "secondary":
+            raise OSError("capture storage refused")
+
+    def warn(message):
+        warnings.append(message)
+        if warning_refuses:
+            raise OSError("warning transport refused")
+
+    monkeypatch.setattr(drawing, "_build_drawing", refuse)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warn)
+    with pytest.raises(exception_type) as caught:
+        try:
+            asyncio.run(drawing.build(adapter))
+        finally:
+            events.append("seat-close")
+    assert caught.value is original
+    assert events == ["build-refusal", "capture", "seat-close"]
+    assert len(warnings) == (1 if capture_behavior == "secondary" else 0)
+    if warnings:
+        assert "capture storage refused" in warnings[0]
+
+
+def test_drawing_build_captures_source_refusal_before_any_native_operation(monkeypatch) -> None:
+    adapter = SimpleNamespace(open_model=AsyncMock())
+    source = SimpleNamespace(is_file=lambda: False)
+    captured, events = [], []
+
+    def capture(captured_adapter, _label, _message, **context):
+        assert captured_adapter is adapter
+        assert context["sheet_png"] is True
+        captured.append(context["exception"])
+        events.append("capture")
+        raise context["exception"]
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(FileNotFoundError) as caught:
+        try:
+            asyncio.run(drawing.build(adapter))
+        finally:
+            events.append("seat-close")
+    assert captured == [caught.value]
+    assert events == ["capture", "seat-close"]
+    adapter.open_model.assert_not_awaited()

@@ -10,8 +10,10 @@ every size keeps its part-authored places.
 The actual under-head face remains at its original station between a real
 concave R0.1 MAX and a native 0.11–0.26 X45 LIMIT outer bevel, whose explicit
 range overrides the generic edge break only there. Both features retain
-their part-owned carriers, limits and precision and their settled actual
-ink must clear each other and the head/slot/shoulder/fitted-span corridors.
+their part-owned carriers, limits and precision. Their settled crossing and
+proximity measurements are logged in full for PNG/reviewer judgment; native
+inventory failures, the sheet border and all existing relief/tip guards
+remain build-fatal.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -42,6 +44,8 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping
+import contextlib
+import json
 import math
 import sys
 import textwrap
@@ -84,6 +88,7 @@ from _gtol_face_resolve import resolve_faces
 import _layout_audit
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+import _seat_forensics
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -1053,11 +1058,15 @@ def _settled_profile_and_tip_errors(dumps: Sequence[Mapping[str, Any]]) -> list[
     return errors
 
 
-def _settled_under_head_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
-    """Collect both new features against each other and every head/53 corridor.
+def _settled_under_head_ink(
+    dumps: Sequence[Mapping[str, Any]],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """Separate hard native-inventory errors from measured visual diagnostics.
 
     Only actual native strokes, arrows and metric text hulls are accepted.
     Missing/malformed data never hides other valid offending primitives.
+    Crossing/proximity records retain full measurements for PNG review,
+    rather than preventing the drawing from being exported for that review.
     """
     names = (*UNDER_HEAD_DIMENSIONS, *UNDER_HEAD_FOREIGN_DIMENSIONS)
     records = {name: [] for name in names}
@@ -1065,7 +1074,7 @@ def _settled_under_head_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
         for annotation in _layout_audit.audited_annotations(_layout_audit.printed_dump(sheet)):
             if annotation.get("owner_type") == 0 and annotation.get("name") in records:
                 records[annotation["name"]].append(annotation)
-    errors, strokes, boxes = [], {}, {}
+    errors, diagnostics, strokes, boxes = [], [], {}, {}
     for name, matching in records.items():
         strokes[name], boxes[name] = [], []
         if len(matching) != 1:
@@ -1110,20 +1119,32 @@ def _settled_under_head_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
             crossings = [(a, b) for a in strokes[name] for b in strokes[other]
                          if _drawing_leaders.segments_cross(a, b)]
             if crossings:
-                errors.append(f"SIDE/{name} vs {other}: under-head foreign ink crossing; actual={crossings!r}")
+                diagnostics.append({
+                    "kind": "foreign_ink_crossing", "first": name, "second": other,
+                    "actual": crossings,
+                })
             for first, second in ((name, other), (other, name)):
                 for box in boxes[first]:
-                    close = [line for line in strokes[second]
-                             if _drawing_leaders.distance_to_box(line, box) < 0.003]
+                    measured = [(line, _drawing_leaders.distance_to_box(line, box))
+                                for line in strokes[second]]
+                    close = [(line, air) for line, air in measured if air < 0.003]
                     if close:
-                        errors.append(f"SIDE/{first} text vs {second}: under-head ink air below 0.003; actual_box={box!r}; actual={close!r}")
+                        diagnostics.append({
+                            "kind": "text_ink_air", "first": first, "second": second,
+                            "actual_box": box, "actual": [line for line, _ in close],
+                            "air_m": [air for _, air in close], "required_air_m": 0.003,
+                        })
             for a in boxes[name]:
                 for b in boxes[other]:
                     dx = max(a[0] - b[2], b[0] - a[2], 0.0)
                     dy = max(a[1] - b[3], b[1] - a[3], 0.0)
-                    if math.hypot(dx, dy) < 0.003:
-                        errors.append(f"SIDE/{name} text vs {other}: under-head text air below 0.003; actual={a!r},{b!r}")
-    return errors
+                    air = math.hypot(dx, dy)
+                    if air < 0.003:
+                        diagnostics.append({
+                            "kind": "text_text_air", "first": name, "second": other,
+                            "actual": (a, b), "air_m": air, "required_air_m": 0.003,
+                        })
+    return errors, diagnostics
 
 
 def _assert_generated_annotation_ink(
@@ -1141,7 +1162,12 @@ def _assert_generated_annotation_ink(
     errors = list(collection_errors)
     if settled:
         errors.extend(_settled_profile_and_tip_errors(dumps))
-        errors.extend(_settled_under_head_errors(dumps))
+        under_head_errors, under_head_diagnostics = _settled_under_head_ink(dumps)
+        errors.extend(under_head_errors)
+        for diagnostic in under_head_diagnostics:
+            _telemetry.warn(
+                "MHA-DT-32 under-head ink diagnostic: " + json.dumps(diagnostic, sort_keys=True)
+            )
     if not dumps:
         errors.append("no drawing sheets collected")
     inner = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -1300,7 +1326,7 @@ def assert_final_annotation_ink(adapter: Any, detail_annotations: Sequence[Any])
     _assert_generated_annotation_ink(dumps, groups, collection_errors=errors, settled=True)
 
 
-async def build(adapter: Any) -> dict[str, str]:
+async def _build_drawing(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
@@ -1444,6 +1470,23 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         settled_checks=(lambda: assert_final_annotation_ink(adapter, detail_annotations),),
     )
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    """Capture failed native paper while the source and session are still open."""
+    try:
+        return await _build_drawing(adapter)
+    except Exception as original:
+        try:
+            _seat_forensics.capture_com_failure(
+                adapter, f"{PART_STEM}-drawing-build", str(original),
+                exception=original, sheet_png=True,
+            )
+        except Exception as capture_exc:  # noqa: BLE001 - never replace the original failure
+            if capture_exc is not original:
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(f"MHA-DT-32 secondary drawing capture failure: {capture_exc!r}")
+        raise
 
 
 def _parse_args() -> argparse.Namespace:

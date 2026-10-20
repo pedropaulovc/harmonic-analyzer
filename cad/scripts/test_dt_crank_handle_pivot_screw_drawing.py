@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import math
 from pathlib import Path
 
@@ -2694,7 +2695,7 @@ def test_relief_note_refuses_missing_or_duplicate_view_ownership(relief_native, 
 def test_build_wires_native_relief_helpers_to_the_correct_views():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body
-                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_drawing")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
     expected = {
         "cropped_relief_view": ["adapter"],
@@ -2720,7 +2721,7 @@ def test_build_wires_native_relief_helpers_to_the_correct_views():
 def test_build_imports_profile_diameter_only_directly_into_detail_and_keeps_four_views_hlr():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body
-                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_drawing")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
     curated = {ast.unparse(node.args[1]): node for node in calls
                if isinstance(node.func, ast.Name) and node.func.id == "curate_view_dimensions"}
@@ -2954,7 +2955,7 @@ def test_wrapped_tip_instruction_has_one_feature_leader_and_no_floating_copy():
     assert bottom > drawing.SIDE_KEEP["UnderHeadLocation"][1] + 0.006
     assert bottom > drawing.SIDE_KEEP["OverallLength"][1] + 0.006
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_drawing")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
     attached = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id == "add_attached_note"]
     assert len(attached) == 1
@@ -2969,7 +2970,7 @@ def test_wrapped_tip_instruction_has_one_feature_leader_and_no_floating_copy():
 
 def test_build_runs_collective_actual_ink_guard_as_finalizer_settled_check():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_drawing")
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
     finalize = next(node for node in calls if isinstance(node.func, ast.Name) and node.func.id == "finalize_drawing")
     settled = next(kw.value for kw in finalize.keywords if kw.arg == "settled_checks")
@@ -3214,7 +3215,7 @@ def _settled_native_record(records, role):
 
 def test_fitted_span_reuses_native_model_carrier_and_all_three_reference_guards():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "_build_drawing")
     loop = next(node for node in build.body
                 if isinstance(node, ast.For) and ast.unparse(node.iter) == "sorted(REFERENCE_DIMENSIONS)")
     code = compile(ast.Module(body=[loop], type_ignores=[]), drawing.__file__, "exec")
@@ -3764,10 +3765,11 @@ def _under_head_native_records():
 
 def test_option2_actual_under_head_corridors_are_collected_without_replacing_old_settlement():
     records = _settled_native_records()
-    assert drawing._settled_under_head_errors([_ink_sheet(*records)]) == []
+    assert drawing._settled_under_head_ink([_ink_sheet(*records)]) == ([], [])
     drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "errors.extend(_settled_under_head_errors(dumps))" in source
+    assert "under_head_errors, under_head_diagnostics = _settled_under_head_ink(dumps)" in source
+    assert "errors.extend(under_head_errors)" in source
     assert "errors.extend(_settled_profile_and_tip_errors(dumps))" in source
     assert "style_under_head_dimensions(adapter, side_annotations)" in source
     assert drawing.SIDE_KEEP["UnderHeadCornerRadius"] == (0.215, 0.212)
@@ -3781,7 +3783,7 @@ def test_option2_actual_corridors_require_each_unique_native_annotation(name, co
     record = next(record for record in records if record["name"] == name)
     records.remove(record)
     records.extend([record] * count)
-    errors = drawing._settled_under_head_errors([_ink_sheet(*records)])
+    errors, _ = drawing._settled_under_head_ink([_ink_sheet(*records)])
     assert any(f"SIDE/{name}: expected one settled under-head corridor annotation; count={count}" in error for error in errors)
 
 
@@ -3792,14 +3794,14 @@ def test_option2_actual_corridors_refuse_missing_or_malformed_ink(name, kind, ba
     records = _under_head_native_records()
     record = next(record for record in records if record["name"] == name)
     record["display"][kind] = bad
-    errors = drawing._settled_under_head_errors([_ink_sheet(*records)])
+    errors, _ = drawing._settled_under_head_ink([_ink_sheet(*records)])
     assert any(f"SIDE/{name}" in error and ("missing" in error or "malformed" in error) for error in errors)
 
 
 @pytest.mark.parametrize("new", drawing.UNDER_HEAD_DIMENSIONS)
 @pytest.mark.parametrize("foreign", [*drawing.UNDER_HEAD_FOREIGN_DIMENSIONS, "other-under-head"])
 @pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
-def test_option2_actual_corridors_refuse_all_new_feature_foreign_cross_tee_overlap(new, foreign, junction):
+def test_option2_actual_corridors_report_all_new_feature_foreign_cross_tee_overlap(new, foreign, junction):
     records = {record["name"]: record for record in _under_head_native_records()}
     if foreign == "other-under-head":
         foreign = next(name for name in drawing.UNDER_HEAD_DIMENSIONS if name != new)
@@ -3808,34 +3810,54 @@ def test_option2_actual_corridors_refuse_all_new_feature_foreign_cross_tee_overl
             "tee": ((0.2, 0.21), (0.21, 0.21)),
             "overlap": ((0.2, 0.205), (0.2, 0.215))}[junction]
     records[foreign]["display"]["lines"] = [_actual_line(*line)]
-    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
-    assert any(new in error and foreign in error and "foreign ink crossing" in error for error in errors)
+    errors, diagnostics = drawing._settled_under_head_ink([_ink_sheet(*records.values())])
+    assert errors == []
+    assert any({new, foreign} == {row["first"], row["second"]}
+               and row["kind"] == "foreign_ink_crossing" for row in diagnostics)
 
 
-@pytest.mark.parametrize("air,accepted", [(0.0, False), (0.002999, False), (0.003001, True)])
-def test_option2_actual_metric_text_requires_three_mm_from_foreign_native_witness(air, accepted):
+@pytest.mark.parametrize("air,reported", [(0.0, True), (0.002999, True), (0.003001, False)])
+def test_option2_actual_metric_text_reports_three_mm_from_foreign_native_witness(air, reported):
     records = {record["name"]: record for record in _under_head_native_records()}
     box = drawing._layout_audit.display_box({"texts": records["UnderHeadCornerRadius"]["display"]["texts"]})
     records["HeadDia"]["display"]["lines"] = [_actual_line((box.xmin, box.ymin - air), (box.xmax, box.ymin - air))]
-    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
-    matching = [error for error in errors if "UnderHeadCornerRadius text vs HeadDia" in error]
-    assert not matching if accepted else matching
+    errors, diagnostics = drawing._settled_under_head_ink([_ink_sheet(*records.values())])
+    assert errors == []
+    matching = [row for row in diagnostics if row["first"] == "UnderHeadCornerRadius"
+                and row["second"] == "HeadDia" and row["kind"] == "text_ink_air"]
+    assert bool(matching) is reported
+    if matching:
+        assert matching[0]["air_m"] == pytest.approx([air])
+        assert matching[0]["required_air_m"] == 0.003
 
 
-def test_option2_actual_corridors_collect_malformed_and_all_simultaneous_old_and_new_failures():
+def test_option2_actual_corridors_collect_hard_failures_and_visual_diagnostics_together(monkeypatch):
     records = _settled_native_records(r17=True)
     for name in (*drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS):
         _settled_native_record(records, name)["display"]["lines"] = [_actual_line((0.2, 0.20), (0.2, 0.22))]
     _settled_native_record(records, "UnderHeadCornerRadius")["display"]["texts"].append({**_actual_text(), "w": math.nan})
     _settled_native_record(records, "HeadOuterChamfer")["display"]["arrows"] = []
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
     with pytest.raises(RuntimeError) as caught:
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
     message = str(caught.value)
     for expected in ("metric text/profile clearance", "ThreadNote/leaders vs UnderHeadLocation",
-                     "UnderHeadCornerRadius vs HeadOuterChamfer", "UnderHeadCornerRadius vs HeadDia",
-                     "HeadOuterChamfer vs SlotDepth", "HeadOuterChamfer vs ShoulderDia",
-                     "HeadOuterChamfer vs ShoulderLength", "malformed", "arrows inventory"):
+                     "malformed", "arrows inventory"):
         assert expected in message
+    _, diagnostics = drawing._settled_under_head_ink([_ink_sheet(*records)])
+    for first, second in (("UnderHeadCornerRadius", "HeadOuterChamfer"),
+                          ("UnderHeadCornerRadius", "HeadDia"),
+                          ("HeadOuterChamfer", "SlotDepth"),
+                          ("HeadOuterChamfer", "ShoulderDia"),
+                          ("HeadOuterChamfer", "ShoulderLength")):
+        assert any(row["first"] == first and row["second"] == second
+                   and row["kind"] == "foreign_ink_crossing" for row in diagnostics)
+    assert warnings == [
+        "MHA-DT-32 under-head ink diagnostic: " + json.dumps(row, sort_keys=True)
+        for row in diagnostics
+    ]
+    assert "foreign_ink_crossing" not in message
 
 
 @pytest.fixture
@@ -4016,8 +4038,10 @@ def test_option2_actual_under_head_foreign_ink_checks_every_real_carrier(primiti
         record["display"]["polygons"] = [[0, 0, 0, 0, 3, 0.19, 0.21, 0, 0.21, 0.21, 0, 0.2, 0.215, 0]]
     else:
         record["display"]["polylines"] = [[0, 0, 0, 0, 0, 0, 2, 0.19, 0.21, 0, 0.21, 0.21, 0]]
-    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
-    assert any("UnderHeadCornerRadius vs HeadDia" in error and "foreign ink crossing" in error for error in errors)
+    errors, diagnostics = drawing._settled_under_head_ink([_ink_sheet(*records.values())])
+    assert errors == []
+    assert any(row["first"] == "UnderHeadCornerRadius" and row["second"] == "HeadDia"
+               and row["kind"] == "foreign_ink_crossing" for row in diagnostics)
 
 
 @pytest.mark.parametrize("previous,replacement", [
@@ -4046,3 +4070,185 @@ def test_settled_native_fixture_roles_do_not_depend_on_annotation_order(reverse)
     assert note["note"]["text"] == drawing.THREAD_NOTE_TEXT.replace("\n", "\r\n")
     assert len(note["display"]["lines"]) == 2
     assert note["leaders"]
+
+
+def _r19_under_head_diagnostic_records():
+    """Replay the three recorded r19 groups, not an invented full-seat snapshot.
+
+    The radius hull and all offending strokes below are the task-log values.
+    Unrecorded required carriers retain the explicitly synthetic clear fixture.
+    Expanded arrow strokes are supplied as native-shaped lines because r19
+    recorded their endpoints, not the original raw arrow-array parameters.
+    """
+    records = _settled_native_records()
+    radius = _settled_native_record(records, "UnderHeadCornerRadius")
+    radius["display"]["texts"] = [
+        _actual_text(0.2028618, 0.2092219, width=0.2271382 - 0.2028618)
+    ]
+    radius["display"]["lines"] = [
+        _actual_line((0.24845, 0.1961341), (0.2287257, 0.2092219)),
+        _actual_line((0.24845, 0.1961341), (0.2537411, 0.1926233)),
+        _actual_line((0.24845, 0.1961341), (0.251623699092054, 0.19448548510467248)),
+        _actual_line((0.2512023953265155, 0.1938505464169686), (0.24845, 0.1961341)),
+    ]
+    _settled_native_record(records, "ShoulderDia")["display"]["lines"] = [
+        _actual_line((0.2022826, 0.2126962), (0.1455, 0.2126962))
+    ]
+    _settled_native_record(records, "HeadLength")["display"]["lines"] = [
+        _actual_line((0.2485, 0.19722), (0.2485, 0.1699438))
+    ]
+    _settled_native_record(records, "HeadOuterChamfer")["display"]["lines"] = [
+        _actual_line((0.24928, 0.2), (0.24928, 0.2381399))
+    ]
+    _settled_native_record(records, "SlotDepth")["display"]["lines"] = [
+        _actual_line((0.2557, 0.2132219), (0.24935, 0.2132219))
+    ]
+    return records
+
+
+def test_r19_all_three_under_head_measurements_are_logged_together_without_blocking(monkeypatch):
+    records = _r19_under_head_diagnostic_records()
+    sheet = _ink_sheet(*records)
+    errors, diagnostics = drawing._settled_under_head_ink([sheet])
+    assert errors == []
+    assert {(row["kind"], row["first"], row["second"]) for row in diagnostics} == {
+        ("text_ink_air", "UnderHeadCornerRadius", "ShoulderDia"),
+        ("foreign_ink_crossing", "UnderHeadCornerRadius", "HeadLength"),
+        ("foreign_ink_crossing", "HeadOuterChamfer", "SlotDepth"),
+    }
+    assert len(diagnostics) == 3
+    proximity = next(row for row in diagnostics if row["kind"] == "text_ink_air")
+    assert proximity["actual_box"] == pytest.approx((0.2028618, 0.2092219, 0.2271382, 0.2127219))
+    assert proximity["actual"] == [((0.2022826, 0.2126962), (0.1455, 0.2126962))]
+    assert proximity["air_m"] == pytest.approx([0.0005792])
+    assert proximity["required_air_m"] == 0.003
+    radius = next(row for row in diagnostics if row["second"] == "HeadLength")
+    assert len(radius["actual"]) == 4
+    assert all(witness == ((0.2485, 0.19722), (0.2485, 0.1699438))
+               for _, witness in radius["actual"])
+    bevel = next(row for row in diagnostics if row["second"] == "SlotDepth")
+    assert bevel["actual"] == [
+        (((0.24928, 0.2), (0.24928, 0.2381399)),
+         ((0.2557, 0.2132219), (0.24935, 0.2132219)))
+    ]
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    drawing._assert_generated_annotation_ink([sheet], _approved_detail_ink(), settled=True)
+    assert warnings == [
+        "MHA-DT-32 under-head ink diagnostic: " + json.dumps(row, sort_keys=True)
+        for row in diagnostics
+    ]
+
+
+@pytest.mark.parametrize("fault,refusal", [
+    ("malformed", "HeadDia.*arrows inventory"),
+    ("native", "HeadDia: wrong native corridor type/visibility"),
+    ("border", "Sheet1/HeadDia: actual ink outside inner border"),
+])
+def test_r19_visual_diagnostics_do_not_weaken_native_inventory_or_border_refusals(monkeypatch, fault, refusal):
+    records = _r19_under_head_diagnostic_records()
+    head = _settled_native_record(records, "HeadDia")
+    if fault == "malformed":
+        head["display"]["arrows"] = []
+    elif fault == "native":
+        head["type"] = 6
+    else:
+        head["display"]["lines"].append(_actual_line((0.420, 0.08), (0.425, 0.08)))
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    assert len(warnings) == 3
+
+
+@pytest.mark.parametrize("air,reported", [(0.0, True), (0.002999, True), (0.003001, False)])
+def test_option2_under_head_text_to_text_air_is_measured_without_becoming_a_hard_error(air, reported):
+    records = {record["name"]: record for record in _under_head_native_records()}
+    box = drawing._layout_audit.display_box({"texts": records["UnderHeadCornerRadius"]["display"]["texts"]})
+    records["HeadDia"]["display"]["texts"] = [_actual_text(box.xmax + air, box.ymin, width=0.015)]
+    errors, diagnostics = drawing._settled_under_head_ink([_ink_sheet(*records.values())])
+    assert errors == []
+    matching = [row for row in diagnostics if row["first"] == "UnderHeadCornerRadius"
+                and row["second"] == "HeadDia" and row["kind"] == "text_text_air"]
+    assert bool(matching) is reported
+    if matching:
+        assert matching[0]["air_m"] == pytest.approx(air)
+        assert matching[0]["required_air_m"] == 0.003
+        assert matching[0]["actual"][0] == (box.xmin, box.ymin, box.xmax, box.ymax)
+
+
+@pytest.mark.asyncio
+async def test_drawing_build_success_returns_outputs_without_failure_capture(monkeypatch):
+    adapter = object()
+    outputs = {"drawing": "native drawing", "pdf": "drawing PDF", "png": "review PNG"}
+    calls = []
+
+    async def body(actual_adapter):
+        assert actual_adapter is adapter
+        calls.append("body")
+        return outputs
+
+    def capture(*args, **kwargs):
+        calls.append(("unexpected capture", args, kwargs))
+        raise AssertionError("successful drawings must not enter failure capture")
+
+    monkeypatch.setattr(drawing, "_build_drawing", body)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    assert await drawing.build(adapter) is outputs
+    assert calls == ["body"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("capture_outcome", ["original", "secondary", "returns"])
+@pytest.mark.parametrize("warning_fails", [False, True])
+async def test_drawing_build_captures_before_cleanup_and_preserves_original_failure(
+    monkeypatch, capture_outcome, warning_fails,
+):
+    from types import SimpleNamespace
+
+    document = object()
+    adapter = SimpleNamespace(currentModel=document, source_open=True, session_open=True)
+    original = RuntimeError("original native drawing refusal")
+    events, warnings = [], []
+
+    async def body(actual_adapter):
+        assert actual_adapter is adapter
+        events.append("body")
+        raise original
+
+    def capture(actual_adapter, label, message, **context):
+        assert actual_adapter is adapter
+        assert adapter.currentModel is document
+        assert adapter.source_open and adapter.session_open
+        assert label == f"{drawing.PART_STEM}-drawing-build"
+        assert message == str(original)
+        assert context == {"exception": original, "sheet_png": True}
+        events.append("capture")
+        if capture_outcome == "original":
+            raise original
+        if capture_outcome == "secondary":
+            raise OSError("secondary capture refusal")
+        return None
+
+    def warning(message):
+        warnings.append(message)
+        if warning_fails:
+            raise OSError("secondary warning refusal")
+
+    monkeypatch.setattr(drawing, "_build_drawing", body)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(drawing._telemetry, "warn", warning)
+    with pytest.raises(RuntimeError) as caught:
+        try:
+            await drawing.build(adapter)
+        finally:
+            events.append("source-cleanup")
+            adapter.source_open = False
+            adapter.currentModel = None
+            events.append("session-cleanup")
+            adapter.session_open = False
+    assert caught.value is original
+    assert events == ["body", "capture", "source-cleanup", "session-cleanup"]
+    assert bool(warnings) is (capture_outcome == "secondary")
+    if warnings:
+        assert "secondary capture refusal" in warnings[0]
