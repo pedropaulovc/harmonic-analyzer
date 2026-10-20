@@ -19,7 +19,7 @@ from typing import Any
 from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_registry import DRAWING_TEMPLATES
 from _part_properties import title_block_properties
 from _paths import CAD_ROOT
@@ -138,10 +138,21 @@ def _note_census(note: Any) -> dict[str, Any]:
         fmt = _early_bound(annotation.GetTextFormat(index), "ITextFormat")
         if fmt is None:
             raise RuntimeError(f"note {note.GetName()!r} has no text format {index}")
+        font_values = {}
+        for name in _FONT_FIELDS:
+            # The generated ITextFormat API exposes IsHeightSpecifiedInPts as
+            # a zero-argument METHOD; the other census fields are properties.
+            value = _read_member(fmt, name)
+            if not isinstance(value, (str, bool, int, float)):
+                raise TypeError(
+                    f"ITextFormat.{name} returned {type(value).__name__}, "
+                    "expected a primitive font value"
+                )
+            font_values[name] = value
         formats.append(
             {
                 "document_default": bool(annotation.GetUseDocTextFormat(index)),
-                **{name: getattr(fmt, name) for name in _FONT_FIELDS},
+                **font_values,
             }
         )
     linked_text = str(note.PropertyLinkedText or "")
