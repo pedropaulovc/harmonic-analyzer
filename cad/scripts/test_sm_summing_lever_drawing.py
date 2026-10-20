@@ -202,6 +202,33 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "v_built, 1e-5 * v_built" in source
 
 
+def test_receiver_drill_upper_limit_reason_matches_the_backing_section() -> None:
+    """H-H steps down to bare plate, not a floor or the spring-anchor pad."""
+    import magnifying_bracket_joint_layout as joint
+
+    reasons = notes.BRACKET_TAP_CALLOUT_PROCESS.splitlines()
+    assert reasons == [
+        "DRILL ENDS IN RIB TO RETAIN PLATE WALLS",
+        f"DRILL CLEARS {notes.BRACKET_SCREW_NUMBER} TIP AND TAP LEAD",
+    ]
+    # Both longitudinal receivers sit outside the pivot cylinder and inboard
+    # of the pad. After the end rib, only the plate backs their bore walls.
+    drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
+    pad_inner_x = sm_summing_lever_spec.PLATE_W - sm_summing_lever_spec.SPRING_PAD_W
+    for x, _y, _z in joint.LEVER_HOLE_POINTS:
+        assert x - joint.POSITION_BAND - drill_radius_max > sm_summing_lever_spec.CYL_R
+        assert x + joint.POSITION_BAND + drill_radius_max < pad_inner_x
+    assert joint.DRILL_POINT_RIB_MARGIN_MIN > 0.0
+    # A MIN-only depth would allow the full drill diameter into this thinner
+    # section. Its worst wall would not meet the unchanged 1.5 mm floor.
+    bare_plate_wall = (
+        sm_summing_lever_spec.PLATE_T - joint.LINEAR_BAND
+        - (sm_summing_lever_spec.PLATE_T / 2.0 + joint.POSITION_BAND)
+        - drill_radius_max - joint.DRILL_WANDER_MAX
+    )
+    assert bare_plate_wall < 1.5
+
+
 def test_nothing_reads_as_an_overall_or_a_band_it_is_not() -> None:
     """Machinist review 20261018: the plan's 152.40 read as the overall (the
     stubs stand 2X 21.72 past it) and the 0.44 rib-end step as a tight band
