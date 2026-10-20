@@ -279,6 +279,35 @@ def test_draw_declarations_cite_current_calls_and_declared_sources(stem: str) ->
                 assert set(exporter._cite(module, symbol)) <= set(feature["cite"]["precision"]), (stem, name, source)
 
 
+@pytest.mark.parametrize(
+    ("feature_name", "field", "tip_sign"),
+    [
+        ("top_edge", "radius", None),
+        ("top_edge", "radius_nominal", None),
+        ("profile_outer", "radial_tip_end", 1),
+        ("tip_land_pos_x", "radial_tip_end", 1),
+        ("tip_land_neg_x", "radial_tip_end", -1),
+    ],
+)
+def test_rocker_shared_profile_radius_exports_interface_authority(
+    feature_name: str, field: str, tip_sign: int | None,
+) -> None:
+    """Resolve real metadata, not declarations echoed back by a test fake."""
+    feature = exporter.requirement_manifest("ch_rocker_arm")["features"][feature_name]
+    citations = set(feature["cite"][field])
+    assert set(exporter._cite(rocker_interface, "CURVE_RADIUS")) <= citations
+    assert citations.isdisjoint(exporter._cite(rocker, "R_TOP"))
+    if tip_sign is None:
+        assert feature[field] == rocker_interface.CURVE_RADIUS
+    else:
+        alpha = rocker.TOP_ARC_LEN / (2.0 * rocker_interface.CURVE_RADIUS)
+        expected = [
+            tip_sign * (rocker_interface.CURVE_RADIUS + rocker.TIP_FACE) * math.sin(alpha),
+            rocker_interface.CENTER_Y - (rocker_interface.CURVE_RADIUS + rocker.TIP_FACE) * math.cos(alpha),
+        ]
+        assert feature[field] == pytest.approx(expected)
+
+
 @pytest.mark.parametrize("source", ["MISSING_TEST_DIMENSION", ("ch_rocker_arm_spec", "MISSING_TEST_DIMENSION")])
 def test_missing_citation_symbol_fails_instead_of_exporting_unsourced_requirements(monkeypatch, source) -> None:
     draw = importlib.import_module("draw_ch_rocker_arm")
