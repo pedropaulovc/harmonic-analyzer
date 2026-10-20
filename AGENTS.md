@@ -996,6 +996,9 @@ Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM
 Keep fit-up wording in the assembly sheet too: for example,
 `dt_drive_train_assembly_sheet.py` derives its lever-pin drill fraction from
 `dt_pinion_lever_geometry.PIN_HOLE_DIA` with `_inch_fraction.inch_fraction`.
+Test fit-up behavior through physical clearance floors, worst-service readings,
+feature-specific cut decisions and limits, sequence, and available sheet space.
+Do not pin the narration or exact note wording.
 `test_assembly_sheet_isolation.py` (`check:graph`) fails if a builder's closure
 reaches a sheet/steps/`draw_*` module, their literals type a dimension (`22.0`
 or `1/16`), they rebind a name the spec/explode spec defines, or a drawing-only

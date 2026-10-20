@@ -1191,14 +1191,6 @@ def _sentences(text: str) -> list[str]:
     return [part for part in re.split(r"[.;]\s+|[.;]$", " ".join(text.split())) if part]
 
 
-def _t120_clearance_facts(text: str) -> dict[str, set[float]]:
-    """Finite clearance figures are attached to their own named feature."""
-    found: dict[str, set[float]] = {"BAND": set(), "SHOULDER": set()}
-    for feature, figure in re.findall(r"\b(BAND|SHOULDER)\s+([+-]?\d+\.\d+)\b", text):
-        found[feature].add(float(figure))
-    return found
-
-
 # MHA-DT-00's crank step, which carries the T120 check.  The part spec never
 # reads the step registry (test_part_isolation), so the key lives here.
 _T120_CHECK_STEP_KEY = "crank-mesh-checked"
@@ -1212,23 +1204,6 @@ def _crank_step() -> str:
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
     return step.split(f"\n{number + 1}. ")[0]
 
-
-def test_no_print_states_the_t120_design_clearances() -> None:
-    # The clearances are a design-check result (build_dt_drive_train_assembly
-    # asserts them). Neither print narrates them: the part sheet dropped them in
-    # Main's MHA-DT-10 eye pass, and #1695 moved the assembly crank step to the
-    # bench check and its cuts only (dt_drive_train_assembly_sheet). The step
-    # still reads the fit-up feeler and both cut limits.
-    import dt_drive_train_assembly_sheet as notes
-
-    text = _crank_step()
-    flat = " ".join(text.split())
-    assert " ".join(notes.T120_FITUP_ASSEMBLY_CHECK.split()) in flat
-    assert f"{spec.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND" in flat
-    assert not re.search(r"\b(?:INF|NAN)\b|∞", text)
-    for printed in (text, spec.DRAWING_NOTES, spec.TURNED_DIA_FITUP_CALLOUT):
-        assert "CLEARANCE" not in printed
-        assert _t120_clearance_facts(printed) == {"BAND": set(), "SHOULDER": set()}
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
