@@ -608,9 +608,9 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
 
 def test_compact_chamfer_has_native_angle_and_one_functional_side() -> None:
     assert drawing.CHAMFER_SUFFIX == " X 45 DEG"
-    assert drawing.CHAMFER_CALLOUT_BELOW == "HUB-SIDE PRESS LEAD-IN"
+    assert drawing.CHAMFER_CALLOUT_BELOW == "FAR SIDE PRESS LEAD-IN"
     assert "\n" not in drawing.CHAMFER_CALLOUT_BELOW
-    assert "FAR SIDE" not in drawing.CHAMFER_CALLOUT_BELOW
+    assert "HUB-SIDE" not in drawing.CHAMFER_CALLOUT_BELOW
     assert "MHA-DT-31" in drawing.DIMENSION_CALLOUTS["HubSeatDia"]
     assert "LIGHT PRESS" in drawing.DIMENSION_CALLOUTS["HubSeatDia"]
     assert all(value not in drawing.CHAMFER_CALLOUT_BELOW for value in ("0.25", "0.10", "INBOARD"))
@@ -639,8 +639,8 @@ def _native_chamfer(monkeypatch, **changed):
             text_parts[part] = value
     text_data = SimpleNamespace(
         GetTextCount=lambda: 1,
-        GetTextAtIndex=lambda _index: "0.10 X 45 DEG\n0.25 X 45 DEG\nHUB-SIDE PRESS LEAD-IN",
-        GetTextPositionAtIndex=lambda _index: (0.243, 0.095, 0.0),
+        GetTextAtIndex=lambda _index: "0.10 X 45 DEG\n0.25 X 45 DEG\nFAR SIDE PRESS LEAD-IN",
+        GetTextPositionAtIndex=lambda _index: changed.get("chamfer_text_position", (0.104, 0.226, 0.0)),
         GetTextInBoxWidthAtIndex=lambda _index: changed.get("chamfer_width", 0.030),
         GetTextHeightAtIndex=lambda _index: 0.0035,
         GetTextRefPositionAtIndex=lambda _index: 1,
@@ -686,11 +686,11 @@ def _native_chamfer(monkeypatch, **changed):
     profile = SimpleNamespace(
         ReferencedDocument=SimpleNamespace(Parameter=parameter),
         GetOrientationName=lambda: changed.get("orientation", "*Top"),
-        Angle=changed.get("angle", drawing.PROFILE_ANGLE),
-        ScaleRatio=changed.get("scale", drawing.PROFILE_SCALE),
+        Angle=changed.get("angle", 0.0),
+        ScaleRatio=changed.get("scale", drawing.SHEET_SCALE),
         mode=changed.get("mode", 2),
         GetDisplayMode2=lambda: profile.mode,
-        GetOutline=lambda: changed.get("profile_box", (0.2936, 0.0894, 0.3064, 0.1946)),
+        GetOutline=lambda: changed.get("profile_box", (0.0422, 0.1916, 0.2478, 0.2124)),
     )
     stock = SimpleNamespace(
         name="stock thickness",
@@ -727,16 +727,14 @@ def _native_chamfer(monkeypatch, **changed):
 
 
 def _project_profile(_adapter, view, points, **_kwargs):
-    """Independent Top basis: +X right and +Z down before its native turn."""
-    cosine, sine = math.cos(view.Angle), math.sin(view.Angle)
+    """Independent projected-Top basis, not coupled to metadata readback."""
     placement = getattr(view, "projection_placement", drawing.PROFILE_CENTER)
-    scale = getattr(view, "projection_scale", 1.0)
+    scale = getattr(view, "projection_scale", drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1])
     result = []
     for x, _y, z in points:
-        dx, dy = x - spec.ARM_C2C / 2000.0, -(z - spec.ARM_THICKNESS / 2000.0)
         result.append((
-            placement[0] + scale * (cosine * dx - sine * dy),
-            placement[1] + scale * (sine * dx + cosine * dy),
+            placement[0] + scale * (x - spec.ARM_C2C / 2000.0),
+            placement[1] - scale * (z - spec.ARM_THICKNESS / 2000.0),
         ))
     return result
 
@@ -768,8 +766,8 @@ def test_compact_chamfer_writes_correct_native_text_parts_without_override(monke
     monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
     monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_a, **_kw: None)
     _check_arm_visual(drawing._place_profile_chamfer, adapter, profile, [annotation])
-    assert display.written == [(2, " X 45 DEG"), (4, "HUB-SIDE PRESS LEAD-IN")]
-    assert display.GetText(2) == " X 45 DEG" and display.GetText(4) == "HUB-SIDE PRESS LEAD-IN"
+    assert display.written == [(2, " X 45 DEG"), (4, "FAR SIDE PRESS LEAD-IN")]
+    assert display.GetText(2) == " X 45 DEG" and display.GetText(4) == "FAR SIDE PRESS LEAD-IN"
     assert display.GetOverride() is False
     assert display.GetDimension2(0).SystemValue == spec.BORE_REAR_CHAMFER / 1000.0
 
@@ -778,7 +776,7 @@ def test_compact_chamfer_writes_correct_native_text_parts_without_override(monke
     "text",
     (
         drawing.CHAMFER_CALLOUT_BELOW.replace("PRESS", "WRONG"),
-        drawing.CHAMFER_CALLOUT_BELOW.replace("HUB-SIDE", "FAR SIDE"),
+        drawing.CHAMFER_CALLOUT_BELOW.replace("FAR SIDE", "HUB-SIDE"),
         " " + drawing.CHAMFER_CALLOUT_BELOW,
         drawing.CHAMFER_CALLOUT_BELOW + " ",
         "\r\n" + drawing.CHAMFER_CALLOUT_BELOW,
@@ -795,19 +793,27 @@ def test_profile_chamfer_text_mismatches_are_visible_diagnostics(monkeypatch, te
     "changed",
     (
         {}, {"orientation": "*Right"}, {"orientation": "*Front"},
-        {"angle": -math.pi / 2}, {"angle": 0.0},
-        {"scale": (2.0, 1.0)}, {"mode": 1},
+        {"angle": -math.pi / 2}, {"angle": math.pi / 2},
+        {"scale": (1.0, 1.0)}, {"mode": 1},
     ),
 )
 def test_profile_metadata_mismatch_does_not_remove_a_measured_mouth(monkeypatch, changed):
     adapter, profile, _annotation, _display = _native_chamfer(monkeypatch, **changed)
     monkeypatch.setattr(drawing, "model_points_in_view", lambda a, _v, points, **kw: _project_profile(
-        a, SimpleNamespace(Angle=drawing.PROFILE_ANGLE), points, **kw,
+        a, SimpleNamespace(), points, **kw,
     ))
     visual_errors = []
     mouth = _check_arm_guard(drawing._profile_geometry, adapter, profile, visual_errors=visual_errors)
-    assert mouth == pytest.approx((0.296, 0.09455))
+    assert mouth == pytest.approx((0.0501, 0.210))
     assert bool(visual_errors) is bool(changed)
+
+
+def test_derived_top_empty_native_orientation_name_keeps_measured_projection(monkeypatch):
+    adapter, profile, _annotation, _display = _native_chamfer(monkeypatch, orientation="")
+    monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
+    visual_errors = []
+    assert _check_arm_guard(drawing._profile_geometry, adapter, profile, visual_errors=visual_errors) == pytest.approx((0.0501, 0.210))
+    assert visual_errors == []
 
 
 @pytest.mark.parametrize("index", (0, 1, 2, 3, 4, 5, 6))
@@ -821,7 +827,7 @@ def test_profile_control_mismatch_returns_actual_native_mouth(monkeypatch, index
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     visual_errors = []
     mouth = _check_arm_guard(drawing._profile_geometry, adapter, profile, visual_errors=visual_errors)
-    assert mouth == pytest.approx((0.298 if index == 6 else 0.296, 0.09455))
+    assert mouth == pytest.approx((0.0521 if index == 6 else 0.0501, 0.210))
     assert visual_errors
 
 
@@ -834,30 +840,68 @@ def test_unreadable_projection_controls_do_not_hide_a_valid_native_mouth(monkeyp
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     visual_errors = []
     mouth = _check_arm_guard(drawing._profile_geometry, adapter, profile, visual_errors=visual_errors)
-    assert mouth == pytest.approx((0.296, 0.09455))
+    assert mouth == pytest.approx((0.0501, 0.210))
     assert visual_errors
 
 
-def test_profile_turn_stays_native_but_ignored_angle_is_telemetry(monkeypatch) -> None:
-    adapter, profile, _annotation, _display = _native_chamfer(monkeypatch, angle=0.0, mode=1)
-    rebuilt = []
-    monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **kw: rebuilt.append(kw["label"]))
-    _check_arm_visual(drawing._turn_profile, adapter, profile)
-    assert profile.Angle == pytest.approx(math.pi / 2)
-    assert rebuilt == ["turn crank arm Top profile 90 DEG CCW"]
-    _check_arm_visual(drawing._turn_profile, adapter, profile, expect_diagnostics=True)
-    class IgnoredAngle:
-        GetOrientationName = staticmethod(profile.GetOrientationName)
-        ScaleRatio = profile.ScaleRatio
-        GetDisplayMode2 = staticmethod(profile.GetDisplayMode2)
+@pytest.mark.parametrize("fault", (None, "missing_child", "scale_read", "scale_assignment", "ignored_inheritance", "parent_read", "wrong_parent"))
+def test_projected_top_selects_front_creates_one_aligned_inherited_child(monkeypatch, forensic_calls, fault):
+    events = []
+    parent = SimpleNamespace(ScaleRatio=drawing.SHEET_SCALE)
+    class Derived:
+        inherited = False
+        def __bool__(self):
+            raise AssertionError("never truth-test a COM dispatch")
         @property
         def Angle(self):
-            return 0.0
-        @Angle.setter
-        def Angle(self, _value):
-            pass
-    _check_arm_visual(drawing._turn_profile, adapter, IgnoredAngle(), expect_diagnostics=True)
+            return 0.0  # no setter: production must never rotate this child
+        @property
+        def UseParentScale(self):
+            if fault == "scale_read":
+                raise OSError("parent scale unreadable")
+            return self.inherited
+        @UseParentScale.setter
+        def UseParentScale(self, value):
+            events.append(("inherit", value))
+            if fault == "scale_assignment":
+                raise OSError("parent scale assignment unavailable")
+            if fault != "ignored_inheritance":
+                self.inherited = value
+        @property
+        def ScaleRatio(self):
+            return parent.ScaleRatio if self.inherited else (1.0, 1.0)
+        def GetBaseView(self):
+            if fault == "parent_read":
+                raise OSError("derived parent unreadable")
+            return object() if fault == "wrong_parent" else parent
+    child = Derived()
+    def create(x, y, z, not_aligned):
+        assert events == [("select", parent)]
+        assert (x, y, z) == (0.145, 0.202, 0.0)
+        assert not_aligned is False
+        events.append(("create", parent, x, y, z, not_aligned))
+        return None if fault == "missing_child" else child
+    doc = SimpleNamespace(CreateUnfoldedViewAt3=create, ClearSelection2=lambda all_marks: events.append(("clear", all_marks)))
+    adapter = SimpleNamespace(currentModel=doc, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    def select(actual_adapter, actual_parent, *, label):
+        assert actual_adapter is adapter and actual_parent is parent
+        assert label == "crank arm projected Top parent"
+        events.append(("select", parent))
+        return "Front"
+    monkeypatch.setattr(drawing, "_activate_and_select_view", select)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda actual_adapter, **kw: events.append(("rebuild", kw["label"])))
+    visual_errors = []
+    if fault == "missing_child":
+        with pytest.raises(RuntimeError, match="failed to create the projected Top"):
+            drawing._project_top(adapter, parent, visual_errors=visual_errors)
+    else:
+        assert drawing._project_top(adapter, parent, visual_errors=visual_errors) is child
+        assert bool(visual_errors) is bool(fault)
+        assert ("clear", True) in events
+        assert events.index(("inherit", True)) < events.index(("rebuild", "crank arm aligned projected Top"))
+    assert len([event for event in events if event[0] == "create"]) == 1
+    assert forensic_calls == []
 
 
 def test_profile_chamfer_offsets_actual_native_leg_without_replacing_it(monkeypatch) -> None:
@@ -867,7 +911,7 @@ def test_profile_chamfer_offsets_actual_native_leg_without_replacing_it(monkeypa
     def offset(adapter_arg, annotations, targets):
         assert adapter_arg is adapter and annotations == [annotation]
         assert display.OffsetText is False
-        assert annotation.position[:2] == pytest.approx((0.296, 0.09455))
+        assert annotation.position[:2] == pytest.approx((0.0501, 0.210))
         positions.append(targets)
         display.OffsetText = True
         annotation.SetPosition2(*targets["BoreRearChamferSize"], 0.0)
@@ -1050,7 +1094,10 @@ def _chamfer_edge_case(monkeypatch, **changed):
     names = ("stock", "stock_split", "inner", "bevel", "outer")
     rendered = (view_stock, view_stock_split, view_inner, view_bevel, view_outer)
     for name, edge in zip(names, rendered):
-        points = changed.get(f"{name}_points", _NATIVE_SAMPLES[name])
+        historical = changed.get(f"{name}_points", _NATIVE_SAMPLES[name])
+        # Synthetic projected-Top envelope, NOT newly measured native ink:
+        # undo the historical sample's quarter-turn; GetXform applies 2:1.
+        points = tuple((y, -x, z) for x, y, z in historical)
         if points and (changed.get("degenerate") or changed.get(f"{name}_degenerate")):
             points = (points[0], points[0])
         edge.raw_points = points
@@ -1072,7 +1119,7 @@ def _chamfer_edge_case(monkeypatch, **changed):
     profile.stock_split = view_stock_split
     profile.bevel = view_bevel
     profile.projection_placement = changed.get("placement", drawing.PROFILE_CENTER)
-    profile.projection_scale = changed.get("projection_scale", 1.0)
+    profile.projection_scale = changed.get("projection_scale", drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1])
     profile.GetXform = lambda: changed.get("xform", (*profile.projection_placement, profile.projection_scale))
     # Optional typed-line absence is tested separately from the observed
     # packet; no GetDisplayData4 return was captured in that native run.
@@ -1101,7 +1148,7 @@ def _typed_lines(profile, *, frame="view-local", styles=None):
 
 
 @pytest.mark.parametrize("face_attachment", (False, True))
-def test_actual_native_chamfer_samples_and_complete_record13_pass_without_mapping(monkeypatch, face_attachment):
+def test_historical_native_samples_in_synthetic_projected_envelope_keep_geometry_diagnostics(monkeypatch, face_attachment):
     adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, face_attachment=face_attachment)
     assert tuple(profile.GetCorrespondingEntity(edge) for edge in profile.source_edges) == (None, None)
     logged = []
@@ -1111,6 +1158,10 @@ def test_actual_native_chamfer_samples_and_complete_record13_pass_without_mappin
     mouths = tuple((0.300 + x, 0.142 + y) for x, y, _z in _NATIVE_SAMPLES["bevel"])
     assert mouths[0] == pytest.approx((0.295999999999, 0.094549999904))
     assert mouths[1] == pytest.approx((0.296250000007, 0.094799999912))
+    tx, ty, scale = profile.GetXform()
+    projected = tuple((tx + scale * x, ty + scale * y) for x, y, _z in profile.bevel.raw_points)
+    assert projected[0] == pytest.approx((0.050099999808, 0.210000000002))
+    assert projected[1] == pytest.approx((0.050599999824, 0.209499999986))
     assert any("GetXform raw=" in entry for entry in logged)
     assert any("positive control:" in entry and "measured=True" in entry for entry in logged)
     assert any("flags=(True, True), bevel=True" in entry for entry in logged)
@@ -1361,8 +1412,9 @@ def test_absent_display_object_is_unmeasured_not_optional_zero_lines(monkeypatch
 def test_typed_coordinate_channel_ambiguity_on_stock_is_diagnostic(monkeypatch):
     adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
     lines = _typed_lines(profile)
-    sheet_lines = [(*line[:4], line[4] + 0.3, line[5] + 0.142, line[6],
-                    line[7] + 0.3, line[8] + 0.142, line[9]) for line in lines]
+    tx, ty, scale = profile.GetXform()
+    sheet_lines = [(*line[:4], tx + scale * line[4], ty + scale * line[5], line[6],
+                    tx + scale * line[7], ty + scale * line[8], line[9]) for line in lines]
     lines.extend(sheet_lines)
     _check_arm_visual(drawing._rendered_chamfer_edges, adapter, profile, annotation, expect_diagnostics=True)
 
@@ -1551,19 +1603,23 @@ def test_dimension_clearance_refuses_unmeasurable_or_undocumented_native_runs(mo
         _check_arm_guard(drawing._dimension_text_bounds, annotation, label="Width")
 
 
-def test_only_chamfer_anchor_moves_to_main_approved_under_front_lane() -> None:
-    # Compact native text is measured on the next seat run, not estimated here.
-    assert drawing.PROFILE_KEEP == {"BoreRearChamferSize": (0.2580, 0.1005), "Depth": (0.300, 0.210)}
-    assert drawing.FRONT_KEEP["EndRadius"] == (0.242, 0.087)
-    assert drawing.PIVOT_CALLOUT_XY == (0.270, 0.225)
+def test_projected_top_uses_main_approved_layout_without_part_note_changes() -> None:
+    assert drawing.PROFILE_KEEP == {"BoreRearChamferSize": (0.119, 0.226), "Depth": (0.270, 0.202)}
+    assert drawing.FRONT_KEEP["EndRadius"] == (0.275, 0.094)
+    assert drawing.FRONT_KEEP["HubSeatDia"] == (0.048, 0.181)
+    assert drawing.FRONT_KEEP["AnchorStation"][1] == 0.098
+    assert drawing.FRONT_KEEP["PivotStation"][1] == 0.088
+    assert drawing.FRONT_KEEP["AnchorOffset"][1] == pytest.approx(0.1654)
+    assert drawing.ANCHOR_CALLOUT_XY == (0.330, 0.169)
+    assert drawing.FIDUCIAL_CALLOUT_XY == (0.016, 0.166)
+    assert drawing.PIVOT_CALLOUT_XY == (0.270, 0.181)
+    assert drawing.SEAM_CALLOUT_XY == (0.104, 0.190)
     assert drawing.FRONT_KEEP["BossRadius"] == (0.030, drawing.FRONT_CENTER[1])
-    assert drawing.FRONT_CENTER == (0.145, 0.142)
-    assert drawing.PROFILE_CENTER == (0.300, 0.142)
-    assert drawing.PROFILE_SCALE == (1.0, 1.0)
-    assert drawing.PROFILE_ANGLE == math.pi / 2
-    assert notes.PROFILE_VIEW_CAPTION.splitlines() == [
-        "TOP VIEW", "ROTATED 90 DEG CCW", "SCALE 1:1"
-    ]
+    assert drawing.FRONT_CENTER == (0.145, 0.132)
+    assert drawing.PROFILE_CENTER == (0.145, 0.202)
+    assert drawing.SHEET_SCALE == (2.0, 1.0)
+    assert drawing.PROFILE_VIEW_CAPTION == "TOP VIEW"
+    assert drawing.PROFILE_CAPTION_XY == (0.285, 0.202)
     assert drawing.ISO_CENTER == (0.360, 0.230)
 
 
@@ -1591,47 +1647,51 @@ def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
             _packet(profile, edges, profile.record_data)
     else:
         adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
-    profile.initial_angle = changed.get("initial_angle", 0.0)
-    front = SimpleNamespace(GetOutline=lambda: changed.get("front_box", (0.0422, 0.1142, 0.250988, 0.1698)))
-    width = SimpleNamespace(name="Width")
-    end = SimpleNamespace(name="EndRadius")
+    front = SimpleNamespace(GetOutline=lambda: changed.get("front_box", (0.0422, 0.1042, 0.250988, 0.1598)))
+    front_dimensions = {name: SimpleNamespace(name=name) for name in drawing.FRONT_KEEP}
+    width = front_dimensions["Width"]
     callouts = {name: SimpleNamespace(name=name) for name in ("overall length", "handle pivot", "anchor tap")}
     segments = {
         "Width": [
-            ((0.279, 0.1166), (0.279, 0.1674)),
-            ((0.221, 0.1166), (0.280, 0.1166)),
+            ((0.279, 0.1066), (0.279, 0.1574)),
+            ((0.221, 0.1066), (0.280, 0.1066)),
         ],
-        "EndRadius": [((0.240, 0.142), (0.242, 0.087))],
+        "EndRadius": [((0.240, 0.132), (0.275, 0.094))],
         "stock thickness": [
-            ((0.296, 0.20622), (0.304, 0.20622)),
-            ((0.296, 0.1785), (0.296, 0.20622)),
-            ((0.304, 0.1785), (0.304, 0.20622)),
+            ((0.2454, 0.194), (0.270, 0.194)), ((0.2454, 0.210), (0.270, 0.210)),
+            ((0.270, 0.194), (0.270, 0.210)),
         ],
         "overall length": [((0.0446, 0.073), (0.2454, 0.073))],
-        "handle pivot": [((0.220, 0.170), (0.234832, 0.225))],
-        "anchor tap": [((0.110, 0.155), (0.195, 0.200))],
+        "handle pivot": [((0.220, 0.160), (0.234832, 0.181))],
+        "anchor tap": [((0.110, 0.145), (0.330, 0.169))],
     }
+    for name, anchor in drawing.FRONT_KEEP.items():
+        segments.setdefault(name, [((0.145, 0.132), anchor)])
     boxes = {
-        "BoreRearChamferSize": changed.get("box", (0.243, 0.095, 0.273, 0.106)),
-        "Width": (0.274, 0.135, 0.279, 0.147),
-        "EndRadius": (0.235, 0.08422, 0.2492358, 0.08772),
-        "stock thickness": (0.293, 0.207, 0.307, 0.213),
+        "BoreRearChamferSize": changed.get("box", (0.104, 0.226, 0.134, 0.2365)),
+        "Width": (0.274, 0.125, 0.279, 0.137),
+        "EndRadius": (0.270, 0.092, 0.282, 0.0955),
+        "stock thickness": (0.263, 0.197, 0.277, 0.207),
         "overall length": (0.130, 0.070, 0.160, 0.076),
-        "handle pivot": (0.234832, 0.213834, 0.305168, 0.234110),
-        "anchor tap": (0.180, 0.200, 0.230, 0.215),
+        "handle pivot": (0.234832, 0.169834, 0.305168, 0.190110),
+        "anchor tap": (0.315, 0.164, 0.365, 0.179),
     }
+    # Synthetic positive text runs for every retained Front dimension.
+    for name, (x, y) in drawing.FRONT_KEEP.items():
+        boxes.setdefault(name, (x, y, x + 0.010, y + 0.0035))
+    boxes.update(changed.get("text_boxes", {}))
     if "cross" in changed:
-        segments[changed["cross"]] = [((0.260, 0.105), (0.290, 0.080))]
+        segments[changed["cross"]] = [((0.080, 0.225), (0.100, 0.205))]
     if "text_overlap" in changed:
-        boxes[changed["text_overlap"]] = (0.255, 0.100, 0.265, 0.110)
+        boxes[changed["text_overlap"]] = (0.110, 0.230, 0.130, 0.235)
     annotation.name = "BoreRearChamferSize"
-    route = changed.get("route", [((0.296, 0.09455), (0.276, 0.09455))])
+    route = changed.get("route", [((0.0501, 0.210), (0.119, 0.226))])
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: (
         "BoreRearChamferSize" if item is annotation else "Depth" if item is profile.stock else item.name
     ))
     monkeypatch.setattr(drawing, "dimension_segments", lambda item: route if item is annotation else segments[item.name])
     if native_guards:
-        for item in (width, end, profile.stock, *callouts.values()):
+        for item in (*front_dimensions.values(), profile.stock, *callouts.values()):
             x0, y0, x1, y1 = boxes[item.name]
             runs = [(item.name, (x0, y0, 0.0), x1 - x0, y1 - y0, 1, 0.0)]
             if item is profile.stock:
@@ -1665,7 +1725,7 @@ def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
     if not native_guards:
         monkeypatch.setattr(drawing, "_rendered_chamfer_edges", edges)
     monkeypatch.setattr(drawing, "callout_ink", lambda *_a, **_kw: SimpleNamespace(
-        text=changed.get("box", (0.2535309, 0.0765837, 0.2754691, 0.1134163))
+        text=changed.get("box", (0.104, 0.226, 0.134, 0.2365))
     ))
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: SimpleNamespace(
         xmin=changed.get("region_left", 0.0127), ymin=0.0127, xmax=0.4191, ymax=0.2667
@@ -1675,18 +1735,22 @@ def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
         Visible=1, OwnerType=0, Owner=changed.get("caption_owner", profile),
     )
     caption = SimpleNamespace(
-        GetText=lambda: changed.get("caption_text", notes.PROFILE_VIEW_CAPTION),
+        GetText=lambda: changed.get("caption_text", drawing.PROFILE_VIEW_CAPTION),
         GetAnnotation=lambda: caption_annotation,
-        GetExtent=lambda: changed.get("caption_extent", (0.316, 0.146, 0.0, 0.365, 0.160, 0.0)),
+        GetExtent=lambda: changed.get("caption_extent", (0.285, 0.1985, 0.0, 0.310, 0.202, 0.0)),
     )
-    return adapter, front, profile, [width, end], [annotation, profile.stock], callouts, caption
+    note_extents = {
+        "seam callout": (0.104, 0.174, 0.0, 0.135, 0.190, 0.0),
+        "fiducial callout": (0.016, 0.159, 0.0, 0.050, 0.166, 0.0),
+        **changed.get("note_extents", {}),
+    }
+    attached_notes = {name: SimpleNamespace(GetExtent=lambda extent=extent: extent)
+                      for name, extent in note_extents.items()}
+    return adapter, front, profile, list(front_dimensions.values()), [annotation, profile.stock], callouts, caption, attached_notes
 
 
 @pytest.mark.parametrize("changed", (
-    {"offset": False}, {"position": (0.296, 0.09455, 0.0)},
-    {"box": (0.2497, 0.078, 0.275, 0.113)}, {"box": (0.254, 0.078, 0.2771, 0.113)},
-    {"box": (0.254, 0.0739, 0.275, 0.113)}, {"box": (0.254, 0.078, 0.275, 0.1147)},
-    {"front_box": (0.04, 0.11, 0.252, 0.17)}, {"profile_box": (0.276, 0.09, 0.306, 0.194)},
+    {"offset": False}, {"position": (0.0501, 0.210, 0.0)},
     {"edge_hidden": True}, {"stock_reference": True}, {"stock_prefix": ""}, {"stock_prefix": "(("},
     {"stock_suffix": ""}, {"stock_suffix": "))"}, {"stock_text": "8.0"}, {"stock_text": "(7.2)"},
     {"stock_text": "(8.00)"}, {"stock_text": "( 8.0)"}, {"stock_text": "8.0 (8.0)"},
@@ -1694,10 +1758,10 @@ def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
     {"cross": "Width"}, {"cross": "EndRadius"}, {"cross": "stock thickness"},
     {"cross": "overall length"}, {"cross": "handle pivot"}, {"text_overlap": "Width"},
     {"text_overlap": "handle pivot"}, {"caption_text": "TOP VIEW SCALE 1:1"},
-    {"caption_text": notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", "\r\n")},
-    {"caption_text": " " + notes.PROFILE_VIEW_CAPTION}, {"caption_text": notes.PROFILE_VIEW_CAPTION + " "},
+    {"caption_text": drawing.PROFILE_VIEW_CAPTION.replace("TOP", "SIDE").replace("\n", "\r\n")},
+    {"caption_text": " " + drawing.PROFILE_VIEW_CAPTION}, {"caption_text": drawing.PROFILE_VIEW_CAPTION + " "},
     {"caption_owner": object()}, {"caption_position": (0.316, 0.170, 0.0)},
-    {"caption_extent": (0.295, 0.146, 0.0, 0.350, 0.160, 0.0)},
+    {"caption_extent": (0.263, 0.197, 0.0, 0.310, 0.207, 0.0)},
 ))
 def test_profile_visual_mutants_log_but_do_not_refuse(monkeypatch, changed):
     args = _final_profile_case(monkeypatch, native_guards=True, **changed)
@@ -1714,8 +1778,8 @@ def test_profile_visual_mutants_log_but_do_not_refuse(monkeypatch, changed):
     ({"leg": 0.1}, "model leg"), ({"kind": 6}, "LIMIT band"), ({"lower": -0.05}, "LIMIT band"),
     ({"upper": 0.1}, "LIMIT band"), ({"precision": 1}, "tolerance precision"),
     ({"primary_precision": 1}, "primary precision"), ({"stock_precision": 2}, "primary precision"),
-    ({"route": []}, "rear-Z mouth"), ({"route": [((0.304, 0.09455), (0.276, 0.09455))]}, "rear-Z mouth"),
-    ({"route": [((0.296, 0.115), (0.276, 0.09455))]}, "rear-Z mouth"),
+    ({"route": []}, "rear-Z mouth"), ({"route": [((0.0502, 0.210), (0.119, 0.226))]}, "rear-Z mouth"),
+    ({"route": [((0.0501, 0.211), (0.119, 0.226))]}, "rear-Z mouth"),
     ({"box": (0.254, 0.078, float("nan"), 0.113)}, "border"),
     ({"box": (0.014, 0.078, 0.030, 0.113)}, "border"), ({"region_left": 0.2506}, "border"),
     ({"caption_extent": (0.014, 0.146, 0.0, 0.350, 0.160, 0.0)}, "border"),
@@ -1747,7 +1811,7 @@ def test_stock_reference_checks_actual_native_display_without_model_reference_cl
     ((0.0, True), (5e-9, True), (1.1e-8, False), (0.0001, False)),
 )
 def test_chamfer_mouth_landing_requires_numerical_zero_not_one_mm(monkeypatch, distance, passes):
-    route = [((0.296 + distance, 0.09455), (0.276, 0.09455))]
+    route = [((0.0501 - distance, 0.210), (0.119, 0.226))]
     args = _final_profile_case(monkeypatch, route=route)
     logged = []
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
@@ -1759,17 +1823,53 @@ def test_chamfer_mouth_landing_requires_numerical_zero_not_one_mm(monkeypatch, d
     assert any("numerical-zero landing distance (abs_tol=1e-8 m)" in entry for entry in logged)
 
 
+@pytest.mark.parametrize("label", ("BoreRearChamferSize", "HubSeatDia", "anchor tap", "handle pivot"))
+@pytest.mark.parametrize("fault", ("outside", "zero_width", "unreadable"))
+def test_new_high_callouts_use_native_positive_width_and_border_gate(monkeypatch, forensic_calls, label, fault):
+    native = _final_profile_case(monkeypatch, native_guards=True)
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    annotations = {drawing.dimension_name(native[0], item): item for item in (*native[3], *native[4])}
+    annotations.update(native[5])
+    data = annotations[label].GetSpecificAnnotation().GetDisplayData()
+    def unavailable(_index):
+        raise OSError("high callout width unavailable")
+    if fault == "outside":
+        data.GetTextPositionAtIndex = lambda _index: (0.100, 0.264, 0.0)
+    else:
+        data.GetTextInBoxWidthAtIndex = unavailable if fault == "unreadable" else lambda _index: 0.0
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(native[0]))
+    assert label in str(caught.value)
+    assert "sheet border" in str(caught.value) or "whole bounds" in str(caught.value)
+    assert case.finalized == [] and len(forensic_calls) == 1
+    assert forensic_calls[0][3]["exception"] is caught.value
+
+
+@pytest.mark.parametrize("label", ("seam callout", "fiducial callout", "profile caption"))
+@pytest.mark.parametrize("extent", (
+    None, (0.100, 0.264, 0.0, 0.150, 0.270, 0.0), (0.100, 0.220, 0.0, 0.100, 0.225, 0.0),
+))
+def test_retained_note_extents_share_positive_bounds_and_border_gate(monkeypatch, forensic_calls, label, extent):
+    native = _final_profile_case(monkeypatch, native_guards=True)
+    note = native[6] if label == "profile caption" else native[7][label]
+    note.GetExtent = lambda: extent
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(native[0]))
+    assert label in str(caught.value)
+    assert case.finalized == [] and len(forensic_calls) == 1
+    assert forensic_calls[0][3]["exception"] is caught.value
+
+
 def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
-    views, curated, hlr, hlv, text, turned = [], [], [], [], [], []
+    views, curated, hlr, hlv, text, projected = [], [], [], [], [], []
     adapter = native_case[0] if native_case is not None else SimpleNamespace()
     if native_case is None:
         adapter.currentModel = object()
-    native_turn = drawing._turn_profile
     native_place = drawing._place_profile_chamfer
     native_guard = drawing._profile_chamfer_clear
     native_breakout = drawing._create_profile_breakout
     if native_case is not None:
-        native_case[2].Angle = native_case[2].initial_angle
         adapter.currentModel.breakout_count = adapter.currentModel.initial_breakout_count
     async def open_model(_path):
         return None
@@ -1783,22 +1883,30 @@ def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
     def place(_adapter, _source, orientation, *xy, scale):
         view = (
             native_case[1] if native_case is not None and orientation == "*Front"
-            else native_case[2] if native_case is not None and orientation == "*Top"
             else SimpleNamespace()
         )
         view.orientation, view.xy, view.mode, view.scale = orientation, xy, None, scale
+        views.append(view)
+        return view
+    def project_top(_adapter, parent, *, visual_errors):
+        assert _adapter is adapter and parent is views[0] and parent.orientation == "*Front"
+        view = native_case[2] if native_case is not None else SimpleNamespace()
+        view.orientation, view.xy, view.mode, view.scale = "*Top", drawing.PROFILE_CENTER, None, parent.scale
+        view.parent = parent
+        projected.append(view)
         views.append(view)
         return view
     def curate(_adapter, view, *, keep, dimensions_by_feature, **_kw):
         assert dimensions_by_feature is spec.DRAWING_DIMENSIONS
         assert view.mode == (1 if view.orientation == "*Top" else 2)
         if view.orientation == "*Top":
-            assert hlv == [view] and turned == [view]
+            assert hlv == [view] and projected == [view]
         curated.append((view.orientation, set(keep)))
         if native_case is not None:
             return native_case[3] if view.orientation == "*Front" else native_case[4]
         return [SimpleNamespace(name=name) for name in keep]
     monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "_project_top", project_top)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     def hidden_removed(_adapter, view):
         view.mode = 2
@@ -1808,11 +1916,6 @@ def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
         hlv.append(view)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", hidden_removed)
     monkeypatch.setattr(drawing, "set_hidden_lines_visible", hidden_visible)
-    def turn(_adapter, view, *, errors):
-        turned.append(view)
-        if native_case is not None:
-            native_turn(_adapter, view, errors=errors)
-    monkeypatch.setattr(drawing, "_turn_profile", turn)
     def breakout(_adapter, view, *, errors):
         if native_case is not None:
             native_breakout(_adapter, view, errors=errors)
@@ -1847,13 +1950,14 @@ def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
         monkeypatch.setattr(drawing, "offset_dimension_text", offset)
     caption = native_case[6] if native_case is not None else object()
     monkeypatch.setattr(drawing, "_profile_caption", lambda _a, view, **_kw: caption)
-    def guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption, *, errors, visual_errors):
-        checked.append((front, profile, front_annotations, profile_annotations, set(callouts), actual_caption))
+    def guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption,
+              attached_notes, *, errors, visual_errors):
+        checked.append((front, profile, front_annotations, profile_annotations, set(callouts), actual_caption, attached_notes))
         assert profile.mode == 2 and hlv == [profile]
         if guard_error:
             errors.append("missing source Parameter identity")
         if native_case is not None:
-            native_guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption,
+            native_guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption, attached_notes,
                          errors=errors, visual_errors=visual_errors)
     monkeypatch.setattr(drawing, "_profile_chamfer_clear", guard)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *_a, **_kw: True)
@@ -1861,7 +1965,10 @@ def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
         annotation = native_case[5]["anchor tap" if label == "anchor tap" else "handle pivot"] if native_case is not None else object()
         return SimpleNamespace(GetAnnotation=lambda: annotation)
     monkeypatch.setattr(drawing, "add_native_hole_callout", hole_callout)
-    monkeypatch.setattr(drawing, "add_attached_note", lambda *_a, **_kw: object())
+    monkeypatch.setattr(drawing, "add_attached_note", lambda *_a, label, **_kw: (
+        native_case[7]["seam callout" if label == "MHA-DT-VN-59 seam callout" else "fiducial callout"]
+        if native_case is not None else object()
+    ))
     monkeypatch.setattr(drawing, "add_edge_dimension", lambda *_a, **_kw: SimpleNamespace(
         GetAnnotation=lambda: native_case[5]["overall length"] if native_case is not None else object(),
     ))
@@ -1871,12 +1978,12 @@ def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     return SimpleNamespace(
         adapter=adapter, views=views, curated=curated, hlr=hlr, hlv=hlv, text=text,
-        turned=turned, placed=placed, checked=checked, finalized=finalized, caption=caption,
+        projected=projected, placed=placed, checked=checked, finalized=finalized, caption=caption,
     )
 
 
 @pytest.mark.parametrize("guard_error", (False, True))
-def test_build_uses_one_replacement_profile_and_native_guards_before_finalization(monkeypatch, guard_error) -> None:
+def test_build_uses_one_derived_top_and_native_guards_before_finalization(monkeypatch, guard_error) -> None:
     case = _mock_arm_build(monkeypatch, guard_error=guard_error)
     adapter, finalized = case.adapter, case.finalized
     views, curated, hlr, hlv = case.views, case.curated, case.hlr, case.hlv
@@ -1889,7 +1996,7 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
         assert asyncio.run(drawing.build(adapter)) == {"drawing": "complete"}
         assert finalized == [True]
     assert [view.orientation for view in views] == ["*Front", "*Top", "*Isometric"]
-    assert [view.scale for view in views] == [(2, 1), (1.0, 1.0), (1, 1)]
+    assert [view.scale for view in views] == [(2, 1), (2, 1), (1, 1)]
     assert hlr == [*views, views[1], views[1]]
     assert hlv == [views[1]]  # import only; breakout exposes final solid HLR ink
     assert [view.mode for view in views] == [2, 2, 2]
@@ -1898,6 +2005,8 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
     assert placed[0][1] is checked[0][3]
     assert checked[0][4] == {"overall length", "handle pivot", "anchor tap"}
     assert checked[0][5] is caption
+    assert case.projected == [views[1]] and views[1].parent is views[0]
+    assert set(checked[0][6]) == {"seam callout", "fiducial callout"}
     assert text == [(set().union(*spec.DRAWING_DIMENSIONS.values()), drawing.DIMENSION_CALLOUTS)]
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     assert not any(
@@ -1912,7 +2021,7 @@ def test_build_aggregates_only_real_gate_faults_and_still_logs_visual_measuremen
         full_name="WrongSize@OtherFeature@dt-crank-arm.SLDPRT", dimension_type=1,
         source_dimension=object(), leg=0.10, kind=6, lower=-0.05, upper=0.10,
         edge_hidden=True, zero_width=True,
-        caption_text=notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", "\r\n"),
+        caption_text=drawing.PROFILE_VIEW_CAPTION.replace("TOP", "SIDE").replace("\n", "\r\n"),
     )
     case = _mock_arm_build(monkeypatch, native_case=native)
     def rejected_precision(*_args):
@@ -1941,11 +2050,11 @@ def test_build_aggregates_only_real_gate_faults_and_still_logs_visual_measuremen
         "WIDTH FIRST", "WIDTH SECOND", "EndRadius run 0", "stock thickness run 0",
         "overall length run 0", "handle pivot run 0", "anchor tap run 0",
         "profile chamfer rendered proof:", "cursor=", "rawlen=", "poly_count=",
-        "caption did not persist with its view (extent)",
+        "profile caption has no measurable whole bounds",
         "profile caption / anchor tap",
     ):
         assert any(measured in entry for entry in logged)
-    assert any("\\r\\n" in entry and "raw/normalized text" in entry for entry in logged)
+    assert any("SIDE VIEW" in entry and "raw/normalized text" in entry for entry in logged)
 
 
 @pytest.mark.parametrize("newline", ("\n", "\r\n"))
@@ -1955,7 +2064,7 @@ def test_build_complete_native_guard_positive_control_reaches_finalize_once(monk
         monkeypatch, native_guards=True,
         mapping=(object(), object()) if mapped else (None, None),
         attached=(), attached_count=0, attached_types=(),
-        caption_text=notes.PROFILE_VIEW_CAPTION.replace("\n", newline),
+        caption_text=drawing.PROFILE_VIEW_CAPTION.replace("\n", newline),
         text=drawing.CHAMFER_CALLOUT_BELOW,
     )
     case = _mock_arm_build(monkeypatch, native_case=native)
@@ -1970,6 +2079,14 @@ def test_build_complete_native_guard_positive_control_reaches_finalize_once(monk
     assert len(doc.accessed) == len(doc.released) == 2
     xyz = doc.splines[0]
     assert len(xyz) == 15 and xyz[:3] == xyz[-3:]
+    # These are synthetic projection/creation controls, not a new native render.
+    xs, ys = [point[0] for point in doc.math_inputs], [point[1] for point in doc.math_inputs]
+    assert max(xs) - min(xs) == pytest.approx(0.006)
+    assert (min(ys), max(ys)) == pytest.approx((0.193, 0.211))
+    cx, cy = (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
+    rx, ry = (max(xs) - min(xs)) / 2.0, (max(ys) - min(ys)) / 2.0
+    wall_points = ((0.0501, 0.210), (0.0506, 0.2095), (0.0506, 0.194))
+    assert all(abs(x - cx) / rx + abs(y - cy) / ry <= 1.0 for x, y in wall_points)
 
 
 @pytest.mark.parametrize("fault", (
@@ -2155,7 +2272,7 @@ def test_breakout_and_width_gate_faults_do_not_promote_visual_diagnostics(monkey
 def test_build_caption_wording_mismatch_is_telemetry_under_either_newline(monkeypatch, forensic_calls, newline):
     native = _final_profile_case(
         monkeypatch, native_guards=True,
-        caption_text=notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", newline),
+        caption_text=drawing.PROFILE_VIEW_CAPTION.replace("TOP", "SIDE").replace("\n", newline),
     )
     case = _mock_arm_build(monkeypatch, native_case=native)
     logged = []
@@ -2165,8 +2282,8 @@ def test_build_caption_wording_mismatch_is_telemetry_under_either_newline(monkey
     assert any("caption did not persist" in entry for entry in logged)
 
 
-def test_early_turn_placement_and_reference_faults_are_visual_only(monkeypatch, forensic_calls):
-    native = _final_profile_case(monkeypatch, native_guards=True, initial_angle=drawing.PROFILE_ANGLE)
+def test_early_placement_and_reference_faults_are_visual_only(monkeypatch, forensic_calls):
+    native = _final_profile_case(monkeypatch, native_guards=True)
     annotation = native[4][0]
     annotation.SetPosition2 = lambda *_xyz: False
     case = _mock_arm_build(monkeypatch, native_case=native)
@@ -2177,7 +2294,7 @@ def test_early_turn_placement_and_reference_faults_are_visual_only(monkeypatch, 
     logged = []
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
     assert asyncio.run(drawing.build(case.adapter)) == {"drawing": "complete"}
-    for diagnostic in ("already rotated", "failed to place the native bore-mouth dimension line",
+    for diagnostic in ("failed to place the native bore-mouth dimension line",
                        "UNMEASURED Depth stock reference placement: OSError: native reference readback rejected"):
         assert any(diagnostic in entry for entry in logged)
     assert len(case.checked) == 1 and case.finalized == [True] and forensic_calls == []
@@ -2213,7 +2330,8 @@ def test_failed_native_field_and_text_run_reads_do_not_hide_later_measurements(m
     def unreadable_type():
         raise OSError("native type unavailable")
     dimension.GetType = unreadable_type
-    width_data = native[3][0].GetSpecificAnnotation().GetDisplayData()
+    width_annotation = next(item for item in native[3] if drawing.dimension_name(native[0], item) == "Width")
+    width_data = width_annotation.GetSpecificAnnotation().GetDisplayData()
     def unreadable_first_width(index):
         if index == 0:
             raise OSError("native width unavailable")
