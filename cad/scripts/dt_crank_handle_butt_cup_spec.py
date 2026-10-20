@@ -114,8 +114,10 @@ HEAD_RUNNING_OFFSET_MAX = round(
     6,
 )
 HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
-    MATING_SCREW_HEAD_DIA_MIN / 2.0 - MATING_SCREW_HEAD_EDGE_BREAK_MAX
-    - FLOOR_HOLE_DIA_MAX / 2.0 - FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    MATING_SCREW_HEAD_DIA_MIN / 2.0
+    - MATING_SCREW_HEAD_EDGE_BREAK_MAX
+    - FLOOR_HOLE_DIA_MAX / 2.0
+    - FLOOR_HOLE_MOUTH_CHAMFER_MAX,
     6,
 )
 HEAD_BEARING_RADIAL_MIN = round(
@@ -139,8 +141,7 @@ FLOOR_HOLE_STRAIGHT_LENGTH_MIN = round(
     FLOOR_THICKNESS_MIN - FLOOR_HOLE_MOUTH_CHAMFER_MAX, 6
 )
 FLOOR_ROOT_RADIAL_MIN = round(
-    (BODY_DIA - BODY_DIA_TOL) / 2.0 - BODY_CHAMFER_MAX
-    - FLOOR_HOLE_DIA_MAX / 2.0,
+    (BODY_DIA - BODY_DIA_TOL) / 2.0 - BODY_CHAMFER_MAX - FLOOR_HOLE_DIA_MAX / 2.0,
     6,
 )
 # Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over
@@ -161,7 +162,9 @@ for _ok, _what in (
         "invalid mating screw head, shoulder or inner-fillet requirements",
     ),
     (
-        0.0 < FLOOR_HOLE_MOUTH_CHAMFER_MIN <= FLOOR_HOLE_MOUTH_CHAMFER_MAX
+        0.0
+        < FLOOR_HOLE_MOUTH_CHAMFER_MIN
+        <= FLOOR_HOLE_MOUTH_CHAMFER_MAX
         == FLOOR_HOLE_MOUTH_CHAMFER
         and FLOOR_HOLE_MOUTH_CHAMFER_BAND[0] == 0.0
         and FLOOR_HOLE_MOUTH_CHAMFER_BAND[1] < 0.0
@@ -169,12 +172,20 @@ for _ok, _what in (
         "invalid native floor-hole mouth chamfer limits",
     ),
     (
-        0.0 < MATING_SCREW_HEAD_EDGE_BREAK_MIN
-        <= MATING_SCREW_HEAD_EDGE_BREAK_MAX < MATING_SCREW_HEAD_DIA_MIN / 2.0,
+        0.0
+        < MATING_SCREW_HEAD_EDGE_BREAK_MIN
+        <= MATING_SCREW_HEAD_EDGE_BREAK_MAX
+        < MATING_SCREW_HEAD_DIA_MIN / 2.0,
         "invalid mating screw outer chamfer requirements",
     ),
-    (UNDER_HEAD_INNER_NORMAL_AIR_MIN > 0.0, "inner corner has no positive zero-gap air"),
-    (UNDER_HEAD_OUTER_NORMAL_AIR_MIN > 0.0, "outer corner has no positive zero-gap air"),
+    (
+        UNDER_HEAD_INNER_NORMAL_AIR_MIN > 0.0,
+        "inner corner has no positive zero-gap air",
+    ),
+    (
+        UNDER_HEAD_OUTER_NORMAL_AIR_MIN > 0.0,
+        "outer corner has no positive zero-gap air",
+    ),
     (
         UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN > 0.0
         and UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN > 0.0,

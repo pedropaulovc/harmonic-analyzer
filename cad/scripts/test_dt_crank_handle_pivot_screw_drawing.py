@@ -3646,6 +3646,10 @@ def _under_head_limit_boundary(monkeypatch, *, name="HeadOuterChamfer", refusal=
 
         def __init__(self):
             self._type, self.values = 0, (0.0, 0.0)
+            if name == "HeadOuterChamfer" and refusal in ("values", "void"):
+                # Isolate the setter's status: a failed call may leave a
+                # previously correct native LIMIT unchanged.
+                self._type, self.values = 3, (-0.00015, 0.0)
 
         @property
         def Type(self):
@@ -3674,6 +3678,8 @@ def _under_head_limit_boundary(monkeypatch, *, name="HeadOuterChamfer", refusal=
 
         def __init__(self):
             self.primary, self.tolerance, self.calls = 0, 0, []
+            if name == "HeadOuterChamfer" and refusal in ("values", "void"):
+                self.primary = self.tolerance = 2
 
         def SetPrecision3(self, primary, dual, tolerance, alternate):
             self.calls.append((primary, dual, tolerance, alternate))
@@ -3728,9 +3734,18 @@ def test_option2_native_limit_writers_author_and_read_the_printed_bounds(monkeyp
 @pytest.mark.parametrize("name", ["HeadOuterChamfer", "UnderHeadCornerRadius"])
 @pytest.mark.parametrize("refusal", ["nominal", "values", "void", "type", "lower", "upper", "primary", "precision", "status"])
 def test_option2_native_limit_writers_refuse_every_independent_boundary_drift(monkeypatch, name, refusal):
-    adapter, _, _, _ = _under_head_limit_boundary(monkeypatch, name=name, refusal=refusal)
+    adapter, display, dimension, _ = _under_head_limit_boundary(monkeypatch, name=name, refusal=refusal)
     writer = part._head_outer_chamfer_limits if name == "HeadOuterChamfer" else part._single_limits
-    with pytest.raises(RuntimeError):
+    message = None
+    if name == "HeadOuterChamfer" and refusal in ("values", "void"):
+        assert dimension.SystemValue == pytest.approx(0.00026)
+        assert dimension.Tolerance.Type == 3
+        assert dimension.Tolerance.GetMinValue() == pytest.approx(-0.00015)
+        assert dimension.Tolerance.GetMaxValue() == 0.0
+        assert display.GetPrimaryPrecision2() == 2
+        assert display.GetPrimaryTolPrecision2() == 2
+        message = "^HeadOuterChamfer@ScrewProfile: LIMIT deviations were rejected$"
+    with pytest.raises(RuntimeError, match=message):
         writer(adapter)
 
 

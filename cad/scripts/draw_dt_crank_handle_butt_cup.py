@@ -262,7 +262,8 @@ def _assert_floor_hole_mouth_chamfer(annotation: Any) -> None:
     if (
         int(display.Type2) not in (2, 11)  # native linear/horizontal linear
         or bool(display.Diametric)
-        or str(dimension.FullName).split("@")[:2] != ["FloorHoleMouthChamfer", "CupProfile"]
+        or str(dimension.FullName).split("@")[:2]
+        != ["FloorHoleMouthChamfer", "CupProfile"]
         or bool(dimension.IsReference())
         or bool(display.ShowParenthesis)
         or bool(display.GetOverride())
@@ -270,16 +271,28 @@ def _assert_floor_hole_mouth_chamfer(annotation: Any) -> None:
         or str(display.GetText(1) or "").strip()
         or str(display.GetText(2) or "") != FLOOR_HOLE_MOUTH_CHAMFER_SUFFIX
         or str(display.GetText(3) or "").strip()
-        or str(display.GetText(4) or "").replace("\r\n", "\n") != FLOOR_HOLE_MOUTH_CHAMFER_CALLOUT
+        or str(display.GetText(4) or "").replace("\r\n", "\n")
+        != FLOOR_HOLE_MOUTH_CHAMFER_CALLOUT
     ):
-        raise RuntimeError(f"{label}: lost its controlling native leg, owner or attached prose")
+        raise RuntimeError(
+            f"{label}: lost its controlling native leg, owner or attached prose"
+        )
     lower, upper = deviations(FLOOR_HOLE_MOUTH_CHAMFER_BAND)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if (
-        not math.isclose(float(dimension.SystemValue), FLOOR_HOLE_MOUTH_CHAMFER / 1000.0, rel_tol=0.0, abs_tol=1e-9)
+        not math.isclose(
+            float(dimension.SystemValue),
+            FLOOR_HOLE_MOUTH_CHAMFER / 1000.0,
+            rel_tol=0.0,
+            abs_tol=1e-9,
+        )
         or int(tolerance.Type) != FLOOR_HOLE_MOUTH_CHAMFER_TOL_TYPE
-        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12)
-        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12
+        )
         or int(display.GetPrimaryPrecision2()) != 2
         or int(display.GetPrimaryTolPrecision2()) != 2
     ):
@@ -288,11 +301,15 @@ def _assert_floor_hole_mouth_chamfer(annotation: Any) -> None:
 
 def _mouth_model_reference(adapter: Any, section: Any) -> tuple[float, float, float]:
     """Use the real CupProfile frame, not an assumed global axis convention."""
-    document = _early_bound(_early_bound(section, "IView").ReferencedDocument, "IModelDoc2")
+    document = _early_bound(
+        _early_bound(section, "IView").ReferencedDocument, "IModelDoc2"
+    )
     feature = document.FeatureByName("CupProfile")
     if feature is None:
         raise RuntimeError("mouth detail: source CupProfile is missing")
-    sketch = _early_bound(_early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
     inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     xyz = (
@@ -301,7 +318,10 @@ def _mouth_model_reference(adapter: Any, section: Any) -> tuple[float, float, fl
         0.0,
     )
     point = _early_bound(utility.CreatePoint(double_array(xyz)), "IMathPoint")
-    result = tuple(float(v) for v in _early_bound(point.MultiplyTransform(inverse), "IMathPoint").ArrayData)
+    result = tuple(
+        float(v)
+        for v in _early_bound(point.MultiplyTransform(inverse), "IMathPoint").ArrayData
+    )
     if len(result) != 3 or not all(map(math.isfinite, result)):
         raise RuntimeError(f"mouth detail: invalid native model reference {result!r}")
     return result
@@ -315,15 +335,26 @@ def _create_mouth_detail(adapter: Any, section: Any) -> Any:
         raise RuntimeError("mouth detail: cannot activate the section parent")
     draw.ClearSelection2(True)
     reference = _mouth_model_reference(adapter, section)
-    center = model_point_in_view(adapter, section, reference, label="mouth detail centre")
+    center = model_point_in_view(
+        adapter, section, reference, label="mouth detail centre"
+    )
     radius = MOUTH_DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
     sketch = _early_bound(_early_bound(section, "IView").GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     points = []
     for xy in (center, (center[0] + radius, center[1])):
-        point = _early_bound(utility.CreatePoint(double_array((*xy, 0.0))), "IMathPoint")
-        points.append(tuple(float(v) for v in _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+        point = _early_bound(
+            utility.CreatePoint(double_array((*xy, 0.0))), "IMathPoint"
+        )
+        points.append(
+            tuple(
+                float(v)
+                for v in _early_bound(
+                    point.MultiplyTransform(transform), "IMathPoint"
+                ).ArrayData
+            )
+        )
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     prior = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -333,18 +364,33 @@ def _create_mouth_detail(adapter: Any, section: Any) -> Any:
         manager.AddToDB = prior
     if circle is None:
         raise RuntimeError("mouth detail: native circle creation failed")
-    actual_center, actual_radius = native_circle_geometry(circle, label="mouth detail fence")
+    actual_center, actual_radius = native_circle_geometry(
+        circle, label="mouth detail fence"
+    )
     asked_radius = math.dist(points[0], points[1])
     sketch_tolerance = MOUTH_GEOMETRY_TOL_M * asked_radius / radius
-    if math.dist(actual_center, points[0]) > sketch_tolerance or abs(actual_radius - asked_radius) > sketch_tolerance:
-        raise RuntimeError("mouth detail: native fence snapped away from its model mouth")
+    if (
+        math.dist(actual_center, points[0]) > sketch_tolerance
+        or abs(actual_radius - asked_radius) > sketch_tolerance
+    ):
+        raise RuntimeError(
+            "mouth detail: native fence snapped away from its model mouth"
+        )
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr").CreateSelectData()
     selection.View = section
     if not _early_bound(circle, "ISketchSegment").Select4(False, selection):
         raise RuntimeError("mouth detail: native circle selection failed")
     detail = drawing.CreateDetailViewAt4(
-        *MOUTH_DETAIL_CENTER, 0.0, 0, *MOUTH_DETAIL_SCALE,
-        MOUTH_DETAIL_LABEL, 1, False, False, True, 5,
+        *MOUTH_DETAIL_CENTER,
+        0.0,
+        0,
+        *MOUTH_DETAIL_SCALE,
+        MOUTH_DETAIL_LABEL,
+        1,
+        False,
+        False,
+        True,
+        5,
     )
     draw.ClearSelection2(True)
     if detail is None:
@@ -354,22 +400,34 @@ def _create_mouth_detail(adapter: Any, section: Any) -> Any:
     # The native outline can be asymmetric for a cut corner.  Settle by the
     # ACTUAL projected model point, behind the established display barrier.
     detail.UpdateViewDisplayGeometry()
-    projected = model_point_in_view(adapter, detail, reference, label="mouth detail placement")
+    projected = model_point_in_view(
+        adapter, detail, reference, label="mouth detail placement"
+    )
     position = tuple(float(v) for v in detail.Position)
     target = [position[i] + MOUTH_DETAIL_CENTER[i] - projected[i] for i in range(2)]
     if not detail.SetViewPosition(double_array(target), False):
         raise RuntimeError("mouth detail: cannot place the native crop")
     rebuild_drawing(adapter, label="place cup mouth detail")
     settle_detail_projection(
-        adapter, detail, reference, ink_xy=MOUTH_DETAIL_CENTER,
+        adapter,
+        detail,
+        reference,
+        ink_xy=MOUTH_DETAIL_CENTER,
         tolerance_xy=(MOUTH_GEOMETRY_TOL_M, MOUTH_GEOMETRY_TOL_M),
         label="cup mouth detail",
     )
     fence = _early_bound(detail.GetDetail(), "IDetailCircle")
     fence.SetLabelPosition(*MOUTH_DETAIL_LETTER)
-    if math.dist(tuple(float(v) for v in fence.GetLabelPosition()), MOUTH_DETAIL_LETTER) > 1e-6:
+    if (
+        math.dist(
+            tuple(float(v) for v in fence.GetLabelPosition()), MOUTH_DETAIL_LETTER
+        )
+        > 1e-6
+    ):
         raise RuntimeError("mouth detail: native parent letter placement changed")
-    position_section_caption(adapter, detail, MOUTH_DETAIL_CAPTION, label="cup mouth DETAIL B")
+    position_section_caption(
+        adapter, detail, MOUTH_DETAIL_CAPTION, label="cup mouth DETAIL B"
+    )
     set_hidden_lines_removed(adapter, detail)
     _assert_mouth_detail(adapter, section, detail)
     return detail
@@ -380,11 +438,14 @@ def _assert_mouth_detail(adapter: Any, section: Any, detail: Any) -> Any:
     detail = _early_bound(detail, "IView")
     section = _early_bound(section, "IView")
     if (
-        int(detail.Type) != 3 or int(section.Type) != 2
+        int(detail.Type) != 3
+        or int(section.Type) != 2
         or section.GetSection() is None
         or int(detail.GetDisplayMode2()) != 2
     ):
-        raise RuntimeError("mouth detail: not an HLR detail of actual cut section geometry")
+        raise RuntimeError(
+            "mouth detail: not an HLR detail of actual cut section geometry"
+        )
     readback = read_circular_detail_crop(adapter, detail, label="cup mouth DETAIL B")
     if (
         readback.label != MOUTH_DETAIL_LABEL
@@ -393,30 +454,58 @@ def _assert_mouth_detail(adapter: Any, section: Any, detail: Any) -> Any:
         or readback.parent_ratio != tuple(float(v) for v in VIEW_SCALE)
     ):
         raise RuntimeError("mouth detail: native label, parent or scale changed")
-    center = model_point_in_view(adapter, section, _mouth_model_reference(adapter, section), label="mouth parent readback")
+    center = model_point_in_view(
+        adapter,
+        section,
+        _mouth_model_reference(adapter, section),
+        label="mouth parent readback",
+    )
     radius = MOUTH_DETAIL_RADIUS_MM * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
-    if math.dist(center, readback.parent_centre) > MOUTH_GEOMETRY_TOL_M or abs(readback.parent_radius - radius) > MOUTH_GEOMETRY_TOL_M:
-        raise RuntimeError("mouth detail: persisted crop no longer encloses the actual model mouth")
+    if (
+        math.dist(center, readback.parent_centre) > MOUTH_GEOMETRY_TOL_M
+        or abs(readback.parent_radius - radius) > MOUTH_GEOMETRY_TOL_M
+    ):
+        raise RuntimeError(
+            "mouth detail: persisted crop no longer encloses the actual model mouth"
+        )
     cx = (readback.crop[0] + readback.crop[2]) / 2.0
     cy = (readback.crop[1] + readback.crop[3]) / 2.0
     if math.dist((cx, cy), MOUTH_DETAIL_CENTER) > MOUTH_GEOMETRY_TOL_M:
         raise RuntimeError("mouth detail: actual crop centre moved")
     # The new crop stays entirely in the unused lower-right corridor, above
     # the title block and below the old pocket-depth/ISO-note lanes.
-    if not (0.290 <= readback.crop[0] < readback.crop[2] <= 0.336
-            and 0.090 <= readback.crop[1] < readback.crop[3] <= 0.132):
-        raise RuntimeError(f"mouth detail: actual crop escaped its blank field: {readback.crop!r}")
+    if not (
+        0.290 <= readback.crop[0] < readback.crop[2] <= 0.336
+        and 0.090 <= readback.crop[1] < readback.crop[3] <= 0.132
+    ):
+        raise RuntimeError(
+            f"mouth detail: actual crop escaped its blank field: {readback.crop!r}"
+        )
     fence = _early_bound(detail.GetDetail(), "IDetailCircle")
-    if math.dist(tuple(float(v) for v in fence.GetLabelPosition()), MOUTH_DETAIL_LETTER) > 1e-6:
+    if (
+        math.dist(
+            tuple(float(v) for v in fence.GetLabelPosition()), MOUTH_DETAIL_LETTER
+        )
+        > 1e-6
+    ):
         raise RuntimeError("mouth detail: settled parent letter moved")
     return readback
 
 
-def _measured_annotation_ink(record: dict[str, Any], label: str) -> tuple[list[Segment], list[Box], list[str]]:
+def _measured_annotation_ink(
+    record: dict[str, Any], label: str
+) -> tuple[list[Segment], list[Box], list[str]]:
     """Decode collected primitives strictly: no anchor boxes or guessed widths."""
     strokes, boxes, errors = [], [], []
     display = record.get("display") or {}
-    sizes = {"lines": 8, "arcs": 17, "polylines": 7, "polygons": 5, "triangles": 9, "arrows": 8}
+    sizes = {
+        "lines": 8,
+        "arcs": 17,
+        "polylines": 7,
+        "polygons": 5,
+        "triangles": 9,
+        "arrows": 8,
+    }
     if not display:
         errors.append(f"{label}: missing actual display ink")
     if not isinstance(display, dict):
@@ -432,7 +521,12 @@ def _measured_annotation_ink(record: dict[str, Any], label: str) -> tuple[list[S
             try:
                 if kind == "texts":
                     values = (*raw["pos"], raw["h"], raw["w"], raw["ang"])
-                    if len(raw["pos"]) < 2 or not all(math.isfinite(float(v)) for v in values) or raw["h"] <= 0 or raw["w"] <= 0:
+                    if (
+                        len(raw["pos"]) < 2
+                        or not all(math.isfinite(float(v)) for v in values)
+                        or raw["h"] <= 0
+                        or raw["w"] <= 0
+                    ):
                         raise ValueError("missing/nonfinite measured text bounds")
                     box = _layout_audit.display_box({"texts": [raw]})
                     if box is None:
@@ -444,11 +538,20 @@ def _measured_annotation_ink(record: dict[str, Any], label: str) -> tuple[list[S
                     raise ValueError("truncated/nonfinite primitive")
                 if kind == "polylines":
                     count = int(values[6])
-                    if count < 2 or not (len(values) >= 7 + 3 * count or len(values) >= 7 + int(values[1]) + 3 * count):
+                    if count < 2 or not (
+                        len(values) >= 7 + 3 * count
+                        or len(values) >= 7 + int(values[1]) + 3 * count
+                    ):
                         raise ValueError("truncated polyline points")
-                if kind == "polygons" and (int(values[4]) < 2 or len(values) < 5 + 3 * int(values[4])):
+                if kind == "polygons" and (
+                    int(values[4]) < 2 or len(values) < 5 + 3 * int(values[4])
+                ):
                     raise ValueError("truncated polygon points")
-                if kind == "arrows" and (math.hypot(values[3], values[4]) <= 0 or values[6] <= 0 or values[7] <= 0):
+                if kind == "arrows" and (
+                    math.hypot(values[3], values[4]) <= 0
+                    or values[6] <= 0
+                    or values[7] <= 0
+                ):
                     raise ValueError("invalid native arrow")
                 decoded = _layout_audit._display_segments({kind: [values]})
                 if not decoded:
@@ -459,19 +562,27 @@ def _measured_annotation_ink(record: dict[str, Any], label: str) -> tuple[list[S
     for index, raw in enumerate(record.get("leaders") or ()):
         try:
             values = tuple(float(v) for v in raw)
-            if len(values) < 6 or len(values) % 3 or not all(map(math.isfinite, values)):
+            if (
+                len(values) < 6
+                or len(values) % 3
+                or not all(map(math.isfinite, values))
+            ):
                 raise ValueError("truncated/nonfinite registered leader")
             strokes.extend(
                 Segment(values[i], values[i + 1], values[i + 3], values[i + 4])
                 for i in range(0, len(values) - 3, 3)
             )
         except (TypeError, ValueError, OverflowError) as exc:
-            errors.append(f"{label}: unreadable actual registered leader[{index}]: {exc}")
+            errors.append(
+                f"{label}: unreadable actual registered leader[{index}]: {exc}"
+            )
     return strokes, boxes, errors
 
 
 def _assert_mouth_annotation_ink(
-    dumps: list[dict[str, Any]], *, collection_errors: tuple[str, ...] = (),
+    dumps: list[dict[str, Any]],
+    *,
+    collection_errors: tuple[str, ...] = (),
     mouth_crop: tuple[float, float, float, float] | None = None,
 ) -> None:
     """Gate every actual new-mouth ink conflict, retaining the old sheet lanes."""
@@ -484,7 +595,9 @@ def _assert_mouth_annotation_ink(
     for sheet in dumps:
         if sheet.get("read_errors"):
             errors.append(f"native collection errors: {sheet['read_errors']!r}")
-        for record in _layout_audit.audited_annotations(_layout_audit.printed_dump(sheet)):
+        for record in _layout_audit.audited_annotations(
+            _layout_audit.printed_dump(sheet)
+        ):
             if record.get("owner_type") == 2:
                 continue
             name = record.get("dimension_name", "")
@@ -497,12 +610,18 @@ def _assert_mouth_annotation_ink(
             if name in found:
                 found[name].append(record)
                 if record.get("owner_type") != 0 or record.get("visible") != 1:
-                    errors.append(f"{label}: lost native view ownership or print visibility")
+                    errors.append(
+                        f"{label}: lost native view ownership or print visibility"
+                    )
                 if name == "FloorHoleMouthChamfer":
                     texts = display.get("texts") or ()
                     if not isinstance(texts, (list, tuple)):
                         texts = ()  # keep collecting faults in this and later records
-                    printed = " ".join(" ".join(str(t.get("t") or "") for t in texts if isinstance(t, dict)).split())
+                    printed = " ".join(
+                        " ".join(
+                            str(t.get("t") or "") for t in texts if isinstance(t, dict)
+                        ).split()
+                    )
                     for token in (
                         f"{FLOOR_HOLE_MOUTH_CHAMFER + FLOOR_HOLE_MOUTH_CHAMFER_BAND[1]:.2f}",
                         f"{FLOOR_HOLE_MOUTH_CHAMFER + FLOOR_HOLE_MOUTH_CHAMFER_BAND[0]:.2f}",
@@ -510,26 +629,46 @@ def _assert_mouth_annotation_ink(
                         *FLOOR_HOLE_MOUTH_CHAMFER_CALLOUT.splitlines(),
                     ):
                         if token not in printed:
-                            errors.append(f"{label}: actual rendered text lost {token!r}")
-                if not boxes or not strokes or not display.get("arrows") or not display.get("lines"):
-                    errors.append(f"{label}: missing actual native text/witness/arrow inventory")
+                            errors.append(
+                                f"{label}: actual rendered text lost {token!r}"
+                            )
+                if (
+                    not boxes
+                    or not strokes
+                    or not display.get("arrows")
+                    or not display.get("lines")
+                ):
+                    errors.append(
+                        f"{label}: missing actual native text/witness/arrow inventory"
+                    )
             # Every generated ink primitive, not merely the new text anchor,
             # stays within the frame and outside the unchanged title block.
             for box in [*boxes, *(stroke.box() for stroke in strokes)]:
-                if not (0.0127 <= box.xmin <= box.xmax <= 0.4191 and 0.0127 <= box.ymin <= box.ymax <= 0.2667):
+                if not (
+                    0.0127 <= box.xmin <= box.xmax <= 0.4191
+                    and 0.0127 <= box.ymin <= box.ymax <= 0.2667
+                ):
                     errors.append(f"{label}: actual ink outside inner border: {box!r}")
                 if box.xmax > 0.216 and box.ymin < 0.070:
                     errors.append(f"{label}: actual ink enters title block: {box!r}")
             if mouth_crop is not None:
                 crop = Box(*mouth_crop)
                 if any(box.gap(crop) < 0.002 for box in boxes):
-                    errors.append(f"{label}: actual text crowds the mouth crop's model geometry")
-                if name != "FloorHoleMouthChamfer" and any(segment_box_distance(line, crop) < 0.002 for line in strokes):
-                    errors.append(f"{label}: actual foreign annotation ink enters the mouth crop")
+                    errors.append(
+                        f"{label}: actual text crowds the mouth crop's model geometry"
+                    )
+                if name != "FloorHoleMouthChamfer" and any(
+                    segment_box_distance(line, crop) < 0.002 for line in strokes
+                ):
+                    errors.append(
+                        f"{label}: actual foreign annotation ink enters the mouth crop"
+                    )
             all_ink.append((name, label, strokes, boxes))
     for name, rows in found.items():
         if len(rows) != 1:
-            errors.append(f"{name}: expected one printed native dimension, found {len(rows)}")
+            errors.append(
+                f"{name}: expected one printed native dimension, found {len(rows)}"
+            )
     mouths = [entry for entry in all_ink if entry[0] == "FloorHoleMouthChamfer"]
     for _, label, strokes, boxes in mouths:
         for other_name, other_label, other_strokes, other_boxes in all_ink:
@@ -537,10 +676,22 @@ def _assert_mouth_annotation_ink(
                 continue
             if any(a.gap(b) < 0.00357 for a in boxes for b in other_boxes):
                 errors.append(f"{label} vs {other_label}: actual text blocks crowd")
-            if any(segment_box_distance(line, box) < 0.002 for line in strokes for box in other_boxes):
-                errors.append(f"{label} vs {other_label}: actual new witness/leader/arrow crowds foreign text")
-            if any(segment_box_distance(line, box) < 0.002 for line in other_strokes for box in boxes):
-                errors.append(f"{label} vs {other_label}: actual foreign ink crowds new text")
+            if any(
+                segment_box_distance(line, box) < 0.002
+                for line in strokes
+                for box in other_boxes
+            ):
+                errors.append(
+                    f"{label} vs {other_label}: actual new witness/leader/arrow crowds foreign text"
+                )
+            if any(
+                segment_box_distance(line, box) < 0.002
+                for line in other_strokes
+                for box in boxes
+            ):
+                errors.append(
+                    f"{label} vs {other_label}: actual foreign ink crowds new text"
+                )
             crossing = False
             for a in strokes:
                 for b in other_strokes:
@@ -550,14 +701,29 @@ def _assert_mouth_annotation_ink(
                         crossing = True
                     if a.length and b.length:
                         ux, uy = (a.x1 - a.x0) / a.length, (a.y1 - a.y0) / a.length
-                        near = all(abs((x - a.x0) * uy - (y - a.y0) * ux) <= 0.00005 for x, y in ((b.x0, b.y0), (b.x1, b.y1)))
-                        projections = [(x - a.x0) * ux + (y - a.y0) * uy for x, y in ((b.x0, b.y0), (b.x1, b.y1))]
-                        if near and min(a.length, max(projections)) - max(0.0, min(projections)) > 0.0001:
+                        near = all(
+                            abs((x - a.x0) * uy - (y - a.y0) * ux) <= 0.00005
+                            for x, y in ((b.x0, b.y0), (b.x1, b.y1))
+                        )
+                        projections = [
+                            (x - a.x0) * ux + (y - a.y0) * uy
+                            for x, y in ((b.x0, b.y0), (b.x1, b.y1))
+                        ]
+                        if (
+                            near
+                            and min(a.length, max(projections))
+                            - max(0.0, min(projections))
+                            > 0.0001
+                        ):
                             crossing = True
             if crossing:
-                errors.append(f"{label} vs {other_label}: actual foreign leader/witness/arrow crossing")
+                errors.append(
+                    f"{label} vs {other_label}: actual foreign leader/witness/arrow crossing"
+                )
     if errors:
-        raise RuntimeError("MHA-DT-35 mouth annotation ink violations:\n" + "\n".join(errors))
+        raise RuntimeError(
+            "MHA-DT-35 mouth annotation ink violations:\n" + "\n".join(errors)
+        )
 
 
 def assert_final_mouth_detail(adapter: Any, section: Any, detail: Any) -> None:
@@ -570,7 +736,8 @@ def assert_final_mouth_detail(adapter: Any, section: Any, detail: Any) -> None:
     try:
         native = _early_bound(detail, "IView")
         owned = [
-            _early_bound(a, "IAnnotation") for a in (native.GetAnnotations() or ())
+            _early_bound(a, "IAnnotation")
+            for a in (native.GetAnnotations() or ())
             if dimension_name(adapter, a)
         ]
         if [dimension_name(adapter, a) for a in owned] != ["FloorHoleMouthChamfer"]:
@@ -616,7 +783,9 @@ def assert_final_mouth_detail(adapter: Any, section: Any, detail: Any) -> None:
             errors.append(f"native layer inventory: {exc}")
         dump["read_errors"] = reader.take_errors()
         dumps.append(dump)
-    _assert_mouth_annotation_ink(dumps, collection_errors=tuple(errors), mouth_crop=crop)
+    _assert_mouth_annotation_ink(
+        dumps, collection_errors=tuple(errors), mouth_crop=crop
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -685,11 +854,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # transfer: a free drawing dimension or numeric note is not a substitute.
     by_name = {dimension_name(adapter, a): a for a in annotations}
     mouth = move_model_dimension(
-        adapter, by_name["FloorHoleMouthChamfer"], detail,
-        MOUTH_DETAIL_KEEP["FloorHoleMouthChamfer"], source_view=section,
+        adapter,
+        by_name["FloorHoleMouthChamfer"],
+        detail,
+        MOUTH_DETAIL_KEEP["FloorHoleMouthChamfer"],
+        source_view=section,
     )
-    annotations = [a for a in annotations if dimension_name(adapter, a) != "FloorHoleMouthChamfer"] + [mouth]
-    _early_bound(mouth.GetSpecificAnnotation(), "IDisplayDimension").SetText(2, FLOOR_HOLE_MOUTH_CHAMFER_SUFFIX)
+    annotations = [
+        a for a in annotations if dimension_name(adapter, a) != "FloorHoleMouthChamfer"
+    ] + [mouth]
+    _early_bound(mouth.GetSpecificAnnotation(), "IDisplayDimension").SetText(
+        2, FLOOR_HOLE_MOUTH_CHAMFER_SUFFIX
+    )
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     by_name = {dimension_name(adapter, a): a for a in annotations}
