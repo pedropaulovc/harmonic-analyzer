@@ -75,6 +75,10 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         assert sorted(kept) == sorted(marked)
         # The whole D-bore prints in the bore view, and only there.
         assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS["BoreProfile"]
+        # The turned blank reads as an overall diameter on the side view,
+        # never as a circular/end-view leader; face width keeps that view too.
+        assert set(drawing.front_keep(teeth)) == {"FloorDia", "ToothThickness"}
+        assert set(drawing.right_keep(teeth)) == {"BlankDia", "FaceWidth"}
 
 
 def test_model_owns_precision_for_every_printed_dimension() -> None:
@@ -710,7 +714,7 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             assert not (x > 0.216 and y < 0.070)
         assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_face
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
-        assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
+        assert right["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
         # Third-angle projection: the side view shares the front bore axis.
         assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
         # The Gear Data block clears the largest side view, and the face-width
@@ -1162,17 +1166,222 @@ def test_only_the_front_view_shows_the_authoring_sketches() -> None:
             assert not owned & set(drawing.bore_view_keep(teeth))
 
 
-# Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):
-# the vertical centre-mark line reaches y 0.1763, and the BlankDia value's text
-# box hangs 0.0036 below its anchor (anchor 0.1791, box bottom 0.1755).
-_T006_CENTRE_MARK_TOP = 0.1763
-_BLANK_DIA_TEXT_DESCENT = 0.0036
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_side_blank_diameter_lane_clears_preserved_dimensions_and_iso(teeth: int) -> None:
+    """Projected diameter witnesses and text have their own side-view lane."""
+    half_face = drawing.rendered_half_face_width(teeth)
+    half_od = drawing.rendered_half_od(teeth)
+    cx, cy = drawing.RIGHT_CENTER
+    blank_x, blank_y = drawing.right_keep(teeth)["BlankDia"]
+    face_x, face_y = drawing.right_keep(teeth)["FaceWidth"]
+    # The 35 mm lane is measured from the physical side silhouette, not the
+    # end-view circle. At the bore axis a vertical linear diameter spans the
+    # whole OD; its text cannot be lifted back onto the end view.
+    assert blank_x == pytest.approx(cx + half_face + 0.035)
+    assert blank_y == pytest.approx(cy)
+    assert blank_x - (cx + half_face) >= 0.035 - 1e-12
+    # The retained mate callout's measured full width is 55.1 mm; do not
+    # infer its font width from the model diameter or shorten its wording.
+    blank_half_width = 0.0551 / 2.0
+    blank_half_height = 0.012
+    assert blank_x - blank_half_width > cx + half_face + 0.005
+    assert blank_x + blank_half_width < drawing.ISO_CENTER[0] - half_od - 0.005
+    # Keep the existing FaceWidth position independently of the new OD lane.
+    expected_face_x = cx if 2.0 * half_face >= 0.040 else cx + half_face + 0.020
+    assert (face_x, face_y) == pytest.approx((expected_face_x, cy - half_od - 0.017))
+    assert face_y + 0.012 < cy - half_od
+    assert face_y + 0.012 < blank_y - blank_half_height
+    floor_x, _floor_y = drawing.front_keep(teeth)["FloorDia"]
+    assert floor_x + _FLOOR_TEXT_HALF_WIDTH < cx - half_face - 0.020
+    assert floor_x + _FLOOR_TEXT_HALF_WIDTH < blank_x - blank_half_width
+    assert blank_y + blank_half_height < drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
 
 
-def test_t006_blank_dia_value_clears_the_centre_mark_line() -> None:
-    """layoutcheck T006: the value sat 0.82 mm down over the centre-mark line."""
-    text_bottom = drawing.front_keep(6)["BlankDia"][1] - _BLANK_DIA_TEXT_DESCENT
-    assert text_bottom >= _T006_CENTRE_MARK_TOP + 0.001
+class _ImportedBlankDimension:
+    """Read-only model data: presentation cannot rewrite size or bands."""
+
+    __slots__ = ("Name", "values", "queries")
+
+    def __init__(self, teeth: int, name: str = "BlankDia") -> None:
+        self.Name = name
+        self.values = {f"T{teeth:03d}": (spec.outside_dia_mm(teeth) / 1000.0,)}
+        self.queries: list[tuple[int, str]] = []
+
+    @property
+    def SystemValue(self) -> float:
+        raise AssertionError("Read the sheet configuration, not the active model")
+
+    def GetSystemValue3(self, which: int, configuration: str) -> tuple[float, ...]:
+        assert which == 3
+        self.queries.append((which, configuration))
+        return self.values[configuration]
+
+
+class _ImportedBlankDisplay:
+    __slots__ = ("dimension", "kind", "linear", "accept_linear", "accept_vertical", "vertical")
+
+    def __init__(self, teeth: int, name: str = "BlankDia") -> None:
+        self.dimension = _ImportedBlankDimension(teeth, name)
+        self.kind = 6
+        self.linear = False
+        self.accept_linear = True
+        self.accept_vertical = True
+        self.vertical = False
+
+    @property
+    def Type2(self) -> int:
+        return self.kind
+
+    @property
+    def DisplayAsLinear(self) -> bool:
+        return self.linear
+
+    @DisplayAsLinear.setter
+    def DisplayAsLinear(self, value: bool) -> None:
+        if self.accept_linear:
+            self.linear = value
+
+    def SetVertical(self) -> bool:
+        self.vertical = self.accept_vertical
+        return self.accept_vertical
+
+    def GetDimension2(self, index: int) -> _ImportedBlankDimension:
+        assert index == 0
+        return self.dimension
+
+
+class _ImportedBlankAnnotation:
+    def __init__(self, display: _ImportedBlankDisplay) -> None:
+        self.display = display
+
+    def GetSpecificAnnotation(self) -> _ImportedBlankDisplay:
+        return self.display
+
+
+@pytest.fixture
+def native_blank_adapter(monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace
+
+    active: list[str] = []
+    model = SimpleNamespace(ActivateSheet=lambda name: active.append(name) or True)
+    adapter = SimpleNamespace(currentModel=model, active=active, rebuilds=[])
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing, "dimension_name",
+        lambda _adapter, annotation: annotation.GetSpecificAnnotation().dimension.Name,
+    )
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing",
+        lambda _adapter, *, label: adapter.rebuilds.append(label),
+    )
+    return adapter
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_imported_blank_becomes_vertical_linear_without_changing_model_data(
+    native_blank_adapter, configuration: str, teeth: int,
+) -> None:
+    display = _ImportedBlankDisplay(teeth)
+    original = dict(display.dimension.values)
+    result = drawing._set_linear_blank_diameter(
+        native_blank_adapter, [_ImportedBlankAnnotation(display)], configuration, teeth,
+    )
+    assert result is display
+    assert display.DisplayAsLinear and display.vertical
+    assert display.Type2 == 6
+    assert display.dimension.values == original
+    assert display.dimension.queries
+    assert set(display.dimension.queries) == {(3, configuration)}
+    assert native_blank_adapter.rebuilds
+
+
+@pytest.mark.parametrize("kind", (0, 2, 3, 5, 12, 15))
+def test_blank_rejects_wrong_native_type_before_reading_a_length(
+    native_blank_adapter, kind: int,
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.kind = kind
+    with pytest.raises(RuntimeError, match="native diameter"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [_ImportedBlankAnnotation(display)], "T006", 6,
+        )
+    assert not display.dimension.queries
+    assert not display.DisplayAsLinear
+
+
+@pytest.mark.parametrize("values", ((), (0.001,), (0.001, 0.002)))
+def test_blank_rejects_wrong_or_ambiguous_configuration_value(
+    native_blank_adapter, values: tuple[float, ...],
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.dimension.values["T006"] = values
+    with pytest.raises(RuntimeError, match="native BlankDia reads"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [_ImportedBlankAnnotation(display)], "T006", 6,
+        )
+    assert not display.DisplayAsLinear
+
+
+@pytest.mark.parametrize("names", ((), ("FaceWidth",), ("BlankDia", "BlankDia")))
+def test_blank_requires_one_imported_model_dimension(
+    native_blank_adapter, names: tuple[str, ...],
+) -> None:
+    annotations = [_ImportedBlankAnnotation(_ImportedBlankDisplay(6, name)) for name in names]
+    with pytest.raises(RuntimeError, match="expected one BlankDia"):
+        drawing._set_linear_blank_diameter(native_blank_adapter, annotations, "T006", 6)
+
+
+@pytest.mark.parametrize("refusal", ("linear", "vertical", "rebuild-revert", "value-drift", "type-drift"))
+def test_blank_refuses_failed_or_unsettled_native_presentation(
+    native_blank_adapter, monkeypatch: pytest.MonkeyPatch, refusal: str,
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.accept_linear = refusal != "linear"
+    display.accept_vertical = refusal != "vertical"
+
+    def rebuild(_adapter, *, label):
+        if refusal == "rebuild-revert":
+            display.linear = False
+        if refusal == "value-drift":
+            display.dimension.values["T006"] = (0.001,)
+        if refusal == "type-drift":
+            display.kind = 5
+
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    with pytest.raises(RuntimeError, match="BlankDia"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [_ImportedBlankAnnotation(display)], "T006", 6,
+        )
+
+
+def test_settled_blank_readback_checks_every_sheet(native_blank_adapter) -> None:
+    blanks = []
+    for configuration, teeth in spec.CONFIGS:
+        display = _ImportedBlankDisplay(teeth)
+        display.linear = True
+        blanks.append((configuration, display, teeth))
+    drawing._assert_settled_blank_diameters(native_blank_adapter, blanks)
+    assert native_blank_adapter.active == list(drawing.GEAR_SHEET_NAMES)
+    for configuration, display, _teeth in blanks:
+        assert display.dimension.queries
+        assert set(display.dimension.queries) == {(3, configuration)}
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+@pytest.mark.parametrize("drift", ("circular", "value", "type"))
+def test_settled_blank_refuses_native_regression_on_any_sheet(
+    native_blank_adapter, configuration: str, teeth: int, drift: str,
+) -> None:
+    display = _ImportedBlankDisplay(teeth)
+    display.linear = drift != "circular"
+    if drift == "value":
+        display.dimension.values[configuration] = (0.001,)
+    if drift == "type":
+        display.kind = 5
+    with pytest.raises(RuntimeError, match="BlankDia"):
+        drawing._assert_settled_blank_diameters(
+            native_blank_adapter, [(configuration, display, teeth)],
+        )
 
 
 def test_invalid_family_member_is_rejected() -> None:
