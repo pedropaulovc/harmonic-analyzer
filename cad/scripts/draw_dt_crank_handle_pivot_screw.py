@@ -15,13 +15,13 @@ tip, the one faced end (see ``dt_crank_handle_pivot_screw_spec``).  The
 head-end view is the ``*Back`` orientation, which is exactly the third-angle
 RIGHT view of that profile, so it sits on the profile's axis to its right and
 shows the slot.
-The relief width, lead, thread-side floor radius and modelled seat edge
+The relief diameter, lead, thread-side floor radius and modelled seat edge
 break read in a standalone cropped 10:1 ``*Right`` model view, labelled
-DETAIL A and circled on the side view.  A temporary face-on Front donor imports
-the true-circle relief Ø and transfers only its annotation to SIDE before
-deletion.  The main profile keeps the root text below-right, the thread length
-above and the thread note below-left.  Rebuilt relief and all three axial
-dimension ink groups must stay separate; no typed size or style fallback.
+DETAIL A and circled on the side view.  The ordinary associative two-arrow
+diameter crosses both neck surfaces within the straight floor; its full text
+block stays below the model.  The width stays on SIDE, avoiding witnesses
+through that text.  Rebuilt native diameter ink must clear both groove corners
+and each of the other three detail dimensions.
 
 Run with SolidWorks open::
 
@@ -40,9 +40,7 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
-    delete_view,
     dimension_name,
-    iter_views,
     place_view,
     view_name,
 )
@@ -59,7 +57,6 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    move_model_dimension,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -89,7 +86,6 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_CORNER_CALLOUT,
     RELIEF_CORNER_RADIUS_MAX,
     RELIEF_DIA,
-    RELIEF_DIAMETER_SKETCH,
     RELIEF_DIA_CALLOUT,
     RELIEF_DIA_ROOT_CALLOUT,
     RELIEF_END_STATION,
@@ -189,12 +185,9 @@ SIDE_KEEP = {
     # The head Ø's value stands a little above the axis so its callout below
     # stays between the head's extension lines.
     "HeadDia": (HEAD_DIA_TEXT_X, SIDE_CENTER[1] + 0.0025),
-    # Reserve the complete native text to the RIGHT, not half its width about
-    # the ask: native broken text can be right/left justified, not centred.
-    # Actual rebuilt ink must still clear both physical groove corners.
-    "ReliefDia": (SEAT_X + 0.014, SIDE_CENTER[1] - 0.024),
+    "ReliefWidth": ((SEAT_X + RELIEF_END_X) / 2.0, SIDE_CENTER[1] - 0.030),
     # The native tip leg and X45 reason stand above-left, outside the thread
-    # profile and clear of the relief diameter's lower seating-reason rows.
+    # profile.
     "TipChamfer": (TIP_X - 0.020, SIDE_CENTER[1] + 0.020),
     # The slot shows as a notch in the head face; its depth reads above it,
     # outside the head face.
@@ -208,25 +201,25 @@ END_KEEP = {
 # A standalone cropped model view offers the tiny model-owned dimensions
 # that a true detail child did not offer in the VN post-mount-screw recipe.
 # The radius owns the upper row, with 3.2 mm nominal reason-to-witness air
-# at a conservative 1.3 mm tiny-leg overrun.  The broad width sits below the
-# crop so its dimension line cannot cross the native radius leader.
+# at a conservative 1.3 mm tiny-leg overrun.  The width's long witnesses stay
+# on SIDE, separate from the enlarged diameter's text and vertical stroke.
 DETAIL_SCALE = (10.0, 1.0)
-DETAIL_CENTER = (0.115, 0.058)
+DETAIL_CENTER = (0.115, 0.068)
 DETAIL_RADIUS_MM = 3.0
 DETAIL_RADIUS = DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
 DETAIL_REFERENCE_MM = (0.0, 0.0, DETAIL_STATION)
 DETAIL_KEEP = {
     "ReliefCornerRadius": (DETAIL_CENTER[0], 0.1015),
-    "ReliefWidth": (DETAIL_CENTER[0], 0.0265),
     "ReliefLead": (0.075, 0.0955),
     "SeatEdgeBreak": (0.180, 0.0955),
+    "ReliefDia": (DETAIL_CENTER[0], 0.032),
 }
 DETAIL_LETTER = "A"
 DETAIL_VIEW_LABEL = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
 )
-DETAIL_LABEL_XY = (0.165, 0.055)
+DETAIL_LABEL_XY = (0.165, 0.065)
 DETAIL_PARENT_LETTER_XY = (
     _sheet_x(DETAIL_STATION) + 0.014,
     SIDE_CENTER[1] + 0.019,
@@ -236,6 +229,8 @@ DETAIL_PARENT_RADIUS = DETAIL_RADIUS_MM * _S / 1000.0
 CIRCLE_TOL_M = 0.00005
 DETAIL_VIEW_POSITION_TOLERANCE_M = 0.0001
 ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+SOLID_LEADER_ALIGNED_TEXT = 1  # swDisplayDimensionLeaderText_e
 _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, the full-thread portion's own end edge in the side view (the
@@ -267,7 +262,7 @@ CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.218)
 # The single assembly-only note sits above the profile, clear of DETAIL A.
 NOTES_XY = (0.016, 0.250)
-AXIAL_DIMENSIONS = ("ThreadLength", "UnderHeadLocation", "OverallLength")
+DETAIL_DIMENSIONS = ("ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius")
 
 
 def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
@@ -445,49 +440,23 @@ def cropped_relief_view(adapter: Any) -> Any:
     return view
 
 
-def import_relief_diameter(adapter: Any, side: Any) -> Any:
-    """Import the hidden true-circle carrier face-on without showing it in SIDE."""
-    donor = place_view(
-        adapter, str(SOURCE), "*Front", 0.030, 0.230, scale=VIEW_SCALE
-    )
-    annotations = curate_view_dimensions(
-        adapter,
-        donor,
-        keep={"ReliefDia": SIDE_KEEP["ReliefDia"]},
-        view_label="relief diameter donor",
-        dimensions_by_feature={
-            RELIEF_DIAMETER_SKETCH: DRAWING_DIMENSIONS[RELIEF_DIAMETER_SKETCH]
-        },
-    )
-    if len(annotations) != 1 or dimension_name(adapter, annotations[0]) != "ReliefDia":
-        raise RuntimeError("MHA-DT-032 relief diameter donor did not own exactly ReliefDia")
-    moved = move_model_dimension(
-        adapter, annotations[0], side, SIDE_KEEP["ReliefDia"], source_view=donor
-    )
-    donor_name = view_name(adapter, donor)
-    delete_view(adapter, donor)
-    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-        raise RuntimeError("MHA-DT-032 relief diameter donor was not deleted")
-    return moved
-
-
 def _assert_relief_diameter_carrier(annotation: Any) -> None:
-    """Reject styled linear carriers and unrelated circles before styling/ink."""
+    """Require the associative doubled-distance profile control, not a note."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    kind = int(display.Type2)  # swDimensionType_e.swDiameterDimension = 6
-    if kind != 6:
+    kind = int(display.Type2)  # swDimensionType_e.swDiametricLinearDimension = 15
+    if kind != 15:
         raise RuntimeError(
-            f"MHA-DT-032 relief diameter wrong native type: Type2={kind!r}, expected 6"
+            f"MHA-DT-032 relief diameter wrong native type: Type2={kind!r}, expected 15"
         )
     raw = display.GetDimension2(0)
     if raw is None:
         raise RuntimeError("MHA-DT-032 relief diameter missing native model dimension")
     dimension = _early_bound(raw, "IDimension")
     full_name = str(dimension.FullName)
-    if full_name.split("@")[:2] != ["ReliefDia", RELIEF_DIAMETER_SKETCH]:
+    if full_name.split("@")[:2] != ["ReliefDia", "ScrewProfile"]:
         raise RuntimeError(
             "MHA-DT-032 relief diameter wrong native owner: "
-            f"FullName={full_name!r}, expected ReliefDia@{RELIEF_DIAMETER_SKETCH}"
+            f"FullName={full_name!r}, expected ReliefDia@ScrewProfile"
         )
     value = float(dimension.SystemValue)
     expected = RELIEF_DIA / 1000.0
@@ -498,128 +467,202 @@ def _assert_relief_diameter_carrier(annotation: Any) -> None:
         )
 
 
-def _assert_relief_diameter_leader(
+def _assert_relief_diameter_style(display: Any) -> None:
+    """Read every native style setting, including the explicit second arrow."""
+    actual = {
+        "Diametric": bool(display.Diametric),
+        "ArrowSide": int(display.ArrowSide),
+        "CenterText": bool(display.CenterText),
+        "SolidLeader": bool(display.SolidLeader),
+        "GetUseDocBrokenLeader": bool(display.GetUseDocBrokenLeader()),
+        "GetBrokenLeader2": int(display.GetBrokenLeader2()),
+        "GetUseDocSecondArrow": bool(display.GetUseDocSecondArrow()),
+        "GetSecondArrow": bool(display.GetSecondArrow()),
+    }
+    expected = {
+        "Diametric": True,
+        "ArrowSide": ARROWS_INSIDE,
+        "CenterText": False,
+        "SolidLeader": True,
+        "GetUseDocBrokenLeader": False,
+        "GetBrokenLeader2": SOLID_LEADER_ALIGNED_TEXT,
+        "GetUseDocSecondArrow": False,
+        "GetSecondArrow": True,
+    }
+    if actual != expected:
+        raise RuntimeError(
+            "MHA-DT-032 relief diameter native two-arrow style did not persist: "
+            f"actual={actual!r}; expected={expected!r}"
+        )
+
+
+def _assert_relief_diameter_ink(
     segments: Sequence[_drawing_leaders.Segment],
-    axial_segments: Mapping[str, Sequence[_drawing_leaders.Segment]],
+    detail_segments: Mapping[str, Sequence[_drawing_leaders.Segment]],
 ) -> None:
-    """Require actual floor landing, corner air and pairwise axial separation."""
-    groups = {"ReliefDia": segments, **axial_segments}
+    """Prove the conventional diameter in DETAIL, not a near-side surrogate.
+
+    Coordinates are actual rebuilt sheet ink.  A normal 1 mm extension gap
+    is measured along the extension at a real floor endpoint, never used as
+    slack in the physical neck's Y coordinate.
+    """
+    groups = {"ReliefDia": segments, **detail_segments}
     if not segments:
         raise RuntimeError(
-            f"MHA-DT-032 relief diameter has no native leader ink; segments={groups!r}"
+            f"MHA-DT-032 relief diameter has no native ink; segments={groups!r}"
         )
-    for name in AXIAL_DIMENSIONS:
-        if name not in axial_segments:
+    for name in DETAIL_DIMENSIONS:
+        if name not in detail_segments:
             raise RuntimeError(
-                "MHA-DT-032 relief axial annotation missing: "
-                f"{name}; segments={groups!r}"
+                f"MHA-DT-032 relief detail annotation missing: {name}; segments={groups!r}"
             )
-        if not axial_segments[name]:
+        if not detail_segments[name]:
             raise RuntimeError(
-                f"MHA-DT-032 relief axial native ink empty: {name}; segments={groups!r}"
+                f"MHA-DT-032 relief detail native ink empty: {name}; segments={groups!r}"
             )
-    floor_left, floor_right = sorted(
-        (
-            _sheet_x(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
-            _sheet_x(SEAT_STATION + RELIEF_LEAD),
+        if not all(
+            math.isfinite(value)
+            for stroke in detail_segments[name] for point in stroke for value in point
+        ):
+            raise RuntimeError(
+                f"MHA-DT-032 relief detail nonfinite native ink: {name}; segments={groups!r}"
+            )
+    if not all(math.isfinite(value) for stroke in segments for point in stroke for value in point):
+        raise RuntimeError(
+            f"MHA-DT-032 relief diameter nonfinite native ink; segments={groups!r}"
         )
-    )
-    floor_y = SIDE_CENTER[1] - RELIEF_DIA * _S / 2000.0
-    if not any(
-        math.hypot(
-            x - min(max(x, floor_left), floor_right),
-            y - floor_y,
-        )
-        <= 0.00015
-        for segment in segments
-        for x, y in segment
+    scale = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+    cx, cy = DETAIL_CENTER
+    floor_left = round(cx + (DETAIL_STATION - RELIEF_END_STATION + RELIEF_CORNER_RADIUS_MAX) * scale, 12)
+    floor_right = round(cx + (DETAIL_STATION - SEAT_STATION - RELIEF_LEAD) * scale, 12)
+    neck_bottom, neck_top = (cy - RELIEF_DIA * scale / 2.0, cy + RELIEF_DIA * scale / 2.0)
+    tol = 0.00015
+    # No blanket exemption for horizontal extensions: every root stroke must
+    # clear the physical shoulder and thread at their respective corners.
+    for label, station, diameter in (
+        ("seat face/witness", SEAT_STATION, SHOULDER_DIA),
+        ("thread-side corner", RELIEF_END_STATION, THREAD_MODEL_DIA),
+    ):
+        x = round(cx + (DETAIL_STATION - station) * scale, 12)
+        bottom, top = cy - diameter * scale / 2.0, cy + diameter * scale / 2.0
+        forbidden = (bottom - 0.002, top + 0.002)
+        for (x0, y0), (x1, y1) in segments:
+            if not min(x0, x1) <= x <= max(x0, x1):
+                continue
+            if x0 == x1:
+                low, high = sorted((y0, y1))
+                if high <= forbidden[0] or low >= forbidden[1]:
+                    continue
+                crossing_y = max(low, forbidden[0])
+            else:
+                crossing_y = y0 + (x - x0) * (y1 - y0) / (x1 - x0)
+                if crossing_y <= forbidden[0] or crossing_y >= forbidden[1]:
+                    continue
+            raise RuntimeError(
+                f"MHA-DT-032 relief diameter ink crosses the {label}; "
+                f"crossing=({x!r}, {crossing_y!r}), "
+                f"physical_y=({bottom!r}, {top!r}), clearance=0.002; segments={groups!r}"
+            )
+    verticals = [
+        stroke for stroke in segments
+        if abs(stroke[0][0] - stroke[1][0]) <= 1e-9
+        and min(stroke[0][1], stroke[1][1]) <= neck_bottom + tol
+        and max(stroke[0][1], stroke[1][1]) >= neck_top - tol
+    ]
+    if not verticals or any(
+        not floor_left <= point[0] <= floor_right
+        for stroke in verticals for point in stroke
     ):
         raise RuntimeError(
-            "MHA-DT-032 relief diameter leader does not land on the lower groove floor; "
-            f"floor=({floor_left!r}, {floor_y!r})..({floor_right!r}, {floor_y!r}); "
-            f"segments={groups!r}"
+            "MHA-DT-032 relief diameter lacks a vertical stroke within the straight floor "
+            "spanning both neck surfaces; "
+            f"floor_x=({floor_left!r}, {floor_right!r}), "
+            f"neck_y=({neck_bottom!r}, {neck_top!r}), tolerance={tol!r}; segments={groups!r}"
         )
-    shoulder_bottom = SIDE_CENTER[1] - SHOULDER_DIA * _S / 2000.0
-    thread_bottom = SIDE_CENTER[1] - THREAD_MODEL_DIA * _S / 2000.0
-    for (x0, y0), (x1, y1) in segments:
-        if min(x0, x1) <= SEAT_X <= max(x0, x1):
-            if x0 == x1:
-                crossing_y = max(y0, y1)
-            else:
-                crossing_y = y0 + (SEAT_X - x0) * (y1 - y0) / (x1 - x0)
-            if crossing_y > shoulder_bottom - 0.002:
-                raise RuntimeError(
-                    "MHA-DT-032 relief diameter leader crosses the seat face/witness "
-                    "instead of passing below its corner; "
-                    f"crossing=({SEAT_X!r}, {crossing_y!r}), "
-                    f"maximum_y={shoulder_bottom - 0.002!r}; segments={groups!r}"
+    for surface, y in (("lower", neck_bottom), ("upper", neck_top)):
+        associated = False
+        for stroke in verticals:
+            x = stroke[0][0]
+            direct = any(math.dist(point, (x, y)) <= tol for point in stroke)
+            extensions = [
+                extension for extension in segments
+                if abs(extension[0][1] - extension[1][1]) <= 1e-9
+                and abs(extension[0][1] - y) <= tol
+                and abs(extension[1][0] - extension[0][0]) > tol
+            ]
+            connected = False
+            for extension in extensions:
+                start, end = sorted(extension, key=lambda point: abs(point[0] - x), reverse=True)
+                # The model-facing end must be on the real straight floor,
+                # or precisely one normal gap from a real floor endpoint.
+                on_floor = floor_left <= start[0] <= floor_right
+                gapped_endpoint = any(
+                    abs(start[0] - (edge + gap)) <= tol
+                    for edge in (floor_left, floor_right) for gap in (-0.001, 0.001)
                 )
-        if min(x0, x1) <= RELIEF_END_X <= max(x0, x1):
-            if x0 == x1:
-                crossing_y = max(y0, y1)
-            else:
-                crossing_y = y0 + (RELIEF_END_X - x0) * (y1 - y0) / (x1 - x0)
-            if crossing_y > thread_bottom - 0.002:
-                raise RuntimeError(
-                    "MHA-DT-032 relief diameter leader crosses the thread-side corner "
-                    "instead of passing below its corner; "
-                    f"crossing=({RELIEF_END_X!r}, {crossing_y!r}), "
-                    f"maximum_y={thread_bottom - 0.002!r}; segments={groups!r}"
-                )
-    # Baseline references legitimately share their tip witness.  Compare
-    # Root-versus-each only, never foreign-versus-foreign.
-    for name in AXIAL_DIMENSIONS:
-        foreign = axial_segments[name]
-        crossings = _drawing_leaders.leader_crossings(
-            {"ReliefDia": segments, name: foreign}
-        )
+                reaches_line = min(start[0], end[0]) <= x <= max(start[0], end[0])
+                if not reaches_line or not (on_floor or gapped_endpoint):
+                    raise RuntimeError(
+                        f"MHA-DT-032 relief diameter floating {surface} neck extension; "
+                        f"extension={extension!r}, expected_surface_y={y!r}, "
+                        f"floor_x=({floor_left!r}, {floor_right!r}), dimension_x={x!r}; "
+                        f"segments={groups!r}"
+                    )
+                connected = True
+            associated |= direct or connected
+        if not associated:
+            raise RuntimeError(
+                f"MHA-DT-032 relief diameter missing {surface} neck association; "
+                f"expected_surface_y={y!r}, floor_x=({floor_left!r}, {floor_right!r}), "
+                f"tolerance={tol!r}; segments={groups!r}"
+            )
+    # Foreign dimensions may share their own witnesses.  Only root-versus-
+    # each is relevant; retain exact offending strokes in a native refusal.
+    for name in DETAIL_DIMENSIONS:
+        foreign = detail_segments[name]
+        crossings = _drawing_leaders.leader_crossings({"ReliefDia": segments, name: foreign})
         if crossings:
             crossing_segments = [
-                (diameter, axial)
-                for diameter in segments
-                for axial in foreign
-                if _drawing_leaders.segments_cross(diameter, axial)
+                (diameter, other) for diameter in segments for other in foreign
+                if _drawing_leaders.segments_cross(diameter, other)
             ]
             raise RuntimeError(
-                f"MHA-DT-032 relief diameter foreign axial ink: {name}; "
+                f"MHA-DT-032 relief diameter foreign detail ink: {name}; "
                 f"crossings={crossings!r}; crossing_segments={crossing_segments!r}; "
                 f"segments={groups!r}"
             )
 
 
 def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Style the true-circle carrier and prove rebuilt ink clears all axial groups."""
-    remaining = {
-        "ReliefDia": SIDE_KEEP["ReliefDia"],
-        "ReliefLead": DETAIL_KEEP["ReliefLead"],
-        "SeatEdgeBreak": DETAIL_KEEP["SeatEdgeBreak"],
-    }
+    """Author and read back the native two-arrow Ø and all four DETAIL groups."""
+    remaining = {name: DETAIL_KEEP[name] for name in ("ReliefDia", "ReliefLead", "SeatEdgeBreak")}
     relief_diameter = None
-    axial_annotations = dict.fromkeys(AXIAL_DIMENSIONS)
+    detail_annotations = dict.fromkeys(DETAIL_DIMENSIONS)
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
         name = dimension_name(adapter, annotation)
-        if name in AXIAL_DIMENSIONS:
-            axial_annotations[name] = annotation
-            continue
+        if name in detail_annotations:
+            detail_annotations[name] = annotation
         xy = remaining.pop(name, None)
         if xy is None:
             continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         if name == "ReliefDia":
             _assert_relief_diameter_carrier(annotation)
-            _drawing_leaders.set_near_side_diameter(
-                annotation, "MHA-DT-032 relief diameter"
-            )
-            display = _early_bound(
-                annotation.GetSpecificAnnotation(), "IDisplayDimension"
-            )
-            if not bool(display.Diametric):
-                raise RuntimeError("MHA-DT-032 relief diameter native style lost Diametric")
+            display.Diametric = True
+            display.ArrowSide = ARROWS_INSIDE
+            display.CenterText = False
+            display.SetSecondArrow(False, True)
+            display.SolidLeader = True
+            status = int(display.SetBrokenLeader2(False, SOLID_LEADER_ALIGNED_TEXT))
+            if status != 0:
+                raise RuntimeError(
+                    "MHA-DT-032 relief diameter solid aligned leader rejected: "
+                    f"SetBrokenLeader2 status={status!r}"
+                )
+            _assert_relief_diameter_style(display)
             relief_diameter = annotation
         else:
-            display = _early_bound(
-                annotation.GetSpecificAnnotation(), "IDisplayDimension"
-            )
             display.CenterText = False
             display.ArrowSide = ARROWS_OUTSIDE
         if not annotation.SetPosition2(*xy, 0.0):
@@ -633,20 +676,20 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
             )
     if remaining:
         raise RuntimeError(f"relief dimension styles not applied: {sorted(remaining)}")
-    for name in AXIAL_DIMENSIONS:
-        if axial_annotations[name] is None:
+    for name in DETAIL_DIMENSIONS:
+        if detail_annotations[name] is None:
             raise RuntimeError(
-                "MHA-DT-032 relief axial annotation missing: "
-                f"{name}; annotations="
-                f"{sorted(key for key, value in axial_annotations.items() if value is not None)!r}"
+                f"MHA-DT-032 relief detail annotation missing: {name}; annotations="
+                f"{sorted(key for key, value in detail_annotations.items() if value is not None)!r}"
             )
     adapter.currentModel.EditRebuild3()
-    _assert_relief_diameter_leader(
+    _assert_relief_diameter_carrier(relief_diameter)
+    _assert_relief_diameter_style(
+        _early_bound(relief_diameter.GetSpecificAnnotation(), "IDisplayDimension")
+    )
+    _assert_relief_diameter_ink(
         _drawing_leaders.dimension_segments(relief_diameter),
-        {
-            name: _drawing_leaders.dimension_segments(axial_annotations[name])
-            for name in AXIAL_DIMENSIONS
-        },
+        {name: _drawing_leaders.dimension_segments(detail_annotations[name]) for name in DETAIL_DIMENSIONS},
     )
 
 
@@ -731,7 +774,7 @@ async def build(adapter: Any) -> dict[str, str]:
     side_annotations = curate_view_dimensions(
         adapter,
         side,
-        keep={name: xy for name, xy in SIDE_KEEP.items() if name != "ReliefDia"},
+        keep=SIDE_KEEP,
         view_label="side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -749,7 +792,6 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="relief detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    side_annotations.append(import_relief_diameter(adapter, side))
     annotations = [*side_annotations, *end_annotations, *detail_annotations]
     # Each native dimension carries its own angle or functional reason below
     # the value; the two tiny legs remain separate in the enlarged view.
@@ -780,7 +822,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         location="above",
     )
-    style_relief_dimensions(adapter, annotations)
+    style_relief_dimensions(adapter, detail_annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [

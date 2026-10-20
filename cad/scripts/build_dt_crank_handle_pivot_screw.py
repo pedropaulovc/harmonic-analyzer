@@ -18,10 +18,9 @@ Plane (the head face) and cut 1.6 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
 ``Axis1`` the screw axis, for the assembly mates.
 
-The printed relief diameter belongs to a hidden construction circle on
-``ReliefDiameterPlane``, at the middle of the straight groove floor.  The
-private profile diameter and this true circle diameter share the one
-``ReliefDia`` global; the reference adds no solid geometry.
+The printed relief diameter is the associative diametric-linear
+``ReliefDia@ScrewProfile`` control of the straight groove floor, driven by the
+``ReliefDia`` global.
 
 Run (SolidWorks already open)::
 
@@ -58,7 +57,6 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_circle import define_circle
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
@@ -85,8 +83,6 @@ from dt_crank_handle_pivot_screw_spec import (
     RELIEF_CORNER_RADIUS_MAX,
     RELIEF_DIA,
     RELIEF_DIA_BAND,
-    RELIEF_DIAMETER_SKETCH,
-    RELIEF_DIAMETER_STATION,
     RELIEF_END_STATION,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
@@ -217,62 +213,6 @@ def _relief_lead_limits(adapter) -> None:
     _telemetry.success(
         f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
     )
-
-
-async def _relief_diameter_reference(adapter) -> list[tuple[str, str]]:
-    """Own the printed true circle diameter without changing the turned body."""
-    from solidworks_mcp.adapters.base import CreatePlaneParameters
-
-    plane = "ReliefDiameterPlane"
-    check(
-        f"create_plane {plane}",
-        await adapter.create_plane(
-            CreatePlaneParameters(
-                mode="offset",
-                base_plane="Front Plane",
-                offset=RELIEF_DIAMETER_STATION,
-            )
-        ),
-    )
-    name_last_feature(adapter, plane)
-    station_dimension = name_dimensions(adapter, plane, ["ReliefStation"])
-    drive_jobs = [
-        (
-            station_dimension[0],
-            '"HeadLength" + "ShoulderLength" + "ReliefWidth" / 2',
-        )
-    ]
-
-    reference = SketchDims()
-    check(
-        f"create_sketch {RELIEF_DIAMETER_SKETCH}",
-        await adapter.create_sketch(plane),
-    )
-    circle = await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        RELIEF_R,
-        RELIEF_DIAMETER_SKETCH,
-        dims=reference,
-        names=(None, None, "ReliefDia"),
-        drives=(None, None, '"ReliefDia"'),
-        size_dimension="diameter",
-    )
-    segment = _early_bound(adapter._sketch_entities[circle], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("relief diameter reference construction flag rejected")
-    await ensure_fully_defined(adapter, RELIEF_DIAMETER_SKETCH)
-    check(
-        f"exit_sketch {RELIEF_DIAMETER_SKETCH}",
-        await adapter.exit_sketch(),
-    )
-    name_last_feature(adapter, RELIEF_DIAMETER_SKETCH)
-    drive_jobs += reference.apply(adapter, RELIEF_DIAMETER_SKETCH)
-    blank_sketch(adapter, RELIEF_DIAMETER_SKETCH)
-    blank_reference_geometry(adapter, ((plane, "PLANE"),))
-    return drive_jobs
 
 
 async def build(adapter) -> dict[str, str]:
@@ -446,9 +386,9 @@ async def build(adapter) -> dict[str, str]:
             SHOULDER_R,
         ),
         (
-            "ReliefProfileDia",
+            "ReliefDia",
             relief_floor,
-            -RELIEF_DIAMETER_STATION,
+            -(SEAT_STATION + RELIEF_WIDTH / 2.0),
             RELIEF_R,
         ),
         (
@@ -461,11 +401,7 @@ async def build(adapter) -> dict[str, str]:
         await add_diametric_linear_dimension(
             adapter, axis, line, (u_mid, radius + 4.0), name
         )
-        # The private linear carrier still drives the same physical floor.
-        # Only the separate true circle diameter is marked for the drawing.
-        profile.record(
-            name, '"ReliefDia"' if name == "ReliefProfileDia" else f'"{name}"'
-        )
+        profile.record(name, f'"{name}"')
     await anchor_point_to_origin(
         adapter, f"{lines[0]}.start", 0.0, 0.0, "screw head face centre"
     )
@@ -614,8 +550,6 @@ async def build(adapter) -> dict[str, str]:
     # Hidden but still selectable by name for the arm-seat mate.
     blank_reference_geometry(adapter, (("ArmSeat", "PLANE"),))
 
-    drive_jobs += await _relief_diameter_reference(adapter)
-
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "screw axis")
 
     # Apply the deferred drive equations once the whole model exists, then
@@ -642,7 +576,7 @@ async def build(adapter) -> dict[str, str]:
     # The relief needs both limits: below the die-cut root, but no weaker
     # than the previous minimum neck (Codex P2 on #1694).
     set_dimension_bilateral_tolerance(
-        adapter, RELIEF_DIAMETER_SKETCH, "ReliefDia", *deviations(RELIEF_DIA_BAND)
+        adapter, "ScrewProfile", "ReliefDia", *deviations(RELIEF_DIA_BAND)
     )
     # The tip, seat break and relief corner print native MAX limits; the slot
     # depth, relief width and thread length are routine .X.
