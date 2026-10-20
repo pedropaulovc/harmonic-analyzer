@@ -124,10 +124,20 @@ approved declaration carries a comment naming it.
 independent blind senior-machinist reviews per package (`--runs N` changes the
 count). Each run receives `drawing-guidelines.md` followed by the reviewer
 instructions for the package kind (`cad/scripts/prompts/machinist_review_part.md`
-or `machinist_review_assembly.md`). A separate isolated judge inspects the sheets,
-vets every finding against the same guidelines, text layer and owner exceptions,
-and clusters duplicate claims. It confirms real findings, rejects misreads, and
-demotes advisory or accepted-exception claims to non-gating `minor`. A confirmed
+or `machinist_review_assembly.md`), with its classification slot expanded from
+the matching `machinist_review_<kind>_severity.md` contract. A separate isolated
+judge inspects the sheets and receives that same kind-specific classification
+and evidence contract, not the reviewer's detection or report instructions.
+It vets every finding against the guidelines, text layer and owner exceptions,
+and clusters duplicate claims. Categories follow the contract's defect-type
+precedence rather than the original filing: the judge corrects misfiled claims,
+confirms real findings, rejects misreads, and keeps contract-defined minor or
+accepted-exception claims non-gating. Complete `--prompt-file` rubric overrides
+remain opaque; repository templates must be composed before use as overrides.
+Historical benchmark composition pins the reviewer rubric, resolving its
+severity contract from the same Git ref rather than the working tree. The
+benchmark judge and its kind-specific contract still come from the working
+tree for both configurations, as before this change. A confirmed
 finding gates only when at least two runs raised it independently (owner ruling
 2026-10-18; `GATING_MIN_RUNS`, reduced to the number of valid runs when fewer
 than two are valid). A confirmed finding from one run stays in the report as

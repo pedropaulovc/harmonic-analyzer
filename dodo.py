@@ -3199,12 +3199,16 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         exceptions = (
             CONFIG_DIR / "assemblies" / f"{dashed.removesuffix('-assembly')}.yaml"
         )
-    # Selecting only this kind's prompt also keys --kind without hashing the
-    # registry. All shared reviewer/judge prompts and schemas are included.
+    # Selecting this kind's reviewer and severity contract also keys --kind
+    # without hashing the registry. Judge instructions and schemas are shared.
     other_kind = "assembly" if spec.source_kind == "part" else "part"
+    other_prompts = {
+        f"machinist_review_{other_kind}.md",
+        f"machinist_review_{other_kind}_severity.md",
+    }
     prompts = [
         path for path in (SCRIPTS_DIR / "prompts").iterdir()
-        if path.is_file() and path.name != f"machinist_review_{other_kind}.md"
+        if path.is_file() and path.name not in other_prompts
     ]
     return sorted({
         str(path.resolve())

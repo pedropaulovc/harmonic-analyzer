@@ -202,7 +202,7 @@ def release_pdf_name(case: Mapping[str, Any]) -> str:
 
 
 def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) -> str:
-    """Compose the exact ref's guidelines plus appendix, or legacy prompt alone."""
+    """Compose the exact ref's guidelines and rubric, or legacy prompt alone."""
     if kind not in mr.PROMPT_FILES:
         raise ValueError(f"unknown review kind: {kind}")
     if ref is None:
@@ -223,11 +223,23 @@ def compose_prompt(kind: str, ref: str | None = None, repo: Path = REPO_ROOT) ->
         raise ValueError(
             f"cannot load {kind} prompt from {ref}: {appendix.stderr.strip()}"
         )
+    template = appendix.stdout
+    if mr.SEVERITY_TOKEN in template:
+        fragment_path = (
+            f"cad/scripts/prompts/{mr.SEVERITY_FILES[kind].name}"
+        )
+        fragment = show(fragment_path)
+        if fragment.returncode:
+            raise ValueError(
+                f"cannot load {kind} severity contract from {ref} "
+                f"({fragment_path}): {fragment.stderr.strip()}"
+            )
+        template = mr.expand_severity_contract(template, fragment.stdout)
     guidelines = show("cad/docs/drawing-guidelines.md")
     return (
-        f"{guidelines.stdout.rstrip()}\n\n{appendix.stdout}"
+        f"{guidelines.stdout.rstrip()}\n\n{template}"
         if guidelines.returncode == 0
-        else appendix.stdout
+        else template
     )
 
 
