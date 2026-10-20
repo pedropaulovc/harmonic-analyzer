@@ -96,11 +96,13 @@ geometry is casting-shaped, not milling-shaped.
 
 - `fr-rocker-arm-support` carries four **5/16 through clearance drills**. Four
   McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
-  top into blind UNC-2B taps in `fr-harmonic-base`: the exact vendor under-head
-  washer transition seats on the support, leaving 12.422 mm installed
-  engagement (1.956D). The seat is sized at its printed .XX worst case:
-  13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
-  cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
+  top into **through-tapped** UNC-2B seats in `fr-harmonic-base`. The exact
+  vendor under-head washer transition still seats on the support, leaving
+  **12.422 mm stock insertion**. Insertion is not useful engagement: the
+  retained casting limits full-thread overlap, and any excess shank projects
+  into the underside pocket. The seat contracts account separately for the
+  printed material limits, edge breaks, full thread, protrusion and bench
+  clearance; there is no blind drill depth or tap-lead reserve at these seats.
   Other receivers are threaded too; the `sm-knife-mount` #10-24 bottoming hanger-bolt tap is one
   example. The 20 `dt-cone-gear`s and the 64T `dt-crank-drive-gear` transmit torque
   through matching D-bores on the shaft's D-flat lands; the cylinder gears
@@ -128,6 +130,26 @@ geometry is casting-shaped, not milling-shaped.
   table X/Y are reference. The generated native hole-table coordinates remain
   unchanged; the D1 row carries the same `SEE NOTE 1` flag in a custom NOTE
   column (#1744), because generated hole-table cells are not editable.
+
+The base's **18 deck seats** are through-tapped at their existing stations
+and thread designations: four rocker-support, one cone-pivot, one cone-lock,
+one swing-stop, four pinion-block, one spring-foot, two arbor-pedestal and four
+nameplate seats. All **11 round interior islands and five rectangular pads**
+formerly backing those seats are removed. The perimeter, four socket bosses,
+two relieved ribs and four horizontal cross-tap lugs remain. A through tap
+continues through any retained rib or other casting in its path; it is not a
+clearance hole, and no underside nut is introduced. The cross taps remain
+blind and retain their independent manufacturing and engagement contracts.
+
+The per-station material map includes retained ribs, socket bosses, lugs,
+walls and pocket fillets rather than assuming every hole crosses only the
+deck skin. A maximum-radius fillet may contribute material to the nominal
+model, but that optional material cannot be counted as guaranteed full thread
+when the print permits a smaller radius. Native readbacks must prove the
+actual cut opens through every retained material segment. Existing screws,
+their top-side bearing seats and the cone knob's clamp/bare-base poses stay
+unchanged; the original pivot-screw operational-retention issue is not fixed
+merely by breaking its tap through the deck.
 
 ### Blind-thread DFM rule
 
