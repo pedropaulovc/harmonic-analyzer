@@ -779,10 +779,12 @@ def test_review_main_uses_registry_pdf_basename(
     assert controls["force"] is True
     assert controls["report_dir"] == report_dir
     assert controls["reviewer"] == "claude"
+    assert controls["model"] == "claude-opus-5-5"
+    assert controls["effort"] == "medium"
     assert controls["runs"] == 3
     assert controls["judge_reviewer"] == "claude"
-    assert controls["judge_model"] is None
-    assert controls["judge_effort"] is None
+    assert controls["judge_model"] == "claude-opus-5-5"
+    assert controls["judge_effort"] == "medium"
 
 
 @pytest.mark.parametrize("uses_tool", [False, True])

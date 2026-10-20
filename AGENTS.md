@@ -998,9 +998,20 @@ contract with the `-assembly` suffix removed), the review/exception/sheet-server
 code and its pinned local-import closure, the selected kind's reviewer template
 and shared reviewer/judge severity contract, shared judge instructions/schemas,
 and `cad/docs/drawing-guidelines.md`. The other kind's template and severity
-contract are excluded. Reviewer and judge defaults live in the hashed review
-code; there are no model/effort environment overrides. `_drawing_registry.py` is
-intentionally excluded because
+contract are excluded. Reviewer and judge defaults remain independently Claude /
+`claude-opus-5-5` / `medium`. `build.py` accepts `--machinist-reviewer`, `--machinist-model`,
+`--machinist-effort` and independent `--machinist-judge-*` counterparts; the
+supervised launcher forwards the matching six `-Machinist*` options in its
+recorded argv. Omitted model/effort use that role's provider defaults (Codex:
+`gpt-6-astra` / `low`). The wrapper freezes canonical effective settings for its
+submitter workers using an internal carrier, not public ambient overrides.
+A content-addressed review-only digest `file_dep` keys all six effective values
+and fixed build runs=3; settings do not enter native/drawing recipes or the
+OFF/LEARN/ENFORCE declaration. Hits and misses require matching selection in
+aggregate and attempted-run reports, and in the judge report when it ran.
+Failed individual runs remain valid evidence; existing partial-run and
+skipped-judge policy is unchanged. See DEVELOPING for exact selection options.
+`_drawing_registry.py` is intentionally excluded because
 the leaf supplies PDF, name and kind explicitly; selecting a different kind
 selects a different hashed prompt. Recipe-skipped modules, including telemetry,
 are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw
