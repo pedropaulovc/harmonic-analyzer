@@ -766,8 +766,20 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
     assert [call[1] for call in placements] == actual
 
 
-@pytest.mark.parametrize("initial_preference", [False, True])
-@pytest.mark.parametrize("fault", ["none", "rename-rejected", "selection-cleanup"])
+@pytest.mark.parametrize(
+    ("initial_preference", "fault"),
+    [
+        (False, "none"),
+        (True, "none"),
+        (False, "rename-rejected"),
+        (True, "rename-rejected"),
+        (False, "selection-cleanup"),
+        (True, "selection-cleanup"),
+        (True, "disable-preference-refused"),
+        (False, "restore-preference-refused"),
+        (True, "restore-preference-refused"),
+    ],
+)
 def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
     unwrapped_com,
     monkeypatch,
@@ -810,9 +822,16 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
 
     component = Component()
 
-    def set_preference(_identifier, value):
-        state["preference"] = value
-        return True
+    preference_writes = []
+
+    def set_preference(_identifier, value) -> None:
+        preference_writes.append(value)
+        if fault == "disable-preference-refused" and len(preference_writes) == 1:
+            return
+        if fault == "restore-preference-refused" and len(preference_writes) == 2:
+            state["preference"] = not value
+        else:
+            state["preference"] = value
 
     def clear_selection(_all):
         state["selected"] = False
@@ -846,14 +865,20 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
         )
 
     if fault != "none":
-        message = (
-            "native rename rejected"
-            if fault == "rename-rejected"
-            else "selection cleanup failed"
-        )
+        message = {
+            "rename-rejected": "native rename rejected",
+            "selection-cleanup": "selection cleanup failed",
+            "disable-preference-refused": (
+                "component-name replacement updates remain enabled"
+            ),
+            "restore-preference-refused": (
+                "component-name replacement preference did not restore"
+            ),
+        }[fault]
         with pytest.raises(RuntimeError, match=message):
             rename()
-        assert component.Name2 == (old_name if fault == "rename-rejected" else new_name)
+        unrenamed = fault in {"rename-rejected", "disable-preference-refused"}
+        assert component.Name2 == (old_name if unrenamed else new_name)
         assert ledger == {old_name: pose, "unrelated-part-4": unrelated_pose}
     else:
         assert rename() == new_name
@@ -863,4 +888,9 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
         assert ledger[new_name] is pose
         assert ledger["unrelated-part-4"] is unrelated_pose
         assert len(ledger) == 2
-    assert state == {"preference": initial_preference, "selected": False}
+    expected_preference = (
+        not initial_preference
+        if fault == "restore-preference-refused"
+        else initial_preference
+    )
+    assert state == {"preference": expected_preference, "selected": False}

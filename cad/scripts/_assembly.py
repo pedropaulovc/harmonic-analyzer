@@ -1270,8 +1270,8 @@ def _set_component_reference(
         raise RuntimeError("swExtRefUpdateCompNames is unavailable in the type library")
     previous = bool(adapter.swApp.GetUserPreferenceToggle(preference))
     try:
-        if not adapter.swApp.SetUserPreferenceToggle(preference, False):
-            raise RuntimeError("could not disable component-name replacement updates")
+        # ISldWorks.SetUserPreferenceToggle is void; verify the getter instead.
+        adapter.swApp.SetUserPreferenceToggle(preference, False)
         if bool(adapter.swApp.GetUserPreferenceToggle(preference)):
             raise RuntimeError("component-name replacement updates remain enabled")
         if not component.Select2(False, 0):
@@ -1287,8 +1287,7 @@ def _set_component_reference(
         try:
             adapter.currentModel.ClearSelection2(True)
         finally:
-            if not adapter.swApp.SetUserPreferenceToggle(preference, previous):
-                raise RuntimeError("could not restore component-name replacement updates")
+            adapter.swApp.SetUserPreferenceToggle(preference, previous)
             if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
                 raise RuntimeError(
                     "component-name replacement preference did not restore"
