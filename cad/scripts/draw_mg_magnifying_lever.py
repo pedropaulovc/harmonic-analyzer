@@ -3,18 +3,20 @@ r"""Native quarter-inch lever sheet with an enlarged flat-thread-end detail.
 The independent model detail imports its dimensions before its circular crop,
 as on MHA-MG-04. Native diameters/lengths/limits remain associative; the part's
 cosmetic thread and the sheet share one UNC-2A callout. Only the free end domes;
-its note attaches to the identified visible spherical face, not a guessed edge.
+its note attaches to the identified visible spherical face, including faces
+obtained from actual visible silhouettes when face enumeration omits them.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_full_name, dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
@@ -35,7 +37,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from mg_lever_thread_joint import ROD_DIA
+from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT, TIP_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
@@ -124,16 +126,109 @@ def _detail(adapter: Any) -> tuple[Any, list[Any]]:
     return view, annotations
 
 
-def _free_end_face(view: Any) -> Any:
-    """Identify the visible dome by its model sphere, not its silhouette hit box."""
+def _free_end_face(adapter: Any, view: Any, annotations: list[Any]) -> Any:
+    """Read visible face provenance and require the known rod as a positive control."""
     hemisphere = SphereFace(ROD_DIA, center_mm=(ROD_DIA / 2.0, 0.0, 0.0))
-    matches = []
-    for face in visible_view_entities(view, 3, label="lever free hemisphere"):  # swViewEntityType_Face
+    body = surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat").face
+    direct = visible_view_entities(view, 3, label="lever visible faces")  # swViewEntityType_Face
+    silhouettes = visible_view_entities(view, 4, label="lever visible silhouette faces")
+    candidates = list(direct)
+    null_faces = 0
+    for silhouette in silhouettes:
+        face = _early_bound(silhouette, "ISilhouetteEdge").GetFace()
+        if face is None:
+            null_faces += 1
+        else:
+            candidates.append(face)
+    faces, records, matches, body_matches = [], [], [], []
+    for face in candidates:
+        if any(int(adapter.swApp.IsSame(face, seen)) == 1 for seen in faces):
+            continue
+        faces.append(face)
         geometry = face_geometry(face)
-        if geometry is not None and hemisphere.matches(geometry):
-            matches.append(face)
+        box = geometry.box if geometry is not None else ()
+        if not box:
+            # Unknown surface identities still need actual model-space bounds
+            # for diagnosis; GetBox is approximate, never a sphere selector.
+            box = tuple(_early_bound(face, "IFace2").GetBox() or ())
+        record = {"identity": None, "parameters": (), "box": box}
+        if geometry is not None:
+            record.update(
+                identity=geometry.identity,
+                surface_type={4001: "plane", 4002: "cylinder", 4003: "cone", 4004: "sphere", 4005: "torus"}.get(geometry.identity, "unhandled native surface identity"),
+                parameters=geometry.parameters,
+            )
+            if geometry.identity == 4004:
+                record.update(
+                    sphere_center_m=geometry.parameters[:3],
+                    sphere_radius_m=geometry.parameters[3],
+                    sphere_center_mm=tuple(value * 1000.0 for value in geometry.parameters[:3]),
+                    sphere_diameter_mm=geometry.parameters[3] * 2000.0,
+                )
+            if hemisphere.matches(geometry):
+                matches.append(face)
+            if body.matches(geometry):
+                body_matches.append(face)
+        records.append(record)
+    expected_dimensions = {
+        "OverallLength@RodProfile": ROD_LENGTH, "RodDia@RodProfile": ROD_DIA,
+        "TipChamfer@RodProfile": TIP_CHAMFER, "ThreadLength@ThreadExtent": THREAD_LENGTH,
+        "IncompleteLength@ThreadExtent": INCOMPLETE_THREAD_MAX,
+    }
+    source = {"requested_path": str(SOURCE), "dimensions": []}
+    referenced = None
+    try:
+        referenced = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+        source["actual_path"] = str(referenced.GetPathName())
+        source["path_matches"] = source["actual_path"].replace("\\", "/").casefold() == str(SOURCE).replace("\\", "/").casefold()
+    except Exception as exc:  # Diagnostics must not replace the strict face failure.
+        source["read_error"] = f"{type(exc).__name__}: {exc}"
+    for name, expected_mm in expected_dimensions.items():
+        row = {"requested_name": name, "expected_mm": expected_mm, "matches_source": False}
+        try:
+            parameter = referenced.Parameter(name) if referenced is not None else None
+            if parameter is None:
+                row["read_error"] = "native source dimension unavailable"
+            else:
+                parameter = _early_bound(parameter, "IDimension")
+                row["full_name"] = str(parameter.FullName)
+                row["actual_m"] = float(parameter.SystemValue)
+                row["actual_mm"] = row["actual_m"] * 1000.0
+                row["matches_source"] = math.isclose(row["actual_mm"], expected_mm, rel_tol=0.0, abs_tol=1e-6)
+        except Exception as exc:
+            row["read_error"] = f"{type(exc).__name__}: {exc}"
+        source["dimensions"].append(row)
+    source["all_dimensions_match"] = all(row["matches_source"] for row in source["dimensions"])
+    projection = {}
+    try:
+        bound_view = _early_bound(view, "IView")
+        matrix = tuple(float(value) for value in _early_bound(bound_view.ModelToViewTransform, "IMathTransform").ArrayData)
+        projection = {
+            "model_to_view": matrix, "rotation": matrix[:9], "translation_m": matrix[9:12],
+            "scale": matrix[12], "orientation": str(bound_view.GetOrientationName()),
+        }
+    except Exception as exc:
+        projection["read_error"] = f"{type(exc).__name__}: {exc}"
+    imported = []
+    for annotation in annotations:
+        full_name = dimension_full_name(adapter, _early_bound(annotation, "IAnnotation"))
+        parts = full_name.split("@")
+        imported.append({"full_name": full_name, "source_feature": parts[1] if len(parts) > 1 else ""})
+    census = {
+        "direct_faces": len(direct), "silhouettes": len(silhouettes),
+        "null_silhouette_faces": null_faces, "unique_faces": len(faces),
+        "plain_body_matches": len(body_matches), "hemisphere_matches": len(matches),
+        "faces": records,
+        "coordinate_frame": "referenced part model", "length_units": "metres",
+        "expected_sphere_center_mm": (ROD_DIA / 2.0, 0.0, 0.0), "expected_sphere_diameter_mm": ROD_DIA,
+        "source": source, "view": projection, "imported_dimensions": imported,
+    }
+    diagnostic = json.dumps(census, sort_keys=True)
+    _telemetry.info(f"lever visible-face census: {diagnostic}")
+    if len(body_matches) != 1:
+        raise RuntimeError(f"lever visible-face census failed its plain-body positive control: {diagnostic}")
     if len(matches) != 1:
-        raise RuntimeError(f"lever free hemisphere: expected one visible spherical face, got {len(matches)}")
+        raise RuntimeError(f"lever free hemisphere: expected one visible spherical face, got {len(matches)}; census={diagnostic}")
     return matches[0]
 
 
@@ -156,7 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS)
     thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
     add_attached_note(adapter, detail, text=THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.350, 0.244), label="native quarter-inch external thread", entity_type="SILHOUETTE")
-    free_end = _free_end_face(front)
+    free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
     symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.020)

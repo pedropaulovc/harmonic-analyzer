@@ -13,3 +13,8 @@ mg-magnifying-lever:
       where: "front view: the Ra 3.2 symbol on the Ø6.35 plain body, its reason MHA-MG-02 SCREW SEAT at the symbol."
       finding: "Ra 3.2 on a set/thumb-screw clamp face: a clamp face carries no symbol (rule 6, roughness symbols only where a surface runs, slides or locates)"
       reason: "owner ruling 2026-10-17, retained on the quarter-inch body in the 2026-10-20 threaded redesign: the plain body is the functional screw seat which locates the MHA-MG-02 clamp anywhere along its permitted travel; this is one static mating seat locating the part on its neighbour."
+    - id: "RV-02"
+      kind: "accept"
+      where: "this lever's external thread in the MHA-MG-01 bracket, installed by MHA-MG-00 to tip projection"
+      finding: "the unseated lever thread has no mechanical anti-loosening means; projection is set without a shoulder or preload (rule 23, lock threaded joints exposed to operating loads)"
+      reason: "user, 2026-10-20: 'no further thread locking needed because mg-magnifying-lever does not experience rotational forces'. The accepted design has no added lock; it is not a static clamp or a demonstrated vibration-proof joint. Vibration can still change projection or back the lever out. Assembly RV-02 and joint_retention.py U-MHA-MG-03-no-lock record this same joint, with full engagement remaining a separate requirement."

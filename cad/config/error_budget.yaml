@@ -73,44 +73,44 @@ reserved:
   readout:                         # ordinate reading at the pen. The stroke is the CAD's
                                    # output.yaml pen_trace_half_mm (15, verify:kinematics), NOT set here
     reading_uncertainty_mm: 0.075  # half a 0.15 mm technical-pen line, read against the grid
-    # The magnifier is NOT an assumption: error_budget.py fits every reference
-    # input to the pen from the CAD's own output chain (spring coupling, the
-    # clamp's permitted station band on the magnifying lever -- complete bore
-    # before thread runout to rod tip, output.yaml magnifier_* -- and wire ratio).
-    # The clamp stations are where the BLOCK sits (reach and setup); what the
-    # pen sees is the WIRE MOMENT ARM -- the knife axis's perpendicular
-    # distance to wire 1's rest run (error_budget.wire_moment_arm): the output
-    # fixture's groove hook sits its signed HOOK_OFFSET_X (~10.0 mm toward the
-    # knife) from the clamp station and below the knife, and the wire leans
-    # toward the wheel. The current report computes each station's actual arm,
-    # not a proportional scale of its radius. The k=0 (greatest) term is made
-    # to span the stroke, Michelson's normalisation, book p. 99: when the
-    # required arm is below the permitted minimum the operator scales down
-    # instead (the machine's ORDINATE CAPACITY, computed in the report), and
-    # where it is above the as-built station's the reading falls short and
-    # the term grows by the shortfall.
+    # error_budget.py fits every reference input to the output chain (loaded
+    # spring coupling, wire ratio and the conservative COMPONENT operating
+    # band from mg_magnifying_lever_geom.operating_clamp_radius_band()).
+    # Current knife-to-clamp/bottom-rod-axis bounds are 81.81 / 165 / 196.825 mm.
+    # The earliest accepted unthreaded root is (167.5-.8)-(18+.51)=148.19 mm.
+    # Credit the FULL 15 mm one-sided clamp envelope from the actual tap axis,
+    # never +/-7.5 mm centring: R_min=215-148.19+15=81.81 mm. The bracket near
+    # face is another lower stop, but runout is stricter. At the free end the
+    # complete bore must stay on cylindrical plain stock beyond the hemisphere:
+    # R_max=215-(ROD_DIA_MAX/2+15)=196.825 mm. The built 165 mm pose is unchanged.
+    # clamp_radius_band(block_depth) is nominal MODEL travel, not capacity.
+    # As-made inspection may admit more travel; published capacity credits none.
+    # The pen sees the WIRE MOMENT ARM (error_budget.wire_moment_arm), not the
+    # station radius: the fixture's signed HOOK_OFFSET_X is toward the knife,
+    # the hook is below it, and the installed wire leans toward the wheel.
+    # When the arm needed for full stroke is below the conservative minimum,
+    # scale ordinates down using the table-derived capacity. Above the arm at
+    # the built station, keep that station and score the stroke shortfall.
     # Only the as-built pose is CAD-gated (build_mg_magnifier_assembly): no
     # clearance or articulation gate exercises the clamp, vertical rod and
     # wire anywhere else, yet every broad input is scored with the clamp at or
-    # just above the MINIMUM pose -- the entire bore before thread runout,
-    # not a shoulder or positive stop -- which bounds them. That is an OPEN DESIGN
-    # ITEM (#748), not a budget assumption: check:budget fails on it unless
-    # waived here, and the waiver is the record that the closure is
-    # conditional on that pose being buildable. The report prints an offline
-    # straight-wire estimate beside the waiver (including the signed hook
-    # offset and the current rim, spoke and boss surface gaps). Those
-    # computed estimates are not a proof of the clamp, rod or threaded bracket.
+    # just above the conservative MINIMUM component station. These component
+    # intervals are not native all-machine clearance/articulation proof. That
+    # is an OPEN DESIGN ITEM (#748), not a budget assumption: check:budget fails
+    # unless waived here, and closure stays conditional on that pose being
+    # buildable. The fitter must verify as-made sliding bore clearance and that
+    # the entire bore clears runout/thread, bracket and the free hemisphere.
+    # The report's straight-wire surface-gap estimate is offline only: it is
+    # not proof of the clamp, rod, threaded bracket or full operating stroke.
     # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this waiver.
     waive_minimum_pose: true
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient
                                    # carries its own read AND the k=0 normaliser's read (scaled
                                    # by the physical r_k/r_0), uniform +/-reading each, averaged
-                                   # over k, on the worst broad input; one reading converts
-                                   # through s = r_0/(S + C_2), so the idle bars' lift and the
-                                   # second harmonic riding the k=0 peak both inflate it. Lands
-                                   # at 0.27 on every broad input; the worst SINGLE coefficient
-                                   # (Michelson's 0.5-unit table quantisation) is reported
-                                   # beside it, not gated.
+                                   # over k, on the worst broad input at its conservative-band
+                                   # setup; one reading converts through s = r_0/(S + C_2), so
+                                   # idle bars' lift and the second harmonic at k=0 inflate it.
+                                   # Report the worst SINGLE coefficient beside it, not gated.
   timebase:                        # reading coefficient k with the crank stopped on its index,
                                    # scored on the worst reference input
     crank_index_deg: 8.0           # +/- stop repeatability on the crank index (uniform)

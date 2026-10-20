@@ -110,10 +110,45 @@ def test_lever_thread_is_depth_installed_without_invented_shoulder_or_lock() -> 
     assert row.member == "mg_magnifying_lever" and row.receiver == "mg_magnifying_bracket"
     assert row.member in jr.THREADED_PARTS and row.receiver in jr.THREADED_PARTS
     assert row.installed_at == steps.LEVER_THREADED_KEY
-    assert row.exposure is Exposure.STATIC_CLAMP and row.lock is Lock.NONE
+    assert row.exposure is Exposure.ADJUSTER and row.lock is Lock.NONE
     assert not row.lock_part
     assert "ThreadProjection" in row.axial_capture and "no shoulder" in row.axial_capture
     assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
+    assert jr.RULINGS[row.exception].joint == row.id
+    inventory = Inventory(
+        {row.assembly: frozenset({row.member, row.receiver})},
+        steps={row.assembly: (row.installed_at,)},
+    )
+    arguments = {
+        "threaded": frozenset({row.member, row.receiver}),
+        "unthreaded": frozenset(),
+        "required": {row.id: jr.REQUIRED_JOINTS[row.id]},
+    }
+    assert jr.audit((row,), inventory, **arguments) == []
+    unwaived = dataclasses.replace(row, exception="")
+    assert _kinds(jr.audit((unwaived,), inventory, **arguments)) == {(row.id, Kind.UNLOCKED)}
+
+
+@pytest.mark.parametrize("name,kind", (
+    ("mg_magnifying_bracket", "part"),
+    ("mg_magnifying_lever", "part"),
+    ("mg_magnifier_assembly", "assembly"),
+))
+def test_unseated_lever_exception_reaches_only_its_actual_review_packages(monkeypatch, name, kind) -> None:
+    import machinist_review
+    from machinist_exceptions import load_exceptions
+
+    package = machinist_review.ReviewPackage(name, kind, (Path("native-sheet.png"),))
+    monkeypatch.setattr(machinist_review, "_text_layers", lambda _package: "")
+    exceptions = load_exceptions(machinist_review.CAD_ROOT / "config", name, kind)
+    declaration = next(entry for entry in exceptions if "unseated lever thread" in entry.finding)
+    assert declaration.kind == "accept"
+    prompt = machinist_review._review_prompt(package, 1, prompt_text="")
+    assert f"- {declaration.id} [accept]" in prompt
+    assert declaration.finding in prompt and declaration.reason in prompt
+    assert "vibration" in declaration.reason.lower()
+    unrelated = machinist_review.ReviewPackage("mg_magnifying_clamp", "part", package.sources)
+    assert declaration.finding not in machinist_review._review_prompt(unrelated, 1, prompt_text="")
 
 
 def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
@@ -704,3 +739,23 @@ def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
         text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))
         for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
             assert banned not in text.upper()
+
+
+def test_bracket_sub_target_wall_reaches_review_as_scoped_minor(monkeypatch) -> None:
+    import machinist_review
+    import mg_lever_thread_joint as lever_joint
+    import mg_magnifying_bracket_spec as bracket_spec
+    from machinist_exceptions import load_exceptions
+
+    package = machinist_review.ReviewPackage("mg_magnifying_bracket", "part", (Path("native-sheet.png"),))
+    monkeypatch.setattr(machinist_review, "_text_layers", lambda _package: "")
+    exceptions = load_exceptions(machinist_review.CAD_ROOT / "config", package.name, package.kind)
+    declaration = next(entry for entry in exceptions if "rule 17" in entry.finding)
+    assert declaration.kind == "minor"
+    assert bracket_spec.WALL_CALLOUT in declaration.where
+    assert f"{lever_joint.WALL_MIN:.6f}" in declaration.finding
+    prompt = machinist_review._review_prompt(package, 1, prompt_text="")
+    assert f"- {declaration.id} [minor]" in prompt
+    assert declaration.finding in prompt and declaration.reason in prompt
+    unrelated = machinist_review.ReviewPackage("mg_magnifying_lever", "part", package.sources)
+    assert declaration.finding not in machinist_review._review_prompt(unrelated, 1, prompt_text="")

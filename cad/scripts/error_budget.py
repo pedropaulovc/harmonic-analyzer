@@ -116,14 +116,14 @@ class Nominal:
     sum_hole_x: float  # manufactured hook-row position relative to the knife, mm
     d_max: float  # amplitude-bar full-scale station
     # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
-    # The clamp's knife radii are where the BLOCK sits on the rod (reach and
-    # setup: plain-body thread-runout boundary, as-built station, rod tip); what the pen sees is
-    # ``wire_moment_arm`` -- the knife axis's perpendicular distance to wire 1's
-    # rest run -- which the fixture's hook offset and the wire's lean toward
-    # the wheel move off the clamp radius.
-    lever_r_min: float  # knife -> clamp centre, entire bore before thread runout
-    lever_r_built: float  # the as-built (CLAMP_LOCAL_X) radius
-    lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
+    # Clamp knife radii use conservative COMPONENT operating bounds, not the
+    # nominal model's travel. The full directional clamp envelope stays on
+    # cylindrical plain stock between accepted runout and the free hemisphere.
+    # This is not native all-machine clearance proof (#748). What the pen sees
+    # is ``wire_moment_arm``, including the hook offset and installed wire lean.
+    lever_r_min: float  # conservative minimum knife -> clamp/bottom-rod axis
+    lever_r_built: float  # unchanged model pose (KNIFE_LOCAL_X - CLAMP_LOCAL_X)
+    lever_r_max: float  # conservative maximum before the free hemisphere
     hook_offset_x: float  # wire hook (fixture groove tangent) from the clamp
     # station along the rod, SIGNED machine x: negative = toward the knife
     wheel_ratio: float  # rim wire pitch radius / drum wire pitch radius
@@ -135,10 +135,12 @@ class Nominal:
 
 
 def nominal() -> Nominal:
-    """The as-designed inputs, read from the spec modules the CAD builds from."""
-    lever_band = mg_magnifying_lever_geom.clamp_radius_band(
-        mg_magnifying_clamp_geom.BLOCK_DEPTH
-    )
+    """As-designed inputs with conservative component operating travel.
+
+    The built pose is unchanged. As-made fit-up may admit more travel, but
+    neither nominal model travel nor inspected extra travel is capacity credit.
+    """
+    lever_band = mg_magnifying_lever_geom.operating_clamp_radius_band()
     return Nominal(
         ecc=dt_cylinder_gear_spec.ECCENTRICITY,
         rod=ch_connecting_rod_spec.CENTER_DISTANCE,
@@ -828,11 +830,12 @@ class NominalTrial:
         (Michelson's normalisation to the greatest term, book p. 99: "scaled by
         adjusting the magnifying lever"). Solve the wire moment arm that does
         it and the clamp station that realises it (``clamp_radius_for_arm``);
-        below the arm at the reachable minimum the operator instead scales
-        every ordinate down (``ordinate_scale_for`` against the machine's
-        ordinate CAPACITY, the peak the pen holds at minimum magnification)
-        with the clamp at the plain-body limit; above the arm at the as-built station
-        the reading falls short of the stroke by ``stroke_fill``."""
+        below the arm at the conservative operating minimum the operator
+        instead scales every ordinate down (``ordinate_scale_for`` against the
+        component's ordinate CAPACITY). Neither nominal travel nor extra
+        as-made fit-up travel is credited. Above the arm at the as-built station
+        the reading falls short of the stroke by ``stroke_fill``. Component
+        bounds do not prove native operating-pose clearance (#748)."""
         nom = self.nom
         pen_per_bar = pen_gain_per_arm_mm(nom) * abs(self.f_full)  # per arm mm
         peak = self.peak_bars(x * nom.d_max)
@@ -1338,10 +1341,10 @@ def monte_carlo(
 
 def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
-    with the clamp at its permitted plain-body limit (``wire_rest_run`` at
+    with the clamp at its conservative component minimum (``wire_rest_run`` at
     ``lever_r_min``) versus the wheel's pen-side faces. Reported so the waiver
-    in error_budget.yaml is an informed one; the proof is a seat build of the
-    magnifier at that pose (#748)."""
+    in error_budget.yaml is an informed one; native assembly clearance and
+    articulation at that pose remain unproven (#748)."""
     hook, end = wire_rest_run(nom, nom.lever_r_min)
     gaps = sh_vn_music_wire_lever_geom.run_gaps(hook, end)
     cx, cy = sh_vn_music_wire_lever_geom.WHEEL_X, mg_wheel_bar_geom.WHEEL_BAR_Y
@@ -1657,14 +1660,13 @@ def closed_form_terms(
         "pct_fs": physical[worst],
         "note": "RMS over k and a uniform +/-index band of the physical trace read off-index through the procedure, worst broad input; ideal-vector slope reported for comparison",
     }
-    # The magnifier: what the CAD's output chain lets the operator do. The
-    # ordinate capacity is the summed full-scale-bar-equivalents whose k=0 peak
-    # just fills the half-stroke at the minimum magnification -- every broad
-    # input whose read ordinates sum to more than this is scaled down by the
-    # operator (MagnifierSetup.ordinate_scale < 1), so setting and knife
-    # errors grow by that factor. A design lever, not a part tolerance. The
-    # lever radii are the clamp's STATIONS (reach: plain-body limit, as-built, rod
-    # tip); the gain runs on the wire moment arm each station realises.
+    # Conservative component operating capacity: the summed full-scale bars
+    # whose k=0 peak just fills the half-stroke at minimum magnification.
+    # Inputs beyond it are scaled down (MagnifierSetup.ordinate_scale < 1),
+    # so setting and knife errors grow. Do not credit nominal model travel or
+    # extra as-made fit-up travel. Stations are clamp/bottom-rod axes; gain
+    # runs on each station's wire moment arm, not the station radius itself.
+    # These component bounds do not establish native assembly clearance (#748).
     gain_min = pen_gain(nom, nom.lever_r_min)
     magnifier = {
         "lever_radius_min_mm": nom.lever_r_min,
@@ -1684,15 +1686,15 @@ def closed_form_terms(
         / (gain_min * abs(trial.f_full))
         * nom.d_max,
         "per_input": {n: asdict(setups[n]) for n in scored},
-        # Only the as-built station is CAD-gated; every input fitted short of
-        # it runs at a pose the minimum one (complete bore before runout) bounds
+        # Only the built station is CAD-gated; the conservative minimum
+        # component station is not native clearance/articulation proof.
         "inputs_at_ungated_pose": [
             n for n in scored if setups[n].lever_r < nom.lever_r_built
         ],
         "minimum_pose_cad_gated": False,  # build_mg_magnifier_assembly builds the
-        # as-built pose only; the clamp/rod/wire at the travel limit is #748's proof
+        # built pose only; native operating-pose proof remains #748
         "minimum_pose_wire_estimate": _minimum_pose_wire_estimate(nom),
-        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; lever radii are clamp stations, the gain runs on the wire moment arm (hook_offset_x, wire lean); only the as-built station is CAD-gated, the minimum pose bounds the rest (reserved.readout.waive_minimum_pose)",
+        "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the conservative component operating minimum (operating_clamp_radius_band); nominal model travel and extra as-made fit-up travel receive no capacity credit; lever radii are clamp/bottom-rod-axis stations, gain runs on the wire moment arm (hook_offset_x, wire lean); only the built station is CAD-gated, component bounds and offline wire estimates do not prove native assembly clearance or articulation (#748, reserved.readout.waive_minimum_pose)",
     }
     return {
         "knife": knife,
@@ -2152,9 +2154,10 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
         and not r["minimum_pose_waived"]
     ):
         bad.append(
-            "magnifier minimum pose is not CAD-gated but bounds the poses scoring "
+            "magnifier minimum pose is not CAD-gated; conservative component bounds "
+            "do not prove clearance/articulation for "
             + ", ".join(
-                f"{n} (clamp {mag['per_input'][n]['lever_r']:.0f} mm from the knife)"
+                f"{n} (clamp {mag['per_input'][n]['lever_r']:.2f} mm from the knife)"
                 for n in mag["inputs_at_ungated_pose"]
             )
             + f"; only the as-built {mag['lever_radius_built_mm']:.0f} mm station is gated"
@@ -2203,12 +2206,16 @@ def readout_procedure(r: dict[str, Any]) -> str:
     nom = Nominal(**r["nominal"])
     cf = r["closed_form"]
     mag = cf["mg-magnifier"]
+    # Human settings must never round the computed capacity upward. Keep the
+    # report's exact capacity for the model; solve procedure examples against
+    # the displayed, rounded-down limit.
+    capacity_limit = math.floor(mag["ordinate_capacity_full_scale_bars"] * 100.0) / 100.0
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
     trial = NominalTrial(nom)
     ones = np.ones(N_ELEMENTS)
-    scale_all = trial.ordinate_scale_for(ones, mag["ordinate_capacity_full_scale_bars"])
-    naive_all = mag["ordinate_capacity_full_scale_bars"] / trial.peak_bars(
+    scale_all = trial.ordinate_scale_for(ones, capacity_limit)
+    naive_all = capacity_limit / trial.peak_bars(
         ones * nom.d_max
     )
     p_all = (
@@ -2234,9 +2241,9 @@ def readout_procedure(r: dict[str, Any]) -> str:
         )
     )
     clamp_table = "\n".join(
-        f"| {s:6.1f} | {wire_moment_arm(nom, s):6.1f} | "
+        f"| {s:6.2f} | {wire_moment_arm(nom, s):6.1f} | "
         f"{mag['pen_mm_per_full_scale_bar_at_min'] * wire_moment_arm(nom, s) / arm_min:5.2f} | "
-        f"{mag['ordinate_capacity_full_scale_bars'] * arm_min / wire_moment_arm(nom, s):5.2f} |"
+        f"{math.floor(mag['ordinate_capacity_full_scale_bars'] * arm_min / wire_moment_arm(nom, s) * 100.0) / 100.0:5.2f} |"
         for s in stations
     )
     scale_table = "\n".join(
@@ -2291,7 +2298,7 @@ readings):
 ```mermaid
 flowchart LR
     t[("station table:<br/>d -> x_read, kappa")]
-    s0["0. scale f: largest with<br/>P(f) = sum table(f x_i)(1+kappa) <= {mag["ordinate_capacity_full_scale_bars"]:.2f}"] --> s1["1. set bar i to the linear<br/>station f x_i * {nom.d_max:.0f} mm"] --> s1b["record x_read,i =<br/>table ordinate / f"]
+    s0["0. scale f: largest with<br/>P(f) = sum table(f x_i)(1+kappa) <= {capacity_limit:.2f}"] --> s1["1. set bar i to the linear<br/>station f x_i * {nom.d_max:.0f} mm"] --> s1b["record x_read,i =<br/>table ordinate / f"]
     t -.-> s1b
     s1b --> s2["2. crank one way; read r_k (mm)<br/>off the mean line at 2k turns"]
     s2 --> s3["3. s = r_0 / (S + C_2)<br/>O'_k = r_k / s"]
@@ -2351,23 +2358,23 @@ $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 
 **Choose the ordinate scale for the pen first.** The pen's half-stroke is
 {cf["readout"]["pen_half_stroke_mm"]:.0f} mm and the $k=0$ reading must span it
-(step 3 divides everything by it). At the magnifier's MINIMUM setting -- the
-clamp at the plain-body limit, {mag["lever_radius_min_mm"]:.0f} mm from the
-knife axis -- one full-scale bar moves the pen
+(step 3 divides everything by it). At the conservative component MINIMUM
+setting -- {mag["lever_radius_min_mm"]:.2f} mm from the knife axis to the
+clamp/bottom-rod axis -- one full-scale bar moves the pen
 {mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the trial's $k=0$ peak,
 $P = \\sum_i t_i\\,(1 + \\kappa_i)$ with $t_i$ the TABLE ordinate at bar $i$'s
 set station, undivided ($= f\\,(S + C_2)$ of step 3, in full-scale-bar units;
 the pen sees table ordinates, the arithmetic sees them divided by $f$), may be
-at most **{mag["ordinate_capacity_full_scale_bars"]:.2f}**
-full-scale bars. If the function's samples give $P > {mag["ordinate_capacity_full_scale_bars"]:.2f}$
+at most **{capacity_limit:.2f}** full-scale bars (the computed capacity rounded
+**down** to two decimals). If the samples give $P > {capacity_limit:.2f}$
 at full scale, set every bar at $f\\,x_i \\cdot {nom.d_max:.0f}$ mm with the
-**largest $f$ for which $P(f) \\le {mag["ordinate_capacity_full_scale_bars"]:.2f}$** --
+**largest $f$ for which $P(f) \\le {capacity_limit:.2f}$** --
 evaluate $P(f)$ from the table at the scaled stations, NOT by proportion: an
 idle bar keeps its {rows[0][1]:+.4f} read ordinate at any $f$, so $P(f)$ is
 affine in $f$ (for 20 bars at 1, $P = {p_all[0]:.2f}$ at $f = 1$ and the solve
 gives $f = {scale_all:.3f}$, where proportion would say
-{mag["ordinate_capacity_full_scale_bars"] / p_all[0]:.3f} and overdrive the
-stroke by {100.0 * (p_all[1] / mag["ordinate_capacity_full_scale_bars"] - 1.0):.0f} %).
+{capacity_limit / p_all[0]:.3f} and exceed the operating limit
+by {100.0 * (p_all[1] / capacity_limit - 1.0):.0f} %).
 $f$ is removed by the division in the read ordinates above, so step 3 sees
 the function's own units. A broad input runs below full scale on this
 machine (20 bars at 1: $f = {scale_all:.3f}$); the stick's +/-{tol:.2f} mm
@@ -2377,15 +2384,16 @@ clamp so the peak just fills the stroke. The pen travel per bar is NOT
 proportional to the clamp's distance from the knife: the wire hooks the
 output fixture {abs(nom.hook_offset_x):.1f} mm on the knife side of the clamp
 and leans toward the wheel, so what the pen sees is the effective wire
-moment arm -- {arm_min:.1f} mm with the clamp at the plain-body limit
-({mag["lever_radius_min_mm"]:.0f} mm from the knife),
+moment arm -- {arm_min:.1f} mm at the conservative component minimum
+({mag["lever_radius_min_mm"]:.2f} mm from the knife),
 {wire_moment_arm(nom, nom.lever_r_built):.1f} mm at the as-built
 {mag["lever_radius_built_mm"]:.0f} mm. Set the clamp at the station whose
 last column matches the trial's $P$ (interpolate between rows), **never past
-the as-built {mag["lever_radius_built_mm"]:.0f} mm** (the clamp's far end; the
-wheel's rim/drum wire pitch ratio is {mag["wheel_ratio"]:.2f}):
+the built {mag["lever_radius_built_mm"]:.0f} mm** for this procedure, even though
+the component-only upper bound is {mag["lever_radius_max_mm"]:.3f} mm
+(the wheel's rim/drum wire pitch ratio is {mag["wheel_ratio"]:.2f}):
 
-| clamp from knife (mm) | wire arm (mm) | pen mm per full-scale bar | $P$ that fills the stroke |
+| clamp/bottom-rod axis from knife (mm) | wire arm (mm) | pen mm per full-scale bar | maximum $P$ (rounded down) |
 |---:|---:|---:|---:|
 {clamp_table}
 
@@ -2396,9 +2404,23 @@ and every reading error in step 3 is $15/r_0$ times larger; scale such an
 input UP (multiply every ordinate by a constant, up to the capacity) before
 setting the bars -- step 3 removes it like any $f$.
 
-Only the as-built pose is CAD-gated. The broad inputs run at or just above
-the minimum pose (complete clamp bore before thread runout), which is not
-(error_budget.yaml `waive_minimum_pose`, #748).
+**Component bounds are not native clearance proof.** These stations come from
+`mg_magnifying_lever_geom.operating_clamp_radius_band()`, not the nominal model
+travel helper. The full one-sided clamp envelope from the actual bottom-rod/tap
+axis must remain inside finished stock and on cylindrical plain rod: clear of
+the earliest accepted thread root/runout, bracket near face and free hemisphere.
+Do not assume a centred half-depth envelope. Before setting the clamp, the fitter
+must verify the as-made sliding bore clearance, actual runout/thread boundary,
+bracket clearance and that the complete bore stays beyond the free hemisphere.
+Inspect both faces with the clamp loose, then secure it without binding or
+entering runout. As-made fit-up may admit more travel, but this procedure and the
+published capacity do not credit it.
+
+Only the built pose is CAD-gated. Inputs below the built station still need
+native assembly clearance and full-stroke articulation proof, including the
+clamp, bottom rod, threaded bracket and wire. An offline straight-wire gap or
+component interval check cannot supply that proof: the minimum-pose waiver
+remains open (error_budget.yaml `waive_minimum_pose`, #748).
 
 $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it):
 
@@ -2505,12 +2527,12 @@ def _main() -> int:
         if mag["inputs_at_ungated_pose"] and r["minimum_pose_waived"]:
             est = mag["minimum_pose_wire_estimate"]
             print(
-                "WAIVED: the magnifier's minimum pose (clamp at "
-                f"{mag['lever_radius_min_mm']:.0f} mm from the knife, wire arm "
+                "WAIVED: the magnifier's conservative component minimum (clamp at "
+                f"{mag['lever_radius_min_mm']:.2f} mm from the knife, wire arm "
                 f"{mag['wire_arm_min_mm']:.1f}) is not CAD-gated; it bounds the "
                 "poses scoring "
                 + ", ".join(
-                    f"{n} ({mag['per_input'][n]['lever_r']:.0f} mm)"
+                    f"{n} ({mag['per_input'][n]['lever_r']:.2f} mm)"
                     for n in mag["inputs_at_ungated_pose"]
                 )
                 + " "
@@ -2518,7 +2540,8 @@ def _main() -> int:
                 "wire surface gaps to the wheel's pen-side faces: rim "
                 f"{est['rim_face_gap_mm']:.2f}, spokes "
                 f"{est['spoke_face_gap_mm']:.2f}, boss "
-                f"{est['boss_face_gap_mm']:.2f} mm) -- closure is conditional on #748"
+                f"{est['boss_face_gap_mm']:.2f} mm) -- component bounds and wire gaps "
+                "are not native clearance proof; closure is conditional on #748"
             )
         print("\nBUDGET:", "closes" if not bad else "; ".join(bad))
     return 0 if not budget_closes(r) else 1
