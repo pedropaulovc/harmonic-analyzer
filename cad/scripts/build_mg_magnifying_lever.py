@@ -48,6 +48,45 @@ def _single_limits(adapter) -> None:
             raise RuntimeError(f"{name}@{feature}: single-limit tolerance did not persist")
 
 
+async def _thread_extent(adapter):
+    """Independent manufacturing witnesses, with creation-time inference off."""
+    dims = SketchDims()
+    check("thread extent requirement sketch", await adapter.create_sketch("Front"))
+    for start, height, name, expression in ((THREAD_ROOT_X, R, "ThreadLength", '"ThreadLength"'), (ROD_LENGTH - INCOMPLETE_THREAD_MAX, -R, "IncompleteLength", None)):
+        (line,) = await add_line_chain(adapter, [(start, height), (ROD_LENGTH, height)], close=False)
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError("thread witness is not construction geometry")
+        await anchor_point_to_origin(adapter, f"{line}.end", ROD_LENGTH, height, "flat thread tip")
+        dims.record(f"{name}Tip", '"RodLength"')
+        dims.record(f"{name}Height")
+        check("thread witness horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
+        await dimension_between(adapter, f"{line}.start", f"{line}.end", "horizontal_distance", ROD_LENGTH - start, name)
+        dims.record(name, expression)
+    await ensure_fully_defined(adapter, "thread extent requirements")
+    check("exit thread extent sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "ThreadExtent")
+    return dims.apply(adapter, "ThreadExtent")
+
+
+def _assert_thread_extent_driving(adapter) -> None:
+    # Check BEFORE equations: equation-owned dimensions legitimately report a
+    # different DrivenState afterward. SDK dimension creation can return success
+    # even when native SetSystemValue3 refuses a redundant/reference dimension.
+    for name, nominal in (
+        ("ThreadLengthTip", ROD_LENGTH), ("ThreadLengthHeight", R),
+        ("ThreadLength", THREAD_LENGTH), ("IncompleteLengthTip", ROD_LENGTH),
+        ("IncompleteLengthHeight", R), ("IncompleteLength", INCOMPLETE_THREAD_MAX),
+    ):
+        _, dimension = _named_dimension(adapter, "ThreadExtent", name)
+        if int(dimension.DrivenState) != 2:
+            raise RuntimeError(f"{name}@ThreadExtent must be driving before equations")
+        actual = float(dimension.SystemValue) * 1000.0
+        if not math.isclose(actual, nominal, abs_tol=1e-6):
+            raise RuntimeError(f"{name}@ThreadExtent: requested {nominal:g} mm, native value is {actual:g} mm")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
@@ -84,27 +123,10 @@ async def build(adapter) -> dict[str, str]:
     check("revolve full-body lever", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Rod")
 
-    # Native manufacturing witnesses on the real constant-diameter surface.
-    # The root runout is allowed within the thread span, before the receiver.
-    dims = SketchDims()
-    check("thread extent requirement sketch", await adapter.create_sketch("Front"))
-    for start, height, name, expression in ((THREAD_ROOT_X, R, "ThreadLength", '"ThreadLength"'), (ROD_LENGTH - INCOMPLETE_THREAD_MAX, -R, "IncompleteLength", None)):
-        line = check("thread extent witness", await adapter.add_line(start, height, ROD_LENGTH, height))
-        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
-        segment.ConstructionGeometry = True
-        if not bool(segment.ConstructionGeometry):
-            raise RuntimeError("thread witness is not construction geometry")
-        await anchor_point_to_origin(adapter, f"{line}.end", ROD_LENGTH, height, "flat thread tip")
-        dims.record(f"{name}Tip", '"RodLength"')
-        dims.record(f"{name}Height")
-        check("thread witness horizontal", await adapter.add_sketch_constraint(line, None, "horizontal"))
-        await dimension_between(adapter, f"{line}.start", f"{line}.end", "horizontal_distance", ROD_LENGTH - start, name)
-        dims.record(name, expression)
-    await ensure_fully_defined(adapter, "thread extent requirements")
-    check("exit thread extent sketch", await adapter.exit_sketch())
-    name_last_feature(adapter, "ThreadExtent")
-    jobs.extend(dims.apply(adapter, "ThreadExtent"))
+    # Native witnesses carry thread length/runout requirements, not body edges.
+    jobs.extend(await _thread_extent(adapter))
     await force_rebuild(adapter)
+    _assert_thread_extent_driving(adapter)
     for dimension, expression in jobs:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)

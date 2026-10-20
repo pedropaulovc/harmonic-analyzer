@@ -104,3 +104,65 @@ def test_native_max_requirements_are_set_and_read_back(monkeypatch, persist) -> 
     else:
         part._single_limits(None)
         assert all(d.Tolerance.Type == 6 and d.Tolerance.values == (0.0, 0.0) for d in dimensions.values())
+
+
+def _placement_adapter(monkeypatch, statuses):
+    reads = []
+    features = {}
+    for name, status in statuses.items():
+        def native_status(name=name, status=status):
+            reads.append(name)
+            if isinstance(status, Exception):
+                raise status
+            return status
+
+        sketch = SimpleNamespace(
+            GetSketchPoints2=lambda: (object(),),
+            GetSketchSegments=lambda: (),
+            GetConstrainedStatus=native_status,
+        )
+        profile = SimpleNamespace(
+            Name=f"{name}Placement",
+            GetTypeName2=lambda: "ProfileFeature",
+            GetSpecificFeature2=lambda sketch=sketch: sketch,
+            GetNextSubFeature=lambda: None,
+        )
+        features[name] = SimpleNamespace(GetFirstSubFeature=lambda profile=profile: profile)
+    model = SimpleNamespace(FeatureByName=features.get)
+    bindings = []
+
+    def bind(value, interface):
+        bindings.append(interface)
+        if value is model:
+            assert interface == "IPartDoc"
+        return value
+
+    def lossy_named_status(*_args):
+        raise AssertionError("must read the retained ISketch, not named SDK status")
+
+    monkeypatch.setattr(part, "_early_bound", bind)
+    return SimpleNamespace(currentModel=model, check_sketch_fully_defined=lossy_named_status), reads, bindings
+
+
+def test_closed_native_wizard_placement_status_is_read_for_both_holes(monkeypatch) -> None:
+    adapter, reads, bindings = _placement_adapter(monkeypatch, {"MountingHoles": 3, "LeverTap": 3})
+    part._assert_placement_sketches_fully_defined(adapter)
+    assert reads == ["MountingHoles", "LeverTap"]
+    assert bindings[0] == "IPartDoc" and bindings.count("ISketch") == 2
+
+
+@pytest.mark.parametrize("status", (None, "unknown", "3", True, 0, 1, 2, 4, RuntimeError("native read unavailable")))
+@pytest.mark.parametrize("feature", ("MountingHoles", "LeverTap"))
+def test_native_wizard_placement_refuses_every_non_fully_defined_result(monkeypatch, feature, status) -> None:
+    states = {"MountingHoles": 3, "LeverTap": 3}
+    states[feature] = status
+    adapter, reads, _bindings = _placement_adapter(monkeypatch, states)
+    with pytest.raises(RuntimeError):
+        part._assert_placement_sketches_fully_defined(adapter)
+    assert reads[-1] == feature
+
+
+def test_native_wizard_placement_refuses_a_missing_feature(monkeypatch) -> None:
+    adapter, _reads, _bindings = _placement_adapter(monkeypatch, {"MountingHoles": 3})
+    with pytest.raises(RuntimeError, match="LeverTap: native part feature not found"):
+        part._assert_placement_sketches_fully_defined(adapter)

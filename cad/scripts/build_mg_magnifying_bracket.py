@@ -55,6 +55,28 @@ def _single_limits(adapter) -> None:
             raise RuntimeError(f"{name}@{feature}: single limit did not persist")
 
 
+def _assert_placement_sketches_fully_defined(adapter) -> None:
+    """Read the retained native sketch, not the SDK's lossy named lookup."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    for feature_name in ("MountingHoles", "LeverTap"):
+        feature = model.FeatureByName(feature_name)
+        if feature is None:
+            raise RuntimeError(f"{feature_name}: native part feature not found")
+        sub = _early_bound(feature, "IFeature").GetFirstSubFeature()
+        while sub is not None:
+            sub = _early_bound(sub, "IFeature")
+            if str(sub.GetTypeName2()) in ("ProfileFeature", "3DProfileFeature"):
+                sketch = _early_bound(sub.GetSpecificFeature2(), "ISketch")
+                if sketch.GetSketchPoints2() and not sketch.GetSketchSegments():
+                    status = sketch.GetConstrainedStatus()  # swFullyConstrained = 3
+                    if type(status) is not int or status != 3:
+                        raise RuntimeError(f"{feature_name}: placement sketch {sub.Name} is not fully defined: native status={status!r}")
+                    break
+            sub = sub.GetNextSubFeature()
+        else:
+            raise RuntimeError(f"{feature_name}: point-only placement sketch not found")
+
+
 async def _coordinates(adapter, jobs) -> None:
     # The mounting coordinates still originate on the real west/lower edges.
     dims = SketchDims()
@@ -169,24 +191,7 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
     wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "unchanged mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
     wizard_holes(adapter, TAP_SPEC, [(NECK_HALF_X, 0.0, 0.0)], (1.0, 0.0, 0.0), "lever through tap", name="LeverTap", expect_dia_mm=TAP_DRILL_DIA, placement_dims=[((None, None), (None, None))])
-    model = _early_bound(adapter.currentModel, "IPartDoc")
-    for feature_name in ("MountingHoles", "LeverTap"):
-        feature = model.FeatureByName(feature_name)
-        if feature is None:
-            raise RuntimeError(f"{feature_name}: native part feature not found")
-        sub = _early_bound(feature, "IFeature").GetFirstSubFeature()
-        while sub is not None:
-            sub = _early_bound(sub, "IFeature")
-            if str(sub.GetTypeName2()) in ("ProfileFeature", "3DProfileFeature"):
-                sketch = _early_bound(sub.GetSpecificFeature2(), "ISketch")
-                if sketch.GetSketchPoints2() and not sketch.GetSketchSegments():
-                    state = check(f"{feature_name} placement definition", await adapter.check_sketch_fully_defined(str(sub.Name)))
-                    if state.get("definition_state") != "fully_defined":
-                        raise RuntimeError(f"{feature_name}: placement sketch is not fully defined: {state}")
-                    break
-            sub = sub.GetNextSubFeature()
-        else:
-            raise RuntimeError(f"{feature_name}: point-only placement sketch not found")
+    _assert_placement_sketches_fully_defined(adapter)
     check("both tap mouth chamfers", await adapter.add_chamfer(MOUTH_CHAMFER, [[x, TAP_DRILL_DIA / 2.0, 0.0] for x in (-NECK_HALF_X, NECK_HALF_X)]))
     name_last_feature(adapter, "MouthBreak")
     name_dimensions(adapter, "MouthBreak", ["MouthChamfer"])
