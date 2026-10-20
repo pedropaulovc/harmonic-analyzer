@@ -464,6 +464,10 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
 BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
+# Separate the chamfer's three-row text from its native dimension shelf and
+# witness overrun. Keep its attached dimension line at the creation point.
+BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
+
 
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
@@ -621,13 +625,13 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # ordinary .XXX station from the round hole has a higher dimension line and
 # its own mate qualifier, on a jog above-left of the round-hole block.
 # The radius-centre reference belongs to the separate enlarged detail L.
-# Under the slot: its controlling overall length.  The caption takes the
-# empty lower-left corner of the band.  Native inspection establishes the
-# new text/arrow clearances; these placements do not change the cut or scale.
+# Under the slot: its controlling overall length. The linked caption sits
+# directly below the section; the length text's separate jog frees that band.
+# Native inspection establishes the new text/arrow/leader clearances.
 HANGER_GRIP_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
-HANGER_GRIP_OFFSET_XY = (0.058, 0.076)
+HANGER_GRIP_OFFSET_XY = (0.072, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 # Its third row names the mate the three-place station matches, the
 # MHA-SM-02 knife mount's own dowel hole (both read
@@ -641,16 +645,11 @@ SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 
 SLOT_STATION_OFFSET_XY = (0.112, 0.1295)
 SLOT_STATION_CALLOUT = "MATCHES MHA-SM-02"
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-# Left of its line the leader landed on the underline's right end through
-# the last "L" of TRAVEL (r5 render: leader 112.4 -> 121.3 mm, underline end
-# 121.3; machinist review r6, two runs).  Now the 63.5 mm block stands right
-# of the line, its underline's left end at 134.6 mm, 22 mm right of where
-# the leader leaves the dimension line (112.4 mm), so the leader comes down
-# from the left and passes 2.7 mm clear of the first glyph at cap height
-# (07527cf4's right-side block, its end almost under the line, ran it
-# through "2X").  The block spans 134.6 -> 198.1 mm, short of the title
-# block (216).
-SLOT_LENGTH_OFFSET_XY = (0.1664, 0.024)
+# The full native dowel-travel block is 69.55 mm wide on 4ef's PDF. Move
+# only its text into the band left of the title block, freeing the space
+# below the profile for its own caption. The selected ends, dimension line
+# and witnesses stay put; the new jog's own-arrow clearance needs native proof.
+SLOT_LENGTH_OFFSET_XY = (0.177, 0.045)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
@@ -668,7 +667,7 @@ HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
     "HangerGrip": "",
 }
-HANGER_SECTION_CAPTION_XY = (0.055, 0.040)
+HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
 # right of the crossbar; datum C the rear one, its tag above the rear rail so
@@ -3596,6 +3595,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=BORE_CHAMFER, orientation="horizontal",
         entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
         suffix="X 45 DEG\nCAP / GOOSENECK TOP", edges=detail_section_edges,
+        offset_text=BORE_CHAMFER_TEXT_OFFSET_XY,
     )
     upper_boss_edge = detail_front_edges.circle_at(
         (COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z), BOSS_DIA/2-EDGE_CHAMFER,

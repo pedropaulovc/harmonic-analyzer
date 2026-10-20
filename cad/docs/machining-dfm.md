@@ -186,8 +186,14 @@ mate, three qualifier rows and **16.30 +0.3/0.0 mm** band. Its native sheet
 anchor is **(382, 158) mm**, 4 mm left of the former placement, with the
 same boss-face and recess-floor attachments. The longer parent-scoped name
 left only **0.21 mm** between the underline and border strokes at the old
-anchor. The shift projects **4.21 mm** of border air; regenerated native
-ink must still verify that gap and the neighbouring boss-height callouts.
+anchor. The regenerated native PDF measured **4.21 mm** of border air;
+subsequent native inspection must retain that gap and check the neighbouring
+boss-height callouts. The **1.0 X 45 DEG CAP / GOOSENECK TOP** chamfer keeps
+its original exact-vertex measurement and dimension-line placement, while
+its native text-only jog moves the three rows to **(315, 174) mm**. This
+separates the text shelf from the dimension line and witness overrun rather
+than moving the coupled self-collision. Native inspection must confirm the
+actual jog/arrow connection and clearance to the 4.5 boss-height leader.
 
 The top-frame's live view identifiers are **H-H** (front/rear rail section),
 **DETAIL J** (underside hub enlargement), **K-K** (set-screw boss section)
@@ -212,8 +218,15 @@ and is created before the locator's authored annotations; native inspection
 must still rule out copied controls. Its outside arrows, outboard text and
 native linked caption, and the renamed letters/captions, need native
 clearance inspection rather than extrapolated historical glyph measurements.
-On UNDERSIDE, only the Bottom view note moves, 4 mm up, to reserve L's caption
-lane; the six-sheet layout and F-F control positions remain unchanged.
+On UNDERSIDE, the Bottom view note moves 4 mm up to reserve L's caption
+lane. F-F's own linked **SECTION F-F / SCALE 1:1** caption is centred under
+its hatched profile at **(120, 31) mm**, not beneath L's circle. The native
+36.50 grip text sits beside the section at **(72, 76) mm**. The overall-slot
+text alone moves to **(177, 45) mm** to free that caption band; its selected
+ends, dimension line, witnesses and controlling value/band do not move.
+The six-sheet layout and L's crop, reference and caption stay unchanged.
+Native ink must establish the caption/border and depth-arrow clearances and
+the jog's own-arrow/witness routing; estimated gaps are not acceptance.
 
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores
