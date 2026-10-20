@@ -205,15 +205,18 @@ UNDERSIDE_LOCATION_PREFIXES: dict[tuple[str, str], str] = {
     )
     for name in names
 }
-# D1 is located from the nearer transferred MHA-DT-02 seat, not the table
-# origin. The model's point-only PivotSeatReference sketch owns these offsets.
+# The pivot is located from the nearer transferred MHA-DT-02 seat, not the
+# table origin. The model's point-only PivotSeatReference sketch owns the offsets.
 PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
-PIVOT_SEAT_TAG = "D1"
-PIVOT_SEAT_STEP = (
-    f"1. {PIVOT_SEAT_TAG} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
-    "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
-    f"{PIVOT_SEAT_TAG} TABLE X/Y ARE REFERENCE."
-)
+
+
+def pivot_seat_step(tag: str) -> str:
+    """Identify the physical pivot using its current native hole-table tag."""
+    return (
+        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
+        "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
+        f"{tag} TABLE X/Y ARE REFERENCE."
+    )
 
 # Both heights are baselines from the same faced underside, never a chain
 # through the flange thickness and deck rise (#1321). Their ordinary .X

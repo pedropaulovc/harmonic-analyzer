@@ -126,10 +126,13 @@ geometry is casting-shaped, not milling-shaped.
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
   lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
-  in one setup without repeating the numeric offsets, and states that D1
-  table X/Y are reference. The generated native hole-table coordinates remain
-  unchanged; the D1 row carries the same `SEE NOTE 1` flag in a custom NOTE
-  column (#1744), because generated hole-table cells are not editable.
+  in one setup without repeating the numeric offsets, and states that the
+  pivot's table X/Y are reference. Its actual native tag is resolved from the
+  physical pivot station, not a fixed family letter. The generated native
+  hole-table coordinates remain unchanged; that same physical row carries
+  `SEE NOTE 1` in a custom NOTE column (#1744), because generated hole-table
+  cells are not editable. Both the numbered note and curated view-tag layout
+  follow station identity if native size families re-letter or merge.
 
 The base's **18 deck seats** are through-tapped at their existing stations
 and thread designations: four rocker-support, one cone-pivot, one cone-lock,
