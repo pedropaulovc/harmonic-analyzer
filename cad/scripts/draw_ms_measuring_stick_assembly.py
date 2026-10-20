@@ -1,9 +1,10 @@
 r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
-Sheet 1 shows the stick clamped at its stop mark (upright elevation and a
-labelled graduated-underside inspection at full size), a reference overall
-and controlled near-face setting dimension, an upright clamp section, and the
-clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED`` presentation with
+Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
+aligned third-angle graduated-underside view below it, both at full size), a
+reference overall and controlled near-face setting dimension, an upright clamp
+section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
+presentation with
 the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
 component, both plate screws included; sheet 3 the finished isometric beside
 the assembly order and
@@ -109,21 +110,21 @@ TITLE_BLOCK = (
 )
 
 # Sheet 1: the 200-long stick at full size, working elevation screw-up.
-# The labelled underside inspection above it retains the readable graduations;
-# it is not a projected top view. Section A-A shows the actual upright clamp.
-# Overall and near-face acceptance run in the gap below the underside view.
+# The graduated underside sits below Front in aligned third-angle projection.
+# Section A-A shows the actual upright clamp. Both dimension rows remain above
+# Front, with the setting line clear of the upper cutting-plane arrow/letter.
 FRONT_CENTER = (0.135, 0.190)
-UNDERSIDE_CENTER = (0.135, 0.248)
-UNDERSIDE_CAPTION_XY = (0.035, 0.263)
+UNDERSIDE_CENTER = (FRONT_CENTER[0], 0.130)
+UNDERSIDE_CAPTION_XY = (0.035, 0.145)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
-STOP_POSITION_TEXT_Y = 0.220
+STOP_POSITION_TEXT_Y = 0.240
 # Fraction of the setting span from the stick end: left of centre, so the
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
-OVERALL_LENGTH_TEXT_Y = 0.237
-SETUP_NOTE_XY = (0.030, 0.160)
+OVERALL_LENGTH_TEXT_Y = 0.257
+SETUP_NOTE_XY = (0.030, 0.100)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
