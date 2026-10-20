@@ -47,16 +47,19 @@ DISCOVERY_SECONDS = 60.0
 STUDY_SECONDS = 180.0
 OPTIONAL_OBSERVATION_SECONDS = 15.0
 PICK_CAP = 112
-BLOCKS = (("A", "P-", "A", "N", "A", "P+", "A"),
-          ("A", "P+", "A", "N", "A", "P-", "A"))
-PAD_BLOCKS = (("P-", "A", "N", "A", "P+", "A", "A"),
-              ("P+", "A", "N", "A", "P-", "A", "A"))
+BLOCKS = (("A", "P-", "A", "N", "A", "P+", "A"), ("A", "P+", "A", "N", "A", "P-", "A"))
+PAD_BLOCKS = (
+    ("P-", "A", "N", "A", "P+", "A", "A"),
+    ("P+", "A", "N", "A", "P-", "A", "A"),
+)
 ARMS = ("A", "P-", "P+", "N")
 PHASE_TARGETS = {"P-": 0.25, "P+": 0.25, "N": 0.75}
 INTEGER_OFFSETS = {"P-": -1, "P+": 1, "N": 0}
 ACHIEVED_TOLERANCE = 1e-6
 REFERENCE_SOURCE = "419cd18af1f6904f76bd794d487eb8616ecc8818"
-REFERENCE_REPORT_SHA256 = "a800fe59adae895ff6a96f1dcb932d048f364a32d78a2795da2772b4983cdc35"
+REFERENCE_REPORT_SHA256 = (
+    "a800fe59adae895ff6a96f1dcb932d048f364a32d78a2795da2772b4983cdc35"
+)
 REFERENCE_REPORT = "azure/failures/sm1667-16c43264/p.json"
 # Actual frozen_points[].normal from the audited report, transformed by its
 # normalized native 2x2 diag(1,-1). Never rounded prose or image-derived normals.
@@ -81,15 +84,20 @@ REFERENCE_RADIUS_BOUNDS = {
     "leverPlateEnd": (0.8660488623791058, None),
 }
 REFERENCE_FRAME = {
-    "FrameLeft": 0, "FrameTop": 22, "FrameWidth": 1205,
-    "FrameHeight": 677, "FrameState": 1,
+    "FrameLeft": 0,
+    "FrameTop": 22,
+    "FrameWidth": 1205,
+    "FrameHeight": 677,
+    "FrameState": 1,
 }
 REFERENCE_WINDOWS = {
     "view_client_rect_px": [0, 0, 1264, 598],
     "grabbed_main_window_rect_px": [0, 0, 1280, 752],
     "view_client_screen_origin_px": [-1, 116],
-    "view_dpi": 96, "main_window_dpi": 96,
-    "caller_thread_dpi_awareness": 0, "seat_window_dpi_awareness": 2,
+    "view_dpi": 96,
+    "main_window_dpi": 96,
+    "caller_thread_dpi_awareness": 0,
+    "seat_window_dpi_awareness": 2,
 }
 A_RESTORATION_TOLERANCE = 1e-6
 PATH_LIMIT_UTF16 = 240  # Conservative budget, including the checkpoint temp.
@@ -248,19 +256,19 @@ def _value(record: Mapping[str, Any], key: str) -> Any:
 
 
 def _event(stage: str, report: Mapping[str, Any], **fields: Any) -> None:
-    # Count API submissions, not exporter retention; compare with serialized spans.
+    # Calls/escaping exceptions only: exporter retention requires trace joins.
     started = time.perf_counter()
     try:
+        counter = _SPAN_EVENTS.get()
+        if counter is not None and stage == "phase_pick":
+            counter["phase_event_call_count"] += 1
         _telemetry.event(
             f"drawing.sm_pose.{stage}", probe_id=report["probe_id"], **fields
         )
-        counter = _SPAN_EVENTS.get()
-        if counter is not None:
-            counter["emitted_event_count"] += 1
     except Exception:
         counter = _SPAN_EVENTS.get()
-        if counter is not None:
-            counter["event_submission_errors"] += 1
+        if counter is not None and stage == "phase_pick":
+            counter["event_call_exception_count"] += 1
     finally:
         _cost("telemetry_emission", (time.perf_counter() - started) * 1000)
 
@@ -862,12 +870,14 @@ def _pose_state(
 
 def _source_witnesses() -> dict[str, dict[str, Any]]:
     # Frozen source study sm-witness-design/report.json. No builder import.
-    # Builder-only expressions are mirrored explicitly, with file/line authority.
+    # Builder-only expressions mirrored by current symbols on main21f2606d6.
     s = lever_spec
     w, length, thickness = s.PLATE_W, s.PLATE_L, s.PLATE_T
-    radius = s.CYL_R + 0.1 * s.MM_PER_IN  # build_sm_summing_lever:159-161,206
-    rib_thickness = 0.2 * s.MM_PER_IN  # build_sm_summing_lever:160
-    reach = s.HOLE_X - 4.1  # build_sm_summing_lever:222
+    radius = s.CYL_R + 0.1 * s.MM_PER_IN  # build_sm_summing_lever:ARC_R,RIB_PAD
+    rib_thickness = (
+        0.2 * s.MM_PER_IN
+    )  # build_sm_summing_lever:RIB_T (not RECEIVER_RIB_T)
+    reach = s.HOLE_X - 4.1  # build_sm_summing_lever:RIB_PLATE_REACH
     slope = radius / math.sqrt(s.SUM_H**2 - radius**2)
     rib_start = (
         -(radius**2) / s.SUM_H,
@@ -880,10 +890,10 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
         mount_spec.BLK_BOT,
         mount_spec.SUPPORT_Z_THICK / 2,
     )
-    mount_gap = 0.0  # frozen build_sm_knife_mount.py:137 MOUNT_GAP
+    mount_gap = 0.0  # build_sm_knife_mount:MOUNT_GAP
     top = (
         999.7 - (979.7 + s.HEX_H / 2) - mount_gap
-    )  # exact builder:135-139, NOT rounded BLK_TOP
+    )  # build_sm_knife_mount:CASTING_UNDERSIDE_Y,CONTACT_Y; NOT rounded BLK_TOP
     definitions = (
         (
             "leverNear",
@@ -891,7 +901,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (s.HEX_W / 2, s.HEX_H / 4, length / 2 + s.HEX_DEPTH / 2),
             (s.HEX_W / 2, s.HEX_H / 4, length / 2),
             (s.HEX_W / 2, s.HEX_H / 4, length / 2 + s.HEX_DEPTH),
-            "build_sm_summing_lever.py:524-595,675-689; sm_summing_lever_spec.py:42-54",
+            "build_sm_summing_lever.py:_hex_knife,_knife_ridge_fillet; sm_summing_lever_spec.py:HEX_W,HEX_H,HEX_DEPTH; main21f2606d6",
         ),
         (
             "leverPad",
@@ -899,7 +909,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (w, thickness / 2 - s.SPRING_SEAT_T, 0),
             (w, thickness / 2 - s.SPRING_SEAT_T, -length / 2),
             (w, thickness / 2 - s.SPRING_SEAT_T, length / 2),
-            "build_sm_summing_lever.py:337-427; sm_summing_lever_spec.py:137-146",
+            "build_sm_summing_lever.py:_coefficients_plate (SpringPad); sm_summing_lever_spec.py:SPRING_SEAT_T; main21f2606d6",
         ),
         (
             "leverFarMidrib",
@@ -907,7 +917,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (-60.0, slope * (s.SUM_H - 60.0), rib_thickness / 2),
             rib_start,
             rib_end,
-            "build_sm_summing_lever.py:979-1008,1053-1063,927-976",
+            "build_sm_summing_lever.py:_middle_rib,_summation_plate,ARC_R,RIB_T,TIP_X; main21f2606d6",
         ),
         (
             "leverPlateEnd",
@@ -915,7 +925,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             ((reach + w) / 2, thickness / 2, length / 2),
             (reach, thickness / 2, length / 2),
             (w, thickness / 2, length / 2),
-            "build_sm_summing_lever.py:337-370,222-237,743-841",
+            "build_sm_summing_lever.py:_coefficients_plate,RIB_PLATE_REACH,_edge_rib (EdgeRibFront); main21f2606d6",
         ),
         (
             "controlY",
@@ -923,7 +933,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (hx, 0, z),
             (hx, bottom, z),
             (hx, top, z),
-            "build_sm_knife_mount.py:112-148,270-345; sm_knife_mount_spec.py:36-45",
+            "build_sm_knife_mount.py:BLK_BOT,BLK_TOP,SUPPORT_Z_THICK,build (BlockProfile); sm_knife_mount_spec.py:BLK_HALF_X; main21f2606d6",
         ),
         (
             "controlX",
@@ -931,7 +941,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (0, bottom, z),
             (-hx, bottom, z),
             (hx, bottom, z),
-            "build_sm_knife_mount.py:270-345",
+            "build_sm_knife_mount.py:build (BlockProfile),BLK_BOT,SUPPORT_Z_THICK; main21f2606d6",
         ),
         (
             "controlZ",
@@ -939,7 +949,7 @@ def _source_witnesses() -> dict[str, dict[str, Any]]:
             (hx, bottom, 0),
             (hx, bottom, -z),
             (hx, bottom, z),
-            "build_sm_knife_mount.py:270-345",
+            "build_sm_knife_mount.py:build (BlockProfile),BLK_BOT,SUPPORT_Z_THICK; main21f2606d6",
         ),
     )
     result = {}
@@ -1840,19 +1850,29 @@ def _bracket_controls(
             )
         checks["output_evidence"] = _output_evidence(actual, initial)
         if arm != "A":
-            fractions = [float(value) - math.floor(float(value)) for value in actual[:2]]
+            fractions = [
+                float(value) - math.floor(float(value)) for value in actual[:2]
+            ]
             phase_error = (
                 max(abs(fractions[i] - expected_phase[i]) for i in range(2))
-                if expected_phase is not None else None
+                if expected_phase is not None
+                else None
             )
             gate(
-                "absolute_phase", expected_phase is not None,
+                "absolute_phase",
+                expected_phase is not None,
                 phase_error is not None and phase_error <= ACHIEVED_TOLERANCE,
-                {"actual": fractions, "expected": expected_phase, "max_error": phase_error},
+                {
+                    "actual": fractions,
+                    "expected": expected_phase,
+                    "max_error": phase_error,
+                },
             )
             gate(
-                "interior_phase", True,
-                all(min(f, 1 - f) >= 0.01 for f in fractions), fractions,
+                "interior_phase",
+                True,
+                all(min(f, 1 - f) >= 0.01 for f in fractions),
+                fractions,
             )
     scales = (_value(viewport, "Scale2"), _value(first_viewport, "Scale2"))
     scale_available = all(v is not None and math.isfinite(v) and v > 0 for v in scales)
@@ -1953,21 +1973,30 @@ def _bracket_controls(
     }
 
 
-def _reference_context(bracket: Mapping[str, Any], frozen: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _reference_context(
+    bracket: Mapping[str, Any], frozen: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
     viewport = bracket["viewport"]
     control = _value(viewport, "Transform_control") or {}
     array = control.get("array")
     scale = float(array[12]) if array is not None else None
-    orientation = _linear(array)[:2, :2] / scale if scale is not None and scale > 0 else None
+    orientation = (
+        _linear(array)[:2, :2] / scale if scale is not None and scale > 0 else None
+    )
     checks = {
         "native_control": bool(control.get("valid")),
-        "uniform_scale": scale is not None and scale > 0 and abs(scale / 119600.0 - 1) <= SCALE_RELATIVE_TOLERANCE,
-        "normalized_2x2_orientation": orientation is not None and float(
-            np.max(np.abs(orientation - np.diag([1.0, -1.0])))
-        ) <= 1e-6,
+        "uniform_scale": scale is not None
+        and scale > 0
+        and abs(scale / 119600.0 - 1) <= SCALE_RELATIVE_TOLERANCE,
+        "normalized_2x2_orientation": orientation is not None
+        and float(np.max(np.abs(orientation - np.diag([1.0, -1.0])))) <= 1e-6,
     }
     scale2 = _value(viewport, "Scale2")
-    checks["Scale2"] = scale2 is not None and scale2 > 0 and abs(scale2 / 55.88 - 1) <= SCALE_RELATIVE_TOLERANCE
+    checks["Scale2"] = (
+        scale2 is not None
+        and scale2 > 0
+        and abs(scale2 / 55.88 - 1) <= SCALE_RELATIVE_TOLERANCE
+    )
     for key, expected in REFERENCE_FRAME.items():
         checks[key] = _value(viewport, key) == expected
     windows = _value(viewport, "windows") or {}
@@ -1983,18 +2012,32 @@ def _reference_context(bracket: Mapping[str, Any], frozen: Sequence[Mapping[str,
             projected = np.linalg.solve(orientation.T, fixed["normal"])
             normal = (projected / np.linalg.norm(projected)).tolist()
         normals[fixed["id"]] = normal
-        checks[f"normal.{fixed['id']}"] = normal is not None and max(
-            abs(normal[i] - REFERENCE_OUTPUT_NORMALS[fixed["id"]][i]) for i in range(2)
-        ) <= 1e-6
+        checks[f"normal.{fixed['id']}"] = (
+            normal is not None
+            and max(
+                abs(normal[i] - REFERENCE_OUTPUT_NORMALS[fixed["id"]][i])
+                for i in range(2)
+            )
+            <= 1e-6
+        )
     _finite_tree((scale, normals))
     return {
-        "admitted": all(checks.values()), "checks": checks,
+        "admitted": all(checks.values()),
+        "checks": checks,
         "failed": [key for key, passed in checks.items() if not passed],
-        "uniform_scale": scale, "output_normals": normals,
+        "uniform_scale": scale,
+        "output_normals": normals,
         "normalized_2x2": orientation.tolist() if orientation is not None else None,
-        "reference_source": REFERENCE_SOURCE, "reference_report": REFERENCE_REPORT,
+        "reference_source": REFERENCE_SOURCE,
+        "reference_report": REFERENCE_REPORT,
         "reference_report_sha256": REFERENCE_REPORT_SHA256,
-        "excluded_from_cross_run_equality": ["HWND", "PID", "thread IDs", "awareness contexts", "timestamps"],
+        "excluded_from_cross_run_equality": [
+            "HWND",
+            "PID",
+            "thread IDs",
+            "awareness contexts",
+            "timestamps",
+        ],
     }
 
 
@@ -2019,7 +2062,8 @@ def _derive_phases(first: Mapping[str, Any]) -> dict[str, Any] | None:
     phases = {
         arm: {
             point: (
-                [PHASE_TARGETS[arm]] * 2 if point == "original" and arm != "A"
+                [PHASE_TARGETS[arm]] * 2
+                if point == "original" and arm != "A"
                 else [(float(q[i]) + shift[i]) % 1 for i in range(2)]
             )
             for point, field in viewport["fixed_point_outputs"].items()
@@ -2028,49 +2072,78 @@ def _derive_phases(first: Mapping[str, Any]) -> dict[str, Any] | None:
         for arm, shift in shifts.items()
     }
     result = {
-        "linear_2x2": linear.tolist(), "inverse_2x2": inverse.tolist(),
-        "determinant": determinant, "first_A_original_output": list(original),
+        "linear_2x2": linear.tolist(),
+        "inverse_2x2": inverse.tolist(),
+        "determinant": determinant,
+        "first_A_original_output": list(original),
         "first_A_point_outputs": {
             point: list(field["value"])
             for point, field in viewport["fixed_point_outputs"].items()
             if field.get("value") is not None
         },
-        "requested_output_shifts": shifts, "sheet_centre_offsets_m": offsets,
-        "expected_point_phases": phases, "derived_once_no_feedback": True,
+        "requested_output_shifts": shifts,
+        "sheet_centre_offsets_m": offsets,
+        "expected_point_phases": phases,
+        "derived_once_no_feedback": True,
     }
     _finite_tree(result)
     return result
 
 
 def _prediction(
-    witness_id: str, point_id: str, arm: str, bracket: Mapping[str, Any],
+    witness_id: str,
+    point_id: str,
+    arm: str,
+    bracket: Mapping[str, Any],
     derivation: Mapping[str, Any],
 ) -> dict[str, Any]:
     outputs = bracket["viewport"].get("fixed_point_outputs", {})
     q, edge = _value(outputs, point_id), _value(outputs, "original")
     if q is None or edge is None:
-        return {"expected_class": None, "adjudicating": False, "reason": "native output unavailable"}
+        return {
+            "expected_class": None,
+            "adjudicating": False,
+            "reason": "native output unavailable",
+        }
     # FLOOR FIRST on exact achieved binary64, never rounded q.
     offset = [math.floor(float(v)) - float(v) for v in q[:2]]
-    group = [0 if abs(v) <= 1e-6 else -1 if abs(v + 1) <= 1e-6 else None for v in offset]
+    group = [
+        0 if abs(v) <= 1e-6 else -1 if abs(v + 1) <= 1e-6 else None for v in offset
+    ]
     expected = None
     if arm in PHASE_TARGETS:
-        expected = "no-selection" if (
-            arm == "N" and point_id == "original" and witness_id in ("leverPad", "controlZ")
-        ) else "target"
+        expected = (
+            "no-selection"
+            if (
+                arm == "N"
+                and point_id == "original"
+                and witness_id in ("leverPad", "controlZ")
+            )
+            else "target"
+        )
     elif point_id == "plus8um":
         expected = "target"
     elif None not in group:
         bits = tuple(group)
         if witness_id == "controlX":
-            expected = {(0, 0): "target", (-1, -1): "target", (0, -1): "no-selection"}.get(bits)
+            expected = {
+                (0, 0): "target",
+                (-1, -1): "target",
+                (0, -1): "no-selection",
+            }.get(bits)
         elif witness_id in ("leverPad", "controlZ"):
-            expected = {(0, 0): "target", (0, -1): "no-selection", (-1, -1): "no-selection"}.get(bits)
+            expected = {
+                (0, 0): "target",
+                (0, -1): "no-selection",
+                (-1, -1): "no-selection",
+            }.get(bits)
         else:
             expected = "target"
-    distance = sum(REFERENCE_OUTPUT_NORMALS[witness_id][i] * (
-        math.floor(float(q[i])) - float(edge[i])
-    ) for i in range(2))
+    distance = sum(
+        REFERENCE_OUTPUT_NORMALS[witness_id][i]
+        * (math.floor(float(q[i])) - float(edge[i]))
+        for i in range(2)
+    )
     actual_floor_group = [math.floor(float(q[i])) - float(edge[i]) for i in range(2)]
     first_points = derivation.get("first_A_point_outputs", {})
     shift = derivation.get("requested_output_shifts", {}).get(arm)
@@ -2078,10 +2151,14 @@ def _prediction(
     if point_id in first_points and "original" in first_points and shift is not None:
         predicted_q = [first_points[point_id][i] + shift[i] for i in range(2)]
         predicted_edge = [first_points["original"][i] + shift[i] for i in range(2)]
-        expected_floor_group = [math.floor(predicted_q[i]) - predicted_edge[i] for i in range(2)]
+        expected_floor_group = [
+            math.floor(predicted_q[i]) - predicted_edge[i] for i in range(2)
+        ]
     return {
-        "expected_class": expected, "adjudicating": expected is not None,
-        "floor_minus_exact_output": offset, "floor_offset_group": group,
+        "expected_class": expected,
+        "adjudicating": expected is not None,
+        "floor_minus_exact_output": offset,
+        "floor_offset_group": group,
         "signed_floor_distance": distance,
         "actual_floor_offset_from_original_edge_output": actual_floor_group,
         "expected_floor_offset_from_original_edge_output": expected_floor_group,
@@ -2089,17 +2166,27 @@ def _prediction(
         "radius_interval_closed_lower_open_upper": REFERENCE_RADIUS_BOUNDS[witness_id],
         "distance_is_descriptive_not_prediction_threshold": True,
         "zero_distance_label": "model-implied d=0, NOT observed selection"
-        if arm == "A" and point_id == "original" and group == [0, 0]
-        and witness_id in ("controlX", "leverPad") else None,
+        if arm == "A"
+        and point_id == "original"
+        and group == [0, 0]
+        and witness_id in ("controlX", "leverPad")
+        else None,
     }
 
 
-def _history_admission(history: Mapping[str, Any], intended_owner: str) -> dict[str, Any]:
+def _history_admission(
+    history: Mapping[str, Any], intended_owner: str
+) -> dict[str, Any]:
     calls, anchors = history.get("calls", []), history.get("anchors", [])
     boundary = history.get("baseline_sequence")
     reasons = []
-    if history.get("source_coverage") != "1667-leaf-selection-prefix-audit/912179e24":
+    if history.get("source_coverage") != "1667-leaf-selection-prefix-audit/21f2606d6":
         reasons.append("source-prefix coverage unavailable")
+    if (
+        history.get("source_coverage_kind")
+        != "source-audit-attestation-not-runtime-native-coverage"
+    ):
+        reasons.append("source-prefix attestation kind unavailable")
     if history.get("discovery_before_attachment") is not True:
         reasons.append("attachment exclusion unavailable")
     if [r.get("sequence") for r in calls] != list(range(1, len(calls) + 1)):
@@ -2107,7 +2194,7 @@ def _history_admission(history: Mapping[str, Any], intended_owner: str) -> dict[
     if intended_owner and boundary:
         baseline = next((r for r in calls if r["sequence"] == boundary), {})
         order, stem = history.get("source_order", []), baseline.get("anchor")
-        prior = order[:order.index(stem)] if stem in order else None
+        prior = order[: order.index(stem)] if stem in order else None
         if prior is None or [a.get("stem") for a in anchors] != prior:
             reasons.append("executed source-order prefix not reconciled")
         prefix = [r for r in calls if r["sequence"] < boundary]
@@ -2116,15 +2203,24 @@ def _history_admission(history: Mapping[str, Any], intended_owner: str) -> dict[
         for anchor in anchors:
             rows = [r for r in prefix if r.get("anchor") == anchor.get("stem")]
             if not (
-                anchor.get("completed") and len(rows) == anchor.get("attempts")
-                and [r["sequence"] for r in rows] == list(range(
-                    anchor.get("first_sequence", 0), anchor.get("last_sequence", -1) + 1
-                ))
+                anchor.get("completed")
+                and len(rows) == anchor.get("attempts")
+                and [r["sequence"] for r in rows]
+                == list(
+                    range(
+                        anchor.get("first_sequence", 0),
+                        anchor.get("last_sequence", -1) + 1,
+                    )
+                )
                 and all(r.get("stage") == "anchor" for r in rows)
             ):
                 reasons.append(f"incomplete anchor coverage: {anchor.get('stem')}")
-        expected = ["baseline"] + (["immediate-repeat"] if baseline.get("raw_result") is False else [])
-        if [r.get("stage") for r in calls if r["sequence"] >= boundary] != expected + ["postobserver_exact_oldXY"]:
+        expected = ["baseline"] + (
+            ["immediate-repeat"] if baseline.get("raw_result") is False else []
+        )
+        if [r.get("stage") for r in calls if r["sequence"] >= boundary] != expected + [
+            "postobserver_exact_oldXY"
+        ]:
             reasons.append("baseline/repeat/postobserver chronology incomplete")
     else:
         reasons.append("natural baseline boundary unavailable")
@@ -2135,17 +2231,27 @@ def _history_admission(history: Mapping[str, Any], intended_owner: str) -> dict[
             owner = row.get("actual_owner")
             if row.get("owner_status") != "known" or not owner:
                 reasons.append(f"unknown-owner success: {row.get('sequence')}")
-            elif owner.replace("\\", "/").casefold() == intended_owner.replace("\\", "/").casefold():
+            elif (
+                owner.replace("\\", "/").casefold()
+                == intended_owner.replace("\\", "/").casefold()
+            ):
                 reasons.append(f"prior lever-owner success: {row.get('sequence')}")
     return {
-        "qualified": not reasons, "reasons": reasons, "prior_call_count": len(calls),
+        "evaluated_after_sequence": calls[-1]["sequence"] if calls else 0,
+        "evaluated_at_monotonic_ns": time.perf_counter_ns(),
+        "source_coverage_kind": "source-audit-attestation-not-runtime-native-coverage",
+        "qualified": not reasons,
+        "reasons": reasons,
+        "prior_call_count": len(calls),
         "status": "qualified" if not reasons else "unprimed-P unavailable",
         "actual_completed_anchor_attempts": sum(a.get("attempts", 0) for a in anchors),
         "scope": "current-leaf explicit successful selection history only; NOT cold seat/process/cache",
     }
 
 
-def _append_pick_history(record: dict[str, Any], xy: Sequence[float], arm: str) -> dict[str, Any] | None:
+def _append_pick_history(
+    record: dict[str, Any], xy: Sequence[float], arm: str
+) -> dict[str, Any] | None:
     history = _HISTORY.get()
     if history is None:
         return None
@@ -2153,57 +2259,126 @@ def _append_pick_history(record: dict[str, Any], xy: Sequence[float], arm: str) 
         calls = history["calls"]
         previous = calls[-1] if calls else None
         row = {
-            "sequence": len(calls) + 1, "api": "IModelDocExtension.SelectByID2",
-            "callsite": "_drawing_sm_pose_diagnostic._pick", "stage": arm,
-            "sheet_xy_m": list(xy), "raw_result": record.get("raw_result"),
-            "raw_error": record.get("raw_error"), "actual_owner": None,
-            "owner_status": "unknown", "select_ms": record.get("select_ms"),
-            "select_begin": record.get("select_begin"), "select_end": record.get("select_end"),
+            "sequence": len(calls) + 1,
+            "api": "IModelDocExtension.SelectByID2",
+            "callsite": "_drawing_sm_pose_diagnostic._pick",
+            "stage": arm,
+            "sheet_xy_m": list(xy),
+            "raw_call_status": "attempted",
+            "raw_result": record.get("raw_result"),
+            "raw_error": record.get("raw_error"),
+            "actual_owner": None,
+            "owner_status": "unknown",
+            **{
+                key: record[key]
+                for key in (
+                    "select_begin_utc_ns",
+                    "select_end_utc_ns",
+                    "select_begin_monotonic_ns",
+                    "select_end_monotonic_ns",
+                    "select_ms",
+                )
+            },
         }
         record["global_sequence"] = row["sequence"]
         record["global_predecessor"] = dict(previous) if previous else None
         record["sub15ms_after_rawmiss_descriptive_only"] = bool(
-            previous and previous.get("raw_result") is False and record.get("select_ms", 15) < 15
+            previous
+            and previous.get("raw_result") is False
+            and record.get("select_ms", 15) < 15
         )
         calls.append(row)
     return row
+
+
+def _point_protocol_unavailable(state: Mapping[str, Any], point_id: str) -> list[str]:
+    reasons = []
+    if state.get("reference_context", {}).get("admitted") is not True:
+        reasons.append("reference_context")
+    for name in ("before", "after"):
+        if (
+            state.get("point_controls", {})
+            .get(point_id, {})
+            .get(name, {})
+            .get("admitted")
+            is not True
+        ):
+            reasons.append(f"{name}_point_controls")
+    before = state.get("predictions", {}).get(point_id)
+    after = state.get("closing_predictions", {}).get(point_id)
+    if before is None or after is None:
+        reasons.append("prediction_or_closing_prediction")
+    elif before["expected_class"] != after["expected_class"]:
+        reasons.append("prediction_changed_in_bracket")
+    pick = state.get("picks", {}).get(point_id, {})
+    if pick.get("raw_call_status") != "attempted" or not isinstance(
+        pick.get("raw_result"), bool
+    ):
+        reasons.append("raw_call_unavailable")
+    if pick.get("selection_identity_readable") is not True:
+        reasons.append("selection_identity")
+    return reasons
 
 
 def _adjudicate(witness: dict[str, Any]) -> None:
     states = witness["states"]
     scales = [
         _value(state.get(bracket, {}).get("viewport", {}), "Scale2")
-        for state in states for bracket in ("before", "after")
+        for state in states
+        for bracket in ("before", "after")
     ]
-    scale_valid = bool(scales) and all(v is not None and math.isfinite(v) and v > 0 for v in scales)
+    scale_valid = bool(scales) and all(
+        v is not None and math.isfinite(v) and v > 0 for v in scales
+    )
     variation = (max(scales) - min(scales)) / min(scales) if scale_valid else None
     endpoints = {}
     for point_id in witness["fixed"]["points"]:
         missing, failures, contradictions, predictions = [], [], [], []
-        if witness["id"] == "leverPad" and point_id == "original" and not witness.get("first_P_history_admission", {}).get("qualified"):
+        if (
+            witness["id"] == "leverPad"
+            and point_id == "original"
+            and not witness.get("first_P_history_admission", {}).get("qualified")
+        ):
             missing.append("unprimed-P unavailable")
         timings = {}
         for arm in ARMS:
             samples = [
-                {"state": s["id"], "block": s["block"], "index": s["index"],
-                 "select_ms": s["picks"][point_id]["select_ms"],
-                 "first_after_zoom": s["picks"][point_id]["first_after_zoom"],
-                 "global_sequence": s["picks"][point_id].get("global_sequence")}
-                for s in states if s["arm"] == arm and point_id in s["picks"]
+                {
+                    "state": s["id"],
+                    "block": s["block"],
+                    "index": s["index"],
+                    "select_ms": s["picks"][point_id]["select_ms"],
+                    "first_after_zoom": s["picks"][point_id]["first_after_zoom"],
+                    "global_sequence": s["picks"][point_id].get("global_sequence"),
+                }
+                for s in states
+                if s["arm"] == arm
+                and point_id in s["picks"]
                 and "select_ms" in s["picks"][point_id]
             ]
             values = [s["select_ms"] for s in samples]
-            timings[arm] = {"n": len(samples), "samples": samples,
-                            "range_ms": [min(values), max(values)] if values else None,
-                            "descriptive_only_not_speedup_delta": True}
+            timings[arm] = {
+                "n": len(samples),
+                "samples": samples,
+                "range_ms": [min(values), max(values)] if values else None,
+                "descriptive_only_not_speedup_delta": True,
+            }
         for state in states:
+            if state.get("reference_context", {}).get("admitted") is not True:
+                failures.append(f"{state['id']}.reference_context")
             for name in ("before", "after"):
                 control = state.get("point_controls", {}).get(point_id, {}).get(name)
                 if control is None:
                     missing.append(f"{state['id']}.{name}")
                 else:
-                    missing.extend(f"{state['id']}.{name}.{key}" for key in control["missing_metadata"])
-                    failures.extend(f"{state['id']}.{name}.{key}" for key in control["observed_control_failures"])
+                    missing.extend(
+                        f"{state['id']}.{name}.{key}"
+                        for key in control["missing_metadata"]
+                    )
+                    failures.extend(
+                        f"{state['id']}.{name}.{key}"
+                        for key in control["observed_control_failures"]
+                    )
             before = state.get("predictions", {}).get(point_id)
             after = state.get("closing_predictions", {}).get(point_id)
             pick = state.get("picks", {}).get(point_id, {})
@@ -2217,16 +2392,33 @@ def _adjudicate(witness: dict[str, Any]) -> None:
             expected = before["expected_class"]
             if expected != after["expected_class"]:
                 failures.append(f"{state['id']}.prediction_changed_in_bracket")
-            matched = None if expected is None else (
-                pick.get("raw_result") is True and pick.get("accepted_own_edge") is True
-                and pick.get("selection_identity_class") == "target"
-            ) if expected == "target" else (
-                pick.get("raw_result") is False and pick.get("canonical_empty_selection") is True
-                and pick.get("selection_identity_class") == "no-selection"
+            unavailable = _point_protocol_unavailable(state, point_id)
+            matched = None
+            if expected is not None and not unavailable:
+                matched = (
+                    (
+                        pick.get("raw_result") is True
+                        and pick.get("accepted_own_edge") is True
+                        and pick.get("selection_identity_class") == "target"
+                    )
+                    if expected == "target"
+                    else (
+                        pick.get("raw_result") is False
+                        and pick.get("canonical_empty_selection") is True
+                        and pick.get("selection_identity_class") == "no-selection"
+                    )
+                )
+            predictions.append(
+                {
+                    "state": state["id"],
+                    "arm": state["arm"],
+                    "expected": expected,
+                    "actual": pick.get("selection_identity_class"),
+                    "protocol_qualified": not unavailable,
+                    "protocol_unavailable_reasons": unavailable,
+                    "matches": matched,
+                }
             )
-            predictions.append({"state": state["id"], "arm": state["arm"],
-                                "expected": expected, "actual": pick.get("selection_identity_class"),
-                                "matches": matched})
             if matched is False:
                 contradictions.append(state["id"])
         if variation is not None and variation > SCALE_RELATIVE_TOLERANCE:
@@ -2238,12 +2430,21 @@ def _adjudicate(witness: dict[str, Any]) -> None:
         admitted = len(states) == 14 and not missing and not failures
         ready = admitted and all_p and not contradictions
         endpoints[point_id] = {
-            "label": "candidate-consistent" if ready else "incomplete" if missing or len(states) != 14
-            else "control-failed" if failures else "prediction-contradiction",
-            "admitted": admitted, "candidate_ready": ready,
-            "missing_metadata": missing, "observed_control_failures": failures,
-            "contradictions": contradictions, "predictions": predictions,
-            "all_four_P_exact_targets": all_p, "scale_relative_variation": variation,
+            "label": "candidate-consistent"
+            if ready
+            else "incomplete"
+            if missing or len(states) != 14
+            else "control-failed"
+            if failures
+            else "prediction-contradiction",
+            "admitted": admitted,
+            "candidate_ready": ready,
+            "missing_metadata": missing,
+            "observed_control_failures": failures,
+            "contradictions": contradictions,
+            "predictions": predictions,
+            "all_four_P_exact_targets": all_p,
+            "scale_relative_variation": variation,
             "per_arm_selection_timing": timings,
         }
     witness["endpoints"] = endpoints
@@ -2280,8 +2481,8 @@ def _phase_study(
                 "fixed": fixed,
                 "states": [],
                 "begin": _stamp(),
-                "emitted_event_count": 0,
-                "event_submission_errors": 0,
+                "phase_event_call_count": 0,
+                "event_call_exception_count": 0,
             }
             report["study"]["witnesses"].append(record)
             token = _SPAN_EVENTS.set(record)
@@ -2299,19 +2500,31 @@ def _phase_study(
                     try:
                         derivation = None
                         first = None
-                        sequences = PAD_BLOCKS if witness["id"] == "leverPad" else BLOCKS
+                        sequences = (
+                            PAD_BLOCKS if witness["id"] == "leverPad" else BLOCKS
+                        )
                         if witness["id"] == "leverPad":
                             calibration = {
-                                "id": "calibrationA", "arm": "A", "picks": {},
-                                "begin": _stamp(), "operation_stage": "zoom-entry",
+                                "id": "calibrationA",
+                                "arm": "A",
+                                "picks": {},
+                                "begin": _stamp(),
+                                "operation_stage": "zoom-entry",
                             }
                             record["calibration"] = calibration
                             with (
                                 _timed("calibration_zoom_bracket_cleanup"),
                                 _isolate_state_native_error(calibration),
-                                _study_zoom(adapter, fixed["centre_sheet_xy_m"], calibration, budget),
+                                _study_zoom(
+                                    adapter,
+                                    fixed["centre_sheet_xy_m"],
+                                    calibration,
+                                    budget,
+                                ),
                             ):
-                                calibration["operation_stage"] = "opening-native-bracket"
+                                calibration["operation_stage"] = (
+                                    "opening-native-bracket"
+                                )
                                 calibration["before"] = _phase_bracket(
                                     adapter, view, utility, fixed, components, budget
                                 )
@@ -2319,38 +2532,64 @@ def _phase_study(
                                 first = calibration["before"]
                                 derivation = _derive_phases(first)
                                 record["offset_derivation"] = derivation
-                                calibration["reference_context"] = _reference_context(first, frozen)
-                                report["cross_run_reference_context"] = calibration["reference_context"]
+                                calibration["reference_context"] = _reference_context(
+                                    first, frozen
+                                )
+                                report["cross_run_reference_context"] = calibration[
+                                    "reference_context"
+                                ]
                                 calibration["point_controls"] = {
                                     point: _bracket_controls(
-                                        first, first, report["pose_reference"], point,
-                                        "A", (0.0, 0.0), None,
+                                        first,
+                                        first,
+                                        report["pose_reference"],
+                                        point,
+                                        "A",
+                                        (0.0, 0.0),
+                                        None,
                                     )
                                     for point in fixed["points"]
                                 }
                                 calibration["source_pose_controls_admitted"] = all(
-                                    control["admitted"] for control in calibration["point_controls"].values()
+                                    control["admitted"]
+                                    for control in calibration[
+                                        "point_controls"
+                                    ].values()
                                 )
                                 calibration["operation_stage"] = "post-bracket-clear"
-                                _invoke(budget, adapter.currentModel, "IModelDoc2", "ClearSelection2", True)
+                                _invoke(
+                                    budget,
+                                    adapter.currentModel,
+                                    "IModelDoc2",
+                                    "ClearSelection2",
+                                    True,
+                                )
                                 calibration["operation_stage"] = "capture"
                                 calibration["capture"] = _capture_png(
-                                    report, "leverPad.A.png",
+                                    report,
+                                    "leverPad.A.png",
                                     _value(first["viewport"], "main_window_hwnd") or 0,
                                 )
                             calibration["end"] = _stamp()
                             with _timed("calibration_checkpoint"):
                                 checkpoint()
                             if "operational_error" in calibration:
-                                record["collection_error"] = {**calibration["operational_error"], "witness": witness["id"]}
-                                report["study"]["witness_errors"].append(record["collection_error"])
+                                record["collection_error"] = {
+                                    **calibration["operational_error"],
+                                    "witness": witness["id"],
+                                }
+                                report["study"]["witness_errors"].append(
+                                    record["collection_error"]
+                                )
                                 sequences = ()
                             elif (
                                 not calibration["reference_context"]["admitted"]
                                 or not calibration["source_pose_controls_admitted"]
                                 or derivation is None
                             ):
-                                report["study_refusal"] = "cross-run calibration/source-pose context mismatch or invalid first-A inverse"
+                                report["study_refusal"] = (
+                                    "cross-run calibration/source-pose context mismatch or invalid first-A inverse"
+                                )
                                 raise _Deadline(report["study_refusal"])
                         for block, sequence in enumerate(sequences, start=1):
                             for index, arm in enumerate(sequence):
@@ -2373,7 +2612,11 @@ def _phase_study(
                                     )
                                     checkpoint()
                                     continue
-                                offset = (0.0, 0.0) if derivation is None else derivation["sheet_centre_offsets_m"][arm]
+                                offset = (
+                                    (0.0, 0.0)
+                                    if derivation is None
+                                    else derivation["sheet_centre_offsets_m"][arm]
+                                )
                                 centre = tuple(
                                     fixed["centre_sheet_xy_m"][i] + offset[i]
                                     for i in range(2)
@@ -2397,19 +2640,38 @@ def _phase_study(
                                         first = state["before"]
                                         derivation = _derive_phases(first)
                                         record["offset_derivation"] = derivation
-                                    state["reference_context"] = _reference_context(state["before"], frozen)
-                                    if derivation is None or not state["reference_context"]["admitted"]:
-                                        report["study_refusal"] = "cross-run state context mismatch or invalid first-A inverse"
+                                    state["reference_context"] = _reference_context(
+                                        state["before"], frozen
+                                    )
+                                    if (
+                                        derivation is None
+                                        or not state["reference_context"]["admitted"]
+                                    ):
+                                        report["study_refusal"] = (
+                                            "cross-run state context mismatch or invalid first-A inverse"
+                                        )
                                         raise _Deadline(report["study_refusal"])
-                                    state["requested_output_shift"] = derivation["requested_output_shifts"][arm]
+                                    state["requested_output_shift"] = derivation[
+                                        "requested_output_shifts"
+                                    ][arm]
                                     state["predictions"] = {
-                                        point: _prediction(witness["id"], point, arm, state["before"], derivation)
+                                        point: _prediction(
+                                            witness["id"],
+                                            point,
+                                            arm,
+                                            state["before"],
+                                            derivation,
+                                        )
                                         for point in fixed["points"]
                                     }
                                     state["operation_stage"] = "point-order"
                                     point_order = list(fixed["points"])
                                     if witness["id"] == "leverPad":
-                                        point_order = ["original", "plus8um"] if arm in ("P-", "P+") else ["plus8um", "original"]
+                                        point_order = (
+                                            ["original", "plus8um"]
+                                            if arm in ("P-", "P+")
+                                            else ["plus8um", "original"]
+                                        )
                                     state["point_order"] = point_order
                                     for pick_index, point_id in enumerate(point_order):
                                         budget.check(
@@ -2422,39 +2684,77 @@ def _phase_study(
                                         pick = {
                                             "point_id": point_id,
                                             "first_after_zoom": pick_index == 0,
+                                            "raw_call_status": "not-attempted",
                                         }
                                         state["picks"][point_id] = pick
                                         picks_total += 1
                                         state["operation_stage"] = "selection"
-                                        if witness["id"] == "leverPad" and block == 1 and index == 0 and point_id == "original":
-                                            report["first_P_history_admission"] = _history_admission(
-                                                report["selection_history"], report["intended_instance"]
+                                        if (
+                                            witness["id"] == "leverPad"
+                                            and block == 1
+                                            and index == 0
+                                            and point_id == "original"
+                                        ):
+                                            report["first_P_history_admission"] = (
+                                                _history_admission(
+                                                    report["selection_history"],
+                                                    report["intended_instance"],
+                                                )
                                             )
-                                            record["first_P_history_admission"] = report["first_P_history_admission"]
-                                        _pick(
-                                            adapter,
-                                            fixed["points"][point_id],
-                                            witness,
-                                            arm,
-                                            budget,
-                                            record=pick,
-                                            view=view,
-                                        )
-                                        _event(
-                                            "phase_pick",
-                                            report,
-                                            json_path=report["checkpoint"]["path"],
-                                            witness=witness["id"],
-                                            state=state["id"],
-                                            point=point_id,
-                                            global_sequence=pick.get("global_sequence", 0),
-                                            result=pick.get(
-                                                "selection_identity_class", "unreadable"
-                                            ),
-                                            raw_result=pick.get("raw_result"),
-                                            raw_error=pick.get("raw_error", ""),
-                                            select_ms=pick.get("select_ms", 0.0),
-                                        )
+                                            record["first_P_history_admission"] = (
+                                                report["first_P_history_admission"]
+                                            )
+                                        try:
+                                            _pick(
+                                                adapter,
+                                                fixed["points"][point_id],
+                                                witness,
+                                                arm,
+                                                budget,
+                                                record=pick,
+                                                view=view,
+                                            )
+                                        finally:
+                                            if pick["raw_call_status"] == "attempted":
+                                                history_fields = {}
+                                                if (
+                                                    witness["id"] == "leverPad"
+                                                    and block == 1
+                                                    and index == 0
+                                                    and point_id == "original"
+                                                ):
+                                                    admission = record[
+                                                        "first_P_history_admission"
+                                                    ]
+                                                    history_fields = {
+                                                        "history_boundary_sequence": admission[
+                                                            "evaluated_after_sequence"
+                                                        ],
+                                                        "history_evaluated_at_monotonic_ns": admission[
+                                                            "evaluated_at_monotonic_ns"
+                                                        ],
+                                                    }
+                                                _event(
+                                                    "phase_pick",
+                                                    report,
+                                                    json_path=report["checkpoint"][
+                                                        "path"
+                                                    ],
+                                                    witness=witness["id"],
+                                                    state=state["id"],
+                                                    point=point_id,
+                                                    global_sequence=pick[
+                                                        "global_sequence"
+                                                    ],
+                                                    result=pick.get(
+                                                        "selection_identity_class",
+                                                        "unreadable",
+                                                    ),
+                                                    raw_result=pick.get("raw_result"),
+                                                    raw_error=pick.get("raw_error", ""),
+                                                    select_ms=pick["select_ms"],
+                                                    **history_fields,
+                                                )
                                     state["operation_stage"] = "closing-native-bracket"
                                     state["after"] = _phase_bracket(
                                         adapter,
@@ -2466,7 +2766,13 @@ def _phase_study(
                                     )
                                     state["operation_stage"] = "control-adjudication"
                                     state["closing_predictions"] = {
-                                        point: _prediction(witness["id"], point, arm, state["after"], derivation)
+                                        point: _prediction(
+                                            witness["id"],
+                                            point,
+                                            arm,
+                                            state["after"],
+                                            derivation,
+                                        )
                                         for point in fixed["points"]
                                     }
                                     state["point_controls"] = {
@@ -2478,7 +2784,9 @@ def _phase_study(
                                                 point,
                                                 arm,
                                                 state["requested_output_shift"],
-                                                derivation["expected_point_phases"][arm].get(point),
+                                                derivation["expected_point_phases"][
+                                                    arm
+                                                ].get(point),
                                             )
                                             for name in ("before", "after")
                                         }
@@ -2492,7 +2800,10 @@ def _phase_study(
                                         "ClearSelection2",
                                         True,
                                     )
-                                    capture = block == 1 and (arm != "A" or (index == 0 and witness["id"] != "leverPad"))
+                                    capture = block == 1 and (
+                                        arm != "A"
+                                        or (index == 0 and witness["id"] != "leverPad")
+                                    )
                                     if capture:
                                         budget.check(
                                             "inside-zoom PNG after picks and closing bracket"
@@ -2532,11 +2843,12 @@ def _phase_study(
                             ) * 1000
                             with contextlib.suppress(Exception):
                                 span.set_attribute(
-                                    "emitted_event_count", record["emitted_event_count"]
+                                    "phase_event_call_count",
+                                    record["phase_event_call_count"],
                                 )
                                 span.set_attribute(
-                                    "event_submission_errors",
-                                    record["event_submission_errors"],
+                                    "event_call_exception_count",
+                                    record["event_call_exception_count"],
                                 )
                                 span.set_attribute(
                                     "study_selection_attempts",
@@ -2605,8 +2917,12 @@ def _phase_study(
             **budget.report(),
             "study_selection_attempts": picks_total,
             "study_selection_cap": PICK_CAP,
-            "picked_states": sum(len(w["states"]) for w in report["study"]["witnesses"]),
-            "calibration_contexts": sum("calibration" in w for w in report["study"]["witnesses"]),
+            "picked_states": sum(
+                len(w["states"]) for w in report["study"]["witnesses"]
+            ),
+            "calibration_contexts": sum(
+                "calibration" in w for w in report["study"]["witnesses"]
+            ),
             "raw_results_recorded": sum(
                 "raw_result" in p
                 for w in report["study"]["witnesses"]
@@ -2630,19 +2946,30 @@ def _pick(
     view: Any = None,
 ) -> dict[str, Any]:
     record = {} if record is None else record
-    record.update(arm=arm, sheet_xy_m=list(xy), begin=_stamp())
+    record.update(
+        arm=arm, sheet_xy_m=list(xy), begin=_stamp(), raw_call_status="not-attempted"
+    )
     pick_started = time.perf_counter()
     draw = adapter.currentModel
     try:
         _invoke(budget, draw, "IModelDoc2", "ClearSelection2", True)
         extension = _invoke(budget, draw, "IModelDoc2", "Extension")
         callout = null_callout()
-        record["select_begin"] = _stamp()
-        started = time.perf_counter()
+        # Refuse BEFORE starting the raw-call clocks/ledger. Retrieval, callout,
+        # history and identity bookkeeping are outside this measured interval.
+        if budget is not None:
+            try:
+                budget.check("IModelDocExtension.SelectByID2")
+            except _Deadline:
+                record["raw_call_refused_before_native"] = True
+                raise
+            budget.calls += 1
+        record["select_begin_utc_ns"] = time.time_ns()
+        record["select_begin_monotonic_ns"] = time.perf_counter_ns()
+        record.update(raw_call_status="attempted", raw_result=None)
         try:
             record["raw_result"] = bool(
-                _invoke(
-                    budget,
+                _native_call(
                     extension,
                     "IModelDocExtension",
                     "SelectByID2",
@@ -2657,18 +2984,16 @@ def _pick(
                     0,
                 )
             )
-        except _Deadline:
-            # _invoke's custom deadline is checked BEFORE entering SelectByID2.
-            # This is an attempted state, not an executed raw call in the ledger.
-            record["raw_call_refused_before_native"] = True
-            raise
         except BaseException as exc:
             record["raw_error"] = _error(exc)
             raise
         finally:
-            record["select_ms"] = (time.perf_counter() - started) * 1000
-            record["select_end"] = _stamp()
-            history_row = None if record.get("raw_call_refused_before_native") else _append_pick_history(record, xy, arm)
+            record["select_end_monotonic_ns"] = time.perf_counter_ns()
+            record["select_end_utc_ns"] = time.time_ns()
+            record["select_ms"] = (
+                record["select_end_monotonic_ns"] - record["select_begin_monotonic_ns"]
+            ) / 1e6
+            history_row = _append_pick_history(record, xy, arm)
         started = time.perf_counter()
         with _timed("identity_reads_inclusive"):
             selection, entity, owner = _selected(
@@ -2680,7 +3005,11 @@ def _pick(
                     actual_owner = _value(selection, "owner")
                     history_row.update(
                         actual_owner=actual_owner,
-                        owner_status="known" if actual_owner else "empty" if _value(selection, "count") == 0 else "unknown",
+                        owner_status="known"
+                        if actual_owner
+                        else "empty"
+                        if _value(selection, "count") == 0
+                        else "unknown",
                     )
             record["accepted_own_edge"] = (
                 _identity(adapter, selection, entity, owner, target, budget)
@@ -2688,11 +3017,14 @@ def _pick(
             )
         if history_row is not None:
             with _timed("history_recording"):
-                history_row["canonical_target_id"] = target["id"] if target and record["accepted_own_edge"] else None
+                history_row["canonical_target_id"] = (
+                    target["id"] if target and record["accepted_own_edge"] else None
+                )
                 predecessor = record.get("global_predecessor") or {}
                 record["same_edge_predecessor_descriptive_only"] = bool(
                     history_row["canonical_target_id"]
-                    and predecessor.get("canonical_target_id") == history_row["canonical_target_id"]
+                    and predecessor.get("canonical_target_id")
+                    == history_row["canonical_target_id"]
                 )
         record["identity_ms"] = (time.perf_counter() - started) * 1000
         if handles is not None:
@@ -2700,8 +3032,10 @@ def _pick(
         count = _value(selection, "count")
         same = _value(selection, "IsSame_edge")
         record["canonical_empty_selection"] = bool(
-            record.get("raw_result") is False and count == 0
-            and selection.get("all_selection_items_recorded") is True and selection.get("items") == []
+            record.get("raw_result") is False
+            and count == 0
+            and selection.get("all_selection_items_recorded") is True
+            and selection.get("items") == []
         )
         if record["canonical_empty_selection"]:
             identity_class = "no-selection"
@@ -2717,7 +3051,24 @@ def _pick(
             )
         ):
             kind = _value(selection, "type")
-            if kind == 1 and same == 1:
+            first_item = selection["items"][0]
+            # Availability, not equality with the intended identity, qualifies
+            # adjudication. Fully observed wrong owner/view/edge stays a mismatch.
+            owner_name = _value(selection, "owner")
+            view_names_available = not (
+                count == 2 and _value(first_item, "type") == DRAWING_VIEW_SELECTION_TYPE
+            ) or all(
+                isinstance(_value(selection, key), str)
+                and bool(_value(selection, key).strip())
+                for key in ("expected_view_name", "first_selected_view_name")
+            )
+            if kind == 1 and (
+                not isinstance(owner_name, str)
+                or not owner_name.strip()
+                or not view_names_available
+            ):
+                identity_class = "unreadable"
+            elif kind == 1 and same == 1:
                 identity_class = "target-edge-noncanonical"
             elif kind == 1 and same == 0:
                 identity_class = "different-target"
@@ -2746,7 +3097,7 @@ def _pick(
             time.perf_counter() - pick_started
         ) * 1000
         _cost("selection_with_identity_inclusive", record["selection_with_identity_ms"])
-    record["end"] = _stamp()
+        record["end"] = _stamp()
     return record
 
 
@@ -2784,7 +3135,11 @@ def _field_failures(value: Any, prefix: str = "") -> list[dict[str, str]]:
             if key == "unavailable_or_error_fields":
                 continue
             field = f"{prefix}.{key}" if prefix else str(key)
-            if key.endswith("_error") and isinstance(child, (str, dict, list)) and child:
+            if (
+                key.endswith("_error")
+                and isinstance(child, (str, dict, list))
+                and child
+            ):
                 gaps.append({"field": field, "status": "error", "reason": str(child)})
             elif isinstance(child, (dict, list)):
                 gaps.extend(_field_failures(child, field))
@@ -2841,7 +3196,10 @@ def collect_and_stop(
         "r1_run": "20261020T124258353Z-a107808c625a43bbac86327d16c196cd",
         "baseline_selection_counts": {
             "original": 1,
-            "immediate_exact_repeat": int(immediate_repeat is not None),
+            "immediate_exact_repeat": int(
+                bool(immediate_repeat)
+                and immediate_repeat.get("raw_call_status") == "attempted"
+            ),
         },
         "selection_timing_scope": "baseline/raw repeat caller timings retained separately; added raw-selection cost includes postobserver pick plus study; not full balloon insertion",
         "r1_measured_phases_ms": {
@@ -2903,21 +3261,24 @@ def collect_and_stop(
                 "change": "complete_current_leaf_raw_history",
                 "new_cost_entry": "history_recording/history_flushing",
                 "baseline": "Python ledger absent; existing native call/read sequence unchanged",
-                "absolute_delta_ms": None, "relative_delta": None,
-                "comparison": "recording and flush measured separately; no native speedup claim",
+                "absolute_delta_ms": None,
+                "relative_delta": None,
+                "comparison": "partial helper-body/owner-update bookkeeping and flush; excludes scope/anchor/external row updates, overlaps selection_with_identity_inclusive; NOT total instrumentation overhead or native speedup",
             },
             {
                 "change": "no_pick_A_calibration",
                 "new_cost_entry": "calibration_zoom_bracket_cleanup/calibration_checkpoint",
                 "baseline": "added one zoom/bracket/cleanup/checkpoint, no raw pick",
-                "absolute_delta_ms": None, "relative_delta": None,
+                "absolute_delta_ms": None,
+                "relative_delta": None,
                 "comparison": "changed study work; added cost, not a production delta",
             },
             {
                 "change": "numeric_field_gap_classification",
                 "new_cost_entry": "field_gap_classification",
                 "baseline": "exact 912179e24 function on preserved 125-entry native payload",
-                "absolute_delta_ms": None, "relative_delta": None,
+                "absolute_delta_ms": None,
+                "relative_delta": None,
                 "comparison": "matched offline receipt prepared separately, NOT native speed",
             },
         ],
@@ -2944,7 +3305,9 @@ def collect_and_stop(
         "execution_identity": execution,
         "execution_identity_available": bool(execution),
         "diagnostic_only_never_publish": True,
-        "baseline": {key: value for key, value in baseline.items() if key != "selection_history"},
+        "baseline": {
+            key: value for key, value in baseline.items() if key != "selection_history"
+        },
         "baseline_raw_result": bool(baseline.get("select_result")),
         "initial_selection_stage": "success_control_post_baseline"
         if baseline.get("select_result")
@@ -2978,7 +3341,14 @@ def collect_and_stop(
             "pad_blocks": [list(block) for block in PAD_BLOCKS],
             "absolute_phase_targets": PHASE_TARGETS,
             "integer_offsets": INTEGER_OFFSETS,
-            "healthy_budgets": {"study_picks": 112, "picked_states": 98, "calibrations": 1, "brackets": 197, "checkpoints": 102, "state_PNGs": 28},
+            "healthy_budgets": {
+                "study_picks": 112,
+                "picked_states": 98,
+                "calibrations": 1,
+                "brackets": 197,
+                "checkpoints": 102,
+                "state_PNGs": 28,
+            },
             "study_selection_count": PICK_CAP,
             "soft_budget_s": STUDY_SECONDS,
             "primary": "leverPad.original",
@@ -3006,6 +3376,8 @@ def collect_and_stop(
             "scalar outputs remain transform-output units unless independent raster registration validates them",
             "quarter-phase replication is bounded to the frozen reference context, not a universal pick algorithm",
             "first-P history admission is current-leaf explicit selector coverage, NEVER cold seat/process/cache",
+            "source-prefix coverage is a source-audit attestation, not runtime proof of all native or implicit selections",
+            "current-main PR1761 changes receiver rib/drill geometry; unchanged witnesses and historical predictions remain hypotheses, not geometry-identical replication",
             "post-pick non-atomic controls can perturb timing/state and do not prove historical baseline pose",
             "bit-identical recorded transforms with different classes are a timing/redraw candidate, not proof of internal nondeterminism",
             "manual explode offsets are retained original numeric inputs; IsExploded does not prove continuous explode-step immutability",
@@ -3020,371 +3392,436 @@ def collect_and_stop(
     primary_error: Exception | None = None
     cancellation: BaseException | None = None
     try:
-        with _timed("history_flushing"):
-            history = baseline.get("selection_history")
-            if history is not None:
-                _finite_tree(history)
-                report["selection_history"].update(json.loads(json.dumps(history, allow_nan=False)))
-                _cost("history_recording", float(history.get("recording_ms", 0.0)))
-        # FIRST added native reads on a hit; after the immediate raw repeat on a
-        # miss. No clear or screenshot precedes this preserved selection.
-        selection, entity, owner = _selected(
-            adapter.currentModel, adapter=adapter, view=view
-        )
-        report["initial_selection"] = selection
-        # The latest existing selection read belongs to repeat if it ran, else baseline.
-        calls = report["selection_history"]["calls"]
-        if calls:
-            calls[-1].update(
-                actual_owner=_value(selection, "owner"),
-                owner_status="known" if _value(selection, "owner") else "empty" if _value(selection, "count") == 0 else "unknown",
+        try:
+            with _timed("history_flushing"):
+                history = baseline.get("selection_history")
+                if history is not None:
+                    _finite_tree(history)
+                    report["selection_history"].update(
+                        json.loads(json.dumps(history, allow_nan=False))
+                    )
+                    _cost("history_recording", float(history.get("recording_ms", 0.0)))
+            # FIRST added native reads on a hit; after the immediate raw repeat on a
+            # miss. No clear or screenshot precedes this preserved selection.
+            selection, entity, owner = _selected(
+                adapter.currentModel, adapter=adapter, view=view
             )
-        checkpoint()
-        utility = _invoke(None, adapter.swApp, "ISldWorks", "GetMathUtility")
-        points = projection_inputs.get("model_points_m") or ()
-        if not points:
-            raise RuntimeError("original assembly-space projection input missing")
-        _linear(projection_inputs.get("component_transform"))
-        snapshot, reference = _snapshot(
-            adapter,
-            view,
-            utility,
-            points[0],
-            sheet_xy,
-            projection_inputs.get("model_to_view_transform_handle"),
-        )
-        report["post_raw_snapshot"] = snapshot
-        control = _value(snapshot, "fresh_transform_control") or {}
-        report["original_point_in_fresh_matrix"] = (
-            _apply(control["array"], points[0])[:2].tolist()
-            if control.get("valid")
-            else None
-        )
-        if report["original_point_in_fresh_matrix"] is not None:
-            report["fresh_minus_original_sheet_xy_m"] = [
-                report["original_point_in_fresh_matrix"][i] - sheet_xy[i]
-                for i in range(2)
-            ]
-        source = _source_witnesses()
-        report["source_witnesses"] = source
-        report["source_authority"] = {}
-        for filename in (
-            "_drawing_sm_pose_diagnostic.py",
-            "_drawing_balloons.py",
-            "draw_sm_summing_assembly.py",
-            "sm_summing_lever_spec.py",
-            "sm_knife_mount_spec.py",
-            "build_sm_summing_lever.py",
-            "build_sm_knife_mount.py",
-            "build_sm_summing_assembly.py",
-        ):
-            _observe(
-                report["source_authority"],
-                filename,
-                lambda name=filename: hashlib.sha256(
-                    Path(__file__).with_name(name).read_bytes()
-                ).hexdigest(),
-            )
-        discovered = _discover(
-            adapter,
-            view,
-            utility,
-            projection_inputs,
-            source,
-            report,
-            reference,
-            _value(snapshot, "ReferencedConfiguration"),
-        )
-        _identity(adapter, selection, entity, owner, discovered.get("leverPad"))
-        report["baseline_own_target_positive_control"] = bool(
-            baseline.get("select_result") and selection.get("accepted_own_edge")
-        )
-        report["postobserver_exact_oldXY_repeat"] = _pick(
-            adapter,
-            sheet_xy,
-            discovered.get("leverPad"),
-            "postobserver_exact_oldXY",
-            view=view,
-        )
-        viewport = _viewport(adapter, utility, sheet_xy)
-        report["original_zoom_capture_mapping"] = viewport
-        _invoke(None, adapter.currentModel, "IModelDoc2", "ClearSelection2", True)
-        report["original_zoom_postobserver_png"] = _capture_png(
-            report,
-            "original_png",
-            _value(viewport, "main_window_hwnd") or 0,
-        )
-        # Every witness is identified/frozen BEFORE the first viewport intervention.
-        witnesses = [discovered[key] for key in PRIORITY if key in discovered]
-        report["unique_edge_identity_checks"] = []
-        for index, left in enumerate(witnesses):
-            for right in witnesses[index + 1 :]:
-                check = {"left": left["id"], "right": right["id"]}
-                _observe(
-                    check,
-                    "IsSame",
-                    lambda a=left, b=right: int(
-                        _invoke(
-                            None,
-                            adapter.swApp,
-                            "ISldWorks",
-                            "IsSame",
-                            a["edge"],
-                            b["edge"],
-                        )
-                    ),
+            report["initial_selection"] = selection
+            # The latest existing selection read belongs to repeat if it ran, else baseline.
+            calls = report["selection_history"]["calls"]
+            if calls and calls[-1].get("raw_result") is not None:
+                calls[-1].update(
+                    actual_owner=_value(selection, "owner"),
+                    owner_status="known"
+                    if _value(selection, "owner")
+                    else "empty"
+                    if _value(selection, "count") == 0
+                    else "unknown",
                 )
-                report["unique_edge_identity_checks"].append(check)
-        report["frozen_witnesses"] = [
-            {
-                key: witness[key]
-                for key in (
-                    "id",
-                    "family",
-                    "instance",
-                    "point_local_m",
-                    "endpoints_local_m",
-                    "source_refs",
-                    "native_geometry",
-                    "values",
-                    "validated",
-                )
-            }
-            | {"explode_offset_m": witness["offset"].tolist()}
-            for witness in witnesses
-        ]
-        report["pose_reference"] = {
-            "stage": "first_post_pick_view_snapshot_and_required_component_discovery; sequential_not_atomic",
-            "view_transform_control": snapshot.get("fresh_transform_control"),
-            "ReferencedConfiguration": snapshot.get("ReferencedConfiguration"),
-            "IsExploded": snapshot.get("IsExploded"),
-            "components": {
-                w["instance"]: w["snapshot"]["post_pick_transforms"]["Transform2"]
-                for w in witnesses
-            },
-        }
-        prereg = report["preregistration"]
-        prereg.update(
-            discovered_order=[w["id"] for w in witnesses],
-            missing_witnesses=[key for key in PRIORITY if key not in discovered],
-            source_native_metrology_valid=bool(
-                len(witnesses) == 7
-                and control.get("valid")
-                and all(w["validated"] for w in witnesses)
-                and not report["discovery"].get("truncated")
-                and all(
-                    _value(check, "IsSame") == 0
-                    for check in report["unique_edge_identity_checks"]
-                )
-            ),
-        )
-        if prereg["source_native_metrology_valid"]:
-            frozen = _freeze_points(witnesses, control["array"], sheet_xy)
-            report["frozen_points"] = frozen
             checkpoint()
-            _phase_study(adapter, view, utility, witnesses, frozen, report, checkpoint)
-        else:
-            report["study_refusal"] = (
-                "all seven unique source witnesses and native transform controls required; no reduced set/substitutions"
+            utility = _invoke(None, adapter.swApp, "ISldWorks", "GetMathUtility")
+            points = projection_inputs.get("model_points_m") or ()
+            if not points:
+                raise RuntimeError("original assembly-space projection input missing")
+            _linear(projection_inputs.get("component_transform"))
+            snapshot, reference = _snapshot(
+                adapter,
+                view,
+                utility,
+                points[0],
+                sheet_xy,
+                projection_inputs.get("model_to_view_transform_handle"),
             )
-        by_id = {w["id"]: w for w in report.get("study", {}).get("witnesses", [])}
-        report["endpoints"] = {
-            key: by_id[key]["endpoints"]
-            if key in by_id
-            else {
-                "original": {
-                    "label": "incomplete",
-                    "admitted": False,
-                    "missing_metadata": ["witness not reached"],
-                }
-            }
-            for key in PRIORITY
-        }
-        report["primary_endpoint"] = report["endpoints"]["leverPad"]["original"]
-        report["candidate_ready"] = bool(
-            report.get("first_P_history_admission", {}).get("qualified")
-            and all(endpoint.get("candidate_ready") for points in report["endpoints"].values() for endpoint in points.values())
-            and report.get("study", {}).get("budget", {}).get("raw_results_recorded") == PICK_CAP
-            and not report.get("study", {}).get("witness_errors")
-            and not report.get("study", {}).get("truncated")
-        )
-        report["preregistered_evidence_sufficient"] = report["candidate_ready"]
-        study = report.get("study", {})
-        report["complete"] = bool(
-            len(by_id) == 7
-            and study.get("budget", {}).get("raw_results_recorded") == PICK_CAP
-            and all(
-                len(w["states"]) == 14
-                and all("after" in state for state in w["states"])
-                for w in by_id.values()
+            report["post_raw_snapshot"] = snapshot
+            control = _value(snapshot, "fresh_transform_control") or {}
+            report["original_point_in_fresh_matrix"] = (
+                _apply(control["array"], points[0])[:2].tolist()
+                if control.get("valid")
+                else None
             )
-            and not study.get("truncated")
-            and not study.get("witness_errors")
-        )
-    except Exception as exc:
-        primary_error = exc
-        report["errors"].append(
-            {"stage": "collection", "error": _error(exc), **_stamp()}
-        )
-        report["complete"] = False
-    except BaseException as exc:
-        cancellation = exc
-        report["cancelled"] = True
-        report["complete"] = False
-    finally:
-        restoration_failed = bool(report.get("study", {}).get("restoration_failure"))
-        native_followup_refused = restoration_failed or any(
-            "collection_error" in witness
-            and witness.get("recovery_fit_after_witness_error", {}).get("status")
-            != "restored"
-            for witness in report.get("study", {}).get("witnesses", ())
-        )
-        report["native_followup_refused"] = native_followup_refused
-        try:
-            if not native_followup_refused:
-                _invoke(
-                    None, adapter.currentModel, "IModelDoc2", "ClearSelection2", True
+            if report["original_point_in_fresh_matrix"] is not None:
+                report["fresh_minus_original_sheet_xy_m"] = [
+                    report["original_point_in_fresh_matrix"][i] - sheet_xy[i]
+                    for i in range(2)
+                ]
+            source = _source_witnesses()
+            report["source_witnesses"] = source
+            report["source_authority"] = {}
+            for filename in (
+                "_drawing_sm_pose_diagnostic.py",
+                "_drawing_balloons.py",
+                "draw_sm_summing_assembly.py",
+                "sm_summing_lever_spec.py",
+                "sm_knife_mount_spec.py",
+                "build_sm_summing_lever.py",
+                "build_sm_knife_mount.py",
+                "build_sm_summing_assembly.py",
+            ):
+                _observe(
+                    report["source_authority"],
+                    filename,
+                    lambda name=filename: hashlib.sha256(
+                        Path(__file__).with_name(name).read_bytes()
+                    ).hexdigest(),
                 )
-            else:
-                report["final_clear_refusal"] = (
-                    "witness-error restoration failed or did not complete; no later collector native calls"
-                )
-        except BaseException as exc:
-            report["errors"].append(
-                {"stage": "final_clear", "error": _error(exc), **_stamp()}
-            )
-            report["complete"] = False
-            if cancellation is not None:
-                cancellation.add_note(f"final selection clear also failed: {exc!r}")
-            elif not isinstance(exc, Exception):
-                cancellation = exc
-                report["cancelled"] = True
-            elif primary_error is None:
-                primary_error = exc
-        if native_followup_refused:
-            report["final_poststudy_capture_bundle"] = {
-                "status": "refused",
-                "reason": "witness-error restoration failed or did not complete; mandatory outer caller cleanup is outside this collector",
-            }
-        if (
-            not native_followup_refused
-            and cancellation is None
-            and not isinstance(primary_error, (_Nonfinite, TypeError, AssertionError))
-        ):
-            final_paths = [
-                v for key, v in path_budget["paths"].items() if key.startswith("final.")
-            ]
-            if all(v["safe"] for v in final_paths):
-                _count("final_capture_bundle_attempts")
-                try:
-                    with _timed("final_capture_bundle"):
-                        _observe(
-                            report,
-                            "final_poststudy_capture_bundle",
-                            lambda: dict(capture_final(path_budget["final_label"])),
-                        )
-                except BaseException as exc:
-                    if isinstance(exc, Exception):
-                        report["errors"].append(
-                            {"stage": "final_capture", "error": _error(exc), **_stamp()}
-                        )
-                        if primary_error is None:
-                            primary_error = exc
-                    else:
-                        cancellation = exc
-                        report["cancelled"] = True
-                    report["complete"] = False
-            else:
-                report["final_poststudy_capture_bundle"] = {
-                    "status": "refused",
-                    "reason": "planned final bundle path exceeds conservative budget",
-                    "unsafe_paths": [v for v in final_paths if not v["safe"]],
-                }
-        report["end"] = _stamp()
-        report["witness_error_count"] = len(
-            report.get("study", {}).get("witness_errors", ())
-        )
-        performance["collector_elapsed_ms_before_final_checkpoint"] = (
-            time.perf_counter() - collector_started
-        ) * 1000
-        with _timed("field_gap_classification"):
-            report["unavailable_or_error_fields"] = _field_failures(report)
-        # Primary endpoint is never gated by completion of later secondary witnesses
-        # or by optional captures. Exceptional partial studies still expose per-point data.
-        if "primary_endpoint" not in report:
-            reached = {w["id"]: w for w in report.get("study", {}).get("witnesses", [])}
-            report["endpoints"] = {
-                key: value.get("endpoints", {}) for key, value in reached.items()
-            }
-            report["primary_endpoint"] = (
-                report["endpoints"]
-                .get("leverPad", {})
-                .get(
-                    "original",
-                    {
-                        "label": "incomplete",
-                        "admitted": False,
-                        "missing_metadata": ["primary not reached"],
-                    },
-                )
-            )
-            report["candidate_ready"] = False
-            report["preregistered_evidence_sufficient"] = False
-        first_pad = next((w for w in report.get("study", {}).get("witnesses", []) if w["id"] == "leverPad"), {})
-        pad_p = [
-            state.get("picks", {}).get("original", {})
-            for state in first_pad.get("states", []) if state["arm"] in ("P-", "P+")
-        ]
-        report["unprimed_primed_contrast"] = {
-            "first_P_history_qualified": report.get("first_P_history_admission", {}).get("qualified", False),
-            "first_P_exact_target": pad_p[0].get("accepted_own_edge") if pad_p else None,
-            "later_P_exact_targets": [p.get("accepted_own_edge") for p in pad_p[1:]],
-            "first_miss_later_hit_association": bool(
-                pad_p and pad_p[0].get("canonical_empty_selection")
-                and any(p.get("accepted_own_edge") for p in pad_p[1:])
-            ),
-            "interpretation": "association consistent with history/priming dependence; NOT an isolated causal effect",
-            "timing_flags_never_erase_contradiction": True,
-        }
-        try:
-            checkpoint(final=True)  # One final attempt, even after a prior OSError.
-        except Exception as exc:
-            report["artifact_serialization_or_programming_error"] = _error(exc)
-            report["complete"] = False
-            with contextlib.suppress(Exception):
-                _telemetry.warn(
-                    f"[1667] FINAL checkpoint not serialized: {exc}", probe_id=probe_id
-                )
-            if cancellation is not None:
-                cancellation.add_note(f"final checkpoint also failed: {exc!r}")
-            elif primary_error is None:
-                primary_error = exc
-            else:
-                primary_error.add_note(f"final checkpoint also failed: {exc!r}")
-        finally:
-            _event(
-                "cancelled" if cancellation is not None else "stop",
+            discovered = _discover(
+                adapter,
+                view,
+                utility,
+                projection_inputs,
+                source,
                 report,
-                json_path=str(checkpoint.path),
-                baseline_raw_result=report["baseline_raw_result"],
-                complete=report["complete"],
-                primary_label=report["primary_endpoint"]["label"],
-                witness_error_count=report["witness_error_count"],
-                restoration_failed=restoration_failed,
-                native_followup_refused=native_followup_refused,
-                study_picks=report.get("study", {})
-                .get("budget", {})
-                .get("study_selection_attempts", 0),
-                collector_elapsed_ms_to_stop_event=(
-                    time.perf_counter() - collector_started
-                )
-                * 1000,
-                checkpoint_final_attempt=json.dumps(
-                    report["checkpoint"]["attempts"][-1], allow_nan=False
+                reference,
+                _value(snapshot, "ReferencedConfiguration"),
+            )
+            _identity(adapter, selection, entity, owner, discovered.get("leverPad"))
+            report["baseline_own_target_positive_control"] = bool(
+                baseline.get("select_result") and selection.get("accepted_own_edge")
+            )
+            report["postobserver_exact_oldXY_repeat"] = _pick(
+                adapter,
+                sheet_xy,
+                discovered.get("leverPad"),
+                "postobserver_exact_oldXY",
+                view=view,
+            )
+            viewport = _viewport(adapter, utility, sheet_xy)
+            report["original_zoom_capture_mapping"] = viewport
+            _invoke(None, adapter.currentModel, "IModelDoc2", "ClearSelection2", True)
+            report["original_zoom_postobserver_png"] = _capture_png(
+                report,
+                "original_png",
+                _value(viewport, "main_window_hwnd") or 0,
+            )
+            # Every witness is identified/frozen BEFORE the first viewport intervention.
+            witnesses = [discovered[key] for key in PRIORITY if key in discovered]
+            report["unique_edge_identity_checks"] = []
+            for index, left in enumerate(witnesses):
+                for right in witnesses[index + 1 :]:
+                    check = {"left": left["id"], "right": right["id"]}
+                    _observe(
+                        check,
+                        "IsSame",
+                        lambda a=left, b=right: int(
+                            _invoke(
+                                None,
+                                adapter.swApp,
+                                "ISldWorks",
+                                "IsSame",
+                                a["edge"],
+                                b["edge"],
+                            )
+                        ),
+                    )
+                    report["unique_edge_identity_checks"].append(check)
+            report["frozen_witnesses"] = [
+                {
+                    key: witness[key]
+                    for key in (
+                        "id",
+                        "family",
+                        "instance",
+                        "point_local_m",
+                        "endpoints_local_m",
+                        "source_refs",
+                        "native_geometry",
+                        "values",
+                        "validated",
+                    )
+                }
+                | {"explode_offset_m": witness["offset"].tolist()}
+                for witness in witnesses
+            ]
+            report["pose_reference"] = {
+                "stage": "first_post_pick_view_snapshot_and_required_component_discovery; sequential_not_atomic",
+                "view_transform_control": snapshot.get("fresh_transform_control"),
+                "ReferencedConfiguration": snapshot.get("ReferencedConfiguration"),
+                "IsExploded": snapshot.get("IsExploded"),
+                "components": {
+                    w["instance"]: w["snapshot"]["post_pick_transforms"]["Transform2"]
+                    for w in witnesses
+                },
+            }
+            prereg = report["preregistration"]
+            prereg.update(
+                discovered_order=[w["id"] for w in witnesses],
+                missing_witnesses=[key for key in PRIORITY if key not in discovered],
+                source_native_metrology_valid=bool(
+                    len(witnesses) == 7
+                    and control.get("valid")
+                    and all(w["validated"] for w in witnesses)
+                    and not report["discovery"].get("truncated")
+                    and all(
+                        _value(check, "IsSame") == 0
+                        for check in report["unique_edge_identity_checks"]
+                    )
                 ),
             )
-            _HISTORY.reset(history_token)
-            _PERFORMANCE.reset(token)
+            if prereg["source_native_metrology_valid"]:
+                frozen = _freeze_points(witnesses, control["array"], sheet_xy)
+                report["frozen_points"] = frozen
+                checkpoint()
+                _phase_study(
+                    adapter, view, utility, witnesses, frozen, report, checkpoint
+                )
+            else:
+                report["study_refusal"] = (
+                    "all seven unique source witnesses and native transform controls required; no reduced set/substitutions"
+                )
+            by_id = {w["id"]: w for w in report.get("study", {}).get("witnesses", [])}
+            report["endpoints"] = {
+                key: by_id[key]["endpoints"]
+                if key in by_id
+                else {
+                    "original": {
+                        "label": "incomplete",
+                        "admitted": False,
+                        "missing_metadata": ["witness not reached"],
+                    }
+                }
+                for key in PRIORITY
+            }
+            report["primary_endpoint"] = report["endpoints"]["leverPad"]["original"]
+            report["candidate_ready"] = bool(
+                report.get("first_P_history_admission", {}).get("qualified")
+                and all(
+                    endpoint.get("candidate_ready")
+                    for points in report["endpoints"].values()
+                    for endpoint in points.values()
+                )
+                and report.get("study", {})
+                .get("budget", {})
+                .get("raw_results_recorded")
+                == PICK_CAP
+                and not report.get("study", {}).get("witness_errors")
+                and not report.get("study", {}).get("truncated")
+            )
+            report["preregistered_evidence_sufficient"] = report["candidate_ready"]
+            study = report.get("study", {})
+            report["complete"] = bool(
+                len(by_id) == 7
+                and study.get("budget", {}).get("raw_results_recorded") == PICK_CAP
+                and all(
+                    len(w["states"]) == 14
+                    and all("after" in state for state in w["states"])
+                    for w in by_id.values()
+                )
+                and not study.get("truncated")
+                and not study.get("witness_errors")
+            )
+        except Exception as exc:
+            primary_error = exc
+            report["errors"].append(
+                {"stage": "collection", "error": _error(exc), **_stamp()}
+            )
+            report["complete"] = False
+        except BaseException as exc:
+            cancellation = exc
+            report["cancelled"] = True
+            report["complete"] = False
+        finally:
+            restoration_failed = bool(
+                report.get("study", {}).get("restoration_failure")
+            )
+            native_followup_refused = restoration_failed or any(
+                "collection_error" in witness
+                and witness.get("recovery_fit_after_witness_error", {}).get("status")
+                != "restored"
+                for witness in report.get("study", {}).get("witnesses", ())
+            )
+            report["native_followup_refused"] = native_followup_refused
+            try:
+                if not native_followup_refused:
+                    _invoke(
+                        None,
+                        adapter.currentModel,
+                        "IModelDoc2",
+                        "ClearSelection2",
+                        True,
+                    )
+                else:
+                    report["final_clear_refusal"] = (
+                        "witness-error restoration failed or did not complete; no later collector native calls"
+                    )
+            except BaseException as exc:
+                report["errors"].append(
+                    {"stage": "final_clear", "error": _error(exc), **_stamp()}
+                )
+                report["complete"] = False
+                if cancellation is not None:
+                    cancellation.add_note(f"final selection clear also failed: {exc!r}")
+                elif not isinstance(exc, Exception):
+                    cancellation = exc
+                    report["cancelled"] = True
+                elif primary_error is None:
+                    primary_error = exc
+            if native_followup_refused:
+                report["final_poststudy_capture_bundle"] = {
+                    "status": "refused",
+                    "reason": "witness-error restoration failed or did not complete; mandatory outer caller cleanup is outside this collector",
+                }
+            if (
+                not native_followup_refused
+                and cancellation is None
+                and not isinstance(
+                    primary_error, (_Nonfinite, TypeError, AssertionError)
+                )
+            ):
+                final_paths = [
+                    v
+                    for key, v in path_budget["paths"].items()
+                    if key.startswith("final.")
+                ]
+                if all(v["safe"] for v in final_paths):
+                    _count("final_capture_bundle_attempts")
+                    try:
+                        with _timed("final_capture_bundle"):
+                            _observe(
+                                report,
+                                "final_poststudy_capture_bundle",
+                                lambda: dict(capture_final(path_budget["final_label"])),
+                            )
+                    except BaseException as exc:
+                        if isinstance(exc, Exception):
+                            report["errors"].append(
+                                {
+                                    "stage": "final_capture",
+                                    "error": _error(exc),
+                                    **_stamp(),
+                                }
+                            )
+                            if primary_error is None:
+                                primary_error = exc
+                        else:
+                            cancellation = exc
+                            report["cancelled"] = True
+                        report["complete"] = False
+                else:
+                    report["final_poststudy_capture_bundle"] = {
+                        "status": "refused",
+                        "reason": "planned final bundle path exceeds conservative budget",
+                        "unsafe_paths": [v for v in final_paths if not v["safe"]],
+                    }
+            report["end"] = _stamp()
+            report["witness_error_count"] = len(
+                report.get("study", {}).get("witness_errors", ())
+            )
+            performance["collector_elapsed_ms_before_final_checkpoint"] = (
+                time.perf_counter() - collector_started
+            ) * 1000
+            with _timed("field_gap_classification"):
+                report["unavailable_or_error_fields"] = _field_failures(report)
+            # Primary endpoint is never gated by completion of later secondary witnesses
+            # or by optional captures. Exceptional partial studies still expose per-point data.
+            if "primary_endpoint" not in report:
+                reached = {
+                    w["id"]: w for w in report.get("study", {}).get("witnesses", [])
+                }
+                report["endpoints"] = {
+                    key: value.get("endpoints", {}) for key, value in reached.items()
+                }
+                report["primary_endpoint"] = (
+                    report["endpoints"]
+                    .get("leverPad", {})
+                    .get(
+                        "original",
+                        {
+                            "label": "incomplete",
+                            "admitted": False,
+                            "missing_metadata": ["primary not reached"],
+                        },
+                    )
+                )
+                report["candidate_ready"] = False
+                report["preregistered_evidence_sufficient"] = False
+            first_pad = next(
+                (
+                    w
+                    for w in report.get("study", {}).get("witnesses", [])
+                    if w["id"] == "leverPad"
+                ),
+                {},
+            )
+            pad_p_states = [
+                state
+                for state in first_pad.get("states", [])
+                if state["arm"] in ("P-", "P+")
+            ]
+            pad_p = [
+                state.get("picks", {}).get("original", {}) for state in pad_p_states
+            ]
+            pad_p_qualified = [
+                not _point_protocol_unavailable(state, "original")
+                for state in pad_p_states
+            ]
+            history_qualified = report.get("first_P_history_admission", {}).get(
+                "qualified", False
+            )
+            report["unprimed_primed_contrast"] = {
+                "first_P_history_qualified": history_qualified,
+                "first_P_exact_target": pad_p[0].get("accepted_own_edge")
+                if pad_p
+                else None,
+                "later_P_exact_targets": [
+                    p.get("accepted_own_edge") for p in pad_p[1:]
+                ],
+                "compared_P_protocol_qualified": pad_p_qualified,
+                "first_miss_later_hit_association": bool(
+                    history_qualified
+                    and pad_p
+                    and pad_p_qualified[0]
+                    and pad_p[0].get("canonical_empty_selection")
+                    and any(
+                        qualified and p.get("accepted_own_edge")
+                        for qualified, p in zip(
+                            pad_p_qualified[1:], pad_p[1:], strict=True
+                        )
+                    )
+                ),
+                "interpretation": "association consistent with history/priming dependence; NOT an isolated causal effect",
+                "timing_flags_never_erase_contradiction": True,
+            }
+            try:
+                checkpoint(final=True)  # One final attempt, even after a prior OSError.
+            except Exception as exc:
+                report["artifact_serialization_or_programming_error"] = _error(exc)
+                report["complete"] = False
+                with contextlib.suppress(Exception):
+                    _telemetry.warn(
+                        f"[1667] FINAL checkpoint not serialized: {exc}",
+                        probe_id=probe_id,
+                    )
+                if cancellation is not None:
+                    cancellation.add_note(f"final checkpoint also failed: {exc!r}")
+                elif primary_error is None:
+                    primary_error = exc
+                else:
+                    primary_error.add_note(f"final checkpoint also failed: {exc!r}")
+            finally:
+                _event(
+                    "cancelled" if cancellation is not None else "stop",
+                    report,
+                    json_path=str(checkpoint.path),
+                    baseline_raw_result=report["baseline_raw_result"],
+                    complete=report["complete"],
+                    primary_label=report["primary_endpoint"]["label"],
+                    witness_error_count=report["witness_error_count"],
+                    restoration_failed=restoration_failed,
+                    native_followup_refused=native_followup_refused,
+                    study_picks=report.get("study", {})
+                    .get("budget", {})
+                    .get("study_selection_attempts", 0),
+                    collector_elapsed_ms_to_stop_event=(
+                        time.perf_counter() - collector_started
+                    )
+                    * 1000,
+                    checkpoint_final_attempt=json.dumps(
+                        report["checkpoint"]["attempts"][-1], allow_nan=False
+                    ),
+                )
+    finally:
+        _HISTORY.reset(history_token)
+        _PERFORMANCE.reset(token)
     if cancellation is not None:
         raise cancellation
     raise RuntimeError(

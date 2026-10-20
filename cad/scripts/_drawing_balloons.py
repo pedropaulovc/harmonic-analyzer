@@ -51,7 +51,8 @@ _POSE_HISTORY: dict[str, Any] | None = None
 
 
 def _pose_raw_history(
-    xy: Sequence[float], stage: str, result: bool | None, error: str | None = None
+    xy: Sequence[float], stage: str, result: bool | None, error: str | None = None,
+    **timing: Any,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     history = _POSE_HISTORY
@@ -64,10 +65,12 @@ def _pose_raw_history(
         "stage": stage,
         "anchor": history.get("current_anchor"),
         "sheet_xy_m": [float(xy[0]), float(xy[1])],
+        "raw_call_status": "attempted",
         "raw_result": result,
         "raw_error": error,
         "actual_owner": None,
-        "owner_status": "unknown" if result else "not-read-on-raw-false",
+        "owner_status": "not-read-on-raw-false" if result is False else "unknown",
+        **timing,
     }
     history["calls"].append(row)
     history["recording_ms"] += (time.perf_counter() - started) * 1000
@@ -80,7 +83,8 @@ def _pose_history_scope(stems: Sequence[str]):
     previous = _POSE_HISTORY
     _POSE_HISTORY = {
         "calls": [], "anchors": [], "source_order": list(stems),
-        "source_coverage": "1667-leaf-selection-prefix-audit/912179e24",
+        "source_coverage": "1667-leaf-selection-prefix-audit/21f2606d6",
+        "source_coverage_kind": "source-audit-attestation-not-runtime-native-coverage",
         "explicit_prefix_only_not_cold_cache": True,
         "discovery_before_attachment": True, "recording_ms": 0.0,
     }
@@ -1110,7 +1114,7 @@ def _hit_test_edge(
                 extension = draw.Extension
                 callout = null_callout()
                 select_begin_utc_ns = time.time_ns()
-                started = time.perf_counter()
+                select_begin_monotonic_ns = time.perf_counter_ns()
                 if _POSE_HISTORY is None:
                     selected = extension.SelectByID2(
                         "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
@@ -1121,28 +1125,38 @@ def _hit_test_edge(
                             "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
                         )
                     except BaseException as exc:
+                        select_end_monotonic_ns = time.perf_counter_ns()
                         _pose_raw_history(
                             sheet_xy, "baseline" if post_raw is not None else "anchor",
                             None, f"{type(exc).__name__}: {exc}",
+                            select_begin_utc_ns=select_begin_utc_ns,
+                            select_end_utc_ns=time.time_ns(),
+                            select_begin_monotonic_ns=select_begin_monotonic_ns,
+                            select_end_monotonic_ns=select_end_monotonic_ns,
+                            select_ms=(select_end_monotonic_ns - select_begin_monotonic_ns) / 1e6,
                         )
                         raise
-                select_ms = (time.perf_counter() - started) * 1000.0
+                select_end_monotonic_ns = time.perf_counter_ns()
+                select_ms = (select_end_monotonic_ns - select_begin_monotonic_ns) / 1e6
                 select_end_utc_ns = time.time_ns()
                 baseline_missed = not bool(selected)
                 if observed is not None:
                     observed.update(
                         select_result=bool(selected), select_ms=select_ms,
+                        raw_call_status="attempted",
                         select_begin_utc_ns=select_begin_utc_ns,
                         select_end_utc_ns=select_end_utc_ns,
+                        select_begin_monotonic_ns=select_begin_monotonic_ns,
+                        select_end_monotonic_ns=select_end_monotonic_ns,
                     )
                 if _POSE_HISTORY is not None:
                     history_row = _pose_raw_history(
                         sheet_xy, "baseline" if post_raw is not None else "anchor",
                         bool(selected),
-                    )
-                    history_row.update(
                         select_ms=select_ms, select_begin_utc_ns=select_begin_utc_ns,
                         select_end_utc_ns=select_end_utc_ns,
+                        select_begin_monotonic_ns=select_begin_monotonic_ns,
+                        select_end_monotonic_ns=select_end_monotonic_ns,
                     )
                     if post_raw is not None and observed is not None:
                         _POSE_HISTORY["baseline_sequence"] = history_row["sequence"]
@@ -1407,29 +1421,40 @@ def _select_balloon_anchor(
                 # native observers. Do not inspect selection or reproject first.
                 repeat: dict[str, Any] | None = None
                 if not raw_result:
-                    repeat = {"arm": "immediate_sameXY_rawrepeat"}
+                    repeat = {"arm": "immediate_sameXY_rawrepeat", "raw_call_status": "not-attempted"}
                     try:
                         draw = adapter.currentModel
                         draw.ClearSelection2(True)
                         extension = draw.Extension
                         callout = null_callout()
-                        repeat["begin_utc_ns"] = time.time_ns()
-                        started = time.perf_counter()
+                        repeat["select_begin_utc_ns"] = time.time_ns()
+                        repeat["select_begin_monotonic_ns"] = time.perf_counter_ns()
+                        repeat["raw_call_status"] = "attempted"
                         try:
                             repeat["select_result"] = bool(extension.SelectByID2(
                                 "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0,
                                 False, 0, callout, 0,
                             ))
+                        except BaseException as exc:
+                            repeat["select_error"] = f"{type(exc).__name__}: {exc}"
+                            raise
                         finally:
-                            repeat["end_utc_ns"] = time.time_ns()
-                            repeat["select_ms"] = (time.perf_counter() - started) * 1000.0
+                            repeat["select_end_monotonic_ns"] = time.perf_counter_ns()
+                            repeat["select_end_utc_ns"] = time.time_ns()
+                            repeat["select_ms"] = (
+                                repeat["select_end_monotonic_ns"] - repeat["select_begin_monotonic_ns"]
+                            ) / 1e6
+                            if _POSE_HISTORY is not None:
+                                _pose_raw_history(
+                                    sheet_xy, "immediate-repeat",
+                                    repeat.get("select_result"), repeat.get("select_error"),
+                                    **{key: repeat[key] for key in (
+                                        "select_begin_utc_ns", "select_end_utc_ns",
+                                        "select_begin_monotonic_ns", "select_end_monotonic_ns", "select_ms",
+                                    )},
+                                )
                     except Exception as exc:
                         repeat["select_error"] = f"{type(exc).__name__}: {exc}"
-                    if _POSE_HISTORY is not None:
-                        _pose_raw_history(
-                            sheet_xy, "immediate-repeat",
-                            repeat.get("select_result"), repeat.get("select_error"),
-                        )
                     with contextlib.suppress(Exception):
                         _telemetry.event(
                             "drawing.pick_diagnostic.raw", label=stem, **repeat
