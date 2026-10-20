@@ -8,8 +8,8 @@ GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-screw boss
-section; UNDERSIDE holds the underside locator, its enlarged native
-detail and the removed knife-hanger section F-F.  The faced keeper-rail top
+section; UNDERSIDE holds the underside locator, native enlarged hub detail J,
+slot-radius detail L and the removed knife-hanger section F-F. The faced keeper-rail top
 is one linked note under the keeper callout on HOLES-SOCKETS, the faced
 underside plane one beside the UNDERSIDE detail.  A group gets
 its own sheet rather than a crowded corner of one:
@@ -51,6 +51,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -463,6 +464,10 @@ BOSS_ABOVE_RAIL_LINE_XY = (
 # Above the dimension's own upper arrow, not 51 mm below it -- see the
 # boss-height comment in the A-A recipe for what the long leader crossed.
 BOSS_ABOVE_RAIL_TEXT_XY = (BOSS_ABOVE_RAIL_LINE_XY[0] + 0.0135, 0.176)
+# Separate the chamfer's three-row text from its native dimension shelf and
+# witness overrun. Keep its attached dimension line at the creation point.
+BORE_CHAMFER_TEXT_OFFSET_XY = (0.315, 0.174)
+
 
 # A-A's joint note. The near wall between the flush counterbore floor and
 # the socket bore only starts the thread; the far casting wall carries the
@@ -479,11 +484,14 @@ if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
     raise AssertionError(
         "far casting wall engages MHA-FR-VN-53 under 1.5D at the printed bands"
     )
-# The engagement follows from the printed floor and socket and is proved
-# above; the sheet states only the requirement (machinist review r1,
-# drawing-guidelines.md rule 20: a sheet never argues for itself).
-CROSS_TAP_SECTION_NOTE = "A-A: THREAD BOTH CASTING WALLS IN PHASE FOR MHA-FR-VN-53"
-CROSS_TAP_SECTION_NOTE_XY = (0.040, 0.032)
+# The phase requirement and its mate belong on the native cross-tap leader
+# (drawing-guidelines.md rule 7), not in a detached section note. The
+# engagement follows from the printed floor and socket and is proved above.
+CROSS_TAP_CALLOUT = (
+    "SAME AT OPPOSITE END, 4X TOTAL FOR MHA-FR-VN-53\n"
+    "DEPTHS FROM COUNTERBORE FLOOR\n"
+    "THREAD NEAR AND FAR WALL IN PHASE"
+)
 
 # Sheet 5: hub location, true-axis side view, removed set-screw boss section.
 HUB_TOP_CENTER = (0.145, 0.200)
@@ -492,7 +500,7 @@ HUB_LEFT_SCALE = (1, 2)
 HUB_SECTION_CENTER = (0.330, 0.210)
 HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
-# D-D prints 1:1, the bore axis pinned at x 332.0 mm (HUB_SECTION_PROFILE_X),
+# K-K prints 1:1, the bore axis pinned at x 332.0 mm (HUB_SECTION_PROFILE_X),
 # so the boss face stands at 310.0, the spot face at 311.0 and the bore wall
 # at 323.5; the rail top prints at y 230.1 and the tap axis at 211.8 (the
 # 40d9d030e render).  The thread length nests inside the 21.0 and shares its
@@ -500,7 +508,7 @@ HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 # LEFT, the 21.0 over it with its text out RIGHT, so neither leader leaves
 # its line across the other's extension lines.  The boss face's 22.0 hangs
 # under the view, its line 3.5 over the caption (178.0), its text out left
-# (test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink).
+# (test_hub_boss_section_layout_replays_historical_ink).
 HUB_SET_THREAD_LINE_XY = (0.3172, 0.2365)
 HUB_SET_THREAD_OFFSET_XY = (0.2840, 0.2380)
 HUB_SET_SPOT_LINE_XY = (0.3215, 0.2435)
@@ -521,8 +529,8 @@ HUB_GUSSET_ANGLE_TEXT_XY = (0.186, 0.0645)
 # its own title and scale; the edge notes stand apart under the title
 # (machinist review r1, 2026-10-18).  The arrow looks +X onto the left
 # rail's outer face at z -80, between the front socket's boss and section
-# D's letters: its letter stands 11 mm right of the 115.1's text and 5 mm
-# over D's letter.
+# K's letters: its letter stands 11 mm right of the 115.1's text and 5 mm
+# over the historical D letter's placement baseline.
 VIEW_LETTER = "G"
 VIEW_LETTER_HEIGHT = 0.005
 VIEW_ARROW_TIP_GAP = 0.0035
@@ -542,10 +550,9 @@ HUB_LEFT_TITLE_XY = (0.128, 0.0455)
 HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP\nOUTER RIB BOTTOM BESIDE BOSS SHARP"
 HUB_LEFT_NOTE_XY = (0.093, 0.030)
 
-# Sheet 6: the underside locator and its enlarged native detail.  The
-# locator sits at the title block's own scale; the detail is the print's
-# only 2:1 view because the 7.0 gusset and its 8.0 feather drop are the
-# smallest features on the casting.
+# Sheet 6: the underside locator at the title block's own scale, hub/gusset
+# detail J at 2:1 and slot-radius detail L at 4:1. The local enlargement
+# separates the reference radius axes without crowding F-F's controls.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
 # The bottom view's label, then its edge note, at the band's left edge: the
@@ -553,11 +560,19 @@ HUB_BOTTOM_SCALE = (1, 3)
 # width's block and F-F's 15.264, as crowding the section dimensions.  The
 # sheet-1 orientation key says the view is from below, front (B) at the
 # bottom (machinist review r1).
-HUB_BOTTOM_NOTE_XY = (0.020, 0.118)
+HUB_BOTTOM_NOTE_XY = (0.020, 0.122)
 HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
+# Presentation-only crop of the front slot; no model dimensions import into L.
+SLOT_DETAIL_RADIUS_MM = 3.0
+SLOT_DETAIL_CENTER = (0.033, 0.064)
+SLOT_DETAIL_SCALE = (4, 1)
+SLOT_DETAIL_LETTER_XY = (0.094, 0.184)
+SLOT_DETAIL_CAPTION_XY = (0.033, 0.100)
+SLOT_DETAIL_RADIUS_CENTRES_LINE_Y = 0.048
+SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY = (0.065, 0.058)
 HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
@@ -566,12 +581,12 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # round the locator are full: between F-F's 7.100 block (top 113.3 mm on
 # farm run 40d9d030e) and the 72.0 block (bottom 137.6) stand 24.3 mm, under
 # the four rows' 20.4 plus two clearances, and right of the plan the Ø30.0
-# leader and detail C's fence leave 41 mm.  So the note takes the open band
-# right of detail C's caption, over the title block: 80.6 x 20.4 mm at the
-# estimated glyph pitch, 11.6 over the title block, 8.5 inside the frame's
-# right edge, 5.7 off the fence (r 76 about the detail centre) and 13.9
-# right of the caption's DETAIL C (316.1 mm), beside the hub boss and
-# gussets it excludes.
+# leader and detail J's fence leave 41 mm.  So the note takes the open band
+# right of detail J's caption, over the title block.  The historical DETAIL C
+# caption ended at 316.1 mm on 40d9d030e; that is placement evidence, not a
+# measurement of J's glyphs.  The note's estimated 80.6 x 20.4 mm block stays
+# beside the hub boss and gussets it excludes.  Native inspection must
+# establish the renamed caption's clearance.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # The slots' stations along the slot are F-F's plain .XXX 15.264 from the
 # round hole ("2X"), and the frames' implied basic zero and 90 deg need no
@@ -605,22 +620,18 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 
 # Left of the profile: the 36.50 grip, its text parked further left on a
 # jog.  Right: the depth the hole and slot share.  Above, between the owned
-# axes: the hole's 7.100 station from the screw axis, its text on a jog to
-# the right, clear of the locator's land text and the boss's Ø30.0; its rows
-# state the hole stands at the screw's own Z (codex review of 07527cf4: the
-# round holes, datums B and C, had no transverse location).  A row higher,
-# so the two dimension lines never share the hole's extension line at one
-# height, the slot's BASIC 14.200 from the round hole (the slot position
-# frames' true location), its box on a short jog up-left, right of the
-# locator's label.  Under the slot: its length, the text on a jog left of
-# its line, so the leader leaves the underline's right end clear of its own
-# rows (the 07527cf4 render ran it up through "2X"), between the caption and
-# the slot's extension lines.  The caption takes the empty lower-left corner
-# of the band.  The slip hole's size prints face-on in the underside locator.
+# axes: the hole's station from the screw axis, its text on a jog to the
+# right; its rows state the hole stands at the screw's own Z.  The slot's
+# ordinary .XXX station from the round hole has a higher dimension line and
+# its own mate qualifier, on a jog above-left of the round-hole block.
+# The radius-centre reference belongs to the separate enlarged detail L.
+# Under the slot: its controlling overall length. The linked caption sits
+# directly below the section; the length text's separate jog frees that band.
+# Native inspection establishes the new text/arrow/leader clearances.
 HANGER_GRIP_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
-HANGER_GRIP_OFFSET_XY = (0.058, 0.076)
+HANGER_GRIP_OFFSET_XY = (0.072, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 # Its third row names the mate the three-place station matches, the
 # MHA-SM-02 knife mount's own dowel hole (both read
@@ -629,18 +640,16 @@ PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H +
 PIN_STATION_OFFSET_XY = (0.157, 0.1115)
 PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-02"
 SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
-SLOT_STATION_OFFSET_XY = (0.104, 0.1115)
+# The added mate row needs its own band above the round-hole block, not the
+# old one-row station's point beside it.
+SLOT_STATION_OFFSET_XY = (0.112, 0.1295)
+SLOT_STATION_CALLOUT = "MATCHES MHA-SM-02"
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-# Left of its line the leader landed on the underline's right end through
-# the last "L" of TRAVEL (r5 render: leader 112.4 -> 121.3 mm, underline end
-# 121.3; machinist review r6, two runs).  Now the 63.5 mm block stands right
-# of the line, its underline's left end at 134.6 mm, 22 mm right of where
-# the leader leaves the dimension line (112.4 mm), so the leader comes down
-# from the left and passes 2.7 mm clear of the first glyph at cap height
-# (07527cf4's right-side block, its end almost under the line, ran it
-# through "2X").  The block spans 134.6 -> 198.1 mm, short of the title
-# block (216).
-SLOT_LENGTH_OFFSET_XY = (0.1664, 0.024)
+# The full native dowel-travel block is 69.55 mm wide on 4ef's PDF. Move
+# only its text into the band left of the title block, freeing the space
+# below the profile for its own caption. The selected ends, dimension line
+# and witnesses stay put; the new jog's own-arrow clearance needs native proof.
+SLOT_LENGTH_OFFSET_XY = (0.177, 0.045)
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
         BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
@@ -658,7 +667,7 @@ HANGER_SECTION_CALLOUTS = {
     "HangerPinHoleDepth": HANGER_PIN_DEPTH_CALLOUT,
     "HangerGrip": "",
 }
-HANGER_SECTION_CAPTION_XY = (0.055, 0.040)
+HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
 # centre): datum B is the front round dowel hole, its tag low in the window
 # right of the crossbar; datum C the rear one, its tag above the rear rail so
@@ -785,7 +794,7 @@ HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
 # the right, not toward datum C's tag or its leader.
 # Right of the hole, the cutting line, F-F's right arrow and the rear-right
 # boss leave no leader route to a block beside the plan.  Left of it, the
-# rear frame's leader, F-F's left arrow and detail C's label leave a window
+# rear frame's leader, F-F's left arrow and detail J's label leave a window
 # too narrow for the block.  The leader climbs instead to the band over the
 # plan; its old foot at (145.9, 247.2) mm and the 17 mm height stay put.
 # These are estimates from the historical crop, not measured new-ID ink;
@@ -797,7 +806,7 @@ HANGER_PIN_DIA_TEXT_HALF_HEIGHT = 0.0085
 HANGER_PIN_DIA_TEXT_XY = (0.1459 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0, 0.2557)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
-# left of the Ø45 barrels, 7.0 left of detail C's fence (r 38 about the
+# left of the Ø45 barrels, 7.0 left of detail J's fence (r 38 about the
 # gooseneck) and 12.0 inside the sheet frame; its extension lines run at
 # y 177 / 223, under and over that fence and between the corner bosses.
 # The block (two rows: the value and "2X POCKET, E-E" naming the section
@@ -834,12 +843,12 @@ POCKET_FROM_SOCKET_LINE_XY = (
 SIDE_SECTION_Z = -56.0
 # Removed sections are centred on the cut span, so each centre puts the
 # dimensioned profile where it sat when the full cut drew its twin as well:
-# B-B's single T at the old right-hand T (the web/flange/chamfer callouts
+# H-H's single T at the old right-hand T (the web/flange/chamfer callouts
 # keep their lanes), E-E's left rail + web pair where those two stood.
 RAIL_SECTION_CENTER = (0.3566, 0.205)
 # The lone T is 12 mm tall at 1:3, so the native caption climbs to the web
 # width callout unless it is pinned; the column under the T then reads
-# caption, B-B note, E-E note, each a text height clear of the next.
+# caption, H-H note, E-E note, each a text height clear of the next.
 RAIL_SECTION_CAPTION_XY = (0.3566, 0.169)
 RAIL_SECTION_NOTE_XY = (0.270, 0.1525)
 SIDE_SECTION_CENTER = (0.3183, 0.106)
@@ -847,16 +856,16 @@ SIDE_SECTION_SCALE = (1, 4)
 SIDE_SECTION_CAPTION_XY = (0.3183, 0.0915)
 # The E-E note's last line keeps 2.1 mm of air over the side web's 13.0 (its
 # top at 124.5 mm); its third line, the crossbar web's centring and the sharp
-# crossbar flange underside, lifts the first to 139.8, 4.6 under B-B's note.
+# crossbar flange underside, lifts the first to 139.8, 4.6 under the rail note.
 # The web text sits 8 mm left so its 37.5 mm qualifier row ends at 345.8 mm,
 # 4.1 short of the crossbar flange's 8.0 dimension line at 349.9 (farm
 # 30394c1da: the row ran 3.8 mm past that line, text-on-line).
 SIDE_SECTION_NOTE_XY = (0.290, 0.1398)
 SIDE_WEB_TEXT_XY = (0.327, 0.120)
 # Where each removed section prints the rail centreline it cuts, sheet x:
-# B-B at z 112 and E-E / D-D at x -197, as on b49e1, the #946 layout-audit
-# leaf that every typed text point in B-B, E-E and D-D was tuned against.
-# (No cross-family machinist review has passed this sheet; see #1024.)
+# H-H at z 112 and E-E / K-K at x -197.  These profile targets are unchanged
+# from b49e1's B-B / E-E / D-D layout calibration; those historical labels
+# describe that render, not the current native view identities.
 # _pin_section_profile holds the profiles here however far the cut runs.
 RAIL_SECTION_PROFILE_X = 0.35643
 SIDE_SECTION_PROFILE_X = 0.29666
@@ -888,8 +897,9 @@ CROSSBAR_FLANGE_LINE_XY = _side_section_xy(BAR_X1 + 20.0, (HALF_H + FLANGE_BOT_Y
 CROSSBAR_FLANGE_TEXT_XY = (0.382, 0.108)
 CROSSBAR_POCKET_DEPTH_LINE_XY = _side_section_xy(BAR_X0 - 8.0, (FLANGE_BOT_Y - HALF_H) / 2.0)
 CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3155, 0.1068)
-# swDimensionArrowsSide_e: swDimArrowsInside (draw_dt_cone_tip_block's precedent).
+# swDimensionArrowsSide_e (draw_dt_cone_tip_block's native-arrow precedent).
 _DIM_ARROWS_INSIDE = 0
+_DIM_ARROWS_OUTSIDE = 1
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -898,13 +908,14 @@ _DIM_ARROWS_INSIDE = 0
 # B's inner letter off the rail's inner face (0.82), E's inner letter off
 # the 18.0 gusset witness line (0.51).  IDrSection has no letter position;
 # SolidWorks prints each letter past the arrow on its cutting line's end.
-# So section_cut_ends() places each END where its letter clears that ink,
-# and each cut still crosses the same stock.
+# That established the cutting stations and endpoints section_cut_ends()
+# preserves when the live section identifiers change to H/E/K.
 #
-# Each letter's ink about its arrow's tail, (dx0, dy0, dx1, dy1) in sheet m,
-# was measured on the b49e1 render and rounded outward.  B's arrows point
-# +X; E's and D's point +Y.  D is the widest glyph.
-SECTION_LETTER_EXTENTS = {
+# Historical B/E/D ink about each arrow tail, (dx0, dy0, dx1, dy1) in sheet m,
+# measured on b49e1 and rounded outward.  B's arrows point +X; E's and D's
+# point +Y.  These are placement calibration, NOT H/K glyph measurements;
+# native inspection must establish the renamed letters' clearance.
+SECTION_CUT_BASELINE_LETTER_EXTENTS = {
     "B": (0.0153, -0.0013, 0.0191, 0.0050),
     "E": (-0.0015, 0.0158, 0.0020, 0.0221),
     "D": (-0.0024, 0.0158, 0.0028, 0.0221),
@@ -919,15 +930,16 @@ WINDOW_WIDTH_TEXT_XS = (0.105, 0.190)
 WINDOW_WIDTH_TEXT_Y = 0.118
 WINDOW_WIDTH_TEXT_EXTENT = (0.0052, 0.0019, 0.0056, 0.0018)
 WINDOW_WIDTH_DIM_LINE_DROP = 0.0027
-# B's outer letter has only the 9.6 mm band between that dimension line and
-# the rail's outer edge.  A 6.2 mm letter centred there clears each side by
-# 1.7 mm, so INK_CLEARANCE cannot hold.  It keeps the text clearance the
-# cone-tip-block sheet uses between a letter and a view's edge.
+# The historical B outer letter had only the 9.6 mm band between that
+# dimension line and the rail's outer edge.  Its calibrated placement uses
+# the text clearance rather than INK_CLEARANCE.  Keep this baseline fixed:
+# changing it to guessed H glyph metrics would move the actual section plane.
 TEXT_CLEARANCE = 0.0015
-# A letter that stands on a value's line reads apart from it only with a
-# letter's width of air plus the ink clearance.
-SECTION_LETTER_TEXT_GAP = (
-    SECTION_LETTER_EXTENTS["B"][2] - SECTION_LETTER_EXTENTS["B"][0] + INK_CLEARANCE + ROUND_OUT
+# Historical B width plus clearance: another fixed input to cut placement,
+# not a live H glyph width or a claim about its clearance.
+SECTION_CUT_BASELINE_TEXT_GAP = (
+    SECTION_CUT_BASELINE_LETTER_EXTENTS["B"][2]
+    - SECTION_CUT_BASELINE_LETTER_EXTENTS["B"][0] + INK_CLEARANCE + ROUND_OUT
 )
 
 # Only views drawn at a scale the title block does not state carry a label,
@@ -1001,7 +1013,7 @@ GUSSET_RUN_TEXT_OFFSET_XY = (0.1145, 0.2205)
 # 359.8 x 186.0 windows inside them -- follow from the socket pitches
 # (sheet 3) and the rail flange widths, each flange centred on its own
 # socket axes: the 34.2 side flanges here, the 38.0 front / rear flanges in
-# B-B.  A socket bore is a feature the shop touches; the old note's "4X
+# H-H.  A socket bore is a feature the shop touches; the old note's "4X
 # socket pattern" centre was mid-air (machinist review r1, 2026-10-18), so
 # the extents and windows print as references, derived from those widths.
 PLAN_REFERENCE_DIMENSIONS = ("Width", "Depth", "WinWidth", "WinDepth")
@@ -1066,7 +1078,9 @@ DETAIL_SECTION_KEEP = {
     # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
-    "CapRecessDepth": (0.386, 0.158),
+    # The full parent-scoped cap number left only 0.21 mm stroke-to-stroke
+    # at x386 in the native PDF; move left without shortening the mate.
+    "CapRecessDepth": (0.382, 0.158),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
@@ -1362,7 +1376,7 @@ def _reference_model_rail_height(adapter: Any, dimensions: list[Any]) -> Any:
 def _reference_plan_outlines(adapter: Any, dimensions: list[Any]) -> None:
     """The plan's imported flange extents and windows, marked references.
 
-    The flange widths centred on the socket axes (34.2 here, 38.0 in B-B)
+    The flange widths centred on the socket axes (34.2 here, 38.0 in H-H)
     and the socket pitches locate every rail edge from a feature the shop
     touches, so the four outline sizes only restate them.  Each must import
     exactly once and carry no band before its parentheses go on.
@@ -1877,12 +1891,12 @@ def _assert_section_display(
     plane and is part of a cut face (see ``_cut_face_edge``).
 
     Cut-faces-only is the separate question of what lies BEYOND the plane.
-    B-B, E-E and D-D cut across a closed rail band whose far side would print
+    H-H, E-E and K-K cut across a closed rail band whose far side would print
     over the cut faces they exist to dimension; A-A cuts a corner boss with
     open air behind it and stays a full section.  Both flags are read back
     because SolidWorks accepts either silently.
 
-    ``GetPartialSection`` is read against ``removed``: a REMOVED section (B-B,
+    ``GetPartialSection`` is read against ``removed``: a REMOVED section (H-H,
     E-E -- ``create_section_view(partial=True)``) is partial by definition,
     its line deliberately stopping past the one profile it dimensions; on a
     full section the same flag means the line fell short and the cut did not
@@ -1969,10 +1983,10 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     """A removed section through the hub rail at the bore/set-tap axis.
 
     The cutting line runs from outside the set-screw boss to just past the
-    rail's inner face, so ``partial=True`` sections that rail alone: the D
+    rail's inner face, so ``partial=True`` sections that rail alone: the K
     arrows sit on the hub end of the plan and the view carries the one
     profile the spot face and the thread run hang on -- the same treatment as
-    B-B/E-E.  (History: a full-width cut then ``Crop2`` to the hub, whose
+    H-H/E-E.  (History: a full-width cut then ``Crop2`` to the hub, whose
     leftover construction midlines had to be hunted down and whose position
     had to be re-derived from the cropped outline.)
     """
@@ -1981,11 +1995,11 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
             adapter, parent_view, (x/1000.0, 0.0, z/1000.0),
             label="set-screw boss section cutting line",
         )
-        for x, z in section_cut_ends()["D"]
+        for x, z in section_cut_ends()["K"]
     ]
     view = create_section_view(
         adapter, parent_view, line_start=line[0], line_end=line[1],
-        view_xy=HUB_SECTION_CENTER, section_label="D", scale=HUB_SECTION_SCALE,
+        view_xy=HUB_SECTION_CENTER, section_label="K", scale=HUB_SECTION_SCALE,
         partial=True, label="set-screw boss manufacturing section",
     )
     _orient_cut_section(adapter, view, (1.0, 0.0, 0.0))
@@ -2012,7 +2026,7 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     if not math.isclose(ratio[0]/ratio[1], HUB_SECTION_SCALE[0]/HUB_SECTION_SCALE[1]):
         raise RuntimeError("set-screw boss section scale did not persist")
     _pin_section_profile(
-        adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), HUB_SECTION_PROFILE_X, label="D-D",
+        adapter, view, (-COLUMN_X, 0.0, GOOSENECK_Z), HUB_SECTION_PROFILE_X, label="K-K",
     )
     axes = _add_view_centerlines(
         adapter, view,
@@ -2029,7 +2043,7 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
     # and the 21.0 stand over the rail top, so they take the upper lines; the
     # boss face's 22.0 stands under the view and takes the boss face's lower
     # line, whose extension line then runs clear of the spot's mouth.
-    section_edges = scan_view_edges(view, label="D-D set-screw boss section")
+    section_edges = scan_view_edges(view, label="K-K set-screw boss section")
     upper, lower = (1, HALF_H/2.0, HALF_H/2.0), (1, -HALF_H/2.0, HALF_H/2.0)
     spot_edge, spot_point = _cut_face_edge(
         section_edges, fixed={0: SET_SPOT_FACE_X, 2: GOOSENECK_Z}, near=upper,
@@ -2072,9 +2086,9 @@ def _hub_boss_section(adapter: Any, parent_view: Any) -> Any:
         entity_types=("SKETCHSEGMENT", "EDGE"), entities=(axes[0], boss_edge),
         suffix="BOSS FACE\nFROM BORE AXIS", offset_text=HUB_SET_BOSS_OFFSET_XY,
     )
-    _hide_cosmetic_threads(adapter, view, label="D-D set-screw boss section")
+    _hide_cosmetic_threads(adapter, view, label="K-K set-screw boss section")
     _assert_section_display(
-        adapter, view, label="D-D set-screw boss section", cut_surface_only=True,
+        adapter, view, label="K-K set-screw boss section", cut_surface_only=True,
         removed=True,
     )
     return view
@@ -2089,10 +2103,11 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     underside, the crossbar's own extrude depth with the band authored on
     it) and the depth the slip hole and slot share, in one targeted import,
     and only reads the grip back; no sheet-side grip exists.  This section
-    also adds the slip hole's station from the screw axis, the slot's BASIC
-    station from the slip hole and the slot's length.  The slip hole's size
-    and the slot's width are across this cut; the underside locator carries
-    them.  Returns the view and its imported dimensions.
+    also adds the slip hole's station from the screw axis, the slot's ordinary
+    station from the slip hole and its controlling overall length. The slip
+    hole's size and the slot's width are across this cut; the underside
+    locator carries them. Detail L carries the reference radius-centre span.
+    Returns the view and its imported dimensions.
     """
     z = HANGER_SECTION_Z
     line = [
@@ -2166,6 +2181,7 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         expected_mm=HANGER_SLOT_FROM_ROUND, orientation="horizontal",
         entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
         entities=(axes[2], axes[1]),
+        suffix=SLOT_STATION_CALLOUT,
     )
     slot_station.SetText(1, "2X ")  # swDimensionTextPrefix
     if str(slot_station.GetText(1) or "") != "2X ":
@@ -2236,7 +2252,7 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     if manager.CreateCircle(*points[0], *points[1]) is None:
         raise RuntimeError("failed to create native underside detail fence")
     detail = drawing.CreateDetailViewAt4(
-        *HUB_DETAIL_CENTER, 0.0, 0, *HUB_DETAIL_SCALE, "C", 1, True, False, False, 5,
+        *HUB_DETAIL_CENTER, 0.0, 0, *HUB_DETAIL_SCALE, "J", 1, True, False, False, 5,
     )
     if detail is None:
         raise RuntimeError("failed to create native underside detail")
@@ -2264,6 +2280,138 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
         raise RuntimeError("native underside detail scale did not persist")
     if math.dist(center, HUB_DETAIL_CENTER) > 0.0001:
         raise RuntimeError(f"native underside detail centre did not persist: {center}")
+    return detail
+
+
+def _hanger_slot_detail(adapter: Any, parent_view: Any) -> Any:
+    """Enlarge the front slot in Bottom for its sole radius-centre reference."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(parent_view, "IView")
+    if not drawing.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError("failed to activate slot-detail parent")
+    draw.ClearSelection2(True)
+    model_centre = (SLOT_X, -HALF_H, STUD_Z_FRONT)
+    parent.UpdateViewDisplayGeometry()
+    centre, rim = [
+        model_point_in_view(
+            adapter, parent_view, tuple(value / 1000.0 for value in xyz),
+            label="slot-detail fence",
+        )
+        for xyz in (
+            model_centre,
+            (SLOT_X + SLOT_DETAIL_RADIUS_MM, -HALF_H, STUD_Z_FRONT),
+        )
+    ]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, rim):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create slot-detail fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("slot-detail fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select slot-detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *SLOT_DETAIL_CENTER, 0.0, 0, *SLOT_DETAIL_SCALE, "L", 1, True, False, False, 5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create native slot detail L")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in SLOT_DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    set_hidden_lines_removed(adapter, detail)
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("slot detail L has invalid initial bounds")
+    span = 2.0 * SLOT_DETAIL_RADIUS_MM * SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1] / 1000.0
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"slot detail L is smaller than its fence: {outline}")
+    target = [
+        position[axis] + SLOT_DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position slot detail L")
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(outline) != 4 or len(ratio) != 2:
+        raise RuntimeError("slot detail L has invalid final bounds")
+    if not math.isclose(ratio[0] / ratio[1], SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1]):
+        raise RuntimeError("slot detail L scale did not persist")
+    if math.dist(
+        tuple((outline[axis] + outline[axis + 2]) / 2.0 for axis in range(2)),
+        SLOT_DETAIL_CENTER,
+    ) > 0.0001:
+        raise RuntimeError(f"slot detail L centre did not persist: {outline}")
+    raw_circle = detail.GetDetail()
+    if raw_circle is None:
+        raise RuntimeError("slot detail L has no native parent circle")
+    circle = _early_bound(raw_circle, "IDetailCircle")
+    if str(circle.GetLabel()) != "L":
+        raise RuntimeError("slot detail L has the wrong native parent label")
+    # This detail owns its circle; J is another circle on the same parent.
+    circle.SetLabelPosition(*SLOT_DETAIL_LETTER_XY)
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, SLOT_DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"slot detail L's letter did not persist: {letter}")
+    _position_view_caption(adapter, detail, SLOT_DETAIL_CAPTION_XY)
+    centre_m = tuple(value / 1000.0 for value in model_centre)
+    settle_detail_projection(
+        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
+        tolerance_xy=(0.0001, 0.0001), label="slot detail L",
+    )
+    radius_centres = tuple(
+        (SLOT_X + side * SLOT_FLAT / 2.0, -HALF_H, STUD_Z_FRONT)
+        for side in (-1.0, 1.0)
+    )
+    # Bottom projects model Y end-on: the short local axes run along Z.
+    axis_half_length = HANGER_SLOT_WIDTH / 2.0 + 0.4
+    axes = _add_view_centerlines(
+        adapter, detail,
+        tuple(
+            ((x, y, z - axis_half_length), (x, y, z + axis_half_length))
+            for x, y, z in radius_centres
+        ),
+    )
+    centre = settle_detail_projection(
+        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
+        tolerance_xy=(0.0001, 0.0001), label="slot detail L radius centres",
+    )
+    # Source-derived REF only: F-F's overall and the locator's width control.
+    slot_centres = _checked_dimension(
+        adapter, detail, p0=radius_centres[0], p1=radius_centres[1],
+        text_xy=(centre[0], SLOT_DETAIL_RADIUS_CENTRES_LINE_Y),
+        label="dowel slot radius centres", expected_mm=SLOT_FLAT,
+        orientation="horizontal", reference=True,
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(axes[0], axes[1]), suffix="SLOT RADIUS\nCENTRES",
+        offset_text=SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY,
+    )
+    slot_centres.ArrowSide = _DIM_ARROWS_OUTSIDE
+    if int(slot_centres.ArrowSide) != _DIM_ARROWS_OUTSIDE:
+        raise RuntimeError("dowel slot radius centres did not keep their arrows outside")
     return detail
 
 
@@ -2328,40 +2476,38 @@ def keeper_facing_note_xy(callout: Point) -> Point:
 def section_cut_ends() -> dict[str, tuple[Point, Point]]:
     """Each removed section's cutting-line (start, end) as plan-model (X, Z) mm.
 
-    Every end stands where its letter (SECTION_LETTER_EXTENTS) clears the
-    nearest ink: an edge of the plan's own stock or a dimension printed
-    beside it.  B, E and D are cut from the two 1:3 plans, so a paper
-    clearance is ``/ s`` model millimetres.
+    Keyed by live H/E/K identifiers, with stations and ends fixed by the
+    historical B/E/D placement calibration.  Never substitute guessed H/K
+    glyph metrics: that would change the cutting plane.  The two 1:3 plans
+    turn a paper clearance into ``/ s`` model millimetres.
     """
     s = GEOMETRY_VIEW_SCALE / 1000.0  # sheet m per model mm
     clear = INK_CLEARANCE + ROUND_OUT
     center_y = GEOMETRY_TOP_CENTER[1]
-    # B: the station slides along the +Z rail until the outer letter ends
-    # left of the "183.9", and stays in the rail's plain T, past the junction
-    # land and short of the corner boss.  The letter stands on that value's
-    # line, and 1.7 mm off it (leaders955-f542) it read as "B183.9", so it
-    # keeps a further letter's width of air.
-    b0, b_down, b1, b_up = SECTION_LETTER_EXTENTS["B"]
+    # Historical B placement sets H's unchanged station.  B183.9 was the
+    # original overprint; the measured B width and extents remain calibration
+    # only and make no claim about the live H glyph.
+    _b0, b_down, b1, b_up = SECTION_CUT_BASELINE_LETTER_EXTENTS["B"]
     text_left = WINDOW_WIDTH_TEXT_XS[1] - WINDOW_WIDTH_TEXT_EXTENT[0]
-    rail_x = (text_left - SECTION_LETTER_TEXT_GAP - b1 - GEOMETRY_TOP_CENTER[0]) / s
+    rail_x = (text_left - SECTION_CUT_BASELINE_TEXT_GAP - b1 - GEOMETRY_TOP_CENTER[0]) / s
     if not LAND_X1 < rail_x < COLUMN_X - BOSS_DIA / 2.0:
-        raise ValueError(f"B-B station x {rail_x:.1f} leaves the rail's plain T")
-    # Its outer letter is centred in the band between that dimension's line
-    # and the rail's outer edge; its inner letter clears the rail's inner face.
+        raise ValueError(f"H-H station x {rail_x:.1f} leaves the rail's plain T")
+    # Historical B's outer letter was centred between the dimension line
+    # and rail edge; its inner letter cleared the rail's inner face.
     band_low = WINDOW_WIDTH_TEXT_Y - WINDOW_WIDTH_DIM_LINE_DROP
     band_high = center_y - OUTER_Z * s
     outer_y = (band_low + band_high - b_down - b_up) / 2.0
     if outer_y + b_down - band_low < TEXT_CLEARANCE:
-        raise ValueError(f"B's outer letter fits its band by {outer_y + b_down - band_low:.4f} m")
+        raise ValueError(f"historical B placement fits its band by {outer_y + b_down - band_low:.4f} m")
     inner_y = center_y - INNER_Z * s + clear - b_down
     # E: the outer letter ends an ink clearance left of the corner boss (and
     # the (439.0) witness line on its Ø45 extreme); the inner one starts an ink
     # clearance right of the 18.0 gusset run's outer witness line.
-    e0, _e_down, e1, _e_up = SECTION_LETTER_EXTENTS["E"]
-    # D: each letter clears the hub rail's face on its own side.
-    d0, _d_down, d1, _d_up = SECTION_LETTER_EXTENTS["D"]
+    e0, _e_down, e1, _e_up = SECTION_CUT_BASELINE_LETTER_EXTENTS["E"]
+    # Historical D placement fixes K's ends at the same hub-rail faces.
+    d0, _d_down, d1, _d_up = SECTION_CUT_BASELINE_LETTER_EXTENTS["D"]
     return {
-        "B": (
+        "H": (
             (rail_x, (center_y - outer_y) / s),
             (rail_x, (center_y - inner_y) / s),
         ),
@@ -2369,7 +2515,7 @@ def section_cut_ends() -> dict[str, tuple[Point, Point]]:
             (BAR_X1 + GUSSET + (clear - e0) / s, SIDE_SECTION_Z),
             (-PLAN_HALF_X - (clear + e1) / s, SIDE_SECTION_Z),
         ),
-        "D": (
+        "K": (
             (-OUTER_X - (clear + d1) / s, GOOSENECK_Z),
             (-INNER_X + (clear - d0) / s, GOOSENECK_Z),
         ),
@@ -2767,7 +2913,7 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
     )
     # drawing-guidelines.md rule 9 (show internal shape in solid lines): the plan view's hidden rail undersides and land
-    # pads repeat what sections B-B and E-E plus the sheet 6 underside
+    # pads repeat what sections H-H and E-E plus the sheet 6 underside
     # view already describe, so they come off the dimensioned plan.
     set_hidden_lines_removed(adapter, geometry_top)
     set_hidden_lines_removed(adapter, geometry_front)
@@ -2871,36 +3017,36 @@ async def build(adapter: Any) -> dict[str, str]:
         edges=geometry_top_edges,
     )
     _crossbar_median_datum(adapter, geometry_top, crossbar_width)
-    # B-B is a REMOVED section: the cutting line crosses the +Z rail alone
+    # H-H is a REMOVED section: the cutting line crosses the +Z rail alone
     # (the -Z rail is its mirror), so the section shows the one T profile the
     # web, flange, chamfer and root dimensions hang on instead of that
     # profile beside an identical twin 80 mm away carrying nothing.
     cut_ends = section_cut_ends()
-    rail_cut_x = cut_ends["B"][0][0]
+    rail_cut_x = cut_ends["H"][0][0]
     rail_cut = [
         model_point_in_view(
             adapter, geometry_top, (x/1000.0, 0.0, z/1000.0),
             label="front rear rail section station",
         )
-        for x, z in cut_ends["B"]
+        for x, z in cut_ends["H"]
     ]
     rail_section = create_section_view(
         adapter, geometry_top,
         line_start=rail_cut[0],
         line_end=rail_cut[1],
-        view_xy=RAIL_SECTION_CENTER, section_label="B", scale=(1, 3),
+        view_xy=RAIL_SECTION_CENTER, section_label="H", scale=(1, 3),
         partial=True, label="T rail manufacturing section",
     )
     _orient_cut_section(adapter, rail_section, (0.0, 0.0, 1.0))
     _pin_section_profile(
         adapter, rail_section, (rail_cut_x, 0.0, abs(FRONT_COLUMN_Z)),
-        RAIL_SECTION_PROFILE_X, label="B-B",
+        RAIL_SECTION_PROFILE_X, label="H-H",
     )
     # The display mode comes before any pick: ``scan_view_edges``
     # answers for the mode the view is in, so an edge picked while the
     # ghosts were drawn would dimension a line the print does not carry.
     set_hidden_lines_removed(adapter, rail_section)
-    rail_section_edges = scan_view_edges(rail_section, label="B-B rail section")
+    rail_section_edges = scan_view_edges(rail_section, label="H-H rail section")
     # Each text parks clear of every witness line: the two widths sit beside
     # their extension lines.  The 8.0 flange run is 2.7 mm of paper, so it
     # needs a leader, and the lane the 36.5 rail height used to occupy is
@@ -2954,14 +3100,14 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.ClearSelection2(True)
     _position_view_caption(adapter, rail_section, RAIL_SECTION_CAPTION_XY)
     if add_note(
-        adapter, "B-B: FRONT / REAR RAILS, IDENTICAL\nWEB CENTRED UNDER TOP FLANGE",
+        adapter, "H-H: FRONT / REAR RAILS, IDENTICAL\nWEB CENTRED UNDER TOP FLANGE",
         *RAIL_SECTION_NOTE_XY,
     ) is None:
         raise RuntimeError("failed to identify the cut rails and centred webs")
     _assert_section_display(
-        adapter, rail_section, label="B-B T rail section", cut_surface_only=True, removed=True
+        adapter, rail_section, label="H-H T rail section", cut_surface_only=True, removed=True
     )
-    # B-B cuts the front/rear rails only, so the 34.2 side rails and the
+    # H-H cuts the front/rear rails only, so the 34.2 side rails and the
     # crossbar had no web thickness, root radius or rim chamfer anywhere on
     # the print, yet the keeper taps and the hanger holes are cut into
     # exactly that stock.  E-E is a second removed section: its cutting line
@@ -3449,6 +3595,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=BORE_CHAMFER, orientation="horizontal",
         entity_types=("VERTEX", "VERTEX"), exact_vertices=True,
         suffix="X 45 DEG\nCAP / GOOSENECK TOP", edges=detail_section_edges,
+        offset_text=BORE_CHAMFER_TEXT_OFFSET_XY,
     )
     upper_boss_edge = detail_front_edges.circle_at(
         (COLUMN_X, HALF_H+BOSS_ABOVE, REAR_COLUMN_Z), BOSS_DIA/2-EDGE_CHAMFER,
@@ -3538,7 +3685,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # face shown); the process states the total once and where every
         # depth starts.  The 46.0 thread and 49.2 drill depths are the
         # requirement, no tool named (machinist review r1).
-        process="SAME AT OPPOSITE END, 4X TOTAL\nDEPTHS FROM COUNTERBORE FLOOR\nTHREAD NEAR AND FAR WALL",
+        process=CROSS_TAP_CALLOUT,
     )
     set_hole_callout_precision(
         cross_tap_callout, {"hw-tapdrldepth": 1, "hw-threaddepth": 1},
@@ -3563,15 +3710,6 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, detail_section, label="A-A corner section",
         cut_surface_only=False,
     )
-    if (
-        add_note(
-            adapter,
-            CROSS_TAP_SECTION_NOTE,
-            *CROSS_TAP_SECTION_NOTE_XY,
-        )
-        is None
-    ):
-        raise RuntimeError("failed to identify section cross-screw relation")
     if not ddoc.ActivateSheet("HUB-SET-SCREW"):
         raise RuntimeError("failed to activate top-frame hub sheet")
     hub_top = place_view(
@@ -3585,7 +3723,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # tap breaks its spot face, so both read as visible ink; the dashed sockets
     # at the rail ends were the only thing hidden lines added here, and sheets
     # 3 and 4 own those.  The re-assertions below are not redundant: creating
-    # the D-D section and picking its faces both put the parent back in its
+    # the K-K section and picking its faces both put the parent back in its
     # default.
     set_hidden_lines_removed(adapter, detail_left)
     hub_top_dimensions = curate_view_dimensions(
@@ -3765,6 +3903,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # precision (machinist review r1: its dashed cross-tap and pad edges
     # communicated nothing, its circles printed faceted).
     set_hidden_lines_removed(adapter, geometry_bottom)
+    # Create L before the locator's authored annotations; import no dimensions
+    # into it. Native inspection still must rule out inherited annotations.
+    _hanger_slot_detail(adapter, hub_bottom_parent)
     hub_bottom_edges = scan_view_edges(hub_bottom_parent, label="underside locator")
     geometry_bottom_edges = scan_view_edges(geometry_bottom, label="enlarged underside")
     bottom_dimensions = curate_view_dimensions(

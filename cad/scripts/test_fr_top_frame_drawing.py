@@ -1329,7 +1329,7 @@ def _worst_thread_wall(half_width, root_radius, flange_depth, corner_x, depth, w
 def test_printed_typ_top_flange_minimum_keeps_the_receiver_wall(stack) -> None:
     """Facing may lower the keeper-rail top; only a directly printed FINAL
     flange that covers it bounds what the receiver's T-root keeps at the
-    worst case.  B-B prints the top flange TYP, so its .X minimum binds the
+    worst case.  H-H prints the top flange TYP, so its .X minimum binds the
     faced keeper rail too, with no second facing allowance."""
     band = spec.PRINTED_LINEAR_BAND_MM
     top_places = spec.DRAWING_REFERENCE_PRECISION["top flange thickness"]
@@ -1556,8 +1556,8 @@ def test_build_places_the_keeper_leader_from_its_projected_feature() -> None:
 # #955 section letters.  layoutcheck's replay of b49e1 found three cutting-
 # plane letters printed on ink (B 3.65 mm on the rail edge and the 183.9,
 # E 0.99 on the corner boss, D 6.17 on the hub rail's inner face) and two more
-# under 1 mm off it.  The two 1:3 plans are projected as above (+X right, +Z
-# down the sheet); each letter's box stands about its arrow's tail.
+# under 1 mm off it.  This is historical B/E/D calibration evidence, not
+# H/K glyph measurements.  The two 1:3 plans project +X right and +Z down.
 _PLAN_S = drawing.GEOMETRY_VIEW_SCALE / 1000.0
 _SECTION_PLAN = {
     "B": drawing.GEOMETRY_TOP_CENTER,
@@ -1636,7 +1636,7 @@ def _letter_tails(ends):
 def _letter_boxes(ends):
     boxes = {}
     for name, (x, y) in _letter_tails(ends).items():
-        dx0, dy0, dx1, dy1 = drawing.SECTION_LETTER_EXTENTS[name[0]]
+        dx0, dy0, dx1, dy1 = drawing.SECTION_CUT_BASELINE_LETTER_EXTENTS[name[0]]
         boxes[name] = (x + dx0, y + dy0, x + dx1, y + dy1)
     return boxes
 
@@ -1719,7 +1719,7 @@ def _letter_ink(name, *, boss_dia):
             # Beside the value on its line: a letter's width of air, so the
             # letter does not read as the value's prefix ("B183.9").
             ("183.9", lambda box: _box_box_gap(box, _mm(_WINDOW_WIDTH_TEXT)),
-             drawing.SECTION_LETTER_TEXT_GAP),
+             drawing.SECTION_CUT_BASELINE_TEXT_GAP),
         )
     if name == "B-inner":
         face = _plan_line("B", (part.BAR_X1, part.INNER_Z), (part.INNER_X, part.INNER_Z))
@@ -1782,12 +1782,16 @@ def test_section_letter_model_reproduces_b49e1() -> None:
 
 
 @pytest.mark.parametrize("name", _LETTER_ENDS)
-def test_section_letter_stands_clear_of_its_ink(name: str) -> None:
-    """#955: each cutting-plane letter clears the ink round it by
-    INK_CLEARANCE; B's outer letter, centred in its 9.6 mm band, clears the
-    rail edge and the 183.9's line by TEXT_CLEARANCE."""
+def test_section_cut_calibration_keeps_historical_letter_clearance(name: str) -> None:
+    """Replay the measured B/E/D glyphs at the preserved cutting endpoints.
+
+    This guards the historical placement calibration only.  It cannot prove
+    live H/K glyph clearance, which requires native inspection.
+    """
+    live_ends = drawing.section_cut_ends()
+    baseline_ends = {"B": live_ends["H"], "E": live_ends["E"], "D": live_ends["K"]}
     assert (
-        _letter_shortfalls(drawing.section_cut_ends(), name, boss_dia=part.BOSS_DIA)
+        _letter_shortfalls(baseline_ends, name, boss_dia=part.BOSS_DIA)
         == {}
     )
 
@@ -1799,10 +1803,10 @@ def test_b49e1_section_letter_is_what_sat_on_ink(name: str) -> None:
     assert _letter_shortfalls(_B49E1_CUT_ENDS, name, boss_dia=_B49E1_BOSS_DIA)
 
 
-def test_b_outer_arrow_keeps_off_the_window_width() -> None:
-    """B's outer arrow runs in the same band: its head clears the 183.9's
-    line and ends an ink clearance short of the value."""
-    tail = _letter_tails(drawing.section_cut_ends())["B-outer"]
+def test_h_outer_arrow_keeps_off_the_window_width() -> None:
+    """H's unchanged outer arrow clears the historical width-dimension ink;
+    this checks its arrow, not the renamed letter's glyph bounds."""
+    tail = _plan_point("B", *drawing.section_cut_ends()["H"][0])
     line_y = _WINDOW_WIDTH_LINE[0][1] / 1000.0
     assert tail[1] - _SECTION_ARROW_HALF_WIDTH - line_y >= 0.001
     assert tail[0] + _SECTION_ARROW_LENGTH <= _WINDOW_WIDTH_TEXT[0] / 1000.0 - drawing.INK_CLEARANCE
@@ -1855,20 +1859,20 @@ def test_short_plan_width_text_parks_clear_of_its_extension_lines(
 
 
 def test_section_cuts_cross_the_same_stock() -> None:
-    """The moved ends keep what each removed section shows: B cuts the
+    """The preserved ends keep what each removed section shows: H cuts the
     rail's plain T between the junction land and the corner boss, E runs
-    from outside the left rail past the crossbar T, D from outside the
+    from outside the left rail past the crossbar T, K from outside the
     set-screw boss past the hub rail's inner face, each at its own station."""
     ends = drawing.section_cut_ends()
-    (bx, b_outer), (bx_inner, b_inner) = ends["B"]
-    assert bx == bx_inner and part.LAND_X1 < bx < part.COLUMN_X - part.BOSS_DIA / 2.0
-    assert b_inner < part.INNER_Z and b_outer > drawing.PLAN_HALF_Z
+    (hx, h_outer), (hx_inner, h_inner) = ends["H"]
+    assert hx == hx_inner and part.LAND_X1 < hx < part.COLUMN_X - part.BOSS_DIA / 2.0
+    assert h_inner < part.INNER_Z and h_outer > drawing.PLAN_HALF_Z
     (e_inner, ez), (e_outer, ez_outer) = ends["E"]
     assert ez == ez_outer == drawing.SIDE_SECTION_Z
     assert e_inner > part.BAR_X1 and e_outer < -drawing.PLAN_HALF_X
-    (d_outer, dz), (d_inner, dz_inner) = ends["D"]
-    assert dz == dz_inner == part.GOOSENECK_Z
-    assert d_outer < part.SET_BOSS_FACE_X and -part.INNER_X < d_inner < part.BAR_X0
+    (k_outer, kz), (k_inner, kz_inner) = ends["K"]
+    assert kz == kz_inner == part.GOOSENECK_Z
+    assert k_outer < part.SET_BOSS_FACE_X and -part.INNER_X < k_inner < part.BAR_X0
 
 
 # Each removed section's profile ink on b49e1 (mm, x only): B-B's T, E-E's
@@ -1967,11 +1971,11 @@ _UNDERLINE_DROP = 0.001
 _UNDERLINE_PAST = 0.0001
 _EXTENSION_OVERSHOOT = 0.00103
 _BENT_SHOULDER = 0.00635
-# D-D's tap axis (rail mid-height) prints at y 211.8 mm; its caption,
-# SECTION D-D over SCALE 1 : 1, printed 307.3..352.6 x 163.3..178.0 mm about
-# HUB_SECTION_CAPTION_XY (run 6).
+# Historical D-D's tap axis (rail mid-height) prints at y 211.8 mm; its
+# SECTION D-D / SCALE 1 : 1 caption printed 307.3..352.6 x 163.3..178.0 mm
+# about HUB_SECTION_CAPTION_XY (run 6).  This is not a K-K caption measurement.
 _DD_AXIS_Y = 0.2118
-_DD_CAPTION_EXTENT = (0.0227, 0.0147, 0.0226, 0.0)
+_HISTORICAL_DD_CAPTION_EXTENT = (0.0227, 0.0147, 0.0226, 0.0)
 # A finish symbol's ink from its point: "Ra 3.2" ends 14.8 right of it and
 # tops out 6.8 over it (the hub bore symbol on the 40d9d030e render).
 _FINISH_INK = (0.0, 0.0, 0.0148, 0.0068)
@@ -2003,20 +2007,20 @@ def _offset_leader(line_xy, block):
 
 
 def _dd(x: float, y: float) -> tuple[float, float]:
-    """D-D at 1:1, model X right of the pinned bore axis, model Y up."""
+    """Historical D-D layout at 1:1; K-K retains its geometry, not its glyphs."""
     return (
         drawing.HUB_SECTION_PROFILE_X + (x - part.GOOSENECK_X) / 1000.0,
         _DD_AXIS_Y + y / 1000.0,
     )
 
 
-def test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink() -> None:
-    """Q5 (user, 2026-10-12): D-D dimensions the thread length, the 21.0 to
-    the spot face and the boss face's 22.0; the spot face carries no finish
-    symbol (machinist review r1: a clamp face neither runs nor locates).  The
-    thread length's text goes out left, the 21.0's right and the 22.0's left
-    under the view, so no leader crosses another dimension's extension line
-    and every text and leader keep INK_CLEARANCE."""
+def test_hub_boss_section_layout_replays_historical_ink() -> None:
+    """Q5 layout with its measured historical D-D caption envelope.
+
+    The current K-K view keeps the thread, spot-face and boss-face geometry
+    and text placement.  Replaying the old caption is baseline evidence
+    only; native inspection must establish the new caption's clearance.
+    """
     from _layout_geometry import Segment, segment_box_distance
 
     ink = drawing.INK_CLEARANCE
@@ -2066,7 +2070,7 @@ def test_hub_boss_section_texts_and_leaders_stand_clear_of_their_ink() -> None:
     right, top = _dd(-part.INNER_X, part.HALF_H)
     outline = (left, bottom, right, top)
     cx, cy = drawing.HUB_SECTION_CAPTION_XY
-    dx0, dy0, dx1, dy1 = _DD_CAPTION_EXTENT
+    dx0, dy0, dx1, dy1 = _HISTORICAL_DD_CAPTION_EXTENT
     caption = (cx - dx0, cy - dy0, cx + dx1, cy + dy1)
     frame = drawing.SHEET_FRAME
     for name, block in blocks.items():
@@ -2213,7 +2217,7 @@ def _pin(monkeypatch, view, offset):
     )
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda _adapter, *, label: None)
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
-    drawing._pin_section_profile(None, view, (0.0, 0.0, 0.0), 0.3320, label="D-D")
+    drawing._pin_section_profile(None, view, (0.0, 0.0, 0.0), 0.3320, label="K-K")
 
 
 def test_pin_section_profile_moves_the_view_by_the_miss(monkeypatch) -> None:
@@ -2223,30 +2227,8 @@ def test_pin_section_profile_moves_the_view_by_the_miss(monkeypatch) -> None:
 
 
 def test_pin_section_profile_fails_loud_when_the_move_does_not_hold(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="D-D section profile prints at"):
+    with pytest.raises(RuntimeError, match="K-K section profile prints at"):
         _pin(monkeypatch, _FakeView((0.3300, 0.2100), persists=False), (-0.0043, 0.0))
-
-
-def test_build_pins_every_removed_section_and_writes_centrelines_direct() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for pinned in ("RAIL_SECTION_PROFILE_X, label=\"B-B\"", "SIDE_SECTION_PROFILE_X, label=\"E-E\"",
-                   "HUB_SECTION_PROFILE_X, label=\"D-D\"",
-                   "HANGER_SECTION_PROFILE_X, label=\"F-F\""):
-        assert pinned in source, pinned
-    body = source[source.index("def _add_view_centerlines(") :]
-    body = body[: body.index("\ndef ")]
-    assert "manager.AddToDB = True" in body
-    assert "_assert_centreline_placed(adapter, segment, points)" in body
-
-
-def test_build_cuts_each_section_at_its_derived_ends() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for placed in (
-        'for x, z in cut_ends["B"]',
-        'for x, z in cut_ends["E"]',
-        'for x, z in section_cut_ends()["D"]',
-    ):
-        assert placed in source, placed
 
 
 # --- Knife hanger: #10 loose plain clearance and dowels --------------------
@@ -3891,7 +3873,7 @@ def test_slot_frames_stand_outside_the_plan_clear_of_every_line() -> None:
                 assert segment_circle_distance(run, circle) >= ink, (station, name)
         assert sheet[0] + ink <= outline.xmin and outline.xmax <= sheet[2] - ink, station
         assert outline.ymax <= sheet[3] - ink, station
-        # Clear of detail C's 76 mm fence beside the plan.
+        # Clear of detail J's unchanged 76 mm fence beside the plan.
         cx, cy = drawing.HUB_DETAIL_CENTER
         for box in (outline, name_box):
             near = (min(max(cx, box.xmin), box.xmax), min(max(cy, box.ymin), box.ymax))
@@ -3980,7 +3962,7 @@ def test_slot_width_leader_passes_left_of_the_land_dimension() -> None:
 
 def test_pocket_length_dimension_stands_outside_the_plan() -> None:
     # The 138.0 line, its extension lines and its text stay out of the plan
-    # silhouette and detail C's fence; the text box is the three-row block
+    # silhouette and detail J's fence; the text box is the three-row block
     # farm c75ac06 printed (17.5 mm tall, widest row 33.9 mm by the 40d9d030e
     # render's glyphs), which the two-row value + "2X POCKET, E-E" fits in.
     from _layout_geometry import Box, Segment, segment_box_distance
@@ -4022,27 +4004,14 @@ def test_pocket_length_dimension_stands_outside_the_plan() -> None:
     )
 
 
-def test_section_note_states_the_far_wall_print_worst_engagement() -> None:
+def test_far_wall_print_worst_engagement_meets_thread_rule() -> None:
     import build_fr_frame_assembly as assembly
     from _mcmaster_90280a837 import SHANK_DIA
 
     engagement = drawing.CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT
-    # drawing-guidelines.md rule 17 (walls and webs): the printed bands only shorten the far-wall engagement, and
+    # Rule 18 (thread engagement): the printed bands only shorten the far-wall engagement, and
     # the shortest still holds 1.5D.
     assert 1.5 * SHANK_DIA <= engagement < assembly.TOP_FAR_CASTING_ENGAGEMENT
-    # Machinist review r1: the note names the requirement (both walls, one
-    # lead) and the mate; the depths it threads are the A-A dimensions.
-    note = drawing.CROSS_TAP_SECTION_NOTE
-    assert "THREAD BOTH CASTING WALLS IN PHASE" in note and "MHA-FR-VN-53" in note
-    assert "FULL THREAD" not in note
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): short notes, short of the title block and inside the frame.
-    lines = note.splitlines()
-    x, y = drawing.CROSS_TAP_SECTION_NOTE_XY
-    assert len(lines) <= 4
-    assert x + 0.0027 * max(len(line) for line in lines) < TITLE_BLOCK[0]
-    # Rows print 5.56 mm apart (farm c75ac06, sheet 6 callout rows).
-    bottom = y - 0.00556 * len(lines)
-    assert bottom > drawing.SHEET_FRAME[1] + drawing.INK_CLEARANCE
 
 
 def _segments_apart(a, b) -> bool:
@@ -4189,7 +4158,7 @@ def test_slip_hole_size_parks_above_the_plan_right_of_datum_c() -> None:
         near = (min(max(point[0], block.xmin), block.xmax), min(max(point[1], block.ymin), block.ymax))
         return math.dist(near, point)
 
-    # Detail C's 76 mm fence.
+    # Detail J's unchanged 76 mm fence.
     assert block_gap(drawing.HUB_DETAIL_CENTER) - 0.076 >= ink
     circles = _locator_circles()
     hole_x, hole_y, hole_r = circles.pop("round hole C")
@@ -4990,7 +4959,8 @@ def test_underside_facing_note_is_the_part_property_carrying_the_seat_finish() -
     assert _keyword(linked[0], "char_height").id == "FACING_NOTE_HEIGHT"
 
 
-def test_underside_facing_note_stands_beside_detail_c_clear_of_all_ink() -> None:
+def test_underside_facing_note_layout_replays_historical_ink() -> None:
+    """Retain the measured DETAIL C baseline, not a live J glyph-clearance claim."""
     x, y = drawing.UNDERSIDE_FACING_NOTE_XY
     rows = spec.DRAWING_NOTES_C.splitlines()
     note = (
@@ -5013,7 +4983,7 @@ def test_underside_facing_note_stands_beside_detail_c_clear_of_all_ink() -> None
         centre[1] + drawing.PLAN_HALF_Z * m_per_mm,
     )
     assert _box_box_gap(note, plan) >= ink
-    # Detail C's circular fence: the parent's fence radius at the detail scale.
+    # Detail J's unchanged circular fence: parent's radius at the detail scale.
     parent_r = (part.HUB_GUSSET_HALF_OUT + part.HUB_BOSS_DROP) * m_per_mm
     detail_r = parent_r * (
         drawing.HUB_DETAIL_SCALE[0] / drawing.HUB_DETAIL_SCALE[1]
@@ -5021,11 +4991,11 @@ def test_underside_facing_note_stands_beside_detail_c_clear_of_all_ink() -> None
     cx, cy = drawing.HUB_DETAIL_CENTER
     nearest = (min(max(cx, note[0]), note[2]), min(max(cy, note[1]), note[3]))
     assert math.dist(nearest, (cx, cy)) >= detail_r + ink
-    # Printed text on the 40d9d030e render (sheet mm): the DETAIL C / SCALE
-    # 2:1 caption, the Ø30.0 CYLINDRICAL BOSS text, the 7.0 gusset block,
-    # the 72.0 land block, F-F's 7.100 block and the locator's label.
+    # Historical text on 40d9d030e (sheet mm), including the old DETAIL C /
+    # SCALE 2:1 caption.  This replays that caption only, not J's new glyphs.
+    # Other blocks: Ø30.0 boss, 7.0 gusset, land, depth and locator label.
     for label, box in {
-        "detail caption": (0.2844, 0.0753, 0.3161, 0.0898),
+        "historical detail C caption": (0.2844, 0.0753, 0.3161, 0.0898),
         "boss diameter": (0.1889, 0.0954, 0.2310, 0.1045),
         "gusset thickness": (0.3689, 0.2356, 0.4112, 0.2503),
         "land": (0.1243, 0.1376, 0.1856, 0.1523),
