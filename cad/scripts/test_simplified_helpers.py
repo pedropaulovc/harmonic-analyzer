@@ -880,7 +880,7 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         reference(drawing.FULL_DETAIL_SHEET, "*Right", (1.0, 1.0), ViewRole.FULL_DETAIL)
         return (1.0, 1.0)
 
-    def bank_settings(_adapter, _facts):
+    def bank_settings(_adapter, _facts, _trace):
         for scale in (drawing.BANK_SETTING_SCALE, drawing.BANK_SPRING_DETAIL_SCALE):
             reference(drawing.BANK_SETTINGS_SHEET, "*Right", scale)
         return idle
