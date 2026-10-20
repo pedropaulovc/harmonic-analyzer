@@ -1075,6 +1075,16 @@ the arc-end condition, actual value, driven ownership, explicit band and
 unparenthesized ordinary ink must survive equations/rebuild and per-view
 hidden-sketch import. These strict API paths still need native-seat proof.
 
+Before creating a transverse point-to-circle dimension, give the exact selected
+circle a native rim selection point. Derive it from the actual circle's centre
+and radius, invert the active sketch's native transform to model space, and
+require the sketch-space pick readback to agree. The nominal entry points share
+the bore centre's transverse coordinate: an unspecified centre pick can request
+a zero span before a later near-arc setting is reachable. Keep the same real
+entity attachments and strict near-arc/value checks; this changes selection
+semantics, not geometry. The r4 null creation is observed, but the zero-span
+mechanism remains an inference until the corrected native path is exercised.
+
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
 own an across-flats acceptance band. Attach the height precision's functional
