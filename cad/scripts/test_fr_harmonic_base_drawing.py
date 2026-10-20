@@ -3235,12 +3235,18 @@ def test_pedestal_thread_interference_budget_stops_at_actual_retained_skin() -> 
         assert allowed[pair] < obsolete
 
 
-def _native_ray_hit(ray: int, depth: float, flags: float, *, x=100.0, z=50.0):
-    """Documented six-field hit record; dimensions are SI in native arrays."""
-    return (0.0, float(ray), flags, x / 1000.0, (50.8 - depth) / 1000.0, z / 1000.0)
+def _native_ray_hit(
+    ray: int, depth: float, flags: float, *, x=100.0, z=50.0, normal=(0.0, 1.0, 0.0),
+):
+    """Documented nine-double ENTRY_EXIT | NORMALS record; lengths are SI."""
+    return (
+        0.0, float(ray), flags,
+        x / 1000.0, (50.8 - depth) / 1000.0, z / 1000.0, *normal,
+    )
 
 
-def _native_ray_adapter(monkeypatch, raw, *, count=None, bodies=None):
+def _native_ray_adapter(monkeypatch, raw, *, count=..., bodies=None):
+    """Model the integer intersection-count retval, not a ray/scalar count."""
     from types import SimpleNamespace
     from solidworks_mcp.adapters import com_variant
 
@@ -3249,7 +3255,7 @@ def _native_ray_adapter(monkeypatch, raw, *, count=None, bodies=None):
 
     def intersect(*args):
         calls.append(args)
-        return len(raw) // 6 if count is None else count
+        return (0 if raw is None else len(raw) // 9) if count is ... else count
 
     model = SimpleNamespace(
         Extension=SimpleNamespace(RayIntersections=intersect),
@@ -3260,6 +3266,61 @@ def _native_ray_adapter(monkeypatch, raw, *, count=None, bodies=None):
     monkeypatch.setattr(com_variant, "dispatch_array", lambda values: values)
     monkeypatch.setattr(com_variant, "double_array", lambda values: values)
     return SimpleNamespace(currentModel=model), calls
+
+
+def _native_ray_diagnostics(error):
+    from ast import literal_eval
+
+    return literal_eval(str(error.value).split("; native_ray_readback=", 1)[1])
+
+
+@pytest.fixture
+def native_flat_nine_field_ray_records():
+    """Two documented face hits on one ray: indices, flags, point, normal."""
+    return (
+        0.0, 0.0, 17.0, 0.100, 0.0508, 0.050, 0.0, 1.0, 0.0,
+        0.0, 0.0, 33.0, 0.100, 0.0378, 0.050, 0.0, -1.0, 0.0,
+    )
+
+
+@pytest.mark.parametrize("container", (tuple, list))
+def test_native_rays_decode_documented_flat_nine_field_records_and_hit_count(
+    monkeypatch, native_flat_nine_field_ray_records, container,
+) -> None:
+    raw = container(native_flat_nine_field_ray_records)
+    assert len(raw) == 18  # Two intersections on one ray, not eighteen hits.
+    adapter, calls = _native_ray_adapter(monkeypatch, raw, count=2)
+    result = part._native_vertical_segments(adapter, ((100.0, 50.0),), "documented rays")
+    assert len(result) == 1
+    assert len(result[0]) == 1
+    assert result[0][0] == pytest.approx((0.0, 13.0))
+    assert len(calls) == 1
+    assert len(calls[0]) == 7
+    assert len(calls[0][0]) == 1
+    assert calls[0][3:6] == (5, 1e-9, 1e-8)
+    assert calls[0][6] is True
+
+
+@pytest.mark.parametrize("count", (1, 18))
+def test_native_rays_refuse_ray_or_scalar_count_instead_of_intersection_count(
+    monkeypatch, native_flat_nine_field_ray_records, count,
+) -> None:
+    adapter, _calls = _native_ray_adapter(monkeypatch, native_flat_nine_field_ray_records, count=count)
+    with pytest.raises(RuntimeError, match="malformed") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "wrong count")
+    diagnostics = _native_ray_diagnostics(error)
+    assert diagnostics["reported_count"] == repr(count)
+    assert diagnostics["raw_length"] == 18
+    assert diagnostics["expected_record_width"] == 9
+
+
+@pytest.mark.parametrize("raw", (None, (), []))
+def test_native_rays_allow_zero_hits_only_with_integral_zero_count(monkeypatch, raw) -> None:
+    adapter, calls = _native_ray_adapter(monkeypatch, raw, count=0)
+    assert part._native_vertical_segments(
+        adapter, ((100.0, 50.0), (100.0, 0.0)), "empty rays",
+    ) == ((), ())
+    assert calls[0][3] == 5
 
 
 @pytest.mark.parametrize(("enter", "exit"), ((16, 32), (17, 33)))
@@ -3277,19 +3338,32 @@ def test_native_rays_sort_entries_and_keep_each_nonuniform_interval(monkeypatch,
     assert result[1][0] == pytest.approx((0.0, 47.8))
     assert calls[0][1] == pytest.approx((0.100, 0.0558, 0.050, 0.100, 0.0558, 0.0))
     assert calls[0][2] == [0.0, -1.0, 0.0, 0.0, -1.0, 0.0]
+    assert calls[0][3:6] == (5, 1e-9, 1e-8)
+    assert calls[0][6] is True
 
 
 @pytest.mark.parametrize(
     ("raw", "count", "message"),
     (
         ((0.0,), 1, "malformed"),
+        (_native_ray_hit(0, 0.0, 16, normal=()), 1, "malformed"),
+        (_native_ray_hit(0, 0.0, 16, normal=(0.0, 1.0)), 1, "malformed"),
+        (_native_ray_hit(0, 0.0, 16, normal=(0.0, 1.0, 0.0, 0.0)), 1, "malformed"),
+        (None, 1, "malformed"),
+        ("not a native array", 0, "malformed"),
+        (42, 0, "malformed"),
         ((), -1, "malformed"),
         ((), 0.5, "nonintegral"),
         (_native_ray_hit(0, math.nan, 16), 1, "non-finite"),
-        ((1.0, 0.0, 16.0, 0.100, 0.0508, 0.050), 1, "index"),
-        ((0.0, 0.5, 16.0, 0.100, 0.0508, 0.050), 1, "index"),
+        ((1.0, *_native_ray_hit(0, 0.0, 16)[1:]), 1, "index"),
+        ((0.5, *_native_ray_hit(0, 0.0, 16)[1:]), 1, "index"),
+        (_native_ray_hit(0.5, 0.0, 16), 1, "index"),
+        (_native_ray_hit(-1, 0.0, 16), 1, "index"),
+        (_native_ray_hit(1, 0.0, 16), 1, "index"),
         (_native_ray_hit(0, 0.0, 16, x=101.0), 1, "off its requested axis"),
         (_native_ray_hit(0, 0.0, 16 | 2), 1, "grazing"),
+        (_native_ray_hit(0, 0.0, 16 | 4), 1, "grazing"),
+        (_native_ray_hit(0, 0.0, 16 | 8), 1, "grazing"),
         (_native_ray_hit(0, 0.0, 16.5), 1, "grazing"),
         (_native_ray_hit(0, 0.0, 16 | 64), 1, "grazing"),
         (_native_ray_hit(0, 0.0, 16 | 32), 1, "grazing"),
@@ -3300,8 +3374,134 @@ def test_native_rays_sort_entries_and_keep_each_nonuniform_interval(monkeypatch,
 )
 def test_native_rays_refuse_malformed_or_ambiguous_boundaries(monkeypatch, raw, count, message) -> None:
     adapter, _calls = _native_ray_adapter(monkeypatch, raw, count=count)
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError, match=message) as error:
         part._native_vertical_segments(adapter, ((100.0, 50.0),), "bad ray")
+    assert _native_ray_diagnostics(error).items() >= {
+        "raw_type": type(raw).__name__,
+        "reported_count": repr(count),
+        "reported_count_type": type(count).__name__,
+        "raw_length": len(raw) if isinstance(raw, (tuple, list, str)) else None,
+        "expected_record_width": 9,
+        "options": 5,
+        "ray_count": 1,
+    }.items()
+
+
+@pytest.mark.parametrize("field_index", range(9))
+@pytest.mark.parametrize("value", (math.nan, math.inf, -math.inf))
+def test_native_rays_refuse_every_nonfinite_record_field(monkeypatch, field_index, value) -> None:
+    raw = list(_native_ray_hit(0, 0.0, 16))
+    raw[field_index] = value
+    adapter, _calls = _native_ray_adapter(monkeypatch, raw, count=1)
+    with pytest.raises(RuntimeError, match="non-finite") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "nonfinite ray")
+    diagnostics = _native_ray_diagnostics(error)
+    assert diagnostics["nonfinite_fields"] == (field_index,)
+    assert diagnostics["record_index"] == 0
+    assert diagnostics["expected_record_width"] == 9
+    assert diagnostics["raw_length"] == 9
+
+
+@pytest.mark.parametrize("field_index", (6, 7, 8))
+@pytest.mark.parametrize(
+    ("value", "conversion_error_type"),
+    ((None, "TypeError"), ("not a normal", "ValueError"), ((), "TypeError"), (10**400, "OverflowError")),
+)
+def test_native_rays_refuse_malformed_normals_with_conversion_diagnostics(
+    monkeypatch, field_index, value, conversion_error_type,
+) -> None:
+    raw = list(_native_ray_hit(0, 0.0, 16))
+    raw[field_index] = value
+    adapter, _calls = _native_ray_adapter(monkeypatch, raw, count=1)
+    with pytest.raises(RuntimeError, match="malformed native ray-intersection record") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "malformed normal")
+    assert _native_ray_diagnostics(error).items() >= {
+        "raw_type": "list",
+        "reported_count": "1",
+        "reported_count_type": "int",
+        "raw_length": 9,
+        "expected_record_width": 9,
+        "options": 5,
+        "ray_count": 1,
+        "record_index": 0,
+        "field_index": field_index,
+        "field_type": type(value).__name__,
+        "conversion_error_type": conversion_error_type,
+    }.items()
+    assert error.value.__cause__ is None
+    assert error.value.__suppress_context__ is True
+
+
+@pytest.mark.parametrize(
+    ("count", "count_value", "conversion_error_type"),
+    (
+        (None, "None", None),
+        (True, "True", None),
+        (False, "False", None),
+        ("2", "'2'", None),
+        ((), "<tuple>", None),
+        (0.5, "0.5", None),
+        (math.nan, "nan", "ValueError"),
+        (math.inf, "inf", "OverflowError"),
+        (-math.inf, "-inf", "OverflowError"),
+    ),
+)
+def test_native_rays_keep_structured_diagnostics_for_invalid_counts(
+    monkeypatch, count, count_value, conversion_error_type,
+) -> None:
+    adapter, _calls = _native_ray_adapter(monkeypatch, None, count=count)
+    with pytest.raises(RuntimeError, match="nonintegral native intersection count") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "bad count")
+    diagnostics = _native_ray_diagnostics(error)
+    assert diagnostics.items() >= {
+        "raw_type": "NoneType",
+        "reported_count": count_value,
+        "reported_count_type": type(count).__name__,
+        "raw_length": None,
+        "expected_record_width": 9,
+        "options": 5,
+        "ray_count": 1,
+    }.items()
+    if conversion_error_type is not None:
+        assert diagnostics["conversion_error_type"] == conversion_error_type
+        assert type(error.value.__cause__).__name__ == conversion_error_type
+
+
+def test_native_rays_bound_diagnostics_without_repr_or_conversion_of_unknown_count(monkeypatch) -> None:
+    class UnprintableCount:
+        def __repr__(self):
+            raise AssertionError("unknown count must not be repr-ed")
+
+        def __int__(self):
+            raise AssertionError("unknown count must not be coerced")
+
+    raw = tuple(range(10000))
+    adapter, _calls = _native_ray_adapter(monkeypatch, raw, count=UnprintableCount())
+    with pytest.raises(RuntimeError, match="nonintegral native intersection count") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "unknown count")
+    diagnostics = _native_ray_diagnostics(error)
+    assert diagnostics["reported_count"] == "<UnprintableCount>"
+    assert diagnostics["reported_count_type"] == "UnprintableCount"
+    assert diagnostics["raw_type"] == "tuple"
+    assert diagnostics["raw_length"] == 10000
+    assert len(str(error.value)) < 1000
+
+
+def test_native_rays_bound_conversion_diagnostics_without_dumping_native_values(monkeypatch) -> None:
+    from traceback import format_exception
+
+    native_value = "unbounded native normal " * 10000
+    raw = _native_ray_hit(0, 0.0, 16, normal=(0.0, native_value, 0.0))
+    adapter, _calls = _native_ray_adapter(monkeypatch, raw, count=1)
+    with pytest.raises(RuntimeError, match="malformed native ray-intersection record") as error:
+        part._native_vertical_segments(adapter, ((100.0, 50.0),), "large native value")
+    diagnostics = _native_ray_diagnostics(error)
+    assert diagnostics["field_index"] == 7
+    assert diagnostics["field_type"] == "str"
+    assert diagnostics["conversion_error_type"] == "ValueError"
+    formatted = "".join(format_exception(error.value))
+    assert "unbounded native normal" not in formatted
+    assert len(formatted) < 5000
 
 
 @pytest.mark.parametrize("bodies", ((), (object(), object()), "not a body array"))
