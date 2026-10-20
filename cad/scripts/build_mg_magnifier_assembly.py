@@ -96,6 +96,7 @@ from _assembly import (
     activate_assembly_contract,
     angle_driver,
     assembly_title_properties,
+    author_in_drawing_configurations,
     assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
@@ -1132,11 +1133,12 @@ async def build(adapter) -> dict[str, str]:
     )
     # Both drawing configurations own the explode: the exploded sheets'
     # views at 1:2 reference Default Simplified.
-    artefacts = await save_assembly_and_images(
+    author_in_drawing_configurations(
         adapter,
         ASM_NAME,
-        author=lambda configuration: create_mg_magnifier_explode(adapter, configuration),
+        lambda configuration: create_mg_magnifier_explode(adapter, configuration),
     )
+    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     return artefacts
 
 
