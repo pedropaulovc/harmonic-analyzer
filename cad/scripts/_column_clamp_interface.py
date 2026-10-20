@@ -6,9 +6,9 @@ on the clamp's bore, ear-hole contract or drawing checks.
 
 from __future__ import annotations
 
-# The two clamped bars (MHA-PD-007 support bar, the magnifier's wheel bar)
+# The two clamped bars (MHA-PD-07 support bar, the magnifier's wheel bar)
 # are one stock section deep: the user's 2026-10-15 ruling thickened it to 9.5
-# (rule 18 engagement for the MHA-VN-041 pivot screw), growing REARWARD so
+# (rule 18 engagement for the MHA-PD-VN-57 pivot screw), growing REARWARD so
 # both front faces stay on the platen-back plane.
 BAR_DEPTH = 9.5
 # The column-axis plane to the bars' front faces (machine z -112.0 to the
