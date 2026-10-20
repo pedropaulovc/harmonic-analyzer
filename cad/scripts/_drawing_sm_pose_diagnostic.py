@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import struct
 import time
+import traceback
 from typing import Any, Callable, Mapping, Sequence
 from uuid import uuid4
 
@@ -103,7 +104,7 @@ def _native_call(obj: Any, interface: str, member: str, *args: Any) -> Any:
         if member == "SelectByID2"
         else "selection_cleanup"
         if member == "ClearSelection2"
-        else "explicit_initial_fit"
+        else "fit_native_call"
         if member == "ViewZoomtofit2"
         else "native_controls_observers"
     )
@@ -1616,6 +1617,44 @@ def _capture_png(report: dict[str, Any], key: str, hwnd: int) -> dict[str, Any]:
 
 
 @contextlib.contextmanager
+def _isolate_state_native_error(state: dict[str, Any]):
+    """Abandon only an operational native state, never checkpoint/adjudication CPU."""
+    try:
+        yield
+    except (_Deadline, TypeError, AssertionError):
+        raise
+    except Exception as exc:
+        stage = state["operation_stage"]
+        if isinstance(exc, _Nonfinite):
+            recoverable = stage in (
+                "opening-native-bracket",
+                "selection",
+                "closing-native-bracket",
+            )
+        else:
+            recoverable = stage in (
+                "zoom-entry",
+                "opening-native-bracket",
+                "selection",
+                "closing-native-bracket",
+                "post-bracket-clear",
+                "capture",
+                "zoom-exit",
+            )
+        if not recoverable:
+            raise
+        state["operational_error"] = {
+            "error": _error(exc),
+            "error_type": type(exc).__name__,
+            "stage": stage,
+            "state": state["id"],
+            "traceback": "".join(traceback.format_exception(exc)),
+            "exception_notes": list(getattr(exc, "__notes__", ())),
+            **_stamp(),
+        }
+
+
+@contextlib.contextmanager
 def _study_zoom(
     adapter: Any, centre: Sequence[float], state: dict[str, Any], budget: _Budget
 ):
@@ -1636,6 +1675,8 @@ def _study_zoom(
                 body_error = exc
                 raise
             finally:
+                if body_error is None:
+                    state["operation_stage"] = "zoom-exit"
                 cleanup_started = time.perf_counter()
     except BaseException as exc:
         if body_error is not None and exc is not body_error:
@@ -2089,18 +2130,23 @@ def _adjudicate(witness: dict[str, Any]) -> None:
         timings = {}
         for arm in SHIFTS:
             samples = [
-                state["picks"][point_id]
+                {
+                    "state": state["id"],
+                    "block": state["block"],
+                    "index": state["index"],
+                    "select_ms": state["picks"][point_id]["select_ms"],
+                    "first_after_zoom": state["picks"][point_id]["first_after_zoom"],
+                }
                 for state in states
                 if state["arm"] == arm
                 and point_id in state["picks"]
                 and "select_ms" in state["picks"][point_id]
             ]
-            values = sorted(sample["select_ms"] for sample in samples)
+            values = [sample["select_ms"] for sample in samples]
             timings[arm] = {
-                "n": len(values),
-                "select_ms": values,
-                "range_ms": [values[0], values[-1]] if values else None,
-                "first_after_zoom": [sample["first_after_zoom"] for sample in samples],
+                "n": len(samples),
+                "samples": samples,
+                "range_ms": [min(values), max(values)] if values else None,
                 "descriptive_only_not_speedup_delta": True,
             }
         endpoints[point_id] = {
@@ -2135,12 +2181,14 @@ def _phase_study(
     components = {w["instance"]: w["component"] for w in witnesses}
     report["study"] = {
         "witnesses": [],
+        "witness_errors": [],
         "begin": _stamp(),
         "capture_asymmetry": "block1 first A and B/C/D captured AFTER picks and closing bracket; block2 no captures",
     }
     try:
         budget.check("explicit initial fit")
-        _invoke(budget, adapter.currentModel, "IModelDoc2", "ViewZoomtofit2")
+        with _timed("explicit_initial_fit"):
+            _invoke(budget, adapter.currentModel, "IModelDoc2", "ViewZoomtofit2")
         report["study"]["explicit_initial_fit_completed"] = True
         for witness, fixed in zip(witnesses, frozen, strict=True):
             budget.check(f"start witness {witness['id']}")
@@ -2181,6 +2229,7 @@ def _phase_study(
                                     "requested_output_shift": SHIFTS[arm],
                                     "picks": {},
                                     "begin": _stamp(),
+                                    "operation_stage": "zoom-entry",
                                 }
                                 record["states"].append(state)
                                 if offsets is None and arm != "A":
@@ -2195,7 +2244,11 @@ def _phase_study(
                                     for i in range(2)
                                 )
                                 state["requested_zoom_centre_sheet_xy_m"] = centre
-                                with _study_zoom(adapter, centre, state, budget):
+                                with (
+                                    _isolate_state_native_error(state),
+                                    _study_zoom(adapter, centre, state, budget),
+                                ):
+                                    state["operation_stage"] = "opening-native-bracket"
                                     state["before"] = _phase_bracket(
                                         adapter,
                                         view,
@@ -2205,6 +2258,7 @@ def _phase_study(
                                         budget,
                                     )
                                     if first is None:
+                                        state["operation_stage"] = "offset-derivation"
                                         first = state["before"]
                                         control = (
                                             _value(
@@ -2238,6 +2292,7 @@ def _phase_study(
                                                 record["offset_derivation"][
                                                     "sheet_centre_offsets_m"
                                                 ] = offsets
+                                    state["operation_stage"] = "point-order"
                                     point_order = list(fixed["points"])
                                     if block == 2:
                                         point_order.reverse()
@@ -2256,6 +2311,7 @@ def _phase_study(
                                         }
                                         state["picks"][point_id] = pick
                                         picks_total += 1
+                                        state["operation_stage"] = "selection"
                                         _pick(
                                             adapter,
                                             fixed["points"][point_id],
@@ -2278,6 +2334,7 @@ def _phase_study(
                                             raw_result=pick.get("raw_result", False),
                                             select_ms=pick.get("select_ms", 0.0),
                                         )
+                                    state["operation_stage"] = "closing-native-bracket"
                                     state["after"] = _phase_bracket(
                                         adapter,
                                         view,
@@ -2286,6 +2343,7 @@ def _phase_study(
                                         components,
                                         budget,
                                     )
+                                    state["operation_stage"] = "control-adjudication"
                                     state["point_controls"] = {
                                         point: {
                                             name: _bracket_controls(
@@ -2299,6 +2357,7 @@ def _phase_study(
                                         }
                                         for point in fixed["points"]
                                     }
+                                    state["operation_stage"] = "post-bracket-clear"
                                     _invoke(
                                         budget,
                                         adapter.currentModel,
@@ -2311,6 +2370,7 @@ def _phase_study(
                                         budget.check(
                                             "inside-zoom PNG after picks and closing bracket"
                                         )
+                                        state["operation_stage"] = "capture"
                                         state["capture"] = _capture_png(
                                             report,
                                             f"{witness['id']}.{arm}.png",
@@ -2321,9 +2381,20 @@ def _phase_study(
                                             or 0,
                                         )
                                 state["end"] = _stamp()
+                                if "operational_error" in state:
+                                    record["collection_error"] = {
+                                        **state["operational_error"],
+                                        "witness": witness["id"],
+                                    }
+                                    report["study"]["witness_errors"].append(
+                                        record["collection_error"]
+                                    )
+                                    break
                                 _adjudicate(record)
                                 checkpoint()  # OUTSIDE zoom, including after its fit cleanup.
                                 budget.check("after state checkpoint")
+                            if "collection_error" in record:
+                                break
                     finally:
                         try:
                             _adjudicate(record)
@@ -2344,11 +2415,60 @@ def _phase_study(
                                     "study_selection_attempts",
                                     sum(len(s["picks"]) for s in record["states"]),
                                 )
+                                span.set_attribute(
+                                    "witness_collection_failed",
+                                    "collection_error" in record,
+                                )
             finally:
                 _SPAN_EVENTS.reset(token)
                 span_scope_ms = (time.perf_counter() - span_started) * 1000
                 _cost("witness_span_scope_inclusive", span_scope_ms)
                 _cost("witness_span_setup_cleanup", span_scope_ms - span_body_ms)
+            if "collection_error" in record:
+                recovery = {
+                    "witness": witness["id"],
+                    "state": record["collection_error"]["state"],
+                    "original_helper_cleanup_notes": record["collection_error"][
+                        "exception_notes"
+                    ],
+                    "status": "not-attempted",
+                    "begin": _stamp(),
+                }
+                record["recovery_fit_after_witness_error"] = recovery
+                budget.check("recovery fit after witness error")
+                recovery_started = time.perf_counter()
+                _count("recovery_fit_after_witness_error_attempts")
+                recovery["status"] = "started"
+                try:
+                    with _timed("recovery_fit_after_witness_error"):
+                        _invoke(
+                            budget, adapter.currentModel, "IModelDoc2", "ViewZoomtofit2"
+                        )
+                    recovery["status"] = "restored"
+                except (_Deadline, _Nonfinite, TypeError, AssertionError):
+                    raise
+                except Exception as exc:
+                    recovery.update(
+                        status="restoration-failed",
+                        error=_error(exc),
+                        traceback="".join(traceback.format_exception(exc)),
+                        exception_notes=list(getattr(exc, "__notes__", ())),
+                    )
+                    report["study"]["restoration_failure"] = recovery
+                    report["study"]["truncated"] = (
+                        f"restoration-failed after witness {witness['id']}"
+                    )
+                finally:
+                    if recovery["status"] == "started":
+                        recovery["status"] = "interrupted"
+                    recovery["elapsed_ms"] = (
+                        time.perf_counter() - recovery_started
+                    ) * 1000
+                    recovery["end"] = _stamp()
+                checkpoint()  # Outside the state catch, zoom and child span.
+                if "restoration_failure" in report["study"]:
+                    break
+                budget.check("after witness-error checkpoint")
     except _Deadline as exc:
         report["study"]["truncated"] = _error(exc)
     finally:
@@ -2428,7 +2548,7 @@ def _pick(
         same = _value(selection, "IsSame_edge")
         if not record["raw_result"] and count == 0:
             identity_class = "no-selection"
-        elif selection.get("accepted_own_edge"):
+        elif record["accepted_own_edge"]:
             identity_class = "target"
         elif (
             count is not None
@@ -2438,12 +2558,16 @@ def _pick(
                 _value(item, "type") is not None and _value(item, "entity") is not None
                 for item in selection["items"]
             )
-            and (
-                (same in (0, 1) and _value(selection, "owner") is not None)
-                or _value(selection, "type") != 1
-            )
         ):
-            identity_class = "different-target"
+            kind = _value(selection, "type")
+            if kind == 1 and same == 1:
+                identity_class = "target-edge-noncanonical"
+            elif kind == 1 and same == 0:
+                identity_class = "different-target"
+            elif kind is not None and kind > 1:
+                identity_class = "non-edge-selection"
+            else:
+                identity_class = "unreadable"
         else:
             identity_class = "unreadable"
         record["selection_identity_class"] = identity_class
@@ -2609,7 +2733,30 @@ def collect_and_stop(
                 "relative_delta": None,
                 "comparison": "added intervention cost measured directly, no paired speedup",
             },
+            {
+                "change": "recovery_fit_after_witness_error",
+                "new_output": "one measured fit after an isolated witness error; failed restoration stops later collector native calls",
+                "new_cost_entry": "recovery_fit_after_witness_error",
+                "baseline": "f72557b61 aborted the whole study; continuation changes completed work",
+                "absolute_delta_ms": None,
+                "relative_delta": None,
+                "comparison": "failure-to-continuation changed workload; no performance win or extra healthy-case COM call",
+            },
         ],
+        "review_corrections": {
+            "source_before": "f72557b61",
+            "isolated_witness_native_errors": "operational native phase only; checkpoint/adjudication/span failures remain outside isolation; no extra healthy-case COM",
+            "chronological_timing_samples": "paired state/block/index/select_ms/first_after_zoom; replaces unpaired arrays; payload changes, no extra COM",
+            "truthful_selection_classes": "rawFalse own edge and noncanonical/non-edge selections are distinct; no extra identity reads",
+            "absolute_delta_ms": None,
+            "relative_delta": None,
+            "comparison": "unmeasured/confounded instrumentation corrections; not a matched native speedup",
+        },
+        "cpu_attribution": {
+            "checkpoint_residual": "checkpoint_total minus serialization/write/replace includes finite-tree traversal and bookkeeping; NOT native work",
+            "adjudication_cpu_ms": None,
+            "adjudication_status": "unmeasured in-study CPU in _adjudicate/_response_details; included only in inclusive study/span timings, NOT native work",
+        },
     }
     report: dict[str, Any] = {
         "schema": 2,
@@ -2660,6 +2807,8 @@ def collect_and_stop(
                 "target",
                 "no-selection",
                 "different-target",
+                "target-edge-noncanonical",
+                "non-edge-selection",
                 "unreadable",
             ],
             "reversible_response": "all 8 A classes agree; both replicates of >=1 arm agree and differ from A; controls admitted",
@@ -2870,6 +3019,7 @@ def collect_and_stop(
                 for w in by_id.values()
             )
             and not study.get("truncated")
+            and not study.get("witness_errors")
         )
     except Exception as exc:
         primary_error = exc
@@ -2882,8 +3032,23 @@ def collect_and_stop(
         report["cancelled"] = True
         report["complete"] = False
     finally:
+        restoration_failed = bool(report.get("study", {}).get("restoration_failure"))
+        native_followup_refused = restoration_failed or any(
+            "collection_error" in witness
+            and witness.get("recovery_fit_after_witness_error", {}).get("status")
+            != "restored"
+            for witness in report.get("study", {}).get("witnesses", ())
+        )
+        report["native_followup_refused"] = native_followup_refused
         try:
-            _invoke(None, adapter.currentModel, "IModelDoc2", "ClearSelection2", True)
+            if not native_followup_refused:
+                _invoke(
+                    None, adapter.currentModel, "IModelDoc2", "ClearSelection2", True
+                )
+            else:
+                report["final_clear_refusal"] = (
+                    "witness-error restoration failed or did not complete; no later collector native calls"
+                )
         except BaseException as exc:
             report["errors"].append(
                 {"stage": "final_clear", "error": _error(exc), **_stamp()}
@@ -2896,8 +3061,15 @@ def collect_and_stop(
                 report["cancelled"] = True
             elif primary_error is None:
                 primary_error = exc
-        if cancellation is None and not isinstance(
-            primary_error, (_Nonfinite, TypeError, AssertionError)
+        if native_followup_refused:
+            report["final_poststudy_capture_bundle"] = {
+                "status": "refused",
+                "reason": "witness-error restoration failed or did not complete; mandatory outer caller cleanup is outside this collector",
+            }
+        if (
+            not native_followup_refused
+            and cancellation is None
+            and not isinstance(primary_error, (_Nonfinite, TypeError, AssertionError))
         ):
             final_paths = [
                 v for key, v in path_budget["paths"].items() if key.startswith("final.")
@@ -2929,6 +3101,9 @@ def collect_and_stop(
                     "unsafe_paths": [v for v in final_paths if not v["safe"]],
                 }
         report["end"] = _stamp()
+        report["witness_error_count"] = len(
+            report.get("study", {}).get("witness_errors", ())
+        )
         performance["collector_elapsed_ms_before_final_checkpoint"] = (
             time.perf_counter() - collector_started
         ) * 1000
@@ -2978,6 +3153,9 @@ def collect_and_stop(
                 baseline_raw_result=report["baseline_raw_result"],
                 complete=report["complete"],
                 primary_label=report["primary_endpoint"]["label"],
+                witness_error_count=report["witness_error_count"],
+                restoration_failed=restoration_failed,
+                native_followup_refused=native_followup_refused,
                 study_picks=report.get("study", {})
                 .get("budget", {})
                 .get("study_selection_attempts", 0),
@@ -2995,5 +3173,7 @@ def collect_and_stop(
     raise RuntimeError(
         f"{STOP} baseline_raw={report['baseline_raw_result']} complete={report['complete']} "
         f"primary={report['primary_endpoint']['label']} "
+        f"witness_errors={report['witness_error_count']} "
+        f"restoration_failed={restoration_failed} "
         f"evidence_sufficient={report['preregistered_evidence_sufficient']} artifact={checkpoint.path}"
     ) from primary_error
