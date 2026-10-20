@@ -11,11 +11,12 @@ import ch_vn_channel_spring_stock_geom as channel_stock
 import sm_gooseneck_geom
 import spring_mount_geom
 import sm_summing_lever_spec as lever
+from _cone_axis_constants import SUMMING_Z
 from stock_anchor_geom import ANCHOR_9489T111 as anchor
 
 
 def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> None:
-    """Thickening downward must not lift a spring or move any channel seat."""
+    """Preserve local taps and their installed world-frame anchor/nut seats."""
     assert spring_mount_geom.KNIFE == (-15.0, 979.7)
     assert spring_mount_geom.PLATE_TOP_Y == pytest.approx(982.24)
     assert spring_mount_geom.PLATE_BOTTOM_Y == pytest.approx(975.24)
@@ -30,10 +31,38 @@ def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> No
     # The nut's bearing face is local z=0; +Z must still point downward.
     assert channel.CHANNEL_ANCHOR_NUT_ROWS[2] == [0.0, -1.0, 0.0]
     assert lever.HOLE_COUNT == 20
+    # build_sm_summing_assembly installs the lever with identity rotation at
+    # (*KNIFE, SUMMING_Z). Its tap stations are part-local; channel.z_station
+    # already includes the same installation Z shift. Do not apply it twice
+    # or compare a world station directly with an unshifted tap coordinate.
+    lever_origin = (*spring_mount_geom.KNIFE, SUMMING_Z)
     for index in range(lever.HOLE_COUNT):
-        station = channel.z_station(index) + channel.ARM_MID_DZ
-        assert station == pytest.approx(-70.62825 + 7.0565 * index)
-        assert station == pytest.approx(lever.HOLE_Z_FIRST + lever.CHANNEL_PITCH * index)
+        local_hole_z = lever.HOLE_Z_FIRST + lever.CHANNEL_PITCH * index
+        assert local_hole_z == pytest.approx(-70.62825 + 7.0565 * index)
+        world_station = channel.z_station(index) + channel.ARM_MID_DZ
+        assert world_station - lever_origin[2] == pytest.approx(local_hole_z)
+        # These are the mounting tuples used by the channel assembly's
+        # grounded spring-hook/jam-nut placements, not lever-local positions.
+        anchor_position = (*spring_mount_geom.CHANNEL_ANCHOR_XY, world_station)
+        nut_position = (*channel.CHANNEL_ANCHOR_NUT_XY, world_station)
+        tap_top = (
+            lever_origin[0] + lever.HOLE_X,
+            lever_origin[1] + lever.COEFFICIENT_TOP_Y,
+            lever_origin[2] + local_hole_z,
+        )
+        tap_bottom = (
+            tap_top[0],
+            lever_origin[1] + lever.COEFFICIENT_BOTTOM_Y,
+            tap_top[2],
+        )
+        # The identity-mounted anchor shoulders on the plate top; the nut's
+        # local z=0 bearing face sits on the underside of that same tap.
+        assert (
+            anchor_position[0],
+            anchor_position[1] + anchor.thread_start_y_mm,
+            anchor_position[2],
+        ) == pytest.approx(tap_top)
+        assert nut_position == pytest.approx(tap_bottom)
 
 
 def test_counter_leading_half_turn_clears_tube_and_head() -> None:

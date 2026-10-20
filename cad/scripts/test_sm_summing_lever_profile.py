@@ -1,13 +1,15 @@
 """Host-hermetic geometry and receiver regressions; never import a CAD recipe.
 
-Independent quadrature is deliberately test-only. Production area/moment gates
-use the profile's finite analytic line/circle integrals, not a sampled mesh.
+Independent quadrature is deliberately test-only. Its cosine change of variable
+regularizes circular endpoint square roots before applying Gauss-Legendre.
+Production area/moment gates use finite analytic line/circle integrals, not a
+sampled mesh. Historical before/after estimates stay local to this evidence.
 """
 
 from __future__ import annotations
 
 import ast
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from itertools import product
 import math
 from pathlib import Path
@@ -196,16 +198,46 @@ _GAUSS = (
 
 
 def _integral(function, breaks: list[float]) -> float:
+    """Regularize both endpoints of every geometric interval, without sampling them."""
     result = 0.0
-    for start, end in zip(sorted(set(breaks)), sorted(set(breaks))[1:]):
+    endpoints = sorted(set(breaks))
+    theta_half_step = math.pi / 64.0
+    for start, end in zip(endpoints, endpoints[1:]):
+        midpoint = (start + end) / 2.0
+        half_width = (end - start) / 2.0
+        # x = midpoint - half_width*cos(theta), 0 < theta < pi.
+        # A circular sqrt(x-start) or sqrt(end-x) endpoint becomes smooth
+        # after multiplication by dx/dtheta = half_width*sin(theta).
         for index in range(32):
-            a = start + (end - start) * index / 32.0
-            b = start + (end - start) * (index + 1) / 32.0
-            result += (b - a) / 2.0 * sum(
-                weight * function((a + b) / 2.0 + node * (b - a) / 2.0)
-                for node, weight in _GAUSS
-            )
+            theta_midpoint = math.pi * (index + 0.5) / 32.0
+            for node, weight in _GAUSS:
+                theta = theta_midpoint + node * theta_half_step
+                x = midpoint - half_width * math.cos(theta)
+                result += (
+                    theta_half_step * weight * function(x)
+                    * half_width * math.sin(theta)
+                )
     return result
+
+
+def test_independent_integral_matches_known_semicircle_moments() -> None:
+    radius = 15.24
+    cx, cy = 3.25, -2.5
+    breaks = [cx, cx + radius]
+
+    def height(x: float) -> float:
+        return math.sqrt(max(0.0, radius**2 - (x - cx) ** 2))
+
+    # A translated right semicircle has a singular right endpoint and nonzero,
+    # differently signed first moments: symmetry cannot conceal a wrong weight.
+    area = math.pi * radius**2 / 2.0
+    assert _integral(lambda x: 2.0 * height(x), breaks) == pytest.approx(area, rel=0.0, abs=1e-8)
+    assert _integral(lambda x: 2.0 * x * height(x), breaks) == pytest.approx(
+        cx * area + 2.0 * radius**3 / 3.0, rel=0.0, abs=1e-8
+    )
+    assert _integral(lambda x: 2.0 * cy * height(x), breaks) == pytest.approx(
+        cy * area, rel=0.0, abs=1e-8
+    )
 
 
 def _base_bounds(x: float, top: float, bottom: float, old_pad: bool = False) -> tuple[float, float]:
@@ -257,6 +289,105 @@ def _legacy_rib_bounds(x: float, middle: bool) -> tuple[float, float]:
     return min(-half_height, pad_bottom), max(half_height, 2.54)
 
 
+@dataclass(frozen=True)
+class _IdealPrismChange:
+    """New minus old; centroid is of SIGNED changed volume, not the whole lever."""
+
+    volume_mm3: float
+    x_moment_mm4: float
+    y_moment_mm4: float
+    z_moment_mm4: float
+
+    @property
+    def centroid_mm(self) -> tuple[float, float, float]:
+        return tuple(value / self.volume_mm3 for value in (
+            self.x_moment_mm4, self.y_moment_mm4, self.z_moment_mm4
+        ))
+
+    def gravity_moment_increment_n_mm(
+        self, density_kg_m3: float, gravity_m_s2: float = 9.80665
+    ) -> float:
+        """Signed Z torque change under -Y gravity: -rho*g*integral(x dV)."""
+        return -density_kg_m3 * 1e-9 * gravity_m_s2 * self.x_moment_mm4
+
+
+def _legacy_section(middle: bool) -> profile.SectionMoments:
+    """Frozen pre-cutover section, including its 10 mm underside spring pad.
+
+    Only the positive half of the middle rib is relevant to this subtraction:
+    its unchanged negative-X extension cancels, so use the same semicircle
+    closure for both designs. This is test-only historical evidence.
+    """
+    radius, width, reach = spec.RIB_WRAP_R, spec.PLATE_W, spec.RIB_REACH
+    top, bottom, pad_bottom = 2.54, -2.54, -4.46
+    pad_x = width - 10.0
+    if middle:
+        tx = radius * radius / reach
+        ty = radius * math.sqrt(1.0 - radius * radius / (reach * reach))
+        nx, ny = tx / radius, ty / radius
+        plate_x = (radius - ny * top) / nx
+        angle = math.atan2(ty, tx)
+        upper: profile.Boundary = (
+            *profile._polyline(((width, top), (plate_x, top), (tx, ty))),
+            profile.Arc((0.0, 0.0), radius, angle, math.pi / 2.0 - angle),
+        )
+        lower: profile.Boundary = (
+            profile.Arc((0.0, 0.0), radius, -math.pi / 2.0, math.pi / 2.0 - angle),
+            *profile._polyline(((tx, -ty), (plate_x, bottom), (pad_x, bottom),
+                               (pad_x, pad_bottom), (width, pad_bottom))),
+        )
+    else:
+        end_h = radius * (1.0 - reach / width)
+        pad_h = radius * (1.0 - pad_x / width)
+        upper = profile._polyline(((width, top), (reach, top), (reach, end_h), (0.0, radius)))
+        lower = profile._polyline(((0.0, -radius), (pad_x, -pad_h),
+                                   (pad_x, pad_bottom), (width, pad_bottom)))
+    return profile._moments((
+        *upper, profile.Arc((0.0, 0.0), radius, math.pi / 2.0, math.pi),
+        *lower, profile.Line((width, pad_bottom), (width, top)),
+    ))
+
+
+def _ideal_prism_change() -> _IdealPrismChange:
+    """Source-only +6.769 cm³ basis for the material/gravity estimate in cad/docs.
+
+    This nominal changed prism union excludes out-of-plane root fillets.
+    The old plate was 5.08 with a 10 mm-wide, 7 mm-deep spring seat; its
+    clipped edge slants and pointed positive middle profile are removed.
+    The receiver stays 8.20 deep and the opposite/middle ribs stay 5.08.
+    Negative-X web, boss, knives and unchanged holes cancel. The spring
+    catalog span supplies no reserve and is deliberately absent here.
+    """
+    # A wrap-radius mutation would also change the negative middle arm, which
+    # this approved nominal cutover preserves.
+    section = profile.PROFILE
+    old_plate = profile.RibProfile(top_y=2.54, bottom_y=-2.54).base_section_moments()
+    pad_x = spec.PLATE_W - 10.0
+    pad = profile._moments(profile._polyline((
+        (pad_x, -4.46), (spec.PLATE_W, -4.46),
+        (spec.PLATE_W, -2.54), (pad_x, -2.54), (pad_x, -4.46),
+    )))
+    old_plate += pad
+    base_delta = section.base_section_moments() - old_plate
+    edge_delta = section.section_moments() - _legacy_section(middle=False)
+    middle_delta = section.section_moments() - _legacy_section(middle=True)
+    back, front, middle = joint.RIB_DEPTH, spec.COUNTER_WEB_T, spec.COUNTER_WEB_T
+    ordinary_length = spec.PLATE_L - back - front - middle
+    total = (
+        base_delta.scaled(ordinary_length)
+        + edge_delta.scaled(back + front)
+        + middle_delta.scaled(middle)
+    )
+    # The base and middle changes are Z-symmetric; equal base sections removed
+    # at unequal end depths leave an opposite first moment to those edge spans.
+    back_center = -spec.PLATE_L / 2.0 + back / 2.0
+    front_center = spec.PLATE_L / 2.0 - front / 2.0
+    z_moment = (edge_delta.area_mm2 - base_delta.area_mm2) * (
+        back * back_center + front * front_center
+    )
+    return _IdealPrismChange(total.area_mm2, total.x_mm3, total.y_mm3, z_moment)
+
+
 def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_reserve() -> None:
     section = profile.PROFILE
     tx = spec.RIB_WRAP_R**2 / spec.RIB_REACH
@@ -290,7 +421,7 @@ def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_re
             value += delta * length
         return value
 
-    delta = profile.ideal_prism_change()
+    delta = _ideal_prism_change()
     assert delta.volume_mm3 == pytest.approx(_integral(lambda x: change(x, "area"), breaks), abs=0.03)
     assert delta.x_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "x"), breaks), abs=0.2)
     assert delta.y_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "y"), breaks), abs=0.03)

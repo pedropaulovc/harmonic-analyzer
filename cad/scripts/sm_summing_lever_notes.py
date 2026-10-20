@@ -108,6 +108,8 @@ BRACKET_SCREW_NUMBER = "MHA-MG-VN-53"  # mg-vn-magnifying-bracket-screw
 # requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"
 # stated a requirement with no limit).  Lines of at most
 # RIDGE_CALLOUT_MAX_CHARS keep each ridge block outside its dimension span.
+# Back reverses the model sides: the longer BOTH STUBS block is on sheet
+# left, so its unchanged wording wraps across three short callout lines.
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "RibReach": "ALL POSITIVE RIBS",
@@ -115,7 +117,7 @@ DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
-    "RidgeFromRight": f"KNIFE-EDGE SEAT IN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
+    "RidgeFromRight": f"KNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
     "RibRootRadius": "RIB/BODY ROOTS\nAND PROFILE BLENDS",

@@ -522,16 +522,73 @@ def _dimension_line_y(name: str, lines: int) -> float:
     return drawing.DETAIL_KEEP[name][1] - _ONE_LINE_DROP_M - _LINE_M * (lines - 1) / 2.0
 
 
-def test_complete_knife_detail_has_room_for_envelope_radius_and_datum() -> None:
-    """Source geometry budgets the enlarged detail; native ink remains a gate."""
+def _knife_envelope_model_owners():
+    """Read the native reference's endpoint owners, not left/right name guesses."""
+    lines, spans, angle_lines = {}, {}, None
+    pending_span = None
+
+    def endpoint(reference):
+        assert isinstance(reference, ast.JoinedStr) and len(reference.values) == 2
+        variable, suffix = reference.values
+        assert isinstance(variable, ast.FormattedValue)
+        assert isinstance(variable.value, ast.Name) and isinstance(suffix, ast.Constant)
+        return lines[variable.value.id][{".start": 0, ".end": 1}[suffix.value]]
+
+    for statement in _builder_function("_knife_envelope_reference").body:
+        calls = _calls_in_order(statement)
+        authored_lines = [call for call in calls if _call_name(call) == "add_line"]
+        if authored_lines:
+            assert isinstance(statement, ast.Assign) and len(authored_lines) == 1
+            [target] = statement.targets
+            assert isinstance(target, ast.Name)
+            # These are the reference's actual constant HEX_W/HEX_H arithmetic,
+            # not executing the builder or substituting screen-side coordinates.
+            coordinates = tuple(
+                float(eval(
+                    compile(ast.Expression(argument), "<knife endpoint>", "eval"),
+                    {"__builtins__": {}},
+                    {"HEX_W": sm_summing_lever_spec.HEX_W, "HEX_H": sm_summing_lever_spec.HEX_H},
+                ))
+                for argument in authored_lines[0].args
+            )
+            assert len(coordinates) == 4
+            lines[target.id] = (coordinates[:2], coordinates[2:])
+        for call in calls:
+            name = _call_name(call)
+            if name == "dimension_between":
+                pending_span = (endpoint(call.args[1]), endpoint(call.args[2]))
+            elif name == "record" and isinstance(call.args[0], ast.Constant):
+                mark = call.args[0].value
+                if mark in ("RidgeFromLeft", "RidgeFromRight"):
+                    assert pending_span is not None
+                    spans[mark] = pending_span
+            elif name == "add_angular_reference_dimension":
+                angle_lines = tuple(lines[argument.id] for argument in call.args[1:3])
+    assert set(spans) == {"RidgeFromLeft", "RidgeFromRight"}
+    assert angle_lines is not None
+    return spans, angle_lines
+
+
+def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle() -> None:
+    """Analytical Back-projected layout budget, not proof of native annotation ink."""
     spec = sm_summing_lever_spec
     assert drawing.DETAIL_SCALE == (10.0, 1.0)
     scale = drawing.DETAIL_SCALE[0] / 1000.0
     cx, cy = drawing.DETAIL_CENTER
     fence = drawing.DETAIL_RADIUS_MM * scale
     hw = spec.HEX_W / 2.0 * scale
-    vertex = (cx, cy + spec.HEX_H / 2.0 * scale)
-    shoulder = (cx + hw, cy + spec.HEX_H / 4.0 * scale)
+    spans, angle_lines = _knife_envelope_model_owners()
+    [model_vertex] = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
+    [model_shoulder] = set(angle_lines[0]) & set(angle_lines[1])
+    assert model_vertex in angle_lines[0]
+    [model_side_end] = set(angle_lines[1]) - {model_shoulder}
+
+    def project(point):
+        # D derives from unrotated *Back: +X goes left and +Y goes up.
+        return cx - point[0] * scale, cy + point[1] * scale
+
+    vertex, shoulder, side_end = map(project, (model_vertex, model_shoulder, model_side_end))
+    assert shoulder[0] < vertex[0]  # the model's +X flank, not its opposite
     assert spec.HEX_H / 2.0 < drawing.DETAIL_RADIUS_MM - 0.5
     blocks = {
         "HexWidth": _detail_block("HexWidth", "2X (8.080)"),
@@ -544,17 +601,45 @@ def test_complete_knife_detail_has_room_for_envelope_radius_and_datum() -> None:
     for name, (left, _right, _bottom, top, _lines) in blocks.items():
         assert top < _BORDER_TOP_M - 0.004, name
         assert left > _BORDER_LEFT_M + 0.002, name
-    left_line = _dimension_line_y("RidgeFromLeft", blocks["RidgeFromLeft"][4])
-    right_line = _dimension_line_y("RidgeFromRight", blocks["RidgeFromRight"][4])
-    assert left_line == pytest.approx(right_line, abs=2e-4)
-    assert left_line > cy + fence + 0.004
-    assert blocks["RidgeFromLeft"][1] < cx - hw - 0.002
-    assert blocks["RidgeFromRight"][0] > cx + hw + 0.002
+    pair_lines = {
+        name: _dimension_line_y(name, blocks[name][4]) for name in spans
+    }
+    pair_line = pair_lines["RidgeFromLeft"]
+    assert pair_line == pytest.approx(pair_lines["RidgeFromRight"], abs=2e-4)
+    assert pair_line > cy + fence + 0.004
+    for name, model_span in spans.items():
+        projected_x = [project(point)[0] for point in model_span]
+        outer = project(next(point for point in model_span if point != model_vertex))[0]
+        if outer > vertex[0]:
+            assert blocks[name][0] > max(projected_x) + 0.002, name
+        else:
+            assert blocks[name][1] < min(projected_x) - 0.002, name
+
     angle_x, angle_y = drawing.DETAIL_KEEP["FlankToSide"]
-    direction = math.degrees(math.atan2(angle_y - shoulder[1], angle_x - shoulder[0]))
-    assert -(90.0 - spec.RIDGE_ANGLE_DEG / 2.0) < direction < 90.0
-    assert blocks["FlankToSide"][0] > shoulder[0] + 0.002
-    assert shoulder[1] + math.dist((angle_x, angle_y), shoulder) < left_line - 0.002
+    direction = math.degrees(math.atan2(angle_y - shoulder[1], angle_x - shoulder[0])) % 360.0
+    outside_side = math.degrees(math.atan2(
+        shoulder[1] - side_end[1], shoulder[0] - side_end[0],
+    )) % 360.0
+    outside_flank = math.degrees(math.atan2(
+        shoulder[1] - vertex[1], shoulder[0] - vertex[0],
+    )) % 360.0
+    assert outside_side < direction < outside_flank
+    angle_radius = math.dist((angle_x, angle_y), shoulder)
+    # The entire exterior arc stays right of the height annotation's column
+    # and below the shared ridge line; an apparently exterior text anchor alone
+    # would miss the long arc's collision with the height text.
+    assert shoulder[0] - angle_radius > blocks["HexHeight"][1] + 0.002
+    assert shoulder[1] + angle_radius < pair_line - 0.002
+    # Its complete text rectangle stays outside the actual sloping flank,
+    # even though its right edge can lie to the right of the shoulder itself.
+    angle_left, angle_right, angle_bottom, angle_top, _ = blocks["FlankToSide"]
+    assert shoulder[1] < angle_bottom < angle_top < vertex[1]
+    for y in (angle_bottom, angle_top):
+        flank_x = shoulder[0] + (y - shoulder[1]) * (
+            vertex[0] - shoulder[0]
+        ) / (vertex[1] - shoulder[1])
+        assert angle_right + 0.002 < flank_x
+    assert angle_left > _BORDER_LEFT_M + 0.002
     assert blocks["HexHeight"][1] < cx - fence - 0.0015
     width_line = _dimension_line_y("HexWidth", blocks["HexWidth"][4])
     assert drawing.DETAIL_LABEL_XY[1] + 0.005 < width_line < cy - fence - 0.001
@@ -563,7 +648,7 @@ def test_complete_knife_detail_has_room_for_envelope_radius_and_datum() -> None:
     assert datum_foot + 0.007 < cy + fence
     assert blocks["KnifeRidgeRadius"][0] > cx + 0.010
     assert blocks["KnifeRidgeRadius"][2] > datum_foot + 0.007 + 0.004
-    assert blocks["KnifeRidgeRadius"][3] < left_line - 0.004
+    assert blocks["KnifeRidgeRadius"][3] < pair_line - 0.004
 
 
 def test_knife_detail_is_cut_from_the_existing_receiver_view(monkeypatch) -> None:
@@ -621,14 +706,15 @@ def test_datum_a_attaches_the_actual_visible_back_knife_round(monkeypatch) -> No
 
 
 def test_the_ridge_callouts_fit_detail_d() -> None:
-    """The +X ridge band takes two wide lines; the -X one and the angle sit
-    in tighter room (the border, the fence, the angle's arc), so they take
-    short lines: the layout test above places them."""
-    lines = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"].split("\n")
-    assert len(lines) == 2
-    assert max(map(len, lines)) <= notes.RIDGE_CALLOUT_MAX_CHARS
-    assert len(notes.DIMENSION_CALLOUTS_BELOW["RidgeFromLeft"].split("\n")) == 2
-    assert "\n" not in notes.DIMENSION_CALLOUTS_BELOW["FlankToSide"]
+    """Reflow preserves every word while the complete projected blocks fit."""
+    right = notes.DIMENSION_CALLOUTS_BELOW["RidgeFromRight"]
+    assert " ".join(right.split()) == (
+        f"KNIFE-EDGE SEAT IN {notes.KNIFE_MOUNT_NUMBER}; BOTH STUBS"
+    )
+    for name in ("RidgeFromLeft", "RidgeFromRight", "FlankToSide"):
+        assert max(map(len, notes.DIMENSION_CALLOUTS_BELOW[name].split("\n"))) <= (
+            notes.RIDGE_CALLOUT_MAX_CHARS
+        )
 
 
 def test_notes_are_short_stated_shortfalls() -> None:

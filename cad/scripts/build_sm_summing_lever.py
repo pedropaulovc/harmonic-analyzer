@@ -1148,15 +1148,13 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     for raw_face in feature.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
+        radius = None
         if surface.IsCylinder():
             radius = float(surface.CylinderParams[6]) * 1000.0
         elif surface.IsTorus():
             radius = float(surface.TorusParams[7]) * 1000.0
-        else:
-            continue
-        if not math.isclose(radius, RIB_BLEND_R, abs_tol=1e-5):
-            continue
-        count += 1
+        # A transition patch can be nonanalytic. It must pass the same exact
+        # bounds, but cannot stand in for a proved cylindrical/toroidal R1.
         # IFace2.GetBox is approximate. A temporary, unsaved sheet body of
         # this actual trimmed fillet face gives exact directional extrema,
         # without confusing its envelope with the plate's X44.45 free edge.
@@ -1179,6 +1177,14 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             )
         if z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
             raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
+        if radius is not None:
+            if not math.isfinite(radius) or not math.isclose(
+                radius, RIB_BLEND_R, abs_tol=1e-5
+            ):
+                raise RuntimeError(
+                    f"{name}: native root radius {radius} is not R{RIB_BLEND_R}"
+                )
+            count += 1
     if count < minimum_faces:
         raise RuntimeError(
             f"{name}: only {count} native R{RIB_BLEND_R} root surfaces "
@@ -1545,8 +1551,8 @@ async def _knife_envelope_reference(adapter, drive_jobs: list[tuple[str, str]]) 
     knife.record("HexHeightHalf", '"HexH" / 2')
     _driven_hex_width(adapter, width)
     knife.record("HexWidth")
-    # Text up-right of the +X shoulder, in the wedge opposite the solid's
-    # corner: the drawing keeps it there (DETAIL_KEEP), outside the hexagon.
+    # In the Front-plane model, put text up-right of the +X shoulder in
+    # the exterior wedge. Back-derived Detail D mirrors this upper-left.
     await add_angular_reference_dimension(
         adapter,
         flank,

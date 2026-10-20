@@ -1094,15 +1094,15 @@ FRONT_KEEP = {
 }
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout
-# outside its span. Datum A and R0.1 MAX stay between that line and the
-# actual ridge; the angle sits in the open wedge right of the upper shoulder.
-# The vertex height is left of the crop and the reference width below it.
+# outside its own model-side span. Back reverses X: RidgeFromLeft prints
+# right, RidgeFromRight left, and the +X flank's exterior wedge is left.
+# Datum A and R0.1 MAX stay above the ridge; height is left and width below.
 DETAIL_KEEP = {
     "HexWidth": (0.203, 0.083),
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
-    "RidgeFromLeft": (0.044, 0.254),
-    "RidgeFromRight": (0.201, 0.254),
-    "FlankToSide": (0.207, 0.201),
+    "RidgeFromLeft": (0.201, 0.2483),
+    "RidgeFromRight": (0.044, 0.25105),
+    "FlankToSide": (0.058, 0.184),
     "KnifeRidgeRadius": (0.150, 0.224),
 }
 TOP_KEEP = {

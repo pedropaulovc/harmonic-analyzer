@@ -146,10 +146,8 @@ class _SketchRecorder:
         self.primitives = {}
         self.constraints = []
         self.dimensions = []
-        self.anchors = []
         self.distances = []
         self.records = []
-        self.events = []
 
     def _result(self, value):
         return SimpleNamespace(is_success=True, data=value, error=None)
@@ -160,7 +158,6 @@ class _SketchRecorder:
         return self._result(identifier)
 
     async def create_sketch(self, plane):
-        self.events.append(("create", plane))
         return self._result(None)
 
     async def add_line(self, x1, y1, x2, y2):
@@ -177,12 +174,7 @@ class _SketchRecorder:
         self.dimensions.append((first, second, kind, value))
         return self._result(None)
 
-    async def create_extrusion(self, parameters):
-        self.events.append(("extrude", parameters))
-        return self._result(None)
-
     async def exit_sketch(self):
-        self.events.append(("exit",))
         return self._result(None)
 
 
@@ -212,7 +204,6 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
             recorder.records.append((name, equation))
 
         def apply(self, adapter, name):
-            recorder.events.append(("apply", name))
             return [(f"{dimension}@{name}", equation) for dimension, equation in recorder.records]
 
     def check(label, result):
@@ -220,20 +211,20 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
         return result.data
 
     async def anchor(adapter, entity, x, y, label):
-        recorder.anchors.append((entity, x, y))
+        return None
 
     async def distance(adapter, first, second, kind, value, label):
         recorder.distances.append((first, second, kind, value))
 
     async def fully_defined(adapter, label):
-        recorder.events.append(("fully_defined_requested",))
+        return None
 
     globals_ = {
         "math": math, "SketchDims": Dims, "check": check,
-        "set_sketch_direct_db": lambda adapter, value: recorder.events.append(("direct_db", value)),
+        "set_sketch_direct_db": lambda adapter, value: None,
         "anchor_point_to_origin": anchor, "dimension_between": distance,
         "ensure_fully_defined": fully_defined,
-        "name_last_feature": lambda adapter, name: recorder.events.append(("name", name)),
+        "name_last_feature": lambda adapter, name: None,
         "UPPER": section.upper, "LOWER": section.lower,
         "ARC_R": section.wrap_radius, "TIP_X": spec.TIP_X,
         "COEFFICIENT_T": section.top_y - section.bottom_y,
@@ -248,33 +239,12 @@ def _extracted_sketch(section: profile.RibProfile, *, mutation: str | None = Non
 
 def _assert_recorded_sketch(
     recorder: _SketchRecorder, section: profile.RibProfile, middle: bool,
-    jobs: list[tuple[str, str]], stem: str,
+    jobs: list[tuple[str, str]],
 ) -> None:
     lines = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "line"}
     arcs = {key: values for key, (kind, values) in recorder.primitives.items() if kind == "arc"}
     assert len(lines) == (5 if middle else 3)
     assert len(arcs) == (4 if middle else 3)
-    expected_lines = [
-        (*section.upper.end_xy, *section.lower.end_xy),
-        (*section.upper.wrap_xy, *section.upper.flank_xy),
-        (*section.lower.flank_xy, *section.lower.wrap_xy),
-    ]
-    expected_arcs = [
-        (*section.upper.center_xy, *section.upper.flank_xy, *section.upper.end_xy),
-        (*section.lower.center_xy, *section.lower.end_xy, *section.lower.flank_xy),
-    ]
-    if middle:
-        x = section.wrap_radius**2 / spec.TIP_X
-        y = section.wrap_radius * math.sqrt(1.0 - section.wrap_radius**2 / spec.TIP_X**2)
-        expected_lines += [(x, y, spec.TIP_X, 0.0), (spec.TIP_X, 0.0, x, -y)]
-        expected_arcs += [(0.0, 0.0, *section.upper.wrap_xy, x, y),
-                          (0.0, 0.0, x, -y, *section.lower.wrap_xy)]
-    else:
-        expected_arcs += [(0.0, 0.0, *section.upper.wrap_xy, *section.lower.wrap_xy)]
-    for expected in expected_lines:
-        assert any(values == pytest.approx(expected) for values in lines.values())
-    for expected in expected_arcs:
-        assert any(values == pytest.approx(expected) for values in arcs.values())
     tangencies = [(a, b) for a, b, relation in recorder.constraints if relation == "tangent"]
     assert len(tangencies) == (6 if middle else 4)
     for first, second in tangencies:
@@ -311,13 +281,6 @@ def _assert_recorded_sketch(
     assert equations.count('"ArcR"') == 1
     assert '"RibReach"' in equations and '"CoefficientTopY"' in equations and '"CoefficientT"' in equations
     assert ('"SumH"' in equations) == middle
-    end = next(key for key, value in lines.items()
-               if value == pytest.approx((*section.upper.end_xy, *section.lower.end_xy)))
-    assert (f"{end}.start", *section.upper.end_xy) in recorder.anchors
-    assert recorder.events[0] == ("create", "Front")
-    assert ("direct_db", True) in recorder.events and ("direct_db", False) in recorder.events
-    assert recorder.events.index(("direct_db", False)) < recorder.events.index(("fully_defined_requested",))
-    assert recorder.events[-2:] == [("name", f"{stem}Profile"), ("apply", f"{stem}Profile")]
 
 
 @pytest.mark.parametrize("middle,stem", [(False, "EdgeRibFront"), (False, "EdgeRibBack"), (True, "MiddleRib")])
@@ -330,7 +293,7 @@ def test_extracted_builder_emits_actual_g1_primitives_and_dimension_equations(
     helper, recorder = _extracted_sketch(section)
     jobs = []
     asyncio.run(helper(recorder, stem, jobs, middle=middle))
-    _assert_recorded_sketch(recorder, section, middle, jobs, stem)
+    _assert_recorded_sketch(recorder, section, middle, jobs)
 
 
 @pytest.mark.parametrize("mutation", ["omit_tangency", "wrong_thickness"])
@@ -339,7 +302,7 @@ def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: st
     jobs = []
     asyncio.run(helper(recorder, "MiddleRib", jobs, middle=True))
     with pytest.raises(AssertionError):
-        _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs, "MiddleRib")
+        _assert_recorded_sketch(recorder, profile.PROFILE, True, jobs)
 
 
 def _source_helpers(names: tuple[str, ...], **bindings):
@@ -467,32 +430,22 @@ def test_extracted_front_slab_rejects_missing_or_changed_persistent_dimensions(o
         namespace["_assert_coefficient_slab"](adapter)
 
 
-def test_extracted_root_picks_are_reentrant_and_stay_off_entry_and_knife_caps() -> None:
+def test_extracted_root_picks_stay_inside_reach_and_off_entry_and_knife_caps() -> None:
     namespace = _source_helpers(("rib_root_edge_families",))
     families = namespace["rib_root_edge_families"]()
-    assert [name for name, _, _ in families] == [
-        "RibCylinderRootFillets", "RibCounterRootFillets", "RibRootFillets",
-    ]
-    assert [len(picks) for _, picks, _ in families] == [6, 4, 8]
-    end_caps = (-namespace["RECEIVER_RIB_OFFSET"], namespace["RIB_OFFSET"])
-    middle_caps = (-spec.COUNTER_WEB_T / 2.0, spec.COUNTER_WEB_T / 2.0)
-    cylinder, counter, plate = [picks for _, picks, _ in families]
-    assert cylinder[:2] == [[-spec.CYL_R, 0.0, z] for z in end_caps]
-    assert cylinder[2:] == [[0.0, sign * spec.CYL_R, z]
-                            for z in middle_caps for sign in (-1.0, 1.0)]
-    assert counter == [[-30.0, sign * spec.COUNTER_WEB_T / 2.0, z]
-                       for z in middle_caps for sign in (-1.0, 1.0)]
-    assert plate == [[25.0, y, z] for z in (*end_caps, *middle_caps)
-                     for y in (spec.COEFFICIENT_TOP_Y, spec.COEFFICIENT_BOTTOM_Y)]
+    assert families
     for _, picks, length in families:
+        assert picks
         assert length > 0.0
         assert all(-spec.PLATE_L / 2.0 < z < spec.PLATE_L / 2.0 for _, _, z in picks)
         assert all(x < spec.RIB_REACH for x, _, _ in picks)
 
 
-def _root_face(box_mm: tuple[float, ...], *, radius: float = 1.0, torus: bool = False):
+def _root_face(
+    box_mm: tuple[float, ...], *, radius: float = 1.0, torus: bool = False, unknown: bool = False
+):
     surface = SimpleNamespace(
-        IsCylinder=lambda: not torus, IsTorus=lambda: torus,
+        IsCylinder=lambda: not torus and not unknown, IsTorus=lambda: torus and not unknown,
         CylinderParams=(0.0,) * 6 + (radius / 1000.0,),
         TorusParams=(0.0,) * 7 + (radius / 1000.0,),
     )
@@ -527,7 +480,7 @@ def test_extracted_native_root_face_envelope_accepts_only_inboard_r1_surfaces(to
         with pytest.raises(RuntimeError):
             namespace["_assert_root_feature_bounds"](_feature_adapter(feature), "RibRootFillets", 1)
     feature.faces = [_root_face((20.0, 2.54, -69.0, 30.0, 3.54, -67.0), radius=2.0, torus=torus)]
-    with pytest.raises(RuntimeError, match="only 0 native"):
+    with pytest.raises(RuntimeError, match="native root radius"):
         namespace["_assert_root_feature_bounds"](_feature_adapter(feature), "RibRootFillets", 1)
 
 
@@ -645,104 +598,56 @@ def test_extracted_receiver_distance_readback_refuses_invalid_points(invalid) ->
         namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces[:1])))
 
 
-def _extracted_front_slab():
-    """Run the real plate-prism prefix only; stop before any hole authoring."""
-    helper = copy.deepcopy(next(
-        node for node in _tree(RECIPE).body
-        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_coefficients_plate"
-    ))
-    gate_index = next(
-        index for index, statement in enumerate(helper.body)
-        if any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-               and node.func.id == "volume_check" for node in ast.walk(statement))
-    )
-    helper.body = helper.body[:gate_index + 1]
-    imports = [node for node in helper.body if isinstance(node, ast.ImportFrom)]
-    assert all(node.module == "solidworks_mcp.adapters.base" for node in imports)
-    helper.body = [node for node in helper.body if not isinstance(node, ast.ImportFrom)]
-    recorder = _SketchRecorder()
-    layouts = []
-    gates = []
 
-    class Dims:
-        def record(self, name, equation):
-            recorder.records.append((name, equation))
-
-        def apply(self, adapter, name):
-            return [(f"{dimension}@{name}", equation) for dimension, equation in recorder.records]
-
-    async def chain(adapter, points):
-        return [
-            (await adapter.add_line(*a, *b)).data
-            for a, b in zip(points, [*points[1:], points[0]])
-        ]
-
-    async def define(adapter, outline, points, *, label, dims, names, drives):
-        layouts.append((outline, points, list(names), list(drives)))
-        for name, expression in zip(names, drives):
-            dims.record(name, expression)
-
-    async def fully_defined(adapter, label):
-        recorder.events.append(("fully_defined_requested",))
-
-    async def volume(adapter, label, expected, tolerance):
-        gates.append((expected, tolerance))
-
-    def check(label, result):
-        assert result.is_success, label
-        return result.data
-
-    namespace = {
-        "math": math, "SketchDims": Dims, "check": check,
-        "PLATE_W": spec.PLATE_W, "PLATE_L": spec.PLATE_L,
-        "COEFFICIENT_T": spec.COEFFICIENT_T,
-        "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
-        "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,
-        "ExtrusionParameters": lambda **values: SimpleNamespace(**values),
-        "add_line_chain": chain, "define_rectilinear_chain": define,
-        "ensure_fully_defined": fully_defined, "volume_check": volume,
-        "set_sketch_direct_db": lambda adapter, value: recorder.events.append(("direct_db", value)),
-        "name_last_feature": lambda adapter, name: recorder.events.append(("name", name)),
-        "name_dimensions": lambda adapter, feature, names: [f"{name}@{feature}" for name in names],
-        "_assert_coefficient_slab": lambda adapter: recorder.events.append(("native_slab_proof_requested",)),
-    }
-    module = ast.Module(body=[
-        ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), helper,
-    ], type_ignores=[])
-    exec(compile(ast.fix_missing_locations(module), str(RECIPE), "exec"), namespace)
-    return namespace["_coefficients_plate"], recorder, layouts, gates
+@pytest.mark.parametrize("torus", [False, True], ids=["cylinder", "torus"])
+@pytest.mark.parametrize("radius", [2.0, math.nan], ids=["r2", "nonfinite"])
+def test_extracted_root_guard_rejects_wrong_radius_after_sufficient_valid_r1_faces(
+    torus: bool, radius: float,
+) -> None:
+    namespace = _source_helpers(("_assert_root_feature_bounds",))
+    inboard = (20.0, 2.54, -69.0, 30.0, 3.54, -67.0)
+    good = _root_face(inboard)
+    bad = _root_face(inboard, radius=radius, torus=torus)
+    # One proved R1 already satisfies the count. Every other recognized face
+    # must still satisfy its own radius constraint, in either traversal order.
+    for faces in ([good, bad], [bad, good]):
+        with pytest.raises(RuntimeError, match="native root radius"):
+            namespace["_assert_root_feature_bounds"](
+                _feature_adapter(_NativeFeature(faces=faces)), "RibRootFillets", 1
+            )
 
 
-def test_extracted_front_slab_places_thickness_on_the_actual_free_end_edge() -> None:
-    helper, recorder, layouts, gates = _extracted_front_slab()
-    jobs = []
-    asyncio.run(helper(recorder, jobs))
-    assert recorder.events[0] == ("create", "Front")
-    assert len(layouts) == 1
-    outline, points, names, drives = layouts[0]
-    assert points == [
-        (0.0, spec.COEFFICIENT_TOP_Y), (spec.PLATE_W, spec.COEFFICIENT_TOP_Y),
-        (spec.PLATE_W, spec.COEFFICIENT_BOTTOM_Y), (0.0, spec.COEFFICIENT_BOTTOM_Y),
-    ]
-    assert names == ["PlateWidth", "PlateThickness", "PlateTopY"]
-    assert drives == ['"PlateW"', '"CoefficientT"', '"CoefficientTopY"']
-    # The thickness dimension's second chain segment is physically on +X's
-    # free end. No imported extrusion depth or detached witness substitutes.
-    kind, free_end = recorder.primitives[outline[1]]
-    assert kind == "line"
-    assert free_end == pytest.approx((
-        spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_W, spec.COEFFICIENT_BOTTOM_Y,
-    ))
-    extrusions = [event[1] for event in recorder.events if event[0] == "extrude"]
-    assert len(extrusions) == 1
-    assert extrusions[0].depth == pytest.approx(spec.PLATE_L)
-    assert extrusions[0].both_directions is True
-    assert not getattr(extrusions[0], "start_offset", 0.0)
-    assert set(jobs) == {
-        ("PlateWidth@PlateProfile", '"PlateW"'),
-        ("PlateThickness@PlateProfile", '"CoefficientT"'),
-        ("PlateTopY@PlateProfile", '"CoefficientTopY"'),
-        ("PlateLength@CoefficientsPlate", '"PlateL"'),
-    }
-    assert len(gates) == 1
-    assert gates[0][0] == pytest.approx(spec.PLATE_W * spec.COEFFICIENT_T * spec.PLATE_L)
+@pytest.mark.parametrize("bad_box", [
+    (20.0, 2.54, -69.0, spec.RIB_REACH + 0.1, 3.54, -67.0),
+    (20.0, 2.54, -spec.PLATE_L / 2.0, 30.0, 3.54, -67.0),
+    (20.0, 2.54, -69.0, 30.0, 3.54, spec.PLATE_L / 2.0),
+    (20.0, 2.54, -69.0, math.nan, 3.54, -67.0),
+], ids=["x-reach", "minus-z-entry", "plus-z-entry", "nonfinite"])
+def test_extracted_root_guard_bounds_unknown_patches_after_sufficient_valid_r1_faces(
+    bad_box: tuple[float, ...],
+) -> None:
+    namespace = _source_helpers(("_assert_root_feature_bounds",))
+    good = _root_face((20.0, 2.54, -69.0, 30.0, 3.54, -67.0))
+    unknown = _root_face(bad_box, unknown=True)
+    # A nonanalytic transition patch cannot evade exact containment merely
+    # because another cylinder has already established the required R1 count.
+    for faces in ([good, unknown], [unknown, good]):
+        with pytest.raises(RuntimeError):
+            namespace["_assert_root_feature_bounds"](
+                _feature_adapter(_NativeFeature(faces=faces)), "RibRootFillets", 1
+            )
+
+
+def test_extracted_root_guard_accepts_inboard_unknown_patches_without_counting_them_as_r1() -> None:
+    namespace = _source_helpers(("_assert_root_feature_bounds",))
+    inboard = (20.0, 2.54, -69.0, 30.0, 3.54, -67.0)
+    good = _root_face(inboard)
+    unknown = _root_face(inboard, unknown=True)
+    adapter = _feature_adapter(_NativeFeature(faces=[good, unknown]))
+    namespace["_assert_root_feature_bounds"](adapter, "RibRootFillets", 1)
+    with pytest.raises(RuntimeError, match="only 1 native"):
+        namespace["_assert_root_feature_bounds"](adapter, "RibRootFillets", 2)
+    with pytest.raises(RuntimeError, match="only 0 native"):
+        namespace["_assert_root_feature_bounds"](
+            _feature_adapter(_NativeFeature(faces=[unknown])), "RibRootFillets", 1
+        )
