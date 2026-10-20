@@ -290,394 +290,612 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
-def _assert_chamfer_limits(annotation: Any) -> None:
-    """Verify the saved part's native leg and limits, never rewrite them."""
-    native = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    if (
-        str(dimension.FullName or "").split("@")[:2]
-        != ["BoreRearChamferSize", "BoreRearChamfer"]
-        or int(dimension.GetType()) != 0  # swDimensionParamTypeDoubleLinear
+def _arm_read(errors: list[str], label: str, read: Any, *, required: bool = False) -> Any:
+    """Keep failed native measurements distinct from valid empty readbacks.
+
+    Only this arm's new guards use the collection. Source/drawing creation and
+    the pre-existing front-view guards retain their fatal failure semantics.
+    """
+    try:
+        value = read()
+        if required and value is None:
+            raise RuntimeError("required native object/readback is absent")
+        return value
+    except Exception as exc:
+        failure = f"UNMEASURED {label}: {type(exc).__name__}: {str(exc)[:512]}"
+        _telemetry.info(failure)
+        errors.append(failure)
+        return None
+
+
+def _arm_check(
+    errors: list[str], label: str, actual: Any, expected: Any, valid: bool,
+) -> None:
+    """Log bounded primitive readbacks, never native object representations."""
+    _telemetry.info(f"crank arm native {label}: actual={actual!r}, expected={expected!r}")
+    if not valid:
+        errors.append(label)
+
+
+def _raise_arm_errors(errors: list[str]) -> None:
+    if errors:
+        raise RuntimeError("crank arm native guard violations:\n- " + "\n- ".join(errors))
+
+
+def _finite_tuple(values: Any, size: int) -> bool:
+    return (
+        isinstance(values, tuple) and len(values) == size
+        and all(math.isfinite(value) for value in values)
+    )
+
+
+def _assert_chamfer_limits(annotation: Any, *, errors: list[str]) -> None:
+    """Measure every part-authored identity, leg and LIMIT field independently."""
+    native = _arm_read(errors, "chamfer annotation", lambda: _early_bound(annotation, "IAnnotation"), required=True)
+    display = _arm_read(errors, "chamfer display", lambda: _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension"), required=True)
+    dimension = _arm_read(errors, "chamfer dimension", lambda: _early_bound(display.GetDimension2(0), "IDimension"), required=True)
+    name = _arm_read(errors, "chamfer FullName", lambda: str(dimension.FullName))
+    kind = _arm_read(errors, "chamfer dimension type", lambda: int(dimension.GetType()))
+    leg = _arm_read(errors, "chamfer model leg", lambda: float(dimension.SystemValue) * 1000.0)
+    tolerance = _arm_read(errors, "chamfer tolerance", lambda: _early_bound(dimension.Tolerance, "IDimensionTolerance"), required=True)
+    tol_type = _arm_read(errors, "chamfer tolerance type", lambda: int(tolerance.Type))
+    lower = _arm_read(errors, "chamfer lower deviation", lambda: float(tolerance.GetMinValue()) * 1000.0)
+    upper = _arm_read(errors, "chamfer upper deviation", lambda: float(tolerance.GetMaxValue()) * 1000.0)
+    identity = ["BoreRearChamferSize", "BoreRearChamfer"]
+    _arm_check(errors, "imported bore-mouth chamfer has the wrong model identity/type (identity)", name, identity,
+               name is not None and name.split("@")[:2] == identity)
+    _arm_check(errors, "imported bore-mouth chamfer has the wrong model identity/type (type)", kind, 0, kind == 0)
+    _arm_check(errors, "imported bore-mouth chamfer changed its model leg", leg, BORE_REAR_CHAMFER,
+               leg is not None and math.isclose(leg, BORE_REAR_CHAMFER, abs_tol=1e-7))
+    wanted_lower, wanted_upper = BORE_REAR_CHAMFER_DEVIATIONS
+    for field, actual, wanted in (
+        ("type", tol_type, BORE_REAR_CHAMFER_TOL_TYPE),
+        ("lower", lower, wanted_lower), ("upper", upper, wanted_upper),
     ):
-        raise RuntimeError("imported bore-mouth chamfer has the wrong model identity/type")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if not math.isclose(
-        float(dimension.SystemValue) * 1000.0, BORE_REAR_CHAMFER, abs_tol=1e-7
-    ):
-        raise RuntimeError("imported bore-mouth chamfer changed its model leg")
-    lower, upper = BORE_REAR_CHAMFER_DEVIATIONS
-    if (
-        int(tolerance.Type) != BORE_REAR_CHAMFER_TOL_TYPE
-        or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, lower, abs_tol=1e-9)
-        or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, upper, abs_tol=1e-9)
-    ):
-        raise RuntimeError("imported bore-mouth chamfer lost its native LIMIT band")
+        _arm_check(errors, f"imported bore-mouth chamfer lost its native LIMIT band ({field})",
+                   actual, wanted, actual is not None and math.isclose(actual, wanted, abs_tol=1e-9))
 
 
 def _assert_profile_dimension(
-    adapter: Any, profile: Any, annotation: Any, parameter: str
+    adapter: Any, profile: Any, annotation: Any, parameter: str, *, errors: list[str],
 ) -> Any:
-    """Require the visible, live source dimension in this particular view."""
-    native = _early_bound(annotation, "IAnnotation")
-    view = _early_bound(profile, "IView")
-    app = _early_bound(adapter.swApp, "ISldWorks")
-    if (
-        int(native.GetType()) != 4  # swDisplayDimension
-        or int(native.Visible) != 1  # swAnnotationVisible
-        or int(native.OwnerType) != 0  # swAnnotationOwner_DrawingView
-        or int(app.IsSame(native.Owner, view)) != 1  # swObjectSame
-        or native.IsDangling()
+    """Read every ownership/display field even when another field already failed."""
+    native = _arm_read(errors, f"{parameter} annotation", lambda: _early_bound(annotation, "IAnnotation"), required=True)
+    view = _arm_read(errors, f"{parameter} view", lambda: _early_bound(profile, "IView"), required=True)
+    app = _arm_read(errors, f"{parameter} application", lambda: _early_bound(adapter.swApp, "ISldWorks"), required=True)
+    kind = _arm_read(errors, f"{parameter} annotation type", lambda: int(native.GetType()))
+    visible = _arm_read(errors, f"{parameter} visibility", lambda: int(native.Visible))
+    owner_type = _arm_read(errors, f"{parameter} owner type", lambda: int(native.OwnerType))
+    owner_object = _arm_read(errors, f"{parameter} owner object", lambda: native.Owner, required=True)
+    owner = _arm_read(errors, f"{parameter} owner identity",
+                      lambda: int(app.IsSame(owner_object, view)) if owner_object is not None and view is not None else None, required=True)
+    dangling = _arm_read(errors, f"{parameter} dangling", lambda: native.IsDangling())
+    for field, actual, wanted in (
+        ("type", kind, 4), ("visible", visible, 1), ("owner type", owner_type, 0),
+        ("owner IsSame", owner, 1), ("dangling", dangling, False),
     ):
-        raise RuntimeError(f"{parameter}: dimension is not visible and attached in the profile view")
-    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    source = _early_bound(view.ReferencedDocument, "IModelDoc2")
-    expected = source.Parameter(parameter)
-    if expected is None or int(app.IsSame(dimension, expected)) != 1:
-        raise RuntimeError(f"{parameter}: dimension is not the source model dimension")
-    if display.GetOverride() is not False or display.ShowDimensionValue is not True:
-        raise RuntimeError(f"{parameter}: dimension lost its native displayed value")
+        _arm_check(errors, f"{parameter}: dimension is not visible and attached in the profile view ({field})",
+                   actual, wanted, actual is not None and actual == wanted)
+    display = _arm_read(errors, f"{parameter} display", lambda: _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension"), required=True)
+    dimension = _arm_read(errors, f"{parameter} dimension", lambda: _early_bound(display.GetDimension2(0), "IDimension"), required=True)
+    source = _arm_read(errors, f"{parameter} source document", lambda: _early_bound(view.ReferencedDocument, "IModelDoc2"), required=True)
+    expected = _arm_read(errors, f"{parameter} source Parameter", lambda: source.Parameter(parameter), required=True)
+    same = _arm_read(errors, f"{parameter} source Parameter IsSame", lambda: int(app.IsSame(dimension, expected)) if dimension is not None and expected is not None else None, required=True)
+    _arm_check(errors, f"{parameter}: dimension is not the source model dimension",
+               (dimension is not None, expected is not None, same), (True, True, 1), same == 1)
+    override = _arm_read(errors, f"{parameter} override", lambda: display.GetOverride())
+    shown = _arm_read(errors, f"{parameter} displayed value", lambda: display.ShowDimensionValue)
+    _arm_check(errors, f"{parameter}: dimension lost its native displayed value (override)", override, False, override is False)
+    _arm_check(errors, f"{parameter}: dimension lost its native displayed value (shown)", shown, True, shown is True)
     return display
 
 
-def _assert_profile_chamfer(adapter: Any, profile: Any, annotation: Any) -> None:
-    """Preserve the model's identity, LIMIT band, precision and short suffix."""
+def _assert_profile_chamfer(
+    adapter: Any, profile: Any, annotation: Any, *, errors: list[str],
+) -> None:
+    """Preserve the model's identity, LIMIT band, precision and exact suffix."""
     display = _assert_profile_dimension(
-        adapter, profile, annotation, "BoreRearChamferSize@BoreRearChamfer"
+        adapter, profile, annotation, "BoreRearChamferSize@BoreRearChamfer", errors=errors,
     )
-    _assert_chamfer_limits(annotation)
-    if (
-        display.IsReferenceDim() is not False
-        or int(display.GetPrimaryPrecision2())
-        != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
-        or int(display.GetPrimaryTolPrecision2())
-        != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
-        or _native_text(display.GetText(4)) != _native_text(BORE_REAR_CHAMFER_CALLOUT)
+    _assert_chamfer_limits(annotation, errors=errors)
+    reference = _arm_read(errors, "chamfer reference", lambda: display.IsReferenceDim())
+    precision = _arm_read(errors, "chamfer primary precision", lambda: int(display.GetPrimaryPrecision2()))
+    tol_precision = _arm_read(errors, "chamfer tolerance precision", lambda: int(display.GetPrimaryTolPrecision2()))
+    raw_suffix = _arm_read(errors, "chamfer raw suffix", lambda: display.GetText(4), required=True)
+    suffix = _native_text(raw_suffix) if raw_suffix is not None else None
+    places = DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
+    for field, actual, wanted, valid in (
+        ("reference", reference, False, reference is False),
+        ("primary precision", precision, places, precision == places),
+        ("tolerance precision", tol_precision, places, tol_precision == places),
+        ("suffix", (raw_suffix, suffix), _native_text(BORE_REAR_CHAMFER_CALLOUT),
+         suffix == _native_text(BORE_REAR_CHAMFER_CALLOUT)),
     ):
-        raise RuntimeError("bore-mouth chamfer lost its native value, LIMIT precision or callout")
+        _arm_check(errors, f"bore-mouth chamfer lost its native value, LIMIT precision or callout ({field})",
+                   actual, wanted, valid)
 
 
-def _profile_geometry(adapter: Any, profile: Any) -> tuple[float, float]:
-    """Read the turned XZ projection, including rear-mouth and stock directions.
-
-    The successful native XZ import (20261020T042443087Z) and failed Front
-    import rule out repeating the plan-view prototype. The original Right
-    projection is YZ, not this chamfer's annotation plane. One Top view replaces
-    it; the angle, scale and actual projected axes must agree with its caption.
-    """
-    view = _early_bound(profile, "IView")
-    if (
-        str(view.GetOrientationName()).lstrip("*").casefold() != "top"
-        or not math.isclose(math.remainder(float(view.Angle) - PROFILE_ANGLE, math.tau), 0.0, abs_tol=1e-8)
-        or tuple(float(value) for value in view.ScaleRatio) != PROFILE_SCALE
-        or int(view.GetDisplayMode2()) != 1  # swHIDDEN_GREYED: HLV
+def _profile_geometry(adapter: Any, profile: Any, *, errors: list[str]) -> Any:
+    """Read the actual Top/90-CCW/1:1 XZ axes, stock and rear-mouth projection."""
+    view = _arm_read(errors, "profile geometry view", lambda: _early_bound(profile, "IView"), required=True)
+    orientation = _arm_read(errors, "profile orientation", lambda: str(view.GetOrientationName()))
+    angle = _arm_read(errors, "profile angle", lambda: float(view.Angle))
+    scale = _arm_read(errors, "profile scale", lambda: tuple(float(value) for value in view.ScaleRatio))
+    mode = _arm_read(errors, "profile display mode", lambda: int(view.GetDisplayMode2()))
+    for field, actual, wanted, valid in (
+        ("orientation", orientation, "Top", orientation is not None and orientation.lstrip("*").casefold() == "top"),
+        ("angle", angle, PROFILE_ANGLE, angle is not None and math.isfinite(angle)
+         and math.isclose(math.remainder(angle - PROFILE_ANGLE, math.tau), 0.0, abs_tol=1e-8)),
+        ("scale", scale, PROFILE_SCALE, scale == PROFILE_SCALE),
+        ("mode", mode, 1, mode == 1),
     ):
-        raise RuntimeError("profile lost its Top/90 DEG CCW/1:1/HLV projection")
+        _arm_check(errors, f"profile lost its Top/90 DEG CCW/1:1/HLV projection ({field})",
+                   actual, wanted, valid)
     radius = HUB_SEAT_DIA / 2.0 + BORE_REAR_CHAMFER
-    origin, x_axis, y_axis, z_axis, low, high, mouth = model_points_in_view(
-        adapter,
-        view,
-        (
-            (0.0, 0.0, 0.0),
-            (0.001, 0.0, 0.0),
-            (0.0, 0.001, 0.0),
-            (0.0, 0.0, 0.001),
-            (-HALF_WIDTH / 1000.0, 0.0, 0.0),
-            (ARM_END_X / 1000.0, 0.0, ARM_THICKNESS / 1000.0),
-            (-radius / 1000.0, 0.0, 0.0),
-        ),
-        label="crank arm turned top profile",
+    projected = _arm_read(
+        errors, "profile projected axes/stock/rear-Z mouth",
+        lambda: tuple(tuple(float(value) for value in point) for point in model_points_in_view(
+            adapter, view,
+            (
+                (0.0, 0.0, 0.0), (0.001, 0.0, 0.0),
+                (0.0, 0.001, 0.0), (0.0, 0.0, 0.001),
+                (-HALF_WIDTH / 1000.0, 0.0, 0.0),
+                (ARM_END_X / 1000.0, 0.0, ARM_THICKNESS / 1000.0),
+                (-radius / 1000.0, 0.0, 0.0),
+            ),
+            label="crank arm turned top profile",
+        )), required=True,
     )
-    axes = [
-        (point[0] - origin[0], point[1] - origin[1])
-        for point in (x_axis, y_axis, z_axis)
-    ]
-    expected = ((0.0, 0.001), (0.0, 0.0), (0.001, 0.0))
+    valid_points = projected is not None and len(projected) == 7 and all(_finite_tuple(point, 2) for point in projected)
+    _arm_check(errors, "profile rear-Z mouth projection has invalid native points",
+               projected, "seven finite XY points", valid_points)
+    if not valid_points:
+        errors.append("UNMEASURED profile projected axes/stock/rear-Z mouth: invalid projection dependency")
+        return None
+    origin, x_axis, y_axis, z_axis, low, high, mouth = projected
+    axes = tuple((point[0] - origin[0], point[1] - origin[1]) for point in (x_axis, y_axis, z_axis))
+    expected_axes = ((0.0, 0.001), (0.0, 0.0), (0.001, 0.0))
     cx, cy = PROFILE_CENTER
     half_length = (ARM_END_X + HALF_WIDTH) / 2000.0
     half_thickness = ARM_THICKNESS / 2000.0
-    if (
-        any(not math.isfinite(value) for point in (origin, *axes, low, high, mouth) for value in point)
-        or any(math.dist(actual, wanted) > 1e-8 for actual, wanted in zip(axes, expected))
-        or math.dist(low, (cx - half_thickness, cy - half_length)) > 1e-6
-        or math.dist(high, (cx + half_thickness, cy + half_length)) > 1e-6
-        or math.dist(
-            mouth, (cx - half_thickness, cy - (ARM_C2C / 2.0 + radius) / 1000.0)
-        ) > 1e-6
+    for index, (actual, wanted) in enumerate(zip(axes, expected_axes)):
+        _arm_check(errors, f"profile does not show the rear-Z mouth in the labelled direction (axis {index})",
+                   actual, wanted, math.dist(actual, wanted) <= 1e-8)
+    for field, actual, wanted in (
+        ("low stock", low, (cx - half_thickness, cy - half_length)),
+        ("high stock", high, (cx + half_thickness, cy + half_length)),
+        ("rear-Z mouth", mouth, (cx - half_thickness, cy - (ARM_C2C / 2.0 + radius) / 1000.0)),
     ):
-        raise RuntimeError("profile does not show the 8 mm stock and rear-Z mouth in the labelled direction")
+        _arm_check(errors, f"profile does not show the 8 mm stock and rear-Z mouth in the labelled direction ({field})",
+                   actual, wanted, math.dist(actual, wanted) <= 1e-6)
     return mouth
 
 
 @_telemetry.traced("drawing.crank_arm_profile_turn")
-def _turn_profile(adapter: Any, profile: Any) -> None:
-    view = _early_bound(profile, "IView")
-    if not math.isclose(float(view.Angle), 0.0, abs_tol=1e-8):
-        raise RuntimeError("Top profile is already rotated; its CCW caption would be false")
-    view.Angle = PROFILE_ANGLE
-    rebuild_drawing(adapter, label="turn crank arm Top profile 90 DEG CCW")
-    _profile_geometry(adapter, view)
+def _turn_profile(adapter: Any, profile: Any, *, errors: list[str]) -> None:
+    view = _arm_read(errors, "turn profile view", lambda: _early_bound(profile, "IView"), required=True)
+    before = _arm_read(errors, "turn profile initial angle", lambda: float(view.Angle))
+    can_turn = before is not None and math.isfinite(before) and math.isclose(before, 0.0, abs_tol=1e-8)
+    _arm_check(errors, "Top profile is already rotated; its CCW caption would be false",
+               before, 0.0, can_turn)
+    if can_turn:
+        _arm_read(errors, "turn profile Angle assignment", lambda: setattr(view, "Angle", PROFILE_ANGLE))
+    _arm_read(errors, "turn profile rebuild", lambda: rebuild_drawing(adapter, label="turn crank arm Top profile 90 DEG CCW"))
+    _profile_geometry(adapter, view, errors=errors)
 
 
 @_telemetry.traced("drawing.crank_arm_profile_caption")
-def _profile_caption(adapter: Any, profile: Any) -> Any:
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(view_name(adapter, profile)):
-        raise RuntimeError("failed to activate the profile for its rotation caption")
-    note = add_note(adapter, PROFILE_VIEW_CAPTION, *PROFILE_CAPTION_XY)
-    if note is None:
-        raise RuntimeError("failed to insert the rotated Top profile caption")
-    return note
+def _profile_caption(adapter: Any, profile: Any, *, errors: list[str]) -> Any:
+    activated = _arm_read(errors, "activate caption profile", lambda: _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(view_name(adapter, profile)))
+    _arm_check(errors, "failed to activate the profile for its rotation caption", activated, True, activated is True)
+    return _arm_read(errors, "insert rotated Top profile caption",
+                     lambda: add_note(adapter, PROFILE_VIEW_CAPTION, *PROFILE_CAPTION_XY), required=True)
 
 
-def _rendered_chamfer_edges(adapter: Any, profile: Any, annotation: Any) -> None:
-    """Require the actual rear chamfer boundaries in the native rendered set.
+def _rendered_chamfer_edges(
+    adapter: Any, profile: Any, annotation: Any, *, errors: list[str],
+) -> None:
+    """Prove both feature-owned circles render, in one drawing-view context.
 
-    GetVisibleEntities2 excludes completely obscured entities, including an
-    internal mouth; a positive count cannot prove this HLV edge prints.
-    GetPolylines7(1) instead pairs each rendered polyline with its model edge.
-    Its XYZs are used ONLY to reject empty/degenerate rendering, never treated
-    as sheet coordinates. Model geometry is projected by SolidWorks separately.
+    IView.GetCorrespondingEntity(part edge) returns the view-context entity
+    (VT_DISPATCH, None on failure). Compare THAT entity with GetPolylines7's
+    edges, never a source-part edge. Polyline XYZs only prove nondegenerate
+    native ink; the separate SolidWorks projection proves the sheet landing.
+    Attachment inventories and candidate circle signatures are telemetry only.
     """
-    view = _early_bound(profile, "IView")
-    app = _early_bound(adapter.swApp, "ISldWorks")
-    part = _early_bound(view.ReferencedDocument, "IPartDoc")
-    raw_feature = part.FeatureByName("BoreRearChamfer")
-    if raw_feature is None:
-        raise RuntimeError("profile has no source BoreRearChamfer feature")
-    faces = list(_early_bound(raw_feature, "IFeature").GetFaces() or ())
+    view = _arm_read(errors, "rendered chamfer view", lambda: _early_bound(profile, "IView"), required=True)
+    app = _arm_read(errors, "rendered chamfer application", lambda: _early_bound(adapter.swApp, "ISldWorks"), required=True)
+    part = _arm_read(errors, "rendered chamfer source part", lambda: _early_bound(view.ReferencedDocument, "IPartDoc"), required=True)
+    feature = _arm_read(errors, "source BoreRearChamfer feature", lambda: _early_bound(part.FeatureByName("BoreRearChamfer"), "IFeature"), required=True)
+    faces = _arm_read(errors, "source chamfer faces", lambda: tuple(feature.GetFaces() or ()))
     expected = (
         (0.0, HUB_SEAT_DIA / 2.0 + BORE_REAR_CHAMFER),
         (BORE_REAR_CHAMFER, HUB_SEAT_DIA / 2.0),
     )
-    boundaries: list[Any] = []
-    for z_mm, radius_mm in expected:
-        matches = []
-        for face in faces:
-            for raw_edge in _early_bound(face, "IFace2").GetEdges() or ():
-                edge = _early_bound(raw_edge, "IEdge")
-                curve = _early_bound(edge.GetCurve(), "ICurve")
-                if not curve.IsCircle():
-                    continue
-                values = tuple(float(value) for value in curve.CircleParams)
-                if (
-                    len(values) == 7
-                    and all(math.isfinite(value) for value in values)
-                    and math.dist(values[:3], (0.0, 0.0, z_mm / 1000.0)) < 1e-8
-                    and abs(abs(values[5]) - 1.0) < 1e-8
-                    and math.hypot(values[3], values[4]) < 1e-8
-                    and abs(values[6] - radius_mm / 1000.0) < 1e-8
-                    and not any(int(app.IsSame(edge, other)) == 1 for other in matches)
-                ):
-                    matches.append(edge)
-        if len(matches) != 1:
-            raise RuntimeError("profile cannot identify both actual rear bore-chamfer boundary edges")
-        boundaries.append(matches[0])
-    native = _early_bound(annotation, "IAnnotation")
-    attached = tuple(native.GetAttachedEntities3() or ())
-    kinds = tuple(int(value) for value in (native.GetAttachedEntityTypes() or ()))
-    count = int(native.GetAttachedEntityCount3())
-    # Imported feature dimensions can report empty/unsupported attachment
-    # kinds. Source Parameter identity and the actual rendered model edges,
-    # not this supplemental annotation inventory, are the authoritative proof.
+    matches: list[list[Any]] = [[], []]
+    _telemetry.info(f"profile chamfer source faces={None if faces is None else len(faces)}, expected circles (z/r mm)={expected}")
+    for face_index, face in enumerate(faces if faces is not None else ()):
+        edges = _arm_read(errors, f"source chamfer face {face_index} edges",
+                          lambda: tuple(_early_bound(face, "IFace2").GetEdges() or ()))
+        for edge_index, raw_edge in enumerate(edges if edges is not None else ()):
+            label = f"source chamfer face {face_index} edge {edge_index}"
+            edge = _arm_read(errors, label, lambda: _early_bound(raw_edge, "IEdge"), required=True)
+            curve = _arm_read(errors, f"{label} curve", lambda: _early_bound(edge.GetCurve(), "ICurve"), required=True)
+            circle = _arm_read(errors, f"{label} IsCircle", lambda: curve.IsCircle())
+            values = _arm_read(errors, f"{label} CircleParams",
+                               lambda: tuple(float(value) for value in curve.CircleParams)) if circle is True else None
+            _telemetry.info(f"{label}: IsCircle={circle!r}, CircleParams={values!r}, expected finite circle params=7")
+            if circle is not True:
+                continue
+            valid = _finite_tuple(values, 7)
+            _arm_check(errors, f"{label} has invalid source circle geometry", values, "seven finite values", valid)
+            if not valid:
+                continue
+            for index, (z_mm, radius_mm) in enumerate(expected):
+                actual = (
+                    math.dist(values[:3], (0.0, 0.0, z_mm / 1000.0)),
+                    abs(abs(values[5]) - 1.0), math.hypot(values[3], values[4]),
+                    abs(values[6] - radius_mm / 1000.0),
+                )
+                same = tuple(_arm_read(errors, f"{label} boundary {index} duplicate IsSame",
+                                       lambda other=other: int(app.IsSame(edge, other))) for other in matches[index])
+                _telemetry.info(f"{label} boundary {index}: center/axis/radius errors={actual!r}, expected each<1e-8; duplicate IsSame={same!r}, duplicate=1")
+                if all(value < 1e-8 for value in actual) and 1 not in same:
+                    matches[index].append(edge)
+    boundaries = []
+    for index, found in enumerate(matches):
+        _arm_check(errors, f"profile cannot identify both actual rear bore-chamfer boundary edges (boundary {index})",
+                   len(found), 1, len(found) == 1)
+        if len(found) == 1:
+            mapped = _arm_read(errors, f"chamfer boundary {index} GetCorrespondingEntity part-to-view",
+                               lambda: view.GetCorrespondingEntity(found[0]), required=True)
+        else:
+            mapped = None
+            errors.append(f"UNMEASURED chamfer boundary {index} mapping: source boundary is not unique")
+        _telemetry.info(f"profile chamfer boundary {index} mapping: source_count={len(found)}, view_entity_present={mapped is not None}, expected=(1, True)")
+        boundaries.append(mapped)
+    if all(boundary is not None for boundary in boundaries):
+        same = _arm_read(errors, "mapped chamfer boundary pair IsSame", lambda: int(app.IsSame(*boundaries)))
+        _arm_check(errors, "mapped rear chamfer boundaries are not distinct", same, 0, same == 0)
+
+    # Attachment support varies for imported feature dimensions. Each field is
+    # independent telemetry, including an exception; none contributes a gate.
+    inventory = {}
+    for member, read in (
+        ("GetAttachedEntities3", lambda: len(tuple(_early_bound(annotation, "IAnnotation").GetAttachedEntities3() or ()))),
+        ("GetAttachedEntityTypes", lambda: tuple(int(value) for value in (_early_bound(annotation, "IAnnotation").GetAttachedEntityTypes() or ()))),
+        ("GetAttachedEntityCount3", lambda: int(_early_bound(annotation, "IAnnotation").GetAttachedEntityCount3())),
+    ):
+        try:
+            inventory[member] = read()
+        except Exception as exc:
+            inventory[member] = None
+            _telemetry.info(f"profile chamfer attachment telemetry {member}: UNMEASURED {type(exc).__name__}: {str(exc)[:512]}")
     _telemetry.info(
-        f"profile chamfer native attachments: count={count}, types={kinds}, "
-        f"entities={len(attached)}"
+        f"profile chamfer native attachments: count={inventory['GetAttachedEntityCount3']}, "
+        f"types={inventory['GetAttachedEntityTypes']}, entities={inventory['GetAttachedEntities3']}"
     )
-    # Generated IView binding returns (model edges, out polyline buffer).
-    result = view.GetPolylines7(1)
-    if not isinstance(result, (list, tuple)) or len(result) != 2:
-        raise RuntimeError("profile chamfer rendered-edge readback is unavailable")
-    edges, raw = result
-    data = tuple(float(value) for value in (raw or ()))
-    if not all(math.isfinite(value) for value in data):
-        raise RuntimeError("profile chamfer rendered-edge data is non-finite")
+    result = _arm_read(errors, "profile GetPolylines7(1)", lambda: view.GetPolylines7(1), required=True)
+    valid_result = isinstance(result, (list, tuple)) and len(result) == 2
+    _arm_check(errors, "profile chamfer rendered-edge readback is unavailable",
+               (type(result).__name__, len(result) if isinstance(result, (list, tuple)) else None),
+               "two-item (edges, raw) result", valid_result)
+    edges = _arm_read(errors, "profile rendered edges", lambda: tuple(result[0] or ())) if valid_result else None
+    data = _arm_read(errors, "profile rendered polyline data", lambda: tuple(float(value) for value in (result[1] or ()))) if valid_result else None
+    finite = data is not None and all(math.isfinite(value) for value in data)
+    _arm_check(errors, "profile chamfer rendered-edge data is non-finite or unavailable",
+               (None if data is None else len(data), None if data is None else tuple(index for index, value in enumerate(data) if not math.isfinite(value))),
+               "available, all finite", finite)
     rendered = [False, False]
     cursor = 0
-    for edge in edges or ():
-        if cursor + 2 > len(data):
-            raise RuntimeError("profile rendered-edge buffer is truncated")
+    poly_count = 0
+    offsets_known = finite
+    candidates = []
+    for edge_index, edge in enumerate(edges if edges is not None else ()):
+        # Bounded diagnostics only, never a geometry/identity fallback.
+        if len(candidates) < 32:
+            try:
+                if edge is None:
+                    signature = "silhouette"
+                else:
+                    curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
+                    signature = tuple(float(value) for value in curve.CircleParams) if curve.IsCircle() else "not circle"
+                candidates.append((edge_index, signature))
+            except Exception as exc:
+                candidates.append((edge_index, "UNMEASURED", type(exc).__name__, str(exc)[:160]))
+        identities = tuple(
+            _arm_read(errors, f"rendered edge {edge_index} / mapped boundary {index} IsSame",
+                      lambda boundary=boundary: int(app.IsSame(edge, boundary)))
+            if edge is not None and boundary is not None else None
+            for index, boundary in enumerate(boundaries)
+        )
+        _telemetry.info(f"profile rendered edge {edge_index}: entity_present={edge is not None}, mapped_boundary_IsSame={identities!r}, expected match=1")
+        if not offsets_known:
+            errors.append(f"UNMEASURED rendered edge {edge_index} polyline: invalid preceding buffer dependency")
+            continue
+        header_ok = cursor + 2 <= len(data)
+        _arm_check(errors, f"profile rendered-edge buffer is truncated (edge {edge_index})",
+                   (cursor, len(data)), "cursor+2 <= rawlen", header_ok)
+        if not header_ok:
+            offsets_known = False
+            continue  # Identities/signatures of subsequent edges remain measurable.
         kind, size = data[cursor:cursor + 2]
-        if (kind, size) not in ((0.0, 0.0), (1.0, 12.0)):
-            raise RuntimeError("profile rendered-edge geometry has an unsupported native shape")
+        shape_ok = (kind, size) in ((0.0, 0.0), (1.0, 12.0))
+        _arm_check(errors, f"profile rendered-edge geometry has an unsupported native shape (edge {edge_index})",
+                   (kind, size), ((0.0, 0.0), (1.0, 12.0)), shape_ok)
+        if not shape_ok:
+            offsets_known = False
+            continue
         count_at = cursor + 2 + int(size) + 6
-        if count_at >= len(data):
-            raise RuntimeError("profile rendered-edge buffer lacks its point count")
+        count_ok = count_at < len(data)
+        _arm_check(errors, f"profile rendered-edge buffer lacks its point count (edge {edge_index})",
+                   (count_at, len(data)), "count_at < rawlen", count_ok)
+        if not count_ok:
+            offsets_known = False
+            continue
         count = int(data[count_at])
         end = count_at + 1 + 3 * count
-        if count < 0 or count != data[count_at] or end > len(data):
-            raise RuntimeError("profile rendered-edge buffer has an invalid point count")
-        points = [data[index:index + 3] for index in range(count_at + 1, end, 3)]
-        if edge is not None and any(math.dist(a, b) > 1e-9 for a, b in zip(points, points[1:])):
-            for index, boundary in enumerate(boundaries):
-                if int(app.IsSame(edge, boundary)) == 1:
-                    rendered[index] = True
+        valid_count = count >= 0 and count == data[count_at] and end <= len(data)
+        _arm_check(errors, f"profile rendered-edge buffer has an invalid point count (edge {edge_index})",
+                   (data[count_at], count, end, len(data)), "nonnegative integral count and end <= rawlen", valid_count)
+        if not valid_count:
+            offsets_known = False
+            continue
+        points = tuple(data[index:index + 3] for index in range(count_at + 1, end, 3))
+        longest = max((math.dist(a, b) for a, b in zip(points, points[1:])), default=0.0)
+        _telemetry.info(f"profile rendered edge {edge_index}: cursor={cursor}, end={end}, point_count={count}, longest_segment={longest!r}, expected>1e-9")
+        for index, same in enumerate(identities):
+            if same == 1 and longest > 1e-9:
+                rendered[index] = True
         cursor = end
-    if cursor != len(data) or not all(rendered):
-        raise RuntimeError("profile does not render both actual rear bore-chamfer edges")
+        poly_count += 1
+    _telemetry.info(f"profile chamfer rendered candidate circle signatures (first 32): {candidates!r}; edge_count={None if edges is None else len(edges)}")
+    _telemetry.info(f"profile chamfer rendered proof: flags={tuple(rendered)}, cursor={cursor}, rawlen={None if data is None else len(data)}, edge_count={None if edges is None else len(edges)}, poly_count={poly_count}")
+    _arm_check(errors, "profile rendered-edge buffer was not fully measured",
+               (cursor, None if data is None else len(data), poly_count, None if edges is None else len(edges)),
+               "cursor=rawlen and poly_count=edge_count",
+               data is not None and edges is not None and cursor == len(data) and poly_count == len(edges))
+    for index, flag in enumerate(rendered):
+        _arm_check(errors, f"profile does not render both actual rear bore-chamfer edges (boundary {index})",
+                   flag, True, flag)
 
 
 @_telemetry.traced("drawing.crank_arm_profile_chamfer")
-def _place_profile_chamfer(adapter: Any, profile: Any, annotations: list[Any]) -> None:
-    """Offset the imported native leg, never replace it with a note/dimension."""
-    annotation = _early_bound(_named(adapter, annotations, "BoreRearChamferSize"), "IAnnotation")
-    _assert_profile_chamfer(adapter, profile, annotation)
-    mouth = _profile_geometry(adapter, profile)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    display.OffsetText = False
-    if bool(display.OffsetText) or not annotation.SetPosition2(*mouth, 0.0):
-        raise RuntimeError("failed to place the native bore-mouth dimension line")
-    offset_dimension_text(
-        adapter, [annotation], {"BoreRearChamferSize": PROFILE_KEEP["BoreRearChamferSize"]}
-    )
-    _assert_chamfer_offset(annotation)
+def _place_profile_chamfer(
+    adapter: Any, profile: Any, annotations: list[Any], *, errors: list[str],
+) -> None:
+    """Attempt independent placement work, retaining every failure until export."""
+    annotation = _arm_read(errors, "place expected one BoreRearChamferSize",
+                           lambda: _early_bound(_named(adapter, annotations, "BoreRearChamferSize"), "IAnnotation"), required=True)
+    _assert_profile_chamfer(adapter, profile, annotation, errors=errors)
+    mouth = _profile_geometry(adapter, profile, errors=errors)
+    display = _arm_read(errors, "place chamfer display", lambda: _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension"), required=True)
+    _arm_read(errors, "clear chamfer OffsetText", lambda: setattr(display, "OffsetText", False))
+    offset = _arm_read(errors, "initial chamfer OffsetText readback", lambda: display.OffsetText)
+    _arm_check(errors, "failed to place the native bore-mouth dimension line (OffsetText)", offset, False, offset is False)
+    if mouth is None:
+        errors.append("UNMEASURED native bore-mouth dimension line placement: rear-Z mouth is unavailable")
+    else:
+        placed = _arm_read(errors, "native chamfer SetPosition2", lambda: annotation.SetPosition2(*mouth, 0.0))
+        _arm_check(errors, "failed to place the native bore-mouth dimension line", (placed, mouth), (True, mouth), placed is True)
+    if annotation is None:
+        errors.append("UNMEASURED chamfer text offset: native annotation is unavailable")
+    else:
+        _arm_read(errors, "offset native chamfer text", lambda: offset_dimension_text(
+            adapter, [annotation], {"BoreRearChamferSize": PROFILE_KEEP["BoreRearChamferSize"]},
+        ))
+    _assert_chamfer_offset(annotation, errors=errors)
 
 
-def _assert_chamfer_offset(annotation: Any) -> None:
-    native = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
-    position = tuple(float(value) for value in (native.GetPosition() or ()))
-    if (
-        not bool(display.OffsetText)
-        or len(position) != 3
-        or not all(math.isfinite(value) for value in position)
-        or math.dist(position[:2], PROFILE_KEEP["BoreRearChamferSize"]) > 1e-5
-    ):
-        raise RuntimeError("native bore-mouth chamfer lost its final offset leader position")
+def _assert_chamfer_offset(annotation: Any, *, errors: list[str]) -> None:
+    native = _arm_read(errors, "offset chamfer annotation", lambda: _early_bound(annotation, "IAnnotation"), required=True)
+    display = _arm_read(errors, "offset chamfer display", lambda: _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension"), required=True)
+    offset = _arm_read(errors, "final chamfer OffsetText", lambda: display.OffsetText)
+    position = _arm_read(errors, "final chamfer position", lambda: tuple(float(value) for value in (native.GetPosition() or ())))
+    _arm_check(errors, "native bore-mouth chamfer lost its final offset leader (OffsetText)", offset, True, offset is True)
+    _arm_check(errors, "native bore-mouth chamfer lost its final offset leader position",
+               position, (*PROFILE_KEEP["BoreRearChamferSize"], 0.0),
+               _finite_tuple(position, 3) and math.dist(position[:2], PROFILE_KEEP["BoreRearChamferSize"]) <= 1e-5)
 
 
-def _dimension_text_bounds(annotation: Any, *, label: str) -> tuple[float, float, float, float]:
-    """Whole measured native runs, using each documented reference corner."""
-    native = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
-    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+def _dimension_text_bounds(
+    annotation: Any, *, label: str, errors: list[str],
+) -> Any:
+    """Read ALL native runs; an invalid run never yields a partial passing box."""
+    native = _arm_read(errors, f"{label} text annotation", lambda: _early_bound(annotation, "IAnnotation"), required=True)
+    display = _arm_read(errors, f"{label} text display", lambda: _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension"), required=True)
+    data = _arm_read(errors, f"{label} display data", lambda: _early_bound(display.GetDisplayData(), "IDisplayData"), required=True)
+    count = _arm_read(errors, f"{label} text count", lambda: int(data.GetTextCount()))
+    _arm_check(errors, f"{label}: native dimension has no rendered text", count, "positive text count",
+               count is not None and count > 0)
     boxes = []
-    for index in range(int(data.GetTextCount())):
-        text = _native_text(data.GetTextAtIndex(index))
-        if not text.strip():
+    invalid = count is None or count <= 0
+    for index in range(count if count is not None and count > 0 else 0):
+        run = f"{label} run {index}"
+        raw_text = _arm_read(errors, f"{run} text", lambda: data.GetTextAtIndex(index), required=True)
+        text = _native_text(raw_text) if raw_text is not None else None
+        position = _arm_read(errors, f"{run} position", lambda: tuple(float(value) for value in (data.GetTextPositionAtIndex(index) or ())))
+        width = _arm_read(errors, f"{run} width", lambda: float(data.GetTextInBoxWidthAtIndex(index)))
+        height = _arm_read(errors, f"{run} height", lambda: float(data.GetTextHeightAtIndex(index)))
+        angle = _arm_read(errors, f"{run} angle", lambda: float(data.GetTextAngleAtIndex(index)))
+        reference = _arm_read(errors, f"{run} reference", lambda: data.GetTextRefPositionAtIndex(index))
+        _telemetry.info(f"{run}: raw_text={raw_text!r}, text={text!r}, pos={position!r}, width={width!r}, height={height!r}, ref={reference!r}, angle={angle!r}; expected finite XYZ, positive width/height, ref=0..5, finite angle")
+        if text is not None and not text.strip():
             continue
-        position = tuple(float(value) for value in (data.GetTextPositionAtIndex(index) or ()))
-        width = float(data.GetTextInBoxWidthAtIndex(index))
-        height = float(data.GetTextHeightAtIndex(index))
-        angle = float(data.GetTextAngleAtIndex(index))
-        reference = data.GetTextRefPositionAtIndex(index)
-        if (
-            len(position) != 3 or width <= 0.0 or height <= 0.0
-            or type(reference) is not int or reference not in (0, 1, 2, 3, 4, 5)
-            or not all(math.isfinite(value) for value in (*position, width, height, angle))
-        ):
-            raise RuntimeError(
-                f"{label}: native dimension text has no measurable whole bounds "
-                f"(run={index}, text={text!r}, width={width!r}, height={height!r}, "
-                f"reference={reference!r}, angle={angle!r})"
-            )
-        # Calibrate the existing reference/rotation geometry to this run's
-        # ACTUAL positive width. No estimated-width or zero-width path exists.
-        advance = width / (max(map(len, text.split("\n"))) * height)
-        if not math.isfinite(advance):
-            raise RuntimeError(f"{label}: native dimension text has no measurable whole bounds")
-        box = estimate_text_box(
+        fields = (
+            ("text", text, "nonblank native text", text is not None),
+            ("position", position, "finite XYZ", _finite_tuple(position, 3)),
+            ("width", width, "finite width > 0", width is not None and math.isfinite(width) and width > 0.0),
+            ("height", height, "finite height > 0", height is not None and math.isfinite(height) and height > 0.0),
+            ("angle", angle, "finite angle", angle is not None and math.isfinite(angle)),
+            ("reference", reference, "integer ref=0..5", type(reference) is int and reference in (0, 1, 2, 3, 4, 5)),
+        )
+        for field, actual, wanted, measured in fields:
+            _arm_check(errors, f"{label}: native dimension text has no measurable whole bounds (run={index}) ({field})",
+                       actual, wanted, measured)
+        valid = all(measured for _field, _actual, _wanted, measured in fields)
+        if not valid:
+            invalid = True
+            continue
+        # This geometry is calibrated to the ACTUAL positive native width.
+        # No zero-width fallback or estimated-width acceptance path exists.
+        advance = _arm_read(errors, f"{run} measured width calibration",
+                            lambda: width / (max(map(len, text.split("\n"))) * height))
+        _arm_check(errors, f"{label}: native dimension text has no measurable whole bounds (run={index} calibration)",
+                   advance, "finite positive native width/height ratio",
+                   advance is not None and math.isfinite(advance) and advance > 0.0)
+        if advance is None or not math.isfinite(advance) or advance <= 0.0:
+            invalid = True
+            continue
+        box = _arm_read(errors, f"{run} whole bounds", lambda: estimate_text_box(
             text, anchor=position[:2], height=height, reference=reference,
             angle=angle, advance_ratio=advance,
-        )
-        if box is None or not all(
-            math.isfinite(value) for value in (box.xmin, box.ymin, box.xmax, box.ymax)
-        ):
-            raise RuntimeError(f"{label}: native dimension text has no measurable whole bounds")
-        boxes.append(box)
-    box = union_boxes(boxes)
-    if box is None:
-        raise RuntimeError(f"{label}: native dimension has no rendered text")
-    return (box.xmin, box.ymin, box.xmax, box.ymax)
+        ), required=True)
+        bounds = None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
+        good_box = _finite_tuple(bounds, 4) and bounds[0] < bounds[2] and bounds[1] < bounds[3]
+        _arm_check(errors, f"{label}: native dimension text has no measurable whole bounds (run={index} box)",
+                   bounds, "finite positive-area measured bounds", good_box)
+        if good_box:
+            boxes.append(box)
+        else:
+            invalid = True
+    box = union_boxes(boxes) if boxes and not invalid else None
+    bounds = None if box is None else (box.xmin, box.ymin, box.xmax, box.ymax)
+    _arm_check(errors, f"{label}: native dimension has no rendered text / measurable whole bounds",
+               bounds, "all nonblank runs measured", bounds is not None)
+    return bounds
 
 
 @_telemetry.traced("drawing.crank_arm_profile_readback")
 def _profile_chamfer_clear(
     adapter: Any, front: Any, profile: Any, front_annotations: list[Any],
     profile_annotations: list[Any], callouts: dict[str, Any], caption: Any,
+    *, errors: list[str],
 ) -> None:
-    """Fail before review unless the native import, receiver and whole ink survive."""
-    annotation = _named(adapter, profile_annotations, "BoreRearChamferSize")
-    _assert_profile_chamfer(adapter, profile, annotation)
-    _assert_chamfer_offset(annotation)
-    mouth = _profile_geometry(adapter, profile)
-    _rendered_chamfer_edges(adapter, profile, annotation)
-    depth = _named(adapter, profile_annotations, "Depth")
-    stock = _assert_profile_dimension(adapter, profile, depth, "Depth@Arm")
-    stock_dimension = _early_bound(stock.GetDimension2(0), "IDimension")
-    if (
-        stock.IsReferenceDim() is not True
-        or int(stock_dimension.GetType()) != 0
-        or not math.isclose(float(stock_dimension.SystemValue) * 1000.0, ARM_THICKNESS, abs_tol=1e-7)
-        or int(stock.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME["Depth"]
+    """Collect every independent final readback; build raises once before export."""
+    annotation = _arm_read(errors, "final expected one BoreRearChamferSize",
+                           lambda: _named(adapter, profile_annotations, "BoreRearChamferSize"), required=True)
+    _assert_profile_chamfer(adapter, profile, annotation, errors=errors)
+    _assert_chamfer_offset(annotation, errors=errors)
+    mouth = _profile_geometry(adapter, profile, errors=errors)
+    _rendered_chamfer_edges(adapter, profile, annotation, errors=errors)
+    depth = _arm_read(errors, "final expected one Depth", lambda: _named(adapter, profile_annotations, "Depth"), required=True)
+    stock = _assert_profile_dimension(adapter, profile, depth, "Depth@Arm", errors=errors)
+    stock_dimension = _arm_read(errors, "stock dimension", lambda: _early_bound(stock.GetDimension2(0), "IDimension"), required=True)
+    reference = _arm_read(errors, "stock reference", lambda: stock.IsReferenceDim())
+    kind = _arm_read(errors, "stock dimension type", lambda: int(stock_dimension.GetType()))
+    value = _arm_read(errors, "stock thickness mm", lambda: float(stock_dimension.SystemValue) * 1000.0)
+    precision = _arm_read(errors, "stock primary precision", lambda: int(stock.GetPrimaryPrecision2()))
+    for field, actual, wanted, valid in (
+        ("reference", reference, True, reference is True),
+        ("type", kind, 0, kind == 0),
+        ("value mm", value, ARM_THICKNESS, value is not None and math.isclose(value, ARM_THICKNESS, abs_tol=1e-7)),
+        ("precision", precision, DRAWING_PRECISION_BY_NAME["Depth"], precision == DRAWING_PRECISION_BY_NAME["Depth"]),
     ):
-        raise RuntimeError("profile stock thickness lost its native 8 mm reference")
-    ink = callout_ink(adapter, annotation, label="far-side bore-mouth chamfer")
-    x0, y0, x1, y1 = ink.text
-    left, bottom, right, top = CHAMFER_TEXT_LANE
-    front_box = tuple(float(value) for value in _early_bound(front, "IView").GetOutline())
-    profile_box = tuple(float(value) for value in _early_bound(profile, "IView").GetOutline())
-    region = sheet_region(adapter)
-    if (
-        len(front_box) != 4 or len(profile_box) != 4
-        or not all(math.isfinite(value) for value in (*ink.text, *front_box, *profile_box))
-        or not (
-            max(left, front_box[2] + 0.002, region.xmin + 0.003) <= x0 < x1
-            <= min(right, profile_box[0] - 0.002, region.xmax - 0.003)
-            and max(bottom, region.ymin + 0.003) <= y0 < y1
-            <= min(top, region.ymax - 0.003)
+        _arm_check(errors, f"profile stock thickness lost its native 8 mm reference ({field})", actual, wanted, valid)
+
+    ink = _arm_read(errors, "chamfer whole rendered callout ink",
+                    lambda: callout_ink(adapter, annotation, label="far-side bore-mouth chamfer"), required=True)
+    ink_box = _arm_read(errors, "chamfer whole ink box", lambda: tuple(float(value) for value in ink.text))
+    front_box = _arm_read(errors, "front outline", lambda: tuple(float(value) for value in _early_bound(front, "IView").GetOutline()))
+    profile_box = _arm_read(errors, "profile outline", lambda: tuple(float(value) for value in _early_bound(profile, "IView").GetOutline()))
+    region = _arm_read(errors, "sheet region", lambda: sheet_region(adapter), required=True)
+    region_box = _arm_read(errors, "sheet region bounds", lambda: (float(region.xmin), float(region.ymin), float(region.xmax), float(region.ymax)))
+    for name, box in (("chamfer whole ink", ink_box), ("front", front_box), ("profile", profile_box), ("sheet", region_box)):
+        _arm_check(errors, f"{name} has no finite positive whole bounds for the clear profile lane",
+                   box, "four finite ordered bounds", _finite_tuple(box, 4) and box[0] < box[2] and box[1] < box[3])
+    lane = None
+    if all(_finite_tuple(box, 4) for box in (front_box, profile_box, region_box)):
+        left, bottom, right, top = CHAMFER_TEXT_LANE
+        lane = (
+            max(left, front_box[2] + 0.002, region_box[0] + 0.003),
+            max(bottom, region_box[1] + 0.003),
+            min(right, profile_box[0] - 0.002, region_box[2] - 0.003),
+            min(top, region_box[3] - 0.003),
         )
-    ):
-        raise RuntimeError(f"bore-mouth chamfer text leaves its clear profile lane: {ink.text}")
-    chamfer = dimension_segments(annotation)
-    if not chamfer or landing_distance(chamfer, mouth) > 0.001:
-        raise RuntimeError("native bore-mouth chamfer leader does not land on the rear-Z mouth")
+    else:
+        errors.append("UNMEASURED clear profile lane: outline/sheet dependency is invalid")
+    _arm_check(errors, "bore-mouth chamfer text leaves its clear profile lane",
+               (ink_box, front_box, profile_box, region_box), lane,
+               lane is not None and _finite_tuple(ink_box, 4)
+               and lane[0] <= ink_box[0] < ink_box[2] <= lane[2]
+               and lane[1] <= ink_box[1] < ink_box[3] <= lane[3])
+    chamfer = _arm_read(errors, "chamfer leader segments", lambda: tuple(dimension_segments(annotation)))
+    landing = _arm_read(errors, "chamfer rear-Z mouth landing distance",
+                        lambda: landing_distance(chamfer, mouth) if chamfer and mouth is not None else None, required=True)
+    _arm_check(errors, "native bore-mouth chamfer leader does not land on the rear-Z mouth",
+               (chamfer, mouth, landing), "nonempty segments, landing <= 0.001 m",
+               landing is not None and math.isfinite(landing) and landing <= 0.001)
+
     others = {
-        name: _named(adapter, front_annotations, name)
+        name: _arm_read(errors, f"final expected one {name}", lambda name=name: _named(adapter, front_annotations, name), required=True)
         for name in ("Width", "EndRadius")
     }
     others.update(callouts)
     others["stock thickness"] = depth
     other_boxes = {}
-    collisions = []
     for name, other in others.items():
-        segments = dimension_segments(other)
-        box = _dimension_text_bounds(other, label=name)
+        segments = _arm_read(errors, f"{name} leader segments", lambda: tuple(dimension_segments(other)))
+        box = _dimension_text_bounds(other, label=name, errors=errors)
         other_boxes[name] = box
-        if (
-            not segments or not boxes_clear(ink.text, box, 0.002)
-            or any(distance_to_box(segment, ink.text) < 0.002 for segment in segments)
-            or any(distance_to_box(segment, box) < 0.002 for segment in chamfer)
-            or any(segments_cross(first, second) for first in chamfer for second in segments)
+        _arm_check(errors, f"bore-mouth chamfer crowds existing callouts: {name} has no native leader",
+                   segments, "nonempty segments", bool(segments))
+        text_clear = _arm_read(errors, f"{name} text-to-chamfer clearance",
+                              lambda: boxes_clear(ink_box, box, 0.002) if _finite_tuple(ink_box, 4) and _finite_tuple(box, 4) else None, required=True)
+        other_distances = _arm_read(errors, f"{name} leaders-to-chamfer ink distances",
+                                   lambda: tuple(distance_to_box(segment, ink_box) for segment in segments)
+                                   if segments and _finite_tuple(ink_box, 4) else None, required=True)
+        chamfer_distances = _arm_read(errors, f"chamfer leaders-to-{name} text distances",
+                                     lambda: tuple(distance_to_box(segment, box) for segment in chamfer)
+                                     if chamfer and _finite_tuple(box, 4) else None, required=True)
+        crossings = _arm_read(errors, f"{name} leader crossings",
+                             lambda: tuple(segments_cross(first, second) for first in chamfer for second in segments)
+                             if chamfer and segments else None, required=True)
+        for field, actual, wanted, valid in (
+            ("whole text boxes", (ink_box, box, text_clear), "boxes clear by 0.002 m", text_clear is True),
+            ("other leaders to ink", other_distances, "each distance >= 0.002 m",
+             other_distances is not None and all(math.isfinite(value) and value >= 0.002 for value in other_distances)),
+            ("chamfer leaders to text", chamfer_distances, "each distance >= 0.002 m",
+             chamfer_distances is not None and all(math.isfinite(value) and value >= 0.002 for value in chamfer_distances)),
+            ("leader crossings", crossings, "all False", crossings is not None and not any(crossings)),
         ):
-            collisions.append(name)
-    note = _early_bound(caption, "INote")
-    note_annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    extent = tuple(float(value) for value in (note.GetExtent() or ()))
-    position = tuple(float(value) for value in (note_annotation.GetPosition() or ()))
-    if (
-        _native_text(note.GetText()) != _native_text(PROFILE_VIEW_CAPTION)
-        or int(note_annotation.Visible) != 1 or int(note_annotation.OwnerType) != 0
-        or int(_early_bound(adapter.swApp, "ISldWorks").IsSame(note_annotation.Owner, profile)) != 1
-        or len(position) != 3 or not all(math.isfinite(value) for value in position)
-        or math.dist(position[:2], PROFILE_CAPTION_XY) > 1e-5
-        or len(extent) != 6 or not all(math.isfinite(value) for value in extent)
+            _arm_check(errors, f"bore-mouth chamfer crowds existing callouts: {name} ({field})", actual, wanted, valid)
+
+    note = _arm_read(errors, "caption note", lambda: _early_bound(caption, "INote"), required=True)
+    note_annotation = _arm_read(errors, "caption annotation", lambda: _early_bound(note.GetAnnotation(), "IAnnotation"), required=True)
+    raw_text = _arm_read(errors, "caption raw text", lambda: note.GetText(), required=True)
+    text = _native_text(raw_text) if raw_text is not None else None
+    extent = _arm_read(errors, "caption extent", lambda: tuple(float(value) for value in (note.GetExtent() or ())))
+    position = _arm_read(errors, "caption position", lambda: tuple(float(value) for value in (note_annotation.GetPosition() or ())))
+    visible = _arm_read(errors, "caption visibility", lambda: int(note_annotation.Visible))
+    owner_type = _arm_read(errors, "caption owner type", lambda: int(note_annotation.OwnerType))
+    owner_object = _arm_read(errors, "caption owner object", lambda: note_annotation.Owner, required=True)
+    owner = _arm_read(errors, "caption owner IsSame",
+                      lambda: int(_early_bound(adapter.swApp, "ISldWorks").IsSame(owner_object, profile))
+                      if owner_object is not None and profile is not None else None, required=True)
+    for field, actual, wanted, valid in (
+        ("raw/normalized text", (raw_text, text), _native_text(PROFILE_VIEW_CAPTION), text == _native_text(PROFILE_VIEW_CAPTION)),
+        ("visibility", visible, 1, visible == 1), ("owner type", owner_type, 0, owner_type == 0),
+        ("owner IsSame", owner, 1, owner == 1),
+        ("position", position, (*PROFILE_CAPTION_XY, 0.0), _finite_tuple(position, 3) and math.dist(position[:2], PROFILE_CAPTION_XY) <= 1e-5),
+        ("extent", extent, "six finite values", _finite_tuple(extent, 6)),
     ):
-        raise RuntimeError("rotated Top profile caption did not persist with its view")
-    caption_box = (extent[0], extent[1], extent[3], extent[4])
-    if (
-        caption_box[0] >= caption_box[2] or caption_box[1] >= caption_box[3]
-        or not boxes_clear(ink.text, caption_box, 0.002)
-        or any(not boxes_clear(caption_box, box, 0.002) for box in other_boxes.values())
-        or not boxes_clear(profile_box, caption_box, 0.002)
-        or not (
-            region.xmin + 0.003 <= caption_box[0] < caption_box[2] <= region.xmax - 0.003
-            and region.ymin + 0.003 <= caption_box[1] < caption_box[3] <= region.ymax - 0.003
-        )
-    ):
-        collisions.append("profile caption")
-    if collisions:
-        raise RuntimeError(f"bore-mouth chamfer crowds existing callouts: {collisions}")
+        _arm_check(errors, f"rotated Top profile caption did not persist with its view ({field})", actual, wanted, valid)
+    caption_box = (extent[0], extent[1], extent[3], extent[4]) if _finite_tuple(extent, 6) else None
+    valid_caption_box = _finite_tuple(caption_box, 4) and caption_box[0] < caption_box[2] and caption_box[1] < caption_box[3]
+    _arm_check(errors, "bore-mouth chamfer crowds existing callouts: profile caption whole bounds",
+               caption_box, "finite positive-area box", valid_caption_box)
+    for name, box in {"chamfer": ink_box, "profile": profile_box, **other_boxes}.items():
+        clear = _arm_read(errors, f"caption clearance from {name}",
+                          lambda box=box: boxes_clear(caption_box, box, 0.002)
+                          if valid_caption_box and _finite_tuple(box, 4) else None, required=True)
+        _arm_check(errors, f"bore-mouth chamfer crowds existing callouts: profile caption / {name}",
+                   (caption_box, box, clear), "boxes clear by 0.002 m", clear is True)
+    _arm_check(errors, "bore-mouth chamfer crowds existing callouts: profile caption border",
+               (caption_box, region_box), "caption inside sheet with 0.003 m air",
+               valid_caption_box and _finite_tuple(region_box, 4)
+               and region_box[0] + 0.003 <= caption_box[0] < caption_box[2] <= region_box[2] - 0.003
+               and region_box[1] + 0.003 <= caption_box[1] < caption_box[3] <= region_box[3] - 0.003)
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -765,8 +983,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     # Only the profile exposes the internal rear mouth. Front and isometric
     # retain HLR; the replacement profile carries both native chamfer and stock.
-    set_hidden_lines_visible(adapter, profile)
-    _turn_profile(adapter, profile)
+    arm_errors: list[str] = []
+    _arm_read(arm_errors, "initial profile hidden lines visible", lambda: set_hidden_lines_visible(adapter, profile))
+    _turn_profile(adapter, profile, errors=arm_errors)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -786,14 +1005,16 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
     # is a one-place .X size: MHA-DT-31 is turned to suit it.
-    assert_imported_precision(adapter, imported_annotations, DRAWING_PRECISION_BY_NAME)
+    _arm_read(arm_errors, "imported model precision", lambda: assert_imported_precision(
+        adapter, imported_annotations, DRAWING_PRECISION_BY_NAME,
+    ))
     # The thickness is the supplied stock's (the stock note governs it).
     for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, _named(adapter, profile_annotations, name), label="arm stock thickness"
-        )
+        _arm_read(arm_errors, f"{name} stock reference placement", lambda name=name: set_reference_dimension(
+            adapter, _named(adapter, profile_annotations, name), label="arm stock thickness",
+        ))
     _hub_seat_leader_clear(adapter, front_annotations)
-    _place_profile_chamfer(adapter, profile, profile_annotations)
+    _place_profile_chamfer(adapter, profile, profile_annotations, errors=arm_errors)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -880,20 +1101,26 @@ async def build(adapter: Any) -> dict[str, str]:
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
-    caption = _profile_caption(adapter, profile)
-    rebuild_drawing(adapter, label="final crank arm profile annotations")
+    caption = _profile_caption(adapter, profile, errors=arm_errors)
+    _arm_read(arm_errors, "final profile annotation rebuild",
+              lambda: rebuild_drawing(adapter, label="final crank arm profile annotations"))
     # A real HLR/HLV toggle regenerates the internal edge set after insertion.
-    # Missing imports, receivers, edge ink or text bounds fail BEFORE review.
-    set_hidden_lines_visible(adapter, profile)
+    # Collect every new arm guard, including earlier placement failures, before
+    # the single fail-closed boundary in front of export and machinist review.
+    _arm_read(arm_errors, "final profile hidden lines visible", lambda: set_hidden_lines_visible(adapter, profile))
     _profile_chamfer_clear(
         adapter, front, profile, front_annotations, profile_annotations,
         {
-            "handle pivot": _early_bound(pivot_callout, "IDisplayDimension").GetAnnotation(),
-            "anchor tap": _early_bound(anchor_callout, "IDisplayDimension").GetAnnotation(),
-            "overall length": _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+            name: _arm_read(arm_errors, f"{name} final annotation",
+                            lambda display=display: _early_bound(display, "IDisplayDimension").GetAnnotation(), required=True)
+            for name, display in (
+                ("handle pivot", pivot_callout), ("anchor tap", anchor_callout),
+                ("overall length", overall),
+            )
         },
-        caption,
+        caption, errors=arm_errors,
     )
+    _raise_arm_errors(arm_errors)
 
     return await finalize_drawing(
         adapter,

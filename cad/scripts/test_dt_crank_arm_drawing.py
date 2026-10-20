@@ -530,6 +530,14 @@ def test_bore_rear_chamfer_costs_no_wall_margin() -> None:
     assert spec.FIDUCIAL_MODEL_DEPTH < spec.ARM_THICKNESS - spec.BORE_REAR_CHAMFER
 
 
+def _check_arm_guard(guard, *args, **kwargs):
+    """Exercise a collector at the same single failure boundary as build."""
+    errors = []
+    result = guard(*args, errors=errors, **kwargs)
+    drawing._raise_arm_errors(errors)
+    return result
+
+
 @pytest.mark.parametrize(
     ("changed", "message"),
     (
@@ -568,10 +576,10 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
     annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
     if message is None:
-        drawing._assert_chamfer_limits(annotation)
+        _check_arm_guard(drawing._assert_chamfer_limits, annotation)
     else:
         with pytest.raises(RuntimeError, match=message):
-            drawing._assert_chamfer_limits(annotation)
+            _check_arm_guard(drawing._assert_chamfer_limits, annotation)
 
 
 def test_bore_rear_chamfer_callout_keeps_principal_front_face_meaning() -> None:
@@ -593,15 +601,15 @@ def test_bore_rear_chamfer_callout_keeps_principal_front_face_meaning() -> None:
 def _native_chamfer(monkeypatch, **changed):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
     tolerance = SimpleNamespace(
-        Type=spec.BORE_REAR_CHAMFER_TOL_TYPE,
-        GetMinValue=lambda: spec.BORE_REAR_CHAMFER_DEVIATIONS[0] / 1000.0,
-        GetMaxValue=lambda: spec.BORE_REAR_CHAMFER_DEVIATIONS[1] / 1000.0,
+        Type=changed.get("kind", spec.BORE_REAR_CHAMFER_TOL_TYPE),
+        GetMinValue=lambda: changed.get("lower", spec.BORE_REAR_CHAMFER_DEVIATIONS[0]) / 1000.0,
+        GetMaxValue=lambda: changed.get("upper", spec.BORE_REAR_CHAMFER_DEVIATIONS[1]) / 1000.0,
     )
     dimension = SimpleNamespace(
         Name="BoreRearChamferSize",
-        FullName="BoreRearChamferSize@BoreRearChamfer@dt-crank-arm.SLDPRT",
-        GetType=lambda: 0,
-        SystemValue=spec.BORE_REAR_CHAMFER / 1000.0,
+        FullName=changed.get("full_name", "BoreRearChamferSize@BoreRearChamfer@dt-crank-arm.SLDPRT"),
+        GetType=lambda: changed.get("dimension_type", 0),
+        SystemValue=changed.get("leg", spec.BORE_REAR_CHAMFER) / 1000.0,
         Tolerance=tolerance,
     )
     display = SimpleNamespace(
@@ -711,7 +719,7 @@ def _project_profile(_adapter, view, points, **_kwargs):
 def test_profile_chamfer_rejects_lost_native_ownership_or_display(monkeypatch, changed) -> None:
     adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
     with pytest.raises(RuntimeError):
-        drawing._assert_profile_chamfer(adapter, profile, annotation)
+        _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -728,7 +736,7 @@ def test_profile_chamfer_suffix_accepts_only_native_newline_variation(
     adapter, profile, annotation, _display = _native_chamfer(
         monkeypatch, text=notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", readback_newline)
     )
-    drawing._assert_profile_chamfer(adapter, profile, annotation)
+    _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -744,7 +752,7 @@ def test_profile_chamfer_suffix_accepts_only_native_newline_variation(
 def test_profile_chamfer_suffix_does_not_strip_real_content_mismatches(monkeypatch, text):
     adapter, profile, annotation, _display = _native_chamfer(monkeypatch, text=text)
     with pytest.raises(RuntimeError, match="callout"):
-        drawing._assert_profile_chamfer(adapter, profile, annotation)
+        _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -760,11 +768,11 @@ def test_profile_requires_labelled_native_xz_projection_and_scale(monkeypatch, c
     monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
     if changed:
         with pytest.raises(RuntimeError, match="projection"):
-            drawing._profile_geometry(adapter, profile)
+            _check_arm_guard(drawing._profile_geometry, adapter, profile)
     else:
         # Rear z=0 is the LEFT stock face; the bore's -X mouth is near the
         # profile's lower end. A relabelled Right projection cannot pass.
-        assert drawing._profile_geometry(adapter, profile) == pytest.approx((0.296, 0.09455))
+        assert _check_arm_guard(drawing._profile_geometry, adapter, profile) == pytest.approx((0.296, 0.09455))
 
 
 @pytest.mark.parametrize("index", (0, 1, 2, 3, 4, 5, 6))
@@ -778,7 +786,7 @@ def test_profile_rejects_wrong_actual_projected_axes_stock_or_mouth(monkeypatch,
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     # No requested anchor substitutes for actual stock/rear-mouth projection.
     with pytest.raises(RuntimeError, match="rear-Z mouth"):
-        drawing._profile_geometry(adapter, profile)
+        _check_arm_guard(drawing._profile_geometry, adapter, profile)
 
 
 def test_profile_turn_is_native_ccw_and_refuses_an_ignored_angle(monkeypatch) -> None:
@@ -786,11 +794,11 @@ def test_profile_turn_is_native_ccw_and_refuses_an_ignored_angle(monkeypatch) ->
     rebuilt = []
     monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **kw: rebuilt.append(kw["label"]))
-    drawing._turn_profile(adapter, profile)
+    _check_arm_guard(drawing._turn_profile, adapter, profile)
     assert profile.Angle == pytest.approx(math.pi / 2)
     assert rebuilt == ["turn crank arm Top profile 90 DEG CCW"]
     with pytest.raises(RuntimeError, match="already rotated"):
-        drawing._turn_profile(adapter, profile)
+        _check_arm_guard(drawing._turn_profile, adapter, profile)
     class IgnoredAngle:
         GetOrientationName = staticmethod(profile.GetOrientationName)
         ScaleRatio = profile.ScaleRatio
@@ -802,7 +810,7 @@ def test_profile_turn_is_native_ccw_and_refuses_an_ignored_angle(monkeypatch) ->
         def Angle(self, _value):
             pass
     with pytest.raises(RuntimeError, match="projection"):
-        drawing._turn_profile(adapter, IgnoredAngle())
+        _check_arm_guard(drawing._turn_profile, adapter, IgnoredAngle())
 
 
 def test_profile_chamfer_offsets_actual_native_leg_without_replacing_it(monkeypatch) -> None:
@@ -817,13 +825,13 @@ def test_profile_chamfer_offsets_actual_native_leg_without_replacing_it(monkeypa
         display.OffsetText = True
         annotation.SetPosition2(*targets["BoreRearChamferSize"], 0.0)
     monkeypatch.setattr(drawing, "offset_dimension_text", offset)
-    drawing._place_profile_chamfer(adapter, profile, [annotation])
-    drawing._assert_profile_chamfer(adapter, profile, annotation)
+    _check_arm_guard(drawing._place_profile_chamfer, adapter, profile, [annotation])
+    _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
     assert positions == [{"BoreRearChamferSize": drawing.PROFILE_KEEP["BoreRearChamferSize"]}]
     assert display.GetDimension2(0).SystemValue == spec.BORE_REAR_CHAMFER / 1000.0
     for candidates in ([], [annotation, annotation]):
         with pytest.raises(RuntimeError, match="expected one"):
-            drawing._place_profile_chamfer(adapter, profile, candidates)
+            _check_arm_guard(drawing._place_profile_chamfer, adapter, profile, candidates)
 
 
 @pytest.mark.parametrize("refusal", ("offset", "position", "native_line"))
@@ -838,11 +846,11 @@ def test_profile_chamfer_refuses_ignored_native_text_placement(monkeypatch, refu
     if refusal == "native_line":
         annotation.SetPosition2 = lambda *_args: False
     with pytest.raises(RuntimeError, match="offset leader|dimension line"):
-        drawing._place_profile_chamfer(adapter, profile, [annotation])
+        _check_arm_guard(drawing._place_profile_chamfer, adapter, profile, [annotation])
 
 
 def _chamfer_edge_case(monkeypatch, **changed):
-    adapter, profile, annotation, _display = _native_chamfer(monkeypatch)
+    adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
     def circle(z_mm, radius_mm):
         curve = SimpleNamespace(
             IsCircle=lambda: True,
@@ -863,17 +871,27 @@ def _chamfer_edge_case(monkeypatch, **changed):
     annotation.GetAttachedEntityTypes = lambda: changed.get(
         "attached_types", (2,) if changed.get("face_attachment") else (1,)
     )
-    # Deliberately NOT sheet-space coordinates. Only edge identity and actual
-    # nondegenerate rendering are read here; model_points_in_view owns landing.
+    # Part and view-context entities are DISTINCT. Direct part/rendered IsSame
+    # must fail this positive control; only the documented mapping can pass.
+    view_outer = SimpleNamespace(GetCurve=outer.GetCurve)
+    view_inner = SimpleNamespace(GetCurve=inner.GetCurve)
+    view_near = SimpleNamespace(GetCurve=near.GetCurve)
+    mapped = changed.get("mapping", (view_outer, view_inner))
+    profile.GetCorrespondingEntity = lambda source: (
+        mapped[0] if source is outer else mapped[1] if source is inner else None
+    )
+    profile.source_edges = (outer, inner)
+    profile.view_edges = (view_outer, view_inner)
+    # XYZs deliberately are NOT sheet-space coordinates.
     def record(degenerate=False):
         end = (4.0, 5.0, 6.0) if degenerate else (7.0, 8.0, 9.0)
         return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 4.0, 5.0, 6.0, *end)
-    rendered = changed.get("rendered", (outer, inner))
+    rendered = changed.get("rendered", (view_outer, view_inner))
     raw = changed.get("raw", tuple(value for _ in rendered for value in record(changed.get("degenerate", False))))
     profile.GetPolylines7 = lambda option: (
         changed.get("result", (rendered, raw)) if option == 1 else pytest.fail("crosshatch option")
     )
-    return adapter, profile, annotation, outer, inner, near
+    return adapter, profile, annotation, view_outer, view_inner, view_near
 
 
 @pytest.mark.parametrize("face_attachment", (False, True))
@@ -881,7 +899,25 @@ def test_chamfer_edge_guard_proves_feature_relation_and_actual_rendering(monkeyp
     adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
         monkeypatch, face_attachment=face_attachment
     )
-    drawing._rendered_chamfer_edges(adapter, profile, annotation)
+    assert all(adapter.swApp.IsSame(source, target) == 0
+               for source, target in zip(profile.source_edges, profile.view_edges))
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("mapping", ((None, None), (None, object()), (object(), object())))
+def test_chamfer_mapping_refuses_null_or_nonrendered_view_entities(monkeypatch, mapping):
+    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
+        monkeypatch, mapping=mapping,
+    )
+    with pytest.raises(RuntimeError, match="mapping|part-to-view|both actual rear"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_chamfer_mapping_refuses_two_boundaries_mapped_to_one_entity(monkeypatch):
+    adapter, profile, annotation, outer, _inner, _near = _chamfer_edge_case(monkeypatch)
+    profile.GetCorrespondingEntity = lambda _source: outer
+    with pytest.raises(RuntimeError, match="not distinct"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -897,12 +933,41 @@ def test_chamfer_attachment_inventory_is_logged_not_used_as_an_extra_gate(monkey
     adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, **changed)
     logged = []
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
-    drawing._assert_profile_chamfer(adapter, profile, annotation)
-    drawing._rendered_chamfer_edges(adapter, profile, annotation)
-    assert logged == [
+    _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+    assert any(
         f"profile chamfer native attachments: count={changed['attached_count']}, "
-        f"types={changed['attached_types']}, entities={len(changed['attached'])}"
-    ]
+        f"types={changed['attached_types']}, entities={len(changed['attached'])}" == entry
+        for entry in logged
+    )
+
+
+@pytest.mark.parametrize(
+    "unsupported_members",
+    (
+        ("GetAttachedEntities3",),
+        ("GetAttachedEntityTypes",),
+        ("GetAttachedEntityCount3",),
+        ("GetAttachedEntities3", "GetAttachedEntityTypes", "GetAttachedEntityCount3"),
+    ),
+)
+def test_chamfer_unsupported_attachment_inventory_is_diagnostic_not_gating(monkeypatch, unsupported_members):
+    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch)
+    def unsupported():
+        raise NotImplementedError("imported dimension attachment inventory unsupported")
+    for member in unsupported_members:
+        setattr(annotation, member, unsupported)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    _check_arm_guard(drawing._assert_profile_chamfer, adapter, profile, annotation)
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+    for member in unsupported_members:
+        assert any(
+            member in entry and "UNMEASURED NotImplementedError" in entry
+            and "attachment inventory unsupported" in entry
+            for entry in logged
+        )
+    assert any("profile chamfer native attachments:" in entry for entry in logged)
 
 
 def test_chamfer_rendered_edge_parser_keeps_native_arc_and_silhouette_alignment(monkeypatch) -> None:
@@ -911,7 +976,7 @@ def test_chamfer_rendered_edge_parser_keeps_native_arc_and_silhouette_alignment(
     line = raw[:15]
     arc = (1.0, 12.0, *(0.0 for _ in range(12)), *line[2:])
     profile.GetPolylines7 = lambda _option: ((None, outer, inner), (*line, *arc, *line))
-    drawing._rendered_chamfer_edges(adapter, profile, annotation)
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize("corrupt", ("truncated", "fractional", "negative", "trailing"))
@@ -929,7 +994,7 @@ def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch,
         raw.append(0.0)
     profile.GetPolylines7 = lambda _option: ((outer, inner), tuple(raw))
     with pytest.raises(RuntimeError, match="buffer|render"):
-        drawing._rendered_chamfer_edges(adapter, profile, annotation)
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -944,7 +1009,7 @@ def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch,
 def test_chamfer_edge_guard_rejects_missing_wrong_or_unrendered_receivers(monkeypatch, changed) -> None:
     adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, **changed)
     with pytest.raises(RuntimeError):
-        drawing._rendered_chamfer_edges(adapter, profile, annotation)
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 def test_chamfer_edge_guard_rejects_one_edge_or_the_opposite_mouth(monkeypatch) -> None:
@@ -952,10 +1017,10 @@ def test_chamfer_edge_guard_rejects_one_edge_or_the_opposite_mouth(monkeypatch) 
     _edges, raw = profile.GetPolylines7(1)
     profile.GetPolylines7 = lambda _option: ((outer, near), raw)
     with pytest.raises(RuntimeError, match="both actual rear"):
-        drawing._rendered_chamfer_edges(adapter, profile, annotation)
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
     profile.GetPolylines7 = lambda _option: ((outer,), raw[:15])
     with pytest.raises(RuntimeError, match="both actual rear"):
-        drawing._rendered_chamfer_edges(adapter, profile, annotation)
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 def _native_dimension_text(monkeypatch, **changed):
@@ -998,7 +1063,7 @@ def test_dimension_clearance_honours_native_reference_and_rotation(monkeypatch, 
     )
     # This string's default estimated width is NOT 12 mm. Only the positive
     # measured width can produce this box around the correct native corner.
-    assert drawing._dimension_text_bounds(annotation, label="Width") == pytest.approx(expected)
+    assert _check_arm_guard(drawing._dimension_text_bounds, annotation, label="Width") == pytest.approx(expected)
 
 
 @pytest.mark.parametrize(
@@ -1015,7 +1080,7 @@ def test_dimension_clearance_honours_native_reference_and_rotation(monkeypatch, 
 def test_dimension_clearance_refuses_unmeasurable_or_undocumented_native_runs(monkeypatch, changed):
     annotation = _native_dimension_text(monkeypatch, **changed)
     with pytest.raises(RuntimeError, match="whole bounds|no rendered text"):
-        drawing._dimension_text_bounds(annotation, label="Width")
+        _check_arm_guard(drawing._dimension_text_bounds, annotation, label="Width")
 
 
 def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
@@ -1037,6 +1102,93 @@ def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
         "TOP VIEW", "ROTATED 90 DEG CCW", "SCALE 1:1"
     ]
     assert drawing.ISO_CENTER == (0.360, 0.230)
+
+
+def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
+    if native_guards:
+        adapter, profile, annotation, outer, _inner, near = _chamfer_edge_case(monkeypatch, **changed)
+        if changed.get("edge_hidden"):
+            _edges, raw = profile.GetPolylines7(1)
+            profile.GetPolylines7 = lambda _option: ((outer, near), raw)
+    else:
+        adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
+    profile.initial_angle = changed.get("initial_angle", 0.0)
+    front = SimpleNamespace(GetOutline=lambda: changed.get("front_box", (0.0422, 0.1142, 0.2478, 0.1698)))
+    width = SimpleNamespace(name="Width")
+    end = SimpleNamespace(name="EndRadius")
+    callouts = {name: SimpleNamespace(name=name) for name in ("overall length", "handle pivot", "anchor tap")}
+    segments = {
+        "Width": [((0.279, 0.1166), (0.279, 0.1674))],
+        "EndRadius": [((0.240, 0.142), (0.248, 0.087))],
+        "stock thickness": [((0.296, 0.082), (0.304, 0.082))],
+        "overall length": [((0.0446, 0.073), (0.2454, 0.073))],
+        "handle pivot": [((0.220, 0.170), (0.270, 0.180))],
+        "anchor tap": [((0.110, 0.155), (0.195, 0.200))],
+    }
+    boxes = {
+        "Width": (0.274, 0.135, 0.279, 0.147),
+        "EndRadius": (0.238, 0.084, 0.258, 0.090),
+        "stock thickness": (0.293, 0.079, 0.307, 0.085),
+        "overall length": (0.130, 0.070, 0.160, 0.076),
+        "handle pivot": (0.225, 0.180, 0.310, 0.205),
+        "anchor tap": (0.180, 0.200, 0.230, 0.215),
+    }
+    if "cross" in changed:
+        segments[changed["cross"]] = [((0.255, 0.140), (0.255, 0.090))]
+    if "text_overlap" in changed:
+        boxes[changed["text_overlap"]] = (0.255, 0.100, 0.265, 0.110)
+    route = changed.get("route", [((0.296, 0.09455), (0.276, 0.09455))])
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: (
+        "BoreRearChamferSize" if item is annotation else "Depth" if item is profile.stock else item.name
+    ))
+    monkeypatch.setattr(drawing, "dimension_segments", lambda item: route if item is annotation else segments[item.name])
+    if native_guards:
+        for item in (width, end, profile.stock, *callouts.values()):
+            x0, y0, x1, y1 = boxes[item.name]
+            runs = [(item.name, (x0, y0, 0.0), x1 - x0, y1 - y0, 1, 0.0)]
+            if item is width and changed.get("zero_width"):
+                runs = [
+                    ("WIDTH FIRST", (x0, y0, 0.0), 0.0, y1 - y0, 1, 0.0),
+                    ("WIDTH SECOND", (x0, y0, 0.0), 0.0, y1 - y0, 1, 0.0),
+                ]
+            data = SimpleNamespace(
+                GetTextCount=lambda runs=runs: len(runs),
+                GetTextAtIndex=lambda index, runs=runs: runs[index][0],
+                GetTextPositionAtIndex=lambda index, runs=runs: runs[index][1],
+                GetTextInBoxWidthAtIndex=lambda index, runs=runs: runs[index][2],
+                GetTextHeightAtIndex=lambda index, runs=runs: runs[index][3],
+                GetTextRefPositionAtIndex=lambda index, runs=runs: runs[index][4],
+                GetTextAngleAtIndex=lambda index, runs=runs: runs[index][5],
+            )
+            if item is profile.stock:
+                item.GetSpecificAnnotation().GetDisplayData = lambda data=data: data
+            else:
+                display = SimpleNamespace(GetDisplayData=lambda data=data: data)
+                item.GetSpecificAnnotation = lambda display=display: display
+    else:
+        monkeypatch.setattr(drawing, "_dimension_text_bounds", lambda item, **_kw: boxes[item.name])
+    monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
+    def edges(*_args, errors):
+        if changed.get("edge_hidden"):
+            errors.append("profile does not render both actual rear bore-chamfer edges")
+    if not native_guards:
+        monkeypatch.setattr(drawing, "_rendered_chamfer_edges", edges)
+    monkeypatch.setattr(drawing, "callout_ink", lambda *_a, **_kw: SimpleNamespace(
+        text=changed.get("box", (0.2504, 0.0926, 0.2756, 0.1314))
+    ))
+    monkeypatch.setattr(drawing, "sheet_region", lambda _a: SimpleNamespace(
+        xmin=changed.get("region_left", 0.0127), ymin=0.0127, xmax=0.4191, ymax=0.2667
+    ))
+    caption_annotation = SimpleNamespace(
+        GetPosition=lambda: changed.get("caption_position", (*drawing.PROFILE_CAPTION_XY, 0.0)),
+        Visible=1, OwnerType=0, Owner=changed.get("caption_owner", profile),
+    )
+    caption = SimpleNamespace(
+        GetText=lambda: changed.get("caption_text", notes.PROFILE_VIEW_CAPTION),
+        GetAnnotation=lambda: caption_annotation,
+        GetExtent=lambda: changed.get("caption_extent", (0.316, 0.146, 0.0, 0.365, 0.160, 0.0)),
+    )
+    return adapter, front, profile, [width, end], [annotation, profile.stock], callouts, caption
 
 
 @pytest.mark.parametrize(
@@ -1081,69 +1233,23 @@ def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
     ),
 )
 def test_profile_chamfer_checks_final_native_ink_placement_and_persistence(monkeypatch, changed, message) -> None:
-    adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
-    front = SimpleNamespace(GetOutline=lambda: changed.get("front_box", (0.0422, 0.1142, 0.2478, 0.1698)))
-    width = SimpleNamespace(name="Width")
-    end = SimpleNamespace(name="EndRadius")
-    callouts = {name: SimpleNamespace(name=name) for name in ("overall length", "handle pivot", "anchor tap")}
-    segments = {
-        "Width": [((0.279, 0.1166), (0.279, 0.1674))],
-        "EndRadius": [((0.240, 0.142), (0.248, 0.087))],
-        "stock thickness": [((0.296, 0.082), (0.304, 0.082))],
-        "overall length": [((0.0446, 0.073), (0.2454, 0.073))],
-        "handle pivot": [((0.220, 0.170), (0.270, 0.180))],
-        "anchor tap": [((0.110, 0.155), (0.195, 0.200))],
-    }
-    boxes = {
-        "Width": (0.274, 0.135, 0.279, 0.147),
-        "EndRadius": (0.238, 0.084, 0.258, 0.090),
-        "stock thickness": (0.293, 0.079, 0.307, 0.085),
-        "overall length": (0.130, 0.070, 0.160, 0.076),
-        "handle pivot": (0.225, 0.180, 0.310, 0.205),
-        "anchor tap": (0.180, 0.200, 0.230, 0.215),
-    }
-    if "cross" in changed:
-        segments[changed["cross"]] = [((0.255, 0.140), (0.255, 0.090))]
-    if "text_overlap" in changed:
-        boxes[changed["text_overlap"]] = (0.255, 0.100, 0.265, 0.110)
-    route = changed.get("route", [((0.296, 0.09455), (0.276, 0.09455))])
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: (
-        "BoreRearChamferSize" if item is annotation else "Depth" if item is profile.stock else item.name
-    ))
-    monkeypatch.setattr(drawing, "dimension_segments", lambda item: route if item is annotation else segments[item.name])
-    monkeypatch.setattr(drawing, "_dimension_text_bounds", lambda item, **_kw: boxes[item.name])
-    monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
-    def edges(*_args):
-        if changed.get("edge_hidden"):
-            raise RuntimeError("profile does not render both actual rear bore-chamfer edges")
-    monkeypatch.setattr(drawing, "_rendered_chamfer_edges", edges)
-    monkeypatch.setattr(drawing, "callout_ink", lambda *_a, **_kw: SimpleNamespace(
-        text=changed.get("box", (0.2504, 0.0926, 0.2756, 0.1314))
-    ))
-    monkeypatch.setattr(drawing, "sheet_region", lambda _a: SimpleNamespace(
-        xmin=changed.get("region_left", 0.0127), ymin=0.0127, xmax=0.4191, ymax=0.2667
-    ))
-    caption_annotation = SimpleNamespace(
-        GetPosition=lambda: changed.get("caption_position", (*drawing.PROFILE_CAPTION_XY, 0.0)),
-        Visible=1, OwnerType=0, Owner=changed.get("caption_owner", profile),
-    )
-    caption = SimpleNamespace(
-        GetText=lambda: changed.get("caption_text", notes.PROFILE_VIEW_CAPTION),
-        GetAnnotation=lambda: caption_annotation,
-        GetExtent=lambda: changed.get("caption_extent", (0.316, 0.146, 0.0, 0.365, 0.160, 0.0)),
-    )
-    args = (adapter, front, profile, [width, end], [annotation, profile.stock], callouts, caption)
+    args = _final_profile_case(monkeypatch, **changed)
     if message is None:
-        drawing._profile_chamfer_clear(*args)
+        _check_arm_guard(drawing._profile_chamfer_clear, *args)
     else:
         with pytest.raises(RuntimeError, match=message):
-            drawing._profile_chamfer_clear(*args)
+            _check_arm_guard(drawing._profile_chamfer_clear, *args)
 
 
-@pytest.mark.parametrize("guard_error", (False, True))
-def test_build_uses_one_replacement_profile_and_native_guards_before_finalization(monkeypatch, guard_error) -> None:
+def _mock_arm_build(monkeypatch, *, guard_error=False, native_case=None):
     views, curated, hlr, hlv, text, turned = [], [], [], [], [], []
-    adapter = SimpleNamespace(currentModel=object())
+    adapter = native_case[0] if native_case is not None else SimpleNamespace()
+    adapter.currentModel = object()
+    native_turn = drawing._turn_profile
+    native_place = drawing._place_profile_chamfer
+    native_guard = drawing._profile_chamfer_clear
+    if native_case is not None:
+        native_case[2].Angle = native_case[2].initial_angle
     async def open_model(_path):
         return None
     adapter.open_model = open_model
@@ -1154,7 +1260,12 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (object(), object()))
     monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_a: None)
     def place(_adapter, _source, orientation, *xy, scale):
-        view = SimpleNamespace(orientation=orientation, xy=xy, mode=None, scale=scale)
+        view = (
+            native_case[1] if native_case is not None and orientation == "*Front"
+            else native_case[2] if native_case is not None and orientation == "*Top"
+            else SimpleNamespace()
+        )
+        view.orientation, view.xy, view.mode, view.scale = orientation, xy, None, scale
         views.append(view)
         return view
     def curate(_adapter, view, *, keep, dimensions_by_feature, **_kw):
@@ -1163,6 +1274,8 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
         if view.orientation == "*Top":
             assert hlv == [view] and turned == [view]
         curated.append((view.orientation, set(keep)))
+        if native_case is not None:
+            return native_case[3] if view.orientation == "*Front" else native_case[4]
         return [SimpleNamespace(name=name) for name in keep]
     monkeypatch.setattr(drawing, "place_view", place)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
@@ -1174,10 +1287,15 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
         hlv.append(view)
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", hidden_removed)
     monkeypatch.setattr(drawing, "set_hidden_lines_visible", hidden_visible)
-    monkeypatch.setattr(drawing, "_turn_profile", lambda _a, view: turned.append(view))
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: annotation.name)
+    def turn(_adapter, view, *, errors):
+        turned.append(view)
+        if native_case is not None:
+            native_turn(_adapter, view, errors=errors)
+    monkeypatch.setattr(drawing, "_turn_profile", turn)
+    if native_case is None:
+        monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: annotation.name)
     monkeypatch.setattr(drawing, "set_dimension_callouts", lambda _a, annotations, rows: (
-        text.append((set(item.name for item in annotations), rows))
+        text.append((set(drawing.dimension_name(_a, item) for item in annotations), rows))
     ))
     for name in (
         "assert_imported_precision", "set_reference_dimension", "_hub_seat_leader_clear",
@@ -1187,25 +1305,52 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
     ):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
     placed, checked, finalized = [], [], []
-    monkeypatch.setattr(drawing, "_place_profile_chamfer", lambda _a, view, annotations: (
+    def place_chamfer(_adapter, view, annotations, *, errors):
         placed.append((view, annotations))
-    ))
-    caption = object()
-    monkeypatch.setattr(drawing, "_profile_caption", lambda _a, view: caption)
-    def guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption):
+        if native_case is not None:
+            native_place(_adapter, view, annotations, errors=errors)
+    monkeypatch.setattr(drawing, "_place_profile_chamfer", place_chamfer)
+    if native_case is not None:
+        def offset(_adapter, annotations, targets):
+            for annotation in annotations:
+                annotation.GetSpecificAnnotation().OffsetText = True
+                annotation.SetPosition2(*targets["BoreRearChamferSize"], 0.0)
+        monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    caption = native_case[6] if native_case is not None else object()
+    monkeypatch.setattr(drawing, "_profile_caption", lambda _a, view, **_kw: caption)
+    def guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption, *, errors):
         checked.append((front, profile, front_annotations, profile_annotations, set(callouts), actual_caption))
         assert profile.mode == 1 and hlv == [profile, profile]
         if guard_error:
-            raise RuntimeError("missing native chamfer edge")
+            errors.append("missing native chamfer edge")
+        if native_case is not None:
+            native_guard(_a, front, profile, front_annotations, profile_annotations, callouts, actual_caption, errors=errors)
     monkeypatch.setattr(drawing, "_profile_chamfer_clear", guard)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *_a, **_kw: True)
-    monkeypatch.setattr(drawing, "add_native_hole_callout", lambda *_a, **_kw: SimpleNamespace(GetAnnotation=lambda: object()))
+    def hole_callout(*_a, label, **_kw):
+        annotation = native_case[5]["anchor tap" if label == "anchor tap" else "handle pivot"] if native_case is not None else object()
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+    monkeypatch.setattr(drawing, "add_native_hole_callout", hole_callout)
     monkeypatch.setattr(drawing, "add_attached_note", lambda *_a, **_kw: object())
-    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *_a, **_kw: SimpleNamespace(GetAnnotation=lambda: object()))
+    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *_a, **_kw: SimpleNamespace(
+        GetAnnotation=lambda: native_case[5]["overall length"] if native_case is not None else object(),
+    ))
     async def finalize(*_a, **_kw):
         finalized.append(True)
         return {"drawing": "complete"}
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    return SimpleNamespace(
+        adapter=adapter, views=views, curated=curated, hlr=hlr, hlv=hlv, text=text,
+        turned=turned, placed=placed, checked=checked, finalized=finalized, caption=caption,
+    )
+
+
+@pytest.mark.parametrize("guard_error", (False, True))
+def test_build_uses_one_replacement_profile_and_native_guards_before_finalization(monkeypatch, guard_error) -> None:
+    case = _mock_arm_build(monkeypatch, guard_error=guard_error)
+    adapter, finalized = case.adapter, case.finalized
+    views, curated, hlr, hlv = case.views, case.curated, case.hlr, case.hlv
+    placed, checked, text, caption = case.placed, case.checked, case.text, case.caption
     if guard_error:
         with pytest.raises(RuntimeError, match="missing native chamfer edge"):
             asyncio.run(drawing.build(adapter))
@@ -1229,3 +1374,142 @@ def test_build_uses_one_replacement_profile_and_native_guards_before_finalizatio
         isinstance(node, ast.Constant) and isinstance(node.value, str) and "A-A" in node.value
         for node in ast.walk(tree)
     )
+
+
+def test_build_collects_native_identity_limits_rendering_all_bad_runs_and_caption_together(monkeypatch):
+    native = _final_profile_case(
+        monkeypatch, native_guards=True,
+        full_name="WrongSize@OtherFeature@dt-crank-arm.SLDPRT", dimension_type=1,
+        source_dimension=object(), leg=0.10, kind=6, lower=-0.05, upper=0.10,
+        edge_hidden=True, zero_width=True,
+        caption_text=notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", "\r\n"),
+    )
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    def rejected_precision(*_args):
+        raise RuntimeError("imported chamfer precision readback mismatch")
+    monkeypatch.setattr(drawing, "assert_imported_precision", rejected_precision)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(case.adapter))
+    report = str(caught.value)
+    for violation in (
+        "UNMEASURED imported model precision: RuntimeError: imported chamfer precision readback mismatch",
+        "wrong model identity/type (identity)", "wrong model identity/type (type)",
+        "source model dimension", "changed its model leg",
+        "LIMIT band (type)", "LIMIT band (lower)", "LIMIT band (upper)",
+        "both actual rear bore-chamfer edges",
+        "Width: native dimension text has no measurable whole bounds (run=0)",
+        "Width: native dimension text has no measurable whole bounds (run=1)",
+        "caption did not persist with its view (raw/normalized text)",
+    ):
+        assert violation in report
+    assert case.finalized == []
+    # Both bad runs and every later independent dimension/caption are measured,
+    # not merely a list of exceptions from coarse, first-failure helpers.
+    for measured in (
+        "WIDTH FIRST", "WIDTH SECOND", "EndRadius run 0", "stock thickness run 0",
+        "overall length run 0", "handle pivot run 0", "anchor tap run 0",
+        "profile chamfer rendered proof:", "cursor=", "rawlen=", "poly_count=",
+        "caption did not persist with its view (extent)",
+        "profile caption / anchor tap",
+    ):
+        assert any(measured in entry for entry in logged)
+    assert any("\\r\\n" in entry and "raw/normalized text" in entry for entry in logged)
+
+
+@pytest.mark.parametrize("newline", ("\n", "\r\n"))
+def test_build_complete_native_guard_positive_control_reaches_finalize_once(monkeypatch, newline):
+    native = _final_profile_case(
+        monkeypatch, native_guards=True,
+        attached=(), attached_count=0, attached_types=(),
+        caption_text=notes.PROFILE_VIEW_CAPTION.replace("\n", newline),
+        text=notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", newline),
+    )
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    assert asyncio.run(drawing.build(case.adapter)) == {"drawing": "complete"}
+    assert case.finalized == [True]
+
+
+@pytest.mark.parametrize("newline", ("\n", "\r\n"))
+def test_build_refuses_real_caption_content_mismatch_under_either_newline(monkeypatch, newline):
+    native = _final_profile_case(
+        monkeypatch, native_guards=True,
+        caption_text=notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", newline),
+    )
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    with pytest.raises(RuntimeError, match="caption did not persist"):
+        asyncio.run(drawing.build(case.adapter))
+    assert case.finalized == []
+
+
+def test_build_retains_early_turn_placement_and_reference_failures_until_final_readback(monkeypatch):
+    native = _final_profile_case(monkeypatch, native_guards=True, initial_angle=drawing.PROFILE_ANGLE)
+    annotation = native[4][0]
+    annotation.SetPosition2 = lambda *_xyz: False
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    def reject_reference(*_args, label, **_kwargs):
+        if label == "arm stock thickness":
+            raise OSError("native reference readback rejected")
+    monkeypatch.setattr(drawing, "set_reference_dimension", reject_reference)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(case.adapter))
+    report = str(caught.value)
+    assert "already rotated" in report
+    assert "failed to place the native bore-mouth dimension line" in report
+    assert "UNMEASURED Depth stock reference placement: OSError: native reference readback rejected" in report
+    assert len(case.checked) == 1
+    assert case.finalized == []
+
+
+def test_absent_annotations_record_unmeasured_dependencies_but_still_measure_ink_and_caption(monkeypatch):
+    native = list(_final_profile_case(
+        monkeypatch, native_guards=True, caption_text="WRONG\r\nCAPTION",
+    ))
+    native[4] = []
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(case.adapter))
+    report = str(caught.value)
+    assert "UNMEASURED" in report and "expected one BoreRearChamferSize" in report
+    assert "UNMEASURED" in report and "expected one Depth" in report
+    assert "caption did not persist" in report
+    assert any("Width run 0" in entry for entry in logged)
+    assert any("EndRadius run 0" in entry for entry in logged)
+    assert any("profile chamfer rendered proof:" in entry for entry in logged)
+    assert case.finalized == []
+
+
+def test_failed_native_field_and_text_run_reads_do_not_hide_later_measurements(monkeypatch):
+    native = _final_profile_case(
+        monkeypatch, native_guards=True, zero_width=True,
+        caption_text="WRONG\r\nCAPTION",
+    )
+    dimension = native[4][0].GetSpecificAnnotation().GetDimension2(0)
+    def unreadable_type():
+        raise OSError("native type unavailable")
+    dimension.GetType = unreadable_type
+    width_data = native[3][0].GetSpecificAnnotation().GetDisplayData()
+    def unreadable_first_width(index):
+        if index == 0:
+            raise OSError("native width unavailable")
+        return 0.0
+    width_data.GetTextInBoxWidthAtIndex = unreadable_first_width
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(case.adapter))
+    report = str(caught.value)
+    for violation in (
+        "UNMEASURED chamfer dimension type: OSError: native type unavailable",
+        "UNMEASURED Width run 0 width: OSError: native width unavailable",
+        "Width: native dimension text has no measurable whole bounds (run=1)",
+        "caption did not persist",
+    ):
+        assert violation in report
+    assert any("WIDTH SECOND" in entry for entry in logged)
+    assert any("anchor tap run 0" in entry for entry in logged)
+    assert case.finalized == []
