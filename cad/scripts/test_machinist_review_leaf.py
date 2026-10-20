@@ -621,6 +621,100 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     assert cache.last_stored_key("check:machinist_review:probe") is None
 
 
+@pytest.mark.parametrize("mode", REVIEWED_MODES, ids=["learn", "enforce"])
+@pytest.mark.parametrize(
+    ("carrier", "winner_matches_selected"),
+    [
+        ("stable", True),
+        ("removed", True),
+        ("changed", True),
+        ("changed", False),
+    ],
+    ids=["stable-selected", "removed-selected", "changed-selected", "changed-wrong-winner"],
+)
+def test_losing_review_keeps_action_selection_when_carrier_changes(
+    action, monkeypatch, mode, carrier, winner_matches_selected
+):
+    dodo = action.dodo
+    selected = review_settings.resolve_settings(
+        reviewer="codex", model="gpt-6-astra", effort="high",
+        judge_reviewer="codex", judge_model="gpt-6-astra", judge_effort="high",
+    )
+    drifted = replace(selected, effort="low", judge_effort="low")
+    monkeypatch.setenv(review_settings.SETTINGS_ENV, selected.canonical())
+    action.state["skipped"] = False
+    directory = dodo._machinist_review_dir("probe")
+    label = "check:machinist_review:probe"
+    monkeypatch.setattr(
+        dodo, "_cache_key",
+        lambda deps, label=None: dodo._cache.cache_key(
+            deps, dodo.ContentChecker._digest, label
+        ),
+    )
+    key = dodo._cache_key(dodo._machinist_review_file_deps("probe", selected), label)
+    assert key != dodo._cache_key(
+        dodo._machinist_review_file_deps("probe", drifted), label
+    )
+    winner_files = {}
+    phases = []
+
+    def store(stored_key, outputs, stored_label):
+        assert (stored_key, outputs, stored_label) == (key, [directory], label)
+        assert not dodo._machinist_review_stamp("probe").exists()
+        assert dodo._read_machinist_aggregate("probe", selected)["verdict"] == "SHIP"
+        action.calls["store"] += 1
+        if not winner_matches_selected:
+            # Build a complete, valid winner for T, not malformed S evidence.
+            monkeypatch.setenv(review_settings.SETTINGS_ENV, drifted.canonical())
+            action.report()
+            assert dodo._read_machinist_aggregate("probe", drifted)["verdict"] == "SHIP"
+        winner_files.update({
+            path.relative_to(directory): path.read_bytes()
+            for path in directory.rglob("*") if path.is_file()
+        })
+        winner_files[Path("winner-evidence.json")] = b'{"producer":"winner"}'
+        (directory / "loser-only-attempt.json").write_text("{}", encoding="utf-8")
+        if carrier == "removed":
+            monkeypatch.delenv(review_settings.SETTINGS_ENV)
+        elif carrier == "changed":
+            monkeypatch.setenv(review_settings.SETTINGS_ENV, drifted.canonical())
+        phases.append("store")
+        return "lost"
+
+    def restore(restored_key, outputs, restored_label):
+        assert (restored_key, outputs, restored_label) == (key, [directory], label)
+        assert phases == ["store"]
+        assert not directory.exists()  # canonical adoption removed all loser evidence
+        for relative, content in winner_files.items():
+            path = directory / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        phases.append("restore")
+        return True
+
+    monkeypatch.setattr(dodo._cache, "store", store)
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    if winner_matches_selected:
+        dodo._cached_machinist_review_action("probe", mode)
+        assert dodo._read_machinist_aggregate("probe", selected)["verdict"] == "SHIP"
+    else:
+        with pytest.raises(
+            RuntimeError, match="could not adopt canonical reports.*provenance mismatch"
+        ):
+            dodo._cached_machinist_review_action("probe", mode)
+        assert dodo._read_machinist_aggregate("probe", drifted)["verdict"] == "SHIP"
+    assert dodo._machinist_review_stamp("probe").exists() == winner_matches_selected
+    assert phases == ["store", "restore"]
+    assert action.calls["run"] == action.calls["store"] == 1
+    assert not action.calls["warnings"]
+    command = action.calls["commands"][0]
+    start = command.index("--reviewer")
+    assert command[start:start + 12] == selected.cli_args()
+    assert (directory / "winner-evidence.json").read_bytes() == b'{"producer":"winner"}'
+    assert not (directory / "loser-only-attempt.json").exists()
+
+
+
 @pytest.mark.parametrize("failure", ["missing", "locked", "cleanup", "invalid-aggregate"])
 def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, failure):
     dodo = action.dodo
