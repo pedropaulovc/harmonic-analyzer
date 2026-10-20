@@ -392,6 +392,14 @@ same native display/model objects and exactly unchanged full name, raw
 value and tolerance metadata, even for a change smaller than that allowance;
 the existing view-ownership and visible free-end witness proofs also remain.
 
+The r6 native display includes a horizontal text leader as well as the two
+thickness witnesses. The check selects exactly one horizontal witness at each
+projected plate-face level, retaining the native-gap/free-end origin and
+arrow-intersection proof; extra horizontal ink must join the arrow-axis
+dimension line. Duplicate face-level candidates are refused. Recorded r6
+tuples cover initial and settled checks without implying a regenerated
+drawing has passed.
+
 **Source-only material/gravity estimate (against #1761, b2c8d954).** The gross
 downward box is 10.080 cm³, but it overlaps the existing cylinder and ribs.
 Integrating the source prism unions gives **+5.808 cm³** for the plate

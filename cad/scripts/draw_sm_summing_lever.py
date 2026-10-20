@@ -686,11 +686,11 @@ def _plate_thickness_check(
     value, must still tie it to the visible top and bottom free-end edges.
     No synthetic witness move or value, tolerance, precision or gap edit.
 
-    R5 supplied no native coordinates. The two unsplit horizontal witnesses,
-    bottom/top gap-index order and left-of-free-end route below remain strict
-    hypotheses to prove, not a seat-observed layout. Any geometry refusal logs
-    the complete small native rows and projection frame before re-raising;
-    diagnostic read failures never supply substitute geometry.
+    R6 captured two face-level witnesses plus a horizontal text leader joined
+    to the split vertical dimension line. Classify those roles by projected
+    face levels and connectivity, not the total horizontal stroke count.
+    Any geometry refusal logs the complete small native rows and projection
+    frame; diagnostic read failures never supply substitute geometry.
     """
     label = "VIEW F PlateThickness"
     slop = 1e-8
@@ -858,10 +858,11 @@ def _plate_thickness_check(
                 "coordinate_tolerance_m": slop,
                 "top_minus_bottom_m": (0.0, COEFFICIENT_T / 1000.0),
                 "inboard_minus_bottom_m": (0.001, 0.0),
-                "horizontal_witness_count": 2,
+                "witness_rule": "exactly one horizontal per projected bottom/top face",
                 "gap_index_face_order": ("bottom", "top"),
                 "origin_rule": "right_x = projected_free_end_x - effective_native_gap_m",
                 "arrow_rule": "common x strictly inside both horizontal witnesses",
+                "text_leader_rule": "horizontal endpoint joins the arrow-axis dimension line",
             },
             **context,
         }
@@ -949,17 +950,19 @@ def _plate_thickness_check(
             if abs(stroke[1][1] - stroke[0][1]) <= slop
             and abs(stroke[1][0] - stroke[0][0]) > slop
         ]
-        if len(horizontal) != 2 or abs(tips[0][0] - tips[1][0]) > slop:
-            raise RuntimeError(f"{label}: expected two horizontal native witnesses")
-        tails = []
+        if abs(tips[0][0] - tips[1][0]) > slop:
+            raise RuntimeError(f"{label}: native arrows do not share a dimension line")
+        tails, witnesses = [], []
         for face, tip, (_use_doc, gap) in zip(faces, tips, gaps):
-            witnesses = [
+            candidates = [
                 stroke for stroke in horizontal
                 if all(abs(point[1] - face[1]) <= slop for point in stroke)
             ]
-            if len(witnesses) != 1:
-                raise RuntimeError(f"{label}: witness does not follow its plate face level")
-            left, right = sorted(point[0] for point in witnesses[0])
+            if len(candidates) != 1:
+                raise RuntimeError(f"{label}: expected one native witness at each plate face level")
+            witness = candidates[0]
+            witnesses.append(witness)
+            left, right = sorted(point[0] for point in witness)
             if (
                 abs(tip[1] - face[1]) > slop
                 or abs(right - (face[0] - gap)) > slop
@@ -967,12 +970,27 @@ def _plate_thickness_check(
             ):
                 raise RuntimeError(f"{label}: unexpected native witness endpoint or arrow")
             tails.append(left)
+        dimension_lines = [stroke for stroke in segments if stroke not in horizontal]
         if any(
-            stroke not in horizontal
-            and any(abs(point[0] - tips[0][0]) > slop for point in stroke)
-            for stroke in segments
+            any(abs(point[0] - tips[0][0]) > slop for point in stroke)
+            for stroke in dimension_lines
         ):
             raise RuntimeError(f"{label}: unexpected native dimension-line ink")
+        # Text outside the arrows can add an underline/leader. It is not a
+        # witness: its horizontal run joins an endpoint of the native vertical
+        # dimension line, away from the two measured face levels.
+        for stroke in horizontal:
+            if stroke in witnesses:
+                continue
+            if not any(
+                abs(point[0] - tips[0][0]) <= slop
+                and any(
+                    math.dist(point, endpoint) <= slop
+                    for line in dimension_lines for endpoint in line
+                )
+                for point in stroke
+            ):
+                raise RuntimeError(f"{label}: unexpected native text-leader ink")
         return tuple(gaps), tuple(tips), tuple(tails)
 
     def ink(display: Any) -> tuple[Any, ...]:

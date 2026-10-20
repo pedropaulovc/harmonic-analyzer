@@ -1331,7 +1331,7 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
-    """Synthetic native API boundary; no VIEW F ink was captured by r5."""
+    """Synthetic native API boundary for independent geometry/identity mutations."""
     dx, dy = offset
     state = SimpleNamespace(
         name="PlateThickness@PlateProfile@sm-summing-lever.SLDPRT",
@@ -1493,6 +1493,224 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
         adapter=adapter, view=view, annotation=annotation, state=state,
         capture=lambda: drawing._plate_thickness_check(adapter, view, [annotation]),
     )
+
+
+def _recorded_plate_thickness(monkeypatch):
+    """Replay r6's dimension-display rows and projected free-end coordinates."""
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    state.name = "PlateThickness@PlateProfile@sm-summing-lever.Part"
+    state.value = 0.006999999969999999
+    state.use_doc = [True, True]
+    state.annotation_position = (0.228, 0.083, -9.999999999949722e-05)
+    state.view_position = (0.3, 0.1)
+    state.transform = (
+        -1.0, 0.0, 6.982962677686267e-15, 0.0, 1.0, 0.0,
+        -6.982962677686267e-15, 0.0, -1.0,
+        0.2793625, 0.1, 1.441108922607503e-16, 1.0, 0.0, 0.0, 0.0,
+    )
+    case.view.Position = state.view_position
+    case.view.ModelToViewTransform.ArrayData = state.transform
+    state.lines = [
+        (0.0, 0.0, -1.0, -1.0,
+         0.23391250000000002, 0.10254, -9.999999999953851e-05,
+         0.22700000000000004, 0.10254, -9.999999999949024e-05),
+        (0.0, 0.0, -1.0, -1.0,
+         0.23391250000000002, 0.09554000003, -9.999999999953851e-05,
+         0.22700000000000004, 0.09554000003, -9.999999999949024e-05),
+        (0.0, 0.0, -1.0, -1.0,
+         0.21636249951273206, 0.08022187500447034, -9.999999999945843e-05,
+         0.22800000000000004, 0.08022187500447034, -9.999999999949723e-05),
+        (0.0, 0.0, -1.0, -1.0,
+         0.22800000000000004, 0.08022187500447034, -9.999999999949723e-05,
+         0.22800000000000004, 0.09554000003, -9.999999999949722e-05),
+        (0.0, 0.0, -1.0, -1.0,
+         0.22800000000000004, 0.10254, -9.999999999949722e-05,
+         0.22800000000000004, 0.10889, -9.999999999949722e-05),
+    ]
+    state.arrows = [
+        [0.22800000000000004, 0.10254, -9.999999999949722e-05,
+         -0.0, 1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.22800000000000004, 0.09554000003, -9.999999999949722e-05,
+         0.0, -1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ]
+    state.projected = {
+        (0.044449999999999996, -0.0044599999999999996, -0.07619999999999999):
+            (0.23491250000000055, 0.09554),
+        (0.044449999999999996, 0.00254, -0.07619999999999999):
+            (0.23491250000000055, 0.10254),
+        (0.043449999999999996, -0.0044599999999999996, -0.07619999999999999):
+            (0.23591250000000055, 0.09554),
+    }
+    state.text_position = (
+        0.21636249951273206, 0.08022187482984736, -9.999999999949722e-05,
+    )
+    monkeypatch.setattr(state.data, "GetLineAtIndex2", lambda index: state.lines[index])
+    monkeypatch.setattr(
+        state.data, "GetTextPositionAtIndex",
+        lambda _index: state.text_position,
+    )
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, _view, xyz, **_kwargs: state.projected[xyz],
+    )
+    return case
+
+
+def test_plate_thickness_accepts_recorded_native_layout(monkeypatch) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    original = (tuple(state.lines), tuple(tuple(row) for row in state.arrows))
+    check = case.capture()
+    check()
+    assert (tuple(state.lines), tuple(tuple(row) for row in state.arrows)) == original
+    assert state.geometry_failures == []
+
+
+@pytest.mark.parametrize("offset", [(0.0, 0.0), (0.017, -0.009)])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_recorded_plate_thickness_is_independent_of_sheet_position_and_row_order(
+    monkeypatch, offset, reverse,
+) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    dx, dy = offset
+    moved = []
+    for raw in state.lines:
+        row = list(raw)
+        for index in (4, 7):
+            row[index] += dx
+            row[index + 1] += dy
+        if reverse:
+            row[4:7], row[7:10] = row[7:10], row[4:7]
+        moved.append(tuple(row))
+    state.lines = moved[::-1] if reverse else moved
+    for row in state.arrows:
+        row[0] += dx
+        row[1] += dy
+    if reverse:
+        state.arrows.reverse()
+    state.projected = {
+        model: (point[0] + dx, point[1] + dy) for model, point in state.projected.items()
+    }
+    for member in ("annotation_position", "text_position", "view_position"):
+        point = getattr(state, member)
+        setattr(state, member, (point[0] + dx, point[1] + dy, *point[2:]))
+    transform = list(state.transform)
+    transform[9] += dx
+    transform[10] += dy
+    state.transform = tuple(transform)
+    case.view.Position = state.view_position
+    case.view.ModelToViewTransform.ArrayData = state.transform
+    case.capture()()
+    assert state.geometry_failures == []
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("index", [0, 1])
+@pytest.mark.parametrize(
+    "damage",
+    ["missing_witness", "displaced_witness", "duplicate_candidate",
+     "duplicate_reversed", "duplicate_wrong_origin", "displaced_origin",
+     "displaced_arrow", "wrong_edge"],
+)
+def test_recorded_plate_thickness_rejects_wrong_native_geometry(
+    monkeypatch, settled, index, damage,
+) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    check = case.capture() if settled else case.capture
+    if damage == "missing_witness":
+        state.lines.pop(index)
+    elif damage in {"duplicate_candidate", "duplicate_reversed", "duplicate_wrong_origin"}:
+        row = list(state.lines[index])
+        if damage == "duplicate_reversed":
+            row[4:7], row[7:10] = row[7:10], row[4:7]
+        elif damage == "duplicate_wrong_origin":
+            row[4] -= 0.001
+        state.lines.append(tuple(row))
+    elif damage in {"displaced_witness", "displaced_origin"}:
+        row = list(state.lines[index])
+        if damage == "displaced_witness":
+            row[5] += 0.001
+            row[8] += 0.001
+        else:
+            row[4] -= 0.001
+        state.lines[index] = tuple(row)
+    elif damage == "displaced_arrow":
+        state.arrows[index][1] += 0.001
+    else:
+        y = (drawing.COEFFICIENT_BOTTOM_Y, drawing.COEFFICIENT_TOP_Y)[index]
+        z = -drawing.PLATE_L / 2.0
+        state.edges[index] = _line(
+            (drawing.PLATE_W - 2.0, y, z), (drawing.PLATE_W - 0.1, y, z),
+        )
+    with pytest.raises(RuntimeError):
+        check()
+    assert len(state.geometry_failures) == 1
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("index", [0, 2, 3])
+@pytest.mark.parametrize("damage", ["incomplete", "nonfinite", "nonnumeric"])
+def test_recorded_plate_thickness_rejects_malformed_display_lines(
+    monkeypatch, settled, index, damage,
+) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    check = case.capture() if settled else case.capture
+    row = list(state.lines[index])
+    if damage == "incomplete":
+        row = row[:7]
+    else:
+        row[4] = math.nan if damage == "nonfinite" else "unreadable-coordinate"
+    state.lines[index] = tuple(row)
+    with pytest.raises(RuntimeError):
+        check()
+    record = state.geometry_failures[0]["geometry"]
+    assert record["dimension_display"]["lines"]["rows"][index] == tuple(row)
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize(
+    "damage", ["arrows_outside", "arrows_at_endpoint", "detached_leader", "diagonal_leader"],
+)
+def test_recorded_plate_thickness_preserves_arrow_intersections_and_leader_attachment(
+    monkeypatch, settled, damage,
+) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    check = case.capture() if settled else case.capture
+    if damage in {"arrows_outside", "arrows_at_endpoint"}:
+        x = state.lines[0][7] - (0.001 if damage == "arrows_outside" else 0.0)
+        for arrow in state.arrows:
+            arrow[0] = x
+    else:
+        row = list(state.lines[2])
+        row[5] += 0.001
+        if damage == "detached_leader":
+            row[8] += 0.001
+        state.lines[2] = tuple(row)
+    with pytest.raises(RuntimeError):
+        check()
+
+
+def test_recorded_plate_thickness_settled_tail_movement_is_not_hidden_by_text_ink(
+    monkeypatch,
+) -> None:
+    case = _recorded_plate_thickness(monkeypatch)
+    state = case.state
+    check = case.capture()
+    row = list(state.lines[1])
+    row[7] -= 0.001
+    state.lines[1] = tuple(row)
+    with pytest.raises(RuntimeError):
+        check()
+    record = state.geometry_failures[0]["geometry"]
+    original, regenerated = record["original_ink"], record["regenerated_ink"]
+    assert original[:2] == regenerated[:2]
+    assert regenerated[2][0] == original[2][0] - 0.001
+    assert regenerated[2][1] == original[2][1]
 
 
 @pytest.mark.parametrize(
