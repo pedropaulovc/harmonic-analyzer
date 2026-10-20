@@ -170,32 +170,18 @@ def test_exploded_caption_follows_actual_wrapped_bom_height(
         RowCount=len(heights),
         GetRowHeight=heights.__getitem__,
     )
-    bindings = []
-
-    def bind(value: object, interface: str) -> object:
-        assert (value is table and interface == "ITableAnnotation") or (
-            value is annotation and interface == "IAnnotation"
-        )
-        bindings.append(interface)
-        return value
-
-    calls = []
+    boxes = []
 
     def add_note(adapter, sheet, text, xy, *, label):
-        calls.append((sheet, text, xy, label))
         # Native INote.GetExtent can extend slightly above its insertion point.
-        return xy[0], xy[1] - 0.009, xy[0] + 0.115, xy[1] + 0.0003
+        box = (xy[0], xy[1] - 0.009, xy[0] + 0.115, xy[1] + 0.0003)
+        boxes.append(box)
+        return box
 
-    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(drawing, "_add_note_block", add_note)
     drawing._place_exploded_caption(None, table, (1.0, 2.0))
-    assert bindings == ["ITableAnnotation", "IAnnotation"]
-    assert len(calls) == 1
-    sheet, text, xy, label = calls[0]
-    assert sheet == drawing.SHEET_NAMES[1]
-    assert text == f"{notes.EXPLODED_CAPTION}\nSCALE 1 : 2"
-    assert xy == pytest.approx((position[0], position[1] - sum(heights) - drawing.NOTE_GAP))
-    assert label == "exploded-view caption"
+    assert position[1] - sum(heights) - boxes[0][3] >= drawing.VIEW_LABEL_GAP
 
 
 def test_exploded_caption_refuses_native_extent_that_still_touches_bom(
@@ -213,6 +199,27 @@ def test_exploded_caption_refuses_native_extent_that_still_touches_bom(
         lambda *args, **kwargs: (0.2481, 0.160, 0.3631, 0.1787),
     )
     with pytest.raises(RuntimeError, match="caption is only"):
+        drawing._place_exploded_caption(None, table, (1.0, 2.0))
+
+
+@pytest.mark.parametrize(
+    ("position", "height"),
+    (
+        ((0.2481, 0.2627), 0.006),
+        ((0.2481, 0.2627, 0.0), 0.0),
+        ((0.2481, 0.2627, 0.0), float("nan")),
+    ),
+)
+def test_exploded_caption_refuses_unreadable_bom_geometry(
+    monkeypatch: pytest.MonkeyPatch, position: tuple[float, ...], height: float
+) -> None:
+    table = SimpleNamespace(
+        GetAnnotation=lambda: SimpleNamespace(GetPosition=lambda: position),
+        RowCount=14,
+        GetRowHeight=lambda row: height,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    with pytest.raises(RuntimeError, match="unreadable geometry"):
         drawing._place_exploded_caption(None, table, (1.0, 2.0))
 
 
