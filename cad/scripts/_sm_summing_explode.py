@@ -219,7 +219,9 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                     axis_attempted = axis_selected = False
                     try:
                         model.ClearSelection2(True)
-                        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                        selection = _early_bound(
+                            model.SelectionManager, "ISelectionMgr"
+                        )
                         data = _early_bound(selection.CreateSelectData(), "ISelectData")
                         if data is None:
                             raise RuntimeError(
@@ -229,7 +231,9 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                         for component in moved:
                             selected_attempted += 1
                             if not component.Select4(True, data, False):
-                                raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                                raise RuntimeError(
+                                    f"{label}: cannot select {component.Name2}"
+                                )
                             selected_completed += 1
                         axis_name, positive = axes[key]
                         axis_attempted = True
@@ -294,8 +298,12 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                     except Exception as observation_error:
                         rebuild_attributes = {
                             "needs_rebuild_before_state": "unreadable",
-                            "needs_rebuild_before_error_type": type(observation_error).__name__,
-                            "needs_rebuild_before_error_message": str(observation_error),
+                            "needs_rebuild_before_error_type": type(
+                                observation_error
+                            ).__name__,
+                            "needs_rebuild_before_error_message": str(
+                                observation_error
+                            ),
                         }
                     else:
                         rebuild_attributes = {
@@ -332,7 +340,8 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                             f"{label}: step component/distance readback mismatch: {actual!r}"
                         )
                 with _telemetry.span(
-                    "assembly.sm_explode.step.readback", instances_expected=len(components)
+                    "assembly.sm_explode.step.readback",
+                    instances_expected=len(components),
                 ):
                     transform_reads_attempted = transform_reads_completed = 0
                     readback_completed = False
@@ -348,7 +357,10 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                             delta = tuple(
                                 current[i + 9] - baseline[name][i + 9] for i in range(3)
                             )
-                            if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                            if any(
+                                abs(delta[i] - expected[name][i]) > 1e-7
+                                for i in range(3)
+                            ):
                                 raise RuntimeError(
                                     f"{label}: {name} world translation mm "
                                     f"{tuple(value * 1000.0 for value in delta)!r} != "
