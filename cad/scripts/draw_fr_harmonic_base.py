@@ -27,8 +27,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
-from typing import Any
+from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -132,10 +133,9 @@ from fr_harmonic_base_spec import (
     HEIGHT_REFERENCE_CALLOUTS,
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
-    PIVOT_SEAT_STEP,
-    PIVOT_SEAT_TAG,
     STACK_HEIGHT,
     POCKET_HALF_X,
+    pivot_seat_step,
     socket_bore_finish_key,
 )
 
@@ -453,27 +453,33 @@ HOLE_SIDE_CALLOUTS = {
     "CrossScrewAxisHeight": HEIGHT_REFERENCE_CALLOUTS["CrossScrewAxisHeight"],
 }
 
-# Native table tags keep their source association while short leaders separate
-# the closely spaced screw patterns. Coordinates below are sheet layout only.
-HOLE_TAG_POSITIONS = {
-    # The A-A cut line at x329.2 mm crossed both old labels. Keep the native
-    # tags in the clear gutter between the plan and section, not on that line.
-    "A3": (0.344, 0.176),
-    "A4": (0.344, 0.215),
-    "C1": (0.247, 0.216),
-    "D1": (0.2456, 0.1550),
-    # The transferred pinion-rig seats left the table (U28 corollary), and
-    # with U34c the arbor-pedestal seats followed them, taking the last #4-40
-    # rows (the former E) along. The native tags re-letter: the
-    # rocker-support taps are now E; the nameplate seats, the former F, are
-    # transferred too (#628).
-    # North-east of its tap, short of E3's tap and west of the nameplate's
-    # rear-west tap, whose mark the former (0.306, 0.187) box sat on.
-    "E1": (0.297, 0.1895),
-    "E2": (0.289, 0.206),
-    "E3": (0.312, 0.173),
-    "E4": (0.312, 0.214),
+# Layout belongs to physical model X/Z stations, never generated tag letters.
+# Keep the proven anchors when native size families merge or re-letter.
+HOLE_TAG_STATION_POSITIONS = {
+    # Larger Z is lower on the top view. Both east socket labels stay in the
+    # clear gutter beyond the A-A cut line at x329.2 mm.
+    **dict(zip(
+        sorted((xz for xz in COLUMN_SOCKET_XZ if xz[0] > 0.0), key=lambda xz: -xz[1]),
+        ((0.344, 0.176), (0.344, 0.215)),
+        strict=True,
+    )),
+    STOP_SCREW_XZ: (0.247, 0.216),
+    PIVOT_SCREW_XZ: (0.2456, 0.1550),
+    # West pair, then east pair; larger Z before smaller Z in each pair.
+    # These are the support pattern's source geometry semantics, not native
+    # table row order. The west/larger-Z label stays short of its east neighbor
+    # and west of the transferred nameplate tap.
+    **dict(zip(
+        sorted(HOLE_XZ, key=lambda xz: (xz[0], -xz[1])),
+        ((0.297, 0.1895), (0.289, 0.206), (0.312, 0.173), (0.312, 0.214)),
+        strict=True,
+    )),
 }
+_CRITICAL_HOLE_TAG_STATIONS = (
+    PIVOT_SCREW_XZ,
+    *sorted(HOLE_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ))[:2],
+)
+_TABLE_LOCATION_TOLERANCE_MM = 0.02
 
 # Hole-table origin is the finished plate's lower-left theoretical sharp
 # corner. The physical corner is filleted, so the native table is seeded from
@@ -752,12 +758,12 @@ def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
 
 
 def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
-    """Apply one-line ABOVE flags to both native D1 offsets and read them back."""
+    """Apply one-line ABOVE flags to both native pivot offsets and read them back."""
     if set(PIVOT_SEAT_CALLOUTS) != set(PIVOT_SEAT_DIMENSIONS) or any(
         not text or "\n" in text or "\r" in text
         for text in PIVOT_SEAT_CALLOUTS.values()
     ):
-        raise RuntimeError("D1 offsets require both one-line ABOVE flags")
+        raise RuntimeError("pivot offsets require both one-line ABOVE flags")
     matches = {}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
@@ -765,10 +771,10 @@ def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
         if name not in PIVOT_SEAT_CALLOUTS:
             continue
         if name in matches:
-            raise RuntimeError(f"duplicate native D1 offset: {name}")
+            raise RuntimeError(f"duplicate native pivot offset: {name}")
         matches[name] = annotation
     if set(matches) != set(PIVOT_SEAT_CALLOUTS):
-        raise RuntimeError(f"missing native D1 offsets: {set(PIVOT_SEAT_CALLOUTS) - set(matches)}")
+        raise RuntimeError(f"missing native pivot offsets: {set(PIVOT_SEAT_CALLOUTS) - set(matches)}")
     set_dimension_callouts(
         adapter, annotations, PIVOT_SEAT_CALLOUTS, location="above"
     )
@@ -789,35 +795,97 @@ def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
     )
 
 
+class _HoleTableRow(NamedTuple):
+    index: int
+    tag: str
+    location_mm: tuple[float, float]
+
+
+def _hole_table_station_rows(table: Any) -> dict[tuple[float, float], _HoleTableRow]:
+    """Resolve every native row to exactly one model station, independent of tag order.
+
+    LOC cells use the theoretical lower-left datum and print to two decimals;
+    use the same 0.02 mm component tolerance as the insertion helper.
+    """
+    row_count, column_count = int(table.RowCount), int(table.ColumnCount)
+    # Include one excess row in a bounded failure inventory, never a COM repr.
+    cells = tuple(
+        tuple(str(table.DisplayedText2(row, column, False) or "").strip()
+              for column in range(min(column_count, 4)))
+        for row in range(min(row_count, len(TABLE_HOLES) + 2))
+    )
+    _telemetry.info(
+        f"native base hole-table rows: shape={row_count}x{column_count}, "
+        f"cells={tuple(tuple(value[:160] for value in row) for row in cells)!r}"
+    )
+    if row_count != len(TABLE_HOLES) + 1 or column_count not in (4, 5):
+        raise RuntimeError("native base hole-table station/row bijection has wrong row/column count")
+    expected = {
+        (x, z): (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
+        for x, z, _diameter in TABLE_HOLES
+    }
+    if len(expected) != len(TABLE_HOLES):
+        raise RuntimeError("base hole-table model stations are not unique")
+    resolved = {}
+    tags = set()
+    for index, row in enumerate(cells[1:], 1):
+        tag = row[0]
+        if not tag or tag in tags:
+            raise RuntimeError(f"duplicate or empty native hole-table tag at row {index}: {tag!r}")
+        tags.add(tag)
+        try:
+            location = (float(row[1]), float(row[2]))
+        except ValueError as error:
+            raise RuntimeError(f"invalid native hole-table coordinates at row {index}: {row!r}") from error
+        if not all(math.isfinite(value) for value in location):
+            raise RuntimeError(f"nonfinite native hole-table coordinates at row {index}: {row!r}")
+        matches = [
+            station for station, wanted in expected.items()
+            if all(abs(actual - target) <= _TABLE_LOCATION_TOLERANCE_MM
+                   for actual, target in zip(location, wanted))
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"native hole-table row {index} needs one model station, "
+                f"got {matches!r}: {row!r}; bound={tuple(resolved.items())!r}"
+            )
+        station = matches[0]
+        if station in resolved:
+            raise RuntimeError(f"duplicate native hole-table station {station!r} at row {index}")
+        resolved[station] = _HoleTableRow(index, tag, location)
+    if set(resolved) != set(expected):
+        raise RuntimeError(f"native hole-table stations missing: {set(expected) - set(resolved)!r}")
+    _telemetry.info(f"native base hole-table station binding: {tuple(resolved.items())!r}")
+    return resolved
+
+
 def _flag_pivot_seat_table_row(table: Any) -> tuple[tuple[tuple[str, ...], ...], float]:
-    """Flag the generated D1 hole-table row in a custom NOTE column.
+    """Flag the physical pivot's generated hole-table row in a custom NOTE column.
 
     Returns the generated TAG/X LOC/Y LOC/SIZE cells and the native table
     width, which the flag must leave unchanged through every rebuild.
     """
     if int(table.ColumnCount) != 4:
-        raise RuntimeError("D1 table flag expects the native four-column hole table")
+        raise RuntimeError("pivot table flag expects the native four-column hole table")
+    pivot = _hole_table_station_rows(table)[PIVOT_SCREW_XZ]
     generated = _table_cells(table, 4)
-    rows = [row for row in range(1, len(generated)) if generated[row][0] == PIVOT_SEAT_TAG]
-    if len(rows) != 1:
-        raise RuntimeError(f"hole table needs one {PIVOT_SEAT_TAG} row, got {rows!r}")
-    row = rows[0]
+    row = pivot.index
     widths = tuple(float(table.GetColumnWidth(column)) for column in range(4))
     location_width = (
         sum(widths[:3]) - HOLE_TABLE_TAG_WIDTH - PIVOT_SEAT_TABLE_COLUMN_WIDTH
     ) / 2.0
     if location_width < HOLE_TABLE_MIN_LOCATION_WIDTH:
         raise RuntimeError(
-            f"hole-table TAG/LOC slack cannot hold the D1 NOTE column: widths={widths!r}"
+            f"hole-table TAG/LOC slack cannot hold the pivot NOTE column: widths={widths!r}"
         )
     if table.InsertColumn2(
         _INSERT_COLUMN_AFTER, 3, PIVOT_SEAT_TABLE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
     ) is not True:
-        raise RuntimeError("native hole table refused the D1 NOTE column")
+        raise RuntimeError("native hole table refused the pivot NOTE column")
     if table.SetColumnTitle2(4, PIVOT_SEAT_TABLE_COLUMN, False) is not True:
         raise RuntimeError("native hole-table NOTE column title did not set")
     if table.IsCellTextEditable(row, 4) is not True:
-        raise RuntimeError("native hole-table D1 NOTE cell is not editable")
+        raise RuntimeError("native hole-table pivot NOTE cell is not editable")
     table.SetText2(row, 4, False, PIVOT_SEAT_FLAG)
     for column, width in (
         (0, HOLE_TABLE_TAG_WIDTH),
@@ -830,7 +898,7 @@ def _flag_pivot_seat_table_row(table: Any) -> tuple[tuple[tuple[str, ...], ...],
             raise RuntimeError(f"hole-table column {column} width did not persist: {actual!r}")
     _check_pivot_seat_table_row(table, generated, sum(widths))
     _telemetry.info(
-        f"D1 hole-table flag: row={row}, column_type={table.GetColumnType2(4, False)!r}, "
+        f"pivot hole-table flag: tag={pivot.tag}, row={row}, column_type={table.GetColumnType2(4, False)!r}, "
         f"native_widths_mm={tuple(round(w * 1000.0, 3) for w in widths)!r}, "
         f"location_width_mm={location_width * 1000.0:.3f}"
     )
@@ -840,15 +908,16 @@ def _flag_pivot_seat_table_row(table: Any) -> tuple[tuple[tuple[str, ...], ...],
 def _check_pivot_seat_table_row(
     table: Any, generated: tuple[tuple[str, ...], ...], width: float
 ) -> None:
-    """Only the custom column changed: D1 flagged, generated cells and extent kept."""
+    """Only the custom column changed: pivot flagged, generated cells and extent kept."""
     if int(table.ColumnCount) != 5:
-        raise RuntimeError("hole table lost or duplicated the D1 NOTE column")
+        raise RuntimeError("hole table lost or duplicated the pivot NOTE column")
     cells = _table_cells(table, 5)
     if tuple(row[:4] for row in cells) != generated:
-        raise RuntimeError(f"D1 NOTE column changed generated hole-table cells: {cells!r}")
+        raise RuntimeError(f"pivot NOTE column changed generated hole-table cells: {cells!r}")
+    pivot = _hole_table_station_rows(table)[PIVOT_SCREW_XZ]
     expected = tuple(
         PIVOT_SEAT_TABLE_COLUMN if index == 0
-        else PIVOT_SEAT_FLAG if row[0] == PIVOT_SEAT_TAG
+        else PIVOT_SEAT_FLAG if index == pivot.index
         else ""
         for index, row in enumerate(cells)
     )
@@ -858,64 +927,83 @@ def _check_pivot_seat_table_row(
     actual_width = sum(float(table.GetColumnWidth(column)) for column in range(5))
     if abs(actual_width - width) > 1e-5:
         raise RuntimeError(
-            f"D1 NOTE column changed the hole-table width: {actual_width!r} != {width!r}"
+            f"pivot NOTE column changed the hole-table width: {actual_width!r} != {width!r}"
         )
 
 
 
 def _spread_hole_tags(view: Any, table: Any) -> None:
-    table_locations = {}
-    for row in range(1, int(table.RowCount)):
-        tag = str(table.DisplayedText2(row, 0, False) or "").strip()
-        if not tag or tag in table_locations:
-            raise RuntimeError(f"duplicate or empty native hole-table tag at row {row}: {tag!r}")
-        table_locations[tag] = tuple(
-            float(table.DisplayedText2(row, column, False))
-            for column in (1, 2)
-        )
-    remaining = dict(HOLE_TAG_POSITIONS)
-    found = set()
+    # Inventory before resolving/moving: a failure must distinguish missing
+    # native rows from a traversal/text mismatch. Ordinary notes are not tags.
+    notes = []
+    inventory = []
+    type_counts = {}
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 6:
+        kind = int(annotation.GetType())
+        type_counts[kind] = type_counts.get(kind, 0) + 1
+        if kind != 6:  # swNote
             continue
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-        tag = str(note.GetText()).strip()
-        if tag in table_locations:
-            if tag in found:
-                raise RuntimeError(f"duplicate native hole-table view tag: {tag}")
-            found.add(tag)
-        position = remaining.pop(tag, None)
-        if position is None:
+        text = str(note.GetText())
+        notes.append((annotation, note, text.strip()))
+        if len(inventory) < 64:
+            inventory.append(text[:160])
+    _telemetry.info(
+        f"native base hole-view inventory: types={type_counts!r}, "
+        f"notes={inventory!r}, note_count={len(notes)}"
+    )
+    rows = _hole_table_station_rows(table)
+    if not set(HOLE_TAG_STATION_POSITIONS) <= set(rows):
+        raise RuntimeError("native hole-tag layout contains a station outside the hole table")
+    table_tags = {row.tag for row in rows.values()}
+    annotations = {}
+    duplicates = set()
+    extras = set()
+    for annotation, note, tag in notes:
+        if tag not in table_tags:
+            # InsertHoleTable3 uses automatic alphanumeric tags. Keep unrelated
+            # manufacturing notes, but refuse orphan native tag-shaped notes.
+            if re.fullmatch(r"[A-Z]+[0-9]+", tag):
+                extras.add(tag)
             continue
+        if tag in annotations:
+            duplicates.add(tag)
+        annotations[tag] = (annotation, note)
+    missing = table_tags - set(annotations)
+    if missing or duplicates or extras:
+        raise RuntimeError(
+            f"native table/view tag bijection failed: missing={sorted(missing)!r}, "
+            f"duplicate={sorted(duplicates)!r}, extra={sorted(extras)!r}"
+        )
+    for station, position in HOLE_TAG_STATION_POSITIONS.items():
+        row = rows[station]
+        annotation, note = annotations[row.tag]
         if annotation.SetLeader3(1, 0, True, False, False, False) != 0:
-            raise RuntimeError(f"failed to give native hole tag {tag} a leader")
+            raise RuntimeError(f"failed to give native hole tag {row.tag} a leader")
         if not annotation.SetPosition2(*position, 0.0):
-            raise RuntimeError(f"failed to reposition native hole tag {tag}")
-        if str(note.GetText()).strip() != tag:
-            raise RuntimeError(f"moving native hole tag changed its text: {tag}")
-        if tag in ("D1", "E1", "E3"):
+            raise RuntimeError(f"failed to reposition native hole tag {row.tag}")
+        if str(note.GetText()).strip() != row.tag:
+            raise RuntimeError(f"moving native hole tag changed its text: {row.tag}")
+        if station in _CRITICAL_HOLE_TAG_STATIONS:
             points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
-            if len(points) < 6 or len(points) % 3:
-                raise RuntimeError(f"native hole tag {tag} has no complete leader: {points!r}")
+            if len(points) < 6 or len(points) % 3 or not all(math.isfinite(v) for v in points):
+                raise RuntimeError(f"native hole tag {row.tag} has no complete finite leader: {points!r}")
             expected = tuple(
                 origin + coordinate * VIEW_SCALE / 1000.0
-                for origin, coordinate in zip(_TABLE_ORIGIN_XY, table_locations[tag])
+                for origin, coordinate in zip(_TABLE_ORIGIN_XY, row.location_mm)
             )
             endpoint = points[-3:-1]
-            if sum((actual - wanted) ** 2 for actual, wanted in zip(endpoint, expected)) > 0.001 ** 2:
+            if math.dist(endpoint, expected) > 0.001:
                 raise RuntimeError(
-                    f"native {tag} leader does not reach its table hole: "
-                    f"table_mm={table_locations[tag]!r}, end={endpoint!r}, centre={expected!r}"
+                    f"native {row.tag} leader does not reach its table hole: "
+                    f"station={station!r}, table_mm={row.location_mm!r}, "
+                    f"end={endpoint!r}, centre={expected!r}"
                 )
             _telemetry.info(
-                f"native hole binding: tag={tag}, table_mm={table_locations[tag]!r}, "
-                f"leader_end={endpoint!r}, centre={expected!r}"
+                f"native hole binding: tag={row.tag}, station={station!r}, "
+                f"table_mm={row.location_mm!r}, leader_end={endpoint!r}, centre={expected!r}"
             )
-    if remaining:
-        raise RuntimeError(f"native hole-table tags not found: {sorted(remaining)}")
-    if found != set(table_locations):
-        raise RuntimeError(f"native table/view tag bijection failed: missing={set(table_locations) - found}")
 
 
 # U28 assembly corollary (Main ruling 2026-09-23, from the user's U27/U28):
@@ -962,7 +1050,7 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
 # The cone swing set is made against the arbor carried by MHA-DT-02.
-# Both native banded offsets and the D1 hole-table row cite spec-owned
+# Both native banded offsets and the physical pivot's hole-table row cite spec-owned
 # numbered note 1 in the B4 notes lane; the free note states the assembly
 # setup and table-reference status.
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
@@ -1693,12 +1781,14 @@ def _check_hole_sheet_callouts(
     callouts: dict[str, Any],
     views: dict[str, Any],
     datum_origin: Any,
+    hole_table: Any,
 ) -> None:
     """Fail loud on any sheet-2 callout that crowds another callout, a note, a
     view label, the hole table, the table's datum origin, any view's casting
     outline, the sheet frame or the title block; that sits closer than a row
     pitch over another callout; that runs over four rows; or whose leader
     runs through any of those texts or through its own text rows."""
+    pivot_tag = _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate the holes sheet for the callout check")
     boxes = {}
@@ -1733,7 +1823,7 @@ def _check_hole_sheet_callouts(
             text = _note_text(adapter, annotation)
             if not note_reaches_final_sheet(text):
                 continue
-            if text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP:
+            if text.replace("\r\n", "\n").strip() == pivot_seat_step(pivot_tag):
                 pivot_seat_notes += 1
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
@@ -2195,7 +2285,8 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
     _check_pivot_seat_table_row(hole_table, *table_flag)
-    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
+    pivot_tag = _hole_table_station_rows(hole_table)[PIVOT_SCREW_XZ].tag
+    add_note(adapter, pivot_seat_step(pivot_tag), *PIVOT_SEAT_NOTE_XY)
     _attached_note(
         adapter,
         hole_top,
@@ -2457,6 +2548,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callouts=hole_sheet_callouts,
         views={"holes top": hole_top, "holes front": hole_side, "section A-A": section},
         datum_origin=hole_feature.DatumOrigin,
+        hole_table=hole_table,
     )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(

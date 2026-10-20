@@ -518,7 +518,9 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert sheet.TRANSFER_SPRING_CALLOUT == (
         f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"
     )
-    assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
+    assert not {hole[:2] for hole in (*pedestal_seats, sheet.TRANSFER_SPRING_HOLE)} & set(
+        sheet.HOLE_TAG_STATION_POSITIONS
+    )
 
 
 def test_nameplate_transfer_is_the_declared_fit_up() -> None:
@@ -1060,6 +1062,8 @@ def _drive_hole_sheet_callout_check(
     *,
     numbered_note_box=(0.150, 0.020, 0.180, 0.040),
     numbered_note_copies=1,
+    pivot_tag="Q7",
+    numbered_note_tag=None,
     leaders=(),
 ) -> None:
     """Exercise ordinary note obstacles without COM; boxes are unit controls."""
@@ -1090,7 +1094,7 @@ def _drive_hole_sheet_callout_check(
         "_section_line_obstacles": lambda views: {},
         "_iter_view_annotations": annotations,
         "_note_text": lambda adapter, annotation: (
-            sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n"
+            sheet.pivot_seat_step(numbered_note_tag or pivot_tag).replace("\n", "\r\n") + "\r\n"
             if annotation == "numbered note" else "D1"
         ),
         "_iter_tables": lambda adapter, view: (
@@ -1106,6 +1110,7 @@ def _drive_hole_sheet_callout_check(
         callouts={"pedestal": object()},
         views={"top": "top view"},
         datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
+        hole_table=_NativeHoleTable(pivot_tag=pivot_tag),
     )
 
 
@@ -1140,6 +1145,15 @@ def test_hole_sheet_requires_exactly_one_numbered_pivot_note(monkeypatch, copies
     with pytest.raises(RuntimeError, match="exactly one numbered pivot seat note"):
         _drive_hole_sheet_callout_check(
             monkeypatch, (0.200, 0.200, 0.220, 0.210), numbered_note_copies=copies,
+        )
+
+
+@pytest.mark.parametrize("tag", ("D1", "Q7", "B12"))
+def test_hole_sheet_numbered_note_matches_the_physical_pivot_tag(monkeypatch, tag) -> None:
+    _drive_hole_sheet_callout_check(monkeypatch, None, pivot_tag=tag)
+    with pytest.raises(RuntimeError, match="exactly one numbered pivot seat note"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, None, pivot_tag=tag, numbered_note_tag="Z99",
         )
 
 
@@ -1588,7 +1602,7 @@ def test_pivot_flags_require_exactly_one_of_each_native_offset(monkeypatch, name
     selected = next(annotation for annotation in annotations if annotation.name == name)
     annotations[:] = [annotation for annotation in annotations if annotation is not selected]
     annotations.extend([selected] * count)
-    with pytest.raises(RuntimeError, match="missing native D1 offsets|duplicate native D1 offset"):
+    with pytest.raises(RuntimeError, match="missing native pivot offsets|duplicate native pivot offset"):
         sheet._flag_pivot_seat_dimensions(adapter, annotations)
     assert events == []
 
@@ -1613,19 +1627,44 @@ def test_pivot_flags_refuse_missing_keys_or_nonprintable_caption_rows(monkeypatc
 
 
 class _NativeHoleTable:
-    """ITableAnnotation surface for the D1 row flag; generated cells are locked."""
+    """Synthetic through-table at all real stations, not a captured native census."""
 
-    def __init__(self, *, refuse=None, widths=(0.0198, 0.0303, 0.0317, 0.0628), d1_rows=1):
+    def __init__(
+        self, *, refuse=None, widths=(0.0198, 0.0303, 0.0317, 0.0628),
+        pivot_tag="Q7", merged=True,
+    ):
+        import draw_fr_harmonic_base as sheet
+
         self.refuse = refuse
-        self.cells = [
-            ["TAG", "X LOC", "Y LOC", "SIZE"],
-            # CombineSameSize: merged SIZE cells read back on every row.
-            ["A1", "31.60", "31.60", "Ø25.50"],
-            ["A2", "31.60", "255.60", "Ø25.50"],
-            *[["D1", "142.05", "39.81", "Ø3.80 ↧ 13.45"]] * d1_rows,
-            ["E1", "284.04", "83.28", "Ø5.11"],
-        ]
-        self.cells = [list(row) for row in self.cells]
+        self.station_tags = {}
+        rows = []
+        supports = sorted(sheet.HOLE_XZ, key=lambda xz: (xz[0], -xz[1]))
+        sockets = sorted(sheet.COLUMN_SOCKET_XZ)
+        for x, z, diameter in sheet.TABLE_HOLES:
+            station = (x, z)
+            if station in supports:
+                tag = f"B{supports.index(station) + 1}" if merged else f"F{supports.index(station) + 1}"
+                size = "1/4-20 UNC - 2B THRU"
+            elif station == sheet.LOCK_KNOB_XZ:
+                tag = "B5" if merged else "L1"
+                size = "1/4-20 UNC - 2B THRU"
+            elif station == sheet.PIVOT_SCREW_XZ:
+                tag, size = pivot_tag, "#10-24 UNC - 2B THRU"
+            elif station == sheet.STOP_SCREW_XZ:
+                # Put the old pivot letter on another station deliberately.
+                tag, size = ("N1" if pivot_tag == "D1" else "D1"), "#4-40 UNC - 2B THRU"
+            else:
+                assert station in sockets
+                tag, size = f"A{sockets.index(station) + 1}", f"Ø{diameter:.2f} THRU"
+            self.station_tags[station] = tag
+            rows.append([
+                tag, f"{x + sheet.BOTTOM_LENGTH / 2.0:.2f}",
+                f"{sheet.BOTTOM_WIDTH / 2.0 - z:.2f}", size,
+            ])
+        # Native row order is not model selection order. Keep every fixture shuffled.
+        rows = (rows[::2] + rows[1::2])[::-1]
+        self.cells = [["TAG", "X LOC", "Y LOC", "SIZE"], *rows]
+        self.pivot_row = next(index for index, row in enumerate(self.cells) if row[0] == pivot_tag)
         self.widths = list(widths)
 
     @property
@@ -1678,20 +1717,25 @@ class _NativeHoleTable:
         return self.widths[column]
 
 
-def test_d1_table_row_carries_note_flag_in_custom_column_only() -> None:
+@pytest.mark.parametrize("pivot_tag", ("D1", "Q7", "B12"))
+@pytest.mark.parametrize("merged", (False, True))
+def test_pivot_table_row_carries_note_flag_in_custom_column_only(pivot_tag, merged) -> None:
     import draw_fr_harmonic_base as sheet
 
-    table = _NativeHoleTable()
+    table = _NativeHoleTable(pivot_tag=pivot_tag, merged=merged)
     native = [list(row) for row in table.cells]
     native_width = sum(table.widths)
     generated, width = sheet._flag_pivot_seat_table_row(table)
 
+    assert len(generated) == len(sheet.TABLE_HOLES) + 1 == 12
     assert generated == tuple(tuple(row) for row in native)
     assert width == pytest.approx(native_width)
     assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
     assert [row[:4] for row in table.cells] == native
     assert [row[4] for row in table.cells] == [
-        sheet.PIVOT_SEAT_TABLE_COLUMN, "", "", sheet.PIVOT_SEAT_FLAG, "",
+        sheet.PIVOT_SEAT_TABLE_COLUMN if index == 0 else
+        sheet.PIVOT_SEAT_FLAG if index == table.pivot_row else ""
+        for index in range(table.RowCount)
     ]
     assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
     assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
@@ -1704,32 +1748,37 @@ def test_d1_table_row_carries_note_flag_in_custom_column_only() -> None:
 @pytest.mark.parametrize(
     ("refuse", "message"),
     (
-        ("insert", "refused the D1 NOTE column"),
+        ("insert", "refused the pivot NOTE column"),
         ("title", "NOTE column title did not set"),
-        ("editable", "D1 NOTE cell is not editable"),
+        ("editable", "pivot NOTE cell is not editable"),
         ("text", "NOTE column did not persist"),
         ("width", "width did not persist"),
     ),
 )
-def test_d1_table_flag_refuses_unconfirmed_native_state(refuse, message) -> None:
+def test_pivot_table_flag_refuses_unconfirmed_native_state(refuse, message) -> None:
     import draw_fr_harmonic_base as sheet
 
     with pytest.raises(RuntimeError, match=message):
         sheet._flag_pivot_seat_table_row(_NativeHoleTable(refuse=refuse))
 
 
-@pytest.mark.parametrize(
-    ("table", "message"),
-    (
-        (_NativeHoleTable(d1_rows=0), "needs one D1 row"),
-        (_NativeHoleTable(d1_rows=2), "needs one D1 row"),
-        (_NativeHoleTable(widths=(0.012, 0.022, 0.022, 0.0628)), "slack cannot hold"),
-    ),
-)
-def test_d1_table_flag_refuses_before_inserting_a_column(table, message) -> None:
+@pytest.mark.parametrize("pivot_rows", (0, 2))
+def test_pivot_table_flag_requires_unique_physical_pivot_before_insertion(pivot_rows) -> None:
     import draw_fr_harmonic_base as sheet
 
-    with pytest.raises(RuntimeError, match=message):
+    table = _NativeHoleTable()
+    pivot = list(table.cells[table.pivot_row])
+    table.cells[table.pivot_row:table.pivot_row + 1] = [pivot] * pivot_rows
+    with pytest.raises(RuntimeError, match="station/row bijection"):
+        sheet._flag_pivot_seat_table_row(table)
+    assert table.ColumnCount == 4
+
+
+def test_pivot_table_flag_refuses_insufficient_column_slack() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable(widths=(0.012, 0.022, 0.022, 0.0628))
+    with pytest.raises(RuntimeError, match="slack cannot hold"):
         sheet._flag_pivot_seat_table_row(table)
     assert table.ColumnCount == 4
 
@@ -1737,15 +1786,17 @@ def test_d1_table_flag_refuses_before_inserting_a_column(table, message) -> None
 @pytest.mark.parametrize(
     ("mutate", "message"),
     (
-        (lambda table: table.cells[3].__setitem__(1, "(142.05)"), "changed generated"),
+        (lambda table: table.cells[table.pivot_row].__setitem__(1, "(142.05)"), "changed generated"),
         (lambda table: table.cells[2].__setitem__(3, ""), "changed generated"),
-        (lambda table: table.cells[3].__setitem__(4, ""), "did not persist"),
-        (lambda table: table.cells[1].__setitem__(4, "SEE NOTE 1"), "did not persist"),
+        (lambda table: table.cells[table.pivot_row].__setitem__(0, "Z99"), "changed generated"),
+        (lambda table: table.cells[table.pivot_row].__setitem__(4, ""), "did not persist"),
+        (lambda table: table.cells[0].__setitem__(4, "NOTES"), "did not persist"),
+        (lambda table: table.cells[1 if table.pivot_row != 1 else 2].__setitem__(4, "SEE NOTE 1"), "did not persist"),
         (lambda table: table.widths.__setitem__(3, 0.070), "changed the hole-table width"),
         (lambda table: [row.pop() for row in table.cells], "lost or duplicated"),
     ),
 )
-def test_d1_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
+def test_pivot_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
     import draw_fr_harmonic_base as sheet
 
     table = _NativeHoleTable()
@@ -1755,21 +1806,301 @@ def test_d1_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
         sheet._check_pivot_seat_table_row(table, generated, width)
 
 
+@pytest.mark.parametrize("merged", (False, True))
+def test_native_table_station_resolver_uses_coordinates_not_family_or_row_order(merged) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable(merged=merged)
+    bindings = sheet._hole_table_station_rows(table)
+    assert set(bindings) == {hole[:2] for hole in sheet.TABLE_HOLES}
+    assert len(bindings) == len({row.tag for row in bindings.values()}) == 11
+    for station, row in bindings.items():
+        assert row.tag == table.station_tags[station]
+        assert table.cells[row.index][0] == row.tag
+        x, z = station
+        assert row.location_mm == pytest.approx(
+            (x + sheet.BOTTOM_LENGTH / 2.0, sheet.BOTTOM_WIDTH / 2.0 - z), abs=0.005,
+        )
+
+
 @pytest.mark.parametrize(
-    ("tag", "old_anchor", "old_box"),
+    ("fault", "message"),
+    (
+        ("missing", "station/row bijection"),
+        ("extra", "station/row bijection"),
+        ("duplicate-tag", "duplicate or empty"),
+        ("empty-tag", "duplicate or empty"),
+        ("duplicate-station", "duplicate native hole-table station"),
+        ("unknown-station", "needs one model station"),
+        ("nonnumeric", "invalid native hole-table coordinates"),
+        ("nan", "nonfinite native hole-table coordinates"),
+        ("infinity", "nonfinite native hole-table coordinates"),
+    ),
+)
+def test_native_table_station_resolver_refuses_corrupt_or_incomplete_rows(fault, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    if fault == "missing":
+        table.cells.pop()
+    elif fault == "extra":
+        table.cells.append(["Z99", "0", "0", "extra"])
+    elif fault == "duplicate-tag":
+        table.cells[2][0] = table.cells[1][0]
+    elif fault == "empty-tag":
+        table.cells[2][0] = " "
+    elif fault == "duplicate-station":
+        table.cells[2][1:3] = table.cells[1][1:3]
+    else:
+        table.cells[1][1] = {
+            "unknown-station": "-999", "nonnumeric": "(31.60)",
+            "nan": "nan", "infinity": "inf",
+        }[fault]
+    with pytest.raises(RuntimeError, match=message):
+        sheet._hole_table_station_rows(table)
+
+
+def test_native_table_station_resolver_refuses_ambiguous_matches(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    x, z, diameter = sheet.TABLE_HOLES[0]
+    tag = table.station_tags[(x, z)]
+    index = next(index for index, row in enumerate(table.cells) if row[0] == tag)
+    table.cells.insert(1, table.cells.pop(index))
+    monkeypatch.setattr(sheet, "TABLE_HOLES", (
+        sheet.TABLE_HOLES[0], (x + 0.01, z + 0.01, diameter), *sheet.TABLE_HOLES[2:],
+    ))
+    with pytest.raises(RuntimeError, match="needs one model station") as error:
+        sheet._hole_table_station_rows(table)
+    assert repr((x, z)) in str(error.value)
+    assert repr((x + 0.01, z + 0.01)) in str(error.value)
+
+
+def test_native_table_station_resolver_keeps_insert_helper_coordinate_tolerance() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    row = table.cells[1]
+    original = row[1]
+    row[1] = str(float(original) + 0.01)
+    sheet._hole_table_station_rows(table)
+    row[1] = str(float(original) + 0.03)
+    with pytest.raises(RuntimeError, match="needs one model station"):
+        sheet._hole_table_station_rows(table)
+
+
+def _native_tag_view(monkeypatch, table):
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    class Annotation:
+        def __init__(self, tag, endpoint, kind=6):
+            self.text = tag
+            self.endpoint = endpoint
+            self.kind = kind
+            self.position = None
+            self.leader_reads = 0
+            self.failure = None
+
+        def GetType(self):  # noqa: N802
+            return self.kind
+
+        def GetSpecificAnnotation(self):  # noqa: N802
+            return self
+
+        def GetText(self):  # noqa: N802
+            return self.text
+
+        def SetLeader3(self, *args):  # noqa: N802
+            assert args == (1, 0, True, False, False, False)
+            return -1 if self.failure == "leader" else 0
+
+        def SetPosition2(self, x, y, z):  # noqa: N802
+            self.position = (x, y, z)
+            if self.failure == "text":
+                self.text = "CHANGED"
+            return self.failure != "position"
+
+        def GetLeaderPointsAtIndex(self, index):  # noqa: N802
+            assert index == 0
+            self.leader_reads += 1
+            return (*self.position, *self.endpoint, 0.0)
+
+    by_station = {}
+    for station, tag in table.station_tags.items():
+        x, z = station
+        by_station[station] = Annotation(
+            tag, sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER),
+        )
+    annotations = list(reversed(tuple(by_station.values())))
+    annotations.extend((
+        Annotation("1/4-20 Tapped Hole", (0.0, 0.0)),
+        Annotation("not a tag", (0.0, 0.0), kind=4),
+    ))
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    return SimpleNamespace(GetAnnotations=lambda: annotations), by_station, annotations
+
+
+@pytest.mark.parametrize("merged", (False, True))
+@pytest.mark.parametrize("pivot_tag", ("D1", "Q7", "B12"))
+def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
+    monkeypatch, merged, pivot_tag,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable(merged=merged, pivot_tag=pivot_tag)
+    generated, width = sheet._flag_pivot_seat_table_row(table)
+    view, by_station, _annotations = _native_tag_view(monkeypatch, table)
+    before = [list(row) for row in table.cells]
+    sheet._spread_hole_tags(view, table)
+    assert table.cells == before
+    assert len(by_station) == len(sheet.TABLE_HOLES) == 11
+    for station, annotation in by_station.items():
+        assert annotation.text == table.station_tags[station]
+        position = sheet.HOLE_TAG_STATION_POSITIONS.get(station)
+        assert annotation.position == ((*position, 0.0) if position else None)
+        assert annotation.leader_reads == int(station in sheet._CRITICAL_HOLE_TAG_STATIONS)
+    sheet._check_pivot_seat_table_row(table, generated, width)
+
+
+def test_native_tag_layout_and_pivot_flag_follow_all_eleven_renamed_tags(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    renamed = {tag: f"R{index}" for index, tag in enumerate(table.station_tags.values(), 1)}
+    for row in table.cells[1:]:
+        row[0] = renamed[row[0]]
+    table.station_tags = {station: renamed[tag] for station, tag in table.station_tags.items()}
+    generated, width = sheet._flag_pivot_seat_table_row(table)
+    view, by_station, _annotations = _native_tag_view(monkeypatch, table)
+    sheet._spread_hole_tags(view, table)
+    for station, position in sheet.HOLE_TAG_STATION_POSITIONS.items():
+        assert by_station[station].position == (*position, 0.0)
+    pivot = sheet._hole_table_station_rows(table)[sheet.PIVOT_SCREW_XZ]
+    assert table.cells[pivot.index][4] == sheet.PIVOT_SEAT_FLAG
+    assert pivot.tag in sheet.pivot_seat_step(pivot.tag)
+    sheet._check_pivot_seat_table_row(table, generated, width)
+
+
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "extra", "wrong-type"))
+def test_native_tag_layout_requires_exact_table_view_bijection(monkeypatch, fault) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    view, by_station, annotations = _native_tag_view(monkeypatch, table)
+    # An uncurated west socket must also exist exactly once.
+    station = min(sheet.COLUMN_SOCKET_XZ)
+    selected = by_station[station]
+    if fault == "missing":
+        annotations.remove(selected)
+    elif fault == "duplicate":
+        annotations.append(selected)
+    elif fault == "extra":
+        orphan = type(selected)("Z99", (0.0, 0.0))
+        annotations.append(orphan)
+    else:
+        selected.kind = 4
+    with pytest.raises(RuntimeError, match="table/view tag bijection failed"):
+        sheet._spread_hole_tags(view, table)
+    assert all(annotation.position is None for annotation in by_station.values())
+
+
+@pytest.mark.parametrize("critical_index", (0, 1, 2))
+@pytest.mark.parametrize("endpoint", ((0.0, 0.0), (math.nan, 0.0), (), "other-hole"))
+def test_native_tag_layout_checks_physical_critical_leader_endpoints(
+    monkeypatch, critical_index, endpoint,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    view, by_station, _annotations = _native_tag_view(monkeypatch, table)
+    station = sheet._CRITICAL_HOLE_TAG_STATIONS[critical_index]
+    if endpoint == "other-hole":
+        other = next(xz for xz in table.station_tags if xz != station)
+        endpoint = by_station[other].endpoint
+    by_station[station].endpoint = endpoint
+    with pytest.raises(RuntimeError, match="does not reach its table hole|no complete finite leader"):
+        sheet._spread_hole_tags(view, table)
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    (("leader", "give native hole tag"), ("position", "reposition native hole tag"),
+     ("text", "changed its text")),
+)
+def test_native_tag_layout_refuses_failed_native_movement(monkeypatch, failure, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    view, by_station, _annotations = _native_tag_view(monkeypatch, table)
+    by_station[sheet.PIVOT_SCREW_XZ].failure = failure
+    with pytest.raises(RuntimeError, match=message):
+        sheet._spread_hole_tags(view, table)
+
+
+@pytest.mark.parametrize("missing", (False, True))
+def test_native_tag_diagnostics_include_bounded_rows_view_inventory_and_station_binding(
+    monkeypatch, missing,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    view, by_station, annotations = _native_tag_view(monkeypatch, table)
+    logs = []
+    monkeypatch.setattr(sheet._telemetry, "info", logs.append)
+    ordinary = annotations[-2]
+    ordinary.text = "ordinary " + "x" * 2000
+    if missing:
+        annotations.remove(by_station[sheet.PIVOT_SCREW_XZ])
+        with pytest.raises(RuntimeError, match="table/view tag bijection failed"):
+            sheet._spread_hole_tags(view, table)
+    else:
+        sheet._spread_hole_tags(view, table)
+    assert any("native base hole-table rows: shape=12x4" in line for line in logs)
+    assert any("native base hole-view inventory:" in line and "Q7" in line for line in logs) is not missing
+    assert any("native base hole-table station binding:" in line and "Q7" in line for line in logs)
+    assert not any("x" * 161 in line for line in logs)
+
+
+def test_station_layout_retains_support_pairing_without_crossing_neighbors() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    supports = sorted(sheet.HOLE_XZ, key=lambda xz: (xz[0], -xz[1]))
+    assert [sheet.HOLE_TAG_STATION_POSITIONS[xz] for xz in supports] == [
+        (0.297, 0.1895), (0.289, 0.206), (0.312, 0.173), (0.312, 0.214),
+    ]
+    assert set(sheet._CRITICAL_HOLE_TAG_STATIONS) == {
+        sheet.PIVOT_SCREW_XZ, supports[0], supports[2],
+    }
+    # Each pair stays on its own side of the pattern midpoint in plan Y.
+    middle_y = sum(sheet._plan_xy(*xz, center=sheet.HOLE_TOP_CENTER)[1] for xz in supports) / 4
+    for station in supports:
+        tip = sheet._plan_xy(*station, center=sheet.HOLE_TOP_CENTER)
+        anchor = sheet.HOLE_TAG_STATION_POSITIONS[station]
+        assert (tip[1] - middle_y) * (anchor[1] - middle_y) > 0.0
+    assert sheet.HOLE_TAG_STATION_POSITIONS[supports[0]][0] < sheet.HOLE_TAG_STATION_POSITIONS[supports[2]][0]
+    assert sheet.HOLE_TAG_STATION_POSITIONS[supports[1]][0] < sheet.HOLE_TAG_STATION_POSITIONS[supports[3]][0]
+
+
+@pytest.mark.parametrize(
+    ("larger_z", "old_anchor", "old_box"),
     [
-        ("A3", (0.325, 0.176), (0.3251, 0.1724, 0.3309, 0.1760)),
-        ("A4", (0.326, 0.215), (0.3261, 0.2115, 0.3319, 0.2150)),
+        (True, (0.325, 0.176), (0.3251, 0.1724, 0.3309, 0.1760)),
+        (False, (0.326, 0.215), (0.3261, 0.2115, 0.3319, 0.2150)),
     ],
 )
-def test_socket_tags_clear_the_native_section_cut_line(tag, old_anchor, old_box) -> None:
+def test_socket_tags_clear_the_native_section_cut_line(larger_z, old_anchor, old_box) -> None:
     import draw_fr_harmonic_base as sheet
 
     # r2b native ink, not an estimated label width. The former tags were
     # both struck by the A-A line through the right-hand socket axes.
     cut_line = (0.3292, 0.155, 0.3292, 0.235)
     assert sheet.segment_crosses_box(cut_line, old_box)
-    x, y = sheet.HOLE_TAG_POSITIONS[tag]
+    east = sorted((xz for xz in sheet.COLUMN_SOCKET_XZ if xz[0] > 0.0), key=lambda xz: xz[1])
+    station = east[-1] if larger_z else east[0]
+    x, y = sheet.HOLE_TAG_STATION_POSITIONS[station]
     dx, dy = x - old_anchor[0], y - old_anchor[1]
     box = tuple(
         value + (dx if index % 2 == 0 else dy)
@@ -2659,7 +2990,7 @@ def test_nameplate_seats_are_transferred_through_the_plate() -> None:
     assert seats <= set(sheet.TRANSFER_HOLES)
     assert not seats & set(sheet.TABLE_HOLES)
     assert sheet.TRANSFER_NAMEPLATE_CALLOUT == "TRANSFER FROM MHA-FR-04\nAT ASSEMBLY;"
-    assert not any(tag.startswith("F") for tag in sheet.HOLE_TAG_POSITIONS)
+    assert not {hole[:2] for hole in seats} & set(sheet.HOLE_TAG_STATION_POSITIONS)
     # The leader lands on the plan's right, upper (rear-east) tap.
     taps = [sheet._plan_xy(x, z, center=sheet.HOLE_TOP_CENTER) for x, z, _ in seats]
     leader_tap = sheet._plan_xy(
@@ -2698,7 +3029,7 @@ def test_nameplate_callout_reads_in_the_top_band_its_leader_clear_of_the_tags() 
     leader = ((box[0], box[1]), tap)
     tag_boxes = {
         tag: (tx, ty - _DIM_TEXT_H_M, tx + 2 * _DIM_CHAR_M, ty)
-        for tag, (tx, ty) in sheet.HOLE_TAG_POSITIONS.items()
+        for tag, (tx, ty) in sheet.HOLE_TAG_STATION_POSITIONS.items()
     }
     for tag, tag_box in tag_boxes.items():
         assert _segment_box_gap(leader, tag_box) > 0.0015, tag
@@ -2746,7 +3077,7 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
     assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
     assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
-    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2456, 0.1550)
+    assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.PIVOT_SCREW_XZ] == (0.2456, 0.1550)
     assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.193, 0.135)
 
     # Native-r4 embedded-font calibration supplies conservative NEW text-width
@@ -2802,36 +3133,35 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
 
 
-def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
-    """Setup identification stays on the note; dimensions own the location
-    and band. The table's D1 identity still resolves to the actual pivot."""
+@pytest.mark.parametrize("tag", ("D1", "Q7", "B12"))
+def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets(tag) -> None:
+    """Native tag presentation changes without moving ownership of offsets/bands."""
     import re
 
     import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    assert sheet.PIVOT_SEAT_STEP is base_spec.PIVOT_SEAT_STEP
-    assert base_spec.PIVOT_SEAT_TAG == "D1"
+    assert sheet.pivot_seat_step is base_spec.pivot_seat_step
     assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
-    assert sheet.PIVOT_SEAT_STEP.split("\n") == [
-        "1. D1 IS LOCATED TO THE MHA-DT-02 SEAT;",
+    text = sheet.pivot_seat_step(tag)
+    assert text.split("\n") == [
+        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;",
         "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.",
-        "D1 TABLE X/Y ARE REFERENCE.",
+        f"{tag} TABLE X/Y ARE REFERENCE.",
     ]
     # Only the note number and part/table identities may contain digits;
     # the native dimensions remain the sole owners of offsets and bands.
-    identification = sheet.PIVOT_SEAT_STEP.removeprefix("1. ")
-    for identity in (base_spec.PIVOT_SEAT_TAG, "MHA-DT-02"):
+    identification = text.removeprefix("1. ")
+    for identity in (tag, "MHA-DT-02"):
         assert identity in identification
         identification = identification.replace(identity, "")
     assert not re.search(r"\d|<MOD-PM>|±", identification)
-    # D1 remains the table's only 10-24 row and resolves to the pivot station.
-    pivot_size = [h for h in sheet.TABLE_HOLES if h[2] == sheet.PIVOT_SCREW_HOLE_DIA]
-    assert pivot_size == [(*sheet.PIVOT_SCREW_XZ, sheet.PIVOT_SCREW_HOLE_DIA)]
+    table = _NativeHoleTable(pivot_tag=tag)
+    assert sheet._hole_table_station_rows(table)[sheet.PIVOT_SCREW_XZ].tag == tag
 
 
-def test_numbered_d1_note_is_created_once_as_an_ordinary_free_note() -> None:
+def test_numbered_pivot_note_is_created_once_as_an_ordinary_free_note() -> None:
     import ast
     import inspect
 
@@ -2841,12 +3171,12 @@ def test_numbered_d1_note_is_created_once_as_an_ordinary_free_note() -> None:
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
     notes = [
         node for node in calls
-        if any(isinstance(arg, ast.Name) and arg.id == "PIVOT_SEAT_STEP" for arg in node.args)
+        if any(isinstance(arg, ast.Call) and getattr(arg.func, "id", None) == "pivot_seat_step" for arg in node.args)
     ]
     assert len(notes) == 1
     assert notes[0].func.id == "add_note"
     assert [ast.unparse(arg) for arg in notes[0].args] == [
-        "adapter", "PIVOT_SEAT_STEP", "*PIVOT_SEAT_NOTE_XY",
+        "adapter", "pivot_seat_step(pivot_tag)", "*PIVOT_SEAT_NOTE_XY",
     ]
     assert notes[0].keywords == []
     hole_sheet = [
@@ -2865,7 +3195,7 @@ def test_numbered_d1_note_is_created_once_as_an_ordinary_free_note() -> None:
     assert "pivot_seat_rim" not in inspect.getsource(sheet.build)
     assert not hasattr(sheet, "_route_pivot_seat_note")
     check = next(node for node in calls if getattr(node.func, "id", None) == "_check_hole_sheet_callouts")
-    assert {keyword.arg for keyword in check.keywords} == {"callouts", "views", "datum_origin"}
+    assert {keyword.arg for keyword in check.keywords} == {"callouts", "views", "datum_origin", "hole_table"}
     flags = [node for node in calls if getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions"]
     assert len(flags) == 1
     assert [ast.unparse(arg) for arg in flags[0].args] == ["adapter", "hole_top_dimensions"]
