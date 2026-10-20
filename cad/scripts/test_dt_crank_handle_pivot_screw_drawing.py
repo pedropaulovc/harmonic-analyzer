@@ -58,6 +58,10 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     # The threaded section is defined by its callout, not a Ø4.826 dimension.
     assert "ThreadDia" not in marked
     assert {"ReliefLead", "ReliefCornerRadius", "SeatEdgeBreak"} <= spec.DRAWING_DIMENSIONS["ScrewProfile"]
+    assert "ReliefDia" not in spec.DRAWING_DIMENSIONS["ScrewProfile"]
+    assert spec.DRAWING_DIMENSIONS[spec.RELIEF_DIAMETER_SKETCH] == {"ReliefDia"}
+    assert "ReliefProfileDia" not in marked
+    assert spec.DRAWING_PRECISION[spec.RELIEF_DIAMETER_SKETCH] == {"ReliefDia": 1}
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
 
@@ -85,7 +89,7 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "HeadDia"): "HEAD_DIA_TOL",
         ("ScrewProfile", "HeadLength"): "HEAD_LENGTH_TOL",
-        ("ScrewProfile", "ReliefDia"): "*deviations(RELIEF_DIA_BAND)",
+        ("RELIEF_DIAMETER_SKETCH", "ReliefDia"): "*deviations(RELIEF_DIA_BAND)",
     }
     # swTolMAX prints the nominal then "MAX", so each model value IS its limit.
     assert spec.SINGLE_LIMITS == {
@@ -517,7 +521,228 @@ async def test_builder_uses_the_supported_tangent_arc_and_associative_radius(cor
     assert state.globals["ReliefCornerRadius"] == f"{e}mm"
     assert ("Line6.start", "Line8.start", "horizontal_distance", spec.RELIEF_WIDTH) in state.dimensions
     assert ("ReliefWidth", '"ReliefWidth"') in state.rows
+    assert ("ReliefProfileDia", '"ReliefDia"') in state.rows
+    assert ("Line7", None, "diameter", "ReliefProfileDia") in state.dimensions
+    assert not any(row[0] == "ReliefDia" for row in state.rows)
     assert state.events == ["fully_defined", "exit", "ScrewProfile"]
+
+
+@pytest.fixture
+def relief_circle_model(monkeypatch):
+    """Exercise the real public circle recipe against a strict adapter surface."""
+    from types import SimpleNamespace
+
+    state = SimpleNamespace(events=[], fault=None, rows=[])
+
+    def result(operation, data=None):
+        return SimpleNamespace(
+            is_success=state.fault != operation, data=data,
+            error=f"native {operation} refused",
+        )
+
+    class Manager:
+        __slots__ = ("AddToDB",)
+
+        def __init__(self):
+            self.AddToDB = False
+
+    class Segment:
+        __slots__ = ("_construction",)
+
+        def __init__(self):
+            self._construction = False
+
+        @property
+        def ConstructionGeometry(self):
+            state.events.append(("construction-read", self._construction))
+            return self._construction
+
+        @ConstructionGeometry.setter
+        def ConstructionGeometry(self, value):
+            assert value is True
+            state.events.append(("construction-set", value))
+            if state.fault != "construction":
+                self._construction = value
+
+    class Adapter:
+        __slots__ = ("currentSketchManager", "_sketch_entities")
+
+        def __init__(self):
+            self.currentSketchManager = Manager()
+            self._sketch_entities = {"ReferenceCircle": Segment()}
+
+        async def create_plane(self, parameters):
+            assert parameters.mode == "offset"
+            assert parameters.base_plane == "Front Plane"
+            assert parameters.offset == spec.RELIEF_DIAMETER_STATION
+            state.events.append(("plane", parameters.offset))
+            return result("plane")
+
+        async def create_sketch(self, plane):
+            assert plane == "ReliefDiameterPlane"
+            state.events.append(("sketch", plane))
+            return result("sketch")
+
+        async def add_circle(self, x, y, radius):
+            assert self.currentSketchManager.AddToDB is True
+            state.events.append(("circle", x, y, radius))
+            return result("circle", "ReferenceCircle")
+
+        async def add_sketch_constraint(self, first, second, relation):
+            assert (first, second, relation) == (
+                "ReferenceCircle.center", "origin", "coincident"
+            )
+            state.events.append(("origin", first, second, relation))
+            return result("origin")
+
+        async def add_sketch_dimension(self, first, second, kind, value):
+            assert (first, second, kind, value) == (
+                "ReferenceCircle", None, "diameter", spec.RELIEF_DIA
+            )
+            state.events.append(("dimension", kind, value))
+            return result("diameter", "D1")
+
+        async def check_sketch_fully_defined(self):
+            state.events.append(("fully-defined",))
+            return result(
+                "definition-state",
+                {"definition_state": (
+                    "under_defined" if state.fault == "definition" else "fully_defined"
+                )},
+            )
+
+        async def exit_sketch(self):
+            state.events.append(("exit",))
+            return result("exit")
+
+    class Dimensions(part.SketchDims):
+        def apply(self, adapter, feature):
+            assert adapter is state.adapter
+            assert feature == spec.RELIEF_DIAMETER_SKETCH
+            state.rows = self._rows.copy()
+            state.events.append(("apply", feature))
+            return [(f"{name}@{feature}", drive) for name, drive in self._rows]
+
+    def bind(value, interface):
+        assert interface == "ISketchSegment" and isinstance(value, Segment)
+        return value
+
+    def name_feature(adapter, name):
+        assert adapter is state.adapter
+        assert name in ("ReliefDiameterPlane", spec.RELIEF_DIAMETER_SKETCH)
+        state.events.append(("name", name))
+
+    def name_dimensions(adapter, feature, names):
+        assert adapter is state.adapter
+        assert (feature, names) == ("ReliefDiameterPlane", ["ReliefStation"])
+        state.events.append(("name-station",))
+        return ["ReliefStation@ReliefDiameterPlane"]
+
+    def hide_sketch(adapter, name):
+        assert adapter is state.adapter and name == spec.RELIEF_DIAMETER_SKETCH
+        state.events.append(("hide-sketch", name))
+
+    def hide_plane(adapter, entities):
+        assert adapter is state.adapter
+        assert entities == (("ReliefDiameterPlane", "PLANE"),)
+        state.events.append(("hide-plane",))
+
+    state.adapter = Adapter()
+    monkeypatch.setattr(part, "SketchDims", Dimensions)
+    monkeypatch.setattr(part, "_early_bound", bind)
+    monkeypatch.setattr(part, "name_last_feature", name_feature)
+    monkeypatch.setattr(part, "name_dimensions", name_dimensions)
+    monkeypatch.setattr(part, "blank_sketch", hide_sketch)
+    monkeypatch.setattr(part, "blank_reference_geometry", hide_plane)
+    return state
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prior_direct_db", [False, True])
+async def test_relief_circle_model_authors_true_diameter_origin_and_hidden_deferred_drive(
+    relief_circle_model, prior_direct_db
+):
+    state = relief_circle_model
+    state.adapter.currentSketchManager.AddToDB = prior_direct_db
+    jobs = await part._relief_diameter_reference(state.adapter)
+    assert jobs == [
+        ("ReliefStation@ReliefDiameterPlane",
+         '"HeadLength" + "ShoulderLength" + "ReliefWidth" / 2'),
+        ("ReliefDia@ReliefDiameterReference", '"ReliefDia"'),
+    ]
+    assert state.rows == [("ReliefDia", '"ReliefDia"')]
+    assert state.adapter.currentSketchManager.AddToDB is prior_direct_db
+    assert state.events == [
+        ("plane", spec.RELIEF_DIAMETER_STATION),
+        ("name", "ReliefDiameterPlane"), ("name-station",),
+        ("sketch", "ReliefDiameterPlane"),
+        ("circle", 0.0, 0.0, spec.RELIEF_DIA / 2.0),
+        ("origin", "ReferenceCircle.center", "origin", "coincident"),
+        ("dimension", "diameter", spec.RELIEF_DIA),
+        ("construction-set", True), ("construction-read", True),
+        ("fully-defined",), ("exit",),
+        ("name", spec.RELIEF_DIAMETER_SKETCH),
+        ("apply", spec.RELIEF_DIAMETER_SKETCH),
+        ("hide-sketch", spec.RELIEF_DIAMETER_SKETCH), ("hide-plane",),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["plane", "sketch", "circle", "origin", "diameter", "exit"])
+async def test_relief_circle_model_refuses_each_public_authoring_failure(relief_circle_model, fault):
+    state = relief_circle_model
+    state.fault = fault
+    with pytest.raises(RuntimeError, match=f"native {fault} refused"):
+        await part._relief_diameter_reference(state.adapter)
+    assert state.adapter.currentSketchManager.AddToDB is False
+    assert ("hide-plane",) not in state.events
+
+
+@pytest.mark.asyncio
+async def test_relief_circle_model_refuses_ignored_construction_flag(relief_circle_model):
+    state = relief_circle_model
+    state.fault = "construction"
+    with pytest.raises(RuntimeError, match="^relief diameter reference construction flag rejected$"):
+        await part._relief_diameter_reference(state.adapter)
+    assert ("fully-defined",) not in state.events
+    assert ("exit",) not in state.events
+
+
+@pytest.mark.asyncio
+async def test_relief_circle_model_refuses_underdefined_circle_before_hide(relief_circle_model):
+    state = relief_circle_model
+    state.fault = "definition"
+    with pytest.raises(RuntimeError, match="ReliefDiameterReference: sketch not fully defined"):
+        await part._relief_diameter_reference(state.adapter)
+    assert ("exit",) not in state.events
+    assert ("hide-plane",) not in state.events
+
+
+@pytest.mark.parametrize("replacement", [
+    "SEAT_STATION + RELIEF_LEAD",
+    "RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX",
+])
+def test_relief_circle_station_refuses_each_nominal_floor_endpoint(replacement):
+    assert spec.RELIEF_DIAMETER_STATION == pytest.approx(58.2)
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    original = "RELIEF_DIAMETER_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0"
+    assert source.count(original) == 1
+    probe = source.replace(original, f"RELIEF_DIAMETER_STATION = {replacement}")
+    with pytest.raises(AssertionError, match="reference station is outside the straight nominal floor"):
+        exec(compile(probe, spec.__file__, "exec"), {"__name__": "_relief_station_probe"})
+
+
+def test_relief_circle_reference_is_hidden_before_the_installed_configuration_split():
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    build = next(node for node in tree.body
+                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)
+             and isinstance(node.func, ast.Name)
+             and node.func.id == "_relief_diameter_reference"]
+    assert len(calls) == 1
+    assert ast.unparse(calls[0]) == "_relief_diameter_reference(adapter)"
+    assert calls[0].lineno < source[:source.index("create_configuration {INSTALLED_CONFIG}")].count("\n") + 1
 
 
 @pytest.mark.asyncio
@@ -1120,17 +1345,14 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         "RELIEF_DIA_TEXT_UNDERLINE_DROP",
     ):
         assert not hasattr(drawing, obsolete)
-    # The thread note stands up and right of its pick, so the leader slants.
+    # The complete note, not a centred half-width, stays left of the tip.
     note_x, note_y = drawing.THREAD_NOTE_XY
-    assert note_x - drawing.THREAD_PICK[0] > 0.010
-    assert note_y - drawing.THREAD_TOP_Y > 0.015
+    assert drawing.TIP_X - (note_x + len(spec.THREAD_CALLOUT) * 0.0028) >= 0.004 - 1e-12
+    assert note_y == pytest.approx(drawing.SIDE_CENTER[1] - 0.008)
     # The slot value stands clear of its 3-mm-apart extension lines.
     assert drawing.END_KEEP["SlotWidth"][1] - drawing.END_CENTER[1] > 0.005
-    assert (
-        drawing.SIDE_KEEP["ThreadLength"][1] + 0.010
-        < drawing.SIDE_KEEP["ReliefDia"][1]
-        < 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y  # below the thread
-    )
+    assert drawing.SIDE_KEEP["ReliefDia"][1] < 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
+    assert drawing.SIDE_KEEP["ThreadLength"][1] > drawing.THREAD_TOP_Y + 0.010
     thread_half = spec.THREAD_MODEL_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
     assert drawing.SEAT_X < drawing.FINISH_PICK[0] < drawing.UNDERHEAD_X
@@ -1141,24 +1363,38 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert abs(drawing.FINISH_PICK[0] - shoulder_dim_x) > 0.010
 
 
-def test_relief_text_block_stays_left_of_the_seat_and_clear_of_thread_rows() -> None:
+def test_relief_text_reserves_its_complete_right_side_block_and_reference_air() -> None:
     x, y = drawing.SIDE_KEEP["ReliefDia"]
     lines = [
         *spec.RELIEF_DIA_ROOT_CALLOUT.splitlines(),
+        f"Ø{spec.RELIEF_DIA:.1f} {spec.RELIEF_DIA_BAND[0]:+.1f}/{spec.RELIEF_DIA_BAND[1]:+.1f}",
         *spec.RELIEF_DIA_CALLOUT.splitlines(),
     ]
-    half = max(map(len, lines)) * 0.0028 / 2.0
-    assert (x, y) == pytest.approx((0.0631, 0.166))
-    assert drawing.SEAT_X - (x + half) == pytest.approx(0.004)
-    assert drawing.SEAT_X - (x + half) >= 0.003
-    assert x - half > 0.0127
-    # Conservative native text envelopes: header/value top 12 mm above the
-    # ask, final BELOW line 14.6 mm below; ThreadLength value top 6 mm above.
+    # R10b's 44.056 mm RIGHT-justified block was not centred on the ask.
+    # Reserve its full width to the intended RIGHT of the new ask, not half
+    # about it.  Only the native final audit/PNG can establish its real box.
+    width = max(0.044056, max(map(len, lines)) * 0.0028)
+    left, right = x, x + width
+    assert (x, y) == pytest.approx((0.1035, 0.166))
+    assert left > drawing.TIP_X
+    assert right < drawing.FINISH_PICK[0] - 0.003
+    assert right < drawing.FINISH_SYMBOL[0] - 0.005
     thread_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
     assert thread_bottom - (y + 0.012) >= 0.003
-    assert y - 0.0146 - (drawing.SIDE_KEEP["ThreadLength"][1] + 0.006) >= 0.003
-    # The under-head block is farther down, retaining its 5 mm floor.
+    # Keep the final BELOW line at least 5 mm above the under-head block.
     assert y - 0.0146 - (drawing.SIDE_KEEP["UnderHeadLocation"][1] + 0.010) >= 0.005
+
+
+def test_thread_note_complete_left_block_clears_root_and_tip_witness() -> None:
+    x, y = drawing.THREAD_NOTE_XY
+    # INote insertion is the upper-left corner, not its centre.
+    note_right = x + len(spec.THREAD_CALLOUT) * 0.0028
+    assert (x, y) == pytest.approx((0.0303, 0.182))
+    assert drawing.TIP_X - note_right == pytest.approx(0.004)
+    root_x, root_y = drawing.SIDE_KEEP["ReliefDia"]
+    assert root_x - note_right >= 0.005
+    assert y - 0.004 - (root_y + 0.012) >= -1e-12
+    assert y < drawing.THREAD_PICK[1]
 
 
 def test_tip_chamfer_header_and_reasons_clear_the_thread_and_relief_block() -> None:
@@ -1171,40 +1407,84 @@ def test_tip_chamfer_header_and_reasons_clear_the_thread_and_relief_block() -> N
     assert tip_y - 0.0065 - drawing.THREAD_TOP_Y >= 0.003
     relief_top = drawing.SIDE_KEEP["ReliefDia"][1] + 0.012
     assert tip_y - 0.0065 - relief_top >= 0.005
-    thread_note_bottom = drawing.THREAD_NOTE_XY[1] - 0.004
-    assert thread_note_bottom - (tip_y + 0.006) >= 0.005
+    # Upper ThreadLength's full native-shaped witness includes a 1 mm gap and
+    # a conservative 1.3 mm overrun.  The tip-leg block is wholly to its left.
+    tip_right = tip_x + max(len(spec.CHAMFER_CALLOUT), len("0.3 MAX")) * 0.0028 / 2.0
+    assert drawing.TIP_X - tip_right >= 0.003
+    assert drawing.SIDE_KEEP["ThreadLength"][1] - drawing.THREAD_TOP_Y >= 0.010
     assert tip_x - len(spec.CHAMFER_CALLOUT) * 0.0028 / 2.0 > 0.0127
 
 
-def test_tip_baselines_have_independent_nested_rows_and_shorter_witnesses() -> None:
+def test_tip_baselines_keep_reference_rows_and_upper_thread_witnesses() -> None:
     assert drawing.SIDE_KEEP["HeadLength"][1] == pytest.approx(0.156)
     rows = {
         name: drawing.SIDE_KEEP[name][1]
         for name in ("ThreadLength", "UnderHeadLocation", "OverallLength")
     }
-    assert tuple(rows.values()) == pytest.approx((0.142, 0.135, 0.116))
-    spans = {
-        "ThreadLength": (drawing.TIP_X, drawing.SEAT_X),
-        "UnderHeadLocation": (drawing.TIP_X, drawing.UNDERHEAD_X),
-        "OverallLength": (drawing.TIP_X, drawing.HEAD_FACE_X),
-    }
-    for short, long in (
-        ("ThreadLength", "UnderHeadLocation"),
-        ("ThreadLength", "OverallLength"),
-        ("UnderHeadLocation", "OverallLength"),
-    ):
-        assert spans[short][0] == spans[long][0] == drawing.TIP_X
-        assert spans[short][1] < spans[long][1]
-        # Include a conservative 2 mm overshoot beyond each shorter line.
-        witness_bottom = rows[short] - 0.005 - 0.002
-        longer_line = rows[long] - 0.005
-        assert witness_bottom - longer_line >= 0.003, (short, long)
+    assert tuple(rows.values()) == pytest.approx((0.225, 0.135, 0.116))
     assert rows["UnderHeadLocation"] - rows["OverallLength"] == pytest.approx(0.019)
-    assert rows["ThreadLength"] - 0.005 - 0.002 - (
-        rows["UnderHeadLocation"] - 0.005
-    ) == pytest.approx(0.005)
-    # Preserve the under-head reason's final-line/overall-value air.
+    # The lower reference rows retain their established envelope floors.
+    assert rows["UnderHeadLocation"] - 0.005 - 0.0013 - (
+        rows["OverallLength"] - 0.005
+    ) >= 0.005
     assert rows["UnderHeadLocation"] - 0.0094 - (rows["OverallLength"] + 0.006) >= 0.003
+    inks = _axial_ink()
+    upper = inks["ThreadLength"]
+    assert all(min(a[1], b[1]) > drawing.SIDE_CENTER[1] for a, b in upper)
+    assert upper[1][0][1] - drawing.THREAD_TOP_Y == pytest.approx(0.001)
+    assert upper[1][1][1] - upper[0][0][1] == pytest.approx(0.0013)
+    for name in ("UnderHeadLocation", "OverallLength"):
+        assert drawing._drawing_leaders.leader_crossings(
+            {"ThreadLength": upper, name: inks[name]}
+        ) == []
+
+
+def test_upper_thread_length_clears_short_tip_inner_witness_and_full_text():
+    # R10b observed 2.778125 mm from requested ThreadLength text to its
+    # horizontal line, not the old fabricated 5 mm.  This source reservation
+    # uses that observation plus the conservative 1.3 mm tiny-leg overrun;
+    # actual final native ink remains authoritative.
+    observed_drop = 0.142 - 0.1392218750044704
+    short_text_y = drawing.SIDE_KEEP["TipChamfer"][1]
+    long_text_y = drawing.SIDE_KEEP["ThreadLength"][1]
+    short_line_y = short_text_y - observed_drop
+    long_line_y = long_text_y - observed_drop
+    short_witness_top = short_line_y + 0.0013
+    short_text_top = short_text_y + 0.0046
+    assert long_text_y > short_text_y
+    assert long_line_y - short_witness_top >= 0.005
+    assert long_line_y - short_text_top >= 0.003
+    inner = (
+        (drawing.THREAD_START_X, drawing.THREAD_TOP_Y + 0.001),
+        (drawing.THREAD_START_X, short_witness_top),
+    )
+    long_line = ((drawing.TIP_X, long_line_y), (drawing.SEAT_X, long_line_y))
+    assert not drawing._drawing_leaders.segments_cross(inner, long_line)
+    # The previous .205 text row puts the long line through that inner leg.
+    rejected_line_y = drawing.SIDE_CENTER[1] + 0.015 - observed_drop
+    assert drawing._drawing_leaders.segments_cross(
+        inner, ((drawing.TIP_X, rejected_line_y), (drawing.SEAT_X, rejected_line_y))
+    )
+
+
+def test_upper_thread_length_clears_parent_a_full_letter_reservation():
+    observed_drop = 0.142 - 0.1392218750044704
+    long_line_y = drawing.SIDE_KEEP["ThreadLength"][1] - observed_drop
+    mark_x, mark_y = drawing.DETAIL_PARENT_LETTER_XY
+    # Reserve a whole 4.6 mm letter envelope, not half about its insertion.
+    mark_left, mark_right = mark_x, mark_x + 0.0046
+    mark_top = mark_y + 0.0046
+    assert mark_left - drawing.SEAT_X >= 0.005
+    assert long_line_y - mark_top >= 0.003
+    assert mark_right < drawing.SIDE_KEEP["ShoulderDia"][0] - 0.003
+
+
+def test_thread_note_route_stays_below_upper_thread_length_witnesses():
+    note_right = drawing.THREAD_NOTE_XY[0] + len(spec.THREAD_CALLOUT) * 0.0028
+    note_leader = [(drawing.THREAD_PICK, (note_right, drawing.THREAD_NOTE_XY[1]))]
+    assert drawing._drawing_leaders.leader_crossings({
+        "ThreadNote": note_leader, "ThreadLength": _axial_ink()["ThreadLength"]
+    }) == []
 
 
 def test_relief_detail_contains_the_actual_native_dimension_endpoints() -> None:
@@ -1759,63 +2039,129 @@ def test_cropped_relief_view_individual_readback_refusals(relief_native, monkeyp
 
 
 def _relief_leader_geometry():
-    """A LEFT route from the real flat floor, below the thread-side corner."""
+    """A synthetic RIGHT route from the true station, below the seat corner."""
     scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
-    floor_left = drawing.RELIEF_END_X + spec.RELIEF_CORNER_RADIUS_MAX * scale / 1000.0
-    floor_right = drawing.SEAT_X - spec.RELIEF_LEAD * scale / 1000.0
-    floor = ((floor_left + floor_right) / 2.0,
-             drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * scale / 2000.0)
+    floor = (
+        drawing._sheet_x(spec.RELIEF_DIAMETER_STATION),
+        drawing.SIDE_CENTER[1] - spec.RELIEF_DIA * scale / 2000.0,
+    )
     bottom = drawing.SIDE_CENTER[1] - spec.SHOULDER_DIA * scale / 2000.0
-    thread_bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
-    bend = (drawing.RELIEF_END_X, thread_bottom - 0.0021)
+    bend = (drawing.SEAT_X, bottom - 0.0021)
     tail = drawing.SIDE_KEEP["ReliefDia"]
     return floor, bend, tail, bottom
 
 
-def _thread_length_ink():
-    """Independent native-shaped line/witness ink in sheet metres."""
-    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
-    line_y = drawing.SIDE_KEEP["ThreadLength"][1] - 0.005
-    thread_bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
-    seat_bottom = drawing.SIDE_CENTER[1] - spec.SHOULDER_DIA * scale / 2000.0
-    return [
-        ((drawing.TIP_X, line_y), (drawing.SEAT_X, line_y)),
-        ((drawing.TIP_X, thread_bottom - 0.001), (drawing.TIP_X, line_y - 0.002)),
-        ((drawing.SEAT_X, seat_bottom - 0.001), (drawing.SEAT_X, line_y - 0.002)),
-    ]
+def _axial_ink():
+    """Independent synthetic native-shaped ink, not calibrated text offsets.
+
+    Only r10b's rejected geometry below is a recorded native observation.
+    These upper/lower witnesses deliberately include the observed 1 mm gap
+    and conservative 1.3 mm overrun without claiming a final native layout.
+    """
+    upper_line = 0.222
+    thread_bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
+    return {
+        "ThreadLength": [
+            ((drawing.TIP_X, upper_line), (drawing.SEAT_X, upper_line)),
+            ((drawing.TIP_X, drawing.THREAD_TOP_Y + 0.001),
+             (drawing.TIP_X, upper_line + 0.0013)),
+            ((drawing.SEAT_X, drawing.SHOULDER_TOP_Y + 0.001),
+             (drawing.SEAT_X, upper_line + 0.0013)),
+        ],
+        "UnderHeadLocation": [
+            ((drawing.TIP_X, 0.130), (drawing.UNDERHEAD_X, 0.130)),
+            ((drawing.TIP_X, thread_bottom - 0.001), (drawing.TIP_X, 0.1287)),
+            ((drawing.UNDERHEAD_X, 0.180), (drawing.UNDERHEAD_X, 0.1287)),
+        ],
+        "OverallLength": [
+            ((drawing.TIP_X, 0.111), (drawing.HEAD_FACE_X, 0.111)),
+            ((drawing.TIP_X, thread_bottom - 0.001), (drawing.TIP_X, 0.1097)),
+            ((drawing.HEAD_FACE_X, 0.180), (drawing.HEAD_FACE_X, 0.1097)),
+        ],
+    }
+
+
+# Unrounded IDisplayData strokes from r10b task.log, artifact 6095 line 37.
+R10B_WRONG_CARRIER_INK = [
+    ((0.08190000027600003, 0.18714999998499998),
+     (0.06209999999999999, 0.18714999998499998)),
+    ((0.08190000027600003, 0.19285000001499997),
+     (0.06209999999999999, 0.19285000001499997)),
+    ((0.01904374835491182, 0.15313993001729248),
+     (0.06309999999999999, 0.15313993001729248)),
+    ((0.06309999999999999, 0.15313993001729248),
+     (0.06309999999999999, 0.18714999998499998)),
+    ((0.06309999999999999, 0.19285000001499997),
+     (0.06309999999999999, 0.19920000001499996)),
+]
+R10B_THREAD_LENGTH_INK = [
+    ((0.08950000003000003, 0.19274999973899998),
+     (0.08950000003000003, 0.1382218750044704)),
+    ((0.05949999983200002, 0.19236750012299997),
+     (0.05949999983200002, 0.1382218750044704)),
+    ((0.08950000003000003, 0.1392218750044704),
+     (0.05949999983200002, 0.1392218750044704)),
+]
 
 
 @pytest.mark.parametrize("reverse", [False, True])
-def test_relief_diameter_leader_accepts_floor_and_safe_left_route(reverse):
+def test_relief_diameter_leader_accepts_floor_and_safe_right_route(reverse):
     floor, bend, tail, _ = _relief_leader_geometry()
     segments = [(floor, bend), (bend, tail)]
-    thread_ink = _thread_length_ink()
-    assert drawing.TIP_X < tail[0] < drawing.RELIEF_END_X < floor[0] < drawing.SEAT_X
-    assert tail == drawing.SIDE_KEEP["ReliefDia"]
+    axial = _axial_ink()
+    assert drawing.RELIEF_END_X < floor[0] < drawing.SEAT_X < tail[0]
     if reverse:
         segments = [(end, start) for start, end in reversed(segments)]
-        thread_ink = [(end, start) for start, end in reversed(thread_ink)]
-    drawing._assert_relief_diameter_leader(segments, thread_ink)
+        axial = {
+            name: [(end, start) for start, end in reversed(ink)]
+            for name, ink in axial.items()
+        }
+    drawing._assert_relief_diameter_leader(segments, axial)
+
+
+def test_relief_diameter_leader_allows_foreign_reference_shared_tip_witness():
+    floor, bend, tail, _ = _relief_leader_geometry()
+    axial = _axial_ink()
+    assert drawing._drawing_leaders.leader_crossings({
+        name: axial[name] for name in ("UnderHeadLocation", "OverallLength")
+    })
+    drawing._assert_relief_diameter_leader([(floor, bend), (bend, tail)], axial)
 
 
 def test_relief_diameter_leader_refuses_empty_ink():
+    axial = _axial_ink()
     with pytest.raises(
         RuntimeError, match="^MHA-DT-032 relief diameter has no native leader ink;"
     ) as caught:
-        drawing._assert_relief_diameter_leader([], _thread_length_ink())
+        drawing._assert_relief_diameter_leader([], axial)
     assert "'ReliefDia': []" in str(caught.value)
-    assert repr(_thread_length_ink()) in str(caught.value)
+    for ink in axial.values():
+        assert repr(ink) in str(caught.value)
 
 
-def test_relief_diameter_leader_refuses_empty_thread_length_ink():
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+def test_relief_diameter_leader_refuses_missing_axial_group(name):
+    floor, bend, tail, _ = _relief_leader_geometry()
+    axial = _axial_ink()
+    del axial[name]
+    with pytest.raises(
+        RuntimeError, match=f"^MHA-DT-032 relief axial annotation missing: {name};"
+    ) as caught:
+        drawing._assert_relief_diameter_leader([(floor, bend), (bend, tail)], axial)
+    assert repr({"ReliefDia": [(floor, bend), (bend, tail)], **axial}) in str(caught.value)
+
+
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+def test_relief_diameter_leader_refuses_empty_axial_ink(name):
     floor, bend, tail, _ = _relief_leader_geometry()
     segments = [(floor, bend), (bend, tail)]
+    axial = _axial_ink()
+    axial[name] = []
     with pytest.raises(
-        RuntimeError, match="^MHA-DT-032 ThreadLength has no native dimension ink;"
+        RuntimeError, match=f"^MHA-DT-032 relief axial native ink empty: {name};"
     ) as caught:
-        drawing._assert_relief_diameter_leader(segments, [])
-    assert "'ThreadLength': []" in str(caught.value)
-    assert repr(segments) in str(caught.value)
+        drawing._assert_relief_diameter_leader(segments, axial)
+    assert repr({"ReliefDia": segments, **axial}) in str(caught.value)
 
 
 def test_relief_diameter_leader_refuses_wrong_lower_floor_landing():
@@ -1823,9 +2169,21 @@ def test_relief_diameter_leader_refuses_wrong_lower_floor_landing():
     wrong = (floor[0], floor[1] - 0.000151)
     segments = [(wrong, bend), (bend, tail)]
     with pytest.raises(RuntimeError, match="does not land on the lower groove floor;") as caught:
-        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
-    assert repr(segments) in str(caught.value)
+        drawing._assert_relief_diameter_leader(segments, _axial_ink())
+    assert repr({"ReliefDia": segments, **_axial_ink()}) in str(caught.value)
     assert "floor=" in str(caught.value)
+
+
+def test_relief_diameter_leader_refuses_r10b_actual_diametric_linear_ink():
+    axial = _axial_ink()
+    axial["ThreadLength"] = R10B_THREAD_LENGTH_INK
+    with pytest.raises(
+        RuntimeError,
+        match="^MHA-DT-032 relief diameter leader does not land on the lower groove floor;",
+    ) as caught:
+        drawing._assert_relief_diameter_leader(R10B_WRONG_CARRIER_INK, axial)
+    assert repr(R10B_WRONG_CARRIER_INK) in str(caught.value)
+    assert repr(R10B_THREAD_LENGTH_INK) in str(caught.value)
 
 
 def test_relief_diameter_leader_refuses_the_removed_sharp_corner():
@@ -1836,14 +2194,13 @@ def test_relief_diameter_leader_refuses_the_removed_sharp_corner():
     )
     with pytest.raises(RuntimeError, match="does not land on the lower groove floor;"):
         drawing._assert_relief_diameter_leader(
-            [(dead_corner, bend), (bend, tail)], _thread_length_ink()
+            [(dead_corner, bend), (bend, tail)], _axial_ink()
         )
 
 
 @pytest.mark.parametrize("vertical", [False, True])
 def test_relief_diameter_leader_refuses_seat_corner_crossing(vertical):
     floor, bend, _, bottom = _relief_leader_geometry()
-    # Keep a valid landing in both cases: only the crossing guard can refuse.
     near_corner = bottom - 0.0019
     if vertical:
         crossing = ((drawing.SEAT_X, bottom - 0.003),
@@ -1857,17 +2214,15 @@ def test_relief_diameter_leader_refuses_seat_corner_crossing(vertical):
         match="^MHA-DT-032 relief diameter leader crosses the seat face/witness "
         "instead of passing below its corner;",
     ) as caught:
-        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
+        drawing._assert_relief_diameter_leader(segments, _axial_ink())
     assert f"crossing=({drawing.SEAT_X!r}, {near_corner!r})" in str(caught.value)
-    assert repr(segments) in str(caught.value)
-    assert repr(_thread_length_ink()) in str(caught.value)
+    assert repr({"ReliefDia": segments, **_axial_ink()}) in str(caught.value)
 
 
 @pytest.mark.parametrize("vertical", [False, True])
-def test_relief_diameter_leader_refuses_left_thread_corner_crossing(vertical):
+def test_relief_diameter_leader_refuses_thread_side_corner_crossing(vertical):
     floor, bend, _, _ = _relief_leader_geometry()
-    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
-    bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
+    bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
     near_corner = bottom - 0.0019
     if vertical:
         crossing = ((drawing.RELIEF_END_X, bottom - 0.003),
@@ -1875,71 +2230,93 @@ def test_relief_diameter_leader_refuses_left_thread_corner_crossing(vertical):
     else:
         crossing = ((drawing.RELIEF_END_X - 0.001, near_corner),
                     (drawing.RELIEF_END_X + 0.001, near_corner))
-    # A valid floor landing, no seat crossing and no ThreadLength crossing:
-    # removing only the thread-side corner predicate must break this test.
     segments = [(floor, bend), crossing]
     with pytest.raises(
         RuntimeError,
         match="^MHA-DT-032 relief diameter leader crosses the thread-side corner "
         "instead of passing below its corner;",
     ) as caught:
-        drawing._assert_relief_diameter_leader(segments, _thread_length_ink())
+        drawing._assert_relief_diameter_leader(segments, _axial_ink())
     assert f"crossing=({drawing.RELIEF_END_X!r}, {near_corner!r})" in str(caught.value)
-    assert repr(segments) in str(caught.value)
-    assert repr(_thread_length_ink()) in str(caught.value)
+    assert repr({"ReliefDia": segments, **_axial_ink()}) in str(caught.value)
 
 
-def test_relief_diameter_leader_refuses_thread_length_witness_crossing():
-    floor, bend, tail, _ = _relief_leader_geometry()
-    # Extend the LEFT route past the tip witness, still safely below both
-    # physical corners.  Only real foreign-ink intersection can reject it.
-    tail = (drawing.TIP_X - 0.004, tail[1])
-    segments = [(floor, bend), (bend, tail)]
-    thread_ink = _thread_length_ink()
-    with pytest.raises(
-        RuntimeError,
-        match="^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;",
-    ) as caught:
-        drawing._assert_relief_diameter_leader(segments, thread_ink)
-    assert "('ReliefDia', 'ThreadLength')" in str(caught.value)
-    assert repr(segments) in str(caught.value)
-    assert repr(thread_ink) in str(caught.value)
-
-
-@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
-def test_relief_diameter_leader_refuses_thread_length_ink_junctions(junction):
-    floor, bend, tail, _ = _relief_leader_geometry()
-    segments = [(floor, bend), (bend, tail)]
+def _foreign_junction(bend, tail, junction):
     midpoint = tuple((a + b) / 2.0 for a, b in zip(bend, tail, strict=True))
     if junction == "crossing":
-        foreign = ((midpoint[0], midpoint[1] - 0.002),
-                   (midpoint[0], midpoint[1] + 0.002))
-    elif junction == "tee":
-        foreign = (midpoint, (midpoint[0], midpoint[1] - 0.002))
-    else:
-        quarter = tuple((a + b) / 2.0 for a, b in zip(bend, midpoint, strict=True))
-        foreign = (quarter, midpoint)
-    # Retain otherwise independent valid thread ink; inject only the named
-    # ink collision, leaving floor landing and corner guards satisfied.
-    thread_ink = [*_thread_length_ink(), foreign]
+        return ((midpoint[0], midpoint[1] - 0.002),
+                (midpoint[0], midpoint[1] + 0.002))
+    if junction == "tee":
+        return (midpoint, (midpoint[0], midpoint[1] - 0.002))
+    quarter = tuple((a + b) / 2.0 for a, b in zip(bend, midpoint, strict=True))
+    return (quarter, midpoint)
+
+
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
+def test_relief_diameter_leader_refuses_each_axial_ink_junction(name, junction):
+    floor, bend, tail, _ = _relief_leader_geometry()
+    segments = [(floor, bend), (bend, tail)]
+    axial = _axial_ink()
+    foreign = _foreign_junction(bend, tail, junction)
+    axial[name].append(foreign)
     with pytest.raises(
-        RuntimeError,
-        match="^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;",
-    ):
-        drawing._assert_relief_diameter_leader(segments, thread_ink)
+        RuntimeError, match=f"^MHA-DT-032 relief diameter foreign axial ink: {name};"
+    ) as caught:
+        drawing._assert_relief_diameter_leader(segments, axial)
+    assert f"('ReliefDia', '{name}')" in str(caught.value)
+    assert repr({"ReliefDia": segments, **axial}) in str(caught.value)
+    assert repr(foreign) in str(caught.value)
+    assert "crossings=" in str(caught.value) and "crossing_segments=" in str(caught.value)
 
 
 @pytest.fixture
 def relief_styles(monkeypatch, relief_native):
     from types import SimpleNamespace
 
+    class Dimension:
+        __slots__ = ("FullName", "SystemValue")
+
+        def __init__(self):
+            self.FullName = "ReliefDia@ReliefDiameterReference@Part4.Part"
+            self.SystemValue = spec.RELIEF_DIA / 1000.0
+
     class Display:
-        __slots__ = ("_center", "_arrow", "ignore_center", "ignore_arrow")
+        __slots__ = (
+            "_center", "_arrow", "ignore_center", "ignore_arrow",
+            "_type", "dimension", "native_reads", "_diametric", "ignore_diametric",
+        )
 
         def __init__(self):
             self._center = True
             self._arrow = drawing.ARROWS_OUTSIDE + 1
             self.ignore_center = self.ignore_arrow = False
+            self._type = 6
+            self.dimension = Dimension()
+            self.native_reads = []
+            self._diametric = False
+            self.ignore_diametric = False
+
+        @property
+        def Type2(self):
+            self.native_reads.append("Type2")
+            return self._type
+
+        def GetDimension2(self, index):
+            assert index == 0
+            self.native_reads.append(("GetDimension2", index))
+            return self.dimension
+
+        @property
+        def Diametric(self):
+            self.native_reads.append("Diametric")
+            return self._diametric
+
+        @Diametric.setter
+        def Diametric(self, value):
+            assert value is True
+            if not self.ignore_diametric:
+                self._diametric = value
 
         @property
         def CenterText(self):
@@ -1975,29 +2352,32 @@ def relief_styles(monkeypatch, relief_native):
             self.positions.append((x, y, z))
             return self.position_ok
 
-    annotations = [Annotation(name) for name in
-                   ("ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefWidth",
-                    "ReliefCornerRadius", "ThreadLength")]
+    annotations = [Annotation(name) for name in (
+        "ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefWidth",
+        "ReliefCornerRadius", "ThreadLength", "UnderHeadLocation", "OverallLength",
+    )]
     floor, bend, tail, _ = _relief_leader_geometry()
     state = SimpleNamespace(
         native=relief_native, annotations=annotations, near_side=[], ink_reads=[],
-        inks={"ReliefDia": [(floor, bend), (bend, tail)],
-              "ThreadLength": _thread_length_ink()},
+        inks={"ReliefDia": [(floor, bend), (bend, tail)], **_axial_ink()},
     )
     original_bind = drawing._early_bound
 
     def bind(value, interface):
-        if interface in ("IAnnotation", "IDisplayDimension"):
-            assert isinstance(value, Annotation if interface == "IAnnotation" else Display)
+        classes = {"IAnnotation": Annotation, "IDisplayDimension": Display, "IDimension": Dimension}
+        if interface in classes:
+            assert isinstance(value, classes[interface])
             return value
         return original_bind(value, interface)
 
     def near_side(annotation, label):
+        assert annotation is annotations[0]
+        annotation.display.Diametric = True
         state.near_side.append((annotation, label))
-        assert annotation.name == "ReliefDia"
 
     def ink(annotation):
         assert isinstance(annotation, Annotation)
+        assert any(annotation is item for item in state.annotations)
         assert state.native.model.rebuilds == 1
         assert annotation.name in state.inks
         state.ink_reads.append(annotation)
@@ -2010,12 +2390,15 @@ def relief_styles(monkeypatch, relief_native):
     return state
 
 
-def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_styles):
+def test_style_relief_dimensions_positions_and_reads_all_actual_axial_ink(relief_styles):
     state = relief_styles
     drawing.style_relief_dimensions(state.native.adapter, state.annotations)
-    diameter, lead, edge, width, radius, thread_length = state.annotations
+    diameter, lead, edge, width, radius, *axial = state.annotations
     assert state.near_side == [(diameter, "MHA-DT-032 relief diameter")]
-    assert state.ink_reads == [diameter, thread_length]
+    assert state.ink_reads == [diameter, *axial]
+    assert diameter.display.native_reads == ["Type2", ("GetDimension2", 0), "Diametric"]
+    with pytest.raises(AttributeError):
+        diameter.display.Type2 = 15
     for annotation, xy in (
         (diameter, drawing.SIDE_KEEP["ReliefDia"]),
         (lead, drawing.DETAIL_KEEP["ReliefLead"]),
@@ -2025,11 +2408,72 @@ def test_style_relief_dimensions_positions_and_reads_real_leader_guard(relief_st
     for annotation in (lead, edge):
         assert annotation.display.CenterText is False
         assert annotation.display.ArrowSide == drawing.ARROWS_OUTSIDE
-    for unrelated in (width, radius, thread_length):
+    for unrelated in (width, radius, *axial):
         assert unrelated.positions == []
         assert unrelated.display.CenterText is True
         assert unrelated.display.ArrowSide == drawing.ARROWS_OUTSIDE + 1
     assert state.native.model.rebuilds == 1
+
+
+@pytest.mark.parametrize("kind", [0, 2, 5, 14, 15])
+def test_relief_carrier_refuses_non_circle_native_type_before_style_or_ink(relief_styles, kind):
+    state = relief_styles
+    display = state.annotations[0].display
+    display._type = kind
+    with pytest.raises(
+        RuntimeError, match=f"^MHA-DT-032 relief diameter wrong native type: Type2={kind},"
+    ):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert display.native_reads == ["Type2"]
+    assert state.near_side == state.ink_reads == []
+    assert state.annotations[0].positions == []
+    assert state.native.model.rebuilds == 0
+
+
+@pytest.mark.parametrize("full_name", [
+    "ReliefDia@ScrewProfile@Part4.Part",
+    "ReliefProfileDia@ReliefDiameterReference@Part4.Part",
+    "ReliefDia@ReliefDiameterReferenceSpoof@Part4.Part",
+    "ReliefDia",
+])
+def test_relief_carrier_refuses_wrong_native_owner_independently(relief_styles, full_name):
+    state = relief_styles
+    state.annotations[0].display.dimension.FullName = full_name
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter wrong native owner:") as caught:
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert repr(full_name) in str(caught.value)
+    assert state.near_side == state.ink_reads == []
+    assert state.native.model.rebuilds == 0
+
+
+@pytest.mark.parametrize("value", [0.00095, 0.001900002, math.nan, math.inf])
+def test_relief_carrier_refuses_wrong_native_value_independently(relief_styles, value):
+    state = relief_styles
+    state.annotations[0].display.dimension.SystemValue = value
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter wrong native value:") as caught:
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert f"SystemValue={value!r}" in str(caught.value)
+    assert state.near_side == state.ink_reads == []
+    assert state.native.model.rebuilds == 0
+
+
+def test_relief_carrier_refuses_ignored_native_diametric_style(relief_styles):
+    state = relief_styles
+    state.annotations[0].display.ignore_diametric = True
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 relief diameter native style lost Diametric$"
+    ):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert state.ink_reads == []
+    assert state.native.model.rebuilds == 0
+
+
+def test_relief_carrier_refuses_missing_underlying_native_dimension(relief_styles):
+    state = relief_styles
+    state.annotations[0].display.dimension = None
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter missing native model dimension$"):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert state.near_side == state.ink_reads == []
 
 
 @pytest.mark.parametrize("name", ["ReliefDia", "ReliefLead", "SeatEdgeBreak"])
@@ -2056,6 +2500,7 @@ def test_style_relief_dimensions_refuses_missing_registered_dimension(relief_sty
     annotations = [item for item in state.annotations if item.name != name]
     with pytest.raises(RuntimeError, match=rf"^relief dimension styles not applied: \['{name}'\]$"):
         drawing.style_relief_dimensions(state.native.adapter, annotations)
+    assert state.ink_reads == []
 
 
 def test_style_relief_dimensions_does_not_bypass_leader_guard(relief_styles):
@@ -2065,44 +2510,50 @@ def test_style_relief_dimensions_does_not_bypass_leader_guard(relief_styles):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
 
 
-def test_style_relief_dimensions_refuses_missing_thread_length_annotation(relief_styles):
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+def test_style_relief_dimensions_refuses_each_missing_axial_annotation(relief_styles, name):
     state = relief_styles
-    annotations = [item for item in state.annotations if item.name != "ThreadLength"]
+    annotations = [item for item in state.annotations if item.name != name]
     with pytest.raises(
-        RuntimeError,
-        match="^MHA-DT-032 ThreadLength annotation is missing for relief leader guard$",
+        RuntimeError, match=f"^MHA-DT-032 relief axial annotation missing: {name};"
     ):
         drawing.style_relief_dimensions(state.native.adapter, annotations)
     assert state.native.model.rebuilds == 0
     assert state.ink_reads == []
+    assert next(item for item in state.annotations if item.name == name).display.native_reads == []
 
 
-def test_style_relief_dimensions_refuses_empty_thread_length_ink(relief_styles):
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+def test_style_relief_dimensions_refuses_each_empty_axial_ink(relief_styles, name):
     state = relief_styles
-    state.inks["ThreadLength"] = []
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 ThreadLength has no native dimension ink;"):
+    state.inks[name] = []
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief axial native ink empty: {name};"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
-    assert [item.name for item in state.ink_reads] == ["ReliefDia", "ThreadLength"]
+    assert [item.name for item in state.ink_reads] == ["ReliefDia", *drawing.AXIAL_DIMENSIONS]
 
 
-@pytest.mark.parametrize("fault", ["thread-corner", "thread-length"])
-def test_style_relief_dimensions_does_not_bypass_native_ink_crossings(relief_styles, fault):
+@pytest.mark.parametrize("name", ["ThreadLength", "UnderHeadLocation", "OverallLength"])
+@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
+def test_style_relief_dimensions_refuses_each_actual_axial_ink_junction(relief_styles, name, junction):
     state = relief_styles
-    floor, bend, tail, _ = _relief_leader_geometry()
-    if fault == "thread-corner":
-        scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
-        bottom = drawing.SIDE_CENTER[1] - spec.THREAD_MODEL_DIA * scale / 2000.0
-        crossing = ((drawing.RELIEF_END_X - 0.001, bottom - 0.0019),
-                    (drawing.RELIEF_END_X + 0.001, bottom - 0.0019))
-        state.inks["ReliefDia"] = [(floor, bend), crossing]
-        message = "^MHA-DT-032 relief diameter leader crosses the thread-side corner "
-    else:
-        tail = (drawing.TIP_X - 0.004, tail[1])
-        state.inks["ReliefDia"] = [(floor, bend), (bend, tail)]
-        message = "^MHA-DT-032 relief diameter leader crosses ThreadLength native ink;"
-    with pytest.raises(RuntimeError, match=message):
+    _, bend, tail, _ = _relief_leader_geometry()
+    state.inks[name].append(_foreign_junction(bend, tail, junction))
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter foreign axial ink: {name};"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
-    assert [item.name for item in state.ink_reads] == ["ReliefDia", "ThreadLength"]
+    assert [item.name for item in state.ink_reads] == ["ReliefDia", *drawing.AXIAL_DIMENSIONS]
+
+
+def test_style_relief_dimensions_does_not_bypass_thread_corner_guard(relief_styles):
+    state = relief_styles
+    floor, bend, _, _ = _relief_leader_geometry()
+    bottom = 2.0 * drawing.SIDE_CENTER[1] - drawing.THREAD_TOP_Y
+    crossing = ((drawing.RELIEF_END_X - 0.001, bottom - 0.0019),
+                (drawing.RELIEF_END_X + 0.001, bottom - 0.0019))
+    state.inks["ReliefDia"] = [(floor, bend), crossing]
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 relief diameter leader crosses the thread-side corner "
+    ):
+        drawing.style_relief_dimensions(state.native.adapter, state.annotations)
 
 
 @pytest.mark.parametrize("parent", [False, True])
@@ -2156,6 +2607,7 @@ def test_build_wires_native_relief_helpers_to_the_correct_views():
     calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
     expected = {
         "cropped_relief_view": ["adapter"],
+        "import_relief_diameter": ["adapter", "side"],
         "style_relief_dimensions": ["adapter", "annotations"],
         "label_relief_view": ["adapter", "detail"],
         "mark_relief_on_side": ["adapter", "side"],
@@ -2172,3 +2624,216 @@ def test_build_wires_native_relief_helpers_to_the_correct_views():
         and node.value.func.id == "cropped_relief_view"
     )
     assert [ast.unparse(target) for target in assignment.targets] == ["detail"]
+
+
+@pytest.fixture
+def relief_donor(monkeypatch):
+    """Run the real shared move/owner check with a strict drawing boundary."""
+    from types import SimpleNamespace
+
+    import _drawing_dimensions as dimensions
+
+    state = SimpleNamespace(events=[], fault=None, selected=None)
+
+    class Display:
+        __slots__ = ()
+
+        def GetNameForSelection(self):
+            return "ReliefDia@ReliefDiameterReference@Donor"
+
+    class Annotation:
+        __slots__ = ("name", "display")
+
+        def __init__(self):
+            self.name = "ReliefDia"
+            self.display = Display()
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+    class View:
+        __slots__ = ("name", "annotations")
+
+        def __init__(self, name):
+            self.name = name
+            self.annotations = []
+
+        def GetAnnotations(self):
+            return self.annotations
+
+    class Extension:
+        __slots__ = ()
+
+        def SelectByID2(self, name, kind, x, y, z, append, mark, callout, option):
+            assert name == "ReliefDia@ReliefDiameterReference@Donor"
+            assert (kind, x, y, z, append, mark, option) == (
+                "DIMENSION", 0.0, 0.0, 0.0, False, 0, 0
+            )
+            state.events.append(("select", name))
+            state.selected = name
+            return True
+
+    class Model:
+        __slots__ = ("Extension",)
+
+        def __init__(self):
+            self.Extension = Extension()
+
+        def ActivateView(self, name):
+            assert name == "Donor"
+            state.events.append(("activate", name))
+            return True
+
+        def ClearSelection2(self, all_selected):
+            assert all_selected is True
+
+        def DragModelDimension(self, name, drop_effect, x, y, z):
+            assert state.selected is not None
+            assert (name, drop_effect, x, y, z) == (
+                "Side", 2, *drawing.SIDE_KEEP["ReliefDia"], 0.0
+            )
+            state.events.append(("move", name))
+            if state.fault != "owner":
+                state.side.annotations.append(state.moved)
+                state.donor.annotations.remove(state.source)
+            return None  # Native DragModelDimension is VOID.
+
+        def EditRebuild3(self):
+            state.events.append(("rebuild",))
+            return True
+
+    state.side = View("Side")
+    state.donor = View("Donor")
+    state.source = Annotation()
+    state.moved = Annotation()
+    state.donor.annotations.append(state.source)
+    state.views = [state.side, state.donor]
+    state.adapter = SimpleNamespace(currentModel=Model())
+
+    def bind(value, interface):
+        classes = {
+            "IDrawingDoc": Model, "IView": View, "IAnnotation": Annotation,
+            "IDisplayDimension": Display,
+        }
+        assert interface in classes and isinstance(value, classes[interface])
+        return value
+
+    def place(adapter, path, orientation, x, y, *, scale):
+        assert adapter is state.adapter and path == str(drawing.SOURCE)
+        assert orientation == "*Front" and scale == drawing.VIEW_SCALE
+        state.events.append(("place", orientation))
+        return state.donor
+
+    def curate(adapter, view, *, keep, view_label, dimensions_by_feature):
+        assert adapter is state.adapter and view is state.donor
+        assert keep == {"ReliefDia": drawing.SIDE_KEEP["ReliefDia"]}
+        assert view_label == "relief diameter donor"
+        assert dimensions_by_feature == {
+            spec.RELIEF_DIAMETER_SKETCH: {"ReliefDia"}
+        }
+        state.events.append(("curate",))
+        if state.fault == "import":
+            return []
+        return [state.source]
+
+    def delete(adapter, view):
+        assert adapter is state.adapter and view is state.donor
+        assert state.side.annotations == [state.moved]
+        state.events.append(("delete", view.name))
+        if state.fault != "delete":
+            state.views.remove(view)
+        # Existing adapter bool(None) on VOID EditDelete reports False even
+        # on successful deletion.  The recipe must instead check absence.
+        return False
+
+    def views(adapter):
+        assert adapter is state.adapter
+        state.events.append(("enumerate",))
+        return iter(state.views)
+
+    def view_name(adapter, view):
+        assert adapter is state.adapter and isinstance(view, View)
+        return view.name
+
+    def dimension_name(adapter, annotation):
+        assert adapter is state.adapter and isinstance(annotation, Annotation)
+        return annotation.name
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "delete_view", delete)
+    monkeypatch.setattr(drawing, "iter_views", views)
+    monkeypatch.setattr(drawing, "view_name", view_name)
+    monkeypatch.setattr(drawing, "dimension_name", dimension_name)
+    monkeypatch.setattr(dimensions, "_early_bound", bind)
+    monkeypatch.setattr(dimensions, "view_name", view_name)
+    monkeypatch.setattr(dimensions, "dimension_name", dimension_name)
+    monkeypatch.setattr(dimensions, "null_callout", lambda: None)
+    return state
+
+
+def test_relief_donor_import_moves_only_true_circle_to_side_then_deletes(relief_donor):
+    state = relief_donor
+    assert drawing.import_relief_diameter(state.adapter, state.side) is state.moved
+    assert state.events == [
+        ("place", "*Front"), ("curate",), ("activate", "Donor"),
+        ("select", "ReliefDia@ReliefDiameterReference@Donor"),
+        ("move", "Side"), ("rebuild",), ("delete", "Donor"), ("enumerate",),
+    ]
+    assert state.side.annotations == [state.moved]
+    assert state.donor.annotations == []
+    assert state.views == [state.side]
+
+
+def test_relief_donor_refuses_missing_import_before_move_or_deletion(relief_donor):
+    state = relief_donor
+    state.fault = "import"
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 relief diameter donor did not own exactly ReliefDia$"
+    ):
+        drawing.import_relief_diameter(state.adapter, state.side)
+    assert state.events == [("place", "*Front"), ("curate",)]
+
+
+def test_relief_donor_refuses_wrong_target_owner_before_deletion(relief_donor):
+    state = relief_donor
+    state.fault = "owner"
+    with pytest.raises(RuntimeError, match="^ReliefDia: native dimension did not move into target view$"):
+        drawing.import_relief_diameter(state.adapter, state.side)
+    assert not any(event[0] == "delete" for event in state.events)
+    assert state.donor.annotations == [state.source]
+
+
+def test_relief_donor_refuses_surviving_view_despite_void_delete_result(relief_donor):
+    state = relief_donor
+    state.fault = "delete"
+    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter donor was not deleted$"):
+        drawing.import_relief_diameter(state.adapter, state.side)
+    assert state.events[-2:] == [("delete", "Donor"), ("enumerate",)]
+
+
+def test_build_excludes_circle_from_side_import_and_keeps_four_final_views_hlr():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body
+                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    side_curate = next(
+        node for node in calls
+        if isinstance(node.func, ast.Name) and node.func.id == "curate_view_dimensions"
+        and ast.unparse(node.args[1]) == "side"
+    )
+    keep = next(keyword.value for keyword in side_curate.keywords if keyword.arg == "keep")
+    assert ast.unparse(keep) == "{name: xy for name, xy in SIDE_KEEP.items() if name != 'ReliefDia'}"
+    hlr = [node for node in build.body
+           if isinstance(node, ast.For)
+           and any(isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                   and call.func.id == "set_hidden_lines_removed" for call in ast.walk(node))]
+    assert len(hlr) == 1
+    assert ast.unparse(hlr[0].iter) == "(side, end, detail, iso)"
+    donor = next(node for node in calls
+                 if isinstance(node.func, ast.Name) and node.func.id == "import_relief_diameter")
+    style = next(node for node in calls
+                 if isinstance(node.func, ast.Name) and node.func.id == "style_relief_dimensions")
+    finalize = next(node for node in calls
+                    if isinstance(node.func, ast.Name) and node.func.id == "finalize_drawing")
+    assert side_curate.lineno < donor.lineno < style.lineno < finalize.lineno

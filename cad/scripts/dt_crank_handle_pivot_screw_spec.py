@@ -12,6 +12,10 @@ at z=HEAD_LENGTH+SHOULDER_LENGTH, and the threaded section (a thread-relief
 groove against the seat face, then the full thread) to the tip at
 z=OVERALL_LENGTH.
 
+The printed relief diameter is carried by a hidden construction circle on the
+straight cylindrical floor, not by the private linear profile control.  Both
+read the same relief diameter global without adding physical geometry.
+
 PURE DATA, no SolidWorks/COM imports.  The part build and the drawing both read
 these names; the derived fit facts below are asserted at import so a retune of
 the handle, the arm or this screw that breaks the running fit fails before any
@@ -224,6 +228,10 @@ SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
 SEAT_STATION = HEAD_LENGTH + SHOULDER_LENGTH
 RELIEF_END_STATION = SEAT_STATION + RELIEF_WIDTH
 OVERALL_LENGTH = SEAT_STATION + THREAD_LENGTH
+# The reference circle lies strictly between the lead and the tangent corner
+# of the nominal straight floor; the printed-band floor guard remains separate.
+RELIEF_DIAMETER_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
+RELIEF_DIAMETER_SKETCH = "ReliefDiameterReference"
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -428,6 +436,12 @@ for _ok, _what in (
         "the largest relief stands above the deepest die-cut root",
     ),
     (
+        SEAT_STATION + RELIEF_LEAD
+        < RELIEF_DIAMETER_STATION
+        < RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX,
+        "relief diameter reference station is outside the straight nominal floor",
+    ),
+    (
         RELIEF_FLOOR_MIN >= 1.5 * THREAD_PITCH,
         "the shortest relief's straight floor is under 1.5 pitches of die run-out",
     ),
@@ -499,13 +513,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "HeadLength",
         "ShoulderDia",
         "ThreadLength",
-        "ReliefDia",
         "ReliefWidth",
         "ReliefLead",
         "ReliefCornerRadius",
         "SeatEdgeBreak",
         "TipChamfer",
     },
+    RELIEF_DIAMETER_SKETCH: {"ReliefDia"},
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
     "StationReference": {"OverallLength", "UnderHeadLocation"},
@@ -521,13 +535,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadLength": 2,
         "ShoulderDia": 2,
         "ThreadLength": 1,
-        "ReliefDia": 1,
         "ReliefWidth": 1,
         "ReliefLead": 1,
         "ReliefCornerRadius": 1,
         "SeatEdgeBreak": 1,
         "TipChamfer": 1,
     },
+    RELIEF_DIAMETER_SKETCH: {"ReliefDia": 1},
     "SlotProfile": {"SlotWidth": 1},
     "DriverSlot": {"SlotDepth": 1},
     "StationReference": {"OverallLength": 1, "UnderHeadLocation": 1},
