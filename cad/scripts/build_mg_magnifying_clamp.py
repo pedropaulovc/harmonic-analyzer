@@ -281,12 +281,50 @@ def _tap_placement_points(adapter: Any) -> dict[str, Any]:
     return points
 
 
+def _select_bore_rim(adapter: Any, circle: Any) -> None:
+    """Give the exact selected circle a real rim pick before dimension creation.
+
+    The Wizard points share the circle's transverse centre coordinate. An
+    unspecified centre pick can request a zero horizontal span before the later
+    near-arc endpoint setting can run. Native selection points distinguish the
+    rim without replacing either attached entity or adding witness geometry.
+    """
+    from solidworks_mcp.adapters.com_variant import double_array
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+    arc = _early_bound(circle, "ISketchArc")
+    center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    radius = float(arc.GetRadius())
+    if not math.isfinite(radius) or radius <= 0.0:
+        raise RuntimeError("clamp location: invalid native bore radius")
+    rim = (float(center.X) + radius, float(center.Y), 0.0)
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    utility = _early_bound(application.GetMathUtility(), "IMathUtility")
+    point = _early_bound(utility.CreatePoint(double_array(list(rim))), "IMathPoint")
+    projected = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+    coordinates = tuple(float(value) for value in (projected.ArrayData or ()))
+    if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
+        raise RuntimeError("clamp location: native bore-rim transform failed")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    if int(manager.GetSelectedObjectCount2(-1)) != 2 or int(application.IsSame(manager.GetSelectedObject6(2, -1), circle)) != 1:
+        raise RuntimeError("clamp location: rim pick lost the actual selected circle")
+    if manager.SetSelectionPoint2(2, -1, coordinates[0], coordinates[1], coordinates[2]) is not True:
+        raise RuntimeError("clamp location: native bore-rim selection point failed")
+    retained = tuple(float(value) for value in (manager.GetSelectionPointInSketchSpace2(2, -1) or ()))
+    if len(retained) != 3 or any(not math.isfinite(actual) or abs(actual - expected) > 1e-10 for actual, expected in zip(retained, rim, strict=True)):
+        raise RuntimeError("clamp location: native bore-rim selection point was not retained")
+
+
 def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> None:
     """Actual Wizard point to actual bore rim, transverse on the Right plane."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
     _native_select(adapter, point, "ISketchPoint", append=False)
     _native_select(adapter, circle, "ISketchSegment", append=True)
+    _select_bore_rim(adapter, circle)
     raw = model.AddHorizontalDimension2(0.0, 0.02, 0.02)
     model.ClearSelection2(True)
     if raw is None:

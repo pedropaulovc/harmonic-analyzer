@@ -672,6 +672,7 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
 
     point, circle, copy = object(), object(), object()
     selections = []
+    picks = []
     ends = {1: 1 if mode == "two-arcs" else 0, 2: 0 if mode == "no-arc" else 1}
     annotation = SimpleNamespace(
         GetAttachedEntities3=lambda: (copy if mode == "coordinate-copy" else point, circle),
@@ -695,6 +696,7 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
 
     def horizontal(*_position):
         assert selections == [(point, "ISketchPoint", False), (circle, "ISketchSegment", True)]
+        assert picks == [circle], "the actual rim must be picked before creating the dimension"
         return None if mode == "missing" else display
 
     model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None)
@@ -703,6 +705,7 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
     monkeypatch.setattr(measured, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(measured._sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
     monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selections.append((entity, interface, append)))
+    monkeypatch.setattr(part, "_select_bore_rim", lambda _adapter, actual: picks.append(actual))
     if mode == "measured":
         part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
         assert dimension.Name == "ThumbTapToBoreRim" and dimension.DrivenState == 1
@@ -710,3 +713,55 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
     else:
         with pytest.raises(RuntimeError):
             part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
+
+
+@pytest.mark.parametrize("mode", ("retained", "bad-radius", "wrong-count", "wrong-circle", "set-refused", "stale-pick", "bad-transform"))
+def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkeypatch, mode) -> None:
+    from solidworks_mcp.adapters import com_variant
+
+    local = (0.00425, 0.01995, 0.0)
+    inverse = object()
+    calls = []
+    retained = [None]
+    circle = SimpleNamespace(
+        GetCenterPoint2=lambda: SimpleNamespace(X=0.001, Y=0.01995),
+        GetRadius=lambda: -1.0 if mode == "bad-radius" else 0.00325,
+    )
+
+    def create_point(coordinates):
+        assert tuple(coordinates) == pytest.approx(local)
+
+        def multiply(actual_transform):
+            assert actual_transform is inverse, "a model-to-sketch transform is not its inverse"
+            x, y, z = coordinates
+            return SimpleNamespace(ArrayData=(float("nan"),) if mode == "bad-transform" else (z + 0.4, y + 0.2, -x + 0.3))
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    def set_point(index, mark, x, y, z):
+        assert (index, mark) == (2, -1)
+        calls.append((x, y, z))
+        retained[0] = (0.3 - z, y - 0.2, x - 0.4)
+        return mode != "set-refused"
+
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: 1 if mode == "wrong-count" else 2,
+        GetSelectedObject6=lambda _index, _mark: object() if mode == "wrong-circle" else circle,
+        SetSelectionPoint2=set_point,
+        GetSelectionPointInSketchSpace2=lambda _index, _mark: (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
+    )
+    sketch = SimpleNamespace(ModelToSketchTransform=SimpleNamespace(Inverse=lambda: inverse))
+    model = SimpleNamespace(GetActiveSketch2=lambda: sketch, SelectionManager=manager)
+    application = SimpleNamespace(
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point),
+        IsSame=lambda left, right: int(left is right),
+    )
+    adapter = SimpleNamespace(currentModel=model, swApp=application)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(com_variant, "double_array", lambda values: values)
+    if mode == "retained":
+        part._select_bore_rim(adapter, circle)
+        assert calls == [pytest.approx((0.4, 0.21995, 0.29575))]
+    else:
+        with pytest.raises(RuntimeError):
+            part._select_bore_rim(adapter, circle)

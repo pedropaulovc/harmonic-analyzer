@@ -2,7 +2,8 @@ r"""Native quarter-inch lever sheet with an enlarged flat-thread-end detail.
 
 The independent model detail imports its dimensions before its circular crop,
 as on MHA-MG-04. Native diameters/lengths/limits remain associative; the part's
-cosmetic thread and the sheet share one UNC-2A callout. Only the free end domes.
+cosmetic thread and the sheet share one UNC-2A callout. Only the free end domes;
+its note attaches to the identified visible spherical face, not a guessed edge.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary, view_name
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_leader_notes import add_attached_note
@@ -27,6 +29,8 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_face_read import face_geometry
+from _gtol_sphere import SphereFace
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -120,6 +124,19 @@ def _detail(adapter: Any) -> tuple[Any, list[Any]]:
     return view, annotations
 
 
+def _free_end_face(view: Any) -> Any:
+    """Identify the visible dome by its model sphere, not its silhouette hit box."""
+    hemisphere = SphereFace(ROD_DIA, center_mm=(ROD_DIA / 2.0, 0.0, 0.0))
+    matches = []
+    for face in visible_view_entities(view, 3, label="lever free hemisphere"):  # swViewEntityType_Face
+        geometry = face_geometry(face)
+        if geometry is not None and hemisphere.matches(geometry):
+            matches.append(face)
+    if len(matches) != 1:
+        raise RuntimeError(f"lever free hemisphere: expected one visible spherical face, got {len(matches)}")
+    return matches[0]
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
@@ -139,8 +156,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS)
     thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
     add_attached_note(adapter, detail, text=THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.350, 0.244), label="native quarter-inch external thread", entity_type="SILHOUETTE")
-    free_tip = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="free hemispherical tip")
-    add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity_xy=free_tip, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="EDGE")
+    free_end = _free_end_face(front)
+    add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
     symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.020)
     add_surface_finish(adapter, front, edge_xy=seat_pick, entity_type="FACE", symbol_xy=symbol, leader_attach_xy=seat_pick, control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"), label="lever clamp screw seat finish", char_height=0.0025)
