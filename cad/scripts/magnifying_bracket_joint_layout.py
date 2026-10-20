@@ -122,8 +122,9 @@ DRILL_WANDER_DEG = 0.3
 DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX
 )
-# The drill point's floor margin also takes the whole wander, as if it were
-# axial (it is lateral: an upper bound, so the receiver rib holds even then).
+# Axial point containment also charges the whole lateral wander as axial.
+# This conservative margin keeps the point in the rib; it is not a bottom
+# wall thickness, since the plate continues beyond the rib.
 DRILL_POINT_RIB_MARGIN_MIN = (
     RIB_DEPTH - RIB_DEPTH_BAND - DRILL_DEPTH_MAX
     - DRILL_POINT_DEPTH_MAX - DRILL_WANDER_MAX

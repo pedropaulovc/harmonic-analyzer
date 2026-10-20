@@ -943,11 +943,13 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
 
 @pytest.mark.asyncio
 async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch) -> None:
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
     part = lever_build
     calls, volumes = [], []
 
     async def success(*args, **kwargs):
-        return "entity"
+        return AdapterResult(status=AdapterResultStatus.SUCCESS, data="entity")
 
     async def arc(*args):
         return "arc", None, None
@@ -988,7 +990,10 @@ async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch)
     jobs = []
     await part._edge_rib(adapter, True, "receiver", "EdgeRibBack", jobs)
     await part._edge_rib(adapter, False, "opposite", "EdgeRibFront", jobs)
-    assert calls == [(8.2, 68.0, {"flip": True}), (5.08, 71.12, {})]
+    assert len(calls) == 2
+    for (depth, offset, _), expected in zip(calls, ((8.2, 68.0), (5.08, 71.12)), strict=True):
+        assert (depth, offset) == pytest.approx(expected)
+    assert [kwargs for _, _, kwargs in calls] == [{"flip": True}, {}]
     assert -calls[0][1] - calls[0][0] == pytest.approx(-76.2)
     assert calls[1][1] + calls[1][0] == pytest.approx(76.2)
     area = part.edge_rib_added_area_mm2()
