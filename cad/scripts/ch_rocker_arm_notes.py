@@ -37,7 +37,7 @@ from ch_rod_pivot_pin_spec import BUDGET as ROD_JOINT_BUDGET
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen"},
+    "StrapProfile": {"TopRadius", "BottomRadius", "RodTipLen", "TipLandAngle"},
     "PivotHoleProfile": {"PivotDia"},
     "HubProfile": {"HubDia"},
     # #743 PR2: the hub length carries its +0.05/0 band natively; the 20-arm
@@ -61,6 +61,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # requirement exporter. The remaining dimensions/notes print at two places.
 DEFAULT_DRAWING_PRECISION = 2
 DRAWING_PRECISION = {
+    "StrapProfile": {"TipLandAngle": DEFAULT_DRAWING_PRECISION},
     "Hub": {"HubLength": 3},
     "HubProfile": {"HubDia": DEFAULT_DRAWING_PRECISION},
     "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
@@ -79,9 +80,10 @@ HUB_ROOT_NOTE = (
     f"{HUB_ROOT_PREFIX}"
     f"{HUB_ROOT_RADIUS_MAX:.{DRAWING_PRECISION['HubRoot']['HubRootRadius']}f} MAX"
 )
-# Detail E's BASIC tip land counts both ends: the J land is the K land's
-# mirror, so its length rides this 2X rather than a mirror note.
+# Detail E's BASIC land length and angle count both ends: the J land is
+# the K land's mirror. Their native dimensions carry 2X, not a mirror note.
 TIP_LAND_PREFIX = "2X "
+TIP_LAND_ANGLE_PREFIX = "2X "
 
 # Judge the minimum wall against the metric band the shop actually reads,
 # not the underlying 0.508 mm inch class: title_block.yaml prints ±0.51.
@@ -112,13 +114,11 @@ BUILT_UP_PERMISSION_NOTE = (
 # Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
 DRAWING_NOTES = "\n".join(
     (
-        # B2-1, option 4: datum C is the rod-pin hole and the BASIC pin
-        # coordinates clock the A|B|C frame, so "above A" is that frame's
-        # axis. The tip lands' 10.46° is the arc half-angle: radial to the
-        # centre, which the 1:2 view cannot draw (~808 mm off the sheet). Both
-        # ends' lands sit on the views (main-r1 Opus: the J LAND row and 2X
-        # 5.59), and the views name datum C, so no mirror or datum narration.
-        "1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT.",
+        # Datum C is the rod-pin hole; its BASIC coordinates clock A|B|C.
+        # The common arc centre remains directly above A in that frame.
+        # Detail E's native BASIC angle now defines the two radial lands,
+        # so the note need not narrate their direction.
+        "1. ARC CENTRE DIRECTLY ABOVE A.",
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.
@@ -157,9 +157,9 @@ PIVOT_FIT_CALLOUT = (
     "SHAFT MHA-CH-005)"
 )
 STRAP_FIT_CALLOUT = (
-    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} SIDE\n"
-    "CLEARANCE IN ROD\n"
-    "FORK MHA-CH-003)"
+    f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} TOTAL\n"
+    "SIDE CLEARANCE IN\n"
+    "MHA-CH-003 FORK)"
 )
 # Integral hub length, not spacers, sets channel pitch: the hubs stack face to
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text

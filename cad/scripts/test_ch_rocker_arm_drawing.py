@@ -178,7 +178,8 @@ def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(line.strip() for line in notes.splitlines())
-    # One common nominal centre, directly above physical A; lands radial to it.
+    # The common arc centre is located in the clocked datum frame; the land
+    # direction is now carried by Detail E's native BASIC angle.
     assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
     assert "R800" not in notes
     assert "R816" not in notes
@@ -212,8 +213,8 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     # Both ends are dimensioned on the views (J LAND row, 2X 5.59), not
     # mirrored by a note (rule 7, main-r1 Opus).
     assert "MIRROR" not in notes
-    assert "1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT." in flat
-    # The lands' 10.46° is derived (radial to the arc centre), never a note number.
+    assert "TIP LANDS RADIAL" not in notes
+    # The lands' angle is a native dimension, never a numeric note.
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
@@ -428,7 +429,7 @@ def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchange
     assert drawing.HUB_SCALE == (4.0, 1.0)
     assert drawing.END_SCALE == (2.0, 1.0)
     assert drawing.DETAIL_NO_OUTLINE == {"D": True, "E": False}
-    assert drawing.DETAIL_STYLE == {"D": 2, "E": 0}  # swDetViewLEADER / swDetViewSTANDARD
+    assert drawing.DETAIL_STYLE == {"D": 2, "E": 2}  # swDetViewLEADER connects each source circle.
     assert drawing.DETAIL_LETTER_XY == {"D": (0.188, 0.161), "E": (0.264, 0.155)}
     assert drawing.ROD_CALLOUT_XY == (0.279, 0.115)
     assert drawing.FCF_XY == (0.262, 0.1001)
@@ -1804,12 +1805,186 @@ def test_top_edge_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "    curate_view_dimensions,\n" not in source
 
 
+def _tip_angle_reference_case(monkeypatch, *, defect=None):
+    """Real carrier and angular helper over a SolidWorks-free native boundary."""
+    import _drawing_dimension_insert
+    from solidworks_mcp.adapters import sw_type_info
+
+    selected, relations, lengths, native_calls = [], [], [], []
+
+    def result(data=True, *, success=True):
+        return SimpleNamespace(is_success=success, data=data, error="native refusal")
+
+    class SketchLine:
+        _native_interfaces = ("ISketchSegment",)
+
+        def __init__(self, start, end):
+            self.start, self.end = start, end
+            self.construction = False
+
+        @property
+        def ConstructionGeometry(self):
+            return self.construction
+
+        @ConstructionGeometry.setter
+        def ConstructionGeometry(self, value):
+            if defect != "construction":
+                self.construction = value
+
+        def Select4(self, append, data):
+            assert append and data.Mark == 0
+            selected.append(self)
+            return True
+
+    class ModelDimension:
+        _native_interfaces = ("IDimension",)
+        SystemValue = 0.0
+        driven = 0
+
+        @property
+        def DrivenState(self):
+            return self.driven
+
+        @DrivenState.setter
+        def DrivenState(self, value):
+            if defect != "driven":
+                self.driven = value
+
+    dimension = ModelDimension()
+    display = _native(
+        "IDisplayDimension", GetDimension2=lambda index: dimension,
+        SupplementaryAngle=lambda: False,
+        SetText=lambda *_args: pytest.fail("model angle must not override its value"),
+    )
+
+    def add_specific(x, y, z, kind, error):
+        assert kind == 3 and z == 0.0 and error == 0
+        native_calls.append((tuple(selected), (x, y)))
+        first, second = selected
+        a = (first.end[0] - first.start[0], first.end[1] - first.start[1])
+        b = (second.end[0] - second.start[0], second.end[1] - second.start[1])
+        cosine = sum(u * v for u, v in zip(a, b)) / (math.hypot(*a) * math.hypot(*b))
+        dimension.SystemValue = math.acos(max(-1.0, min(1.0, cosine)))
+        if defect == "value":
+            dimension.SystemValue += 0.01
+        return (None if defect == "creation" else display), 0
+
+    class Adapter:
+        currentSketchManager = SimpleNamespace(AddToDB=False)
+
+        def __init__(self):
+            start = (arm.TOP_END_X, arm.TOP_END_Y)
+            end = (
+                start[0] + arm.TIP_FACE * math.sin(arm._ALPHA_TOP),
+                start[1] - arm.TIP_FACE * math.cos(arm._ALPHA_TOP),
+            )
+            self._sketch_entities = {"real-land": SketchLine(start, end)}
+            self.currentModel = _native(
+                "IModelDoc2", ClearSelection2=lambda _all: selected.clear(),
+                SelectionManager=_native(
+                    "ISelectionMgr", CreateSelectData=lambda: SimpleNamespace(Mark=None),
+                ),
+                Extension=_native("IModelDocExtension", AddSpecificDimension=add_specific),
+            )
+
+        def _attempt(self, fn, default=None):
+            return fn()
+
+        async def add_line(self, x1, y1, x2, y2):
+            assert self.currentSketchManager.AddToDB
+            self._sketch_entities["vertical"] = SketchLine((x1, y1), (x2, y2))
+            return result("vertical")
+
+        async def add_sketch_constraint(self, *args):
+            relations.append(args)
+            return result(success=defect != "relation")
+
+        async def add_sketch_dimension(self, *args):
+            lengths.append(args)
+            return result("length")
+
+    monkeypatch.setattr(arm, "_early_bound", _bind_owner)
+    monkeypatch.setattr(_drawing_dimension_insert, "_early_bound", _bind_owner)
+    monkeypatch.setattr(sw_type_info, "early_bound", _bind_owner)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
+    return SimpleNamespace(
+        adapter=Adapter(), dims=arm.SketchDims(), dimension=dimension,
+        relations=relations, lengths=lengths, native_calls=native_calls,
+    )
+
+
+@pytest.mark.parametrize("alpha", [ch_rocker_arm_spec._ALPHA_TOP, 0.24])
+def test_tip_angle_measures_real_radial_land_from_vertical_without_driving_it(monkeypatch, alpha):
+    import asyncio
+
+    monkeypatch.setattr(arm, "_ALPHA_TOP", alpha)
+    monkeypatch.setattr(arm, "TOP_END_X", arm.R_TOP * math.sin(alpha))
+    monkeypatch.setattr(arm, "TOP_END_Y", arm.CENTER_Y - arm.R_TOP * math.cos(alpha))
+    case = _tip_angle_reference_case(monkeypatch)
+    land = case.adapter._sketch_entities["real-land"]
+    original = (land.start, land.end)
+    asyncio.run(arm._tip_land_angle_reference(case.adapter, "real-land", case.dims))
+    vertical = case.adapter._sketch_entities["vertical"]
+    assert (land.start, land.end) == original
+    assert not land.ConstructionGeometry and vertical.ConstructionGeometry
+    assert vertical.start == land.start
+    assert vertical.end == (land.start[0], land.start[1] - arm.TIP_FACE)
+    assert case.relations == [
+        ("vertical.start", "real-land.start", "coincident"),
+        ("vertical", None, "vertical"),
+    ]
+    assert case.lengths == [
+        ("vertical.start", "vertical.end", "vertical_distance", arm.TIP_FACE),
+    ]
+    assert case.dims._rows == [
+        ("TipLandVerticalLength", '"TipFaceLen"'), ("TipLandAngle", None),
+    ]
+    assert case.native_calls[0][0] == (vertical, land)
+    assert case.dimension.SystemValue == pytest.approx(alpha)
+    assert case.dimension.DrivenState == 1
+    assert case.adapter.currentSketchManager.AddToDB is False
+
+
+@pytest.mark.parametrize("defect", ["construction", "relation", "creation", "driven", "value"])
+def test_tip_angle_carrier_rejects_native_authoring_refusals(monkeypatch, defect):
+    import asyncio
+
+    case = _tip_angle_reference_case(monkeypatch, defect=defect)
+    with pytest.raises(RuntimeError):
+        asyncio.run(arm._tip_land_angle_reference(case.adapter, "real-land", case.dims))
+
+
+def test_tip_angle_is_recorded_before_the_unchanged_profile_definition_and_extrusion():
+    tree = ast.parse(Path(arm.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    angle = next(node for node in calls if isinstance(node.func, ast.Name)
+                 and node.func.id == "_tip_land_angle_reference")
+    defined = next(node for node in calls if isinstance(node.func, ast.Name)
+                   and node.func.id == "ensure_fully_defined"
+                   and ast.literal_eval(node.args[1]) == "strap sketch")
+    extrusion = next(node for node in calls if isinstance(node.func, ast.Attribute)
+                     and node.func.attr == "create_extrusion")
+    assert [ast.unparse(arg) for arg in angle.args] == ["adapter", "rod_tip_line", "strap"]
+    assert angle.lineno < defined.lineno < extrusion.lineno
+    assert arm._ALPHA_TOP == pytest.approx(ch_rocker_arm_spec._ALPHA_TOP)
+    land_angle = math.atan2(
+        ch_rocker_arm_spec.ROD_TIP_X - ch_rocker_arm_spec.TOP_END_X,
+        ch_rocker_arm_spec.TIP_FACE * math.cos(ch_rocker_arm_spec._ALPHA_TOP),
+    )
+    assert land_angle == pytest.approx(arm._ALPHA_TOP)
+
+
 def test_top_basic_height_is_off_the_pin_x_witness() -> None:
     assert drawing.FRONT_KEEP["TopAbovePivot"] == (0.165, 0.191)
     assert drawing.FRONT_KEEP["TopAbovePivot"][0] != drawing.FRONT_CENTER[0]
     assert drawing.PIN_X_TEXT_XY[1] == 0.197
     assert drawing.TAPER_INTERSECTION_TEXT_XY[1] == 0.137
-    assert drawing.OVERALL_WIDTH_TEXT_XY[1] == 0.221
+    land_rows = max(
+        drawing.LAND_LOCATION_TEXT_XY[1], drawing.LEFT_LAND_LOCATION_TEXT_XY[1]
+    )
+    assert drawing.OVERALL_WIDTH_TEXT_XY[1] > land_rows + RENDERED_ROW_PITCH
+    assert drawing.OVERALL_WIDTH_TEXT_XY[1] + 0.0035 < DRAWABLE.ymax
 
 
 _PIVOT_CENTRE = drawing.HUB_CENTER
@@ -2049,10 +2224,14 @@ def test_build_keeps_pivot_out_of_strict_part_precision() -> None:
         "HubLength",
         "StrapThickness",
         "HubRootRadius",
+        "TipLandAngle",
     }
     # The hub-root single limit prints the part's one place ("R0.2 MAX").
     assert precision["HubRootRadius"] == (
         "rocker_notes.DRAWING_PRECISION['HubRoot']['HubRootRadius']"
+    )
+    assert precision["TipLandAngle"] == (
+        "rocker_notes.DRAWING_PRECISION['StrapProfile']['TipLandAngle']"
     )
     assert ch_rocker_arm_notes.DRAWING_PRECISION["HubRoot"] == {"HubRootRadius": 1}
     front_import = next(
@@ -2376,10 +2555,14 @@ def test_iso_caption_sits_under_the_iso_clear_of_the_frame_and_end_view() -> Non
 
 def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() -> None:
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["StrapProfile"] == {
-        "TopRadius", "BottomRadius", "RodTipLen",
+        "TopRadius", "BottomRadius", "RodTipLen", "TipLandAngle",
     }
     assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["HubProfile"] == {"HubDia"}
-    assert set(drawing.END_KEEP) == {"RodTipLen"}
+    assert set(drawing.END_KEEP) == {"RodTipLen", "TipLandAngle"}
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["StrapProfile"]["TipLandAngle"] == 2
+    assert "TipLandVerticalLength" not in set().union(
+        *ch_rocker_arm_notes.DRAWING_DIMENSIONS.values()
+    )
     assert set(drawing.HUB_KEEP) == {"PivotDia", "HubDia"}
     assert not {"RodTipLen", "HubDia"} & set(drawing.FRONT_KEEP)
     assert ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]["HubDia"] == 2
@@ -2415,6 +2598,55 @@ def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
     assert spec.TIP_FACE == pytest.approx(5.588)
     assert spec.HUB_DIA == pytest.approx(10.2)
     assert (spec.HUB_LENGTH - spec.ARM_THICKNESS) / 2.0 == pytest.approx(2.27825)
+
+
+def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands():
+    """Rule 17: the finite oblique taper, not horizontal edge distance.
+
+    Charge the entire lower profile zone against the wall, conservatively
+    ignoring its material-adding disposition. This short through hole in
+    2.5 mm plate needs no deep-hole drill-wander allowance.
+    """
+    from _printed_tolerance import drilled_oversize_mm
+
+    spec = ch_rocker_arm_spec
+    centre = (spec.ROD_HOLE_X, spec.ROD_HOLE_Y)
+    tip = (
+        spec.ROD_TIP_X,
+        spec.TOP_END_Y + spec.TIP_FACE * (spec.TOP_END_Y - spec.CENTER_Y) / spec.R_TOP,
+    )
+    bottom = (
+        spec.BOT_END_X,
+        spec.CENTER_Y - math.sqrt(spec.R_BOTTOM**2 - spec.BOT_END_X**2),
+    )
+    direction = (bottom[0] - tip[0], bottom[1] - tip[1])
+    fraction = sum(
+        (centre[index] - tip[index]) * direction[index] for index in range(2)
+    ) / sum(value**2 for value in direction)
+    assert fraction == pytest.approx(0.78133996267)
+    assert 0.0 < fraction < 1.0
+    closest = tuple(tip[index] + fraction * direction[index] for index in range(2))
+    normal_distance = math.dist(centre, closest)
+    taper_face = drawing._RIGHT[1]
+    face_distance = abs(
+        sum(taper_face.normal[index] * centre[index] for index in range(2))
+        - taper_face.offset_mm
+    )
+    assert normal_distance == pytest.approx(face_distance)
+    assert normal_distance == pytest.approx(3.81835328575)
+    hole_nominal = blind_cut_dia_mm(spec.ROD_HOLE_SPEC)
+    # A named drill retains its real size even when its numeric callout rounds
+    # down. Charge the larger of the native and displayed nominal.
+    conservative_hole_max = max(
+        hole_nominal, round(hole_nominal, drawing.ROD_HOLE.precision["dia"])
+    ) + drilled_oversize_mm()
+    assert conservative_hole_max == pytest.approx(2.094)
+    position_diameter = float(spec.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+    assert position_diameter == drawing.ROD_HOLE.fields["position_dia"][0]
+    profile_allowance = float(drawing.ARC_PROFILE_ZONE_MM)
+    worst_wall = normal_distance - conservative_hole_max / 2.0 - position_diameter / 2.0 - profile_allowance
+    assert worst_wall == pytest.approx(2.17135328575)
+    assert worst_wall >= 2.0, f"rod-pin hole to K-taper normal wall is only {worst_wall:g} mm"
 
 
 @pytest.mark.parametrize("ignored_part", [None, 1, 2])
@@ -2561,19 +2793,20 @@ def test_rocker_native_helpers_use_the_extracted_owners() -> None:
 
 
 @pytest.mark.parametrize("defect", [None, "one_place", "missing", "no_display"])
-def test_imported_hub_diameter_cannot_lose_the_model_two_place_size_band(
-    monkeypatch: pytest.MonkeyPatch, defect: str | None,
+@pytest.mark.parametrize("feature,name", [("HubProfile", "HubDia"), ("StrapProfile", "TipLandAngle")])
+def test_imported_native_dimensions_cannot_lose_the_model_two_place_precision(
+    monkeypatch: pytest.MonkeyPatch, defect: str | None, feature: str, name: str,
 ) -> None:
     import _drawing_dimensions
     from solidworks_mcp.adapters import sw_type_info
 
-    display = _native("IDisplayDimension", GetPrimaryPrecision2=lambda: 1 if defect == "one_place" else 2, SetPrecision3=lambda *_: pytest.fail("imported hub precision is part-owned"),)
+    display = _native("IDisplayDimension", GetPrimaryPrecision2=lambda: 1 if defect == "one_place" else 2, SetPrecision3=lambda *_: pytest.fail("imported precision is part-owned"),)
     annotation = _native("IAnnotation", GetSpecificAnnotation=lambda: None if defect == "no_display" else display)
     adapter = SimpleNamespace(_attempt=lambda fn: fn())
     monkeypatch.setattr(sw_type_info, "early_bound_or_flag", _bind_owner)
-    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: "HubDia")
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", lambda *_: name)
     annotations = [] if defect == "missing" else [annotation]
-    precision = ch_rocker_arm_notes.DRAWING_PRECISION["HubProfile"]
+    precision = {name: ch_rocker_arm_notes.DRAWING_PRECISION[feature][name]}
     if defect is None:
         _drawing_dimensions.assert_imported_precision(adapter, annotations, precision)
     else:
@@ -2703,7 +2936,11 @@ def _imported_native_quantities(monkeypatch: pytest.MonkeyPatch):
         "PivotDia": _NativeQuantity("PivotDia", ch_rocker_arm_spec.PIVOT_HOLE_DIA),
         "RodTipLen": _NativeQuantity("RodTipLen", ch_rocker_arm_spec.TIP_FACE, precision=1),
         "HubDia": _NativeQuantity("HubDia", ch_rocker_arm_spec.HUB_DIA),
+        "TipLandAngle": _NativeQuantity("TipLandAngle", 0.0),
     }
+    angle = displays["TipLandAngle"]
+    angle.Type2 = angle.model.Type2 = 3
+    angle.model.SystemValue = ch_rocker_arm_spec._ALPHA_TOP
     adapter = SimpleNamespace(
         _attempt=lambda fn, **_kwargs: fn(), swApp=_APP,
         currentModel=_native("IModelDoc2", GraphicsRedraw2=lambda: None),
@@ -2741,6 +2978,12 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     # Both tip lands ride the one BASIC 5.59 (main-r1: no mirror note).
     assert displays["RodTipLen"].text[1] == ch_rocker_arm_notes.TIP_LAND_PREFIX == "2X "
     assert displays["RodTipLen"].model.GetToleranceType() == 1
+    angle = displays["TipLandAngle"]
+    assert angle.model.SystemValue == pytest.approx(ch_rocker_arm_spec._ALPHA_TOP)
+    assert angle.text[1] == ch_rocker_arm_notes.TIP_LAND_ANGLE_PREFIX == "2X "
+    assert angle.model.GetToleranceType() == 1
+    assert angle.ShowDimensionValue is True
+    assert not any(part == 0 for part, _text in angle.writes)
     assert pivot.ShowDimensionValue is True
     # The ream band reads as clearance on its named mate (MR #1020).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
@@ -2749,7 +2992,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     )
 
 
-@pytest.mark.parametrize("name", ["PivotDia", "RodTipLen", "HubDia"])
+@pytest.mark.parametrize("name", ["PivotDia", "RodTipLen", "HubDia", "TipLandAngle"])
 @pytest.mark.parametrize("defect", ["missing", "wrong", "nan", "inf", "no_value"])
 def test_imported_front_sizes_require_each_sourced_native_readback(
     monkeypatch: pytest.MonkeyPatch, name: str, defect: str,
@@ -2766,6 +3009,44 @@ def test_imported_front_sizes_require_each_sourced_native_readback(
         )
     with pytest.raises(RuntimeError):
         drawing._dress_detail_dimensions(adapter, [display.GetAnnotation() for display in displays.values()], keep={**drawing.HUB_KEEP, **drawing.END_KEEP})
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
+@pytest.mark.parametrize("offset,accepted", [(0.0, True), (5e-9, True), (2e-8, False)])
+def test_tip_angle_import_preserves_the_builder_signed_readback_contract(
+    monkeypatch: pytest.MonkeyPatch, sign: int, offset: float, accepted: bool,
+) -> None:
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    angle = displays["TipLandAngle"]
+    actual = sign * (ch_rocker_arm_spec._ALPHA_TOP + offset)
+    angle.model.SystemValue = actual
+    annotations = [displays[name].GetAnnotation() for name in drawing.END_KEEP]
+    if not accepted:
+        with pytest.raises(RuntimeError, match="native radial-land measurement"):
+            drawing._dress_detail_dimensions(adapter, annotations, keep=drawing.END_KEEP)
+        return
+    drawing._dress_detail_dimensions(adapter, annotations, keep=drawing.END_KEEP)
+    assert angle.model.SystemValue == actual
+    assert angle.model.GetToleranceType() == 1
+    assert angle.text[1] == ch_rocker_arm_notes.TIP_LAND_ANGLE_PREFIX
+    assert not any(part == 0 for part, _text in angle.writes)
+
+
+@pytest.mark.parametrize("defect", ["linear", "prefix", "basic"])
+def test_tip_angle_native_dressing_refuses_wrong_kind_and_ignored_setters(monkeypatch, defect):
+    adapter, displays = _imported_native_quantities(monkeypatch)
+    angle = displays["TipLandAngle"]
+    if defect == "linear":
+        angle.Type2 = 1
+    elif defect == "prefix":
+        angle.ignored_text = 1
+    else:
+        angle.model.SetToleranceType = lambda _kind: True
+    with pytest.raises(RuntimeError):
+        drawing._dress_detail_dimensions(
+            adapter, [displays[name].GetAnnotation() for name in drawing.END_KEEP],
+            keep=drawing.END_KEEP,
+        )
 
 
 @pytest.mark.parametrize("ignored", ["prefix", "suffix", "hub_precision", "fit_callout"])
@@ -4224,8 +4505,8 @@ def test_native_detail_fences_parent_links_scale_and_settled_projection(bound, m
         assert detail.GetOutline()[3] > target[1] + detail.radius
         assert created[0].radius == pytest.approx(radius_mm / 1000.0)  # Nonidentity sketch scale 2.
         assert parent.transform.inverse_calls >= 2
-        # D leads its letter to the fence (regate-r1 #3); E stays standard.
-        assert calls[0][3] == drawing.DETAIL_STYLE[label] == {"D": 2, "E": 0}[label]
+        # Both letters lead to their source circles; E is not a floating label.
+        assert calls[0][3] == drawing.DETAIL_STYLE[label] == 2
         assert calls[0][7:] == (1, label == "E", False, label == "D", 5)
         # The documented setter runs only when creation ignored the style.
         expected_writes = [drawing.DETAIL_STYLE[label]] if defect == "ignored-style" else []
@@ -4678,7 +4959,36 @@ def test_end_caption_seats_actual_ink_between_crop_and_actual_title_rule(bound, 
     box = drawing._note_extent(adapter, note)
     assert box[3] <= 0.084 - 0.003
     assert box[1] >= top + 0.003
-    assert (box[0] + box[2]) / 2 == pytest.approx(0.330)
+    assert (box[0] + box[2]) / 2 == pytest.approx(0.322)
+    assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
+
+
+@pytest.mark.parametrize("width", [0.0234, 0.0324])
+def test_end_caption_clears_land_angle_witness_without_moving_native_view(bound, monkeypatch, width):
+    note = _FakeNote((0.318, 0.078), 0.007)
+    note.PropertyLinkedText = "$PRPVIEW:DETAIL E SCALE"
+    note.annotation.SetPosition2 = note.annotation.SetPosition
+    original_extent = note.GetExtent
+    def measured_extent():
+        values = list(original_extent())
+        values[3] = values[0] + width
+        return tuple(values)
+    note.GetExtent = measured_extent
+    adapter, view = _native_crop_fixture(monkeypatch, "E")
+    view.Position = view.physical = (0.330, 0.084 + view.radius)
+    view.notes = [note]
+    position = view.Position
+    crop = drawing._detail_crop(adapter, view, label="E")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    drawing._seat_detail_caption(adapter, view, _native_sheet(), label="E")
+    box = drawing._note_extent(adapter, note)
+    # Native proof put the angle's vertical witness at X=341.5 mm; the
+    # centred caption missed it by only 0.05 mm. Keep ordinary 3 mm air.
+    assert 0.3415 - box[2] >= 0.003
+    assert box[3] <= crop[1] - 0.003
+    assert box[1] >= 0.066 + 0.003
+    assert view.Position == position
+    assert drawing._detail_crop(adapter, view, label="E") == crop
     assert note.PropertyLinkedText == "$PRPVIEW:DETAIL E SCALE"
 
 
@@ -4714,7 +5024,8 @@ def test_native_caption_target_has_margin_for_r12_one_pixel_extents(bound, monke
     assert crop[1] - box[3] >= 0.003
     floor = 0.0127 if label == "D" else 0.066
     assert box[1] - floor >= 0.003
-    assert abs((box[0] + box[2] - crop[0] - crop[2]) / 2.0) <= pixel
+    offset = -0.008 if label == "E" else 0.0
+    assert abs((box[0] + box[2] - crop[0] - crop[2]) / 2.0 - offset) <= pixel
     assert note.PropertyLinkedText == f"$PRPVIEW:DETAIL {label} SCALE"
     if label == "D":
         # The same causal native pixel grid rejects the old near-boundary
@@ -8860,7 +9171,7 @@ def test_r24_5_point_59_observed_sp4_true_true_one_mm_gap_has_real_visible_corne
     assert case.annotation.attached == before
     assert case.model.SystemValue == drawing.TIP_FACE / 1000.0
     assert not hasattr(case.annotation.display, "SetWitnessLineGap")
-    assert drawing.END_KEEP == {"RodTipLen": (0.377, 0.128)}
+    assert drawing.END_KEEP["RodTipLen"] == (0.377, 0.128)
 
 
 @pytest.mark.parametrize("gaps,use_doc", [
@@ -9594,10 +9905,11 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
 def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(notes.split())
-    # The 10.46° land angle is derived (lands radial to the arc centre), so no
-    # note carries a number for it; datum C is named on the rod-pin frame.
+    # Detail E measures the real land from vertical; note 1 only locates the
+    # common arc centre, and datum C is named on the rod-pin frame.
     assert "°" not in notes and "BASIC TO DATUM" not in notes
-    assert flat.startswith("1. ARC CENTRE DIRECTLY ABOVE A; TIP LANDS RADIAL TO IT.")
+    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
+    assert "TIP LANDS RADIAL" not in notes
     assert "DATUM C" not in notes and "ENDS MIRROR" not in notes
     # Both ends' locations from A are on the views: no 8.00 restatement, no
     # datum C land narration in the notes.

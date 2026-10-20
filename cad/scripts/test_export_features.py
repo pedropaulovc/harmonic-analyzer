@@ -375,7 +375,10 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
         assert "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg" not in citations
         assert not any("linear_" in citation for citation in citations)
         assert set(exporter._cite(rocker, "_ALPHA_TOP")) <= set(citations)
-        assert set(exporter._cite(rocker_notes, "DRAWING_NOTES")) <= set(citations)
+        native = set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_dress_detail_dimensions"))
+        assert native <= set(citations)
+        assert native <= set(features[name]["cite"]["dimension_type"])
+        assert native <= set(features[name]["cite"]["top_edge_feature"])
         # Each land's own BASIC LAND row from A (the J row, main-r1 Opus).
         assert features[name]["station"] == rocker.ROD_TIP_X
         assert set(exporter._cite(importlib.import_module("draw_ch_rocker_arm"), "_add_rocker_outline_dimensions")) <= set(features[name]["cite"]["station"])
