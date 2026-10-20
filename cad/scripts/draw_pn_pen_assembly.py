@@ -294,15 +294,6 @@ BOM_ANCHOR = (
     SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()) - 0.003,
     SHEET_INNER_BORDER[3] - 0.004,
 )
-# The header and the marker's row wrap to two lines: the table measured 91.5 mm
-# tall (farm run 20261016T064716571Z), not its 14 rows at BOM_ROW_HEIGHT.
-BOM_WRAPPED_LINES = 2
-EXPLODED_CAPTION_XY = (
-    BOM_ANCHOR[0],
-    BOM_ANCHOR[1]
-    - (len(spec.BOM_ORDER) + 1 + BOM_WRAPPED_LINES) * BOM_ROW_HEIGHT
-    - NOTE_GAP,
-)
 BALLOON_MARGIN = 0.012
 # The exploded outline plus its balloon ring keeps left of the BOM.
 EXPLODED_RIGHT_LIMIT = BOM_ANCHOR[0] - 0.006
@@ -1040,6 +1031,34 @@ def _bom_column(
     return matches[0]
 
 
+def _place_exploded_caption(adapter: Any, table: Any, scale: tuple[float, float]) -> None:
+    """Place the caption below the rebuilt BOM, including every wrapped row."""
+    table = _early_bound(table, "ITableAnnotation")
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    if (
+        len(position) != 3
+        or not all(map(math.isfinite, position))
+        or not heights
+        or any(not math.isfinite(height) or height <= 0.0 for height in heights)
+    ):
+        raise RuntimeError(f"pen BOM has unreadable geometry: {position!r}, {heights!r}")
+    bottom = position[1] - sum(heights)
+    caption = _add_note_block(
+        adapter,
+        SHEET_NAMES[1],
+        f"{notes.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}",
+        (position[0], bottom - NOTE_GAP),
+        label="exploded-view caption",
+    )
+    gap = bottom - caption[3]
+    if gap < VIEW_LABEL_GAP:
+        raise RuntimeError(
+            f"pen exploded-view caption is only {gap * 1000.0:.2f} mm below BOM"
+        )
+
+
 def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     """Rewrite part numbers, prove identities/descriptions/quantities and the
     item numbers the steps cite, add the registry's VENDOR SKU column after
@@ -1282,13 +1301,7 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         )
     for name, trail in notes.EXPLODE_TRAILS.items():
         _add_explode_trail(adapter, exploded, trail, label=f"pen {name} explode trail")
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[1],
-        f"{notes.EXPLODED_CAPTION}\nSCALE {_scale_text(scale)}",
-        EXPLODED_CAPTION_XY,
-        label="exploded-view caption",
-    )
+    _place_exploded_caption(adapter, table, scale)
     return lambda: assert_balloon_landings(adapter, landings)
 
 

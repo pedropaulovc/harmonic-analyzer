@@ -1,6 +1,7 @@
 """Offline contract for the pen fitter package (MHA-PN-00)."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -148,6 +149,71 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
     )
     assert drawing.BOM_SKUS[spec.HANGER] == drawing.MADE_PART_SKU
     assert drawing.BOM_SKUS[spec.HANGER_JAM_NUT] != drawing.MADE_PART_SKU
+
+
+@pytest.mark.parametrize(
+    "heights",
+    (
+        (0.006,) * 14,
+        (0.006,) * 5 + (0.010168333333333333,) * 9,
+    ),
+)
+def test_exploded_caption_follows_actual_wrapped_bom_height(
+    monkeypatch: pytest.MonkeyPatch, heights: tuple[float, ...]
+) -> None:
+    # The naming cutover grew the native BOM to 121.515 mm; the old 96 mm
+    # estimate placed the caption through row 12. Read every final row instead.
+    position = (0.2481, 0.2627, 0.0)
+    annotation = SimpleNamespace(GetPosition=lambda: position)
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        RowCount=len(heights),
+        GetRowHeight=heights.__getitem__,
+    )
+    bindings = []
+
+    def bind(value: object, interface: str) -> object:
+        assert (value is table and interface == "ITableAnnotation") or (
+            value is annotation and interface == "IAnnotation"
+        )
+        bindings.append(interface)
+        return value
+
+    calls = []
+
+    def add_note(adapter, sheet, text, xy, *, label):
+        calls.append((sheet, text, xy, label))
+        # Native INote.GetExtent can extend slightly above its insertion point.
+        return xy[0], xy[1] - 0.009, xy[0] + 0.115, xy[1] + 0.0003
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "_add_note_block", add_note)
+    drawing._place_exploded_caption(None, table, (1.0, 2.0))
+    assert bindings == ["ITableAnnotation", "IAnnotation"]
+    assert len(calls) == 1
+    sheet, text, xy, label = calls[0]
+    assert sheet == drawing.SHEET_NAMES[1]
+    assert text == f"{notes.EXPLODED_CAPTION}\nSCALE 1 : 2"
+    assert xy == pytest.approx((position[0], position[1] - sum(heights) - drawing.NOTE_GAP))
+    assert label == "exploded-view caption"
+
+
+def test_exploded_caption_refuses_native_extent_that_still_touches_bom(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    table = SimpleNamespace(
+        GetAnnotation=lambda: SimpleNamespace(GetPosition=lambda: (0.2481, 0.2627, 0.0)),
+        RowCount=14,
+        GetRowHeight=lambda row: 0.006,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing,
+        "_add_note_block",
+        lambda *args, **kwargs: (0.2481, 0.160, 0.3631, 0.1787),
+    )
+    with pytest.raises(RuntimeError, match="caption is only"):
+        drawing._place_exploded_caption(None, table, (1.0, 2.0))
 
 
 def test_explode_names_match_the_builder() -> None:

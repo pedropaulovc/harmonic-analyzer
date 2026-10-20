@@ -257,6 +257,17 @@ left edge reports `GetPosition` x = 0.074 m, and its `GetDisplayData` lines agre
 Report and reason in mm; call the API in m. The third coordinate is model depth
 and is not always 0; ignore it.
 
+**BOM-adjacent captions follow the rebuilt table, not a row-count estimate.**
+The pen assembly's parent-scoped vendor Numbers wrap in its 30 mm part-number
+column. The naming cutover grew its native BOM from the earlier 91.5 mm
+measurement to 121.515 mm, putting the old fixed caption through row 12.
+`draw_pn_pen_assembly._place_exploded_caption` follows the existing native-table
+pattern: read the top-left `IAnnotation::GetPosition`, sum every rebuilt
+`ITableAnnotation::GetRowHeight`, then place the caption below that bottom.
+Keep the full Numbers and the view's actual scale. Read `INote::GetExtent`
+after insertion to prove at least 4 mm of final air, as well as sheet and
+title-block containment; a readable source string does not prove a readable PDF.
+
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when
 `GetTextInBoxStyleAtIndex` is `swTextInBoxStyleNone`). `_layout_geometry`
