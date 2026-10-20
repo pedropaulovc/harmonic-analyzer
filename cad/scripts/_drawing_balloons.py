@@ -45,6 +45,50 @@ _BALLOON_CLEARANCE_M = 0.0015
 # the frame's screw balloon ending in the nameplate engraving.
 _BALLOON_LANDING_TOLERANCE_M = 0.0002
 
+# Diagnostic-only, scoped to the discovery-before-attachment prefix. No buffer,
+# collector import or native observer exists on the ordinary path.
+_POSE_HISTORY: dict[str, Any] | None = None
+
+
+def _pose_raw_history(
+    xy: Sequence[float], stage: str, result: bool | None, error: str | None = None
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    history = _POSE_HISTORY
+    assert history is not None
+    row = {
+        "sequence": len(history["calls"]) + 1,
+        "api": "IModelDocExtension.SelectByID2",
+        "callsite": "_drawing_balloons._hit_test_edge"
+        if stage != "immediate-repeat" else "_drawing_balloons.diagnose_pose",
+        "stage": stage,
+        "anchor": history.get("current_anchor"),
+        "sheet_xy_m": [float(xy[0]), float(xy[1])],
+        "raw_result": result,
+        "raw_error": error,
+        "actual_owner": None,
+        "owner_status": "unknown" if result else "not-read-on-raw-false",
+    }
+    history["calls"].append(row)
+    history["recording_ms"] += (time.perf_counter() - started) * 1000
+    return row
+
+
+@contextlib.contextmanager
+def _pose_history_scope(stems: Sequence[str]):
+    global _POSE_HISTORY
+    previous = _POSE_HISTORY
+    _POSE_HISTORY = {
+        "calls": [], "anchors": [], "source_order": list(stems),
+        "source_coverage": "1667-leaf-selection-prefix-audit/912179e24",
+        "explicit_prefix_only_not_cold_cache": True,
+        "discovery_before_attachment": True, "recording_ms": 0.0,
+    }
+    try:
+        yield
+    finally:
+        _POSE_HISTORY = previous
+
 
 def _min_angular_gap(
     ring_radius: float, balloon_radius: float, *, clearance: float
@@ -1067,9 +1111,21 @@ def _hit_test_edge(
                 callout = null_callout()
                 select_begin_utc_ns = time.time_ns()
                 started = time.perf_counter()
-                selected = extension.SelectByID2(
-                    "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
-                )
+                if _POSE_HISTORY is None:
+                    selected = extension.SelectByID2(
+                        "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
+                    )
+                else:
+                    try:
+                        selected = extension.SelectByID2(
+                            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
+                        )
+                    except BaseException as exc:
+                        _pose_raw_history(
+                            sheet_xy, "baseline" if post_raw is not None else "anchor",
+                            None, f"{type(exc).__name__}: {exc}",
+                        )
+                        raise
                 select_ms = (time.perf_counter() - started) * 1000.0
                 select_end_utc_ns = time.time_ns()
                 baseline_missed = not bool(selected)
@@ -1079,6 +1135,17 @@ def _hit_test_edge(
                         select_begin_utc_ns=select_begin_utc_ns,
                         select_end_utc_ns=select_end_utc_ns,
                     )
+                if _POSE_HISTORY is not None:
+                    history_row = _pose_raw_history(
+                        sheet_xy, "baseline" if post_raw is not None else "anchor",
+                        bool(selected),
+                    )
+                    history_row.update(
+                        select_ms=select_ms, select_begin_utc_ns=select_begin_utc_ns,
+                        select_end_utc_ns=select_end_utc_ns,
+                    )
+                    if post_raw is not None and observed is not None:
+                        _POSE_HISTORY["baseline_sequence"] = history_row["sequence"]
                 if post_raw is not None:
                     with contextlib.suppress(Exception):
                         _telemetry.event(
@@ -1142,6 +1209,13 @@ def _hit_test_edge(
     owner = _entity_owner(adapter, edge)
     if observed is not None:
         observed["owner_read_ms"] = (time.perf_counter() - started) * 1000.0
+    if _POSE_HISTORY is not None and history_row is not None:
+        history_started = time.perf_counter()
+        history_row.update(
+            actual_owner=owner or None,
+            owner_status="known" if owner else "unknown",
+        )
+        _POSE_HISTORY["recording_ms"] += (time.perf_counter() - history_started) * 1000
     return edge, owner
 
 
@@ -1315,6 +1389,9 @@ def _select_balloon_anchor(
     instance = first.path
     tried: list[tuple[float, float]] = []
     scan_attrs: dict[str, Any] = {}
+    if _POSE_HISTORY is not None:
+        _POSE_HISTORY["current_anchor"] = stem
+        _POSE_HISTORY["anchor_start_sequence"] = len(_POSE_HISTORY["calls"]) + 1
     method: AnchorMethod
     if anchor.point_mm is not None:
         if sheet_xy is None:
@@ -1348,10 +1425,17 @@ def _select_balloon_anchor(
                             repeat["select_ms"] = (time.perf_counter() - started) * 1000.0
                     except Exception as exc:
                         repeat["select_error"] = f"{type(exc).__name__}: {exc}"
+                    if _POSE_HISTORY is not None:
+                        _pose_raw_history(
+                            sheet_xy, "immediate-repeat",
+                            repeat.get("select_result"), repeat.get("select_error"),
+                        )
                     with contextlib.suppress(Exception):
                         _telemetry.event(
                             "drawing.pick_diagnostic.raw", label=stem, **repeat
                         )
+                if _POSE_HISTORY is not None:
+                    observed["selection_history"] = _POSE_HISTORY
                 try:
                     from _drawing_sm_pose_diagnostic import collect_and_stop
 
@@ -1601,6 +1685,13 @@ def _select_balloon_anchor(
                     f"edges (sampled when 1-{_VISIBLE_EDGES_PER_INSTANCE})"
                 )
         point_mm = tuple(value * 1000.0 for value in point)
+    if _POSE_HISTORY is not None:
+        _POSE_HISTORY["anchors"].append({
+            "stem": stem, "completed": True,
+            "attempts": 1 if anchor.point_mm is not None else len(tried),
+            "first_sequence": _POSE_HISTORY["anchor_start_sequence"],
+            "last_sequence": len(_POSE_HISTORY["calls"]),
+        })
     # The span carries what profiling queries group by; the event is what a
     # run-to-run anchor diff compares (App Insights traces, this name).
     _span_scan_attrs(instance=instance, method=method, tried=len(tried), **scan_attrs)
@@ -1864,21 +1955,34 @@ def add_component_bom_balloons(
     # Every anchor is hit-tested before the first balloon exists: a balloon
     # dropped near its own anchor would otherwise sit on the next family's
     # point and swallow its hit test.
-    picks = [
-        _select_balloon_anchor(
-            adapter,
-            view,
-            stem=stem,
-            anchor=anchors[stem],
-            candidates=candidates[stem],
-            offsets=offsets,
-            sheet_xy=sheet_points.get(stem),
-            label=label,
-            projection_inputs=projection_inputs.get(stem),
-            activation_view_name=activation_view_name,
-        )
-        for stem in stems
-    ]
+    if pose_probe:
+        with _pose_history_scope(stems):
+            picks = [
+                _select_balloon_anchor(
+                    adapter, view, stem=stem, anchor=anchors[stem],
+                    candidates=candidates[stem], offsets=offsets,
+                    sheet_xy=sheet_points.get(stem), label=label,
+                    projection_inputs=projection_inputs.get(stem),
+                    activation_view_name=activation_view_name,
+                )
+                for stem in stems
+            ]
+    else:
+        picks = [
+            _select_balloon_anchor(
+                adapter,
+                view,
+                stem=stem,
+                anchor=anchors[stem],
+                candidates=candidates[stem],
+                offsets=offsets,
+                sheet_xy=sheet_points.get(stem),
+                label=label,
+                projection_inputs=projection_inputs.get(stem),
+                activation_view_name=activation_view_name,
+            )
+            for stem in stems
+        ]
     landings = [
         _create_component_bom_balloon(
             adapter,
