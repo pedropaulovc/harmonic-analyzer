@@ -4286,9 +4286,9 @@ if HDSCREW_HEAD_DIA / 2.0 > min(
 ):
     raise AssertionError("pedestal hold-down head overhangs the ledge")
 _PEDESTAL_SCREW_XZ = (
-    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),  # -91.652
+    (X_DRUM, -ARBOR_PEDESTAL_Z + ARBOR_PED_SCREW_Z),  # south origin + SCREW_Z
     # North pedestal (Ry180 flips its ledge to +z): origin - SCREW_Z.
-    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),  # +94.202
+    (X_DRUM, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_SCREW_Z),  # north origin - SCREW_Z
 )
 
 # Both machine-handed: the base holes agree directly.

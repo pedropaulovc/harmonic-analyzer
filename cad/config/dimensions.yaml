@@ -673,7 +673,7 @@ sections:
       rows:
       - - '`dt-arbor-pedestal` ×2 (south + north; ch30 GT height; PR3 reshape)'
         - 'dt_arbor_pedestal_spec: foot flange 24 ×28 ×5 mm (10 mm strap +18 mm ledge), tapered strap 10 mm deep, R11 crown and 55.45 mm total height. Finished clamp bore Ø9.55 +0.03/0 along Z, at 44.45 above the base deck (machine y = 95.25), following the common raised drive axis. Former total height 50.718 / bore height 39.718 and 24 ×16 foot / R10 / Ø9.5 descriptions are historical reconstruction geometry.'
-        - 'X = −60.393602135, pedestal origins Z = −79.518912220 south / +81.061087780 north; strap inner faces −71.518912220 / +73.061087780. Arbor spans both full 10 mm strap bores with 1.5 mm proud domes; positions derive from cylinder_bank_layout, not the former 187 mm arbor.'
+        - 'X = −60.393602135, pedestal origins Z = −79.068912220 south / +80.511087780 north; strap inner faces −71.068912220 / +72.511087780. Arbor spans both full 10 mm strap bores with 1.5 mm proud domes; positions derive from cylinder_bank_layout, not the former 187 mm arbor.'
         - 'Historical ch30 GT (cyl_front) and t00393 / v4_pinion_008 supply the tapered casting interpretation, previously scaled using OD 62.2 mm; current shared raised-axis law and 48DP bank determine geometry/placement.'
         - med (selected/derived geometry; historical shape scale separate)
       - - '`dt-cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'

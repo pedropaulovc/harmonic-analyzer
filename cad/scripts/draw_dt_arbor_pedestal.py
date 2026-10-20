@@ -185,9 +185,9 @@ TOP_KEEP = {
 # dimensioned from the foot's west side face, so the two views share one
 # origin the shop can touch off.
 
-# The arbor (MHA-DT-13) is what the reamed bore fits: the back pedestal's
-# apex screw locks it, and the front pedestal slides along it while its strap
-# is set off the bank's spring blade (cylinder_bank_layout), so the bore is a
+# The arbor (MHA-DT-13) is what the reamed bore fits: the front pedestal's
+# apex screw locks it, and the back pedestal slides along it while its strap
+# is set off the bank's north spring blade (cylinder_bank_layout), so the bore is a
 # sliding fit and the Ra 1.6 says so (rule 4 (tighten only for function, and
 # name the mate); 2026-10-18 ENFORCE r1 blocker).
 ARBOR_NUMBER = str(_config.parts("dt-cylinder-gear-shaft")["number"])
