@@ -41,6 +41,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
@@ -48,7 +49,7 @@ from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
-from _dimensions import drive_dimension, name_dimensions, set_global
+from _dimensions import _feature_display_dimensions, drive_dimension, name_dimensions, set_global
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -387,15 +388,93 @@ def _assert_pin_hole_lands(adapter) -> None:
     )
 
 
+def _log_root_relief_dimension_census(adapter) -> None:
+    """Record the actual model-feature shape before refusing an unknown display.
+
+    GetDimension2's index selects a second component ONLY for a native chamfer
+    display; other display types ignore it. Keep both identities and SI values
+    so a distance returned twice cannot be mistaken for an angular dimension.
+    Diagnostic read failures are recorded, never substituted into the build.
+    """
+    def failure(exc):
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+    def scalar(getter):
+        try:
+            value = getter()
+            if isinstance(value, float) and not math.isfinite(value):
+                return {"nonfinite": str(value)}
+            return value
+        except Exception as exc:
+            return failure(exc)
+
+    def dimension(raw):
+        if raw is None:
+            return None
+        item = _early_bound(raw, "IDimension")
+        return {
+            "full_name": scalar(lambda: str(item.FullName)),
+            "name": scalar(lambda: str(item.Name)),
+            "system_value": scalar(lambda: float(item.SystemValue)),
+        }
+
+    census = {"feature": "CamRootRelief", "display_dimensions": []}
+    try:
+        feature = _early_bound(_feature_by_name(adapter, "CamRootRelief"), "IFeature")
+        try:
+            definition = _early_bound(feature.GetDefinition(), "IChamferFeatureData2")
+            census["definition"] = {
+                "type": scalar(lambda: int(definition.Type)),
+                "angle_rad": scalar(lambda: float(definition.EdgeChamferAngle)),
+                "width_m": scalar(lambda: float(definition.GetEdgeChamferDistance(0))),
+                "tangent_propagation": scalar(lambda: bool(definition.TangentPropagation)),
+            }
+        except Exception as exc:
+            census["definition"] = failure(exc)
+        for index, raw_display in enumerate(_feature_display_dimensions(feature)):
+            display = _early_bound(raw_display, "IDisplayDimension")
+            row = {"index": index, "type2": scalar(lambda: int(display.Type2))}
+            components = []
+            for component in (0, 1):
+                try:
+                    raw_dimension = display.GetDimension2(component)
+                    row[f"dimension{component}"] = dimension(raw_dimension)
+                    components.append(raw_dimension)
+                except Exception as exc:
+                    row[f"dimension{component}"] = failure(exc)
+                    components.append(None)
+            row["same_0_1"] = (
+                scalar(lambda: int(adapter.swApp.IsSame(*components)))
+                if all(item is not None for item in components) else None
+            )
+            census["display_dimensions"].append(row)
+    except Exception as exc:
+        census["enumeration"] = failure(exc)
+    _telemetry.info(
+        "cam-root relief native dimension census: "
+        + json.dumps(census, sort_keys=True, allow_nan=False)
+    )
+
+
 def _root_relief_dimensions(adapter) -> tuple[object, object, object]:
     display, size = _named_dimension(adapter, "CamRootRelief", "RootReliefSize")
     display = _early_bound(display, "IDisplayDimension")
-    # A chamfer's SECOND model dimension is its angle, not a second display
-    # dimension in the feature's creation-order list (GetDimension2 docs).
-    angle = display.GetDimension2(1)
-    if angle is None or int(display.Type2) != 10:  # swChamferDimension
-        raise RuntimeError("cam-root relief: native compound chamfer dimension missing")
-    angle = _early_bound(angle, "IDimension")
+    # A compound display is part of the current print contract, not a
+    # documented consequence of InsertFeatureChamfer. Census before refusing
+    # an unrecognized native shape; do not infer an angular D2 or a wrapper.
+    try:
+        kind = int(display.Type2)
+        second = display.GetDimension2(1)
+    except Exception:
+        _log_root_relief_dimension_census(adapter)
+        raise
+    if second is None or kind != 10:  # swChamferDimension
+        _log_root_relief_dimension_census(adapter)
+        raise RuntimeError(
+            "cam-root relief: native compound chamfer dimension missing: "
+            f"Type2={kind}, GetDimension2(1) is None={second is None}"
+        )
+    angle = _early_bound(second, "IDimension")
     if (
         not math.isclose(float(size.SystemValue) * 1000.0, ROOT_RELIEF_SIZE, abs_tol=1e-6)
         or not math.isclose(
