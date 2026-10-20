@@ -940,6 +940,17 @@ async def _verify_static_one(
     if not _assert_fresh(name, report):
         return  # stale on-disk artefact: fail loud rather than verify old geometry
 
+    if name == "pd-paper-drive":
+        if auto_repair:
+            raise RuntimeError("paper-drive digest probe forbids auto-repair")
+        from _verify_pd_digest_probe import inspect_saved_paper_drive
+
+        await inspect_saved_paper_drive(
+            adapter,
+            sldasm,
+            REPORTS_DIR / "pd-paper-drive-digest-probe.json",
+        )
+
     # Fresh session per assembly: accumulating open docs across the multi-assembly
     # run degrades the COM session -- the InterferenceDetectionManager comes back
     # null after several opens, failing its interference gate spuriously. Reset
