@@ -1292,7 +1292,7 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"),
         ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"),
         ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"),
-        ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
+        ("CROSS_TAP_PROCESS", "COMMON THREAD LEAD IN BOTH WALLS\n"),
     ],
 )
 def test_base_callout_prefix_is_the_shared_helpers(
@@ -1384,7 +1384,8 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.CROSS_TAP_PROCESS == "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+    assert sheet.CROSS_TAP_PROCESS == "COMMON THREAD LEAD IN BOTH WALLS\n"
+    assert "THRU" not in sheet.CROSS_TAP_PROCESS
     source = inspect.getsource(sheet)
     for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
         assert gone not in source

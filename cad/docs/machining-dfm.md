@@ -118,6 +118,8 @@ geometry is casting-shaped, not milling-shaped.
   segments, not only the near wall. Even allowing a 0.762 mm stock-screw length
   reduction, a Ø26.0 matched socket and two 1.5-pitch end losses, total engagement
   is `44.45 − 0.762 − 26.0 − 3 × 25.4/32 = 15.31 mm`, above 1.5D = 7.24 mm.
+  The drawing states `COMMON THREAD LEAD IN BOTH WALLS`: the seat remains blind,
+  and its associative full-thread and minimum-drill depth tokens are unchanged.
   The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
   near pedestal axis with the existing ±0.05 mm functional band; the setup note
   identifies the mate and operation but does not carry their numeric offsets.

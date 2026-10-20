@@ -805,7 +805,7 @@ def is_pivot_seat_note(text: str) -> bool:
 # BASE_SCREW_SEAT_Z), and its depths run from that face. "ON A1-A4 X
 # CENTRES" was a location, now the CrossTapX/CrossTapFarX dimensions, and
 # the spotface callout's 4X FRONT/REAR already counts the faces.
-CROSS_TAP_PROCESS = "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+CROSS_TAP_PROCESS = "COMMON THREAD LEAD IN BOTH WALLS\n"
 TRANSFER_HOLES = (
     *TRANSFER_BLOCK_HOLES,
     TRANSFER_SPRING_HOLE,
