@@ -138,6 +138,7 @@ if farm is not None:
             json.dumps({
                 "argv": sys.argv[farm + 1 :],
                 "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
+                "UV_PROJECT_ENVIRONMENT": os.environ.get("UV_PROJECT_ENVIRONMENT"),
             }) + "\\n"
         )
     if command == "close-build":
@@ -217,6 +218,7 @@ if farm is not None:
                     {
                         "argv": sys.argv[farm + 1 :],
                         "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
+                        "UV_PROJECT_ENVIRONMENT": os.environ.get("UV_PROJECT_ENVIRONMENT"),
                     }
                 )
                 + "\\n"
@@ -2346,6 +2348,74 @@ def test_status_ignores_persistent_wmi_failure_for_launcher_liveness(
     assert "WBEM_E_CALL_CANCELLED" not in status.stderr, status.stderr
 
 
+def test_pool_cli_isolates_and_restores_caller_environment(tmp_path: Path) -> None:
+    pwsh = shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is required")
+    script = f"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    {_ps_quote(str(LAUNCHER))}, [ref]$tokens, [ref]$errors)
+if ($errors.Count) {{ throw ($errors | Out-String) }}
+$node = $ast.Find({{
+    param($n)
+    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-FarmCli'
+}}, $true)
+if ($null -eq $node) {{ throw 'missing Invoke-FarmCli' }}
+. ([scriptblock]::Create($node.Extent.Text))
+$pool = {_ps_quote(str(tmp_path / "selected-pool"))}
+$env:UV_OFFLINE = 'preserved-fixture-setting'
+function uv {{
+    if ($null -ne $env:VIRTUAL_ENV -or $null -ne $env:UV_PROJECT_ENVIRONMENT) {{
+        throw 'caller environment leaked into pool command'
+    }}
+    if ($env:UV_OFFLINE -ne 'preserved-fixture-setting') {{
+        throw 'unrelated setting was removed'
+    }}
+    $expected = @('run', '--frozen', '--project', $pool, (Join-Path $pool 'farm.py'), 'agents', '--json')
+    if (($args | ConvertTo-Json -Compress) -ne ($expected | ConvertTo-Json -Compress)) {{
+        throw 'pool arguments changed'
+    }}
+    if ($script:Outcome -eq 'throw') {{ throw 'fixture invocation failure' }}
+    $global:LASTEXITCODE = if ($script:Outcome -eq 'nonzero') {{ 23 }} else {{ 0 }}
+    'fixture-output'
+}}
+foreach ($present in @($false, $true)) {{
+    $active = if ($present) {{ {_ps_quote(str(tmp_path / "outer-active"))} }} else {{ $null }}
+    $project = if ($present) {{ {_ps_quote(str(tmp_path / "outer-project"))} }} else {{ $null }}
+    foreach ($script:Outcome in @('success', 'nonzero', 'throw')) {{
+        $env:VIRTUAL_ENV = $active
+        $env:UV_PROJECT_ENVIRONMENT = $project
+        $caught = $false
+        try {{
+            $result = Invoke-FarmCli -PoolHome $pool -Arguments @('agents', '--json')
+        }} catch {{
+            if ($script:Outcome -ne 'throw' -or $_.ToString() -notlike '*fixture invocation failure*') {{ throw }}
+            $caught = $true
+        }}
+        if ($script:Outcome -eq 'throw') {{
+            if (-not $caught) {{ throw 'invocation failure was swallowed' }}
+        }} else {{
+            $expectedCode = if ($script:Outcome -eq 'nonzero') {{ 23 }} else {{ 0 }}
+            if ($result.code -ne $expectedCode -or $result.output.Count -ne 1 -or
+                $result.output[0] -ne 'fixture-output') {{ throw 'command result changed' }}
+        }}
+        if ($env:VIRTUAL_ENV -ne $active -or $env:UV_PROJECT_ENVIRONMENT -ne $project) {{
+            throw 'caller environment was not restored'
+        }}
+    }}
+}}
+"""
+    result = subprocess.run(
+        [pwsh, "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+
+
 @pytest.mark.parametrize(
     ("case", "expected"),
     [
@@ -2938,6 +3008,10 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
     """2026-09-28: a launcher killed mid-run wrote no .done, its record still said
     `running`, and a watcher waiting for .done sat silent for 35 min."""
     fixture = _launcher_fixture(tmp_path)
+    fixture["environment"]["VIRTUAL_ENV"] = str(tmp_path / "outer-active-environment")
+    fixture["environment"]["UV_PROJECT_ENVIRONMENT"] = str(
+        tmp_path / "outer-project-environment"
+    )
     lines = (
         DISPATCH_LINES
         + f"  --  [   61.0s +  1.0s] Farm workflow requested: {LEAF_NUT}\n"
@@ -3048,6 +3122,7 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         ]
     ]
     assert cancels[0]["VIRTUAL_ENV"] is None
+    assert cancels[0]["UV_PROJECT_ENVIRONMENT"] is None
     # The cleanup the dead launcher never ran: outputs kept, snapshot gone.
     assert done["outputs_preserved"] is True
     assert (Path(done["outputs"]) / "reports" / "stub-output.txt").read_text(
