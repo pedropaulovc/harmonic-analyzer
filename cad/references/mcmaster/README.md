@@ -1186,9 +1186,10 @@ Catalog specifications checked on September 10, 2026:
   was harvested, so it is catalogue-only: no replica gate.
 
 - [9714K392](https://www.mcmaster.com/9714K392/) (`dt-vn-cylinder-bank-spring`,
-  MHA-DT-VN-68, one) sits on the MHA-DT-13 arbor between the front MHA-DT-26
-  washer and the front MHA-DT-02 strap, set by a 0.95 blade, and holds the
-  20-gear stack north on its datum (#948 ruling R). Its page was read live on
+  MHA-DT-VN-68, one) sits on the MHA-DT-13 arbor directly between gear 19's
+  north planar face and the north MHA-DT-02 strap, set by a 0.95 blade, and
+  holds the 20-gear stack south on the single MHA-DT-26 brass disc and south
+  strap datum (user ruling 2026-10-20). Its page was read live on
   October 9, 2026: Wave Disc Spring, steel, stackable; ID 0.385 in -0.01/+0.01,
   OD 0.5 in -0.01/+0.01, thickness 0.005 in, height 0.05 in (free); compressed
   height 0.024 in and deflection 0.026 in at the 1.5 lb working load; pack of

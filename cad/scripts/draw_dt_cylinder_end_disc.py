@@ -20,11 +20,22 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from dt_cylinder_end_disc_spec import (
+    BORE_CALLOUT,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    THICKNESS_CALLOUT,
+    WASHER_OD,
+    WASHER_THICK,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["dt_cylinder_end_disc"]
@@ -39,21 +50,40 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Retain the useful 2:1 scale for the enlarged south disc. Separate the projected
-# side view and move both diameter lanes clear of the enlarged face.
+# A native axial section puts both turned diameters on solid side-view edges.
+# The end view carries only its cutting line and centre mark.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 FRONT_CENTER = (0.105, 0.175)
-RIGHT_CENTER = (0.225, 0.175)
-ISO_CENTER = (0.330, 0.175)
+SECTION_CENTER = (0.225, 0.175)
+ISO_CENTER = (0.350, 0.175)
 
-FRONT_KEEP = {
-    "DiscDia": (0.025, 0.255),
-    "BoreDia": (0.180, 0.255),
+HALF_OD = WASHER_OD * VIEW_SCALE[0] / (2.0 * VIEW_SCALE[1] * 1000.0)
+SECTION_LINE = (
+    (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
+    (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
+)
+SECTION_KEEP = {
+    "DiscDia": (0.195, 0.175),
+    "BoreDia": (0.270, 0.175),
+    "DiscThick": (0.225, 0.255),
 }
-RIGHT_KEEP = {
-    "DiscThick": (0.255, 0.255),
+DIMENSION_CALLOUTS = {
+    "BoreDia": BORE_CALLOUT,
+    "DiscThick": THICKNESS_CALLOUT,
 }
+
+
+def _require_horizontal_axis(adapter: Any, section: Any) -> None:
+    south, north = model_points_in_view(
+        adapter,
+        section,
+        ((0.0, 0.0, 0.0), (0.0, 0.0, WASHER_THICK / 1000.0)),
+        label="disc turning axis",
+        names=("south face", "north face"),
+    )
+    if abs(north[0] - south[0]) <= 1e-8 or abs(north[1] - south[1]) > 1e-8:
+        raise RuntimeError("disc axial section does not have a horizontal turning axis")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -89,13 +119,33 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    # Reuse the pinion-sleeve longitudinal-section recipe. The shared helper
+    # reads back the exact centre cut; targeted import below must deliver the
+    # real model diameters or fail, never substitute numeric drawing text.
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=SECTION_LINE[0],
+        line_end=SECTION_LINE[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="south end disc axial centre section",
+    )
+    _require_horizontal_axis(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (front, right, iso):
+    for view in (front, section, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="disc axial section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the disc face view")
 
