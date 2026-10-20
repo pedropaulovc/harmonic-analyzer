@@ -141,6 +141,21 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
+The synthetic Claude transport tests in `test_machinist_review.py` launch only a
+local Python protocol fixture, never a reviewer CLI or model. Startup-failure,
+retry and shared-budget cases install a clock on each private event loop before
+the production timeout contexts start. Protocol polling advances startup time;
+LF/CRLF-framed fixture diagnostics advance it when the child intentionally stops
+responding. The production `asyncio.timeout` contexts still cancel and reap the
+real subprocess. A failure-marked wall-time fallback begins after ten seconds
+to unblock active production timers if protocol progress is lost; it is not a
+cleanup deadline, and any activation fails the test. The fixture owns its ticker
+task and restores the loop clock in `finally`. The 0.75-second startup and
+2-second overall test budgets stay independent of busy-host process scheduling.
+One healthy retry deliberately pauses for one wall-clock second before replying.
+Keep the separate real-time slow-readiness test, actual handshake,
+no-prompt-before-connection assertions and retained attempt evidence.
+
 ### Finite stock-envelope endpoint reuse
 
 `paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's
