@@ -1,11 +1,11 @@
 """Drawing-only data of the magnifier fitter package (MHA-MG-00).
 
 The BOM rows (families, quantities, descriptions), the axle-stack dimensions
-the sheet imports, the setting callouts, the exploded-view caption, the
-fit-up steps and the checks the sheets print. Only draw_mg_magnifier_assembly
-(and its tests) import this module; no assembly builder may
-(``test_assembly_sheet_isolation`` pins it), so a wording edit here does not
-rebuild the magnifier assembly. No SolidWorks.
+the sheet imports, the exploded-view caption, the fit-up steps and the checks
+the sheets print. Native setting callouts belong to the model spec, not here.
+Only draw_mg_magnifier_assembly (and its tests) import this module; no assembly
+builder may (``test_assembly_sheet_isolation`` pins it), so a wording edit here
+does not rebuild the magnifier assembly. No SolidWorks.
 """
 
 from __future__ import annotations
@@ -17,10 +17,8 @@ from _inch_fraction import inch_fraction
 from _mcmaster_91882a221 import SHANK_LEN as _THUMB_SHANK_LEN
 from _mcmaster_91882a221 import THREAD as _THUMB_THREAD
 from mg_magnifier_assembly_spec import (
-    CLAMP_STATION_DIMENSION,
     ENDSHAKE_DIMENSION,
     FEATURE,
-    FIXTURE_DROP_DIMENSION,
     PRESS_GAUGE_DIMENSION,
 )
 from mg_vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
@@ -28,34 +26,6 @@ from mg_vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
 # The axle-stack dimensions the AXLE AS PRESSED and WHEEL ENDSHAKE details
 # import (the builder marks the banded ones, DIMENSION_TOLERANCES).
 DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
-
-# --- Setting callouts ---------------------------------------------------------
-# Each callout states what its band protects, naming the mate the tight gauge
-# serves (drawing-guidelines.md rule 4; machinist review r6 read the ±0.05 as
-# over-tight without it: mg_wheel_group's worst-case stack spends it, leaving
-# LOCKNUT_THREAD_MARGIN 0.002). The gauge's prints above its
-# value, on one line: SolidWorks keeps a line break in that compartment but
-# prints none of the callout (run 20261012T185729782Z). The endshake's
-# prints below, where line breaks print.
-DIMENSION_CALLOUTS = {
-    PRESS_GAUGE_DIMENSION: "PRESS GAUGE: KEEPS MHA-MG-VN-52 LOCKNUT ON FULL THREAD",
-    ENDSHAKE_DIMENSION: "\n".join(
-        (
-            "WHEEL FREE, NO RATTLE;",
-            "SET BY THE FIRST NUT,",
-            "LOCKED BY THE SECOND",
-        )
-    ),
-}
-
-# --- Lever setting callouts (LEVER_FEATURE) -----------------------------------
-# What each setting does (joint_retention's clamp and fixture rows): the
-# clamp's radius from the knife is the magnification; the fixture's height on
-# the rod places the trace. Above-callouts print on one line only.
-LEVER_CALLOUTS = {
-    CLAMP_STATION_DIMENSION: "CLAMP STATION: SETS MAGNIFICATION",
-    FIXTURE_DROP_DIMENSION: "FIXTURE DROP:\nSETS TRACE HEIGHT",
-}
 
 # --- Fitter package -----------------------------------------------------------
 DRAWING_NUMBER = _steps.DRAWING_NUMBER

@@ -463,6 +463,30 @@ _STANDOFF_R = DRUM_DIA / 2.0 + HUB_WIRE_DIA / 2.0 + WIRE_CLEARANCE  # 10.1
 _WIRE_SPIN_ANGLE = math.degrees(math.acos(min(1.0, abs(_HW_ROWS[2][0]))))
 
 
+def _author_setting_callouts(adapter, feature: str) -> None:
+    """Persist native setting text on its model dimensions before save.
+
+    Imported IDisplayDimension.SetText writes through to this same source;
+    the drawing must only assert the text it inherits. SetText is void, so
+    read its own compartment back, as in build_pd_transgear_arm.
+    """
+    callouts = stack_spec.SETTING_CALLOUTS[feature]
+    broken = sorted(
+        name for name, (part, text) in callouts.items() if part == 3 and "\n" in text
+    )
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    for name, (part, text) in callouts.items():
+        display, _dimension = _named_dimension(adapter, feature, name)
+        display.SetText(part, text)
+        actual = str(display.GetText(part) or "").replace("\r\n", "\n")
+        if actual != text:
+            raise RuntimeError(
+                f"{name}@{feature}: native setting callout reads {actual!r}, "
+                f"not {text!r}"
+            )
+
+
 async def _author_axle_stack_reference(adapter) -> None:
     """The press gauge and the endshake as model dimensions: no solid or pose
     edits, one construction chain on the axle centreline through the bar front
@@ -539,6 +563,7 @@ async def _author_axle_stack_reference(adapter) -> None:
             places=spec.TOLERANCE_PRECISION,
         )
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    _author_setting_callouts(adapter, spec.FEATURE)
     mark_dimensions_for_drawing(adapter, spec.FEATURE, set(spec.DIMENSION_TOLERANCES))
     # Blanked so no view of this assembly or of the top assembly renders the
     # chain; the MHA-MG-00 detail shows it in that view only.
@@ -622,6 +647,7 @@ async def _author_lever_setting_reference(adapter) -> None:
     for name, expression in dims.apply(adapter, spec.LEVER_FEATURE):
         await drive_dimension(adapter, name, expression)
     apply_drawing_precision(adapter, spec.LEVER_DRAWING_PRECISION)
+    _author_setting_callouts(adapter, spec.LEVER_FEATURE)
     mark_dimensions_for_drawing(
         adapter, spec.LEVER_FEATURE, spec.LEVER_DRAWING_DIMENSIONS[spec.LEVER_FEATURE]
     )

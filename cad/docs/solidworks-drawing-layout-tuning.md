@@ -719,27 +719,50 @@ does not isolate Crop2 or establish changed geometry. This disproves post-BOM
 ordering as the primary cause of that transition, not the released-source
 safety rule.
 
-MG now passes its read-only `magnifier.source_save_flag` callback through the
-assembled/settings operations: each named-view placement and configuration,
-detail position/rebuild/display/isolation, each per-view reference-sketch
-show, model-item import/curation, crop-circle creation, Crop2, crop rebuild,
-display update, each setting callout, and subsequent readbacks/labels.
-The formatting path already uses the shared
-`_drawing_dimensions.set_dimension_callouts` (`IDisplayDimension.SetText`);
-precision is checked by `assert_imported_precision`, and stack tolerances
-are read, not written. Sketch visibility uses the drawing-qualified
-`<sketch>@<component>@<view>` selection, and configuration assignment uses
-`IView.ReferencedConfiguration`, not `IModelDoc2.ShowConfiguration2`.
-Those API targets do not prove that SOLIDWORKS cannot dirty the referenced
-assembly. Do not replace the existing drawing APIs or edit the model on a
-guess. One MG drawing-only native leaf at the checkpointed published head,
-with the same cached assembly input, must capture the first dirty checkpoint
-and its neighboring `magnifier.source_save_flag` events; import and curation
-remain one shared-helper boundary. A dirty flag means “needs save”
-(`IModelDoc2.GetSaveFlag`), not necessarily changed geometry. Keep the final
-refusal before drawing SaveAs3, without a source save or dirty-flag reset.
-Missing explode steps still fail. Do not change geometry, fitter cameras,
-standard views or the shared zero-step guard to conceal this mismatch.
+The narrower native run at PR1764 head `e3d66daf9` (artifact198) first records
+`magnifier source went DIRTY after lever ClampStation above callout` at
+31.8 s. Earlier checkpoints, including model-item import/curation, are clean.
+That checkpoint immediately followed
+`_drawing_dimensions.set_dimension_callouts` →
+`IDisplayDimension.SetText(3, "CLAMP STATION: SETS MAGNIFICATION")`.
+It identifies a source save-flag mutation, not a geometry change. The
+[native source-hash controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
+already reproduce imported/source dimension identity (`IsSame == 1`), callout
+`SetText` dirtying the source, and drawing `SaveAs3` persisting that mutation.
+
+The API ownership matters: `IDisplayDimension.SetText` edits the native
+dimension's text, returns void and has no drawing-only ownership argument.
+`swDimensionTextParts_e` uses 3/4 for the above/below callout compartments;
+neither replaces or hides the native numeric value (unlike `SetText(0, ...)`).
+`AddDisplayText` is not a persistent replacement: its documented graphics are
+temporary and revert when the dimension changes. The drawing-only
+`DimensionLowerText` argument to `IModelDocExtension.EditDimensionProperties`
+is a separate lane, not the required above/below callouts. No proven
+drawing-only setter preserves these exact callout compartments.
+
+All four MG setting callouts now belong to the assembly model:
+`mg_magnifier_assembly_spec.SETTING_CALLOUTS` owns the exact text and native
+compartments for PressGauge, Endshake, ClampStation and FixtureDrop.
+`build_mg_magnifier_assembly` authors them beside their reference dimensions,
+strictly reads each compartment back and marks/blanks the chains before its
+normal assembly save, following `build_pd_transgear_arm`'s model-text pattern.
+The drawing only imports the associative native dimensions and checks their
+inherited text, precision and stack tolerances, initially and once settled.
+It must reject a stale assembly lacking the text, not stamp it during drawing
+generation. Setting callout wording now re-keys `assembly:mg_magnifier` and
+requires rebuilding that source and its drawing; BOM/step/check prose remains
+drawing-only and must not enter the assembly builder's import closure.
+
+The temporary per-operation crop/settings checkpoints and synthetic
+checkpoint-attribution tests are superseded by this native evidence. Keep
+read-only `magnifier.source_save_flag` phase telemetry, the initial clean
+source guard, guarded balloon/configuration reads, and the final refusal
+before drawing SaveAs3. Never save a dirty released source, clear its flag,
+replace native dimensions with free-text notes, or assume identical text
+setters are harmless. Native acceptance still needs the rebuilt assembly's
+callout readbacks, printed dimension text, and unchanged source identity across
+drawing generation. Missing explode steps still fail; geometry, fitter
+cameras, standard views and the shared zero-step guard remain unchanged.
 
 MS's working pose has the thumbscrew above the stick, both standalone and
 parked in HA. Its graduated face remains against the fixed clamp wall and is

@@ -78,7 +78,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
@@ -189,10 +189,6 @@ _PAD = 0.004
 CLAMP_STATION_RISE = 0.012
 FIXTURE_DROP_RUN = 0.018
 FIXTURE_DROP_BELOW = 0.006
-LEVER_CALLOUT_LOCATION = {
-    stack.CLAMP_STATION_DIMENSION: "above",
-    stack.FIXTURE_DROP_DIMENSION: "below",
-}
 LEVER_VIEW_LABEL = "lever settings (back)"
 
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
@@ -637,41 +633,19 @@ ENDSHAKE_KEEP = {
         ENDSHAKE.sheet_xy(stack.HUB_FRONT_D, ENDSHAKE_RISE)[1],
     ),
 }
-CALLOUT_LOCATION = {
-    stack.PRESS_GAUGE_DIMENSION: "above",
-    stack.ENDSHAKE_DIMENSION: "below",
-}
-# swDimensionTextParts_e: the compartment each location writes and reads.
-CALLOUT_TEXT_PART = {"above": 3, "below": 4}
 
 
-def _printable_callouts() -> dict[str, str]:
-    """The callouts, refused if an above one holds a line break.
-
-    SolidWorks keeps a line break in the above compartment, and GetText reads
-    it back, yet prints none of that callout: the gauge's two-line callout in
-    run 20261012T185729782Z, like the thumbnut's and the cone-gear shaft's
-    before it. Below-callout line breaks print.
-    """
-    broken = sorted(
-        name
-        for name, location in CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in notes.DIMENSION_CALLOUTS[name]
-    )
-    if broken:
-        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: notes.DIMENSION_CALLOUTS[name] for name in CALLOUT_LOCATION}
-
-
-def _assert_callouts(displays: list[tuple[str, Any]], callouts: dict[str, str]) -> None:
-    """Each setting's callout reads back from its own compartment."""
+def _assert_callouts(
+    displays: list[tuple[str, Any]], callouts: dict[str, tuple[int, str]]
+) -> None:
+    """Read inherited native setting text without writing the released model."""
     for name, display in displays:
-        part = CALLOUT_TEXT_PART[CALLOUT_LOCATION[name]]
-        text = str(display.GetText(part) or "")
-        if text.replace("\r\n", "\n") != callouts[name]:
+        part, expected = callouts[name]
+        text = str(display.GetText(part) or "").replace("\r\n", "\n")
+        if text != expected:
+            location = {3: "above", 4: "below"}[part]
             raise RuntimeError(
-                f"{name}: {CALLOUT_LOCATION[name]} callout reads {text!r}, "
-                f"not {callouts[name]!r}"
+                f"{name}: {location} callout reads {text!r}, not {expected!r}"
             )
 
 
@@ -683,9 +657,7 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _placed_detail(
-    adapter: Any, detail: StackDetail, source_step: Callable[[str], None]
-) -> Any:
+def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
     """``detail`` uncropped: an MG LEFT model view at its scale, moved so its
     circle's centre lands on ``detail.centre``."""
     view = _early_bound(
@@ -694,40 +666,31 @@ def _placed_detail(
         ),
         "IView",
     )
-    source_step(f"{detail.title} named view placement and scale")
     label = f"{detail.title} centre"
     apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=detail.title)
-    source_step(f"{detail.title} view configuration")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
     target = [position[axis] + detail.centre[axis] - centre[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
         raise RuntimeError(f"failed to move {detail.title} onto its spot")
-    source_step(f"{detail.title} view position")
     adapter.currentModel.EditRebuild3()
-    source_step(f"{detail.title} position rebuild")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     if max(abs(a - b) for a, b in zip(centre, detail.centre)) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(
             f"{detail.title} centre sits at {centre!r}, not {detail.centre!r}"
         )
     set_hidden_lines_removed(adapter, view)
-    source_step(f"{detail.title} hidden lines removed")
     isolate_drawing_view_components(
         adapter, view, visible_stems=detail.stems, label=detail.title
     )
-    source_step(f"{detail.title} component isolation")
     return view
 
 
-def _crop(
-    adapter: Any, view: Any, detail: StackDetail, source_step: Callable[[str], None]
-) -> None:
+def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
     """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
     in the active view's own sketch and Crop2 while it is still selected."""
     view = _early_bound(view, "IView")
     _activate(adapter, view, label=detail.title)
-    source_step(f"{detail.title} crop view activation")
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -745,21 +708,15 @@ def _crop(
     previous = bool(manager.AddToDB)
     manager.AddToDB = False
     try:
-        source_step(f"{detail.title} crop AddToDB disabled")
         circle = manager.CreateCircle(*points[0], *points[1])
-        source_step(f"{detail.title} crop circle")
     finally:
         manager.AddToDB = previous
-    source_step(f"{detail.title} crop AddToDB restored")
     if circle is None:
         raise RuntimeError(f"failed to sketch the {detail.title} crop circle")
     status = int(view.Crop2(False, False, 1))
-    source_step(f"{detail.title} Crop2")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
-    source_step(f"{detail.title} crop rebuild")
     view.UpdateViewDisplayGeometry()
-    source_step(f"{detail.title} crop display geometry update")
     cropped = bool(view.IsCropped())
     _telemetry.info(
         f"magnifier: {detail.title} Crop2 status {status}, IsCropped {cropped}",
@@ -776,13 +733,11 @@ def _dimensioned_detail(
     adapter: Any,
     detail: StackDetail,
     keep: dict[str, tuple[float, float]],
-    source_step: Callable[[str], None],
 ) -> list[Any]:
     """Place ``detail``, show the stack chain in it, import ``keep``, crop it
     and prove the kept dimensions survived the crop."""
-    view = _placed_detail(adapter, detail, source_step)
+    view = _placed_detail(adapter, detail)
     _show_base_view_sketches(adapter, view, (stack.FEATURE,), label=detail.title)
-    source_step(f"{detail.title} per-view {stack.FEATURE} show")
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -790,8 +745,7 @@ def _dimensioned_detail(
         view_label=detail.title,
         dimensions_by_feature=notes.DRAWING_DIMENSIONS,
     )
-    source_step(f"{detail.title} model dimension import and curation")
-    _crop(adapter, view, detail, source_step)
+    _crop(adapter, view, detail)
     kept = {
         dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
         for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
@@ -801,12 +755,9 @@ def _dimensioned_detail(
         raise RuntimeError(
             f"{detail.title} lost {lost} to its crop; kept {sorted(kept)}"
         )
-    source_step(f"{detail.title} cropped dimension readback")
     _activate(adapter, view, label=detail.title)
-    source_step(f"{detail.title} label view activation")
     if add_note(adapter, detail.label_text, *detail.label_xy) is None:
         raise RuntimeError(f"failed to label {detail.title}")
-    source_step(f"{detail.title} label")
     return annotations
 
 
@@ -816,23 +767,17 @@ def _stack_dimensions(
     """Both settings, with their callouts, places and bands read back once
     both details are cropped; the returned check re-reads the bands and the
     callouts once the drawing has settled."""
-    callouts = _printable_callouts()
+    callouts = stack.SETTING_CALLOUTS[stack.FEATURE]
     annotations = [
-        *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP, source_step),
-        *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP, source_step),
+        *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP),
+        *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP),
     ]
-    for name, location in CALLOUT_LOCATION.items():
-        set_dimension_callouts(
-            adapter, annotations, {name: callouts[name]}, location=location
-        )
-        source_step(f"stack {name} {location} callout")
     precision = {
         name: places
         for names in stack.DRAWING_PRECISION.values()
         for name, places in names.items()
     }
     assert_imported_precision(adapter, annotations, precision)
-    source_step("stack imported precision readback")
     displays = [
         (
             dimension_name(adapter, annotation),
@@ -846,7 +791,7 @@ def _stack_dimensions(
     if sorted(name for name, _ in displays) != sorted(stack.DIMENSION_TOLERANCES):
         raise RuntimeError(f"stack details imported {sorted(n for n, _ in displays)}")
     _assert_callouts(displays, callouts)
-    source_step("stack dimension names and callout readback")
+    source_step("stack settings import and readback")
 
     def settled() -> None:
         for name, display in displays:
@@ -863,32 +808,6 @@ def _stack_dimensions(
         _assert_callouts(displays, callouts)
 
     return settled
-
-
-def _printable_lever_callouts() -> dict[str, str]:
-    """The lever callouts, refused if an above one holds a line break (see
-    :func:`_printable_callouts`)."""
-    broken = sorted(
-        name
-        for name, location in LEVER_CALLOUT_LOCATION.items()
-        if location == "above" and "\n" in notes.LEVER_CALLOUTS[name]
-    )
-    if broken:
-        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
-    return {name: notes.LEVER_CALLOUTS[name] for name in LEVER_CALLOUT_LOCATION}
-
-
-def _assert_lever_callouts(
-    displays: list[tuple[str, Any]], callouts: dict[str, str]
-) -> None:
-    for name, display in displays:
-        part = CALLOUT_TEXT_PART[LEVER_CALLOUT_LOCATION[name]]
-        text = str(display.GetText(part) or "")
-        if text.replace("\r\n", "\n") != callouts[name]:
-            raise RuntimeError(
-                f"{name}: {LEVER_CALLOUT_LOCATION[name]} callout reads {text!r}, "
-                f"not {callouts[name]!r}"
-            )
 
 
 def lever_keep(
@@ -916,7 +835,7 @@ def _lever_settings(
 ) -> Callable[[], None]:
     """The clamp station and the fixture drop on the back view, with their
     callouts; the returned check re-reads the callouts once settled."""
-    callouts = _printable_lever_callouts()
+    callouts = stack.SETTING_CALLOUTS[stack.LEVER_FEATURE]
     tip, clamp, fixture = model_points_in_view(
         adapter,
         view,
@@ -928,10 +847,8 @@ def _lever_settings(
         label=LEVER_VIEW_LABEL,
         names=("lever tip", "clamp centre", "fixture axis"),
     )
-    source_step("lever setting projection readback")
-    _add_setting_axes(adapter, view, source_step)
+    _add_setting_axes(adapter, view)
     _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
-    source_step(f"lever per-view {stack.LEVER_FEATURE} show")
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -939,12 +856,6 @@ def _lever_settings(
         view_label=LEVER_VIEW_LABEL,
         dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
     )
-    source_step("lever model dimension import and curation")
-    for name, location in LEVER_CALLOUT_LOCATION.items():
-        set_dimension_callouts(
-            adapter, annotations, {name: callouts[name]}, location=location
-        )
-        source_step(f"lever {name} {location} callout")
     assert_imported_precision(
         adapter,
         annotations,
@@ -954,7 +865,6 @@ def _lever_settings(
             for name, places in names.items()
         },
     )
-    source_step("lever imported precision readback")
     displays = [
         (
             dimension_name(adapter, annotation),
@@ -965,13 +875,13 @@ def _lever_settings(
         )
         for annotation in annotations
     ]
-    if sorted(name for name, _ in displays) != sorted(LEVER_CALLOUT_LOCATION):
+    if sorted(name for name, _ in displays) != sorted(callouts):
         raise RuntimeError(
             f"{LEVER_VIEW_LABEL} imported {sorted(n for n, _ in displays)}"
         )
-    _assert_lever_callouts(displays, callouts)
-    source_step("lever dimension names and callout readback")
-    return lambda: _assert_lever_callouts(displays, callouts)
+    _assert_callouts(displays, callouts)
+    source_step("lever settings import and readback")
+    return lambda: _assert_callouts(displays, callouts)
 
 
 def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
@@ -991,9 +901,7 @@ def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
     }
 
 
-def _add_setting_axes(
-    adapter: Any, view: Any, source_step: Callable[[str], None]
-) -> None:
+def _add_setting_axes(adapter: Any, view: Any) -> None:
     """The vertical rod's and the lever's ASME centrelines on the back view.
 
     Machinist review r7 (run 20261016T162927333Z) read the lever setting
@@ -1009,7 +917,6 @@ def _add_setting_axes(
         add_view_centerline(
             adapter, view, face_xy=(xy[0], xy[1]), label=f"back view {name} axis"
         )
-        source_step(f"lever {name} centreline")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1740,13 +1647,13 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 
 def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
-    """Observe the released source at MG operation boundaries, without edits.
+    """Observe the released source at MG phase boundaries, without edits.
 
-    A dirty flag is not evidence of changed geometry, but drawing SaveAs3 may
-    persist that state. The eccfe91249e8 leaf first sampled it dirty after the
-    entire assembled/settings phase; checkpoints within that phase distinguish
-    placement/configuration, sketch visibility, imported dimensions, crop and
-    callouts. Never save the source or clear the flag; keep the final refusal.
+    Native artifact198 first went dirty after the lever ClampStation callout
+    SetText, while its preceding import/curation was clean. Stable setting
+    text is now model-authored and drawing-read-only. A dirty flag still does
+    not prove changed geometry; retain phase telemetry and the final refusal
+    before drawing SaveAs3, never a source save or flag reset.
     """
     state = {"dirty": bool(source_model.GetSaveFlag())}
 
@@ -1793,8 +1700,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Follow the drive-train package order: place/configure every view, then
     # explode/isolate/fit it, and only then insert the BOM and bind balloons.
     # That recipe's native probes found post-BOM configuration-switch rebuilds
-    # dirty the source. MG eccfe91249e8 was already dirty before its explodes/BOM,
-    # so that order is not its primary cause. Keep the narrower settings trace.
+    # dirty the source. MG artifact198 isolated imported callout SetText as its
+    # first dirty operation; settings now inherit model-owned text read-only.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
     source_step(f"{WHEEL_LABEL} view configuration and explode")
     reference = _place_collapsed_view(
