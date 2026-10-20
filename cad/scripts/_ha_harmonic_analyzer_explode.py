@@ -198,7 +198,9 @@ def create_harmonic_analyzer_explode(adapter: Any, configuration_name: str) -> N
                     axis_attempted = axis_selected = False
                     try:
                         model.ClearSelection2(True)
-                        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                        selection = _early_bound(
+                            model.SelectionManager, "ISelectionMgr"
+                        )
                         data = _early_bound(selection.CreateSelectData(), "ISelectData")
                         if data is None:
                             raise RuntimeError(
@@ -285,8 +287,12 @@ def create_harmonic_analyzer_explode(adapter: Any, configuration_name: str) -> N
                     except Exception as observation_error:
                         rebuild_attributes = {
                             "needs_rebuild_before_state": "unreadable",
-                            "needs_rebuild_before_error_type": type(observation_error).__name__,
-                            "needs_rebuild_before_error_message": str(observation_error),
+                            "needs_rebuild_before_error_type": type(
+                                observation_error
+                            ).__name__,
+                            "needs_rebuild_before_error_message": str(
+                                observation_error
+                            ),
                         }
                     else:
                         rebuild_attributes = {
@@ -340,7 +346,10 @@ def create_harmonic_analyzer_explode(adapter: Any, configuration_name: str) -> N
                             delta = tuple(
                                 current[i + 9] - baseline[name][i + 9] for i in range(3)
                             )
-                            if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                            if any(
+                                abs(delta[i] - expected[name][i]) > 1e-7
+                                for i in range(3)
+                            ):
                                 mismatches.append(
                                     f"{name} moved {tuple(v * 1000.0 for v in delta)!r} mm, "
                                     f"expected {tuple(v * 1000.0 for v in expected[name])!r}"
@@ -349,7 +358,9 @@ def create_harmonic_analyzer_explode(adapter: Any, configuration_name: str) -> N
                                 abs(current[i] - baseline[name][i]) > 1e-9
                                 for i in (*range(9), 12)
                             ):
-                                mismatches.append(f"{name} presentation rotated or scaled")
+                                mismatches.append(
+                                    f"{name} presentation rotated or scaled"
+                                )
                         _telemetry.event(
                             "assembly.ha_explode.readback",
                             step=label,
