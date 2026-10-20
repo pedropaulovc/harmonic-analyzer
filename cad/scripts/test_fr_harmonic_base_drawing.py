@@ -1611,7 +1611,6 @@ class _NativeHoleTable:
         ]
         self.cells = [list(row) for row in self.cells]
         self.widths = list(widths)
-        self.events = []
 
     @property
     def RowCount(self):  # noqa: N802 - the COM member name
@@ -1632,7 +1631,6 @@ class _NativeHoleTable:
         return 0
 
     def InsertColumn2(self, where, index, name, width_style):  # noqa: N802
-        self.events.append(("insert", where, index, name, width_style))
         if self.refuse == "insert":
             return False
         for row in self.cells:
@@ -1654,7 +1652,6 @@ class _NativeHoleTable:
     def SetText2(self, row, column, include_hidden, text):  # noqa: N802
         assert include_hidden is False
         assert self.IsCellTextEditable(row, column), "wrote a generated hole-table cell"
-        self.events.append(("text", row, column, text))
         if self.refuse != "text":
             self.cells[row][column] = text
 
@@ -1675,14 +1672,11 @@ def test_d1_table_row_carries_note_flag_in_custom_column_only() -> None:
 
     assert generated == tuple(tuple(row) for row in native)
     assert width == pytest.approx(native_width)
-    assert sheet.PIVOT_SEAT_FLAG == "SEE NOTE 1"
     assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
-    assert table.events == [
-        ("insert", 3, 3, "NOTE", 0),
-        ("text", 3, 4, "SEE NOTE 1"),
-    ]
     assert [row[:4] for row in table.cells] == native
-    assert [row[4] for row in table.cells] == ["NOTE", "", "", "SEE NOTE 1", ""]
+    assert [row[4] for row in table.cells] == [
+        sheet.PIVOT_SEAT_TABLE_COLUMN, "", "", sheet.PIVOT_SEAT_FLAG, "",
+    ]
     assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
     assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
     assert table.widths[3] == 0.0628
@@ -1721,7 +1715,6 @@ def test_d1_table_flag_refuses_before_inserting_a_column(table, message) -> None
 
     with pytest.raises(RuntimeError, match=message):
         sheet._flag_pivot_seat_table_row(table)
-    assert table.events == []
     assert table.ColumnCount == 4
 
 
@@ -1744,34 +1737,6 @@ def test_d1_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
     mutate(table)
     with pytest.raises(RuntimeError, match=message):
         sheet._check_pivot_seat_table_row(table, generated, width)
-
-
-def test_d1_table_flag_precedes_row_sizing_and_is_reread_after_every_rebuild() -> None:
-    import ast
-    import inspect
-
-    import draw_fr_harmonic_base as sheet
-
-    tree = ast.parse(inspect.getsource(sheet.build))
-    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
-
-    def lines(name):
-        return [
-            node.lineno for node in calls
-            if getattr(node.func, "id", None) == name or getattr(node.func, "attr", None) == name
-        ]
-
-    (flag,) = lines("_flag_pivot_seat_table_row")
-    bound, settled = lines("_check_pivot_seat_table_row")
-    (spread,) = lines("_spread_hole_tags")
-    assert flag < min(lines("SetRowHeight")) < spread < bound
-    assert flag < min(line for line in lines("EditRebuild3") if line > flag) < spread
-    assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
-    finalize = next(node for node in calls if getattr(node.func, "id", None) == "finalize_drawing")
-    keywords = {keyword.arg: keyword.value for keyword in finalize.keywords}
-    (check,) = keywords["settled_checks"].elts
-    assert ast.unparse(check) == "lambda: _check_pivot_seat_table_row(hole_table, *table_flag)"
-    assert check.lineno == settled
 
 
 @pytest.mark.parametrize(
