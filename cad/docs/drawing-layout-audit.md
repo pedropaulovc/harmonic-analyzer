@@ -47,22 +47,40 @@ audit: sheet 12's external-interfaces note ended at 415.042449 mm against
 its unchanged 415 mm field. Its native `INote.GetExtent` left edge was
 222.7818125 mm after three moves toward 222.5 mm; the 192.260637 mm text
 width fits at the requested anchor. The retained exact-e2 execution also
-exhausted three moves without meeting the existing 0.05 mm anchor threshold,
-but happened to stay within the field. These are distinct from its twelve
-post-export findings and strict cache-identity failure.
+exhausted three moves without meeting the existing 0.05 mm early-stop goal,
+but stayed within the field. That goal was not an old terminal requirement.
+These are distinct from its twelve post-export findings and strict
+cache-identity failure.
 
-`draw_dt_drive_train_assembly._anchor_note` now rereads native extent after
-each correction, permits at most twelve moves, and returns only when both
-rendered top-left residuals meet the unchanged 0.05 mm threshold. Otherwise
-it refuses with target, measured extent and residual. Move telemetry records
-each correction/readback; the terminal event distinguishes `settled` from
-`limit`. All DT note fields and view captions using this local helper keep
-their text, fonts, target coordinates and independent containment guards.
-The offline regression
-`test_note_anchor_converges_after_more_than_three_native_moves` exercises
-the real placement function; companion cases cover initially settled notes,
-the inclusive threshold and bounded nonconvergence. Native post-fix proof
-and printed-sheet acceptance remain required; offline fakes do not supply them.
+The focused `4674e93656b0` follow-up added a terminal residual check and
+rejected the first general-assembly note even though its measured box was
+inside its field. Twelve moves oscillated on a 0.47656856 mm lattice at
+2.098 pixels/mm: increasing the iteration cap cannot resolve a target
+between display pixels. This was a newly introduced refusal, not a proved
+physical overflow.
+
+`draw_dt_drive_train_assembly._anchor_note` now uses the existing
+`_drawing_scan._zoomed_on` around a 5 mm square at the requested corner.
+Each correction and the final native `INote.GetExtent` read happen inside
+that zoom; the context restores fit on success or failure. The helper returns
+the retained fine-view extent to the unchanged field guard rather than
+rereading the coarse fitted grid. It keeps the twelve-move bound and
+0.05 mm residual check, and refuses bounded nonconvergence. Per-move and
+terminal telemetry retain the measured target, extent, residual and outcome.
+Text, fonts, target coordinates, field bounds and containment tolerances
+are unchanged for all DT note fields and captions using this local helper.
+
+`test_note_anchor_escapes_fit_pixel_grid_and_returns_zoomed_extent` exercises
+the real zoom context and anchor function against a pixel-floor native fake,
+including the unreachable fitted grid and fit restoration. Companion cases
+cover movement/zoom/restore failures, late convergence, initially settled
+notes, the inclusive threshold and bounded nonconvergence. The fake models
+the full note box even when most of that box is offscreen under the corner
+zoom. **Native fidelity of that offscreen `GetExtent` read is not yet proved
+for this DT package.** The existing cone-swing-platform label placement is
+the zoomed-readback precedent, not proof of this longer note. Focused native
+post-fix and printed-sheet acceptance remain required; no fallback or
+relaxed containment is introduced.
 
 ## Where it runs
 

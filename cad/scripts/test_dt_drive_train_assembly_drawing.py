@@ -876,7 +876,12 @@ def _anchor_test_adapter(monkeypatch):
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attributes: events.append((name, attributes))
     )
-    return SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None)), events
+    window = SimpleNamespace(
+        GraphicsRedraw2=lambda: None,
+        ViewZoomTo2=lambda *_box: None,
+        ViewZoomtofit2=lambda: None,
+    )
+    return SimpleNamespace(currentModel=window), events
 
 
 def test_note_anchor_converges_after_more_than_three_native_moves(monkeypatch) -> None:
@@ -934,6 +939,110 @@ def test_note_anchor_uses_existing_inclusive_settle_threshold(monkeypatch, axis,
     drawing._anchor_note(adapter, note, (0.0, 0.0), label="threshold note")
     assert note.moves == int(outside)
     assert events[-1][1]["outcome"] == "settled"
+
+
+class _AnchorPixelWindow:
+    """GetExtent's grid changes with the real zoom context's view calls."""
+
+    FIT_PIXEL_M = 0.000476568561873
+    WINDOW_PX = (1010, 598)
+
+    def __init__(self, *, fault=None):
+        self.pixel_m = self.FIT_PIXEL_M
+        self.fault = fault
+        self.calls = []
+
+    def GraphicsRedraw2(self):
+        pass
+
+    def ViewZoomTo2(self, x0, y0, _z0, x1, y1, _z1):
+        self.pixel_m = max(
+            (x1 - x0) / self.WINDOW_PX[0],
+            (y1 - y0) / self.WINDOW_PX[1],
+        )
+        self.calls.append("zoom")
+        if self.fault == "zoom":
+            raise RuntimeError("zoom moved the view then failed")
+
+    def ViewZoomtofit2(self):
+        self.calls.append("fit")
+        if self.fault in ("restore", "body-and-restore"):
+            raise RuntimeError("fit restore failed")
+        self.pixel_m = self.FIT_PIXEL_M
+
+
+class _PixelAnchoringNote(_AnchoringNote):
+    def __init__(self, window):
+        super().__init__(0.2227818125, 0.23871186328125, response=1.0)
+        self.window = window
+        self.read_grids = []
+
+    def GetExtent(self):
+        self.reads += 1
+        pixel = self.window.pixel_m
+        self.read_grids.append(pixel)
+        # The far-offscreen full box is deliberately modeled here. Its native
+        # fidelity under a 5 mm corner zoom still needs focused farm proof.
+        values = (
+            self.left, self.top - 0.04516189453125, 0.0,
+            self.left + 0.19226063671875, self.top, 0.0,
+        )
+        return tuple(math.floor(value / pixel) * pixel for value in values)
+
+    def SetPosition(self, x, y, z):
+        if self.window.fault in ("body", "body-and-restore"):
+            raise RuntimeError("native note move failed")
+        return super().SetPosition(x, y, z)
+
+
+def test_note_anchor_escapes_fit_pixel_grid_and_returns_zoomed_extent(monkeypatch) -> None:
+    adapter, events = _anchor_test_adapter(monkeypatch)
+    window = _AnchorPixelWindow()
+    adapter.currentModel = window
+    note = _PixelAnchoringNote(window)
+    target = (0.2225, 0.23852165217391308)
+    # No number of fitted corrections can produce either target within 0.05 mm.
+    for coordinate in target:
+        nearest = round(coordinate / window.FIT_PIXEL_M) * window.FIT_PIXEL_M
+        assert abs(coordinate - nearest) > drawing.NOTE_ANCHOR_SETTLE
+    extent = drawing._anchor_note(adapter, note, target, label="general assembly notes")
+    assert note.moves > 0
+    assert max(abs(target[0] - extent[0]), abs(target[1] - extent[3])) <= drawing.NOTE_ANCHOR_SETTLE
+    assert all(pixel < drawing.NOTE_ANCHOR_SETTLE for pixel in note.read_grids)
+    assert window.calls == ["zoom", "fit"]
+    assert window.pixel_m == window.FIT_PIXEL_M
+    assert events[-1][1]["outcome"] == "settled"
+    assert drawing.note_field_violations(extent, (0.222, 0.252, 0.415, 0.140)) == []
+    # A fresh fitted read is coarse again; production must return the fine box,
+    # not mistake a changed display grid for another physical annotation move.
+    fitted = note.GetExtent()
+    assert abs(target[0] - fitted[0]) > drawing.NOTE_ANCHOR_SETTLE
+    assert extent[0] != fitted[0]
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        ("zoom", "zoom moved the view then failed"),
+        ("body", "native note move failed"),
+        ("restore", "fit restore failed"),
+        ("body-and-restore", "native note move failed"),
+    ],
+)
+def test_note_anchor_zoom_restoration_keeps_the_primary_failure(monkeypatch, fault, message) -> None:
+    adapter, _events = _anchor_test_adapter(monkeypatch)
+    window = _AnchorPixelWindow(fault=fault)
+    adapter.currentModel = window
+    note = _PixelAnchoringNote(window)
+    with pytest.raises(RuntimeError, match=message) as error:
+        drawing._anchor_note(adapter, note, (0.2225, 0.23852165217391308), label="fault note")
+    assert window.calls == ["zoom", "fit"]
+    if fault in ("zoom", "body"):
+        assert window.pixel_m == window.FIT_PIXEL_M
+    if fault == "body-and-restore":
+        assert error.value.__notes__ == [
+            "restoring the fit zoom also failed: RuntimeError('fit restore failed')"
+        ]
 
 
 def _title_block_keep_out() -> tuple[float, float, float, float]:

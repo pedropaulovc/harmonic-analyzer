@@ -60,6 +60,7 @@ from _drawing_layout_collect import (
 from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -1838,46 +1839,49 @@ def _anchor_note(
     annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"{label}: note has no annotation to move")
-    extent = _note_extent(adapter, note, label=label)
-    moves = 0
-    for _pass in range(NOTE_ANCHOR_PASSES + 1):
-        shift = (target_x - extent[0], target_y - extent[3])
-        settled = max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE
-        if settled or moves == NOTE_ANCHOR_PASSES:
-            break
-        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-        if len(position) != 3:
-            raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
-        if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
-            raise RuntimeError(f"{label}: note SetPosition failed")
+    # GetExtent is pixel-quantized at fit; corrections and acceptance must use
+    # the same fine view. Retain that extent for the caller's field guard.
+    with _zoomed_on(adapter, corner, _HIT_ZOOM_HALF):
         extent = _note_extent(adapter, note, label=label)
-        moves += 1
+        moves = 0
+        for _pass in range(NOTE_ANCHOR_PASSES + 1):
+            shift = (target_x - extent[0], target_y - extent[3])
+            settled = max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE
+            if settled or moves == NOTE_ANCHOR_PASSES:
+                break
+            position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+            if len(position) != 3:
+                raise RuntimeError(f"{label}: note position is unreadable: {position!r}")
+            if not annotation.SetPosition(position[0] + shift[0], position[1] + shift[1], position[2]):
+                raise RuntimeError(f"{label}: note SetPosition failed")
+            extent = _note_extent(adapter, note, label=label)
+            moves += 1
+            _telemetry.event(
+                "drawing.note_anchor.move",
+                block=label,
+                move=moves,
+                target_mm=(target_x * 1000.0, target_y * 1000.0),
+                extent_mm=tuple(value * 1000.0 for value in extent),
+                shift_mm=tuple(value * 1000.0 for value in shift),
+                residual_mm=((target_x - extent[0]) * 1000.0, (target_y - extent[3]) * 1000.0),
+            )
         _telemetry.event(
-            "drawing.note_anchor.move",
+            "drawing.note_anchor",
             block=label,
-            move=moves,
+            moves=moves,
+            outcome="settled" if settled else "limit",
             target_mm=(target_x * 1000.0, target_y * 1000.0),
             extent_mm=tuple(value * 1000.0 for value in extent),
-            shift_mm=tuple(value * 1000.0 for value in shift),
-            residual_mm=((target_x - extent[0]) * 1000.0, (target_y - extent[3]) * 1000.0),
+            residual_mm=tuple(value * 1000.0 for value in shift),
         )
-    _telemetry.event(
-        "drawing.note_anchor",
-        block=label,
-        moves=moves,
-        outcome="settled" if settled else "limit",
-        target_mm=(target_x * 1000.0, target_y * 1000.0),
-        extent_mm=tuple(value * 1000.0 for value in extent),
-        residual_mm=tuple(value * 1000.0 for value in shift),
-    )
-    if not settled:
-        raise RuntimeError(
-            f"{label}: note anchor did not settle after {moves} moves: "
-            f"target_mm={(target_x * 1000.0, target_y * 1000.0)!r}, "
-            f"extent_mm={tuple(value * 1000.0 for value in extent)!r}, "
-            f"residual_mm={tuple(value * 1000.0 for value in shift)!r}, "
-            f"settle_mm={NOTE_ANCHOR_SETTLE * 1000.0!r}"
-        )
+        if not settled:
+            raise RuntimeError(
+                f"{label}: note anchor did not settle after {moves} moves: "
+                f"target_mm={(target_x * 1000.0, target_y * 1000.0)!r}, "
+                f"extent_mm={tuple(value * 1000.0 for value in extent)!r}, "
+                f"residual_mm={tuple(value * 1000.0 for value in shift)!r}, "
+                f"settle_mm={NOTE_ANCHOR_SETTLE * 1000.0!r}"
+            )
     return extent
 
 
