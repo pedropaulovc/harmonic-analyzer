@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion-arbor collar (R1a).
 
-A plain turned steel collar: Ø15 x 20, a drilled Ø8 slide bore, and one
+A plain turned steel collar: Ø15 x 17, a drilled Ø8 slide bore, and one
 1/16 in spring-pin hole through both walls at the length's centre.  The
 profile lies as it sits in the lathe (axis horizontal) and looks along the
 pin hole, so the hole is a solid circle located from the right-hand end face;
@@ -44,6 +44,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_geometry import audit_sheet, format_findings
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -56,6 +57,9 @@ from dt_pinion_arbor_collar_spec import (
     DRAWING_PRECISION_BY_NAME,
     PIN_HOLE_CALLOUT,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_arbor_collar"]
@@ -104,8 +108,28 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
-# Text on a line and text on text are defects; leader crossings stay logged.
-BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
+# Text on a line, text on text and a mark printed twice over itself are
+# defects; leader crossings stay logged.
+BLOCKING_LAYOUT_FINDINGS = frozenset(
+    {"text-on-line", "text-on-text", "duplicate-annotation"}
+)
+# swAnnotationType_e.swCenterMarkSym.  The template centre-marks a view's
+# circles as it is placed; an unconditional auto_center_marks printed a second
+# identical mark over the end view's (layout audit duplicate-annotation,
+# DetailItem347/350 on r0 of #1697; the dt_pinion_cam_pin precedent), so each
+# view gets one only if the template did not, and proves exactly one.
+_CENTER_MARK_ANNOTATION = 13
+
+
+def _ensure_one_center_mark(adapter: Any, view: Any, size: float, label: str) -> None:
+    """Leave exactly one centre mark in ``view``, adding it only if missing."""
+    native = _early_bound(view, "IView")
+    if not (native.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()):
+        if not auto_center_marks(adapter, view, holes=True, size=size):
+            raise RuntimeError(f"failed to add the centre mark to the {label}")
+    found = len(native.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if found != 1:
+        raise RuntimeError(f"expected 1 centre mark in the {label}, found {found}")
 
 
 def _move_dimension(
@@ -254,10 +278,8 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*end_annotations, *profile_annotations, moved_od]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add center marks to the collar end view")
-    if not auto_center_marks(adapter, profile, holes=True, size=0.0015):
-        raise RuntimeError("failed to add center mark to the collar pin hole")
+    _ensure_one_center_mark(adapter, end, 0.0025, "collar end view")
+    _ensure_one_center_mark(adapter, profile, 0.0015, "collar profile pin hole")
     # The turning axis, picked on the OD face between the pin hole and the
     # left end so the pick cannot land on the hole.
     add_view_centerline(
