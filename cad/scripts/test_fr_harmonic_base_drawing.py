@@ -1064,6 +1064,11 @@ def _drive_hole_sheet_callout_check(
     pivot_native_state=None,
     pivot_copies=1,
     pivot_extent=None,
+    tag_native_state=None,
+    tag_box=(0.310, 0.200, 0.316, 0.2035),
+    tag_extent=None,
+    tag_copies=1,
+    origin_boxes=None,
 ) -> None:
     """Exercise the native-note guard without COM; boxes are unit controls."""
     from types import SimpleNamespace
@@ -1102,6 +1107,26 @@ def _drive_hole_sheet_callout_check(
         GetLeaderPointsAtIndex=lambda index: state["points"] if index == 0 else (),
         GetDisplayData=lambda: state.get("display", display),
     )
+    tag_state = {
+        "leaders": 1,
+        "dangling": False,
+        "points": (tag_box[2], tag_box[1], 0.0, tag_box[2] + 0.004, tag_box[1] - 0.010, 0.0),
+        "display": _pivot_note_display([{
+            "text": "D1",
+            "position": (tag_box[0], tag_box[1], 0.0),
+            "height": tag_box[3] - tag_box[1],
+            "reference": 1,
+            "angle": 0.0,
+            "width": tag_box[2] - tag_box[0],
+        }]),
+    }
+    tag_state.update(tag_native_state or {})
+    tag = SimpleNamespace(
+        GetLeaderCount=lambda: tag_state["leaders"],
+        IsDangling=lambda: tag_state["dangling"],
+        GetLeaderPointsAtIndex=lambda index: tag_state["points"] if index == 0 else (),
+        GetDisplayData=lambda: tag_state["display"],
+    )
 
     def annotations(_adapter, view):
         if view == "sheet":
@@ -1109,14 +1134,22 @@ def _drive_hole_sheet_callout_check(
                 (None, "display dimension"),
                 (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
             ))
-        if pivot_seat_box is not None and view == "top view":
-            return iter([
+        rows = []
+        if view == "top view":
+            rows.extend([
                 (SimpleNamespace(
-                    kind="note", label="PS",
-                    box=pivot_extent if pivot_extent is not None else pivot_seat_box,
-                ), pivot)
-            ] * pivot_copies)
-        return iter(())
+                    kind="note", label="native D1",
+                    box=tag_extent if tag_extent is not None else tag_box,
+                ), tag)
+            ] * tag_copies)
+            if pivot_seat_box is not None:
+                rows.extend([
+                    (SimpleNamespace(
+                        kind="note", label="PS",
+                        box=pivot_extent if pivot_extent is not None else pivot_seat_box,
+                    ), pivot)
+                ] * pivot_copies)
+        return iter(rows)
 
     for name, value in {
         "_callout_display_data": lambda display, label: (None, (), ()),
@@ -1126,11 +1159,12 @@ def _drive_hole_sheet_callout_check(
         "_sheet_frame_obstacles": lambda adapter, ddoc: {},
         "_view_geometry_box": lambda adapter, view, label: (0.300, 0.150, 0.400, 0.250),
         "_early_bound": lambda obj, interface: obj,
-        "datum_origin_boxes": lambda points: {},
+        "datum_origin_boxes": lambda points: origin_boxes or {},
         "_section_line_obstacles": lambda views: {},
         "_iter_view_annotations": annotations,
         "_note_text": lambda adapter, annotation: (
-            sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") if annotation is pivot else "D1"
+            sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") if annotation is pivot
+            else "D1" if annotation is tag else "OTHER NOTE"
         ),
         "_iter_tables": lambda adapter, view: (
             [SimpleNamespace(label="holes", box=(0.020, 0.020, 0.090, 0.060))]
@@ -1285,7 +1319,7 @@ def test_pivot_note_text_boxes_honor_native_width_reference_and_angle(
         "width": 0.030,
     }])
     monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
-    rows = sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+    rows = sheet._d1_text_rows(SimpleNamespace(GetDisplayData=lambda: display), "pivot seat note")
     assert list(rows) == ["0: D1: LOCATES PIVOT"]
     assert next(iter(rows.values())) == pytest.approx(expected)
 
@@ -1304,7 +1338,7 @@ def test_pivot_note_zero_native_width_uses_the_existing_text_estimator(monkeypat
         "width": 0.0,
     }])
     monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
-    rows = sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+    rows = sheet._d1_text_rows(SimpleNamespace(GetDisplayData=lambda: display), "pivot seat note")
     assert next(iter(rows.values())) == pytest.approx(
         (0.150, 0.020, 0.150 + 4 * 0.0035 * sheet.DEFAULT_ADVANCE_RATIO, 0.0235)
     )
@@ -1342,7 +1376,7 @@ def test_pivot_note_text_boxes_refuse_malformed_native_runs(monkeypatch, bad) ->
     display = _pivot_note_display([item])
     monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
     with pytest.raises(RuntimeError, match="malformed native text run"):
-        sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+        sheet._d1_text_rows(SimpleNamespace(GetDisplayData=lambda: display), "pivot seat note")
 
 
 @pytest.mark.parametrize("display", (None, _pivot_note_display([])))
@@ -1353,7 +1387,188 @@ def test_pivot_note_refuses_missing_native_text_display(monkeypatch, display) ->
 
     monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
     with pytest.raises(RuntimeError, match="no native text"):
-        sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+        sheet._d1_text_rows(SimpleNamespace(GetDisplayData=lambda: display), "pivot seat note")
+
+
+_FAILED_D1_NOTE_UNION = (0.1575, 0.126397221878, 0.211944444482, 0.143474305470)
+_FAILED_D1_NOTE_LEADER = (
+    0.212226510324, 0.129615170535, 0.257966478570, 0.168792566697,
+)
+_FAILED_ORIGIN_X = (0.21935, 0.142105, 0.242401, 0.149105)
+_FAILED_ORIGIN_Y = (0.205855, 0.1556, 0.212855, 0.178651)
+_FAILED_D1_TAG_EXTENT = (0.248306662, 0.150661077, 0.258314602, 0.168770682)
+
+
+def test_failed_native_straight_route_still_refuses_the_real_origin_x_crossing(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.segment_crosses_box(_FAILED_D1_NOTE_LEADER, _FAILED_ORIGIN_X)
+    assert sheet.segment_crosses_box(_FAILED_D1_NOTE_LEADER, _FAILED_D1_TAG_EXTENT)
+    # r4 native glyphs translated to the failed run's tag anchor, not its
+    # leader-polluted extent. Measurement removes only the false tag finding.
+    tag_glyphs = (0.2484, 0.1504743, 0.2544569, 0.1539743)
+    assert not sheet.segment_crosses_box(_FAILED_D1_NOTE_LEADER, tag_glyphs)
+    kwargs = {
+        "pivot_seat_box": _FAILED_D1_NOTE_UNION,
+        "pivot_native_state": {"points": (
+            _FAILED_D1_NOTE_LEADER[0], _FAILED_D1_NOTE_LEADER[1], 0.0,
+            _FAILED_D1_NOTE_LEADER[2], _FAILED_D1_NOTE_LEADER[3], 0.0,
+        )},
+        "tag_box": tag_glyphs,
+        "tag_extent": _FAILED_D1_TAG_EXTENT,
+    }
+    with pytest.raises(RuntimeError, match="pivot seat note crosses origin X axis") as exc:
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210),
+            origin_boxes={"origin X axis": _FAILED_ORIGIN_X, "origin Y axis": _FAILED_ORIGIN_Y},
+            **kwargs,
+        )
+    assert "D1 tag" not in str(exc.value)
+    _drive_hole_sheet_callout_check(
+        monkeypatch, (0.200, 0.200, 0.220, 0.210),
+        origin_boxes={"origin Y axis": _FAILED_ORIGIN_Y}, **kwargs,
+    )
+
+
+def test_d1_tag_glyphs_are_measured_without_its_polluted_extent_or_own_view(monkeypatch) -> None:
+    # The default native tag glyphs are INSIDE the fake plan. They are an
+    # obstacle to callouts, not a callout checked against its own view.
+    _drive_hole_sheet_callout_check(
+        monkeypatch, (0.200, 0.200, 0.220, 0.210),
+        tag_extent=(0.020, 0.020, 0.320, 0.250),
+    )
+
+
+@pytest.mark.parametrize("copies", (0, 2))
+def test_d1_tag_must_exist_exactly_once(monkeypatch, copies) -> None:
+    with pytest.raises(RuntimeError, match="no native D1 tag|duplicate native D1 tags"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210), tag_copies=copies,
+        )
+
+
+@pytest.mark.parametrize(
+    "state",
+    (
+        {"display": None},
+        {"display": _pivot_note_display([])},
+        {"leaders": 0},
+        {"leaders": 2},
+        {"dangling": True},
+        {"points": (0.316, 0.200, 0.0)},
+        {"points": (0.316, 0.200, 0.0, math.nan, 0.190, 0.0)},
+        {"display": _pivot_note_display([{
+            "text": "D1", "position": (), "height": 0.0035,
+            "reference": 1, "angle": 0.0, "width": 0.0060569,
+        }])},
+    ),
+)
+def test_d1_tag_refuses_missing_or_malformed_native_glyphs_and_leaders(monkeypatch, state) -> None:
+    with pytest.raises(RuntimeError, match="D1 tag"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210), tag_native_state=state,
+        )
+
+
+def test_d1_tag_actual_native_leader_still_cross_checks_other_callouts(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="leader of callout D1 tag crosses callout pedestal"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210),
+            tag_native_state={"points": (0.316, 0.200, 0.0, 0.115, 0.105, 0.0)},
+        )
+
+
+def test_d1_tag_actual_native_leader_cannot_cross_its_own_glyphs(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="D1 tag crosses its own row"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210),
+            tag_native_state={"points": (0.316, 0.2015, 0.0, 0.310, 0.2015, 0.0)},
+        )
+
+
+def _pivot_note_route_fake(failure=None):
+    events = []
+
+    class Annotation:
+        def __init__(self):
+            self.length = -1.0
+            self.style = 1
+            self.side = 0
+
+        def SetLeader3(self, *args):  # noqa: N802 - native member
+            events.append(("leader", args))
+            self.style = 1 if failure == "style" else args[0]
+            self.side = 0 if failure == "side" else args[1]
+            return -1 if failure == "status" else 0
+
+        @property
+        def BentLeaderLength(self):  # noqa: N802 - native member
+            if failure == "nan":
+                return math.nan
+            return self.length
+
+        @BentLeaderLength.setter
+        def BentLeaderLength(self, value):  # noqa: N802 - native member
+            events.append(("length", value))
+            if failure != "length":
+                self.length = value
+
+        def GetLeaderStyle(self):  # noqa: N802 - native member
+            return self.style
+
+        def GetLeaderSide(self):  # noqa: N802 - native member
+            return self.side
+
+    return Annotation(), events
+
+
+def test_pivot_note_route_sets_and_reads_native_bent_right_shoulder() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    annotation, events = _pivot_note_route_fake()
+    sheet._route_pivot_seat_note(annotation)
+    assert events == [("leader", (2, 2, True, False, False, False)), ("length", 0.0755)]
+    assert annotation.GetLeaderStyle() == annotation.GetLeaderSide() == 2
+    assert annotation.BentLeaderLength == 0.0755
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    (
+        ("status", "failed to route"),
+        ("length", "length did not persist"),
+        ("nan", "length did not persist"),
+        ("style", "style or side did not persist"),
+        ("side", "style or side did not persist"),
+    ),
+)
+def test_pivot_note_route_refuses_native_setting_or_readback_failure(failure, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    annotation, _events = _pivot_note_route_fake(failure)
+    with pytest.raises(RuntimeError, match=message):
+        sheet._route_pivot_seat_note(annotation)
+
+
+def test_other_attached_notes_keep_the_existing_straight_native_route(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    events = []
+    annotation = SimpleNamespace(
+        SetAttachedEntities=lambda edges: True,
+        SetLeader3=lambda *args: events.append(args) or 0,
+        SetPosition2=lambda *args: True,
+        GetAttachedEntityCount3=lambda: 1,
+    )
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(ActivateView=lambda name: True))
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "view_name", lambda adapter, view: "view")
+    monkeypatch.setattr(sheet, "dispatch_array", lambda edges: edges)
+    monkeypatch.setattr(sheet, "add_note", lambda *args: SimpleNamespace(GetAnnotation=lambda: annotation))
+    assert sheet._attached_note(adapter, object(), object(), "OTHER NOTE", (0.1, 0.2)) is annotation
+    assert events == [(1, 0, True, False, False, False)]
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -1509,9 +1724,13 @@ def test_pivot_x_keep_replays_clearance_from_both_native_witnesses_and_datum() -
     tail = (0.2649016, line_y, 0.2712516, line_y)
     spring_leader = (0.2717697, 0.1756206, 0.2809549, 0.131634)
     assert not sheet.segment_crosses_box(spring_leader, tail)
-    # The lowered X line now passes BELOW the native spring leader's endpoint;
-    # extending that finite leader to the X lane would invent an intersection.
-    assert min(spring_leader[1], spring_leader[3]) - line_y >= 0.002
+    # Compare FINITE native segments: the line may be above the spring
+    # leader's endpoint now, but its right-hand tail still ends well left
+    # of the leader at that height. Infinite extrapolation invents a clash.
+    assert _segment_box_gap(
+        ((spring_leader[0], spring_leader[1]), (spring_leader[2], spring_leader[3])),
+        tail,
+    ) >= 0.002
 
 
 def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
@@ -1581,40 +1800,19 @@ def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
         assert sheet.box_gap(box, neighbor) >= 0.0035, label
 
 
-def test_d1_tag_replays_native_clearances_and_an_approach_below_the_y_witness() -> None:
+def test_recorded_r4_d1_tag_leader_uses_its_actual_native_dock() -> None:
     import draw_fr_harmonic_base as sheet
 
-    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
-    dx, dy = x - _R2B_D1_ANCHOR[0], y - _R2B_D1_ANCHOR[1]
-    box = tuple(
-        value + (dx if index % 2 == 0 else dy)
-        for index, value in enumerate(_R2B_D1_TEXT)
-    )
-    x_keep = sheet.HOLE_TOP_KEEP["PivotSeatX"]
-    line_y = _R2B_PIVOT_X_LINE_Y + x_keep[1] - _R2B_PIVOT_X_KEEP[1]
-    neighbors = {
-        "datum X letter": _R2B_DATUM_X_TEXT,
-        "datum X axis": _R2B_DATUM_X_AXIS,
-        "plan": _R2B_HOLE_PLAN,
-        "new X text": _r2b_pivot_x_text_at(x_keep),
-        "X D1 witness": (0.2583636, line_y - 0.001, 0.2583636, 0.1711521),
-    }
-    for label, neighbor in neighbors.items():
-        assert sheet.box_gap(box, neighbor) >= 0.0035, label
-    line_x = sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
-    far_side_witness = (0.256264, _R2B_D1_Y, line_x + 0.001, _R2B_D1_Y)
-    old_leader = (
-        _R2B_D1_TEXT[2],
-        (_R2B_D1_TEXT[1] + _R2B_D1_TEXT[3]) / 2.0,
-        *_R2B_D1_END,
-    )
-    assert sheet.segment_crosses_box(old_leader, far_side_witness)
-    leader = (box[2], (box[1] + box[3]) / 2.0, *_R2B_D1_END)
-    assert leader[1] < leader[3] < _R2B_D1_Y
-    assert not sheet.segment_crosses_box(leader, far_side_witness)
-    # The leader's unavoidable approach to its own hole remains inside the
-    # native audit's existing 0.1 mm endpoint tolerance at the X witness.
-    assert abs(_R2B_D1_END[0] - _R2B_PIVOT_X_WITNESS_STARTS[0][0]) < 1e-4
+    # Historical native r4 tag at (245.6, 155) mm. Its leader does NOT start
+    # at a guessed text-box corner or centre. The new above-hole route is
+    # checked separately as a prediction until a native leaf supplies it.
+    glyphs = (0.2456, 0.1504743, 0.2516569, 0.1539743)
+    leader = (0.2521384, 0.1531815, 0.2584485, 0.1685855)
+    assert not sheet.segment_crosses_box(leader, glyphs)
+    assert leader[0] > glyphs[2]
+    assert glyphs[1] < leader[1] < glyphs[3]
+    assert leader[3] < _R2B_D1_Y
+    assert abs(leader[2] - _R2B_PIVOT_X_WITNESS_STARTS[0][0]) < 1e-4
 
 
 def _pivot_y_placement_fakes(monkeypatch, failure=None):
@@ -3170,8 +3368,9 @@ _NOTE_LINE_MM = 4.58
 
 
 # r4 native cap height/pitch and PDF-font-derived conservative row widths.
-# Widths and the translated placements are offline estimates, not a claim
-# that the replacement note or flags have already printed on a native seat.
+# Keep this wider glyph-air envelope separate from the failed run's measured
+# 54.444444 mm last-row width used to bound the predicted native docking.
+# Translated placements and bent routes remain estimates, not after-fix proof.
 _D1_NOTE_ROW_WIDTHS_M = (0.0420751, 0.0378354, 0.0487889, 0.0553971)
 _D1_NOTE_PITCH_M = 0.0045257
 _R4_DATUM_LETTERS = {
@@ -3196,96 +3395,164 @@ def _d1_note_rows(xy):
     }
 
 
-def test_d1_note_and_flags_replay_r4_measured_ink_lanes() -> None:
+def _estimated_d1_bent_routes():
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.PIVOT_SEAT_NOTE_XY == (0.1575, 0.1445)
-    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
+    # The failed run actually docked 0.2821 mm right of its displayed text;
+    # bound that offset and the entire last-row cap height independently.
+    # Do not substitute the conservative envelope's bottom-right corner.
+    width = _FAILED_D1_NOTE_UNION[2] - _FAILED_D1_NOTE_UNION[0]
+    baseline = _FAILED_D1_NOTE_UNION[1] + sheet.PIVOT_SEAT_NOTE_XY[1] - 0.1445
+    for dx in (0.0, 0.0002821):
+        for dy in (0.0, 0.0035):
+            dock = (sheet.PIVOT_SEAT_NOTE_XY[0] + width + dx, baseline + dy)
+            elbow = (dock[0] + 0.0755, dock[1])
+            yield ((dock, elbow), (elbow, _FAILED_D1_NOTE_LEADER[2:]))
+
+
+def _estimated_d1_tag_box():
+    import draw_fr_harmonic_base as sheet
+
+    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
+    return (x, y - _D1_NOTE_PITCH_M, x + 0.006404, y - _D1_NOTE_PITCH_M + 0.0035)
+
+
+def test_d1_note_and_flags_predict_clearance_at_all_four_native_docking_bounds() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.PIVOT_SEAT_NOTE_XY == (0.1150, 0.1425)
+    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2030, 0.1350)
     assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
     assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
-    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2484, 0.1550)
+    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2502, 0.1792)
     rows = _d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY)
     note = (
         min(box[0] for box in rows.values()), min(box[1] for box in rows.values()),
         max(box[2] for box in rows.values()), max(box[3] for box in rows.values()),
     )
     last = list(rows.values())[-1]
-    assert last[2] == note[2]  # The leader leaves the longest, LAST row.
-    note_leader = ((last[2], last[1]), (0.2583636, 0.1690524))
-    for row, box in rows.items():
-        inner = (box[0] + 0.0002, box[1] + 0.0002, box[2] - 0.0002, box[3] - 0.0002)
-        assert _segment_box_gap(note_leader, inner) > 0.0001, row
+    assert last[2] == note[2]  # The longest row remains LAST.
 
-    # r4's actual native value boxes, translated only by the approved keeps.
-    dy = sheet.HOLE_TOP_KEEP["PivotSeatX"][1] - 0.1385
-    x_value = (0.2291351, 0.1357219 + dy, 0.2562650, 0.1392219 + dy)
-    x_flag = (0.23535, x_value[1] + 0.00556, 0.25005, x_value[1] + 0.00906)
+    # Native r4 values translated only by the approved X keep; Y is unchanged.
+    dx = sheet.HOLE_TOP_KEEP["PivotSeatX"][0] - 0.2427
+    dy = sheet.HOLE_TOP_KEEP["PivotSeatX"][1] - 0.1320
+    x_value = (0.2291351 + dx, 0.1292219 + dy, 0.2562650 + dx, 0.1327219 + dy)
+    x_flag = (0.23535 + dx, x_value[1] + 0.00556, 0.25005 + dx, x_value[1] + 0.00906)
     y_value = (0.2599351, 0.1822219, 0.2870650, 0.1857219)
     y_flag = (0.26615, 0.18778, 0.28085, 0.19128)
+    values = {"X value": x_value, "X flag": x_flag, "Y value": y_value, "Y flag": y_flag}
     tags = {
+        "D1": _estimated_d1_tag_box(),
         "E1": (0.297, 0.1849743, 0.30209, 0.1884743),
         "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
         "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
     }
-    x_line_y = 0.1357219 + dy
+    axes = {"origin X": _FAILED_ORIGIN_X, "origin Y": _FAILED_ORIGIN_Y}
+    # Native text positions/cap heights bound the separate cross-tap rows.
+    # Its union has an EMPTY upper-left corner: do not call that corner ink.
+    cross_tap_rows = {
+        "cross-tap size": (0.2624, 0.11983, 0.3076, 0.12333),
+        "cross-tap common-thread caption": (0.239806253, 0.114221875, 0.331781247, 0.117721875),
+        "cross-tap thread": (0.2590618, 0.1086121, 0.316, 0.1121657),
+    }
+    captions = {
+        **cross_tap_rows,
+        "spring transfer": (0.2822479, 0.1316340, 0.3461646, 0.1519098),
+        "pedestal transfer": (0.1688354, 0.2408340, 0.2327521, 0.2611098),
+        "block transfer": (0.2408354, 0.2408340, 0.3047521, 0.2611098),
+    }
     witnesses = [
-        ((x, x_line_y - 0.001), (x, end_y))
+        ((x, x_value[1] - 0.001), (x, end_y))
         for x, end_y in _R2B_PIVOT_X_WITNESS_STARTS
     ]
     assert _R2B_PIVOT_X_WITNESS_STARTS[0][0] - x_value[2] >= 0.002
-    for name, box in {"X value": x_value, "X flag": x_flag, "Y value": y_value, "Y flag": y_flag}.items():
+    for name, box in values.items():
         for label, letter in _R4_DATUM_LETTERS.items():
             assert _box_gap(box, letter) >= 0.0035, (name, label)
-        assert _segment_box_gap(note_leader, box) >= 0.0035, name
         for witness in witnesses:
             assert _segment_box_gap(witness, box) >= 0.002, name
-    for label, box in {**tags, **_R4_DATUM_LETTERS}.items():
-        assert _segment_box_gap(note_leader, box) >= 0.0035, label
-    assert _segment_box_gap(note_leader, _R4_DATUM_LETTERS["X"]) >= 0.0035
+        for text, row in rows.items():
+            assert _box_gap(row, box) >= 0.0035, (text, name)
+
+    routes = list(_estimated_d1_bent_routes())
+    assert len(routes) == 4
+    for route in routes:
+        for segment in route:
+            for label, box in {**values, **tags, **_R4_DATUM_LETTERS, **axes, **captions}.items():
+                assert _segment_box_gap(segment, box) >= 0.0035, label
+        # Only the last row's RIGHT edge is measured in the failed run;
+        # use it for own-row docking, not the deliberately wider air envelope.
+        measured_last_right = sheet.PIVOT_SEAT_NOTE_XY[0] + (
+            _FAILED_D1_NOTE_UNION[2] - _FAILED_D1_NOTE_UNION[0]
+        )
+        for index, (text, box) in enumerate(rows.items()):
+            right = measured_last_right if index == len(rows) - 1 else box[2]
+            inner = (box[0] + 0.0002, box[1] + 0.0002, right - 0.0002, box[3] - 0.0002)
+            for segment in route:
+                assert _segment_box_gap(segment, inner) > 0.0001, text
+        cross_tap_union = (0.239806253, 0.108612152, 0.331781247, 0.123331598)
+        for segment in route:
+            assert not sheet.segment_crosses_box((*segment[0], *segment[1]), cross_tap_union)
+
     for box in (y_value, y_flag):
         for tag, tag_box in tags.items():
             assert _box_gap(box, tag_box) >= 0.0035, tag
     y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
     assert _segment_box_gap(y_offset_leader, y_flag) >= 0.0035
     assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
-    cross_tap_first_row = (0.2624, 0.11983, 0.3076, 0.12333)
-    assert _box_gap(x_value, cross_tap_first_row) >= 0.0035
-    assert note[3] < 0.153512 - 0.0035  # Even the padded plan outline is clear.
+    assert note[3] < 0.153512 - 0.0035
 
 
-def test_d1_tag_clears_both_attached_note_leader_and_pivot_x_witness() -> None:
+def test_d1_tag_predicts_clearance_to_note_routes_witness_and_y_offset_leader() -> None:
     import draw_fr_harmonic_base as sheet
 
-    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
-    tag = (x, y - _D1_NOTE_PITCH_M, x + 0.006404, y - _D1_NOTE_PITCH_M + 0.0035)
-    last = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())[-1]
-    leader = ((last[2], last[1]), (0.2583636, 0.1690524))
-    witness = ((0.2583636, 0.1282219), (0.2583636, 0.1711521))
-    assert _segment_box_gap(leader, tag) >= 0.0035
+    tag = _estimated_d1_tag_box()
+    witness = ((0.2583636, 0.1322219 - 0.001), (0.2583636, 0.1711521))
+    for route in _estimated_d1_bent_routes():
+        for segment in route:
+            assert _segment_box_gap(segment, tag) >= 0.0035
     assert _segment_box_gap(witness, tag) >= 0.0035
+    y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
+    assert _segment_box_gap(y_offset_leader, tag) >= 0.0035
     for letter in _R4_DATUM_LETTERS.values():
         assert _box_gap(tag, letter) >= 0.0035
-    # The initially proposed left tag would crowd the new note's leader.
-    crowded = (0.231, tag[1], 0.237404, tag[3])
-    assert _segment_box_gap(leader, crowded) < 0.0035
+
+    # Predicted native tag dock translates r4's ACTUAL dock; the endpoint
+    # stays on its table rim. It is not a fabricated text-corner leader.
+    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
+    dock = (0.2521384 + x - 0.2456, 0.1531815 + y - 0.1550)
+    leader = (dock, (0.2584485, 0.1685855))
+    inner = (tag[0] + 0.0002, tag[1] + 0.0002, tag[2] - 0.0002, tag[3] - 0.0002)
+    assert _segment_box_gap(leader, inner) > 0.0001
+    for label, box in {
+        **_R4_DATUM_LETTERS, "origin X": _FAILED_ORIGIN_X, "origin Y": _FAILED_ORIGIN_Y,
+        "Y value": (0.2599351, 0.1822219, 0.2870650, 0.1857219),
+        "Y flag": (0.26615, 0.18778, 0.28085, 0.19128),
+        "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
+    }.items():
+        assert _segment_box_gap(leader, box) >= 0.0035, label
 
 
-def test_native_spotface_callout_moves_to_the_freed_left_lane_below_the_table() -> None:
+def test_native_spotface_callout_predicts_the_freed_left_lane_below_the_table() -> None:
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.100, 0.135)
+    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.045, 0.131)
     dx = sheet.HOLE_SIDE_KEEP["SpotFaceDia"][0] - 0.193
-    moved = tuple(value + (dx if index % 2 == 0 else 0.0) for index, value in enumerate(_R4_SPOTFACE_BOX))
-    last = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())[-1]
+    dy = sheet.HOLE_SIDE_KEEP["SpotFaceDia"][1] - 0.135
+    moved = tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(_R4_SPOTFACE_BOX)
+    )
     rows = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())
-    note = (rows[0][0], last[1], last[2], rows[0][3])
+    note = (rows[0][0], rows[-1][1], rows[-1][2], rows[0][3])
     assert sheet.box_gap(_R4_SPOTFACE_BOX, note) < 0.0
     assert _box_gap(moved, note) > 0.030
     spotface_leader = ((moved[2], moved[1]), _R4_SPOTFACE_LEADER_END)
-    assert _segment_box_gap(spotface_leader, note) > 0.0095
+    for row in rows:
+        assert _segment_box_gap(spotface_leader, row) > 0.0095
     assert moved[1] > _TITLE_BLOCK_M[3] + 0.0035
     assert moved[0] > _BORDER_INNER_M[0] + 0.0035
-    table = (0.018, 0.160, 0.162763, 0.260)
+    table = (0.018, 0.1630628306, 0.1627633865, 0.260)
     assert _box_gap(moved, table) > 0.015
     assert _box_gap(note, table) > 0.015
     assert sheet.find_leader_crossings(
@@ -3327,7 +3594,7 @@ def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
     assert sheet.is_pivot_seat_note(sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n")
     assert not sheet.is_pivot_seat_note(sheet.TRANSFER_SPRING_CALLOUT)
     source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "note_rows = _pivot_seat_note_text_rows(annotation)" in source
+    assert "note_rows = _d1_text_rows(annotation, PIVOT_SEAT_NOTE_LABEL)" in source
     assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" not in source
 
 
@@ -3348,6 +3615,17 @@ def test_d1_note_is_created_once_on_the_exact_native_table_rim() -> None:
     assert [ast.unparse(arg) for arg in notes[0].args] == [
         "adapter", "hole_top", "pivot_seat_rim", "PIVOT_SEAT_STEP", "PIVOT_SEAT_NOTE_XY",
     ]
+    annotations = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Assign) and node.value is notes[0]
+    ]
+    assert len(annotations) == 1
+    assert annotations[0].targets[0].id == "pivot_seat_annotation"
+    routes = [node for node in calls if getattr(node.func, "id", None) == "_route_pivot_seat_note"]
+    assert len(routes) == 1
+    assert [ast.unparse(arg) for arg in routes[0].args] == ["pivot_seat_annotation"]
+    assert routes[0].lineno > notes[0].lineno
+    assert "SetLeaderAttachmentPointAtIndex" not in inspect.getsource(sheet._route_pivot_seat_note)
     rims = [
         node for node in ast.walk(tree)
         if isinstance(node, ast.Assign)
