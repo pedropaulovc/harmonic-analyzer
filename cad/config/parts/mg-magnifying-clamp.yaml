@@ -6,4 +6,19 @@ mg-magnifying-clamp:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "cut 29.50 long from 7/16 hex bar (brass), flats as supplied: face both ends square to the hex axis (the bottom face is the MHA-MG-04 shoulder seat); hold on flats and centre-drill the corner ridge before drilling the Ø6.50 +0.10/0 lever bore through the corners at 19.95 from the bottom, sliding on the MHA-MG-03 quarter-inch body; tap #4-40 from the top face on the hex axis into the bore (6.30 REF thread, 9.55 drill) and #4-40 blind from the bottom face on the hex axis; retain the rod tap 8.55 full thread and 12.75 drill at the .XX band; spend 0.10 plus 0.3 degree angular wander over maximum-stock half depth at the bottom tap and full depth at the exit-side flats/contact; rod-tap floor 2.036 minimum, whole-flat wall 2.023 minimum; actual stock thumb-tip chamfer 0.47625 and finite-tip/angle envelope included in installed male/female FULL overlap 4.313 minimum, collar clearance 3.373 minimum; chemically blacken"
+  process: >-
+    Cut 29.50 long from 1/2 hex brass, AF acceptance 12.57–12.83 and transverse
+    envelope 15.00 MAX over the full height; flats as supplied. Face both ends
+    square to the nominal hex axis; the bottom is the MHA-MG-04 shoulder seat.
+    Drill Ø6.50 +0.10/0 through the corners at 19.95 from the bottom, sliding
+    on the MHA-MG-03 quarter-inch body. Locate each #4-40 entry from its actual
+    diagonal stock flat and directly from the actual bore rim; the transverse
+    rim-to-entry-axis dimension is 3.25 ±1.02, not an assumed common stock axis.
+    Tap the top into the bore (6.30 REF thread, 9.55 drill); retain the blind
+    bottom rod tap at 8.55 full thread and 12.75 drill at the .XX band.
+    Inspect 2.0 MIN finished net wall at the bore and both taps throughout
+    their depth; AF alone does not certify stock form or those finished walls.
+    Full-depth 15.00 tan(0.3 degree) angular run-off and actual relative-axis
+    limits feed the finite-tip male/female FULL overlap and drill-cone checks.
+    Seat the actual stock thumb screw on the lever before inspecting overlap
+    and collar clearance. Chemically blacken.
