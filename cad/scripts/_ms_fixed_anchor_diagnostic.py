@@ -329,15 +329,18 @@ class MSFixedAnchorDiagnostic:
                 _require(current_zoom is not None and abs(current_zoom - zoom) < 1e-6,
                          "zoom changed after observations; no diagnostic coordinate call")
                 comparison_started = time.perf_counter_ns()
+                self.coordinate_comparisons = result["diagnostic_coordinate_calls"] = 1
+                result["diagnostic_same_point_pick"] = {
+                    "arguments": ["", "EDGE", xy[0], xy[1], 0.0, False, 0, "null_callout", 0],
+                    "sheet_xy_m": xy, "zoom_scale2_before": current_zoom,
+                    "started_monotonic_ns": comparison_started, "outcome": "unknown",
+                    "explicit_redraw_or_zoom_or_setter": False,
+                }
                 diagnostic_selected = adapter.currentModel.Extension.SelectByID2(
                     "", "EDGE", xy[0], xy[1], 0.0, False, 0, balloons.null_callout(), 0)
                 comparison_returned = time.perf_counter_ns()
-                self.coordinate_comparisons = result["diagnostic_coordinate_calls"] = 1
-                result["diagnostic_same_point_pick"] = {
-                    "selected": diagnostic_selected, "sheet_xy_m": xy,
-                    "zoom_scale2_before": current_zoom, "started_monotonic_ns": comparison_started,
-                    "returned_monotonic_ns": comparison_returned, "explicit_redraw_or_zoom_or_setter": False,
-                }
+                result["diagnostic_same_point_pick"].update(
+                    selected=diagnostic_selected, returned_monotonic_ns=comparison_returned, outcome="returned")
                 if diagnostic_selected:
                     result["diagnostic_coordinate_identity"] = capture.collect_coordinate_identity(
                         adapter, view, leaf, anchor.point_mm, xy, balloons)
