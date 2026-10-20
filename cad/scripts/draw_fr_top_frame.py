@@ -483,10 +483,9 @@ if CROSS_SCREW_FAR_WALL_MIN_ENGAGEMENT < 1.5 * CROSS_SCREW_SHANK_DIA:
 # (drawing-guidelines.md rule 7), not in a detached section note. The
 # engagement follows from the printed floor and socket and is proved above.
 CROSS_TAP_CALLOUT = (
-    "SAME AT OPPOSITE END, 4X TOTAL\n"
+    "SAME AT OPPOSITE END, 4X TOTAL FOR MHA-FR-VN-53\n"
     "DEPTHS FROM COUNTERBORE FLOOR\n"
-    "IN PHASE FOR MHA-FR-VN-53\n"
-    "THREAD NEAR AND FAR WALL"
+    "THREAD NEAR AND FAR WALL IN PHASE"
 )
 
 # Sheet 5: hub location, true-axis side view, removed set-screw boss section.
