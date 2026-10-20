@@ -1,11 +1,12 @@
 r"""Crank-hub drawing prose -- the feature callouts only its sheet prints.
 
-Split OUT of ``crank_hub_geometry`` / ``crank_hub_spec`` (codex #361): every
-crank part recipe and every assembly (through ``_interference_contracts``)
+Split OUT of ``dt_crank_hub_geometry`` / ``dt_crank_hub_spec`` (codex #361):
+every crank part recipe and every assembly (through ``_interference_contracts``)
 imports those modules, so callout prose living there made a wording edit
-rebuild all five crank parts.  This module is imported ONLY by the hub and arm
-drawing scripts (the arm through ``crank_arm_notes``) and their offline tests,
-so a prose edit re-keys drawings, never a part.
+rebuild all five crank parts.  This module is imported by the hub, arm and shaft
+drawing scripts (the arm through ``dt_crank_arm_notes``), the MHA-DT-00
+assembly drawing and their offline tests. A prose edit re-keys drawings,
+never a part.
 
 Callouts read in the order the work is done: the size and process line
 first, the matched-fit prose after it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
@@ -132,14 +133,14 @@ RELIEF_LENGTH_CALLOUT = "SETS #25 CHAIN AIR ON\nSPROCKET MHA-PD-09"
 #     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.10
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
 #                                                                    3.85 +/-0.05
-#     removable seat face           transgear_removable_spec.SEAT_FACE_Z
-#                                   + crankshaft_spec.SEAT_COLLAR_BAND
+#     removable seat face           pd_transgear_removable_spec.SEAT_FACE_Z
+#                                   + dt_crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
 #     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
 #                                   4.699, chain floated frontmost)
-#   A  chain -> relief shoulder, in two poses (crank_hub_geometry.
+#   A  chain -> relief shoulder, in two poses (dt_crank_hub_geometry.
 #      chain_shoulder_axial_air; floor CHAIN_SHOULDER_AIR_MIN 0.2135):
 #      seated, the wheel on the seat face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)

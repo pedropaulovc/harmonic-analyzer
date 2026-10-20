@@ -289,7 +289,7 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     )
     # Blind in the hub: the dowel's pull thread is how it comes out
     # (machinist review r2b of 383c31baa).
-    assert "PULL-THREAD DOWEL MHA-VN-029" in seam
+    assert "PULL-THREAD DOWEL MHA-DT-VN-59" in seam
     assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates, by name and number, and the
     # fit on its callout; the front face it is drilled at carries its own note.
@@ -350,7 +350,7 @@ def test_shaft_cross_hole_is_drilled_through_the_hub_pilot_at_assembly() -> None
     """#1678: drilled separately, the shaft's .X station and the hub's own
     location could set the two holes further apart than the 1:48 ream cleans
     up round a #9 hole.  The shaft is drilled at assembly through the hub's
-    pilot instead, and the hub, shaft and MHA-DT-000 texts all say so from one
+    pilot instead, and the hub, shaft and MHA-DT-00 texts all say so from one
     drill size and one taper."""
     import dt_crank_pin_spec as pin
     import dt_crank_pin_ring_spec as ring
@@ -368,7 +368,7 @@ def test_shaft_cross_hole_is_drilled_through_the_hub_pilot_at_assembly() -> None
     assert f"DRILL {drill} THRU CRANKSHAFT" in hub
     assert hub.index(f"DRILL {drill}") < hub.index(f"TAPER-REAM {taper} BOTH")
     shaft = _flat(dt_crankshaft_notes.CROSS_HOLE_CALLOUT)
-    assert shaft.startswith("AT ASSY THRU HUB MHA-DT-031 PILOT")
+    assert shaft.startswith("AT ASSY THRU HUB MHA-DT-31 PILOT")
     assert f"TAPER-REAM {taper} BOTH" in shaft
     # The hub sets the station, so the shaft prints it as a reference.
     assert dt_crankshaft_notes.ASSEMBLY_SET_REFERENCES == {"PinHoleStation"}

@@ -89,12 +89,12 @@ FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 def _pull_thread_entry_edge(view: Any) -> Any:
     """The visible tap-drill rim at the Hole Wizard's Z=0 extraction entry."""
     return (
-        scan_view_edges(view, label="MHA-VN-029 extraction entry")
+        scan_view_edges(view, label="MHA-DT-VN-59 extraction entry")
         .circle_at(
             (0.0, 0.0, 0.0),
             PULL_THREAD_TAP_DRILL / 2.0,
             axis=(0.0, 0.0, 1.0),
-            label="MHA-VN-029 pull thread entry",
+            label="MHA-DT-VN-59 pull thread entry",
         )
         .edge
     )
@@ -103,16 +103,16 @@ def _pull_thread_entry_edge(view: Any) -> Any:
 def _require_pull_thread_definition(definition: Any) -> None:
     """Validate actual feature data, including drill and thread termination."""
     definition = read_hole_wizard_metadata(
-        definition, label="MHA-VN-029 saved pull thread"
+        definition, label="MHA-DT-VN-59 saved pull thread"
     )
-    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 saved pull thread")
+    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-DT-VN-59 saved pull thread")
     # Control build 20261019T195835.864950Z-3cf3a31cc7644bbf8d4f0ebbdd501a43:
     # restored #6-32 has Type=48 but FastenerType2=-1. The latter is logged
     # telemetry, not identity; enforce the documented saved-Type contract.
     native_type = definition.Type
     if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
         raise RuntimeError(
-            f"MHA-VN-029 saved extraction Type {native_type!r} is not a through tap"
+            f"MHA-DT-VN-59 saved extraction Type {native_type!r} is not a through tap"
         )
     for member, expected in (
         ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
@@ -121,7 +121,7 @@ def _require_pull_thread_definition(definition: Any) -> None:
         actual = getattr(definition, member)
         if actual != expected:
             raise RuntimeError(
-                f"MHA-VN-029 saved extraction {member} {actual!r} != {expected!r}"
+                f"MHA-DT-VN-59 saved extraction {member} {actual!r} != {expected!r}"
             )
     if not math.isclose(
         float(definition.ThruTapDrillDiameter) * 1000.0,
@@ -130,7 +130,7 @@ def _require_pull_thread_definition(definition: Any) -> None:
         abs_tol=0.005,
     ):
         raise RuntimeError(
-            f"MHA-VN-029 saved tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
+            f"MHA-DT-VN-59 saved tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
         )
 
 
@@ -138,13 +138,13 @@ def _require_saved_pull_thread(model: Any) -> None:
     """Read the feature from the SLDPRT opened by this drawing, not its recipe."""
     feature = _early_bound(model, "IPartDoc").FeatureByName("PullThread")
     if feature is None:
-        raise RuntimeError("MHA-VN-029 saved PullThread feature is missing")
+        raise RuntimeError("MHA-DT-VN-59 saved PullThread feature is missing")
     feature = _early_bound(feature, "IFeature")
     if str(feature.GetTypeName2()) != "HoleWzd":
-        raise RuntimeError("MHA-VN-029 saved PullThread is not a Hole Wizard feature")
+        raise RuntimeError("MHA-DT-VN-59 saved PullThread is not a Hole Wizard feature")
     definition = feature.GetDefinition()
     if definition is None:
-        raise RuntimeError("MHA-VN-029 saved pull-thread definition is missing")
+        raise RuntimeError("MHA-DT-VN-59 saved pull-thread definition is missing")
     _require_pull_thread_definition(_early_bound(definition, "IWizardHoleFeatureData2"))
 
 
@@ -157,7 +157,7 @@ def _name_pull_thread_drill(display: Any) -> None:
         **{f"definition_{part}": text for part, text in definitions.items()},
         **{f"resolved_{part}": text for part, text in resolved.items()},
     }
-    _telemetry.info("MHA-VN-029 original native pull-thread callout", **attributes)
+    _telemetry.info("MHA-DT-VN-59 original native pull-thread callout", **attributes)
     _telemetry.event("drawing.pull_thread_callout", **attributes)
     drill_token = "<hw-thrutapdrldia>"
     drill_parts = [
@@ -167,12 +167,12 @@ def _name_pull_thread_drill(display: Any) -> None:
         len(drill_parts) != 1
         or sum(text.lower().count(drill_token) for text in definitions.values()) != 1
     ):
-        raise RuntimeError("MHA-VN-029 native callout has no unique tap-drill row")
+        raise RuntimeError("MHA-DT-VN-59 native callout has no unique tap-drill row")
     definition_part = drill_parts[0]
     original = definitions[definition_part]
     if original.lower().count("<mod-diam>") != 1 or len(original.splitlines()) != 1:
         raise RuntimeError(
-            "MHA-VN-029 native tap-drill row has no unique diameter token"
+            "MHA-DT-VN-59 native tap-drill row has no unique diameter token"
         )
     prefix = PULL_THREAD_TAP_DRILL_PREFIX
     definitions[definition_part] = prefix + original
@@ -186,7 +186,7 @@ def _name_pull_thread_drill(display: Any) -> None:
     actual_resolved = {part: str(display.GetText(part) or "") for part in resolved}
     if actual_definitions != definitions or actual_resolved != resolved:
         raise RuntimeError(
-            "MHA-VN-029 native drill name or callout fields did not persist"
+            "MHA-DT-VN-59 native drill name or callout fields did not persist"
         )
 
 
@@ -209,7 +209,7 @@ def _require_pull_thread_callout(display: Any) -> None:
         or "<HOLE-DEPTH>" in normalized
     ):
         raise RuntimeError(
-            f"MHA-VN-029 native callout lost {PULL_THREAD_HOLE.size} through semantics: {text!r}"
+            f"MHA-DT-VN-59 native callout lost {PULL_THREAD_HOLE.size} through semantics: {text!r}"
         )
 
 
@@ -240,7 +240,7 @@ def _append_pull_thread_wall(display: Any) -> None:
         or any(str(display.GetText(part) or "") != resolved[part] for part in (1, 2, 3))
     ):
         raise RuntimeError(
-            "MHA-VN-029 wall fact or native callout definitions did not persist"
+            "MHA-DT-VN-59 wall fact or native callout definitions did not persist"
         )
 
 
@@ -312,7 +312,7 @@ async def build(adapter: Any) -> dict[str, str]:
         end,
         edge=_pull_thread_entry_edge(end),
         callout_xy=THREAD_NOTE_XY,
-        label="MHA-VN-029 pull thread callout",
+        label="MHA-DT-VN-59 pull thread callout",
     )
     _name_pull_thread_drill(thread_callout)
     _require_pull_thread_callout(thread_callout)

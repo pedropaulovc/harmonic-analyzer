@@ -1,7 +1,7 @@
 r"""Crankshaft drawing prose -- the cross-hole and drive-pin hole callouts.
 
-Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
-``crank_hub_notes``), so a wording edit re-keys the drawing, never the part.
+Imported ONLY by ``draw_dt_crankshaft`` and its offline test (codex #361; see
+``dt_crank_hub_notes``), so a wording edit re-keys the drawing, never the part.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from dt_crankshaft_spec import (
 )
 
 # Matched-fit requirement on the feature callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), naming both mates
-# and the acceptance of the custom 1:48 taper pin (crank_pin_spec).  It reads
+# and the acceptance of the custom 1:48 taper pin (dt_crank_pin_spec).  It reads
 # under the native #9 drill size, in the order the work is done.  The shaft
 # is not drilled alone (#1678): at assembly, the hub flush on the dome root,
 # the #9 goes through the hub's pilot and the pair is taper-reamed together
@@ -60,7 +60,7 @@ COLLAR_SEAT_MATE = " MHA-PD-09 SEAT"
 SHAFT_LENGTH_MATE = " SETS MHA-DT-31 TO MHA-PD-09 AIR"
 
 # The thinnest wall round the drive-pin holes, to the seat spigot's rim, at
-# the printed worst case (crankshaft_spec rounds it down): stated as the fact
+# the printed worst case (dt_crankshaft_spec rounds it down): stated as the fact
 # the shop holds, under the holes' own callout.
 # Emits approved declaration dt-crankshaft RV-02 (owner ruling 2026-10-18,
 # #991; redesign tracked in #1679).
@@ -79,9 +79,9 @@ DRIVE_PIN_CALLOUT = "\n".join(
 
 # The native REAM callout prints the hole depth bare, so it reads under the
 # title block's .XX +/-0.51, though the cut's depth carries the part's
-# +/-0.10 (crankshaft_spec: pressed to the floor, the depth sets the pin's
+# +/-0.10 (dt_crankshaft_spec: pressed to the floor, the depth sets the pin's
 # proud length).  The band is appended to the depth at the end of the
-# callout's own format text, in mm: draw_crankshaft refuses a non-mm sheet.
+# callout's own format text, in mm: draw_dt_crankshaft refuses a non-mm sheet.
 DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 
 # Under each 7.000 location: the mate the +/-0.025 serves.  The MHA-PD-09
@@ -89,7 +89,7 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 # 0.111 diametral clearance, which must absorb the pin-spacing error of both
 # parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
 # would need 4 x 0.13 = 0.52; the widest per-part band the clearance allows is
-# +/-0.0278 (crankshaft_spec DRIVE_PIN_SPACING_ERROR_MAX check).
+# +/-0.0278 (dt_crankshaft_spec DRIVE_PIN_SPACING_ERROR_MAX check).
 # Four short rows, none wider than the 7.000 value above them: the text runs
 # right from the dimension line beside the end view and must end before the
 # dome tip's extension lines (machinist review of 19e33c6c2: the two-row

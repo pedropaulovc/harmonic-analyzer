@@ -99,7 +99,7 @@ ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 # MHA-DT-31 is a light press in MHA-DT-06 and pinned; nothing runs in this part.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
-# Inboard mouth of the hub seat (z = 0, the face that bears on the MHA-DT-031
+# Inboard mouth of the hub seat (z = 0, the face that bears on the MHA-DT-31
 # barrel shoulder; the outboard face at z = ARM_THICKNESS is flush with the
 # hub's front face).  A 45-degree chamfer whose smallest leg clears the hub's
 # seat-root radius and whose largest is the arm-side break the shoulder land

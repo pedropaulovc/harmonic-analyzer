@@ -72,10 +72,10 @@ PULL_THREAD_MAJOR_WALL = (PIN_DIA - PULL_THREAD_MAJOR) / 2.0
 PULL_THREAD_WALL_CALLOUT = f"THREAD-MAJOR WALL {PULL_THREAD_MAJOR_WALL:.2f} NOM"
 if PULL_THREAD_FULL_PROFILE_WORST_MM < PULL_THREAD_FULL_PROFILE_REQUIRED_MM:
     raise AssertionError(
-        "MHA-VN-029 rule 18 needs at least 1.5D worst-case FULL thread"
+        "MHA-DT-VN-59 rule 18 needs at least 1.5D worst-case FULL thread"
     )
 if not PULL_THREAD_TAP_DRILL < PULL_THREAD_MAJOR:
-    raise AssertionError("MHA-VN-029 tap drill must sit inside the thread major")
+    raise AssertionError("MHA-DT-VN-59 tap drill must sit inside the thread major")
 
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {

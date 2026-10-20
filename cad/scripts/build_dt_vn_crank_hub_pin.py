@@ -63,16 +63,16 @@ PULL_THREAD_ENTRY_NORMAL = (0.0, 0.0, -1.0)
 def _require_pull_thread_definition(definition: Any) -> None:
     """Prove the committed feature is the specified inch tap and #56 cut."""
     definition = read_hole_wizard_metadata(
-        definition, label="MHA-VN-029 built pull thread"
+        definition, label="MHA-DT-VN-59 built pull thread"
     )
-    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-VN-029 built pull thread")
+    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-DT-VN-59 built pull thread")
     # Control build 20261019T195835.864950Z-3cf3a31cc7644bbf8d4f0ebbdd501a43:
     # restored #6-32 has Type=48 but FastenerType2=-1. The latter is logged
     # telemetry, not identity; enforce the documented saved-Type contract.
     native_type = definition.Type
     if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
         raise RuntimeError(
-            f"MHA-VN-029 native extraction Type {native_type!r} is not a through tap"
+            f"MHA-DT-VN-59 native extraction Type {native_type!r} is not a through tap"
         )
     for member, expected in (
         ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
@@ -81,7 +81,7 @@ def _require_pull_thread_definition(definition: Any) -> None:
         actual = getattr(definition, member)
         if actual != expected:
             raise RuntimeError(
-                f"MHA-VN-029 native extraction {member} {actual!r} != {expected!r}"
+                f"MHA-DT-VN-59 native extraction {member} {actual!r} != {expected!r}"
             )
     if not math.isclose(
         float(definition.ThruTapDrillDiameter) * 1000.0,
@@ -90,7 +90,7 @@ def _require_pull_thread_definition(definition: Any) -> None:
         abs_tol=0.005,
     ):
         raise RuntimeError(
-            f"MHA-VN-029 native tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
+            f"MHA-DT-VN-59 native tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
         )
 
 
@@ -150,7 +150,7 @@ async def build(adapter) -> dict[str, str]:
         PULL_THREAD_HOLE,
         [PULL_THREAD_ENTRY_POINT],
         PULL_THREAD_ENTRY_NORMAL,
-        "MHA-VN-029 extraction thread",
+        "MHA-DT-VN-59 extraction thread",
         name="PullThread",
         expect_dia_mm=PULL_THREAD_TAP_DRILL,
         placement_dims=[((None, None), (None, None))],
@@ -160,7 +160,7 @@ async def build(adapter) -> dict[str, str]:
         pull_thread.hole_dia_mm, PULL_THREAD_TAP_DRILL, rel_tol=0.0, abs_tol=0.005
     ):
         raise RuntimeError(
-            f"MHA-VN-029 native tap drill is not {PULL_THREAD_TAP_DRILL:.4f} mm"
+            f"MHA-DT-VN-59 native tap drill is not {PULL_THREAD_TAP_DRILL:.4f} mm"
         )
     volume = await volume_check(
         adapter, "native through pull tap", V_PIN - V_TAP, 0.005 * V_PIN
@@ -176,7 +176,7 @@ async def build(adapter) -> dict[str, str]:
         pull_thread.name
     )
     if feature is None:
-        raise RuntimeError("MHA-VN-029 native pull-thread feature is missing")
+        raise RuntimeError("MHA-DT-VN-59 native pull-thread feature is missing")
     definition = _early_bound(
         _early_bound(feature, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
     )

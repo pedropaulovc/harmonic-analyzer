@@ -271,7 +271,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "HubSeat")
 
-    # Inboard mouth of the seat (z = 0): the face that bears on the MHA-DT-031
+    # Inboard mouth of the seat (z = 0): the face that bears on the MHA-DT-31
     # barrel shoulder, so its chamfer clears the hub's seat-root radius.  The
     # pick is opposite the six-o'clock seam, which never reaches this face.
     before_chamfer = await _volume(adapter)

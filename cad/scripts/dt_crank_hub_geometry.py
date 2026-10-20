@@ -304,7 +304,7 @@ SHOULDER_LAND_WORST_MIN = EDGE_BREAK_MAX_MM
 # Inside corners (drawing-guidelines.md rule 16 (design for the cutter);
 # owner ruling A on #1661: a modelled root radius printed as a single-limit
 # R MAX, its model value the printed limit, and every mate's edge cleared).
-# The seat-shoulder root sits under the MHA-DT-006 rear bore mouth, so the
+# The seat-shoulder root sits under the MHA-DT-06 rear bore mouth, so the
 # arm carries a bore-mouth chamfer whose smallest leg clears the root radius
 # (a 45-degree chamfer of leg c clears a fillet of radius R when c >= R) and
 # whose largest leg is the arm-side break the shoulder land below already
@@ -341,9 +341,9 @@ _LAND_UNDER_ARM_CHAMFER = (
     - EDGE_BREAK_MAX_MM
 )
 if _LAND_UNDER_ARM_CHAMFER < SHOULDER_LAND_WORST_MIN - 1e-9:
-    raise AssertionError("MHA-DT-006 bore-mouth chamfer eats the hub shoulder land")
+    raise AssertionError("MHA-DT-06 bore-mouth chamfer eats the hub shoulder land")
 if ARM_BORE_REAR_CHAMFER_LEG[0] < SEAT_ROOT_FILLET_R:
-    raise AssertionError("MHA-DT-006 bore-mouth chamfer does not clear the seat root")
+    raise AssertionError("MHA-DT-06 bore-mouth chamfer does not clear the seat root")
 if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
     raise AssertionError("MHA-DT-31 relief is not a step between the bore and barrel")
 if SERVICE_PIN_STATION >= RELIEF_STATION:

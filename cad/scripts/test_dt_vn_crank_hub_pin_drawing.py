@@ -98,10 +98,10 @@ def test_pw01_accepts_only_this_computed_nominal_wall() -> None:
     from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
-    (entry,) = load_exceptions(CAD_ROOT / "config", "vn_crank_hub_pin", "part")
+    (entry,) = load_exceptions(CAD_ROOT / "config", "dt_vn_crank_hub_pin", "part")
     assert (entry.id, entry.kind) == ("PW-01", "minor")
     assert pin_spec.PULL_THREAD_HOLE.size + " UNF" in entry.where
-    assert "MHA-VN-029 only" in entry.where
+    assert "MHA-DT-VN-59 only" in entry.where
     assert f"{pin_spec.PULL_THREAD_MAJOR_WALL:.3f} mm" in entry.finding
     assert pin_spec.PULL_THREAD_WALL_CALLOUT in entry.finding
     assert entry.reason.startswith("OWNER ACCEPTED 2026-10-19:")
@@ -109,7 +109,7 @@ def test_pw01_accepts_only_this_computed_nominal_wall() -> None:
     assert "not a minimum-wall guarantee" in entry.reason
     assert "not a guaranteed full-profile engagement" in entry.reason
     assert "1.0 mm" not in entry.reason
-    process = _config.parts("vn-crank-hub-pin")["process"]
+    process = _config.parts("dt-vn-crank-hub-pin")["process"]
     assert pin_spec.PULL_THREAD_HOLE.size + " UNF" in process
     assert "#56 tap drill" in process
 
@@ -331,7 +331,7 @@ def test_wall_fact_refuses_failed_or_destructive_native_append(
 def test_pull_tap_outer_end_and_callout_layout() -> None:
     import math
 
-    import build_vn_crank_hub_pin as build
+    import build_dt_vn_crank_hub_pin as build
 
     assert build.TAP_R == pytest.approx(1.1811 / 2.0)
     assert build.V_TAP == pytest.approx(math.pi * (1.1811 / 2.0)**2 * pin_spec.PIN_LEN)
@@ -367,7 +367,7 @@ def _circle(
 def test_pull_thread_callout_selects_entry_not_coincident_exit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import build_vn_crank_hub_pin as build
+    import build_dt_vn_crank_hub_pin as build
 
     entry = _circle(build.PULL_THREAD_ENTRY_POINT, pin_spec.PULL_THREAD_TAP_DRILL / 2.0)
     exit_rim = _circle((0.0, 0.0, pin_spec.PIN_LEN), entry.circle[6])
@@ -513,7 +513,7 @@ def test_native_tuple_is_logged_before_any_release_assertion(
     member: str,
     value: object,
 ) -> None:
-    import build_vn_crank_hub_pin as builder
+    import build_dt_vn_crank_hub_pin as builder
 
     _model, definition = saved_pull_thread
     setattr(definition, member, value)
@@ -543,7 +543,7 @@ def test_saved_pull_thread_accepts_correct_native_data(
     model, _definition = saved_pull_thread
     _definition.Type = native_type
     drawing._require_saved_pull_thread(model)
-    import build_vn_crank_hub_pin as build
+    import build_dt_vn_crank_hub_pin as build
 
     build._require_pull_thread_definition(_definition)
 
@@ -578,7 +578,7 @@ def test_saved_pull_thread_rejects_wrong_native_data(
     setattr(definition, member, value)
     with pytest.raises(RuntimeError):
         drawing._require_saved_pull_thread(model)
-    import build_vn_crank_hub_pin as build
+    import build_dt_vn_crank_hub_pin as build
 
     with pytest.raises(RuntimeError):
         build._require_pull_thread_definition(definition)
@@ -642,7 +642,7 @@ def test_build_uses_entry_native_callout_and_exact_automatic_note_cleanup(
 ) -> None:
     """Exercise authoring, unchanged rendered-text refusal and finalizer policy."""
     model, _definition = saved_pull_thread
-    source = tmp_path / "vn-crank-hub-pin.SLDPRT"
+    source = tmp_path / "dt-vn-crank-hub-pin.SLDPRT"
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
     adapter = SimpleNamespace(currentModel=model, open_model=AsyncMock())

@@ -392,7 +392,7 @@ def test_arm_thickness_prints_as_a_reference_to_the_supplied_stock() -> None:
     assert 'label="arm stock thickness"' in source
 
 
-# --- Inboard bore-mouth chamfer (MHA-DT-031 seat-root clearance) ------------
+# --- Inboard bore-mouth chamfer (MHA-DT-31 seat-root clearance) ------------
 
 
 def test_bore_rear_chamfer_is_the_hub_contract() -> None:
@@ -482,7 +482,7 @@ def test_bore_rear_chamfer_callout_names_front_view_face_and_mate() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
     assert "X 45 DEG" in rows
     assert "FAR SIDE" in rows
-    assert "MHA-DT-031" in rows
+    assert "MHA-DT-31" in rows
     assert "HUB SIDE" in rows
     assert "INBOARD" not in notes.BORE_REAR_CHAMFER_CALLOUT
     assert "CLEARS HUB" not in notes.BORE_REAR_CHAMFER_CALLOUT
