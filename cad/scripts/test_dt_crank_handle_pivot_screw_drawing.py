@@ -921,6 +921,70 @@ def test_running_shoulder_carries_the_only_finish_symbol() -> None:
     )
 
 
+def test_shoulder_finish_resolves_the_part_owned_face_and_pins_the_original_landing(monkeypatch):
+    from types import SimpleNamespace
+
+    document, shoulder_face = object(), object()
+    view = SimpleNamespace(ReferencedDocument=document)
+    adapter = SimpleNamespace(currentModel=object())
+    control = drawing.surface_finish_by_key(spec.SURFACE_FINISHES, "pivot_shoulder")
+    events = []
+
+    def bind(value, interface):
+        assert (value is view and interface == "IView") or (
+            value is document and interface == "IModelDoc2"
+        )
+        events.append(("bind", interface))
+        return value
+
+    def resolve(value, selectors):
+        assert value is document and value is not adapter.currentModel
+        assert selectors == {"pivot_shoulder": control.face}
+        events.append(("resolve",))
+        return {"pivot_shoulder": shoulder_face}
+
+    def finish(actual_adapter, actual_view, **kwargs):
+        assert actual_adapter is adapter and actual_view is view
+        assert kwargs == {
+            "entity": shoulder_face,
+            "entity_type": "FACE",
+            "leader_attach_xy": drawing.FINISH_PICK,
+            "symbol_xy": drawing.FINISH_SYMBOL,
+            "control": control,
+            "label": "MHA-DT-32 pivot-shoulder finish",
+            "char_height": 0.0025,
+        }
+        events.append(("finish",))
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "add_surface_finish", finish)
+    drawing._add_shoulder_finish(adapter, view)
+    assert events == [("bind", "IView"), ("bind", "IModelDoc2"), ("resolve",), ("finish",)]
+    assert drawing.FINISH_PICK == pytest.approx((0.1985, 0.184))
+    assert drawing.FINISH_SYMBOL == pytest.approx((0.2105, 0.168))
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_shoulder_finish_propagates_failed_exact_one_face_resolution(monkeypatch, count):
+    from types import SimpleNamespace
+
+    document = object()
+    view = SimpleNamespace(ReferencedDocument=document)
+    calls = []
+
+    def resolve(value, selectors):
+        assert value is document and set(selectors) == {"pivot_shoulder"}
+        raise RuntimeError(f"pivot_shoulder matched {count} faces")
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "add_surface_finish", lambda *args, **kwargs: calls.append(kwargs))
+    with pytest.raises(RuntimeError, match=f"^pivot_shoulder matched {count} faces$"):
+        drawing._add_shoulder_finish(object(), view)
+    assert calls == []
+
+
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
     shoulder = math.pi * 2.0**2 * 53.0
@@ -2559,6 +2623,7 @@ def test_build_wires_native_relief_helpers_to_the_correct_views():
     expected = {
         "cropped_relief_view": ["adapter"],
         "style_relief_dimensions": ["adapter", "detail_annotations"],
+        "_add_shoulder_finish": ["adapter", "side"],
         "label_relief_view": ["adapter", "detail"],
         "mark_relief_on_side": ["adapter", "side"],
     }

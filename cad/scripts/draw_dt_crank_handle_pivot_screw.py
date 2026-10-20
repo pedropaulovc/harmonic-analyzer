@@ -68,6 +68,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -723,6 +724,28 @@ def mark_relief_on_side(adapter: Any, side: Any) -> None:
         )
 
 
+def _add_shoulder_finish(adapter: Any, view: Any) -> None:
+    """Attach Ra to the part-owned face, with the original flank landing."""
+    # R14 lost silhouette ownership after rebuild.  Resolve the same face the
+    # part PMI controls, and let the separate landing readback pin the flank.
+    control = surface_finish_by_key(SURFACE_FINISHES, "pivot_shoulder")
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    face = resolve_faces(document, {control.key: control.face})[control.key]
+    add_surface_finish(
+        adapter,
+        view,
+        entity=face,
+        entity_type="FACE",
+        leader_attach_xy=FINISH_PICK,
+        symbol_xy=FINISH_SYMBOL,
+        control=control,
+        label="MHA-DT-32 pivot-shoulder finish",
+        char_height=0.0025,
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -851,16 +874,7 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
     )
-    add_surface_finish(
-        adapter,
-        side,
-        edge_xy=FINISH_PICK,
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_shoulder"),
-        label="MHA-DT-32 pivot-shoulder finish",
-        entity_type="SILHOUETTE",
-        char_height=0.0025,
-    )
+    _add_shoulder_finish(adapter, side)
     label_relief_view(adapter, detail)
     mark_relief_on_side(adapter, side)
     _activate(adapter, side, label="side view notes")
