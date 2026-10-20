@@ -25,6 +25,7 @@ shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
 (mg_magnifier_assembly_steps) and the checks. The instruction column uses
 the left 190 mm; the finished view is centred in the remaining right field.
+The checks wrap more narrowly where they sit beside the title block.
 Step text names the settings and never values them. This recipe never edits
 the source assembly or its explodes.
 """
@@ -962,6 +963,52 @@ def _view_outline(view: Any, *, label: str) -> Box:
 
 def _grown(box: Box, by: float) -> Box:
     return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
+
+
+def _assert_instruction_clearance(adapter: Any, sequence: Any, checks: Any) -> None:
+    """Read the settled native note boxes, not character-count width estimates."""
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    adapter.currentModel.GraphicsRedraw2()
+    bounds: dict[str, Box] = {}
+    for label, note in (("assembly sequence", sequence), ("assembly checks", checks)):
+        extent = tuple(
+            float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
+        )
+        if (
+            len(extent) != 6
+            or not all(math.isfinite(value) for value in extent)
+            or extent[3] <= extent[0]
+            or extent[4] <= extent[1]
+        ):
+            raise RuntimeError(f"magnifier {label}: invalid native note extent {extent!r}")
+        box = (extent[0], extent[1], extent[3], extent[4])
+        padded = _grown(box, _PAD)
+        if (
+            padded[0] < INNER_BORDER[0]
+            or padded[1] < INNER_BORDER[1]
+            or padded[2] > INNER_BORDER[2]
+            or padded[3] > INNER_BORDER[3]
+        ):
+            raise RuntimeError(
+                f"magnifier {label}: native note box {box!r} lacks "
+                f"{_PAD * 1000:.1f} mm border clearance"
+            )
+        if padded[2] > TITLE_BLOCK[0] and padded[1] < TITLE_BLOCK[3]:
+            raise RuntimeError(
+                f"magnifier {label}: native note box {box!r} lacks "
+                f"{_PAD * 1000:.1f} mm title-block clearance"
+            )
+        bounds[label] = box
+    gap = bounds["assembly sequence"][1] - bounds["assembly checks"][3]
+    if gap < _PAD:
+        raise RuntimeError(
+            f"magnifier assembly checks: native gap below the sequence is "
+            f"{gap * 1000:.3f} mm, under {_PAD * 1000:.1f} mm"
+        )
+    _telemetry.info(
+        f"magnifier instruction native note boxes={bounds!r}, "
+        f"sequence-to-checks gap_mm={gap * 1000:.3f}"
+    )
 
 
 def ring_fit_shift(outline: Box, field: Box, *, name: str) -> tuple[float, float]:
@@ -1904,11 +1951,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="finished caption",
     )
     source_step("finished caption")
-    _add_note_block(
+    sequence_note = _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
     )
     source_step("assembly sequence")
-    _add_note_block(
+    checks_note = _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
     )
     source_step("assembly checks")
@@ -1937,6 +1984,7 @@ async def build(adapter: Any) -> dict[str, str]:
             settled_checks=(
                 *settled_checks,
                 lambda: assert_balloon_landings(adapter, landings),
+                lambda: _assert_instruction_clearance(adapter, sequence_note, checks_note),
                 lambda: _assert_source_identity(
                     source_model,
                     source_sha256,

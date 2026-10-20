@@ -598,11 +598,34 @@ def _assert_section_setting_clearance(front: Any, display: Any) -> None:
     if not ink_top:
         raise RuntimeError("clamped setting: missing native dimension ink")
     section_clearance = marker_bottom - max(ink_top)
+    # Emit the actual bounds BEFORE refusal as well as on success. The b3
+    # refusal retained only its 0.354 mm gap, hiding the marker/font envelope
+    # that invalidated the earlier estimate from an older layout audit.
+    _telemetry.event(
+        "drawing.ms_measuring_stick_assembly.section_setting_clearance",
+        marker_extension_m=CLAMP_SECTION_TOP_CLEARANCE,
+        marker_text_x_m=text[upper][0],
+        marker_text_top_m=text[upper][1],
+        marker_text_height_m=height,
+        marker_text_bottom_m=text[upper][1] - height,
+        marker_arrow_start_y_m=arrows[upper][1],
+        marker_arrow_tip_y_m=arrows[upper][4],
+        marker_arrow_height_m=arrows[upper][7],
+        marker_arrow_bottom_m=(
+            min(arrows[upper][1], arrows[upper][4]) - arrows[upper][7] / 2.0
+        ),
+        section_marker_bottom_m=marker_bottom,
+        section_ink_top_m=max(ink_top),
+        section_clearance_m=section_clearance,
+        required_clearance_m=SECTION_SETTING_CLEARANCE,
+    )
     if section_clearance < SECTION_SETTING_CLEARANCE:
         raise RuntimeError(
             f"clamped setting: upper section marker clears dimension ink by "
             f"{section_clearance * 1000.0:.3f} mm; "
-            f"requires {SECTION_SETTING_CLEARANCE * 1000.0:g} mm"
+            f"requires {SECTION_SETTING_CLEARANCE * 1000.0:g} mm "
+            f"(marker bottom {marker_bottom * 1000.0:.6f} mm, "
+            f"dimension ink top {max(ink_top) * 1000.0:.6f} mm)"
         )
     # Native RD1's plain value rests ON its dimension line; the witnesses
     # extend 1 mm above it. Compare glyph bottoms with the horizontal

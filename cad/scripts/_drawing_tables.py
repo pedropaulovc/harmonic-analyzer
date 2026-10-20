@@ -6,6 +6,7 @@ drawings without tables stay independent.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
@@ -510,6 +511,232 @@ def bom_row_identities(
     return result
 
 
+def _annotate_bom_number_binding(
+    table: Any,
+    *,
+    configuration: str,
+    column: int,
+    stage: str,
+    grouped_components: dict[tuple[str, str], Any] | None,
+) -> dict[tuple[str, str], Any]:
+    """Bound read-only evidence to the existing BOM span, never repair its rows."""
+    prefix = f"number_bind_{stage}"
+    attributes: dict[str, Any] = {}
+    caps: dict[str, bool] = {}
+    watched = dict(grouped_components or {})
+    observed: dict[tuple[int, str, str], int] = {}
+    printed_rows: list[list[Any]] = []
+    metadata: list[dict[str, Any]] = []
+    try:
+        from _com import _early_bound
+        from _component_references import component_identity
+
+        rows = int(table.RowCount)
+        attributes[f"{prefix}_row_count"] = rows
+        attributes[f"{prefix}_total_row_count"] = int(table.TotalRowCount)
+        columns = int(table.ColumnCount)
+        caps.update(rows=rows > 65, columns=columns > 8)
+        headers = [
+            str(table.DisplayedText(0, index) or "")[:56]
+            for index in range(min(columns, 8))
+        ]
+        quantity_columns = [
+            index
+            for index, title in enumerate(headers)
+            if title.strip().upper() in ("QTY.", "QTY", "QUANTITY")
+        ]
+        quantity_column = quantity_columns[0] if quantity_columns else None
+        printed_rows = [
+            [
+                row,
+                str(table.DisplayedText(row, column) or "")[:56],
+                str(table.DisplayedText(row, quantity_column) or "")[:8]
+                if quantity_column is not None
+                else None,
+            ]
+            for row in range(1, min(rows, 65))
+        ]
+        attributes[f"{prefix}_printed"] = json.dumps(
+            printed_rows, separators=(",", ":")
+        )
+        annotation = _sw_type_info.early_bound_or_flag(
+            table, "IBomTableAnnotation", "GetComponents2", "BomFeature"
+        )
+        members_by_row: dict[tuple[int, str], set[str]] = {}
+        native_members: dict[tuple[str, str], Any] = {}
+        caps["members"] = False
+        attributes[f"{prefix}_member_read_errors"] = 0
+        for row in range(1, min(rows, 65)):
+            try:
+                components = annotation.GetComponents2(row, configuration) or ()
+            except Exception as error:
+                attributes[f"{prefix}_member_read_errors"] += 1
+                attributes.setdefault(
+                    f"{prefix}_first_member_read_error",
+                    f"row {row}: {type(error).__name__}: {error}"[:192],
+                )
+                continue
+            for index, raw in enumerate(components):
+                try:
+                    stem, member = component_identity(raw)
+                except Exception as error:
+                    attributes[f"{prefix}_member_read_errors"] += 1
+                    attributes.setdefault(
+                        f"{prefix}_first_member_read_error",
+                        f"row {row} component {index}: {type(error).__name__}: {error}"[
+                            :192
+                        ],
+                    )
+                    continue
+                key = (row, stem, member)
+                if key not in observed and len(observed) >= 64:
+                    caps["members"] = True
+                    continue
+                observed[key] = observed.get(key, 0) + 1
+                members_by_row.setdefault((row, stem), set()).add(member)
+                native_members.setdefault((stem, member), raw)
+        attributes[f"{prefix}_members"] = json.dumps(
+            [
+                [row, stem[:64], member[:32], count]
+                for (row, stem, member), count in observed.items()
+            ],
+            separators=(",", ":"),
+        )
+        if grouped_components is None:
+            grouped_stems = {
+                stem
+                for (_row, stem), members in members_by_row.items()
+                if len(members) > 1
+            }
+            watched = {
+                key: raw
+                for key, raw in native_members.items()
+                if key[0] in grouped_stems
+            }
+        caps["grouped"] = len(watched) > 8
+        # Keep the original component handles for read-only metadata even if
+        # conversion subsequently removes their native table associations.
+        for (stem, _member), raw in watched.items():
+            if len(metadata) >= 8:
+                break
+            detail: dict[str, Any] = {"file": stem[:64]}
+            metadata.append(detail)
+            try:
+                component = _early_bound(raw, "IComponent2")
+                selected = str(component.ReferencedConfiguration or "")
+                detail["configuration"] = selected[:64]
+                detail["suppression"] = int(component.GetSuppression2())
+                detail["excluded"] = tuple(
+                    bool(value)
+                    for value in (
+                        component.GetExcludeFromBOM2(
+                            3,
+                            bstr_array([configuration]),  # swSpecifyConfiguration
+                        )
+                        or ()
+                    )
+                )
+                native = component.GetModelDoc2()
+                detail["resolved"] = native is not None
+                if native is None:
+                    continue
+                native = _early_bound(native, "IModelDoc2")
+                detail["member_number"] = str(
+                    native.GetCustomInfoValue(selected, "Number") or ""
+                )[:64]
+                detail["document_number"] = str(
+                    native.GetCustomInfoValue("", "Number") or ""
+                )[:64]
+                config = native.GetConfigurationByName(selected)
+                detail["configuration_exists"] = config is not None
+                if config is None:
+                    continue
+                config = _early_bound(config, "IConfiguration")
+                detail.update(
+                    bom_source=int(config.BOMPartNoSource),
+                    alternate_name=str(config.AlternateName or "")[:64],
+                    use_alternate=bool(config.UseAlternateNameInBOM),
+                )
+            except Exception as error:
+                detail["read_error"] = f"{type(error).__name__}: {error}"[:192]
+        attributes[f"{prefix}_grouped"] = json.dumps(metadata, separators=(",", ":"))
+        feature = _sw_type_info.early_bound_or_flag(
+            annotation.BomFeature,
+            "IBomFeature",
+            "PartConfigurationGrouping",
+            "DisplayAsOneItem",
+        )
+        attributes[f"{prefix}_grouping"] = int(feature.PartConfigurationGrouping)
+        attributes[f"{prefix}_one_item"] = bool(feature.DisplayAsOneItem)
+        attributes[f"{prefix}_rows_after_read"] = int(table.RowCount)
+        total_columns = int(table.TotalColumnCount)
+        caps["columns"] |= total_columns > 8
+        attributes[f"{prefix}_columns"] = json.dumps(
+            [
+                [index, repr(table.GetColumnType3(index, True))[:128]]
+                for index in range(min(total_columns, 8))
+            ],
+            separators=(",", ":"),
+        )
+    except Exception as error:
+        # Diagnostic read failures must not replace the existing strict BOM proof.
+        attributes[f"{prefix}_read_error"] = f"{type(error).__name__}: {error}"[:192]
+    attributes[f"{prefix}_caps"] = json.dumps(caps, separators=(",", ":"))
+    attributes[f"{prefix}_truncated"] = any(caps.values())
+    try:
+        printed_by_row = {row[0]: row[1:] for row in printed_rows}
+        grouped_summary = []
+        for index, (stem, member) in enumerate(watched):
+            if index >= 8:
+                break
+            detail = metadata[index] if index < len(metadata) else {}
+            grouped_summary.append(
+                {
+                    "key": f"{stem[:64]}@{member[:32]}",
+                    "rows": [
+                        [row, count, *printed_by_row.get(row, [None, None])]
+                        for (row, file_stem, selected), count in observed.items()
+                        if (file_stem, selected) == (stem, member)
+                    ],
+                    "configuration": detail.get("configuration"),
+                    "suppression": detail.get("suppression"),
+                    "excluded": detail.get("excluded"),
+                    "bom_source": detail.get("bom_source"),
+                    "alternate_name": detail.get("alternate_name"),
+                    "numbers": [
+                        detail.get("member_number"),
+                        detail.get("document_number"),
+                    ],
+                    "read_error": detail.get("read_error"),
+                }
+            )
+        summary = {
+            "stage": stage,
+            "configuration": configuration[:64],
+            "rows": attributes.get(f"{prefix}_row_count"),
+            "total_rows": attributes.get(f"{prefix}_total_row_count"),
+            "grouping": attributes.get(f"{prefix}_grouping"),
+            "one_item": attributes.get(f"{prefix}_one_item"),
+            "grouped": grouped_summary,
+            "caps": caps,
+            "member_read_errors": attributes.get(f"{prefix}_member_read_errors"),
+            "first_member_read_error": attributes.get(
+                f"{prefix}_first_member_read_error"
+            ),
+            "read_error": attributes.get(f"{prefix}_read_error"),
+        }
+        # Put critical evidence in task.log too: span export is best-effort and
+        # a failed leaf need not publish a forensic bundle.
+        _telemetry.info(
+            "drawing.bom_number_binding " + json.dumps(summary, separators=(",", ":"))
+        )
+    except Exception:
+        # Logging is observational and cannot replace the strict BOM proof.
+        pass
+    _telemetry.annotate(**attributes)
+    return watched
+
+
 def _bind_bom_number_property(
     adapter: Any,
     table: Any,
@@ -525,6 +752,13 @@ def _bind_bom_number_property(
     if "PART NUMBER" not in headers:
         raise RuntimeError(f"{label} BOM has no PART NUMBER column")
     column = headers.index("PART NUMBER")
+    grouped_components = _annotate_bom_number_binding(
+        table,
+        configuration=configuration,
+        column=column,
+        stage="before",
+        grouped_components=None,
+    )
     status = int(
         table.SetColumnType3(
             column,
@@ -535,6 +769,13 @@ def _bind_bom_number_property(
     )
     if status != 0:  # swColumnTypeStatus_Success
         raise RuntimeError(f"{label} BOM Number column type failed: {status}")
+    _annotate_bom_number_binding(
+        table,
+        configuration=configuration,
+        column=column,
+        stage="column_type",
+        grouped_components=grouped_components,
+    )
     annotation = _sw_type_info.early_bound_or_flag(
         table,
         "IBomTableAnnotation",
@@ -544,11 +785,32 @@ def _bind_bom_number_property(
     )
     if not annotation.SetColumnCustomProperty(column, "Number"):
         raise RuntimeError(f"{label} BOM rejected the Number property binding")
+    _annotate_bom_number_binding(
+        table,
+        configuration=configuration,
+        column=column,
+        stage="custom_property",
+        grouped_components=grouped_components,
+    )
     if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
         raise RuntimeError(f"{label} BOM Number property binding did not persist")
     if not table.SetColumnTitle2(column, "PART NUMBER", True):
         raise RuntimeError(f"{label} BOM PART NUMBER header could not be restored")
+    _annotate_bom_number_binding(
+        table,
+        configuration=configuration,
+        column=column,
+        stage="column_title",
+        grouped_components=grouped_components,
+    )
     rebuild_drawing(adapter, label="bind_bom_number_property")
+    _annotate_bom_number_binding(
+        table,
+        configuration=configuration,
+        column=column,
+        stage="rebuild",
+        grouped_components=grouped_components,
+    )
     validate_bom_number_property(table, configuration=configuration, label=label)
 
 

@@ -494,31 +494,25 @@ class _NumberTable:
         self.property_readback = "Number"
         self.accept_title = True
         self.column_property = ""
-        self.calls = []
 
     def DisplayedText(self, row, column):
         return self.cells[row][column]
 
     def SetColumnType3(self, column, kind, all_configurations, property_name):
-        self.calls.append(("type", column, kind, all_configurations, property_name))
         return self.type_status
 
     def SetColumnCustomProperty(self, column, property_name):
-        self.calls.append(("property", column, property_name))
         self.column_property = property_name
         return self.accept_property
 
     def GetColumnCustomProperty(self, column):
-        self.calls.append(("property-read", column))
         return self.property_readback
 
     def SetColumnTitle2(self, column, title, include_hidden):
-        self.calls.append(("title", column, title, include_hidden))
         self.cells[0][column] = title
         return self.accept_title
 
     def GetComponents2(self, row, configuration):
-        self.calls.append(("components", row, configuration))
         return self.components
 
 
@@ -539,32 +533,36 @@ def number_binding(unwrapped_com, monkeypatch):
 def test_number_column_binds_native_property_and_reads_actual_configuration(
     number_binding, member
 ):
-    adapter, rebuilds = number_binding
-    component = _component(
-        properties={
-            (member, "Number"): NUMBER,
-            ("", "Number"): "WRONG-GLOBAL-NUMBER",
-        },
-        configuration=member,
-    )
+    adapter, _rebuilds = number_binding
+    properties = {
+        ("", "Number"): "WRONG-GLOBAL-NUMBER",
+        ("Default Simplified", "Number"): "WRONG-VIEW-CONFIGURATION-NUMBER",
+        ("LeverWire", "Number"): "WRONG-UNSIMPLIFIED-NUMBER",
+        (member, "Number"): NUMBER,
+    }
+    component = _component(properties=properties, configuration=member)
     table = _NumberTable([component])
+    table.cells[0][1] = " part number "
     tables._bind_bom_number_property(
         adapter,
         table,
         configuration="Default Simplified",
         label="wire",
     )
-    assert table.calls[:4] == [
-        ("type", 1, 204, True, "Number"),
-        ("property", 1, "Number"),
-        ("property-read", 1),
-        ("title", 1, "PART NUMBER", True),
-    ]
-    assert ("components", 1, "Default Simplified") in table.calls
-    assert component.property_reads == [(member, "Number")]
+    assert table.column_property == "Number"
     assert table.cells[0][1] == "PART NUMBER"
-    assert table.cells[1][1] == NUMBER
-    assert rebuilds == ["bind_bom_number_property"]
+
+    # Changing the actual selected member makes the displayed Number stale,
+    # regardless of the view configuration or document-level property.
+    properties[(member, "Number")] = "MHA-SH-VN-57"
+    with pytest.raises(RuntimeError, match="associative Number"):
+        tables.validate_bom_number_property(
+            table, configuration="Default Simplified", label="stale wire Number"
+        )
+    table.cells[1][1] = "MHA-SH-VN-57"
+    tables.validate_bom_number_property(
+        table, configuration="Default Simplified", label="updated wire Number"
+    )
 
 
 def test_number_column_uses_document_property_only_when_actual_member_has_none(

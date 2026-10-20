@@ -547,6 +547,247 @@ def test_slot_callout_refuses_text_or_leader_on_section(monkeypatch, collision) 
             drawing._assert_slot_callout_clear(None, [annotation], section)
 
 
+@pytest.fixture
+def slot_depth_native(monkeypatch):
+    """b3 native inputs plus explicit offset controls, not native-after proof."""
+    outline = (0.042662, 0.028412, 0.063338, 0.067588)
+    boxes = {
+        "ClampSlotCboreDepth": (0.0592538, 0.0480875, 0.0922462, 0.0682562),
+        "ClampSlotCboreWidth": (0.0740076, 0.0579181, 0.107, 0.0770563),
+        "ClampStation4": (0.098142, 0.0782219, 0.127858, 0.0817219),
+        "ClampRowHeight": (0.019486, 0.095887, 0.047, 0.118097),
+        "section-caption": (0.0309857, 0.0154134, 0.0750143, 0.0291391),
+    }
+    witnesses = [
+        ((0.05775, 0.04475), (0.05775, 0.0490875)),
+        ((0.0529876, 0.04475), (0.0529876, 0.0490875)),
+    ]
+    lines = {
+        "ClampSlotCboreDepth": [
+            *witnesses,
+            ((0.05775, 0.0480875), (0.0922462, 0.0480875)),
+            ((0.05775, 0.0480875), (0.0529876, 0.0480875)),
+            ((0.0529876, 0.0480875), (0.0466376, 0.0480875)),
+        ],
+        "ClampSlotCboreWidth": [
+            ((0.126, 0.0395), (0.106, 0.0395)),
+            ((0.126, 0.0565), (0.106, 0.0565)),
+            ((0.0740076, 0.0579181), (0.107, 0.0579181)),
+            ((0.107, 0.0579181), (0.107, 0.0565)),
+            ((0.107, 0.0395), (0.107, 0.0565)),
+        ],
+        "ClampStation4": _outer_clamp_station_lines(),
+        "ClampRowHeight": [],
+    }
+    position = [0.07575, 0.0592, 0.41865]
+    state = {"ignore_seed": False, "activations": [], "seeds": []}
+
+    class Display:
+        _offset = False
+
+        @property
+        def OffsetText(self):
+            return self._offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            self._offset = value
+            if value:
+                # Model the documented native creation-point re-dress. An
+                # omitted/ignored baseline seed must fail the witness guard.
+                state["activations"].append(position[1])
+                dy = position[1] - 0.0480875
+                lines["ClampSlotCboreDepth"] = [
+                    (start, (end[0], end[1] + dy))
+                    if start[0] == end[0]
+                    else ((start[0], start[1] + dy), (end[0], end[1] + dy))
+                    for start, end in lines["ClampSlotCboreDepth"]
+                ]
+
+    display = Display()
+
+    def seed(x, y, z):
+        assert display.OffsetText is False
+        state["seeds"].append((x, y, z))
+        if not state["ignore_seed"]:
+            position[:] = [x, y, z]
+        return True
+
+    annotations = {
+        name: SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda: display,
+            GetPosition=lambda: tuple(position), SetPosition2=seed,
+        )
+        for name in boxes
+    }
+    caption = SimpleNamespace(
+        PropertyLinkedText="<VLNAME><VLLABEL><VLSCALEV>",
+        GetAnnotation=lambda: annotations["section-caption"],
+    )
+    section = SimpleNamespace(
+        GetOutline=lambda: outline, UpdateViewDisplayGeometry=lambda: None,
+        GetNotes=lambda: [caption],
+    )
+    moves = []
+
+    def move(_adapter, annotation, dx, dy, *, label):
+        assert display.OffsetText is True
+        box = boxes[annotation.name]
+        boxes[annotation.name] = (
+            box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy,
+        )
+        # A positive-control native route leaves the mouth horizontally,
+        # then turns outside the actual bar. Unlike the previous fixture,
+        # this includes an OffsetText leader that the material guard sees.
+        left, bottom = boxes[annotation.name][:2]
+        lines[annotation.name].extend([
+            ((0.05775, 0.0480875), (left, 0.0480875)),
+            ((left, 0.0480875), (left, bottom)),
+        ])
+        moves.append((dx, dy))
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing, "_dimension_annotation",
+        lambda _adapter, _annotations, name: annotations[name],
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(
+        drawing, "_native_text_box",
+        lambda _adapter, annotation, *, label: boxes[annotation.name],
+    )
+    monkeypatch.setattr(drawing, "dimension_segments", lambda annotation: lines[annotation.name])
+    monkeypatch.setattr(
+        drawing, "_sheet",
+        lambda _adapter, _view, point, _label: (
+            0.053 - point[2] / 1000.0, 0.048 + point[1] / 1000.0,
+        ),
+    )
+    monkeypatch.setattr(drawing, "move_annotation", move)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "sheet_region",
+        lambda _adapter: SimpleNamespace(xmin=0.0127, ymin=0.0127, xmax=0.4191, ymax=0.2667),
+    )
+    return SimpleNamespace(
+        section=section, boxes=boxes, lines=lines, witnesses=witnesses,
+        display=display, moves=moves, state=state,
+        details=[annotations["ClampSlotCboreWidth"]],
+        depth=[annotations["ClampSlotCboreDepth"]],
+        back=[annotations["ClampStation4"], annotations["ClampRowHeight"]],
+    )
+
+
+def test_slot_depth_offset_uses_native_lane_without_moving_witnesses(slot_depth_native):
+    native = slot_depth_native
+    original_lines = list(native.lines["ClampSlotCboreDepth"])
+    witnesses = drawing._place_slot_depth_callout(
+        None, native.section, native.details, native.depth, native.back
+    )
+    assert witnesses == native.witnesses
+    assert all(line in native.lines["ClampSlotCboreDepth"] for line in original_lines)
+    assert len(native.lines["ClampSlotCboreDepth"]) == len(original_lines) + 2
+    assert native.display.OffsetText is True
+    assert native.state["seeds"] == [(0.07575, 0.0480875, 0.41865)]
+    assert native.state["activations"] == [0.0480875]
+    assert len(native.moves) == 1
+    box = native.boxes["ClampSlotCboreDepth"]
+    assert box[0] == pytest.approx(0.063338 + drawing.SLOT_CALLOUT_AIR_M)
+    assert box[3] == pytest.approx(0.0579181 - drawing.SLOT_CALLOUT_AIR_M)
+    assert box[1] > native.boxes["section-caption"][3] + 0.002
+
+
+def test_slot_depth_ignored_baseline_seed_refuses_native_redress(slot_depth_native):
+    native = slot_depth_native
+    native.state["ignore_seed"] = True
+    with pytest.raises(RuntimeError, match="native witness moved"):
+        drawing._place_slot_depth_callout(
+            None, native.section, native.details, native.depth, native.back
+        )
+    assert native.state["activations"] == [0.0592]
+    assert native.moves == []
+
+
+@pytest.mark.parametrize("flip", [-1.0, 1.0])
+def test_slot_material_proof_uses_projected_voids_not_padded_outline(monkeypatch, flip):
+    def project(_adapter, _view, point, _label):
+        return 0.053 + flip * point[2] / 1000.0, 0.048 + point[1] / 1000.0
+
+    monkeypatch.setattr(drawing, "_sheet", project)
+    front = project(None, None, (0.0, 0.0, -BAR_DEPTH / 2.0), "")[0]
+    floor = project(
+        None, None, (0.0, 0.0, -BAR_DEPTH / 2.0 + part.CLAMP_CBORE_DEPTH), ""
+    )[0]
+    witnesses = [
+        ((x, 0.04475), (x, 0.0490875)) for x in (front, floor)
+    ]
+    material = drawing._slot_section_material_boxes(None, None, witnesses)
+    assert material["upper bar"] == pytest.approx((0.04825, 0.05225, 0.05775, 0.062))
+    assert material["lower bar"] == pytest.approx((0.04825, 0.034, 0.05775, 0.04375))
+    # The whole through-slot lane is genuinely void, including through the
+    # back half of the section; contact with the counterbore wall is allowed.
+    drawing._require_slot_depth_ink_outside_material(
+        [((0.047, 0.048), (0.059, 0.048)), ((floor, 0.05225), (front, 0.05225))],
+        material,
+    )
+    # No millimetre inset hides a thin penetration past the actual wall.
+    y = 0.05225 + 1e-8
+    with pytest.raises(RuntimeError, match="upper bar"):
+        drawing._require_slot_depth_ink_outside_material(
+            [((floor, y), (front, y))], material
+        )
+    rear = material["rear upper step"]
+    x = (rear[0] + rear[2]) / 2.0
+    with pytest.raises(RuntimeError, match="rear upper step"):
+        drawing._require_slot_depth_ink_outside_material(
+            [((x, 0.048), (x, (rear[1] + rear[3]) / 2.0))], material
+        )
+
+
+@pytest.mark.parametrize(
+    "collision",
+    ["text", "width-shelf", "depth-shelf", "crossing", "witness-drift", "offset-off", "front-witness", "outside", "hatch", "caption"],
+)
+def test_slot_depth_settled_guard_refuses_text_shelf_or_witness_regression(slot_depth_native, collision):
+    native = slot_depth_native
+    original_box = native.boxes["ClampSlotCboreDepth"]
+    witnesses = drawing._place_slot_depth_callout(
+        None, native.section, native.details, native.depth, native.back
+    )
+    if collision == "text":
+        native.boxes["ClampSlotCboreDepth"] = original_box
+    elif collision == "width-shelf":
+        native.lines["ClampSlotCboreWidth"].append(((0.065, 0.042), (0.101, 0.042)))
+    elif collision == "depth-shelf":
+        native.lines["ClampSlotCboreDepth"].append(((0.074, 0.065), (0.107, 0.065)))
+    elif collision == "crossing":
+        native.lines["ClampSlotCboreDepth"].append(((0.100, 0.048), (0.105, 0.048)))
+        native.lines["ClampSlotCboreWidth"].append(((0.103, 0.044), (0.103, 0.052)))
+    elif collision == "witness-drift":
+        native.lines["ClampSlotCboreDepth"][0] = (
+            (0.05785, 0.04475), (0.05785, 0.0490875),
+        )
+    elif collision == "offset-off":
+        native.display.OffsetText = False
+    elif collision == "front-witness":
+        native.lines["ClampStation4"].append(((0.070, 0.030), (0.070, 0.060)))
+    elif collision == "outside":
+        box = native.boxes["ClampSlotCboreDepth"]
+        native.boxes["ClampSlotCboreDepth"] = (
+            box[0] - 0.100, box[1], box[2] - 0.100, box[3],
+        )
+    elif collision == "hatch":
+        # Predicted bad routing is only an offline negative control. Actual
+        # native segments, not that prediction, decide the farm outcome.
+        native.lines["ClampSlotCboreDepth"].append(((0.055, 0.048), (0.055, 0.075)))
+    elif collision == "caption":
+        native.lines["ClampSlotCboreDepth"].append(((0.066, 0.027), (0.080, 0.027)))
+    with pytest.raises(RuntimeError, match="section B-B depth"):
+        drawing._assert_slot_depth_callout_clear(
+            None, native.section, native.details, native.depth, native.back, witnesses
+        )
+
+
 def _outer_clamp_station_lines():
     # Actual 63fad6340 native audit, sheet metres: both witnesses and the
     # 440.50 dimension line. These are not rendered/PDF estimates.

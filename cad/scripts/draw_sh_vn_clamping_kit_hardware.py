@@ -212,12 +212,12 @@ def _note_text_box(annotation: Any) -> tuple[float, float, float, float]:
 def _tnut_thread_note(
     adapter: Any, cells: tuple, views: list[Any]
 ) -> Callable[[], None]:
-    """Relocate the native cosmetic-thread callout, not a matching text note.
+    """Author and relocate the native cosmetic-thread callout, never free text.
 
-    ICThread.ThreadCallout documents the cosmetic-thread-to-INote relationship;
-    the failed run did not capture its old GetNotes inventory. Identify the
-    bore by the attached edge/face's owning feature. Capture rendered wording
-    only to prove that relocation preserves it.
+    The b3c709 native canary had one cosmetic thread but no drawing callout.
+    Select that bore-owned thread and request its native callout once during
+    authoring. ICThread.ThreadCallout is the creation proof; later settled
+    checks only read it and must not recreate a lost note.
     """
     iso = _early_bound(views[3], "IView")
     # The member hook follows HLR fitting, before the finalizer authors this
@@ -250,21 +250,198 @@ def _tnut_thread_note(
             features.append(tuple(names))
         return attached, types, count, tuple(features)
 
-    def notes() -> list[tuple]:
+    def belongs_to_bore(state: tuple) -> bool:
+        attached, types, count, features = state
+        return (
+            bool(attached)
+            and count == len(attached) == len(types)
+            and all(entity is not None for entity in attached)
+            and all(kind in (1, 2) for kind in types)
+            and any("TNutThreadBore" in names for names in features)
+        )
+
+    insertion_before: dict[str, Any] = {}
+
+    def insert_callout(thread_annotation: Any, state: tuple) -> None:
+        thread_name = str(thread_annotation.GetName())
+        part = _early_bound(iso.ReferencedDocument, "IPartDoc")
+        # ICThread's SDK overview documents this name-to-source-feature lookup.
+        feature = part.FeatureByName(thread_name)
+        definition: dict[str, Any] = {"feature_resolved": feature is not None}
+        if feature is not None:
+            feature = _early_bound(feature, "IFeature")
+            definition["feature_type"] = str(feature.GetTypeName2())
+            if definition["feature_type"] == "CosmeticThread":
+                raw_data = feature.GetDefinition()
+                if raw_data is not None:
+                    data = _early_bound(raw_data, "ICosmeticThreadFeatureData")
+                    definition.update(
+                        standard=int(data.Standard),
+                        standard_type=str(data.StandardType)[:80],
+                        text=str(data.ThreadCallout)[:120],
+                    )
+        insertion_before.update(
+            view=str(iso.GetName2())[:80],
+            thread_name=thread_name[:120],
+            attachment_count=state[2],
+            attachment_types=state[1][:8],
+            attachment_features=tuple(
+                tuple(name[:64] for name in names[:4]) for names in state[3][:8]
+            ),
+            source_definition=definition,
+            selected=False,
+            requested=False,
+        )
+        draw = _early_bound(adapter.currentModel, "IModelDoc2")
+        drawing = _early_bound(draw, "IDrawingDoc")
+        previous = drawing.ActiveDrawingView
+        previous_name = (
+            _early_bound(previous, "IView").GetName2() if previous is not None else None
+        )
+        sheet_name = _early_bound(drawing.GetCurrentSheet(), "ISheet").GetName()
+        primary_error: BaseException | None = None
+        try:
+            if drawing.ActivateView(iso.GetName2()) is not True:
+                raise RuntimeError(
+                    f"kit T-nut: cannot activate thread-callout view; {insertion_before!r}"
+                )
+            draw.ClearSelection2(True)
+            manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+            # Follow the established drawing-annotation Select2 convention;
+            # its reported success is not proof of the actual selection.
+            selected = thread_annotation.Select2(False, 0)
+            count = int(manager.GetSelectedObjectCount2(-1))
+            kind = int(manager.GetSelectedObjectType3(1, -1)) if count else 0
+            picked = manager.GetSelectedObject6(1, -1) if count else None
+            picked_annotation = None
+            if count == 1 and kind == 39 and picked is not None:
+                # swSelectType_e.swSelCTHREADS = 39; drawing selections return ICThread.
+                picked_annotation = _early_bound(
+                    _early_bound(picked, "ICThread").GetAnnotation(),
+                    "IAnnotation",
+                )
+            same = (
+                picked_annotation is not None
+                and int(adapter.swApp.IsSame(picked_annotation, thread_annotation)) == 1
+            )
+            insertion_before.update(
+                selection_count=count,
+                selection_type=kind,
+                selection_name=(
+                    str(picked_annotation.GetName())[:120]
+                    if picked_annotation is not None
+                    else None
+                ),
+                same_thread=same,
+            )
+            if selected is not True or count != 1 or kind != 39 or not same:
+                raise RuntimeError(
+                    f"kit T-nut: cannot select cosmetic thread; {insertion_before!r}"
+                )
+            insertion_before["selected"] = True
+            insertion_before["requested"] = True
+            _telemetry.info(
+                f"kit T-nut: requesting native thread callout; {insertion_before!r}"
+            )
+            # VT_VOID. Method docs give no eligibility remarks; the UI command
+            # documents no-standard/nonempty-text restrictions, so only the
+            # same ICThread's subsequent ThreadCallout readback proves success.
+            drawing.InsertThreadCallout()
+        except BaseException as error:
+            primary_error = error
+            raise
+        finally:
+            try:
+                draw.ClearSelection2(True)
+                restored = (
+                    drawing.ActivateView(previous_name)
+                    if previous_name is not None
+                    else drawing.ActivateSheet(sheet_name)
+                )
+                active = drawing.ActiveDrawingView
+                active_name = (
+                    _early_bound(active, "IView").GetName2()
+                    if active is not None
+                    else None
+                )
+                active_sheet = _early_bound(
+                    drawing.GetCurrentSheet(),
+                    "ISheet",
+                ).GetName()
+                if (
+                    restored is not True
+                    or active_name != previous_name
+                    or active_sheet != sheet_name
+                ):
+                    raise RuntimeError(
+                        f"activation readback: expected view={previous_name!r}, "
+                        f"sheet={sheet_name!r}; actual view={active_name!r}, "
+                        f"sheet={active_sheet!r}, reported={restored!r}"
+                    )
+            except Exception as restore_error:
+                message = (
+                    f"kit T-nut: cannot restore drawing activation: {restore_error!r}; "
+                    f"insertion_before={insertion_before!r}"
+                )
+                if primary_error is not None:
+                    primary_error.add_note(message)
+                else:
+                    raise RuntimeError(message) from restore_error
+
+    def notes(*, author_missing: bool = False) -> list[tuple]:
         iso.UpdateViewDisplayGeometry()  # VT_VOID: immediate display-geometry access.
         found, observed = [], []
-        threads = callouts = 0
-        for raw in iso.GetAnnotations() or ():
-            thread_annotation = _early_bound(raw, "IAnnotation")
-            if int(thread_annotation.GetType()) != 1:  # swAnnotationType_e.swCThread
-                continue
-            threads += 1
+        thread_annotations = [
+            annotation
+            for raw in (iso.GetAnnotations() or ())
+            if int((annotation := _early_bound(raw, "IAnnotation")).GetType()) == 1
+            # swAnnotationType_e.swCThread
+        ]
+        threads, callouts = len(thread_annotations), 0
+        for thread_annotation in thread_annotations:
             thread = _early_bound(thread_annotation.GetSpecificAnnotation(), "ICThread")
             raw_note = _read_member(thread, "ThreadCallout")
             if raw_note is None:
-                if len(observed) < 4:
-                    observed.append({"callout": None})
-                continue
+                state = attachment_state(thread_annotation)
+                if author_missing and threads == 1 and belongs_to_bore(state):
+                    insert_callout(thread_annotation, state)
+                    iso.UpdateViewDisplayGeometry()
+                    fresh = [
+                        annotation
+                        for raw in (iso.GetAnnotations() or ())
+                        if int(
+                            (annotation := _early_bound(raw, "IAnnotation")).GetType()
+                        )
+                        == 1
+                        and int(adapter.swApp.IsSame(annotation, thread_annotation))
+                        == 1
+                    ]
+                    if len(fresh) != 1:
+                        raise RuntimeError(
+                            "kit T-nut: selected cosmetic thread lost identity after "
+                            f"insertion; matching_annotations={len(fresh)}, "
+                            f"insertion_before={insertion_before!r}"
+                        )
+                    thread_annotation = fresh[0]
+                    thread = _early_bound(
+                        thread_annotation.GetSpecificAnnotation(),
+                        "ICThread",
+                    )
+                    raw_note = _read_member(thread, "ThreadCallout")
+                if raw_note is None:
+                    if len(observed) < 4:
+                        observed.append(
+                            {
+                                "callout": None,
+                                "thread_count": state[2],
+                                "thread_types": state[1][:8],
+                                "thread_features": tuple(
+                                    tuple(name[:64] for name in names[:4])
+                                    for names in state[3][:8]
+                                ),
+                            }
+                        )
+                    continue
             callouts += 1
             note = _early_bound(raw_note, "INote")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -282,13 +459,7 @@ def _tnut_thread_note(
                         "nulls": sum(entity is None for entity in attached),
                     }
                 )
-            if (
-                attached
-                and count == len(attached) == len(types)
-                and all(entity is not None for entity in attached)
-                and all(kind in (1, 2) for kind in types)
-                and any("TNutThreadBore" in names for names in features)
-            ):
+            if belongs_to_bore((attached, types, count, features)):
                 found.append((note, annotation, thread_annotation, attached, types))
         if len(found) != 1:
             # Diagnostic only: ordinary view notes are not a substitute for the
@@ -302,11 +473,14 @@ def _tnut_thread_note(
                 "kit T-nut: expected one automatic isometric thread note attached "
                 f"to TNutThreadBore; found={len(found)}, cosmetic_threads={threads}, "
                 f"callouts={callouts}, candidates={observed!r}, "
-                f"view_notes={len(view_notes)}, view_note_texts={view_note_texts!r}"
+                f"view_notes={len(view_notes)}, view_note_texts={view_note_texts!r}, "
+                f"insertion_before={insertion_before!r}"
             )
         return found
 
-    note, annotation, thread_annotation, attachments, attachment_types = notes()[0]
+    note, annotation, thread_annotation, attachments, attachment_types = notes(
+        author_missing=True,
+    )[0]
     text, linked = note.GetText(), note.PropertyLinkedText
     if not text.strip():
         raise RuntimeError("kit T-nut: native thread callout has no text")

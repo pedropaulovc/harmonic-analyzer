@@ -619,9 +619,9 @@ def test_bom_identity_is_the_registry() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(physical)["number"]
     assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
     assert drawing.BOM_COMPONENT_IDENTITIES == spec.COMPONENT_IDENTITIES
-    assert {
-        drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES
-    } == {"MHA-SH-VN-57"}
+    assert {drawing.BOM_PART_NUMBERS[family] for family in spec.KIT_IDENTITIES} == {
+        "MHA-SH-VN-57"
+    }
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)
     }
@@ -656,7 +656,8 @@ def native_bom_bindings(monkeypatch):
         _component_references, "_early_bound", lambda value, _interface: value
     )
     monkeypatch.setattr(
-        _drawing_tables._sw_type_info, "early_bound_or_flag",
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
         lambda value, *_interfaces: value,
     )
 
@@ -678,13 +679,17 @@ def _native_component(family, index=0, *, simplified=True):
 
 
 @pytest.mark.parametrize("simplified", (False, True))
-def test_component_census_distinguishes_shared_file_members(native_bom_bindings, simplified):
+def test_component_census_distinguishes_shared_file_members(
+    native_bom_bindings, simplified
+):
     for family in spec.KIT_IDENTITIES:
         component = _native_component(family, simplified=simplified)
         assert drawing._component_stem(component) == family
 
 
-@pytest.mark.parametrize("configuration", ("Default", "WrongMember", "TNut OtherSuffix"))
+@pytest.mark.parametrize(
+    "configuration", ("Default", "WrongMember", "TNut OtherSuffix")
+)
 def test_component_census_refuses_unknown_kit_configuration(
     native_bom_bindings, configuration
 ):
@@ -702,14 +707,17 @@ def test_source_census_proves_all_twelve_native_kit_references(native_bom_bindin
     ]
     source = SimpleNamespace(
         ConfigurationManager=SimpleNamespace(
-            ActiveConfiguration=SimpleNamespace(Name=drawing.ASSEMBLY_VIEW_CONFIGURATION)
+            ActiveConfiguration=SimpleNamespace(
+                Name=drawing.ASSEMBLY_VIEW_CONFIGURATION
+            )
         ),
         GetComponents=lambda _top_only: tuple(reversed(components)),
         GetExplodedViewNames2=lambda owner: (drawing.EXPLODED_VIEW_NAMES[owner],),
     )
     drawing._validate_source(source)
     [first_stud] = [
-        component for component in components
+        component
+        for component in components
         if component.ComponentReference == "HoldDownStud:1"
     ]
     first_stud.ComponentReference = ""
@@ -735,7 +743,10 @@ class _Table:
         self.heights: dict[int, float] = {}
         self.position = (*drawing.BOM_ANCHOR, 0.0)
         self.native_members = [
-            tuple(_native_component(family, index) for index in range(spec.QUANTITIES[family]))
+            tuple(
+                _native_component(family, index)
+                for index in range(spec.QUANTITIES[family])
+            )
             for family in native_order
         ]
         self.association_configurations = []
@@ -778,10 +789,16 @@ class _Table:
         return SimpleNamespace(GetPosition=lambda: self.position)
 
 
-_ADAPTER = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+_ADAPTER = SimpleNamespace(
+    currentModel=SimpleNamespace(
+        EditRebuild3=lambda: True, GraphicsRedraw2=lambda: None
+    )
+)
 
 
-def test_bom_prints_registry_numbers_one_line_a_row(monkeypatch, native_bom_bindings) -> None:
+def test_bom_prints_registry_numbers_one_line_a_row(
+    monkeypatch, native_bom_bindings
+) -> None:
     events = []
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
@@ -805,8 +822,12 @@ def test_bom_prints_registry_numbers_one_line_a_row(monkeypatch, native_bom_bind
     [(name, attrs)] = events
     assert name == "drawing.bom_piece"
     assert attrs["rows"] == len(spec.BOM_ORDER) + 1 and attrs["violations"] == ()
-    assert set(table.association_configurations) == {drawing.SIMPLIFIED_VIEW_CONFIGURATION}
-    kit_rows = [table.cells[int(spec.ITEM_NUMBERS[family])] for family in spec.KIT_IDENTITIES]
+    assert set(table.association_configurations) == {
+        drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    }
+    kit_rows = [
+        table.cells[int(spec.ITEM_NUMBERS[family])] for family in spec.KIT_IDENTITIES
+    ]
     assert [row[1] for row in kit_rows] == ["MHA-SH-VN-57"] * 3
     assert [row[3] for row in kit_rows] == ["4"] * 3
 
@@ -866,6 +887,175 @@ def test_bom_refuses_a_row_that_wraps_into_the_title_block(native_bom_bindings) 
 
     with pytest.raises(RuntimeError, match="enters the title block"):
         drawing._validate_bom(_ADAPTER, Wrapping(spec.BOM_ORDER))
+
+
+def test_kit_bom_key_uses_registry_identity_and_native_item_mapping(
+    native_bom_bindings,
+):
+    # Reversed native rows prove the citations are not copied from spec item 18-20.
+    order = tuple(reversed(spec.BOM_ORDER))
+    table = _Table(order)
+    text = drawing._kit_bom_note_text(
+        table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    )
+    registry = _config.parts(spec.CLAMPING_KIT)
+    assert registry["number"] in text
+    assert str(registry["supplier"]).upper() in text
+    assert all(sku in text for sku in registry["supplier_skus"])
+    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
+        [citation] = [line for line in text.splitlines() if member in line]
+        assert f"ITEM {order.index(family) + 1}:" in citation
+        assert f"({registry['configuration_quantities'][member]})" in citation
+    assert "CONFIGURATIONS" in text and "INSTALLED QTY." in text
+    assert "MEMBERS, NOT KITS" in text
+
+
+class _KitBomNote:
+    """Native-style note geometry with a nonzero insertion-to-extent offset."""
+
+    def __init__(self, text, xy, *, width, move):
+        self.text = text
+        self.position = (*xy, 0.0)
+        self.width = width
+        self.move = move
+        self.OwnerType = 1
+        self.Visible = 1
+        self.leaders = 0
+
+    def GetAnnotation(self):
+        return self
+
+    def GetPosition(self):
+        return self.position
+
+    def GetExtent(self):
+        x, y, _z = self.position
+        return x + 0.005, y - 0.036, 0.0, x + 0.005 + self.width, y + 0.002, 0.0
+
+    def GetText(self):
+        return self.text.replace("\n", "\r\n")
+
+    def GetLeaderCount(self):
+        return self.leaders
+
+    def SetPosition2(self, *position):
+        if self.move == "refused":
+            return False
+        if self.move != "ignored":
+            self.position = position
+        return True
+
+
+@pytest.fixture
+def kit_bom_note_state(monkeypatch, native_bom_bindings):
+    table = _Table(spec.BOM_ORDER)
+    table.widths = dict(enumerate(drawing.BOM_COLUMN_WIDTHS.values()))
+    table.heights = {
+        row: drawing.BOM_ROW_HEIGHT for row in range(len(spec.BOM_ORDER) + 1)
+    }
+    state = SimpleNamespace(
+        table=table,
+        outline=(0.060, 0.125, 0.190, 0.230),
+        notes=[],
+        width=0.145,
+        move="applied",
+    )
+    state.reference = SimpleNamespace(
+        ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        GetOutline=lambda: state.outline,
+    )
+
+    def add_block(_adapter, sheet, text, xy, *, label):
+        assert sheet == drawing.BOM_SHEET
+        note = _KitBomNote(text, xy, width=state.width, move=state.move)
+        state.notes.append(note)
+        return note
+
+    monkeypatch.setattr(drawing, "_add_note_block", add_block)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    return state
+
+
+def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state):
+    state = kit_bom_note_state
+    settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+    [note] = state.notes
+    extent = drawing._kit_bom_note_extent(note)
+    bom = drawing._bom_bounds(state.table)
+    field = drawing.kit_bom_note_region(bom, state.outline)
+    assert _inside(extent, field) and _inside_sheet(extent)
+    assert state.outline[1] - extent[3] >= 0.004
+    assert bom[0] - extent[2] >= 0.004
+    assert drawing.TITLE_BLOCK[0] - extent[2] >= 0.004
+    assert extent[0] > note.position[0]  # placement used ink, not the annotation origin
+    settled()
+    for family in spec.KIT_IDENTITIES:
+        row = state.table.cells[int(spec.ITEM_NUMBERS[family])]
+        assert row[1] == drawing.BOM_PART_NUMBERS[family] and row[3] == "4"
+
+
+@pytest.mark.parametrize("fault", ("oversized", "ignored", "refused"))
+def test_kit_bom_key_refuses_a_native_note_that_does_not_fit(kit_bom_note_state, fault):
+    state = kit_bom_note_state
+    if fault == "oversized":
+        state.width = 0.250
+    else:
+        state.move = fault
+    with pytest.raises(RuntimeError):
+        drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "bom-moved",
+        "reference-moved",
+        "wrong-text",
+        "wrong-member",
+        "wrong-quantity",
+        "wrong-number",
+        "view-owned",
+        "hidden",
+        "leader",
+        "empty-extent",
+        "nonfinite-extent",
+    ),
+)
+def test_kit_bom_key_rechecks_content_and_clearance_after_final_rebuild(
+    kit_bom_note_state, fault
+):
+    state = kit_bom_note_state
+    settled = drawing._place_kit_bom_note(_ADAPTER, state.table, state.reference)
+    [note] = state.notes
+    extent = drawing._kit_bom_note_extent(note)
+    member_row = int(spec.ITEM_NUMBERS[spec.T_NUT])
+    if fault == "bom-moved":
+        state.table.position = (extent[2] + 0.003, state.table.position[1], 0.0)
+    elif fault == "reference-moved":
+        left, _bottom, right, top = state.outline
+        state.outline = left, extent[3] + 0.003, right, top
+    elif fault == "wrong-text":
+        note.text += "\nUNRELATED KIT"
+    elif fault == "wrong-member":
+        for component in state.table.native_members[member_row - 1]:
+            component.ReferencedConfiguration = "FlangeNut Simplified"
+    elif fault == "wrong-quantity":
+        state.table.cells[member_row][3] = "12"
+    elif fault == "wrong-number":
+        state.table.cells[member_row][1] = "UNRELATED-PURCHASE"
+    elif fault == "view-owned":
+        note.OwnerType = 0
+    elif fault == "hidden":
+        note.Visible = 3
+    elif fault == "leader":
+        note.leaders = 1
+    elif fault == "empty-extent":
+        note.width = 0.0
+    else:
+        note.width = math.nan
+    with pytest.raises(RuntimeError):
+        settled()
 
 
 class _Manager:

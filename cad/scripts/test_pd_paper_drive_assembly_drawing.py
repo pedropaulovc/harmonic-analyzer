@@ -2,6 +2,7 @@
 
 import asyncio
 from itertools import product
+import json
 import math
 import re
 from types import SimpleNamespace
@@ -2336,6 +2337,7 @@ def _pd_bom_fixture(monkeypatch):
         PartConfigurationGrouping=3, DisplayAsOneItem=False
     )
     type(table).RowCount = PropertyMock(side_effect=lambda: len(cells))
+    type(table).TotalRowCount = PropertyMock(side_effect=lambda: len(cells))
     table.ColumnCount = 4
     table.GetColumnCustomProperty.return_value = "Number"
     table.DisplayedText.side_effect = lambda row, column: cells[row][column]
@@ -2500,6 +2502,17 @@ def _pd_bom_insertion_fixture(monkeypatch):
     monkeypatch.setattr(_drawing_tables, "bstr_array", tuple)
     table.BomFeature.SetConfigurations = lambda *_: True
     table.SetColumnType3.return_value = 0
+    column_types = [202, 201, 204, 203]
+    table.TotalColumnCount = len(column_types)
+    table.GetColumnType3.side_effect = lambda index, _hidden: (
+        column_types[index], "Number" if column_types[index] == 204 else None, 0
+    )
+
+    def set_column_type(index, kind, _hidden, _property):
+        column_types[index] = kind
+        return 0
+
+    table.SetColumnType3.side_effect = set_column_type
     table.SetColumnCustomProperty.return_value = True
     table.SetColumnTitle2.return_value = True
     table.IsCellTextEditable.return_value = True
@@ -2609,6 +2622,309 @@ def test_bom_insertion_refuses_row_loss_from_the_number_binding(monkeypatch, dro
     if drop == "transgear":
         contents = tuple(tuple(row) for row in scene.cells)
         assert repr(contents) in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "boundary", ("column_type", "custom_property", "column_title", "rebuild")
+)
+@pytest.mark.parametrize("effect", ("omitted", "merged", "excluded", "hidden"))
+def test_number_binding_census_localizes_native_row_loss(
+    monkeypatch, boundary, effect
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_rows = [
+        list(scene.table.GetComponents2(row, drawing.SIMPLIFIED_VIEW_CONFIGURATION))
+        for row in range(1, len(scene.cells))
+    ]
+    scene.table.GetComponents2.side_effect = lambda row, _configuration: native_rows[row - 1]
+    gear_row = scene.keys.index("pd-transgear-removable") + 1
+    gear_components = native_rows[gear_row - 1]
+    number = drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    configurations = {
+        component.ReferencedConfiguration: SimpleNamespace(
+            BOMPartNoSource=8,
+            AlternateName="native-group-key",
+            UseAlternateNameInBOM=True,
+        )
+        for component in gear_components
+    }
+    properties = {
+        (selected, "Number"): number for selected in configurations
+    } | {("", "Number"): "DOCUMENT-DIAGNOSTIC-NUMBER"}
+    native = gear_components[0].GetModelDoc2()
+    native.GetConfigurationByName = configurations.__getitem__
+    native.GetCustomInfoValue = lambda selected, property_name: properties[
+        (selected, property_name)
+    ]
+    exclusions = {
+        (3, (configuration,), selected): False for selected in configurations
+    }
+    exclusion_queries = set()
+    for component in gear_components:
+        selected = component.ReferencedConfiguration
+        component.GetSuppression2 = lambda: 2
+
+        def excluded(option, names, selected=selected):
+            names = tuple(names)
+            exclusion_queries.add((option, names))
+            return (exclusions[(option, names, selected)],)
+
+        component.GetExcludeFromBOM2 = excluded
+    hidden_rows = 0
+    type(scene.table).TotalRowCount = PropertyMock(
+        side_effect=lambda: len(scene.cells) + hidden_rows
+    )
+    attributes = {}
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "annotate",
+        lambda **values: attributes.update(values),
+    )
+    messages = []
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "info",
+        lambda message, **_fields: messages.append(message),
+    )
+    changed = False
+
+    def mutate(at):
+        nonlocal changed, hidden_rows
+        if at != boundary or changed:
+            return
+        scene.cells.pop(gear_row)
+        native_rows.pop(gear_row - 1)
+        if effect == "merged":
+            native_rows[0].extend(gear_components)
+            scene.cells[1][3] = str(int(scene.cells[1][3]) + len(gear_components))
+        elif effect == "hidden":
+            hidden_rows += 1
+        elif effect == "excluded":
+            selected = "T18 Simplified"
+            exclusions[(3, (configuration,), selected)] = True
+            configurations[selected].BOMPartNoSource = 1
+            configurations[selected].AlternateName = ""
+            properties[(selected, "Number")] = "CHANGED-T18"
+        changed = True
+
+    original_type_setter = scene.table.SetColumnType3.side_effect
+
+    def set_column_type(*args):
+        result = original_type_setter(*args)
+        mutate("column_type")
+        return result
+
+    def set_custom_property(*_args):
+        mutate("custom_property")
+        return True
+
+    def set_column_title(column, title, _hidden):
+        scene.cells[0][column] = title
+        mutate("column_title")
+        return True
+
+    def rebuild():
+        if scene.table.GetColumnType3(1, True)[0] == 204:
+            mutate("rebuild")
+        return True
+
+    scene.table.SetColumnType3.side_effect = set_column_type
+    scene.table.SetColumnCustomProperty.side_effect = set_custom_property
+    scene.table.SetColumnTitle2.side_effect = set_column_title
+    scene.adapter.currentModel.EditRebuild3 = rebuild
+    message = "associative Number" if effect == "merged" else "BOM table is.*expected"
+    with pytest.raises(RuntimeError, match=message):
+        scene.insert()
+    stages = ("before", "column_type", "custom_property", "column_title", "rebuild")
+    expected_rows = len(drawing.BOM_PART_NUMBERS) + 1
+    for index, stage in enumerate(stages):
+        assert attributes[f"number_bind_{stage}_row_count"] == (
+            expected_rows - (index >= stages.index(boundary))
+        )
+        assert attributes[f"number_bind_{stage}_total_row_count"] == (
+            expected_rows - (effect != "hidden" and index >= stages.index(boundary))
+        )
+        assert json.loads(attributes[f"number_bind_{stage}_caps"]) == {
+            "rows": False, "columns": False, "members": False, "grouped": False
+        }
+        assert attributes[f"number_bind_{stage}_grouping"] == 3
+        assert attributes[f"number_bind_{stage}_one_item"] is False
+        assert attributes[f"number_bind_{stage}_truncated"] is False
+        assert f"number_bind_{stage}_read_error" not in attributes
+    before = json.loads(attributes["number_bind_before_members"])
+    after = json.loads(attributes[f"number_bind_{boundary}_members"])
+    gear_before = [entry for entry in before if entry[1] == "pd-transgear-removable"]
+    gear_after = [entry for entry in after if entry[1] == "pd-transgear-removable"]
+    assert {entry[2] for entry in gear_before} == {"T12", "T18", "T24"}
+    assert {entry[0] for entry in gear_before} == {gear_row}
+    assert sum(entry[3] for entry in gear_before) == 3
+    if effect == "merged":
+        assert {entry[2] for entry in gear_after} == {"T12", "T18", "T24"}
+        assert {entry[0] for entry in gear_after} == {1}
+    else:
+        assert gear_after == []
+    printed_before = json.loads(attributes["number_bind_before_printed"])
+    printed_after = json.loads(attributes[f"number_bind_{boundary}_printed"])
+    assert [entry[2] for entry in printed_before if entry[1] == number] == ["3"]
+    assert not any(entry[1] == number for entry in printed_after)
+    metadata = json.loads(attributes["number_bind_before_grouped"])
+    assert {entry["configuration"] for entry in metadata} == {
+        "T12 Simplified", "T18 Simplified", "T24 Simplified"
+    }
+    assert all(
+        entry["bom_source"] == 8
+        and entry["alternate_name"] == "native-group-key"
+        and entry["member_number"] == number
+        and entry["document_number"] == "DOCUMENT-DIAGNOSTIC-NUMBER"
+        and entry["suppression"] == 2
+        and entry["excluded"] == [False]
+        for entry in metadata
+    )
+    # The same original handles must expose later configuration-specific state,
+    # even after those components have lost their native table associations.
+    for stage in stages[1:]:
+        expected_metadata = [dict(entry) for entry in metadata]
+        if effect == "excluded" and stages.index(stage) >= stages.index(boundary):
+            next(
+                entry for entry in expected_metadata
+                if entry["configuration"] == "T18 Simplified"
+            ).update(
+                excluded=[True], bom_source=1,
+                alternate_name="", member_number="CHANGED-T18",
+            )
+        assert json.loads(attributes[f"number_bind_{stage}_grouped"]) == expected_metadata
+    assert exclusion_queries == {(3, (configuration,))}
+    columns_before = json.loads(attributes["number_bind_before_columns"])
+    columns_after = json.loads(attributes["number_bind_column_type_columns"])
+    assert columns_before[1][1].startswith("(201,")
+    assert columns_after[1][1].startswith("(204,")
+    log_prefix = "drawing.bom_number_binding "
+    summaries = [
+        json.loads(message[len(log_prefix):])
+        for message in messages if message.startswith(log_prefix)
+    ]
+    assert len(summaries) == len(stages)
+    by_stage = {summary["stage"]: summary for summary in summaries}
+    assert set(by_stage) == set(stages)
+    summary = by_stage[boundary]
+    assert summary["rows"] == expected_rows - 1
+    assert summary["total_rows"] == expected_rows - (effect != "hidden")
+    assert {entry["key"] for entry in summary["grouped"]} == {
+        "pd-transgear-removable@T12",
+        "pd-transgear-removable@T18",
+        "pd-transgear-removable@T24",
+    }
+    assert all(bool(entry["rows"]) == (effect == "merged") for entry in summary["grouped"])
+    if effect == "excluded":
+        t18 = next(
+            entry for entry in summary["grouped"]
+            if entry["key"] == "pd-transgear-removable@T18"
+        )
+        assert t18["excluded"] == [True]
+        assert t18["bom_source"] == 1
+        assert t18["alternate_name"] == ""
+        assert t18["numbers"] == ["CHANGED-T18", "DOCUMENT-DIAGNOSTIC-NUMBER"]
+
+
+@pytest.mark.parametrize("failure", ("column_type", "total_column_count"))
+@pytest.mark.parametrize("drop_row", (False, True))
+def test_number_binding_diagnostic_failure_preserves_consumer_proof(
+    monkeypatch, failure, drop_row
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_rows = [
+        list(scene.table.GetComponents2(row, drawing.SIMPLIFIED_VIEW_CONFIGURATION))
+        for row in range(1, len(scene.cells))
+    ]
+    scene.table.GetComponents2.side_effect = lambda row, _configuration: native_rows[row - 1]
+    attributes = {}
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "annotate",
+        lambda **values: attributes.update(values),
+    )
+    messages = []
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "info",
+        lambda message, **_fields: messages.append(message),
+    )
+    error = RuntimeError("diagnostic-only-read-failure")
+    if failure == "column_type":
+        scene.table.GetColumnType3.side_effect = error
+    else:
+        type(scene.table).TotalColumnCount = PropertyMock(side_effect=error)
+    original_type_setter = scene.table.SetColumnType3.side_effect
+    column_kind = 201
+    changed = False
+
+    def set_column_type(index, kind, hidden, property_name):
+        nonlocal column_kind
+        column_kind = kind
+        return original_type_setter(index, kind, hidden, property_name)
+
+    def rebuild():
+        nonlocal changed
+        if drop_row and column_kind == 204 and not changed:
+            row = scene.keys.index("pd-transgear-removable") + 1
+            scene.cells.pop(row)
+            native_rows.pop(row - 1)
+            changed = True
+        return True
+
+    scene.table.SetColumnType3.side_effect = set_column_type
+    scene.adapter.currentModel.EditRebuild3 = rebuild
+    if drop_row:
+        with pytest.raises(RuntimeError, match="BOM table is.*expected"):
+            scene.insert()
+    else:
+        assert scene.insert() is scene.table
+    for stage in ("before", "column_type", "custom_property", "column_title", "rebuild"):
+        prefix = f"number_bind_{stage}"
+        assert "diagnostic-only-read-failure" in attributes[f"{prefix}_read_error"]
+        assert attributes[f"{prefix}_row_count"] >= 2
+        assert attributes[f"{prefix}_total_row_count"] == attributes[f"{prefix}_row_count"]
+        assert json.loads(attributes[f"{prefix}_printed"])
+        assert json.loads(attributes[f"{prefix}_members"])
+        assert attributes[f"{prefix}_grouping"] == 3
+    log_prefix = "drawing.bom_number_binding "
+    summaries = [
+        json.loads(message[len(log_prefix):])
+        for message in messages if message.startswith(log_prefix)
+    ]
+    assert len(summaries) == 5
+    assert all(
+        summary["rows"] >= 2 and summary["total_rows"] == summary["rows"]
+        and "diagnostic-only-read-failure" in summary["read_error"]
+        for summary in summaries
+    )
+
+
+@pytest.mark.parametrize("failure", ("row-association", "component-path"))
+def test_number_binding_census_isolates_bad_rows_and_components(monkeypatch, failure):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_components = scene.table.GetComponents2.side_effect
+    if failure == "row-association":
+        def components(row, configuration):
+            if row == 1:
+                raise RuntimeError("native-row-association-failure")
+            return native_components(row, configuration)
+
+        scene.table.GetComponents2.side_effect = components
+        message = "native-row-association-failure"
+    else:
+        component = native_components(1, drawing.SIMPLIFIED_VIEW_CONFIGURATION)[0]
+        component.GetPathName = lambda: ""
+        message = "component has no native file path"
+    attributes = {}
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "annotate",
+        lambda **values: attributes.update(values),
+    )
+    with pytest.raises(RuntimeError, match=message):
+        scene.insert()
+    assert attributes["number_bind_before_member_read_errors"] == 1
+    assert "row 1" in attributes["number_bind_before_first_member_read_error"]
+    assert json.loads(attributes["number_bind_before_members"])
+    assert attributes["number_bind_before_grouping"] == 3
+    assert json.loads(attributes["number_bind_before_columns"])
 
 
 @pytest.mark.parametrize(

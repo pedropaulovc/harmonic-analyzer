@@ -63,10 +63,13 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
     callout_ink,
     move_annotation,
     require_clear,
+    require_inside,
     require_leader_clear,
+    sheet_region,
 )
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
@@ -74,7 +77,7 @@ from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_layout_audit import annotation_display
-from _drawing_leaders import dimension_segments
+from _drawing_leaders import dimension_segments, distance_to_box, leader_crossings
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -84,6 +87,7 @@ from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _layout_audit import display_box
+from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _session import run_build
 import _telemetry
 from _surface_finish import surface_finish_by_key
@@ -92,6 +96,7 @@ from build_pd_support_bar import (
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
     CLAMP_ROUND_X,
+    CLAMP_SLOT_WIDTH,
     CLAMP_SLOT_X,
 )
 from _column_clamp_interface import BAR_DEPTH
@@ -288,11 +293,12 @@ DETAIL_KEEP = {
 # depth's line runs at the bar's mid-height, through the counterbore's mouth
 # and the through slot, so neither extension line crosses the cut: over the
 # top face (r6) the floor's extension line ran up through the hatch and read
-# as a seam (its 0.13 stroke from the floor's lower corner, PDF paths). The
-# text's centre stands SLOT_DEPTH_SHELF_DROP over the line, the drop the r6
-# sheet measured from a kept four-line depth text to its shelf (72.00 to
-# 60.85), and far enough off the face for the block to clear it and the
-# border. The caption's top centre stands SLOT_CAPTION_DROP under the
+# as a seam (its 0.13 stroke from the floor's lower corner, PDF paths).
+# SLOT_DEPTH_SHELF_DROP seeds the dimension line through the open slot.
+# After the callout is hung, OffsetText keeps the original line in the open
+# slot while placing its native text right of B-B, below detail C's shelf.
+# Native segment readback must stay out of the actual section material.
+# The caption's top centre stands SLOT_CAPTION_DROP under the
 # section's centre: its block (r7: 14.6 tall, its top 0.05 under the anchor)
 # then has 3 mm of air under the cut and 3.4 over the inner border's edge
 # (y 12.9), which the r7 caption touched (0.4) at centre y 45.
@@ -307,6 +313,7 @@ SLOT_SECTION_CAPTION_XY = (
 SLOT_SECTION_KEEP_NAMES = ("ClampSlotCboreDepth",)
 SLOT_DEPTH_SHELF_DROP = 0.0112
 SLOT_DEPTH_TEXT_SIDE = 0.018
+SLOT_CALLOUT_AIR_M = 0.003
 
 # Section A-A: the thickness up-left of the cut bar, its text outside the
 # extension lines since the 2:1 span is narrower than it. Nothing is
@@ -631,9 +638,8 @@ def _label_slot_detail(adapter: Any, detail: Any, back: Any) -> None:
 
 
 def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, float]]:
-    """Section B-B's depth text from its own projection, whichever way the cut
-    looks: outside the front face the counterbore enters, its line at the
-    bar's mid-height."""
+    """Seed the associative depth's line through the open slot; its text is
+    subsequently offset right of B-B and below detail C."""
 
     def point(z: float, y: float = 0.0) -> tuple[float, float]:
         return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "section B-B")
@@ -674,6 +680,225 @@ def _assert_slot_callout_clear(
         f"slot counterbore width clearance: text={ink.text!r}, "
         f"segments={ink.leader!r}, section B-B outline={outline!r}"
     )
+
+
+def _slot_depth_text_target(
+    box: tuple[float, ...], outline: tuple[float, ...], width_box: tuple[float, ...]
+) -> tuple[float, float]:
+    """Text centre/bottom in the measured lane right of B-B and below C."""
+    left = outline[2] + SLOT_CALLOUT_AIR_M
+    top = width_box[1] - SLOT_CALLOUT_AIR_M
+    return left + (box[2] - box[0]) / 2.0, top - (box[3] - box[1])
+
+
+def _slot_section_material_boxes(
+    adapter: Any, section: Any, witnesses: list[Any]
+) -> dict[str, tuple[float, ...]]:
+    """The centre-of-slot cut: bar minus through-slot and counterbore voids.
+
+    Project the authored model geometry, not GetOutline's padded rectangle.
+    The two associative witnesses give the native front/floor surface x's;
+    they must match those projected surfaces at the existing 1 um readback
+    tolerance. Using their actual x's also retains exact boundary landings.
+    """
+
+    def point(y: float, z: float = 0.0) -> tuple[float, float]:
+        return _sheet(adapter, section, (SLOT_SECTION_X, y, z), "B-B material")
+
+    front = point(0.0, -BAR_DEPTH / 2.0)
+    floor = point(0.0, -BAR_DEPTH / 2.0 + CLAMP_CBORE_DEPTH)
+    back = point(0.0, BAR_DEPTH / 2.0)
+    xs = [line[0][0] for line in witnesses]
+    front_x = min(xs, key=lambda x: abs(x - front[0]))
+    floor_x = min(xs, key=lambda x: abs(x - floor[0]))
+    if abs(front_x - front[0]) > 1e-6 or abs(floor_x - floor[0]) > 1e-6:
+        raise RuntimeError(
+            "section B-B depth: witnesses are not on the front/floor surfaces"
+        )
+    xmin, xmax = sorted((back[0], front_x))
+    rear_min, rear_max = sorted((back[0], floor_x))
+    bottom, top = sorted(point(y)[1] for y in (-BAR_HEIGHT / 2.0, BAR_HEIGHT / 2.0))
+    slot_bottom, slot_top = sorted(
+        point(y)[1] for y in (-CLAMP_SLOT_WIDTH / 2.0, CLAMP_SLOT_WIDTH / 2.0)
+    )
+    cbore_bottom, cbore_top = sorted(
+        point(y)[1] for y in (-CLAMP_CBORE_DIA / 2.0, CLAMP_CBORE_DIA / 2.0)
+    )
+    return {
+        "upper bar": (xmin, cbore_top, xmax, top),
+        "lower bar": (xmin, bottom, xmax, cbore_bottom),
+        "rear upper step": (rear_min, slot_top, rear_max, cbore_top),
+        "rear lower step": (rear_min, cbore_bottom, rear_max, slot_bottom),
+    }
+
+
+def _require_slot_depth_ink_outside_material(
+    lines: list[Any], material: dict[str, tuple[float, ...]]
+) -> None:
+    for start, end in lines:
+        segment = Segment(*start, *end)
+        for name, bounds in material.items():
+            # Existing interior clipping permits surface contact, not
+            # penetration. No outline inset or hatch allowance is introduced.
+            if segment_box_overlap_length(segment, Box(*bounds)) > 0.0:
+                raise RuntimeError(
+                    f"section B-B depth ink crosses {name}: {start!r}->{end!r}, {bounds!r}"
+                )
+
+
+def _require_slot_depth_witnesses(lines: list[Any], witnesses: list[Any]) -> None:
+    for expected in witnesses:
+        if not any(
+            all(math.dist(a, b) <= 1e-6 for a, b in zip(expected, candidate))
+            for line in lines
+            for candidate in (line, line[::-1])
+        ):
+            raise RuntimeError(f"section B-B depth: native witness moved: {expected!r}")
+
+
+def _assert_slot_depth_callout_clear(
+    adapter: Any,
+    section: Any,
+    detail_annotations: list[Any],
+    section_annotations: list[Any],
+    back_annotations: list[Any],
+    witnesses: list[Any],
+) -> None:
+    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+    display = _early_bound(
+        _early_bound(depth, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    if not bool(display.OffsetText):
+        raise RuntimeError("section B-B depth: native offset text did not persist")
+    depth_box = _native_text_box(adapter, depth, label="section B-B depth")
+    depth_lines = dimension_segments(depth)
+    _require_slot_depth_witnesses(depth_lines, witnesses)
+    material = _slot_section_material_boxes(adapter, section, witnesses)
+    _require_slot_depth_ink_outside_material(depth_lines, material)
+    outline = tuple(
+        float(value) for value in _early_bound(section, "IView").GetOutline()
+    )
+    others = {"section B-B": outline}
+    caption_count = 0
+    for raw_note in _early_bound(section, "IView").GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked = str(note.PropertyLinkedText or "")
+        if all(token in linked for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+            caption_count += 1
+            others["section B-B caption"] = _native_text_box(
+                adapter, note.GetAnnotation(), label="section B-B caption"
+            )
+    if caption_count != 1:
+        raise RuntimeError(
+            f"section B-B depth: expected one native caption, found {caption_count}"
+        )
+    if any(
+        distance_to_box(line, others["section B-B caption"]) < CLEAR_GAP_M
+        for line in depth_lines
+    ):
+        raise RuntimeError("section B-B depth ink meets its native section caption")
+    detail_lines = {}
+    for annotation in detail_annotations:
+        name = dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        others[name] = _native_text_box(adapter, annotation, label=name)
+        detail_lines[name] = dimension_segments(annotation)
+    if "ClampSlotCboreWidth" not in detail_lines:
+        raise RuntimeError("section B-B depth: missing detail C counterbore width")
+    for annotation in back_annotations:
+        name = dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        others[name] = _native_text_box(adapter, annotation, label=name)
+        if any(
+            distance_to_box(line, depth_box) < CLEAR_GAP_M
+            for line in dimension_segments(annotation)
+        ):
+            raise RuntimeError(f"section B-B depth text meets front-view {name} ink")
+    require_clear("section B-B depth", depth_box, others)
+    require_inside("section B-B depth", depth_box, sheet_region(adapter))
+    for name, lines in detail_lines.items():
+        if (
+            any(distance_to_box(line, depth_box) < CLEAR_GAP_M for line in lines)
+            or any(
+                distance_to_box(line, others[name]) < CLEAR_GAP_M
+                for line in depth_lines
+            )
+            or leader_crossings({"section B-B depth": depth_lines, name: lines})
+        ):
+            raise RuntimeError(f"section B-B depth text/leader meets detail C {name}")
+    _telemetry.info(
+        f"section B-B depth native text={depth_box!r}, lines={depth_lines!r}, "
+        f"fixed witnesses={witnesses!r}, material={material!r}, neighbouring text={others!r}"
+    )
+
+
+def _place_slot_depth_callout(
+    adapter: Any,
+    section: Any,
+    detail_annotations: list[Any],
+    section_annotations: list[Any],
+    back_annotations: list[Any],
+) -> list[Any]:
+    """Move only the native depth text; retain its original dimension line."""
+    depth = _dimension_annotation(adapter, section_annotations, "ClampSlotCboreDepth")
+    original_lines = dimension_segments(depth)
+    witnesses = [
+        line
+        for line in original_lines
+        if abs(line[0][0] - line[1][0]) < 1e-9 and abs(line[0][1] - line[1][1]) > 1e-9
+    ]
+    if len(witnesses) != 2:
+        raise RuntimeError(
+            f"section B-B depth: expected two native witnesses: {witnesses!r}"
+        )
+    widget = [
+        line
+        for line in original_lines
+        if abs(line[0][1] - line[1][1]) < 1e-9
+        and {line[0][0], line[1][0]} == {witness[0][0] for witness in witnesses}
+    ]
+    if len(widget) != 1:
+        raise RuntimeError(
+            "section B-B depth: no unambiguous native dimension baseline"
+        )
+    baseline_y = widget[0][0][1]
+    annotation = _early_bound(depth, "IAnnotation")
+    x, _y, z = (float(value) for value in annotation.GetPosition())
+    # OffsetText can re-dress a line onto its annotation's creation-point y.
+    # Seed that point on the already-native void-height baseline first, then
+    # offset the text, as the shared offset_dimension_text sequence does.
+    if not annotation.SetPosition2(x, baseline_y, z):
+        raise RuntimeError("section B-B depth: could not seed its native baseline")
+    display = _early_bound(
+        _early_bound(depth, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    display.OffsetText = True
+    rebuild_drawing(adapter, label="section B-B offset depth text")
+    if not bool(display.OffsetText):
+        raise RuntimeError("section B-B depth: native offset text did not persist")
+    _require_slot_depth_witnesses(dimension_segments(depth), witnesses)
+    width = _dimension_annotation(adapter, detail_annotations, "ClampSlotCboreWidth")
+    for _attempt in range(4):
+        _early_bound(section, "IView").UpdateViewDisplayGeometry()
+        box = _native_text_box(adapter, depth, label="section B-B depth")
+        outline = tuple(
+            float(value) for value in _early_bound(section, "IView").GetOutline()
+        )
+        width_box = _native_text_box(adapter, width, label="detail C counterbore width")
+        centre, bottom = _slot_depth_text_target(box, outline, width_box)
+        error = (centre - (box[0] + box[2]) / 2.0, bottom - box[1])
+        if math.hypot(*error) <= CAPTION_SETTLE_M:
+            break
+        move_annotation(adapter, depth, *error, label="section B-B depth text")
+    else:
+        raise RuntimeError("section B-B depth text did not settle in its measured lane")
+    _assert_slot_depth_callout_clear(
+        adapter,
+        section,
+        detail_annotations,
+        section_annotations,
+        back_annotations,
+        witnesses,
+    )
+    return witnesses
 
 
 def _dimension_annotation(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -1185,6 +1410,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_caption(adapter, STATION_END_LABEL, FACE_END_LABEL_TOP)
     _place_caption(adapter, STATION_END_LABEL, BACK_END_LABEL_TOP)
     rebuild_drawing(adapter, label="slot callout clearance")
+    slot_depth_witnesses = _place_slot_depth_callout(
+        adapter,
+        slot_section,
+        detail_annotations,
+        slot_section_annotations,
+        back_annotations,
+    )
     _assert_slot_callout_clear(adapter, detail_annotations, slot_section)
     _assert_slot_marker_clear(
         adapter, slot_section, slot_section_line, back_annotations
@@ -1208,6 +1440,14 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
             lambda: _assert_slot_marker_clear(
                 adapter, slot_section, slot_section_line, back_annotations
+            ),
+            lambda: _assert_slot_depth_callout_clear(
+                adapter,
+                slot_section,
+                detail_annotations,
+                slot_section_annotations,
+                back_annotations,
+                slot_depth_witnesses,
             ),
         ),
     )

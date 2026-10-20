@@ -1113,6 +1113,11 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
 @pytest.mark.parametrize(
     "drift",
     (
+        "create",
+        "create-from-sheet",
+        "create-without-source-definition",
+        "create-fresh-wrapper",
+        "create-replaced-thread",
         "none",
         "face",
         "ignored-move",
@@ -1120,6 +1125,7 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "link",
         "lost",
         "identity",
+        "lost-callout",
         "thread-identity",
         "dangling",
         "attachment",
@@ -1127,7 +1133,19 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "collision",
         "no-thread",
         "no-callout",
+        "activation-refused",
+        "selection-refused",
+        "selection-ignored",
+        "selection-neighbour",
+        "selection-wrong-type",
+        "selection-extra",
+        "restore-view-ignored",
+        "restore-sheet-ignored",
+        "restore-sheet-mismatch",
+        "insert-error-restore-error",
+        "wrong-thread",
         "duplicate",
+        "duplicate-uncreated",
         "wrong-feature",
         "null-attachment",
         "bad-count",
@@ -1207,12 +1225,47 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     class ThreadAnnotation:
         def __init__(self, callout):
             self.callout = callout
+            self.entity = edge()
+            self.native_identity = object()
+
+        def GetName(self):
+            return "CosmeticThread1"
+
+        def GetAttachedEntities3(self):
+            return (self.entity,)
+
+        def GetAttachedEntityTypes(self):
+            return (1,)
+
+        def GetAttachedEntityCount3(self):
+            return 1
+
+        def Select2(self, append, mark):
+            assert append is False and mark == 0
+            events.append("select-thread")
+            if drift == "selection-refused":
+                return False
+            if drift == "selection-ignored":
+                return True
+            drawing_state.selected = (
+                ThreadAnnotation(self.callout)
+                if drift == "selection-neighbour"
+                else self
+            )
+            return True
+
+        def GetAnnotation(self):
+            return self
 
         def GetType(self):
             return 1
 
         def GetSpecificAnnotation(self):
-            return SimpleNamespace(ThreadCallout=self.callout)
+            return self
+
+        @property
+        def ThreadCallout(self):
+            return self.callout
 
     class AnnotationReadback:
         def __init__(self, note, identity):
@@ -1232,7 +1285,109 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         ),
     ]
     native_threads = [ThreadAnnotation(note)]
+    original_thread = native_threads[0]
     events = []
+    drawing_state = SimpleNamespace(
+        selected=None,
+        active=None
+        if drift
+        in {
+            "create-from-sheet",
+            "restore-sheet-ignored",
+            "restore-sheet-mismatch",
+        }
+        else "previous-view",
+        sheet="Sheet1",
+    )
+    previous_active = drawing_state.active
+
+    class NativeInsertError(RuntimeError):
+        pass
+
+    native_error = NativeInsertError("native insertion failed")
+
+    class SelectionReadback:
+        def GetSelectedObjectCount2(self, mark):
+            assert mark == -1
+            if drawing_state.selected is None:
+                return 0
+            return 2 if drift == "selection-extra" else 1
+
+        def GetSelectedObjectType3(self, index, mark):
+            assert index == 1 and mark == -1
+            return 2 if drift == "selection-wrong-type" else 39
+
+        def GetSelectedObject6(self, index, mark):
+            assert index == 1 and mark == -1
+            return drawing_state.selected
+
+    class Drawing:
+        SelectionManager = SelectionReadback()
+
+        @property
+        def ActiveDrawingView(self):
+            if drawing_state.active is None:
+                return None
+            return SimpleNamespace(GetName2=lambda: drawing_state.active)
+
+        def GetCurrentSheet(self):
+            return SimpleNamespace(GetName=lambda: drawing_state.sheet)
+
+        def ActivateView(self, name):
+            events.append(f"activate:{name}")
+            if name == "TNut-Isometric" and drift == "activation-refused":
+                return False
+            if name == "previous-view":
+                if drift == "restore-view-ignored":
+                    return True
+                if drift == "insert-error-restore-error":
+                    raise RuntimeError("native restore failed")
+            drawing_state.active = name
+            return True
+
+        def ActivateSheet(self, name):
+            assert name == "Sheet1"
+            if drift != "restore-sheet-ignored":
+                drawing_state.active = None
+            if drift == "restore-sheet-mismatch":
+                drawing_state.sheet = "OtherSheet"
+            events.append("restore-sheet")
+            return True
+
+        def ClearSelection2(self, all_selected):
+            assert all_selected is True
+            drawing_state.selected = None
+            events.append("clear")
+
+        def InsertThreadCallout(self):
+            events.append("insert")
+            assert drawing_state.active == "TNut-Isometric"
+            assert drawing_state.selected is native_threads[0]
+            if drift == "insert-error-restore-error":
+                raise native_error
+            if drift in {"create-fresh-wrapper", "create-replaced-thread"}:
+                replacement = ThreadAnnotation(note)
+                if drift == "create-fresh-wrapper":
+                    replacement.native_identity = drawing_state.selected.native_identity
+                    replacement.entity = drawing_state.selected.entity
+                native_threads[0] = replacement
+            elif drift != "no-callout":
+                drawing_state.selected.callout = note
+            # Native insertion is VT_VOID; a None return is not failure.
+
+    def source_feature(name):
+        assert name == "CosmeticThread1"
+        events.append("source-definition")
+        if drift == "create-without-source-definition":
+            return None
+        return SimpleNamespace(
+            GetTypeName2=lambda: "CosmeticThread",
+            GetDefinition=lambda: SimpleNamespace(
+                Standard=0,
+                StandardType="",
+                ThreadCallout="1/2-13 Tapped Hole",
+            ),
+        )
 
     def read_annotations():
         assert events[0] == "final-display-mode"
@@ -1245,6 +1400,8 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     views[3].GetNotes = lambda: [decoy]
     views[3].GetAnnotations = read_annotations
     views[3].UpdateViewDisplayGeometry = lambda: events.append("refresh")
+    views[3].GetName2 = lambda: "TNut-Isometric"
+    views[3].ReferencedDocument = SimpleNamespace(FeatureByName=source_feature)
     monkeypatch.setattr(
         kit,
         "set_high_quality_shaded_with_edges",
@@ -1252,21 +1409,45 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     )
     monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
     adapter = SimpleNamespace(
+        currentModel=Drawing(),
         swApp=SimpleNamespace(
             IsSame=lambda a, b: int(
                 getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
             )
-        )
+        ),
     )
     cells = configured.configuration_view_cells(1, 3)
     if drift == "face":
         note.entity, note.attachment_type = face(), 2
     elif drift == "no-thread":
         native_threads.clear()
-    elif drift == "no-callout":
+    elif drift in {
+        "create",
+        "create-from-sheet",
+        "create-without-source-definition",
+        "create-fresh-wrapper",
+        "create-replaced-thread",
+        "no-callout",
+        "activation-refused",
+        "selection-refused",
+        "selection-ignored",
+        "selection-neighbour",
+        "selection-wrong-type",
+        "selection-extra",
+        "restore-view-ignored",
+        "restore-sheet-ignored",
+        "restore-sheet-mismatch",
+        "insert-error-restore-error",
+    }:
         native_threads[0].callout = None
+    elif drift == "wrong-thread":
+        native_threads[0].callout = None
+        native_threads[0].entity = edge("FlangeNutThreadBore")
     elif drift == "duplicate":
         native_threads.append(ThreadAnnotation(ThreadNote()))
+    elif drift == "duplicate-uncreated":
+        native_threads[0].callout = None
+        native_threads.append(ThreadAnnotation(None))
     elif drift == "wrong-feature":
         note.entity = edge("FlangeNutThreadBore")
     elif drift == "null-attachment":
@@ -1276,9 +1457,76 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     elif drift == "unsupported-type":
         note.attachment_type = 3
     if drift in {
+        "activation-refused",
+        "selection-refused",
+        "selection-ignored",
+        "selection-neighbour",
+        "selection-wrong-type",
+        "selection-extra",
+    }:
+        with pytest.raises(
+            RuntimeError, match="cannot activate|cannot select"
+        ) as refused:
+            kit.annotate_member(adapter, "TNut", cells, views)
+        message = str(refused.value)
+        if drift == "selection-ignored":
+            assert "'selection_count': 0" in message
+        elif drift == "selection-neighbour":
+            assert "'selection_name': 'CosmeticThread1'" in message
+            assert "'same_thread': False" in message
+        elif drift == "selection-wrong-type":
+            assert "'selection_type': 2" in message
+        elif drift == "selection-extra":
+            assert "'selection_count': 2" in message
+        assert "insert" not in events
+        assert (
+            drawing_state.selected is None and drawing_state.active == previous_active
+        )
+        return
+    if drift in {
+        "restore-view-ignored",
+        "restore-sheet-ignored",
+        "restore-sheet-mismatch",
+    }:
+        with pytest.raises(
+            RuntimeError, match="cannot restore drawing activation"
+        ) as refused:
+            kit.annotate_member(adapter, "TNut", cells, views)
+        message = str(refused.value)
+        assert "actual view=" in message and "expected view=" in message
+        assert "CosmeticThread1" in message
+        assert events.count("insert") == 1 and drawing_state.selected is None
+        if drift == "restore-sheet-mismatch":
+            assert drawing_state.active is None and drawing_state.sheet == "OtherSheet"
+            assert "OtherSheet" in message
+        else:
+            assert drawing_state.active == "TNut-Isometric"
+        return
+    if drift == "insert-error-restore-error":
+        with pytest.raises(NativeInsertError) as refused:
+            kit.annotate_member(adapter, "TNut", cells, views)
+        assert refused.value is native_error
+        restore_notes = "\n".join(refused.value.__notes__)
+        assert "native restore failed" in restore_notes
+        assert (
+            "CosmeticThread1" in restore_notes and "'requested': True" in restore_notes
+        )
+        assert events.count("insert") == 1 and drawing_state.selected is None
+        return
+    if drift == "create-replaced-thread":
+        with pytest.raises(RuntimeError, match="lost identity after insertion"):
+            kit.annotate_member(adapter, "TNut", cells, views)
+        assert events.count("insert") == 1
+        assert (
+            drawing_state.selected is None and drawing_state.active == previous_active
+        )
+        return
+    if drift in {
         "no-thread",
         "no-callout",
+        "wrong-thread",
         "duplicate",
+        "duplicate-uncreated",
         "wrong-feature",
         "null-attachment",
         "bad-count",
@@ -1290,8 +1538,20 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         assert f"found={2 if drift == 'duplicate' else 0}" in message
         assert "cosmetic_threads=" in message and "callouts=" in message
         assert "candidates=" in message
-        if drift not in {"no-thread", "no-callout"}:
-            assert f"'text': {note.GetText()!r}" in message
+        assert events.count("insert") == int(drift == "no-callout")
+        assert (
+            drawing_state.selected is None and drawing_state.active == previous_active
+        )
+        if drift == "no-callout":
+            assert "'thread_name': 'CosmeticThread1'" in message
+            assert "'source_definition':" in message
+            assert "'requested': True" in message
+        if drift not in {
+            "no-thread",
+            "no-callout",
+            "wrong-thread",
+            "duplicate-uncreated",
+        }:
             assert "'types':" in message and "'features':" in message
         return
     if drift == "ignored-move":
@@ -1299,6 +1559,20 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             kit.annotate_member(adapter, "TNut", cells, views)
         return
     checks = kit.annotate_member(adapter, "TNut", cells, views)
+    created = drift in {
+        "create",
+        "create-from-sheet",
+        "create-without-source-definition",
+        "create-fresh-wrapper",
+    }
+    assert events.count("insert") == int(created)
+    assert drawing_state.selected is None and drawing_state.active == previous_active
+    if created:
+        assert events.index("source-definition") < events.index("insert")
+    if drift == "create-fresh-wrapper":
+        assert (
+            original_thread.callout is None and native_threads[0] is not original_thread
+        )
     box = kit._note_text_box(note)
     assert box[0] >= cells[0][2][0]
     assert box[2] <= cells[2][2][2] < 0.297412
@@ -1313,6 +1587,8 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         note.PropertyLinkedText = "replaced"
     elif drift == "lost":
         native_threads.clear()
+    elif drift == "lost-callout":
+        native_threads[0].callout = None
     elif drift == "identity":
         note.annotation_readback = AnnotationReadback(note, object())
     elif drift == "thread-identity":
@@ -1325,11 +1601,13 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         note.entity, note.attachment_type = face(), 2
     elif drift == "collision":
         note.SetPosition(0.32, 0.23, 0.0)
-    if drift in {"none", "face"}:
+    if drift in {"none", "face"} or created:
         checks[0]()
     else:
         with pytest.raises(RuntimeError):
             checks[0]()
+    # Missing callouts during settled readback are failures, not repair requests.
+    assert events.count("insert") == int(created)
 
 
 @pytest.mark.parametrize(

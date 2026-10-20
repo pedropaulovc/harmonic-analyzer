@@ -789,6 +789,91 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
     assert drawing.TITLE_BLOCK[3] < y < drawing.FINISHED_FIELD[3]
 
 
+@pytest.fixture
+def instruction_note_bounds(monkeypatch):
+    # Sequence: actual b3 native GetExtent. The narrower checks box is only
+    # an accepted-predicate control, not evidence of a native after-fix sheet.
+    sequence_extent = [0.0176475, 0.0863243, 0.0, 0.2278142, 0.2583656, 0.0]
+    checks_extent = [0.0176475, 0.0529645, 0.0, 0.201, 0.0753632, 0.0]
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    sequence = SimpleNamespace(GetExtent=lambda: sequence_extent)
+    checks = SimpleNamespace(GetExtent=lambda: checks_extent)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda _message: None)
+    return SimpleNamespace(
+        sequence_extent=sequence_extent,
+        checks_extent=checks_extent,
+        readback=lambda: drawing._assert_instruction_clearance(adapter, sequence, checks),
+    )
+
+
+def test_instruction_native_bounds_accept_clear_boxes(instruction_note_bounds) -> None:
+    instruction_note_bounds.readback()
+
+
+def test_instruction_native_bounds_refuse_the_b3_title_block_overprint(
+    instruction_note_bounds,
+) -> None:
+    # DetailItem377 from the b3 audit: the box reaches 8.4782 mm into the
+    # title-block field. The note origin alone remains outside that field.
+    instruction_note_bounds.checks_extent[:] = [
+        0.0176475, 0.0529645, 0.0, 0.2244782, 0.0753632, 0.0,
+    ]
+    with pytest.raises(RuntimeError, match="assembly checks.*title-block clearance"):
+        instruction_note_bounds.readback()
+
+
+@pytest.mark.parametrize("gap_m", (0.0039, 0.0041))
+def test_instruction_native_bounds_require_air_below_step_eleven(
+    instruction_note_bounds, gap_m: float,
+) -> None:
+    instruction_note_bounds.checks_extent[4] = (
+        instruction_note_bounds.sequence_extent[1] - gap_m
+    )
+    if gap_m < drawing._PAD:
+        with pytest.raises(RuntimeError, match="native gap below the sequence"):
+            instruction_note_bounds.readback()
+    else:
+        instruction_note_bounds.readback()
+
+
+@pytest.mark.parametrize(
+    ("index", "value"),
+    (
+        (0, drawing.INNER_BORDER[0] + drawing._PAD - 0.0001),
+        (1, drawing.INNER_BORDER[1] + drawing._PAD - 0.0001),
+        (3, drawing.INNER_BORDER[2] - drawing._PAD + 0.0001),
+        (4, drawing.INNER_BORDER[3] - drawing._PAD + 0.0001),
+    ),
+)
+def test_instruction_native_bounds_require_border_air(
+    instruction_note_bounds, index: int, value: float,
+) -> None:
+    instruction_note_bounds.checks_extent[index] = value
+    with pytest.raises(RuntimeError, match="assembly checks.*border clearance"):
+        instruction_note_bounds.readback()
+
+
+@pytest.mark.parametrize(
+    "extent",
+    (
+        (),
+        (0.018, 0.053, 0.0, 0.201, 0.075),
+        (0.018, 0.053, 0.0, math.nan, 0.075, 0.0),
+        (0.018, 0.053, 0.0, 0.201, math.inf, 0.0),
+        (0.018, 0.053, 0.0, 0.018, 0.075, 0.0),
+        (0.018, 0.075, 0.0, 0.201, 0.053, 0.0),
+    ),
+)
+def test_instruction_native_bounds_refuse_unreadable_or_degenerate_boxes(
+    instruction_note_bounds, extent: tuple[float, ...],
+) -> None:
+    instruction_note_bounds.checks_extent[:] = extent
+    with pytest.raises(RuntimeError, match="assembly checks.*invalid native note extent"):
+        instruction_note_bounds.readback()
+
+
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
         assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH

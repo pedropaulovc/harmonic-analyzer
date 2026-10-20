@@ -10,8 +10,11 @@ hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated and purcha
 family from the part registry, numbered in the spec's BOM order with its full
 description and total quantity, one line a row, beside its collapsed parent
 view. Shared kit members retain three native configuration rows with the same
-associative SH-VN-57 Number. Vendor Numbers have their own 56 mm column without
-changing the table's sheet footprint or the reference view's room. Sheets 3 to 5
+associative SH-VN-57 Number. A BOM-scoped key identifies their common purchased
+SKU and maps the native items to named configurations and installed counts,
+never kit purchase quantities. Its measured note box stays below the reference
+view and clear of the rebuilt BOM, border and title block. Vendor Numbers have
+their own 56 mm column without changing the table's footprint. Sheets 3 to 5
 each show the builder-owned
 ``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail
 bars, leadscrew feed, carrier), at the largest scale whose balloon ring fits
@@ -802,19 +805,31 @@ def bom_extent_violations(
     return findings
 
 
-def _assert_bom_on_paper(table: Any) -> None:
-    """Measure the rebuilt table from its native anchor: every row's height (a
-    wrapped description grows its row past ``BOM_ROW_HEIGHT``) and every
-    column's width."""
+def _bom_bounds(table: Any) -> tuple[float, float, float, float]:
+    """The rebuilt table's native top-left anchor, row heights and widths."""
     annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
     position = tuple(float(value) for value in annotation.GetPosition())
-    if len(position) != 3:
-        raise RuntimeError(f"jig BOM position unreadable: {position!r}")
-    rows = int(table.RowCount)
-    height = sum(float(table.GetRowHeight(row)) for row in range(rows))
-    width = sum(
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    widths = tuple(
         float(table.GetColumnWidth(column)) for column in range(int(table.ColumnCount))
     )
+    if (
+        len(position) != 3
+        or not all(map(math.isfinite, position))
+        or not heights
+        or not widths
+        or any(not math.isfinite(value) or value <= 0 for value in (*heights, *widths))
+    ):
+        raise RuntimeError("jig BOM has unreadable native geometry")
+    return position[0], position[1] - sum(heights), position[0] + sum(widths), position[1]
+
+
+def _assert_bom_on_paper(table: Any) -> None:
+    """Measure the rebuilt table, including any row grown by wrapped text."""
+    left, bottom, right, top = _bom_bounds(table)
+    position = (left, top)
+    rows = int(table.RowCount)
+    width, height = right - left, top - bottom
     violations = bom_extent_violations((position[0], position[1]), width, height)
     _telemetry.event(
         "drawing.bom_piece",
@@ -909,6 +924,119 @@ def _validate_bom(
             raise RuntimeError(f"jig BOM part number for {stem!r} reads {applied!r}")
     _assert_bom_on_paper(table)
     return tuple((stem, BOM_ITEM_NUMBERS[stem]) for stem in BOM_COMPONENTS)
+
+
+def _kit_bom_note_text(table: Any, *, configuration: str) -> str:
+    """Resolve kit item citations from native members, never the repeated Number."""
+    registry = PART_ROWS[spec.HOLD_DOWN_STUD]
+    skus = registry["supplier_skus"]
+    if len(skus) != 1:
+        raise RuntimeError("jig kit key requires its one authoritative supplier SKU")
+    number = str(registry["number"])
+    contents = _bom_cells(table)
+    columns = _bom_columns(contents[0])
+    native_rows = bom_row_identities(
+        table,
+        configuration=configuration,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    )
+    lines = [
+        f"PURCHASED KIT IDENTITY: {number}",
+        f"{str(registry['supplier']).upper()} SKU {skus[0]}",
+        "MEMBER CONFIGURATIONS (INSTALLED QTY.):",
+    ]
+    for family, (_physical, member) in spec.KIT_IDENTITIES.items():
+        row = contents[native_rows[family]]
+        quantity = str(registry["configuration_quantities"][member])
+        if row[columns["part"]] != number or row[columns["quantity"]] != quantity:
+            raise RuntimeError(f"jig kit key disagrees with native BOM row for {member}")
+        lines.append(f"ITEM {row[columns['item']]}: {member} ({quantity})")
+    lines.append("BOM QTY. COUNTS MEMBERS, NOT KITS.")
+    return "\n".join(lines)
+
+
+def kit_bom_note_region(
+    bom: tuple[float, float, float, float],
+    reference: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Room below the measured reference, left of the measured BOM/title block."""
+    return (
+        SHEET_INNER_BORDER[0] + REGION_GAP,
+        SHEET_INNER_BORDER[1] + REGION_GAP,
+        min(bom[0], TITLE_BLOCK[0]) - REGION_GAP,
+        reference[1] - REGION_GAP,
+    )
+
+
+def _kit_bom_note_extent(note: Any) -> tuple[float, float, float, float]:
+    values = tuple(float(value) for value in (note.GetExtent() or ()))
+    if len(values) != 6 or not all(map(math.isfinite, values)):
+        raise RuntimeError(f"jig kit key has unreadable native note extent: {values!r}")
+    box = values[0], values[1], values[3], values[4]
+    if box[0] >= box[2] or box[1] >= box[3]:
+        raise RuntimeError(f"jig kit key has empty native note extent: {values!r}")
+    return box
+
+
+def _place_kit_bom_note(adapter: Any, table: Any, reference: Any) -> Callable[[], None]:
+    """Seat the measured BOM key once, then recheck its content and clearance."""
+    configuration = str(reference.ReferencedConfiguration)
+    text = _kit_bom_note_text(table, configuration=configuration)
+    region = kit_bom_note_region(
+        _bom_bounds(table), _view_outline(reference, label="jig BOM reference")
+    )
+    if region[0] >= region[2] or region[1] >= region[3]:
+        raise RuntimeError(f"jig kit key has no clear note field: {region!r}")
+    note = _add_note_block(
+        adapter, BOM_SHEET, text, (region[0], region[3]), label="configured-kit BOM key"
+    )
+    rebuild_drawing(adapter, label="measure jig configured-kit BOM key")
+    adapter.currentModel.GraphicsRedraw2()
+    box = _kit_bom_note_extent(note)
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(map(math.isfinite, position)):
+        raise RuntimeError("jig kit key has unreadable native note position")
+    # A measured inset, not an assumption that the insertion point is an ink edge.
+    inset = BOM_SHEET_CLEARANCE
+    if not annotation.SetPosition2(
+        position[0] + region[0] + inset - box[0],
+        position[1] + region[3] - inset - box[3],
+        position[2],
+    ):
+        raise RuntimeError("jig kit key native note placement failed")
+    rebuild_drawing(adapter, label="seat jig configured-kit BOM key")
+
+    def settled() -> None:
+        _activate_sheet(adapter, BOM_SHEET)
+        adapter.currentModel.GraphicsRedraw2()
+        expected = _kit_bom_note_text(table, configuration=configuration)
+        printed = str(note.GetText() or "").replace("\r\n", "\n").replace("\r", "\n")
+        if expected != text or printed != expected:
+            raise RuntimeError("jig kit key no longer agrees with the native BOM")
+        if int(annotation.OwnerType) != 1 or int(annotation.Visible) != 1:
+            raise RuntimeError("jig kit key is not a visible sheet-owned note")
+        if int(annotation.GetLeaderCount()) != 0:
+            raise RuntimeError("jig kit key unexpectedly has a leader")
+        bom = _bom_bounds(table)
+        outline = _view_outline(reference, label="jig BOM reference")
+        field = kit_bom_note_region(bom, outline)
+        extent = _kit_bom_note_extent(note)
+        if not (
+            field[0] <= extent[0] < extent[2] <= field[2]
+            and field[1] <= extent[1] < extent[3] <= field[3]
+        ):
+            raise RuntimeError(
+                f"jig kit key extent {extent!r} leaves its clear field {field!r}"
+            )
+        _telemetry.info(
+            f"jig configured-kit BOM key: extent_m={extent!r}; "
+            f"field_m={field!r}; BOM air_mm={(bom[0] - extent[2]) * 1000:.3f}; "
+            f"reference air_mm={(outline[1] - extent[3]) * 1000:.3f}"
+        )
+
+    settled()
+    return settled
 
 
 _PROJECTION_TOLERANCE_M = 1e-5
@@ -1901,6 +2029,7 @@ def _place_package(
     items = _validate_bom(
         adapter, table, configuration=str(reference.ReferencedConfiguration)
     )
+    kit_note_settled = _place_kit_bom_note(adapter, table, reference)
     bom_name = _bom_feature_name(table)
     landings: list[BalloonLanding] = []
     for cluster, view, scale in placed:
@@ -1921,7 +2050,11 @@ def _place_package(
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )
-    return scales, (lambda: assert_balloon_landings(adapter, landings), cl_tip_settled)
+    return scales, (
+        lambda: assert_balloon_landings(adapter, landings),
+        cl_tip_settled,
+        kit_note_settled,
+    )
 
 
 @_telemetry.traced("drawing.ch_rocker_arm_tl_oblique_jig_assembly")

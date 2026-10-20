@@ -928,24 +928,30 @@ def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
     _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
-def _section_setting_geometry(upper_shift):
-    """Replay sheet-1 collision coordinates in the native API array layout.
+def _section_setting_geometry(upper_extension):
+    """Native dimension arrays with a marker calibrated to b3's measured gap.
 
     Lines and arrows follow the retained 20261020T083921201Z native audit's
     NearFace display: witnesses extend 1 mm past the dimension line. The
     plain value rests on that line, as the same audit's native RD1 does.
-    The marker envelope is conservative; its translation is an offline
-    control, not a claimed native capture of the new placement.
+    At 16 mm upper extension, b3 measured 0.354 mm clearance. Only that gap
+    was retained, so this synthetic marker envelope reproduces the gap,
+    not unknown b3 absolute bounds, glyph height or arrow dimensions.
+    Translation from that measured baseline is an offline layout control;
+    native acceptance and the upper overall-reference gap still need review.
     """
-    arrow_y = 0.2100755 + upper_shift
+    upper_shift = upper_extension - 0.016
+    marker_bottom = 0.2126656 + 0.000354 + upper_shift
+    arrow_y = marker_bottom + 0.003
+    marker_height = 0.0115739
     section = [
         1, 0, 1,
         0, 0.1199, arrow_y, 0, 0.1199, 0.1699245, 0,
         0.1199, arrow_y, 0, 0.1079, arrow_y, 0, 0.006, 0.003, 0,
         0.1199, 0.1699245, 0, 0.1079, 0.1699245, 0, 0.006, 0.003, 0,
-        0.0999105, 0.2177623 + upper_shift, 0,
+        0.0999105, marker_bottom + marker_height, 0,
         0.0999105, 0.1776114, 0,
-        0.0115739,
+        marker_height,
     ]
     lines = [
         (0, 0, 0, 0, 0.035, 0.1993875, -0.0038495, 0.035, 0.2126656, -0.0038495),
@@ -983,10 +989,11 @@ def _section_setting_geometry(upper_shift):
 )
 def test_section_marker_clears_native_setting_ink(monkeypatch, defect) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    shift = drawing.CLAMP_SECTION_UPPER_EXTENSION - 0.004
-    front, display, section, lines, arrows = _section_setting_geometry(shift)
+    front, display, section, lines, arrows = _section_setting_geometry(
+        drawing.CLAMP_SECTION_TOP_CLEARANCE
+    )
     if defect == "old placement":
-        front, display, section, lines, arrows = _section_setting_geometry(0.0)
+        front, display, section, lines, arrows = _section_setting_geometry(0.016)
     elif defect == "witness intrusion":
         lines.append((0, 0, 0, 0, 0.1094, 0.198, 0, 0.1094, 0.224, 0))
     elif defect == "arrow intrusion":
@@ -1023,6 +1030,44 @@ def test_section_marker_clears_native_setting_ink(monkeypatch, defect) -> None:
             drawing._assert_section_setting_clearance(front, display)
 
 
+def test_marker_deficit_translation_keeps_bounds_on_refusal(monkeypatch) -> None:
+    """The applied production extension must recover b3's measured deficit.
+
+    This checks the physical clearance after the recipe's actual extension
+    change, not a separately hardcoded successful translation. Absolute
+    marker bounds remain synthetic, as described by the calibrated fixture.
+    """
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    measured_extension = 0.016
+    measured_gap = 0.000354
+    events = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
+    front, display, *_ = _section_setting_geometry(measured_extension)
+    with pytest.raises(RuntimeError, match="marker bottom.*dimension ink top"):
+        drawing._assert_section_setting_clearance(front, display)
+    front, display, *_ = _section_setting_geometry(
+        drawing.CLAMP_SECTION_TOP_CLEARANCE
+    )
+    drawing._assert_section_setting_clearance(front, display)
+    before, after = [
+        attributes for name, attributes in events
+        if name.endswith(".section_setting_clearance")
+    ]
+    applied_shift = drawing.CLAMP_SECTION_TOP_CLEARANCE - measured_extension
+    assert before["section_clearance_m"] == pytest.approx(measured_gap)
+    assert before["section_clearance_m"] < drawing.SECTION_SETTING_CLEARANCE
+    assert after["section_marker_bottom_m"] - before["section_marker_bottom_m"] == pytest.approx(
+        applied_shift
+    )
+    assert after["section_ink_top_m"] == before["section_ink_top_m"]
+    assert after["section_clearance_m"] == pytest.approx(measured_gap + applied_shift)
+    assert after["section_clearance_m"] >= drawing.SECTION_SETTING_CLEARANCE
+    assert after["required_clearance_m"] == drawing.SECTION_SETTING_CLEARANCE
+
+
 @pytest.mark.parametrize("text_drop", (0.0, 2.0**-27, 2.0**-25, 0.0005))
 def test_plain_native_value_rests_on_dimension_line(monkeypatch, text_drop) -> None:
     """Replay actual RD1 display data, not a value lifted above its witnesses.
@@ -1033,7 +1078,7 @@ def test_plain_native_value_rests_on_dimension_line(monkeypatch, text_drop) -> N
     above this recorded overall dimension solely to isolate text clearance.
     """
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    front, display, _section, lines, arrows = _section_setting_geometry(0.040)
+    front, display, _section, lines, arrows = _section_setting_geometry(0.050)
     lines[:] = [
         (0, 0, 0, 0, 0.035, 0.1993875, -0.0039495, 0.035, 0.2352219, -0.0039495),
         (0, 0, 0, 0, 0.235, 0.1993875, -0.0039495, 0.235, 0.2352219, -0.0039495),
@@ -1155,7 +1200,9 @@ def test_reference_dimensions_select_owned_visible_end_edges(
             return self.precision
 
         def GetDisplayData(self):
-            return _section_setting_geometry(0.012)[1].GetDisplayData()
+            return _section_setting_geometry(
+                drawing.CLAMP_SECTION_TOP_CLEARANCE
+            )[1].GetDisplayData()
 
     class Draw:
         Extension = SimpleNamespace(
@@ -1219,7 +1266,9 @@ def test_reference_dimensions_select_owned_visible_end_edges(
     )
     front = SimpleNamespace(
         GetVisibleComponents=lambda: (block_component, stick_component),
-        GetSectionLineInfo2=_section_setting_geometry(0.012)[0].GetSectionLineInfo2,
+        GetSectionLineInfo2=_section_setting_geometry(
+            drawing.CLAMP_SECTION_TOP_CLEARANCE
+        )[0].GetSectionLineInfo2,
     )
     adapter = SimpleNamespace(
         currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()
