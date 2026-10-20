@@ -135,9 +135,9 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
-MHA-SM-003's two MHA-MG-001 bracket receivers retain the owner-ruled
+MHA-SM-03's two MHA-MG-01 bracket receivers retain the owner-ruled
 **6.05 +0.10/0 mm** tap-drill depth (2026-10-18). Its lower limit clears the
-MHA-VN-050 screw tip and bottoming-tap lead; its upper limit keeps the drill
+MHA-MG-VN-53 screw tip and bottoming-tap lead; its upper limit keeps the drill
 point in the **7.3 mm end rib**, before section H-H steps down to the
 **5.08 mm plate**. Both receiver axes are inboard of the spring-anchor pad,
 which does not back those bore walls. The callout names retaining the plate
