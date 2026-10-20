@@ -1046,27 +1046,45 @@ def _drive_hole_sheet_callout_check(
     monkeypatch,
     note_box,
     pivot_seat_box: tuple[float, float, float, float] | None = _FAKE_PIVOT_SEAT_BOX,
+    *,
+    pivot_native_state=None,
+    pivot_copies=1,
 ) -> None:
-    """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
-    ``note_box``, the D1 pivot seat note at ``pivot_seat_box`` (None: absent)
-    and a display dimension, which _iter_view_annotations yields as
-    ``(None, annotation)`` since #902 (a5563c7a0)."""
+    """Exercise the native-note guard without COM; boxes are unit controls."""
     from types import SimpleNamespace
 
     import draw_fr_harmonic_base as sheet
 
-    texts = {"note": "D1", "pivot seat": sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n")}
+    edge = object()
+    state = {
+        "attached": (edge,),
+        "count": 1,
+        "types": (1,),
+        "leaders": 1,
+        "dangling": False,
+        "points": (0.180, 0.020, 0.0, 0.190, 0.015, 0.0),
+    }
+    state.update(pivot_native_state or {})
+    pivot = SimpleNamespace(
+        GetAttachedEntities3=lambda: state["attached"],
+        GetAttachedEntityCount3=lambda: state["count"],
+        GetAttachedEntityTypes=lambda: state["types"],
+        GetLeaderCount=lambda: state["leaders"],
+        IsDangling=lambda: state["dangling"],
+        GetLeaderPointsAtIndex=lambda index: state["points"] if index == 0 else (),
+    )
 
     def annotations(_adapter, view):
-        if view != "sheet":
-            return iter(())
-        rows = [
-            (None, "display dimension"),
-            (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
-        ]
-        if pivot_seat_box is not None:
-            rows.append((SimpleNamespace(kind="note", label="PS", box=pivot_seat_box), "pivot seat"))
-        return iter(rows)
+        if view == "sheet":
+            return iter((
+                (None, "display dimension"),
+                (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
+            ))
+        if pivot_seat_box is not None and view == "top view":
+            return iter([
+                (SimpleNamespace(kind="note", label="PS", box=pivot_seat_box), pivot)
+            ] * pivot_copies)
+        return iter(())
 
     for name, value in {
         "_callout_display_data": lambda display, label: (None, (), ()),
@@ -1079,7 +1097,9 @@ def _drive_hole_sheet_callout_check(
         "datum_origin_boxes": lambda points: {},
         "_section_line_obstacles": lambda views: {},
         "_iter_view_annotations": annotations,
-        "_note_text": lambda adapter, annotation: texts[annotation],
+        "_note_text": lambda adapter, annotation: (
+            sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") if annotation is pivot else "D1"
+        ),
         "_iter_tables": lambda adapter, view: (
             [SimpleNamespace(label="holes", box=(0.020, 0.020, 0.090, 0.060))]
             if view == "sheet"
@@ -1087,13 +1107,17 @@ def _drive_hole_sheet_callout_check(
         ),
     }.items():
         monkeypatch.setattr(sheet, name, value)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda actual, wanted: int(actual is wanted))
+    )
     ddoc = SimpleNamespace(ActivateSheet=lambda name: True, GetFirstView=lambda: "sheet")
     sheet._check_hole_sheet_callouts(
-        object(),
+        adapter,
         ddoc,
         callouts={"pedestal": object()},
         views={"top": "top view"},
         datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
+        pivot_seat_edge=edge,
     )
 
 
@@ -1121,6 +1145,77 @@ def test_hole_sheet_callout_check_measures_the_pivot_seat_note_against_obstacles
         _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=(0.030, 0.030, 0.060, 0.050))
     with pytest.raises(RuntimeError, match="no pivot seat note"):
         _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=None)
+
+
+@pytest.mark.parametrize(
+    "state",
+    (
+        {"attached": ()},
+        {"attached": (None,)},
+        {"attached": (object(),)},
+        {"count": 0},
+        {"count": 2},
+        {"types": (2,)},
+        {"dangling": True},
+        {"leaders": 0},
+        {"leaders": 2},
+    ),
+)
+def test_pivot_note_requires_one_live_leader_on_the_exact_d1_edge(monkeypatch, state) -> None:
+    with pytest.raises(RuntimeError, match="pivot seat note lost its edge attachment"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210), pivot_native_state=state
+        )
+
+
+@pytest.mark.parametrize(
+    "points",
+    ((), (0.180, 0.020, 0.0), (0.180,) * 7, (0.180, math.nan, 0.0, 0.190, 0.015, 0.0),
+     (0.180, 0.020, 0.0, math.inf, 0.015, 0.0)),
+)
+def test_pivot_note_refuses_incomplete_or_nonfinite_native_leaders(monkeypatch, points) -> None:
+    with pytest.raises(RuntimeError, match="no complete native leader"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch,
+            (0.200, 0.200, 0.220, 0.210),
+            pivot_native_state={"points": points},
+        )
+
+
+@pytest.mark.parametrize(
+    ("points", "obstacle"),
+    (
+        ((0.180, 0.020, 0.0, 0.050, 0.040, 0.0), "table holes"),
+        ((0.180, 0.020, 0.0, 0.115, 0.105, 0.0), "callout pedestal"),
+        ((0.180, 0.020, 0.0, 0.210, 0.205, 0.0), "note D1"),
+        ((0.180, 0.020, 0.0, 0.115, 0.105, 0.0, 0.190, 0.015, 0.0), "callout pedestal"),
+    ),
+)
+def test_pivot_note_native_leader_participates_in_crossing_checks(
+    monkeypatch, points, obstacle,
+) -> None:
+    with pytest.raises(RuntimeError, match=f"leader of callout pivot seat note crosses {obstacle}"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch,
+            (0.200, 0.200, 0.220, 0.210),
+            pivot_native_state={"points": points},
+        )
+
+
+def test_pivot_note_rejects_a_duplicate_even_when_both_are_attached(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="duplicate pivot seat notes"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210), pivot_copies=2
+        )
+
+
+def test_pivot_note_native_leader_cannot_return_through_its_own_ink(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="pivot seat note crosses its own row"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch,
+            (0.200, 0.200, 0.220, 0.210),
+            pivot_native_state={"points": (0.180, 0.020, 0.0, 0.150, 0.040, 0.0)},
+        )
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -1276,10 +1371,9 @@ def test_pivot_x_keep_replays_clearance_from_both_native_witnesses_and_datum() -
     tail = (0.2649016, line_y, 0.2712516, line_y)
     spring_leader = (0.2717697, 0.1756206, 0.2809549, 0.131634)
     assert not sheet.segment_crosses_box(spring_leader, tail)
-    fraction = (line_y - spring_leader[1]) / (spring_leader[3] - spring_leader[1])
-    spring_x = spring_leader[0] + fraction * (spring_leader[2] - spring_leader[0])
-    assert 0.0 < fraction < 1.0
-    assert spring_x - tail[2] >= 0.0035
+    # The lowered X line now passes BELOW the native spring leader's endpoint;
+    # extending that finite leader to the X lane would invent an intersection.
+    assert min(spring_leader[1], spring_leader[3]) - line_y >= 0.002
 
 
 def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
@@ -1513,6 +1607,107 @@ def test_pivot_y_placement_refuses_failed_state_without_com(
         sheet._place_pivot_seat_y(adapter, [other, annotation])
     assert events[-1][0] == last_event
     assert any(event[0] == "offset-call" for event in events) is offset_called
+
+
+def _pivot_flag_fakes(monkeypatch, *, failed_name=None, readback=None):
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    events = []
+    adapter = object()
+    displays = {}
+
+    class Display:
+        def __init__(self, name):
+            self.name = name
+            self.text = ""
+
+        def GetText(self, part):  # noqa: N802 - the COM member name
+            events.append(("read", self.name, part))
+            assert part == 3
+            return readback if self.name == failed_name else self.text
+
+    annotations = []
+    for name in ("PivotSeatY", "Other", "PivotSeatX"):
+        display = Display(name)
+        displays[name] = display
+        annotations.append(SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display
+        ))
+
+    def set_flags(actual_adapter, actual_annotations, callouts, *, location):
+        assert actual_adapter is adapter
+        assert actual_annotations is annotations
+        events.append(("set", dict(callouts), location))
+        for name, text in callouts.items():
+            displays[name].text = text
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, annotation: annotation.name)
+    monkeypatch.setattr(sheet, "set_dimension_callouts", set_flags)
+    return adapter, annotations, events
+
+
+def test_pivot_offsets_flag_exactly_both_native_above_compartments(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert sheet.PIVOT_SEAT_CALLOUTS == {"PivotSeatX": "SEE D1", "PivotSeatY": "SEE D1"}
+    assert events == [
+        ("set", sheet.PIVOT_SEAT_CALLOUTS, "above"),
+        ("read", "PivotSeatY", 3),
+        ("read", "PivotSeatX", 3),
+    ]
+
+
+@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
+@pytest.mark.parametrize("actual", (None, "", "SEE C1", "SEE D1\n", "SEE D1\r\n"))
+def test_pivot_flags_refuse_silent_or_multiline_native_readback(
+    monkeypatch, name, actual,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(
+        monkeypatch, failed_name=name, readback=actual
+    )
+    with pytest.raises(RuntimeError, match=f"native {name} ABOVE flag did not persist"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events[-1] == ("read", name, 3)
+
+
+@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
+@pytest.mark.parametrize("count", (0, 2))
+def test_pivot_flags_require_exactly_one_of_each_native_offset(monkeypatch, name, count) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    selected = next(annotation for annotation in annotations if annotation.name == name)
+    annotations[:] = [annotation for annotation in annotations if annotation is not selected]
+    annotations.extend([selected] * count)
+    with pytest.raises(RuntimeError, match="missing native D1 offsets|duplicate native D1 offset"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    "callouts",
+    (
+        {"PivotSeatX": "SEE D1"},
+        {"PivotSeatX": "SEE D1", "PivotSeatY": "SEE\nD1"},
+        {"PivotSeatX": "SEE\rD1", "PivotSeatY": "SEE D1"},
+        {"PivotSeatX": "", "PivotSeatY": "SEE D1"},
+    ),
+)
+def test_pivot_flags_refuse_missing_keys_or_nonprintable_caption_rows(monkeypatch, callouts) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    monkeypatch.setattr(sheet, "PIVOT_SEAT_CALLOUTS", callouts)
+    with pytest.raises(RuntimeError, match="both one-line ABOVE flags"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events == []
 
 
 @pytest.mark.parametrize(
@@ -2836,13 +3031,129 @@ _NOTE_CHAR_MM = 2.69
 _NOTE_LINE_MM = 4.58
 
 
-def _pivot_seat_note_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+# r4 native cap height/pitch and PDF-font-derived conservative row widths.
+# Widths and the translated placements are offline estimates, not a claim
+# that the replacement note or flags have already printed on a native seat.
+_D1_NOTE_ROW_WIDTHS_M = (0.0420751, 0.0378354, 0.0487889, 0.0553971)
+_D1_NOTE_PITCH_M = 0.0045257
+_R4_DATUM_LETTERS = {
+    "X": (0.242401, 0.142429, 0.245245, 0.148808),
+    "X zero": (0.218557, 0.142407, 0.221143, 0.148787),
+    "Y": (0.207974, 0.175453, 0.210736, 0.181833),
+    "Y zero": (0.208062, 0.152902, 0.210648, 0.159282),
+}
+_R4_SPOTFACE_BOX = (0.168835, 0.123861, 0.218752, 0.144083)
+_R4_SPOTFACE_LEADER_END = (0.230274, 0.099194)
+
+
+def _d1_note_rows(xy):
     import draw_fr_harmonic_base as sheet
 
-    lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    width = max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0
-    height = len(lines) * _NOTE_LINE_MM / 1000.0
-    return (xy[0], xy[1] - height, xy[0] + width, xy[1])
+    return {
+        text: (xy[0], baseline, xy[0] + width, baseline + 0.0035)
+        for row, (text, width) in enumerate(zip(
+            sheet.PIVOT_SEAT_STEP.split("\n"), _D1_NOTE_ROW_WIDTHS_M, strict=True
+        ))
+        for baseline in (xy[1] - (row + 1) * _D1_NOTE_PITCH_M,)
+    }
+
+
+def test_d1_note_and_flags_replay_r4_measured_ink_lanes() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.PIVOT_SEAT_NOTE_XY == (0.1575, 0.1445)
+    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
+    assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
+    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
+    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2484, 0.1550)
+    rows = _d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY)
+    note = (
+        min(box[0] for box in rows.values()), min(box[1] for box in rows.values()),
+        max(box[2] for box in rows.values()), max(box[3] for box in rows.values()),
+    )
+    last = list(rows.values())[-1]
+    assert last[2] == note[2]  # The leader leaves the longest, LAST row.
+    note_leader = ((last[2], last[1]), (0.2583636, 0.1690524))
+    for row, box in rows.items():
+        inner = (box[0] + 0.0002, box[1] + 0.0002, box[2] - 0.0002, box[3] - 0.0002)
+        assert _segment_box_gap(note_leader, inner) > 0.0001, row
+
+    # r4's actual native value boxes, translated only by the approved keeps.
+    dy = sheet.HOLE_TOP_KEEP["PivotSeatX"][1] - 0.1385
+    x_value = (0.2291351, 0.1357219 + dy, 0.2562650, 0.1392219 + dy)
+    x_flag = (0.23535, x_value[1] + 0.00556, 0.25005, x_value[1] + 0.00906)
+    y_value = (0.2599351, 0.1822219, 0.2870650, 0.1857219)
+    y_flag = (0.26615, 0.18778, 0.28085, 0.19128)
+    tags = {
+        "E1": (0.297, 0.1849743, 0.30209, 0.1884743),
+        "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
+        "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
+    }
+    x_line_y = 0.1357219 + dy
+    witnesses = [
+        ((x, x_line_y - 0.001), (x, end_y))
+        for x, end_y in _R2B_PIVOT_X_WITNESS_STARTS
+    ]
+    assert _R2B_PIVOT_X_WITNESS_STARTS[0][0] - x_value[2] >= 0.002
+    for name, box in {"X value": x_value, "X flag": x_flag, "Y value": y_value, "Y flag": y_flag}.items():
+        for label, letter in _R4_DATUM_LETTERS.items():
+            assert _box_gap(box, letter) >= 0.0035, (name, label)
+        assert _segment_box_gap(note_leader, box) >= 0.0035, name
+        for witness in witnesses:
+            assert _segment_box_gap(witness, box) >= 0.002, name
+    for label, box in {**tags, **_R4_DATUM_LETTERS}.items():
+        assert _segment_box_gap(note_leader, box) >= 0.0035, label
+    assert _segment_box_gap(note_leader, _R4_DATUM_LETTERS["X"]) >= 0.0035
+    for box in (y_value, y_flag):
+        for tag, tag_box in tags.items():
+            assert _box_gap(box, tag_box) >= 0.0035, tag
+    y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
+    assert _segment_box_gap(y_offset_leader, y_flag) >= 0.0035
+    assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
+    cross_tap_first_row = (0.2624, 0.11983, 0.3076, 0.12333)
+    assert _box_gap(x_value, cross_tap_first_row) >= 0.0035
+    assert note[3] < 0.153512 - 0.0035  # Even the padded plan outline is clear.
+
+
+def test_d1_tag_clears_both_attached_note_leader_and_pivot_x_witness() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
+    tag = (x, y - _D1_NOTE_PITCH_M, x + 0.006404, y - _D1_NOTE_PITCH_M + 0.0035)
+    last = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())[-1]
+    leader = ((last[2], last[1]), (0.2583636, 0.1690524))
+    witness = ((0.2583636, 0.1282219), (0.2583636, 0.1711521))
+    assert _segment_box_gap(leader, tag) >= 0.0035
+    assert _segment_box_gap(witness, tag) >= 0.0035
+    for letter in _R4_DATUM_LETTERS.values():
+        assert _box_gap(tag, letter) >= 0.0035
+    # The initially proposed left tag would crowd the new note's leader.
+    crowded = (0.231, tag[1], 0.237404, tag[3])
+    assert _segment_box_gap(leader, crowded) < 0.0035
+
+
+def test_native_spotface_callout_moves_to_the_freed_left_lane_below_the_table() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.100, 0.135)
+    dx = sheet.HOLE_SIDE_KEEP["SpotFaceDia"][0] - 0.193
+    moved = tuple(value + (dx if index % 2 == 0 else 0.0) for index, value in enumerate(_R4_SPOTFACE_BOX))
+    last = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())[-1]
+    rows = list(_d1_note_rows(sheet.PIVOT_SEAT_NOTE_XY).values())
+    note = (rows[0][0], last[1], last[2], rows[0][3])
+    assert sheet.box_gap(_R4_SPOTFACE_BOX, note) < 0.0
+    assert _box_gap(moved, note) > 0.030
+    spotface_leader = ((moved[2], moved[1]), _R4_SPOTFACE_LEADER_END)
+    assert _segment_box_gap(spotface_leader, note) > 0.0095
+    assert moved[1] > _TITLE_BLOCK_M[3] + 0.0035
+    assert moved[0] > _BORDER_INNER_M[0] + 0.0035
+    table = (0.018, 0.160, 0.162763, 0.260)
+    assert _box_gap(moved, table) > 0.015
+    assert _box_gap(note, table) > 0.015
+    assert sheet.find_leader_crossings(
+        {"spotface": [(*spotface_leader[0], *spotface_leader[1])]},
+        {"callout pivot seat note": note, "table holes": table},
+    ) == []
 
 
 def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
@@ -2858,6 +3169,9 @@ def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
     assert sheet.PIVOT_SEAT_STEP is base_spec.PIVOT_SEAT_STEP
     assert base_spec.PIVOT_SEAT_TAG == "D1"
     assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    assert sheet.PIVOT_SEAT_STEP.split("\n") == [
+        "D1: LOCATES PIVOT", "WITH MHA-DT-02", "TABLE X/Y REFERENCE", "ONE SETUP AT ASSEMBLY",
+    ]
     # Part/table identities are allowed; no other digits or tolerance tokens
     # can replace the native offset dimensions with another numeric note.
     identification = sheet.PIVOT_SEAT_STEP
@@ -2871,21 +3185,47 @@ def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
     pivot_size = [h for h in sheet.TABLE_HOLES if h[2] == sheet.PIVOT_SCREW_HOLE_DIA]
     assert pivot_size == [(*sheet.PIVOT_SCREW_XZ, sheet.PIVOT_SCREW_HOLE_DIA)]
     assert "B1, D1," in sheet.UNDERSIDE_BOTTOM_CALLOUTS["ShallowBoss4Dia"]
-    obstacles = dict(E0E287C83_OBSTACLES)
-    obstacles.update((f"callout {name}", b) for name, b in HB_RENDER_4_BOXES.items())
-
-    def clashes(xy: tuple[float, float]) -> list[str]:
-        return sheet.find_callout_clashes({sheet.PIVOT_SEAT_NOTE_LABEL: _pivot_seat_note_box(xy)}, obstacles)
-
-    assert clashes(sheet.PIVOT_SEAT_NOTE_XY) == []
-    on_table = clashes((sheet.PIVOT_SEAT_NOTE_XY[0], 0.140))
-    assert any("table DetailItem460" in finding for finding in on_table), on_table
-    assert _pivot_seat_note_box(sheet.PIVOT_SEAT_NOTE_XY)[1] > 0.02  # above the frame's inner border
     # The build check boxes the note's own ink, found by its text as read back.
     assert sheet.is_pivot_seat_note(sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n")
     assert not sheet.is_pivot_seat_note(sheet.TRANSFER_SPRING_CALLOUT)
     source = inspect.getsource(sheet._check_hole_sheet_callouts)
     assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" in source
+
+
+def test_d1_note_is_created_once_on_the_exact_native_table_rim() -> None:
+    import ast
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    tree = ast.parse(inspect.getsource(sheet.build))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    notes = [
+        node for node in calls
+        if any(isinstance(arg, ast.Name) and arg.id == "PIVOT_SEAT_STEP" for arg in node.args)
+    ]
+    assert len(notes) == 1
+    assert notes[0].func.id == "_attached_note"
+    assert [ast.unparse(arg) for arg in notes[0].args] == [
+        "adapter", "hole_top", "pivot_seat_rim", "PIVOT_SEAT_STEP", "PIVOT_SEAT_NOTE_XY",
+    ]
+    rims = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "pivot_seat_rim" for target in node.targets)
+    ]
+    assert len(rims) == 1
+    expected = ast.parse(
+        "hole_entities[TABLE_HOLES.index((*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA))]",
+        mode="eval",
+    ).body
+    assert ast.dump(rims[0].value) == ast.dump(expected)
+    check = next(node for node in calls if getattr(node.func, "id", None) == "_check_hole_sheet_callouts")
+    assert next(keyword.value.id for keyword in check.keywords if keyword.arg == "pivot_seat_edge") == "pivot_seat_rim"
+    flags = [node for node in calls if getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions"]
+    assert len(flags) == 1
+    assert [ast.unparse(arg) for arg in flags[0].args] == ["adapter", "hole_top_dimensions"]
+    assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
 
 
 def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> None:

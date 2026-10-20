@@ -46,6 +46,7 @@ from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -133,7 +134,9 @@ from fr_harmonic_base_spec import (
     GREEN_TOP,
     HEIGHT_REFERENCE_CALLOUTS,
     PART_SURFACE_FINISHES,
+    PIVOT_SEAT_DIMENSIONS,
     PIVOT_SEAT_STEP,
+    PIVOT_SEAT_TAG,
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
@@ -367,12 +370,14 @@ HOLE_TOP_KEEP = {
     # D1 is held from the nearer transferred pedestal seat. The point-only
     # reference sketch supplies real centre-to-centre extension origins;
     # place X below the plan, left of both witnesses and the datum X letter.
-    "PivotSeatX": (0.2427, 0.1385),
+    "PivotSeatX": (0.2427, 0.1320),
     # Keep the short native line between the holes; offset only its text
     # onto the blank pocket floor, clear of the nearby marks and leaders.
     "PivotSeatY": (0.2616, 0.1705),
 }
 PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
+# ABOVE accepts one printable row; both native offsets flag the same D1 note.
+PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, f"SEE {PIVOT_SEAT_TAG}")
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear
 # end it cuts.
@@ -400,7 +405,9 @@ SECTION_KEEP = {
     "SpotFaceDepth": (0.3845, 0.1186),
 }
 HOLE_SIDE_KEEP = {
-    "SpotFaceDia": (0.193, 0.135),
+    # The native spotface block uses the left lane freed by D1's attached note;
+    # its unchanged front-hole leader passes below that note, not through it.
+    "SpotFaceDia": (0.100, 0.135),
     # 4 mm above the old station: three caption lines hang below this value and
     # the lowest reached the title-block band at y 66 mm (audit keep-out).
     "CrossScrewAxisHeight": (0.196, 0.0785),
@@ -444,7 +451,7 @@ HOLE_TAG_POSITIONS = {
     "A3": (0.344, 0.176),
     "A4": (0.344, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.2456, 0.1550),
+    "D1": (0.2484, 0.1550),
     # The transferred pinion-rig seats left the table (U28 corollary), and
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
@@ -734,6 +741,34 @@ def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"harmonic base PivotSeatY text did not persist: {position!r}")
 
 
+def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Apply one-line ABOVE flags to both native D1 offsets and read them back."""
+    if set(PIVOT_SEAT_CALLOUTS) != set(PIVOT_SEAT_DIMENSIONS) or any(
+        not text or "\n" in text or "\r" in text
+        for text in PIVOT_SEAT_CALLOUTS.values()
+    ):
+        raise RuntimeError("D1 offsets require both one-line ABOVE flags")
+    matches = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in PIVOT_SEAT_CALLOUTS:
+            continue
+        if name in matches:
+            raise RuntimeError(f"duplicate native D1 offset: {name}")
+        matches[name] = annotation
+    if set(matches) != set(PIVOT_SEAT_CALLOUTS):
+        raise RuntimeError(f"missing native D1 offsets: {set(PIVOT_SEAT_CALLOUTS) - set(matches)}")
+    set_dimension_callouts(
+        adapter, annotations, PIVOT_SEAT_CALLOUTS, location="above"
+    )
+    for name, annotation in matches.items():
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        actual = display.GetText(3)  # swDimensionTextCalloutAbove
+        if actual != PIVOT_SEAT_CALLOUTS[name]:
+            raise RuntimeError(f"native {name} ABOVE flag did not persist: {actual!r}")
+
+
 def _spread_hole_tags(view: Any, table: Any) -> None:
     table_locations = {}
     for row in range(1, int(table.RowCount)):
@@ -834,10 +869,10 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
 )
 # The cone swing set is made against the arbor carried by MHA-DT-02.
 # PivotSeatReference owns D1's native banded offsets from the near pedestal
-# seat; the spec-owned setup note identifies their mate and makes the table's
-# origin-based position reference-only. Keep that identification below the
-# table, with the same read-back ink clearance check as the hole callouts.
-PIVOT_SEAT_NOTE_XY = (0.020, 0.108)
+# seat; both offsets flag the single spec-owned EDGE-attached D1 note below
+# the table. Its mate/setup facts disclose the table's reference-only X/Y;
+# the native readback checks its ink and actual leader with the hole callouts.
+PIVOT_SEAT_NOTE_XY = (0.1575, 0.1445)
 PIVOT_SEAT_NOTE_LABEL = "pivot seat note"
 
 
@@ -1761,6 +1796,7 @@ def _check_hole_sheet_callouts(
     callouts: dict[str, Any],
     views: dict[str, Any],
     datum_origin: Any,
+    pivot_seat_edge: Any,
 ) -> None:
     """Fail loud on any sheet-2 callout that crowds another callout, a note, a
     view label, the hole table, the table's datum origin, any view's casting
@@ -1801,7 +1837,34 @@ def _check_hole_sheet_callouts(
             if not note_reaches_final_sheet(text):
                 continue
             if is_pivot_seat_note(text):
+                if PIVOT_SEAT_NOTE_LABEL in boxes:
+                    raise RuntimeError("callout check found duplicate pivot seat notes")
+                annotation = _early_bound(annotation, "IAnnotation")
+                _assert_attached_to(
+                    adapter,
+                    annotation,
+                    pivot_seat_edge,
+                    entity_type="EDGE",
+                    what="pivot seat note",
+                    label=PIVOT_SEAT_TAG,
+                )
+                points = tuple(
+                    float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ()
+                )
+                if (
+                    len(points) < 6
+                    or len(points) % 3
+                    or not all(math.isfinite(value) for value in points)
+                ):
+                    raise RuntimeError(f"pivot seat note has no complete native leader: {points!r}")
+                leaders[PIVOT_SEAT_NOTE_LABEL] = [
+                    (points[index], points[index + 1], points[index + 3], points[index + 4])
+                    for index in range(0, len(points) - 3, 3)
+                ]
                 boxes[PIVOT_SEAT_NOTE_LABEL] = element.box
+                # The longest row is last, so the leader must leave the full
+                # native ink envelope, not rise back through an earlier row.
+                own_rows[PIVOT_SEAT_NOTE_LABEL] = {PIVOT_SEAT_STEP: element.box}
                 continue
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
@@ -2171,6 +2234,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     _place_pivot_seat_y(adapter, hole_top_dimensions)
+    _flag_pivot_seat_dimensions(adapter, hole_top_dimensions)
     section_dimensions = curate_view_dimensions(
         adapter,
         section,
@@ -2193,9 +2257,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
     # review over-specification item).
-    # Sheet-2 left notes column, below the hole table: D1's setup and mate
-    # identification, with its offsets carried only by the native dimensions.
-    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
@@ -2260,6 +2321,12 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
+    pivot_seat_rim = hole_entities[
+        TABLE_HOLES.index((*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA))
+    ]
+    _attached_note(
+        adapter, hole_top, pivot_seat_rim, PIVOT_SEAT_STEP, PIVOT_SEAT_NOTE_XY
+    )
     _attached_note(
         adapter,
         hole_top,
@@ -2527,6 +2594,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callouts=hole_sheet_callouts,
         views={"holes top": hole_top, "holes front": hole_side, "section A-A": section},
         datum_origin=hole_feature.DatumOrigin,
+        pivot_seat_edge=pivot_seat_rim,
     )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(
