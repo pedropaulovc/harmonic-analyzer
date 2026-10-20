@@ -159,7 +159,6 @@ CLUSTERS = (
             spec.PILLOW_BLOCK_SCREW,
             spec.NUT_SCREW,
             spec.BLOCK_LOCK_WASHER,
-            spec.NUT_WASHER,
         ),
         (1.0, 3.0),
         # Review full-bought (owner ruling 2026-10-18): the nut bracket and its
@@ -476,9 +475,6 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
-    ),
-    "ch-rocker-arm-tl-vn-oblique-nut-washer": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-nut-washer"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):

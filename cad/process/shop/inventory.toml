@@ -3660,8 +3660,8 @@ verify = true
 purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-17 UTC), not a second required purchase."
 note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Backlash, dimensional tolerances and received fit remain unverified."
 # Lubrication and backlash acceptance remain shop checks, not catalogue proof.
-# Four plain 3.5 mm holes take #4-40 screws and flat washers into the shop-made
-# nut bracket; bought carriage threads remain M4.
+# Four plain 3.5 mm holes take #4-40 button head screws, no washers, into the
+# shop-made nut bracket; bought carriage threads remain M4.
 # C4 owner identifies TL-29 (MHA-CH-06-TL-29), defined in
 # cad/scripts/ch_rocker_arm_tl_oblique_nut_bracket_spec.py, as that bracket.
 # Interface authority: NUT_ID and NUT_* in

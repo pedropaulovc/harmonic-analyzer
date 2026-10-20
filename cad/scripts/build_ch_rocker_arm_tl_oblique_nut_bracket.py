@@ -15,7 +15,8 @@ unprinted, driven from them. Then three native Hole Wizard features: the two
 circle, and the nut seat (counterbore for the spigot over the screw's THRU
 clearance), both on the -X face, placed from the Y = 0 face and the bottom.
 The seat's placement dimensions print; the #4-40 taps' run from the edges, so
-they stay unprinted and the taps print from the seat's axis on the hidden
+they stay unprinted and the taps' offsets from the seat's axis print as
+REFERENCE values (spotted from the nut at assembly) on the hidden
 Right-plane sketch ``NutPatternReference``.
 
 Run (SolidWorks already open)::

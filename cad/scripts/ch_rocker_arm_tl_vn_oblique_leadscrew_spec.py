@@ -71,7 +71,6 @@ import math
 from fractions import Fraction
 
 import _config
-import _mcmaster_90945a710 as _nut_washer
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -115,18 +114,16 @@ NUT_LENGTH = 15.0
 NUT_BODY_SHORT = 1.5  # the spigot, in TL-29's -X counterbore
 NUT_BODY_LONG = NUT_LENGTH - NUT_FLANGE_THICK - NUT_BODY_SHORT  # 10, proud on -X
 # US-customary UNC (fastener policy): the flange's Ø3.5 plain holes float a
-# #4-40 (major 2.845) 0.33 a side. Each head sits on a plain NAS620C4L flat
-# washer (MHA-CH-06-TL-VN-72), Ø5.31: it doubles the head's bearing ring on the
-# brass flange and stays inside the Ø16 circle less the nut's Ø10.2 body.
+# #4-40 (major 2.845) 0.33 a side. Each button head (MHA-CH-06-TL-VN-66)
+# bears directly on the brass flange, no washer (owner ruling 2026-10-20).
 NUT_SCREW = "#4-40"
-NUT_WASHER_THICK = _nut_washer.THICKNESS_MAX  # 0.457, the band's maximum
 # Derived from the nut above, so a vendor swap changes numbers only.
 NUT_SCREW_MAJOR = THREAD_MAJOR_MM[NUT_SCREW]
 INCH_SCREW_LENGTHS = ("1/4", "5/16", "3/8", "7/16", "1/2", "5/8", "3/4")  # SHCS
 # Rule 18 at the worst case: the shortest screw (ASME B18.3, -0.03 in up to
 # 1 in long, plus nothing) past the grip, less the screw tip's incomplete
 # threads (rule 18's 1.5 pitches) and the tap mouth's title-block edge break.
-SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3, up to 1 in long
+SHCS_LENGTH_TOL_MM = 0.03 * INCH  # STANDARD: ASME B18.3 (SHCS, BHCS), to 1 in long
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 _TIP_INCOMPLETE_PITCHES = 1.5  # rule 18
 # Each bought screw is the shortest stock length whose worst-case full thread
@@ -136,8 +133,9 @@ ENGAGEMENT_TARGET_D = 2.0
 
 
 def full_thread_min(length: str, grip: float, thread: str) -> float:
-    """Worst-case full-thread engagement of an inch SHCS ``length`` long past
-    ``grip`` (the grip at its nominal: the bought parts state no band)."""
+    """Worst-case full-thread engagement of an inch B18.3 socket screw
+    ``length`` long past ``grip`` (the grip at its nominal: the bought parts
+    state no band)."""
     pitch = INCH / float(thread.rsplit("-", 1)[1])
     return (
         float(Fraction(length)) * INCH
@@ -162,16 +160,16 @@ def _shortest_length(grip: float, thread: str) -> str:
 
 # UNVERIFIED: the vendor gives the flange's 3.5 with no band; a thicker flange
 # takes engagement off one for one (ENGAGEMENT_TARGET_D's half diameter).
-NUT_SCREW_GRIP = NUT_FLANGE_THICK + NUT_WASHER_THICK  # 3.957
+NUT_SCREW_GRIP = NUT_FLANGE_THICK  # the head on the flange: 3.5
 NUT_SCREW_LENGTH = _shortest_length(NUT_SCREW_GRIP, NUT_SCREW)  # 1/2
 NUT_SCREW_LENGTH_MM = float(Fraction(NUT_SCREW_LENGTH)) * INCH  # 12.7
-NUT_SCREW_ENGAGEMENT = NUT_SCREW_LENGTH_MM - NUT_SCREW_GRIP  # 8.743 nominal
+NUT_SCREW_ENGAGEMENT = NUT_SCREW_LENGTH_MM - NUT_SCREW_GRIP  # 9.2 nominal
 NUT_SCREW_FULL_THREAD_MIN = full_thread_min(
     NUT_SCREW_LENGTH, NUT_SCREW_GRIP, NUT_SCREW
-)  # 6.778, 2.38 D
-# The longest screw (B18.3: never long) on the thinnest washer stops inside
-# TL-29's full thread.
-NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # TL-29's full thread: 9.543
+)  # 7.236, 2.54 D
+# The longest screw (B18.3: never long) on the flange's nominal stops 0.8
+# inside TL-29's full thread.
+NUT_SCREW_TAP_DEPTH = NUT_SCREW_ENGAGEMENT + 0.8  # TL-29's full thread: 10.0
 # KP08 pillow block. Verified: axis height, bolt spacing, length, height, bore.
 KP08_AXIS_HEIGHT = 15.0
 KP08_BOLT_SPACING = 42.0
@@ -342,7 +340,9 @@ NUT_BRACKET_HEIGHT = NUT_BRACKET_TOP_Z - NUT_BRACKET_BOTTOM_Z
 # counterbore in the -X face and the screw passes TL-29 THRU; the flange
 # screws to the -X face with 4 x #4-40 tapped on the nut's NUT_HOLE_PCD and the
 # long body stands proud on -X.
-NUT_BORE_DIA = NUT_BODY_DIA + 0.5  # the spigot's counterbore: 10.7
+# 0.3 over the spigot (owner ruling 2026-10-20), so the spigot's float, which
+# the spotted #4-40 taps stack, holds their wall to this counterbore.
+NUT_BORE_DIA = NUT_BODY_DIA + 0.3  # the spigot's counterbore: 10.5
 NUT_BORE_YZ = (
     -(SCREW_LATERAL - BLOCK_SIDE_LATERAL),
     SCREW_AXIS_Z - NUT_BRACKET_BOTTOM_Z,

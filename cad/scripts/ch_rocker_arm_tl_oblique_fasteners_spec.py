@@ -32,16 +32,17 @@ screw sized to float).
 Washers (``WASHERS``): a wedge-lock pair under each head of two joints whose
 screws carry a reversing load, so rule 23 wants a mechanical lock: the two
 TL-29 block screws (the leadscrew's reversing thrust, TL-VN-70) and the two
-feed lever screws (the operator's push and pull on the lever, TL-VN-71). A
-plain flat washer (TL-VN-72) under each of the four nut screw heads spreads the
-head's clamp on the Tr8 nut's brass flange. Each washer's stack adds to its
-row's grip. Every other head seats in a counterbore or countersink, or on a
-flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit. A
-longer stud reaches the swinging carrier (the jig spec's ``STUD_LENGTH_MAX``).
+feed lever screws (the operator's push and pull on the lever, TL-VN-71).
+Each pair's stack adds to its row's grip. The four nut screws are button
+heads (BHCS) bearing directly on the Tr8 nut's brass flange, no washer (owner
+ruling 2026-10-20). Every other head seats in a counterbore or countersink,
+or on a flat face. Hold-down studs: 1/2-13 x 3 in only, from the clamping kit.
+A longer stud reaches the swinging carrier (the jig spec's
+``STUD_LENGTH_MAX``).
 
 Each joint's screw is its own bought part and BOM row (TL-VN-61 to TL-VN-69, the
-wedge-lock pairs TL-VN-70 and TL-VN-71, the flat washer TL-VN-72); the assembly steps
-name each by its callout (``callout``) and its item number.
+wedge-lock pairs TL-VN-70 and TL-VN-71); the assembly steps name each by its
+callout (``callout``) and its item number.
 """
 
 from __future__ import annotations
@@ -62,6 +63,7 @@ from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 INCH = trammel.INCH
 RAILS = 2  # one rail, one base bar, one carriage, one pivot block per side
 SHCS = "SHCS"
+BHCS = "BHCS"  # ASME B18.3 button head socket cap screw
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
@@ -80,7 +82,7 @@ def inch_mm(length: str) -> float:
 class Fastener:
     joint: str
     thread: str  # as printed: "#8-32", "M4"
-    head: str  # SHCS or FLAT HEAD
+    head: str  # SHCS, BHCS or FLAT HEAD
     length: str  # as printed: "3/4" (inch) or "20" (mm)
     count: int
     grip_mm: float  # under the head, before the receiving thread
@@ -189,10 +191,10 @@ KP08_TO_BRACKET = Fastener(
 NUT_TO_NUT_BRACKET = Fastener(
     "Tr8 flanged nut to TL-29 nut bracket",
     leadscrew.NUT_SCREW,
-    SHCS,
+    BHCS,
     leadscrew.NUT_SCREW_LENGTH,
     len(leadscrew.NUT_HOLE_ANGLES_DEG),
-    leadscrew.NUT_SCREW_GRIP,  # head on the TL-VN-72 washer, on the flange
+    leadscrew.NUT_SCREW_GRIP,  # the button head on the flange
     leadscrew.NUT_SCREW_TAP_DEPTH,  # blind
 )
 RISER_TO_CARRIER = Fastener(
@@ -253,14 +255,7 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-NUT_WASHER = Washer(
-    NUT_TO_NUT_BRACKET.joint,
-    "#4",
-    "FLAT WASHER",
-    NUT_TO_NUT_BRACKET.count,
-    leadscrew.NUT_WASHER_THICK,
-)
-WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER, NUT_WASHER)
+WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER)
 
 # Hold-down studs, from the clamping kit (fixtures.clamping-kit-pm-52pcck-14mm).
 HOLD_DOWN_STUD_THREAD = "1/2-13"

@@ -81,7 +81,7 @@ _EXPECTED = {
         "MHA-CH-06-TL-VN-65",
         4,
     ),
-    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("91251A110",), "MHA-CH-06-TL-VN-66", 4),
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": (("4C50BHCA",), "MHA-CH-06-TL-VN-66", 4),
     "ch-rocker-arm-tl-vn-oblique-riser-screw": (("91771A112",), "MHA-CH-06-TL-VN-67", 4),
     "ch-rocker-arm-tl-vn-oblique-clamp-screw": (("91251A541",), "MHA-CH-06-TL-VN-68", 1),
     "ch-rocker-arm-tl-vn-oblique-lever-screw": (("91251A583",), "MHA-CH-06-TL-VN-69", 2),
@@ -95,14 +95,13 @@ _EXPECTED = {
         "MHA-CH-06-TL-VN-71",
         2,
     ),
-    "ch-rocker-arm-tl-vn-oblique-nut-washer": (
-        ("90945A710",),
-        "MHA-CH-06-TL-VN-72",
-        4,
-    ),
 }
-# The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
-_SUPPLIERS = {"dt-vn-post-mount-screw": "MSC Industrial Supply"}
+# The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC; the jig's nut
+# screws are Olander button heads (owner ruling 2026-10-20).
+_SUPPLIERS = {
+    "dt-vn-post-mount-screw": "MSC Industrial Supply",
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": "Olander",
+}
 
 
 def _supplier(stem: str) -> str:

@@ -132,7 +132,6 @@ _PARTS = (
     "ch-rocker-arm-tl-vn-oblique-lever-screw",
     "ch-rocker-arm-tl-vn-oblique-block-washer",
     "ch-rocker-arm-tl-vn-oblique-lever-washer",
-    "ch-rocker-arm-tl-vn-oblique-nut-washer",
 )
 assert _PARTS == spec.BOM_ORDER, (_PARTS, spec.BOM_ORDER)
 # A family of this many instances or more goes in one AddComponents3 (one

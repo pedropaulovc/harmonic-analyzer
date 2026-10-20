@@ -153,7 +153,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_block_washer "
-    "ch_rocker_arm_tl_vn_oblique_lever_washer ch_rocker_arm_tl_vn_oblique_nut_washer",
+    "ch_rocker_arm_tl_vn_oblique_lever_washer",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }

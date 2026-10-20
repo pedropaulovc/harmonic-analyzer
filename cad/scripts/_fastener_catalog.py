@@ -473,14 +473,16 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91251A150",
         material="Alloy Steel",
     ),
-    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 1/2 SHCS (the
-    # fastener table's NUT_TO_NUT_BRACKET row); shop fixture hardware,
-    # modelled so the jig assembly can mate it and run native interference.
+    # MHA-CH-06-TL-VN-66: the oblique trammel jig's #4-40 X 1/2 BHCS (the
+    # fastener table's NUT_TO_NUT_BRACKET row), Olander 4C50BHCA; shop fixture
+    # hardware, modelled so the jig assembly can mate it and run native
+    # interference.
     "ch-rocker-arm-tl-vn-oblique-nut-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-nut-screw",
-        "Black-Oxide Alloy Steel Socket Head Screw",
-        "91251A110",
+        "Alloy Steel Button Head Socket Cap Screw",
+        "4C50BHCA",
         material="Alloy Steel",
+        supplier="Olander",
     ),
     # MHA-CH-06-TL-VN-67: the oblique trammel jig's #4-40 X 5/8 flat head (the
     # fastener table's RISER_TO_CARRIER row), installed as bought; shop
@@ -530,16 +532,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Extreme-Vibration-Resistant Wedge Lock Washer",
         "91812A230",
         material="AISI 304",  # native library stand-in; purchased grade is 316
-    ),
-    # MHA-CH-06-TL-VN-72: the oblique trammel jig's #4 flat washers (the fastener
-    # table's NUT_WASHER row, one under each nut screw head); shop fixture
-    # hardware, modelled so the jig assembly can mate it and run native
-    # interference.
-    "ch-rocker-arm-tl-vn-oblique-nut-washer": _stock(
-        "ch-rocker-arm-tl-vn-oblique-nut-washer",
-        "18-8 Stainless Steel Mil. Spec. Washer",
-        "90945A710",
-        material="AISI 304",  # native library stand-in for 18-8
     ),
 }
 

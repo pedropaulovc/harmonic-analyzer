@@ -48,10 +48,8 @@ recipes:
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91812A215 | `ch-rocker-arm-tl-vn-oblique-block-washer` (MHA-CH-06-TL-VN-70; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
-| 90945A710 | `ch-rocker-arm-tl-vn-oblique-nut-washer` (MHA-CH-06-TL-VN-72; shop fixture; catalogue-only, product page login-walled, no vendor model) | 18-8 Stainless Steel Mil. Spec. Washer |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
-| 91251A110 | `ch-rocker-arm-tl-vn-oblique-nut-screw` (MHA-CH-06-TL-VN-66; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
@@ -268,26 +266,6 @@ replica-gated and no copy is kept here:
   91251A108 convention), and ASME B18.3's -0.03 in length tolerance (up to 1
   in long).
   `diag_build_91251A150.py` builds it from those catalogue values on the 91251A
-  family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
-  cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
-  0, tip at y = -length), fully threaded. No vendor model was downloaded (the
-  product page is login-walled), so it is not replica-gated: the standalone run
-  is catalogue-only (it builds the recipe, checks the solid and saves it under
-  `cad/out/reference`).
-- [91251A110](https://www.mcmaster.com/91251A110/)
-  (`ch-rocker-arm-tl-vn-oblique-nut-screw`, MHA-CH-06-TL-VN-66, 4 in the oblique
-  trammel jig: the fastener table's `NUT_TO_NUT_BRACKET` row) was read live on
-  October 19, 2026 from the #4-40 x 1/2 in black-oxide socket head screw
-  listing (https://www.mcmaster.com/products/socket-head-screws/steel-socket-head-screws~~/thread-size~4-40/finish~black-oxide/length~1-2-2/;
-  the product page is login-walled): #4-40, 1/2 in under the head, fully
-  threaded, head Ø0.183 x 0.112 in, 170,000 psi, $12.26 per pack of 100. It
-  replaced the M3 x 10 mm 91290A115 when issue #1630 moved TL-29's nut taps to
-  #4-40 UNC (fastener policy); 1/2 is the shortest length giving 2D of full
-  thread at the worst case through the nut's flange and a TL-VN-72 washer.
-  The row gives no drive or socket depth, so the model takes the family's #4
-  hex, 3/32 in (91251A108's), ASME B18.3's minimum key engagement for #4,
-  0.051 in, and ASME B18.3's -0.03 in length tolerance (up to 1 in long).
-  `diag_build_91251A110.py` builds it from those catalogue values on the 91251A
   family recipe (`diag_mcmaster_socket_head.build_socket_head`: plain
   cylindrical head, 0.75P tip chamfer, 45 deg thread neck; bearing face at y =
   0, tip at y = -length), fully threaded. No vendor model was downloaded (the

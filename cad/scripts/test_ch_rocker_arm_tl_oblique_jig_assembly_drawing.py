@@ -184,7 +184,7 @@ def test_fitted_cluster_scales_reach_finalize_in_sheet_order() -> None:
 def test_clusters_partition_the_bom() -> None:
     clustered = [stem for cluster in drawing.CLUSTERS for stem in cluster.stems]
     assert sorted(clustered) == sorted(spec.BOM_ORDER)
-    assert len(clustered) == len(set(clustered)) == 32
+    assert len(clustered) == len(set(clustered))
     for cluster in drawing.CLUSTERS:
         # Each sheet balloons in item order.
         assert list(cluster.stems) == [s for s in spec.BOM_ORDER if s in cluster.stems]

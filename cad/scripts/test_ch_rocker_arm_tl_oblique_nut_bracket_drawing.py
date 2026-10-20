@@ -61,7 +61,7 @@ def test_nut_seat_and_nut_taps_sit_on_the_screw_axis_and_bolt_circle() -> None:
         radii.append(math.hypot(y - seat_y, z - seat_z))
         # UNC (fastener policy): the flange's holes are plain.
         assert tap["thread"] == f"{leadscrew.NUT_SCREW} UNC-2B" == "#4-40 UNC-2B"
-    assert radii == pytest.approx([leadscrew.NUT_HOLE_PCD / 2.0] * 4, abs=0.001)
+    assert radii == pytest.approx([leadscrew.NUT_HOLE_PCD / 2.0] * 4, abs=1e-6)
     # The spigot seats in the counterbore; the screw passes the THRU.
     counterbore = features["nut_seat_counterbore"]
     assert counterbore["dia_nominal"] == pytest.approx(leadscrew.NUT_BORE_DIA)
@@ -76,17 +76,20 @@ def test_nut_flange_lands_on_the_nut_face_at_worst_case() -> None:
     )
     # The seat at its two-place band, the nut at its float, the depth at one.
     assert spec.WORST_FLANGE_MARGINS == pytest.approx(
-        {"to the -Y side": 0.44, "to the bottom face": 1.24}, abs=0.005
+        {"to the -Y side": 0.49, "to the bottom face": 1.29}, abs=0.005
     )
 
 
-def test_nut_pattern_fits_its_mate_only_at_three_places() -> None:
-    assert spec.NUT_PATTERN_ALLOWANCE > 0.0
-    two_place = math.hypot(printed_band_mm(2), printed_band_mm(2))
-    assert two_place > max(spec.NUT_SCREW_FLOAT, spec.SPIGOT_FLOAT)
-    # The offsets from the seat's axis carry the fit; the seat's own stations
-    # from the edges carry walls only (c4 review).
-    assert spec.PATTERN_PLACES == 3
+def test_nut_taps_are_spotted_from_the_nuts_own_flange_holes() -> None:
+    # A #29 drill, the largest number drill through the flange's plain holes
+    # (#28 is 0.1405 in), centres each spot.
+    assert spec.NUT_SPOT_DRILL == "#29"
+    assert spec.NUT_SPOT_DRILL_DIA == pytest.approx(0.136 * 25.4)
+    assert 0.1405 * 25.4 > leadscrew.NUT_HOLE_DIA > spec.NUT_SPOT_DRILL_DIA
+    assert spec.NUT_SPOT_FLOAT == pytest.approx(
+        (leadscrew.NUT_HOLE_DIA - spec.NUT_SPOT_DRILL_DIA) / 2.0
+    )
+    assert 0.0 < spec.NUT_SPOT_FLOAT < 0.05
     assert spec.SEAT_PLACES == 2
     assert not hasattr(spec, "HOLE_PLACES")
     # The #8 taps print no station: their pattern is TL-22's, spotted.
@@ -97,16 +100,19 @@ def test_nut_pattern_fits_its_mate_only_at_three_places() -> None:
 _PATTERN_DIMS = ("NutPatternY1", "NutPatternY2", "NutPatternZ1", "NutPatternZ2")
 
 
-def test_nut_pattern_prints_from_the_seat_axis_not_the_edges() -> None:
+def test_nut_pattern_prints_from_the_seat_axis_as_reference() -> None:
     assert spec.DRAWING_PRECISION["NutSeat"] == {"BoreY": 2, "BoreZ": 2}
     assert spec.DRAWING_PRECISION[spec.NUT_PATTERN_REFERENCE] == dict.fromkeys(
-        _PATTERN_DIMS, 3
+        _PATTERN_DIMS, 2
     )
     assert spec.DRAWING_DIMENSIONS[spec.NUT_PATTERN_REFERENCE] == set(_PATTERN_DIMS)
+    assert spec.REFERENCE_DIMENSIONS == set(_PATTERN_DIMS)
     assert {spec.DRAWING_VALUES[name] for name in _PATTERN_DIMS} == {
         spec.NUT_HOLE_OFFSET
     }
-    assert spec.NUT_HOLE_OFFSET == 5.657
+    # The model keeps the nut's circle; the sheet shows (5.66).
+    assert spec.NUT_HOLE_OFFSET == pytest.approx(8.0 * math.sqrt(0.5), abs=1e-12)
+    assert f"{spec.NUT_HOLE_OFFSET:.2f}" == "5.66"
     assert {spec.DIMENSION_PREFIXES[name] for name in _PATTERN_DIMS} == {"2X "}
     assert set(spec.DIMENSION_PREFIXES) == set(_PATTERN_DIMS)
     # The wizard's edge placements stay driven but unprinted.
@@ -123,7 +129,8 @@ def test_nut_pattern_prints_from_the_seat_axis_not_the_edges() -> None:
     for index in range(1, 5):
         tap = features[f"nut_tap_{index}"]
         for key in ("width", "height"):
-            assert list(tap[key]) == pytest.approx([5.527, 5.787]), (index, key)
+            # A reference: the nominal only, no banded station.
+            assert key not in tap, (index, key)
             assert tap[f"{key}_nominal"] == spec.NUT_HOLE_OFFSET
             # prechips measures a height_from across the two parallel axes.
             assert f"{key}_from" not in tap, (index, key)
@@ -152,15 +159,32 @@ def test_nut_pattern_lives_on_a_blanked_sketch_of_points() -> None:
     assert "hidden_sketches.curate_view_dimensions(" in draw_source
 
 
-def test_walls_and_margins_stack_the_seat_and_pattern_bands() -> None:
+def test_walls_and_margins_stack_the_seat_band_and_the_nuts_floats() -> None:
     walls = spec.WORST_WALLS
-    assert walls["#4-40 tap to nut-seat counterbore"] == pytest.approx(0.994, abs=0.001)
-    assert walls["#4-40 tap to screw clearance"] == pytest.approx(1.844, abs=0.001)
-    assert walls["#4-40 tap to bottom face"] == pytest.approx(5.2805, abs=0.001)
-    assert walls["#4-40 tap to -Y side"] == pytest.approx(4.4805, abs=0.001)
-    assert walls["counterbore to bottom face"] == pytest.approx(7.09, abs=0.001)
-    assert walls["counterbore to -Y side"] == pytest.approx(6.29, abs=0.001)
-    assert f"{spec.NUT_WALL_MIN:.2f}" == "0.99"
+    # The spigot floats in the largest counterbore the printed band admits.
+    cbore_min, cbore_max = _features()["nut_seat_counterbore"]["dia"]
+    assert (cbore_min, cbore_max) == pytest.approx((10.5, 10.6))
+    float_max = (cbore_max - leadscrew.NUT_BODY_DIA) / 2.0
+    assert spec.SPIGOT_FLOAT == pytest.approx(float_max)
+    assert spec.SPIGOT_FLOAT == pytest.approx(0.20)
+    # Each tap off the nut's circle by the spigot's float and the spot's.
+    offset = spec.SPIGOT_FLOAT + spec.NUT_SPOT_FLOAT
+    assert offset == pytest.approx(0.2228, abs=1e-4)
+    wall = leadscrew.NUT_HOLE_PCD / 2.0 - offset - cbore_max / 2.0 - spec._NUT_R
+    assert walls["#4-40 tap to nut-seat counterbore"] == pytest.approx(wall)
+    assert wall == pytest.approx(1.0547, abs=0.001)
+    assert walls["#4-40 tap to screw clearance"] == pytest.approx(1.8047, abs=0.001)
+    # The spigot's float shifts all four alike: only the spots close up.
+    assert walls["#4-40 tap to #4-40 tap"] == pytest.approx(
+        2.0 * spec.NUT_HOLE_OFFSET - 2.0 * spec.NUT_SPOT_FLOAT - 2.0 * spec._NUT_R
+    )
+    assert walls["#4-40 tap to bottom face"] == pytest.approx(5.1878, abs=0.001)
+    assert walls["#4-40 tap to -Y side"] == pytest.approx(4.3878, abs=0.001)
+    assert walls["counterbore to bottom face"] == pytest.approx(7.19, abs=0.001)
+    assert walls["counterbore to -Y side"] == pytest.approx(6.39, abs=0.001)
+    assert f"{spec.NUT_WALL_MIN:.2f}" == "1.05"
+    # RV-01 is not widened: the wall holds the 0.99 the owner accepted.
+    assert spec.NUT_WALL_MIN >= spec.RV01_ACCEPTED_WALL_MIN == 0.99
 
 
 def test_x_set_centres_the_bracket_on_the_pivot_block_side_holes() -> None:
@@ -226,7 +250,7 @@ def test_every_shortfall_is_stated_on_the_sheet() -> None:
     assert spec.END_WALL_MIN == pytest.approx(1.544, abs=0.001)
     seat_rows = spec.NUT_SEAT_MATE_CALLOUT.splitlines()
     assert seat_rows == [
-        "LOCATES NUT SPIGOT ON #4-40 PATTERN",
+        "LOCATES NUT SPIGOT",
         "FOR fixtures.trammel-tr8-flange-nut",
         f"WALL TO #4-40 TAPS {spec.NUT_WALL_MIN:.2f} MIN",
     ]
@@ -387,13 +411,14 @@ _CHAR = 2.3  # c4-r3: "2X 29.343" 20.6, "35.000" 13.9, "4.525" 11.3 wide
 # its wall row: four 5.56 mm rows. The seat adds its locating row (five), and
 # the #8 block's spot row is 39 characters to the 30 of c4-r3's mate row.
 # c4-r9: the nut taps' block's widest row is the mate's 31-character inventory
-# id (69 scaled from the seat's 78 for 35 characters; taken at _CHAR).
-_NUT_TAPS = (31 * _CHAR, 4 * 5.56)
+# id (69 scaled from the seat's 78 for 35 characters; taken at _CHAR); its
+# locate-at-assembly rows make it five.
+_NUT_TAPS = (31 * _CHAR, 5 * 5.56)
 _SEAT_BLOCK = (78.0, 24.2 + 5.56)
 _BLOCK_TAP_BLOCK = (79.3 * 39.0 / 30.0, 3 * 5.56 + 3.5)
 # c4-r3 render: a nut tap's centre-mark arms reach this far from its centre.
 _MARK_REACH = 7.4
-_PATTERN_TEXT = "2X 5.657"
+_PATTERN_TEXT = "2X (5.66)"
 # A hung text's near edge stands this far off its line (draw_fr_harmonic_base).
 _HANG_GAP = 1.3
 
@@ -562,10 +587,12 @@ def test_nut_face_callouts_stay_inside_the_border_and_off_the_lines() -> None:
     assert seat_x - _SEAT_BLOCK[0] / 2.0 >= _LEFT_BORDER + 5.0
     assert seat_y + _SEAT_BLOCK[1] / 2.0 <= bottom_edge - 5.0
     # c4-r9 (rule 4): the nut taps' callout names the bought nut by its inventory
-    # id, as the seat's does, on a row of its own.
+    # id, as the seat's does, on a row of its own; the taps are located from
+    # its flange holes at assembly (the riser's LOCATE ... AT ASSEMBLY).
     rows = spec.NUT_TAP_PROCESS.split("\n")
     assert spec.NUT_ID == "fixtures.trammel-tr8-flange-nut"
-    assert rows == ["MATCHES FLANGE HOLES OF", spec.NUT_ID, ""]
+    assert rows == ["LOCATE FROM FLANGE HOLES OF", spec.NUT_ID, "AT ASSEMBLY", ""]
+    assert max(len(row) for row in rows) == len(spec.NUT_ID)
     assert spec.NUT_ID in spec.NUT_SEAT_MATE_CALLOUT
     assert "NUT\n" not in spec.NUT_TAP_PROCESS
     # Its block, the id its widest row, rides over the plan, right of the
@@ -642,31 +669,46 @@ def respec(monkeypatch: pytest.MonkeyPatch) -> Iterator:
 
 def test_spec_follows_the_nut_bolt_circle(respec) -> None:
     reloaded = respec(NUT_HOLE_PCD=16.1)
-    assert reloaded.NUT_HOLE_OFFSET == round(16.1 / 2.0 * math.sqrt(0.5), 3)
-    assert reloaded.NUT_HOLE_Y == pytest.approx((35.0 - 5.692, 35.0 + 5.692))
-    # The offsets print at three places, so the circle holds to 0.001.
+    assert reloaded.NUT_HOLE_OFFSET == pytest.approx(16.1 / 2.0 * math.sqrt(0.5))
+    assert reloaded.NUT_HOLE_Y == pytest.approx(
+        (35.0 - 5.6922, 35.0 + 5.6922), abs=1e-4
+    )
+    # The model keeps the circle exactly; the sheet prints it as a reference.
     assert reloaded.WALLS_MM["#4-40 tap to nut-seat counterbore"] == pytest.approx(
-        8.05 - reloaded.CBORE_DIA / 2.0 - 1.4225, abs=0.001
+        8.05 - reloaded.CBORE_DIA / 2.0 - 1.4224, abs=1e-4
     )
 
 
 def test_spec_follows_the_nut_spigot(respec) -> None:
-    reloaded = respec(NUT_BODY_DIA=10.0, NUT_BORE_DIA=10.5, NUT_BODY_SHORT=2.0)
-    assert reloaded.CBORE_DIA == 10.5
-    assert reloaded.SPIGOT_FLOAT == pytest.approx(0.25)
+    reloaded = respec(NUT_BODY_DIA=10.0, NUT_BORE_DIA=10.3, NUT_BODY_SHORT=2.0)
+    assert reloaded.CBORE_DIA == 10.3
+    # At the largest counterbore: (10.3 + 0.10 - 10.0) / 2.
+    assert reloaded.SPIGOT_FLOAT == pytest.approx(0.20)
     # ceil0.1(spigot 2.0 + the 0.51 band + 0.05 end clearance)
     assert reloaded.CBORE_DEPTH == pytest.approx(2.6)
-    assert reloaded.NUT_SEAT_SPEC.overrides_mm["CounterBoreDiameter"] == 10.5
+    assert reloaded.NUT_SEAT_SPEC.overrides_mm["CounterBoreDiameter"] == 10.3
+
+
+def test_spec_refuses_a_counterbore_that_widens_rv01(respec) -> None:
+    # The former Ø10.70: its largest (10.80) lets the spotted taps stack a
+    # 0.30 float, a 0.85 wall under the owner's accepted 0.99.
+    with pytest.raises(AssertionError, match="RV-01"):
+        respec(NUT_BORE_DIA=10.7)
 
 
 def test_spec_follows_the_nut_screw_holes(respec) -> None:
-    original_float = spec.NUT_SCREW_FLOAT
-    original_allowance = spec.NUT_PATTERN_ALLOWANCE
+    original_spot_float = spec.NUT_SPOT_FLOAT
+    original_wall = spec.NUT_WALL_MIN
     original_spigot_float = spec.SPIGOT_FLOAT
-    reloaded = respec(NUT_HOLE_DIA=3.3)
-    assert 0.0 < reloaded.NUT_SCREW_FLOAT < original_float
-    assert 0.0 < reloaded.NUT_PATTERN_ALLOWANCE < original_allowance
+    reloaded = respec(NUT_HOLE_DIA=3.48)
+    assert 0.0 < reloaded.NUT_SPOT_FLOAT < original_spot_float
+    assert reloaded.NUT_WALL_MIN > original_wall
     assert reloaded.SPIGOT_FLOAT == original_spigot_float
+
+
+def test_spec_refuses_holes_the_spot_drill_cannot_pass(respec) -> None:
+    with pytest.raises(AssertionError, match="spot drill"):
+        respec(NUT_HOLE_DIA=3.4)
 
 
 def test_spec_refuses_a_flange_that_overhangs(respec) -> None:

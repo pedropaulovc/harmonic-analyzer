@@ -67,11 +67,7 @@ def test_catalogue_dimensions_and_the_unverified_stack() -> None:
 def test_one_pair_under_each_lever_screw_head() -> None:
     washer = fasteners.LEVER_LOCK_WASHER
     screw = fasteners.LEVER_TO_CARRIER
-    assert fasteners.WASHERS == (
-        fasteners.BLOCK_LOCK_WASHER,
-        washer,
-        fasteners.NUT_WASHER,
-    )
+    assert fasteners.WASHERS == (fasteners.BLOCK_LOCK_WASHER, washer)
     assert spec.ROW is washer
     assert washer.joint == screw.joint
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == screw.count == 2
