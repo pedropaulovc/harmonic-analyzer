@@ -19,6 +19,7 @@ import draw_dt_crankshaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _layout_audit import TEXT_ROW_LIMIT
 from _surface_finish import MACHINED_UM
 
 
@@ -629,6 +630,14 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
 _RUN_ISO_OUTLINE = (0.3778456, 0.1095392, 0.4181544, 0.2504608)
 # That run's retention-pin note text, measured natively, ended here.
 _RUN_PINION_TEXT_RIGHT = 0.3745611
+# Run 20261020T143150379Z's PDF glyph boxes (pypdfium2) and layout audit: the
+# centres note's 3.5 mm rows printed this far apart, none of its glyphs
+# advanced further than M, its three-row block's bottom row inked this box,
+# and its leader ran from (start) to the rim (tip).
+_RUN_NOTE_ROW_PITCH = 0.0045257
+_RUN_NOTE_GLYPH_ADVANCE_MAX = 0.00444
+_RUN_NOTE_BOTTOM_INK = (0.38041, 0.25036, 0.41073, 0.25392)
+_RUN_NOTE_LEADER = ((0.4112417, 0.2523299), (0.4024147, 0.2369673))
 
 
 def test_far_end_rim_window_follows_the_native_isometric_projection() -> None:
@@ -660,14 +669,14 @@ def test_far_end_rim_window_follows_the_native_isometric_projection() -> None:
 
 
 def test_centres_note_text_fits_its_field_over_the_isometric() -> None:
-    # Sized like the pin-location rows (2.75 mm a character) at the
-    # retention-pin test's 1.7 x 3.5 mm row pitch, the block needs no shift
-    # in the field left clear of that run's measured retention-pin text.
+    # Sized like the pin-location rows (2.75 mm a character) at the run's
+    # measured row pitch, the block needs no shift in the field left clear
+    # of that run's measured retention-pin text.
     rows = notes.CENTRES_NOTE.splitlines()
     x, y = drawing.CENTRES_NOTE_XY
     text = (
         x,
-        y - 1.7 * 0.0035 * len(rows),
+        y - _RUN_NOTE_ROW_PITCH * len(rows),
         x + _CALLOUT_CHAR_WIDTH * max(map(len, rows)),
         y,
     )
@@ -677,6 +686,26 @@ def test_centres_note_text_fits_its_field_over_the_isometric() -> None:
     assert field[0] == pytest.approx(_RUN_PINION_TEXT_RIGHT + drawing.NOTE_TEXT_GAP)
     assert field[1] == pytest.approx(drawing.FAR_END_ISO_RIM_WINDOW[3] + drawing.NOTE_TEXT_GAP)
     assert field[2] < 0.4191 and field[3] < 0.2667  # ASME B inner border
+
+
+def test_centres_note_leader_leaves_its_bottom_row_away_from_the_text() -> None:
+    # SolidWorks started the leader just past the bottom row's ink end, at
+    # that row's mid-height. Started right of the tip, the leader ran down-left
+    # and was back inside the row's ink before it cleared the row's bottom
+    # (the audit's 0.62 mm leader-through-own-text).
+    (sx, sy), (tx, ty) = _RUN_NOTE_LEADER
+    x0, y0, x1, y1 = _RUN_NOTE_BOTTOM_INK
+    gap = sx - x1
+    assert 0.0 < gap < 0.001 and y0 < sy < y1
+    assert sx > tx and sx - (sy - y0) * (sx - tx) / (sy - ty) < x1
+    # A bottom row inked no further right than one widest advance a glyph
+    # puts that start at or left of the tip, so the leader runs right of the
+    # row and below every row above it.
+    rows = notes.CENTRES_NOTE.splitlines()
+    assert len(rows) <= TEXT_ROW_LIMIT
+    bottom_ink_right = drawing.CENTRES_NOTE_XY[0] + _RUN_NOTE_GLYPH_ADVANCE_MAX * len(rows[-1])
+    assert bottom_ink_right + gap <= tx
+    assert drawing.FAR_END_ISO_RIM_PICK[0] == pytest.approx(tx, abs=1e-4)
 
 
 class _CircleEdge:

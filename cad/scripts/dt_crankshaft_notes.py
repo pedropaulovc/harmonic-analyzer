@@ -100,6 +100,10 @@ FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"
 # unleadered "AT PLAIN END" row named an end the sheet never identified.  The
 # restriction is on the centre hole, a turning location: the dome's punched
 # witness (FIDUCIAL_NOTE) is a separate, required mark made by eye on the
-# finished sphere, which a centre hole would destroy.  Three rows fit the
-# field over the isometric.  Pending owner confirmation (#991).
-CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNOT IN DOME"
+# finished sphere, which a centre hole would destroy.  Four rows: SolidWorks
+# starts the leader at the bottom row's right end, and the short last row
+# ends left of the rim so the leader drops away from the text (run
+# 20261020T143150379Z's three rows put that end right of it, and the leader
+# ran back through the row); a start at the block's right edge, at that
+# row's height, would clear it too.  Pending owner confirmation (#991).
+CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNOT IN\nDOME"
