@@ -2363,7 +2363,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Edge-break row takes the tap mouths off the carrier taps' engagement.
         "ch_rocker_arm_tl_oblique_carrier_spec",
         # Edge-break row sizes the nut and pillow-block screws' full engagement.
-        "ch_rocker_arm_tl_oblique_leadscrew_spec",
+        "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
         "dt_crankshaft_spec",
         "error_budget",
         "export_features",

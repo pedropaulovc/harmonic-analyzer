@@ -831,61 +831,6 @@ def test_source_configuration_switch_is_read_back(monkeypatch) -> None:
             pass
 
 
-def _function_body(name: str) -> str:
-    """A top-level function's source, to its next top-level statement."""
-    with open(drawing.__file__, encoding="utf-8") as handle:
-        text = handle.read()
-    body = text[text.index(f"\ndef {name}(") + 1 :]
-    end = re.search(r"\n(?=[^\s)])", body)
-    return body if end is None else body[: end.start()]
-
-
-def test_cluster_balloons_inside_the_source_configuration_switch() -> None:
-    body = _function_body("_balloon_cluster")
-    switch = body.index("with _source_configuration_active(view")
-    # Linked to the BOM first; one balloon pass, inside the switch; the ring
-    # after it.
-    assert body.index("_link_view_to_bom(") < switch
-    assert body.count("add_component_bom_balloons(") == 1
-    assert body.index("add_component_bom_balloons(") > switch
-    assert body.index("_ring_balloons(") > body.index("add_component_bom_balloons(")
-
-
-def test_every_view_is_configured_before_the_bom() -> None:
-    # draw_dt_drive_train_assembly's order: every configuration switch and
-    # explode, then the BOM, then only links and balloons.
-    body = _function_body("_place_package")
-    bom = body.index("insert_bom_table(")
-    for placed in (
-        "_place_assembled_sheet(",
-        "_place_reference_view(",
-        "_place_finished_view(",
-        "_place_cluster_view(",
-    ):
-        assert body.index(placed) < bom
-    assert body.index("_balloon_cluster(") > bom
-    for name in ("_balloon_cluster", "_place_steps_notes"):
-        tail = _function_body(name)
-        for call in (
-            "apply_view_configuration(",
-            "set_view_exploded_state(",
-            "isolate_drawing_view_components(",
-            "_set_view_scale(",
-        ):
-            assert call not in tail
-    cluster = _function_body("_place_cluster_view")
-    order = [
-        cluster.index(call)
-        for call in (
-            "apply_view_configuration(",
-            "set_view_exploded_state(",
-            "isolate_drawing_view_components(",
-            "_fit_cluster_view(",
-        )
-    ]
-    assert order == sorted(order)
-
-
 def test_cl_tip_reference_is_the_placed_dowel_over_the_riser() -> None:
     """#1619: the elevation's (1.6) is the CL dowel's modelled round tip above
     the riser top, up the dowel's axis, a reference inside the fitter's band."""

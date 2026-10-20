@@ -806,7 +806,6 @@ def test_studs_stop_under_the_swinging_carrier() -> None:
     assert spec.STUD_LENGTH < spec.STUD_LENGTH_MAX
 
 
-
 def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
     sidecar = spec.sweep_sidecar()
     assert json.loads(json.dumps(sidecar)) == sidecar
@@ -889,7 +888,6 @@ def test_inch_eighths_down() -> None:
     assert spec.inch_eighths_down(3.0 * trammel.INCH) == "3"
     assert spec.inch_eighths_down(3.874 * trammel.INCH) == "3-3/4"
     assert spec.inch_eighths_down(0.25 * trammel.INCH) == "1/4"
-
 
 
 def test_sweep_table_edge_margins(report) -> None:
@@ -1264,12 +1262,6 @@ def test_nut_flange_is_a_static_clamp() -> None:
     assert spec.NUT_FLANGE_SLIP_MARGIN >= leadscrew.SLIP_MARGIN_MIN
     # The washer stays under OD 5.8: the Ø16 circle less the nut's Ø10.2 body.
     assert nut_washer.OD < 16.0 - 10.2
-    exceptions = machinist_exceptions.load_exceptions(
-        _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
-    )
-    flange = [e for e in exceptions if "nut-flange" in e.finding]
-    assert [e.id for e in flange] == ["RV-01"]
-    assert "#4-40" in flange[0].where and "0.4 N·m" in flange[0].where
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

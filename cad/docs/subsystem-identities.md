@@ -360,7 +360,6 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | `ch-rocker-arm-tl-vn-oblique-block-washer` | MHA-CH-06-TL-VN-70 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-washer` | MHA-CH-006-TL-52 | `ch-rocker-arm-tl-vn-oblique-nut-washer` | MHA-CH-06-TL-VN-72 |
 | tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | `ch-pivot-bracket-tl-ledge` | MHA-CH-08-TL-01 |
 | tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-08-TL-02 |
 | tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-05-TL-01 |
