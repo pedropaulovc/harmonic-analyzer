@@ -1068,6 +1068,63 @@ def _shift(box: Box, dx: float, dy: float) -> Box:
     return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
 
 
+def _measured_root_section_boxes() -> tuple[Box, ...]:
+    # Farm v13: distinguish the native view allocation from its smaller solid
+    # profile. These actual extents must not be replaced by nominal geometry.
+    return (
+        Box(0.387949500048, 0.066411999952115, 0.4056504999520001, 0.101588000047885),
+        Box(0.4089102675585283, 0.0758398127090302, 0.4541842809364547, 0.0920431438127091),
+    )
+
+
+def test_measured_section_and_caption_translate_together_without_shrinking() -> None:
+    boxes = _measured_root_section_boxes()
+    band = Box(0.219, 0.069, 0.4161, 0.109)
+    dx, dy = drawing._root_section_shift(boxes, band)
+    moved = tuple(_shift(box, dx, dy) for box in boxes)
+    assert dx < 0.0  # The caption initially extends beyond the right border.
+    for before, after in zip(boxes, moved, strict=True):
+        assert (after.width, after.height) == pytest.approx((before.width, before.height))
+        assert band.xmin <= after.xmin <= after.xmax <= band.xmax
+        assert band.ymin <= after.ymin <= after.ymax <= band.ymax
+    assert moved[1].xmin - moved[0].xmax == pytest.approx(boxes[1].xmin - boxes[0].xmax)
+    assert moved[0].union(moved[1]).center()[1] == pytest.approx(band.center()[1])
+    # Placement is sheet-frame independent, rather than tied to an import seed.
+    offset = (0.123, -0.040)
+    assert drawing._root_section_shift(
+        tuple(_shift(box, *offset) for box in boxes), _shift(band, *offset),
+    ) == pytest.approx((dx, dy))
+
+
+@pytest.mark.parametrize(
+    "band",
+    [
+        Box(0.219, 0.069, 0.4161, 0.099),  # v13's actual 35.176 mm allocation > 30 mm
+        Box(0.219, 0.069, 0.280, 0.109),  # enough height, insufficient width
+    ],
+)
+def test_measured_section_refuses_a_band_that_requires_clipping_or_shrinking(band) -> None:
+    with pytest.raises(RuntimeError, match="do not fit"):
+        drawing._root_section_shift(_measured_root_section_boxes(), band)
+
+
+def test_partial_strap_section_spans_the_whole_wall_and_one_chamfer() -> None:
+    spec = ch_connecting_rod_spec
+    start, end = drawing.ROOT_SECTION_START, drawing.ROOT_SECTION_END
+    wall = [
+        drawing._sheet_xy(0.0, y)
+        for y in (
+            spec.RING_BOTTOM_Y,
+            -spec.RING_BORE_DIA / 2.0 - spec.ROOT_RELIEF_SIZE,
+            -spec.RING_BORE_DIA / 2.0,
+        )
+    ]
+    assert all(point[0] == pytest.approx(start[0]) for point in (*wall, end))
+    assert all(start[1] < point[1] < end[1] for point in wall)
+    # The span stops in the bore; it does not add the opposite strap wall.
+    assert end[1] < drawing._sheet_xy(0.0, spec.RING_BORE_DIA / 2.0)[1]
+
+
 def test_scalar_dimension_lane_clears_the_other_dimensions_native_line() -> None:
     band = Box(0.300, 0.040, 0.420, 0.059)
     text = Box(0.0, 0.0, 0.030, 0.008)
