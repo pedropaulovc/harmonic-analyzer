@@ -26,9 +26,15 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+from collections import Counter
+import hashlib
+import json
 import math
+from pathlib import Path
 import re
+import shutil
 import sys
+import tempfile
 from typing import Any, NamedTuple
 
 from solidworks_mcp.adapters.com_variant import dispatch_array
@@ -75,7 +81,11 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import create_view_theoretical_datum, insert_hole_table
+from _drawing_tables import (
+    create_view_theoretical_datum,
+    hole_table_template,
+    insert_hole_table,
+)
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
 from _machinist_review_mode import MachinistReviewMode
@@ -1956,6 +1966,359 @@ def _visible_hole_table_entities(
     )
 
 
+@_telemetry.traced("drawing.base_native_table_format_proof")
+def _probe_native_table_format(adapter: Any, drawing_model: Any, part_model: Any) -> None:
+    """Throwaway-branch experiment; always refuse before production exports.
+
+    API bundle v3.12.1: ISldWorks.Get/SetUserPreferenceStringValue and
+    swconst/SO_FileLocations document the *folder* preference. Static reflection
+    of the installed SolidWorks.Interop.swconst 34.4.0.78 establishes
+    swUserPreferenceStringValue_e.swFileLocationsHoleCalloutFormatFile == 26.
+    No documented contract says that hole tables consume this callout file:
+    only native before/after SIZE cells, with a fresh-callout positive control,
+    can answer that question. No persistence or production suitability is proved.
+    """
+    preference = 26
+    token = b"<hw-threadclass>"
+    token_pattern = re.compile(rb"<[^<>\r\n]+>")
+    omit_token = re.compile(rb"[ \t]*(?:-[ \t]*)?<hw-threadclass>")
+    printed_class = re.compile(r"(?<![A-Za-z0-9])2B(?![A-Za-z0-9])")
+    omit_class = re.compile(r"[ \t]*(?:[-\u2013\u2014][ \t]*)?2B\b")
+    report: dict[str, Any] = {
+        "probe": "fr-base-native-table-format",
+        "target": "drawing:fr_harmonic_base",
+        "status": "PROBE_ERROR",
+        "preference": {"enum": "swFileLocationsHoleCalloutFormatFile", "value": preference},
+        "format": None,
+        "baseline": {},
+        "candidate": {},
+        "changes": {},
+        "modelclass": {},
+        "exceptions": [],
+        "uncertainties": [
+            "Unsaved fresh annotations only; no restore/rebuild or save/reopen persistence proof.",
+            "No documented hole-table SIZE definition accessor; generated cells are read, never rewritten.",
+            "GetText documents no hole-callout support; definitions follow the existing native helper path and require rendered-text corroboration.",
+        ],
+    }
+    app = None
+    original_preference = None
+    folder = None
+    preference_touched = False
+    restored = False
+    phase = "preference_read"
+
+    def canonical(text: str) -> str:
+        return " ".join(text.split())
+
+    def without_class(text: str) -> str:
+        return canonical(omit_class.sub("", text))
+
+    def model_classes() -> dict[str, str]:
+        # Same read-only definition path as diagnostics/probe_tap_thread_semantics.
+        # IPartDoc.FeatureByName -> IFeature.GetDefinition ->
+        # IWizardHoleFeatureData2.ThreadClass (documented string getter).
+        part = _early_bound(part_model, "IPartDoc")
+        result = {}
+        for name, _stations, _diameter in DECK_TAPPED_SEAT_FEATURES:
+            feature = part.FeatureByName(name)
+            if feature is None:
+                raise RuntimeError(f"proof source lacks Hole Wizard feature {name}")
+            definition = _early_bound(
+                _early_bound(feature, "IFeature").GetDefinition(),
+                "IWizardHoleFeatureData2",
+            )
+            result[name] = str(definition.ThreadClass)
+        return result
+
+    def capture(sheet: str, destination: dict[str, Any]) -> None:
+        drawing = _early_bound(drawing_model, "IDrawingDoc")
+        if not drawing.ActivateSheet(sheet):
+            raise RuntimeError(f"proof cannot activate {sheet}")
+        view = place_view(
+            adapter, str(SOURCE), "*Top", *HOLE_TOP_CENTER, scale=SHEET_SCALE
+        )
+        set_hidden_lines_removed(adapter, view)
+        datum = create_view_theoretical_datum(
+            adapter, view,
+            point_xy=(-BOTTOM_LENGTH / 2000.0, -BOTTOM_REAR_Z / 1000.0),
+            label=f"{sheet} format proof",
+        )
+        rims, x_axis, y_axis = _visible_hole_table_entities(adapter, view, TABLE_HOLES)
+        pivot_index = TABLE_HOLES.index((*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA))
+        display = add_native_hole_callout(
+            adapter, view, edge=rims[pivot_index],
+            callout_xy=BLOCK_CALLOUT_XY,
+            label=f"{sheet} fresh PivotSeat positive control",
+        )
+        # Generate the callout before the table so a lazy format-file reload
+        # at AddHoleCallout2 cannot leave us judging a pre-reload SIZE snapshot.
+        table = insert_hole_table(
+            adapter, view,
+            datum_xy=_TABLE_ORIGIN_XY,
+            datum_point=datum,
+            datum_axes=(x_axis, y_axis),
+            hole_points=tuple(_hole_rim(x, z, diameter) for x, z, diameter in TABLE_HOLES),
+            hole_entities=rims,
+            expected_locations_mm=tuple(
+                (x + BOTTOM_LENGTH / 2.0, BOTTOM_WIDTH / 2.0 - z)
+                for x, z, _diameter in TABLE_HOLES
+            ),
+            anchor_xy=HOLE_TABLE_ANCHOR,
+            basic_locations=False,
+            label=f"{sheet} native format proof",
+        )
+        # Keep the helper's uncombined rows: every selected physical hole has
+        # its own generated SIZE; no pivot flag, cell edits or custom definitions.
+        if (int(table.RowCount), int(table.ColumnCount)) != (len(TABLE_HOLES) + 1, 4):
+            raise RuntimeError("proof table shape is malformed")
+        destination["cells"] = [
+            [str(table.DisplayedText2(row, column, False) or "") for column in range(4)]
+            for row in range(len(TABLE_HOLES) + 1)
+        ]
+        destination["size_editable"] = [
+            bool(table.IsCellTextEditable(row, 3)) for row in range(1, len(TABLE_HOLES) + 1)
+        ]
+        if any(destination["size_editable"]):
+            raise RuntimeError("proof SIZE cells are not exclusively native-generated")
+        display = _early_bound(display, "IDisplayDimension")
+        destination["callout"] = {
+            "feature": "PivotSeat",
+            "hole_mm": list(TABLE_HOLES[pivot_index]),
+            # swDimensionTextParts_e: Prefix/Suffix/Above/Below = 1..4;
+            # their definitions = 5..8. No SetText or omission helper is used.
+            "definitions": [str(display.GetText(i) or "") for i in (5, 6, 7, 8)],
+            "resolved": [str(display.GetText(i) or "") for i in (1, 2, 3, 4)],
+        }
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+        count = int(data.GetTextCount())
+        if not 0 < count <= 128:
+            raise RuntimeError(f"proof callout has malformed display-text count {count}")
+        destination["callout"]["rendered"] = [
+            str(data.GetTextAtIndex(i)) for i in range(count)
+        ]
+
+    try:
+        app = _early_bound(adapter.swApp, "ISldWorks")
+        original_preference = app.GetUserPreferenceStringValue(preference)
+        if not isinstance(original_preference, str):
+            raise RuntimeError("format folder preference is not a string")
+        report["preference"]["before"] = original_preference
+        phase = "baseline_capture"
+        capture(SHEET_NAMES[0], report["baseline"])
+        report["modelclass"]["before"] = model_classes()
+        baseline = report["baseline"]
+        control = baseline["callout"]
+        baseline_sizes = [row[3] for row in baseline["cells"][1:]]
+        report["baseline"]["class_rows"] = sum(
+            bool(printed_class.search(size)) for size in baseline_sizes
+        )
+        if (
+            not report["baseline"]["class_rows"]
+            or not any("<hw-threadclass>" in text for text in control["definitions"])
+            or not printed_class.search(" ".join(control["resolved"]))
+            or not printed_class.search(" ".join(control["rendered"]))
+            or any(value != "2B" for value in report["modelclass"]["before"].values())
+        ):
+            report["status"] = "BASELINE_CLASS_ABSENT"
+            raise RuntimeError("baseline must genuinely generate 2B in SIZE, fresh callout and model")
+
+        phase = "stage_format"
+        if original_preference.strip():
+            if ";" in original_preference:
+                raise RuntimeError("multiple configured format folders are ambiguous; refusing to guess")
+            original_file = Path(original_preference) / "calloutformat.txt"
+            source_rule = "configured_folder"
+        else:
+            # Existing table-template convention derives install/lang/english
+            # from the worker's actual GetExecutablePath, not a local install.
+            original_file = hole_table_template(adapter).parent / "calloutformat.txt"
+            source_rule = "installed_table_template_language_folder"
+        original_bytes = original_file.read_bytes()
+        if b"\0" in original_bytes:
+            raise RuntimeError("format is not ASCII-compatible; refusing a lossy byte edit")
+        original_lines = original_bytes.splitlines(keepends=True)
+        staged_lines = []
+        edits = []
+        in_ansi_inch = False
+        for number, line in enumerate(original_lines, 1):
+            if line.startswith(b"["):
+                in_ansi_inch = line.strip() == b"[ANSI INCH]"
+            revised = line
+            if in_ansi_inch and not line.lstrip().startswith(b"*"):
+                revised = omit_token.sub(b"", line)
+            staged_lines.append(revised)
+            if revised != line:
+                edits.append({
+                    "line": number,
+                    "before": line.decode("ascii").rstrip("\r\n"),
+                    "after": revised.decode("ascii").rstrip("\r\n"),
+                })
+        staged_bytes = b"".join(staged_lines)
+        original_tokens = token_pattern.findall(original_bytes)
+        staged_tokens = token_pattern.findall(staged_bytes)
+        if (
+            not edits
+            or [item for item in original_tokens if item != token]
+            != [item for item in staged_tokens if item != token]
+            or original_bytes.count(token) - staged_bytes.count(token) != len(edits)
+        ):
+            raise RuntimeError("staged format did not remove only ANSI INCH thread-class tokens")
+        folder = Path(tempfile.mkdtemp(prefix="fr-base-native-format-"))
+        staged_file = folder / "calloutformat.txt"
+        staged_file.write_bytes(staged_bytes)
+        if staged_file.read_bytes() != staged_bytes:
+            raise RuntimeError("staged format bytes did not persist")
+        report["format"] = {
+            "original": str(original_file),
+            "staged": str(staged_file),
+            "source_rule": source_rule,
+            "original_sha256": hashlib.sha256(original_bytes).hexdigest(),
+            "staged_sha256": hashlib.sha256(staged_bytes).hexdigest(),
+            "original_bytes": len(original_bytes),
+            "staged_bytes": len(staged_bytes),
+            "original_lines": len(original_lines),
+            "staged_lines": len(staged_lines),
+            "original_tokens": dict(Counter(item.decode("ascii") for item in original_tokens)),
+            "staged_tokens": dict(Counter(item.decode("ascii") for item in staged_tokens)),
+            "edits": edits,
+            "other_lines_and_standards_byte_identical": True,
+        }
+        phase = "stage_preference"
+        report["preference"]["staged_requested"] = str(folder)
+        preference_touched = True  # restore even if the setter throws after applying
+        report["preference"]["set_ok"] = bool(
+            app.SetUserPreferenceStringValue(preference, str(folder))
+        )
+        staged_readback = app.GetUserPreferenceStringValue(preference)
+        report["preference"]["staged_readback"] = staged_readback
+        if not report["preference"]["set_ok"] or Path(staged_readback) != folder:
+            raise RuntimeError("staged format folder preference did not read back")
+        phase = "candidate_capture"
+        capture(SHEET_NAMES[1], report["candidate"])
+        candidate = report["candidate"]
+        candidate_control = candidate["callout"]
+        candidate_sizes = [row[3] for row in candidate["cells"][1:]]
+        report["changes"] = {
+            "class_rows_before": report["baseline"]["class_rows"],
+            "class_rows_after": sum(bool(printed_class.search(size)) for size in candidate_sizes),
+            "size_rows": [
+                {"row": i, "before": before, "after": after}
+                for i, (before, after) in enumerate(zip(baseline_sizes, candidate_sizes, strict=True), 1)
+                if before != after
+            ],
+        }
+        # Setting readback is NOT the control. A newly generated callout must
+        # consume the staged definition before interpreting the table result.
+        if (
+            any("<hw-threadclass>" in text for text in candidate_control["definitions"])
+            or printed_class.search(" ".join(candidate_control["resolved"]))
+            or printed_class.search(" ".join(candidate_control["rendered"]))
+        ):
+            report["status"] = "FORMAT_NOT_LOADED"
+        else:
+            definitions_preserved = all(
+                canonical(omit_token.sub(b"", before.encode("utf-8")).decode("utf-8"))
+                == canonical(after)
+                for before, after in zip(
+                    control["definitions"], candidate_control["definitions"], strict=True
+                )
+            )
+            resolved_preserved = all(
+                without_class(before) == canonical(after)
+                for before, after in zip(control["resolved"], candidate_control["resolved"], strict=True)
+            )
+            rendered_preserved = without_class(" ".join(control["rendered"])) == canonical(
+                " ".join(candidate_control["rendered"])
+            )
+            coordinates_preserved = all(
+                before[:3] == after[:3]
+                for before, after in zip(baseline["cells"], candidate["cells"], strict=True)
+            )
+            sizes_preserved = all(
+                without_class(before) == without_class(after)
+                for before, after in zip(baseline_sizes, candidate_sizes, strict=True)
+            )
+            report["changes"].update({
+                "fresh_callout_omits_class": True,
+                "callout_other_definitions_preserved": definitions_preserved,
+                "callout_other_resolved_preserved": resolved_preserved,
+                "callout_other_rendered_preserved": rendered_preserved,
+                "tags_coordinates_preserved": coordinates_preserved,
+                "size_pitch_series_drill_extents_preserved": sizes_preserved,
+            })
+            if not all((
+                definitions_preserved, resolved_preserved, rendered_preserved,
+                coordinates_preserved, sizes_preserved,
+            )):
+                report["status"] = "COMPARISON_MALFORMED"
+            elif not report["changes"]["class_rows_after"]:
+                report["status"] = "EFFECTIVE_UNSAVED_ONLY"
+            elif all(
+                canonical(before) == canonical(after)
+                for before, after in zip(baseline_sizes, candidate_sizes, strict=True)
+            ):
+                report["status"] = "INEFFECTIVE_TABLE_SIZE"
+            else:
+                report["status"] = "PARTIAL_TABLE_EFFECT_REFUSED"
+        if original_file.read_bytes() != original_bytes:
+            raise RuntimeError("installed format file changed during the proof")
+        report["format"]["installed_file_unchanged"] = True
+    except Exception as error:
+        report["exceptions"].append({"phase": phase, "error": f"{type(error).__name__}: {error}"})
+        if report["status"] not in ("BASELINE_CLASS_ABSENT",):
+            report["status"] = "PROBE_ERROR"
+    finally:
+        # Do not let an insertion/comparison failure skip restoration. Readback
+        # is attempted separately even if SetUserPreferenceStringValue throws.
+        if app is not None and original_preference is not None:
+            restore_ok = not preference_touched
+            if preference_touched:
+                try:
+                    restore_ok = bool(app.SetUserPreferenceStringValue(preference, original_preference))
+                    report["preference"]["restore_set_ok"] = restore_ok
+                except Exception as error:
+                    report["exceptions"].append({"phase": "restore_set", "error": f"{type(error).__name__}: {error}"})
+            try:
+                readback = app.GetUserPreferenceStringValue(preference)
+                report["preference"]["restored_readback"] = readback
+                restored = restore_ok and readback == original_preference
+            except Exception as error:
+                report["exceptions"].append({"phase": "restore_read", "error": f"{type(error).__name__}: {error}"})
+            report["preference"]["restored_verified"] = restored
+            if not restored:
+                report["status"] = "RESTORE_FAILED_DO_NOT_REUSE_SEAT"
+        try:
+            report["modelclass"]["after"] = model_classes()
+            report["modelclass"]["unchanged"] = (
+                report["modelclass"].get("before") == report["modelclass"]["after"]
+            )
+            if not report["modelclass"]["unchanged"] and restored:
+                report["status"] = "MODEL_CLASS_CHANGED_REFUSED"
+        except Exception as error:
+            report["exceptions"].append({"phase": "modelclass_after", "error": f"{type(error).__name__}: {error}"})
+            if restored:
+                report["status"] = "MODEL_CLASS_READ_FAILED"
+        if folder is not None:
+            # Never delete a folder that the app might still reference. A
+            # restoration failure leaves the valid file in place for recovery.
+            report["preference"]["staged_folder_retained"] = True
+            if restored:
+                try:
+                    shutil.rmtree(folder)
+                    report["preference"]["staged_folder_retained"] = False
+                except Exception as error:
+                    report["exceptions"].append({"phase": "temp_cleanup", "error": f"{type(error).__name__}: {error}"})
+        _telemetry.info(
+            "NATIVE_TABLE_FORMAT_PROOF " + json.dumps(report, separators=(",", ":"), ensure_ascii=True)
+        )
+    raise RuntimeError(
+        f"PROBE_COMPLETE: {report['status']}; preference_restored={restored}; "
+        "intentional refusal before drawing exports and cache publication"
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1987,10 +2350,12 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
         ),
     )
+    proof_part_model = adapter.currentModel
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
     create_blank_drawing_sheets(adapter, SHEET_NAMES, label="harmonic-base package")
+    _probe_native_table_format(adapter, drawing_model, proof_part_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
