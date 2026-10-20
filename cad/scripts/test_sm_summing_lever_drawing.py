@@ -1331,7 +1331,7 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
 
 
 def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
-    """Native boundaries for the actual free-end witnesses in back VIEW F."""
+    """Synthetic native API boundary; no VIEW F ink was captured by r5."""
     dx, dy = offset
     state = SimpleNamespace(
         name="PlateThickness@PlateProfile@sm-summing-lever.SLDPRT",
@@ -1345,6 +1345,13 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
     levels = (
         0.100 + dy + drawing.COEFFICIENT_BOTTOM_Y / 1000.0,
         0.100 + dy + drawing.COEFFICIENT_TOP_Y / 1000.0,
+    )
+    state.geometry_failures = []
+    state.annotation_position = (0.228 + dx, 0.083 + dy, 0.0)
+    state.view_position = (0.235 + dx, 0.100 + dy)
+    state.transform = (
+        -1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0,
+        free_x + drawing.PLATE_W / 1000.0, 0.100 + dy, 0.0, 1.0, 0.0, 0.0, 0.0,
     )
     state.arrows = [
         [arrow_x, y, 0.0, 0.0, direction, 0.0, 0.001, 0.001, 0.0, 0.0, 0.0, 1.0]
@@ -1390,6 +1397,13 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
             first, second = state.lines[index]
             return (0.0, 0.0, 0.0, 0.0, *first, 0.0, *second, 0.0)
 
+        def GetTextCount(self):
+            return 1
+
+        def GetTextPositionAtIndex(self, index):
+            assert index == 0
+            return (0.0, 0.0, 0.0)
+
     class Display:
         def GetDimension2(self, index):
             assert index == 0
@@ -1417,7 +1431,14 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
         def GetSpecificAnnotation(self):
             return state.display
 
+        def GetPosition(self):
+            return state.annotation_position
+
+        def GetDisplayData(self):
+            return state.annotation_data
+
     state.dimension, state.data, state.display = Dimension(), Data(), Display()
+    state.annotation_data = state.data
     annotation = Annotation()
     state.annotations = [annotation]
     view = SimpleNamespace(
@@ -1425,6 +1446,8 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
             len(state.annotations) if state.count_override is None else state.count_override
         ),
         GetAnnotations=lambda: tuple(state.annotations),
+        Position=state.view_position,
+        ModelToViewTransform=SimpleNamespace(ArrayData=state.transform),
     )
 
     def activate_sheet(name):
@@ -1462,6 +1485,10 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
     )
     monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "scan_view_edges", scan)
+    monkeypatch.setattr(
+        drawing._telemetry, "error",
+        lambda _message, **fields: state.geometry_failures.append(fields),
+    )
     return SimpleNamespace(
         adapter=adapter, view=view, annotation=annotation, state=state,
         capture=lambda: drawing._plate_thickness_check(adapter, view, [annotation]),
@@ -1497,6 +1524,7 @@ def test_plate_thickness_keeps_native_identity_band_gaps_and_free_end_ink(
     assert state.lines == lines
     assert state.gaps == [0.001, 0.001]
     assert state.use_doc == [True, False]
+    assert state.geometry_failures == []
     assert state.active_sheet == drawing.SHEET_NAMES[1]
     assert state.scans == 2
     assert set(state.projections) == {
@@ -1662,6 +1690,181 @@ def test_settled_thickness_check_reads_regenerated_native_state(
         state.use_doc[0] = False
     with pytest.raises(RuntimeError, match="VIEW F PlateThickness"):
         settled_check()
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize(
+    "damage",
+    ["missing_edge", "projection", "gap", "extra_arrow", "arrow_x",
+     "missing_witness", "extra_horizontal", "witness_origin", "other_ink"],
+)
+def test_plate_thickness_refusals_capture_every_native_geometry_boundary(
+    monkeypatch, settled, damage,
+) -> None:
+    case = _native_plate_thickness(monkeypatch, band=(2, -0.0001, 0.0002))
+    state = case.state
+    check = case.capture() if settled else case.capture
+    if damage == "missing_edge":
+        state.edges.pop(0)
+    elif damage == "projection":
+        state.projection_scale = (-1.0, 1.0)
+    elif damage == "gap":
+        state.read_overrides[0] = (False, True, 0.003)
+    elif damage == "extra_arrow":
+        state.arrows.append([*state.arrows[0]])
+    elif damage == "arrow_x":
+        state.arrows[0][0] += 0.001
+    elif damage == "missing_witness":
+        state.lines.pop(0)
+    elif damage == "extra_horizontal":
+        state.lines.append(((0.230, 0.125), (0.240, 0.125)))
+    elif damage == "witness_origin":
+        first, second = state.lines[0]
+        state.lines[0] = ((first[0] - 0.001, first[1]), second)
+    else:
+        state.lines.append(((0.220, 0.101), (0.224, 0.102)))
+
+    # Exercise the real guard, including failures before it reaches display
+    # data. The error log must still retain every independent observation.
+    with pytest.raises(RuntimeError):
+        check()
+    assert len(state.geometry_failures) == 1
+    record = state.geometry_failures[0]["geometry"]
+    display = record["dimension_display"]
+    assert display["lines"]["count"] == len(state.lines)
+    assert display["lines"]["rows"] == [
+        (0.0, 0.0, 0.0, 0.0, *first, 0.0, *second, 0.0)
+        for first, second in state.lines
+    ]
+    assert display["arrows"]["count"] == len(state.arrows)
+    assert display["arrows"]["rows"] == [tuple(row) for row in state.arrows]
+    assert display["text_positions"]["rows"] == [(0.0, 0.0, 0.0)]
+    assert record["annotation_display"] == display
+    assert record["annotation_position_m"] == state.annotation_position
+    assert record["view_position_m"] == state.view_position
+    assert record["model_to_view_transform"] == state.transform
+    assert record["native_model"] == {
+        "FullName": state.name, "SystemValue_m": state.value,
+        "tolerance": {"Type": 2, "min_m": -0.0001, "max_m": 0.0002},
+    }
+    assert record["native_gap_replies"] == [
+        state.read_overrides.get(index, (True, state.use_doc[index], state.gaps[index]))
+        for index in (0, 1)
+    ]
+    model = record["expected_model_points_m"]
+    projected = record["expected_projected_points_m"]
+    assert set(projected) == {"bottom", "top", "inboard"}
+    for face, (x, y, z) in model.items():
+        assert z == -drawing.PLATE_L / 2000.0
+        assert projected[face] == (
+            0.235 - state.projection_scale[0] * (x - drawing.PLATE_W / 1000.0),
+            0.100 + y,
+        )
+
+
+def test_plate_thickness_malformed_raw_line_is_preserved_not_reparsed_as_a_witness(
+    monkeypatch,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    data = case.state.data
+    original = data.GetLineAtIndex2
+    malformed = (0.0, 0.0, 0.0, 0.0, 0.234, 0.088, 0.0)
+    monkeypatch.setattr(
+        data, "GetLineAtIndex2", lambda index: malformed if index == 0 else original(index),
+    )
+    with pytest.raises(RuntimeError):
+        case.capture()
+    record = case.state.geometry_failures[0]["geometry"]
+    assert record["dimension_display"]["lines"]["rows"] == [
+        malformed, original(1), original(2),
+    ]
+    assert record["dimension_display"]["arrows"]["rows"] == [
+        tuple(row) for row in case.state.arrows
+    ]
+    assert record["dimension_segments_m"]["error_type"] == "RuntimeError"
+
+
+def test_plate_thickness_missing_dimension_display_does_not_use_annotation_ink(
+    monkeypatch,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    monkeypatch.setattr(state.display, "GetDisplayData", lambda: None)
+    with pytest.raises(RuntimeError):
+        case.capture()
+    record = state.geometry_failures[0]["geometry"]
+    assert record["dimension_display"] == {"missing": True}
+    assert record["annotation_display"]["lines"]["count"] == len(state.lines)
+    assert record["annotation_display"]["arrows"]["rows"] == [
+        tuple(row) for row in state.arrows
+    ]
+    assert record["native_model"]["SystemValue_m"] == state.value
+    assert record["model_to_view_transform"] == state.transform
+    assert set(record["expected_projected_points_m"]) == {"bottom", "top", "inboard"}
+
+
+def test_plate_thickness_diagnostic_read_errors_do_not_hide_other_native_rows(
+    monkeypatch,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    line, arrow = state.data.GetLineAtIndex2, state.data.GetArrowHeadAtIndex2
+
+    def read_line(index):
+        if index == 0:
+            raise OSError("line-zero-unreadable")
+        return line(index)
+
+    def read_arrow(index):
+        if index == 0:
+            raise ValueError("arrow-zero-unreadable")
+        return arrow(index)
+
+    def read_position():
+        raise OSError("position-unreadable")
+
+    monkeypatch.setattr(state.data, "GetLineAtIndex2", read_line)
+    monkeypatch.setattr(state.data, "GetArrowHeadAtIndex2", read_arrow)
+    monkeypatch.setattr(case.annotation, "GetPosition", read_position)
+    # A distinct native provider is diagnostic evidence, never a fallback.
+    state.annotation_data = SimpleNamespace(
+        GetLineCount=lambda: 1, GetLineAtIndex2=lambda _index: line(0),
+        GetArrowHeadCount=lambda: 0, GetTextCount=lambda: 0,
+    )
+    with pytest.raises(RuntimeError) as refused:
+        case.capture()
+    assert isinstance(refused.value.__cause__, ValueError)
+    record = state.geometry_failures[0]["geometry"]
+    rows = record["dimension_display"]
+    assert rows["lines"]["rows"][0]["error_type"] == "OSError"
+    assert rows["lines"]["rows"][1:] == [line(1), line(2)]
+    assert rows["arrows"]["rows"][0]["error_type"] == "ValueError"
+    assert rows["arrows"]["rows"][1] == tuple(arrow(1))
+    assert record["annotation_position_m"]["error_type"] == "OSError"
+    assert record["annotation_display"]["lines"]["rows"] == [line(0)]
+    assert record["annotation_display"]["arrows"]["count"] == 0
+    assert record["model_to_view_transform"] == state.transform
+    assert all(isinstance(point, tuple) for point in record["expected_projected_points_m"].values())
+
+
+def test_plate_thickness_settled_witness_movement_records_original_and_current_ink(
+    monkeypatch,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    check = case.capture()
+    first, second = state.lines[0]
+    state.lines[0] = (first, (second[0] - 0.001, second[1]))
+    with pytest.raises(RuntimeError):
+        check()
+    record = state.geometry_failures[0]["geometry"]
+    original, regenerated = record["original_ink"], record["regenerated_ink"]
+    assert original[:2] == regenerated[:2]
+    assert regenerated[2][0] == original[2][0] - 0.001
+    assert regenerated[2][1] == original[2][1]
+    assert record["dimension_display"]["lines"]["rows"][0][7:9] == (
+        second[0] - 0.001, second[1],
+    )
 
 
 @pytest.mark.parametrize(

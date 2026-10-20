@@ -685,6 +685,12 @@ def _plate_thickness_check(
     vertical edge. Native witness origins, not a coincident seven-millimetre
     value, must still tie it to the visible top and bottom free-end edges.
     No synthetic witness move or value, tolerance, precision or gap edit.
+
+    R5 supplied no native coordinates. The two unsplit horizontal witnesses,
+    bottom/top gap-index order and left-of-free-end route below remain strict
+    hypotheses to prove, not a seat-observed layout. Any geometry refusal logs
+    the complete small native rows and projection frame before re-raising;
+    diagnostic read failures never supply substitute geometry.
     """
     label = "VIEW F PlateThickness"
     slop = 1e-8
@@ -763,6 +769,109 @@ def _plate_thickness_check(
             )
         return display, dimension, name, value, band
 
+    def geometry_failure(display: Any, failure: Exception, **context: Any) -> RuntimeError:
+        """Capture independently: one unreadable row must not hide the others."""
+        def observe(reader: Callable[[], Any]) -> Any:
+            try:
+                result = reader()
+                return tuple(result) if isinstance(result, (list, tuple)) else result
+            except Exception as exc:
+                return {"error_type": type(exc).__name__, "error": str(exc)}
+
+        def display_record(reader: Callable[[], Any]) -> dict[str, Any]:
+            try:
+                raw = reader()
+                if raw is None:
+                    return {"missing": True}
+                data = _early_bound(raw, "IDisplayData")
+            except Exception as exc:
+                return {"error_type": type(exc).__name__, "error": str(exc)}
+            record = {}
+            for key, counter, getter in (
+                ("lines", "GetLineCount", "GetLineAtIndex2"),
+                ("arrows", "GetArrowHeadCount", "GetArrowHeadAtIndex2"),
+                ("text_positions", "GetTextCount", "GetTextPositionAtIndex"),
+            ):
+                count = observe(lambda: getattr(data, counter)())
+                entry = {"count": count, "rows": []}
+                if type(count) is int and count >= 0:
+                    # A single thickness callout has only a few rows. Bound a
+                    # corrupt census without silently presenting it as complete.
+                    entry["rows"] = [
+                        observe(lambda index=index: getattr(data, getter)(index))
+                        for index in range(min(count, 128))
+                    ]
+                    entry["omitted"] = max(0, count - 128)
+                record[key] = entry
+            return record
+
+        def transform_data() -> Any:
+            raw = view.ModelToViewTransform
+            return None if raw is None else _early_bound(raw, "IMathTransform").ArrayData
+
+        def model_record() -> dict[str, Any]:
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            record = {
+                "FullName": observe(lambda: native.FullName),
+                "SystemValue_m": observe(lambda: native.SystemValue),
+            }
+            tolerance = observe(lambda: _early_bound(native.Tolerance, "IDimensionTolerance"))
+            if isinstance(tolerance, dict):
+                record["tolerance"] = tolerance
+            else:
+                record["tolerance"] = {
+                    "Type": observe(lambda: tolerance.Type),
+                    "min_m": observe(lambda: tolerance.GetMinValue()),
+                    "max_m": observe(lambda: tolerance.GetMaxValue()),
+                }
+            return record
+
+        z_mm = -PLATE_L / 2.0
+        model_points = {
+            "bottom": _metres((PLATE_W, COEFFICIENT_BOTTOM_Y, z_mm)),
+            "top": _metres((PLATE_W, COEFFICIENT_TOP_Y, z_mm)),
+            "inboard": _metres((PLATE_W - 1.0, COEFFICIENT_BOTTOM_Y, z_mm)),
+        }
+        evidence = {
+            "annotation_position_m": observe(lambda: annotation.GetPosition()),
+            "requested_annotation_position_m": BACK_KEEP["PlateThickness"],
+            "view_position_m": observe(lambda: view.Position),
+            "model_to_view_transform": observe(transform_data),
+            "native_model": observe(model_record),
+            "native_gap_replies": [
+                observe(lambda index=index: display.GetWitnessLineGap(index, False, 0.0))
+                for index in (0, 1)
+            ],
+            # Keep both native providers distinct; neither substitutes for the
+            # dimension display used by dimension_segments and the ink proof.
+            "dimension_display": display_record(lambda: display.GetDisplayData()),
+            "annotation_display": display_record(lambda: annotation.GetDisplayData()),
+            "dimension_segments_m": observe(lambda: dimension_segments(annotation)),
+            "expected_model_points_m": model_points,
+            "expected_projected_points_m": {
+                face: observe(lambda point=point, face=face: model_point_in_view(
+                    adapter, view, point, label=f"{label} diagnostic {face}",
+                ))
+                for face, point in model_points.items()
+            },
+            "guard_requirements": {
+                "coordinate_tolerance_m": slop,
+                "top_minus_bottom_m": (0.0, COEFFICIENT_T / 1000.0),
+                "inboard_minus_bottom_m": (0.001, 0.0),
+                "horizontal_witness_count": 2,
+                "gap_index_face_order": ("bottom", "top"),
+                "origin_rule": "right_x = projected_free_end_x - effective_native_gap_m",
+                "arrow_rule": "common x strictly inside both horizontal witnesses",
+            },
+            **context,
+        }
+        _telemetry.error(
+            f"{label}: native geometry refusal", failure=str(failure), geometry=evidence,
+        )
+        # The task log is the only surviving r5 artifact. Preserve the same
+        # unrounded evidence there even when structured logs are unavailable.
+        return RuntimeError(f"{failure}; native_geometry={evidence!r}")
+
     def geometry() -> tuple[tuple[float, float], tuple[float, float]]:
         z_mm = -PLATE_L / 2.0
         edges = scan_view_edges(view, label="coefficient plate free end")
@@ -804,7 +913,7 @@ def _plate_thickness_check(
             raise RuntimeError(f"{label}: unexpected projected plate direction or scale")
         return bottom, top
 
-    def ink(display: Any) -> tuple[Any, ...]:
+    def native_ink(display: Any) -> tuple[Any, ...]:
         faces = geometry()
         gaps = []
         for index in (0, 1):
@@ -866,6 +975,12 @@ def _plate_thickness_check(
             raise RuntimeError(f"{label}: unexpected native dimension-line ink")
         return tuple(gaps), tuple(tips), tuple(tails)
 
+    def ink(display: Any) -> tuple[Any, ...]:
+        try:
+            return native_ink(display)
+        except Exception as exc:
+            raise geometry_failure(display, exc) from exc
+
     display, dimension, name, value, band = model_state()
     original_ink = ink(display)
 
@@ -893,7 +1008,12 @@ def _plate_thickness_check(
             or any(math.dist(a, b) > slop for a, b in zip(actual_tips, tips))
             or any(abs(a - b) > slop for a, b in zip(actual_tails, tails))
         ):
-            raise RuntimeError(f"{label}: native witness gaps, arrow tips or tails moved")
+            raise geometry_failure(
+                current,
+                RuntimeError(f"{label}: native witness gaps, arrow tips or tails moved"),
+                original_ink=original_ink,
+                regenerated_ink=(actual_gaps, actual_tips, actual_tails),
+            )
 
     return check_thickness
 
