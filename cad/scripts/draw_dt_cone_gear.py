@@ -59,9 +59,9 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leaders import ARROW_TEXT_CLEARANCE
+from _drawing_leaders import ARROW_TEXT_CLEARANCE, dimension_segments
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
@@ -761,7 +761,7 @@ def _blank_diameter_display(
     return display
 
 
-def _assert_blank_diameter_value(display: Any, configuration: str, teeth: int) -> None:
+def _assert_blank_diameter_value(display: Any, configuration: str, teeth: int) -> float:
     """A display-style change must leave the source diameter untouched."""
     # swDimensionType_e.swDiameterDimension: check before treating a native
     # system value as a diameter, never reinterpret a radius or doubled span.
@@ -776,29 +776,109 @@ def _assert_blank_diameter_value(display: Any, configuration: str, teeth: int) -
         raise RuntimeError(
             f"{configuration}: native BlankDia reads {values!r} m, expected {expected} m"
         )
+    return values[0]
+
+
+def _blank_diameter_ink_problem(
+    segments: list[tuple[tuple[float, float], tuple[float, float]]],
+    ends: list[tuple[float, float]],
+    line_x: float,
+) -> str | None:
+    """Require the native axis and witnesses at the projected blank limits."""
+    slop = 0.0001  # Sheet-ink comparison only, not a manufacturing tolerance.
+    if len(ends) != 2 or not all(
+        math.isfinite(value) for point in ends for value in point
+    ):
+        return "blank limits are not two finite projected points"
+    low, high = sorted(ends, key=lambda point: point[1])
+    if abs(low[0] - high[0]) > slop or high[1] - low[1] <= slop:
+        return "blank limits do not project to a vertical diameter"
+    if not math.isfinite(line_x) or line_x <= max(low[0], high[0]) + slop:
+        return "diameter lane is not right of the blank limits"
+    if not segments:
+        return "no native dimension strokes"
+    axis: list[tuple[float, float]] = []
+    witnesses: list[list[tuple[float, float]]] = [[], []]
+    for (x0, y0), (x1, y1) in segments:
+        if not all(math.isfinite(value) for value in (x0, y0, x1, y1)):
+            return "nonfinite native dimension stroke"
+        if abs(x0 - line_x) <= slop and abs(x1 - line_x) <= slop:
+            if abs(y1 - y0) > slop:
+                axis.append(tuple(sorted((y0, y1))))
+            continue
+        for index, (_, limit_y) in enumerate((low, high)):
+            if max(abs(y0 - limit_y), abs(y1 - limit_y)) <= slop:
+                witnesses[index].append(tuple(sorted((x0, x1))))
+                break
+        else:
+            return "stroke is neither the vertical diameter axis nor a blank witness"
+    for (source_x, limit_y), xs in zip((low, high), witnesses, strict=True):
+        if not any(start - slop <= limit_y <= end + slop for start, end in axis):
+            return f"no vertical dimension run reaches blank limit y={limit_y * 1000:.3f} mm"
+        # The captured cylinder diameter uses a 1.244 mm native start gap.
+        # Permit its standard extension gap, not a detached sheet-side leader.
+        if not any(
+            source_x - slop <= start <= source_x + 0.003 + slop
+            and end >= line_x - slop
+            for start, end in xs
+        ):
+            return f"no native witness joins blank limit y={limit_y * 1000:.3f} mm to its axis"
+    return None
+
+
+def _assert_blank_diameter_ink(
+    adapter: Any, display: Any, configuration: str, teeth: int, view: Any
+) -> None:
+    """Read native ink against the original circle's actual view projection."""
+    diameter = _assert_blank_diameter_value(display, configuration, teeth)
+    # BlankProfile is the fully constrained origin circle on Front. These
+    # points validate its imported display; they never create a sheet dimension.
+    ends = model_points_in_view(
+        adapter,
+        view,
+        [(0.0, -diameter / 2.0, 0.0), (0.0, diameter / 2.0, 0.0)],
+        label=f"{configuration} native blank diameter limits",
+    )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    segments = dimension_segments(annotation)
+    line_x = right_keep(teeth)["BlankDia"][0]
+    problem = _blank_diameter_ink_problem(segments, ends, line_x)
+    if problem is not None:
+        raise RuntimeError(f"{configuration}: BlankDia native ink: {problem}")
+    _telemetry.info(
+        f"{configuration}: BlankDia native ink: {len(segments)} strokes, "
+        f"projected limits {[(round(x * 1000, 3), round(y * 1000, 3)) for x, y in ends]} mm, "
+        f"vertical axis x={line_x * 1000:.3f} mm"
+    )
 
 
 def _set_linear_blank_diameter(
-    adapter: Any, annotations: list[Any], configuration: str, teeth: int
+    adapter: Any, annotations: list[Any], configuration: str, teeth: int, view: Any
 ) -> Any:
-    """Change only the imported diameter's native presentation, not its value."""
+    """Set diameter-specific presentation, then prove its native result."""
     display = _blank_diameter_display(adapter, annotations, configuration, teeth)
     display.DisplayAsLinear = True
-    if not display.SetVertical():
-        raise RuntimeError(f"{configuration}: BlankDia refused vertical presentation")
-    rebuild_drawing(adapter, label=f"{configuration} linear blank diameter")
+    # DisplayAsLinear's SDK contract requires redraw. This native diameter
+    # rejected SetVertical; its actual ink, not a generic orientation setter's
+    # success flag or our requested position, is the acceptance boundary.
+    adapter.currentModel.GraphicsRedraw2()
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    curate_dimensions(
+        adapter, [annotation], reposition={"BlankDia": right_keep(teeth)["BlankDia"]}
+    )
     _assert_blank_diameter_value(display, configuration, teeth)
     if not bool(display.DisplayAsLinear):
         raise RuntimeError(f"{configuration}: BlankDia did not retain linear presentation")
+    _assert_blank_diameter_ink(adapter, display, configuration, teeth, view)
     return display
 
 
 def _assert_settled_blank_diameters(
-    adapter: Any, blanks: list[tuple[str, Any, int]]
+    adapter: Any, blanks: list[tuple[str, Any, int, Any]]
 ) -> None:
     """The final rebuild must retain the side view's native linear diameters."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for configuration, display, teeth in blanks:
+    for configuration, display, teeth, view in blanks:
         if not drawing.ActivateSheet(configuration):
             raise RuntimeError(f"failed to activate {configuration} for its blank diameter")
         _assert_blank_diameter_value(display, configuration, teeth)
@@ -806,6 +886,7 @@ def _assert_settled_blank_diameters(
             raise RuntimeError(
                 f"{configuration}: settled BlankDia lost linear presentation"
             )
+        _assert_blank_diameter_ink(adapter, display, configuration, teeth, view)
 
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
@@ -1392,7 +1473,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
     clocks: list[tuple[str, Any, int]] = []
-    blanks: list[tuple[str, Any, int]] = []
+    blanks: list[tuple[str, Any, int, Any]] = []
     for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
@@ -1458,9 +1539,9 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         blank = _set_linear_blank_diameter(
-            adapter, right_annotations, configuration, teeth
+            adapter, right_annotations, configuration, teeth, right
         )
-        blanks.append((configuration, blank, teeth))
+        blanks.append((configuration, blank, teeth, right))
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
         _assert_sheet_bands(adapter, annotations, configuration, teeth)
         set_dimension_callouts(adapter, annotations, callouts_below(teeth))
