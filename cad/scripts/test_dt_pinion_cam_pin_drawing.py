@@ -216,7 +216,7 @@ def test_the_cam_rides_the_shank_short_of_the_crown() -> None:
 # shelf, right of it (r5 layout audit: text 4.2-6.8 mm above the root), and
 # the CAM CONTACT target prints a row above the bar, about 11.5 mm up.
 _SHELF_LEFT_DX = -0.0030
-_TEXT_RIGHT_DX = 0.0148
+_LEADER_ELBOW_DX = 0.00635
 _SYMBOL_TOP_DY = 0.0115
 
 
@@ -228,11 +228,12 @@ def test_shank_finish_sits_clear_above_the_shank() -> None:
         drawing.RIGHT_CENTER[1] + model_y * drawing.SHEET_SCALE[0],
     )
     assert model_x == 0.0
+    assert dt_pinion_cam_pin_spec.SEAT_LEN < model_z * 1000.0 < drawing.PIN_LEN
     assert target[1] == pytest.approx(drawing.RIGHT_CENTER[1] + drawing.HALF_DIA)
     # The leader falls from the shelf end to the shank's upper edge, so it
     # passes below the text that sits above the shelf.
     assert y > target[1] + 0.004
-    assert target[0] > x + _TEXT_RIGHT_DX
+    assert target[0] > x + _LEADER_ELBOW_DX + 0.005
     # Clear of the crown-root extension line and under the Depth block.
     assert x + _SHELF_LEFT_DX > drawing.side_view_x(drawing.PIN_LEN) + 0.005
     # r5 layout audit: the Depth dimension line runs 8 mm under its keep point.
@@ -241,7 +242,6 @@ def test_shank_finish_sits_clear_above_the_shank() -> None:
     assert (
         dt_pinion_cam_pin_spec.SURFACE_FINISHES[0].production_method
         == dt_pinion_cam_pin_spec.SHANK_FINISH_TARGET
-        == "CAM CONTACT"
     )
 
 

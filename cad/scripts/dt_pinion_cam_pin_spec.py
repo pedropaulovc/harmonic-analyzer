@@ -73,11 +73,11 @@ CAP_RADIUS_CALLOUT = "OUTER CROWN"
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
 # slides or locates): the cam rides the Ø4 shank, a cam-follower contact, so
 # the shank carries Ra 1.6 (ground drill rod meets it as received; Codex P2 on
-# #1687).  The symbol names the function, as the mating cam's "CAM OD" does,
-# because the shank's callouts otherwise read as a static seat (machinist
-# review r5 of #1009).  The crown touches nothing and carries no symbol
-# (machinist review r1).  The 360-degree revolve leaves one Ø4 cylinder.
-SHANK_FINISH_TARGET = "CAM CONTACT"
+# #1687).  Name both the function and its physical surface so the free crown
+# cannot be mistaken for the contact (epoch4 review of #1687).  This remains
+# the existing whole cylindrical-face control, not a localized contact band.
+# The crown touches nothing and carries no symbol (machinist review r1).
+SHANK_FINISH_TARGET = "CAM CONTACT - SHANK OD"
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         key="shank",

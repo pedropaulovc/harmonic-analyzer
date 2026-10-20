@@ -5,9 +5,9 @@ MHA-DT-14 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
-4:1 isometric sits clear of the title block.  The shank the cam rides carries
-the one roughness symbol, and the sheet has no general notes
-(dt_pinion_cam_pin_spec).
+4:1 isometric sits clear of the title block.  The shank OD the cam rides carries
+the one roughness symbol, explicitly distinguished from the free crown, and
+the sheet has no general notes (dt_pinion_cam_pin_spec).
 
 Run with SolidWorks open::
 
