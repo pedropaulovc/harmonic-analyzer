@@ -6,7 +6,7 @@ others:
 * ``build_fr_nameplate`` -- the plate envelope and its four corner screw stations
   (``SCREW_XY``, plate-local mm);
 * ``build_fr_harmonic_base`` -- the SAME stations transformed into the machine
-  frame (``MOUNT_HOLE_XZ``), where it taps the four blind #4-40 seats the
+  frame (``MOUNT_HOLE_XZ``), where it through-taps four #4-40 seats the
   plate's screws thread into. It must NOT import ``build_fr_nameplate``:
   ``_buildgraph.module_deps_of`` follows sibling ``build_*.py`` imports, so
   the base (the root of every assembly) would rebuild on each engraving edit;
@@ -42,6 +42,9 @@ from __future__ import annotations
 
 import math
 
+import _mcmaster_90114a511 as _screw
+from _printed_tolerance import printed_deviations
+
 # --- Photo-traced DXF measurements BEFORE the 2026-10-09 rebake (mm). ---
 # The brief's 39.892 was rounded; preserve the measured outer-loop height and
 # uniformly scale every contour. These data need no DXF/CAD dependency at import.
@@ -60,6 +63,36 @@ DXF_SCREW_XY = (
 PLATE_WIDTH = DXF_OUTER_WIDTH * DXF_SCALE
 PLATE_HEIGHT = DXF_OUTER_HEIGHT * DXF_SCALE
 PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
+PLATE_THICKNESS_PRECISION = 3
+
+# Shared mechanical installation limits, formerly drawing-only. RV-03 in the
+# nameplate registry preserves the original cosmetic-joint shortfall: these
+# bounds describe the stock screw projecting through the plate, not a newly
+# qualified supplier profile or a new 1.5D claim for the through-tap conversion.
+SCREW_LENGTH_SHORT_ALLOWANCE = 0.02 * 25.4
+SCREW_TIP_INCOMPLETE = 0.75 * _screw.BF_PITCH
+SCREW_ENGAGEMENT_TARGET = 1.5 * _screw.SHANK_DIA
+SCREW_FULL_THREAD_MIN = (
+    _screw.SHANK_LEN
+    - SCREW_LENGTH_SHORT_ALLOWANCE
+    - (
+        PLATE_THICKNESS
+        + printed_deviations(PLATE_THICKNESS, PLATE_THICKNESS_PRECISION)[1]
+    )
+    - SCREW_TIP_INCOMPLETE
+)
+SCREW_FULL_THREAD_ACCEPTED = 3.736
+if not (
+    0.0
+    < SCREW_FULL_THREAD_ACCEPTED
+    <= round(SCREW_FULL_THREAD_MIN, 3)
+    < SCREW_ENGAGEMENT_TARGET
+):
+    raise AssertionError(
+        f"nameplate screw full thread {SCREW_FULL_THREAD_MIN:.3f} is not the "
+        f"accepted rule-20 shortfall [{SCREW_FULL_THREAD_ACCEPTED}, "
+        f"{SCREW_ENGAGEMENT_TARGET:.3f})"
+    )
 
 # Four slotted screw-head marks in the traced DXF, measured at each mark's
 # combined contour bbox centre. Preserve their slight asymmetry rather than a
@@ -79,7 +112,7 @@ HEAD_MARK_XY = tuple(
 # (fr_nameplate_drawing_spec.HOLE_LIGAMENT_WORST measures it on the DXF).
 # 0.0972 is the least inset that does it; 0.1 keeps the stations off the .X
 # rounding knife-edge without a band. The heads (R2.32) still cover the
-# engraved marks (R2.16 + 0.14 offset). The base's blind seats derive from
+# engraved marks (R2.16 + 0.14 offset). The base's through seats derive from
 # these stations through MOUNT_HOLE_XZ, so they move with them.
 SCREW_INSET = 0.1
 SCREW_XY = tuple(

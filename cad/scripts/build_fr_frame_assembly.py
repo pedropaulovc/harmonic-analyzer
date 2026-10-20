@@ -60,17 +60,17 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
-  base's blind #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
+  base's through #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
   fr_nameplate_spec derivation). Same single-mate fix-all treatment.
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
-through the support foot's 5/16 clearance drills, into blind 1/4-20 UNC-2B
+through the support foot's 5/16 clearance drills, into through 1/4-20 UNC-2B
 seats in the base. The foot pattern transforms from local X +/-60.32,
 Z +/-17.46 to machine x 55.44/90.36, z -60.32/+60.32 (the base's shared
 SUPPORT_HOLD_DOWN_XZ contract). Each McMaster 92240A540 screw bears on the
 bottom of its exact vendor-modeled 0.277813 mm under-head washer transition,
-crosses the 6.35 mm foot, and engages 12.422187 mm = 1.956D in the base. The
-screws are inserted at exact authored transforms and locked to the fixed base;
+crosses the 6.35 mm foot, and inserts 12.422187 mm into the base receiver.
+The screws are inserted at exact authored transforms and locked to the fixed base;
 they do not constrain the support. Every rigid frame member uses this
 same single-mate strategy; transform readback remains the fail-loud placement
 tripwire. Final asserts: every component fixed or ``swFullyConstrained`` and no
@@ -102,6 +102,7 @@ from _custom_properties import apply_custom_properties
 from _paths import OUT_SLDPRT
 from _session import run_build
 from _drawing_marks import DRAWN_BY
+from _printed_tolerance import printed_deviations
 from _simplified_names import simplified_name
 from _assembly import (
     activate_assembly_contract,
@@ -130,11 +131,15 @@ from _transforms import (
 )
 from fr_harmonic_base_fasteners import (
     BASE_CROSS_TAP_SPEC,
+    EDGE_BREAK_MAX_MM,
     HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_THREAD,
     HOLD_DOWN_THREAD_CLASS,
-    NAMEPLATE_SCREW_HOLE_DEPTH,
+    NAMEPLATE_SEAT_SPEC,
     NAMEPLATE_SCREW_XZ,
+    require_through_seat_fit,
+    through_seat_material,
 )
 from _interference_contracts import allowed_interference_pairs
 from _cone_axis_constants import (
@@ -150,6 +155,8 @@ from fr_nameplate_spec import (
     MOUNT_ROWS as NAMEPLATE_ROWS,
     PLATE_HEIGHT as NAMEPLATE_HEIGHT,
     PLATE_THICKNESS as NAMEPLATE_THICKNESS,
+    PLATE_THICKNESS_PRECISION as NAMEPLATE_THICKNESS_PRECISION,
+    SCREW_FULL_THREAD_MIN as NAMEPLATE_STOCK_FULL_THREAD_MIN,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as LAG_FOOT_THICKNESS
 from fr_rocker_arm_support_spec import (
@@ -175,6 +182,7 @@ from fr_vn_lag_screw_spec import (
     THREAD_CLASS as LAG_THREAD_CLASS,
     THREAD_LEN as LAG_THREAD_LEN,
     THREAD_SIZE as LAG_THREAD_SIZE,
+    TIP_CHAMFER as LAG_TIP_CHAMFER,
 )
 from build_fr_top_frame import (
     SET_SPOT_FACE_X as TOP_SET_SPOT_FACE_X,
@@ -219,7 +227,7 @@ SUPPORT_EULER = [0.0, 90.0, 0.0]
 SUPPORT_ROWS = ROT_Y_POS90
 
 # Rocker-support hold-down: four stock 1/4-20 x 3/4 hex-head screws,
-# coaxial with the support clearance drills and blind base taps via authored
+# coaxial with the support clearance drills and through base taps via authored
 # transforms; one seed lock mate and a native grid retain that placement.
 # Stations are the foot pattern in the machine frame: local X +/-60.32,
 # Z +/-17.46 turned +90 degrees about Y -> machine x 55.44/90.36 and
@@ -247,6 +255,20 @@ if not math.isclose(LAG_BASE_ENGAGEMENT, HOLD_DOWN_ENGAGEMENT, abs_tol=1e-9):
     raise AssertionError(
         "stock hold-down engagement must follow its exact bearing-face geometry"
     )
+# The washer face/stock tip are nominal supplier geometry. Charge the
+# manufactured foot's ordinary .XX band without inventing supplier limits.
+_LAG_FOOT_LOW, _LAG_FOOT_HIGH = printed_deviations(LAG_FOOT_THICKNESS, 2)
+LAG_BASE_THREAD_FITS = tuple(
+    require_through_seat_fit(
+        "rocker support",
+        HOLD_DOWN_SEAT_SPEC,
+        through_seat_material(HOLD_DOWN_SEAT_SPEC, xz),
+        insertion_min_mm=HOLD_DOWN_ENGAGEMENT - _LAG_FOOT_HIGH,
+        insertion_max_mm=HOLD_DOWN_ENGAGEMENT - _LAG_FOOT_LOW,
+        tip_loss_mm=LAG_TIP_CHAMFER,
+    )
+    for xz in LAG_SCREW_XZ
+)
 
 TOP_FRAME_MID_Y = TOP_SCREW_Y
 
@@ -331,7 +353,7 @@ if any(
     )
 #
 # nameplate screws (2026-09-02 ch26 p.71 re-derive): 4x #4-40 brass
-# fillister-screw, one per plate corner, screwed DOWN into the base's blind
+# fillister-screw, one per plate corner, screwed DOWN into the base's through
 # #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the plate's own
 # DXF-mark holes carried through the shared mount transform). The part is
 # authored axis along local +Z with the origin at the UNDER-HEAD bearing plane,
@@ -354,12 +376,39 @@ if NAMEPLATE_SCREW_SHANK_LEN < NAMEPLATE_THICKNESS + 2.0:
         f"fillister-screw shank {NAMEPLATE_SCREW_SHANK_LEN} cannot pass the "
         f"{NAMEPLATE_THICKNESS} nameplate with 2.0 thread engagement"
     )
-if NAMEPLATE_SCREW_HOLE_DEPTH < NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS + 0.5:
-    raise AssertionError(
-        f"base nameplate tap thread depth {NAMEPLATE_SCREW_HOLE_DEPTH} bottoms the "
-        f"{NAMEPLATE_SCREW_SHANK_LEN} shank (needs "
-        f"{NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS + 0.5})"
+# RV-03's external screw full-form projection is inherited unchanged; it is
+# NOT a claim that the installed female overlap reaches 1.5D. The original
+# shortfall calculation did not deduct the unchanged female entrance break.
+_NAMEPLATE_THICKNESS_LOW = printed_deviations(
+    NAMEPLATE_THICKNESS, NAMEPLATE_THICKNESS_PRECISION,
+)[0]
+NAMEPLATE_SCREW_MAX_INSERTION = (
+    NAMEPLATE_SCREW_SHANK_LEN - NAMEPLATE_THICKNESS - _NAMEPLATE_THICKNESS_LOW
+)
+NAMEPLATE_BASE_MATERIALS = tuple(
+    through_seat_material(NAMEPLATE_SEAT_SPEC, xz)
+    for xz in NAMEPLATE_SCREW_XZ
+)
+for _material in NAMEPLATE_BASE_MATERIALS:
+    if not any(
+        start <= EDGE_BREAK_MAX_MM + 1e-9
+        and end >= NAMEPLATE_SCREW_MAX_INSERTION - 1e-9
+        for start, end in _material.guaranteed_segments_mm
+    ):
+        raise AssertionError("nameplate through receiver reduces existing usable thread")
+NAMEPLATE_BASE_FULL_FORM_MIN = min(
+    sum(
+        max(0.0, min(end, NAMEPLATE_STOCK_FULL_THREAD_MIN) - start)
+        for start, end in material.guaranteed_segments_mm
     )
+    for material in NAMEPLATE_BASE_MATERIALS
+)
+NAMEPLATE_TIP_CLEARANCE_MIN = min(
+    material.deck_height_min_mm - NAMEPLATE_SCREW_MAX_INSERTION
+    for material in NAMEPLATE_BASE_MATERIALS
+)
+if NAMEPLATE_TIP_CLEARANCE_MIN <= 0.0:
+    raise AssertionError("nameplate screw tip reaches the base underside clearance floor")
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -713,7 +762,7 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, support_name, support_target, SUPPORT_ROWS)
 
     # Hold-down: four stock 1/4-20 hex-head screws install top-down through the
-    # support foot's 5/16 clearance drills into the base's blind UNC-2B seats.
+    # support foot's 5/16 clearance drills into the base's through UNC-2B seats.
     # The authored support pose seats its foot exactly on the base top at the
     # derived machine stations. IDENTITY keeps each screw head above the foot,
     # its shank along -Y, and its vendor-modeled washer face on the support;

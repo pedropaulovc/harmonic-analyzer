@@ -16,3 +16,6 @@ from _mcmaster_90280a203 import FILLISTER_SIZE
 THREAD = "#8-32"
 THREAD_CLASS = "2A"
 SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, PITCH = FILLISTER_SIZE
+# Native source-model end losses (diag_mcmaster_fillister), not stock limits.
+TIP_CHAMFER = 0.7 * PITCH
+FULL_THREAD_START = 1.625 * PITCH

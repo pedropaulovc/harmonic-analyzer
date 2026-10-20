@@ -141,6 +141,18 @@ continues through any retained rib or other casting in its path; it is not a
 clearance hole, and no underside nut is introduced. The cross taps remain
 blind and retain their independent manufacturing and engagement contracts.
 
+Owner ruling **2026-10-20** retains a **13.0 mm nominal deck skin** by making
+the underside pocket **1.0 mm shallower** (37.8 mm pocket depth). The deck
+top, mounting stations, hardware and existing loose tolerance scheme stay
+unchanged. The controlling dimensions remain green-top height, deck rise and
+pocket depth, each with the title block's `.X` ±0.8 mm band; the skin is not
+silently made a directly controlled or tighter dimension. The worst-case
+female full-thread depth at a skin-only seat is
+`(47.8−0.8)+(3.0−0.8)−(37.8+0.8)−2×0.25 = 10.10 mm`.
+That exceeds the 1/4-20 receiver's **1.5D = 9.525 mm** requirement by
+**0.575 mm**, after both edge breaks. The former 12 mm skin would retain
+only 9.10 mm under the same chain and was not accepted for this conversion.
+
 The per-station material map includes retained ribs, socket bosses, lugs,
 walls and pocket fillets rather than assuming every hole crosses only the
 deck skin. A maximum-radius fillet may contribute material to the nominal
@@ -150,6 +162,47 @@ actual cut opens through every retained material segment. Existing screws,
 their top-side bearing seats and the cone knob's clamp/bare-base poses stay
 unchanged; the original pivot-screw operational-retention issue is not fixed
 merely by breaking its tap through the deck.
+
+The current live stations have the following retained material. Coordinates
+are machine X/Z; the source-owned station tuples, not these rounded labels,
+remain authoritative. `THROUGH_SEAT_MATERIAL` records every individual seat.
+
+| Seats | Count | Nominal metal on the hole axis | Complete-circumference nominal receiver |
+|---|---:|---:|---:|
+| Rocker support | 4 | 13.0 mm | 13.0 mm |
+| Cone pivot, cone lock, swing stop | 1 each | 13.0 mm | 13.0 mm |
+| Pinion blocks, `PINION_PIVOT_X − 8.5` | 2 | 13.0 mm | 13.0 mm |
+| Pinion blocks, `PINION_PIVOT_X + 8.5` (X ≈ −4.652) | 2 | 47.8 mm, through cross rib | 13.0 mm |
+| Spring foot | 1 | 13.0 mm | 13.0 mm |
+| Arbor pedestals, including ±2 X / ±5 Z transfer envelopes | 2 | 13.0 mm | 13.0 mm |
+| Nameplate | 4 | 13.0 mm | 13.0 mm |
+
+The two block holes on the cross-rib edge break through to the rib's
+3.0 mm bottom relief, but their thread circles cross that edge: the extra
+axis depth is **not** a full circumference of useful thread. All eighteen
+receivers therefore use the conservative full-form interval **0.25–10.35 mm**
+below the deck at the printed limits. The current lock is 13.53 mm inside
+the pocket wall, and the stop is about 5.43 mm beyond the long rib's edge;
+neither is backed by those structures. No current hole footprint reaches an
+R6 patch, socket boss or cross-tap lug.
+
+Receiver capacity is distinct from unchanged stock-screw limitations. The
+nameplate's existing **RV-03** ruling (`parts/fr-nameplate.yaml`) retains the
+1/4 in brass screw and the printed **3.73 MIN** external full-form projection:
+`6.35−0.508−(1.500+0.13)−0.75×0.635 = 3.73575 mm`.
+That inherited calculation omits the female entrance edge break. Charging
+the unchanged 0.25 mm maximum entrance loss gives **3.48575 mm** female
+overlap; the conversion does not shorten it, and it must not be described as
+a new 1.5D-qualified joint. The frame checks that the new receiver fully
+covers the existing screw reach and records this finite overlap separately.
+The pivot shoulder screw likewise retains its existing installed **4.83 mm
+minimum** inspection: the harvested tail's nominal full-form interval is
+`[2.3368, 9.525−0.43434]`, or **6.75386 mm**, not 9.525 mm of useful thread.
+Neither inherited stock limitation is remedied by removing casting islands.
+The existing [base thread audit #617](https://github.com/pedropaulovc/harmonic-analyzer/issues/617)
+and [engagement audit #846](https://github.com/pedropaulovc/harmonic-analyzer/issues/846)
+retain the inherited qualification questions; this geometry conversion does
+not close either audit or authorize a new shortfall.
 
 ### Blind-thread DFM rule
 
