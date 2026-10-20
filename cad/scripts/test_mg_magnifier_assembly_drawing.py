@@ -1266,3 +1266,250 @@ def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
     assert source.configuration_switches == []
     assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
     assert not source.exploded
+
+
+@pytest.fixture
+def mg_source_trace(monkeypatch):
+    events = []
+    warnings = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda _name, **fields: events.append(fields)
+    )
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    return SimpleNamespace(
+        source=source,
+        events=events,
+        warnings=warnings,
+        step=drawing._source_dirty_tracer(source),
+    )
+
+
+@pytest.mark.parametrize("dirty_during", ["placement", "configuration"])
+def test_mg_assembled_trace_separates_named_view_and_configuration(
+    monkeypatch, mg_source_trace, dirty_during
+) -> None:
+    probe = mg_source_trace
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+
+    def place(_adapter, _source, name, *_xy, **_kwargs):
+        probe.source.dirty |= dirty_during == "placement"
+        return SimpleNamespace(name=name)
+
+    def configure(*_args, **_kwargs):
+        probe.source.dirty |= dirty_during == "configuration"
+
+    def lever(_adapter, _view, source_step):
+        assert source_step is probe.step
+        source_step("lever settings test boundary")
+        return lambda: None
+
+    def stack_settings(_adapter, source_step):
+        assert source_step is probe.step
+        source_step("stack settings test boundary")
+        return lambda: None
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "apply_view_configuration", configure)
+    monkeypatch.setattr(drawing, "_lever_settings", lever)
+    monkeypatch.setattr(drawing, "_stack_dimensions", stack_settings)
+    monkeypatch.setattr(drawing, "_add_note_block", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "_view_outline", lambda *_args, **_kwargs: (0.0, 0.1, 0.1, 0.2)
+    )
+
+    settled = drawing._place_assembled_sheet(object(), probe.step)
+
+    orientations = (
+        stack.DRAWING_BACK_VIEW,
+        stack.DRAWING_LEFT_VIEW,
+        stack.DRAWING_ISOMETRIC_VIEW,
+    )
+    assert [event["step"] for event in probe.events] == [
+        "assembled sheet activation",
+        *(
+            f"assembled {name} {operation}"
+            for name in orientations
+            for operation in ("named view placement and scale", "view configuration")
+        ),
+        "lever settings test boundary",
+        "stack settings test boundary",
+        *(f"assembled {name} caption" for name in drawing.ASSEMBLED_VIEW_CAPTIONS),
+    ]
+    first_dirty = next(event["step"] for event in probe.events if event["dirty"])
+    operation = (
+        "named view placement and scale"
+        if dirty_during == "placement"
+        else "view configuration"
+    )
+    assert first_dirty == f"assembled {stack.DRAWING_BACK_VIEW} {operation}"
+    assert probe.warnings == [f"magnifier source went DIRTY after {first_dirty}"]
+    assert len(settled) == 2
+    assert probe.source.dirty
+    assert probe.source.configuration_switches == []
+
+
+@pytest.mark.parametrize("group", ["lever", "stack"])
+def test_mg_settings_trace_checks_each_display_callout_without_model_writes(
+    monkeypatch, mg_source_trace, group
+) -> None:
+    import _drawing_dimensions as dimension_helpers
+
+    probe = mg_source_trace
+    locations = (
+        drawing.LEVER_CALLOUT_LOCATION if group == "lever" else drawing.CALLOUT_LOCATION
+    )
+    source_precision = (
+        stack.LEVER_DRAWING_PRECISION if group == "lever" else stack.DRAWING_PRECISION
+    )
+    precision = {
+        name: places
+        for names in source_precision.values()
+        for name, places in names.items()
+    }
+    annotations = {}
+    writes = []
+
+    def no_model_dimension(*_args):
+        raise AssertionError("setting formatting must not write a model dimension")
+
+    def annotation(name):
+        text = {}
+
+        def set_text(part, value):
+            writes.append((name, part, value))
+            text[part] = value
+            # Synthetic transition tests checkpoint attribution, not COM behavior.
+            probe.source.dirty = True
+
+        display = SimpleNamespace(
+            SetText=set_text,
+            GetText=lambda part: text.get(part, ""),
+            GetPrimaryPrecision2=lambda: precision[name],
+            GetDimension2=no_model_dimension,
+        )
+        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
+
+    for name in locations:
+        annotations[name] = annotation(name)
+    monkeypatch.setattr(
+        dimension_helpers._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
+    for module in (drawing, dimension_helpers):
+        monkeypatch.setattr(module, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda *_args, **_kwargs: list(annotations.values()),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda *_a, **_k: ((0.0, 0.0),) * 3
+    )
+    monkeypatch.setattr(
+        drawing,
+        "_add_setting_axes",
+        lambda _adapter, _view, source_step: source_step("lever axes test boundary"),
+    )
+
+    def detail(_adapter, _detail, keep, source_step):
+        assert source_step is probe.step
+        return [annotations[name] for name in keep]
+
+    monkeypatch.setattr(drawing, "_dimensioned_detail", detail)
+    adapter = SimpleNamespace(_attempt=lambda action: action())
+    if group == "lever":
+        drawing._lever_settings(adapter, object(), probe.step)
+        prefix = [
+            "lever setting projection readback",
+            "lever axes test boundary",
+            f"lever per-view {stack.LEVER_FEATURE} show",
+            "lever model dimension import and curation",
+        ]
+    else:
+        drawing._stack_dimensions(adapter, probe.step)
+        prefix = []
+    callout_steps = [
+        f"{group} {name} {location} callout" for name, location in locations.items()
+    ]
+    assert [event["step"] for event in probe.events] == [
+        *prefix,
+        *callout_steps,
+        f"{group} imported precision readback",
+        f"{group} dimension names and callout readback",
+    ]
+    assert [(name, part) for name, part, _value in writes] == [
+        (name, drawing.CALLOUT_TEXT_PART[location]) for name, location in locations.items()
+    ]
+    assert probe.warnings == [f"magnifier source went DIRTY after {callout_steps[0]}"]
+    assert probe.source.dirty
+    assert probe.source.configuration_switches == []
+
+
+@pytest.mark.parametrize(
+    "dirty_during, expected",
+    [
+        ("circle", "crop circle"),
+        ("Crop2", "Crop2"),
+        ("rebuild", "crop rebuild"),
+        ("display", "crop display geometry update"),
+    ],
+)
+def test_mg_crop_trace_separates_circle_crop_rebuild_and_display(
+    monkeypatch, mg_source_trace, dirty_during, expected
+) -> None:
+    probe = mg_source_trace
+
+    def operation(name, result=None):
+        probe.source.dirty |= dirty_during == name
+        return result
+
+    manager = SimpleNamespace(
+        AddToDB=True, CreateCircle=lambda *_args: operation("circle", object())
+    )
+    model = SimpleNamespace(
+        SketchManager=manager,
+        ClearSelection2=lambda _all: None,
+        EditRebuild3=lambda: operation("rebuild", True),
+    )
+    view = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
+        Crop2=lambda *_args: operation("Crop2", drawing.CROP_NO_ERROR),
+        UpdateViewDisplayGeometry=lambda: operation("display"),
+        IsCropped=lambda: True,
+    )
+    utility = SimpleNamespace(
+        CreatePoint=lambda xyz: SimpleNamespace(
+            MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=xyz)
+        )
+    )
+    adapter = SimpleNamespace(
+        currentModel=model, swApp=SimpleNamespace(GetMathUtility=lambda: utility)
+    )
+    monkeypatch.setattr(drawing, "_activate", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "double_array", lambda values: values)
+    monkeypatch.setattr(drawing._telemetry, "info", lambda *_args, **_kwargs: None)
+
+    drawing._crop(adapter, view, drawing.ENDSHAKE, probe.step)
+
+    assert [event["step"] for event in probe.events] == [
+        f"{drawing.ENDSHAKE.title} {operation}"
+        for operation in (
+            "crop view activation",
+            "crop AddToDB disabled",
+            "crop circle",
+            "crop AddToDB restored",
+            "Crop2",
+            "crop rebuild",
+            "crop display geometry update",
+        )
+    ]
+    assert probe.warnings == [
+        f"magnifier source went DIRTY after {drawing.ENDSHAKE.title} {expected}"
+    ]
+    assert manager.AddToDB is True
+    assert probe.source.dirty
+    assert probe.source.configuration_switches == []
