@@ -9,7 +9,7 @@ read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
 Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-VN-50 to TL-VN-71). Overall envelope at the modelled pose,
+bought items' (TL-VN-50 to TL-VN-72). Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
@@ -38,11 +38,12 @@ underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
 with the nut bracket's block screws out; the handwheel feeds the finish pass.
 
 Every bought item is modelled and inserted, each family its own TL part
-(TL-VN-50 to TL-VN-71, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
+(TL-VN-50 to TL-VN-72, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
 the four 6200-2RS bearings, the CL dowel, the leadscrew, its flanged nut, the
 two KP08 blocks and the handwheel, the four hold-down studs with their
-T-nuts and flange nuts, every screw, and the wedge-lock washer pair under
-each block screw's and each feed lever screw's head. Each instance's pose is
+T-nuts and flange nuts, every screw, the wedge-lock washer pair under each
+block screw's and each feed lever screw's head, and each nut screw's flat washer.
+Each instance's pose is
 ``PLACEMENTS`` (from the part frames each part spec documents), and the BOM
 rows, item numbers and descriptions are ``QUANTITIES``, ``ITEM_NUMBERS`` and
 ``BOM_DESCRIPTIONS``. No skid (user ruling).
@@ -153,7 +154,7 @@ NUT_WASHER = "ch-rocker-arm-tl-vn-oblique-nut-washer"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory, in registry order
-# TL-20..29 and TL-VN-50..71. The bought counts are the part specs' own.
+# TL-20..29 and TL-VN-50..72. The bought counts are the part specs' own.
 QUANTITIES = {
     BASE_BAR: base_bar.QUANTITY,
     CARRIER: 1,
