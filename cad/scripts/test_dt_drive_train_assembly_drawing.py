@@ -299,6 +299,18 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
     assert {"dt-cone-gear", "dt-pinion-lever-pin"} <= set(printed)
 
 
+def test_pinion_cam_thread_matches_its_supplied_hardware() -> None:
+    import dt_pinion_cam_geometry as cam
+
+    designation = f"{cam.SET_SCREW_HOLE_SPEC.size} SET SCREW"
+    description = drawing.BOM_DESCRIPTIONS["dt-pinion-cam"]
+    fit_up = _rig_step_body("cams-and-lever-fitted")
+    assert designation in description
+    assert designation in fit_up
+    assert "M2.5" not in description + fit_up
+    assert "(SUPPLIED WITH MHA-DT-023) LOOSE" in fit_up
+
+
 def test_bom_descriptions_keep_one_line() -> None:
     for stem, text in drawing.BOM_DESCRIPTIONS.items():
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
