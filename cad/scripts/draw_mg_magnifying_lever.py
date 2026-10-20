@@ -1,10 +1,10 @@
 r"""Native quarter-inch lever sheet with an enlarged flat-thread-end detail.
 
 The independent model detail imports its dimensions before its circular crop,
-as on MHA-MG-04. Native diameters/lengths/limits remain associative; the part's
-cosmetic thread and the sheet share one UNC-2A callout. Only the free end domes;
-its note attaches to the identified visible spherical face, including faces
-obtained from actual visible silhouettes when face enumeration omits them.
+as on MHA-MG-04. Native diameters/lengths/limits remain associative. The model
+retains UNC-2A metadata; drawing instances defer the default class to the title.
+Only the free end domes; its note attaches to the identified spherical face,
+including actual visible-silhouette faces when face enumeration omits them.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT, TIP_CALLOUT
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT, TIP_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
 PART_STEM = SPEC.artifact_stem
@@ -53,7 +53,7 @@ DETAIL_CENTER = (0.310, 0.190)
 DETAIL_SCALE = (3, 1)
 DETAIL_FOCUS = (0.156, 0.0, 0.0)
 DETAIL_RADIUS_MM = 12.5
-DETAIL_KEEP = {"ThreadLength": (0.323, 0.220), "TipChamfer": (0.377, 0.198), "IncompleteLength": (0.368, 0.165)}
+DETAIL_KEEP = {"ThreadLength": (0.323, 0.220), "TipChamfer": (0.377, 0.198), "IncompleteLength": (0.377, 0.165)}
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.118, 0.150)}
 CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "TipChamfer": TIP_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
 
@@ -232,6 +232,61 @@ def _free_end_face(adapter: Any, view: Any, annotations: list[Any]) -> Any:
     return matches[0]
 
 
+def _print_native_thread_callout(adapter: Any, view: Any) -> None:
+    """Edit ICThread's drawing INote, not the part's cosmetic-thread metadata."""
+    native = _early_bound(view, "IView")
+    count = int(native.GetCThreadCount())
+    thread = _early_bound(native.GetFirstCThread(), "ICThread")
+    if count != 1 or thread is None or thread.GetNext() is not None:
+        raise RuntimeError(f"lever front needs one native cosmetic-thread seed, reported {count}")
+    note = _early_bound(thread.ThreadCallout, "INote")
+    if note is None:
+        raise RuntimeError("lever front cosmetic thread has no native drawing callout note")
+    original = str(note.GetText() or "")
+    if " ".join(original.split()) != " ".join(THREAD_CALLOUT.split()):
+        raise RuntimeError(f"unexpected native lever thread callout: {original!r}")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    owner = annotation.Owner
+    owner_type = int(annotation.OwnerType)
+    if owner_type not in (0, 1) or owner is None:  # swAnnotationOwner_DrawingView/Sheet
+        raise RuntimeError("native lever thread callout is not owned by a drawing view or sheet")
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    entity_types = tuple(annotation.GetAttachedEntityTypes() or ())
+    entity_count = int(annotation.GetAttachedEntityCount3())
+    dangling = bool(annotation.IsDangling())
+    if len(entities) != entity_count or len(entity_types) != entity_count:
+        raise RuntimeError("native lever thread callout attachment census is incomplete")
+    app = adapter.swApp
+    for label, obj in (("callout", note), ("owner", owner), *(("attachment", entity) for entity in entities)):
+        result = int(app.IsSame(obj, obj))
+        if result != 1:
+            raise RuntimeError(f"native lever {label} identity comparison unsupported: self={result}")
+    if owner_type == 0 and int(app.IsSame(owner, native)) != 1:
+        raise RuntimeError("native lever thread callout belongs to another drawing view")
+    if not note.SetText(PRINT_THREAD_CALLOUT):
+        raise RuntimeError("native lever thread drawing callout refused its print-only text")
+    rebuild_drawing(adapter, label="omit title-block thread class from lever drawing callout")
+    current = _early_bound(thread.ThreadCallout, "INote")
+    if current is None or int(app.IsSame(note, current)) != 1:
+        raise RuntimeError("lever thread text mutation replaced its native drawing callout")
+    current_annotation = _early_bound(current.GetAnnotation(), "IAnnotation")
+    current_entities = tuple(current_annotation.GetAttachedEntities3() or ())
+    if (
+        str(current.GetText() or "") != PRINT_THREAD_CALLOUT
+        or int(current_annotation.OwnerType) != owner_type
+        or current_annotation.Owner is None
+        or int(app.IsSame(owner, current_annotation.Owner)) != 1
+        or int(current_annotation.GetAttachedEntityCount3()) != entity_count
+        or tuple(current_annotation.GetAttachedEntityTypes() or ()) != entity_types
+        or len(current_entities) != len(entities)
+        or any(int(app.IsSame(before, after)) != 1 for before, after in zip(entities, current_entities))
+        or bool(current_annotation.IsDangling()) != dangling
+    ):
+        raise RuntimeError("lever thread drawing callout lost its text, ownership or native attachment")
+    _telemetry.info(f"lever drawing INote text rewritten: native seed={count}, owner_type={owner_type}, attached_count={entity_count}")
+
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
@@ -250,7 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()})
     set_dimension_callouts(adapter, annotations, CALLOUTS)
     thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
-    add_attached_note(adapter, detail, text=THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.350, 0.244), label="native quarter-inch external thread", entity_type="SILHOUETTE")
+    add_attached_note(adapter, detail, text=PRINT_THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.273, 0.213), label="native quarter-inch external thread", entity_type="SILHOUETTE")
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
@@ -265,6 +320,7 @@ async def build(adapter: Any) -> dict[str, str]:
     seeds, instances = import_cosmetic_threads(adapter, iso)
     if (seeds, instances) != (1, 1):
         raise RuntimeError(f"lever isometric external thread missing: {(seeds, instances)}")
+    _print_native_thread_callout(adapter, front)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Lever Rod Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 

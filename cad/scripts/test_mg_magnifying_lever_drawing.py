@@ -20,6 +20,7 @@ import mg_magnifying_lever_geom as geom
 import mg_magnifying_lever_spec as spec
 import _drawing_leader_notes as leader_notes
 from _printed_tolerance import drilled_oversize_mm
+from _layout_geometry import Box, Segment, segment_box_overlap_length
 
 
 def _intersection(first, second):
@@ -497,12 +498,40 @@ class _LeverNoteDocument:
 
 @pytest.mark.parametrize("fault", (None, "selection_rejected", "wrong_attachment", "dangling"))
 def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monkeypatch, tmp_path, fault) -> None:
-    """Run the recipe's actual note call through real selection/attachment code."""
+    """Run real detail/callout ordering, FACE attachment and drawing-thread rewrite."""
     hemisphere = _LeverFace()
     front = _LeverVisibleView("front", (_LeverFace(identity=4002), hemisphere))
     iso, detail = _LeverVisibleView("iso"), _LeverVisibleView("detail")
     document = _LeverNoteDocument((front, iso, detail), fault)
     hemisphere.document = document
+    _thread_adapter, _thread_view, native_thread = _native_thread_note_adapter(view=front)
+    trace, qualifiers, captured = [], {}, {}
+    values = {
+        "OverallLength": joint.ROD_LENGTH, "RodDia": joint.ROD_DIA,
+        "TipChamfer": joint.TIP_CHAMFER, "ThreadLength": joint.THREAD_LENGTH,
+        "IncompleteLength": joint.INCOMPLETE_THREAD_MAX,
+    }
+    dimensions, annotations = {}, {}
+    for name, value in values.items():
+        feature = "RodProfile" if name in ("OverallLength", "RodDia", "TipChamfer") else "ThreadExtent"
+        dimension = SimpleNamespace(Name=name, FullName=f"{name}@{feature}@mg-magnifying-lever.SLDPRT", SystemValue=value / 1000.0)
+        dimensions[name] = dimension
+
+        def set_text(location, text, *, name=name):
+            assert location == 4  # Native below-callout text, never a detached note.
+            trace.append(f"callout:{name}")
+            qualifiers[name] = text
+
+        display = SimpleNamespace(GetDimension=lambda dimension=dimension: dimension, SetText=set_text)
+        annotations[name] = SimpleNamespace(GetSpecificAnnotation=lambda display=display: display)
+    detail.ScaleRatio = drawing.DETAIL_SCALE
+    detail.Position = drawing.DETAIL_CENTER
+    detail.SetViewPosition = lambda *_a: True
+    detail.GetAnnotations = lambda: tuple(annotations[name] for name in drawing.DETAIL_KEEP)
+    detail.Crop2 = lambda *_a: trace.append("crop") or 1
+    detail.IsCropped = lambda: True
+    detail.CropViewJaggedOutline = detail.CropViewNoOutline = False
+    detail.UpdateViewDisplayGeometry = lambda: None
     source = tmp_path / "lever.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
@@ -510,7 +539,8 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
     async def open_model(_path):
         return SimpleNamespace(is_success=True, data=None)
 
-    async def finalize(*_args, **_kwargs):
+    async def finalize(*_args, **kwargs):
+        captured["finalize"] = kwargs
         return {"slddrw": "lever.SLDDRW"}
 
     def read_member(obj, name):
@@ -522,22 +552,47 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         _attempt=lambda fn, default=None: fn(), _get_attr_or_call=read_member,
         swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
     )
-    views = iter((front, iso))
+    views = iter((front, iso, detail))
     monkeypatch.setattr(drawing, "place_view", lambda *_a, **_kw: next(views))
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (document, object()))
-    monkeypatch.setattr(drawing, "_detail", lambda _adapter: (detail, []))
-    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_a, **_kw: [])
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, point, **_kw: point[:2])
+    def curate_detail(_adapter, view, *, keep, **_kwargs):
+        assert view is detail
+        trace.append("detail import")
+        captured["detail_keep"] = dict(keep)
+        return [annotations[name] for name in keep]
+
+    def curate_front(_adapter, view, *, keep, **_kwargs):
+        assert view is front
+        trace.append("front import")
+        return [annotations[name] for name in keep]
+
+    def project(_adapter, view, point, **_kwargs):
+        if view is detail:
+            scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1]
+            return (
+                drawing.DETAIL_CENTER[0] + (point[0] - drawing.DETAIL_FOCUS[0]) * scale,
+                drawing.DETAIL_CENTER[1] + point[1] * scale,
+            )
+        return point[:2]
+
+    monkeypatch.setattr(drawing, "curate_hidden_dimensions", curate_detail)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate_front)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "assert_imported_precision", "set_dimension_callouts", "add_surface_finish", "_note", "_circle", "add_property_linked_note"):
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "assert_imported_precision", "add_property_linked_note", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
     monkeypatch.setattr(leader_notes, "rebuild_drawing", lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing, "_circle", lambda *_a, mark=False: None if mark else trace.append("crop boundary"))
+    monkeypatch.setattr(drawing, "_note", lambda _a, view, text, xy: captured.setdefault("notes", []).append((view, text, xy)))
+    monkeypatch.setattr(drawing, "add_surface_finish", lambda _a, view, **kwargs: captured.update(finish=(view, kwargs)))
 
     def attach(_adapter, view, **kwargs):
         if kwargs["text"] == spec.FREE_END_CALLOUT:
             return leader_notes.add_attached_note(_adapter, view, **kwargs)
-        return None  # The already-successful thread-end note is not this regression.
+        assert view is detail and kwargs["entity_type"] == "SILHOUETTE"
+        captured["thread"] = kwargs
+        return None
 
     monkeypatch.setattr(drawing, "add_attached_note", attach)
     if fault is not None:
@@ -552,5 +607,139 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert annotation.GetAttachedEntityTypes() == (2,)
         assert annotation.position == (0.030, 0.185, 0.0)
         assert annotation.GetLeaderCount() == 1 and not annotation.IsDangling()
+        assert trace.index("detail import") < trace.index("crop boundary") < trace.index("crop") < trace.index("front import")
+        assert trace.index("crop") < trace.index("callout:TipChamfer")
+        assert trace.index("front import") < trace.index("callout:RodDia")
+        assert set(qualifiers) == {"RodDia", "TipChamfer", "IncompleteLength"}
+        fit = qualifiers["RodDia"]
+        assert "MHA-MG-02 CLAMP BORE" in fit and "SLIDING FIT" in fit and "BRASS" not in fit
+        chamfer = qualifiers["TipChamfer"]
+        assert "MHA-MG-01 THREAD ENTRY" in chamfer and "FULL ENGAGEMENT" in chamfer
+        assert "45°" in chamfer
+        assert {name: dimension.SystemValue * 1000.0 for name, dimension in dimensions.items()} == pytest.approx(values)
+        assert captured["finish"][0] is front
+        assert captured["finish"][1]["control"] is spec.SURFACE_FINISHES[0]
+        assert captured["notes"][0][1] == "MHA-MG-02 SCREW SEAT"
+        thread = captured["thread"]
+        assert thread["entity_xy"] == pytest.approx((0.316, 0.199525))  # Actual R6 thread flank, unchanged.
+        assert joint.THREAD in thread["text"] and "MATES MHA-MG-01 BRACKET" in thread["text"]
+        assert "2A" not in thread["text"] and "2A" not in native_thread.note.GetText()
+        assert "UNC-2A" in native_thread.model_thread.ThreadCallout
+        assert native_thread.thread.ThreadCallout is native_thread.note
+        # Replay the R6 18 mm dimension lane as a negative control. This checks
+        # the recipe's route, not native leader elbow or glyph extents.
+        length_lane = Box(0.2905, 0.2199, 0.3445, 0.2201)
+        assert segment_box_overlap_length(Segment(0.350, 0.244, *thread["entity_xy"]), length_lane) > 0
+        assert segment_box_overlap_length(Segment(*thread["note_xy"], *thread["entity_xy"]), length_lane) == 0
+        # Both fixed extension lines must be left of every wrapped qualifier
+        # row, even using a conservative 3.5 mm advance per character.
+        incomplete_xy = captured["detail_keep"]["IncompleteLength"]
+        rows = qualifiers["IncompleteLength"].splitlines()
+        assert " ".join(rows) == "INCOMPLETE THREAD, EACH END" and len(rows) == 2
+        assert incomplete_xy[0] - max(map(len, rows)) * 0.0035 / 2.0 > 0.3445
+        assert captured["finalize"]["layout"] is drawing.SPEC.layout
     assert hemisphere.selection_attempts == 1
     assert front.entity_kinds == [3, 4]
+
+
+def _native_thread_note_adapter(*, view=None, attachment_types=(), sheet_owned=False, fault=None):
+    """Expose a drawing ICThread/INote graph, separate from native part metadata."""
+    view = SimpleNamespace() if view is None else view
+    state = SimpleNamespace(
+        text=spec.THREAD_CALLOUT, writes=[], entities=tuple(object() for _ in attachment_types),
+        entity_types=tuple(attachment_types), dangling=False,
+        model_thread=SimpleNamespace(ThreadCallout=spec.THREAD_CALLOUT, thread_class="2A"),
+    )
+    annotation = SimpleNamespace(
+        OwnerType=int(sheet_owned), Owner=object() if sheet_owned else view,
+        GetAttachedEntities3=lambda: state.entities,
+        GetAttachedEntityTypes=lambda: state.entity_types,
+        GetAttachedEntityCount3=lambda: len(state.entities) + int(fault == "incomplete_attachments"),
+        IsDangling=lambda: state.dangling,
+    )
+
+    def set_text(text):
+        state.writes.append(text)
+        if fault == "setter_refused":
+            return False
+        if fault != "ignored_text":
+            state.text = text
+        if fault == "owner_changed":
+            annotation.Owner = object()
+        elif fault == "owner_type_changed":
+            annotation.OwnerType = 3
+        elif fault == "attachment_lost":
+            state.entities, state.entity_types = (), ()
+        elif fault == "attachment_changed":
+            state.entities = tuple(object() for _ in state.entities)
+        elif fault == "attachment_type_changed":
+            state.entity_types = tuple(46 for _ in state.entity_types)
+        elif fault == "dangling":
+            state.dangling = True
+        elif fault == "note_replaced":
+            state.thread.ThreadCallout = SimpleNamespace()
+        return True
+
+    state.note = SimpleNamespace(
+        GetText=lambda: state.text, GetAnnotation=lambda: annotation, SetText=set_text,
+    )
+    state.thread = SimpleNamespace(ThreadCallout=state.note, GetNext=lambda: None)
+    view.GetCThreadCount = lambda: 0 if fault == "no_seed" else 1
+    view.GetFirstCThread = lambda: state.thread
+    if fault == "no_note":
+        state.thread.ThreadCallout = None
+    elif fault == "unexpected_text":
+        state.text = "M6 X 1-6g"
+    elif fault == "part_owner":
+        annotation.OwnerType = 3
+    elif fault == "other_view_owner":
+        annotation.Owner = object()
+    adapter = SimpleNamespace(swApp=SimpleNamespace(
+        IsSame=lambda first, second: 2 if fault == "identity_unsupported" else int(first is second),
+    ))
+    return adapter, view, state
+
+
+@pytest.mark.parametrize("sheet_owned", (False, True))
+@pytest.mark.parametrize("attachment_types", ((), (1,), (2,)))
+def test_printed_thread_class_override_keeps_the_actual_drawing_note_and_native_metadata(monkeypatch, attachment_types, sheet_owned) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=attachment_types, sheet_owned=sheet_owned)
+    original_entities, original_owner = state.entities, state.note.GetAnnotation().Owner
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    drawing._print_native_thread_callout(adapter, view)
+    assert state.thread.ThreadCallout is state.note
+    assert state.note.GetAnnotation().Owner is original_owner
+    assert state.note.GetAnnotation().OwnerType == int(sheet_owned)
+    assert state.entities == original_entities and state.entity_types == attachment_types
+    assert state.writes == [state.note.GetText()]
+    assert joint.THREAD in state.note.GetText() and "MATES MHA-MG-01 BRACKET" in state.note.GetText()
+    assert "2A" not in state.note.GetText()
+    assert state.model_thread.ThreadCallout == f"{joint.THREAD} UNC-2A\nMATES MHA-MG-01 BRACKET"
+    assert state.model_thread.thread_class == "2A"
+
+
+@pytest.mark.parametrize("fault, message", (
+    ("no_seed", "one native cosmetic-thread seed"),
+    ("no_note", "no native drawing callout note"),
+    ("unexpected_text", "unexpected native lever thread callout"),
+    ("part_owner", "not owned by a drawing view"),
+    ("other_view_owner", "belongs to another drawing view"),
+    ("incomplete_attachments", "attachment census is incomplete"),
+    ("identity_unsupported", "identity comparison unsupported: self=2"),
+    ("setter_refused", "refused its print-only text"),
+    ("ignored_text", "lost its text, ownership or native attachment"),
+    ("owner_changed", "lost its text, ownership or native attachment"),
+    ("owner_type_changed", "lost its text, ownership or native attachment"),
+    ("attachment_lost", "lost its text, ownership or native attachment"),
+    ("attachment_changed", "lost its text, ownership or native attachment"),
+    ("attachment_type_changed", "lost its text, ownership or native attachment"),
+    ("dangling", "lost its text, ownership or native attachment"),
+    ("note_replaced", "replaced its native drawing callout"),
+))
+def test_thread_class_override_refuses_unsupported_or_changed_native_identity(monkeypatch, fault, message) -> None:
+    adapter, view, state = _native_thread_note_adapter(attachment_types=(2,), fault=fault)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._print_native_thread_callout(adapter, view)
+    assert state.model_thread.ThreadCallout.endswith("MATES MHA-MG-01 BRACKET")
+    assert "UNC-2A" in state.model_thread.ThreadCallout and state.model_thread.thread_class == "2A"
