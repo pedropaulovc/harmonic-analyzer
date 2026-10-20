@@ -139,10 +139,15 @@ _MS_ROTATED_CORNERS = tuple(
     tuple(sum(point[i] * MS_ROWS[i][axis] for i in range(3)) for axis in range(3))
     for point in product(*zip(ms.EXTENT_MIN, ms.EXTENT_MAX, strict=True))
 )
-_MS_ROTATED_MIN = tuple(min(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3))
-_MS_ROTATED_MAX = tuple(max(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3))
+_MS_ROTATED_MIN = tuple(
+    min(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3)
+)
+_MS_ROTATED_MAX = tuple(
+    max(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3)
+)
 MS_POS = (
-    (PARK_WEST_LIMIT_X + PARK_EAST_LIMIT_X - _MS_ROTATED_MIN[0] - _MS_ROTATED_MAX[0]) / 2.0,
+    (PARK_WEST_LIMIT_X + PARK_EAST_LIMIT_X - _MS_ROTATED_MIN[0] - _MS_ROTATED_MAX[0])
+    / 2.0,
     LAND_TOP_Y + STOP_LAND_GAP - _MS_ROTATED_MIN[1],
     -(_MS_ROTATED_MIN[2] + _MS_ROTATED_MAX[2]) / 2.0,
 )
@@ -185,10 +190,13 @@ def _assert_ms_working_pose(adapter: Any, instance: str) -> None:
     screws = [
         _early_bound(child, "IComponent2")
         for child in (component.GetChildren() or ())
-        if Path(str(_early_bound(child, "IComponent2").GetPathName())).stem == ms.THUMB_SCREW
+        if Path(str(_early_bound(child, "IComponent2").GetPathName())).stem
+        == ms.THUMB_SCREW
     ]
     if len(screws) != 1:
-        raise RuntimeError(f"{ASM_NAME}: expected one measuring-stick thumbscrew, got {len(screws)}")
+        raise RuntimeError(
+            f"{ASM_NAME}: expected one measuring-stick thumbscrew, got {len(screws)}"
+        )
     # Transform2 is relative to the active assembly's root, including for
     # children of a subassembly (IComponent2::Transform2).
     transform = _early_bound(screws[0].Transform2, "IMathTransform")
