@@ -768,7 +768,7 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
         projected.append((view, point))
         x = 0.1199
         if defect == "alignment" and view is underside:
-            x += 0.001
+            x += 2e-6  # Just beyond the 1 micrometre alignment boundary.
         return (x, 0.190)
 
     def create(adapter, parent, **kwargs):
@@ -797,7 +797,6 @@ def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> N
     assert cut["line_end"] == pytest.approx((0.1199, 0.1699245))
     assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
     assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
-
 
 
 @pytest.mark.parametrize(
@@ -895,9 +894,9 @@ def _assert_fitter_text_spacing(fitter) -> None:
         > drawing.SHEET_INNER_BORDER[1] + line_pitch
     )
     assert drawing.SETUP_NOTE_XY[1] < drawing.UNDERSIDE_CENTER[1] - 0.020
-    # The stacked callout fits between the setting's extension lines and
-    # ends left of the section-A label (r7 sheet: a 49-character criterion
-    # line crossed both). Default note glyphs measure ~2.5 mm wide.
+    # Native audit run20261020T155437689Z-8f0ca7b774c4: the original
+    # setting dimension line crossed the section-A label. Keep the stacked
+    # callout between extension lines and left of that label (~2.5 mm glyphs).
     char_width = 0.0026
     section_label_clearance = 0.009  # label's left edge to the near block face
     span = fitter.SETTING_NEAR_FACE_MM / 1000.0
@@ -909,7 +908,7 @@ def _assert_fitter_text_spacing(fitter) -> None:
     assert centre - half_width > 0.0
     assert centre + half_width < span - section_label_clearance
     # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
-    # put the upper arrow at Y210.0755, across the setting's right witness.
+    # left the upper arrow below the setting dimension line.
     # At text Y220 the native setting line is Y211.6656; its witness ends
     # 1 mm beyond it. The 18 mm overhang places the complete upper arrow
     # above that witness, with the overall reference still above the arrow.

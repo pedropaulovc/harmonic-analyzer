@@ -1012,6 +1012,13 @@ class _ExplodeSource:
         self.configuration_switches: list[str] = []
         self.refuse: set[str] = set()
         self.ignore: set[str] = set()
+        self.view_changes_on_show: dict[str, dict[str, object]] = {}
+        self.view = SimpleNamespace(
+            ReferencedConfiguration=self.owner,
+            ReferencedDocument=self,
+            exploded=True,
+            IsExploded=lambda: self.view.exploded,
+        )
         self.ConfigurationManager = SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name=self.active)
         )
@@ -1042,6 +1049,8 @@ class _ExplodeSource:
             self.active = name
             self.ConfigurationManager.ActiveConfiguration.Name = name
             self.dirty |= name in self.dirty_on_show
+            for attribute, value in self.view_changes_on_show.get(name, {}).items():
+                setattr(self.view, attribute, value)
         return True
 
     def GetSaveFlag(self) -> bool:
@@ -1061,11 +1070,7 @@ class _ExplodeSource:
         return True
 
     def drawing_view(self):
-        return SimpleNamespace(
-            ReferencedConfiguration=self.owner,
-            ReferencedDocument=self,
-            IsExploded=lambda: True,
-        )
+        return self.view
 
 
 @pytest.mark.parametrize(
@@ -1130,6 +1135,28 @@ def test_mg_source_configuration_restoration_is_read_back(monkeypatch, failure) 
             pass
 
 
+@pytest.mark.parametrize("during", ["activation", "restoration"])
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [("exploded", False), ("ReferencedConfiguration", "unexpected")],
+)
+def test_mg_source_configuration_refuses_changed_view(
+    monkeypatch, during, attribute, value
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    target = source.owner if during == "activation" else source.active
+    source.view_changes_on_show[target] = {attribute: value}
+    entered = False
+    message = "activating" if during == "activation" else "restoring"
+    with pytest.raises(RuntimeError, match=f"{message} .* changed the view"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            entered = True
+    assert entered == (during == "restoration")
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert getattr(source.view, attribute) == value
+
+
 def test_mg_source_configuration_restores_after_balloon_failure(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource("mg-wheel-axle-1")
@@ -1143,7 +1170,7 @@ def test_mg_collapsed_view_does_not_switch_the_source_configuration(monkeypatch)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource("mg-wheel-axle-1")
     view = source.drawing_view()
-    view.IsExploded = lambda: False
+    view.exploded = False
     with drawing._source_configuration_active(view, label="finished"):
         pass
     assert source.configuration_switches == []
@@ -1158,11 +1185,23 @@ def test_mg_source_configuration_refuses_newly_dirty_source(
     source.dirty_on_show.add(
         source.owner if dirty_during == "activation" else source.active
     )
-    with pytest.raises(RuntimeError, match="configuration dirtied it"):
+    with pytest.raises(RuntimeError, match="scoped balloon/config readback dirtied"):
         with drawing._source_configuration_active(source.drawing_view(), label="t"):
             pass
     assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
     assert source.dirty  # Refuse, never save the released assembly or clear its flag.
+
+
+def test_mg_same_configuration_readback_refuses_newly_dirty_source(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    source.active = source.owner
+    source.ConfigurationManager.ActiveConfiguration.Name = source.owner
+    with pytest.raises(RuntimeError, match="scoped balloon/config readback dirtied"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            source.dirty = True
+    assert source.configuration_switches == []
+    assert source.dirty
 
 
 def test_mg_source_configuration_preserves_existing_dirty_state(monkeypatch) -> None:
@@ -1194,5 +1233,7 @@ def test_mg_source_cleanup_failure_preserves_balloon_error(
     assert caught.value is primary_error
     assert len(warnings) == 1
     assert (
-        "did not re-activate" if cleanup_failure == "restore" else "configuration dirtied it"
+        "did not re-activate"
+        if cleanup_failure == "restore"
+        else "scoped balloon/config readback dirtied"
     ) in warnings[0]

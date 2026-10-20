@@ -1576,7 +1576,7 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
                 raise RuntimeError(f"{label}: restoring {rest!r} changed the view")
             if bool(model.GetSaveFlag()) and not was_dirty:
                 raise RuntimeError(
-                    f"{label}: switching the source's configuration dirtied it"
+                    f"{label}: scoped balloon/config readback dirtied the source"
                 )
         except Exception as cleanup_error:
             if primary_error is None:
@@ -1698,6 +1698,10 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    if bool(source_model.GetSaveFlag()):
+        raise RuntimeError(
+            "magnifier source assembly is already dirty; refusing to discard user changes"
+        )
     properties = read_required_properties(
         source_model,
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
@@ -1844,6 +1848,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _activate_sheet(adapter, SHEET_NAMES[1])
     _hide_bom_reference(adapter, reference, table, items)
+    if bool(source_model.GetSaveFlag()):
+        raise RuntimeError(
+            "magnifier drawing dirtied the source assembly; refusing to save it"
+        )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
