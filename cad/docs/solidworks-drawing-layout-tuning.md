@@ -653,7 +653,7 @@ of a symmetric frame, not that rail and its unannotated twin — ask for it:
 `_drawing_sections.create_section_view(..., partial=True)` passes
 `swCreateSectionView_Partial` (0x10) to `CreateSectionViewAt5`, SolidWorks
 sections just the span, the cut closes, and `GetPartialSection()` reads True by
-design (top-frame B-B/E-E; the recipe's `_assert_section_display(removed=True)`
+design (top-frame H-H/E-E; the recipe's `_assert_section_display(removed=True)`
 pins it). Centre the line's span on the profile you dimension: a partial section
 is centred on the cut span, so `view_xy` places that profile, not the old
 full-cut centre.

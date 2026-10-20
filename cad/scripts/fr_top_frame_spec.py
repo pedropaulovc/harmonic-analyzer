@@ -467,9 +467,9 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw spot face from bore axis": HUB_SET_SPOT_PLACES,
     "set-screw thread length": 1,
     "set-screw boss face from bore axis": 1,
-    # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
-    # -- the native finished-top grip is imported.  Stations and overall slot
-    # length are measured, while radius-centre spacing is source-derived REF.
+    # Sheet 6, UNDERSIDE: junction lands, knife-hanger section F-F and detail L.
+    # The native finished-top grip is imported; stations and overall slot length
+    # are measured. L's source-derived radius-centre spacing is REF only.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
     "crossbar pocket from front socket": 1,
@@ -477,7 +477,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
-    "dowel slot radius centres": 3,
+    "dowel slot radius centres": HANGER_SLOT_LENGTH_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.

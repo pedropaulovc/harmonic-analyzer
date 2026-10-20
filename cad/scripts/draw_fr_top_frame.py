@@ -8,8 +8,8 @@ GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-screw boss
-section; UNDERSIDE holds the underside locator, its enlarged native
-detail and the removed knife-hanger section F-F.  The faced keeper-rail top
+section; UNDERSIDE holds the underside locator, native enlarged hub detail J,
+slot-radius detail L and the removed knife-hanger section F-F. The faced keeper-rail top
 is one linked note under the keeper callout on HOLES-SOCKETS, the faced
 underside plane one beside the UNDERSIDE detail.  A group gets
 its own sheet rather than a crowded corner of one:
@@ -51,6 +51,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -545,10 +546,9 @@ HUB_LEFT_TITLE_XY = (0.128, 0.0455)
 HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP\nOUTER RIB BOTTOM BESIDE BOSS SHARP"
 HUB_LEFT_NOTE_XY = (0.093, 0.030)
 
-# Sheet 6: the underside locator and its enlarged native detail.  The
-# locator sits at the title block's own scale; the detail is the print's
-# only 2:1 view because the 7.0 gusset and its 8.0 feather drop are the
-# smallest features on the casting.
+# Sheet 6: the underside locator at the title block's own scale, hub/gusset
+# detail J at 2:1 and slot-radius detail L at 4:1. The local enlargement
+# separates the reference radius axes without crowding F-F's controls.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
 # The bottom view's label, then its edge note, at the band's left edge: the
@@ -556,11 +556,19 @@ HUB_BOTTOM_SCALE = (1, 3)
 # width's block and F-F's 15.264, as crowding the section dimensions.  The
 # sheet-1 orientation key says the view is from below, front (B) at the
 # bottom (machinist review r1).
-HUB_BOTTOM_NOTE_XY = (0.020, 0.118)
+HUB_BOTTOM_NOTE_XY = (0.020, 0.122)
 HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
+# Presentation-only crop of the front slot; no model dimensions import into L.
+SLOT_DETAIL_RADIUS_MM = 3.0
+SLOT_DETAIL_CENTER = (0.033, 0.064)
+SLOT_DETAIL_SCALE = (4, 1)
+SLOT_DETAIL_LETTER_XY = (0.094, 0.184)
+SLOT_DETAIL_CAPTION_XY = (0.033, 0.100)
+SLOT_DETAIL_RADIUS_CENTRES_LINE_Y = 0.048
+SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY = (0.065, 0.058)
 HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
@@ -612,8 +620,7 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 # right; its rows state the hole stands at the screw's own Z.  The slot's
 # ordinary .XXX station from the round hole has a higher dimension line and
 # its own mate qualifier, on a jog above-left of the round-hole block.
-# The radius-centre reference has outside arrows and text outboard left,
-# above the profile, rather than inside its 0.710 mm witness span.
+# The radius-centre reference belongs to the separate enlarged detail L.
 # Under the slot: its controlling overall length.  The caption takes the
 # empty lower-left corner of the band.  Native inspection establishes the
 # new text/arrow clearances; these placements do not change the cut or scale.
@@ -632,11 +639,7 @@ SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 
 # The added mate row needs its own band above the round-hole block, not the
 # old one-row station's point beside it.
 SLOT_STATION_OFFSET_XY = (0.112, 0.1295)
-SLOT_STATION_CALLOUT = "MATCHES MHA-SM-002"
-SLOT_RADIUS_CENTRES_TEXT_XY = _hanger_section_xy(SLOT_X, HALF_H + 5.0)
-# Keep the qualifier left of the 15.264's existing outside arrow/line
-# (x 106.018..112.368 mm at y 107.25), not just the reference nominal.
-SLOT_RADIUS_CENTRES_OFFSET_XY = (0.0885, 0.110)
+SLOT_STATION_CALLOUT = "MATCHES MHA-SM-02"
 SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
 # Left of its line the leader landed on the underline's right end through
 # the last "L" of TRAVEL (r5 render: leader 112.4 -> 121.3 mm, underline end
@@ -1887,12 +1890,12 @@ def _assert_section_display(
     plane and is part of a cut face (see ``_cut_face_edge``).
 
     Cut-faces-only is the separate question of what lies BEYOND the plane.
-    B-B, E-E and D-D cut across a closed rail band whose far side would print
+    H-H, E-E and K-K cut across a closed rail band whose far side would print
     over the cut faces they exist to dimension; A-A cuts a corner boss with
     open air behind it and stays a full section.  Both flags are read back
     because SolidWorks accepts either silently.
 
-    ``GetPartialSection`` is read against ``removed``: a REMOVED section (B-B,
+    ``GetPartialSection`` is read against ``removed``: a REMOVED section (H-H,
     E-E -- ``create_section_view(partial=True)``) is partial by definition,
     its line deliberately stopping past the one profile it dimensions; on a
     full section the same flag means the line fell short and the cut did not
@@ -2100,10 +2103,10 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     it) and the depth the slip hole and slot share, in one targeted import,
     and only reads the grip back; no sheet-side grip exists.  This section
     also adds the slip hole's station from the screw axis, the slot's ordinary
-    station from the slip hole, its controlling overall length and its derived
-    reference radius-centre span.  The slip hole's size and the slot's width
-    are across this cut; the underside locator carries them.  Returns the
-    view and its imported dimensions.
+    station from the slip hole and its controlling overall length. The slip
+    hole's size and the slot's width are across this cut; the underside
+    locator carries them. Detail L carries the reference radius-centre span.
+    Returns the view and its imported dimensions.
     """
     z = HANGER_SECTION_Z
     line = [
@@ -2147,10 +2150,6 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
              (PIN_HOLE_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
             ((SLOT_X, -HALF_H-2.0, z),
              (SLOT_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
-            ((SLOT_X-SLOT_FLAT/2.0, -HALF_H-2.0, z),
-             (SLOT_X-SLOT_FLAT/2.0, HALF_H+2.0, z)),
-            ((SLOT_X+SLOT_FLAT/2.0, -HALF_H-2.0, z),
-             (SLOT_X+SLOT_FLAT/2.0, HALF_H+2.0, z)),
         ),
     )
     edges = scan_view_edges(view, label="F-F knife-hanger section")
@@ -2211,21 +2210,6 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix=HANGER_SLOT_LENGTH_CALLOUT,
         offset_text=SLOT_LENGTH_OFFSET_XY,
     )
-    # Source stadium radius axes, not a second controlling slot size: the
-    # overall length and width still alone determine their actual spacing.
-    slot_centres = _checked_dimension(
-        adapter, view,
-        p0=(SLOT_X-SLOT_FLAT/2.0, HALF_H+2.0, z),
-        p1=(SLOT_X+SLOT_FLAT/2.0, HALF_H+2.0, z),
-        text_xy=SLOT_RADIUS_CENTRES_TEXT_XY, label="dowel slot radius centres",
-        expected_mm=SLOT_FLAT, orientation="horizontal", reference=True,
-        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
-        entities=(axes[3], axes[4]), suffix="SLOT RADIUS\nCENTRES",
-        offset_text=SLOT_RADIUS_CENTRES_OFFSET_XY,
-    )
-    slot_centres.ArrowSide = _DIM_ARROWS_OUTSIDE
-    if int(slot_centres.ArrowSide) != _DIM_ARROWS_OUTSIDE:
-        raise RuntimeError("dowel slot radius centres did not keep their arrows outside")
     dimensions = curate_view_dimensions(
         adapter, view,
         keep=HANGER_SECTION_KEEP,
@@ -2295,6 +2279,138 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
         raise RuntimeError("native underside detail scale did not persist")
     if math.dist(center, HUB_DETAIL_CENTER) > 0.0001:
         raise RuntimeError(f"native underside detail centre did not persist: {center}")
+    return detail
+
+
+def _hanger_slot_detail(adapter: Any, parent_view: Any) -> Any:
+    """Enlarge the front slot in Bottom for its sole radius-centre reference."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    parent = _early_bound(parent_view, "IView")
+    if not drawing.ActivateView(view_name(adapter, parent_view)):
+        raise RuntimeError("failed to activate slot-detail parent")
+    draw.ClearSelection2(True)
+    model_centre = (SLOT_X, -HALF_H, STUD_Z_FRONT)
+    parent.UpdateViewDisplayGeometry()
+    centre, rim = [
+        model_point_in_view(
+            adapter, parent_view, tuple(value / 1000.0 for value in xyz),
+            label="slot-detail fence",
+        )
+        for xyz in (
+            model_centre,
+            (SLOT_X + SLOT_DETAIL_RADIUS_MM, -HALF_H, STUD_Z_FRONT),
+        )
+    ]
+    sketch = _early_bound(parent.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, rim):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
+        raise RuntimeError("failed to create slot-detail fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("slot-detail fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select slot-detail fence")
+    detail = drawing.CreateDetailViewAt4(
+        *SLOT_DETAIL_CENTER, 0.0, 0, *SLOT_DETAIL_SCALE, "L", 1, True, False, False, 5,
+    )
+    if detail is None:
+        raise RuntimeError("failed to create native slot detail L")
+    detail = _early_bound(detail, "IView")
+    detail.ScaleRatio = double_array([float(value) for value in SLOT_DETAIL_SCALE])
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    set_hidden_lines_removed(adapter, detail)
+    outline = tuple(float(value) for value in detail.GetOutline())
+    position = tuple(float(value) for value in detail.Position)
+    if len(outline) != 4 or len(position) != 2:
+        raise RuntimeError("slot detail L has invalid initial bounds")
+    span = 2.0 * SLOT_DETAIL_RADIUS_MM * SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1] / 1000.0
+    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
+        raise RuntimeError(f"slot detail L is smaller than its fence: {outline}")
+    target = [
+        position[axis] + SLOT_DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
+        for axis in range(2)
+    ]
+    if not detail.SetViewPosition(double_array(target), False):
+        raise RuntimeError("failed to position slot detail L")
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    outline = tuple(float(value) for value in detail.GetOutline())
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if len(outline) != 4 or len(ratio) != 2:
+        raise RuntimeError("slot detail L has invalid final bounds")
+    if not math.isclose(ratio[0] / ratio[1], SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1]):
+        raise RuntimeError("slot detail L scale did not persist")
+    if math.dist(
+        tuple((outline[axis] + outline[axis + 2]) / 2.0 for axis in range(2)),
+        SLOT_DETAIL_CENTER,
+    ) > 0.0001:
+        raise RuntimeError(f"slot detail L centre did not persist: {outline}")
+    raw_circle = detail.GetDetail()
+    if raw_circle is None:
+        raise RuntimeError("slot detail L has no native parent circle")
+    circle = _early_bound(raw_circle, "IDetailCircle")
+    if str(circle.GetLabel()) != "L":
+        raise RuntimeError("slot detail L has the wrong native parent label")
+    # This detail owns its circle; J is another circle on the same parent.
+    circle.SetLabelPosition(*SLOT_DETAIL_LETTER_XY)
+    rebuild_drawing(adapter, label="_hanger_slot_detail")
+    letter = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(letter) != 2 or math.dist(letter, SLOT_DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"slot detail L's letter did not persist: {letter}")
+    _position_view_caption(adapter, detail, SLOT_DETAIL_CAPTION_XY)
+    centre_m = tuple(value / 1000.0 for value in model_centre)
+    settle_detail_projection(
+        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
+        tolerance_xy=(0.0001, 0.0001), label="slot detail L",
+    )
+    radius_centres = tuple(
+        (SLOT_X + side * SLOT_FLAT / 2.0, -HALF_H, STUD_Z_FRONT)
+        for side in (-1.0, 1.0)
+    )
+    # Bottom projects model Y end-on: the short local axes run along Z.
+    axis_half_length = HANGER_SLOT_WIDTH / 2.0 + 0.4
+    axes = _add_view_centerlines(
+        adapter, detail,
+        tuple(
+            ((x, y, z - axis_half_length), (x, y, z + axis_half_length))
+            for x, y, z in radius_centres
+        ),
+    )
+    centre = settle_detail_projection(
+        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
+        tolerance_xy=(0.0001, 0.0001), label="slot detail L radius centres",
+    )
+    # Source-derived REF only: F-F's overall and the locator's width control.
+    slot_centres = _checked_dimension(
+        adapter, detail, p0=radius_centres[0], p1=radius_centres[1],
+        text_xy=(centre[0], SLOT_DETAIL_RADIUS_CENTRES_LINE_Y),
+        label="dowel slot radius centres", expected_mm=SLOT_FLAT,
+        orientation="horizontal", reference=True,
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(axes[0], axes[1]), suffix="SLOT RADIUS\nCENTRES",
+        offset_text=SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY,
+    )
+    slot_centres.ArrowSide = _DIM_ARROWS_OUTSIDE
+    if int(slot_centres.ArrowSide) != _DIM_ARROWS_OUTSIDE:
+        raise RuntimeError("dowel slot radius centres did not keep their arrows outside")
     return detail
 
 
@@ -3785,6 +3901,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # precision (machinist review r1: its dashed cross-tap and pad edges
     # communicated nothing, its circles printed faceted).
     set_hidden_lines_removed(adapter, geometry_bottom)
+    # Create L before the locator's authored annotations; import no dimensions
+    # into it. Native inspection still must rule out inherited annotations.
+    _hanger_slot_detail(adapter, hub_bottom_parent)
     hub_bottom_edges = scan_view_edges(hub_bottom_parent, label="underside locator")
     geometry_bottom_edges = scan_view_edges(geometry_bottom, label="enlarged underside")
     bottom_dimensions = curate_view_dimensions(

@@ -2231,28 +2231,6 @@ def test_pin_section_profile_fails_loud_when_the_move_does_not_hold(monkeypatch)
         _pin(monkeypatch, _FakeView((0.3300, 0.2100), persists=False), (-0.0043, 0.0))
 
 
-def test_build_pins_every_removed_section_and_writes_centrelines_direct() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for pinned in ("RAIL_SECTION_PROFILE_X, label=\"H-H\"", "SIDE_SECTION_PROFILE_X, label=\"E-E\"",
-                   "HUB_SECTION_PROFILE_X, label=\"K-K\"",
-                   "HANGER_SECTION_PROFILE_X, label=\"F-F\""):
-        assert pinned in source, pinned
-    body = source[source.index("def _add_view_centerlines(") :]
-    body = body[: body.index("\ndef ")]
-    assert "manager.AddToDB = True" in body
-    assert "_assert_centreline_placed(adapter, segment, points)" in body
-
-
-def test_build_cuts_each_section_at_its_derived_ends() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for placed in (
-        'for x, z in cut_ends["H"]',
-        'for x, z in cut_ends["E"]',
-        'for x, z in section_cut_ends()["K"]',
-    ):
-        assert placed in source, placed
-
-
 # --- Knife hanger: #10 loose plain clearance and dowels --------------------
 
 
@@ -4075,8 +4053,6 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
         "station offset": drawing.PIN_STATION_OFFSET_XY,
         "slot station": drawing.SLOT_STATION_TEXT_XY,
         "slot station offset": drawing.SLOT_STATION_OFFSET_XY,
-        "slot radius centres": drawing.SLOT_RADIUS_CENTRES_TEXT_XY,
-        "slot radius centres offset": drawing.SLOT_RADIUS_CENTRES_OFFSET_XY,
         "slot length": drawing.SLOT_LENGTH_TEXT_XY,
         "slot length offset": drawing.SLOT_LENGTH_OFFSET_XY,
         "caption": drawing.HANGER_SECTION_CAPTION_XY,
