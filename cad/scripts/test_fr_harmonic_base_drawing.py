@@ -970,9 +970,31 @@ NATIVE_R5_OBSTACLES = {
     "table DetailItem457": (0.018, 0.16737522039776861, 0.16276338643434313, 0.26),
 }
 
+# Native R6 at d17443bdb526, artifact 157:98, 105-115 (2026-10-20).
+# All five callouts and every other obstacle are identical to R5. Only the
+# lock tag's full GetBox changed; keep the observed stop attachment extent.
+NATIVE_R6_OBSTACLES = {
+    **NATIVE_R5_OBSTACLES,
+    "note DetailItem449 'C1'": (
+        0.24211127090301005, 0.21881038127090305,
+        0.2540254849498328, 0.22309949832775924,
+    ),
+}
+NATIVE_R6_STOP_TAG_XY = (0.247, 0.216)
+# PDF ink, NOT the leader-inclusive GetBox above. The audit log rounds each
+# edge to 0.1 mm; replay with half a quantum outward on every edge.
+NATIVE_R6_TAG_INK = {
+    "note DetailItem448 'B1'": (0.2474, 0.2125, 0.2512, 0.2159),
+    "note DetailItem449 'C1'": (0.2428, 0.2194, 0.2478, 0.2230),
+}
+NATIVE_R6_INK_PAD_M = 0.00005
+# The logged 5.40 mm pitch is rounded to 0.01 mm. This is its conservative
+# upper bound, not a captured native font height or a different audit threshold.
+NATIVE_R6_PITCH_UPPER_M = 0.005405
 
-def test_native_r5_lock_tag_layout_replays_all_callouts_with_attached_extent() -> None:
-    """Observed collision, then a conditional placement control, not native proof."""
+
+def _native_r5_r6_callout_layout():
+    """Reconstruct all five unchanged callouts from their actual display data."""
     import draw_fr_harmonic_base as sheet
 
     anchors = {
@@ -990,6 +1012,14 @@ def test_native_r5_lock_tag_layout_replays_all_callouts_with_attached_extent() -
         assert callouts[label] == pytest.approx(NATIVE_R5_CALLOUT_BOXES[label])
         leaders[label] = sheet.leader_segments(lines)
         own_rows[label] = sheet.callout_text_rows(lines, texts, label)
+    return callouts, leaders, own_rows
+
+
+def test_native_r5_r6_tag_layout_replays_all_callouts_with_attached_extents() -> None:
+    """Observed R5/R6, then a conditional stop placement, not native after-fix proof."""
+    import draw_fr_harmonic_base as sheet
+
+    callouts, leaders, own_rows = _native_r5_r6_callout_layout()
     text_obstacles = {
         name: box for name, box in NATIVE_R5_OBSTACLES.items()
         if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
@@ -1070,6 +1100,167 @@ def test_native_r5_lock_tag_layout_replays_all_callouts_with_attached_extent() -
         {label: lines for label, (_anchor, lines, _texts) in NATIVE_R5_CALLOUTS.items()},
         {lock_tag: extent},
     ) == []
+
+    # R6 confirmed the lock placement without moving any callout. Reuse every
+    # logged obstacle, replacing only the captured C1 GetBox, before proposing
+    # the stop move. No R5 obstacle is silently discarded.
+    r6_texts = {
+        name: box for name, box in NATIVE_R6_OBSTACLES.items()
+        if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
+    }
+    assert set(NATIVE_R6_OBSTACLES) == set(NATIVE_R5_OBSTACLES)
+    assert sheet.find_callout_clashes(callouts, NATIVE_R6_OBSTACLES) == []
+    assert sheet.find_leader_crossings(
+        leaders, {**foreign_texts, **r6_texts}, own_rows,
+    ) == []
+
+    stop_tag = "note DetailItem448 'B1'"  # captured identity, not a layout key
+    new_anchor = sheet.HOLE_TAG_STATION_POSITIONS[sheet.STOP_SCREW_XZ]
+    assert new_anchor == (0.247, 0.212)
+    dy = new_anchor[1] - NATIVE_R6_STOP_TAG_XY[1]
+    assert dy == pytest.approx(-0.004)
+    old_stop = NATIVE_R6_OBSTACLES[stop_tag]
+    ink = NATIVE_R6_TAG_INK[stop_tag]
+    moved_ink = (
+        ink[0] - NATIVE_R6_INK_PAD_M, ink[1] + dy - NATIVE_R6_INK_PAD_M,
+        ink[2] + NATIVE_R6_INK_PAD_M, ink[3] + dy + NATIVE_R6_INK_PAD_M,
+    )
+    centre = sheet._plan_xy(*sheet.STOP_SCREW_XZ, center=sheet.HOLE_TOP_CENTER)
+    radius = sheet.STOP_SCREW_HOLE_DIA * sheet.VIEW_SCALE / 2000.0
+    stop_rim = (
+        centre[0] - radius, centre[1] - radius,
+        centre[0] + radius, centre[1] + radius,
+    )
+    # Preserve the complete physical rim and old tip/stub footprint. Only the
+    # text/shoulder end drops: the hull bounds a shortened straight/monotone
+    # bent leader to ANY unchanged rim point. Translating the whole GetBox
+    # would falsely move its hole end down 4 mm. This is a conditional envelope;
+    # the rebuilt native text, shoulder, stub and route must remain inside it.
+    stop_extent = (
+        min(old_stop[0], stop_rim[0], moved_ink[0]),
+        min(old_stop[1], stop_rim[1], moved_ink[1]),
+        max(old_stop[2], stop_rim[2], moved_ink[2]),
+        max(old_stop[3] + dy, stop_rim[3], moved_ink[3]),
+    )
+    assert stop_extent[1] <= old_stop[1]
+    assert stop_extent[1] > old_stop[1] + dy
+    assert stop_extent[3] == pytest.approx(0.2124275384615385)
+    for x, y in ((stop_rim[0], stop_rim[1]), (stop_rim[2], stop_rim[3])):
+        assert stop_extent[0] <= x <= stop_extent[2]
+        assert stop_extent[1] <= y <= stop_extent[3]
+    assert abs(new_anchor[1] - centre[1]) < abs(NATIVE_R6_STOP_TAG_XY[1] - centre[1])
+    assert sheet.box_gap(extent, stop_extent) == pytest.approx(0.005783344481605331)
+    assert sheet.box_gap(NATIVE_R6_OBSTACLES[lock_tag], stop_extent) == pytest.approx(
+        0.00638284280936455,
+    )
+    pedestal_start_y = NATIVE_R5_CALLOUTS["MHA-DT-02 pedestal transfer"][1][0][1]
+    assert pedestal_start_y - stop_extent[3] == pytest.approx(0.00557919335855367)
+    # Even the pedestal's lower tip stub remains above this full stop envelope.
+    assert min(
+        value for line in leaders["MHA-DT-02 pedestal transfer"] for value in (line[1], line[3])
+    ) - stop_extent[3] > sheet.CALLOUT_CLEARANCE_M
+
+    proposed = {**NATIVE_R6_OBSTACLES, stop_tag: stop_extent}
+    assert proposed[lock_tag] == NATIVE_R6_OBSTACLES[lock_tag]
+    proposed_texts = {
+        name: box for name, box in proposed.items()
+        if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
+    }
+    assert set(proposed) == set(NATIVE_R5_OBSTACLES)
+    assert sheet.find_callout_clashes(
+        {"stop tag": stop_extent},
+        {name: box for name, box in proposed_texts.items() if name != stop_tag},
+    ) == []
+    assert sheet.find_callout_clashes(callouts, proposed) == []
+    assert sheet.find_merged_blocks(callouts) == []
+    assert sheet.find_tall_callouts(own_rows) == []
+    assert sheet.find_leader_crossings(
+        leaders, {**foreign_texts, **proposed_texts}, own_rows,
+    ) == []
+    assert sheet.find_leader_crossings(
+        {label: lines for label, (_anchor, lines, _texts) in NATIVE_R5_CALLOUTS.items()},
+        {stop_tag: stop_extent, lock_tag: proposed[lock_tag]},
+    ) == []
+
+
+def test_native_r6_stop_lock_ink_blocks_require_stop_station_shift() -> None:
+    """Replay the enforced shared predicate, not the recipe's callout-only rule."""
+    import draw_fr_harmonic_base as sheet
+    from _layout_audit import AuditAnnotation, ROW_PITCH_HEIGHTS, find_merged_blocks
+    from _layout_geometry import Box, DrawableRegion, Segment, SheetGeometry
+
+    _callouts, _leaders, own_rows = _native_r5_r6_callout_layout()
+    callout_annotations = tuple(
+        AuditAnnotation(
+            label=f"hole-callout {label}", kind="hole-callout", owner="callout replay",
+            text_boxes=tuple(Box(*box) for box in own_rows[label].values()),
+            segments=tuple(
+                Segment(*line, "shoulder" if sheet._is_shoulder(line) else "leader")
+                for line in lines
+            ),
+            text_height=max(height for _text, _position, height in texts),
+        )
+        for label, (_anchor, lines, texts) in NATIVE_R5_CALLOUTS.items()
+    )
+    stop_tag, lock_tag = NATIVE_R6_TAG_INK
+    tags = []
+    for station, label, anchor, diameter in (
+        (sheet.STOP_SCREW_XZ, stop_tag, NATIVE_R6_STOP_TAG_XY, sheet.STOP_SCREW_HOLE_DIA),
+        (sheet.LOCK_KNOB_XZ, lock_tag, (0.2425, 0.2230), sheet.LOCK_SCREW_HOLE_DIA),
+    ):
+        x0, y0, x1, y1 = NATIVE_R6_TAG_INK[label]
+        rim = sheet._hole_rim(*station, diameter)
+        # The captured annotations are native leadered notes, not hole-callout
+        # dimensions or free notes. Their actual leader arrays/font heights
+        # were NOT logged. The source anchor-to-rim segment is only an explicit
+        # nonempty-leader fixture contract for _callout_blocks, NOT a captured
+        # native vector. Recover a conservative text-height bound from the
+        # logged audit pitch using its unchanged ROW_PITCH_HEIGHTS constant.
+        tags.append(AuditAnnotation(
+            label=label, kind="note", owner="holes top",
+            text_boxes=(Box(
+                x0 - NATIVE_R6_INK_PAD_M, y0 - NATIVE_R6_INK_PAD_M,
+                x1 + NATIVE_R6_INK_PAD_M, y1 + NATIVE_R6_INK_PAD_M,
+            ),),
+            segments=(Segment(*anchor, *rim, "leader"),),
+            position=anchor,
+            text_height=NATIVE_R6_PITCH_UPPER_M / ROW_PITCH_HEIGHTS,
+        ))
+    observed = SheetGeometry(
+        name="HOLES-SOCKETS", width=0.4318, height=0.2794,
+        region=DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667),
+        annotations=(*callout_annotations, *tags),
+    )
+    assert len(observed.annotations) == 7  # all five callouts plus both tag notes
+    before = find_merged_blocks(observed)
+    assert [(finding.kind, finding.a, finding.b) for finding in before] == [
+        ("merged-blocks", stop_tag, lock_tag),
+    ]
+    assert before[0].extra["gap_mm"] == pytest.approx(3.40)
+    assert before[0].extra["limit_mm"] == pytest.approx(5.405)
+
+    stop, lock = tags
+    new_anchor = sheet.HOLE_TAG_STATION_POSITIONS[sheet.STOP_SCREW_XZ]
+    assert new_anchor == (0.247, 0.212)
+    assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.LOCK_KNOB_XZ] == lock.position
+    dy = new_anchor[1] - stop.position[1]
+    ink = stop.text_boxes[0]
+    shifted_stop = replace(
+        stop, position=new_anchor,
+        text_boxes=(Box(ink.xmin, ink.ymin + dy, ink.xmax, ink.ymax + dy),),
+        # Move only the text end of the conditional leader, never its rim.
+        segments=tuple(replace(line, y0=line.y0 + dy) for line in stop.segments),
+    )
+    assert shifted_stop.segments[0].x1 == stop.segments[0].x1
+    assert shifted_stop.segments[0].y1 == stop.segments[0].y1
+    proposed = replace(observed, annotations=(*callout_annotations, shifted_stop, lock))
+    assert find_merged_blocks(proposed) == []
+    # The actual R6 finding was 3.52 + 4 = 7.52 mm versus 5.40 mm. The rounded,
+    # outward-padded replay is stricter: 3.40 + 4 = 7.40 versus 5.405 mm, leaving
+    # 1.995 mm. This translated-ink control is NOT a native after-fix audit.
+    padded_gap_mm = before[0].extra["gap_mm"] - dy * 1000.0
+    assert padded_gap_mm == pytest.approx(7.40)
+    assert padded_gap_mm - before[0].extra["limit_mm"] == pytest.approx(1.995)
 
 
 
@@ -2230,6 +2421,7 @@ def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
     assert len(by_station) == len(sheet.TABLE_HOLES) == 11
     assert len(sheet.HOLE_TAG_STATION_POSITIONS) == 9
     assert by_station[sheet.LOCK_KNOB_XZ].position == (0.2425, 0.2230, 0.0)
+    assert by_station[sheet.STOP_SCREW_XZ].position == (0.247, 0.212, 0.0)
     for station, annotation in by_station.items():
         assert annotation.text == table.station_tags[station]
         position = sheet.HOLE_TAG_STATION_POSITIONS.get(station)

@@ -463,14 +463,18 @@ HOLE_TAG_STATION_POSITIONS = {
         ((0.344, 0.176), (0.344, 0.215)),
         strict=True,
     )),
-    STOP_SCREW_XZ: (0.247, 0.216),
+    # Native R6 stop/lock ink: 3.52 mm gap against a 5.40 mm row pitch.
+    # Lower only the stop text 4 mm: 3.52 + 4 = 7.52 mm, 2.12 mm headroom.
+    # Keep its physical rim and the R6-proven lock/callout routes unchanged.
+    STOP_SCREW_XZ: (0.247, 0.212),
     PIVOT_SCREW_XZ: (0.2456, 0.1550),
     # Native R5: the lock's default tag (then C1) crossed the pedestal leader.
     # Put its text between the measured A2 and stop-tag boxes, not over A2 at
     # x232 mm. The R5 replay includes the fixed lock rim and the whole proposed
     # text/shoulder/leader envelope: 1.04 mm west of the unchanged pedestal
-    # diagonal, 1.80 mm east of A2 and 1.78 mm above the stop tag. These are
-    # source-calculated clearances; the rebuilt native route must confirm them.
+    # diagonal, 1.80 mm east of A2. The stop's 4 mm drop widens that old
+    # whole-annotation gap from 1.78 to 5.78 mm; the enforced merged-blocks
+    # budget above uses R6's actual ink, not these leader-inclusive boxes.
     LOCK_KNOB_XZ: (0.2425, 0.2230),
     # West pair, then east pair; larger Z before smaller Z in each pair.
     # These are the support pattern's source geometry semantics, not native
