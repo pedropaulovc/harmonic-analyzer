@@ -1523,7 +1523,7 @@ def _virtual_sharp_witness_groups(view: Any) -> list[list[tuple[float, ...]]]:
     """Parse style3 straight-line groups observed in r23, without assuming a frame.
 
     Each group is five attributes, tag0, line count and six values per line.
-    Empty arc trailers are not emitted by the native style3 path.
+    An empty arc trailer was absent in r23's single observed style3 group.
     Source placement is proved separately by the native Type4 point.
     """
     count, size = view.GetWitnessEntitiesCount()
