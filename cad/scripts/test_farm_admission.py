@@ -30,6 +30,7 @@ import build  # noqa: E402
 
 _REAL_RUN = subprocess.run
 _REAL_FARM_DOIT = build._FarmDoitMain
+_REAL_POOL_FARM = build._pool_farm
 _REAL_RUN_LEAF = _farm.run_leaf
 _LABEL = "Offline selected-pool admission regression"
 
@@ -675,24 +676,42 @@ def test_missing_pool_admission_files_are_refused_before_starting_uv(
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv is not available")
-def test_real_uv_uses_the_selected_pool_project_and_environment(admission, monkeypatch):
+@pytest.mark.parametrize("boundary", ["admission", "farm-command"])
+def test_real_uv_uses_the_selected_pool_project_and_environment(
+    admission, monkeypatch, boundary
+):
     protocol = """
 import json, os, sys
 from pathlib import Path
 def leaf_admitted(task):
-    Path('runtime.json').write_text(json.dumps({
+    (Path(__file__).resolve().parents[1] / 'runtime.json').write_text(json.dumps({
         'prefix': sys.prefix, 'cwd': os.getcwd(),
         'virtual_env': os.environ.get('VIRTUAL_ENV'),
+        'project_environment': os.environ.get('UV_PROJECT_ENVIRONMENT'),
     }), encoding='utf-8')
     return task == 'features:fixture-ok'
 """
     home = admission.pool(accepted=["features:fixture-ok"], protocol=protocol)
+    (home / "farm.py").write_text(
+        "import json, runpy\n"
+        "from pathlib import Path\n"
+        "protocol = runpy.run_path(str(Path(__file__).parent / 'agent' / 'protocol.py'))\n"
+        "print(json.dumps(protocol['leaf_admitted']('features:fixture-ok')))\n",
+        encoding="utf-8",
+    )
     monkeypatch.setenv("UV_PYTHON", sys.executable)
     monkeypatch.setenv("UV_PYTHON_DOWNLOADS", "never")
     monkeypatch.setenv("UV_OFFLINE", "1")
     inherited = str(admission.tmp_path / "unrelated-outer-venv")
     monkeypatch.setenv("VIRTUAL_ENV", inherited)
-    env = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
+    project_environment = str(admission.tmp_path / "unrelated-project-venv")
+    monkeypatch.setenv("UV_PROJECT_ENVIRONMENT", project_environment)
+    # Lock setup must not touch the runner's external environment either.
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"}
+    }
     locked = _REAL_RUN(
         ["uv", "lock", "--offline", "--project", str(home)],
         cwd=home,
@@ -703,18 +722,31 @@ def leaf_admitted(task):
     )
     assert locked.returncode == 0, locked.stdout + locked.stderr
     monkeypatch.setattr(build.subprocess, "run", _REAL_RUN)
-    control = build._validate_farm_selection(
-        [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
-        ["features:fixture-ok"],
-    )
-    labels, identity = build._require_leaf_admission(control)
-    assert labels == ["features:fixture-ok"]
-    assert identity == ("a" * 64, "fixture-aaaaaaaa")
+    if boundary == "admission":
+        control = build._validate_farm_selection(
+            [Task("features:fixture-ok", [admission.action("features:fixture-ok")])],
+            ["features:fixture-ok"],
+        )
+        labels, identity = build._require_leaf_admission(control)
+        assert labels == ["features:fixture-ok"]
+        assert identity == ("a" * 64, "fixture-aaaaaaaa")
+        expected_cwd = home
+    else:
+        result = _REAL_POOL_FARM(home, "agents", "--json")
+        assert result.returncode == 0, result.stdout
+        assert json.loads(result.stdout) is True
+        expected_cwd = build.REPO_ROOT
     runtime = json.loads((home / "runtime.json").read_text(encoding="utf-8"))
-    assert Path(runtime["cwd"]).resolve() == home.resolve()
+    assert Path(runtime["cwd"]).resolve() == expected_cwd.resolve()
     assert Path(runtime["prefix"]).resolve() == (home / ".venv").resolve()
     assert Path(runtime["virtual_env"]).resolve() == (home / ".venv").resolve()
     assert runtime["virtual_env"] != inherited
+    assert runtime["virtual_env"] != project_environment
+    assert runtime["project_environment"] is None
+    assert os.environ["VIRTUAL_ENV"] == inherited
+    assert os.environ["UV_PROJECT_ENVIRONMENT"] == project_environment
+    assert not Path(inherited).exists()
+    assert not Path(project_environment).exists()
     assert admission.events == []
 
 
