@@ -674,7 +674,8 @@ import sys
 import time
 from pathlib import Path
 
-mode, reply_path, delay, pending_polls = sys.argv[1:]
+mode, reply_path, delay, pending_polls, startup_delay, newline = sys.argv[1:]
+sys.stdout.reconfigure(newline=newline or None)
 pending_polls = int(pending_polls)
 started = time.monotonic()
 last_status = None
@@ -697,9 +698,11 @@ def respond(request, value, subtype="success"):
 
 print("synthetic CLI startup diagnostic", flush=True)
 print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
+time.sleep(float(startup_delay))
 if mode == "eof":
     sys.exit(9)
 if mode == "silent":
+    print("synthetic CLI awaiting startup timeout", flush=True)
     time.sleep(60)
 for line in sys.stdin:
     event = json.loads(line)
@@ -738,6 +741,7 @@ for line in sys.stdin:
         if last_status != "connected":
             sys.exit("review submitted before connection")
         if mode == "review_timeout":
+            print("synthetic CLI awaiting review timeout", flush=True)
             time.sleep(60)
         # Include a line larger than asyncio's default readline limit.
         print(json.dumps({"type": "diagnostic", "payload": "x" * 131072}), flush=True)
@@ -747,36 +751,43 @@ for line in sys.stdin:
         encoding="utf-8",
     )
     state = SimpleNamespace(processes=[], commands=[])
-    real_spawn = mr.asyncio.create_subprocess_exec
 
-    async def spawn(*args: Any, **kwargs: Any):
-        process = await real_spawn(*args, **kwargs)
-        state.processes.append(process)
-        return process
+    class TransportAsyncio:
+        def __getattr__(self, name: str):
+            return getattr(asyncio, name)
+
+        async def create_subprocess_exec(self, *args: Any, **kwargs: Any):
+            process = await asyncio.create_subprocess_exec(*args, **kwargs)
+            state.processes.append(process)
+            return process
 
     def command(
-        mode: str, reply: str, delay_s: float = 0.0, *, pending_polls: int = -1,
+        mode: str, reply: str, delay_s: float = 0.0, *,
+        pending_polls: int = -1, startup_delay_s: float = 0.0, newline: str | None = None,
     ) -> list[str]:
         reply_path = tmp_path / f"reply-{len(state.commands)}.jsonl"
         reply_path.write_text(reply, encoding="utf-8")
         argv = [
             sys.executable, str(script), mode, str(reply_path), str(delay_s),
-            str(pending_polls),
+            str(pending_polls), str(startup_delay_s), newline or "",
         ]
         state.commands.append(argv)
         return argv
 
     state.command = command
-    monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
+    state.asyncio = TransportAsyncio()
+    monkeypatch.setattr(mr, "asyncio", state.asyncio)
     monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
     return state
 
 
 @pytest.fixture
-def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
+def claude_startup_clock(
+    claude_transport: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> list[SimpleNamespace]:
     """Advance retry deadlines by protocol polls, never mutate the loop's clock."""
     real_run = mr._run_claude
-    transport_asyncio = mr.asyncio
+    transport_asyncio = claude_transport.asyncio
     clocks = []
 
     async def run(*args: Any, **kwargs: Any):
@@ -863,6 +874,7 @@ def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
     assert all(event.get("type") != "control_response" for event in mr._parse_events(stdout))
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
 @pytest.mark.parametrize(
     ("mode", "error"),
     [
@@ -877,9 +889,11 @@ def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
 )
 def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, mode: str, error: str,
+    claude_transport: SimpleNamespace, mode: str, error: str, newline: str,
 ) -> None:
-    command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
+    command = claude_transport.command(
+        mode, _claude_stdout(1, _clean_verdict()), newline=newline,
+    )
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
     monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
     review = mr.review_package(
@@ -910,7 +924,10 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
     reply = _claude_stdout(1, value)
     commands = [
         claude_transport.command(failure, reply),
-        claude_transport.command("slow", reply, pending_polls=2),
+        claude_transport.command(
+            "slow", reply, pending_polls=2,
+            startup_delay_s=1.0 if failure == "pending" and judge else 0.0,
+        ),
     ]
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
     monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
@@ -941,6 +958,7 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
     }[failure]
     assert expected_error in first["error"], diagnostics
     assert second["outcome"] == "succeeded", diagnostics
+    assert second["error"] is None, diagnostics
     assert len(claude_startup_clock) == 2
     assert all(clock.budget == 0.75 and not clock.outer.expired() for clock in claude_startup_clock)
     assert claude_startup_clock[0].startup.expired() is (failure == "pending")
@@ -949,6 +967,8 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
         assert 0.75 <= claude_startup_clock[0].elapsed < 0.8
     assert claude_startup_clock[1].elapsed == pytest.approx(0.04)
     assert first["cwd"] != second["cwd"]
+    assert not Path(first["attempt_dir"]).exists()
+    assert not Path(second["attempt_dir"]).exists()
     for index, attempt in enumerate((first, second)):
         records = [
             json.loads(line) for line in
@@ -958,14 +978,23 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
         statuses = [row["value"] for row in records if row["type"] == "status"]
         if index == 1:
             assert statuses == ["pending", "pending", "connected"]
+            assert records[-1]["type"] == "user"
+            if failure == "pending" and judge:
+                assert records[0]["at"] >= 1.0
+        else:
+            assert "connected" not in statuses or failure == "missing_tools"
     assert all(process.returncode is not None for process in claude_transport.processes)
     assert "synthetic CLI startup diagnostic" in Path(first["stdout_file"]).read_text()
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
 def test_claude_startup_and_review_share_one_overall_timeout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, newline: str,
 ) -> None:
-    command = claude_transport.command("review_timeout", "", delay_s=1.0)
+    command = claude_transport.command(
+        "review_timeout", "", delay_s=1.0, newline=newline,
+    )
     monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 10.0)
     started = mr.time.monotonic()
     with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
@@ -975,7 +1004,7 @@ def test_claude_startup_and_review_share_one_overall_timeout(
         )
     elapsed = mr.time.monotonic() - started
     assert caught.value.timeout == 2.0
-    assert elapsed < 2.75  # Not startup time plus another full review timeout.
+    assert 2.0 <= elapsed < 2.75  # Not startup time plus another full review timeout.
     records = [json.loads(line) for line in (tmp_path / "protocol.jsonl").read_text().splitlines()]
     assert sum(row["type"] == "user" for row in records) == 1
     assert any(row["type"] == "status" and row["value"] == "connected" for row in records)

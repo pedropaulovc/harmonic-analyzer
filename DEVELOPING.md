@@ -173,15 +173,19 @@ bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
 
-The startup-retry cases in `test_machinist_review.py` use a test-local MCP
-poll clock and a fixed number of pending responses. A proxy of only that test's
-`machinist_review.asyncio` binding arms a real startup `Timeout` when polling
-consumes the unchanged 0.75-second budget; neither global asyncio nor the event
-loop's clock is modified. Windows launch/pipe scheduling stays under the real,
-unchanged overall timeout instead of consuming the synthetic startup budget.
-Real cancellation/reaping, the local Python protocol child, 131-KB pipe draining,
-no prompt before connection and two attempts remain exercised. Separate slow-start
-and shared-overall-timeout tests still use real time.
+The synthetic Claude transport tests in `test_machinist_review.py` launch only a
+local Python protocol fixture, never a reviewer CLI or model. The startup-retry
+cases use a test-local MCP poll clock and a fixed number of pending responses.
+A proxy of only that test's `machinist_review.asyncio` binding arms a real startup
+`Timeout` when polling consumes the unchanged 0.75-second budget; neither global
+asyncio nor the event loop's clock is modified. Subprocess tracking also uses
+only a local module-binding proxy. Windows launch/pipe scheduling stays under the
+real, unchanged overall timeout instead of consuming the synthetic startup
+budget. One healthy retry deliberately pauses for one wall-clock second before
+replying. Real cancellation/reaping, 131-KB pipe draining, no prompt before
+connection and two attempts remain exercised. Startup-failure and shared
+2-second overall-timeout cases cover both LF and CRLF framing with real time;
+the separate real-time slow-readiness case still waits for actual connection.
 
 The refresh-carrier regression in `tests/test_farm_mode.py` runs a real nested
 pytest against the cache test with a private `--basetemp`, plugin autoload and
