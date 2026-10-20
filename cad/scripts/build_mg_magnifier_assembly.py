@@ -84,7 +84,7 @@ from _drawing_tolerances import (
     _set_tolerance_precision,
 )
 from _feature_tree import name_last_feature
-from _named_views import name_standard_views
+from _assembly_named_views import name_standard_views
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,

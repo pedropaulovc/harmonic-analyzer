@@ -35,6 +35,7 @@ import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import _mcmaster_91882a221 as thumb
 from _transforms import rows_from_euler
+from _named_views import octant_axes, octant_view_name
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
@@ -374,9 +375,9 @@ def test_final_save_wires_the_native_orientation_gate(module, guard, instance) -
     assert ast.unparse(gates[0].body) == f"{guard}(current, {instance})"
 
 
-def test_drawing_wires_working_views_and_only_two_preserved_cameras(monkeypatch) -> None:
-    """Exercise all three sheet placers: the section must derive from Front,
-    never the underside inspection; finished must be standard and collapsed."""
+def test_drawing_wires_upright_views_with_only_the_scale_inspection_underneath(monkeypatch) -> None:
+    """Front, its section and both isometrics stay screw-up; only the labelled
+    graduated-underside inspection uses the old stop-frame camera."""
     placed, sections, states, notes = [], [], [], []
     adapter = object()
 
@@ -431,11 +432,12 @@ def test_drawing_wires_working_views_and_only_two_preserved_cameras(monkeypatch)
     assert states == [(spec.DRAWING_EXPLODED_VIEW, True), ("*Isometric", False)]
     assert sheet.UNDERSIDE_CAPTION in notes
     assert "UNDERSIDE" in sheet.UNDERSIDE_CAPTION
-    assert spec.DRAWING_STANDARD_VIEWS == {
-        spec.DRAWING_UNDERSIDE_VIEW: 5, spec.DRAWING_EXPLODED_VIEW: 7,
-    }
-    # Named cameras alone undo the physical Rx180. Standard Front and iso
-    # are not redefined by the builder; their screw-up pose is the native one.
+    assert spec.DRAWING_STANDARD_VIEWS == {spec.DRAWING_UNDERSIDE_VIEW: 5}
+    assert len(spec.DRAWING_EXPLODED_OCTANTS) == 1
+    key, octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.items()))
+    assert spec.DRAWING_EXPLODED_VIEW == octant_view_name(*octant) == f"ISO {key}"
+    # Only the scale inspection undoes the physical Rx180. Front and the
+    # finished isometric use the native working frame; the explode is +Y-up.
     tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
     cameras = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
                and isinstance(node.func, ast.Name) and node.func.id == "name_standard_views"]
@@ -446,6 +448,12 @@ def test_drawing_wires_working_views_and_only_two_preserved_cameras(monkeypatch)
         "model_rotation": "spec.WORKING_ROWS",
     }
     assert spec.WORKING_ROWS == ((1, 0, 0), (0, -1, 0), (0, 0, -1))
+    octants = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
+               and isinstance(node.func, ast.Name) and node.func.id == "name_octant_views"]
+    assert len(octants) == 1
+    assert {kw.arg: ast.unparse(kw.value) for kw in octants[0].keywords} == {
+        "octants": "spec.DRAWING_EXPLODED_OCTANTS", "label": "ASM_NAME",
+    }
 
 
 def test_joint_rows_name_printed_steps() -> None:
@@ -1240,17 +1248,36 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         settled()
 
 
+def _exploded_projection(point) -> tuple[float, float]:
+    octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.values()))
+    x_axis, y_axis, _viewer = octant_axes(*octant)
+    return tuple(sum(value * axis[i] for i, value in enumerate(point)) for axis in (x_axis, y_axis))
+
+
+def test_exploded_camera_is_above_with_the_screw_head_projected_above_its_tip() -> None:
+    octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.values()))
+    _x_axis, y_axis, viewer = octant_axes(*octant)
+    assert y_axis[1] > 0.0 and viewer[1] > 0.0
+    offset = tuple(
+        sum(distance for _label, families, key, distance in explode.EXPLODE_STEPS
+            if spec.THUMB_SCREW in families and key == axis)
+        for axis in "xyz"
+    )
+    head = tuple(spec.THUMB_ORIGIN[i] + offset[i] for i in range(3))
+    tip = tuple(value + offset[i] for i, value in enumerate(
+        _image(spec.THUMB_ROWS, spec.THUMB_ORIGIN, (thumb.OVERALL_LEN, 0.0, 0.0))
+    ))
+    assert _exploded_projection(head)[1] > _exploded_projection(tip)[1]
+
+
 def _iso_hull(box) -> list[tuple[float, float]]:
-    """Project working-frame boxes through the Rx180-preserved exploded camera."""
-    s2, s6 = 2.0**-0.5, 6.0**-0.5
+    """Project physical working-frame boxes through the upright named camera."""
     points = sorted(
         {
-            (round(s2 * (x - z), 9), round(s6 * (2.0 * y - x - z), 9))
-            for working_x in box[0]
-            for working_y in box[1]
-            for working_z in box[2]
-            for x, y, z in [_image(spec.WORKING_ROWS, (0, 0, 0),
-                                  (working_x, working_y, working_z))]
+            tuple(round(value, 9) for value in _exploded_projection((x, y, z)))
+            for x in box[0]
+            for y in box[1]
+            for z in box[2]
         }
     )
 
@@ -1283,7 +1310,7 @@ def _hulls_overlap(a, b) -> bool:
 
 
 def test_exploded_isometric_shows_every_component() -> None:
-    """The flipped boxes retain occlusion in the named, Rx180-preserved camera:
+    """The upright named camera separates every exploded component box;
     only the long stick crosses the block."""
     head = plate_screw.HEAD_DIA / 2.0
     knurl = thumb.HEAD_DIA / 2.0

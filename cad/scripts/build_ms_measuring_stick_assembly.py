@@ -56,7 +56,8 @@ from _drawing_tolerances import (
 )
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
-from _named_views import name_standard_views
+from _assembly_named_views import name_standard_views
+from _named_views import name_octant_views
 from _sketch import (
     SketchDims, anchor_point_to_origin, blank_sketch, dimension_between,
     ensure_fully_defined, set_sketch_direct_db,
@@ -420,6 +421,9 @@ async def build(adapter) -> dict[str, str]:
         views=spec.DRAWING_STANDARD_VIEWS,
         label=ASM_NAME,
         model_rotation=spec.WORKING_ROWS,
+    )
+    name_octant_views(
+        adapter, octants=spec.DRAWING_EXPLODED_OCTANTS, label=ASM_NAME
     )
     return await save_assembly_and_images(
         adapter,

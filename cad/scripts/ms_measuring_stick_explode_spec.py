@@ -6,9 +6,11 @@ the cover and its screws off the open side, the screws clear of the cover, the
 bar out of the opened window, then the thumbscrew up its axis. Each step is
 (label, families, axis, signed distance mm) along the assembly's global axes.
 Positions come from the opened model; distances are presentation offsets, not
-dimensions. The named MS CLAMP EXPLODED ISOMETRIC preserves the original
-graduation inspection: viewer +X-Y-Z, sheet up -Y. Positive Z steps slide
-parts up and right, clear of the cover; the screw backs out above the block.
+dimensions. The named ISO FRONT-TOP-LEFT looks from -X+Y+Z with +Y up, so the
+thumbscrew remains above the block in both the working and exploded views.
+Positive Z steps move parts right and down, clear of the cover; the screw
+backs out upward. This mirrors the original projected separation vertically
+without changing its physical disassembly distances.
 
 No local imports: an explode edit reaches the measuring-stick builder and its
 drawing, never the top assembly that parks the stick by its placement spec.
