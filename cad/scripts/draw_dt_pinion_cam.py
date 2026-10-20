@@ -4,8 +4,8 @@ An eccentric steel collar: the Ø6.40 bore is offset 2.0 mm from the Ø14.6 OD
 axis (so the collar and bore are NOT concentric -- the drawing dimensions that
 offset explicitly, per the cam-note precedent).  The collar/bore sketches live
 on the Front plane (front view carries bore/eccentricity); the side profile
-carries collar length/OD and the set-screw station, while the set-screw end
-view owns the M2.5 tapped hole (U28: the raised boss is gone).
+carries collar length/OD, while the set-screw end view owns the #2-56 tapped
+hole and its station (U28: the raised boss is gone).
 
 Run with SolidWorks open::
 
@@ -18,13 +18,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
-    auto_center_marks,
     dimension_name,
     place_view,
-    view_name,
 )
 
 from _check import check
@@ -36,25 +33,35 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
 from _named_views import octant_view_name
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_pinion_cam_spec import (
+    BORE_CALLOUT,
     CAM_OD,
+    COLLAR_OD_CALLOUT,
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ECC,
-    LIFT_ROD_NUMBER,
+    ECCENTRICITY_CALLOUT,
+    SET_SCREW_STAKE_STEP_KEY,
     SURFACE_FINISHES,
+    TAP_DRILL_CALLOUT,
 )
+from dt_drive_train_steps import step_ref
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_pinion_cam"]
 PART_STEM = SPEC.artifact_stem
@@ -103,18 +110,28 @@ FRONT_KEEP = {
 }
 SIDE_KEEP = {
     "Depth": (SIDE_CENTER[0], SIDE_CENTER[1] + 0.055),
-    "CollarOd": (SIDE_CENTER[0] + 0.035, SIDE_CENTER[1]),
+    # ENFORCE r2: at +0.035 the follower-pin line ran back over the right
+    # face; +0.051 centres the 53-wide callout between the profile and the
+    # isometric view boxes (~5.5 clear each side).
+    "CollarOd": (SIDE_CENTER[0] + 0.051, SIDE_CENTER[1]),
 }
 # The tap-drill callout sits LEFT of the end view, under the profile view:
 # placed right of it, its diameter line ran out past the view (render r1).
+# ENFORCE r2: far enough left that its leader passes above the rotated
+# view's title.
+# The set-screw station stays on the view along the screw axis, where the
+# hole is drawn solid with its centre mark (ENFORCE r3/r4: moved to the
+# profile, its hole-axis witness either ran the full height of the plain
+# cylinder or floated below it with nothing drawn where it ended).
 BOTTOM_KEEP = {
-    "TapDrillDia": (0.262, 0.100),
-    "TapCz": (BOTTOM_CENTER[0], BOTTOM_CENTER[1] + 0.035),
+    "TapDrillDia": (0.215, 0.100),
+    "TapCz": (BOTTOM_CENTER[0] + 0.036, BOTTOM_CENTER[1] + 0.007),
 }
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"REAM THRU\nSLIP FIT ON LIFT ROD {LIFT_ROD_NUMBER}",
-    "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
-    "TapDrillDia": "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H",
+    "BoreDia": BORE_CALLOUT,
+    "CollarOd": COLLAR_OD_CALLOUT,
+    "CollarCy": ECCENTRICITY_CALLOUT,
+    "TapDrillDia": f"{TAP_DRILL_CALLOUT}\n{step_ref(SET_SCREW_STAKE_STEP_KEY)}",
 }
 # Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
 # by build_pinion_cam): two on the critical bore, OD and eccentricity and on
@@ -143,49 +160,6 @@ def _limit_witness_lines(
             f"missing dimensions for witness-line limits: {sorted(remaining)!r}"
         )
     adapter.currentModel.GraphicsRedraw2()
-
-def _move_dimension(
-    adapter: Any,
-    annotation: Any,
-    target: Any,
-    text_xy: tuple[float, float],
-    *,
-    source_view: Any,
-) -> Any:
-    """Move a model dimension to the projection that shows its extension lines."""
-    name = dimension_name(adapter, annotation)
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, source_view)):
-        raise RuntimeError(f"{name}: failed to activate source dimension view")
-    draw.ClearSelection2(True)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name or not draw.Extension.SelectByID2(
-        selection_name,
-        "DIMENSION",
-        0.0,
-        0.0,
-        0.0,
-        False,
-        0,
-        null_callout(),
-        0,
-    ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(
-        view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0
-    )
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    matches = [
-        _early_bound(item, "IAnnotation")
-        for item in (_early_bound(target, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"{name}: native dimension did not move into target view")
-    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -246,40 +220,29 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (side, bottom, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # Import the set-screw station from its authoring projection, then move it
-    # to the right-side profile where its end-face and hole-axis witnesses read
-    # as a conventional horizontal linear dimension.
+    # The construction-only tap reference is now unabsorbed and saved hidden;
+    # opt into the established per-view import without changing its ownership.
     bottom_annotations = curate_view_dimensions(
-        adapter, bottom, keep=BOTTOM_KEEP, view_label="set-screw end"
+        adapter,
+        bottom,
+        keep=BOTTOM_KEEP,
+        view_label="set-screw end",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     side_annotations = curate_view_dimensions(
-        adapter, side, keep=SIDE_KEEP, view_label="profile"
-    )
-    screw_station = [
-        annotation
-        for annotation in bottom_annotations
-        if dimension_name(adapter, annotation) == "TapCz"
-    ]
-    if len(screw_station) != 1:
-        raise RuntimeError("expected one set-screw station donor dimension")
-    moved_station = _move_dimension(
         adapter,
-        screw_station[0],
         side,
-        # Outside the right face (x 0.273): on the hole axis its centreline
-        # ran through the 4.5.
-        (SIDE_CENTER[0] + 0.021, SIDE_CENTER[1] + 0.030),
-        source_view=bottom,
+        keep=SIDE_KEEP,
+        view_label="profile",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    bottom_annotations = [
-        annotation
-        for annotation in bottom_annotations
-        if dimension_name(adapter, annotation) != "TapCz"
-    ]
-    side_annotations.append(moved_station)
     annotations = [*bottom_annotations, *front_annotations, *side_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _limit_witness_lines(
@@ -289,10 +252,10 @@ async def build(adapter: Any) -> dict[str, str]:
         0.008,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to front view")
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to set-screw end view")
+    # No explicit centre marks: the template marks every hole as each view is
+    # placed, and AutoInsertCenterMarks2 printed a second, identical mark on
+    # the bore and the tap (layout audit duplicate-annotation, ENFORCE r2; as
+    # draw_mg_wheel_drum, #913).
 
     # Cam-OD roughness (the follower's running surface): the lower-right OD
     # rim, clear of the bore callout's upper-left diagonal and of the tap
@@ -325,6 +288,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pinion Lift Cam Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # One native tap adds one redundant automatic thread note; the
+        # dimension's curated callout already releases the same thread.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

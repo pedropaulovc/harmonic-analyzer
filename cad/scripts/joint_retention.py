@@ -622,7 +622,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pn_pen_v_block",  # receiver: #4-40 UNC-2B Hole Wizard tap through the front face into the pivot bore, receiver of pen_rod_set_screw
         "pn_pen_rod",  # receiver: #0-80 UNF-2B blind tap in the square's top face, receiver of pen_adjust_screw
         "pn_pen_adjust_screw",  # made MHA-PN brass eye stud, #0-80 UNF member into the pen rod's top tap; carries the jam nut
-        "dt_pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
+        "dt_pinion_cam",  # #2-56 UNC-2B tap + supplied ASME B18.3 #2-56 x 3/16 flat-point socket set screw, member (collar) gripping pinion_lift_rod
         "pd_platen",  # #2-56 tapped through (pd_platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
         "pd_platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
         "vn_post_mount_screw",  # 1/4-20 (MSC 40923906 fillister, 4 in stock cut to fit), member into cone_swing_platform
@@ -1171,7 +1171,7 @@ JOINTS: tuple[Joint, ...] = (
         assembly="dt_drive_train",
         member="dt_pinion_cam",
         receiver="dt_pinion_lift_rod",
-        thread="M2.5 x 0.45 (ISO 4026 M2.5 X 5 flat-point set screw supplied with MHA-DT-023, 6H tap in the cam)",
+        thread="#2-56 UNC (ASME B18.3 #2-56 X 3/16 flat-point socket set screw supplied with MHA-DT-023, 2B tap in the cam)",
         quantity=2,
         installed_at="cams-and-lever-fitted",
         exposure=Exposure.OSCILLATING,
@@ -1193,9 +1193,9 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_dt_drive_train_assembly.py rig_steps 'cams-and-lever-fitted' (set screw loose) and 'cam-collars-set' "
             "(pinion_rig_fitup COLLAR_SET_STEP: 'TIGHTEN THEIR SET SCREWS AND STAKE EACH TAP MOUTH AT 2 POINTS'); "
-            "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/TAP_DRILL_DIA (tap 45 deg or more "
+            "dt_pinion_cam_spec.DRAWING_NOTES; dt_pinion_cam_geometry SET_SCREW_Z/SET_SCREW_MAJOR_DIA (tap 45 deg or more "
             "off the follower contact, test_cam_set_screw_hole_stays_clear_of_the_follower); "
-            "build_dt_drive_train_assembly.py pinion cam mates (~L5805-5841, 'set-pin anti-spin')"
+            "build_dt_drive_train_assembly.py cam-on-rod concentric, axial and CAM_ROD_PHASE_DEG anti-spin mates"
         ),
     ),
     Joint(

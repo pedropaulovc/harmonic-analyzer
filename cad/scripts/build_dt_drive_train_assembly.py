@@ -3256,8 +3256,8 @@ if _S_CAM - _FPIN_S0 < 2.0:
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
 # Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
-# U28 (2026-09-23) deleted the set-pin boss for a sub-flush M2.5 set screw at
-# SET_SCREW_Z = 4.5, so the collar is a bare cylinder at every azimuth of the
+# U28 deleted the set-pin boss; DT-023 now has a sub-flush #2-56 set screw at
+# its geometry-owned SET_SCREW_Z, so the collar is a bare cylinder throughout
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
 # block's inner face (0.25 feeler) -- flush with the strap's outer face, so
 # the pin rides mid-collar (T/2) and the collar and lever hub capture the lift
@@ -6695,7 +6695,7 @@ async def build(adapter) -> dict[str, str]:
         # branch (a +/-LEVER_TILT_DEG mirror would re-phase the cams).
         witness_local=[0.0, 5.0, 0.0],
     )
-    # Eccentric cams: pinned to the rod (set pin) -- coaxial on the rod's axis
+    # Eccentric cams: clamped to the rod by set screws -- coaxial on its axis
     # + an axial seat + an angle anti-spin at CAM_ROD_PHASE_DEG to the rod (the
     # rod is phased to the lever's pin hole, the cams stay ecc-down in the
     # world), so the set spins as one with the rod.

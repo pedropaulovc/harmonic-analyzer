@@ -515,7 +515,7 @@ BOM_DESCRIPTIONS = {
     "dt-pinion-lift-rod": "PINION LIFT ROD",
     "dt-pinion-spring": "PINION SPRING",
     "dt-pinion-cam-pin": "PINION CAM FOLLOWER PIN",
-    "dt-pinion-cam": "PINION ECCENTRIC CAM, WITH M2.5 SET SCREW",
+    "dt-pinion-cam": "PINION ECCENTRIC CAM, #2-56 SET SCREW",
     "dt-pinion-lever": "PINION LEVER",
     # Grouped: its configurations' BOM description wins over a written cell,
     # so the row prints the registry description the builder stamps.
@@ -1052,7 +1052,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         (
             "cams-and-lever-fitted",
             f"FIT {cams}X MHA-DT-023 AND MHA-DT-016 ON MHA-DT-017 IN THE MHA-DT-018 LIFT "
-            "BORES, EACH CAM ECCENTRIC DOWN, ITS M2.5 SET SCREW (SUPPLIED WITH "
+            "BORES, EACH CAM ECCENTRIC DOWN, ITS #2-56 SET SCREW (SUPPLIED WITH "
             "MHA-DT-023) LOOSE. SEAT MHA-DT-016 ON MHA-DT-017 TO THE BORE FLOOR.",
         ),
         # U28 corollary (Main 2026-09-23): the rig's east-west locate is its
