@@ -1255,7 +1255,6 @@ from dt_vn_foot_screw_spec import (  # noqa: E402
 from dt_vn_pedestal_hold_down_screw_spec import (  # noqa: E402
     FULL_THREAD_START as HDSCREW_FULL_THREAD_START,
     HEAD_DIA as HDSCREW_HEAD_DIA,
-    SHANK_DIA as HDSCREW_SHANK_DIA,
     SHANK_LEN as HDSCREW_SHANK_LEN,
     THREAD as HDSCREW_THREAD,
     TIP_CHAMFER as HDSCREW_TIP_INCOMPLETE,

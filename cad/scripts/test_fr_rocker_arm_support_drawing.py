@@ -207,7 +207,9 @@ def test_stock_hold_down_clears_support_and_engages_finite_through_base_tap() ->
         assert fit.full_thread_engagement_min_mm == pytest.approx(10.10)
         assert fit.full_thread_engagement_min_mm >= 1.5 * screw.SHANK_DIA
         assert fit.protrusion_max_mm == pytest.approx(
-            base.HOLD_DOWN_ENGAGEMENT - frame._LAG_FOOT_LOW - material.exit_depth_min_mm,
+            base.HOLD_DOWN_ENGAGEMENT
+            - frame._LAG_FOOT_LOW
+            - material.exit_depth_min_mm,
         )
         assert fit.protrusion_max_mm > 0.0
         assert fit.clearance_min_mm > 0.0
