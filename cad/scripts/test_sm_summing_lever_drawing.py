@@ -256,8 +256,8 @@ def test_view_f_axis_centreline_extends_beyond_the_receiver_row() -> None:
 
     spec = sm_summing_lever_spec
     assert all(point[1] == 0.0 for point in joint.LEVER_HOLE_POINTS)
-    station = drawing.RECEIVER_AXIS_STATION_MM
     overrun = drawing.RECEIVER_AXIS_OVERRUN_MM
+    station = drawing.RECEIVER_AXIS_START_MM - overrun
     outer_tap = max(point[0] for point in joint.LEVER_HOLE_POINTS)
     assert outer_tap + joint.TAP_DRILL_DIA / 2.0 < lever_build.RIB_PLATE_REACH
     assert lever_build.RIB_PLATE_REACH < station

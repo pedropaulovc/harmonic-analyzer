@@ -102,6 +102,8 @@ After the final drawing rebuild, each imported corner-radius arrow is checked
 against its finite material arc using native display-data readback. A tip on
 the continuation of the supporting circle is rejected even when the radius
 value and MAX tolerance are correct.
+The receiver view retains its native locating dimension and axis centerline
+without repeating their distance as a reference dimension.
 
 The cone-pivot-post drawing also checks the linked Finish note's native extent
 against the landscape template's cell rules. In the exported sheet, those rules

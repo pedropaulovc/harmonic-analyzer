@@ -20,11 +20,12 @@ cut in the front profile along the outer receiver tap through the -Z end
 rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
 two bracket receiver taps and the spring-anchor pad under the plate they sit
 in, so the end rib's slant over each tap reads, and the tap row's centreline
-through the hex centre.  Removed VIEW K at 5:1 shows the stub-root rounds
-in plan; Detail J at 10:1 shows the end-rib step's round onto the plate.
-Their native arrow tips must land on the finite material arcs after the
-final rebuild, before export; correct radius/MAX metadata alone is
-insufficient.  Sheet 1 runs at 1:2.
+through the hex centre.  The native row-height dimension locates that common
+axis from the plate top, without a duplicate reference.  Removed VIEW K at
+5:1 shows the stub-root rounds in plan; Detail J at 10:1 shows
+the end-rib step's round onto the plate.  Their native arrow tips must land
+on the finite material arcs after the final rebuild, before export; correct
+radius/MAX metadata alone is insufficient.  Sheet 1 runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -222,9 +223,10 @@ STUB_ROOT_CENTER = (0.080, 0.225)
 STUB_ROOT_SCALE = (5.0, 1.0)
 STUB_ROOT_CROP_RADIUS_MM = 6.5
 STUB_ROOT_ANCHOR_MM = (0.0, 0.0, -PLATE_L / 2.0)
-# Aim the shelf through the upper-left material quarter of the right-hand
-# root round, not the lower-right extension of its complete circle.
-STUB_ROOT_KEEP = {"StubRootRadius": (0.112, 0.248)}
+# Aim well inside the upper-left material quarter of the right-hand root.
+# V2's (112,248) put the tip only 0.184 mm below the 0.35 mm end-face ink.
+# The measured shelf offset at (108,240) targets a 0.897 mm tip/face gap.
+STUB_ROOT_KEEP = {"StubRootRadius": (0.108, 0.240)}
 STUB_ROOT_NOTE_XY = (0.0605, 0.189)
 # Centre and tangent points of that -X root quarter, in model mm.  K looks
 # along Y, so the cross-section's Y station does not affect its projection.
@@ -1718,24 +1720,25 @@ def _mounting_rims(edges: ViewEdges) -> list[Any]:
     ]
 
 
-# VIEW F's controlled ReceiverY0 locates the bracket row from the plate top.
-# The plate is extruded mid-plane on the pivot, and both tap centres lie at
-# y=0. An owned centreline runs through the taps and hex centre, extending
-# past the free-edge station and hex flats. The separate (2.54) reference
-# repeated ReceiverY0's span and was struck by ReceiverX1's extension line.
-RECEIVER_AXIS_STATION_MM = 37.5
+# VIEW F's owned centreline continues through BOTH taps and the hex centre
+# (#1607: stopping it at the holes left the row's relation to the axis unclear).
+# ReceiverY0 already measures vertically from the plate-top/free-edge corner
+# (PLATE_W, PLATE_T/2) to tap 0, whose Y is 0 (LEVER_HOLE_POINTS).  The former
+# (2.54) REF from that same plate-top plane to this Y=0 centreline repeated
+# ReceiverY0's interval without adding a requirement.  Keep the common axis
+# and native 2.54 +/-0.05, not a second dimension with colliding ink.
+RECEIVER_AXIS_START_MM = 39.5  # unchanged free-edge end: former 37.5 + 2 overrun
 RECEIVER_AXIS_OVERRUN_MM = 2.0
 
 
-def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
-    """Extend VIEW F's receiver-row centreline through the hex centre."""
+def _receiver_row_centerline(adapter: Any, back: Any) -> Any:
+    """Show the receiver row and hex centre on one axis, with no duplicate REF."""
     z_mm = -PLATE_L / 2.0
-    station = RECEIVER_AXIS_STATION_MM
     return _owned_centerline(
         adapter,
         back,
         (
-            (station + RECEIVER_AXIS_OVERRUN_MM, 0.0, z_mm),
+            (RECEIVER_AXIS_START_MM, 0.0, z_mm),
             (-(HEX_W / 2.0 + RECEIVER_AXIS_OVERRUN_MM), 0.0, z_mm),
         ),
         label="receiver row centreline",
@@ -2507,7 +2510,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
-    _receiver_axis_centerline(adapter, back)
+    _receiver_row_centerline(adapter, back)
     stub_root = _stub_root_view(adapter)
     stub_annotations = curate_view_dimensions(
         adapter,
