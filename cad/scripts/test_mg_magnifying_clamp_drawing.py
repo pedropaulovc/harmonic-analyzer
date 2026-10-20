@@ -527,10 +527,16 @@ def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mo
         assert selections == [(center, "ISketchPoint", False), (flat, "ISketchSegment", True)]
         return None if mode == "missing" else display
 
-    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddDimension2=add_dimension)
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: len(selections),
+        GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
+        GetSelectedObjectType3=lambda index, _mark: (6, 9)[index - 1],
+    )
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddDimension2=add_dimension, SelectionManager=manager)
     application = SimpleNamespace(
         SetUserPreferenceToggle=lambda preference, value: toggles.__setitem__(preference, value),
         GetUserPreferenceToggle=lambda preference: mode == "input-dialog" or toggles[preference],
+        IsSame=lambda left, right: int(left is right),
     )
     adapter = SimpleNamespace(currentModel=model, swApp=application)
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
@@ -699,7 +705,12 @@ def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circl
         assert picks == [circle], "the actual rim must be picked before creating the dimension"
         return None if mode == "missing" else display
 
-    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None)
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: len(selections),
+        GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
+        GetSelectedObjectType3=lambda index, _mark: (6, 9)[index - 1],
+    )
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None, SelectionManager=manager)
     adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
     monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(measured, "_early_bound", lambda value, _interface: value)
@@ -747,6 +758,7 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
     manager = SimpleNamespace(
         GetSelectedObjectCount2=lambda _mark: 1 if mode == "wrong-count" else 2,
         GetSelectedObject6=lambda _index, _mark: object() if mode == "wrong-circle" else circle,
+        GetSelectedObjectType3=lambda _index, _mark: 9,
         SetSelectionPoint2=set_point,
         GetSelectionPointInSketchSpace2=lambda _index, _mark: (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
     )
@@ -765,3 +777,47 @@ def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkey
     else:
         with pytest.raises(RuntimeError):
             part._select_bore_rim(adapter, circle)
+
+
+@pytest.mark.parametrize("mode", ("retained", "one-selected", "missing-object", "wrong-identity", "unknown-identity", "unknown-self"))
+def test_selection_diagnostics_discriminate_count_type_and_native_identity(monkeypatch, mode) -> None:
+    import _telemetry
+
+    point, circle, returned_circle, wrong = object(), object(), object(), object()
+    selected = (point,) if mode == "one-selected" else (point, None if mode == "missing-object" else wrong if mode == "wrong-identity" else returned_circle)
+    events = []
+
+    def same(left, right):
+        if mode == "unknown-self" and left is right:
+            return -1
+        if left is returned_circle and right is circle:
+            return -1 if mode == "unknown-identity" else 1
+        return int(left is right)
+
+    manager = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: len(selected),
+        GetSelectedObject6=lambda index, _mark: selected[index - 1],
+        GetSelectedObjectType3=lambda index, _mark: (6, 9)[index - 1],
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(SelectionManager=manager),
+        swApp=SimpleNamespace(IsSame=same),
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
+    if mode == "retained":
+        part._require_location_selection(adapter, ((1, point), (2, circle)), stage="native-positive-control")
+    else:
+        with pytest.raises(RuntimeError, match="count=|unavailable|positive control"):
+            part._require_location_selection(adapter, ((1, point), (2, circle)), stage="native-positive-control")
+    assert len(events) == 1
+    message, fields = events[0]
+    assert fields["operation_stage"] == "native-positive-control"
+    assert fields["selection_count"] == len(selected)
+    assert fields["selected_types"] == (6, 9)[:len(selected)]
+    assert fields["selected_available"] == tuple(entity is not None for entity in selected)
+    assert f"count={len(selected)}" in message and "IsSame=" in message
+    if mode == "retained":
+        assert fields["identity_codes"] == fields["self_identity_codes"] == (1, 1)
+    if mode == "unknown-identity":
+        assert fields["identity_codes"] == (1, -1)

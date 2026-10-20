@@ -245,6 +245,19 @@ RULINGS: dict[str, Ruling] = {
             "the plain 91375A105 cup point goes in bare, nothing added to its thread"
         ),
     ),
+    "U-MHA-MG-03-no-lock": Ruling(
+        joint="mg-magnifier/lever-in-bracket",
+        granted=(
+            "user, 2026-10-20, approved MG threaded-lever redesign: "
+            "'no further thread locking needed because mg-magnifying-lever "
+            "does not experience rotational forces'. This accepts no added "
+            "lock for this joint, not a demonstrated immunity to vibration. "
+            "The lever is installed to projection without a shoulder or preload; "
+            "vibration can still change projection or back the thread out. "
+            "The assembly package declares RV-02; the two mating part packages "
+            "declare the same joint-specific departure."
+        ),
+    ),
 }
 
 
@@ -1950,12 +1963,12 @@ JOINTS: tuple[Joint, ...] = (
         thread="1/4-20 UNC",
         quantity=1,
         installed_at=mg_magnifier_assembly_steps.LEVER_THREADED_KEY,
-        exposure=Exposure.STATIC_CLAMP,
+        exposure=Exposure.ADJUSTER,
         exposure_reason=(
-            "owner-approved axial retention without an added lock (2026-10-20); "
-            "the joint has no operating rotational load about its X thread axis. "
-            "Lever and bracket rock together about the knife's Z axis; the wire "
-            "and rod lie in the plumb plane through the lever axis."
+            "rotation of the unseated thread sets the installed ThreadProjection; "
+            "there is no shoulder or preload, so this is not a static clamp. "
+            "The nominal load has no torque about the X thread axis, but the "
+            "knife-rocking assembly exposes it to vibration and possible backoff."
         ),
         axial_capture=(
             "1/4-20 UNC-2A lever end in the steel UNC-2B through neck, installed "
@@ -1963,6 +1976,7 @@ JOINTS: tuple[Joint, ...] = (
             "the tip reaches the far face and the plain rod has no shoulder"
         ),
         lock=Lock.NONE,
+        exception="U-MHA-MG-03-no-lock",
         evidence="mg_lever_thread_joint.py; mg_magnifier_assembly_spec.THREAD_PROJECTION; mg_magnifier_assembly_sheet.STEP_TEXT",
     ),
     Joint(

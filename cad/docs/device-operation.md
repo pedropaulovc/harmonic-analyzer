@@ -102,7 +102,7 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 
 | step | what | why | provenance |
 |---|---|---|---|
-| 0 | **choose the ordinate scale** from the current release's `READOUT.md`: its capacity is computed at the permitted minimum clamp station, with the complete bore on plain stock before the lever's thread runout. Keep $P(f)=\sum_i t_i(1+\kappa_i)$ no greater than that capacity rounded **down** to two decimals, with each $t_i$ read at the scaled station before division by $f$. Scale a broader function down using the table solve, not by proportion (idle bars retain a fixed read ordinate), then set the clamp using the report's clamp-station table to fill the stroke, **no farther than the as-built 165 mm**. A sparse input that cannot fill the stroke at any permitted setting must first be scaled up within the capacity and bar travel; otherwise each reading error grows by $15/r_0$. | range is finite: keep the complete bore clear of runout and thread, with no physical shoulder stop. Only the as-built pose is CAD-gated (#748). Step 3 removes the scale, but fixed errors become a larger share of a scaled-down trial. | book p. 99 ("scaled by adjusting the magnifying lever"); this CAD's current capacity and wire moment arm are computed by `error_budget.py`, not historical collar dimensions; [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
+| 0 | **choose the ordinate scale** from the current release's `READOUT.md`: its capacity uses the conservative **component operating minimum**, not nominal model travel or extra travel admitted by as-made inspection. Keep $P(f)=\sum_i t_i(1+\kappa_i)$ no greater than the generated capacity rounded **down** to two decimals, with each $t_i$ read at the scaled station before division by $f$. Solve a broader input's scale from the table, not by proportion (idle bars retain a fixed read ordinate), then use the clamp-station table to fill the stroke, **no farther than the built 165 mm**. A sparse input may need scaling up within capacity and bar travel; otherwise reading errors grow by $15/r_0$. | the full one-sided clamp envelope must remain on cylindrical plain stock, clear of runout/thread, bracket and the free hemisphere. Check the as-made sliding bore and fit-up as described below; only the built pose is CAD-gated (#748). | book p. 99 ("scaled by adjusting the magnifying lever"); `error_budget.py` derives capacity from `operating_clamp_radius_band()`, not historical collar dimensions; [#748](https://github.com/pedropaulovc/harmonic-analyzer/issues/748) |
 | 1 | set bar $i$ to the linear station $f\,x_i \cdot 88$ mm; **record the ordinate it reads** from the station table, divided by $f$ so steps 3–4 use the function's own units | a bar at the stick zero still moves (≈ 0.028 of full scale: the null lies behind the pivot); the ordinate-per-mm slope changes by +4.1 % across the range | Michelson's unevenly-stamped stick (book p. 34); here a linear stick + table |
 | 2 | crank in one direction; read the pen height $r_k$ (mm) off the trace's own mean line at $\theta_k$, i.e. with the crank on its index after $2k$ turns | the coefficients are the ordinates at those divisions | 1898 p. 10; book p. 8 |
 | 3 | **normalise**: $s = r_0 / (S + C_2)$ with $S = \sum x^{read}_i$, $C_2 = \sum x^{read}_i \kappa_i$; then $O'_k = r_k / s$ | the pen scale is unknown; the $k = 0$ reading is the greatest term and fixes it | 1898 pp. 10–11 (`obs.` $n = 0$ ≡ 100); book p. 99 |
@@ -110,24 +110,56 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 | 4b | subtract $\sum_i (x^{read}_i - x^{set}_i)\cos(i\theta_k)$ | the read-vs-set difference of step 1 is a known vector ($20\ell$ at $k = 0$, $-\ell$ at odd $k$ for a common lift $\ell$) | the same fact Michelson's stick absorbed |
 | 5 | report $e_k = (O_k - C_k)/\max|C|$ with $C_k$ from the same 20-sample rule | so quadrature error is never charged to the hardware | 1898 p. 11 ("of the value of the greatest term"); [`michelson-1898-trial-accuracy.md`](./michelson-1898-trial-accuracy.md) |
 
-How much each step is worth, on the *nominal* machine with perfect parts (% of the
-greatest term, mean absolute error; Gaussian input | two-channel input):
+### Model travel, published capacity and as-made fit-up
 
-| after | Gaussian | two-channel |
-|---|---:|---:|
-| reading and normalising only (Michelson's procedure) | 0.49 | 10.66 |
-| + the read-vs-set lift vector (4b, common lift only) | 0.14 | 1.33 |
-| + the second-harmonic correction (4a) | 0.06 | 0.14 |
-| + the full station table (1 and 4b) | **0.007** | **0.019** |
+`mg_magnifying_lever_geom.operating_clamp_radius_band()` is the source for the
+current **81.81 / 165.0 / 196.825 mm** minimum / built / maximum distances from
+the knife axis to the clamp's bottom-rod/tap axis. The built pose and actual
+part geometry have not moved. The component upper bound is not the setup
+limit: `READOUT.md` still caps this procedure at the built 165 mm station.
 
-(on a machine whose cam lobes stand vertical at crank home; the as-built CAD's sit 1.5° off —
-the tooth-in-gap lock, [#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749) —
-and that common phase adds 0.30 | 0.80 that no step here can remove: it is the sine transform)
+The full **15 mm one-sided** clamp envelope starts at the actual tap axis
+inside the finished block; do not assume a centred ±7.5 mm envelope. The
+earliest accepted plain-to-runout boundary is
+$(167.5-0.8)-(18+0.51)=148.19$ mm in lever coordinates. Thus the conservative
+minimum radius is $215-148.19+15=81.81$ mm; the bracket near face is an
+additional lower stop, but the runout limit is stricter. At the free end the
+complete bore must remain on cylindrical plain stock beyond the hemisphere,
+so the maximum is $215-(D_{\max}/2+15)=196.825$ mm. These are component
+interval bounds, **not a native all-machine clearance or articulation proof**.
 
-against 0.155 from the combined part and station-setting scatter. The corrections are where the
-accuracy lives; the drawings and setup are where that scatter lives. That is the whole point of
-the error budget, and why `READOUT.md` ships beside the drawings as a manufacturing
-output, not as a footnote.
+Before setting the clamp, verify the **as-made sliding bore clearance** against
+the drawing's fit requirement. With the clamp loose, inspect both bore ends:
+the entire bore must clear the actual thread and runout, the bracket near face,
+and the free hemisphere. Check that the actual tap axis and block faces leave
+the required directional envelope inside finished stock. Secure the clamp and
+verify that it does not bind or enter runout. Then check the complete assembly
+through the required stroke in both directions, including clamp, bottom rod,
+threaded bracket and wire clearance. Offline intervals or straight-wire gaps
+do not replace that native/physical operating-pose evidence: **#748 remains
+open** and the minimum-pose budget waiver remains necessary.
+
+The nominal `clamp_radius_band(block_depth)` helper is for model visualization
+and export, not published capacity. Inspection of a particular assembly may
+admit more travel than the conservative bounds, but **do not advertise that
+extra travel as capacity** or substitute it for the generated operating table.
+
+
+The generated report gives the value of each step on the *nominal* machine with
+perfect parts (`nominal_design_errors`), using the operating-band setup:
+
+
+The credited machine has its cam lobes vertical at crank home. The as-built
+CAD's sit 1.5° off — the tooth-in-gap lock,
+[#749](https://github.com/pedropaulovc/harmonic-analyzer/issues/749). That common
+phase adds a sine-transform residual no step here can remove; the current
+report scores the credited and as-built cases separately.
+
+Compare those residuals with the current report's combined part and
+station-setting scatter (`monte_carlo.combined`), not a copied result from a
+different clamp range. The corrections are where the accuracy lives; drawings
+and setup are where the scatter lives. `READOUT.md` ships beside the drawings
+as a manufacturing output, not as a footnote.
 
 ## Is the machine "biased", then?
 
@@ -151,12 +183,12 @@ rejected for the same reason:
 
 The normalisation (step 3) can never be removed: it is the price of an adjustable
 magnifier, and the reason the trace can span the paper for any input. What *can*
-change is how much the operator has to give up to fit the pen: on this CAD the
-clamp must remain on the plain body, clear of thread runout. A broad function
-therefore needs the reduced scale solved in the current `READOUT.md`;
-every fixed error grows by the inverse scale.
-Readout and timebase are the largest broad-input terms; the magnifier's range
-forces those reduced scales, and the minimum permitted pose remains unproven (#748).
+change is how much the operator has to give up to fit the pen: published
+capacity keeps the complete directional clamp envelope on cylindrical plain
+body, clear of thread runout and the free hemisphere. A broad function needs
+the reduced scale solved in the current `READOUT.md`; fixed errors grow by the
+inverse scale. Use the current report to rank those terms. The conservative
+component limits do not close the native minimum-pose gate (#748).
 
 ## For the impatient builder
 

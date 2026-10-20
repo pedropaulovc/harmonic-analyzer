@@ -34,15 +34,58 @@ if TIP_PROJECTION_MIN < 0.0:
 
 
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:
-    """Nominal permitted plain-body travel, working pose and free-tip limit.
+    """Nominal geometric plain-body range, working pose and free-end limit.
 
-    This is not a tolerance-safe endpoint or a positive stop. The fitter keeps
-    the complete bore clear of the AS-MADE runout/thread; the shortest accepted
-    rod and longest thread move the nominal X149.50 boundary to X148.19.
+    This is not an accepted-part operating guarantee or a positive stop.
+    Capacity/setup consumers use operating_clamp_radius_band instead; model
+    visualization can retain these nominal dimensions. The complete bore
+    excludes both the thread runout and the free hemisphere.
     """
-    from mg_lever_thread_joint import THREAD_ROOT_X
+    from mg_lever_thread_joint import ROD_DIA, THREAD_ROOT_X
 
     half = block_depth / 2.0
     nearest = min(BRACKET_WINDOW_X[0], THREAD_ROOT_X) - half
-    farthest = half
+    farthest = ROD_DIA / 2.0 + half
     return (KNIFE_LOCAL_X - nearest, KNIFE_LOCAL_X - CLAMP_LOCAL_X, KNIFE_LOCAL_X - farthest)
+
+
+def operating_clamp_radius_band() -> tuple[float, float, float]:
+    """Conservative component travel for published capacity and setup.
+
+    Station is the actual bottom rod/tap axis at its seat. The required
+    finished tap wall puts that point INSIDE the clamp. The received 15 MAX
+    transverse envelope covers the full height, so either bore end is at
+    most 15 from that station, regardless of stock/tap centring. Do not divide
+    the envelope by two or add another locating-error allowance to it.
+
+    The shortest rod/longest threaded extent owns the earliest plain-body
+    boundary; that extent already includes incomplete root runout. The
+    opposite stop excludes the largest accepted free hemisphere. The earliest
+    bracket face is checked too. These are component/body bounds in the
+    existing knife/free-tip frame, not an all-machine articulation proof:
+    the minimum-pose native gate remains open. As-made inspection may admit
+    more travel, but published capacity does not credit it.
+    """
+    from mg_lever_thread_joint import (
+        NECK_THICKNESS,
+        ROD_DIA,
+        ROD_DIA_BAND,
+        THREAD_LENGTH,
+        THREAD_LENGTH_TOL,
+    )
+    from mg_magnifying_clamp_geom import STOCK_WIDTH_MAX, WALL_TARGET
+
+    if STOCK_WIDTH_MAX <= 0.0 or WALL_TARGET <= 0.0:
+        raise AssertionError("MG travel needs a bounded finished clamp with its tap axis inside")
+    earliest_runout = ROD_LENGTH - ROD_LENGTH_TOL - (THREAD_LENGTH + THREAD_LENGTH_TOL)
+    earliest_bracket = BRACKET_LOCAL_X - (NECK_THICKNESS + NECK_THICKNESS_TOL) / 2.0
+    nearest_station = min(earliest_runout, earliest_bracket) - STOCK_WIDTH_MAX
+    farthest_station = (ROD_DIA + ROD_DIA_BAND[0]) / 2.0 + STOCK_WIDTH_MAX
+    band = (
+        KNIFE_LOCAL_X - nearest_station,
+        KNIFE_LOCAL_X - CLAMP_LOCAL_X,
+        KNIFE_LOCAL_X - farthest_station,
+    )
+    if not band[0] <= band[1] <= band[2]:
+        raise AssertionError("MG built clamp station is outside its conservative component travel")
+    return band

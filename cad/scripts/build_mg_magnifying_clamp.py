@@ -118,6 +118,42 @@ V_ROD_TAP = blind_hole_volume_mm3(ROD_TAP_DRILL_DIA, ROD_TAP_DRILL_DEPTH)
 V_TOTAL = V_HEX - V_BORE - V_THUMB - V_ROD_TAP
 
 
+def _require_location_selection(
+    adapter: Any, expected: tuple[tuple[int, Any], ...], *, stage: str
+) -> None:
+    """Discriminate native selection loss from unsupported identity comparison."""
+    import _telemetry
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    count = int(manager.GetSelectedObjectCount2(-1))
+    selected = tuple(manager.GetSelectedObject6(index, -1) for index in range(1, count + 1))
+    types = tuple(int(manager.GetSelectedObjectType3(index, -1)) for index in range(1, count + 1))
+    compared = tuple((index, entity) for index, entity in expected if index <= count and selected[index - 1] is not None)
+    codes = tuple(int(application.IsSame(selected[index - 1], entity)) for index, entity in compared)
+    self_codes = tuple(int(application.IsSame(entity, entity)) for _index, entity in expected)
+    detail = f"stage={stage}, count={count}, types={types}, compared={tuple(index for index, _entity in compared)}, IsSame={codes}, self={self_codes}"
+    _telemetry.info(
+        f"clamp native selection: {detail}",
+        operation_stage=stage,
+        selection_count=count,
+        selected_types=types,
+        selected_available=tuple(entity is not None for entity in selected),
+        compared_selection_indices=tuple(index for index, _entity in compared),
+        identity_codes=codes,
+        self_identity_codes=self_codes,
+    )
+    if count != 2:
+        raise RuntimeError(f"clamp location: expected two selected objects; {detail}")
+    if len(compared) != len(expected):
+        raise RuntimeError(f"clamp location: selected object unavailable; {detail}")
+    if any(code != 1 for code in self_codes):
+        raise RuntimeError(f"clamp location: native identity positive control failed; {detail}")
+    if any(code != 1 for code in codes):
+        raise RuntimeError(f"clamp location: actual selection identity differs or is unavailable; {detail}")
+
+
 def _native_select(adapter: Any, entity: Any, interface: str, *, append: bool) -> None:
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.SelectionManager, "ISelectionMgr")
@@ -241,6 +277,7 @@ def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> None:
     model.ClearSelection2(True)
     _native_select(adapter, center, "ISketchPoint", append=False)
     _native_select(adapter, flat, "ISketchSegment", append=True)
+    _require_location_selection(adapter, ((1, center), (2, flat)), stage=f"{name}.point-flat.before-create")
     raw = model.AddDimension2(0.02, 0.02, 0.0)
     model.ClearSelection2(True)
     if raw is None:
@@ -309,8 +346,7 @@ def _select_bore_rim(adapter: Any, circle: Any) -> None:
     if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
         raise RuntimeError("clamp location: native bore-rim transform failed")
     manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    if int(manager.GetSelectedObjectCount2(-1)) != 2 or int(application.IsSame(manager.GetSelectedObject6(2, -1), circle)) != 1:
-        raise RuntimeError("clamp location: rim pick lost the actual selected circle")
+    _require_location_selection(adapter, ((2, circle),), stage="bore-rim.before-set-selection-point")
     if manager.SetSelectionPoint2(2, -1, coordinates[0], coordinates[1], coordinates[2]) is not True:
         raise RuntimeError("clamp location: native bore-rim selection point failed")
     retained = tuple(float(value) for value in (manager.GetSelectionPointInSketchSpace2(2, -1) or ()))
@@ -324,6 +360,7 @@ def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> 
     model.ClearSelection2(True)
     _native_select(adapter, point, "ISketchPoint", append=False)
     _native_select(adapter, circle, "ISketchSegment", append=True)
+    _require_location_selection(adapter, ((1, point), (2, circle)), stage=f"{name}.point-circle.after-select")
     _select_bore_rim(adapter, circle)
     raw = model.AddHorizontalDimension2(0.0, 0.02, 0.02)
     model.ClearSelection2(True)

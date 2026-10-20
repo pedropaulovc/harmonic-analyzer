@@ -1085,6 +1085,16 @@ entity attachments and strict near-arc/value checks; this changes selection
 semantics, not geometry. The r4 null creation is observed, but the zero-span
 mechanism remains an inference until the corrected native path is exercised.
 
+The r5 attempt failed earlier, at the combined selected-count/circle-identity
+guard, before setting or reading a native pick. Do not attribute that failure
+to the zero-span hypothesis. Record count, every selected native type and
+availability, per-index `IsSame` codes and self-comparison positive controls
+with an operation stage. Apply the same readback before the existing successful
+point-to-flat dimension path, immediately after the relative pair selection,
+and before setting its rim pick. Count mismatch, missing objects, unsupported
+identity comparison and a genuinely different object are separate failures,
+not a generic “lost circle”. Unknown identity never passes.
+
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
 own an across-flats acceptance band. Attach the height precision's functional
@@ -1092,11 +1102,34 @@ reason to the height dimension itself, and remove only the native hole-callout
 thread-class variable where the title block already owns 2B. Keep live
 thread/drill/depth variables and reject resolved text that still repeats 2B.
 
-Clamp travel remains a nominal setting range under the existing fit-up waiver,
-not a tolerance-safe endpoint or positive stop. Keep the entire bore clear of
-the **as-made** incomplete runout/thread. Accepted shortest-rod/longest-thread
-dimensions move the nominal runout boundary X149.50 to X148.19; such parts have
-less usable travel. Native minimum-pose/kinematics closure is still required.
+Keep nominal model travel separate from published operating capacity. The
+accepted shortest rod and longest thread move nominal runout X149.50 to
+X148.19; nominal `THREAD_ROOT_X` still owns the part's nominal witness.
+Published setup/capacity uses the conservative component band **81.81 / 165 /
+196.825** from `operating_clamp_radius_band`. The actual bottom rod/tap axis at
+its seat is inside the finished clamp by its required net wall. The received
+**15 MAX over full height** therefore bounds either bore end from that station
+by the **full15**, without inventing symmetric±7.5 or exact60° stock form.
+The lower radius is215−148.19+15; the upper is215−15−3.175 because the complete
+bore must also stay beyond the free hemisphere on cylindrical body. Check the
+earliest bracket face as an additional stop. The built165 pose does not move.
+
+As-made fit-up can inspect and admit more travel, but published capacity does
+not credit it. These component bounds in the existing knife/free-tip frame are
+not a positive stop or an all-machine articulation certificate. Keep the entire
+bore clear of the as-made runout/thread and hemisphere. The existing minimum-
+pose/kinematics native gate remains open.
+
+The unseated lever thread is not a static clamp: it has no shoulder or preload,
+and its rotation sets installed projection. Its operational retention audit
+uses the existing adjuster classification and joint-specific
+`U-MHA-MG-03-no-lock` ruling, also declared as RV-02 in the assembly and mating
+part packages. The user's exact2026-10-20 direction was “no further thread
+locking needed because mg-magnifying-lever does not experience rotational
+forces”. The approved implementation has no added lock; that is not native
+test proof of immunity to vibration, projection drift or backout. The bracket's
+approved1.667MIN mouth wall is separately declared RV-01, kind minor, for its
+sub-2.0 target while retaining the1.5 floor and original dimensional bands.
 
 The retention and wall checks are not a brass strength certification. Wire
 force below the lever produces bending even though there is no torque about

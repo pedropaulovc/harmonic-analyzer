@@ -46,6 +46,7 @@ ROOT_CALLOUT = "ALL NECK / FOOT INSIDE CORNERS"
 FOOT_CORNER_CALLOUT = "4 FOOT CORNERS"
 TAP_PROCESS = "THRU\nMATES MHA-MG-03 LEVER"
 MOUNTING_HOLE_PROCESS = "2 HOLES THRU\nMATES MHA-SM-03 TAPPED HOLES"
+# Package RV-01 declares this approved sub-target wall; print only its fact.
 # Actual ordinary-dimensional stack, not the conditional sketch's 1.925.
 WALL_CALLOUT = f"THREAD-MOUTH WALL {math.floor(WALL_MIN * 1000.0) / 1000.0:.3f} MIN"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
