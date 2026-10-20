@@ -10,6 +10,10 @@ checks. Every text, pose and reference value comes from
 ``ms_measuring_stick_assembly_spec``, ``ms_measuring_stick_assembly_sheet``,
 ``ms_measuring_stick_explode_spec`` or the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
+
+PRIVATE HISTORICAL-INPUT DIAGNOSTIC, NOT A MERGE CANDIDATE: the normal farm leaf
+observes the original first frozen stop-block pick, then fails before its
+balloon/finalization. No successful drawing or manufacturing approval is possible.
 """
 
 from __future__ import annotations
@@ -29,10 +33,13 @@ import ms_stick_spec as stick
 import ms_stop_spec as stop
 from _check import check
 from _com import _early_bound
+from _ms_fixed_anchor_diagnostic import (
+    MSFixedAnchorDiagnostic,
+    refuse_finalize as finalize_drawing,
+)
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
-    finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_high_quality_shaded_with_edges,
@@ -1047,4 +1054,6 @@ def _parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     _parse_args()
     _telemetry.set_service("drawing-export")
-    sys.exit(run_build(build))
+    with MSFixedAnchorDiagnostic(SOURCE, _validate_source) as diagnostic:
+        _validate_source = diagnostic.validate_source
+        sys.exit(run_build(diagnostic.observe(build)))
