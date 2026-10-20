@@ -116,8 +116,8 @@ def test_support_bar_isolation(part_closures, contract: Contract) -> None:
                 "build_mg_wheel_axle_spacer",
             ),
             forbidden=(
-                "vn_transgear_pivot_screw_spec",
-                "vn_transgear_arm_plate_locating_pin_spec",
+                "pd_vn_transgear_pivot_screw_spec",
+                "pd_vn_transgear_arm_plate_locating_pin_spec",
             ),
         )
     ],

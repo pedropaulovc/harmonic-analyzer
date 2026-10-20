@@ -1020,9 +1020,9 @@ geometry. The support-bar builder still reads `sh_column_clamp_fit` for its
 physically mating clamp-screw clearance budget.
 The transgear arm and pivot spacer read the pivot screw's catalogue shoulder
 dimensions directly from `_mcmaster_90325a174`; fitted-thread and chamfer checks
-remain in `vn_transgear_pivot_screw_spec`. `_transgear_arm_plate_locating_interface`
+remain in `pd_vn_transgear_pivot_screw_spec`. `_transgear_arm_plate_locating_interface`
 owns the arm/plate dowel-hole limits, proud set, blind depth and mouth breaks;
-`vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
+`pd_vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
 stock-to-interface fit, insertion and bottom-air calculations. Mating geometry
 imports the narrow providers directly, not either full hardware spec.
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
