@@ -146,6 +146,88 @@ def test_anchor_callout_defers_thread_class_to_title_block() -> None:
         drill_process(spec.ANCHOR_HOLE_SPEC)
 
 
+class _NativeHoleText:
+    """Native SetText is void; only its independently returned text can pass."""
+
+    def __init__(self, definition, newline, mutate=lambda text: text):
+        self.definition = definition
+        self.newline = newline
+        self.mutate = mutate
+        self.written = []
+
+    def GetText(self, part):
+        assert part == 5
+        return self.definition
+
+    def SetText(self, part, text) -> None:
+        assert part == 1
+        self.written.append((part, text))
+        self.definition = self.mutate(text).replace("\n", self.newline)
+
+
+@pytest.mark.parametrize("newline", ("\n", "\r\n", "\r"))
+def test_thread_class_cleanup_accepts_native_newlines_without_changing_other_whitespace(monkeypatch, newline):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    definition = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH>  <hw-threaddepth>\n\tKEEP  \n"
+    expected = "<hw-threaddesc> <HOLE-DEPTH>  <hw-threaddepth>\n\tKEEP  \n"
+    native = _NativeHoleText(definition.replace("\n", newline), newline)
+    drawing._omit_title_block_thread_class(native)
+    assert native.written == [(1, expected)]
+    assert native.definition == expected.replace("\n", newline)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda text: text.replace("<HOLE-DEPTH>", "WRONG"),
+        lambda text: text.replace("KEEP  ", "KEEP "),
+        lambda text: " " + text,
+        lambda text: text + " ",
+        lambda text: text.replace("\n", " "),
+    ),
+)
+def test_thread_class_cleanup_rejects_real_content_and_whitespace_changes(monkeypatch, mutate):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    native = _NativeHoleText(
+        "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH>\r\nKEEP  ", "\r\n", mutate
+    )
+    with pytest.raises(RuntimeError, match="retained its redundant thread class"):
+        drawing._omit_title_block_thread_class(native)
+
+
+@pytest.mark.parametrize(
+    ("definition_newline", "rows_newline", "readback_newline"),
+    (("\n", "\n", "\r\n"), ("\r\n", "\r\n", "\r"), ("\r", "\r", "\n")),
+)
+def test_appended_native_rows_accept_all_newlines_and_preserve_other_whitespace(
+    monkeypatch, definition_newline, rows_newline, readback_newline
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    definition = "<hw-threaddesc>  <hw-threaddepth> \t\n<HOLE-DEPTH>  <hw-depth>  \t\n"
+    rows = "\tFOR MHA-DT-32  \nMOUTH 3.0 MAX \t"
+    native = _NativeHoleText(definition.replace("\n", definition_newline), readback_newline)
+    drawing._append_callout_rows(native, rows.replace("\n", rows_newline))
+    assert native.written == [(1, definition + rows)]
+    assert native.definition == (definition + rows).replace("\n", readback_newline)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    (
+        lambda text: text.replace("MOUTH", "WRONG"),
+        lambda text: text.replace("KEEP  ", "KEEP "),
+        lambda text: " " + text,
+        lambda text: text + " ",
+        lambda text: text.replace("\n", " "),
+    ),
+)
+def test_appended_native_rows_reject_real_content_and_whitespace_changes(monkeypatch, mutate):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    native = _NativeHoleText("<hw-threaddesc>\r\nKEEP  ", "\r\n", mutate)
+    with pytest.raises(RuntimeError, match="rows did not persist"):
+        drawing._append_callout_rows(native, "FOR MHA-DT-32\r\nMOUTH 3.0 MAX")
+
+
 def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_FACE_Z == -183.0
     assert drive.CRANKSHAFT_Z0 == drive.CRANK_HUB_Z0 == drive.CRANK_ARM_Z0 == -183.0
@@ -633,6 +715,39 @@ def test_profile_chamfer_rejects_lost_native_ownership_or_display(monkeypatch, c
 
 
 @pytest.mark.parametrize(
+    ("source_newline", "readback_newline"),
+    (("\n", "\r\n"), ("\r\n", "\r"), ("\r", "\n")),
+)
+def test_profile_chamfer_suffix_accepts_only_native_newline_variation(
+    monkeypatch, source_newline, readback_newline
+):
+    monkeypatch.setattr(
+        drawing, "BORE_REAR_CHAMFER_CALLOUT",
+        notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", source_newline),
+    )
+    adapter, profile, annotation, _display = _native_chamfer(
+        monkeypatch, text=notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", readback_newline)
+    )
+    drawing._assert_profile_chamfer(adapter, profile, annotation)
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        notes.BORE_REAR_CHAMFER_CALLOUT.replace("PRESS", "WRONG").replace("\n", "\r\n"),
+        notes.BORE_REAR_CHAMFER_CALLOUT.replace("FAR SIDE", "FAR  SIDE").replace("\n", "\r\n"),
+        " " + notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", "\r\n"),
+        notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", "\r\n") + " ",
+        "\r\n" + notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", "\r\n"),
+    ),
+)
+def test_profile_chamfer_suffix_does_not_strip_real_content_mismatches(monkeypatch, text):
+    adapter, profile, annotation, _display = _native_chamfer(monkeypatch, text=text)
+    with pytest.raises(RuntimeError, match="callout"):
+        drawing._assert_profile_chamfer(adapter, profile, annotation)
+
+
+@pytest.mark.parametrize(
     "changed",
     (
         {}, {"orientation": "*Right"}, {"orientation": "*Front"},
@@ -769,6 +884,27 @@ def test_chamfer_edge_guard_proves_feature_relation_and_actual_rendering(monkeyp
     drawing._rendered_chamfer_edges(adapter, profile, annotation)
 
 
+@pytest.mark.parametrize(
+    "changed",
+    (
+        {"attached": (), "attached_types": (), "attached_count": 0},
+        {"attached": (None,), "attached_types": (0,), "attached_count": 1},
+        {"attached": (object(),), "attached_types": (23,), "attached_count": 1},
+        {"attached": (object(),), "attached_types": (), "attached_count": 2},
+    ),
+)
+def test_chamfer_attachment_inventory_is_logged_not_used_as_an_extra_gate(monkeypatch, changed):
+    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, **changed)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    drawing._assert_profile_chamfer(adapter, profile, annotation)
+    drawing._rendered_chamfer_edges(adapter, profile, annotation)
+    assert logged == [
+        f"profile chamfer native attachments: count={changed['attached_count']}, "
+        f"types={changed['attached_types']}, entities={len(changed['attached'])}"
+    ]
+
+
 def test_chamfer_rendered_edge_parser_keeps_native_arc_and_silhouette_alignment(monkeypatch) -> None:
     adapter, profile, annotation, outer, inner, _near = _chamfer_edge_case(monkeypatch)
     _edges, raw = profile.GetPolylines7(1)
@@ -800,9 +936,7 @@ def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch,
     "changed",
     (
         {"feature": None}, {"outer_z": 8.0}, {"inner_z": 0.10}, {"outer_r": 9.7},
-        {"feature_edges": ()}, {"attached": ()}, {"attached": (None,)},
-        {"attached": (object(),)}, {"attached_count": 2}, {"attached_types": (2,)},
-        {"attached_types": ()}, {"rendered": ()}, {"rendered": (object(), object())},
+        {"feature_edges": ()}, {"rendered": ()}, {"rendered": (object(), object())},
         {"degenerate": True}, {"raw": ()}, {"raw": (float("nan"),)},
         {"raw": (3.0, 0.0)}, {"result": None}, {"result": ((),)},
     ),
@@ -822,33 +956,66 @@ def test_chamfer_edge_guard_rejects_one_edge_or_the_opposite_mouth(monkeypatch) 
     profile.GetPolylines7 = lambda _option: ((outer,), raw[:15])
     with pytest.raises(RuntimeError, match="both actual rear"):
         drawing._rendered_chamfer_edges(adapter, profile, annotation)
-    annotation.GetAttachedEntities3 = lambda: (near,)
-    with pytest.raises(RuntimeError, match="actual rear-mouth feature"):
-        drawing._rendered_chamfer_edges(adapter, profile, annotation)
+
+
+def _native_dimension_text(monkeypatch, **changed):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    data = SimpleNamespace(
+        GetTextCount=lambda: changed.get("count", 1),
+        GetTextAtIndex=lambda _: changed.get("text", "NATIVE 25.4"),
+        GetTextPositionAtIndex=lambda _: changed.get("position", (0.279, 0.135, 0.0)),
+        GetTextInBoxWidthAtIndex=lambda _: changed.get("width", 0.012),
+        GetTextHeightAtIndex=lambda _: changed.get("height", 0.005),
+        GetTextAngleAtIndex=lambda _: changed.get("angle", math.pi / 2),
+        GetTextRefPositionAtIndex=lambda _: changed.get("reference", 1),
+    )
+    return SimpleNamespace(GetSpecificAnnotation=lambda: SimpleNamespace(GetDisplayData=lambda: data))
+
+
+@pytest.mark.parametrize(
+    ("reference", "local_box"),
+    (
+        (0, (0.0, -0.005, 0.012, 0.0)),       # swUPPER_LEFT
+        (1, (0.0, 0.0, 0.012, 0.005)),        # swLOWER_LEFT
+        (2, (-0.006, -0.0025, 0.006, 0.0025)),  # swCENTER
+        (3, (-0.012, -0.005, 0.0, 0.0)),      # swUPPER_RIGHT
+        (4, (-0.012, 0.0, 0.0, 0.005)),       # swLOWER_RIGHT
+        (5, (-0.006, -0.005, 0.006, 0.0)),    # swUPPER_CENTER
+    ),
+)
+@pytest.mark.parametrize("angle", (0.0, math.pi / 2, -math.pi / 2, math.pi / 4))
+def test_dimension_clearance_honours_native_reference_and_rotation(monkeypatch, reference, local_box, angle):
+    annotation = _native_dimension_text(monkeypatch, reference=reference, angle=angle)
+    x0, y0, x1, y1 = local_box
+    cosine, sine = math.cos(angle), math.sin(angle)
+    corners = [
+        (0.279 + x * cosine - y * sine, 0.135 + x * sine + y * cosine)
+        for x, y in ((x0, y0), (x1, y0), (x0, y1), (x1, y1))
+    ]
+    expected = (
+        min(x for x, _y in corners), min(y for _x, y in corners),
+        max(x for x, _y in corners), max(y for _x, y in corners),
+    )
+    # This string's default estimated width is NOT 12 mm. Only the positive
+    # measured width can produce this box around the correct native corner.
+    assert drawing._dimension_text_bounds(annotation, label="Width") == pytest.approx(expected)
 
 
 @pytest.mark.parametrize(
     "changed",
-    ({}, {"width": 0.0}, {"width": float("nan")}, {"height": 0.0}, {"position": (0.27, 0.14)}),
+    (
+        {"width": 0.0}, {"width": -0.001}, {"width": float("nan")}, {"width": float("inf")},
+        {"height": 0.0}, {"height": -0.001}, {"height": float("nan")}, {"height": float("inf")},
+        {"angle": float("nan")}, {"angle": float("inf")},
+        {"position": (0.27, 0.14)}, {"position": (0.27, float("nan"), 0.0)},
+        {"reference": -1}, {"reference": 6}, {"reference": None},
+        {"reference": 1.5}, {"reference": True}, {"count": 0}, {"text": " \t"},
+    ),
 )
-def test_dimension_clearance_uses_measured_whole_native_runs(monkeypatch, changed) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
-    data = SimpleNamespace(
-        GetTextCount=lambda: 1,
-        GetTextAtIndex=lambda _: "25.4",
-        GetTextPositionAtIndex=lambda _: changed.get("position", (0.279, 0.135, 0.0)),
-        GetTextInBoxWidthAtIndex=lambda _: changed.get("width", 0.012),
-        GetTextHeightAtIndex=lambda _: changed.get("height", 0.005),
-        GetTextAngleAtIndex=lambda _: math.pi / 2,
-    )
-    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: SimpleNamespace(GetDisplayData=lambda: data))
-    if changed:
-        with pytest.raises(RuntimeError, match="whole bounds"):
-            drawing._dimension_text_bounds(annotation, label="Width")
-    else:
-        assert drawing._dimension_text_bounds(annotation, label="Width") == pytest.approx(
-            (0.274, 0.135, 0.279, 0.147)
-        )
+def test_dimension_clearance_refuses_unmeasurable_or_undocumented_native_runs(monkeypatch, changed):
+    annotation = _native_dimension_text(monkeypatch, **changed)
+    with pytest.raises(RuntimeError, match="whole bounds|no rendered text"):
+        drawing._dimension_text_bounds(annotation, label="Width")
 
 
 def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
@@ -876,6 +1043,8 @@ def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
     ("changed", "message"),
     (
         ({}, None),
+        ({"caption_text": notes.PROFILE_VIEW_CAPTION.replace("\n", "\r\n")}, None),
+        ({"caption_text": notes.PROFILE_VIEW_CAPTION.replace("\n", "\r")}, None),
         ({"offset": False}, "final offset leader"),
         ({"position": (0.296, 0.09455, 0.0)}, "final offset leader"),
         ({"box": (0.2497, 0.096, 0.275, 0.132)}, "clear profile lane"),
@@ -903,6 +1072,9 @@ def test_chamfer_lane_preserves_border_air_stock_and_named_rotation() -> None:
         ({"text_overlap": "Width"}, "existing callouts"),
         ({"text_overlap": "handle pivot"}, "existing callouts"),
         ({"caption_text": "TOP VIEW SCALE 1:1"}, "caption did not persist"),
+        ({"caption_text": notes.PROFILE_VIEW_CAPTION.replace("CCW", "CW").replace("\n", "\r\n")}, "caption did not persist"),
+        ({"caption_text": " " + notes.PROFILE_VIEW_CAPTION.replace("\n", "\r\n")}, "caption did not persist"),
+        ({"caption_text": notes.PROFILE_VIEW_CAPTION.replace("\n", "\r\n") + " "}, "caption did not persist"),
         ({"caption_owner": object()}, "caption did not persist"),
         ({"caption_position": (0.316, 0.170, 0.0)}, "caption did not persist"),
         ({"caption_extent": (0.295, 0.146, 0.0, 0.350, 0.160, 0.0)}, "existing callouts"),

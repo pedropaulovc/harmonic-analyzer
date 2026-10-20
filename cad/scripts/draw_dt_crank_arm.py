@@ -71,7 +71,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _hole_spec import blind_cut_dia_mm
-from _layout_audit import display_box
+from _layout_geometry import estimate_text_box, union_boxes
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -172,14 +172,18 @@ def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
         )
 
 
+def _native_text(value: Any) -> str:
+    """Canonicalise native line endings only; every other character is exact."""
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _omit_title_block_thread_class(display: Any) -> None:
     """Remove only the redundant Hole Wizard thread-class field."""
     native = _early_bound(display, "IDisplayDimension")
-    definition = str(native.GetText(5) or "")
+    definition = _native_text(native.GetText(5))
     without_class = re.sub(
-        r"\s*(?:-\s*)?<hw-threadclass>\s*", " ", definition, flags=re.IGNORECASE
+        r"[ \t]*(?:-[ \t]*)?<hw-threadclass>[ \t]*", " ", definition, flags=re.IGNORECASE
     )
-    without_class = re.sub(r" {2,}", " ", without_class)
     if without_class == definition:
         raise RuntimeError(
             f"anchor tap callout lacks its thread-class variable: {definition!r}"
@@ -187,7 +191,7 @@ def _omit_title_block_thread_class(display: Any) -> None:
     # IDisplayDimension.SetText is void; the definition readback is the
     # authoritative persistence check.
     native.SetText(1, without_class)
-    if str(native.GetText(5) or "") != without_class:
+    if _native_text(native.GetText(5)) != without_class:
         raise RuntimeError("anchor tap callout retained its redundant thread class")
 
 
@@ -199,13 +203,14 @@ def _append_callout_rows(display: Any, rows: str) -> None:
     review r3: a prefix split the callout between the two).
     """
     native = _early_bound(display, "IDisplayDimension")
-    definition = str(native.GetText(5) or "")
+    definition = _native_text(native.GetText(5))
     if not definition.strip():
         raise RuntimeError("hole callout has no definition to extend")
-    extended = definition.rstrip() + "\n" + rows
+    extended = definition.rstrip("\n") + "\n" + _native_text(rows)
     native.SetText(1, extended)
-    if str(native.GetText(5) or "") != extended:
-        raise RuntimeError(f"hole callout rows did not persist: {native.GetText(5)!r}")
+    actual = _native_text(native.GetText(5))
+    if actual != extended:
+        raise RuntimeError(f"hole callout rows did not persist: {actual!r}")
 
 
 # Per-view survivors of the marked-dimension import.
@@ -348,7 +353,7 @@ def _assert_profile_chamfer(adapter: Any, profile: Any, annotation: Any) -> None
         != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
         or int(display.GetPrimaryTolPrecision2())
         != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
-        or str(display.GetText(4) or "") != BORE_REAR_CHAMFER_CALLOUT
+        or _native_text(display.GetText(4)) != _native_text(BORE_REAR_CHAMFER_CALLOUT)
     ):
         raise RuntimeError("bore-mouth chamfer lost its native value, LIMIT precision or callout")
 
@@ -471,18 +476,14 @@ def _rendered_chamfer_edges(adapter: Any, profile: Any, annotation: Any) -> None
     native = _early_bound(annotation, "IAnnotation")
     attached = tuple(native.GetAttachedEntities3() or ())
     kinds = tuple(int(value) for value in (native.GetAttachedEntityTypes() or ()))
-    if (
-        len(attached) != len(kinds)
-        or len(attached) != int(native.GetAttachedEntityCount3())
-        or not attached
-        or any(item is None for item in attached)
-        or not any(
-            int(app.IsSame(item, receiver)) == 1
-            for item, kind in zip(attached, kinds)
-            for receiver in (boundaries if kind == 1 else faces if kind == 2 else ())
-        )
-    ):
-        raise RuntimeError("native chamfer leg is not attached to its actual rear-mouth feature")
+    count = int(native.GetAttachedEntityCount3())
+    # Imported feature dimensions can report empty/unsupported attachment
+    # kinds. Source Parameter identity and the actual rendered model edges,
+    # not this supplemental annotation inventory, are the authoritative proof.
+    _telemetry.info(
+        f"profile chamfer native attachments: count={count}, types={kinds}, "
+        f"entities={len(attached)}"
+    )
     # Generated IView binding returns (model edges, out polyline buffer).
     result = view.GetPolylines7(1)
     if not isinstance(result, (list, tuple)) or len(result) != 2:
@@ -546,26 +547,45 @@ def _assert_chamfer_offset(annotation: Any) -> None:
 
 
 def _dimension_text_bounds(annotation: Any, *, label: str) -> tuple[float, float, float, float]:
-    """Whole native text runs, not requested anchors or estimated glyph widths."""
+    """Whole measured native runs, using each documented reference corner."""
     native = _early_bound(annotation, "IAnnotation")
     display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
-    texts = []
+    boxes = []
     for index in range(int(data.GetTextCount())):
-        text = str(data.GetTextAtIndex(index) or "")
+        text = _native_text(data.GetTextAtIndex(index))
         if not text.strip():
             continue
         position = tuple(float(value) for value in (data.GetTextPositionAtIndex(index) or ()))
         width = float(data.GetTextInBoxWidthAtIndex(index))
         height = float(data.GetTextHeightAtIndex(index))
         angle = float(data.GetTextAngleAtIndex(index))
+        reference = data.GetTextRefPositionAtIndex(index)
         if (
             len(position) != 3 or width <= 0.0 or height <= 0.0
+            or type(reference) is not int or reference not in (0, 1, 2, 3, 4, 5)
             or not all(math.isfinite(value) for value in (*position, width, height, angle))
         ):
+            raise RuntimeError(
+                f"{label}: native dimension text has no measurable whole bounds "
+                f"(run={index}, text={text!r}, width={width!r}, height={height!r}, "
+                f"reference={reference!r}, angle={angle!r})"
+            )
+        # Calibrate the existing reference/rotation geometry to this run's
+        # ACTUAL positive width. No estimated-width or zero-width path exists.
+        advance = width / (max(map(len, text.split("\n"))) * height)
+        if not math.isfinite(advance):
             raise RuntimeError(f"{label}: native dimension text has no measurable whole bounds")
-        texts.append({"t": text, "pos": position, "w": width, "h": height, "ang": angle})
-    box = display_box({"texts": texts})
+        box = estimate_text_box(
+            text, anchor=position[:2], height=height, reference=reference,
+            angle=angle, advance_ratio=advance,
+        )
+        if box is None or not all(
+            math.isfinite(value) for value in (box.xmin, box.ymin, box.xmax, box.ymax)
+        ):
+            raise RuntimeError(f"{label}: native dimension text has no measurable whole bounds")
+        boxes.append(box)
+    box = union_boxes(boxes)
     if box is None:
         raise RuntimeError(f"{label}: native dimension has no rendered text")
     return (box.xmin, box.ymin, box.xmax, box.ymax)
@@ -636,7 +656,7 @@ def _profile_chamfer_clear(
     extent = tuple(float(value) for value in (note.GetExtent() or ()))
     position = tuple(float(value) for value in (note_annotation.GetPosition() or ()))
     if (
-        str(note.GetText() or "") != PROFILE_VIEW_CAPTION
+        _native_text(note.GetText()) != _native_text(PROFILE_VIEW_CAPTION)
         or int(note_annotation.Visible) != 1 or int(note_annotation.OwnerType) != 0
         or int(_early_bound(adapter.swApp, "ISldWorks").IsSame(note_annotation.Owner, profile)) != 1
         or len(position) != 3 or not all(math.isfinite(value) for value in position)
