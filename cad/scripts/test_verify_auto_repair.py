@@ -393,6 +393,8 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         )
     for proof in proofs.values():
         proof.write_text("stale-proof\n", encoding="utf-8")
+    original_bytes = {file.path: file.path.read_bytes() for file in files.values()}
+    original_bytes.update((path, path.read_bytes()) for path in proofs.values())
 
     class Model(FakeOpenAssembly):
         def __init__(self, file):
@@ -580,7 +582,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         assert ordinary_saved_states == {}
         assert rendered == {}
         assert all(not files[name].repaired for name in repaired_names)
-        assert all(proof.exists() for proof in proofs.values())
+        assert {path: path.read_bytes() for path in original_bytes} == original_bytes
         assert adapter.currentModel is None
         assert adapter.open_documents == []
         return
