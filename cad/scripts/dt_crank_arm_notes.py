@@ -51,8 +51,9 @@ PIVOT_TAP_ROWS = (
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
 # The native leg and LIMIT band identify the bore edge. FAR SIDE names its
-# face against the front view; MHA-DT-31 HUB SIDE identifies the mating hub.
-# Outside the cheek this block grows right. Its existing two-space allowance
-# belongs on the LEFT, away from the native upright; moving the padding rather
-# than duplicating it preserves the audited block width.
-BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nFAR SIDE  \nMHA-DT-31  \n  HUB SIDE"
+# face against the front view; HUB SIDE identifies its mating face. The same
+# bore's primary seat callout already names MHA-DT-31 and its light press fit.
+# The controlling leg, limits and decimal places are the imported model
+# dimension's, not prose. Keep its approved angle suffix on that dimension.
+# Short intent rows leave border and overall-witness air without smaller text.
+BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG\nFAR SIDE\nHUB SIDE\nPRESS\nLEAD-IN"

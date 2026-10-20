@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -58,8 +60,9 @@ def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert arm.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.SECTION_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
+    assert "BoreRearChamferSize" in drawing.FRONT_KEEP
     assert set(drawing.DIMENSION_CALLOUTS) == {"HubSeatDia", "BoreRearChamferSize"}
     assert drawing.DIMENSION_CALLOUTS["HubSeatDia"] == notes.HUB_SEAT_CALLOUT
     assert (
@@ -448,6 +451,9 @@ def test_bore_rear_chamfer_costs_no_wall_margin() -> None:
     ("changed", "message"),
     (
         ({}, None),
+        ({"full_name": "BoreRearChamferSize@OtherChamfer@dt-crank-arm.SLDPRT"}, "identity/type"),
+        ({"full_name": "OtherSize@BoreRearChamfer@dt-crank-arm.SLDPRT"}, "identity/type"),
+        ({"dimension_type": 1}, "identity/type"),
         ({"leg": 0.1}, "model leg"),
         ({"kind": 6}, "LIMIT band"),
         ({"lower": -0.05}, "LIMIT band"),
@@ -457,6 +463,8 @@ def test_bore_rear_chamfer_costs_no_wall_margin() -> None:
 def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, message):
     values = {
         "leg": spec.BORE_REAR_CHAMFER,
+        "full_name": "BoreRearChamferSize@BoreRearChamfer@dt-crank-arm.SLDPRT",
+        "dimension_type": 0,
         "kind": spec.BORE_REAR_CHAMFER_TOL_TYPE,
         "lower": spec.BORE_REAR_CHAMFER_DEVIATIONS[0],
         "upper": spec.BORE_REAR_CHAMFER_DEVIATIONS[1],
@@ -467,7 +475,12 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
         GetMinValue=lambda: values["lower"] / 1000.0,
         GetMaxValue=lambda: values["upper"] / 1000.0,
     )
-    dimension = SimpleNamespace(SystemValue=values["leg"] / 1000.0, Tolerance=tolerance)
+    dimension = SimpleNamespace(
+        FullName=values["full_name"],
+        GetType=lambda: values["dimension_type"],
+        SystemValue=values["leg"] / 1000.0,
+        Tolerance=tolerance,
+    )
     display = SimpleNamespace(GetDimension2=lambda _: dimension)
     annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
@@ -478,96 +491,286 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
             drawing._assert_chamfer_limits(annotation)
 
 
-def test_bore_rear_chamfer_callout_names_front_view_face_and_mate() -> None:
+def test_bore_rear_chamfer_callout_names_front_view_face_mate_and_intent() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
-    assert "X 45 DEG" in rows
-    assert "FAR SIDE" in rows
-    assert "MHA-DT-31" in rows
-    assert "HUB SIDE" in rows
+    assert rows == ["X 45 DEG", "FAR SIDE", "HUB SIDE", "PRESS", "LEAD-IN"]
+    # The primary native callout names the mate and fit on this SAME bore;
+    # repeating its long Number on the chamfer would consume border air.
+    assert "MHA-DT-31" in drawing.DIMENSION_CALLOUTS["HubSeatDia"]
+    assert "LIGHT PRESS" in drawing.DIMENSION_CALLOUTS["HubSeatDia"]
+    assert "MHA-DT-31" not in notes.BORE_REAR_CHAMFER_CALLOUT
+    # The angle remains the approved native-dimension suffix. Neither the
+    # controlling leg nor either LIMIT value is duplicated as typed prose.
+    assert "0.25" not in notes.BORE_REAR_CHAMFER_CALLOUT
+    assert "0.10" not in notes.BORE_REAR_CHAMFER_CALLOUT
     assert "INBOARD" not in notes.BORE_REAR_CHAMFER_CALLOUT
-    assert "CLEARS HUB" not in notes.BORE_REAR_CHAMFER_CALLOUT
-    assert len(rows) == 4
-    assert all(len(row) <= 10 for row in rows)
-    # This dimension intentionally grows right; its upright is on the left.
-    last_row = notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()[-1]
-    assert last_row.startswith("  ")
-    assert last_row == last_row.rstrip()
+    assert all(len(row) <= 8 for row in rows)
 
 
-def test_section_a_a_and_all_chamfer_rows_clear_caption_and_title_block() -> None:
-    row_pitch = 0.0055563  # native sol5/sol6 callout row pitch
-    sx, sy = drawing.SECTION_CENTER
-    k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
-    half_w = (spec.HALF_WIDTH - spec.HUB_SEAT_DIA / 2.0) / 2.0 * k  # cheek across
-    half_h = spec.ARM_THICKNESS / 2.0 * k  # axial thickness vertical
-    # Boxes from the last layout audit (asm-drawings 20261019T024444355Z).
-    side_view_right = 0.3136
-    iso_note_bottom = 0.1806
-    title_block_top = 0.0647
-    border_right = 0.4318 - 0.0127
-    assert sx - half_w > side_view_right + 0.02
-    assert sy + half_h < iso_note_bottom - 0.01
-    tx, ty = drawing.SECTION_KEEP["BoreRearChamferSize"]
-    # Native text flips right of the cheek. Measured compact rows, rather
-    # than translating the old left-growing block, fit entirely in this lane.
-    width = drawing.CHAMFER_CALLOUT_WIDTH
-    # Prior native outline is the lane budget, not proof of the new partial
-    # section's rendered extent; the farm layout audit must read that back.
-    section_outline_right = 0.380788
-    assert tx - section_outline_right >= 0.0035
-    assert border_right - (tx + width) >= 0.0035
-    assert sy - half_h - (ty + row_pitch) > row_pitch
-    # The native second-row baseline is 10.0819 mm below ty; every additional
-    # printed row consumes one native row pitch, including the new HUB SIDE.
-    rows = notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()
-    block_bottom = ty - 0.0100819 - (len(rows) - 2) * row_pitch
-    _cx, cy = drawing.SECTION_CAPTION_XY
-    assert block_bottom - (cy + 0.0002385) >= 0.0035
-    assert cy - 2.0 * row_pitch > title_block_top
-
-
-def test_partial_section_line_crosses_only_the_negative_x_bore_wall_in_xz() -> None:
-    # Horizontal at model Y=0 retains the native chamfer's XZ annotation plane.
-    # The cut starts outside the OD and stops inside the bore, before its axis.
-    (x0, y0), (x1, y1) = drawing.SECTION_LINE
-    outer = drawing._sheet_x(-spec.HALF_WIDTH)
-    bore_wall = drawing._sheet_x(-spec.HUB_SEAT_DIA / 2.0)
-    assert y0 == y1 == drawing.BORE_CENTER[1]
-    assert x0 < outer < bore_wall < x1 < drawing.BORE_CENTER[0]
-    assert outer - x0 == pytest.approx(0.005)
-    assert x1 - bore_wall == pytest.approx(0.002)
-    # Native armfix1 A text ran 2.94 mm right of its endpoint and struck the
-    # overall's witness line at the OD extreme. Retain at least 1 mm of air.
-    assert outer - (x0 + 0.00294) >= 0.001
-    ax, ay, az = drawing.SECTION_ANCHOR_MM
-    assert -spec.HALF_WIDTH < ax < -spec.HUB_SEAT_DIA / 2.0
-    assert ay == 0.0
-    assert 0.0 < az < spec.ARM_THICKNESS
-    assert drawing.SECTION_SCALE == (4, 1)
-    assert not hasattr(drawing, "SECTION_CROP_MODEL_MM")
+def _native_chamfer(**changed):
+    tolerance = SimpleNamespace(
+        Type=spec.BORE_REAR_CHAMFER_TOL_TYPE,
+        GetMinValue=lambda: spec.BORE_REAR_CHAMFER_DEVIATIONS[0] / 1000.0,
+        GetMaxValue=lambda: spec.BORE_REAR_CHAMFER_DEVIATIONS[1] / 1000.0,
+    )
+    dimension = SimpleNamespace(
+        Name="BoreRearChamferSize",
+        FullName="BoreRearChamferSize@BoreRearChamfer@dt-crank-arm.SLDPRT",
+        GetType=lambda: 0,
+        SystemValue=spec.BORE_REAR_CHAMFER / 1000.0,
+        Tolerance=tolerance,
+    )
+    display = SimpleNamespace(
+        GetDimension=lambda: dimension,
+        GetDimension2=lambda _: dimension,
+        GetOverride=lambda: changed.get("override", False),
+        ShowDimensionValue=changed.get("show_value", True),
+        IsReferenceDim=lambda: changed.get("reference", False),
+        GetPrimaryTolPrecision2=lambda: changed.get("precision", 2),
+        GetText=lambda _: changed.get("text", notes.BORE_REAR_CHAMFER_CALLOUT),
+        OffsetText=changed.get("offset", True),
+    )
+    def parameter(name):
+        assert name == "BoreRearChamferSize@BoreRearChamfer"
+        return changed.get("source_dimension", dimension)
+    front = SimpleNamespace(ReferencedDocument=SimpleNamespace(Parameter=parameter))
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display,
+        GetType=lambda: changed.get("annotation_type", 4),
+        Visible=changed.get("visible", 1),
+        OwnerType=changed.get("owner_type", 0),
+        Owner=changed.get("owner", front),
+        IsDangling=lambda: changed.get("dangling", False),
+        position=changed.get("position", (*drawing.FRONT_KEEP["BoreRearChamferSize"], 0.0)),
+    )
+    def set_position(x, y, z):
+        annotation.position = (x, y, z)
+        return True
+    annotation.SetPosition2 = set_position
+    annotation.GetPosition = lambda: annotation.position
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0),
+        _attempt=lambda fn: fn(),
+        _get_attr_or_call=lambda obj, name: (
+            getattr(obj, name)() if callable(getattr(obj, name)) else getattr(obj, name)
+        ),
+    )
+    return adapter, front, annotation, display
 
 
 @pytest.mark.parametrize(
-    ("partial", "surface_only", "message"),
+    "changed",
     (
-        (True, True, None),
-        (False, True, "partial wall cut"),
-        (None, True, "partial wall cut"),
-        (True, False, "beyond the cutting plane"),
-        (True, None, "beyond the cutting plane"),
+        {"annotation_type": 6},
+        {"visible": 0},
+        {"visible": 2},
+        {"visible": 3},
+        {"owner_type": 1},
+        {"owner": object()},
+        {"dangling": True},
+        {"source_dimension": None},
+        {"source_dimension": object()},
+        {"override": True},
+        {"show_value": False},
+        {"reference": True},
+        {"precision": 1},
+        {"text": "FAR SIDE"},
     ),
 )
-def test_section_rejects_missing_native_partial_or_surface_cut(
-    monkeypatch, partial, surface_only, message
-) -> None:
-    cut = SimpleNamespace(
-        GetPartialSection=lambda: partial,
-        GetDisplayOnlySurfaceCut=lambda: surface_only,
-    )
-    view = SimpleNamespace(GetSection=lambda: cut)
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+def test_front_chamfer_rejects_lost_native_ownership_or_display(changed) -> None:
+    adapter, front, annotation, _display = _native_chamfer(**changed)
+    with pytest.raises(RuntimeError):
+        drawing._assert_front_chamfer(adapter, front, annotation)
+
+
+def test_front_chamfer_offsets_the_actual_model_dimension_without_replacing_it(monkeypatch) -> None:
+    adapter, front, annotation, display = _native_chamfer()
+    positions = []
+    def offset(adapter_arg, annotations, targets):
+        assert adapter_arg is adapter and annotations == [annotation]
+        assert display.OffsetText is False
+        assert annotation.position[:2] == drawing.CHAMFER_MOUTH_XY
+        positions.append(targets)
+        display.OffsetText = True
+        annotation.SetPosition2(*targets["BoreRearChamferSize"], 0.0)
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    drawing._place_front_chamfer(adapter, front, [annotation])
+    drawing._assert_front_chamfer(adapter, front, annotation)
+    assert positions == [{"BoreRearChamferSize": drawing.FRONT_KEEP["BoreRearChamferSize"]}]
+    assert display.GetDimension2(0).SystemValue == spec.BORE_REAR_CHAMFER / 1000.0
+    with pytest.raises(RuntimeError, match="expected one"):
+        drawing._place_front_chamfer(adapter, front, [])
+    with pytest.raises(RuntimeError, match="expected one"):
+        drawing._place_front_chamfer(adapter, front, [annotation, annotation])
+
+
+@pytest.mark.parametrize("refusal", ("offset", "position"))
+def test_front_chamfer_refuses_ignored_native_text_placement(monkeypatch, refusal) -> None:
+    adapter, front, annotation, display = _native_chamfer()
+    def offset(_adapter, _annotations, targets):
+        display.OffsetText = refusal != "offset"
+        if refusal != "position":
+            annotation.SetPosition2(*targets["BoreRearChamferSize"], 0.0)
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    with pytest.raises(RuntimeError, match="offset leader"):
+        drawing._place_front_chamfer(adapter, front, [annotation])
+
+
+def test_chamfer_lane_uses_the_native_proof_and_preserves_other_layout() -> None:
+    # Proof 20261020T042443087Z: border12.7, overall extension44.6,
+    # R12.7 shelf139.2219, fiducial's lowest centre-mark ink152.0392 (mm).
+    left, bottom, right, top = drawing.CHAMFER_TEXT_LANE
+    assert left == pytest.approx(0.0127 + 0.003)
+    assert right == pytest.approx(0.0446 - 0.002)
+    tx, ty = drawing.FRONT_KEEP["BoreRearChamferSize"]
+    # Budget the WHOLE block, not just glyph advance: keep the old block's
+    # measured padding beyond its widest row; the angle is now the widest
+    # row, without its old two spaces. The live ink readback must prove it.
+    width = 0.029864 - 0.0272465 + 0.0245243 - 2.0 * 0.0009443
+    half_height = (2 + len(notes.BORE_REAR_CHAMFER_CALLOUT.splitlines())) * 0.0055563 / 2
+    assert left <= tx - width / 2 < tx + width / 2 <= right
+    assert bottom <= ty - half_height < ty + half_height <= top
+    assert bottom > 0.0702219 + 0.003  # overall DIMENSION line, not its witness
+    assert top < 0.1392219 - 0.003
+    assert drawing.CHAMFER_MOUTH_XY == pytest.approx((0.0506, 0.142))
+    assert drawing.FRONT_KEEP["BossRadius"] == pytest.approx((0.030, 0.148))
+    assert 0.142 + 0.006 - 0.0027781 + 0.0035 + 0.003 < 0.1520392
+    assert drawing.FRONT_CENTER == (0.145, 0.142)
+    assert drawing.RIGHT_CENTER == (0.300, 0.142)
+    assert drawing.ISO_CENTER == (0.360, 0.230)
+
+
+@pytest.mark.parametrize(
+    ("changed", "message"),
+    (
+        ({}, None),
+        ({"offset": False}, "final offset leader"),
+        ({"position": (*drawing.CHAMFER_MOUTH_XY, 0.0)}, "final offset leader"),
+        ({"box": (0.0156, 0.090, 0.041, 0.130)}, "clear lane"),
+        ({"box": (0.016, 0.090, 0.0427, 0.130)}, "clear lane"),
+        ({"box": (0.016, 0.079, 0.041, 0.130)}, "clear lane"),
+        ({"box": (0.016, 0.090, 0.041, 0.136)}, "clear lane"),
+        ({"route": []}, "land on the seat bore"),
+        ({"route": [((0.070, 0.142), (0.041, 0.111))]}, "land on the seat bore"),
+        ({"route": [((0.0446, 0.142), (0.041, 0.111))]}, "land on the seat bore"),
+        ({"cross": "HubSeatDia"}, "existing callouts"),
+        ({"cross": "BossRadius"}, "existing callouts"),
+        ({"cross": "seam"}, "existing callouts"),
+        ({"cross": "fiducial"}, "existing callouts"),
+        ({"text_strike": True}, "existing callouts"),
+    ),
+)
+def test_chamfer_checks_native_ink_landing_and_foreign_callouts(monkeypatch, changed, message) -> None:
+    adapter, front, annotation, _display = _native_chamfer(**changed)
+    seat = SimpleNamespace(name="HubSeatDia")
+    radius = SimpleNamespace(name="BossRadius")
+    others = {
+        "HubSeatDia": [((0.0730572, 0.1611576), (0.0810243, 0.2110826))],
+        "BossRadius": [((0.0227642, 0.1452219), (0.070, 0.142))],
+        "seam": [((0.1034507, 0.2485139), (0.0920442, 0.1450013))],
+        "fiducial": [((0.0499773, 0.190136), (0.0536482, 0.1584534))],
+    }
+    if "cross" in changed:
+        others[changed["cross"]] = [((0.038, 0.134), (0.060, 0.134))]
+    if changed.get("text_strike"):
+        others["seam"] = [((0.020, 0.100), (0.030, 0.100))]
+    route = changed.get("route", [(drawing.CHAMFER_MOUTH_XY, (0.041, 0.111))])
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: (
+        "BoreRearChamferSize" if item is annotation else item.name
+    ))
+    monkeypatch.setattr(drawing, "dimension_segments", lambda item: (
+        route if item is annotation else others[item.name]
+    ))
+    monkeypatch.setattr(drawing, "leader_segments", lambda item: others[item.name])
+    monkeypatch.setattr(drawing, "callout_ink", lambda *_a, **_kw: SimpleNamespace(
+        text=changed.get("box", (0.016, 0.090, 0.041, 0.130))
+    ))
+    attached_notes = {
+        name: SimpleNamespace(GetAnnotation=lambda name=name: SimpleNamespace(name=name))
+        for name in ("seam", "fiducial")
+    }
     if message is None:
-        drawing._assert_cheek_section_display(view)
+        drawing._front_chamfer_clear(adapter, front, [annotation, seat, radius], attached_notes)
     else:
         with pytest.raises(RuntimeError, match=message):
-            drawing._assert_cheek_section_display(view)
+            drawing._front_chamfer_clear(adapter, front, [annotation, seat, radius], attached_notes)
+
+
+def test_build_imports_chamfer_only_into_front_and_creates_no_cut_view(monkeypatch) -> None:
+    views, curated, hlr, hlv, text = [], [], [], [], []
+    adapter = SimpleNamespace(currentModel=object())
+    async def open_model(_path):
+        return None
+    adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "SOURCE", SimpleNamespace(is_file=lambda: True))
+    monkeypatch.setattr(drawing, "check", lambda *_a: None)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (object(), object()))
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_a: None)
+    def place(_adapter, _source, orientation, *xy, **_kw):
+        view = SimpleNamespace(orientation=orientation, xy=xy, mode=None,
+                               UpdateViewDisplayGeometry=lambda: None)
+        views.append(view)
+        return view
+    def curate(_adapter, view, *, keep, dimensions_by_feature, **_kw):
+        assert dimensions_by_feature is spec.DRAWING_DIMENSIONS
+        assert view.mode == (1 if view.orientation == "*Front" else 2)
+        if view.orientation == "*Front":
+            assert hlv == [view]  # HLV before native model-item import
+        curated.append((view.orientation, set(keep)))
+        return [SimpleNamespace(name=name) for name in keep]
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    def hidden_removed(_adapter, view):
+        view.mode = 2
+        hlr.append(view)
+    def hidden_visible(_adapter, view):
+        view.mode = 1
+        hlv.append(view)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", hidden_removed)
+    monkeypatch.setattr(drawing, "set_hidden_lines_visible", hidden_visible)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", lambda _a, annotations, rows: (
+        text.append((set(item.name for item in annotations), rows))
+    ))
+    for name in (
+        "assert_imported_precision", "set_reference_dimension", "_hub_seat_leader_clear",
+        "_texts_off_the_part", "_omit_title_block_thread_class", "_append_callout_rows",
+        "set_arc_endpoints_to_max", "_set_reference_precision", "add_property_linked_note",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    placed = []
+    monkeypatch.setattr(drawing, "_place_front_chamfer", lambda _a, view, annotations: (
+        placed.append((view, annotations))
+    ))
+    checked = []
+    monkeypatch.setattr(drawing, "_front_chamfer_clear", lambda _a, view, annotations, notes: (
+        checked.append((view, annotations, set(notes), view.mode, len(hlv)))
+    ))
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_a, **_kw: True)
+    monkeypatch.setattr(drawing, "add_native_hole_callout", lambda *_a, **_kw: object())
+    monkeypatch.setattr(drawing, "add_attached_note", lambda *_a, **_kw: object())
+    monkeypatch.setattr(drawing, "add_edge_dimension", lambda *_a, **_kw: (
+        SimpleNamespace(GetAnnotation=lambda: object())
+    ))
+    async def finalize(*_a, **_kw):
+        return {"drawing": "complete"}
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    assert asyncio.run(drawing.build(adapter)) == {"drawing": "complete"}
+    assert [view.orientation for view in views] == ["*Front", "*Right", "*Isometric"]
+    assert hlr == views  # retain the isometric in the HLR loop
+    assert hlv == [views[0], views[0]]  # reassert after the last annotation
+    assert [view.mode for view in views] == [1, 2, 2]
+    assert curated == [("*Front", set(drawing.FRONT_KEEP)), ("*Right", {"Depth"})]
+    assert placed[0][0] is checked[0][0] is views[0]
+    assert placed[0][1] is checked[0][1]
+    assert checked[0][2] == {"seam", "fiducial"}
+    assert checked[0][3:] == (1, 2)  # native guards follow the final HLV regen
+    assert text == [(set().union(*spec.DRAWING_DIMENSIONS.values()), drawing.DIMENSION_CALLOUTS)]
+    # Reject residual A-A labels/captions/cut annotations in executable source,
+    # without coupling the contract to any deleted helper/constant's name.
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert not any(
+        isinstance(node, ast.Constant) and isinstance(node.value, str) and "A-A" in node.value
+        for node in ast.walk(tree)
+    )

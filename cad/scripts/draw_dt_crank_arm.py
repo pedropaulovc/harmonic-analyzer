@@ -4,9 +4,9 @@ Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
 to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
-depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Partial
-XZ section A-A cuts only the seat's -X wall and shows the far-side mouth
-chamfer on the MHA-DT-31 hub side, clearing its seat-root radius.
+depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  The
+principal view carries the native far-side bore-mouth chamfer dimension,
+identifying the MHA-DT-31 hub side and its press lead-in.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -26,16 +26,15 @@ import re
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
-    curate_dimensions,
     dimension_name,
     place_view,
 )
 
 from _check import check
 from _com import _early_bound
+from _drawing_annotation_extent import callout_ink
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -46,6 +45,7 @@ from _drawing_common import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
@@ -58,19 +58,20 @@ from _drawing_leaders import (
     assert_leaders_clear,
     dimension_segments,
     dimension_text_points,
+    distance_to_box,
+    landing_distance,
+    leader_segments,
     points_inside,
+    segments_cross,
     set_near_side_diameter,
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import model_point_in_view
-from _drawing_sections import create_section_view
-from _drawing_view_display import set_hidden_lines_removed
+from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _section_axis import position_section_caption
 import _telemetry
 from dt_crank_arm_notes import (
     BORE_REAR_CHAMFER_CALLOUT,
@@ -85,7 +86,6 @@ from dt_crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
-    ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
     BORE_REAR_CHAMFER,
@@ -205,11 +205,14 @@ FRONT_KEEP = {
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "Width": (0.279, FRONT_CENTER[1]),
-    "BossRadius": (0.030, FRONT_CENTER[1]),
+    # Six millimetres above the old shelf: its native centre-to-arc line
+    # otherwise crosses the new lower-left bore-mouth callout leader.
+    "BossRadius": (0.030, FRONT_CENTER[1] + 0.006),
     # Below and right of the handle end, clear of the Width row and the
     # 75.0 station row; its leader lands on the lower-right quarter of the arc.
     "EndRadius": (0.268, 0.100),
     "HubSeatDia": (0.048, 0.225),
+    "BoreRearChamferSize": (0.02865, 0.111),
 }
 # The hub seat's leader lands on the near rim, upper left of the bore: at
 # 0.054 with both arrows it ran down through the bore centre to the far
@@ -258,33 +261,15 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 
-# The short horizontal cut crosses only the -X bore wall in the XZ plane
-# containing the chamfer's native model dimension. The prior partial YZ cut
-# used the wrong annotation plane. Keep native radial X across / axial Z
-# vertical, with a genuine partial section rather than a full-cut crop.
-SECTION_SCALE = (4, 1)
-# Armfix1 measured the left A glyph ending 2.94 mm right of its endpoint.
-# Extend that end into air so it clears the overall's outer witness line;
-# the right end stays 1 mm into the bore at the front view's 2:1 scale.
-SECTION_LINE_LEFT_OVERRUN = 0.005
-SECTION_LINE_RIGHT_OVERRUN = 0.002
-SECTION_LINE = (
-    (_sheet_x(-HALF_WIDTH) - SECTION_LINE_LEFT_OVERRUN, BORE_CENTER[1]),
-    (_sheet_x(-HUB_SEAT_DIA / 2.0) + SECTION_LINE_RIGHT_OVERRUN, BORE_CENTER[1]),
-)
-SECTION_CENTER = (0.368, 0.150)
-SECTION_ANCHOR_MM = (
-    -(HUB_SEAT_DIA / 2.0 + HALF_WIDTH) / 2.0,
-    0.0,
-    ARM_THICKNESS / 2.0,
-)
-# Sol6 proved that the native block flips to the RIGHT outside the cheek.
-# Compact rows measured from the actual Century Gothic PDF glyphs need at
-# most 29.864 mm including padding. At x=385 this leaves 4.236 mm to the inner
-# border and 4.212 mm to the section's audited outline; neither side is guessed.
-CHAMFER_CALLOUT_WIDTH = 0.029864
-SECTION_KEEP = {"BoreRearChamferSize": (0.385, 0.118)}
-SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.091)
+# Native proof 20261020T042443087Z: the overall's left extension is x44.6,
+# R12.7's old shelf y139.22, and the inner border x12.7 (all sheet mm).
+# The old 29.864-mm whole block includes padding beyond its 27.2465-mm
+# widest row. Keeping that padding, the now-longest angle row (24.5243 mm
+# less two 0.9443-mm spaces) budgets 25.2532 mm: over 3 mm air on both sides
+# at x28.65. Seven printed rows at 5.5563 mm pitch stay below R12.7.
+# Crossing the overall's EXTENSION with the leader is conventional (rule 14).
+CHAMFER_TEXT_LANE = (0.0157, 0.080, _sheet_x(-HALF_WIDTH) - 0.002, 0.135)
+CHAMFER_MOUTH_XY = (_sheet_x(-HUB_SEAT_DIA / 2.0), FRONT_CENTER[1])
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,
     "BoreRearChamferSize": BORE_REAR_CHAMFER_CALLOUT,
@@ -299,10 +284,16 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
 
 
 def _assert_chamfer_limits(annotation: Any) -> None:
-    """Verify the saved part's native limits after importing into the section."""
+    """Verify the saved part's native leg and limits, never rewrite them."""
     native = _early_bound(annotation, "IAnnotation")
     display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    if (
+        str(dimension.FullName or "").split("@")[:2]
+        != ["BoreRearChamferSize", "BoreRearChamfer"]
+        or int(dimension.GetType()) != 0  # swDimensionParamTypeDoubleLinear
+    ):
+        raise RuntimeError("imported bore-mouth chamfer has the wrong model identity/type")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     if not math.isclose(
         float(dimension.SystemValue) * 1000.0, BORE_REAR_CHAMFER, abs_tol=1e-7
@@ -317,82 +308,112 @@ def _assert_chamfer_limits(annotation: Any) -> None:
         raise RuntimeError("imported bore-mouth chamfer lost its native LIMIT band")
 
 
-def _assert_cheek_section_display(section: Any) -> None:
-    """Require the native short-span cut, not a full cut with a cropped outline."""
-    native = _early_bound(section, "IView")
-    cut = _early_bound(native.GetSection(), "IDrSection")
-    if cut.GetPartialSection() is not True:
-        raise RuntimeError("section A-A did not retain its partial wall cut")
-    if cut.GetDisplayOnlySurfaceCut() is not True:
-        raise RuntimeError("section A-A retained geometry beyond the cutting plane")
+def _assert_front_chamfer(adapter: Any, front: Any, annotation: Any) -> None:
+    """Require the actual part dimension, visible and owned by the plan view."""
+    native = _early_bound(annotation, "IAnnotation")
+    view = _early_bound(front, "IView")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    if (
+        int(native.GetType()) != 4  # swDisplayDimension
+        or int(native.Visible) != 1  # swAnnotationVisible
+        or int(native.OwnerType) != 0  # swAnnotationOwner_DrawingView
+        or int(app.IsSame(native.Owner, view)) != 1  # swObjectSame
+        or native.IsDangling()
+    ):
+        raise RuntimeError("bore-mouth chamfer is not visible and attached in the front view")
+    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    source = _early_bound(view.ReferencedDocument, "IModelDoc2")
+    expected = source.Parameter("BoreRearChamferSize@BoreRearChamfer")
+    if expected is None or int(app.IsSame(dimension, expected)) != 1:
+        raise RuntimeError("bore-mouth chamfer is not the source model dimension")
+    _assert_chamfer_limits(native)
+    if (
+        display.GetOverride() is not False
+        or display.ShowDimensionValue is not True
+        or display.IsReferenceDim() is not False
+        or int(display.GetPrimaryTolPrecision2())
+        != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
+        or str(display.GetText(4) or "") != BORE_REAR_CHAMFER_CALLOUT
+    ):
+        raise RuntimeError("bore-mouth chamfer lost its native value, LIMIT precision or callout")
 
 
-def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
-    return tuple(value / 1000.0 for value in point_mm)
+def _place_front_chamfer(adapter: Any, front: Any, annotations: list[Any]) -> None:
+    """Offset the imported leg's text, retaining its native bore attachment.
 
-
-def _cheek_section(adapter: Any, front: Any) -> Any:
-    """Create a partial XZ wall cut for the native chamfer dimension."""
-    section = create_section_view(
-        adapter,
-        front,
-        line_start=SECTION_LINE[0],
-        line_end=SECTION_LINE[1],
-        view_xy=SECTION_CENTER,
-        section_label="A",
-        scale=SECTION_SCALE,
-        partial=True,
-        label="hub seat cheek section",
+    This is rocker-arm support's RimChamferSize pattern: OffsetText keeps the
+    model dimension and its witnesses, unlike a new note or AddChamferDim.
+    InsertModelAnnotations3 is view-targeted but does not promise that a
+    non-parallel annotation plane will import; curation must refuse if absent.
+    """
+    annotation = _early_bound(
+        _named(adapter, annotations, "BoreRearChamferSize"), "IAnnotation"
     )
-    native = _early_bound(section, "IView")
-    cut = _early_bound(native.GetSection(), "IDrSection")
-    cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="section A-A cut face only")
-    _assert_cheek_section_display(native)
-    set_hidden_lines_removed(adapter, native)
-    return native
+    _assert_front_chamfer(adapter, front, annotation)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.OffsetText = False
+    if bool(display.OffsetText) or not annotation.SetPosition2(*CHAMFER_MOUTH_XY, 0.0):
+        raise RuntimeError("failed to place the native bore-mouth dimension line")
+    offset_dimension_text(
+        adapter, [annotation], {"BoreRearChamferSize": FRONT_KEEP["BoreRearChamferSize"]}
+    )
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if (
+        not bool(display.OffsetText)
+        or len(position) != 3
+        or not all(math.isfinite(value) for value in position)
+        or math.dist(position[:2], FRONT_KEEP["BoreRearChamferSize"]) > 1e-5
+    ):
+        raise RuntimeError("native bore-mouth chamfer text did not stay on its offset leader")
 
 
-def _position_cheek_section(adapter: Any, section: Any) -> None:
-    """Centre the wall's native projected anchor and retain its XZ orientation."""
-    native = _early_bound(section, "IView")
-    anchor = _metres(SECTION_ANCHOR_MM)
-    origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
-    radial = model_point_in_view(
-        adapter,
-        native,
-        _metres((SECTION_ANCHOR_MM[0] + 1.0, 0.0, SECTION_ANCHOR_MM[2])),
-        label="A-A radial X",
-    )
-    axial = model_point_in_view(
-        adapter,
-        native,
-        _metres((SECTION_ANCHOR_MM[0], 0.0, SECTION_ANCHOR_MM[2] + 1.0)),
-        label="A-A axial Z",
-    )
-    if abs(radial[1] - origin[1]) > 1e-7 or abs(axial[0] - origin[0]) > 1e-7:
-        raise RuntimeError("cheek section is not radial-across, axial-vertical")
-    for attempt in range(4):
-        native.UpdateViewDisplayGeometry()
-        projected = model_point_in_view(
-            adapter, native, anchor, label=f"A-A centre, pass {attempt}"
-        )
-        if math.dist(projected, SECTION_CENTER) <= 1e-4:
-            break
-        position = tuple(float(value) for value in native.Position)
-        moved = [
-            position[axis] + SECTION_CENTER[axis] - projected[axis] for axis in (0, 1)
-        ]
-        if not native.SetViewPosition(double_array(moved), False):
-            raise RuntimeError("failed to re-centre section A-A")
-        rebuild_drawing(adapter, label=f"section A-A re-centred, pass {attempt}")
-    else:
-        raise RuntimeError(
-            f"section A-A centre stands at {projected}, not {SECTION_CENTER}"
-        )
-    position_section_caption(
-        adapter, native, SECTION_CAPTION_XY, label="cheek section A-A"
-    )
+def _front_chamfer_clear(
+    adapter: Any, front: Any, annotations: list[Any], notes: dict[str, Any]
+) -> None:
+    """Read the complete native block and route, not just the requested anchor."""
+    annotation = _named(adapter, annotations, "BoreRearChamferSize")
+    _assert_front_chamfer(adapter, front, annotation)
+    native = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
+    position = tuple(float(value) for value in (native.GetPosition() or ()))
+    if (
+        not bool(display.OffsetText)
+        or len(position) != 3
+        or not all(math.isfinite(value) for value in position)
+        or math.dist(position[:2], FRONT_KEEP["BoreRearChamferSize"]) > 1e-5
+    ):
+        raise RuntimeError("native bore-mouth chamfer lost its final offset leader position")
+    ink = callout_ink(adapter, annotation, label="far-side bore-mouth chamfer")
+    x0, y0, x1, y1 = ink.text
+    left, bottom, right, top = CHAMFER_TEXT_LANE
+    if not all(math.isfinite(value) for value in ink.text) or not (
+        left <= x0 < x1 <= right and bottom <= y0 < y1 <= top
+    ):
+        raise RuntimeError(f"bore-mouth chamfer text leaves its clear lane: {ink.text}")
+    chamfer = dimension_segments(annotation)
+    others = {
+        name: dimension_segments(_named(adapter, annotations, name))
+        for name in ("HubSeatDia", "BossRadius")
+    }
+    others.update({
+        name: leader_segments(_early_bound(note, "INote").GetAnnotation())
+        for name, note in notes.items()
+    })
+    # Native witnesses end on the bore mouth. This radial band allows the
+    # normal dimension-line/text gap but rejects a centre/OD/wrong-space route.
+    radius = HUB_SEAT_DIA * SHEET_SCALE[0] / 2000.0
+    if not chamfer or not radius - 0.001 <= landing_distance(chamfer, BORE_CENTER) <= radius + 0.001:
+        raise RuntimeError("native bore-mouth chamfer leader does not land on the seat bore")
+    collisions = [
+        name for name, segments in others.items()
+        if not segments or any(
+            segments_cross(first, second)
+            for first in chamfer for second in segments
+        ) or any(distance_to_box(segment, ink.text) < 0.002 for segment in segments)
+    ]
+    if collisions:
+        raise RuntimeError(f"bore-mouth chamfer crowds existing callouts: {collisions}")
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -478,6 +499,10 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    # The far-mouth chamfer is the plan's informative hidden feature. Show it
+    # before importing; right and isometric stay in the HLR loop above.
+    set_hidden_lines_visible(adapter, front)
+    _early_bound(front, "IView").UpdateViewDisplayGeometry()
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -494,29 +519,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    section = _cheek_section(adapter, front)
-    section_annotations = curate_view_dimensions(
-        adapter,
-        section,
-        keep=SECTION_KEEP,
-        view_label="section A-A",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _position_cheek_section(adapter, section)
-    section_annotations = curate_dimensions(
-        adapter, section_annotations, reposition=SECTION_KEEP
-    )
-    if any(
-        int(_early_bound(item, "IAnnotation").Visible) != 1
-        for item in section_annotations
-    ):
-        raise RuntimeError("cheek section hid its native chamfer dimension")
-    _assert_chamfer_limits(_named(adapter, section_annotations, "BoreRearChamferSize"))
-    imported_annotations = [
-        *front_annotations,
-        *right_annotations,
-        *section_annotations,
-    ]
+    imported_annotations = [*front_annotations, *right_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
     # is a one-place .X size: MHA-DT-31 is turned to suit it.
@@ -527,6 +530,7 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
         )
     _hub_seat_leader_clear(adapter, front_annotations)
+    _place_front_chamfer(adapter, front, front_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -579,7 +583,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # MHA-DT-VN-59's axial seam is match-drilled in the assembled arm and hub; its
     # callout names the mate, the fit and the pin's nominal size and depth.
-    add_attached_note(
+    seam_note = add_attached_note(
         adapter,
         front,
         text=SEAM_CALLOUT,
@@ -589,7 +593,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The punched fiducial is flagged at the mark itself, from the clear
     # band above the boss end.
-    add_attached_note(
+    fiducial_note = add_attached_note(
         adapter,
         front,
         text=FIDUCIAL_CALLOUT,
@@ -613,6 +617,13 @@ async def build(adapter: Any) -> dict[str, str]:
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
+    # Annotation insertion can leave an HLV edge set unregenerated even when
+    # its mode reads correctly. Toggle after the last annotation/rebuild,
+    # then read back the native chamfer's owner, limits, visibility and ink.
+    set_hidden_lines_visible(adapter, front)
+    _front_chamfer_clear(
+        adapter, front, front_annotations, {"seam": seam_note, "fiducial": fiducial_note}
+    )
 
     return await finalize_drawing(
         adapter,
