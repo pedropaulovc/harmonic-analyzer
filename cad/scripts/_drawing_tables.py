@@ -7,9 +7,10 @@ drawings without tables stay independent.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from math import isfinite
 from pathlib import Path
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Iterator, Literal, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
@@ -912,6 +913,187 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
         raise RuntimeError(f"{label} BOM physical column census read failed") from error
 
 
+def _annotate_bom_quantity_boundary(
+    table: Any,
+    *,
+    configuration: str,
+    stage: str,
+    watched: set[tuple[str, str]],
+    outcome: dict[str, str],
+) -> None:
+    """Observe native quantity cells around existing mutations, never repair them."""
+    from _component_references import component_identity
+
+    def read(call: Callable[[], Any]) -> dict[str, Any]:
+        try:
+            value = repr(call())
+            return {"value": value[:160], "truncated": len(value) > 160}
+        except Exception as error:
+            return {"error": f"{type(error).__name__}: {error}"[:160]}
+
+    try:
+        annotation = _sw_type_info.early_bound_or_flag(
+            table, "IBomTableAnnotation", "GetComponents2", "GetColumnCustomProperty"
+        )
+        rows = int(table.RowCount)
+        total_columns = int(table.TotalColumnCount)
+        column_indices = tuple(range(min(total_columns, 8)))
+        quantities: list[int] = []
+        columns = []
+        for column in column_indices:
+            try:
+                kind, _property_data, status = table.GetColumnType3(column, True)
+                if kind == 203 and status == 0:
+                    quantities.append(column)
+            except Exception:
+                pass  # Other accessors retain independent column evidence.
+            columns.append(
+                {
+                    "index": column,
+                    "type": read(lambda: table.GetColumnType3(column, True)),
+                    "title": read(lambda: table.GetColumnTitle2(column, True)),
+                    "hidden": read(lambda: table.ColumnHidden(column)),
+                    "property": read(
+                        lambda: annotation.GetColumnCustomProperty(column)
+                    ),
+                }
+            )
+        native_rows = []
+        for row in range(1, min(rows, 65)):
+            detail: dict[str, Any] = {
+                "row": row,
+                "quantity": [
+                    {
+                        "column": column,
+                        "text": read(lambda: table.Text2(row, column, True)),
+                        "displayed": read(
+                            lambda: table.DisplayedText2(row, column, True)
+                        ),
+                    }
+                    for column in quantities
+                ],
+            }
+            native_rows.append(detail)
+            try:
+                components = tuple(annotation.GetComponents2(row, configuration) or ())
+                detail["component_count"] = len(components)
+                identities: dict[tuple[str, str], int] = {}
+                selected: set[tuple[str, str]] = set()
+                for raw in components[:128]:
+                    component = _early_bound(raw, "IComponent2")
+                    selected.add(component_identity(component))
+                    key = (
+                        str(component.GetPathName() or ""),
+                        str(component.ReferencedConfiguration or ""),
+                    )
+                    identities[key] = identities.get(key, 0) + 1
+                detail["members"] = [
+                    [path[-128:], member[:64], count]
+                    for (path, member), count in sorted(identities.items())[:8]
+                ]
+                detail["members_truncated"] = (
+                    len(components) > 128
+                    or len(identities) > 8
+                    or any(
+                        len(path) > 128 or len(member) > 64
+                        for path, member in identities
+                    )
+                )
+                detail["watched"] = bool(selected & watched)
+            except Exception as error:
+                detail["member_error"] = f"{type(error).__name__}: {error}"[:160]
+        controls = [
+            detail["row"]
+            for detail in native_rows
+            if not detail.get("watched") and "member_error" not in detail
+        ][:2]
+        for detail in native_rows:
+            if not detail.get("watched") and detail["row"] not in controls:
+                detail.pop("members", None)
+        full_rows = []
+        for detail in sorted(
+            native_rows,
+            key=lambda detail: (
+                not bool(detail.get("watched")),
+                "member_error" not in detail,
+            ),
+        ):
+            if (
+                not detail.get("watched")
+                and "member_error" not in detail
+                and detail["row"] not in controls
+            ):
+                continue
+            if len(full_rows) >= 8:
+                break
+            row = detail["row"]
+            full_rows.append(
+                {
+                    "row": row,
+                    "watched": bool(detail.get("watched")),
+                    "hidden": read(lambda: table.RowHidden(row)),
+                    "cells": [
+                        {
+                            "column": column,
+                            "text": read(lambda: table.Text2(row, column, True)),
+                            "displayed": read(
+                                lambda: table.DisplayedText2(row, column, True)
+                            ),
+                        }
+                        for column in column_indices
+                    ],
+                }
+            )
+        try:
+            feature = _sw_type_info.early_bound_or_flag(
+                annotation.BomFeature, "IBomFeature", "PartConfigurationGrouping"
+            )
+            feature_metadata = {
+                "grouping": read(lambda: feature.PartConfigurationGrouping),
+                "configurations": read(lambda: feature.GetConfigurations(False, None)),
+            }
+        except Exception as error:
+            feature_metadata = {
+                "feature_error": f"{type(error).__name__}: {error}"[:160]
+            }
+        summary = {
+            "stage": stage,
+            "outcome": outcome,
+            "configuration": configuration,
+            "rows": rows,
+            "total_rows": read(lambda: table.TotalRowCount),
+            "visible_columns": read(lambda: table.ColumnCount),
+            "declared_columns": total_columns,
+            **feature_metadata,
+            "watched_members": [
+                [stem[:64], member[:32]] for stem, member in sorted(watched)[:8]
+            ],
+            "columns": columns,
+            "native_rows": native_rows,
+            "full_rows": full_rows,
+            "controls": controls,
+            "caps": {
+                "rows": rows > 65,
+                "columns": total_columns > 8,
+                "watched_members": len(watched) > 8,
+                "full_rows": sum(
+                    bool(detail.get("watched"))
+                    or "member_error" in detail
+                    or detail["row"] in controls
+                    for detail in native_rows
+                )
+                > 8,
+            },
+        }
+        payload = json.dumps(summary, separators=(",", ":"))
+        try:
+            _telemetry.info("drawing.bom_quantity_boundary " + payload)
+        finally:
+            _telemetry.annotate(**{f"number_quantity_{stage}": payload})
+    except Exception:
+        pass  # Observational evidence cannot replace the strict native proof.
+
+
 def _bind_bom_number_property(
     adapter: Any,
     table: Any,
@@ -940,6 +1122,32 @@ def _bind_bom_number_property(
         stage="before",
         grouped_components=None,
     )
+
+    def checkpoint(stage: str, outcome: dict[str, str]) -> None:
+        if grouped_components:
+            try:
+                _annotate_bom_quantity_boundary(
+                    table,
+                    configuration=configuration,
+                    stage=stage,
+                    watched=set(grouped_components),
+                    outcome=outcome,
+                )
+            except Exception:
+                pass  # A failed observation cannot mask the mutator's exception.
+
+    @contextmanager
+    def observe_mutation(stage: str) -> Iterator[dict[str, str]]:
+        outcome: dict[str, str] = {}
+        try:
+            yield outcome
+        except Exception as error:
+            outcome["error"] = f"{type(error).__name__}: {error}"[:160]
+            raise
+        finally:
+            checkpoint(stage, outcome)
+
+    checkpoint("before_mutations", {})
     visible_columns = int(table.ColumnCount)
     try:
         physical = _bom_physical_columns(table, label=label)
@@ -955,20 +1163,26 @@ def _bind_bom_number_property(
         native_column = len(physical) - 1
         moved = physical[:column] + physical[column + 1 :] + (physical[column],)
         if column != native_column:
-            if not table.MoveColumn(
-                column,
-                3,
-                native_column,  # swTableItemInsertPosition_After
-            ):
+            with observe_mutation("after_move_native") as outcome:
+                result = table.MoveColumn(
+                    column,
+                    3,
+                    native_column,  # swTableItemInsertPosition_After
+                )
+                outcome["return"] = repr(result)[:160]
+            if not result:
                 raise RuntimeError(f"{label} BOM native column could not be moved")
             if _bom_physical_columns(table, label=label) != moved:
                 raise RuntimeError(f"{label} BOM column sequence changed during move")
-        if not table.InsertColumn2(
-            2,
-            column,
-            "PART NUMBER",
-            0,  # Before; swInsertColumn_DefaultWidth
-        ):
+        with observe_mutation("after_insert_custom") as outcome:
+            result = table.InsertColumn2(
+                2,
+                column,
+                "PART NUMBER",
+                0,  # Before; swInsertColumn_DefaultWidth
+            )
+            outcome["return"] = repr(result)[:160]
+        if not result:
             raise RuntimeError(f"{label} BOM Number column could not be inserted")
         inserted = _bom_physical_columns(table, label=label)
         if (
@@ -978,18 +1192,21 @@ def _bind_bom_number_property(
         ):
             raise RuntimeError(f"{label} BOM column sequence changed during insertion")
         native_column = len(inserted) - 1
-        table.SetColumnHidden(native_column, True)  # Indexed property; VT_VOID.
+        with observe_mutation("after_hide_native") as outcome:
+            result = table.SetColumnHidden(native_column, True)  # VT_VOID.
+            outcome["return"] = repr(result)[:160]
         retained = inserted[:-1] + ((201, True),)
         if _bom_physical_columns(table, label=label) != retained:
             raise RuntimeError(f"{label} BOM retained native column is not hidden")
-        status = int(
-            table.SetColumnType3(
+        with observe_mutation("after_bind_Number") as outcome:
+            result = table.SetColumnType3(
                 column,
                 204,
                 True,
                 "Number",  # swBomTableColumnType_CustomProperty
             )
-        )
+            outcome["return"] = repr(result)[:160]
+        status = int(result)
         if status != 0:  # swColumnTypeStatus_Success
             raise RuntimeError(f"{label} BOM Number column type failed: {status}")
         # SetColumnType3 already binds its PropertyData; do not rebind the column.
@@ -998,9 +1215,14 @@ def _bind_bom_number_property(
         )
         if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
             raise RuntimeError(f"{label} BOM Number property binding did not persist")
-        if not table.SetColumnTitle2(column, "PART NUMBER", True):
+        with observe_mutation("after_set_Number_title") as outcome:
+            result = table.SetColumnTitle2(column, "PART NUMBER", True)
+            outcome["return"] = repr(result)[:160]
+        if not result:
             raise RuntimeError(f"{label} BOM PART NUMBER header could not be restored")
-        rebuild_drawing(adapter, label="bind_bom_number_property")
+        with observe_mutation("after_rebuild") as outcome:
+            result = rebuild_drawing(adapter, label="bind_bom_number_property")
+            outcome["return"] = repr(result)[:160]
         if int(table.ColumnCount) != visible_columns:
             raise RuntimeError(f"{label} BOM visible column count changed")
     finally:
