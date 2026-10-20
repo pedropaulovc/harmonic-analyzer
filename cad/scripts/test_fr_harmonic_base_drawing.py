@@ -1192,31 +1192,355 @@ def test_datum_origin_boxes_pad_each_axis_for_its_labels() -> None:
         sheet.datum_origin_boxes([0.0] * 6)
 
 
-def test_pivot_y_lane_clears_the_native_datum_axis_and_origin_note() -> None:
+def test_green_top_caption_clears_the_native_height_stack() -> None:
     import draw_fr_harmonic_base as sheet
 
-    # Run 20261019T154928828Z: the real dimension ink at its old anchor
-    # (207, 170) mm was struck by the origin's vertical line. Replay the
-    # measured 23.7 x 3.5 mm box, not a character-count estimate.
-    old_box = (0.1954, 0.1682, 0.2191, 0.1717)
-    datum_axis = (0.2094, 0.1591, 0.2094, 0.1716)
-    assert sheet.segment_crosses_box(datum_axis, old_box)
+    # r2b raw display extents include the underlining shelf, not just the
+    # narrower ink boxes. Both height witnesses crossed the old lower row.
+    old_box = (0.0231007, 0.1036656, 0.0625, 0.1182781)
+    rd1_arrow = (0.0425, 0.10635, 0.0425, 0.1127)
+    own_witness = (0.0884, 0.1056, 0.0615, 0.1056)
+    rd1_witness = (0.0415, 0.10635, 0.10384, 0.10635)
+    assert sheet.segment_crosses_box(rd1_arrow, old_box)
+    assert sheet.segment_crosses_box(own_witness, old_box)
+    assert sheet.segment_crosses_box(rd1_witness, old_box)
+    x, y = sheet.SIDE_KEEP["GreenTopHeight"]
+    assert sheet.SIDE_KEEP["BottomThickness"][0] > x == 0.0625 > rd1_arrow[0]
+    dy = y - 0.112
+    box = (old_box[0], old_box[1] + dy, old_box[2], old_box[3] + dy)
+    for line_y in (0.1127, 0.10635, 0.1056):
+        assert box[1] - line_y >= 0.0035
+    assert 0.143512 - box[3] >= 0.0035
+    neighbors = (
+        (0.098, 0.1184229, 0.1425667, 0.1309743),
+        (0.0349604, 0.0962219, 0.0500396, 0.0997219),
+    )
+    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors)
+
+
+# Sheet-2 native extents from r2b, run
+# 20261019T211244551Z-fb69447dfb4048419fd6b021e4f5c124, in sheet metres.
+# Translations and the two offset-anchor readings below are offline controls,
+# not a claim that the proposed placement has already drawn on a native seat.
+_R2B_PIVOT_X_KEEP = (0.257, 0.145)
+_R2B_PIVOT_X_TEXT = (0.2448681, 0.1431558, 0.2690665, 0.1467211)
+_R2B_PIVOT_X_LINE_Y = 0.1422219
+_R2B_PIVOT_X_WITNESS_STARTS = (
+    (0.2583636, 0.1711521),
+    (0.2649016, 0.1740415),
+)
+_R2B_DATUM_X_TEXT = (0.2425598, 0.1438616, 0.2450907, 0.1472636)
+_R2B_DATUM_X_AXIS = (0.22285, 0.145605, 0.238901, 0.145605)
+_R2B_HOLE_PLAN = (0.22285, 0.1591, 0.33715, 0.2309)
+_R2B_D1_ANCHOR = (0.247, 0.187)
+_R2B_D1_TEXT = (0.247406, 0.1834876, 0.251993, 0.1868896)
+_R2B_D1_END = (0.2584485, 0.1685855)
+_R2B_D1_Y = 0.1690524
+_R2B_PEDESTAL_Y = 0.1719847
+
+
+def _r2b_pivot_x_text_at(keep):
+    dx, dy = keep[0] - _R2B_PIVOT_X_KEEP[0], keep[1] - _R2B_PIVOT_X_KEEP[1]
+    return tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(_R2B_PIVOT_X_TEXT)
+    )
+
+
+def test_pivot_x_keep_replays_clearance_from_both_native_witnesses_and_datum() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
+        witness = (x, start_y, x, _R2B_PIVOT_X_LINE_Y - 0.001)
+        assert sheet.segment_crosses_box(witness, _R2B_PIVOT_X_TEXT)
+    assert sheet.box_gap(_R2B_PIVOT_X_TEXT, _R2B_DATUM_X_TEXT) < 0.0
+
+    keep = sheet.HOLE_TOP_KEEP["PivotSeatX"]
+    box = _r2b_pivot_x_text_at(keep)
+    line_y = _R2B_PIVOT_X_LINE_Y + keep[1] - _R2B_PIVOT_X_KEEP[1]
+    assert _R2B_PIVOT_X_WITNESS_STARTS[0][0] - box[2] >= 0.0035
+    neighbors = {
+        "datum X letter": _R2B_DATUM_X_TEXT,
+        "datum zero": (0.2187063, 0.1437608, 0.2209937, 0.1473261),
+        "datum X axis": _R2B_DATUM_X_AXIS,
+        "datum vertical drop": (0.22285, 0.143605, 0.22285, 0.1581),
+        "plan": _R2B_HOLE_PLAN,
+    }
+    for label, neighbor in neighbors.items():
+        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+    cross_tap_count = (0.2625209, 0.1208449, 0.2676798, 0.1243309)
+    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
+        witness = (x, line_y - 0.001, x, start_y)
+        assert not sheet.segment_crosses_box(witness, box)
+        assert sheet.box_gap(witness, cross_tap_count) >= 0.0035
+    tail = (0.2649016, line_y, 0.2712516, line_y)
+    spring_leader = (0.2717697, 0.1756206, 0.2809549, 0.131634)
+    assert not sheet.segment_crosses_box(spring_leader, tail)
+    fraction = (line_y - spring_leader[1]) / (spring_leader[3] - spring_leader[1])
+    spring_x = spring_leader[0] + fraction * (spring_leader[2] - spring_leader[0])
+    assert 0.0 < fraction < 1.0
+    assert spring_x - tail[2] >= 0.0035
+
+
+def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    a1_text = (0.2345301, 0.1671557, 0.2393918, 0.1705577)
+    old_d1_witness = (0.256264, _R2B_D1_Y, 0.191, _R2B_D1_Y)
+    assert sheet.segment_crosses_box(old_d1_witness, a1_text)
     x, y = sheet.HOLE_TOP_KEEP["PivotSeatY"]
-    dx, dy = x - 0.207, y - 0.170
+    # Native centre-mark arms plus their 1 mm witness gaps leave only this
+    # 2.38 mm window. A fully right-sided line would run through other ink.
+    assert 0.2604633 < x < 0.2628448
+    assert _R2B_D1_Y < y < _R2B_PEDESTAL_Y
+    # Replay either plausible D1 arm after moving the line across its hole.
+    # The pedestal's measured inner-arm start is 262.8448 mm, not 262.7 mm.
+    witnesses = (
+        (0.2604633, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
+        (0.256264, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
+        (x - 0.001, _R2B_PEDESTAL_Y, 0.2628448, _R2B_PEDESTAL_Y),
+    )
+    for witness in witnesses:
+        assert 0.256 < witness[0] <= witness[2] <= 0.2628448
+        assert not sheet.segment_crosses_box(witness, a1_text)
+        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_TEXT)
+        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_AXIS)
+    # The lower outside-arrow tail remains parallel between the X witnesses.
+    # This is line-to-line air, not the 3.5 mm text-clearance requirement.
+    assert x - _R2B_PIVOT_X_WITNESS_STARTS[0][0] >= 0.003
+    assert _R2B_PIVOT_X_WITNESS_STARTS[1][0] - x >= 0.003
+
+
+@pytest.mark.parametrize("anchor_is_top", (False, True), ids=("centred", "top-centre"))
+def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
+    anchor_is_top,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # r2b's actual Y text was left of its line, not centred on its keep.
+    old_text = (0.166826, 0.1621558, 0.1905016, 0.1657212)
+    width, height = old_text[2] - old_text[0], old_text[3] - old_text[1]
+    x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
+    top = y if anchor_is_top else y + height / 2.0
+    box = (x - width / 2.0, top - height, x + width / 2.0, top)
+    assert box[0] >= sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
+    # Deliberately inboard on blank printed pocket floor: reject nearby ink,
+    # not the whole plan outline, which is not an occupied rectangular box.
+    assert _R2B_HOLE_PLAN[0] < box[0] < box[2] < _R2B_HOLE_PLAN[2]
+    assert _R2B_HOLE_PLAN[1] < box[1] < box[3] < _R2B_HOLE_PLAN[3]
+    neighbors = {
+        "spring centre mark": (0.2708043, 0.1749896, 0.2726196, 0.1768049),
+        "pedestal centre mark": (0.2638448, 0.170928, 0.2659583, 0.1730415),
+        "centre mark 391": (0.2925969, 0.1786569, 0.2951231, 0.1811831),
+        "E1 leader": (0.2943345, 0.1794933, 0.2964761, 0.1879897),
+        "B1 tag": (0.2471988, 0.1904933, 0.2509839, 0.1938953),
+        "former D1 tag": _R2B_D1_TEXT,
+        "X pedestal witness": (
+            0.2649016,
+            _R2B_PIVOT_X_LINE_Y
+            + sheet.HOLE_TOP_KEEP["PivotSeatX"][1]
+            - _R2B_PIVOT_X_KEEP[1]
+            - 0.001,
+            0.2649016,
+            0.1740415,
+        ),
+    }
+    for label, neighbor in neighbors.items():
+        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+
+
+def test_d1_tag_replays_native_clearances_and_an_approach_below_the_y_witness() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    x, y = sheet.HOLE_TAG_POSITIONS["D1"]
+    dx, dy = x - _R2B_D1_ANCHOR[0], y - _R2B_D1_ANCHOR[1]
+    box = tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(_R2B_D1_TEXT)
+    )
+    x_keep = sheet.HOLE_TOP_KEEP["PivotSeatX"]
+    line_y = _R2B_PIVOT_X_LINE_Y + x_keep[1] - _R2B_PIVOT_X_KEEP[1]
+    neighbors = {
+        "datum X letter": _R2B_DATUM_X_TEXT,
+        "datum X axis": _R2B_DATUM_X_AXIS,
+        "plan": _R2B_HOLE_PLAN,
+        "new X text": _r2b_pivot_x_text_at(x_keep),
+        "X D1 witness": (0.2583636, line_y - 0.001, 0.2583636, 0.1711521),
+    }
+    for label, neighbor in neighbors.items():
+        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+    line_x = sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
+    far_side_witness = (0.256264, _R2B_D1_Y, line_x + 0.001, _R2B_D1_Y)
+    old_leader = (
+        _R2B_D1_TEXT[2],
+        (_R2B_D1_TEXT[1] + _R2B_D1_TEXT[3]) / 2.0,
+        *_R2B_D1_END,
+    )
+    assert sheet.segment_crosses_box(old_leader, far_side_witness)
+    leader = (box[2], (box[1] + box[3]) / 2.0, *_R2B_D1_END)
+    assert leader[1] < leader[3] < _R2B_D1_Y
+    assert not sheet.segment_crosses_box(leader, far_side_witness)
+    # The leader's unavoidable approach to its own hole remains inside the
+    # native audit's existing 0.1 mm endpoint tolerance at the X witness.
+    assert abs(_R2B_D1_END[0] - _R2B_PIVOT_X_WITNESS_STARTS[0][0]) < 1e-4
+
+
+def _pivot_y_placement_fakes(monkeypatch, failure=None):
+    """Unit-only collaborators; they do not establish native layout success."""
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    events = []
+
+    class Display:
+        def __init__(self):
+            self.offset = True  # Prove the helper resets an inherited offset.
+
+        @property
+        def OffsetText(self):  # noqa: N802 - the COM member name
+            events.append(("offset-read", self.offset))
+            return self.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):  # noqa: N802 - the COM member name
+            events.append(("offset-set", value))
+            if not (failure == "reset" and not value):
+                self.offset = value
+
+    class Annotation:
+        name = "PivotSeatY"
+
+        def __init__(self):
+            self.display = Display()
+            self.stage = "line"
+            self.position = (0.192, 0.164, 0.0)
+
+        def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
+            return self.display
+
+        def SetPosition2(self, x, y, z):  # noqa: N802 - the COM member name
+            events.append(("line-set", (x, y, z)))
+            assert not self.display.offset
+            if failure == "line-set":
+                return False
+            self.position = (x, y, z)
+            return True
+
+        def GetPosition(self):  # noqa: N802 - the COM member name
+            position = self.position
+            if failure == f"{self.stage}-missing":
+                position = None
+            elif failure == f"{self.stage}-drift":
+                position = (position[0] + 0.001, position[1], position[2])
+            elif failure == f"{self.stage}-nan":
+                position = (math.nan, position[1], position[2])
+            events.append(("position-read", position))
+            return position
+
+    adapter = object()
+    annotation = Annotation()
+
+    def offset(adapter_arg, annotations, positions):
+        events.append(("offset-call", adapter_arg, annotations, positions))
+        assert adapter_arg is adapter
+        assert annotations == [annotation]
+        assert positions == {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}
+        if failure == "offset-helper":
+            raise RuntimeError("offset helper refused")
+        annotation.display.OffsetText = True
+        if failure == "offset-state":
+            annotation.display.offset = False
+        annotation.stage = "text"
+        annotation.position = (*positions["PivotSeatY"], 0.0)
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, item: item.name)
+    monkeypatch.setattr(sheet, "offset_dimension_text", offset)
+    other = SimpleNamespace(name="PivotSeatX")
+    return adapter, annotation, other, events
+
+
+def test_pivot_y_placement_resets_then_places_line_offsets_and_reads_back(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
+    sheet._place_pivot_seat_y(adapter, [other, annotation])
+    assert events == [
+        ("offset-set", False),
+        ("offset-read", False),
+        ("line-set", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
+        ("position-read", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
+        ("offset-call", adapter, [annotation], {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}),
+        ("offset-set", True),
+        ("offset-read", True),
+        ("position-read", (*sheet.PIVOT_SEAT_Y_TEXT_XY, 0.0)),
+    ]
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_pivot_y_placement_requires_one_native_named_annotation(monkeypatch, count) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
+    with pytest.raises(RuntimeError, match=f"one native PivotSeatY, got {count}"):
+        sheet._place_pivot_seat_y(adapter, [other, *([annotation] * count)])
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    ("failure", "message", "last_event", "offset_called"),
+    (
+        ("reset", "offset could not be reset", "offset-read", False),
+        ("line-set", "failed to position .* line", "line-set", False),
+        ("line-missing", "line did not persist", "position-read", False),
+        ("line-drift", "line did not persist", "position-read", False),
+        ("line-nan", "line did not persist", "position-read", False),
+        ("offset-helper", "offset helper refused", "offset-call", True),
+        ("offset-state", "text did not stay offset", "offset-read", True),
+        ("text-missing", "text did not persist", "position-read", True),
+        ("text-drift", "text did not persist", "position-read", True),
+        ("text-nan", "text did not persist", "position-read", True),
+    ),
+)
+def test_pivot_y_placement_refuses_failed_state_without_com(
+    monkeypatch, failure, message, last_event, offset_called,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch, failure)
+    with pytest.raises(RuntimeError, match=message):
+        sheet._place_pivot_seat_y(adapter, [other, annotation])
+    assert events[-1][0] == last_event
+    assert any(event[0] == "offset-call" for event in events) is offset_called
+
+
+@pytest.mark.parametrize(
+    ("tag", "old_anchor", "old_box"),
+    [
+        ("A3", (0.325, 0.176), (0.3251, 0.1724, 0.3309, 0.1760)),
+        ("A4", (0.326, 0.215), (0.3261, 0.2115, 0.3319, 0.2150)),
+    ],
+)
+def test_socket_tags_clear_the_native_section_cut_line(tag, old_anchor, old_box) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # r2b native ink, not an estimated label width. The former tags were
+    # both struck by the A-A line through the right-hand socket axes.
+    cut_line = (0.3292, 0.155, 0.3292, 0.235)
+    assert sheet.segment_crosses_box(cut_line, old_box)
+    x, y = sheet.HOLE_TAG_POSITIONS[tag]
+    dx, dy = x - old_anchor[0], y - old_anchor[1]
     box = tuple(
         value + (dx if index % 2 == 0 else dy)
         for index, value in enumerate(old_box)
     )
-    assert not sheet.segment_crosses_box(datum_axis, box)
-    # Preserve at least a text-height gap from the native line, nearby note,
-    # table and plan; moving left alone would crowd the ORIGIN note.
-    assert datum_axis[0] - box[2] >= 0.0035
-    neighbors = {
-        "ORIGIN note": (0.1649072, 0.1725832, 0.2016029, 0.1864037),
-        "hole table": (0.018, 0.1630628, 0.1627634, 0.260),
-        "plan": (0.22285, 0.1591, 0.33715, 0.2309),
-    }
-    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors.values())
+    assert _segment_box_gap(cut_line, box) >= 0.0035
+    neighbors = (
+        (0.22285, 0.1591, 0.33715, 0.2309),
+        (0.363437, 0.093512, 0.386563, 0.176488),
+    )
+    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors)
 
 
 def test_callout_box_rule_refuses_display_data_it_cannot_box() -> None:
@@ -2615,6 +2939,13 @@ def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> 
     assert len(imports) == 1
     assert imports[0].value.func.id == "curate_hidden_owner_dimensions"
     imported_name = imports[0].targets[0].id
+    body = drawing.body[0].body
+    placement = body[body.index(imports[0]) + 1]
+    assert isinstance(placement, ast.Expr) and isinstance(placement.value, ast.Call)
+    assert placement.value.func.id == "_place_pivot_seat_y"
+    assert [ast.unparse(argument) for argument in placement.value.args] == [
+        "adapter", imported_name,
+    ]
     precision = [
         node for node in ast.walk(drawing)
         if isinstance(node, ast.Call)

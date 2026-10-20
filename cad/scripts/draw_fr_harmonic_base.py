@@ -57,6 +57,7 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -349,7 +350,9 @@ GEOMETRY_TOP_KEEP = {
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
-    "GreenTopHeight": (0.0625, 0.112),
+    # r2b's lower caption row crossed its own witness and the overall-height
+    # reference. Lift the whole native text block above both arrow spans.
+    "GreenTopHeight": (0.0625, 0.125),
     # Right of the front view, above the deck step it measures at its right
     # end; the 0.75 mm span on paper puts the arrows outside.
     "DeckRise": (0.228, 0.116),
@@ -363,12 +366,13 @@ SIDE_KEEP = {
 HOLE_TOP_KEEP = {
     # D1 is held from the nearer transferred pedestal seat. The point-only
     # reference sketch supplies real centre-to-centre extension origins;
-    # place X below the plan and Y in the strip left of it, clear of the table.
-    "PivotSeatX": (0.257, 0.145),
-    # Native proof: the old 23.7 x 3.5 mm text block crossed the datum's
-    # vertical axis. Keep it below the ORIGIN note and left of that axis.
-    "PivotSeatY": (0.192, 0.164),
+    # place X below the plan, left of both witnesses and the datum X letter.
+    "PivotSeatX": (0.2427, 0.1385),
+    # Keep the short native line between the holes; offset only its text
+    # onto the blank pocket floor, clear of the nearby marks and leaders.
+    "PivotSeatY": (0.2616, 0.1705),
 }
+PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear
 # end it cuts.
@@ -435,10 +439,12 @@ HOLE_SIDE_CALLOUTS = {
 # Native table tags keep their source association while short leaders separate
 # the closely spaced screw patterns. Coordinates below are sheet layout only.
 HOLE_TAG_POSITIONS = {
-    "A3": (0.325, 0.176),
-    "A4": (0.326, 0.215),
+    # The A-A cut line at x329.2 mm crossed both old labels. Keep the native
+    # tags in the clear gutter between the plan and section, not on that line.
+    "A3": (0.344, 0.176),
+    "A4": (0.344, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.247, 0.187),
+    "D1": (0.2456, 0.1550),
     # The transferred pinion-rig seats left the table (U28 corollary), and
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
@@ -683,6 +689,49 @@ def _serial_edge(view: Any) -> Any:
     if not candidates:
         raise RuntimeError("base stamped identifier lacks a visible source edge")
     return min(candidates, key=lambda item: item[0])[1]
+
+
+def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the native Y line between its holes and offset only its text."""
+    name = "PivotSeatY"
+    matches = []
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) == name:
+            matches.append(annotation)
+    if len(matches) != 1:
+        raise RuntimeError(f"harmonic base needs one native {name}, got {len(matches)}")
+    annotation = matches[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # An inherited offset would move only text, leaving the old long witnesses.
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError("harmonic base PivotSeatY offset could not be reset")
+    if not annotation.SetPosition2(*HOLE_TOP_KEEP[name], 0.0):
+        raise RuntimeError("failed to position the harmonic base PivotSeatY line")
+    line_position = annotation.GetPosition()
+    if (
+        not line_position
+        or not math.dist(
+            (float(line_position[0]), float(line_position[1])), HOLE_TOP_KEEP[name]
+        )
+        <= 1e-5
+    ):
+        raise RuntimeError(
+            f"harmonic base PivotSeatY line did not persist: {line_position!r}"
+        )
+    offset_dimension_text(adapter, [annotation], {name: PIVOT_SEAT_Y_TEXT_XY})
+    if not bool(display.OffsetText):
+        raise RuntimeError("harmonic base PivotSeatY text did not stay offset")
+    position = annotation.GetPosition()
+    if (
+        not position
+        or not math.dist(
+            (float(position[0]), float(position[1])), PIVOT_SEAT_Y_TEXT_XY
+        )
+        <= 1e-5
+    ):
+        raise RuntimeError(f"harmonic base PivotSeatY text did not persist: {position!r}")
 
 
 def _spread_hole_tags(view: Any, table: Any) -> None:
@@ -2121,6 +2170,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="holes top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _place_pivot_seat_y(adapter, hole_top_dimensions)
     section_dimensions = curate_view_dimensions(
         adapter,
         section,
