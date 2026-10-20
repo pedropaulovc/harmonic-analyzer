@@ -47,5 +47,12 @@ POCKET_DEPTH_CALLOUT = "\n".join((f"KEEPS {SCREW_NUMBER} HEAD", "BELOW FACE"))
 BODY_CHAMFER_CALLOUT = "\n".join(
     ("X 45 DEG", f"CLEARS {HANDLE_NUMBER}", "COUNTERBORE CORNER")
 )
+# Only prose is authored here: both LIMIT values come from the real model
+# dimension.  Put the angle beside those values, leaving two short attached
+# reason rows rather than a five-row limits/angle/reason tower.
+FLOOR_HOLE_MOUTH_CHAMFER_SUFFIX = " X 45 DEG"
+FLOOR_HOLE_MOUTH_CHAMFER_CALLOUT = "\n".join(
+    (f"CLEARS {SCREW_NUMBER}", "UNDER-HEAD FILLET")
+)
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

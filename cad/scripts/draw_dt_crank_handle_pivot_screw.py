@@ -7,6 +7,11 @@ the MHA-DT-35 cup sets, and the tip chamfer and seat edge break print as
 single MAX limits.  The relief Ø retains its native size band, the relief
 lead its native limits and the thread-side floor radius its native MAX;
 every size keeps its part-authored places.
+The actual under-head face remains at its original station between a real
+concave R0.1 MAX and a native 0.11–0.26 X45 LIMIT outer bevel, whose explicit
+range overrides the generic edge break only there. Both features retain
+their part-owned carriers, limits and precision and their settled actual
+ink must clear each other and the head/slot/shoulder/fitted-span corridors.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
@@ -91,6 +96,10 @@ from dt_crank_handle_pivot_screw_spec import (
     HEAD_DIA_CALLOUT,
     HEAD_LENGTH,
     HEAD_LENGTH_CALLOUT,
+    HEAD_OUTER_CHAMFER,
+    HEAD_OUTER_CHAMFER_BAND,
+    HEAD_OUTER_CHAMFER_CALLOUT,
+    HEAD_OUTER_CHAMFER_MAX,
     OVERALL_LENGTH,
     REFERENCE_DIMENSIONS,
     RELIEF_CORNER_CALLOUT,
@@ -112,6 +121,7 @@ from dt_crank_handle_pivot_screw_spec import (
     THREAD_SIZE,
     TIP_CHAMFER,
     UNDER_HEAD_CALLOUT,
+    UNDER_HEAD_CORNER_RADIUS_MAX,
 )
 
 
@@ -206,6 +216,8 @@ SIDE_KEEP = {
     # The slot shows as a notch in the head face; its depth reads above it,
     # outside the head face.
     "SlotDepth": (SLOT_DEPTH_TEXT_X, SIDE_CENTER[1] + 0.026),
+    "UnderHeadCornerRadius": (0.215, 0.212),
+    "HeadOuterChamfer": (0.245, 0.250),
 }
 # The 3-mm slot is narrower than the text, so the value stands above its
 # extension lines rather than between them.
@@ -233,7 +245,7 @@ DETAIL_LETTER = "A"
 DETAIL_VIEW_LABEL = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
 )
-DETAIL_LABEL_XY = (0.370, 0.127)
+DETAIL_LABEL_XY = (0.342, 0.0845)
 DETAIL_PARENT_LETTER_XY = (
     _sheet_x(DETAIL_STATION) - 0.002,
     SIDE_CENTER[1] + DETAIL_RADIUS_MM * _S / 1000.0 + 0.0055,
@@ -273,7 +285,10 @@ FINISH_SYMBOL = (UNDERHEAD_X - 0.038, SIDE_CENTER[1] - 0.022)
 # its grey dash-dot over the black edge.  Drawn in the outline's black it IS
 # the edge (draw_ch_fulcrum_keeper._blacken_reference_lines' recipe).
 REFERENCE_SKETCH = "StationReference"
-UNDER_HEAD_WITNESS_LEN = (HEAD_DIA - SHOULDER_DIA) / 2.0
+UNDER_HEAD_WITNESS_LEN = (
+    (HEAD_DIA - SHOULDER_DIA) / 2.0
+    - HEAD_OUTER_CHAMFER_MAX - UNDER_HEAD_CORNER_RADIUS_MAX
+)
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 SW_SEL_EXT_SKETCH_SEGS = 24  # swSelectType_e.swSelEXTSKETCHSEGS
 REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the line is a fully defined sketch length
@@ -281,6 +296,8 @@ REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the line is a fully defined sketch lengt
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.218)
 DETAIL_DIMENSIONS = ("ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius")
+UNDER_HEAD_DIMENSIONS = ("UnderHeadCornerRadius", "HeadOuterChamfer")
+UNDER_HEAD_FOREIGN_DIMENSIONS = ("HeadDia", "SlotDepth", "ShoulderDia", "ShoulderLength", "HeadLength")
 
 
 def _reference_line_in_view(view: Any, sketch_name: str, length_mm: float) -> Any:
@@ -712,6 +729,59 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+def _assert_under_head_carrier(annotation: Any, name: str) -> None:
+    """Part-owned radius/axial leg, native bounds and precision, no value override."""
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    raw = display.GetDimension2(0)
+    if raw is None:
+        raise RuntimeError(f"{name}: missing native model dimension")
+    dimension = _early_bound(raw, "IDimension")
+    expected_type = (5,) if name == "UnderHeadCornerRadius" else (2, 11)
+    expected_value = UNDER_HEAD_CORNER_RADIUS_MAX if name == "UnderHeadCornerRadius" else HEAD_OUTER_CHAMFER
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    upper, lower = (0.0, 0.0) if name == "UnderHeadCornerRadius" else HEAD_OUTER_CHAMFER_BAND
+    if (
+        str(dimension.FullName).split("@")[:2] != [name, "ScrewProfile"]
+        or int(display.Type2) not in expected_type
+        or bool(display.GetOverride())
+        or not math.isclose(float(dimension.SystemValue), expected_value / 1000.0, rel_tol=0.0, abs_tol=1e-9)
+        or int(tolerance.Type) != (6 if name == "UnderHeadCornerRadius" else 3)
+        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+        or int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]
+        or int(display.GetPrimaryTolPrecision2()) != DRAWING_PRECISION_BY_NAME[name]
+    ):
+        raise RuntimeError(f"{name}: native owner/type/value/bounds/precision drift")
+
+
+def style_under_head_dimensions(adapter: Any, annotations: Sequence[Any]) -> None:
+    """Keep the tiny bevel's native witnesses outside its limits/reason block."""
+    matches = {name: [] for name in UNDER_HEAD_DIMENSIONS}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name in matches:
+            matches[name].append(annotation)
+    for name, records in matches.items():
+        if len(records) != 1:
+            raise RuntimeError(f"{name}: expected one native under-head annotation; count={len(records)}")
+        annotation = records[0]
+        _assert_under_head_carrier(annotation, name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if name == "HeadOuterChamfer":
+            display.CenterText = False
+            display.ArrowSide = ARROWS_OUTSIDE
+        if not annotation.SetPosition2(*SIDE_KEEP[name], 0.0):
+            raise RuntimeError(f"{name}: cannot position native under-head text")
+    adapter.currentModel.EditRebuild3()
+    for name, records in matches.items():
+        _assert_under_head_carrier(records[0], name)
+        if name == "HeadOuterChamfer":
+            display = _early_bound(records[0].GetSpecificAnnotation(), "IDisplayDimension")
+            if bool(display.CenterText) or int(display.ArrowSide) != ARROWS_OUTSIDE:
+                raise RuntimeError(f"{name}: native arrows/centring did not persist")
+
+
 def label_relief_view(adapter: Any, view: Any) -> None:
     """Give the cropped model view its own two-line DETAIL A scale label."""
     _activate(adapter, view, label="relief view")
@@ -983,6 +1053,79 @@ def _settled_profile_and_tip_errors(dumps: Sequence[Mapping[str, Any]]) -> list[
     return errors
 
 
+def _settled_under_head_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Collect both new features against each other and every head/53 corridor.
+
+    Only actual native strokes, arrows and metric text hulls are accepted.
+    Missing/malformed data never hides other valid offending primitives.
+    """
+    names = (*UNDER_HEAD_DIMENSIONS, *UNDER_HEAD_FOREIGN_DIMENSIONS)
+    records = {name: [] for name in names}
+    for sheet in dumps:
+        for annotation in _layout_audit.audited_annotations(_layout_audit.printed_dump(sheet)):
+            if annotation.get("owner_type") == 0 and annotation.get("name") in records:
+                records[annotation["name"]].append(annotation)
+    errors, strokes, boxes = [], {}, {}
+    for name, annotations in records.items():
+        strokes[name], boxes[name] = [], []
+        if len(annotations) != 1:
+            errors.append(f"SIDE/{name}: expected one settled under-head corridor annotation; count={len(annotations)}")
+        for annotation in annotations:
+            if annotation.get("type") != 4 or annotation.get("visible") != 1:
+                errors.append(f"SIDE/{name}: wrong native corridor type/visibility; actual={annotation!r}")
+            display = annotation.get("display")
+            for kind in ("lines", "arrows"):
+                actual, invalid = _actual_stroke_inventory(annotation, kind, f"SIDE/{name}")
+                errors.extend(invalid)
+                strokes[name].extend(actual)
+            if annotation.get("leaders"):
+                actual, invalid = _actual_stroke_inventory(annotation, "leaders", f"SIDE/{name}")
+                errors.extend(invalid)
+                strokes[name].extend(actual)
+            for kind in ("arcs", "polylines", "polygons", "triangles"):
+                if isinstance(display, Mapping) and display.get(kind):
+                    actual, invalid = _actual_stroke_inventory(annotation, kind, f"SIDE/{name}")
+                    errors.extend(invalid)
+                    strokes[name].extend(actual)
+            texts = display.get("texts") if isinstance(display, Mapping) else None
+            if not isinstance(texts, Sequence) or isinstance(texts, (str, bytes)) or not texts:
+                errors.append(f"SIDE/{name}: missing actual corridor text; actual={texts!r}")
+                continue
+            for text in texts:
+                invalid = _annotation_ink_errors({"display": {"texts": [text]}}, f"SIDE/{name}")
+                errors.extend(invalid)
+                if invalid:
+                    continue
+                try:
+                    box = _layout_audit.display_box({"texts": [text]})
+                except (AttributeError, KeyError, TypeError, ValueError, OverflowError, IndexError) as exc:
+                    errors.append(f"SIDE/{name}: unreadable actual corridor text: {exc}; actual={text!r}")
+                    continue
+                if box is not None:
+                    boxes[name].append((box.xmin, box.ymin, box.xmax, box.ymax))
+    for index, name in enumerate(names):
+        for other in names[index + 1:]:
+            if name not in UNDER_HEAD_DIMENSIONS and other not in UNDER_HEAD_DIMENSIONS:
+                continue
+            crossings = [(a, b) for a in strokes[name] for b in strokes[other]
+                         if _drawing_leaders.segments_cross(a, b)]
+            if crossings:
+                errors.append(f"SIDE/{name} vs {other}: under-head foreign ink crossing; actual={crossings!r}")
+            for first, second in ((name, other), (other, name)):
+                for box in boxes[first]:
+                    close = [line for line in strokes[second]
+                             if _drawing_leaders.distance_to_box(line, box) < 0.003]
+                    if close:
+                        errors.append(f"SIDE/{first} text vs {second}: under-head ink air below 0.003; actual_box={box!r}; actual={close!r}")
+            for a in boxes[name]:
+                for b in boxes[other]:
+                    dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+                    dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+                    if math.hypot(dx, dy) < 0.003:
+                        errors.append(f"SIDE/{name} text vs {other}: under-head text air below 0.003; actual={a!r},{b!r}")
+    return errors
+
+
 def _assert_generated_annotation_ink(
     dumps: Sequence[Mapping[str, Any]],
     detail_groups: Mapping[str, Sequence[_drawing_leaders.Segment]],
@@ -998,6 +1141,7 @@ def _assert_generated_annotation_ink(
     errors = list(collection_errors)
     if settled:
         errors.extend(_settled_profile_and_tip_errors(dumps))
+        errors.extend(_settled_under_head_errors(dumps))
     if not dumps:
         errors.append("no drawing sheets collected")
     inner = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -1236,6 +1380,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "ReliefLead": RELIEF_LEAD_CALLOUT,
             "ReliefCornerRadius": RELIEF_CORNER_CALLOUT,
             "SeatEdgeBreak": SEAT_EDGE_BREAK_CALLOUT,
+            "HeadOuterChamfer": HEAD_OUTER_CHAMFER_CALLOUT,
             "TipChamfer": CHAMFER_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
@@ -1256,6 +1401,7 @@ async def build(adapter: Any) -> dict[str, str]:
         location="above",
     )
     style_relief_dimensions(adapter, detail_annotations)
+    style_under_head_dimensions(adapter, side_annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):
         matches = [

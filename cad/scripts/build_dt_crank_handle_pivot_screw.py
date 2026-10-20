@@ -10,9 +10,11 @@ Layout: one revolve about local +Z.  The slotted head face is at z=0; the head,
 shoulder and threaded section follow in +Z, the threaded section opening
 with a thread-relief groove against the seat face (a 45-degree lead from its
 floor into the seat face and a tangent R0.2 MAX thread-side floor corner) so
-a die runs out into air and the shoulder seats tight.  A 45-degree outer
+a die runs out into air and the shoulder seats tight. A 45-degree outer
 seat-edge break clears the arm-face corner; the threaded section closes with
-a 45-degree thread-start chamfer on the tip.
+a 45-degree thread-start chamfer on the tip. The head's underside carries a
+real concave R0.1 MAX and an outer 45-degree LIMIT bevel, leaving the actual
+under-head face at its original station.
 The driver slot is sketched on the Front
 Plane (the head face) and cut 1.6 deep across the full head, running along
 local X.  ``ArmSeat`` is a named plane on the shoulder's seat face and
@@ -75,6 +77,9 @@ from dt_crank_handle_pivot_screw_spec import (
     HEAD_DIA_TOL,
     HEAD_LENGTH,
     HEAD_LENGTH_TOL,
+    HEAD_OUTER_CHAMFER,
+    HEAD_OUTER_CHAMFER_BAND,
+    HEAD_OUTER_CHAMFER_TOL_TYPE,
     INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH,
     INSTALLED_TIP_CHAMFER,
@@ -99,6 +104,7 @@ from dt_crank_handle_pivot_screw_spec import (
     THREAD_LENGTH,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
+    UNDER_HEAD_CORNER_RADIUS_MAX,
 )
 
 
@@ -123,13 +129,23 @@ V_RELIEF_CORNER = 2.0 * math.pi * (
 V_RELIEF = (
     math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD - V_RELIEF_CORNER
 )
+# Filled inner spandrel and removed outer triangle: the axial face stations
+# do not move. The driver slot is disjoint from both underside features.
+V_UNDER_HEAD_CORNER = 2.0 * math.pi * (
+    SHOULDER_R * UNDER_HEAD_CORNER_RADIUS_MAX**2 * (1.0 - math.pi / 4.0)
+    + UNDER_HEAD_CORNER_RADIUS_MAX**3 * (5.0 / 6.0 - math.pi / 4.0)
+)
+V_HEAD_OUTER_CHAMFER = math.pi * (
+    HEAD_R * HEAD_OUTER_CHAMFER**2 - HEAD_OUTER_CHAMFER**3 / 3.0
+)
 
 
 def turned_volume(thread_length: float, tip_chamfer: float) -> float:
     """Revolved body volume for a threaded section and tip chamfer.
 
-    The 45-degree tip chamfer and outer seat-edge break remove corner triangles
-    whose centroids lie one third of their leg length inward from the outer radius.
+    The tip, seat-edge and outer under-head bevels remove corner triangles.
+    The concave inner under-head fillet adds its revolved spandrel in both
+    configurations; neither treatment moves the actual face stations.
     """
     turned = math.pi * (
         HEAD_R**2 * HEAD_LENGTH
@@ -140,7 +156,7 @@ def turned_volume(thread_length: float, tip_chamfer: float) -> float:
     seat_edge_break = math.pi * SEAT_EDGE_BREAK_MAX**2 * (
         SHOULDER_R - SEAT_EDGE_BREAK_MAX / 3.0
     )
-    return turned - V_RELIEF - chamfer - seat_edge_break
+    return turned - V_RELIEF - chamfer - seat_edge_break + V_UNDER_HEAD_CORNER - V_HEAD_OUTER_CHAMFER
 
 
 V_BODY = turned_volume(THREAD_LENGTH, TIP_CHAMFER)
@@ -165,7 +181,7 @@ def _single_limits(adapter) -> None:
     nominal then the limit word, so the model value is the limit itself."""
     for (feature, name), (limit, tol_type) in SINGLE_LIMITS.items():
         label = f"{name}@{feature}"
-        _, dimension = _named_dimension(adapter, feature, name)
+        display, dimension = _named_dimension(adapter, feature, name)
         value = float(dimension.SystemValue)
         if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
             raise RuntimeError(
@@ -180,6 +196,12 @@ def _single_limits(adapter) -> None:
             or not math.isclose(float(tolerance.GetMaxValue()), 0.0, abs_tol=1e-12)
         ):
             raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
+        if name == "UnderHeadCornerRadius":
+            places = DRAWING_PRECISION[feature][name]
+            display = _early_bound(display, "IDisplayDimension")
+            status = int(display.SetPrecision3(places, -1, places, -1))
+            if status != 0 or int(display.GetPrimaryPrecision2()) != places or int(display.GetPrimaryTolPrecision2()) != places:
+                raise RuntimeError(f"{label}: MAX precision did not persist")
         _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
@@ -215,6 +237,34 @@ def _relief_lead_limits(adapter) -> None:
     )
 
 
+def _head_outer_chamfer_limits(adapter) -> None:
+    """Native two-place LIMIT on the real axial bevel leg, never typed bounds."""
+    label = "HeadOuterChamfer@ScrewProfile"
+    display, dimension = _named_dimension(adapter, "ScrewProfile", "HeadOuterChamfer")
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, HEAD_OUTER_CHAMFER / 1000.0, rel_tol=0.0, abs_tol=1e-9):
+        raise RuntimeError(f"{label}: nominal is not the modelled outer chamfer")
+    upper, lower = HEAD_OUTER_CHAMFER_BAND
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = HEAD_OUTER_CHAMFER_TOL_TYPE
+    # Pinned SW2026 pattern: SetValues(MinValue, MaxValue), metres.
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != HEAD_OUTER_CHAMFER_TOL_TYPE
+        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, rel_tol=0.0, abs_tol=1e-12)
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = DRAWING_PRECISION["ScrewProfile"]["HeadOuterChamfer"]
+    display = _early_bound(display, "IDisplayDimension")
+    status = int(display.SetPrecision3(places, -1, places, -1))
+    if status != 0 or int(display.GetPrimaryPrecision2()) != places or int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    _telemetry.success(f"{label}: LIMIT {value * 1000.0 + upper:.2f}/{value * 1000.0 + lower:.2f}")
+
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreateConfigurationParameters,
@@ -230,6 +280,8 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HeadDia", HEAD_DIA),
         ("HeadLength", HEAD_LENGTH),
+        ("UnderHeadCornerRadius", UNDER_HEAD_CORNER_RADIUS_MAX),
+        ("HeadOuterChamfer", HEAD_OUTER_CHAMFER),
         ("ShoulderDia", SHOULDER_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
         ("SeatEdgeBreak", SEAT_EDGE_BREAK_MAX),
@@ -264,8 +316,12 @@ async def build(adapter) -> dict[str, str]:
     points = [
         (0.0, 0.0),
         (0.0, HEAD_R),
-        (-HEAD_LENGTH, HEAD_R),
-        (-HEAD_LENGTH, SHOULDER_R),
+        (-(HEAD_LENGTH - HEAD_OUTER_CHAMFER), HEAD_R),
+        (-HEAD_LENGTH, HEAD_R - HEAD_OUTER_CHAMFER),
+        (-HEAD_LENGTH, SHOULDER_R + UNDER_HEAD_CORNER_RADIUS_MAX),
+    ]
+    shoulder_points = [
+        (-(HEAD_LENGTH + UNDER_HEAD_CORNER_RADIUS_MAX), SHOULDER_R),
         (-(SEAT_STATION - SEAT_EDGE_BREAK_MAX), SHOULDER_R),
         (-SEAT_STATION, SHOULDER_R - SEAT_EDGE_BREAK_MAX),
         (-SEAT_STATION, RELIEF_R + RELIEF_LEAD),
@@ -281,6 +337,7 @@ async def build(adapter) -> dict[str, str]:
         points[0],
     ]
     lines = await add_line_chain(adapter, points, close=False)
+    shoulder_lines = await add_line_chain(adapter, shoulder_points, close=False)
     thread_lines = await add_line_chain(adapter, thread_points, close=False)
     # add_arc is counter-clockwise.  Traverse from the flank DOWN to the
     # floor, opposite the profile chain, to make the short tangent quarter.
@@ -290,11 +347,22 @@ async def build(adapter) -> dict[str, str]:
             -(RELIEF_END_STATION - RELIEF_CORNER_RADIUS_MAX),
             RELIEF_R + RELIEF_CORNER_RADIUS_MAX,
             *thread_points[0],
+            *shoulder_points[-1],
+        ),
+    )
+    # Keep the relief arc first; CCW shaft tangent -> actual head-face tangent
+    # is the short 90-degree concave arc, not the complementary 270 degrees.
+    under_head_corner = check(
+        "screw inner under-head corner arc",
+        await adapter.add_arc(
+            -(HEAD_LENGTH + UNDER_HEAD_CORNER_RADIUS_MAX),
+            SHOULDER_R + UNDER_HEAD_CORNER_RADIUS_MAX,
+            *shoulder_points[0],
             *points[-1],
         ),
     )
     set_sketch_direct_db(adapter, False)
-    for chain, vertices in ((lines, points), (thread_lines, thread_points)):
+    for chain, vertices in ((lines, points), (shoulder_lines, shoulder_points), (thread_lines, thread_points)):
         for index, line in enumerate(chain):
             (u0, v0), (u1, v1) = vertices[index], vertices[index + 1]
             if u0 != u1 and v0 != v1:
@@ -304,9 +372,8 @@ async def build(adapter) -> dict[str, str]:
                 f"screw profile {relation} {line}",
                 await adapter.add_sketch_constraint(line, None, relation),
             )
-    head_outline, shoulder_outline = lines[1], lines[3]
-    seat_edge_break = lines[4]
-    relief_lead, relief_floor = lines[6], lines[7]
+    head_outline, head_outer_chamfer, under_head_face = lines[1], lines[2], lines[3]
+    shoulder_outline, seat_edge_break, _, relief_lead, relief_floor = shoulder_lines
     relief_flank, thread_outline, tip_chamfer, _, _ = thread_lines
     # Exact-coordinate endpoints merge in the sketch DB, as in _chain_link.
     # Do not constrain those already-shared vertices a second time.
@@ -315,15 +382,26 @@ async def build(adapter) -> dict[str, str]:
             f"screw relief corner tangent to {label}",
             await adapter.add_sketch_constraint(line, relief_corner, "tangent"),
         )
+    for label, line in (("head face", under_head_face), ("shoulder", shoulder_outline)):
+        check(
+            f"screw inner under-head corner tangent to {label}",
+            await adapter.add_sketch_constraint(line, under_head_corner, "tangent"),
+        )
     # ShoulderLength spans from under the head to the actual seat face, not
     # the shortened cylindrical outline.  The threaded section is sized from
     # the seat face to the tip, across the relief; the relief width and lead's
     # axial leg start at that same seat face.  Each chamfer has an axial leg.
     for name, start, end, value in (
-        ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
+        ("HeadLength", f"{head_outline}.start", f"{under_head_face}.start", HEAD_LENGTH),
+        (
+            "HeadOuterChamfer",
+            f"{head_outer_chamfer}.start",
+            f"{head_outer_chamfer}.end",
+            HEAD_OUTER_CHAMFER,
+        ),
         (
             "ShoulderLength",
-            f"{shoulder_outline}.start",
+            f"{under_head_face}.end",
             f"{seat_edge_break}.end",
             SHOULDER_LENGTH,
         ),
@@ -342,6 +420,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, start, end, "horizontal_distance", value, f"screw {name}"
         )
         profile.record(name, f'"{name}"')
+    await dimension_between(
+        adapter,
+        f"{head_outer_chamfer}.start",
+        f"{head_outer_chamfer}.end",
+        "vertical_distance",
+        HEAD_OUTER_CHAMFER,
+        "screw outer under-head chamfer rise",
+    )
+    profile.record("HeadOuterChamferRise", '"HeadOuterChamfer"')
     await dimension_between(
         adapter,
         f"{seat_edge_break}.start",
@@ -377,6 +464,13 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     profile.record("ReliefCornerRadius", '"ReliefCornerRadius"')
+    check(
+        "screw inner under-head corner radius",
+        await adapter.add_sketch_dimension(
+            under_head_corner, None, "radial", UNDER_HEAD_CORNER_RADIUS_MAX
+        ),
+    )
+    profile.record("UnderHeadCornerRadius", '"UnderHeadCornerRadius"')
     for name, line, u_mid, radius in (
         ("HeadDia", head_outline, -HEAD_LENGTH / 2.0, HEAD_R),
         (
@@ -492,7 +586,10 @@ async def build(adapter) -> dict[str, str]:
     set_sketch_direct_db(adapter, True)
     witness = check(
         "under-head witness line",
-        await adapter.add_line(-HEAD_LENGTH, -HEAD_R, -HEAD_LENGTH, -SHOULDER_R),
+        await adapter.add_line(
+            -HEAD_LENGTH, -(HEAD_R - HEAD_OUTER_CHAMFER),
+            -HEAD_LENGTH, -(SHOULDER_R + UNDER_HEAD_CORNER_RADIUS_MAX),
+        ),
     )
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[witness], "ISketchSegment")
@@ -517,19 +614,22 @@ async def build(adapter) -> dict[str, str]:
         f"{overall_line}.end",
         f"{witness}.start",
         "vertical_distance",
-        HEAD_R,
+        HEAD_R - HEAD_OUTER_CHAMFER,
         "under-head witness at the head's edge",
     )
-    stations.record("UnderHeadY", '"HeadDia" / 2')
+    stations.record("UnderHeadY", '"HeadDia" / 2 - "HeadOuterChamfer"')
     await dimension_between(
         adapter,
         f"{witness}.start",
         f"{witness}.end",
         "vertical_distance",
-        HEAD_R - SHOULDER_R,
+        HEAD_R - HEAD_OUTER_CHAMFER - SHOULDER_R - UNDER_HEAD_CORNER_RADIUS_MAX,
         "under-head witness across the annulus",
     )
-    stations.record("UnderHeadWitness", '( "HeadDia" - "ShoulderDia" ) / 2')
+    stations.record(
+        "UnderHeadWitness",
+        '( "HeadDia" - "ShoulderDia" ) / 2 - "HeadOuterChamfer" - "UnderHeadCornerRadius"',
+    )
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -583,6 +683,7 @@ async def build(adapter) -> dict[str, str]:
     _single_limits(adapter)
     # The relief lead's own native dimension prints both limits of its band.
     _relief_lead_limits(adapter)
+    _head_outer_chamfer_limits(adapter)
 
     # Every model edit -- the material, the appearance, the drawing marks, the
     # PMI and the hidden reference sketch -- precedes the INSTALLED split, so

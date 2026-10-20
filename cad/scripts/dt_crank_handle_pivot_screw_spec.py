@@ -15,6 +15,10 @@ z=OVERALL_LENGTH.
 The printed relief diameter is the associative diametric-linear
 ``ReliefDia@ScrewProfile`` control of the straight groove floor, driven by the
 ``ReliefDia`` global.
+The underside has a real concave inner R0.1 MAX and a native outer
+0.11–0.26 X45 LIMIT bevel. Together with the cup's native mouth break they
+clear both corner envelopes at zero-gap eccentric float while preserving
+the actual under-head face, axial interfaces and minimum bearing annulus.
 
 PURE DATA, no SolidWorks/COM imports.  The part build and the drawing both read
 these names; the derived fit facts below are asserted at import so a retune of
@@ -32,10 +36,21 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from dt_crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
-    FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
+    FLOOR_HOLE_DIA_MIN as CUP_FLOOR_HOLE_DIA_MIN,
+    FLOOR_HOLE_DIA_MAX as CUP_FLOOR_HOLE_DIA_MAX,
+    FLOOR_HOLE_MOUTH_CHAMFER_MIN as CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN,
+    FLOOR_HOLE_MOUTH_CHAMFER_MAX as CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    MATING_SCREW_UNDER_HEAD_FILLET_MAX,
+    MATING_SCREW_HEAD_DIA_MIN,
+    MATING_SCREW_SHOULDER_DIA_MIN,
+    MATING_SCREW_HEAD_EDGE_BREAK_MIN,
+    MATING_SCREW_HEAD_EDGE_BREAK_MAX,
+    MATING_SCREW_HEAD_BEARING_FLOOR,
+    MATING_SCREW_SEATED_GAP_MIN,
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
+    POCKET_FLOOR_CORNER_R_MAX as CUP_POCKET_FLOOR_CORNER_R_MAX,
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
@@ -59,15 +74,22 @@ STOCK_DIA = 0.25 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-35
 # butt cup's pocket, which is bored to suit it, and bears on the cup floor.
-# Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
-# the worst case, after an edge break on each.  Ø6 (user ruling 2026-09-30,
-# ch30 eight-views-4): the photographed head, which lets the cup and the butt
-# shrink to the photographed size.
+# Its +/-0.10 band protects the bearing annulus as well as the stock envelope.
+# The Ø6 head lets the cup and butt retain their photographed size.
 HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
-# Rule 4: the diameter names its pocket clearance, not the axial floor face.
-# The maximum also preserves the wall around the pocket bored to suit it.
-HEAD_DIA_CALLOUT = "CLEARANCE IN MHA-DT-35 POCKET"
+HEAD_DIA_MIN = round(HEAD_DIA - HEAD_DIA_TOL, 6)
+HEAD_DIA_CALLOUT = "BEARING ANNULUS ON MHA-DT-35"
+# Owner-approved option2: the inner corner ADDS a concave tangent fillet.
+# The outer 45-degree bevel explicitly overrides the generic edge break
+# only here; its minimum clears the cup's protruding pocket-floor round.
+UNDER_HEAD_CORNER_RADIUS_MAX = MATING_SCREW_UNDER_HEAD_FILLET_MAX
+UNDER_HEAD_CORNER_TOL_TYPE = 6  # swTolType_e.swTolMAX
+HEAD_OUTER_CHAMFER_MIN = MATING_SCREW_HEAD_EDGE_BREAK_MIN
+HEAD_OUTER_CHAMFER_MAX = MATING_SCREW_HEAD_EDGE_BREAK_MAX
+HEAD_OUTER_CHAMFER = HEAD_OUTER_CHAMFER_MAX
+HEAD_OUTER_CHAMFER_BAND = (0.0, round(HEAD_OUTER_CHAMFER_MIN - HEAD_OUTER_CHAMFER_MAX, 6))
+HEAD_OUTER_CHAMFER_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 # A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review) keeps
 # 1.5 of head under the deepest .X slot below.  Banded (Codex P2 on #1139,
 # user ruling 2026-09-30): at .X the longest head, at the widest fitted end
@@ -214,6 +236,7 @@ RELIEF_LEAD_LIMITS = (
     round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
 )
 CHAMFER_CALLOUT = "X 45 DEG"
+HEAD_OUTER_CHAMFER_CALLOUT = f"{CHAMFER_CALLOUT}\nCLEARS MHA-DT-35\nFLOOR RADIUS"
 # Each chamfer leg is imported from its own native model dimension.  The
 # relief diameter's root reason is one ABOVE line (native multiline ABOVE
 # does not print); its seating reason and mate remain two BELOW lines.
@@ -272,21 +295,36 @@ CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2
 # The slot's worst-case web: the shortest head under the deepest slot.
 SLOT_WEB_MIN = round(HEAD_LENGTH - HEAD_LENGTH_TOL - SLOT_DEPTH_MAX, 6)
 TIP_CHAMFER_MAX = TIP_CHAMFER
-# Under-head bearing annulus on the cup floor at the worst case: the smallest
-# head over the largest drilled floor hole, less a title-block edge break on
-# each, on the narrow side with the head pushed off-centre as far as its
-# running play allows (local review of fbf82ad96: the concentric figure
-# overstated it).  The play is the smaller of the head's in the pocket and
-# the shoulder's in the floor hole.
-_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + 0.10  # DRILLED HOLES +0.10/0
-HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
-    ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM, 6
-)
+# Explicit actual inputs, not duplicated mating requirements: the float is
+# correlated with the actual shaft/hole pair. At shaft3.92/hole4.30, e=.19;
+# the near hole edge is tangent to that shaft, never an incompatible holeMIN.
+_FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA_MAX
 HEAD_RUNNING_OFFSET_MAX = round(
-    min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - (SHOULDER_DIA + SHOULDER_DIA_BAND[1])) / 2.0),
+    min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - SHOULDER_DIA_MIN) / 2.0),
     6,
 )
-HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6)
+HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
+    HEAD_DIA_MIN / 2.0 - HEAD_OUTER_CHAMFER_MAX
+    - _FLOOR_HOLE_MAX / 2.0 - CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+    6,
+)
+HEAD_BEARING_RADIAL_MIN = round(
+    HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6
+)
+# The fitted E is a seated gap, not a minimum while the handle floats.
+# Both complete R envelopes must clear even at instantaneous zero gap.
+UNDER_HEAD_INNER_NORMAL_AIR_MIN = (
+    CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN - UNDER_HEAD_CORNER_RADIUS_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_OUTER_NORMAL_AIR_MIN = (
+    HEAD_OUTER_CHAMFER_MIN - CUP_POCKET_FLOOR_CORNER_R_MAX
+) / math.sqrt(2.0)
+UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN = END_PLAY_RANGE[0] - UNDER_HEAD_CORNER_RADIUS_MAX
+UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN = END_PLAY_RANGE[0] - CUP_POCKET_FLOOR_CORNER_R_MAX
+UNDER_HEAD_FLAT_WITNESS_LENGTH = (
+    (HEAD_DIA - SHOULDER_DIA) / 2.0
+    - HEAD_OUTER_CHAMFER_MAX - UNDER_HEAD_CORNER_RADIUS_MAX
+)
 # Wood-on-steel running clearance, on diameter.
 DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
@@ -406,6 +444,7 @@ for _ok, _what in (
         END_PLAY_RANGE[0] <= END_PLAY_NOMINAL <= END_PLAY_RANGE[1],
         "the modelled end play is outside the fitted band",
     ),
+    (END_PLAY_RANGE[0] >= MATING_SCREW_SEATED_GAP_MIN, "fitted end play is below the cup mating requirement"),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
         RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
@@ -471,9 +510,44 @@ for _ok, _what in (
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
         "the MHA-DT-35 pocket bored to suit the largest head leaves under its 1.5 wall",
     ),
-    (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 of under-head bearing on the cup floor"),
     (
-        CUP_FLOOR_HOLE_DIA > SHOULDER_DIA_MAX,
+        HEAD_DIA_MIN >= MATING_SCREW_HEAD_DIA_MIN
+        and SHOULDER_DIA_MIN >= MATING_SCREW_SHOULDER_DIA_MIN,
+        "actual head/shoulder minima violate the MHA-DT-35 mating requirements",
+    ),
+    (
+        0.0 < UNDER_HEAD_CORNER_RADIUS_MAX <= MATING_SCREW_UNDER_HEAD_FILLET_MAX,
+        "invalid inner under-head fillet",
+    ),
+    (
+        0.0 < HEAD_OUTER_CHAMFER_MIN <= HEAD_OUTER_CHAMFER_MAX
+        and HEAD_OUTER_CHAMFER_MIN >= MATING_SCREW_HEAD_EDGE_BREAK_MIN
+        and HEAD_OUTER_CHAMFER_MAX <= MATING_SCREW_HEAD_EDGE_BREAK_MAX
+        and HEAD_OUTER_CHAMFER == HEAD_OUTER_CHAMFER_MAX
+        and HEAD_OUTER_CHAMFER_BAND == (0.0, round(HEAD_OUTER_CHAMFER_MIN - HEAD_OUTER_CHAMFER_MAX, 6)),
+        "invalid outer under-head chamfer range",
+    ),
+    (
+        0.0 < CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN <= CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX,
+        "invalid cup floor-hole mouth chamfer range",
+    ),
+    (UNDER_HEAD_INNER_NORMAL_AIR_MIN > 0.0, "inner under-head corner has no positive zero-gap air"),
+    (UNDER_HEAD_OUTER_NORMAL_AIR_MIN > 0.0, "outer under-head corner has no positive zero-gap air"),
+    (
+        min(UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN, UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN) > 0.0,
+        "under-head corner envelopes consume the seated end play",
+    ),
+    (UNDER_HEAD_FLAT_WITNESS_LENGTH > 0.0, "under-head corners consume the actual flat face"),
+    (
+        HEAD_LENGTH - HEAD_OUTER_CHAMFER_MAX > SLOT_DEPTH_MAX,
+        "outer under-head chamfer reaches the driver slot",
+    ),
+    (
+        HEAD_BEARING_RADIAL_MIN >= MATING_SCREW_HEAD_BEARING_FLOOR,
+        "under 0.1 of under-head bearing on the cup floor",
+    ),
+    (
+        CUP_FLOOR_HOLE_DIA_MIN > SHOULDER_DIA_MAX,
         "the MHA-DT-35 floor hole does not pass the shoulder",
     ),
     (HEAD_RECESS_NOMINAL >= 0.0, "the head stands proud of the cup at nominal"),
@@ -502,6 +576,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
         "HeadLength",
+        "UnderHeadCornerRadius",
+        "HeadOuterChamfer",
         "ShoulderDia",
         "ShoulderLength",
         "ThreadLength",
@@ -525,6 +601,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
         "HeadLength": 2,
+        "UnderHeadCornerRadius": 1,
+        "HeadOuterChamfer": 2,
         "ShoulderDia": 2,
         "ShoulderLength": 1,
         "ThreadLength": 1,
@@ -547,6 +625,9 @@ SINGLE_LIMITS: dict[tuple[str, str], tuple[float, int]] = {
         SEAT_EDGE_BREAK_TOL_TYPE,
     ),
     ("ScrewProfile", "ReliefCornerRadius"): (RELIEF_CORNER_RADIUS_MAX, 6),  # swTolMAX
+    ("ScrewProfile", "UnderHeadCornerRadius"): (
+        UNDER_HEAD_CORNER_RADIUS_MAX, UNDER_HEAD_CORNER_TOL_TYPE,
+    ),
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

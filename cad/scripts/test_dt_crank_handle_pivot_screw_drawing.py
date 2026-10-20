@@ -71,7 +71,7 @@ def test_model_owns_places_and_bands() -> None:
     # length that keeps it below the cup face print at two places.  The relief's
     # bounded seating neck and lead, relief-corner MAX, seat-edge break MAX,
     # tip chamfer MAX, slot depth and thread length print at one (r8).
-    running_fit = {"ShoulderDia", "HeadDia", "HeadLength"}
+    running_fit = {"ShoulderDia", "HeadDia", "HeadLength", "HeadOuterChamfer"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     # Main's r18 ruling adds the existing local 53 REF with its to-suit rule,
@@ -93,6 +93,7 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "TipChamfer"): (spec.TIP_CHAMFER, 6),
         ("ScrewProfile", "SeatEdgeBreak"): (spec.SEAT_EDGE_BREAK_MAX, 6),
         ("ScrewProfile", "ReliefCornerRadius"): (spec.RELIEF_CORNER_RADIUS_MAX, 6),
+        ("ScrewProfile", "UnderHeadCornerRadius"): (spec.UNDER_HEAD_CORNER_RADIUS_MAX, 6),
     }
     assert "_single_limits(adapter)" in Path(part.__file__).read_text(encoding="utf-8")
     assert spec.SHOULDER_DIA == 4.00
@@ -435,7 +436,8 @@ def corner_profile(monkeypatch):
         async def add_arc(self, *points):
             assert self.currentSketchManager.AddToDB is True
             state.arcs.append(points)
-            return result("Corner", operation="arc")
+            name = "Corner" if len(state.arcs) == 1 else "UnderHeadCorner"
+            return result(name, operation="arc" if len(state.arcs) == 1 else "under-head-arc")
 
         async def add_sketch_constraint(self, first, second, relation):
             state.constraints.append((first, second, relation))
@@ -443,7 +445,8 @@ def corner_profile(monkeypatch):
 
         async def add_sketch_dimension(self, first, second, kind, value):
             state.dimensions.append((first, second, kind, value))
-            return result(f"Dimension{len(state.dimensions)}", operation=kind)
+            operation = "under-head-radial" if first == "UnderHeadCorner" else kind
+            return result(f"Dimension{len(state.dimensions)}", operation=operation)
 
         async def exit_sketch(self):
             state.events.append("exit")
@@ -493,38 +496,40 @@ async def test_builder_uses_the_supported_tangent_arc_and_associative_radius(cor
     r = spec.RELIEF_DIA / 2.0
     end = spec.RELIEF_END_STATION
     # The adapter's CCW arc starts on the flank and ends on the floor.
-    assert state.arcs == [pytest.approx((-(end - e), r + e, -end, r + e, -(end - e), r))]
-    assert state.lines["Line7"] == pytest.approx(
+    assert len(state.arcs) == 2
+    assert state.arcs[0] == pytest.approx((-(end - e), r + e, -end, r + e, -(end - e), r))
+    assert state.lines["Line8"] == pytest.approx(
         (-(spec.SEAT_STATION + spec.RELIEF_LEAD), r, -(end - e), r)
     )
-    assert state.lines["Line8"] == pytest.approx((-end, r + e, -end, part.THREAD_R))
+    assert state.lines["Line9"] == pytest.approx((-end, r + e, -end, part.THREAD_R))
     for u, v in (state.arcs[0][2:4], state.arcs[0][4:6]):
         # Contain the endpoints the builder REALLY sends to CreateArc, not
         # the removed sharp floor/flank intersection.
         assert drawing.DETAIL_RADIUS_MM - math.hypot(
             -u - drawing.DETAIL_STATION, v
         ) >= 0.2
-    assert state.lines["Line7"][2:] == state.arcs[0][4:6]
-    assert state.lines["Line8"][:2] == state.arcs[0][2:4]
-    assert state.lines["Line12"][2:] == state.lines["Line0"][:2]
+    assert state.lines["Line8"][2:] == state.arcs[0][4:6]
+    assert state.lines["Line9"][:2] == state.arcs[0][2:4]
+    assert state.lines["Line13"][2:] == state.lines["Line0"][:2]
     for connection in (
-        ("Line7", "Corner", "tangent"),
         ("Line8", "Corner", "tangent"),
+        ("Line9", "Corner", "tangent"),
     ):
         assert connection in state.constraints
     assert not any(relation == "fix" for _, _, relation in state.constraints)
     assert ("Corner", None, "radial", e) in state.dimensions
     assert ("ReliefCornerRadius", '"ReliefCornerRadius"') in state.rows
     assert state.globals["ReliefCornerRadius"] == f"{e}mm"
-    assert ("Line6.start", "Line8.start", "horizontal_distance", spec.RELIEF_WIDTH) in state.dimensions
+    assert ("Line7.start", "Line9.start", "horizontal_distance", spec.RELIEF_WIDTH) in state.dimensions
     assert ("ReliefWidth", '"ReliefWidth"') in state.rows
     assert ("ReliefDia", '"ReliefDia"') in state.rows
-    assert ("Line7", None, "diameter", "ReliefDia") in state.dimensions
+    assert ("Line8", None, "diameter", "ReliefDia") in state.dimensions
     assert state.events == ["fully_defined", "exit", "ScrewProfile"]
 
 
 @pytest.mark.asyncio
-async def test_relief_corner_real_adapter_emits_a_90_degree_not_270_degree_arc(corner_profile):
+@pytest.mark.parametrize("arc_index", [0, 1], ids=["thread-relief", "inner-under-head"])
+async def test_relief_corner_real_adapter_emits_a_90_degree_not_270_degree_arc(corner_profile, arc_index):
     from types import SimpleNamespace
 
     from solidworks_mcp.adapters.solidworks.sketch import SolidWorksSketchMixin
@@ -564,26 +569,29 @@ async def test_relief_corner_real_adapter_emits_a_90_degree_not_270_degree_arc(c
     native = Boundary()
     # Exercise the installed adapter's PUBLIC add_arc path, including its
     # actual mm-to-metres conversion and CreateArc direction argument.
-    made = await SolidWorksSketchMixin.add_arc(native, *state.arcs[0])
+    made = await SolidWorksSketchMixin.add_arc(native, *state.arcs[arc_index])
     assert made.is_success and made.data == "Corner"
     assert native.registered == [("Arc", native.currentSketchManager.segment)]
     assert len(native.currentSketchManager.calls) == 1
     xc, yc, zc, x1, y1, z1, x2, y2, z2, direction = native.currentSketchManager.calls[0]
-    e = spec.RELIEF_CORNER_RADIUS_MAX / 1000.0
-    r = spec.RELIEF_DIA / 2000.0
-    station = spec.RELIEF_END_STATION / 1000.0
-    assert (xc, yc, zc, x1, y1, z1, x2, y2, z2) == pytest.approx(
-        (-(station - e), r + e, 0.0, -station, r + e, 0.0,
-         -(station - e), r, 0.0)
-    )
-    # ISketchManager.CreateArc: +1 is CCW in sketch coordinates.  Starting
-    # at the FLANK gives (-R, 0) -> (0, -R), a positive 90-degree turn.
-    # Starting at the floor instead would use the complementary 270 degrees.
+    if arc_index == 0:
+        e = spec.RELIEF_CORNER_RADIUS_MAX / 1000.0
+        r = spec.RELIEF_DIA / 2000.0
+        station = spec.RELIEF_END_STATION / 1000.0
+        expected = (-(station - e), r + e, 0.0, -station, r + e, 0.0,
+                    -(station - e), r, 0.0)
+        expected_start, expected_end = (-e, 0.0), (0.0, -e)
+    else:
+        e = spec.UNDER_HEAD_CORNER_RADIUS_MAX / 1000.0
+        expected = (-0.0041, 0.0021, 0.0, -0.0041, 0.0020, 0.0, -0.0040, 0.0021, 0.0)
+        expected_start, expected_end = (0.0, -e), (e, 0.0)
+    assert (xc, yc, zc, x1, y1, z1, x2, y2, z2) == pytest.approx(expected)
+    # Public adapter -> pinned CreateArc centre/start/end in metres; +1 CCW.
     assert direction == 1
     start = (x1 - xc, y1 - yc)
     end = (x2 - xc, y2 - yc)
-    assert start == pytest.approx((-e, 0.0))
-    assert end == pytest.approx((0.0, -e))
+    assert start == pytest.approx(expected_start)
+    assert end == pytest.approx(expected_end)
     signed_turn = math.atan2(
         start[0] * end[1] - start[1] * end[0],
         start[0] * end[0] + start[1] * end[1],
@@ -751,12 +759,13 @@ def test_native_callouts_own_the_relief_lead_corner_and_seat_break() -> None:
         "ReliefLead": "RELIEF_LEAD_CALLOUT",
         "ReliefCornerRadius": "RELIEF_CORNER_CALLOUT",
         "SeatEdgeBreak": "SEAT_EDGE_BREAK_CALLOUT",
+        "HeadOuterChamfer": "HEAD_OUTER_CHAMFER_CALLOUT",
         "TipChamfer": "CHAMFER_CALLOUT",
         "HeadDia": "HEAD_DIA_CALLOUT",
         "HeadLength": "HEAD_LENGTH_CALLOUT",
         "ShoulderLength": "UNDER_HEAD_CALLOUT",
     }
-    assert spec.HEAD_DIA_CALLOUT == "CLEARANCE IN MHA-DT-35 POCKET"
+    assert spec.HEAD_DIA_CALLOUT == "BEARING ANNULUS ON MHA-DT-35"
     assert spec.HEAD_LENGTH_CALLOUT == "HEAD; KEEPS TOP BELOW MHA-DT-35 FACE"
     assert drawing.HEAD_DIA_CALLOUT is spec.HEAD_DIA_CALLOUT
     assert drawing.HEAD_LENGTH_CALLOUT is spec.HEAD_LENGTH_CALLOUT
@@ -773,12 +782,12 @@ def test_native_seat_break_preserves_the_functional_shoulder_length() -> None:
     assert "(-SEAT_STATION, SHOULDER_R - SEAT_EDGE_BREAK_MAX)," in body
     assert "(-SEAT_STATION, RELIEF_R + RELIEF_LEAD)," in body
     assert "lines = await add_line_chain(adapter, points, close=False)" in body
-    assert "head_outline, shoulder_outline = lines[1], lines[3]" in body
-    assert "seat_edge_break = lines[4]" in body
+    assert "head_outline, head_outer_chamfer, under_head_face = lines[1], lines[2], lines[3]" in body
+    assert "shoulder_outline, seat_edge_break, _, relief_lead, relief_floor = shoulder_lines" in body
     assert '("SeatEdgeBreak", SEAT_EDGE_BREAK_MAX),' in body
     assert (
         '"ShoulderLength",\n'
-        '            f"{shoulder_outline}.start",\n'
+        '            f"{under_head_face}.end",\n'
         '            f"{seat_edge_break}.end",\n'
         "            SHOULDER_LENGTH,"
     ) in body
@@ -887,9 +896,9 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
 
 
 def test_head_bearing_acceptance_accounts_for_running_offset() -> None:
-    assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(0.3)
+    assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(0.29)
     assert spec.HEAD_RUNNING_OFFSET_MAX == pytest.approx(min(0.4 / 2.0, (4.3 - 3.92) / 2.0))
-    assert spec.HEAD_BEARING_RADIAL_MIN == pytest.approx(0.11)
+    assert spec.HEAD_BEARING_RADIAL_MIN == pytest.approx(0.10)
 
 
 def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
@@ -1003,14 +1012,16 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
         + 0.2**3 * (5.0 / 6.0 - math.pi / 4.0)
     )
     assert part.V_RELIEF_CORNER == pytest.approx(corner)
+    inner = 2.0 * math.pi * (2.0 * 0.1**2 * (1.0 - math.pi / 4.0) + 0.1**3 * (5.0 / 6.0 - math.pi / 4.0))
+    outer = math.pi * (3.0 * 0.26**2 - 0.26**3 / 3.0)
     assert part.V_BODY == pytest.approx(
-        head + shoulder + relief + thread + lead + corner - tip - seat_break
+        head + shoulder + relief + thread + lead + corner - tip - seat_break + inner - outer
     )
     # Filed flush: 5.6 of full thread past the relief, a 0.25 edge break.
     fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 5.6
     fitted_tip = 2.0 * math.pi * (2.845 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
     assert part.turned_volume(8.0, 0.25) == pytest.approx(
-        head + shoulder + relief + fitted_thread + lead + corner - fitted_tip - seat_break
+        head + shoulder + relief + fitted_thread + lead + corner - fitted_tip - seat_break + inner - outer
     )
     assert part.V_INSTALLED == pytest.approx(part.turned_volume(8.0, 0.25) - part.V_SLOT)
     # A 1.0 strip across a Ø6 circle: integrate the chord 2*sqrt(r^2 - y^2)
@@ -1131,14 +1142,14 @@ def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
 
 
 def test_under_head_witness_lies_on_the_edge_and_prints_black() -> None:
-    # Machinist review of 04b95f481: the full-length under-head line under
-    # the shank read as a stray feature line.  The reference now ends on a
-    # 1.0 witness ON the under-head annulus's edge, drawn in the outline's
-    # black.
+    # The witness is exactly the remaining .64 flat, never a phantom sharp
+    # corner through the fillet or bevel. It prints in the outline's black.
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert "under_head_v" not in build
-    assert "add_line(-HEAD_LENGTH, -HEAD_R, -HEAD_LENGTH, -SHOULDER_R)" in build
-    assert drawing.UNDER_HEAD_WITNESS_LEN == pytest.approx(1.0)
+    assert "-HEAD_LENGTH, -(HEAD_R - HEAD_OUTER_CHAMFER)," in build
+    assert "-HEAD_LENGTH, -(SHOULDER_R + UNDER_HEAD_CORNER_RADIUS_MAX)," in build
+    assert drawing.UNDER_HEAD_WITNESS_LEN == pytest.approx(0.64)
+    assert drawing.UNDER_HEAD_WITNESS_LEN == pytest.approx(spec.UNDER_HEAD_FLAT_WITNESS_LENGTH)
     assert drawing.REFERENCE_WITNESS_COLOR == 0
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.index("_blacken_under_head_witness(adapter, side)") < source.index(
@@ -1279,11 +1290,12 @@ def test_relief_width_side_witness_reservations_start_below_the_real_profile_wit
 
 def test_relief_caption_full_block_clears_crop_root_and_title_block():
     x, y = drawing.DETAIL_LABEL_XY
-    assert (x, y) == pytest.approx((0.370, 0.127))
+    assert (x, y) == pytest.approx((0.342, 0.0845))
     width = max(map(len, drawing.DETAIL_VIEW_LABEL.splitlines())) * 0.0028
-    assert x - (drawing.DETAIL_CENTER[0] + drawing.DETAIL_RADIUS) >= 0.005
+    assert drawing.DETAIL_CENTER[1] - drawing.DETAIL_RADIUS - y >= 0.005
     assert x + width < 0.4191
-    assert y - 2.0 * 0.0046 > drawing.DETAIL_KEEP["ReliefDia"][1] + 0.0092
+    # Below the crop, right of the actual rotated ROOT block, above the title.
+    assert x - drawing.DETAIL_KEEP["ReliefDia"][0] >= 0.020
     assert y - 2.0 * 0.0046 > 0.066
 
 
@@ -3126,7 +3138,7 @@ def test_approved_corridor_tune_keeps_exact_detail_frame_scale_crop_and_anchors(
         "ReliefLead": (0.378, 0.106),
         "SeatEdgeBreak": (0.378, 0.1615),
     }
-    assert drawing.DETAIL_LABEL_XY == (0.370, 0.127)
+    assert drawing.DETAIL_LABEL_XY == (0.342, 0.0845)
     assert drawing.HEAD_LENGTH_TEXT_X == 0.360
     assert drawing.SIDE_KEEP["HeadLength"] == (0.360, 0.1765)
 
@@ -3182,7 +3194,7 @@ def _settled_native_records(*, r17=False):
               "extent": [0.0190772, 0.1506611, 0.0, 0.0600621, 0.1945054, 0.0]},
     )
     note["display"]["arrows"] = [[*tip, 0.0, *direction, 0.0, 0.003556, 0.000762, 1, 0, 0, 1]]
-    return [root, *references, note]
+    return [root, *references, note, *_under_head_native_records()]
 
 
 def test_fitted_span_reuses_native_model_carrier_and_all_three_reference_guards():
@@ -3432,3 +3444,548 @@ def test_settled_unreadable_text_reference_keeps_all_other_native_offenders():
     for reference in ("UnderHeadLocation", "OverallLength"):
         assert f"ThreadNote/lines vs {reference}" in message
         assert f"ThreadNote/leaders vs {reference}" in message
+
+
+def test_option2_uses_the_exact_lower_level_mating_requirements_and_actual_inputs():
+    assert spec.UNDER_HEAD_CORNER_RADIUS_MAX == cup.MATING_SCREW_UNDER_HEAD_FILLET_MAX == 0.1
+    assert spec.HEAD_OUTER_CHAMFER_MIN == cup.MATING_SCREW_HEAD_EDGE_BREAK_MIN == 0.11
+    assert spec.HEAD_OUTER_CHAMFER_MAX == cup.MATING_SCREW_HEAD_EDGE_BREAK_MAX == 0.26
+    assert spec.HEAD_OUTER_CHAMFER == 0.26
+    assert spec.HEAD_OUTER_CHAMFER_BAND == (0.0, -0.15)
+    assert spec.HEAD_OUTER_CHAMFER_TOL_TYPE == 3
+    assert spec.HEAD_DIA_MIN == cup.MATING_SCREW_HEAD_DIA_MIN == 5.9
+    assert spec.SHOULDER_DIA_MIN == cup.MATING_SCREW_SHOULDER_DIA_MIN == 3.92
+    assert spec.END_PLAY_RANGE[0] == cup.MATING_SCREW_SEATED_GAP_MIN == 0.25
+    assert spec.CUP_FLOOR_HOLE_DIA_MIN == 4.2
+    assert spec.CUP_FLOOR_HOLE_DIA_MAX == 4.3
+    assert spec.CUP_FLOOR_HOLE_MOUTH_CHAMFER_MIN == 0.11
+    assert spec.CUP_FLOOR_HOLE_MOUTH_CHAMFER_MAX == 0.25
+    assert spec.CUP_POCKET_FLOOR_CORNER_R_MAX == 0.1
+    assert spec.HEAD_BEARING_RADIAL_MIN == cup.MATING_SCREW_HEAD_BEARING_FLOOR == 0.1
+    assert spec.HEAD_OUTER_CHAMFER_CALLOUT == "X 45 DEG\nCLEARS MHA-DT-35\nFLOOR RADIUS"
+    assert "0.11" not in spec.HEAD_OUTER_CHAMFER_CALLOUT
+    assert "0.26" not in spec.HEAD_OUTER_CHAMFER_CALLOUT
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert "2.0 * EDGE_BREAK_MAX_MM" not in source
+    assert "UNDER_HEAD_CORNER_RADIUS_MAX = MATING_SCREW_UNDER_HEAD_FILLET_MAX" in source
+    assert spec.HEAD_OUTER_CHAMFER_MAX > geometry.EDGE_BREAK_MAX_MM
+
+
+def test_option2_both_corners_have_positive_air_at_a_valid_same_coordinate_state():
+    head, shaft, hole, clearance = 5.9, 3.92, 4.3, 0.38
+    pocket = head + clearance
+    offset = min(clearance / 2.0, (hole - shaft) / 2.0)
+    assert pocket == pytest.approx(6.28)
+    assert offset == pytest.approx(0.19)
+    assert hole / 2.0 - offset == pytest.approx(shaft / 2.0)
+    assert pocket / 2.0 - offset == pytest.approx(head / 2.0)
+    # Separate tolerance extrema: minimum breaks prove air; maximum breaks
+    # prove the far-side bearing floor, not one manufactured tolerance set.
+    for r, leg, normal, seated in (
+        (spec.UNDER_HEAD_CORNER_RADIUS_MAX, cup.FLOOR_HOLE_MOUTH_CHAMFER_MIN,
+         spec.UNDER_HEAD_INNER_NORMAL_AIR_MIN, spec.UNDER_HEAD_INNER_SEATED_AXIAL_AIR_MIN),
+        (cup.POCKET_FLOOR_CORNER_R_MAX, spec.HEAD_OUTER_CHAMFER_MIN,
+         spec.UNDER_HEAD_OUTER_NORMAL_AIR_MIN, spec.UNDER_HEAD_OUTER_SEATED_AXIAL_AIR_MIN),
+    ):
+        assert normal == pytest.approx((leg - r) / math.sqrt(2.0))
+        assert normal == pytest.approx(0.00707106781186547)
+        assert seated == pytest.approx(0.15)
+        for index in range(1001):
+            angle = index / 1000.0 * math.pi / 2.0
+            x, y = r * (1.0 - math.cos(angle)), r * (1.0 - math.sin(angle))
+            assert (leg - x - y) / math.sqrt(2.0) >= normal - 1e-14
+    bearing = head / 2.0 - 0.26 - hole / 2.0 - offset - 0.25
+    assert bearing == pytest.approx(spec.HEAD_BEARING_RADIAL_MIN)
+    assert bearing == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize("shaft", [3.92, 3.945, 3.97])
+@pytest.mark.parametrize("hole", [4.2, 4.25, 4.3])
+@pytest.mark.parametrize("pocket_clearance", [0.2, 0.3, 0.4])
+def test_option2_offset_is_correlated_with_each_physically_allowed_pair(shaft, hole, pocket_clearance):
+    offset = min(pocket_clearance / 2.0, (hole - shaft) / 2.0)
+    assert hole / 2.0 - offset - shaft / 2.0 >= -1e-14
+    assert pocket_clearance / 2.0 - offset >= -1e-14
+    assert offset <= spec.HEAD_RUNNING_OFFSET_MAX + 1e-14
+
+
+@pytest.mark.parametrize("name,value,message", [
+    ("FLOOR_HOLE_MOUTH_CHAMFER_MIN", 0.1, "inner under-head corner has no positive"),
+    ("POCKET_FLOOR_CORNER_R_MAX", 0.11, "outer under-head corner has no positive"),
+    ("FLOOR_HOLE_MOUTH_CHAMFER_MIN", 0.26, "invalid cup floor-hole mouth chamfer range"),
+    ("FLOOR_HOLE_MOUTH_CHAMFER_MAX", 0.250002, "under 0.1 of under-head bearing"),
+    ("FLOOR_HOLE_DIA_MAX", 4.300002, "under 0.1 of under-head bearing"),
+    ("MATING_SCREW_HEAD_EDGE_BREAK_MIN", 0.27, "invalid outer under-head chamfer range"),
+    ("MATING_SCREW_HEAD_EDGE_BREAK_MAX", 0.260002, "under 0.1 of under-head bearing"),
+    ("MATING_SCREW_UNDER_HEAD_FILLET_MAX", 0.11, "inner under-head corner has no positive"),
+    ("MATING_SCREW_UNDER_HEAD_FILLET_MAX", 0.0, "invalid inner under-head fillet"),
+    ("MATING_SCREW_SEATED_GAP_MIN", 0.26, "fitted end play is below"),
+])
+def test_option2_imported_boundary_mutations_fail_the_independent_screw_guard(monkeypatch, name, value, message):
+    monkeypatch.setattr(cup, name, value)
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    with pytest.raises(AssertionError, match=message):
+        exec(compile(source, spec.__file__, "exec"), {"__name__": "_option2_mating_probe"})
+
+
+@pytest.mark.parametrize("previous,replacement", [
+    ("HEAD_DIA_TOL = 0.10", "HEAD_DIA_TOL = 0.11"),
+    ("SHOULDER_DIA_BAND = (-0.03, -0.08)", "SHOULDER_DIA_BAND = (-0.03, -0.09)"),
+])
+def test_option2_actual_screw_minima_cannot_be_replaced_by_acceptance_constants(previous, replacement):
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert source.count(previous) == 1
+    with pytest.raises(AssertionError, match="actual head/shoulder minima violate"):
+        exec(compile(source.replace(previous, replacement), spec.__file__, "exec"),
+             {"__name__": "_option2_actual_inputs_probe"})
+
+
+@pytest.mark.asyncio
+async def test_option2_real_profile_keeps_actual_face_carriers_and_both_45_degree_legs(corner_profile):
+    state = corner_profile
+    with pytest.raises(state.complete):
+        await part.build(state.adapter)
+    assert state.arcs[1] == pytest.approx((-4.1, 2.1, -4.1, 2.0, -4.0, 2.1))
+    assert state.lines["Line1"] == pytest.approx((0.0, 3.0, -3.74, 3.0))
+    assert state.lines["Line2"] == pytest.approx((-3.74, 3.0, -4.0, 2.74))
+    assert state.lines["Line3"] == pytest.approx((-4.0, 2.74, -4.0, 2.1))
+    assert state.lines["Line4"][:2] == pytest.approx((-4.1, 2.0))
+    assert ("Line3", "UnderHeadCorner", "tangent") in state.constraints
+    assert ("Line4", "UnderHeadCorner", "tangent") in state.constraints
+    assert ("UnderHeadCorner", None, "radial", 0.1) in state.dimensions
+    assert ("UnderHeadCornerRadius", '"UnderHeadCornerRadius"') in state.rows
+    assert ("HeadOuterChamfer", '"HeadOuterChamfer"') in state.rows
+    assert ("HeadOuterChamferRise", '"HeadOuterChamfer"') in state.rows
+    assert state.globals["HeadOuterChamfer"] == "0.26mm"
+    assert state.globals["UnderHeadCornerRadius"] == "0.1mm"
+    assert ("Line1.start", "Line3.start", "horizontal_distance", 4.0) in state.dimensions
+    assert ("Line3.end", "Line5.end", "horizontal_distance", 53.0) in state.dimensions
+    for kind in ("horizontal_distance", "vertical_distance"):
+        assert ("Line2.start", "Line2.end", kind, 0.26) in state.dimensions
+    center, start, end = state.arcs[1][:2], state.arcs[1][2:4], state.arcs[1][4:6]
+    a = (start[0] - center[0], start[1] - center[1])
+    b = (end[0] - center[0], end[1] - center[1])
+    assert math.degrees(math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1])) == pytest.approx(90)
+    assert spec.SEAT_STATION == 57.0
+    assert spec.OVERALL_LENGTH == 67.0
+    assert spec.OVERALL_LENGTH - spec.HEAD_LENGTH == 63.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["under-head-arc", "under-head-radial"])
+async def test_option2_builder_rejects_each_new_native_feature_failure(corner_profile, failure):
+    state = corner_profile
+    state.failure = failure
+    with pytest.raises(RuntimeError, match=f"native {failure} refused"):
+        await part.build(state.adapter)
+    assert state.events == []
+
+
+def test_option2_both_configuration_volume_deltas_match_independent_radial_integrals():
+    steps = 20_000
+    r, s, h, c = 0.1, 2.0, 3.0, 0.26
+    dz = r / steps
+    filled = sum(math.pi * ((s + r - math.sqrt(r*r - ((i + 0.5)*dz - r)**2))**2 - s*s) * dz
+                 for i in range(steps))
+    dz = c / steps
+    removed = sum(math.pi * (h*h - (h - (i + 0.5)*dz)**2) * dz for i in range(steps))
+    assert part.V_UNDER_HEAD_CORNER == pytest.approx(filled, abs=1e-6)
+    assert part.V_HEAD_OUTER_CHAMFER == pytest.approx(removed, abs=1e-9)
+    assert filled > 0.0 and removed > filled
+    for length, tip, actual in (
+        (spec.THREAD_LENGTH, spec.TIP_CHAMFER, part.V_FINAL),
+        (spec.INSTALLED_THREAD_LENGTH, spec.INSTALLED_TIP_CHAMFER, part.V_INSTALLED),
+    ):
+        sharp_under_head = (
+            math.pi * (h*h * spec.HEAD_LENGTH + s*s * spec.SHOULDER_LENGTH + part.THREAD_R**2 * length)
+            - part.V_RELIEF - math.pi * tip**2 * (part.THREAD_R - tip / 3.0)
+            - math.pi * spec.SEAT_EDGE_BREAK_MAX**2 * (s - spec.SEAT_EDGE_BREAK_MAX / 3.0)
+            - part.V_SLOT
+        )
+        assert actual - sharp_under_head == pytest.approx(filled - removed, abs=1e-6)
+    assert spec.SLOT_DEPTH_MAX < spec.HEAD_LENGTH - c
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.index("_head_outer_chamfer_limits(adapter)") < source.index("create_configuration {INSTALLED_CONFIG}")
+    assert source.index("_single_limits(adapter)") < source.index("create_configuration {INSTALLED_CONFIG}")
+    assert '( "HeadDia" - "ShoulderDia" ) / 2 - "HeadOuterChamfer" - "UnderHeadCornerRadius"' in source
+
+
+def _under_head_limit_boundary(monkeypatch, *, name="HeadOuterChamfer", refusal=None):
+    """Strict in-memory documented COM boundary; not a native-seat result."""
+    from types import SimpleNamespace
+
+    class Tolerance:
+        __slots__ = ("_type", "values")
+
+        def __init__(self):
+            self._type, self.values = 0, (0.0, 0.0)
+
+        @property
+        def Type(self):
+            return self._type
+
+        @Type.setter
+        def Type(self, value):
+            if refusal != "type":
+                self._type = value
+
+        def SetValues(self, lower, upper):
+            if refusal in ("values", "void"):
+                return False if refusal == "values" else None
+            self.values = (lower + (0.0001 if refusal == "lower" else 0.0),
+                           upper + (0.0001 if refusal == "upper" else 0.0))
+            return True
+
+        def GetMinValue(self):
+            return self.values[0]
+
+        def GetMaxValue(self):
+            return self.values[1]
+
+    class Display:
+        __slots__ = ("primary", "tolerance", "calls")
+
+        def __init__(self):
+            self.primary, self.tolerance, self.calls = 0, 0, []
+
+        def SetPrecision3(self, primary, dual, tolerance, alternate):
+            self.calls.append((primary, dual, tolerance, alternate))
+            self.primary = primary if refusal != "primary" else 0
+            self.tolerance = tolerance if refusal != "precision" else 0
+            return -1 if refusal == "status" else 0
+
+        def GetPrimaryPrecision2(self):
+            return self.primary
+
+        def GetPrimaryTolPrecision2(self):
+            return self.tolerance
+
+    display, tolerance = Display(), Tolerance()
+    nominal = 0.26 if name == "HeadOuterChamfer" else 0.1
+    dimension = SimpleNamespace(Tolerance=tolerance, SystemValue=nominal / 1000.0 + (0.0001 if refusal == "nominal" else 0.0))
+    adapter, lookups = object(), []
+
+    def lookup(actual_adapter, feature, actual_name):
+        assert actual_adapter is adapter
+        lookups.append((feature, actual_name))
+        assert (feature, actual_name) == ("ScrewProfile", name)
+        return display, dimension
+
+    def bind(raw, interface):
+        assert raw is {"IDimensionTolerance": tolerance, "IDisplayDimension": display}[interface]
+        return raw
+
+    monkeypatch.setattr(part, "_named_dimension", lookup)
+    monkeypatch.setattr(part, "_early_bound", bind)
+    if name == "UnderHeadCornerRadius":
+        key = ("ScrewProfile", name)
+        monkeypatch.setattr(part, "SINGLE_LIMITS", {key: spec.SINGLE_LIMITS[key]})
+    return adapter, display, dimension, lookups
+
+
+@pytest.mark.parametrize("name", ["HeadOuterChamfer", "UnderHeadCornerRadius"])
+def test_option2_native_limit_writers_author_and_read_the_printed_bounds(monkeypatch, name):
+    adapter, display, dimension, lookups = _under_head_limit_boundary(monkeypatch, name=name)
+    writer = part._head_outer_chamfer_limits if name == "HeadOuterChamfer" else part._single_limits
+    writer(adapter)
+    places = 2 if name == "HeadOuterChamfer" else 1
+    assert lookups == [("ScrewProfile", name)]
+    assert display.calls == [(places, -1, places, -1)]
+    assert dimension.Tolerance.Type == (3 if places == 2 else 6)
+    assert dimension.Tolerance.GetMinValue() == pytest.approx(-0.00015 if places == 2 else 0.0)
+    assert dimension.Tolerance.GetMaxValue() == 0.0
+    assert (dimension.SystemValue + dimension.Tolerance.GetMinValue()) * 1000 == pytest.approx(0.11 if places == 2 else 0.1)
+    assert (dimension.SystemValue + dimension.Tolerance.GetMaxValue()) * 1000 == pytest.approx(0.26 if places == 2 else 0.1)
+
+
+@pytest.mark.parametrize("name", ["HeadOuterChamfer", "UnderHeadCornerRadius"])
+@pytest.mark.parametrize("refusal", ["nominal", "values", "void", "type", "lower", "upper", "primary", "precision", "status"])
+def test_option2_native_limit_writers_refuse_every_independent_boundary_drift(monkeypatch, name, refusal):
+    adapter, _, _, _ = _under_head_limit_boundary(monkeypatch, name=name, refusal=refusal)
+    writer = part._head_outer_chamfer_limits if name == "HeadOuterChamfer" else part._single_limits
+    with pytest.raises(RuntimeError):
+        writer(adapter)
+
+
+def _under_head_native_records():
+    """Disjoint synthetic native-shaped inventories, never rendered evidence."""
+    records = []
+    for index, name in enumerate((*drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS)):
+        x = 0.10 + index * 0.04
+        annotation = _ink_annotation(name, type=4, dim={"hole_callout": False},
+            texts=[_actual_text(x, 0.245, width=0.015)],
+            lines=[_actual_line((x, 0.230), (x + 0.005, 0.230))])
+        annotation["display"]["arrows"] = [[x + 0.005, 0.230, 0, -1, 0, 0, 0.001, 0.0004]]
+        records.append(annotation)
+    return records
+
+
+def test_option2_actual_under_head_corridors_are_collected_without_replacing_old_settlement():
+    records = _settled_native_records()
+    assert drawing._settled_under_head_errors([_ink_sheet(*records)]) == []
+    drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "errors.extend(_settled_under_head_errors(dumps))" in source
+    assert "errors.extend(_settled_profile_and_tip_errors(dumps))" in source
+    assert "style_under_head_dimensions(adapter, side_annotations)" in source
+    assert drawing.SIDE_KEEP["UnderHeadCornerRadius"] == (0.215, 0.212)
+    assert drawing.SIDE_KEEP["HeadOuterChamfer"] == (0.245, 0.250)
+
+
+@pytest.mark.parametrize("name", [*drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS])
+@pytest.mark.parametrize("count", [0, 2])
+def test_option2_actual_corridors_require_each_unique_native_annotation(name, count):
+    records = _under_head_native_records()
+    record = next(record for record in records if record["name"] == name)
+    records.remove(record)
+    records.extend([record] * count)
+    errors = drawing._settled_under_head_errors([_ink_sheet(*records)])
+    assert any(f"SIDE/{name}: expected one settled under-head corridor annotation; count={count}" in error for error in errors)
+
+
+@pytest.mark.parametrize("name", [*drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS])
+@pytest.mark.parametrize("kind", ["lines", "arrows", "texts"])
+@pytest.mark.parametrize("bad", [None, [], 42, [None]])
+def test_option2_actual_corridors_refuse_missing_or_malformed_ink(name, kind, bad):
+    records = _under_head_native_records()
+    record = next(record for record in records if record["name"] == name)
+    record["display"][kind] = bad
+    errors = drawing._settled_under_head_errors([_ink_sheet(*records)])
+    assert any(f"SIDE/{name}" in error and ("missing" in error or "malformed" in error) for error in errors)
+
+
+@pytest.mark.parametrize("new", drawing.UNDER_HEAD_DIMENSIONS)
+@pytest.mark.parametrize("foreign", [*drawing.UNDER_HEAD_FOREIGN_DIMENSIONS, "other-under-head"])
+@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
+def test_option2_actual_corridors_refuse_all_new_feature_foreign_cross_tee_overlap(new, foreign, junction):
+    records = {record["name"]: record for record in _under_head_native_records()}
+    if foreign == "other-under-head":
+        foreign = next(name for name in drawing.UNDER_HEAD_DIMENSIONS if name != new)
+    records[new]["display"]["lines"] = [_actual_line((0.2, 0.20), (0.2, 0.22))]
+    line = {"crossing": ((0.19, 0.21), (0.21, 0.21)),
+            "tee": ((0.2, 0.21), (0.21, 0.21)),
+            "overlap": ((0.2, 0.205), (0.2, 0.215))}[junction]
+    records[foreign]["display"]["lines"] = [_actual_line(*line)]
+    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
+    assert any(new in error and foreign in error and "foreign ink crossing" in error for error in errors)
+
+
+@pytest.mark.parametrize("air,accepted", [(0.0, False), (0.002999, False), (0.003001, True)])
+def test_option2_actual_metric_text_requires_three_mm_from_foreign_native_witness(air, accepted):
+    records = {record["name"]: record for record in _under_head_native_records()}
+    box = drawing._layout_audit.display_box({"texts": records["UnderHeadCornerRadius"]["display"]["texts"]})
+    records["HeadDia"]["display"]["lines"] = [_actual_line((box.xmin, box.ymin - air), (box.xmax, box.ymin - air))]
+    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
+    matching = [error for error in errors if "UnderHeadCornerRadius text vs HeadDia" in error]
+    assert not matching if accepted else matching
+
+
+def test_option2_actual_corridors_collect_malformed_and_all_simultaneous_old_and_new_failures():
+    records = _settled_native_records(r17=True)
+    for record in records[4:]:
+        record["display"]["lines"] = [_actual_line((0.2, 0.20), (0.2, 0.22))]
+    records[4]["display"]["texts"].append({**_actual_text(), "w": math.nan})
+    records[5]["display"]["arrows"] = []
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    message = str(caught.value)
+    for expected in ("metric text/profile clearance", "ThreadNote/leaders vs UnderHeadLocation",
+                     "UnderHeadCornerRadius vs HeadOuterChamfer", "UnderHeadCornerRadius vs HeadDia",
+                     "HeadOuterChamfer vs SlotDepth", "HeadOuterChamfer vs ShoulderDia",
+                     "HeadOuterChamfer vs ShoulderLength", "malformed", "arrows inventory"):
+        assert expected in message
+
+
+@pytest.fixture
+def under_head_drawing_boundary(monkeypatch):
+    """Documented native-shaped carrier; no hidden member or seat assumptions."""
+    from types import SimpleNamespace
+    state = SimpleNamespace(rebuilds=0, after_rebuild=None, refused_position=None)
+
+    class Tolerance:
+        __slots__ = ("Type", "lower", "upper")
+
+        def __init__(self, radius):
+            self.Type, self.lower, self.upper = (6, 0.0, 0.0) if radius else (3, -0.00015, 0.0)
+
+        def GetMinValue(self):
+            return self.lower
+
+        def GetMaxValue(self):
+            return self.upper
+
+    class Dimension:
+        __slots__ = ("FullName", "SystemValue", "Tolerance")
+
+        def __init__(self, name):
+            radius = name == "UnderHeadCornerRadius"
+            self.FullName = f"{name}@ScrewProfile@Part.Part"
+            self.SystemValue = 0.0001 if radius else 0.00026
+            self.Tolerance = Tolerance(radius)
+
+    class Display:
+        __slots__ = ("dimension", "Type2", "primary", "tolerance", "override", "CenterText", "ArrowSide")
+
+        def __init__(self, name):
+            radius = name == "UnderHeadCornerRadius"
+            self.dimension = Dimension(name)
+            self.Type2 = 5 if radius else 11
+            self.primary = self.tolerance = 1 if radius else 2
+            self.override, self.CenterText, self.ArrowSide = False, True, 0
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return self.dimension
+
+        def GetPrimaryPrecision2(self):
+            return self.primary
+
+        def GetPrimaryTolPrecision2(self):
+            return self.tolerance
+
+        def GetOverride(self):
+            return self.override
+
+    class Annotation:
+        __slots__ = ("name", "display", "positions")
+
+        def __init__(self, name):
+            self.name, self.display, self.positions = name, Display(name), []
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+        def SetPosition2(self, x, y, z):
+            self.positions.append((x, y, z))
+            return self.name != state.refused_position
+
+    def rebuild():
+        state.rebuilds += 1
+        if state.after_rebuild:
+            state.after_rebuild()
+
+    def bind(raw, interface):
+        assert isinstance(raw, {"IAnnotation": Annotation, "IDisplayDimension": Display,
+                                "IDimension": Dimension, "IDimensionTolerance": Tolerance}[interface])
+        return raw
+
+    state.annotations = [Annotation(name) for name in drawing.UNDER_HEAD_DIMENSIONS]
+    state.adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
+    return state
+
+
+def test_option2_native_under_head_style_keeps_real_bounds_and_exact_side_anchors(under_head_drawing_boundary):
+    state = under_head_drawing_boundary
+    drawing.style_under_head_dimensions(state.adapter, state.annotations)
+    radius, bevel = state.annotations
+    assert radius.positions == [(*drawing.SIDE_KEEP[radius.name], 0.0)]
+    assert bevel.positions == [(*drawing.SIDE_KEEP[bevel.name], 0.0)]
+    assert bevel.display.ArrowSide == drawing.ARROWS_OUTSIDE
+    assert bevel.display.CenterText is False
+    assert state.rebuilds == 1
+    assert bevel.display.dimension.Tolerance.lower == -0.00015
+    assert not radius.display.override and not bevel.display.override
+
+
+@pytest.mark.parametrize("name", drawing.UNDER_HEAD_DIMENSIONS)
+@pytest.mark.parametrize("fault", ["missing-dimension", "owner", "name", "type", "value", "nonfinite",
+                                    "tol-type", "lower", "upper", "primary", "tolerance", "override"])
+def test_option2_native_under_head_carriers_refuse_each_independent_native_drift(under_head_drawing_boundary, name, fault):
+    state = under_head_drawing_boundary
+    annotation = next(annotation for annotation in state.annotations if annotation.name == name)
+    display, dimension = annotation.display, annotation.display.dimension
+    if fault == "missing-dimension":
+        display.dimension = None
+    elif fault == "owner":
+        dimension.FullName = f"{name}@ScrewProfileSpoof@Part.Part"
+    elif fault == "name":
+        dimension.FullName = "Other@ScrewProfile@Part.Part"
+    elif fault == "type":
+        display.Type2 = 6
+    elif fault in ("value", "nonfinite"):
+        dimension.SystemValue = math.nan if fault == "nonfinite" else dimension.SystemValue + 0.000002
+    elif fault == "tol-type":
+        dimension.Tolerance.Type = 2
+    elif fault == "lower":
+        dimension.Tolerance.lower += 0.000001
+    elif fault == "upper":
+        dimension.Tolerance.upper += 0.000001
+    elif fault == "primary":
+        display.primary = 3
+    elif fault == "tolerance":
+        display.tolerance = 3
+    else:
+        display.override = True
+    with pytest.raises(RuntimeError, match="missing native model dimension|native owner/type/value/bounds/precision drift"):
+        drawing._assert_under_head_carrier(annotation, name)
+
+
+@pytest.mark.parametrize("name", drawing.UNDER_HEAD_DIMENSIONS)
+@pytest.mark.parametrize("count", [0, 2])
+def test_option2_native_under_head_style_requires_unique_features(under_head_drawing_boundary, name, count):
+    state = under_head_drawing_boundary
+    annotation = next(annotation for annotation in state.annotations if annotation.name == name)
+    records = [item for item in state.annotations if item.name != name] + [annotation] * count
+    with pytest.raises(RuntimeError, match=f"{name}: expected one native under-head annotation; count={count}"):
+        drawing.style_under_head_dimensions(state.adapter, records)
+
+
+@pytest.mark.parametrize("name", drawing.UNDER_HEAD_DIMENSIONS)
+def test_option2_native_under_head_style_refuses_failed_positions(under_head_drawing_boundary, name):
+    state = under_head_drawing_boundary
+    state.refused_position = name
+    with pytest.raises(RuntimeError, match=f"{name}: cannot position native under-head text"):
+        drawing.style_under_head_dimensions(state.adapter, state.annotations)
+
+
+@pytest.mark.parametrize("fault", ["bounds", "override", "style"])
+def test_option2_native_under_head_style_rechecks_after_rebuild(under_head_drawing_boundary, fault):
+    state = under_head_drawing_boundary
+    bevel = state.annotations[1].display
+
+    def drift():
+        if fault == "bounds":
+            bevel.dimension.Tolerance.lower = 0.0
+        elif fault == "override":
+            bevel.override = True
+        else:
+            bevel.ArrowSide = 0
+
+    state.after_rebuild = drift
+    with pytest.raises(RuntimeError, match="native owner/type/value/bounds/precision drift|native arrows/centring did not persist"):
+        drawing.style_under_head_dimensions(state.adapter, state.annotations)
+    assert state.rebuilds == 1
+
+
+@pytest.mark.parametrize("primitive", ["arrow", "leader", "triangle", "polygon", "polyline"])
+def test_option2_actual_under_head_foreign_ink_checks_every_real_carrier(primitive):
+    records = {record["name"]: record for record in _under_head_native_records()}
+    records["UnderHeadCornerRadius"]["display"]["lines"] = [_actual_line((0.2, 0.2), (0.2, 0.22))]
+    record = records["HeadDia"]
+    if primitive == "arrow":
+        record["display"]["arrows"] = [[0.2, 0.21, 0, -1, 0, 0, 0.003, 0.001]]
+    elif primitive == "leader":
+        record["leaders"] = [[0.19, 0.21, 0, 0.21, 0.21, 0]]
+    elif primitive == "triangle":
+        record["display"]["triangles"] = [[0.19, 0.21, 0, 0.21, 0.21, 0, 0.2, 0.215, 0]]
+    elif primitive == "polygon":
+        record["display"]["polygons"] = [[0, 0, 0, 0, 3, 0.19, 0.21, 0, 0.21, 0.21, 0, 0.2, 0.215, 0]]
+    else:
+        record["display"]["polylines"] = [[0, 0, 0, 0, 0, 0, 2, 0.19, 0.21, 0, 0.21, 0.21, 0]]
+    errors = drawing._settled_under_head_errors([_ink_sheet(*records.values())])
+    assert any("UnderHeadCornerRadius vs HeadDia" in error and "foreign ink crossing" in error for error in errors)
+
+
+@pytest.mark.parametrize("previous,replacement", [
+    ("HEAD_OUTER_CHAMFER = HEAD_OUTER_CHAMFER_MAX", "HEAD_OUTER_CHAMFER = 0.25"),
+    ("HEAD_OUTER_CHAMFER_BAND = (0.0, round(HEAD_OUTER_CHAMFER_MIN - HEAD_OUTER_CHAMFER_MAX, 6))",
+     "HEAD_OUTER_CHAMFER_BAND = (0.0, -0.16)"),
+])
+def test_option2_model_nominal_and_native_band_cannot_diverge_from_proved_chamfer_limits(previous, replacement):
+    source = Path(spec.__file__).read_text(encoding="utf-8")
+    assert source.count(previous) == 1
+    with pytest.raises(AssertionError, match="invalid outer under-head chamfer range"):
+        exec(compile(source.replace(previous, replacement), spec.__file__, "exec"),
+             {"__name__": "_option2_actual_chamfer_probe"})
