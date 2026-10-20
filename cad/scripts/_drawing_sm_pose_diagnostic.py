@@ -3,6 +3,10 @@
 Imported only inside the original pick zoom, after the baseline (and a miss's
 immediate unchanged raw repeat). Every observation is post-pick, non-atomic,
 and potentially perturbing. This module always stops the drawing before save.
+
+Visibility/settings observations are additive, bounded, and never adjudicate the
+frozen phase hypothesis. Configured preferences and installed video controllers
+do not attest an active rendering backend or explain a missed selection.
 """
 
 from __future__ import annotations
@@ -16,7 +20,9 @@ import math
 import os
 from pathlib import Path
 import struct
+import subprocess
 import time
+import threading
 import traceback
 from typing import Any, Callable, Mapping, Sequence
 from uuid import uuid4
@@ -46,6 +52,10 @@ PAD_CONTROL_OFFSET_M = 8e-6
 DISCOVERY_SECONDS = 60.0
 STUDY_SECONDS = 180.0
 OPTIONAL_OBSERVATION_SECONDS = 15.0
+VISIBILITY_SECONDS = 30.0
+VISIBILITY_CHECKPOINT_SECONDS = 5.0
+VISIBILITY_GRACE_SECONDS = 5.0
+VISIBILITY_EXIT_CODE = 90
 PICK_CAP = 112
 BLOCKS = (("A", "P-", "A", "N", "A", "P+", "A"), ("A", "P+", "A", "N", "A", "P-", "A"))
 PAD_BLOCKS = (
@@ -117,6 +127,7 @@ _SPAN_EVENTS: ContextVar[dict[str, Any] | None] = ContextVar(
     "sm1667_events", default=None
 )
 _HISTORY: ContextVar[dict[str, Any] | None] = ContextVar("sm1667_history", default=None)
+_visibility_exit = os._exit
 
 
 class _Nonfinite(ValueError):
@@ -253,6 +264,755 @@ def _observe(record: dict[str, Any], key: str, probe: Callable[[], Any]) -> Any:
 
 def _value(record: Mapping[str, Any], key: str) -> Any:
     return record.get(key, {}).get("value")
+
+
+class _VisibilityDeadline:
+    """Private self-exit only: no flush, COM, logging or report access on expiry."""
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds = seconds
+        self.lock = threading.Lock()
+        self.state = "disarmed"
+        self.timer: Any = None
+
+    def _fire(self) -> None:
+        with self.lock:
+            if self.state != "armed":
+                return
+            self.state = "fired"
+        _visibility_exit(VISIBILITY_EXIT_CODE)
+
+    def __enter__(self):
+        started = time.perf_counter()
+        with self.lock:
+            self.state = "armed"
+        self.timer = threading.Timer(self.seconds, self._fire)
+        self.timer.daemon = True
+        self.timer.start()
+        _cost("visibility_guard_arm", (time.perf_counter() - started) * 1000)
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        started = time.perf_counter()
+        with self.lock:
+            fired = self.state == "fired"
+            if not fired:
+                self.state = "disarmed"
+        if fired:
+            # A returning getter must not continue when the callback won.
+            _visibility_exit(VISIBILITY_EXIT_CODE)
+            raise RuntimeError("self-exit unexpectedly returned")
+        self.timer.cancel()
+        _cost("visibility_guard_disarm", (time.perf_counter() - started) * 1000)
+
+
+def _metadata_field(
+    stage: str,
+    probe: Callable[[], Any] | None = None,
+    *,
+    reason: str = "",
+    status: str = "unavailable",
+) -> dict[str, Any]:
+    """Failure-preserving optional envelope; never relax scientific _observe."""
+    field: dict[str, Any] = {"begin": _stamp(), "stage": stage}
+    try:
+        if probe is None:
+            field.update(status=status, reason=reason)
+        else:
+            value = probe()
+            if value is None:
+                field.update(
+                    status="unavailable", reason="native accessor returned null"
+                )
+            else:
+                _finite_tree(value)
+                # Reject handles and opaque Python values, not merely nonfinite floats.
+                json.dumps(value, allow_nan=False)
+                field.update(status="available", value=value)
+    except _Deadline as exc:
+        field.update(status="budget_skipped", reason=_error(exc))
+    except Exception as exc:
+        field.update(status="error", error=_error(exc))
+    finally:
+        field["end"] = _stamp()
+    return field
+
+
+def _metadata_scalar(value: Any, kind: type) -> Any:
+    if value is None:
+        return None
+    if type(value) is not kind:
+        raise ValueError(
+            f"malformed scalar: expected {kind.__name__}, got {type(value).__name__}"
+        )
+    if kind is str and not value:
+        raise ValueError("empty configuration is unavailable")
+    return value
+
+
+def _curve_packet(values: Any) -> dict[str, Any] | None:
+    """IEdge.GetCurveParams2: numeric0:8, opaque packed int pairs8:11."""
+    if values is None:
+        return None
+    packet = tuple(float(value) for value in values)
+    if len(packet) != 11:
+        raise ValueError(f"GetCurveParams2 requires11 doubles, got{len(packet)}")
+    if not all(math.isfinite(value) for value in packet[:8]):
+        raise ValueError("nonfinite GetCurveParams2 geometry/parameters")
+    pairs = [
+        list(struct.unpack("<ii", struct.pack("<d", value))) for value in packet[8:]
+    ]
+    return {
+        "raw_double_bits_be": [struct.pack(">d", value).hex() for value in packet],
+        "numeric_0_7": list(packet[:8]),
+        "endpoints_local_m": [list(packet[:3]), list(packet[3:6])],
+        "parameter_bounds": list(packet[6:8]),
+        "packed_int32_pairs_le": pairs,
+        "curve_type": pairs[0][1],
+        "curve_tag": pairs[1][1],
+        "sense_flag": pairs[2][1],
+        "packing": "little-endian int32 pair in native Windows double; second integer documented",
+    }
+
+
+class _VisibilityCheckpoint:
+    """New atomic snapshots, deliberately outside the frozen102 receipt ledger."""
+
+    def __init__(self, report: dict[str, Any], path: Path, temp: Path) -> None:
+        self.report, self.path, self.temp = report, path, temp
+
+    def __call__(self) -> bool:
+        # Caller owns the five-second guard across traversal/serialization/all I/O.
+        with _timed("visibility_checkpoint_serialization"):
+            _finite_tree(self.report)
+            payload = json.dumps(self.report, sort_keys=True, allow_nan=False) + "\n"
+        with _timed("visibility_checkpoint_write"):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.temp.write_text(payload, encoding="utf-8")
+        with _timed("visibility_checkpoint_replace"):
+            os.replace(self.temp, self.path)
+        return True
+
+
+class _VisibilityTelemetry:
+    """Cumulative optional observation allowance, paused across original science."""
+
+    def __init__(self, report: dict[str, Any], checkpoint: Any) -> None:
+        self.report, self.writer = report, checkpoint
+        self.retained: dict[str, tuple[Any, int]] = {}
+        self.pending_censuses: list[
+            tuple[dict[str, Any], Sequence[Any], list[dict[str, Any]]]
+        ] = []
+        self.disabled = False
+        stage = "not_reached"
+        self.data: dict[str, Any] = {
+            "schema_version": 1,
+            "status": "unavailable",
+            "profile_before": _metadata_field(
+                stage, reason="before profile not reached"
+            ),
+            "profile_after": _metadata_field(stage, reason="after profile not reached"),
+            "components_at_discovery": {},
+            "censuses": [],
+            "os_inventory": _metadata_field(
+                stage, reason="required post-study attempt not reached"
+            ),
+            "active_graphics_backend": _metadata_field(
+                stage,
+                reason="no documented active-process/backend attestation established",
+            ),
+            "budget": {
+                "soft_limit_s": VISIBILITY_SECONDS,
+                "consumed_s": 0.0,
+                "remaining_s": VISIBILITY_SECONDS,
+                "calls": 0,
+                "sections": [],
+                "checkpoint_limit_s": VISIBILITY_CHECKPOINT_SECONDS,
+                "hard_grace_s": VISIBILITY_GRACE_SECONDS,
+                "exit_code": VISIBILITY_EXIT_CODE,
+                "clock_scope": "cumulative active new-observer sections including new checkpoints; excludes original discovery/phase",
+                "pending_stage": None,
+                "checkpoint_status": "pending",
+            },
+            "costs": {
+                "new_native_calls": {},
+                "reused_native_calls": {},
+                "profile_calls": 0,
+                "component_calls": 0,
+                "census_extra_calls": 0,
+                "checkpoint_attempts": 0,
+                "os_query_attempts": 0,
+                "os_query_elapsed_s": 0.0,
+                "scope": "known getter invocations; SDK hidden calls excluded; overlaps legacy performance scopes, no whole-leaf delta",
+            },
+            "deadline": {
+                "exit_code": VISIBILITY_EXIT_CODE,
+                "checkpoint_limit_s": VISIBILITY_CHECKPOINT_SECONDS,
+                "grace_s": VISIBILITY_GRACE_SECONDS,
+                "mechanism": "private locked Python timer; expiry only os._exit(90), no flush",
+                "limitations": "not OS real-time; does not cancel server COM or guarantee seat health; pool redispatch remains possible",
+            },
+        }
+        report["visibility_telemetry"] = self.data
+
+    def _charge(self, row: dict[str, Any], started: float, calls: int = 0) -> None:
+        elapsed = time.perf_counter() - started
+        row.update(end=_stamp(), elapsed_s=elapsed, calls=calls)
+        budget = self.data["budget"]
+        budget["consumed_s"] += elapsed
+        budget["remaining_s"] = max(0.0, VISIBILITY_SECONDS - budget["consumed_s"])
+        budget["calls"] += calls
+        _cost(f"visibility_{row['kind']}", elapsed * 1000)
+
+    def checkpoint(self, stage: str) -> bool:
+        budget = self.data["budget"]
+        budget.update(pending_stage=stage, checkpoint_status="pending")
+        row = {
+            "name": stage,
+            "kind": "checkpoint",
+            "begin": _stamp(),
+            "soft_limit_s": budget["remaining_s"],
+            "hard_limit_s": VISIBILITY_CHECKPOINT_SECONDS,
+            "status": "partial",
+        }
+        budget["sections"].append(row)
+        self.data["costs"]["checkpoint_attempts"] += 1
+        started = time.perf_counter()
+        try:
+            with _VisibilityDeadline(VISIBILITY_CHECKPOINT_SECONDS):
+                self.finish(clear_pending=False)
+                before = self.report.get("checkpoint", {}).get("last_good_attempt")
+                result = self.writer()
+                after = self.report.get("checkpoint", {}).get("last_good_attempt")
+                success = result is True or (after is not None and after != before)
+            budget["checkpoint_status"] = "written" if success else "failed"
+            row["status"] = "complete" if success else "partial"
+            if not success:
+                self.disabled = True
+            return success
+        except Exception as exc:
+            row["error"] = _error(exc)
+            budget["checkpoint_status"] = "failed"
+            self.disabled = True
+            return False
+        finally:
+            self._charge(row, started)
+
+    @contextlib.contextmanager
+    def section(self, name: str, kind: str, original_budget: _Budget | None = None):
+        started = time.perf_counter()
+        try:
+            if self.disabled or self.data["budget"]["remaining_s"] <= 0:
+                yield None
+                return
+            if not self.checkpoint(name):
+                yield None
+                return
+            remaining = self.data["budget"]["remaining_s"]
+            if remaining <= 0:
+                yield None
+                return
+            budget = _Budget(remaining)
+            row = {
+                "name": name,
+                "kind": kind,
+                "begin": _stamp(),
+                "soft_limit_s": remaining,
+                "hard_limit_s": remaining + VISIBILITY_GRACE_SECONDS,
+                "status": "partial",
+            }
+            self.data["budget"]["sections"].append(row)
+            active = time.perf_counter()
+            try:
+                with _VisibilityDeadline(row["hard_limit_s"]):
+                    yield budget
+                row["status"] = (
+                    "complete"
+                    if time.perf_counter() - budget.start < remaining
+                    else "partial"
+                )
+            finally:
+                self._charge(row, active, budget.calls)
+            self.checkpoint(f"{name}:boundary")
+        finally:
+            if original_budget is not None:
+                # Extras must not consume the frozen required-discovery budget.
+                original_budget.start += time.perf_counter() - started
+
+    def call(
+        self, budget: _Budget, obj: Any, interface: str, member: str, *args: Any
+    ) -> Any:
+        before = budget.calls
+        try:
+            return budget.call(obj, interface, member, *args)
+        finally:
+            if budget.calls != before:
+                name = f"{interface}.{member}"
+                counts = self.data["costs"]["new_native_calls"]
+                counts[name] = counts.get(name, 0) + 1
+
+    def reuse(self, interface: str, member: str) -> None:
+        counts = self.data["costs"]["reused_native_calls"]
+        name = f"{interface}.{member}"
+        counts[name] = counts.get(name, 0) + 1
+
+    def field(
+        self,
+        stage: str,
+        budget: _Budget | None,
+        obj: Any,
+        interface: str,
+        member: str,
+        kind: type,
+        *args: Any,
+    ) -> dict[str, Any]:
+        if budget is None:
+            return _metadata_field(
+                stage,
+                reason="observer allowance exhausted or precheckpoint failed",
+                status="budget_skipped",
+            )
+        return _metadata_field(
+            stage,
+            lambda: _metadata_scalar(
+                self.call(budget, obj, interface, member, *args), kind
+            ),
+        )
+
+    def component(
+        self,
+        instance: str,
+        component: Any,
+        ordinal: int,
+        original_budget: _Budget | None = None,
+    ) -> None:
+        self.retained[instance] = (component, ordinal)
+        stage = "existing_discovery_retained_handle_non_atomic"
+        row: dict[str, Any] = {
+            "instance": instance,
+            "discovery_ordinal": ordinal,
+            "stage": stage,
+            "begin": _stamp(),
+            "status": "partial",
+            "pending": True,
+        }
+        self.data["components_at_discovery"][instance] = row
+        with self.section(
+            f"component:{instance}", "component", original_budget
+        ) as budget:
+            self._component_fields(row, component, stage, budget)
+        row["end"] = _stamp()
+        row["pending"] = False
+        row["status"] = (
+            "complete"
+            if all(
+                row[m]["status"] == "available"
+                for m in ("ReferencedConfiguration", "GetSuppression2")
+            )
+            else "partial"
+        )
+
+    def _component_fields(
+        self, row: dict[str, Any], component: Any, stage: str, budget: _Budget | None
+    ) -> None:
+        before = budget.calls if budget else 0
+        for member, kind in (
+            ("ReferencedConfiguration", str),
+            ("GetSuppression2", int),
+        ):
+            row[member] = self.field(
+                stage, budget, component, "IComponent2", member, kind
+            )
+        self.data["costs"]["component_calls"] += (
+            budget.calls if budget else 0
+        ) - before
+        row["status"] = (
+            "complete"
+            if all(
+                row[m]["status"] == "available"
+                for m in ("ReferencedConfiguration", "GetSuppression2")
+            )
+            else "partial"
+        )
+
+    def profile(self, adapter: Any, view: Any, *, after: bool = False) -> None:
+        stage = (
+            "post_study_cleanup_fit_non_atomic"
+            if after
+            else "post_baseline_pre_discovery_non_atomic"
+        )
+        row: dict[str, Any] = {
+            "stage": stage,
+            "begin": _stamp(),
+            "view": {},
+            "application": {},
+            "components": {},
+            "status": "partial",
+            "pending": True,
+            "components_status": "available"
+            if after and self.retained
+            else "unavailable",
+        }
+        if row["components_status"] == "unavailable":
+            row["components_reason"] = (
+                "no early component traversal"
+                if not after
+                else "discovery retained no component handles"
+            )
+        self.data["profile_after" if after else "profile_before"] = row
+        with self.section(stage, "profile") as budget:
+            for member in (
+                "GetDisplayMode2",
+                "GetFacettedHlrDisplay",
+                "GetUseParentDisplayMode",
+                "GetDisplayEdgesInShadedMode",
+                "GetCThreadQuality",
+                "IsLightweight",
+                "ReferencedConfiguration",
+            ):
+                if member == "ReferencedConfiguration" and not after:
+                    original = self.report.get("post_raw_snapshot", {}).get(member, {})
+                    field = _metadata_field(
+                        stage, lambda: _metadata_scalar(original.get("value"), str)
+                    )
+                    if original.get("status") != "available":
+                        field = _metadata_field(
+                            stage, reason="original view configuration unavailable"
+                        )
+                    field["reused_from"] = "post_raw_snapshot.ReferencedConfiguration"
+                    row["view"][member] = field
+                    self.reuse("IView", member)
+                else:
+                    kind = (
+                        str
+                        if member == "ReferencedConfiguration"
+                        else int
+                        if member == "GetDisplayMode2"
+                        else bool
+                    )
+                    row["view"][member] = self.field(
+                        stage, budget, view, "IView", member, kind
+                    )
+            for name in (
+                "swUseSimpleOpenGL",
+                "swEnablePerformancePipeline",
+                "swHardwareAccSilhouetteEdges",
+                "swSystemOptionDisplayAntiAliasing",
+            ):
+
+                def preference(n=name):
+                    if budget is None:
+                        raise _Deadline(
+                            "observer allowance exhausted or precheckpoint failed"
+                        )
+                    budget.check(n)
+                    from solidworks_mcp.adapters.sw_type_info import constant
+
+                    integer = n == "swSystemOptionDisplayAntiAliasing"
+                    member = (
+                        "GetUserPreferenceIntegerValue"
+                        if integer
+                        else "GetUserPreferenceToggle"
+                    )
+                    return _metadata_scalar(
+                        self.call(
+                            budget, adapter.swApp, "ISldWorks", member, constant(n)
+                        ),
+                        int if integer else bool,
+                    )
+
+                row["application"][name] = _metadata_field(stage, preference)
+            self.data["costs"]["profile_calls"] += budget.calls if budget else 0
+        if after:
+            # Separate child-metadata timing/calls, not double billed as profile getters.
+            with self.section(f"{stage}:components", "component") as budget:
+                for instance, (component, ordinal) in self.retained.items():
+                    child = {
+                        "instance": instance,
+                        "discovery_ordinal": ordinal,
+                        "stage": stage,
+                        "begin": _stamp(),
+                    }
+                    self._component_fields(child, component, stage, budget)
+                    child["end"] = _stamp()
+                    row["components"][instance] = child
+        row["end"] = _stamp()
+        row["pending"] = False
+        row["status"] = (
+            "complete"
+            if row["components_status"] == "available"
+            and all(
+                f["status"] == "available"
+                for group in ("view", "application")
+                for f in row[group].values()
+            )
+            and all(c["status"] == "complete" for c in row["components"].values())
+            else "partial"
+        )
+
+    def census(self, instance: str, family: str) -> dict[str, Any]:
+        stage = "existing_component_filtered_view_discovery"
+        row = {
+            "stage": stage,
+            "begin": _stamp(),
+            "instance": instance,
+            "family": family,
+            "association": "component_filtered_enumeration",
+            "returned_total": None,
+            "reported_total": _metadata_field(stage, reason="count not reached"),
+            "native_return_shape": _metadata_field(
+                stage, reason="enumeration not reached"
+            ),
+            "enumeration_status": "unavailable",
+            "metadata_status": "unavailable",
+            "status": "unavailable",
+            "examined": 0,
+            "metadata_complete": 0,
+            "rows": [],
+        }
+        self.data["censuses"].append(row)
+        return row
+
+    def census_extras(
+        self,
+        census: dict[str, Any],
+        edges: Sequence[Any],
+        original_budget: _Budget,
+        observed: Sequence[Mapping[str, Any]],
+        *,
+        allow_native: bool = True,
+    ) -> None:
+        stage = census["stage"]
+        self.finish_census(census)
+        with self.section(
+            f"census:{census['instance']}", "census_extra", original_budget
+        ) as budget:
+            before = budget.calls if budget else 0
+            for row, edge, captured in zip(
+                census["rows"], edges, observed, strict=True
+            ):
+                if "GetCurve" in captured:
+                    row["GetCurve"] = _metadata_field(
+                        stage, lambda c=captured: True if c["GetCurve"] else None
+                    )
+                if "IsLine" in captured:
+                    row["IsLine"] = _metadata_field(
+                        stage, lambda c=captured: _metadata_scalar(c["IsLine"], bool)
+                    )
+                for member in ("GetCurve", "IsLine", "GetCurveParams2"):
+                    failure = captured.get(f"{member}_error")
+                    if failure:
+                        row[member] = _metadata_field(
+                            stage, reason=failure["error"], status=failure["status"]
+                        )
+                if (
+                    budget is None
+                    or time.perf_counter() - budget.start >= budget.seconds
+                ):
+                    continue
+                if "GetCurveParams2" in captured:
+                    row["GetCurveParams2"] = _metadata_field(
+                        stage, lambda c=captured: _curve_packet(c["GetCurveParams2"])
+                    )
+                elif (
+                    allow_native
+                    and captured.get("GetCurve") is True
+                    and captured.get("IsLine") is False
+                ):
+                    # Same handle's original GetCurve already established the precondition.
+                    # No retry on null/error; no owner/vertex/face/identity getters.
+                    row["GetCurveParams2"] = _metadata_field(
+                        stage,
+                        lambda e=edge: _curve_packet(
+                            self.call(budget, e, "IEdge", "GetCurveParams2")
+                        ),
+                    )
+            self.data["costs"]["census_extra_calls"] += (
+                budget.calls if budget else 0
+            ) - before
+            self.finish_census(census)
+            if (
+                budget is not None
+                and time.perf_counter() - budget.start < budget.seconds
+            ):
+                json_started = time.perf_counter()
+                census["serialized_rows_bytes_utf8"] = len(
+                    json.dumps(census["rows"], allow_nan=False).encode("utf-8")
+                )
+                census["serialization_elapsed_s"] = time.perf_counter() - json_started
+                _cost(
+                    "visibility_census_json", census["serialization_elapsed_s"] * 1000
+                )
+        self.pending_censuses = [
+            item for item in self.pending_censuses if item[0] is not census
+        ]
+        self.finish_census(census)
+
+    @staticmethod
+    def finish_census(census: dict[str, Any]) -> None:
+        for row in census["rows"]:
+            fields = [row[m] for m in ("GetCurve", "IsLine", "GetCurveParams2")]
+            row["status"] = (
+                "available"
+                if all(f["status"] == "available" for f in fields)
+                else "error"
+                if any(f["status"] == "error" for f in fields)
+                else "budget_skipped"
+                if any(f["status"] == "budget_skipped" for f in fields)
+                else "unavailable"
+            )
+        census["examined"] = sum(
+            row["GetCurve"]["status"] != "budget_skipped" for row in census["rows"]
+        )
+        census["metadata_complete"] = sum(
+            row["status"] == "available" for row in census["rows"]
+        )
+        census["metadata_status"] = (
+            "complete"
+            if census["returned_total"] is not None
+            and census["metadata_complete"] == census["returned_total"]
+            else "incomplete"
+            if census["rows"]
+            else "unavailable"
+        )
+        census["status"] = (
+            "complete"
+            if census["enumeration_status"] == "complete"
+            and census["metadata_status"] == "complete"
+            else "partial"
+            if census["returned_total"] is not None
+            else "unavailable"
+        )
+        census["end"] = _stamp()
+
+    def inventory(self) -> None:
+        stage = "post_study_os_inventory"
+        fields = (
+            "Name",
+            "DeviceID",
+            "PNPDeviceID",
+            "DriverVersion",
+            "DriverDate",
+            "InstalledDisplayDrivers",
+            "Status",
+            "ConfigManagerErrorCode",
+        )
+        script = (
+            "$ErrorActionPreference='Stop'; @(Get-CimInstance Win32_VideoController | Select-Object "
+            + ",".join(fields)
+            + ") | ConvertTo-Json -Depth 4 -Compress"
+        )
+        command = ["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command", script]
+        detail: dict[str, Any] = {
+            "command": command,
+            "exit_code": None,
+            "stdout": "",
+            "stderr": "",
+            "timed_out": False,
+            "timeout_s": 5.0,
+        }
+        self.data["costs"]["os_query_attempts"] += 1
+        started = time.perf_counter()
+
+        def query():
+            startup = time.perf_counter()
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            detail["startup_elapsed_s"] = time.perf_counter() - startup
+            query_started = time.perf_counter()
+            try:
+                stdout, stderr = process.communicate(timeout=5.0)
+            except subprocess.TimeoutExpired as exc:
+                # Only this Popen's retained process handle; no PID discovery/tree kill.
+                process.kill()
+                detail.update(
+                    timed_out=True,
+                    stdout=_subprocess_text(exc.output),
+                    stderr=_subprocess_text(exc.stderr),
+                    exit_code=process.poll(),
+                )
+                detail["query_elapsed_s"] = time.perf_counter() - query_started
+                raise TimeoutError(
+                    "owned Win32_VideoController query exceeded5s"
+                ) from exc
+            detail.update(stdout=stdout, stderr=stderr, exit_code=process.returncode)
+            detail["query_elapsed_s"] = time.perf_counter() - query_started
+            if process.returncode != 0:
+                raise RuntimeError(f"CIM query exited{process.returncode}")
+            parse_started = time.perf_counter()
+            parsed = json.loads(stdout)
+            rows = (
+                parsed
+                if isinstance(parsed, list)
+                else [parsed]
+                if isinstance(parsed, dict)
+                else None
+            )
+            if rows is None or any(
+                not isinstance(row, dict) or set(row) != set(fields) for row in rows
+            ):
+                raise ValueError(
+                    "CIM inventory is not a complete explicit-field row array"
+                )
+            detail["parse_elapsed_s"] = time.perf_counter() - parse_started
+            return {**detail, "rows": rows}
+
+        self.data["os_inventory"] = _metadata_field(stage, query)
+        if self.data["os_inventory"]["status"] != "available":
+            self.data["os_inventory"].update(detail)
+        elapsed = time.perf_counter() - started
+        self.data["costs"]["os_query_elapsed_s"] = elapsed
+        _cost("visibility_os_query", elapsed * 1000)
+
+    def finish(self, *, clear_pending: bool = True) -> None:
+        if clear_pending:
+            self.data["budget"]["pending_stage"] = None
+        if not clear_pending:
+            for row in self.data["components_at_discovery"].values():
+                if row.get("pending"):
+                    row["status"] = "partial"
+        sections = [
+            self.data["profile_before"],
+            self.data["profile_after"],
+            *self.data["components_at_discovery"].values(),
+            *self.data["censuses"],
+        ]
+        inventory = self.data["os_inventory"]["status"] == "available"
+
+        def observed(value: Any) -> bool:
+            if isinstance(value, Mapping):
+                return value.get("status") == "available" or any(
+                    observed(child) for child in value.values()
+                )
+            return isinstance(value, (tuple, list)) and any(
+                observed(child) for child in value
+            )
+
+        any_observed = any(observed(row) for row in sections)
+        self.data["status"] = (
+            "complete"
+            if inventory and all(row.get("status") == "complete" for row in sections)
+            else "partial"
+            if inventory or any_observed
+            else "unavailable"
+        )
+        if not clear_pending and self.data["status"] == "complete":
+            self.data["status"] = "partial"
+
+
+def _subprocess_text(value: Any) -> str:
+    return (
+        value.decode("utf-8", errors="replace")
+        if isinstance(value, bytes)
+        else value or ""
+    )
 
 
 def _event(stage: str, report: Mapping[str, Any], **fields: Any) -> None:
@@ -1128,6 +1888,7 @@ def _discover(
     report: dict[str, Any],
     reference: Any,
     configuration_name: Any,
+    visibility: _VisibilityTelemetry | None = None,
 ) -> dict[str, dict[str, Any]]:
     budget = _Budget(DISCOVERY_SECONDS)
     record: dict[str, Any] = {
@@ -1147,7 +1908,7 @@ def _discover(
         record["retained_drawing_leaves_total"] = len(retained)
         if len(retained) > COMPONENT_CAP:
             record["truncated"] = True
-        for leaf in retained[:COMPONENT_CAP]:
+        for ordinal, leaf in enumerate(retained[:COMPONENT_CAP]):
             budget.check("retained drawing component")
             if not leaf.visible or leaf.component is None:
                 continue
@@ -1158,6 +1919,8 @@ def _discover(
                 "referenced_path",
                 lambda: str(budget.call(leaf.component, "IComponent2", "GetPathName")),
             )
+            if visibility is not None:
+                visibility.component(leaf.path, leaf.component, ordinal, budget)
             stem = Path(path.replace("\\", "/")).stem.casefold() if path else ""
             family = {"sm-summing-lever": "lever", "sm-knife-mount": "control"}.get(
                 stem
@@ -1252,37 +2015,122 @@ def _discover(
                 "truncated": False,
             }
             record["edge_scans"].append(scan)
-            count = int(
-                budget.call(
+            census = (
+                visibility.census(component["instance"], family) if visibility else None
+            )
+            try:
+                reported = budget.call(
                     view, "IView", "GetVisibleEntityCount2", component["component"], 1
                 )
-                or 0
-            )
+            except Exception as exc:
+                if census is not None:
+                    census["reported_total"] = _metadata_field(
+                        census["stage"], reason=_error(exc), status="error"
+                    )
+                raise
+            if census is not None:
+                visibility.reuse("IView", "GetVisibleEntityCount2")
+
+                def strict_count():
+                    value = _metadata_scalar(reported, int)
+                    if value is not None and value < 0:
+                        raise ValueError("negative native visible entity count")
+                    return value
+
+                census["reported_total"] = _metadata_field(
+                    census["stage"], strict_count
+                )
+            count = int(reported or 0)
             scan["reported_total"] = count
             if count > EDGE_CAP:
                 scan.update(
                     truncated=True,
                     unavailable="visible edge count exceeds fixed cap; no enumeration",
                 )
+                if census is not None:
+                    census["enumeration_error"] = (
+                        "original fixed cap refuses enumeration"
+                    )
+                    visibility.finish_census(census)
                 return {}
             budget.check("raw_visible_entities")
-            edges = sw_drawing.raw_visible_entities(view, component["component"], 1)
+            try:
+                edges = sw_drawing.raw_visible_entities(view, component["component"], 1)
+            except Exception as exc:
+                if census is not None:
+                    census["enumeration_error"] = _error(exc)
+                    visibility.finish_census(census)
+                raise
+            observed: list[dict[str, Any]] = (
+                [{} for _ in edges] if census is not None else []
+            )
+            if census is not None:
+                census["rows"] = [
+                    {
+                        "ordinal": index,
+                        "status": "budget_skipped",
+                        **{
+                            member: _metadata_field(
+                                census["stage"],
+                                reason="optional metadata not examined: allowance/cap/original discovery interruption",
+                                status="budget_skipped",
+                            )
+                            for member in ("GetCurve", "IsLine", "GetCurveParams2")
+                        },
+                    }
+                    for index in range(len(edges))
+                ]
+                visibility.pending_censuses.append((census, edges, observed))
+                visibility.reuse("IView", "GetVisibleEntities2")
+                census["returned_total"] = len(edges)
+                native_count = _value(census, "reported_total")
+                census["enumeration_status"] = (
+                    "inconsistent"
+                    if not edges and native_count not in (None, 0)
+                    else "ambiguous"
+                    if not edges
+                    else "incomplete"
+                    if native_count is None
+                    else "complete"
+                    if native_count == len(edges)
+                    else "inconsistent"
+                )
+                census["native_return_shape"] = _metadata_field(
+                    census["stage"],
+                    (lambda: "nonempty helper sequence") if edges else None,
+                    reason="helper normalizes native null and empty",
+                )
             scan["returned_total"] = len(edges)
             scan["truncated"] = len(edges) > EDGE_CAP
             matches: dict[str, list[tuple[Any, Any]]] = {
                 key: [] for key, w in source.items() if w["family"] == family
             }
-            for edge in edges[:EDGE_CAP]:
+            for edge_index, edge in enumerate(edges[:EDGE_CAP]):
                 budget.check("visible straight edge")
                 scan["examined"] += 1
                 try:
+                    native_member, native_before = "GetCurve", budget.calls
                     curve = budget.call(edge, "IEdge", "GetCurve")
-                    if curve is None or not budget.call(curve, "ICurve", "IsLine"):
-                        continue
-                    params = tuple(
-                        float(v)
-                        for v in (budget.call(edge, "IEdge", "GetCurveParams2") or ())
+                    if census is not None:
+                        observed[edge_index]["GetCurve"] = curve is not None
+                        visibility.reuse("IEdge", "GetCurve")
+                    native_member, native_before = "IsLine", budget.calls
+                    is_line = (
+                        budget.call(curve, "ICurve", "IsLine")
+                        if curve is not None
+                        else None
                     )
+                    if census is not None and curve is not None:
+                        observed[edge_index]["IsLine"] = is_line
+                        visibility.reuse("ICurve", "IsLine")
+                    if curve is None or not is_line:
+                        continue
+                    native_member, native_before = "GetCurveParams2", budget.calls
+                    raw_params = budget.call(edge, "IEdge", "GetCurveParams2")
+                    if census is not None:
+                        observed[edge_index]["GetCurveParams2"] = raw_params
+                        visibility.reuse("IEdge", "GetCurveParams2")
+                    params = tuple(float(v) for v in (raw_params or ()))
                     if not all(math.isfinite(v) for v in params[:6]):
                         raise _Nonfinite("edge has nonfinite endpoints")
                     if len(params) < 6:
@@ -1344,14 +2192,35 @@ def _discover(
                                 raise ValueError("native edge identity unavailable")
                             geometry["IsSame_self"] = 1
                             matches[key].append((edge, geometry))
-                except _Deadline:
-                    raise
-                except (_Nonfinite, TypeError, AssertionError):
+                except (_Deadline, _Nonfinite, TypeError, AssertionError) as exc:
+                    if census is not None and native_member not in observed[edge_index]:
+                        attempted = budget.calls > native_before
+                        observed[edge_index][f"{native_member}_error"] = {
+                            "status": "error" if attempted else "budget_skipped",
+                            "error": _error(exc),
+                        }
+                        if attempted:
+                            visibility.reuse(
+                                "ICurve" if native_member == "IsLine" else "IEdge",
+                                native_member,
+                            )
                     raise
                 except Exception as exc:
+                    if census is not None:
+                        if native_member not in observed[edge_index]:
+                            observed[edge_index][f"{native_member}_error"] = {
+                                "status": "error",
+                                "error": _error(exc),
+                            }
+                            visibility.reuse(
+                                "ICurve" if native_member == "IsLine" else "IEdge",
+                                native_member,
+                            )
                     scan["errors"].append(
                         {"edge_index": scan["examined"] - 1, "error": _error(exc)}
                     )
+            if census is not None:
+                visibility.census_extras(census, edges, budget, observed)
             found = {}
             for key, hits in matches.items():
                 scan["matches"][key] = len(hits)
@@ -1389,6 +2258,13 @@ def _discover(
     except _Deadline as exc:
         record.update(truncated=True, deadline_error=_error(exc))
     finally:
+        if visibility is not None:
+            for census, edges, observed in tuple(visibility.pending_censuses):
+                visibility.census_extras(
+                    census, edges, budget, observed, allow_native=False
+                )
+            for census in visibility.data["censuses"]:
+                visibility.finish_census(census)
         record["budget"] = budget.report()
         record["end"] = _stamp()
         record["frozen_subset"] = [key for key in PRIORITY if key in resolved]
@@ -3386,6 +4262,9 @@ def collect_and_stop(
         ],
     }
     checkpoint = _Checkpoint(report, out_dir / "p.json", out_dir / "p.tmp")
+    visibility = _VisibilityTelemetry(
+        report, _VisibilityCheckpoint(report, checkpoint.path, checkpoint.temp)
+    )
     token = _PERFORMANCE.set(performance)
     report["selection_history"] = {"calls": [], "anchors": []}
     history_token = _HISTORY.set(report["selection_history"])
@@ -3433,6 +4312,7 @@ def collect_and_stop(
                 projection_inputs.get("model_to_view_transform_handle"),
             )
             report["post_raw_snapshot"] = snapshot
+            visibility.profile(adapter, view)
             control = _value(snapshot, "fresh_transform_control") or {}
             report["original_point_in_fresh_matrix"] = (
                 _apply(control["array"], points[0])[:2].tolist()
@@ -3473,6 +4353,7 @@ def collect_and_stop(
                 report,
                 reference,
                 _value(snapshot, "ReferencedConfiguration"),
+                visibility,
             )
             _identity(adapter, selection, entity, owner, discovered.get("leverPad"))
             report["baseline_own_target_positive_control"] = bool(
@@ -3655,6 +4536,25 @@ def collect_and_stop(
                     report["cancelled"] = True
                 elif primary_error is None:
                     primary_error = exc
+            if (
+                cancellation is None
+                and not native_followup_refused
+                and primary_error is None
+                and report.get("study", {}).get("explicit_initial_fit_completed")
+            ):
+                visibility.profile(adapter, view, after=True)
+            else:
+                visibility.data["profile_after"] = _metadata_field(
+                    "post_study_cleanup_fit_non_atomic",
+                    reason="defined post-study fit state not established or native followup refused",
+                )
+            if cancellation is None:
+                visibility.inventory()
+            else:
+                visibility.data["os_inventory"] = _metadata_field(
+                    "post_study_os_inventory", reason="cancellation refuses new work"
+                )
+            visibility.finish()
             if native_followup_refused:
                 report["final_poststudy_capture_bundle"] = {
                     "status": "refused",
