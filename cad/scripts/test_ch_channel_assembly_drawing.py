@@ -449,6 +449,227 @@ def test_the_exploded_details_enlarge_the_north_hardware_beside_the_bom() -> Non
     assert previous_bottom > template.title_block_top_m
 
 
+class _CaptionAnnotation:
+    def __init__(self, position: tuple[float, ...]) -> None:
+        self.position = position
+
+    def GetPosition(self) -> tuple[float, ...]:
+        return self.position
+
+
+class _CaptionTable:
+    def __init__(
+        self,
+        heights: tuple[float, ...],
+        position: tuple[float, ...] = (0.205, 0.250, 0.0),
+    ) -> None:
+        self.heights = heights
+        self.annotation = _CaptionAnnotation(position)
+        self.RowCount = len(heights)
+
+    def GetAnnotation(self) -> _CaptionAnnotation:
+        return self.annotation
+
+    def GetRowHeight(self, row: int) -> float:
+        return self.heights[row]
+
+
+class _CaptionNote:
+    def __init__(self, extent: tuple[float, ...]) -> None:
+        self.extent = extent
+
+    def GetExtent(self) -> tuple[float, ...]:
+        return self.extent
+
+
+@pytest.fixture
+def native_caption_geometry(monkeypatch) -> None:
+    """Exercise native geometry guards without a SolidWorks seat."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda adapter, name: None)
+
+
+def test_native_bom_limits_use_its_actual_position_and_each_row_height(
+    native_caption_geometry,
+) -> None:
+    table = _CaptionTable((0.005, 0.009, 0.013), (0.180, 0.240, 0.002))
+    assert drawing._bom_vertical_limits(table) == pytest.approx((0.213, 0.240))
+
+
+def test_caption_tracks_native_bom_growth_from_wrapped_rows(
+    native_caption_geometry,
+) -> None:
+    heights = (0.0065,) * 20
+    short = _CaptionTable(heights, (*drawing.BOM_ANCHOR, 0.0))
+    wrapped_heights = list(heights)
+    wrapped_heights[17] = 0.019
+    wrapped_heights[18] = 0.019
+    wrapped = _CaptionTable(tuple(wrapped_heights), (*drawing.BOM_ANCHOR, 0.0))
+
+    short_bottom, short_top = drawing._bom_vertical_limits(short)
+    wrapped_bottom, wrapped_top = drawing._bom_vertical_limits(wrapped)
+    growth = sum(wrapped_heights) - sum(heights)
+    assert (short_bottom, short_top) == pytest.approx(
+        (drawing.BOM_ANCHOR[1] - sum(heights), drawing.BOM_ANCHOR[1])
+    )
+    assert wrapped_top == pytest.approx(short_top)
+    assert wrapped_bottom == pytest.approx(short_bottom - growth)
+    short_xy = drawing.exploded_caption_xy(short_bottom)
+    wrapped_xy = drawing.exploded_caption_xy(wrapped_bottom)
+    assert short_xy == pytest.approx((drawing.BOM_ANCHOR[0], short_bottom - 0.006))
+    assert wrapped_xy == pytest.approx(
+        (drawing.BOM_ANCHOR[0], wrapped_bottom - 0.006)
+    )
+    assert short_xy[1] - wrapped_xy[1] == pytest.approx(growth)
+
+
+@pytest.mark.parametrize(
+    "heights",
+    [
+        (),
+        (0.0,),
+        (-0.001,),
+        (math.nan,),
+        (math.inf,),
+        (-math.inf,),
+        (0.006, 0.0, 0.006),
+        (0.006, -0.001, 0.006),
+        (0.006, math.nan, 0.006),
+    ],
+)
+def test_native_bom_refuses_missing_or_invalid_row_heights(
+    native_caption_geometry, heights,
+) -> None:
+    with pytest.raises(RuntimeError):
+        drawing._bom_vertical_limits(_CaptionTable(heights))
+
+
+@pytest.mark.parametrize(
+    "position",
+    [
+        (),
+        (0.205, 0.250),
+        (0.205, 0.250, 0.0, 0.0),
+        (math.nan, 0.250, 0.0),
+        (0.205, math.inf, 0.0),
+        (0.205, 0.250, -math.inf),
+    ],
+)
+def test_native_bom_refuses_invalid_annotation_positions(
+    native_caption_geometry, position,
+) -> None:
+    with pytest.raises(RuntimeError):
+        drawing._bom_vertical_limits(_CaptionTable((0.006,), position))
+
+
+@pytest.mark.parametrize("gap", [-0.0200011, -0.001, 0.0, 0.003, 0.003999])
+def test_caption_refuses_native_bom_overlap_or_under_four_mm_clearance(
+    native_caption_geometry, gap,
+) -> None:
+    table = _CaptionTable((0.0625, 0.0625))
+    # The native BOM bottom is 0.125 m; use the note's actual upper edge,
+    # not its insertion point or a text-height estimate.
+    top = 0.125 - gap
+    note = _CaptionNote((0.205, top - 0.009, 0.0, 0.285, top, 0.0))
+    with pytest.raises(RuntimeError):
+        drawing._assert_exploded_caption(object(), table, note)
+
+
+@pytest.mark.parametrize("gap", [0.004, 0.004001, 0.010])
+def test_caption_accepts_at_least_four_mm_native_clearance(
+    native_caption_geometry, gap,
+) -> None:
+    table = _CaptionTable((0.0625, 0.0625))
+    top = 0.125 - gap
+    note = _CaptionNote((0.205, top - 0.009, 0.0, 0.285, top, 0.0))
+    drawing._assert_exploded_caption(object(), table, note)
+
+
+@pytest.mark.parametrize(
+    "extent",
+    [
+        (),
+        (0.205, 0.100, 0.0, 0.285, 0.110),
+        (0.205, 0.100, 0.0, 0.285, 0.110, 0.0, 0.0),
+        (0.205, 0.100, 0.0, 0.205, 0.110, 0.0),
+        (0.205, 0.100, 0.0, 0.285, 0.100, 0.0),
+        (0.285, 0.100, 0.0, 0.205, 0.110, 0.0),
+        (0.205, 0.110, 0.0, 0.285, 0.100, 0.0),
+    ],
+)
+def test_caption_refuses_malformed_or_empty_native_extents(
+    native_caption_geometry, extent,
+) -> None:
+    with pytest.raises(RuntimeError):
+        drawing._assert_exploded_caption(
+            object(), _CaptionTable((0.0625, 0.0625)), _CaptionNote(extent)
+        )
+
+
+@pytest.mark.parametrize("coordinate", range(6))
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_caption_refuses_nonfinite_native_extent_coordinates(
+    native_caption_geometry, coordinate, value,
+) -> None:
+    extent = [0.205, 0.100, 0.0, 0.285, 0.110, 0.0]
+    extent[coordinate] = value
+    with pytest.raises(RuntimeError):
+        drawing._assert_exploded_caption(
+            object(), _CaptionTable((0.0625, 0.0625)), _CaptionNote(tuple(extent))
+        )
+
+
+@pytest.mark.parametrize("edge", ["left", "right", "bottom", "top"])
+def test_caption_refuses_native_extent_outside_sheet_border(
+    native_caption_geometry, edge,
+) -> None:
+    template = drawing._TEMPLATE
+    box = {
+        "left": (drawing.BORDER - 0.001, 0.100, drawing.BORDER + 0.010, 0.110),
+        "right": (
+            template.width_m - drawing.BORDER - 0.010,
+            0.100,
+            template.width_m - drawing.BORDER + 0.001,
+            0.110,
+        ),
+        "bottom": (0.020, drawing.BORDER - 0.001, 0.030, drawing.BORDER + 0.010),
+        "top": (
+            0.020,
+            template.height_m - drawing.BORDER - 0.010,
+            0.030,
+            template.height_m - drawing.BORDER + 0.001,
+        ),
+    }[edge]
+    x0, y0, x1, y1 = box
+    # Put the BOM above the note, so this refusal proves containment rather
+    # than accidentally failing the separate BOM-clearance condition.
+    table = _CaptionTable((0.006,), (0.205, y1 + 0.020, 0.0))
+    with pytest.raises(RuntimeError, match="border"):
+        drawing._assert_exploded_caption(
+            object(), table, _CaptionNote((x0, y0, 0.0, x1, y1, 0.0))
+        )
+
+
+def test_caption_refuses_native_extent_entering_title_block(
+    native_caption_geometry,
+) -> None:
+    template = drawing._TEMPLATE
+    top = template.title_block_top_m + 0.003
+    note = _CaptionNote(
+        (
+            template.title_block_left_m + 0.005,
+            template.title_block_top_m - 0.003,
+            0.0,
+            template.width_m - drawing.BORDER - 0.005,
+            top,
+            0.0,
+        )
+    )
+    table = _CaptionTable((0.006,), (0.205, top + 0.020, 0.0))
+    with pytest.raises(RuntimeError, match="title block"):
+        drawing._assert_exploded_caption(object(), table, note)
+
+
 def test_the_lifted_foot_screws_clear_their_uprights_in_the_isometric() -> None:
     """r2 machinist review (sheet 2, DETAILS B/C): lifted 25, each keeper
     foot screw and bracket hold-down hung in front of its upright (it sits

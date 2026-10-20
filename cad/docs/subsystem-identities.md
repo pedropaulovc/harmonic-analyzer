@@ -93,6 +93,12 @@ The package recipes own sheet counts and locations:
   column and 118 mm description column form two 190 mm pieces, split using
   rebuilt native row heights. Every instruction sheet has a reference model
   view for title-block property links.
+- [`draw_ch_channel_assembly.py`](../scripts/draw_ch_channel_assembly.py)
+  retains its four sheets and complete parent-scoped vendor Numbers. On sheet 2,
+  the exploded-view caption follows the rebuilt native BOM bottom, including
+  wrapped rows, rather than an estimated row pitch. Its actual native note
+  extent must leave at least 4 mm below the table and remain clear of the border
+  and title block, including after the final rebuild.
 
 Earlier selected-image page indices remain unchanged. Native note extents,
 table growth and view outlines still determine containment; offline wrapping

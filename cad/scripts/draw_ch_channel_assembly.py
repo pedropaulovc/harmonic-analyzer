@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import math
 import sys
 import textwrap
 from pathlib import Path
@@ -223,8 +224,10 @@ BOM_COLUMN_WIDTHS = {
 BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
-# Below the BOM's 19 rows (bottom ~0.129 m), above the title block.
-EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.124)
+# Wrapped full vendor Numbers grow the native table beyond its nominal pitch.
+# Follow its rebuilt bottom, then prove the caption's actual gap again at save.
+EXPLODED_CAPTION_OFFSET = 0.006
+EXPLODED_CAPTION_MIN_GAP = 0.004
 EXPLODED_CAPTION = "\n".join(
     (
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
@@ -1032,11 +1035,9 @@ def _view_outline(view: Any, *, label: str) -> tuple[float, float, float, float]
     return outline[0], outline[1], outline[2], outline[3]
 
 
-def _assert_view_on_sheet(view: Any, *, margin: float = 0.0, label: str) -> None:
-    """The view's outline, grown by ``margin`` (a balloon ring), stays inside
-    the inner border and clear of the title block."""
-    x0, y0, x1, y1 = _view_outline(view, label=label)
-    x0, y0, x1, y1 = x0 - margin, y0 - margin, x1 + margin, y1 + margin
+def _assert_box_on_sheet(box: tuple[float, float, float, float], *, label: str) -> None:
+    """The actual native box stays inside the border and outside the title block."""
+    x0, y0, x1, y1 = box
     border = (BORDER, BORDER, _TEMPLATE.width_m - BORDER, _TEMPLATE.height_m - BORDER)
     title = (
         _TEMPLATE.title_block_left_m,
@@ -1053,6 +1054,14 @@ def _assert_view_on_sheet(view: Any, *, margin: float = 0.0, label: str) -> None
         raise RuntimeError(
             f"{label}: outline {(x0, y0, x1, y1)!r} " + "; ".join(findings)
         )
+
+
+def _assert_view_on_sheet(view: Any, *, margin: float = 0.0, label: str) -> None:
+    """Keep the view outline and its balloon margin inside the drawing field."""
+    x0, y0, x1, y1 = _view_outline(view, label=label)
+    _assert_box_on_sheet(
+        (x0 - margin, y0 - margin, x1 + margin, y1 + margin), label=label
+    )
 
 
 def _center_view_outline(
@@ -1263,6 +1272,52 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
+def _bom_vertical_limits(table: Any) -> tuple[float, float]:
+    """Read the top-left-anchored BOM after its rows have grown to fit."""
+    table = _early_bound(table, "ITableAnnotation")
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError("channel BOM has invalid native position")
+    if not heights or any(
+        not math.isfinite(height) or height <= 0.0 for height in heights
+    ):
+        raise RuntimeError("channel BOM has invalid native row heights")
+    top = position[1]
+    return top - sum(heights), top
+
+
+def exploded_caption_xy(bom_bottom: float) -> tuple[float, float]:
+    """Follow the rebuilt BOM without changing its complete identities."""
+    return BOM_ANCHOR[0], bom_bottom - EXPLODED_CAPTION_OFFSET
+
+
+def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    bottom, top = _bom_vertical_limits(table)
+    extent = tuple(float(value) for value in note.GetExtent())
+    if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
+        raise RuntimeError(f"channel exploded caption has invalid extent {extent!r}")
+    box = (extent[0], extent[1], extent[3], extent[4])
+    if box[2] <= box[0] or box[3] <= box[1]:
+        raise RuntimeError(f"channel exploded caption has empty extent {extent!r}")
+    gap = bottom - box[3]
+    _telemetry.info(
+        "channel BOM and exploded caption native clearance",
+        bom_top_mm=top * 1000.0,
+        bom_bottom_mm=bottom * 1000.0,
+        caption_box_mm=tuple(value * 1000.0 for value in box),
+        caption_gap_mm=gap * 1000.0,
+    )
+    _assert_box_on_sheet(box, label="channel exploded caption")
+    if gap < EXPLODED_CAPTION_MIN_GAP:
+        raise RuntimeError(
+            f"channel exploded caption has {gap * 1000.0:.3f} mm below the BOM; "
+            f"requires {EXPLODED_CAPTION_MIN_GAP * 1000.0:.1f} mm"
+        )
+
+
 def _place_assembled_sheet(adapter: Any) -> None:
     _activate_sheet(adapter, SHEET_NAMES[0])
     for orientation, center, scale in (
@@ -1351,11 +1406,12 @@ def _place_exploded_sheet(
             f"channel exploded view carries {len(landings)} balloons, "
             f"expected one per BOM row ({len(BOM_COMPONENTS)})"
         )
-    _add_note_block(
+    bom_bottom, _ = _bom_vertical_limits(table)
+    caption = _add_note_block(
         adapter,
         SHEET_NAMES[1],
         EXPLODED_CAPTION,
-        EXPLODED_CAPTION_XY,
+        exploded_caption_xy(bom_bottom),
         label="exploded-view caption",
     )
     # After the balloons, so the boundary circles are never picked as a
@@ -1365,7 +1421,16 @@ def _place_exploded_sheet(
     _activate_sheet(adapter, SHEET_NAMES[1])
     for detail in EXPLODED_DETAILS:
         _exploded_detail(adapter, detail)
-    return lambda: assert_balloon_landings(adapter, landings)
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("channel exploded caption rebuild failed")
+    _assert_exploded_caption(adapter, table, caption)
+
+    def settled() -> None:
+        assert_balloon_landings(adapter, landings)
+        _assert_exploded_caption(adapter, table, caption)
+
+    return settled
 
 
 def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
