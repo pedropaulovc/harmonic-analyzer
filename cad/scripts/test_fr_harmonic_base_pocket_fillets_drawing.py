@@ -123,7 +123,12 @@ def pocket_features() -> tuple[Feature, ...]:
         Feature("cross rib", "cross rib", base.CROSS_RIB_SHAPE, base.RIB_RELIEF),
     ]
     features += [
-        Feature("cross-tap lug", f"cross-tap lug {_shape_label(shape)}", shape, base.CROSS_TAP_LUG_BOTTOM_Y)
+        Feature(
+            "cross-tap lug",
+            f"cross-tap lug {_shape_label(shape)}",
+            shape,
+            base.CROSS_TAP_LUG_BOTTOM_Y,
+        )
         for shape in base.CROSS_TAP_LUG_SHAPES
     ]
     names = [f.name for f in features]
@@ -768,12 +773,20 @@ def test_every_hole_keeps_the_ligament_floor_to_every_new_fillet() -> None:
 
 def test_holes_cover_every_seat_group_socket_and_cross_tap() -> None:
     holes = pocket_holes()
-    seats = sum(len(stations) for _tag, _seat, stations, _bounds in base.THROUGH_SEAT_GROUPS)
+    seats = sum(
+        len(stations) for _tag, _seat, stations, _bounds in base.THROUGH_SEAT_GROUPS
+    )
     assert seats == 18
     assert len(holes) == seats + 2 * len(base.COLUMN_SOCKET_XZ)
     assert {tag for tag, _seat, _stations, _bounds in base.THROUGH_SEAT_GROUPS} == {
-        "SupportHoldDownSeats", "PivotSeat", "LockSeat", "StopSeat",
-        "BlockScrewHoles", "FootScrewHoles", "PedestalSeats", "NameplateSeats",
+        "SupportHoldDownSeats",
+        "PivotSeat",
+        "LockSeat",
+        "StopSeat",
+        "BlockScrewHoles",
+        "FootScrewHoles",
+        "PedestalSeats",
+        "NameplateSeats",
     }
 
 
@@ -787,7 +800,8 @@ def test_through_seat_axis_material_matches_the_independent_retained_profile() -
         for xz, material in zip(stations, base.THROUGH_SEAT_MATERIAL[tag], strict=True):
             bottoms = [_CEILING]
             bottoms.extend(
-                f.bottom_y for f in features
+                f.bottom_y
+                for f in features
                 if float(f.clearance(np.array([xz]))[0]) <= 1e-9
             )
             bottoms.extend(f.corner.y_lo for f in fillets if _inside(f.zone, xz)[0])
@@ -796,7 +810,17 @@ def test_through_seat_axis_material_matches_the_independent_retained_profile() -
             assert material.nominal_segments_mm[0] == pytest.approx(
                 (0.0, base.STACK_HEIGHT - expected_bottom),
             ), (tag, xz)
-    assert all(f.kind in {"pocket wall", "socket boss", "long rib", "cross rib", "cross-tap lug"} for f in features)
+    assert all(
+        f.kind
+        in {
+            "pocket wall",
+            "socket boss",
+            "long rib",
+            "cross rib",
+            "cross-tap lug",
+        }
+        for f in features
+    )
 
 
 @pytest.mark.parametrize("r", STANDARD_RADII)

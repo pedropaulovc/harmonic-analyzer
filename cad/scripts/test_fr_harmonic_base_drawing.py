@@ -2007,6 +2007,28 @@ def test_retained_pocket_walls_socket_bosses_and_cross_tap_lugs_keep_their_contr
     assert part.SOCKET_BOSS_WALL == pytest.approx(8.0)
 
 
+def test_cross_tap_remains_backed_when_the_pocket_ceiling_is_below_its_axis() -> None:
+    spec = fr_harmonic_base_spec
+    radius = part.THREAD_MAJOR_MM[part.BASE_CROSS_TAP_SPEC.size] / 2.0
+    thread_bottom = part.BASE_SCREW_Y - radius
+    thread_top = part.BASE_SCREW_Y + radius
+    lug_interval = (spec.CROSS_TAP_LUG_BOTTOM_Y, spec.POCKET_CEILING_Y)
+    skin_interval = (spec.POCKET_CEILING_Y, spec.GREEN_TOP)
+    assert part.BASE_SCREW_Y - spec.POCKET_CEILING_Y == pytest.approx(0.3)
+    # The bore crosses the shared boundary; lug below plus skin above is
+    # continuous metal even though the ceiling is lower than the axis.
+    assert lug_interval[0] < thread_bottom < lug_interval[1]
+    assert lug_interval[1] == skin_interval[0]
+    assert skin_interval[0] < thread_top < skin_interval[1]
+    margins = part.cross_tap_backing_margins_mm(part._general_band_mm())
+    assert margins["lug/skin join"] == pytest.approx(9.7)
+    assert margins["green skin"] == pytest.approx(6.4)
+    assert min(margins.values()) > 0.0
+    # A looser stack loses finite lateral backing; the check cannot pass
+    # simply because the nominal axis still lies above the lug bottom.
+    assert min(part.cross_tap_backing_margins_mm(2.0).values()) < 0.0
+
+
 def test_stamped_id_leader_clears_the_socket_bores() -> None:
     # 2026-09-25 Codex machinist review (hb-render-5, clarity): the stamped-ID
     # leader ran through the A3 socket bore. The leader starts where SolidWorks

@@ -567,6 +567,9 @@ RIB_HALF_LENGTH_Z = POCKET_HALF_Z + POCKET_WALL / 2.0
 # Dimensions live in the pure casting spec, independently of removed seats.
 CROSS_TAP_LUG_INNER_Z = abs(FRAME_FRONT_COLUMN_Z) - CROSS_TAP_LUG_LENGTH
 _CROSS_TAP_MAJOR = THREAD_MAJOR_MM[BASE_CROSS_TAP_SPEC.size]
+# The print specifies 49 MIN, not a maximum blind-drill depth. Tip/past-tip
+# checks therefore cover the nominal native drill only, not an unbounded
+# manufactured deep end. The finite backing envelope is checked separately.
 CROSS_TAP_TIP_Z = (
     BASE_SCREW_SEAT_Z
     - CASTING_TAP_DRILL_DEPTH
@@ -588,7 +591,7 @@ if not (
 if CROSS_TAP_LUG_WALLS["past tip"] < 1.5 * _CROSS_TAP_MAJOR:
     raise AssertionError("cross-tap lug ends less than 1.5D past the drill tip")
 if min(CROSS_TAP_LUG_WALLS.values()) - 1.5 * _general_band_mm() < 2.0:
-    raise AssertionError("cross-tap lug wall thins under 2.0 at the worst case")
+    raise AssertionError("cross-tap nominal drill/lug wall allowance falls under 2.0")
 
 # The socket bosses: 1/2 x (boss - bore) of wall round each bore, and the
 # boss swallows the pocket's plan corner, so the pocket needs no corner radius.
@@ -606,10 +609,54 @@ for _x, _z in COLUMN_SOCKET_XZ:
         >= SOCKET_BOSS_DIA / 2.0
     ):
         raise AssertionError("socket boss no longer covers the pocket's plan corner")
-# Under the deck and under the green land, the ceiling keeps a full skin.
-if min(POCKET_CEILING_Y - BASE_SCREW_Y, GREEN_TOP - POCKET_CEILING_Y) < 0.0:
+
+
+def cross_tap_backing_margins_mm(band_mm: float) -> dict[str, float]:
+    """Conservative 2 mm backing margins, without optional fillet credit.
+
+    The lug joins the skin at the same ceiling plane, wherever that plane
+    falls relative to the cross-tap axis. Erode the guaranteed lug, socket
+    and wall footprints by 2 mm and require their intervals to overlap.
+    Socket-bore air and the open spotface entrance are intentional; neither
+    is credited as thread material. The printed MIN drill has no deep limit.
+    """
+    radius = max(_CROSS_TAP_MAJOR, BASE_CROSS_TAP_DRILL_DIA + band_mm) / 2.0
+    axis_x_radius = radius + band_mm
+    socket_radius = (
+        SOCKET_BOSS_DIA / 2.0
+        - band_mm / 2.0
+        - math.sqrt(2.0) * band_mm
+        - 2.0
+    )
+    socket_half_z = math.sqrt(socket_radius**2 - axis_x_radius**2)
+    return {
+        "lug/skin join": POCKET_CEILING_Y - CROSS_TAP_LUG_BOTTOM_Y - 2.0 * band_mm,
+        "green skin": GREEN_TOP - POCKET_CEILING_Y - 2.0 * band_mm - 2.0,
+        "below thread": (
+            BASE_SCREW_Y - radius - CROSS_TAP_LUG_BOTTOM_Y - 2.0 * band_mm - 2.0
+        ),
+        "above thread": GREEN_TOP - BASE_SCREW_Y - radius - 2.0 * band_mm - 2.0,
+        "lug inner X": COLUMN_X - axis_x_radius - CROSS_TAP_LUG_INNER_X - band_mm - 2.0,
+        "lug outer X": (
+            CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH
+            - 2.0 * band_mm - COLUMN_X - axis_x_radius - 2.0
+        ),
+        "wall outer X": TOP_LENGTH / 2.0 - band_mm - COLUMN_X - axis_x_radius - 2.0,
+        "lug/socket join": socket_half_z - band_mm - 2.0,
+        "socket/wall join": min(
+            abs(z) + socket_half_z - POCKET_HALF_Z - band_mm - 2.0
+            for _, z in COLUMN_SOCKET_XZ
+        ),
+    }
+
+
+CROSS_TAP_BACKING_MARGINS = cross_tap_backing_margins_mm(_general_band_mm())
+if (
+    CROSS_TAP_BACKING_MARGINS["lug/skin join"] <= 0.0
+    or min(CROSS_TAP_BACKING_MARGINS.values()) < 0.0
+):
     raise AssertionError(
-        "pocket ceiling below the cross-tap axis or above the green land"
+        f"cross-tap lug/skin/socket/wall backing fails: {CROSS_TAP_BACKING_MARGINS}"
     )
 
 # Retained underside shapes in machine (x,z): ("disc",x,z,r) or

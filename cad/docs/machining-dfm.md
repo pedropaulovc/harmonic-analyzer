@@ -153,6 +153,19 @@ That exceeds the 1/4-20 receiver's **1.5D = 9.525 mm** requirement by
 **0.575 mm**, after both edge breaks. The former 12 mm skin would retain
 only 9.10 mm under the same chain and was not accepted for this conversion.
 
+The retained cross-tap lugs extend from Y26.5 to the pocket ceiling Y37.8,
+where they join the green skin up to Y47.8. The unchanged cross-tap axis at
+Y38.1 is 0.3 mm above that shared boundary: the lug/skin union, not the skin
+alone, backs its complete thread. Lug-bottom and top-land wall checks remain
+controlling; the ceiling need not be above the cross-tap axis.
+
+The separate 49 MIN cross-drill callout has no upper depth limit. Its existing
+tip/past-tip proof therefore describes the nominal native drill, not a
+worst-case manufactured deep end. The finite lateral and vertical backing
+checks charge the printed bands and require a continuous 2 mm envelope through
+the retained lug/socket/wall union, with the socket bore and spotface entrance
+treated as intended openings. No fillet credit or new depth band is assumed.
+
 The per-station material map includes retained ribs, socket bosses, lugs,
 walls and pocket fillets rather than assuming every hole crosses only the
 deck skin. A maximum-radius fillet may contribute material to the nominal
