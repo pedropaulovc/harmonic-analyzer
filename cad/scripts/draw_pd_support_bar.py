@@ -864,7 +864,7 @@ def _place_slot_depth_callout(
     x, _y, z = (float(value) for value in annotation.GetPosition())
     # OffsetText can re-dress a line onto its annotation's creation-point y.
     # Seed that point on the already-native void-height baseline first, then
-    # offset the text, as the shared offset_dimension_text sequence does.
+    # enable offset text, following the trammel, harmonic-base and v-block pattern.
     if not annotation.SetPosition2(x, baseline_y, z):
         raise RuntimeError("section B-B depth: could not seed its native baseline")
     display = _early_bound(
