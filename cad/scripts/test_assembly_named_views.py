@@ -109,10 +109,10 @@ def test_named_standard_views_preserve_exact_native_projections(
     model = _StandardModel(transposed=transposed)
     standard = dict(model.standard)
     name_standard_views(
-        _Adapter(model), views={"MG BACK": 1, "MG BACK-TOP-LEFT": 7}, label="test"
+        _Adapter(model), views={"MG BACK": 1, "ISO MG BACK-TOP-LEFT": 7}, label="test"
     )
     assert model.named["MG BACK"] == standard[1]
-    assert model.named["MG BACK-TOP-LEFT"] == standard[7]
+    assert model.named["ISO MG BACK-TOP-LEFT"] == standard[7]
     assert model.standard == standard
 
 
@@ -152,5 +152,5 @@ def test_named_standard_view_rejects_a_wrong_off_diagonal_readback(monkeypatch):
     model.Extension.GetNamedViewRotation = lambda name: _transpose(model.named[name])
     with pytest.raises(RuntimeError, match="read back"):
         name_standard_views(
-            _Adapter(model), views={"MG BACK-TOP-LEFT": 7}, label="test"
+            _Adapter(model), views={"ISO MG BACK-TOP-LEFT": 7}, label="test"
         )

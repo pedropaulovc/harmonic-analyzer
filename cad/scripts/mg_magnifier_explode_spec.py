@@ -10,7 +10,7 @@ wire (the finished sheet balloons it).
 
 Machine frame: +X west, +Y up, -Z front (the pen side). Standard Front is
 rebased to the machine front, while the fitter package uses the preserved
-``MG BACK-TOP-LEFT`` view from +X+Y+Z: the machine's back, above and west.
+``ISO MG BACK-TOP-LEFT`` view from +X+Y+Z: the machine's back, above and west.
 A part moved -Z draws up and right and passes BEHIND what it left; a part
 moved +Z draws down and left, in front. Each part pushed off the front of the
 axle therefore clears the wheel's outline by more than the wheel's projected

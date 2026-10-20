@@ -313,7 +313,7 @@ FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # ring so it passes under the vertical rod's lower end, the one part right of
 # the run.
 FINISHED_WIRE_BALLOON_RISE_DEG = -10.0
-ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # MG BACK-TOP-LEFT looks from +X+Y+Z
+ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # ISO MG BACK-TOP-LEFT looks from +X+Y+Z
 
 
 def wire_facing_point(
@@ -324,7 +324,7 @@ def wire_facing_point(
     station: float,
 ) -> tuple[float, float, float]:
     """Part-frame point (mm) on the wire's ring at ``station`` that faces the
-    preserved MG BACK-TOP-LEFT viewer.
+    preserved ISO MG BACK-TOP-LEFT viewer.
 
     The frame is ``build_mg_magnifier_assembly._lever_wire_rows``': part +Y
     onto drum->hook, +X the horizontal perpendicular (d_y, -d_x, 0), +Z = X x Y.
