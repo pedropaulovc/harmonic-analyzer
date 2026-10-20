@@ -9,6 +9,11 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
+from _drawing_edges import scan_view_edges
+from _drawing_gdt import add_feature_control_frame
+from _gear_drawing_entities import visible_circle_edge
+from _gtol_face_read import face_geometry
+from _native_axis_datum import add_native_axis_datum
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -50,28 +55,17 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 37 mm pin: 4:1 keeps the collar, the chamfers and the shoulder radii
-# legible on the one turned profile.
-SHEET_SCALE = (4.0, 1.0)
-VIEW_SCALE = (4, 1)
+# The integral flange and transverse cross hole are visible in the Right
+# projection. Native model dimensions remain the sole printed size authority.
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
-# One turned profile (*Right: model +Z runs to sheet -X, so the top end,
-# faced in the turning chucking, is on the left) carries every size. The
-# profile sketch lies on the upper half, so its length and chamfer extension
-# lines rise from the upper outline: the length baseline from the top end
-# and both chamfers go above the view (the hub pin's layout). The diameters
-# and the two shoulder radii go below, where nothing but their own leaders
-# reaches. Farm run 20261017T015225029Z had the lengths below, and both
-# radius shoulders crossed the extension lines rising at the shoulders.
-PROFILE_CENTER = (0.200, 0.160)
-# The isometric moves 10 mm right of run 20261017T015225029Z's, clear of the
-# bottom chamfer's callout; the note keeps its 45 mm over the view centre.
-ISO_CENTER = (0.370, 0.200)
+PROFILE_CENTER = (0.185, 0.164)
+ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (2, 1)
-ISO_NOTE_XY = (0.340, 0.245)
-_COLLAR_HALF = COLLAR_DIA / 2.0 * _S
-_ABOVE = PROFILE_CENTER[1] + _COLLAR_HALF
-_BELOW = PROFILE_CENTER[1] - _COLLAR_HALF
+ISO_NOTE_XY = (0.325, 0.252)
+_ABOVE = PROFILE_CENTER[1] + part_spec.FLANGE_DIA / 2.0 * _S
+_BELOW = PROFILE_CENTER[1] - part_spec.FLANGE_DIA / 2.0 * _S
 
 
 def _x(z_mm: float) -> float:
@@ -79,65 +73,36 @@ def _x(z_mm: float) -> float:
     return PROFILE_CENTER[0] - (z_mm - OVERALL_LENGTH / 2.0) * _S
 
 
-# Rows of the top-end baseline, nearest first. A chamfer's extension lines
-# end about 4.6 mm under its text position, so the chamfers stand under the
-# first row and no row's dimension line crosses them.
-ROW_Y = (_ABOVE + 0.019, _ABOVE + 0.032, _ABOVE + 0.045)
-CHAMFER_Y = _ABOVE + 0.009
-# The callout text (value over "X 45° LEAD CHAMFER", about 48 mm wide) is
-# centred on its position; each block ends 8 mm outboard of its end face.
-CHAMFER_OUTBOARD = 0.032
-# Below the view, as run 20261017T022004769Z printed them (sheet mm):
-# * a radius text is centred on its position with its shoulder 2.8 under
-#   it; the knee is 13.7 from the position on the corner's side.
-# * a diameter's dimension line stands at its position's x and runs from
-#   its callout block's bottom up through the part. The block starts at
-#   that line and runs right by its widest line; four lines span +-12.85
-#   about the position's y, the bare Ø12.70 sits 2.8 above its shoulder.
-# So each block must stay out of every other diameter's line, and every
-# deeper block's line out of the shallower blocks. Run 20261017T022004769Z
-# stacked the 65 mm wide carrier block over the collar's Ø12.5 (now Ø12.70).
-FILLET_Y = _BELOW - 0.003
-# The seat radius's knee 2.8 mm toward the collar from its corner, so its
-# leader passes left of where the bearing diameter's extension line starts
-# at the collar face (run 20261017T022004769Z's one advisory crossing).
-SEAT_FILLET_X = _x(COLLAR_STATION) + 0.0117
-CARRIER_FILLET_X = _x(CARRIER_STATION) - 0.016
-# Nearest the part: the collar's one line between the two radius knees,
-# under the radius shoulders.
-COLLAR_DIA_XY = (_x(COLLAR_STATION + COLLAR_HEIGHT / 2.0), _BELOW - 0.011)
-# The bearing block right of the seat radius's text, on its section.
-BEARING_DIA_XY = (_x(BEARING_LENGTH / 2.0), _BELOW - 0.017)
-# The carrier block deepest, its line 6 mm in from the top end and left of
-# the carrier radius's shoulder; the block runs under the collar's Ø12.70
-# and stops left of the bearing's line.
-CARRIER_DIA_XY = (_x(OVERALL_LENGTH) + 0.006, _BELOW - 0.031)
-
-
 def _span_mid(station_mm: float) -> float:
-    """Sheet X of the middle of a top-end-to-station span."""
     return (_x(OVERALL_LENGTH) + _x(station_mm)) / 2.0
 
 
+ROW_Y = (_ABOVE + 0.012, _ABOVE + 0.024, _ABOVE + 0.036)
+CHAMFER_Y = _ABOVE - 0.025
 PROFILE_KEEP = {
-    # Shortest span nearest the part so no extension line crosses a row.
     "CarrierLength": (_span_mid(CARRIER_STATION), ROW_Y[0]),
-    "CollarSeatStation": (_span_mid(COLLAR_STATION), ROW_Y[1]),
+    "BearingLength": (_x(BEARING_LENGTH / 2.0), ROW_Y[1]),
+    "UpperBossHeight": (_x((part_spec.FLANGE_TOP_STATION + CARRIER_STATION) / 2.0), 0.210),
     "PinLength": (_span_mid(0.0), ROW_Y[2]),
-    "TopChamfer": (_x(OVERALL_LENGTH) - CHAMFER_OUTBOARD, CHAMFER_Y),
-    "BottomChamfer": (_x(0.0) + CHAMFER_OUTBOARD, CHAMFER_Y),
-    "BearingDia": BEARING_DIA_XY,
-    "CarrierDia": CARRIER_DIA_XY,
-    "CollarDia": COLLAR_DIA_XY,
-    "CarrierFilletR": (CARRIER_FILLET_X, FILLET_Y),
-    "SeatFilletR": (SEAT_FILLET_X, FILLET_Y),
+    "TopChamfer": (_x(OVERALL_LENGTH) - 0.012, CHAMFER_Y),
+    "BottomChamfer": (_x(0.0) + 0.012, CHAMFER_Y),
+    "BearingDia": (_x(BEARING_LENGTH / 2.0), 0.101),
+    "CarrierDia": (_x(OVERALL_LENGTH) + 0.004, 0.082),
+    "CollarDia": (_x(CARRIER_STATION - 5.0), 0.127),
+    "FlangeDia": (_x(part_spec.FLANGE_BOTTOM_STATION + part_spec.FLANGE_THICK / 2.0), 0.079),
+    "FlangeThick": (_x(part_spec.FLANGE_BOTTOM_STATION + part_spec.FLANGE_THICK / 2.0), 0.229),
+    "LowerBossHeight": (0.303, 0.118),
+    "CarrierFilletR": (_x(CARRIER_STATION) - 0.012, 0.137),
+    "SeatFilletR": (_x(COLLAR_STATION) + 0.012, 0.137),
+    "CrossHoleDia": (_x(part_spec.CROSS_HOLE_STATION) - 0.035, 0.209),
+    "CrossHoleFromEnd": (_x(OVERALL_LENGTH - part_spec.CROSS_HOLE_FROM_END / 2.0), 0.192),
 }
-# The axis pick sits on the collar face just off the axis.
-CENTERLINE_PICK = (_x(COLLAR_STATION + COLLAR_HEIGHT / 2.0), PROFILE_CENTER[1] + 0.003)
+CENTERLINE_PICK = (_x(CARRIER_STATION - 5.0), PROFILE_CENTER[1] + 0.003)
 
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _FROM_TOP = ("top_face", (("draw_ch_rocker_arm_tl_oblique_pivot_pin", "build"),))
+_FROM_BOTTOM = ("bottom_face", (("draw_ch_rocker_arm_tl_oblique_pivot_pin", "build"),))
 
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
@@ -189,11 +154,11 @@ requirement(
             ("COLLAR_STATION",),
         ),
         "station": (
-            limits(part_spec.TOP_TO_COLLAR_SEAT, part_spec.LENGTH_PLACES),
-            ("TOP_TO_COLLAR_SEAT",),
+            limits(part_spec.BEARING_LENGTH, part_spec.LENGTH_PLACES),
+            ("BEARING_LENGTH",),
         ),
-        "station_nominal": (part_spec.TOP_TO_COLLAR_SEAT, ("TOP_TO_COLLAR_SEAT",)),
-        "height_from": _FROM_TOP,
+        "station_nominal": (part_spec.BEARING_LENGTH, ("BEARING_LENGTH",)),
+        "height_from": _FROM_BOTTOM,
     },
     precision={"station": part_spec.LENGTH_PLACES},
 )
@@ -202,25 +167,23 @@ requirement(
     "bottom_face",
     kind="face",
     faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-    requirements=("station",),
+    requirements=(),
     fields={
         "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
         "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-        "station": (
-            limits(part_spec.OVERALL_LENGTH, part_spec.LENGTH_PLACES),
-            ("OVERALL_LENGTH",),
-        ),
-        "station_nominal": (part_spec.OVERALL_LENGTH, ("OVERALL_LENGTH",)),
-        "height_from": _FROM_TOP,
     },
-    precision={"station": part_spec.LENGTH_PLACES},
 )
 
 requirement(
     "collar",
     kind="boss",
-    faces=(CylinderFace(part_spec.COLLAR_DIA),),
-    requirements=("dia",),
+    faces=(
+        CylinderFace(
+            part_spec.COLLAR_DIA,
+            contains_z_mm=(part_spec.FLANGE_TOP_STATION + part_spec.CARRIER_STATION) / 2.0,
+        ),
+    ),
+    requirements=("dia", "length"),
     fields={
         "axis": _AXIS,
         "dia": (
@@ -228,8 +191,13 @@ requirement(
             ("COLLAR_DIA",),
         ),
         "dia_nominal": (part_spec.COLLAR_DIA, ("COLLAR_DIA",)),
+        "length": (
+            limits(part_spec.UPPER_BOSS_HEIGHT, part_spec.UPPER_BOSS_PLACES),
+            ("UPPER_BOSS_HEIGHT", "UPPER_BOSS_PLACES"),
+        ),
+        "length_nominal": (part_spec.UPPER_BOSS_HEIGHT, ("UPPER_BOSS_HEIGHT",)),
     },
-    precision={"dia": part_spec.COLLAR_PLACES},
+    precision={"dia": part_spec.COLLAR_PLACES, "length": part_spec.UPPER_BOSS_PLACES},
 )
 
 # Rule 4: the k5 press seat in both 6200-2RS inner races.
@@ -281,6 +249,107 @@ requirement(
     precision={"dia": part_spec.FIT_PLACES},
 )
 
+requirement(
+    "captive_flange",
+    kind="boss",
+    faces=(CylinderFace(part_spec.FLANGE_DIA),),
+    requirements=("dia", "length"),
+    fields={
+        "axis": _AXIS,
+        "dia": (
+            limits(part_spec.FLANGE_DIA, 2, part_spec.FLANGE_DIA_BAND),
+            ("FLANGE_DIA", "FLANGE_DIA_BAND"),
+        ),
+        "dia_nominal": (part_spec.FLANGE_DIA, ("FLANGE_DIA",)),
+        "length": (
+            limits(part_spec.FLANGE_THICK, part_spec.FLANGE_THICK_PLACES),
+            ("FLANGE_THICK", "FLANGE_THICK_PLACES"),
+        ),
+        "length_nominal": (part_spec.FLANGE_THICK, ("FLANGE_THICK",)),
+    },
+    precision={"dia": 2, "length": part_spec.FLANGE_THICK_PLACES},
+)
+
+requirement(
+    "lower_inner_race_boss",
+    kind="boss",
+    faces=(
+        CylinderFace(
+            part_spec.COLLAR_DIA,
+            contains_z_mm=part_spec.COLLAR_STATION + part_spec.LOWER_BOSS_HEIGHT / 2.0,
+        ),
+    ),
+    requirements=("note",),
+    fields={
+        "axis": _AXIS,
+        "note": (
+            " ".join(part_spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()),
+            ("LOWER_BOSS_HEIGHT", "DIMENSION_CALLOUTS"),
+        ),
+    },
+)
+
+requirement(
+    "clevis_cross_hole",
+    kind="hole",
+    faces=(CylinderFace(part_spec.CROSS_HOLE_DIA),),
+    requirements=("dia", "station", "thru"),
+    fields={
+        "axis": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "at": ([0.0, 0.0, part_spec.CROSS_HOLE_STATION], ("CROSS_HOLE_STATION",)),
+        "dia": (
+            limits(part_spec.CROSS_HOLE_DIA, 2, part_spec.CROSS_HOLE_BAND),
+            ("CROSS_HOLE_DIA", "CROSS_HOLE_BAND"),
+        ),
+        "dia_nominal": (part_spec.CROSS_HOLE_DIA, ("CROSS_HOLE_DIA",)),
+        "station": (limits(part_spec.CROSS_HOLE_FROM_END, part_spec.LENGTH_PLACES), ("CROSS_HOLE_FROM_END",)),
+        "station_nominal": (part_spec.CROSS_HOLE_FROM_END, ("CROSS_HOLE_FROM_END",)),
+        "height_from": _FROM_TOP,
+        "thru": (True, ("DIMENSION_CALLOUTS",)),
+    },
+    precision={"dia": 2, "station": part_spec.LENGTH_PLACES},
+)
+
+
+def _flange_square_frames(adapter: Any, profile: Any, end: Any) -> None:
+    """Both real stop faces, not just the revolve's nominal square geometry."""
+    add_native_axis_datum(
+        adapter, end,
+        entity=visible_circle_edge(adapter, end, part_spec.BEARING_DIA),
+        source_path=SOURCE, radius_m=part_spec.BEARING_DIA / 2000.0,
+        datum="A", label="pin bearing-journal axis", shoulder=True,
+        stability_tolerance_m=0.0001,
+    )
+    rims = scan_view_edges(profile, label="captured flange rims")
+    for control, station, side in zip(
+        part_spec.GEOMETRIC_CONTROLS,
+        (part_spec.FLANGE_BOTTOM_STATION, part_spec.FLANGE_TOP_STATION),
+        (1.0, -1.0),
+        strict=True,
+    ):
+        matches = [
+            item for item in rims.circles
+            if abs(item.circle[2] - station) < 1e-4
+            and abs(item.circle[6] - part_spec.FLANGE_DIA / 2.0) < 1e-4
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"{control.key}: expected one flange-face rim")
+        faces = []
+        for face in matches[0].edge.GetTwoAdjacentFaces2() or ():
+            geometry = None if face is None else face_geometry(face)
+            if geometry is not None and control.face.matches(geometry):
+                faces.append(face)
+        if len(faces) != 1:
+            raise RuntimeError(f"{control.key}: rim does not identify one stop face")
+        landing = (_x(station), PROFILE_CENTER[1] + part_spec.FLANGE_DIA * _S / 3.0)
+        add_feature_control_frame(
+            adapter, profile, entity=faces[0], entity_type="FACE",
+            leader_attach_xy=landing,
+            frame_xy=(landing[0] + side * 0.025 - (0.027 if side < 0.0 else 0.0), landing[1] + 0.004),
+            characteristic=control.characteristic, tolerance=control.tolerance,
+            datums=control.datums, label=control.key,
+        )
+
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -316,7 +385,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Right", *PROFILE_CENTER, scale=VIEW_SCALE
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (profile, iso):
+    end = place_view(adapter, str(SOURCE), "*Back", 0.355, 0.105, scale=(2, 1))
+    for view in (profile, iso, end):
         set_hidden_lines_removed(adapter, view)
 
     annotations = curate_view_dimensions(
@@ -335,6 +405,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=CENTERLINE_PICK, label="pivot pin axis"
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _flange_square_frames(adapter, profile, end)
 
     return await finalize_drawing(
         adapter,

@@ -61,6 +61,7 @@ from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -85,6 +86,8 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     CR_TAP_DRILL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     ISOMETRIC_VIEW_NOTE,
     LEVER_HOLES,
     LEVER_SPEC,
@@ -779,6 +782,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

@@ -6,16 +6,15 @@ made: one bolts on each rail's HIWIN HGH15CA carriage and carries, in two
 (MHA-CH-06-TL-21) turns on (``ch_rocker_arm_tl_oblique_trammel_spec``,
 imported as ``trammel``; values read from it are marked ⚙).
 
-Material and stock: 6061-T6 aluminium, a 70 x 40 x ``PIVOT_BLOCK_HEIGHT`` ⚙
-(24) block machined from 1 x 2 in flat bar.
-
-Frame: origin at the carriage centre (the centre of the carriage's 26 x 26
-M4 pattern) on the block's bottom face, the carriage seat; +X along the rail
-AWAY from the spindle, +Z up, +Y completing the right-handed set. The block
-occupies X -50 .. +20, Y -20 .. +20, Z 0 .. 24. The origin is a modelling
-frame only: every X station prints from the -X end face and every Y station
-from the -Y side face (rule 10, from real faces), carried by construction
-points in the top seat's profile sketch that the same knobs drive.
+Material and stock: 6061-T6 aluminium, 1 x 3 in flat bar, faced to the
+unchanged 24 height. The integral wide wing occupies X -54..-10, Y +/-32;
+the original-width tail occupies X -10..20, Y +/-20. The original bearing
+axis, carriage pattern, nut-bracket pattern and 40-wide bracket grip stay put.
+Frame origin is the carriage-pattern centre on its top mating plane, +X
+away from the spindle, +Z up. Existing hole stations still read from the
+real -X end and tail -Y side; the four cap receiver taps instead read
+DIRECTLY from the actual bearing axis at three places (+/-0.13), never
+through a loose outside-edge stack.
 
 Bearing seats (rule 4, rule 16). The bore axis stands at X = ``PIN_OFFSET`` ⚙
 (-32), Y = 0. From the top, a Ø30 N6 seat (29.976/29.989) ``BEARING_RECESS``
@@ -96,7 +95,7 @@ two places (+/-0.51) and both seat depths three (+/-0.13): the thinnest
 block and the deepest seats leave 23.49 - 2 x 10.13 = 3.23
 (``PULLER_GAP_MIN``), stated once on each seat depth as the web it sets
 (rule 4; review r8: not on the 24.00, a general size). The web is named by
-the Ø25's "THRU WEB" callout. The 70 and 40 print two
+the Ø25's "THRU WEB" callout. The overall length and tail width print two
 places for the counterbores' walls to the +X end and the +Y side, which
 they set: 2.10 at two places, 1.81 at one (under the 2.0 target), stated on
 both.
@@ -118,6 +117,15 @@ the -X end and the bottom face, carried by a hidden reference sketch the
 same knobs drive; TL-29's taps are spotted through these holes at assembly
 (TL-00), so the pair's spacing need only stay inside the screws' float,
 and the callout names the mate.
+
+The unchanged machined top around the upper bearing seat is the lower
+flange stop, not a new bearing pocket. Four 1/4-20 THRU receiver taps in
+the wing take the mechanically locked cap. Constructive assembly presses
+only the ring being fitted, with the pin's narrow boss against the upper
+inner race and its broad flange underside clear of the seal. Cartridge
+service removes the cap first, presses the pin UPWARD from its lower end,
+then uses the retained puller cavity for the remaining bearing. Extraction
+may load the balls: replace pin and both bearings, never promise their reuse.
 """
 
 from __future__ import annotations
@@ -125,8 +133,9 @@ from __future__ import annotations
 import math
 
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _fit_deviations import deviations
-from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # drawing-guidelines.md rule 17 (walls and webs): 2.0 target, 1.5 floor.
@@ -137,7 +146,7 @@ _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
 DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 
 # --- Block -----------------------------------------------------------------
-BLOCK_X0 = -50.0  # the -X end, toward the spindle
+BLOCK_X0 = retention.BLOCK_SPINDLE_END
 BLOCK_X1 = 20.0  # the +X end
 BLOCK_LENGTH = BLOCK_X1 - BLOCK_X0
 BLOCK_WIDTH = 40.0
@@ -146,6 +155,44 @@ BLOCK_HEIGHT = trammel.PIVOT_BLOCK_HEIGHT  # ⚙ 24
 # -Y side face (rule 10). The model's knobs stay origin-relative.
 DATUM_X = BLOCK_X0
 DATUM_Y = -BLOCK_WIDTH / 2.0
+WING_X1 = retention.BLOCK_WING_END
+WING_WIDTH = 2.0 * retention.BLOCK_WING_HALF_WIDTH
+WING_LENGTH = WING_X1 - BLOCK_X0
+BEARING_AXIS_NAME = "BearingAxis"
+CAP_TAP_REFERENCE = "CapTapReference"
+CAP_TAP_HOLE_SPEC = HoleSpec("tapped", "1/4-20")
+CAP_TAP_DRILL_DIA = TAP_DRILL_MM[CAP_TAP_HOLE_SPEC.size]
+CAP_TAP_POINTS = tuple(
+    (trammel.PIN_OFFSET + dx, dy) for dx, dy in retention.CAP_BOLT_CENTERS
+)
+CAP_TAP_LOCATION_PLACES = retention.CAP_BOLT_LOCATION_PLACES
+CAP_TAP_CALLOUT = "CAP LOCATING PATTERN\nFROM BEARING AXIS"
+
+
+def cap_receiver_walls(
+    *,
+    location_band: float = printed_band_mm(CAP_TAP_LOCATION_PLACES),
+    wing_width: float = WING_WIDTH,
+    wing_length: float = WING_LENGTH,
+) -> dict[str, float]:
+    """Thread-envelope walls, including the loose bearing-axis edge location.
+
+    The narrow direct tap-to-axis bands govern cap translation. Outside-edge
+    bands are charged separately here, only for the wing's material walls.
+    """
+    radius = THREAD_MAJOR_MM[CAP_TAP_HOLE_SPEC.size] / 2.0
+    edge_band = printed_band_mm(2)
+    x_from_end = trammel.PIN_OFFSET - BLOCK_X0
+    dx, dy = abs(retention.CAP_BOLT_X_OFFSETS[0]), abs(retention.CAP_BOLT_Y_OFFSETS[0])
+    return {
+        "cap thread to spindle end": x_from_end - dx - edge_band - location_band - radius,
+        "cap thread to wing step": wing_length - printed_band_mm(1) - x_from_end - dx - edge_band - location_band - radius,
+        "cap thread to wing side": (wing_width - edge_band) / 2.0 - dy - edge_band - location_band - radius,
+    }
+
+
+if min(cap_receiver_walls().values()) < WALL_TARGET:
+    raise AssertionError("the cap receiver threads lose the two-mm wing wall target")
 
 # --- Bearing seats ---------------------------------------------------------
 BORE_X = trammel.PIN_OFFSET  # ⚙ -32
@@ -258,8 +305,8 @@ ENGAGEMENT_TARGET = 1.5 * SCREW_DIA  # drawing-guidelines.md rule 18
 if ENGAGEMENT_MAX >= ENGAGEMENT_TARGET:
     raise AssertionError("the M4 engagement meets rule 18: drop the shortfall")
 # One row over its value: review r8 found the three-row callout never
-# printed (layout audit text-unmatched), while the one-row "2X" and 70's
-# rows do; the HGH15CA mate is already the hole callout's. Both limits print
+# printed (layout audit text-unmatched), while one-row callouts
+# print; the HGH15CA mate is already the hole callout's. Both limits print
 # (review r11 read the three places as rescuing the minimum alone): the
 # floor's band holds the screw between that minimum and the thread's bottom.
 CBORE_FLOOR_CALLOUT = (
@@ -307,7 +354,7 @@ SIDE_CALLOUT_PRECISION = {
     "hw-cbdia": SIDE_CBORE_PLACES,
     "hw-cbdepth": SIDE_CBORE_PLACES,
 }
-REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, SIDE_SCREW_REFERENCE)
+REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, SIDE_SCREW_REFERENCE, CAP_TAP_REFERENCE)
 
 # --- Seat corner (rule 16) ---------------------------------------------------
 BEARING_OD_CHAMFER_MIN = 0.6  # 6200 outer ring r1,2 min
@@ -352,6 +399,9 @@ MODEL_KNOBS: dict[str, float] = {
     "SideScrewX": abs(SIDE_SCREW_X[1]),
     "SideScrewZ": SIDE_SCREW_Z,
 }
+MODEL_KNOBS["WingSideY"] = WING_WIDTH / 2.0
+MODEL_KNOBS["CapTapX"] = abs(retention.CAP_BOLT_X_OFFSETS[0])
+MODEL_KNOBS["CapTapY"] = abs(retention.CAP_BOLT_Y_OFFSETS[0])
 
 # --- Printed places ----------------------------------------------------------
 # Hole stations three places (hole to hole, the docstring's carriage
@@ -386,6 +436,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SideScrewRowZ": SIDE_STATION_PLACES,
     },
 }
+DRAWING_PRECISION["WingProfile"] = {"WingLength": 1, "WingWidth": 2}
+DRAWING_PRECISION[CAP_TAP_REFERENCE] = {
+    name: CAP_TAP_LOCATION_PLACES
+    for name in ("CapTapLeftX", "CapTapRightX", "CapTapLowerY", "CapTapUpperY")
+}
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
 }
@@ -413,6 +468,12 @@ DRAWING_VALUES: dict[str, float] = {
     "SideScrew1X": SIDE_STATIONS_X[0],
     "SideScrew2X": SIDE_STATIONS_X[1],
     "SideScrewRowZ": SIDE_ROW_Z,
+    "WingLength": WING_LENGTH,
+    "WingWidth": WING_WIDTH,
+    "CapTapLeftX": abs(retention.CAP_BOLT_X_OFFSETS[0]),
+    "CapTapRightX": abs(retention.CAP_BOLT_X_OFFSETS[1]),
+    "CapTapLowerY": abs(retention.CAP_BOLT_Y_OFFSETS[0]),
+    "CapTapUpperY": abs(retention.CAP_BOLT_Y_OFFSETS[1]),
 }
 if set(DRAWING_VALUES) != set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every marked pivot block dimension needs a value")
@@ -640,10 +701,8 @@ SHOULDER_HOLE_CALLOUT = "THRU WEB\nPULLER CLEARANCE\nBEHIND 6200\nINNER RACES"
 # A horizontal dimension's line runs along its LAST row's baseline, so B-B's
 # floor height carries its rows over the value (review r7: under it, its
 # line, shorter than the rows, struck "(5 DEEP THREAD)"; draw_ch_rocker_arm_
-# tl_filing_button EDGE_KEEP). The 70's one row stands under its value, on
-# its own line, as the 40.00's does (close-c4-r5: over the value, it sat
-# between the 63.000 and 70.00 lines and read as either's); the ~67 mm row
-# runs inside the 140 mm line.
+# tl_filing_button EDGE_KEEP). Overall length and tail-width callouts each
+# remain attached to the controlling native dimension.
 CALLOUTS_ABOVE = {
     "BoreDia": "2X",
     "SeatFilletR": "2X",
@@ -667,6 +726,11 @@ CALLOUTS_BELOW = {
     "ShoulderHoleDia": SHOULDER_HOLE_CALLOUT,
     "SideScrewRowZ": SIDE_ROW_CALLOUT,
 }
+CALLOUTS_BELOW.update({
+    name: CAP_TAP_CALLOUT
+    for name in DRAWING_PRECISION[CAP_TAP_REFERENCE]
+})
+CALLOUTS_BELOW["WingWidth"] = "SYMMETRIC ABOUT\nBEARING AXIS"
 SURFACE_FINISHES = ()
 # The side screws' callout rows under the native hole callout: the mate the
 # three-place stations serve (rule 4) and the counterbore walls' shortfall.

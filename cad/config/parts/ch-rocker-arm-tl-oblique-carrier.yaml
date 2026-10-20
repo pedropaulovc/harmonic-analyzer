@@ -16,3 +16,8 @@ ch-rocker-arm-tl-oblique-carrier:
       where: "the 2X 5/16-18 UNC feed-lever taps"
       finding: "engagement 9.53 min (1.20D) in the 12 plate, under 1.5D (rule 18)"
       reason: "12 plate cannot hold 1.5D of 5/16-18 and the feed lever only takes hand load; the shortfall is stated in the tap callout (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+    - id: "PV-01"
+      kind: "accept"
+      where: "four reamed pivot-pin hole axes relative to BOTTOM face datum A"
+      finding: "diametral perpendicularity 0.02 to datum A (rule 5)"
+      reason: "Owner-approved positive captured pivot, 2026-10-20: the rigid upset bound needs actual hole-axis tilt relative to the carrier plate, which the H7 size and ordinary position chains do not control. The BOTTOM face is the collar-side orientation datum; no added flatness frame, tighter position band, or skid is required."

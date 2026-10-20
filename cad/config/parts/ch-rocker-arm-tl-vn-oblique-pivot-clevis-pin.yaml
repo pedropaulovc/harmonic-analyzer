@@ -1,0 +1,16 @@
+ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin:
+  title: Headed Clevis Pin
+  number: MHA-CH-06-TL-VN-74
+  stock_name: Headed Clevis Pin
+  supplier: Huyett
+  supplier_skus: ["CLPS6-0187-1250D"]
+  material: AISI 316
+  material_specification: "316 stainless steel, Huyett CLPS6-0187-1250D, 3/16 x 1-1/4 inch"
+  finish: AS SUPPLIED
+  purchased_note: |-
+    INSTALL WITH FRESH SPLIT COTTER; SPREAD BOTH PRONGS.
+    DO NOT SUBSTITUTE A HEADLESS OR SHORTER PIN.
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

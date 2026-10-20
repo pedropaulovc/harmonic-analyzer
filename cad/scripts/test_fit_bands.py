@@ -310,6 +310,25 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title-block DRILLED HOLES +0.10/0 tap-pilot diameter: indexed into "
         "accepted limits, without a redundant explicit callout band"
     ),
+    ("ch_rocker_arm_tl_oblique_retention_spec", "PIN_FLANGE_DIA_BAND"): (
+        "indexed for the captive flange's minimum stop overlap and maximum "
+        "pocket envelope; also authored on the native pivot pin"
+    ),
+    ("ch_rocker_arm_tl_oblique_retention_spec", "PIN_CROSS_HOLE_BAND"): (
+        "the clevis cross-hole's drilled band, indexed by the actual loaded "
+        "top-retainer stack and authored on the native pivot pin"
+    ),
+    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_POCKET_DIAMETER_BAND"): (
+        "indexed for the worst flange-to-pocket shift and contact margin; "
+        "also authored on the native cap's PocketDia"
+    ),
+    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_APERTURE_BAND"): (
+        "indexed for the largest cap aperture in the positive-stop margin"
+    ),
+    ("ch_rocker_arm_tl_oblique_retention_spec", "CAP_BOLT_CLEARANCE_BAND"): (
+        "indexed with the sourced screw major limits and printed locations "
+        "to bound the cap's lateral shift"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}
@@ -535,6 +554,31 @@ def test_every_band_tuple_is_checked_or_classified() -> None:
 def test_indexed_fit_bands_are_valid(module_name: str, name: str) -> None:
     band = getattr(importlib.import_module(module_name), name)
     _check_band(f"{module_name}.{name}", band, "upper_lower")
+
+
+@pytest.mark.parametrize(
+    ("module_name", "expected"),
+    (
+        (
+            "build_ch_rocker_arm_tl_oblique_pivot_cap",
+            {
+                ("PocketProfile", "PocketDia"): "*deviations(spec.POCKET_BAND)",
+                ("ApertureProfile", "ApertureDia"): "*deviations(spec.DRILLED_BAND)",
+                ("BoltProfile", "BoltHoleDia"): "*deviations(spec.DRILLED_BAND)",
+            },
+        ),
+        (
+            "build_ch_rocker_arm_tl_oblique_pivot_retainer",
+            {("WasherProfile", "WasherBore"): "*deviations(spec.DRILLED_BAND)"},
+        ),
+    ),
+)
+def test_capture_manufactured_parts_author_their_real_native_fit_bands(
+    module_name: str, expected: dict[tuple[str, str], str]
+) -> None:
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert model_toleranced_dimensions(_import(module_name)) == expected
 
 
 def test_classification_lists_are_current() -> None:

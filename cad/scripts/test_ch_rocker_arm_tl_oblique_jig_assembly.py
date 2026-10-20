@@ -1,11 +1,11 @@
 """Offline contract for the oblique-trammel jig assembly (MHA-CH-06-TL-00).
 
 The poses close on the calculator's rail and carrier geometry and the leadscrew
-feed's layout, the builder places all thirty-one made and bought families,
-one free DOF slides the carriages and what rides them, the interference
-contracts are the specs' press fits and threads, the jig stays a shop fixture
-outside the machine tree, and the sweep of both passes clears the table and
-the column cover by the pinned margins.
+feed's layout, the builder places all thirty-seven made and bought families,
+one free DOF slides the carriages and their positively captured pivot stacks,
+the interference contracts are the specs' press fits and threads, the jig stays
+a shop fixture outside the machine tree, and both passes retain both carrier
+ends while their full sweeps clear the table and column cover by pinned margins.
 """
 
 from __future__ import annotations
@@ -47,9 +47,15 @@ import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
+import ch_rocker_arm_tl_oblique_pivot_retainer_spec as pivot_retainer
+import ch_rocker_arm_tl_oblique_retention_spec as retention
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
+import ch_rocker_arm_tl_oblique_tooling_clearance_spec as tooling
+import ch_rocker_arm_tl_vn_oblique_pivot_cotter_spec as pivot_cotter
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 
 
 BUILDER = Path(__file__).with_name("build_ch_rocker_arm_tl_oblique_jig_assembly.py")
@@ -57,6 +63,14 @@ JIG = "ch_rocker_arm_tl_oblique_jig"
 PART_STEMS = {
     physical.replace("-", "_")
     for physical, _configuration in spec.COMPONENT_IDENTITIES.values()
+}
+CAPTURE_FAMILIES = {
+    spec.PIVOT_CAP: 2,
+    spec.PIVOT_RETAINER: 2,
+    spec.PIVOT_CAP_SCREW: 8,
+    spec.PIVOT_CLEVIS_PIN: 2,
+    spec.PIVOT_COTTER: 2,
+    spec.PIVOT_LOCK_WIRE: 4,
 }
 # Each screw family and its fastener-table row (count, callout, engagement).
 SCREW_ROWS = {
@@ -69,6 +83,7 @@ SCREW_ROWS = {
     spec.RISER_SCREW: fasteners.RISER_TO_CARRIER,
     spec.CLAMP_SCREW: fasteners.CR_CLAMP,
     spec.LEVER_SCREW: fasteners.LEVER_TO_CARRIER,
+    spec.PIVOT_CAP_SCREW: fasteners.CAP_TO_BLOCK,
 }
 
 
@@ -78,6 +93,26 @@ def _image(rows, origin, point):
         origin[axis] + sum(point[k] * rows[k][axis] for k in range(3))
         for axis in range(3)
     )
+
+
+def _inside_xy(polygon, point) -> bool:
+    """Filled-polygon inclusion, accepting contact within roundoff."""
+    x, y = point
+    inside = False
+    for a, b in zip(polygon, (*polygon[1:], polygon[0])):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        cross = dx * (y - a[1]) - dy * (x - a[0])
+        if (
+            abs(cross) <= 1e-8 * max(1.0, math.hypot(dx, dy))
+            and min(a[0], b[0]) - 1e-9 <= x <= max(a[0], b[0]) + 1e-9
+            and min(a[1], b[1]) - 1e-9 <= y <= max(a[1], b[1]) + 1e-9
+        ):
+            return True
+        if (a[1] > y) != (b[1] > y):
+            crossing = a[0] + (y - a[1]) * dx / dy
+            if x < crossing:
+                inside = not inside
+    return inside
 
 
 def _all_rows():
@@ -171,8 +206,18 @@ def test_pivot_blocks_and_pins_sit_on_the_pin_stations() -> None:
         assert pin_origin[:2] == pytest.approx(spec.POSE.to_machine(pin))
         assert pin_origin[2] == trammel.CARRIAGE_TOP_Z + trammel.BEARING_RECESS
     assert spec.PIN_TOP_Z == pytest.approx(
-        trammel.CARRIER_TOP_Z - pivot_pin.CARRIER_TOP_SHORTFALL
+        trammel.CARRIER_UNDERSIDE_Z + pivot_pin.CARRIER_LENGTH
     )
+    assert (
+        trammel.CARRIER_UNDERSIDE_Z,
+        trammel.CARRIER_TOP_Z,
+        spec.PART_TOP_Z,
+        spec.PIN_TOP_Z,
+    ) == pytest.approx((78.2, 90.2, 98.7, 102.7))
+    assert spec.PIN_TOP_Z - spec.PART_TOP_Z == pytest.approx(
+        retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL
+    )
+    assert retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL == pytest.approx(4.0)
 
 
 def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
@@ -291,6 +336,13 @@ def test_nut_bracket_hangs_on_pivot_block_1_round_the_screw() -> None:
     along = _image(spec.NUT_BRACKET_ROWS, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
     assert along[:2] == pytest.approx(spec.rail_rows(leadscrew.RAIL)[0][:2])
     assert spec.NUT_BRACKET_ORIGIN[2] == leadscrew.NUT_BRACKET_BOTTOM_Z
+    # The wider spindle-end wing changes the real -X datum, not the original
+    # side-hole axes or nut-bracket location. Step 7C must follow that datum.
+    centre = pivot_block.DATUM_X + nut_bracket.X_SET_MID
+    assert centre == pytest.approx(sum(pivot_block.SIDE_SCREW_X) / 2.0)
+    assert centre == pytest.approx(sum(leadscrew.NUT_BRACKET_X) / 2.0)
+    spotting = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("7C."))
+    assert f"CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f}" in spotting
 
 
 def test_explode_stands_every_layer_clear_and_in_sight() -> None:
@@ -336,6 +388,12 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.BLOCK_SCREW: 90.0,
         spec.NUT_SCREW: 90.0,
         spec.BLOCK_LOCK_WASHER: 90.0,
+        spec.PIVOT_CAP: 220.0,
+        spec.PIVOT_CAP_SCREW: 250.0,
+        spec.PIVOT_LOCK_WIRE: 260.0,
+        spec.PIVOT_RETAINER: 260.0,
+        spec.PIVOT_CLEVIS_PIN: 260.0,
+        spec.PIVOT_COTTER: 260.0,
         spec.PIVOT_PIN: 150.0,
         spec.CARRIAGE_SCREW: 150.0,
         spec.CARRIER: 230.0,
@@ -361,6 +419,10 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         (spec.BLOCK_SCREW, "y"): -40.0,
         (spec.BLOCK_LOCK_WASHER, "y"): -20.0,
         (spec.HANDWHEEL, "x"): -50.0,
+        (spec.PIVOT_CLEVIS_PIN, "x"): 40.0,
+        (spec.PIVOT_COTTER, "x"): 40.0,
+        (spec.PIVOT_COTTER, "y"): 40.0,
+        (spec.PIVOT_LOCK_WIRE, "y"): 40.0,
     }
     # The stack in fitting order, bottom up (machine Z, mm).
     block_top = trammel.PIVOT_BLOCK_TOP_Z + lift[spec.PIVOT_BLOCK]
@@ -374,8 +436,8 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     assert underside - pin[1] > -carrier.OUTLINE_Y[0]
     assert underside - hub_top > trammel.HUB[1] - carrier.OUTLINE_Y[0]
     assert spec.HUB_HEAD_BOTTOM_Z + lift[spec.HUB_PIN] > trammel.BASE_BAR_THICK
-    # The HUB pin leaves downward, the way step 10 presses it in from below;
-    # the pivot pins leave upward, the way step 4 presses them in from above.
+    # Service removes the cap before pressing a pin upward from its lower end;
+    # the HUB pin still leaves downward from the carrier.
     hub_steps = [d for _l, fams, _a, d in spec.EXPLODE_STEPS if fams == (spec.HUB_PIN,)]
     pin_steps = [
         d for _l, fams, _a, d in spec.EXPLODE_STEPS if fams == (spec.PIVOT_PIN,)
@@ -466,6 +528,8 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.FEED_LEVER: 1,
         spec.END_BRACKET: 2,
         spec.NUT_BRACKET: 1,
+        spec.PIVOT_CAP: 2,
+        spec.PIVOT_RETAINER: 2,
         spec.RAIL: 2,
         spec.CARRIAGE: 2,
         spec.BEARING: 4,
@@ -488,8 +552,12 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.LEVER_SCREW: 2,
         spec.BLOCK_LOCK_WASHER: 2,
         spec.LEVER_LOCK_WASHER: 2,
+        spec.PIVOT_CAP_SCREW: 8,
+        spec.PIVOT_CLEVIS_PIN: 2,
+        spec.PIVOT_COTTER: 2,
+        spec.PIVOT_LOCK_WIRE: 4,
     }
-    assert sum(spec.QUANTITIES.values()) == 90
+    assert sum(spec.QUANTITIES.values()) == 110
     assert spec.QUANTITIES[spec.END_BRACKET] == (leadscrew.END_BRACKET_QUANTITY)
     assert spec.QUANTITIES[spec.NUT_BRACKET] == leadscrew.NUT_BRACKET_QUANTITY
     assert spec.QUANTITIES[spec.BASE_BAR] == base_bar.QUANTITY
@@ -504,8 +572,8 @@ def test_builder_places_exactly_the_inventory() -> None:
         spec.FLANGE_NUT: ("sh-vn-clamping-kit-hardware", "FlangeNut"),
     }
     assert set(bg.references_of(JIG)) == PART_STEMS
-    assert len(manifest) == len(spec.BOM_ORDER) == 31
-    assert len(PART_STEMS) == 29
+    assert len(manifest) == len(spec.BOM_ORDER) == 37
+    assert len(PART_STEMS) == 35
 
 
 @pytest.mark.parametrize("source_kind", ("all", "batch-only", "single-only"))
@@ -528,7 +596,7 @@ def test_actual_builder_sources_resolve_every_physical_producer(source_kind) -> 
                 node.func.id = "_excluded_source_sink"
         source = ast.unparse(tree)
     assert bg._AssemblySources(source).collect() == expected
-    assert len(expected) == 29
+    assert len(expected) == 35
 
 
 def test_kit_selectors_are_role_local_not_native_instance_indices() -> None:
@@ -642,6 +710,170 @@ def test_save_rechecks_kit_references_after_its_final_solve():
     assert gate.body.func.id == "_verify_kit_references"
 
 
+def test_capture_inventory_has_native_parts_and_cartridge_lock_parents() -> None:
+    parents = {
+        spec.PIVOT_CAP: (spec.PIVOT_BLOCK, 1),
+        spec.PIVOT_RETAINER: (spec.PIVOT_PIN, 1),
+        spec.PIVOT_CAP_SCREW: (spec.PIVOT_CAP, 4),
+        spec.PIVOT_CLEVIS_PIN: (spec.PIVOT_PIN, 1),
+        spec.PIVOT_COTTER: (spec.PIVOT_CLEVIS_PIN, 1),
+        spec.PIVOT_LOCK_WIRE: (spec.PIVOT_CAP, 2),
+    }
+    numbers = {
+        spec.PIVOT_CAP: "MHA-CH-06-TL-30",
+        spec.PIVOT_RETAINER: "MHA-CH-06-TL-31",
+        spec.PIVOT_CAP_SCREW: "MHA-CH-06-TL-VN-73",
+        spec.PIVOT_CLEVIS_PIN: "MHA-CH-06-TL-VN-74",
+        spec.PIVOT_COTTER: "MHA-CH-06-TL-VN-75",
+        spec.PIVOT_LOCK_WIRE: "MHA-CH-06-TL-VN-76",
+    }
+    parts = _builder_parts()
+    for family, count in CAPTURE_FAMILIES.items():
+        assert parts.count((family, family)) == 1
+        assert spec.QUANTITIES[family] == len(spec.PLACEMENTS[family]) == count
+        assert spec.LOCKED_TO[family] == parents[family]
+        parent, per_parent = parents[family]
+        assert count == spec.QUANTITIES[parent] * per_parent
+        for index in range(count):
+            assert spec.lock_parent(family, index) == spec.instance_name(
+                parent, index // per_parent
+            )
+        row = _config.parts(family)
+        assert row["number"] == numbers[family]
+        assert row["quantity"] == count
+    made_start = spec.BOM_ORDER.index(spec.NUT_BRACKET) + 1
+    assert spec.BOM_ORDER[made_start:made_start + 3] == (
+        spec.PIVOT_CAP, spec.PIVOT_RETAINER, spec.RAIL
+    )
+    assert spec.BOM_ORDER[-5:] == (
+        spec.LEVER_LOCK_WASHER, spec.PIVOT_CAP_SCREW, spec.PIVOT_CLEVIS_PIN,
+        spec.PIVOT_COTTER, spec.PIVOT_LOCK_WIRE,
+    )
+
+
+@pytest.mark.parametrize("pass_name", ("inner", "outer"))
+def test_both_pass_pairs_keep_both_complete_capture_stacks(pass_name: str) -> None:
+    mates = spec.PIN_MATES[pass_name]
+    assert len(mates) == 2
+    assert {pin for _label, _hole, pin in mates} == {0, 1}
+    assert {hole for _label, hole, _pin in mates} == (
+        {"A1", "B1"} if pass_name == "inner" else {"A2", "B2"}
+    )
+    for _label, _hole, pin in mates:
+        for family, total in CAPTURE_FAMILIES.items():
+            for index in range(pin * (total // 2), (pin + 1) * (total // 2)):
+                ancestor = family
+                instance = index
+                while ancestor in spec.LOCKED_TO:
+                    parent, per_parent = spec.LOCKED_TO[ancestor]
+                    assert parent != spec.CARRIER
+                    instance //= per_parent
+                    ancestor = parent
+                assert ancestor == spec.CARRIAGE
+                assert instance == pin
+    # Re-mating changes the carrier holes, never removes either cartridge's
+    # retainer/clevis/cotter or safety-wired cap from the moving inventory.
+    assert set(CAPTURE_FAMILIES) <= set(spec.MOVING)
+    sweep = trammel.SWEEP[pass_name]
+    for theta in (-sweep, 0.0, sweep):
+        pose = trammel.carrier_pose(pass_name, theta)
+        stations = spec.carriage_stations(pass_name, theta)
+        for rail, hole in zip(spec.RAILS, trammel.pin_pair(pass_name), strict=True):
+            assert pose.to_machine(hole) == pytest.approx(
+                trammel.rail_point(rail, stations[rail] + pivot_block.BORE_X)
+            )
+
+
+def test_loaded_top_retainers_clear_the_native_crosspins_and_cotters() -> None:
+    gap = sum(retention.TOP_RUNNING_GAP) / 2.0
+    assert gap == pytest.approx(0.175)
+    assert pivot_retainer.NOMINAL_RUNNING_GAP == pytest.approx(gap)
+    allowed = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    for index, pin_origin in enumerate(spec.PIVOT_PIN_ORIGINS):
+        washer_origin, washer_rows = spec.PLACEMENTS[spec.PIVOT_RETAINER][index]
+        clevis_origin, clevis_rows = spec.PLACEMENTS[spec.PIVOT_CLEVIS_PIN][index]
+        cotter_origin, cotter_rows = spec.PLACEMENTS[spec.PIVOT_COTTER][index]
+        assert washer_origin == pytest.approx(
+            (*pin_origin[:2], trammel.CARRIER_TOP_Z + gap)
+        )
+        for rows in (washer_rows, clevis_rows, cotter_rows):
+            for actual, expected in zip(rows, spec.PIN_ROWS, strict=True):
+                assert actual == pytest.approx(expected)
+        hole_z = pin_origin[2] + pivot_pin.CROSS_HOLE_STATION
+        clevis_radius = retention_hardware.CLEVIS_DIA / 2.0
+        assert clevis_origin[2] + clevis_radius == pytest.approx(
+            hole_z + retention.PIN_CROSS_HOLE_DIA / 2.0
+        )
+        washer_top = washer_origin[2] + pivot_retainer.THICKNESS
+        assert clevis_origin[2] - clevis_radius == pytest.approx(washer_top)
+        # Coaxial placement at the loose cross-hole centre would falsely cut
+        # into the fitted washer; contact is at the UPPER loaded hole edge.
+        assert clevis_origin[2] > hole_z
+        assert hole_z - clevis_radius < washer_top
+        assert clevis_origin == pytest.approx(_image(
+            spec.PIN_ROWS, pin_origin,
+            (spec.PIVOT_CLEVIS_HEAD_X, 0.0,
+             pivot_pin.CARRIER_STATION + spec.PIVOT_CLEVIS_CENTRE_ABOVE_SEAT),
+        ))
+        assert cotter_origin == pytest.approx(_image(
+            clevis_rows, clevis_origin,
+            (retention_hardware.CLEVIS_HOLE_FROM_HEAD, 0.0, 0.0),
+        ))
+        # The headed end and cotter eye are wholly outside the Ø24 washer.
+        # Spread prongs can overhang its plan, but only ABOVE its top face.
+        washer_radius = pivot_retainer.OUTER_DIA / 2.0
+        assert spec.PIVOT_CLEVIS_HEAD_X < -washer_radius
+        cotter_x = spec.PIVOT_CLEVIS_HEAD_X + retention_hardware.CLEVIS_HOLE_FROM_HEAD
+        assert cotter_x - pivot_cotter.EYE_OUTER_RADIUS > washer_radius
+        assert cotter_x - pivot_cotter.COTTER_DIA / 2.0 > washer_radius
+        assert cotter_origin[2] + pivot_cotter.PRONG_BEND > washer_top
+        pin_name = spec.instance_name(spec.PIVOT_PIN, index)
+        washer_name = spec.instance_name(spec.PIVOT_RETAINER, index)
+        for family in (spec.PIVOT_CLEVIS_PIN, spec.PIVOT_COTTER):
+            name = spec.instance_name(family, index)
+            assert frozenset((name, washer_name)) not in allowed
+            assert frozenset((name, pin_name)) not in allowed
+
+
+def test_caps_screws_and_safety_wire_close_on_each_block_receiver_pattern() -> None:
+    allowed = contracts.allowed_interference_pairs(spec.ASM_NAME)
+    for index, (block_origin, block_rows) in enumerate(spec.PIVOT_BLOCK_PLACEMENTS):
+        cap_origin, cap_rows = spec.PLACEMENTS[spec.PIVOT_CAP][index]
+        assert cap_origin == pytest.approx(_image(
+            block_rows, block_origin,
+            (pivot_block.BORE_X, 0.0, pivot_block.BLOCK_HEIGHT),
+        ))
+        for actual, expected in zip(cap_rows, block_rows, strict=True):
+            assert actual == pytest.approx(expected)
+        for slot, (x, y) in enumerate(retention.CAP_BOLT_CENTERS):
+            screw_index = index * 4 + slot
+            screw_origin, screw_rows = spec.PLACEMENTS[spec.PIVOT_CAP_SCREW][screw_index]
+            assert screw_origin == pytest.approx(_image(
+                cap_rows, cap_origin,
+                (x, y, retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH),
+            ))
+            receiver = _image(
+                block_rows, block_origin,
+                (pivot_block.BORE_X + x, y, pivot_block.BLOCK_HEIGHT),
+            )
+            assert screw_origin[:2] == pytest.approx(receiver[:2])
+            assert screw_rows[2] == pytest.approx((0.0, 0.0, 1.0))
+            screw = spec.instance_name(spec.PIVOT_CAP_SCREW, screw_index)
+            block = spec.instance_name(spec.PIVOT_BLOCK, index)
+            assert frozenset((screw, block)) in allowed
+            assert {pair for pair in allowed if screw in pair} == {
+                frozenset((screw, block))
+            }
+        for slot, y in enumerate(retention.CAP_BOLT_Y_OFFSETS):
+            wire_origin, wire_rows = spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE][index * 2 + slot]
+            assert wire_origin == pytest.approx(_image(
+                cap_rows, cap_origin,
+                (0.0, y, retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH),
+            ))
+            for actual, expected in zip(wire_rows, cap_rows, strict=True):
+                assert actual == pytest.approx(expected)
+
+
 def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
     path = _config.CONFIG_DIR / "assemblies" / f"{spec.ASM_NAME}.yaml"
     contract = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -656,6 +888,7 @@ def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
         spec.CARRIER,
         spec.PIVOT_BLOCK,
         spec.PIVOT_PIN,
+        *CAPTURE_FAMILIES,
         spec.RISER,
         spec.HUB_PIN,
         spec.FEED_LEVER,
@@ -757,6 +990,10 @@ def test_interference_contracts_are_the_press_fits_and_threads() -> None:
         (
             contracts.JIG_LEVER_SCREW_THREAD,
             _thread(fasteners.LEVER_TO_CARRIER, carrier.LEVER_TAP_DRILL),
+        ),
+        (
+            contracts.JIG_PIVOT_CAP_SCREW_THREAD,
+            _thread(fasteners.CAP_TO_BLOCK, pivot_block.CAP_TAP_DRILL_DIA),
         ),
         (
             contracts.JIG_T_NUT_THREAD,
@@ -870,6 +1107,31 @@ def test_bom_follows_the_part_registry() -> None:
             assert not source or str(source).casefold() not in description, stem
 
 
+def test_source_bom_and_drawing_clusters_partition_every_capture_family_once() -> None:
+    clustered = [family for cluster in drawing.CLUSTERS for family in cluster.stems]
+    assert sorted(clustered) == sorted(spec.BOM_ORDER)
+    assert tuple(drawing.BOM_COMPONENTS) == spec.BOM_ORDER
+    assert drawing.BOM_QUANTITIES == spec.QUANTITIES
+    assert drawing.BOM_ITEM_NUMBERS == spec.ITEM_NUMBERS
+    capture, = [
+        cluster for cluster in drawing.CLUSTERS
+        if cluster.sheet == "PIVOTCAPTUREEXPLODED"
+    ]
+    assert set(capture.stems) == {
+        spec.PIVOT_PIN, spec.BEARING, *CAPTURE_FAMILIES
+    }
+    parts = _builder_parts()
+    for family in spec.BOM_ORDER:
+        assert spec.BOM_ORDER.count(family) == 1
+        assert parts.count(
+            (spec.COMPONENT_IDENTITIES[family][0], family)
+        ) == 1
+        assert clustered.count(family) == 1
+    assert drawing.CAPTURE_SHEET == "CAPTUREANDOPERATION"
+    assert drawing.CAPTURE_SHEET in drawing.SHEET_NAMES
+    assert drawing.CAPTURE_SHEET != drawing.STEPS_SHEET
+
+
 def test_jig_is_a_shop_fixture_outside_the_machine_tree() -> None:
     assert bg.is_shop_fixture(JIG)
     shared_kit = _config.parts(spec.CLAMPING_KIT)
@@ -905,28 +1167,50 @@ def test_alignment_note_prints_the_calculator_targets() -> None:
 
 
 def test_sweep_clears_the_column_cover(report) -> None:
-    assert report.cover_clearance == pytest.approx(
-        {
-            "carrier": 113.29,
-            "riser": 150.80,
-            "feed lever": 236.58,
-            "HUB pin head": 169.49,
-            "pivot block 1": 178.89,
-            "pivot block 2": 178.89,
-            "carriage 1": 184.61,
-            "carriage 2": 184.61,
-            "nut bracket": 135.28,
-            # Ruling A′: each bracket's outer end moved 4.4 out to bar 1's
-            # column-side edge (lateral 88.9).
-            "end bracket near": 111.45,
-            "end bracket far": 164.49,
-            "KP08 near": 114.81,
-            "KP08 far": 167.86,
-            "screw": 141.19,
-            "handwheel": 179.91,
-        },
-        abs=0.01,
+    expected = {
+        "carrier": 113.29,
+        "riser": 150.80,
+        "feed lever": 236.58,
+        "HUB pin head": 169.49,
+        "carriage 1": 184.61,
+        "carriage 2": 184.61,
+        "nut bracket": 135.28,
+        # Ruling A′: bracket outer ends remain at lateral 88.9.
+        "end bracket near": 111.45,
+        "end bracket far": 164.49,
+        "KP08 near": 114.81,
+        "KP08 far": 167.86,
+        "screw": 141.19,
+        "handwheel": 179.91,
+    }
+    # The new wing changes the block's old 178.89 margin. Its column-most
+    # corner occurs at the analytical near carriage stop, not mid-sweep.
+    near = min(low for low, _high in trammel.END_STOPS.values())
+    for rail in spec.RAILS:
+        column_y = max(
+            trammel.rail_point(
+                rail, near + pivot_block.BLOCK_X0, lateral
+            )[1]
+            for lateral in (
+                -retention.BLOCK_WING_HALF_WIDTH,
+                retention.BLOCK_WING_HALF_WIDTH,
+            )
+        )
+        expected[f"pivot block {rail}"] = spec.COVER_Y - column_y
+    assert {name: report.cover_clearance[name] for name in expected} == pytest.approx(
+        expected, abs=0.01
     )
+    # Added hardware must enter the report, without dropping any older item.
+    outlines = spec.moving_outlines("inner", 0.0)
+    assert set(report.cover_clearance) == (
+        set(outlines) | set(spec.feed_outlines()) | {"HUB pin head"}
+    )
+    for rail in spec.RAILS:
+        assert {
+            f"pivot cap {rail}", f"pivot retainer {rail}", f"pivot pin {rail}",
+            f"pivot clevis {rail}", f"pivot cotter {rail}", f"pivot lock wire {rail}",
+        } <= set(outlines)
+    assert {f"pivot cap screw {index}" for index in range(1, 9)} <= set(outlines)
     assert min(report.cover_clearance.values()) > 100.0
 
 
@@ -1117,6 +1401,7 @@ FASTENER_TABLE = {
     "RISER_TO_CARRIER": ("#4-40 X 5/8 B18.6.3 FLAT HEAD", 4, 10.4014, -1.5986),
     "CR_CLAMP": ("1/4-20 X 7/8 SHCS", 1, 12.0, 1.725),
     "LEVER_TO_CARRIER": ("5/16-18 X 1 SHCS", 2, 10.414, -1.586),
+    "CAP_TO_BLOCK": ("1/4-20 X 3/4 SHCS", 8, 16.05, -7.95),
 }
 
 
@@ -1458,3 +1743,215 @@ def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:
     assert screw_rows[0] == pytest.approx((0.0, 0.0, -1.0))
     # The screw's axis is the handwheel's.
     assert screw_rows[1] == pytest.approx(wheel_rows[1])
+
+
+def test_capture_instructions_require_loaded_gaps_and_positive_locks() -> None:
+    steps = " ".join(spec.CAPTURE_STEPS)
+    assert "FOUR" in steps and spec._item(spec.PIVOT_CAP_SCREW) in steps
+    assert spec._item(spec.PIVOT_LOCK_WIRE) in steps
+    assert "NEW 0.032 STAINLESS WIRE" in steps
+    assert "PULLING EACH HEAD TOWARD TIGHTENING" in steps
+    assert "THREADLOCKER IS NOT THE POSITIVE LOCK" in steps
+    assert "0.10-0.15" in steps and "0.20-0.30" in steps
+    assert "DO NOT PRELOAD THE BEARINGS" in steps
+    assert "SUPPLY 7 MIN" in steps and "0.10-0.25" in steps
+    assert "UPPER EDGE OF THE PIN'S CROSS-HOLE" in steps
+    assert "DO NOT SET THE GAP WITH THE CLEVIS CENTRED" in steps
+    assert "INSERT BOTH HEADED CLEVIS PINS" in steps
+    assert "SPREAD BOTH LEGS" in steps
+    checks = " ".join(spec.ASSEMBLY_CHECKS)
+    assert "BOTH PIN SEATS" in checks
+    assert "WITHOUT THE TOP RETAINERS CLAMPING IT" in checks
+    assert "BOTH CLEVIS PINS HAVE NEW BENT COTTERS" in checks
+    assert "BOTH CAPS HAVE INTACT TIGHTENING-DIRECTION SAFETY WIRE" in checks
+    assert "NEITHER PIVOT PIN" not in checks
+    assert "STANDS ABOVE THE CARRIER TOP" not in checks
+
+
+def test_pass_change_requires_isolation_both_retainers_and_fresh_cotters() -> None:
+    change = next(step for step in spec.ASSEMBLY_STEPS if step.startswith("13."))
+    assert change.index("ISOLATE THE SPINDLE") < change.index("REMOVE BOTH")
+    assert change.index("REMOVE BOTH TOP RETAINERS") < change.index("LIFT THE CARRIER")
+    assert "REFIT AND LOCK BOTH RETAINERS WITH NEW COTTERS BEFORE USE" in change
+    assert "A2/B2" in change and "SHIP ON A1/B1" in change
+    routine = next(step for step in spec.CAPTURE_STEPS if step.startswith("C6."))
+    assert "BEFORE EITHER PASS" in routine
+    assert "BOTH CAPS/WIRES" in routine
+    assert "BOTH FITTED TOP RETAINERS AND BOTH BENT COTTERS" in routine
+    assert routine.index("STOP/ISOLATE THE SPINDLE") < routine.index("REMOVE BOTH COTTERS")
+    assert "WITHDRAW THE CUTTER/TOOLHOLDER" in routine
+    assert "CLEVIS PINS AND RETAINERS BEFORE LIFTING THE CARRIER" in routine
+    assert "REFIT BOTH RETAINERS WITH NEW COTTERS" in routine
+
+
+def test_cartridge_service_replaces_pin_and_both_bearings_without_down_extraction() -> None:
+    service = next(step for step in spec.CAPTURE_STEPS if "SERVICE:" in step)
+    assert service.index("REMOVE THE CAP/WIRE") < service.index("PRESS THE PIN UPWARD")
+    assert "UPWARD FROM BELOW" in service
+    assert "INTEGRAL FLANGE PREVENTS DOWNWARD EXTRACTION" in service
+    assert "MAY LOAD THE BALLS" in service
+    assert "REPLACE THE PIN AND BOTH 6200 BEARINGS AS A SET" in service
+    assert "DO NOT PROMISE BEARING REUSE" in service
+    assert "EXISTING PULLER CAVITY" in service
+    assert "RE-FIT ALL GAPS AND APPLY NEW WIRE/COTTERS" in service
+
+
+def test_installed_tooling_acceptance_does_not_claim_collision_or_force_proof() -> None:
+    acceptance = " ".join(spec.CAPTURE_CHECKS)
+    assert "ACTUAL CUTTER STICKOUT" in acceptance
+    assert "EVERY NON-CUTTING TOOLHOLDER/SPINDLE STEP RADIUS AND MACHINE-Z LIMIT" in acceptance
+    assert "MEASUREMENT/RUNOUT UNCERTAINTIES" in acceptance
+    assert "BOTH COMPLETE SWEEPS AND THE BOUNDED UPSET" in acceptance
+    assert "NO INSTALLED ENVELOPE IS SUPPLIED" in acceptance
+    assert "NOMINAL CAD CLEARANCE ALONE DOES NOT ESTABLISH COLLISION SAFETY" in acceptance
+    assert f"NEW WORK HEIGHT IS {spec.PART_TOP_Z:.1f}" in acceptance
+    assert f"PIN ENDS ARE NOMINALLY {spec.PIN_TOP_Z:.1f}" in acceptance
+    assert "4.0 ABOVE THE WORK" in acceptance
+    assert "ACTUAL RETAINERS, CLEVIS HEADS AND BENT COTTERS" in acceptance
+    assert "CHECK IT AFTER ANY TOOL CHANGE" in acceptance
+    assert "NOT A BUMP-FORCE OR STRENGTH CERTIFICATION" in acceptance
+    assert "EXCLUDES ELASTIC DEFLECTION" in acceptance
+    assert "DO NOT USE IT AS A LOAD RATING" in acceptance
+    assert "NO SKID IS FITTED" in acceptance
+
+
+def test_absent_installed_tooling_authority_stays_unverified() -> None:
+    report = spec.installed_tooling_clearance()
+    assert report.status == "UNVERIFIED"
+    assert report.min_clearance is None
+    assert report.limiting_pair is None
+    assert report.authority is None
+    assert report == spec.installed_tooling_clearance(None)
+
+
+def test_installed_tooling_report_uses_the_actual_full_fixture_census() -> None:
+    fixtures = spec.captured_fixture_envelopes(samples=3)
+    assert isinstance(fixtures, tuple) and fixtures
+    assert all(isinstance(fixture, tooling.FixtureEnvelope) for fixture in fixtures)
+    assert len({fixture.label for fixture in fixtures}) == len(fixtures)
+    top = max(fixture.z_max for fixture in fixtures)
+    bottom = min(fixture.z_min for fixture in fixtures)
+    radius = max(math.hypot(x, y) for fixture in fixtures for x, y in fixture.xy) + 1.0
+    clear = tooling.InstalledToolingEnvelope(
+        source="SYNTHETIC TEST ONLY: tooling wholly above fixture",
+        radial_uncertainty=0.0,
+        axial_uncertainty=0.0,
+        steps=(tooling.ToolingCylinder(top + 100.0, top + 110.0, radius),),
+    )
+    separated = spec.installed_tooling_clearance(clear, samples=3)
+    assert separated == tooling.tooling_clearance_report(clear, fixtures)
+    assert separated.status == "VERIFIED_GEOMETRY_ONLY"
+    assert separated.min_clearance == pytest.approx(100.0)
+    assert separated.authority == clear.source
+    conflict = tooling.InstalledToolingEnvelope(
+        source="SYNTHETIC TEST ONLY: deliberately enclosing tooling",
+        radial_uncertainty=0.0,
+        axial_uncertainty=0.0,
+        steps=(tooling.ToolingCylinder(bottom - 1.0, top + 1.0, radius),),
+    )
+    overlapping = spec.installed_tooling_clearance(conflict, samples=3)
+    assert overlapping == tooling.tooling_clearance_report(conflict, fixtures)
+    assert overlapping.status == "POTENTIAL_CONFLICT"
+    assert overlapping.min_clearance < 0.0
+    assert overlapping.authority == conflict.source
+
+
+def test_assembled_caption_warns_about_the_projecting_pin_and_installed_tooling() -> None:
+    caption = spec.ASSEMBLED_CAPTION
+    assert "TOP RETAINERS MUST BE LOCKED IN EITHER PASS" in caption
+    assert "4.0 mm ABOVE THE WORK NOMINALLY" in caption
+    assert "CAPTURE IS NOT COLLISION PROOF" in caption
+    assert "ACCEPT THE INSTALLED TOOLHOLDER/SPINDLE ENVELOPE INCLUDING UPSET" in caption
+
+
+@pytest.mark.parametrize("pass_name", ("inner", "outer"))
+def test_swept_outlines_include_the_wings_caps_and_both_retainers(pass_name: str) -> None:
+    for theta in spec.sweep_thetas(pass_name, samples=21):
+        outlines = spec.moving_outlines(pass_name, theta)
+        stations = spec.carriage_stations(pass_name, theta)
+        for rail, station in stations.items():
+            block = outlines[f"pivot block {rail}"]
+            for x, y in (
+                (pivot_block.BLOCK_X0, -retention.BLOCK_WING_HALF_WIDTH),
+                (retention.BLOCK_WING_END, -retention.BLOCK_WING_HALF_WIDTH),
+                (pivot_block.BLOCK_X0, retention.BLOCK_WING_HALF_WIDTH),
+                (retention.BLOCK_WING_END, retention.BLOCK_WING_HALF_WIDTH),
+                (pivot_block.BLOCK_X1, -pivot_block.BLOCK_WIDTH / 2.0),
+                (pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH / 2.0),
+            ):
+                assert _inside_xy(block, trammel.rail_point(rail, station + x, y))
+            pin_station = station + pivot_block.BORE_X
+            cap = outlines[f"pivot cap {rail}"]
+            for x in (-retention.CAP_WIDTH / 2.0, retention.CAP_WIDTH / 2.0):
+                for y in (-retention.CAP_LENGTH / 2.0, retention.CAP_LENGTH / 2.0):
+                    assert _inside_xy(
+                        cap, trammel.rail_point(rail, pin_station + x, y)
+                    )
+            px, py = trammel.rail_point(rail, pin_station)
+            retainer = outlines[f"pivot retainer {rail}"]
+            for angle in range(0, 360, 30):
+                radians = math.radians(angle)
+                radius = pivot_retainer.OUTER_DIA / 2.0
+                assert _inside_xy(
+                    retainer,
+                    (px + radius * math.cos(radians), py + radius * math.sin(radians)),
+                )
+
+
+@pytest.mark.parametrize("pass_name", ("inner", "outer"))
+def test_full_sweep_fixture_prisms_cover_interstitial_poses_and_rigid_upset(
+    pass_name: str,
+) -> None:
+    fixtures = {
+        fixture.label: fixture
+        for fixture in spec.captured_fixture_envelopes(samples=3)
+    }
+    required = {
+        f"{pass_name}: pivot {family} {rail}"
+        for family in ("cap", "retainer", "pin", "clevis", "cotter", "lock wire")
+        for rail in spec.RAILS
+    } | {
+        f"{pass_name}: pivot cap screw {index}" for index in range(1, 9)
+    }
+    required |= {
+        f"{pass_name}: {name}" for name in (
+            "carrier", "riser", "feed lever", "HUB pin head", "nut bracket",
+            "CL dowel", "clamp screw", "leadscrew nut",
+            "pivot block 1", "pivot block 2", "carriage 1", "carriage 2",
+        )
+    }
+    for family, count in (
+        ("bearing", 4), ("riser screw", 4), ("carriage screw", 8),
+        ("block screw", 2), ("nut screw", 4), ("lever screw", 2),
+        ("block lock washer", 2), ("lever lock washer", 2),
+    ):
+        required.update(
+            f"{pass_name}: {family} {index}" for index in range(1, count + 1)
+        )
+    assert required <= set(fixtures)
+    # Three provider samples are intentionally coarse. This independent grid
+    # includes points BETWEEN them, so a sampled-only, unexpanded box fails.
+    for theta in spec.sweep_thetas(pass_name, samples=21):
+        for label, outline in spec.moving_outlines(pass_name, theta).items():
+            fixture = fixtures[f"{pass_name}: {label}"]
+            assert all(_inside_xy(fixture.xy, point) for point in outline), (
+                pass_name, theta, label
+            )
+    normal_z = {
+        "carrier": (trammel.CARRIER_UNDERSIDE_Z, trammel.CARRIER_TOP_Z),
+        "riser": (
+            trammel.CARRIER_TOP_Z, trammel.CARRIER_TOP_Z + riser.THICKNESS
+        ),
+        "feed lever": (
+            trammel.CARRIER_TOP_Z, trammel.CARRIER_TOP_Z + feed_lever.LEVER_THICK
+        ),
+    }
+    bounds = retention.capture_bounds()
+    for name, outline in spec.CARRIER_OUTLINES.items():
+        fixture = fixtures[f"{pass_name}: {name}"]
+        bottom, top = normal_z[name]
+        rise = max(
+            retention.point_lift_bound(point, pass_name, bounds) for point in outline
+        )
+        assert fixture.z_max >= top + rise - 1e-9
+        assert fixture.z_min <= bottom - bounds.support_drop + 1e-9

@@ -14,6 +14,9 @@ the partial one imported nothing), its cut direction SolidWorks' own. It
 stands lower left, under the bottom lanes, its caption, thickness, slab and
 chamfer text on one row; the shaded isometric stands right of it, above the
 title block.
+The BOTTOM face carries native datum A in section A-A; four native frames on
+the top view control each pin-hole axis perpendicular to that face. They
+project the part-owned PMI without changing the position chains.
 
 One sheet holds it: the left lanes need ~75 mm of the 79 between the outline
 and the border, the right lanes ~63 of 67.
@@ -50,6 +53,11 @@ from _drawing_detail_projection import settle_detail_projection
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_gdt import (
+    PmiDrawingPlacement,
+    assert_frame_datums_defined,
+    project_part_pmi,
+)
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -233,8 +241,29 @@ CR_CALLOUT_XY = (0.377, 0.230)
 RISER_CALLOUT_XY = (0.312, 0.248)
 LEVER_CALLOUT_XY = (0.179, 0.143)
 
+# Compact native frames inside the otherwise empty plate, not another view.
+# Carrier (X, Y), mapped through the existing top-view transform.
+PIN_ORIENTATION_FRAME_MODEL_MM = {
+    "A1": _xy(-180.0, -20.0),
+    "B1": _xy(140.0, -20.0),
+    "A2": _xy(-185.0, 65.0),
+    "B2": _xy(140.0, 65.0),
+}
+# Bottom edge of the section's +X wall (past the hole and its chamfer).
+BOTTOM_DATUM_ATTACHMENT_MODEL_MM = (
+    _A1[0] + 7.0, -part_spec.THICKNESS, 0.0
+)
+BOTTOM_DATUM_SYMBOL_XY = (0.139, 0.018)
+
 part_metadata(
+    datums={
+        part_spec.BOTTOM_DATUM: (
+            {"feature": "pin_collar_seat", "surface": "carrier BOTTOM face"},
+            ("BOTTOM_DATUM", "PART_DATUMS"),
+        ),
+    },
     precision_sources=(
+        "GEOMETRIC_CONTROLS",
         "DRAWING_PRECISION_BY_NAME",
         ("_drawing_hole_callout", "add_native_hole_callout"),
     )
@@ -260,9 +289,10 @@ requirement(
     "pin_collar_seat",
     kind="face",
     # PlanarFace.offset_mm is n·p: the underside (y = -12) along -Y is +12.
-    faces=(PlanarFace((0.0, -1.0, 0.0), part_spec.THICKNESS),),
-    requirements=("height",),
+    faces=(part_spec.PART_DATUMS[0].face,),
+    requirements=("height", "datum"),
     fields={
+        "datum": (part_spec.BOTTOM_DATUM, ("BOTTOM_DATUM", "PART_DATUMS")),
         "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
         "plane": (
             {"frame": "model", "axis": "y", "value": -part_spec.THICKNESS},
@@ -316,6 +346,8 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "thru",
             "note",
             *(name for name in ("station", "height") if name in _chain),
+            "perpendicularity_dia",
+            "perpendicularity_datums",
         ),
         fields={
             "at": ([_x, 0.0, -_y], ("PIN_HOLES",)),
@@ -325,6 +357,24 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
                 ("PIN_HOLE_DIA", "PIN_HOLE_BAND"),
             ),
             "dia_nominal": (part_spec.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
+            "perpendicularity_dia": (
+                float(
+                    part_spec.GEOMETRIC_CONTROLS[
+                        list(part_spec.PIN_HOLES).index(_key)
+                    ].tolerance
+                ),
+                (
+                    "GEOMETRIC_CONTROLS",
+                    (
+                        "ch_rocker_arm_tl_oblique_retention_spec",
+                        "CARRIER_HOLE_PERPENDICULARITY",
+                    ),
+                ),
+            ),
+            "perpendicularity_datums": (
+                [part_spec.BOTTOM_DATUM],
+                ("BOTTOM_DATUM", "GEOMETRIC_CONTROLS", "PART_DATUMS"),
+            ),
             "thru": (True, ("PIN_HOLE_CALLOUT",)),
             "note": (
                 " ".join(part_spec.PIN_HOLE_CALLOUT.splitlines()),
@@ -334,6 +384,7 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
         },
         precision={
             "dia": 3,
+            "perpendicularity_dia": 2,
             **{
                 name: 2 if _key == "A1" else 3
                 for name in ("station", "height")
@@ -802,6 +853,47 @@ def _reposition_section_dimensions(
     return placed
 
 
+def _project_carrier_pmi(adapter: Any, top: Any, section: Any) -> None:
+    """Project all five part-owned items as attached native annotations."""
+    datum = part_spec.PART_DATUMS[0]
+    placements = {
+        datum.key: PmiDrawingPlacement(
+            section,
+            BOTTOM_DATUM_SYMBOL_XY,
+            attachment_xy=model_point_in_view(
+                adapter,
+                section,
+                _metres(BOTTOM_DATUM_ATTACHMENT_MODEL_MM),
+                label="carrier BOTTOM datum edge",
+            ),
+        ),
+    }
+    on_top = _view_mapper(adapter, top)
+    for (hole, (x, y)), control in zip(
+        part_spec.PIN_HOLES.items(), part_spec.GEOMETRIC_CONTROLS, strict=True
+    ):
+        placements[control.key] = PmiDrawingPlacement(
+            top,
+            on_top(PIN_ORIENTATION_FRAME_MODEL_MM[hole]),
+            edge_entity=_circle_edge(
+                adapter,
+                top,
+                part_spec.PIN_HOLE_DIA,
+                f"{hole} orientation-control rim",
+                center_x_mm=x,
+                center_y_mm=y,
+            ),
+        )
+    project_part_pmi(
+        adapter,
+        placements=placements,
+        datums=part_spec.PART_DATUMS,
+        controls=part_spec.GEOMETRIC_CONTROLS,
+        label="carrier hole axes to BOTTOM",
+    )
+    assert_frame_datums_defined((top, section), label="carrier orientation")
+
+
 def _pin_section(adapter: Any, source_model: Any, top: Any) -> list[Any]:
     """Full section A-A along the pin line, cropped to A1's slab, carrying the
     finished thickness and the chamfer leg, both from SectionReference.
@@ -853,6 +945,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> list[Any]:
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )
+    _project_carrier_pmi(adapter, top, section)
     return annotations
 
 

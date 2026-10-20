@@ -57,6 +57,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 
@@ -230,6 +231,19 @@ LEVER_TO_CARRIER = Fastener(
     min_engagement_d=1.3,
     note="the 12 carrier limits engagement; see the lever washer's worst-case stack",
 )
+CAP_TO_BLOCK = Fastener(
+    "TL-30 capture cap to TL-22 pivot block",
+    "1/4-20",
+    SHCS,
+    "3/4",
+    len(retention.CAP_BOLT_CENTERS) * RAILS,
+    retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH,
+    pivot_block.BLOCK_HEIGHT,
+    note=(
+        "NAS1352N4H12 drilled heads positively safety-wired in pairs; "
+        "retention_spec bounds complete-thread engagement at tolerance limits"
+    ),
+)
 FASTENERS: tuple[Fastener, ...] = (
     RAIL_TO_BAR,
     BRACKET_TO_BAR,
@@ -240,6 +254,7 @@ FASTENERS: tuple[Fastener, ...] = (
     RISER_TO_CARRIER,
     CR_CLAMP,
     LEVER_TO_CARRIER,
+    CAP_TO_BLOCK,
 )
 BLOCK_LOCK_WASHER = Washer(
     NUT_BRACKET_TO_BLOCK.joint,

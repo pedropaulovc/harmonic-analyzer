@@ -3,8 +3,14 @@ ch-rocker-arm-tl-oblique-pivot-pin:
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-23
   material: 1144 stress-proof steel
-  material_specification: 1144 stress-proof cold-drawn round, 1/2 in
+  material_specification: 1144 stress-proof cold-drawn round, 1-1/2 in
   finish: as turned
   quantity: 2
   tolerance_class: machined_block
-  process: "turn the carrier section and bearing section in one chucking from the top end, leaving the collar at the bar's own diameter; part off and face the bottom end to length; lead chamfer both ends"
+  process: "turn both original fit journals, narrow inner-race bosses and integral 36 x 3 flange from one piece; leave the lower boss long, measure the installed upper inner-race face against the block floor, and fit the boss for 0.10-0.15 flange-rim floor clearance without bearing preload; keep the relieved broad underside clear of seal and outer race; drill the real 5 cross hole 18.5 above the carrier seat and 6 from the end; lead-chamfer both ends with carrier-end lead MAX 0.5 to preserve the cross-hole end ligament; limit seating shoulder fillets to R0.2 and flange edge breaks to 0.25; press assembly loads only through the fitted races; destructive service presses upward from the lower pin end and replaces pin plus both bearings"
+  machinist_exceptions:
+    - id: "PC-01"
+      kind: "accept"
+      where: "both integral-flange stop faces, perpendicularity 0.02 to datum A, the bearing-journal axis"
+      finding: "flange-face perpendicularity outside the rule 5 short list"
+      reason: "owner-approved 2026-10-20 positive capture uses both stop faces to bound actual pin tilt independently of bearing axial behavior; the actual journal axis must remain square to those faces"

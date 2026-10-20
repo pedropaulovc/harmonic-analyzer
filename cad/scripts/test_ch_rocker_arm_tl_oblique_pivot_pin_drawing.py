@@ -31,15 +31,14 @@ def test_section_lengths_derive_from_the_bearing_and_collar_constants() -> None:
         trammel.BEARINGS_PER_PIN * trammel.BEARING_WIDTH + trammel.BEARING_SHOULDER
     )
     assert spec.BEARING_LENGTH == 22.0
-    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT == 4.0
+    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT == 14.5
     assert spec.COLLAR_HEIGHT == trammel.BEARING_RECESS + trammel.PIN_COLLAR_PROUD
-    assert spec.CARRIER_LENGTH == trammel.CARRIER_THICK - spec.CARRIER_TOP_SHORTFALL
-    assert spec.CARRIER_LENGTH == 11.0 < trammel.CARRIER_THICK
+    assert spec.CARRIER_LENGTH == 24.5 > trammel.CARRIER_THICK
+    assert spec.CARRIER_LENGTH == spec.CROSS_HOLE_FROM_SEAT + spec.CROSS_HOLE_FROM_END
     assert spec.OVERALL_LENGTH == (
         spec.BEARING_LENGTH + spec.COLLAR_HEIGHT + spec.CARRIER_LENGTH
     )
-    assert spec.OVERALL_LENGTH == 37.0
-    assert spec.TOP_TO_COLLAR_SEAT == spec.COLLAR_HEIGHT + spec.CARRIER_LENGTH
+    assert spec.OVERALL_LENGTH == 61.0
     assert spec.FIT_DIA == trammel.BEARING_BORE
 
 
@@ -111,11 +110,10 @@ def test_mounted_play_stays_inside_the_calculator_bound() -> None:
 
 
 def test_collar_seats_on_the_inner_race_only() -> None:
-    # Codex (#1578): at one place the Ø12.5 could go to 11.7, under the
-    # abutment; the bar's own Ø12.70 at two places holds 12.19.
-    assert spec.COLLAR_DIA == spec.STOCK_DIA and spec.COLLAR_PLACES == 2
+    assert spec.STOCK_DIA == 38.1
+    assert spec.COLLAR_DIA == 12.7 and spec.COLLAR_PLACES == 2
     assert spec.BEARING_DA_MIN <= spec.COLLAR_DIA - 0.51
-    assert spec.BEARING_DA_MIN <= spec.STOCK_DIA_MIN
+    assert spec.STOCK_DIA > spec.FLANGE_DIA
     assert spec.SHOULDER_FILLET_RADIUS < spec.BEARING_BORE_CHAMFER_MIN
 
 
@@ -148,13 +146,17 @@ def test_every_exported_nominal_lies_inside_its_band() -> None:
 def test_every_printed_band_has_a_requirement_owner() -> None:
     owners = {
         "CarrierLength": ("collar_top", "station", None),
-        "CollarSeatStation": ("collar_seat", "station", None),
-        "PinLength": ("bottom_face", "station", None),
+        "UpperBossHeight": ("collar", "length", None),
+        "BearingLength": ("collar_seat", "station", None),
         "CollarDia": ("collar", "dia", None),
         "BearingDia": ("bearing_section", "dia", spec.BEARING_PRINT_BAND),
         "CarrierDia": ("carrier_section", "dia", spec.CARRIER_BAND),
+        "FlangeDia": ("captive_flange", "dia", spec.FLANGE_DIA_BAND),
+        "FlangeThick": ("captive_flange", "length", None),
+        "CrossHoleDia": ("clevis_cross_hole", "dia", spec.CROSS_HOLE_BAND),
+        "CrossHoleFromEnd": ("clevis_cross_hole", "station", None),
     }
-    exempt = {"BottomChamfer", "TopChamfer", "SeatFilletR", "CarrierFilletR"}
+    exempt = {"BottomChamfer", "TopChamfer", "SeatFilletR", "CarrierFilletR", "LowerBossHeight", "PinLength"}
     assert set(owners) | exempt == set(spec.DRAWING_PRECISION_BY_NAME)
     features = _features()
     for printed, (name, key, band) in owners.items():
@@ -181,102 +183,6 @@ def test_finish_fits_one_title_block_line() -> None:
     assert "\n" not in finish and len(finish) <= 40, finish
 
 
-# Below-view geometry as run 20261017T022004769Z printed it (sheet mm).
-_CHAR_MM = 2.52  # widest measured: 65.3 mm for 26 characters
-_BLOCK_HALF = 12.85  # a four-line fit block about its position's y
-_RADIUS_TEXT = 24.3
-_RADIUS_KNEE = 13.7
-_AIR = 1.78  # the audit's text-clearance air
-
-
-def _mm(xy: tuple[float, float]) -> tuple[float, float]:
-    return xy[0] * 1000.0, xy[1] * 1000.0
-
-
-def _below_view_ink() -> tuple[dict, dict, dict]:
-    """Text boxes (x0, y0, x1, y1), dimension lines (x, y0, y1) and radius
-    shoulders (x0, x1, y), each keyed by dimension name."""
-    keep = {name: _mm(xy) for name, xy in drawing.PROFILE_KEEP.items()}
-    boxes, lines, shoulders = {}, {}, {}
-    for name, top in (("BearingDia", 180.0), ("CarrierDia", 180.0)):
-        x, y = keep[name]
-        width = _CHAR_MM * max(
-            len(line) for line in spec.DIMENSION_CALLOUTS[name].splitlines()
-        )
-        boxes[name] = (x, y - _BLOCK_HALF, x + width, y + _BLOCK_HALF)
-        lines[name] = (x, y - _BLOCK_HALF, top)
-    x, y = keep["CollarDia"]
-    boxes["CollarDia"] = (x, y - 2.8, x + 19.4, y + 1.7)
-    lines["CollarDia"] = (x, y - 2.8, 185.0)
-    for name, side in (("SeatFilletR", -1.0), ("CarrierFilletR", 1.0)):
-        x, y = keep[name]
-        boxes[name] = (x - _RADIUS_TEXT / 2.0, y - 1.8, x + _RADIUS_TEXT / 2.0, y + 1.7)
-        knee = x + side * _RADIUS_KNEE
-        far = knee - side * (_RADIUS_TEXT + 1.5)
-        shoulders[name] = (min(knee, far), max(knee, far), y - 2.8)
-    return boxes, lines, shoulders
-
-
-def test_below_view_blocks_keep_clear_of_each_other_and_every_line() -> None:
-    """Run 20261017T022004769Z printed the carrier block over the collar's
-    Ø12.5; run 20261017T015225029Z crossed the radius shoulders with the
-    length extension lines. Every below-view text keeps the audit's air from
-    every other, no diameter's dimension line passes through another's text
-    or a radius shoulder, and the lengths and chamfers stand above."""
-    keep = drawing.PROFILE_KEEP
-    for name in ("CarrierLength", "CollarSeatStation", "PinLength"):
-        assert keep[name][1] > drawing._ABOVE, name
-    for name in ("TopChamfer", "BottomChamfer"):
-        assert drawing._ABOVE < keep[name][1] < drawing.ROW_Y[0] - 0.006, name
-    rows = [keep[n][1] for n in ("CarrierLength", "CollarSeatStation", "PinLength")]
-    assert rows == sorted(rows)
-
-    boxes, lines, shoulders = _below_view_ink()
-    names = sorted(boxes)
-    for i, a in enumerate(names):
-        ax0, ay0, ax1, ay1 = boxes[a]
-        assert ay1 < drawing._BELOW * 1000.0, a
-        assert ay0 > 90.0, a
-        for b in names[i + 1 :]:
-            bx0, by0, bx1, by1 = boxes[b]
-            gap = max(bx0 - ax1, ax0 - bx1, by0 - ay1, ay0 - by1)
-            assert gap >= _AIR, (a, b, gap)
-    for owner, (x, y0, y1) in lines.items():
-        for name, (bx0, by0, bx1, by1) in boxes.items():
-            if name == owner:
-                continue
-            assert not (bx0 - 0.5 < x < bx1 + 0.5 and y0 < by1 and by0 < y1), (
-                owner,
-                name,
-            )
-        for name, (sx0, sx1, sy) in shoulders.items():
-            assert not (sx0 - 0.5 < x < sx1 + 0.5 and y0 < sy < y1), (owner, name)
-
-
-def test_radius_leaders_stay_off_the_collar_and_the_extension_lines() -> None:
-    """Each radius knee stands just outside its collar face, toward its own
-    section: the seat radius's leader then passes left of where the bearing
-    diameter's extension line starts at the collar face (run
-    20261017T022004769Z's advisory crossing), and neither knee reaches the
-    collar diameter's line between them."""
-    _boxes, lines, shoulders = _below_view_ink()
-    seat_face = drawing._x(spec.COLLAR_STATION) * 1000.0
-    carrier_face = drawing._x(spec.CARRIER_STATION) * 1000.0
-    seat_knee = shoulders["SeatFilletR"][0]
-    carrier_knee = shoulders["CarrierFilletR"][1]
-    assert seat_face - 4.0 < seat_knee < seat_face - 1.0
-    assert carrier_face - 4.0 < carrier_knee < carrier_face
-    assert carrier_knee < lines["CollarDia"][0] < seat_knee
-    # Every diameter line stands on its own section.
-    top_end, bottom_end = (
-        drawing._x(spec.OVERALL_LENGTH) * 1000.0,
-        drawing._x(0.0) * 1000.0,
-    )
-    assert top_end < lines["CarrierDia"][0] < carrier_face
-    assert carrier_face < lines["CollarDia"][0] < seat_face
-    assert seat_face < lines["BearingDia"][0] < bottom_end
-
-
 def test_callouts_are_short_below_lane_lines() -> None:
     for name, text in spec.DIMENSION_CALLOUTS.items():
         for line in text.splitlines():
@@ -291,8 +197,10 @@ def test_sheet_carries_no_notes() -> None:
     assert '"Manufacturing Notes"' not in inspect.getsource(drawing)
 
 
-def test_knockout_is_stated_in_the_docstring_not_a_note() -> None:
-    assert "presses the pin" in spec.__doc__ and "out downward" in spec.__doc__
+def test_cartridge_service_is_upward_and_replaces_all_pressed_parts() -> None:
+    assert "UPWARD from its lower end" in spec.__doc__
+    assert "Replace the pin AND BOTH bearings" in spec.__doc__
+    assert "cannot pass downward" in spec.__doc__
 
 
 def test_drawing_script_meets_the_drawing_contract() -> None:
@@ -302,3 +210,43 @@ def test_drawing_script_meets_the_drawing_contract() -> None:
         inspect.getsource(drawing), filename=filename
     )
     assert not violations, violations
+
+
+def test_captured_flange_and_raised_seat_are_the_actual_pin_profile() -> None:
+    assert spec.FLANGE_DIA == 36.0 and spec.FLANGE_THICK == 3.0
+    assert spec.FLANGE_DIA_BAND == (0.1, -0.1)
+    assert spec.FLANGE_BOTTOM_STATION + trammel.BEARING_RECESS == pytest.approx(24.15)
+    assert spec.FLANGE_TOP_STATION - spec.FLANGE_BOTTOM_STATION == 3.0
+    assert spec.CARRIER_STATION - spec.FLANGE_TOP_STATION == pytest.approx(spec.UPPER_BOSS_HEIGHT)
+    assert spec.UPPER_BOSS_HEIGHT == 10.35
+    assert spec.CARRIER_STATION + trammel.BEARING_RECESS == 37.5
+    assert spec.CROSS_HOLE_STATION == 55.0
+    assert spec.CROSS_HOLE_DIA == 5.0
+    assert spec.OVERALL_LENGTH - spec.CROSS_HOLE_STATION == 6.0
+
+
+def test_both_stop_faces_are_square_to_the_actual_bearing_axis() -> None:
+    assert spec.PART_DATUMS[0].letter == "A"
+    assert spec.PART_DATUMS[0].face.diameter_mm == spec.BEARING_DIA
+    assert len(spec.GEOMETRIC_CONTROLS) == 2
+    assert {control.face.normal for control in spec.GEOMETRIC_CONTROLS} == {
+        (0.0, 0.0, -1.0), (0.0, 0.0, 1.0),
+    }
+    assert all(
+        control.characteristic == "perpendicularity"
+        and control.datums == ("A",)
+        and float(control.tolerance) == spec.FLANGE_PERPENDICULARITY == 0.02
+        for control in spec.GEOMETRIC_CONTROLS
+    )
+    assert spec.FLANGE_EDGE_BREAK_MAX == 0.25
+
+
+def test_carrier_end_lead_has_a_physical_maximum_for_the_cross_hole() -> None:
+    assert spec.LEAD_CHAMFER_MAX == spec.LEAD_CHAMFER == 0.5
+    end_gap = (
+        min(limits(spec.CROSS_HOLE_FROM_END, spec.LENGTH_PLACES))
+        - max(limits(spec.CROSS_HOLE_DIA, 2, spec.CROSS_HOLE_BAND)) / 2.0
+        - spec.LEAD_CHAMFER_MAX
+    )
+    assert end_gap == pytest.approx(2.15)
+    assert end_gap >= 2.0

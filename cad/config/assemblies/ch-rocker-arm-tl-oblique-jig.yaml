@@ -31,6 +31,8 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-oblique-nut-bracket
+  - ch-rocker-arm-tl-oblique-pivot-cap
+  - ch-rocker-arm-tl-oblique-pivot-retainer
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-bearing
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
@@ -43,6 +45,10 @@ allowed_free_stems:
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-pivot-cap-screw
+  - ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin
+  - ch-rocker-arm-tl-vn-oblique-pivot-cotter
+  - ch-rocker-arm-tl-vn-oblique-pivot-lock-wire
 # One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
 # moving family rides it, so each must read under-constrained: a rider whose
 # lock mate silently fixed it to the ground would otherwise pass.
@@ -54,6 +60,8 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-oblique-nut-bracket
+  - ch-rocker-arm-tl-oblique-pivot-cap
+  - ch-rocker-arm-tl-oblique-pivot-retainer
   - ch-rocker-arm-tl-vn-oblique-carriage
   - ch-rocker-arm-tl-vn-oblique-bearing
   - ch-rocker-arm-tl-vn-oblique-cl-dowel
@@ -66,6 +74,10 @@ required_free_stems:
   - ch-rocker-arm-tl-vn-oblique-lever-screw
   - ch-rocker-arm-tl-vn-oblique-block-washer
   - ch-rocker-arm-tl-vn-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-pivot-cap-screw
+  - ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin
+  - ch-rocker-arm-tl-vn-oblique-pivot-cotter
+  - ch-rocker-arm-tl-vn-oblique-pivot-lock-wire
 # The sweep; verify's pass-sweep-interference-free gate replays the recorded
 # slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1

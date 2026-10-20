@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import math
 import re
@@ -581,3 +582,125 @@ def test_tap_callout_leaders_clear_every_station_text() -> None:
                 name,
                 dim,
             )
+
+
+def test_bottom_datum_and_four_axis_zones_share_the_retention_authority() -> None:
+    from _gtol_controls import validate_part_pmi
+    from _gtol_cylinder import CylinderFace
+    from _gtol_planar import PlanarFace
+    import ch_rocker_arm_tl_oblique_retention_spec as retention
+
+    validate_part_pmi(spec.PART_DATUMS, spec.GEOMETRIC_CONTROLS)
+    (datum,) = spec.PART_DATUMS
+    assert datum.letter == spec.BOTTOM_DATUM == "A"
+    assert datum.face == PlanarFace((0.0, -1.0, 0.0), spec.THICKNESS)
+    assert datum.annotation_name == "HARMONIC_PMI_datum_A"
+    assert part.PART_DATUMS is spec.PART_DATUMS
+    assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
+    assert spec.CARRIER_HOLE_PERPENDICULARITY == retention.CARRIER_HOLE_PERPENDICULARITY
+    assert len(spec.GEOMETRIC_CONTROLS) == len(spec.PIN_HOLES) == 4
+    for (hole, (x, y)), control in zip(
+        spec.PIN_HOLES.items(), spec.GEOMETRIC_CONTROLS, strict=True
+    ):
+        assert control.key == f"pin_hole_{hole.lower()}_perpendicularity"
+        assert control.annotation_name == f"HARMONIC_PMI_{control.key}"
+        assert control.characteristic == "perpendicularity"
+        assert control.tolerance_zone == "diametral"
+        assert control.tolerance == f"{retention.CARRIER_HOLE_PERPENDICULARITY:.2f}" == "0.02"
+        assert control.datums == ("A",)
+        assert control.projected_zone_height_mm is None
+        assert control.face == CylinderFace(
+            spec.PIN_HOLE_DIA, contains_x_mm=x, contains_z_mm=-y
+        )
+    # Import the functional authority; no same-valued local replacement.
+    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
+    imports = [
+        node for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "ch_rocker_arm_tl_oblique_retention_spec"
+    ]
+    assert any(
+        alias.name == "CARRIER_HOLE_PERPENDICULARITY"
+        for node in imports for alias in node.names
+    )
+    assert "CARRIER_HOLE_PERPENDICULARITY" not in export_features._declarations(spec)
+    source = inspect.getsource(part.build)
+    assert "author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)" in source
+    assert source.index("author_part_pmi(") < source.index("save_part_and_images(")
+
+
+def test_orientation_requirements_link_every_new_spec_declaration() -> None:
+    declarations = requirements_for(drawing)
+    seat = declarations["pin_collar_seat"]
+    assert seat.faces == (spec.PART_DATUMS[0].face,)
+    assert seat.fields["datum"][0] == "A"
+    linked = set(seat.fields["datum"][1])
+    for hole, control in zip(spec.PIN_HOLES, spec.GEOMETRIC_CONTROLS, strict=True):
+        requirement = declarations[f"pin_hole_{hole.lower()}"]
+        assert requirement.faces == (control.face,)
+        assert requirement.fields["perpendicularity_dia"][0] == float(control.tolerance)
+        assert requirement.fields["perpendicularity_datums"][0] == list(control.datums)
+        assert requirement.precision["perpendicularity_dia"] == 2
+        for field in ("perpendicularity_dia", "perpendicularity_datums"):
+            assert field in requirement.requirements
+            linked.update(requirement.fields[field][1])
+        feature = _features()[f"pin_hole_{hole.lower()}"]
+        assert feature["perpendicularity_dia"] == 0.02
+        assert feature["perpendicularity_datums"] == ["A"]
+    assert {"BOTTOM_DATUM", "PART_DATUMS", "GEOMETRIC_CONTROLS"} <= linked
+    assert (
+        "ch_rocker_arm_tl_oblique_retention_spec", "CARRIER_HOLE_PERPENDICULARITY"
+    ) in linked
+
+
+def test_native_projection_routes_every_owned_item_to_its_real_feature(monkeypatch) -> None:
+    top, section, adapter = object(), object(), object()
+    captured = {}
+    selected = {}
+
+    def circle(_adapter, view, diameter, label, *, center_x_mm, center_y_mm):
+        assert view is top and diameter == spec.PIN_HOLE_DIA
+        edge = object()
+        selected[(center_x_mm, center_y_mm)] = edge
+        return edge
+
+    def project(_adapter, **kwargs):
+        assert _adapter is adapter
+        captured.update(kwargs)
+
+    monkeypatch.setattr(drawing, "_circle_edge", circle)
+    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: lambda xyz: (xyz[0], -xyz[2]))
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda *_, **__: (0.139, 0.027))
+    monkeypatch.setattr(drawing, "project_part_pmi", project)
+    monkeypatch.setattr(
+        drawing, "assert_frame_datums_defined",
+        lambda views, **_: captured.update(views=views),
+    )
+    drawing._project_carrier_pmi(adapter, top, section)
+    assert captured["datums"] is spec.PART_DATUMS
+    assert captured["controls"] is spec.GEOMETRIC_CONTROLS
+    assert captured["views"] == (top, section)
+    placements = captured["placements"]
+    assert set(placements) == {"datum:A"} | {c.key for c in spec.GEOMETRIC_CONTROLS}
+    assert placements["datum:A"].view is section
+    assert placements["datum:A"].attachment_xy == (0.139, 0.027)
+    for point, control in zip(spec.PIN_HOLES.values(), spec.GEOMETRIC_CONTROLS, strict=True):
+        assert placements[control.key].view is top
+        assert placements[control.key].edge_entity is selected[point]
+    assert set(drawing.PIN_ORIENTATION_FRAME_MODEL_MM) == set(spec.PIN_HOLES)
+    assert "_project_carrier_pmi(adapter, top, section)" in inspect.getsource(drawing._pin_section)
+
+
+def test_orientation_control_has_owner_approved_rule_five_exception() -> None:
+    from machinist_exceptions import load_exceptions
+
+    exceptions = {
+        exception.id: exception
+        for exception in load_exceptions(_config.CONFIG_DIR, STEM, "part")
+    }
+    assert exceptions["RV-01"].kind == "minor"
+    exception = exceptions["PV-01"]
+    assert exception.kind == "accept"
+    assert "BOTTOM face datum A" in exception.where
+    assert "actual hole-axis tilt" in exception.reason
+    assert "no added flatness frame" in spec.__doc__

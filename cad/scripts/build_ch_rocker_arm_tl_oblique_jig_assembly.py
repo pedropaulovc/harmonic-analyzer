@@ -111,6 +111,11 @@ _PARTS = (
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
     ("ch-rocker-arm-tl-oblique-nut-bracket", "ch-rocker-arm-tl-oblique-nut-bracket"),
+    ("ch-rocker-arm-tl-oblique-pivot-cap", "ch-rocker-arm-tl-oblique-pivot-cap"),
+    (
+        "ch-rocker-arm-tl-oblique-pivot-retainer",
+        "ch-rocker-arm-tl-oblique-pivot-retainer",
+    ),
     ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
     ("ch-rocker-arm-tl-vn-oblique-bearing", "ch-rocker-arm-tl-vn-oblique-bearing"),
@@ -168,6 +173,22 @@ _PARTS = (
     (
         "ch-rocker-arm-tl-vn-oblique-lever-washer",
         "ch-rocker-arm-tl-vn-oblique-lever-washer",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
     ),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER

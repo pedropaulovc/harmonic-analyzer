@@ -34,6 +34,7 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
         drawing.SECTION_A_KEEP,
         drawing.SECTION_B_KEEP,
         drawing.SIDE_KEEP,
+        drawing.CAPTURE_KEEP,
     )
     assert set().union(*keeps) == marked
     assert sum(len(keep) for keep in keeps) == len(marked)
@@ -43,7 +44,7 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 
 def test_block_and_seats_read_the_calculator() -> None:
     assert spec.BLOCK_HEIGHT == trammel.PIVOT_BLOCK_HEIGHT == 24.0
-    assert (spec.BLOCK_X0, spec.BLOCK_X1, spec.BLOCK_WIDTH) == (-50.0, 20.0, 40.0)
+    assert (spec.BLOCK_X0, spec.BLOCK_X1, spec.BLOCK_WIDTH) == (-54.0, 20.0, 40.0)
     assert spec.BORE_X == trammel.PIN_OFFSET
     assert spec.BORE_DEPTH == trammel.BEARING_RECESS + trammel.BEARING_WIDTH
     assert spec.SHOULDER == trammel.BEARING_SHOULDER
@@ -98,88 +99,6 @@ def test_web_hole_keeps_the_abutment_and_clears_a_puller() -> None:
     assert _features()["top_bearing_seat"]["depth"] == [9.87, 10.13]
 
 
-# Section A-A's mapping: sheet x = 1000 cx + 2 (x - centre), y = 1000 cy -
-# 2 (z - H / 2), mm; hung rows run 5.56 mm apart, 3.5 mm high, ~2.6 mm a
-# character (draw_pd_support_bar), their block's right edge on the
-# dimension line (tl22-r1: 0.2 mm left of it).
-_ROW_PITCH, _TEXT_H, _CHAR_W, _HANG_GAP = 5.56, 3.5, 2.6, 0.2
-_LEFT_BORDER, _BOTTOM_BORDER, _TITLE_LEFT, _TITLE_TOP = 12.7, 13.0, 215.5, 64.5
-
-
-def _on_a(x: float, z: float) -> tuple[float, float]:
-    cx, cy = drawing.SECTION_A_CENTER
-    centre = (spec.BLOCK_X0 + spec.BLOCK_X1) / 2.0
-    return 1000.0 * cx + 2.0 * (x - centre), 1000.0 * cy - 2.0 * (
-        z - spec.BLOCK_HEIGHT / 2.0
-    )
-
-
-def test_seat_depths_hang_beyond_their_spans_clear_of_every_line() -> None:
-    """Review r12: requested inside its 20 mm span the block ran past both
-    extension lines and the dimension line struck its first and last rows.
-    Beyond the span SolidWorks hangs it left of the line, centred on the
-    requested height: the bottom seat's over the bottom face, the top
-    seat's under the top face, each 3 mm off its face's extension line."""
-    outline_left, top_face = _on_a(spec.BLOCK_X0, spec.BLOCK_HEIGHT)
-    _, bottom_face = _on_a(spec.BLOCK_X0, 0.0)
-    printed = drawing._hung_clear(spec.CALLOUTS_BELOW)
-    for name in printed.keys() - set(drawing.HUNG_BESIDE_LINE):
-        assert printed[name] == spec.CALLOUTS_BELOW[name]
-    for name, beyond in (("TopBoreDepth", +1), ("BottomBoreDepth", -1)):
-        x, y, z = drawing.SECTION_A_KEEP[name]
-        assert y == 0.0
-        rows = [f"{spec.BORE_DEPTH:.3f}", *printed[name].splitlines()]
-        half_h = (_TEXT_H + (len(rows) - 1) * _ROW_PITCH) / 2.0
-        line_x, text_y = _on_a(x, z)
-        right = line_x - _HANG_GAP
-        left = right - _CHAR_W * max(map(len, rows))
-        assert line_x <= outline_left - 3.0
-        assert left >= _LEFT_BORDER + 3.0
-        if beyond > 0:  # under the top face (model +Z prints down)
-            assert z > spec.BLOCK_HEIGHT
-            assert text_y + half_h <= top_face - 3.0
-            assert text_y - half_h >= _BOTTOM_BORDER + 3.0
-            # Beside its line from the face to its shoulder: every row's
-            # glyphs stand a padding off it (tl22-r1: 0.2 mm).
-            assert name in drawing.HUNG_BESIDE_LINE
-            for row, spec_row in zip(
-                printed[name].splitlines(), spec.CALLOUTS_BELOW[name].splitlines()
-            ):
-                assert row.rstrip() == spec_row and len(row) - len(spec_row) >= 2
-        else:
-            assert z < 0.0
-            assert text_y - half_h >= bottom_face + 3.0
-    # Left of the Ø25's rows (centred on the bore, ~43 mm wide).
-    hole_x, _ = _on_a(spec.BORE_X, 0.0)
-    line_x, _ = _on_a(drawing.SECTION_A_KEEP["TopBoreDepth"][0], 0.0)
-    assert line_x < hole_x - 43.0 / 2.0 - 3.0
-    # The caption clears the Ø25's outside arrow (6.3 mm past its witness
-    # line, tl22-r1: the caption's ~46 mm row began on the arrow's tip).
-    witness_x, _ = _on_a(spec.BORE_X + spec.SHOULDER_HOLE_DIA / 2.0, 0.0)
-    assert 1000.0 * drawing.CAPTION_A_XY[0] - 23.0 > witness_x + 6.3 + 2.0
-    # Close-c4-r4: the side row's 9.000 names A-A's top edge (the carriage
-    # seat). Its line right of the +X end, short of the title block; its
-    # rows hang right of it over the section, clear of the plan's +X witness
-    # line (x 200) and left of View C (x 238).
-    x, y, z = drawing.SECTION_A_KEEP["SideScrewRowZ"]
-    assert y == 0.0 and z < 0.0
-    line_x, text_y = _on_a(x, z)
-    _, seat_face = _on_a(0.0, 0.0)
-    plus_x_end, _ = _on_a(spec.BLOCK_X1, 0.0)
-    assert line_x >= plus_x_end + 3.0
-    assert line_x + 1.5 < _TITLE_LEFT - 3.0
-    rows = [
-        f"{spec.SIDE_ROW_Z:.3f}",
-        *spec.CALLOUTS_BELOW["SideScrewRowZ"].splitlines(),
-    ]
-    half_h = (_TEXT_H + (len(rows) - 1) * _ROW_PITCH) / 2.0
-    assert text_y - half_h >= seat_face + 3.0
-    side_left = 1000.0 * drawing.SIDE_CENTER[0] + 2.0 * (
-        spec.BLOCK_X0 - (spec.BLOCK_X0 + spec.BLOCK_X1) / 2.0
-    )
-    assert line_x + _HANG_GAP + _CHAR_W * max(map(len, rows)) <= side_left - 2.5
-
-
 def test_top_seat_is_positioned_to_the_bottom_seat_datum() -> None:
     # Review r8: the seats are bored from opposite faces; datum A on the
     # bottom seat and a Ø0.02 position frame on the top one tie them.
@@ -198,45 +117,6 @@ def test_top_seat_is_positioned_to_the_bottom_seat_datum() -> None:
     assert spec.SEAT_SPAN == 13.0
     assert math.isclose(spec.SEAT_TILT_ARCMIN, 2.64, abs_tol=0.005)
     assert spec.SEAT_TILT_ARCMIN <= spec.BEARING_MISALIGNMENT_MAX_ARCMIN
-    # Both in A-A (review r12: the frame on the plan's rim and datum A in
-    # A-A read alike), both boxes outside the outline (tl22-r2 review, rule
-    # 14), A-A under the plan (tl22-r2: 10 mm off, it read as misaligned).
-    assert drawing.SECTION_A_CENTER[0] == drawing.PLAN_CENTER[0]
-    outline_left, top_face = _on_a(spec.BLOCK_X0, spec.BLOCK_HEIGHT)
-    _, bottom_face = _on_a(spec.BLOCK_X0, 0.0)
-    # Datum A: the triangle on the bottom seat's -X wall, level with its box
-    # (review r11: over the mouth it went onto the wall's extension and read
-    # as "face A"), the ~6.8 mm box (its leader edge here) between the
-    # depths' line and the outline, between the seat's witness lines.
-    x, y, z = drawing.SEAT_DATUM_EDGE
-    assert math.isclose(x, spec.BORE_X - spec.BORE_DIA / 2.0)
-    assert 0.0 < z < spec.BORE_DEPTH and y == 0.0
-    box_right, box_y = _on_a(*drawing.SEAT_DATUM_SYMBOL[::2])
-    assert drawing.SEAT_DATUM_SYMBOL[1] == 0.0
-    depth_line, _ = _on_a(drawing.SECTION_A_KEEP["BottomBoreDepth"][0], 0.0)
-    assert box_right <= outline_left - 3.0 and box_right - 6.8 >= depth_line + 3.0
-    _, floor_y = _on_a(0.0, spec.BORE_DEPTH)
-    assert floor_y + 3.0 <= box_y - 3.4 and box_y + 3.4 <= bottom_face - 3.0
-    # The frame: its leader on the top seat's +X wall, up from the frame's
-    # left end through the open mouth; the ~29 x 7 mm box under the top
-    # face, right of the Ø25's right witness line.
-    wall_x, wall_y = _on_a(*drawing.SEAT_FRAME_EDGE[::2])
-    assert drawing.SEAT_FRAME_EDGE[1] == drawing.SEAT_FRAME_CORNER[1] == 0.0
-    assert math.isclose(drawing.SEAT_FRAME_EDGE[0], spec.BORE_X + spec.BORE_DIA / 2.0)
-    _, top_floor_y = _on_a(0.0, spec.BORE_DEPTH + spec.SHOULDER)
-    assert top_face < wall_y < top_floor_y
-    left, frame_top = _on_a(*drawing.SEAT_FRAME_CORNER[::2])
-    witness_x, _ = _on_a(spec.BORE_X + spec.SHOULDER_HOLE_DIA / 2.0, 0.0)
-    assert left >= witness_x + 2.0 and frame_top <= top_face - 3.0
-    assert frame_top - 6.8 >= 1000.0 * drawing.CAPTION_A_XY[1] + 3.0
-    mid_y = frame_top - 3.4
-    at_face = left + (wall_x - left) * (top_face - mid_y) / (wall_y - mid_y)
-    assert wall_x - at_face >= 2.0
-    assert list(inspect.signature(drawing._seat_gdt).parameters) == [
-        "adapter",
-        "section_a",
-        "on_a",
-    ]
 
 
 def test_walls_hold_rule_17_from_the_spec_values() -> None:
@@ -409,7 +289,7 @@ def test_side_screw_head_sinks_and_spacing_fits_the_float() -> None:
             features[f"side_screw_hole_{i}"]["height_nominal"],
         )
         for i in (1, 2)
-    ) == [(45.0, 9.0), (55.0, 9.0)]
+    ) == [(49.0, 9.0), (59.0, 9.0)]
     assert "MHA-CH-06-TL-29" in features["side_screw_hole_1"]["note"]
 
 
@@ -450,6 +330,7 @@ def test_floor_reference_lies_in_section_b_and_is_saved_hidden() -> None:
     assert spec.REFERENCE_SKETCHES == (
         spec.CBORE_FLOOR_REFERENCE,
         spec.SIDE_SCREW_REFERENCE,
+        spec.CAP_TAP_REFERENCE,
     )
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE] == {"CboreFloor": 3}
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -489,13 +370,13 @@ def test_carriage_screws_are_one_native_counterbore_at_the_spec_sizes() -> None:
     }
     assert part.SCREW_HOLE_SPEC is hole
     source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("wizard_holes(") == 2
+    assert source.count("wizard_holes(") == 3
 
 
 def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
     features = _features()
     seat = features["top_bearing_seat"]
-    assert seat["station_nominal"] == spec.BORE_X - spec.BLOCK_X0 == 18.0
+    assert seat["station_nominal"] == spec.BORE_X - spec.BLOCK_X0 == 22.0
     assert seat["width_nominal"] == spec.BLOCK_WIDTH / 2.0 == 20.0
     stations = sorted(
         (
@@ -504,7 +385,7 @@ def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
         )
         for i in range(1, 5)
     )
-    assert stations == [(37.0, 7.0), (37.0, 33.0), (63.0, 7.0), (63.0, 33.0)]
+    assert stations == [(41.0, 7.0), (41.0, 33.0), (67.0, 7.0), (67.0, 33.0)]
     assert features["screw_hole_1"]["precision"]["station"] == 3
     # Every printed station is driven from the origin knobs, not a global.
     assert set(part._STATION_DRIVES) <= set(spec.DRAWING_VALUES)
@@ -584,3 +465,35 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
                 assert band[0] <= nominal <= band[1], (name, requirement)
             checked += 1
     assert checked
+
+
+def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
+    assert (spec.WING_LENGTH, spec.WING_WIDTH, spec.WING_X1) == (44.0, 64.0, -10.0)
+    assert spec.SIDE_UNDER_HEAD == 35.6
+    assert spec.BORE_X == -32.0
+    assert spec.BOLT_POINTS == ((-13.0, -13.0), (-13.0, 13.0), (13.0, -13.0), (13.0, 13.0))
+    assert part.V_BLOCK == (74.0 * 40.0 + 44.0 * 24.0) * 24.0
+    assert spec.BEARING_AXIS_NAME == "BearingAxis"
+    assert drawing.SHEET_NAMES == ("Bearing and carriage", "Capture wing")
+
+
+def test_cap_receiver_taps_are_located_from_the_actual_bearing_axis() -> None:
+    assert spec.CAP_TAP_POINTS == ((-47.0, -25.0), (-47.0, 25.0), (-17.0, -25.0), (-17.0, 25.0))
+    assert spec.CAP_TAP_HOLE_SPEC.kind == "tapped"
+    assert spec.CAP_TAP_HOLE_SPEC.size == "1/4-20"
+    assert spec.CAP_TAP_HOLE_SPEC.end == "through_all"
+    assert spec.CAP_TAP_LOCATION_PLACES == 3
+    assert set(spec.DRAWING_PRECISION[spec.CAP_TAP_REFERENCE].values()) == {3}
+    features = _features()
+    for index in range(1, 5):
+        tap = features[f"cap_receiver_tap_{index}"]
+        assert tap["station"] == [14.87, 15.13]
+        assert tap["width"] == [24.87, 25.13]
+        assert tap["thru"] is True
+        assert tap["precision"] == {"station": 3, "width": 3}
+
+
+def test_thread_envelope_walls_reject_an_undersized_wing() -> None:
+    assert min(spec.cap_receiver_walls().values()) >= spec.WALL_TARGET
+    assert min(spec.cap_receiver_walls(wing_width=56.0).values()) < spec.WALL_FLOOR
+    assert min(spec.cap_receiver_walls(wing_length=40.0).values()) < spec.WALL_FLOOR

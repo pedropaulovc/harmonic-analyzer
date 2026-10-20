@@ -39,6 +39,7 @@ from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
@@ -81,213 +82,78 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 70 x 40 x 24 block at 2:1. The plan view (*Front: the model's +Z top
-# face) carries the plan sizes and every station, X from the -X end face
-# (one baseline stack below the view, shortest nearest) and Y from the -Y
-# side face (a stack right of it), plus the screw holes' one native
-# counterbore callout above it. Section A-A on the bore axis, below the
-# plan, shows the two-sided seats, their depths and corners, the shoulder
-# hole and the height. Full section B-B through the -X counterbores,
-# right of the plan, carries the counterbore floor's height
-# from the carriage seat. The side view (*Top, the +Y face) right of A
-# carries the nut-bracket screws' stations and their native counterbore
-# callout; the shaded isometric stands at the upper right.
-#
-# Section arrows point away from their view (A's up), and SolidWorks prints
-# each letter 15-22 mm past its arrow's tail (draw_fr_top_frame's historical
-# SECTION_CUT_BASELINE_LETTER_EXTENTS), so A's letters stand above both ends.
-# Farm run jig-r1 (fa975d169) failed with a hole-size shoulder
-# across a second section line and the size callouts over the top border.
-# Jig-r2 (c2f7d1c03) put the five-row BoreDia block over the plan: its
-# "2X" and tolerance stack printed over the top border (ink top 270.2 mm),
-# and its native leader ran rim to rim through the bore and across line A.
-# It now stands left of the plan in seven narrow rows
-# (part_spec.BORE_CALLOUT), its single arrow on the near rim
-# (set_near_side_diameter), above line A's left end. Jig-r3 (fbf443c77)
-# chained the stations from the pattern centre (now from the faces) and
-# the Ø27 inside section A (now under it). r5: the counterbore floor, the
-# face that sets the M4 x 20's engagement in the carriage, prints from the
-# carriage seat in B-B (part_spec.CBORE_FLOOR), and the native callout's
-# depth is its reference "(8.40)". PR C4 adds the side view under the Y
-# stack, so the isometric drops to 1:2 in the corner. r6: the web hole (now
-# Ø25) and the two-place sizes print their functions with their values
-# (part_spec.CALLOUTS_BELOW/ABOVE), and B-B stands aligned with its cutting
-# line between the plan's width and the isometric. r7: B-B is a full
-# section (its partial cut's open end broke the hatch into dashes), and the
-# 70 drops to its own tier.
-SHEET_SCALE = (2.0, 1.0)
-VIEW_SCALE = (2, 1)
+# The bearing/carriage sheet retains the original interfaces at 3:2.
+# A separate 2:1 plan owns the wing and all four tightly located cap taps.
+# Its tap stations reference the bearing axis directly, never a loose edge.
+# Section A-A is on the bearing axis; full section B-B shows the remaining
+# carriage-counterbore floor from the carriage seat. Removed view C looks at
+# the original tail's +Y face and carries the nut-bracket hole stations.
+SHEET_SCALE = (3.0, 2.0)
+VIEW_SCALE = (3, 2)
+SHEET_NAMES = ("Bearing and carriage", "Capture wing")
+CAPTURE_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
-# Plan outline x 60..200, y 152..232 mm; the block centre at (130, 192), so
-# a model point maps to sheet (160 + 2x, 192 + 2y).
 PLAN_CENTER = (0.130, 0.192)
-# Outline y 49..97 (model +Z prints DOWN in A-A: sheet y = 73 - 2(z - 12)),
-# x 60..200 (sheet x = 130 + 2(x + 15)), under the plan's (tl22-r2 review:
-# 10 mm left of it, it read as projected but misaligned). The depths' lines
-# stand 14 mm left of it (x 46), each block hung beyond its span (review
-# r12: inside the 20 mm span the four-row block ran past both extension
-# lines and the line struck its first and last rows), datum A's box
-# between them and the outline. The height stands right, one row at x
-# ~201..215, y ~70..76, over the title block's top (y 64.5; its left edge
-# x 215.5, 6 mm right of the height's witness ends). The Ø25 hangs under it
-# and the seat corner over it, under the plan's lowest station row (y
-# ~113). The 24 mm block (r4: BEARING_SHOULDER 4) grows the outline 4 mm;
-# the centre drops 1 mm so the seat corner's text keeps its gap over the
-# bottom seat's mouth.
+# A-A remains vertically aligned with the plan.
 SECTION_A_CENTER = (PLAN_CENTER[0], 0.073)
-# The 48 x 37 mm pictorial (1:2, review r7: B-B needs the corner under it):
-# x ~361..409, y ~213..251, inside the right border (419.1) and under the
-# top one (267); its note (left-anchored, ~59 mm) under it, over B-B's
-# floor text (y <= 187).
 ISO_CENTER = (0.385, 0.232)
 ISO_NOTE_XY = (0.355, 0.200)
-# Right of the Ø25's witness lines (x 71, 121; down to y ~20) and its
-# outside arrow (to x ~127.3; tl22-r1 put the caption's left end on it),
-# under A-A: the ~46 mm caption at x ~132..178.
 CAPTION_A_XY = (0.155, 0.024)
-# Side view (*Top: looking at the +Y face, X right, model +Z DOWN): outline
-# x 238..378, y 76..124, so a model point maps to sheet (338 + 2x, 124 - 2z);
-# 11 mm over the title block (y 65). c4 review: 4 mm further right than
-# c4r3; close-c4-r4: 4 mm more, so the side row's 9.000 block, now in A-A
-# (x ~208..232), keeps its gap to the view.
+# The removed side view remains clear of the title block.
 SIDE_CENTER = (0.308, 0.102)
-# Review c4r3: the side view stands out of projection (above the plan there
-# is no room for its 48 mm), so it is a removed view: "VIEW C" under it and a
-# letter arrow on the plan's +Y edge, the face it looks at (the cone tip
-# block's VIEW B/C recipe: a pointer note whose straight leader is the
-# viewing arrow). The tip at model X -30 (sheet x 100), the 5 mm letter
-# 10.5 mm over it (y ~237..243): right of the bore callout (x <= 55), left
-# of B-B's upper letter (x ~149) and the screw callout (x >= 158).
 SIDE_VIEW_LETTER = "C"
 SIDE_VIEW_LETTER_HEIGHT = 0.005
-SIDE_VIEW_ARROW_TIP = (-30.0, BLOCK_WIDTH / 2.0, BLOCK_HEIGHT)
+SIDE_VIEW_ARROW_TIP = (5.0, BLOCK_WIDTH / 2.0, BLOCK_HEIGHT)
 SIDE_VIEW_LETTER_OFFSET = (-0.0018, 0.0105)
-# Under the view's centre (outline bottom y 76), over the title block (65).
 SIDE_VIEW_CAPTION = f"VIEW {SIDE_VIEW_LETTER}"
 SIDE_VIEW_CAPTION_XY = (0.3005, 0.0775)
 # Cutting line on the top face, past the outline (model mm).
 CUT_A_X = (BLOCK_X0 - 4.0, BLOCK_X1 + 4.0)
-# Section B-B's full cut along Y through both -X counterbores, on the
-# build's CboreSectionPlane (X = -BOLT_X). Review r5: cut along X, its
-# left letter and arrow sat on the Ø29.976 bore circle, and no X-wise cut
-# can clear it (the arrow must stand left of the counterbore, X <= -17.5,
-# the letter right of the bore, X >= -15). Along Y the line runs 4 past
-# both side faces (sheet y 144..240) at sheet x 134, crossing line A at
-# the block centre. Drawn bottom to top, its arrows point +X (A's, drawn
-# left to right, point up: the arrow turns clockwise from the line's run)
-# and the letters stand ~17 mm along them, at sheet x ~151: the upper one
-# over the plan's top edge, the lower one (y ~142..149) under its bottom
-# edge (y 152), right of the 18.00 text (x <= 85) and over the 63.000 line
-# (y 128). Review r7: the partial cut (Y 8 up) ended inside the Ø4.5 hole's
-# wall band, its open end left no outline, and the hatch below the hole
-# broke into dashes; a full cut has a face on every side.
-CUT_B_Y = (-BLOCK_WIDTH / 2.0 - 4.0, BLOCK_WIDTH / 2.0 + 4.0)
-# Review r6: B-B printed turned (+Z down) with no ROTATED label. It stands
-# aligned with its cutting line: the line runs +Y up the plan, so +Y runs
-# up the section, and seen along the +X arrows +Z reads right
-# (_orient_section_b proves both). The strip (Z 0..24 across, Y -20..20
-# up: 48 x 80 mm at 2:1) centred at x 320, y 193, so x 296..344, y 153..233:
-# right of the plan's BlockWidth text (x <= 281), left of the isometric
-# (x 361) and its note (x 355), over the side view's stations (y <= 141).
+# Full-width B-B through the unchanged -X carriage-hole column.
+CUT_B_Y = (-part_spec.WING_WIDTH / 2.0 - 4.0, part_spec.WING_WIDTH / 2.0 + 4.0)
+# Aligned section: +Y reads up and +Z right (_orient_section_b proves both).
 SECTION_B_CENTER = (0.320, 0.193)
 SECTION_B_ANCHOR = (-BOLT_X, 0.0, BLOCK_HEIGHT / 2.0)
-# Under the strip (y 153): x ~297..343, y ~143..150, 2 mm over the side
-# stations' lines (y <= 141), right of their text (x <= 295) and left of
-# the side callout (x 352).
-CAPTION_B_XY = (0.320, 0.150)
-# The floor height runs across the strip from the carriage seat (x 296)
-# on witness lines rising from the reference line (the Ø4.5 hole's +Y
-# wall, Y 15.25, y 223.5). Its one engagement row stands over the value
-# (part_spec.CALLOUTS_ABOVE), so the line runs under "15.600" (review r7:
-# under the rows, it struck "(5 DEEP THREAD)"; review r8: the three-row
-# block never printed). The ~11 x 76 mm block: line y ~239 (6 mm over the
-# strip's top, y 233), top y ~250 (under the top border, 267), x ~274..350,
-# right of the BlockWidth text and the screw callout (x <= 218), centred on
-# the 15.6 span.
+CAPTION_B_XY = (0.320, 0.132)
+# The floor's witness lines extend beyond the complete wing, not the tail.
 SECTION_B_KEEP: dict[str, tuple[float, float, float]] = {
-    "CboreFloor": (-BOLT_X, BLOCK_WIDTH / 2.0 + 8.5, CBORE_FLOOR / 2.0),
+    "CboreFloor": (-BOLT_X, part_spec.WING_WIDTH / 2.0 + 7.0, CBORE_FLOOR / 2.0),
 }
 
-# Every dimension's text position is a MODEL point (mm) off the part, mapped
-# onto its view at run time. Jig-r2 readback: a position stands 1.0 mm over
-# the middle of its text block, the block running from its last row's
-# baseline (where the shoulder runs) to 3.5 mm over its first row's; rows
-# run 5.56 mm apart on the sheet (2.8 model mm at 2:1), and a "2X" over a
-# stacked tolerance 9.05 mm over the value's baseline. Rows are centred on
-# the position's x.
+# All dimension-text placements below are model points (mm), projected into
+# the corresponding native view. Cap tap dimensions use their own sheet.
 _H = BLOCK_HEIGHT
 _HW = BLOCK_WIDTH / 2.0
 _HOLE_PLACES = part_spec.HOLE_STATION_PLACES
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
-    # X stations from the -X end, one baseline stack under the view at a
-    # 7 mm (sheet) pitch, shortest nearest (lines y 141, 134, 127, 112). The
-    # X datum is the top face's -Y/-X corner, so every datum witness line
-    # runs down the end face's corner; the hole stations print on the -Y row
-    # (build _top_seat_sketch). Each text stands off the witness lines that
-    # end just over it (bore x 96, -X hole column x 134).
-    "BoreStationX": (-41.0, -_HW - 4.0, _H),
-    "HoleColumn1X": (-25.0, -_HW - 7.5, _H),
-    "HoleColumn2X": (-5.0, -_HW - 11.0, _H),
-    # The block's length on its own tier, line y ~112.5 (3 mm over the seat
-    # corner's "2X", y 109.4): its function row under the value, on the
-    # line (part_spec.CALLOUTS_BELOW), a two-row block topping at y ~121.5,
-    # 5.5 under the 63.000 line (review r7: three rows rose to y 130 and
-    # that line struck "70.00"; close-c4-r5: 3.7 under it, the row read as
-    # either line's). The ~67 mm row centres at x 165 (x ~131..199), inside
-    # the +X end's witness line (x 200).
-    "BlockLength": (2.5, -_HW - 17.0, _H),
-    # Y stations from the -Y side, a stack right of the view at a 10 mm
-    # (sheet) pitch (x 220, 230, 240), each text centred in its span,
-    # off the witness lines of the stations beyond it. The datum is the
-    # top face's -Y/+X corner; the bore's witness line runs on line A as
-    # BoltY's did (jig-r3). c4 review: 8 mm further right, so line A's
-    # right arrow and letter (x ~205..210) stand left of the whole stack.
+    "BoreStationX": (-41.0, -part_spec.WING_WIDTH / 2.0 - 4.0, _H),
+    "HoleColumn1X": (-25.0, -part_spec.WING_WIDTH / 2.0 - 8.0, _H),
+    "HoleColumn2X": (-5.0, -part_spec.WING_WIDTH / 2.0 - 12.0, _H),
+    "BlockLength": (2.5, -part_spec.WING_WIDTH / 2.0 - 19.0, _H),
+    # Y stations reference the original tail-side datum plane, not the wing.
     "HoleRow1Y": (30.0, -16.5, _H),
     "BoreStationY": (35.0, -10.0, _H),
     "HoleRow2Y": (40.0, -3.5, _H),
-    # The width, outermost at x 264: its three ~35 mm rows (x ~247..281)
-    # stand 7 mm right of HoleRow2Y's line (x 240).
     "BlockWidth": (52.0, 8.0, _H),
-    # The bore left of the view: "2X", the value and five rows under it, a
-    # 40.3 mm (sheet) block about 35 mm wide (the value row with its
-    # tolerance stack). Its shoulder at y 202 mm stands 10 mm over line A
-    # (y 192), whose left end, arrow and letter (x ~48..60) lie under it,
-    # and its top at ~243 mm is 23 mm inside the border. The block's x
-    # ~19..55 keeps 6 mm off the left border and 5 mm off the outline (x 60);
-    # the near-rim leader runs ~11 mm to the rim at ~(67..70, 199..206).
     "BoreDia": (BLOCK_X0 - 11.5, 15.5, _H),
 }
+CAPTURE_KEEP = {
+    "WingLength": (-32.0, 40.0, _H),
+    "WingWidth": (59.0, 0.0, _H),
+    "CapTapLeftX": (-39.5, -43.0, _H),
+    "CapTapRightX": (-24.5, -51.0, _H),
+    "CapTapLowerY": (35.0, -12.5, _H),
+    "CapTapUpperY": (43.0, 12.5, _H),
+}
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
-    # The side screws' row from the carriage seat (A-A's top edge: model +Z
-    # prints down), right of the +X end (x 208). Close-c4-r4 review: from
-    # View C alone the reader took A-A's top edge for the counterbored face,
-    # so the section names its own top face. Beyond its span, over the
-    # section, the six rows hang right of the line, away from the part
-    # (draw_pd_support_bar; close-c4-r5 render: four rows at x ~208..232),
-    # centred at y ~117 (y ~101..133): right of the plan's +X witness line
-    # (x 200) and the 70's line end, left of View C (x 238).
+    # In A-A, the carriage seat is model Z0, not the counterbored top face.
     "SideScrewRowZ": (BLOCK_X1 + 4.0, 0.0, -10.5),
-    # Left of the -X end: each seat floor's witness line leaves the bore
-    # wall and crosses only the 3 mm end wall (jig-r3 ran them right across
-    # the whole hatched block), to a line at x 46. Review r12: requested
-    # inside the 20 mm span, the four-row block ran past both extension
-    # lines and the line struck "10.000" and "FOR PULLER". Each now stands
-    # beyond its span, so SolidWorks hangs it LEFT of the line (right edge
-    # on it, x ~17..46), centred on the requested height over a
-    # shoulder at its last row: the bottom seat's over the bottom face (y
-    # 97; block y ~101..127, left of the plan's -X witness lines at x 60),
-    # the top seat's under the top face (y 49; block y ~20..46, left of
-    # the Ø25's rows).
+    # Hang each seat-depth block outside its span, beside the left end face.
     "TopBoreDepth": (BLOCK_X0 - 7.0, 0.0, _H + 8.25),
     "BottomBoreDepth": (BLOCK_X0 - 7.0, 0.0, -8.75),
-    # Under the view (model +Z down), off the silhouette: its witness lines
-    # drop from the web hole's walls through the open top seat (x 71, 121);
-    # five rows (value, THRU, the three-row function), the widest ~43 mm
-    # (x ~75..117) inside them, y ~20..46 (2.5 under the outline, 7 over
-    # the bottom border).
+    # The puller opening hangs under the section, off its silhouette.
     "ShoulderHoleDia": (BORE_X, 0.0, _H + 7.5),
-    # Over the view, "2X" above: the leader rises from a corner through the
-    # open bottom seat (y 97 at the mouth, between the bore walls).
+    # Seat-corner fillets share one native maximum-radius callout.
     "SeatFilletR": (-20.0, 0.0, -4.0),
 }
 # Hung under the top face, the top seat's block runs beside its dimension
@@ -701,6 +567,51 @@ for _index, (_x, _z) in enumerate(SIDE_SCREW_HOLES, start=1):
         precision={"dia": _SIDE_CBORE_PLACES, "depth": _SIDE_CBORE_PLACES},
     )
 
+requirement(
+    "capture_wing",
+    kind="face",
+    faces=(
+        PlanarFace((0.0, 1.0, 0.0), part_spec.WING_WIDTH / 2.0),
+        PlanarFace((0.0, -1.0, 0.0), part_spec.WING_WIDTH / 2.0),
+    ),
+    requirements=("length", "width"),
+    fields={
+        "length": (limits(part_spec.WING_LENGTH, 1), ("WING_LENGTH",)),
+        "length_nominal": (part_spec.WING_LENGTH, ("WING_LENGTH",)),
+        "width": (limits(part_spec.WING_WIDTH, 2), ("WING_WIDTH",)),
+        "width_nominal": (part_spec.WING_WIDTH, ("WING_WIDTH",)),
+    },
+    precision={"length": 1, "width": 2},
+)
+
+for _index, (_x, _y) in enumerate(part_spec.CAP_TAP_POINTS, start=1):
+    requirement(
+        f"cap_receiver_tap_{_index}",
+        kind="hole",
+        faces=(CylinderFace(part_spec.CAP_TAP_DRILL_DIA, contains_x_mm=_x, contains_y_mm=_y),),
+        requirements=("station", "width", "thru", "note"),
+        fields={
+            "at": ([_x, _y, part_spec.BLOCK_HEIGHT], ("CAP_TAP_POINTS", "BLOCK_HEIGHT")),
+            "axis": (_DOWN, ("__frame__",)),
+            "station": (
+                limits(abs(_x - part_spec.BORE_X), part_spec.CAP_TAP_LOCATION_PLACES),
+                ("CAP_TAP_POINTS", "BORE_X", "CAP_TAP_LOCATION_PLACES"),
+            ),
+            "station_nominal": (abs(_x - part_spec.BORE_X), ("CAP_TAP_POINTS", "BORE_X")),
+            "width": (
+                limits(abs(_y), part_spec.CAP_TAP_LOCATION_PLACES),
+                ("CAP_TAP_POINTS", "CAP_TAP_LOCATION_PLACES"),
+            ),
+            "width_nominal": (abs(_y), ("CAP_TAP_POINTS",)),
+            "thru": (True, ("CAP_TAP_HOLE_SPEC",)),
+            "note": (
+                "1/4-20 THRU; " + " ".join(part_spec.CAP_TAP_CALLOUT.splitlines()),
+                ("CAP_TAP_HOLE_SPEC", "CAP_TAP_CALLOUT"),
+            ),
+        },
+        precision={"station": part_spec.CAP_TAP_LOCATION_PLACES, "width": part_spec.CAP_TAP_LOCATION_PLACES},
+    )
+
 
 def screw_hole_callout_definitions(
     definitions: dict[int, str], below: str, *, reference_depth: bool
@@ -1013,6 +924,10 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="pivot block package")
+    ddoc = _early_bound(drawing_model, "IDrawingDoc")
+    if not ddoc.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("cannot activate bearing/carriage sheet")
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -1057,7 +972,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # hidden: _drawing_hidden_sketches shows it while B-B is cut and curated.
     annotations += _cbore_floor_section(adapter, source_model, plan)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-    set_dimension_callouts(adapter, annotations, _hung_clear(CALLOUTS_BELOW))
+    set_dimension_callouts(
+        adapter, annotations,
+        {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in CAPTURE_KEEP},
+    )
     # Natively the bore's leader runs rim to rim through the centre and across
     # line A (jig-r2); one arrow on the near (left) rim keeps it short and
     # above the line.
@@ -1067,7 +985,10 @@ async def build(adapter: Any) -> dict[str, str]:
     set_near_side_diameter(bore_dia[0], "pivot block bore diameter")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(
+        adapter, annotations,
+        {name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name not in CAPTURE_KEEP},
+    )
     _set_screw_hole_callout(
         add_native_hole_callout(
             adapter,
@@ -1098,12 +1019,45 @@ async def build(adapter: Any) -> dict[str, str]:
     _label_side_view(adapter, plan, on_plan)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
+    if not ddoc.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("cannot activate captured-wing sheet")
+    capture = place_view(adapter, str(SOURCE), "*Front", 0.195, 0.160, scale=CAPTURE_SCALE)
+    capture_iso = place_view(adapter, str(SOURCE), "*Isometric", 0.385, 0.230, scale=ISO_SCALE)
+    for view in (capture, capture_iso):
+        set_hidden_lines_removed(adapter, view)
+    on_capture = _view_mapper(adapter, capture)
+    capture_annotations = hidden_sketches.curate_view_dimensions(
+        adapter, capture,
+        keep={name: on_capture(xyz) for name, xyz in CAPTURE_KEEP.items()},
+        view_label="capture wing plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    assert_imported_precision(
+        adapter, capture_annotations,
+        {name: DRAWING_PRECISION_BY_NAME[name] for name in CAPTURE_KEEP},
+    )
+    set_dimension_callouts(
+        adapter, capture_annotations,
+        {name: text for name, text in CALLOUTS_BELOW.items() if name in CAPTURE_KEEP},
+    )
+    tap_x, tap_y = part_spec.CAP_TAP_POINTS[1]
+    add_native_hole_callout(
+        adapter, capture,
+        edge_xy=on_capture((tap_x, tap_y + part_spec.CAP_TAP_DRILL_DIA / 2.0, _H)),
+        callout_xy=(0.069, 0.246),
+        label="four cap receiver taps",
+    )
+    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker Oblique Trammel Pivot Block Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: CAPTURE_SCALE},
     )
 
 

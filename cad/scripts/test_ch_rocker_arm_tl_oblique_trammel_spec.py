@@ -40,8 +40,8 @@ PINNED = {
     # The jig stack: BEARING_SHOULDER 4 (r4) makes the pivot block 24 high.
     "PIVOT_BLOCK_HEIGHT": (trammel.PIVOT_BLOCK_HEIGHT, 24.0),
     "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 64.7),
-    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 67.7),
-    "CARRIER_TOP_Z": (trammel.CARRIER_TOP_Z, 79.7),
+    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 78.2),
+    "CARRIER_TOP_Z": (trammel.CARRIER_TOP_Z, 90.2),
 }
 
 
@@ -71,6 +71,21 @@ def test_inputs_come_from_the_rocker_spec() -> None:
     assert rocker.TOP_EDGE_ABOVE_PIVOT == rocker_interface.PIVOT_MID_Y
     assert trammel.HUB_TO_TOP_EDGE == pytest.approx(8.25)
     assert trammel.ALPHA_DEG == 16.4405
+
+
+def test_captured_pivot_adds_ten_and_a_half_without_moving_the_carriages() -> None:
+    assert trammel.PIN_COLLAR_PROUD == 13.5
+    assert trammel.PIN_COLLAR_HEIGHT == 14.5
+    assert trammel.CARRIAGE_TOP_Z == pytest.approx(40.7)
+    assert trammel.PIVOT_BLOCK_HEIGHT == 24.0
+    assert trammel.CARRIER_UNDERSIDE_Z - trammel.CARRIAGE_TOP_Z == 37.5
+    former_seat = trammel.PIVOT_BLOCK_TOP_Z + 3.0
+    assert trammel.CARRIER_UNDERSIDE_Z - former_seat == 10.5
+    assert trammel.CARRIER_TOP_Z + trammel.RISER_THICK == pytest.approx(96.2)
+    assert (
+        trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
+        == pytest.approx(98.7)
+    )
 
 
 def test_both_cutters_are_on_hand_as_four_flute_end_mills() -> None:

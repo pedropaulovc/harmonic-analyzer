@@ -81,12 +81,36 @@ _STOCK_REQUIREMENTS = {
     "ch-rocker-arm-tl-vn-oblique-lever-washer": (
         ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
     ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": (
+        ("NAS1352N4H12",),
+        "MHA-CH-06-TL-VN-73",
+        8,
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": (
+        ("CLPS6-0187-1250D",),
+        "MHA-CH-06-TL-VN-74",
+        2,
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": (
+        ("CP-062-0500",),
+        "MHA-CH-06-TL-VN-75",
+        2,
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": (
+        ("05-02685",),
+        "MHA-CH-06-TL-VN-76",
+        4,
+    ),
 }
 # The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC; the jig's nut
 # screws are Olander button heads (owner ruling 2026-10-20).
 _SUPPLIERS = {
     "dt-vn-post-mount-screw": "MSC Industrial Supply",
     "ch-rocker-arm-tl-vn-oblique-nut-screw": "Olander",
+    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": "Hardware Specialty",
+    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": "Huyett",
+    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": "Huyett",
+    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "Aircraft Spruce",
 }
 
 

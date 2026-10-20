@@ -1,0 +1,31 @@
+ch-rocker-arm-tl-oblique-pivot-cap:
+  title: Rocker Oblique Pivot Capture Cap
+  number: MHA-CH-06-TL-30
+  material: low-carbon steel
+  material_specification: low-carbon steel flat, 1/2 x 2 in
+  finish: as machined; light oil
+  quantity: 2
+  tolerance_class: machined_block
+  process: >-
+    Face from 1/2-in steel flat to finished thickness. Mill the centered
+    outline, underside flange chamber, through journal aperture and cap-bolt
+    clearance pattern. Locate every cap-bolt coordinate from the actual
+    flange-pocket axis. Recess the four screw heads and open each head recess
+    over its full width to the nearest X edge at the same depth. Mill the
+    separate shallow X-pair channels for twisted wire and bent tails. Fit the
+    chamber depth to the actual MHA-CH-06-TL-23 flange, including local face
+    variation, with all screws fully seated. The complete opposing-stop
+    chamber excess is 0.20-0.30 mm; the normally seated flange rim has
+    0.10-0.15 mm lower clearance without bearing preload. Safety-wire each
+    X pair in the tightening direction; heads, single wire, twists and tails
+    remain wholly below the cap plane. Renew locking wire after removal.
+  machinist_exceptions:
+    - id: CAP-APERTURE-AXIS
+      kind: accept
+      where: journal aperture axis relative to the actual flange pocket
+      finding: position control over-specified (rule 5)
+      reason: >-
+        Owner-approved diametral axis control is needed by the captured-upset
+        journal-clearance stack; an unconstrained second hole axis would
+        invalidate the no-contact margin. This is not a general requirement
+        for precision on the cap outline or bearing axial behavior.

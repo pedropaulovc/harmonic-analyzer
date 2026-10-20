@@ -1,6 +1,6 @@
 # Subsystem identities
 
-Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities and the 2026-10-20 consolidation of repeated supplier SKUs into shared `sh-vn-*` identities: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains all three cutovers; it does not replace either source of truth.
+Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities, the 2026-10-20 consolidation of repeated supplier SKUs into shared `sh-vn-*` identities, and later dated allocations: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains all three cutovers and later additions; it does not replace either source of truth.
 
 ## Naming and numbering
 
@@ -80,6 +80,42 @@ Drawing callouts retain complete category-qualified Numbers and process
 information; do not abbreviate Numbers in cross-part callouts.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers.
+
+### Oblique jig captured-pivot tooling
+
+The oblique jig's positive-capture additions (2026-10-20) are manufactured
+`ch-rocker-arm-tl-oblique-pivot-cap` (MHA-CH-06-TL-30, two) and
+`ch-rocker-arm-tl-oblique-pivot-retainer` (MHA-CH-06-TL-31, two), followed by
+the jig's purchased TL-VN-73 to TL-VN-76 hardware. They belong only to the
+jig's BOM and moving/free-DOF contract, never to a machine assembly. New rows
+in `current-identity-map.json` retain their canonical stem as the source key
+with `old_number: null` and an introduction date: there is no prior model or
+historical Number to invent. TL-VN-72 stays retired and is never reissued.
+
+[`ch_rocker_arm_tl_oblique_retention_spec.py`](../scripts/ch_rocker_arm_tl_oblique_retention_spec.py)
+owns cartridge dimensions and intact-rigid upset bounds; the pure
+[`retention hardware provider`](../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py)
+owns supplier dimensions. Native builders own the model and its PMI; each
+manufactured part's sheet imports those dimensions and their precision.
+The safety path is carrier → top washer and clevis cross-pin → pivot pin's
+integral flange → cap and block floor → block → carriage, **not** bearing
+press-fit pullout. Both ends remain positively retained in both pass pairs;
+there is no skid.
+
+For a pass change, isolate the machine and support the carrier before removing
+**both** top retainers; only then lift the carrier. Refit both retainers and
+install two fresh cotters before either pass can run. Replace disturbed safety
+wire with freshly formed pieces. Destructive **upward** pivot-pin extraction
+requires replacement of the service pin and both bearings in that cartridge,
+not reuse after a through-ball extraction load.
+
+The capture stack raises the carrier/work setup by 10.5 mm. The pivot-pin end
+is nominally 4 mm above the finished work, and the intact-rigid bound at the
+outer grip is about 5.35 mm, not 4.25 mm. These are geometry limits, not force
+or deflection certification. No toolholder/spindle envelope is supplied in
+the repository: accept the actual installed tooling clearance before cutting;
+the retained-pin dimensions do not prove collision freedom.
+
 
 ## Drawing package layout
 
@@ -345,6 +381,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-006-TL-26 | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-06-TL-26 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-006-TL-28 | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-06-TL-28 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-006-TL-29 | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-06-TL-29 |
+| new tooling part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 |
+| new tooling part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-bearing` | MHA-CH-006-TL-32 | `ch-rocker-arm-tl-vn-oblique-bearing` | MHA-CH-06-TL-VN-52 |
@@ -367,6 +405,10 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | `ch-rocker-arm-tl-vn-oblique-block-washer` | MHA-CH-06-TL-VN-70 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cap-screw` | MHA-CH-06-TL-VN-73 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin` | MHA-CH-06-TL-VN-74 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |

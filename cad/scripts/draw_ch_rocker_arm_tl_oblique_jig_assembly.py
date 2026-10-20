@@ -109,6 +109,7 @@ PNG = OUTPUTS.png
 ASSEMBLED_SHEET = "ASSEMBLED AT INNER PASS"
 BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
+CAPTURE_SHEET = "CAPTUREANDOPERATION"
 
 
 @dataclass(frozen=True)
@@ -139,10 +140,8 @@ CLUSTERS = (
         (
             spec.BASE_BAR,
             spec.PIVOT_BLOCK,
-            spec.PIVOT_PIN,
             spec.RAIL,
             spec.CARRIAGE,
-            spec.BEARING,
             spec.HOLD_DOWN_STUD,
             spec.T_NUT,
             spec.FLANGE_NUT,
@@ -150,6 +149,22 @@ CLUSTERS = (
             spec.CARRIAGE_SCREW,
         ),
         (1.0, 5.0),
+    ),
+    Cluster(
+        "PIVOTCAPTUREEXPLODED",
+        "BIDIRECTIONAL CAPTURED PIVOT CARTRIDGES",
+        (
+            spec.PIVOT_PIN,
+            spec.PIVOT_CAP,
+            spec.PIVOT_RETAINER,
+            spec.BEARING,
+            spec.PIVOT_CAP_SCREW,
+            spec.PIVOT_CLEVIS_PIN,
+            spec.PIVOT_COTTER,
+            spec.PIVOT_LOCK_WIRE,
+        ),
+        (1.0, 3.0),
+        context=tuple(spec.instance_name(spec.PIVOT_BLOCK, index) for index in (0, 1)),
     ),
     Cluster(
         "LEADSCREW FEED EXPLODED",
@@ -194,6 +209,7 @@ SHEET_NAMES = (
     BOM_SHEET,
     *(cluster.sheet for cluster in CLUSTERS),
     STEPS_SHEET,
+    CAPTURE_SHEET,
 )
 # The captions cite sheets by these numbers, never typed ones.
 BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
@@ -238,6 +254,7 @@ def package_sheet_scales(
         ASSEMBLED_SHEET: ASSEMBLED_SCALE,
         BOM_SHEET: REFERENCE_SCALE,
         STEPS_SHEET: ISOMETRIC_SCALE,
+        CAPTURE_SHEET: (1.0, 1.0),
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -310,12 +327,14 @@ CL_TIP_TEXT_MODEL_MM = (
     spec.CL_TIP_LINE[1][1] + 10.0,
 )
 
-# Sheet 2: the BOM right, four columns to the inner border. All 31 families
-# fit above the title block at one line a row. Reallocate 8 mm of the former
-# 118 mm description column to the Number column: full 18-character vendor
-# Numbers need 52.2 mm at the unchanged default format. Both text columns
-# retain 2 mm of horizontal clearance, and the rebuilt table is measured
-# against its paper. Table text runs about 2.9 mm a character.
+# Sheet 2: the BOM right, four columns to the inner border. The captured
+# cartridges add six families: use the available top border rather than
+# shrinking the legible 5.5 mm rows or the default-format text. Reallocate
+# 8 mm of the former 118 mm description column to the Number column: full
+# 18-character vendor Numbers need 52.2 mm at the unchanged default format.
+# Both text columns retain 2 mm horizontal clearance. Native table bounds
+# are checked after rebuilding, including clearance above the title block.
+# Table text runs about 2.9 mm a character.
 BOM_CHAR_M = 0.0029
 BOM_CELL_PADDING_M = 0.002  # total horizontal clearance inside each text column
 BOM_COLUMN_WIDTHS = {
@@ -329,7 +348,10 @@ BOM_DESCRIPTION_MAX_CHARS = int(
 )
 BOM_ROW_HEIGHT = 0.0055
 BOM_SHEET_CLEARANCE = 0.003  # the paper the BOM keeps off the title block
-BOM_ANCHOR = (SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()), 0.262)
+BOM_ANCHOR = (
+    SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()),
+    SHEET_INNER_BORDER[3] - BOM_SHEET_CLEARANCE,
+)
 REGION_GAP = 0.006  # between a view's room and the text beside it
 # Left of the BOM, over the title block's top, the BOM's parent view: the jig
 # collapsed, unballooned, a reference for the table. Its measured outline is
@@ -422,6 +444,12 @@ PART_ROWS = {
     "ch-rocker-arm-tl-oblique-nut-bracket": _config.parts(
         "ch-rocker-arm-tl-oblique-nut-bracket"
     ),
+    "ch-rocker-arm-tl-oblique-pivot-cap": _config.parts(
+        "ch-rocker-arm-tl-oblique-pivot-cap"
+    ),
+    "ch-rocker-arm-tl-oblique-pivot-retainer": _config.parts(
+        "ch-rocker-arm-tl-oblique-pivot-retainer"
+    ),
     "ch-rocker-arm-tl-vn-oblique-rail": _config.parts("ch-rocker-arm-tl-vn-oblique-rail"),
     "ch-rocker-arm-tl-vn-oblique-carriage": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-carriage"
@@ -485,6 +513,18 @@ PART_ROWS = {
     ),
     "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-lever-washer"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter"
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
@@ -576,14 +616,16 @@ class StepsLayout:
     finished_region: tuple[float, float, float, float]
 
 
-def steps_sheet_layout(steps: Sequence[str], checks: Sequence[str]) -> StepsLayout:
+def steps_sheet_layout(
+    steps: Sequence[str], checks: Sequence[str], *, heading: str = STEPS_HEADING
+) -> StepsLayout:
     """Lay the steps sheet out: the heading and the most whole steps whose
     block ends over ``STEPS_FLOOR`` down the left column, the rest atop the
     right one, the checks under them, and under those, over the title block,
     the finished view's room. Raises when the first step alone overruns."""
     for count in range(len(steps), 0, -1):
         left = _wrapped(
-            tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=STEPS_HEADING
+            tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading
         )
         if _note_height(left) <= STEPS_XY[1] - STEPS_FLOOR:
             break
@@ -609,6 +651,11 @@ ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
 FINISHED_REGION = STEPS_LAYOUT.finished_region
+CAPTURE_LAYOUT = steps_sheet_layout(
+    spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="CAPTURE AND MACHINE ACCEPTANCE"
+)
+if CAPTURE_LAYOUT.finished_region[3] < STEPS_FLOOR:
+    raise AssertionError("capture instructions overrun the second text column")
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -1933,6 +1980,31 @@ def _place_steps_notes(adapter: Any) -> None:
     )
 
 
+def _place_capture_notes(adapter: Any) -> None:
+    _add_note_block(
+        adapter,
+        CAPTURE_SHEET,
+        CAPTURE_LAYOUT.steps,
+        STEPS_XY,
+        label="captured cartridge and pass change",
+    )
+    if CAPTURE_LAYOUT.continued:
+        _add_note_block(
+            adapter,
+            CAPTURE_SHEET,
+            CAPTURE_LAYOUT.continued,
+            STEPS_CONTINUED_XY,
+            label="capture instructions, continued",
+        )
+    _add_note_block(
+        adapter,
+        CAPTURE_SHEET,
+        CAPTURE_LAYOUT.checks,
+        CAPTURE_LAYOUT.checks_xy,
+        label="capture and installed-machine acceptance",
+    )
+
+
 def _activate_package(adapter: Any, target: Any) -> None:
     title = str(target.GetTitle() or "")
     if not title:
@@ -2078,6 +2150,7 @@ def _place_package(
             f"BOM row ({len(BOM_COMPONENTS)}) across the exploded sheets"
         )
     _place_steps_notes(adapter)
+    _place_capture_notes(adapter)
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )

@@ -32,6 +32,7 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -97,6 +98,13 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     SIDE_SCREW_HOLE_SPEC,
     SIDE_SCREW_HOLES,
     SIDE_SCREW_REFERENCE,
+    BEARING_AXIS_NAME,
+    CAP_TAP_HOLE_SPEC,
+    CAP_TAP_POINTS,
+    CAP_TAP_REFERENCE,
+    WING_LENGTH,
+    WING_WIDTH,
+    WING_X1,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
@@ -114,7 +122,9 @@ THROUGH_CUT_DEPTH = 2.0 * BLOCK_HEIGHT
 _R_BORE = BORE_DIA / 2.0
 _R_SHOULDER = SHOULDER_HOLE_DIA / 2.0
 
-V_BLOCK = (BLOCK_X1 - BLOCK_X0) * BLOCK_WIDTH * BLOCK_HEIGHT
+V_CORE = (BLOCK_X1 - BLOCK_X0) * BLOCK_WIDTH * BLOCK_HEIGHT
+V_WING_ADDED = WING_LENGTH * (WING_WIDTH - BLOCK_WIDTH) * BLOCK_HEIGHT
+V_BLOCK = V_CORE + V_WING_ADDED
 V_BORE = math.pi * _R_BORE**2 * BORE_DEPTH
 V_SHOULDER_HOLE = math.pi * _R_SHOULDER**2 * SHOULDER
 # A concave corner fillet ADDS its (1 - pi/4) r^2 section, swept (Pappus) at
@@ -472,6 +482,44 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     return jobs + dims.apply(adapter, feature)
 
 
+async def _cap_tap_reference(adapter: Any) -> SketchDims:
+    """Locate all four tap axes directly from the actual bearing-axis knobs.
+
+    These are not edge ordinates. The printed X/Y distances start on the
+    bearing centre; the other pattern points share native row/column relations.
+    """
+    label = "cap tap bearing-axis reference"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("TopFace"))
+    at = _xy_mapper(adapter, BLOCK_HEIGHT, label)
+    centre = _add_reference_point(adapter, at(BORE_X, 0.0), "bearing axis")
+    await anchor_point_to_origin(adapter, centre, *at(BORE_X, 0.0), label)
+    dims.record("CapPatternBearingX", '"BoreX"')
+    refs = [
+        _add_reference_point(adapter, at(x, y), f"cap tap {index}")
+        for index, (x, y) in enumerate(CAP_TAP_POINTS, start=1)
+    ]
+    left_lower, left_upper, right_lower, right_upper = refs
+    for first, second, relation in (
+        (left_lower, left_upper, "vertical_points"),
+        (right_lower, right_upper, "vertical_points"),
+        (left_lower, right_lower, "horizontal_points"),
+        (left_upper, right_upper, "horizontal_points"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    for ref, kind, name, expression in (
+        (left_lower, "horizontal_distance", "CapTapLeftX", '"CapTapX"'),
+        (right_lower, "horizontal_distance", "CapTapRightX", '"CapTapX"'),
+        (left_lower, "vertical_distance", "CapTapLowerY", '"CapTapY"'),
+        (left_upper, "vertical_distance", "CapTapUpperY", '"CapTapY"'),
+    ):
+        await dimension_between(adapter, centre, ref, kind, DRAWING_VALUES[name], name)
+        dims.record(name, expression)
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -518,7 +566,33 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "Block", ["BlockHeight"])[0], '"BlockHeight"')
     )
-    volume = await volume_check(adapter, "block", V_BLOCK, 0.002 * V_BLOCK)
+    volume = await volume_check(adapter, "block core", V_CORE, 0.002 * V_CORE)
+
+    # Integral wing from the same bar: its overlap with the original-width
+    # core merges into one body; the original tail and bracket grip stay 40.
+    wing = SketchDims()
+    check("create_sketch wing", await adapter.create_sketch("Front"))
+    at_front = _xy_mapper(adapter, 0.0, "wing profile")
+    points = [
+        at_front(BLOCK_X0, -WING_WIDTH / 2.0),
+        at_front(WING_X1, -WING_WIDTH / 2.0),
+        at_front(WING_X1, WING_WIDTH / 2.0),
+        at_front(BLOCK_X0, WING_WIDTH / 2.0),
+    ]
+    lines = await add_line_chain(adapter, points)
+    await define_rectilinear_chain(
+        adapter, lines, points, label="integral wing", dims=wing,
+        names=["WingLength", "WingWidth", "WingEndX", "WingSideY"],
+        drives=['"WingLength"', '"WingWidth"', '"BlockEndX"', '"WingSideY"'],
+    )
+    await ensure_fully_defined(adapter, "integral wing")
+    check("exit_sketch wing", await adapter.exit_sketch())
+    name_last_feature(adapter, "WingProfile")
+    drive_jobs += wing.apply(adapter, "WingProfile")
+    check("extrude integral wing", await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)))
+    name_last_feature(adapter, "Wing")
+    drive_jobs.append((name_dimensions(adapter, "Wing", ["WingHeight"])[0], '"BlockHeight"'))
+    volume = await volume_check(adapter, "integral wing", V_BLOCK, 0.002 * V_BLOCK)
 
     # --- The top face plane ----------------------------------------------------
     check(
@@ -676,6 +750,30 @@ async def build(adapter) -> dict[str, str]:
         volume - len(SIDE_SCREW_HOLES) * v_side,
         0.01 * len(SIDE_SCREW_HOLES) * v_side,
     )
+    # Native THRU taps in the wing, separate from all original holes.
+    cap_taps = wizard_holes(
+        adapter, CAP_TAP_HOLE_SPEC,
+        [[x, y, BLOCK_HEIGHT] for x, y in CAP_TAP_POINTS],
+        (0.0, 0.0, 1.0), "cap receiver taps", name="CapTaps",
+        placement_dims=[
+            (
+                (f"CapTap{index}X", f'"BoreX" {"+" if x < BORE_X else "-"} "CapTapX"'),
+                (f"CapTap{index}Y", '"CapTapY"'),
+            )
+            for index, (x, _y) in enumerate(CAP_TAP_POINTS, start=1)
+        ],
+    )
+    drive_jobs += cap_taps.placement_drive_jobs
+    removed = len(CAP_TAP_POINTS) * math.pi * (cap_taps.hole_dia_mm / 2.0) ** 2 * BLOCK_HEIGHT
+    volume = await volume_check(adapter, "cap receiver taps", volume - removed, 0.01 * removed)
+    reference = await _cap_tap_reference(adapter)
+    name_last_feature(adapter, CAP_TAP_REFERENCE)
+    drive_jobs += reference.apply(adapter, CAP_TAP_REFERENCE)
+    await name_bore_axis(
+        adapter, "Right Plane", BORE_X, "Top Plane", 0.0,
+        "bearing axis", drive_a='"BoreX"', drive_jobs=drive_jobs,
+    )
+    name_last_feature(adapter, BEARING_AXIS_NAME)
     _require_one_solid_body(adapter, label="pivot block")
     drive_jobs += await _cbore_floor_reference(adapter)
     reference = await _side_screw_reference(adapter)

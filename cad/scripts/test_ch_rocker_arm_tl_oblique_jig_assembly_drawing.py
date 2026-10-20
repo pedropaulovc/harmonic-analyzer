@@ -86,6 +86,90 @@ def _nut_bracket(dx: float = 0.0, dy: float = 0.0) -> list[tuple[float, float]]:
     return [(x + dx, y + dy) for x, y in corners]
 
 
+def _exploded_part_points(stem, bounds):
+    """Conservative native part-box corners under the actual explode transform."""
+    shift = tuple(spec.explode_shift(stem, axis) for axis in "xyz")
+    points = []
+    for origin, rows in spec.PLACEMENTS[stem]:
+        for x in bounds[0]:
+            for y in bounds[1]:
+                for z in bounds[2]:
+                    local = (x, y, z)
+                    points.append(tuple(
+                        origin[axis] + shift[axis]
+                        + sum(local[k] * rows[k][axis] for k in range(3))
+                        for axis in range(3)
+                    ))
+    return points
+
+
+def _capture_cluster_extent():
+    retention, hardware = spec.retention, spec.retention_hardware
+    cotter, wire = spec.pivot_cotter, spec.pivot_wire
+    wire_controls = [
+        point for segment in wire.installed_wire_segments() for point in segment
+    ]
+    wire_bounds = tuple(
+        (min(p[axis] for p in wire_controls) - wire.WIRE_DIA / 2.0,
+         max(p[axis] for p in wire_controls) + wire.WIRE_DIA / 2.0)
+        for axis in range(3)
+    )
+    prong_outer = cotter.PRONG_GAP / 2.0 + cotter.PRONG_THICK
+    screw = spec.cap_screw.DIMS
+    boxes = {
+        spec.PIVOT_BLOCK: (
+            (spec.pivot_block.BLOCK_X0, spec.pivot_block.BLOCK_X1),
+            (-retention.BLOCK_WING_HALF_WIDTH, retention.BLOCK_WING_HALF_WIDTH),
+            (0.0, spec.pivot_block.BLOCK_HEIGHT),
+        ),
+        spec.PIVOT_PIN: (
+            (-retention.PIN_FLANGE_DIA / 2.0, retention.PIN_FLANGE_DIA / 2.0),
+            (-retention.PIN_FLANGE_DIA / 2.0, retention.PIN_FLANGE_DIA / 2.0),
+            (0.0, spec.pivot_pin.OVERALL_LENGTH),
+        ),
+        spec.BEARING: (
+            (-spec.bearing.OD / 2.0, spec.bearing.OD / 2.0),
+            (0.0, spec.bearing.WIDTH),
+            (-spec.bearing.OD / 2.0, spec.bearing.OD / 2.0),
+        ),
+        spec.PIVOT_CAP: (
+            (-retention.CAP_WIDTH / 2.0, retention.CAP_WIDTH / 2.0),
+            (-retention.CAP_LENGTH / 2.0, retention.CAP_LENGTH / 2.0),
+            (0.0, retention.CAP_HEIGHT),
+        ),
+        spec.PIVOT_RETAINER: (
+            (-retention.TOP_WASHER_OD / 2.0, retention.TOP_WASHER_OD / 2.0),
+            (-retention.TOP_WASHER_OD / 2.0, retention.TOP_WASHER_OD / 2.0),
+            (0.0, spec.pivot_retainer.THICKNESS),
+        ),
+        spec.PIVOT_CAP_SCREW: (
+            (-screw.head_dia / 2.0, screw.head_dia / 2.0),
+            (-screw.head_dia / 2.0, screw.head_dia / 2.0),
+            (-screw.length, screw.head_h),
+        ),
+        spec.PIVOT_CLEVIS_PIN: (
+            (-hardware.CLEVIS_HEAD_HEIGHT_MAX, hardware.CLEVIS_LENGTH_MAX),
+            (-hardware.CLEVIS_HEAD_DIA_MAX / 2.0, hardware.CLEVIS_HEAD_DIA_MAX / 2.0),
+            (-hardware.CLEVIS_HEAD_DIA_MAX / 2.0, hardware.CLEVIS_HEAD_DIA_MAX / 2.0),
+        ),
+        spec.PIVOT_COTTER: (
+            (min(-cotter.EYE_OUTER_RADIUS, -prong_outer - cotter.SHORT_TAIL),
+             max(cotter.EYE_OUTER_RADIUS, prong_outer + cotter.LONG_TAIL)),
+            (-cotter.COTTER_WIDTH / 2.0, cotter.COTTER_WIDTH / 2.0),
+            (cotter.EYE_CENTER - cotter.EYE_OUTER_RADIUS,
+             cotter.PRONG_BEND + cotter.PRONG_THICK),
+        ),
+        spec.PIVOT_LOCK_WIRE: wire_bounds,
+    }
+    points = [
+        point for stem, bounds in boxes.items()
+        for point in _exploded_part_points(stem, bounds)
+    ]
+    return [(x, y) for x, y, _z in points], (
+        min(z for _x, _y, z in points), max(z for _x, _y, z in points)
+    )
+
+
 def _cluster_extent(sheet: str):
     """A cluster's exploded plan points and Z range (mm): its families' plan
     outlines where the spec draws them, each slid as its explode slides it,
@@ -102,8 +186,14 @@ def _cluster_extent(sheet: str):
         ]
         z = (
             spec.STUD_BOTTOM_Z + lift(spec.T_NUT),
-            spec.PIN_TOP_Z + lift(spec.PIVOT_PIN),
+            max(
+                origin[2] + spec.carriage_screw.DIMS.head_h
+                + lift(spec.CARRIAGE_SCREW)
+                for origin, _rows in spec.CARRIAGE_SCREW_PLACEMENTS
+            ),
         )
+    elif sheet == "PIVOTCAPTUREEXPLODED":
+        return _capture_cluster_extent()
     elif sheet == "LEADSCREW FEED EXPLODED":
         points = [p for outline in spec.feed_outlines().values() for p in outline]
         points += [
@@ -118,8 +208,8 @@ def _cluster_extent(sheet: str):
         points += feed.rect(
             spec.CARRIAGE_STATION + block.BLOCK_X0,
             spec.CARRIAGE_STATION + block.BLOCK_X1,
-            -feed.BLOCK_SIDE_LATERAL,
-            feed.BLOCK_SIDE_LATERAL,
+            -spec.retention.BLOCK_WING_HALF_WIDTH,
+            spec.retention.BLOCK_WING_HALF_WIDTH,
         )
         z = (
             -feed.BAR_SCREW_LENGTH_MM + lift(spec.BRACKET_SCREW),
@@ -157,18 +247,22 @@ def test_sheets_are_landscape_with_their_scales() -> None:
         "ASSEMBLED AT INNER PASS",
         "BILL OF MATERIALS",
         "RAIL BARS EXPLODED",
+        "PIVOTCAPTUREEXPLODED",
         "LEADSCREW FEED EXPLODED",
         "CARRIER EXPLODED",
         "ASSEMBLY STEPS",
+        drawing.CAPTURE_SHEET,
     )
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert drawing.SHEET_SCALES == {
         "ASSEMBLED AT INNER PASS": (1.0, 4.0),
         "BILL OF MATERIALS": (1.0, 6.0),
         "RAIL BARS EXPLODED": (1.0, 5.0),
+        "PIVOTCAPTUREEXPLODED": (1.0, 3.0),
         "LEADSCREW FEED EXPLODED": (1.0, 3.0),
         "CARRIER EXPLODED": (1.0, 5.0),
         "ASSEMBLY STEPS": (1.0, 15.0),
+        drawing.CAPTURE_SHEET: (1.0, 1.0),
     }
     assert drawing.SHEET_SCALE == (1.0, 4.0)
     assert drawing.SPEC.source_kind == "assembly"
@@ -195,15 +289,33 @@ def test_clusters_partition_the_bom() -> None:
     feed = {cluster.sheet: cluster for cluster in drawing.CLUSTERS}[
         "LEADSCREW FEED EXPLODED"
     ]
-    for item in ("22", "25", "26"):
-        assert spec.BOM_ORDER[int(item) - 1] in feed.stems
+    for stem in (spec.BRACKET_SCREW, spec.PILLOW_BLOCK_SCREW, spec.NUT_SCREW):
+        assert stem in feed.stems
     # Review full-bought: the feed sheet shows the nut bracket on its pivot
     # block (rail 1's), ballooned only on the rail bars' sheet.
     assert feed.context == (spec.instance_name(spec.PIVOT_BLOCK, 0),)
     assert spec.lock_parent(spec.NUT_BRACKET, 0) in feed.context
-    assert all(
-        not cluster.context for cluster in drawing.CLUSTERS if cluster is not feed
+    capture = next(
+        cluster for cluster in drawing.CLUSTERS
+        if cluster.sheet == "PIVOTCAPTUREEXPLODED"
     )
+    assert capture.context == tuple(
+        spec.instance_name(spec.PIVOT_BLOCK, index) for index in (0, 1)
+    )
+    assert set(capture.stems) == {
+        spec.PIVOT_PIN, spec.BEARING, spec.PIVOT_CAP, spec.PIVOT_RETAINER,
+        spec.PIVOT_CAP_SCREW, spec.PIVOT_CLEVIS_PIN, spec.PIVOT_COTTER,
+        spec.PIVOT_LOCK_WIRE,
+    }
+    assert all(
+        not cluster.context for cluster in drawing.CLUSTERS
+        if cluster not in (feed, capture)
+    )
+    inventory = {
+        spec.instance_name(stem, index)
+        for stem, count in spec.QUANTITIES.items() for index in range(count)
+    }
+    assert all(set(cluster.context) <= inventory for cluster in drawing.CLUSTERS)
 
 
 def test_exploded_captions_fit_their_text_region() -> None:
@@ -212,6 +324,12 @@ def test_exploded_captions_fit_their_text_region() -> None:
         lines = caption.split("\n")
         assert max(map(len, lines)) <= drawing.EXPLODED_CAPTION_WIDTH
         assert len(lines) <= 3
+        words = " ".join(lines)
+        assert f"BOM ON SHEET {drawing.SHEET_NAMES.index(drawing.BOM_SHEET) + 1}" in words
+        assert (
+            "ASSEMBLY SEQUENCE ON SHEET "
+            f"{drawing.SHEET_NAMES.index(drawing.STEPS_SHEET) + 1}"
+        ) in words
 
 
 def test_sheet_text_is_the_spec_text_wrapped() -> None:
@@ -231,12 +349,20 @@ def test_sheet_text_is_the_spec_text_wrapped() -> None:
         words("ASSEMBLY SEQUENCE " + " ".join(spec.ASSEMBLY_STEPS))
     )
     assert words(drawing.ASSEMBLY_CHECKS) == words(" ".join(spec.ASSEMBLY_CHECKS))
+    capture = drawing.CAPTURE_LAYOUT
+    assert words(capture.steps + " " + capture.continued) == words(
+        "CAPTURE AND MACHINE ACCEPTANCE " + " ".join(spec.CAPTURE_STEPS)
+    )
+    assert words(capture.checks) == words(" ".join(spec.CAPTURE_CHECKS))
     for text, width in (
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
         (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
         (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
+        (capture.steps, drawing.STEPS_LINE_WIDTH),
+        (capture.continued, drawing.STEPS_LINE_WIDTH),
+        (capture.checks, drawing.STEPS_LINE_WIDTH),
     ):
         assert max(len(line) for line in text.split("\n")) <= width
     # Each alignment station prints whole on one line.
@@ -375,7 +501,8 @@ def test_bom_sheet_regions_fit_apart() -> None:
 
 def test_bom_extent_violations_name_each_breach() -> None:
     anchor = drawing.BOM_ANCHOR
-    assert drawing.bom_extent_violations(anchor, BOM_WIDTH, 0.200) == [
+    into_title = anchor[1] - drawing.TITLE_BLOCK[3]
+    assert drawing.bom_extent_violations(anchor, BOM_WIDTH, into_title) == [
         "enters the title block"
     ]
     assert drawing.bom_extent_violations(anchor, BOM_WIDTH + 0.001, BOM_HEIGHT) == [
@@ -541,6 +668,44 @@ def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
 
 
+def test_capture_operation_notes_fit_their_own_sheet() -> None:
+    layout = drawing.CAPTURE_LAYOUT
+    boxes = [
+        _note_box(layout.steps, drawing.STEPS_XY),
+        _note_box(layout.checks, layout.checks_xy),
+    ]
+    if layout.continued:
+        boxes.append(_note_box(layout.continued, drawing.STEPS_CONTINUED_XY))
+    assert drawing.CAPTURE_SHEET != drawing.STEPS_SHEET
+    assert drawing.CAPTURE_SHEET in drawing.SHEET_NAMES
+    assert all(_inside_sheet(box) for box in boxes)
+    for index, box in enumerate(boxes):
+        assert all(not _overlap(box, other) for other in boxes[index + 1:])
+    assert (
+        drawing.STEPS_XY[1] - _lines(layout.steps) * drawing.NOTE_LINE_M
+        >= drawing.STEPS_FLOOR
+    )
+    assert layout.finished_region[3] >= drawing.STEPS_FLOOR
+
+
+def test_capture_notes_are_placed_only_on_the_capture_operation_sheet(monkeypatch) -> None:
+    placed = []
+    monkeypatch.setattr(
+        drawing, "_add_note_block",
+        lambda _adapter, sheet, text, xy, *, label:
+        placed.append((sheet, text, xy, label)),
+    )
+    drawing._place_capture_notes(_ADAPTER)
+    layout = drawing.CAPTURE_LAYOUT
+    assert [text for _sheet, text, _xy, _label in placed] == [
+        layout.steps, *([layout.continued] if layout.continued else []),
+        layout.checks,
+    ]
+    assert {sheet for sheet, _text, _xy, _label in placed} == {
+        drawing.CAPTURE_SHEET
+    }
+
+
 def test_steps_sheet_holds_an_added_step() -> None:
     # Headroom: a line more in the last step (the right column) still lays
     # out with the finished view at its scale. The left column is full: steps
@@ -641,8 +806,11 @@ def test_bom_identity_is_the_registry() -> None:
 
 def test_steps_cite_every_screw_by_item_number() -> None:
     screws = [stem for stem in spec.BOM_ORDER if stem.endswith("-screw")]
-    assert len(screws) == 9
-    steps = drawing.ASSEMBLY_STEPS + "\n" + drawing.ASSEMBLY_STEPS_CONTINUED
+    assert len(screws) == 10
+    steps = "\n".join((
+        drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED,
+        drawing.CAPTURE_LAYOUT.steps, drawing.CAPTURE_LAYOUT.continued,
+    ))
     for stem in screws:
         assert f"(ITEM {drawing.BOM_ITEM_NUMBERS[stem]})" in steps
     # A citation never breaks across a line.

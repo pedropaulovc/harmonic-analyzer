@@ -82,7 +82,11 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Flatness: title block; the plate sits on the pin collars, so no face locates.
+Flatness remains the general title-block requirement: the plate rests on two
+pin collars, with no added flatness frame. Its BOTTOM face is datum A only
+for the four pin-hole axes' diametral perpendicularity control. That control
+bounds actual hole-axis tilt relative to the plate in the captured pivot's
+rigid upset calculation; it neither relocates the holes nor adds a skid.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -101,8 +105,12 @@ import math
 
 import _config
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
+from ch_rocker_arm_tl_oblique_retention_spec import CARRIER_HOLE_PERPENDICULARITY
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
+from _gtol_controls import GeometricControl, PartDatum
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -155,6 +163,25 @@ SPACING_CALLOUT = f"SETS R{trammel.R_INNER:.0f} ON\n{STRAP_NUMBER}"
 DX_CALLOUT = f"SETS R{trammel.R_OUTER:.0f} ON\n{STRAP_NUMBER}"
 DY_CALLOUT = DX_CALLOUT
 STRAP_DEPTH = trammel.R_OUTER - trammel.R_INNER
+
+# Owner-approved rule-5 exception: actual hole axes must remain square to the
+# collar-side plate face for the positive-capture upset bound. No position
+# frame or basic coordinates: the original +/- position chains remain.
+BOTTOM_DATUM = "A"
+PART_DATUMS = (
+    PartDatum(BOTTOM_DATUM, PlanarFace((0.0, -1.0, 0.0), THICKNESS)),
+)
+GEOMETRIC_CONTROLS = tuple(
+    GeometricControl(
+        key=f"pin_hole_{hole.lower()}_perpendicularity",
+        characteristic="perpendicularity",
+        tolerance=f"{CARRIER_HOLE_PERPENDICULARITY:.2f}",
+        face=CylinderFace(PIN_HOLE_DIA, contains_x_mm=x, contains_z_mm=-y),
+        datums=(BOTTOM_DATUM,),
+        tolerance_zone="diametral",
+    )
+    for hole, (x, y) in PIN_HOLES.items()
+)
 
 # 45° chamfer on each pin hole's underside (collar-side) edge: it clears the
 # pivot pin's collar fillet.  Printed as a native single MIN limit: the title

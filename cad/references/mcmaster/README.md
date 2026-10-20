@@ -386,6 +386,30 @@ replica-gated and no copy is kept here:
   catalogue-only (it builds the recipe, checks the solid and saves it under
   `cad/out/reference`).
 
+### Non-McMaster captured-pivot hardware
+
+The oblique jig's new positive-capture hardware is **not** McMaster stock.
+Primary supplier pages were read on October 20, 2026; dimensions and source
+URLs are owned by
+[`ch_rocker_arm_tl_oblique_retention_hardware_spec.py`](../../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py).
+The native solids represent catalogue/installed envelopes, not harvested
+vendor CAD, replica-gate evidence or a load rating.
+
+| Number | Quantity in jig | Supplier identity and primary source |
+|---|---:|---|
+| MHA-CH-06-TL-VN-73 | 8 | Hardware Specialty [NAS1352N4H12, supplier product 1216451](https://www.hardwarespecialty.com/Product/1216451), predrilled 1/4-20 × 3/4 in socket-head cap screw; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
+| MHA-CH-06-TL-VN-74 | 2 | Huyett [CLPS6-0187-1250D](https://www.huyett.com/clps6-0187-1250d), headed clevis pin, 3/16 × 1-1/4 in, 316 stainless, plain finish |
+| MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter pin |
+| MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless safety wire, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
+
+NAS1352N4H12 is purchased A286; the catalog's AISI 304 native material is a
+rendering surrogate, not its purchasing specification. The clevis pin's
+actual diameter limits, not the listing's rounded 0.188 in nominal, control
+the fitted top-washer stack. The wire quantity counts installed formed
+pieces, not four spools. TL-VN-72 remains retired. See
+[captured-pivot authority and service instructions](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling)
+for the two-retainer pass change and destructive upward-extraction replacement.
+
 Live catalogue verification on October 12, 2026:
 
 - [91410A540](https://www.mcmaster.com/91410A540/) replaces 91410A538 as the
