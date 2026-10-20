@@ -3067,7 +3067,11 @@ def _bank_setting_circle(
 
 
 def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], None]:
-    """Full bank at 1:1 and a 4:1 north bearing-face detail; no scaled-down views."""
+    """Full bank at 1:1 and a 4:1 north bearing-face detail; no scaled-down views.
+
+    Captions follow measured view outlines; the ordinary crop's identifier is
+    owned by its parent view and its rendered clearance survives final rebuilds.
+    """
     _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
     _heading(adapter, BANK_SETTINGS_SHEET)
     overall = _bank_setting_view(
@@ -3111,14 +3115,70 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
     detail.UpdateViewDisplayGeometry()
     if status != 1 or not bool(detail.IsCropped()):
         raise RuntimeError(f"north spring setting Crop2 failed: {status}")
-    _add_note_block(adapter, "CYLINDER BANK RIGHT 1:1",
-                    (0.165, 0.145), label="bank setting caption")
-    _add_note_block(adapter, "DETAIL A 4:1 - NORTH SPRING SET",
-                    (0.060, 0.035), label="spring detail caption")
-    _add_note_block(adapter, "A", (parent_centre[0] - 0.014, parent_centre[1] + 0.010),
-                    label="spring detail letter")
+    # Follow the rebuilt outlines, not insertion coordinates. Centering the
+    # overall caption below its view would hit the spring dimension's two-line
+    # callout; its right end has clear space below the south pedestal instead.
+    captions = []
+    for view, text, right_aligned, label in (
+        (overall, "CYLINDER BANK RIGHT 1:1", True, "bank setting caption"),
+        (detail, "DETAIL A 4:1 - NORTH SPRING SET", False, "spring detail caption"),
+    ):
+        view.UpdateViewDisplayGeometry()
+        outline = _view_outline(view)
+        _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+        note = _add_note_block(adapter, text, (outline[0], outline[1]), label=label)
+        extent = _note_extent(adapter, note, label=label)
+        width = extent[2] - extent[0]
+        left = outline[2] - width if right_aligned else (outline[0] + outline[2] - width) / 2.0
+        corner = (left, outline[1] - VIEW_CAPTION_GAP)
+        _anchor_note(adapter, note, corner, label=label)
+        captions.append((note, corner, label))
+
+    # This is the channel package's ordinary cropped-view/boundary pattern,
+    # not an IDetailCircle. The parent view must own both its sketch circle and
+    # identifier so they move together. Keep the whole rendered A above-left
+    # of the circle, clear of the pedestal, rather than exempting sheet ink.
+    overall_name = view_name(adapter, overall)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(overall_name):
+        raise RuntimeError("cannot activate bank setting view for its detail identifier")
+    letter = _add_note_block(adapter, "A", parent_centre, label="spring detail letter")
+    letter_extent = _note_extent(adapter, letter, label="spring detail letter")
+    letter_corner = (
+        parent_centre[0] - radius - VIEW_CAPTION_GAP - (letter_extent[2] - letter_extent[0]),
+        parent_centre[1] + radius + VIEW_CAPTION_GAP + (letter_extent[3] - letter_extent[1]),
+    )
+    _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
+    letter_annotation = _early_bound(letter.GetAnnotation(), "IAnnotation")
+    letter_position = tuple(float(value) for value in (letter_annotation.GetPosition() or ()))
+    if len(letter_position) != 3 or not all(map(math.isfinite, letter_position)):
+        raise RuntimeError(f"spring detail letter position is unreadable: {letter_position!r}")
 
     def settled() -> None:
+        _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+        for note, corner, label in (*captions, (letter, letter_corner, "spring detail letter")):
+            extent = _note_extent(adapter, note, label=label)
+            if max(abs(extent[0] - corner[0]), abs(extent[3] - corner[1])) > NOTE_ANCHOR_SETTLE:
+                raise RuntimeError(f"{label} moved from its rendered target {corner!r}: {extent!r}")
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            # swAnnotationOwner_e: DrawingView=0, DrawingSheet=1.
+            expected_owner = 0 if note is letter else 1
+            if int(annotation.OwnerType) != expected_owner:
+                raise RuntimeError(f"{label} has the wrong native owner: {annotation.OwnerType!r}")
+        owner = _early_bound(letter_annotation.Owner, "IView")
+        if view_name(adapter, owner) != overall_name:
+            raise RuntimeError("spring detail letter is not owned by the bank setting view")
+        position = tuple(float(value) for value in (letter_annotation.GetPosition() or ()))
+        if len(position) != 3 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"spring detail letter position is unreadable: {position!r}")
+        if math.dist(position, letter_position) > NOTE_ANCHOR_SETTLE:
+            raise RuntimeError(f"spring detail letter moved from {letter_position!r} to {position!r}")
+        extent = _note_extent(adapter, letter, label="spring detail letter")
+        circle_air = (
+            parent_centre[0] - radius - extent[2],
+            extent[1] - parent_centre[1] - radius,
+        )
+        if min(circle_air) < VIEW_CAPTION_GAP - NOTE_ANCHOR_SETTLE:
+            raise RuntimeError(f"spring detail letter crowds its boundary circle: {circle_air!r}")
         assert_imported_precision(
             adapter, annotations,
             {name: 2 for names in bank_settings.DRAWING_DIMENSIONS.values() for name in names},
