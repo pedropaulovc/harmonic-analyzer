@@ -134,8 +134,10 @@ precedence rather than the original filing: the judge corrects misfiled claims,
 confirms real findings, rejects misreads, and keeps contract-defined minor or
 accepted-exception claims non-gating. Complete `--prompt-file` rubric overrides
 remain opaque; repository templates must be composed before use as overrides.
-Historical benchmark composition resolves a template's severity contract from
-the same Git ref and never substitutes the working-tree contract. A confirmed
+Historical benchmark composition pins the reviewer rubric, resolving its
+severity contract from the same Git ref rather than the working tree. The
+benchmark judge and its kind-specific contract still come from the working
+tree for both configurations, as before this change. A confirmed
 finding gates only when at least two runs raised it independently (owner ruling
 2026-10-18; `GATING_MIN_RUNS`, reduced to the number of valid runs when fewer
 than two are valid). A confirmed finding from one run stays in the report as
