@@ -201,12 +201,18 @@ The nearest #8-32 axis is X≈−4.652206 with major radius 2.083 mm.
 The existing `.X` location band plus half the flange-length band bounds the
 rib face by ±(0.8+0.4), independently of the ±0.8 hole-position allowance:
 `6.0−(0.8+0.4)−(−4.652206+0.8+2.083) = 6.569206 mm` minimum
-bare-face clearance. Existing R6 MAX vertical root/end fillets are retained:
+bare-face clearance. The implemented all-station exit gate is more conservative:
+it subtracts three `(0.8+0.05)` location/rounding allowances and the 0.25 mm
+edge break from the 8.569206 mm nominal gap, giving **5.769206 mm** at these
+block seats, still above their 2.0 mm exit-clearance requirement.
+Existing R6 MAX vertical root/end fillets are retained:
 cross/long-rib patches lie at |Z|5–11, and cross-rib/end-wall patches at
 |Z|119.25–125.25, far from these block stations at about Z−85.589/+87.311.
 The material/clearance contracts cover every seat and pedestal transfer
 envelope against the actual finite fillet patches, not an infinite rib line.
 No unrequested horizontal root fillet is introduced.
+These bounds describe the authored geometry, not the size or clearance of an
+unmodelled foundry root; no such root allowance is qualified by this proof.
 
 All eighteen receivers use the conservative full-form interval
 **0.25–10.35 mm** below the deck at the printed limits. The current lock is
