@@ -1,14 +1,41 @@
-# ch_rocker_arm (MHA-CH-006) prechips route, authored from scratch (trial T4, ported from
-# cad/prechips-shop 6d5991c9b onto the merged shop fixtures MHA-CH-006-TL-04/05 and TL-10..19).
-# Coordinates: the model frame is the manifest's (pivot axis at model X0 Y8, hub centred
-# on Z0). Setup frames are plan frames below; every number is derived from features.toml.
-# Face references are bare HAF labels; _process_plans.bind_plan binds them to the exported
-# STEP's exact faces in the generated travelers/ch_rocker_arm/plan.toml.
+# ch_rocker_arm (MHA-CH-006) prechips route v3: BUILT UP (harmonic-analyzer #1577).
+# The finished arm's drawing permits two-piece construction
+# (ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE, exported as construction = built_up_permitted):
+# a turned hub (MHA-CH-012, ch_rocker_hub_spec) pressed into a flat strap (MHA-CH-013,
+# ch_rocker_strap_spec), H7/r6 (ch_rocker_hub_fit, user ruling 2026-10-17). One plan, one
+# traveler: the hub and strap sheets carry no feature bundle of their own, and the joined
+# lineage is what the post-press setups cut, so both branches live here as
+# [[stock.components]] joined at J1.
+#
+# Route (user ruling 2026-10-16, local brief rocker-trammel-plan.md), prechips 0.2.0:
+#   H1  lathe: face, turn the Ø10.2 r6 land, drill the supply bore, part off oversize
+#       (the parted-off end_face is a stock face since prechips #292)
+#   S0  mill: face the strap both sides 3 -> 2.5 on the sub-plate, a typed tape area hold
+#       (S0A, S0B; user ruling 2026-10-17, shop record PR #1594)
+#   T1  mill vise: spot, drill, ream the Ø10.2 H7 hub hole; the CL (Ø6 E7, reamed) and CR
+#       (Ø6.6 drilled) tooling holes in the end waste (prechips #293; owner ruling 2026-10-17)
+#       (headroom on the 290 mm vise base vs 222.25 mm Y travel: prechips #297)
+#   T2  bench: glue a 1:1 print of the strap outline (consumables spray-adhesive-3m-super-77;
+#       owner ruling 2026-10-17); 4x6 bandsaw, vertical, 24 TPI: rough R800/R816 to the
+#       printed line +1                                           BLOCKED: prechips #344
+#   T3  oblique trammel jig TL-000: R800 then R816                  BLOCKED: prechips #278
+#       (guided_sweep has no trammel guide; its headroom/travel stay debt: prechips #272)
+#   T4  bandsaw: saw the end waste off (keep = the part)            BLOCKED: follows T3
+#   T5  mill vise: both angled tip lands                            BLOCKED: follows T4
+#   J1  bench vise: press the hub in (the press forms the hub root, joint forms)
+#   P1  mill: indicate the hub OD, ream Ø6.5, face hub side A, spot and drill the #47
+#   P2  mill: flip, face hub side B to length
+#   V1/V2 mill vise swivelled 40.89 deg, set on pins in A/C: side-mill each taper   BLOCKED: prechips #300
+#   F1  bench: deburr, inspect, black oxide
+# Each BLOCKED setup is left out until the prechips release that expresses it is pinned; the
+# plan does not work around a missing prechips feature.
+#
+# Coordinates: the model frame is the manifest's (pivot axis at model X0 Y8, hub centred on
+# Z0, strap datum B at Z+1.25). Setup frames are plan frames below. Face references are bare
+# HAF labels; _process_plans.bind_plan binds them to the exported STEP's exact faces.
 part = "ch-rocker-arm"
 features = "../../out/features/ch_rocker_arm/features.toml"
-construction = "one_piece"
-quantity = 1
-quantity_cite = "AUTHOR'S CHOICE: one arm per traveler run"
+construction = "built_up"   # ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE; ch_rocker_hub_fit (user ruling 2026-10-16)
 
 [drawing]
 number = "MHA-CH-006"
@@ -26,195 +53,691 @@ x = "right"
 y = "away"
 z = "up"
 
-# Purchased blank (Pedro 2026-10-11): Online Metals 1018 CR 5/16 x 1-1/2 flat, 2 ft cut
-# length; one 336 mm blank is sawn from it. The part (X -146.26..146.26, Y 0..29.30,
-# Z -3.53..3.53) sits with 4.4 below Y0 and 4.4 above the tips, so neither 3.75 mm wide
-# chain-drill corridor (0.3/0.6 leave + #29 drill) breaks out of the bar edge, and 21.7
-# past each tip: the raw blank ends carry the S3/S4 table clamps.
 [stock]
-form = "flat_bar"
-form_verify = false
-material = "1018 cold-rolled steel"
-drawing_material = "AISI 1018 low-carbon steel" # the drawing's single named grade (Opus review #1020 removed "OR GRAY IRON")
-material_verify = false
-material_cite = [
-  "harmonic-analyzer/cad/config/parts/ch-rocker-arm.yaml:ch-rocker-arm.material_specification",
-  "https://www.onlinemetals.com/en/buy/carbon-steel/0-3125-x-1-5-tool-steel-rectangle-bar-1018/pid/12035 (1018 cold finish rectangle 0.3125 x 1.5 in)",
-]
+form = "built_up"
+material = "1018 low-carbon steel"
+drawing_material = "AISI 1018 low-carbon steel"
 on_hand = false
-prerequisite = "Buy Online Metals pid 12035 (1018 CR, 5/16 x 1-1/2 in), 2 ft cut length (USD 79.26 on 2026-10-11, length +/-0.125 in). Saw one 336 mm blank on the 4x6 bandsaw; deburr the sawn ends; keep the offcut."
-# Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13"; Online Metals pid 12035 section 1-1/2 x 5/16 in = [38.1, 7.9375] mm exactly; instruments="25-50 mm micrometer for width; 0-25 mm micrometer, 0.001 mm for thickness"; scalar/vector-only plan schema.
-section_mm = [38.1, 7.9375]
-length_mm = 336.0
-origin_mm = [-168.0, -4.4, -3.96875]
-axis = [1.0, 0.0, 0.0]
-section_axis = [0.0, 1.0, 0.0]
 as_is_faces = []
+note = "Two components: a 7/16 in cold-finish 1018 round for the hub (MHA-CH-012) and a 3 x 40 mm 1018 flat for the strap (MHA-CH-013), pressed together at J1."
 cite = [
-  "Pedro 2026-10-11 decision (ledger L5): buy 1018 CR 5/16 x 1-1/2 in flat",
-  "AUTHOR'S CHOICE: section placement Y -4.4..33.7 keeps the chain-drill corridors inside the bar; 336 mm = tips at X +/-146.26, plus the 3/8 in facing cutter's radius and pass overrun (to X +/-155.8), 3.2 mm crash clearance, and an 8 mm strap pad with 1 mm to the sawn end",
-  "Online Metals Cold Roll Steel Tolerances, Rectangle Bar (https://www.onlinemetals.com/en/cold-roll-steel-tolerances, read 2026-10-15): 1018 Cold Finish, width over 0.75 to 1.5 in incl., +/-0.004 in; width governs both width and thickness, so the 5/16 in thickness is 7.9375 +/-0.1016 mm (the S1 D-drill exit margin)",
+  "harmonic-analyzer/cad/config/parts/ch-rocker-hub.yaml:ch-rocker-hub.material_specification (AISI 1018 cold-finish round)",
+  "harmonic-analyzer/cad/config/parts/ch-rocker-strap.yaml:ch-rocker-strap.material_specification (AISI 1018 flat, 3 x 40 mm)",
 ]
 
-[frames.up]
-origin = [0.0, 8.0, -3.96875]
+[[stock.components]]
+id = "hub"
+form = "round_bar"
+dia_mm = 11.1125
+length_mm = 40.0
+origin_mm = [0.0, 8.0, 5.2]
+axis = [0.0, 0.0, -1.0]
+note = "AUTHOR'S CHOICE: 7/16 in cold-finish round over the Ø10.229 land: 1.0 to face, the 8.4 supply hub (ch_rocker_hub_spec SUPPLY_LENGTH_MIN 8.2), the 1.59 parting blade, 4.0 clear of the jaws and a 25 mm grip."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:SUPPLY_LENGTH_MIN"]
+
+[[stock.components]]
+id = "strap"
+form = "flat_bar"
+section_mm = [40.0, 3.0]
+length_mm = 350.0
+origin_mm = [-175.0, -6.0, -1.5]
+axis = [1.0, 0.0, 0.0]
+section_axis = [0.0, 1.0, 0.0]
+note = "AUTHOR'S CHOICE: the 350 x 40 x 3 strap blank of the trammel jig (ch_rocker_arm_tl_oblique_trammel_spec BLANK), model Y -6..34 so the 29.3 mm arm sits 6 inside each long edge; 3 mm faced to 2.5 at S0."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/config/parts/ch-rocker-strap.yaml:ch-rocker-strap.material_specification"]
+
+# Lathe, hub: origin on the faced hub top end (model Z+4.2), +Z toward the exposed end.
+[frames.HL]
+origin = [0.0, 8.0, 4.2]
 x = [1.0, 0.0, 0.0]
 y = [0.0, 1.0, 0.0]
 z = [0.0, 0.0, 1.0]
 binding = "nominal"
-note = "AUTHOR'S CHOICE: datum-B side up, lying on the table (rotary or mill); X0 Y0 on the pivot axis, Z0 on the table top under the raw lower face"
-cite = ["AUTHOR'S CHOICE", "features.toml pivot_bore.at [0, 8, 0]", "plan stock origin_mm z -3.96875"]
+note = "AUTHOR'S CHOICE: hub axis = spindle axis; Z0 on the faced top end (op 10); +Z toward the tailstock"
+cite = ["AUTHOR'S CHOICE", "features.toml pivot_bore.at [0, 8, 0]"]
 
-[frames.down]
-origin = [0.0, 8.0, 3.96875]
+# Mill, strap datum-B side up: Z0 on the raw underside, which lies on the taped sub-plate.
+[frames.SA]
+origin = [0.0, 8.0, -1.5]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: X0 Y0 on the hub axis (model X0 Y8), Z0 on the raw strap underside on the tape"
+cite = ["AUTHOR'S CHOICE"]
+
+# Mill, strap turned over about X: Z0 on the faced datum B, which lies on the taped sub-plate.
+[frames.SB]
+origin = [0.0, 8.0, 1.25]
 x = [1.0, 0.0, 0.0]
 y = [0.0, -1.0, 0.0]
 z = [0.0, 0.0, -1.0]
 binding = "nominal"
-note = "AUTHOR'S CHOICE: turned over about X, lying on the table on the raw upper face; X0 Y0 on the pivot axis, Z0 on the table top"
-cite = ["AUTHOR'S CHOICE", "features.toml pivot_bore.at [0, 8, 0]", "plan stock origin_mm z -3.96875 + 7.9375"]
+note = "AUTHOR'S CHOICE: turned over about X; Z0 on the S0A-faced datum B, now on the tape"
+cite = ["AUTHOR'S CHOICE", "features.toml strap_datum_b z +1.25"]
 
-[frames.top]
-origin = [0.0, 8.0, 3.52825]
+# Mill, datum B up, Z0 on the finished strap underside.
+[frames.SU]
+origin = [0.0, 8.0, -1.25]
 x = [1.0, 0.0, 0.0]
 y = [0.0, 1.0, 0.0]
 z = [0.0, 0.0, 1.0]
 binding = "nominal"
-note = "AUTHOR'S CHOICE: bench frame, datum-B side up; X0 Y0 on the pivot axis, Z0 on the upper hub face"
-cite = ["AUTHOR'S CHOICE", "features.toml pivot_bore.at [0, 8, 0]", "features.toml hub_faces.upper_z 3.52825"]
+note = "AUTHOR'S CHOICE: datum B up; Z0 on the finished strap underside (model Z-1.25)"
+cite = ["AUTHOR'S CHOICE", "features.toml strap_faces z -1.25"]
+
+# Mill, turned over: Z0 on datum B (model Z+1.25), datum B down.
+[frames.SD]
+origin = [0.0, 8.0, 1.25]
+x = [1.0, 0.0, 0.0]
+y = [0.0, -1.0, 0.0]
+z = [0.0, 0.0, -1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: turned over about X; Z0 on datum B (model Z+1.25), datum B down"
+cite = ["AUTHOR'S CHOICE", "features.toml strap_datum_b z +1.25"]
+
+# Bench: the model frame.
+[frames.BM]
+origin = [0.0, 8.0, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 1.0, 0.0]
+z = [0.0, 0.0, 1.0]
+binding = "nominal"
+note = "AUTHOR'S CHOICE: bench frame on the hub axis at the strap mid-plane"
+cite = ["AUTHOR'S CHOICE"]
+
+# The hub's two supply ends: faced at H1 (top) and parted at H1 (bottom). Neither is a
+# drawing surface: P1 and P2 face both to the finished hub_faces after the press.
+[process_features.hub_supply_top]
+kind = "end_face"
+at = [0.0, 8.0, 4.2]
+axis = [0.0, 0.0, -1.0]
+note = "the hub supply's top end, faced square at H1; 0.6718 over the finished hub face"
+cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:SUPPLY_LENGTH_MIN, FACE_STOCK"]
+
+[process_features.hub_supply_bottom]
+kind = "end_face"
+at = [0.0, 8.0, -4.2]
+axis = [0.0, 0.0, 1.0]
+note = "the hub supply's bottom end, parted off at H1; 0.6718 over the finished hub face"
+cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py:SUPPLY_LENGTH_MIN, FACE_STOCK"]
+
+# The strap's two tooling holes in its end waste, drilled at T1 (route step: the oblique
+# trammel jig's carrier locates the strap on the CL dowel and clamps it with the CR screw)
+# and sawn off with the waste. Centres: ch_rocker_arm_tl_oblique_trammel_spec.CL_FROM_HUB /
+# CR_FROM_HUB (∓160.8945, ∓16.1761 in the jig frame, where the arm hangs below the hub),
+# here about the hub axis at model X0 Y8 with the arm above it: Y = 8 + 16.1761.
+# Sizes: owner ruling via coordinator 2026-10-17.
+[process_features.cl_tooling_hole]
+kind = "tooling_hole"
+at = [-160.8945, 24.1761, 1.25]
+axis = [0.0, 0.0, -1.0]
+dia = [6.020, 6.032]
+thru = true
+note = "CL: Ø6 E7, reamed, in the -X end waste; locates on the trammel carrier's m6 CL dowel (6.004-6.012) with 0.008-0.028 clearance; sawn off with the waste"
+cite = ["owner ruling via coordinator 2026-10-17: Ø6 E7 for 0.008-0.028 clearance on the m6 CL dowel (not F7, which can interfere by 0.002)", "ISO 286-2 E7 over 3 up to 6: +0.020/+0.032", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_cl_dowel_spec.py:DIA_BAND (m6, +0.012/+0.004 on 6; rocker trammel-jig PR stack #1578-#1593)", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_trammel_spec.py:CL_FROM_HUB"]
+
+[process_features.cr_tooling_hole]
+kind = "tooling_hole"
+at = [160.8945, 24.1761, 1.25]
+axis = [0.0, 0.0, -1.0]
+dia = [6.6, 6.7]
+thru = true
+note = "CR: Ø6.6 drilled clearance for the 1/4-20 clamp screw, in the +X end waste, the same size as the riser's CL/CR holes; sawn off with the waste"
+cite = ["owner ruling via coordinator 2026-10-17: Ø6.6 clearance for the 1/4-20 CR clamp screw, the same as the riser", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_riser_spec.py:CLAMP_DIA (6.6; rocker trammel-jig PR stack #1578-#1593)", "harmonic-analyzer cad/scripts/_printed_tolerance.py:drilled_oversize_mm (title block DRILLED HOLES +0.1/-0)", "harmonic-analyzer cad/scripts/ch_rocker_arm_tl_oblique_trammel_spec.py:CR_FROM_HUB"]
+
+# The press joint (ch_rocker_hub_fit): strap hole H7, hub land r6 on the 10.20 nominal
+# (user ruling 2026-10-17: H7/r6, 0.005-0.034 diametral interference). ISO 286-2 over 10
+# up to 18: H7 0/+0.018, r6 +0.023/+0.034.
+[joint_features.strap_hole]
+kind = "cylinder_bore"
+component = "strap"
+at = [0.0, 8.0, 1.25]
+axis = [0.0, 0.0, -1.0]
+dia = [10.200, 10.218]
+nominal_dia = 10.209
+depth = 2.5
+thru = true
+requirements = ["dia"]
+precision = { dia = 3 }
+edge_break = { kind = "sharp" }   # T1 leaves both mouths sharp: a break would leave a groove round the hub root
+note = "MHA-CH-013's Ø10.20 H7 hub hole, through the faced 2.5 strap"
+cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_fit.py:STRAP_HOLE_BAND", "harmonic-analyzer/cad/scripts/ch_rocker_strap_spec.py:HOLE_DIA"]
+
+[joint_features.hub_land]
+kind = "cylinder_spigot"
+component = "hub"
+at = [0.0, 8.0, 4.2]
+axis = [0.0, 0.0, -1.0]
+dia = [10.223, 10.234]
+nominal_dia = 10.2285
+depth = 8.4
+thru = false
+requirements = ["dia"]
+precision = { dia = 3 }
+note = "MHA-CH-012's Ø10.20 r6 land, the hub's whole length; it is also the finished hub_od"
+cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_fit.py:HUB_LAND_BAND (user ruling 2026-10-17: H7/r6)", "harmonic-analyzer/cad/scripts/ch_rocker_hub_spec.py"]
 
 # ---------------------------------------------------------------------------------------
-# S1: mill table, raw blank flat on the table, datum-B side up, one strap clamp across each
-# raw blank end. Skim the upper hub face, stair-mill the upper hub OD outside its line down
-# to datum B (Pedro 2026-10-11: the 336 mm blank cannot swing on the rotary table; the hub
-# is filed to buttons in S6), then spot, drill and ream the pivot bore and spot and drill
-# the rod hole.
+# H1: lathe, hub. Face the bar end, turn the land, drill the supply bore, part off.
 [[setups]]
-id = "S1"
-machine = "PM-30MV"
-frame = "up"
+id = "H1"
+machine = "PM-1127VF-LB"
+frame = "HL"
 coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "stock"
+stock_in = "stock.hub"
 
 [setups.stock_state]
-# The top stays the raw upper face (the blank ends are never faced): no feature names it.
-top_feature = "unknown"
-top_z = 7.9375
-bottom_z = 0.0
-
-# Hole entries and through thickness (docs/rules-operations.md blind_depth). The pivot bore
-# enters the raw top, which op 10 faces to 7.497 over the hub (its box covers the bore);
-# the rod hole enters the raw top at X133. Both run through to the raw underside (Z0).
-# Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 5/16 in = 7.9375 mm exactly, Online Metals pid 12035 (checklist A1); all raw-stock heights/entries below derive from this same trial reading.
-[setups.stock_state.entry_z]
-pivot_bore = 7.9375
-rod_hole = 7.9375
-
-[setups.stock_state.local_thickness]
-pivot_bore = 7.497                # upper hub face (after op 10) to the raw underside
-rod_hole = 7.9375                 # raw bar at the arm tip
+od_mm = 11.1125
+north_end_z = 1.0
+south_end_z = -39.0
 
 [setups.hold]
-fixture = "rocker-riser-blocks"
-pose = { origin_mm = [0.0, 0.0, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-# AUTHOR'S CHOICE: retain each toe position but point the straps outwards.
-# The stud is 38.1 behind its toe; these unit axes put both stud centres on
-# the table's centre T-slot, Y+/-6.8 after the hold pose is applied (manual p6).
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill-raised", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [-0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated for the shim-raised work" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill-raised", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated for the shim-raised work" },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the left blank end, below its clamp; seats the work at Z0 (prechips#184: locate, not none)", pose = { origin_mm = [-158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X-60", pose = { origin_mm = [-60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the bar at X+60", pose = { origin_mm = [60.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the right blank end, below its clamp", pose = { origin_mm = [158.0, 6.65, -2.71875], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-]
-clamp_order = [1, 2]
+fixture = "chuck-3jaw-6-d1-4"
+support = "none"
+grip_on = "plain bar behind the jaw fronts"
+grip_mm = 25.0
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: sawn end 15 mm out of the jaw fronts, checked with a steel rule before tightening"
+clamp = "tighten the chuck key by hand at all three pinions; remove the key"
+stickout_mm = 15.0
+pose = { origin_mm = [0.0, 0.0, -14.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+jaw_clock_deg = 0.0
+
+[setups.zero.x]
+feature = "spindle_axis"
+edge_mm = 0.0
+from = "+x"
+method = "trial_cut_measure"
+tool = "hss-toolbit-3-8-rh"
+gauge = "micrometers/0-1in"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "hub bar end (sawn)"
+edge_mm = 1.0
+from = "+z"
+method = "touch the sawn end with the spindle running until the first chip shows; no paper: the end is faced off at op 10"
+tool = "hss-toolbit-3-8-rh"
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "hub_supply_top"
+tool = "hss-toolbit-3-8-rh"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+to_z = 0.0
+to_dia = 0.0
+direction = "radially_inward"
+
+[[setups.ops]]
+op = 20
+do = "rough_turn"
+feature = "hub_land"
+tool = "hss-toolbit-3-8-rh"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+z_from = 0.3
+z_to = -10.5
+rough_allowance_mm = 0.2
+doc_mm = 0.25
+direction = "toward_chuck"
+
+[[setups.ops]]
+op = 30
+do = "finish_turn"
+feature = "hub_land"
+tool = "hss-toolbit-3-8-rh"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+z_from = 0.3
+z_to = -10.5
+doc_mm = 0.1
+direction = "toward_chuck"
+
+[setups.ops.checks]
+dia = "micrometers/0-1in"
+
+[[setups.ops]]
+op = 40
+do = "spot"
+feature = "pivot_bore"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-tailstock-mt3"
+depth_mm = 1.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 50
+do = "drill"
+feature = "pivot_bore"
+tool = "drill-index-115/D"
+holder = "drill-chuck-tailstock-mt3"
+depth_mm = 10.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 60
+do = "part_off"
+feature = "hub_supply_bottom"
+tool = "parting-blade-lms-1728"
+holder = "qctp-axa-lms-2280/7-parting"
+to_z = -8.4
+direction = "plunge_radial"
+
+# ---------------------------------------------------------------------------------------
+# S0A: mill table, strap blank taped to the faced sub-plate (user ruling 2026-10-17: face
+# first on a vacuum/double-sided-tape hold). Face datum B (the +Z face) 3.0 -> 2.75 end to end.
+[[setups]]
+id = "S0A"
+machine = "PM-30MV"
+frame = "SA"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "stock.strap"
+
+[setups.stock_state]
+top_feature = "unknown"
+top_z = 3.0
+bottom_z = 0.0
+
+[setups.hold]
+fixture = "thin-part-tape-subplate"
+pose = { origin_mm = [0.0, 6.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+area = { ref = "tape-3m-444", on = "plate" }
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
-clamp = "AUTHOR'S CHOICE: the six riser blocks clamped to the table along the bar line (they lift the work 18.50 so the 3/8 in end mill reaches it inside the spindle-to-table minimum); the raw blank on the four strap shim stacks set on the blocks (any equal height; the S4 set at nominal 2.719), so the letter D drill, the reamer and the #47 drill break through into air above the blocks; then one strap clamp across each raw blank end (X 160-168 either side), over its stack and end block"
+clamp = "AUTHOR'S CHOICE: the raw underside taped over its whole length to the sub-plate, which is clamped to the table at its ends and faced in place; roll the blank down"
 
 [setups.zero.x]
-edge = "left sawn blank end, finder tip at Z +4"
-edge_mm = -168.0
+edge = "left blank end"
+edge_mm = -175.0
 from = "-x"
+method = "edge_find"
 tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.y]
-edge = "front (Y-) bar edge as rolled, finder tip at Z +4"
-edge_mm = -12.4
+edge = "front long edge of the blank"
+edge_mm = -14.0
 from = "-y"
+method = "edge_find"
 tool = "edge-finder"
 check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-# The drills touch off on this same spot (tool_touches below), so they share the end mill's Z.
-edge = "raw top over the X+60 shim stack, at X+60.0 Y+6.65"
-# Catalogue-valued placeholder (realistic, remeasure: #1413), status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm" (original authorization 2026-10-11; see
-# local://rocker-measurement-checklist.md A1): raw bar thickness = 7.9375 (nominal 5/16 in,
-# Online Metals pid 12035), so the raw top stands at stock_state.top_z. Mike the bar before
-# clamping; if it is not 7.94 +/-0.02, put M back (measure_then_set, offset 0) or re-author top_z.
+edge = "raw top of the right blank end, at X+160 Y+6"
+edge_mm = 3.0
 method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
 
-[[setups.zero.tool_touches]]
+[[setups.ops]]
+op = 10
+do = "finish_face"
+feature = "strap_datum_b"
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
+direction = "climb"
+to_z = 2.75
+doc_mm = 0.25
+approach_mm = 5.0
+stock_removal_bounds = { x = [-181.0, 181.0], y = [-14.5, 26.5], z = [2.75, 3.5] }
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "model", sweep_bounds = { x = [-181.0, 181.0], y = [-8.0, 36.0], z = [1.25, 1.5] } }
+
+# ---------------------------------------------------------------------------------------
+# S0B: peeled, turned over about X and re-taped datum B down; face the lower strap face to 2.5.
+[[setups]]
+id = "S0B"
+machine = "PM-30MV"
+frame = "SB"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "S0A"
+
+[setups.stock_state]
+top_feature = "unknown"
+top_z = 2.75
+bottom_z = 0.0
+
+[setups.hold]
+fixture = "thin-part-tape-subplate"
+pose = { origin_mm = [0.0, -6.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+area = { ref = "tape-3m-444", on = "plate" }
+fixed_jaw = "not_applicable"
+grip_mm = "not_applicable"
+stop = "none"
+clamp = "AUTHOR'S CHOICE: peel, clean, turn over about X; tape the faced datum B over its whole length to the sub-plate and roll it down"
+
+[setups.zero.x]
+edge = "left blank end"
+edge_mm = -175.0
+from = "-x"
+method = "edge_find"
+tool = "edge-finder"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "front long edge of the blank (the S0A back edge)"
+edge_mm = -26.0
+from = "-y"
+method = "edge_find"
+tool = "edge-finder"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+edge = "raw top of the right blank end, at X+168 Y-6"
+edge_mm = 2.75
+method = "paper"
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
+paper_mm = 0.05
+check_jog_mm = 1.0
+retouch_after = []
+
+[[setups.ops]]
+op = 10
+do = "finish_face"
+feature = "strap_faces"
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
+direction = "climb"
+to_z = 2.5
+doc_mm = 0.25
+approach_mm = 5.0
+stock_removal_bounds = { x = [-181.0, 181.0], y = [-26.5, 14.5], z = [2.5, 3.25] }
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "model", sweep_bounds = { x = [-181.0, 181.0], y = [-8.0, 36.0], z = [-1.5, -1.25] } }
+
+[setups.ops.checks]
+thickness = "micrometers/0-1in"
+
+# ---------------------------------------------------------------------------------------
+# T1: mill vise, datum B up on parallels, the jaws on the two long edges. Spot, drill and
+# ream the Ø10.2 H7 hub hole; spot, drill and ream the CL tooling hole and spot and drill
+# the CR tooling hole in the end waste, which overhangs the jaws.
+[[setups]]
+id = "T1"
+machine = "PM-30MV"
+frame = "SU"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.0
+deburr_cite = ["AUTHOR'S CHOICE: the hub hole's two entry edges stay sharp, burrs removed with no break, so the pressed hub root is a corner (R0.2 MAX), not a groove; joint_features.strap_hole states the sharp mouths that J1's forms = [\"hub_root\"] reads"]
+stock_in = "S0B"
+
+[setups.stock_state]
+top_feature = "strap_datum_b"
+top_z = 2.5
+bottom_z = 0.0
+
+[setups.stock_state.entry_z]
+strap_hole = 2.5
+cl_tooling_hole = 2.5
+cr_tooling_hole = 2.5
+
+[setups.stock_state.local_thickness]
+strap_hole = 2.5
+cl_tooling_hole = 2.5
+cr_tooling_hole = 2.5
+
+[setups.hold]
+fixture = "vise-pm-6"
+support = "none"
+grip_on = "AUTHOR'S CHOICE: the strap's two long edges, the hub hole centred in the jaws"
+grip_mm = 2.5
+fixed_jaw = "rear"
+jaws_along = "x"
+parallels = "parallels-lms-6745/1in"
+parallels_along = "x"
+parallels_centres_mm = [[0.0, -10.0], [0.0, 22.0]]
+jaw_above_parallels_mm = 19.546
+jaw_center_along_mm = 0.0
+align = { indicator = "dti", limit_mm = 0.02, over_mm = 120.0, face = "fixed jaw", cite = "AUTHOR'S CHOICE: the vise goes back on after the S0 sub-plate; square the fixed jaw to X within 0.02 over 120 so the T1 hole and the strap edges share one X axis" }
+stop = "AUTHOR'S CHOICE: none; X from the edge finder on the left strap end"
+clamp = "AUTHOR'S CHOICE: tap the strap down on the two 1 in parallels and tighten; the 350 mm strap overhangs the jaws both sides"
+
+[setups.zero.x]
+edge = "left strap end"
+edge_mm = -175.0
+from = "-x"
+method = "edge_find"
+tool = "edge-finder"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+edge = "front long edge (against the moving jaw)"
+edge_mm = -14.0
+from = "-y"
+method = "edge_find"
+tool = "edge-finder"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+edge = "datum B beside the hole, at X+20 Y+0"
+edge_mm = 2.5
+method = "paper"
 tool = "center-drills-lms-4859/2"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
+holder = "drill-chuck-r8"
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub), at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 20
-before_ops = [30]
+check_jog_mm = 1.0
+retouch_after = []
 
-[[setups.zero.tool_touches]]
-tool = "drill-index-115/D"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub), at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 30
-before_ops = [40]
-
-[[setups.zero.tool_touches]]
-tool = "reamers-metric/6.5mm"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub), at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 40
-before_ops = [50]
-
-[[setups.zero.tool_touches]]
+[[setups.ops]]
+op = 10
+do = "spot"
+feature = "strap_hole"
 tool = "center-drills-lms-4859/2"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub), at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 50
-before_ops = [60]
+holder = "drill-chuck-r8"
+depth_mm = 1.5
+approach_mm = 3.0
 
-[[setups.zero.tool_touches]]
-tool = "drill-index-115/#47"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
+[[setups.ops]]
+op = 20
+do = "drill"
+feature = "strap_hole"
+tool = "drills-metric/9.5mm"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 30
+do = "ream"
+feature = "strap_hole"
+tool = "reamers-metric/10.2mm"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+note = "Leave both edges of the reamed hole sharp: remove the drill and reamer burrs without breaking the edge. A break here leaves a groove round the pressed hub root, which R0.2 MAX does not admit."
+
+[setups.ops.checks]
+dia = "bore-gauge-small"
+
+[[setups.ops]]
+op = 40
+do = "spot"
+feature = "cl_tooling_hole"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 1.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 50
+do = "spot"
+feature = "cr_tooling_hole"
+tool = "center-drills-lms-4859/2"
+holder = "drill-chuck-r8"
+depth_mm = 1.5
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 60
+do = "drill"
+feature = "cl_tooling_hole"
+tool = "drill-index-115/#1"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 70
+do = "ream"
+feature = "cl_tooling_hole"
+tool = "reamers-metric/6.026mm"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+[[setups.ops]]
+op = 80
+do = "drill"
+feature = "cr_tooling_hole"
+tool = "drill-index-115/G"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
+
+# ---------------------------------------------------------------------------------------
+# J1: fitting bench, bench vise. Press the hub into the strap hole, centred in the strap.
+[[setups]]
+id = "J1"
+machine = "fitting-bench"
+frame = "BM"
+stock_in = ["T1", "H1"]
+coolant = "none: bench assembly"
+deburr_mm = 0.0
+deburr_cite = ["AUTHOR'S CHOICE: a press fit cuts no edges"]
+
+[setups.stock_state]
+top_z = 4.2
+bottom_z = -4.2
+
+[setups.joint]
+kind = "cylindrical"
+socket = "strap_hole"
+spigot = "hub_land"
+fit = "interference"
+interference_mm = [0.005, 0.034]   # H7/r6, user ruling 2026-10-17
+method = "press"
+process = "AUTHOR'S CHOICE: press in the bench vise between soft jaws, the hub centred in the strap thickness"
+cite = ["harmonic-analyzer/cad/scripts/ch_rocker_hub_fit.py:PRESS_INTERFERENCE (user rulings 2026-10-16: press fit in the vise; 2026-10-17: H7/r6)"]
+# prechips 0.2.0 refuses this join: the S0A/S0B facings keep the root fillet's ring outside
+# the hub-land column as finished material, so the strap arrives carrying the hub_root
+# faces; the same ring is the S0B and T1 bottom_z and tape/plate findings (prechips #334).
+forms = ["hub_root"]   # 2X R0.2 MAX: the press leaves the root a sharp corner, which the band admits
+
+[setups.hold]
+fixture = "bench-vise-4in"
+support = "none"
+grip_on = "AUTHOR'S CHOICE: the hub's two supply ends, between soft jaws"
+grip_mm = "not_applicable"
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+# The vise's jaws close along its local X: turn it so they close along the hub axis
+# (model Z) on the two hub ends, its top (local Z) toward +Y, the hub centre 6.5 below the
+# jaw tops. The strap stands up between the open jaws, its 14 mm side below the hub
+# (strap edge BM Y-14, clear of the body under the jaws at Y-18.5).
+pose = { origin_mm = [0.0, 6.5, 0.0], x = [0.0, 0.0, 1.0], z = [0.0, 1.0, 0.0] }
+stop = "AUTHOR'S CHOICE: a 2.95 spacer under the strap sets the hub's stand-out equal both sides"
+clamp = "none"
+
+[[setups.ops]]
+op = 10
+do = "inspect"
+feature = "hub_od"
+note = "Bore-gauge the strap hole and mic the hub land: land minus hole must read 0.005-0.034."
+
+[setups.ops.checks]
+dia = "micrometers/0-1in"
+
+[[setups.ops]]
+op = 20
+do = "fit"
+feature = "hub_od"
+note = "Start the hub square in the hole by hand, then close the vise on the two hub ends with the strap on the 2.95 spacer until the hub stands out equally both sides (caliper: 2.95 each side)."
+
+# ---------------------------------------------------------------------------------------
+# P1: mill vise, datum B up on parallels clear of the hub (the hub hangs between them);
+# indicate the hub OD, ream the pivot bore, face hub side A, spot and drill the #47.
+[[setups]]
+id = "P1"
+machine = "PM-30MV"
+frame = "SU"
+coolant = "cutting oil, brushed on"
+deburr_mm = 0.25
+deburr_cite = "features.toml general_tolerances edge_break R0.25"
+stock_in = "J1"
+
+[setups.stock_state]
+top_feature = "unknown"
+top_z = 5.45
+bottom_z = -2.95
+
+[setups.stock_state.entry_z]
+pivot_bore = 5.45
+rod_hole = 2.5
+
+[setups.stock_state.local_thickness]
+pivot_bore = 8.4
+rod_hole = 2.5
+
+[setups.hold]
+fixture = "vise-pm-6"
+support = "none"
+grip_on = "AUTHOR'S CHOICE: the strap's two long edges, the hub centred in the jaws"
+grip_mm = 2.5
+fixed_jaw = "rear"
+jaws_along = "x"
+parallels = "parallels-lms-6745/1in"
+parallels_along = "x"
+parallels_centres_mm = [[0.0, -10.0], [0.0, 22.0]]
+jaw_above_parallels_mm = 19.546
+jaw_center_along_mm = 0.0
+stop = "AUTHOR'S CHOICE: none; X and Y indicated on the hub OD"
+clamp = "AUTHOR'S CHOICE: datum B up on the two 1 in parallels, which stand clear of the lower hub either side; tap down and tighten"
+
+[setups.zero.x]
+feature = "hub_od"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dti"
+check_jog_mm = 10.0
+
+[setups.zero.y]
+feature = "hub_od"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dti"
+check_jog_mm = 10.0
+
+[setups.zero.z]
+face = "top"
+edge = "datum B, at X+20 Y+0"
+edge_mm = 2.5
+method = "paper"
+tool = "endmills-lms-6784/3-8in-4fl"
+holder = "r8-collets-lms-4860/3-8in"
 paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top over the X+60 shim stack (clear of the faced hub), at X+60.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 60
-before_ops = [70]
+check_jog_mm = 1.0
+retouch_after = []
 
 [[setups.ops]]
 op = 10
@@ -224,113 +747,72 @@ faces = ["HAF_HUB_FACES__P02"]
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 7.497
-doc_mm = 0.4405
+to_z = 4.77825
+doc_mm = 0.67175
 approach_mm = 5.0
-stock_removal_bounds = { x = [-15.5, 15.5], y = [-15.5, 15.5], z = [7.497, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-10.8, 10.8], y = [-2.8, 18.8], z = [3.52825, 3.96875] } }
+stock_removal_bounds = { x = [-10.5, 10.5], y = [-10.5, 10.5], z = [4.77825, 5.5] }
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "model", sweep_bounds = { x = [-6.0, 6.0], y = [2.0, 14.0], z = [3.52825, 4.2] } }
 
 [[setups.ops]]
 op = 20
-do = "rough_profile"
-feature = "hub_od"
-faces = ["HAF_HUB_OD__P02"]
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-direction = "climb"
-to_z = 5.21875
-doc_mm = 1.0
-approach_mm = 5.0
-# AUTHOR'S CHOICE: stairs (one handwheel moves at a time) at 0 allowance down to datum B:
-# the stair corners touch the nominal hub circle and the 0.15 cusp is what the S6 file
-# takes to the hub buttons. A nonzero leave cannot be kept: its guard covers the datum-B
-# floor beside the hub, and the stairs must reach the foot of the hub OD (ledger L34).
-rough_allowance_mm = 0.0
-contour = { method = "stairs", cusp_mm = 0.15 }
+do = "ream"
+feature = "pivot_bore"
+tool = "reamers-metric/6.5mm"
+holder = "drill-chuck-r8"
+exit_mm = 1.0
+approach_mm = 3.0
 
 [[setups.ops]]
 op = 30
 do = "spot"
-feature = "pivot_bore"
+feature = "rod_hole"
 tool = "center-drills-lms-4859/2"
 holder = "drill-chuck-r8"
-depth_mm = 1.5                    # tip at Z 5.997 below the faced hub, as the 6.0 stop before
+depth_mm = 0.74
 approach_mm = 3.0
 
 [[setups.ops]]
 op = 40
 do = "drill"
-feature = "pivot_bore"
-tool = "drill-index-115/D"
-holder = "drill-chuck-r8"
-# Author's choice: full Ø 0.4 past the raw underside (the #47's breakout), tip at -2.276. With
-# Z zero on the raw top, bar thickness (+/-0.004 in, width-governed: see the [stock] cite)
-# moves the underside and, with the S4 stacks built to M - 5.219, the
-# block seat too: >= 0.298 full-Ø breakout on a thick bar and >= 0.23 point clearance above
-# the block on a thin bar (blocks equal within 0.01). At 0.6 that clearance was 0.03.
-exit_mm = 0.4
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 50
-do = "ream"
-feature = "pivot_bore"
-tool = "reamers-metric/6.5mm"
-holder = "drill-chuck-r8"
-exit_mm = 1.0                     # author's choice: reamer lead and 1.0 past the raw underside
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 60
-do = "spot"
-feature = "rod_hole"
-tool = "center-drills-lms-4859/2"
-holder = "drill-chuck-r8"
-depth_mm = 0.74                   # tip at Z 7.2 below the raw top, as before
-approach_mm = 3.0
-
-[[setups.ops]]
-op = 70
-do = "drill"
 feature = "rod_hole"
 tool = "drill-index-115/#47"
 holder = "drill-chuck-r8"
-exit_mm = 0.4                     # author's choice: tip about 1.0 below the raw underside, 1.7 above the right outer riser block
+exit_mm = 0.4
 approach_mm = 3.0
 
 # ---------------------------------------------------------------------------------------
-# S2: mill table, turned over onto the raw upper face (the finished upper hub stands 0.44
-# below it); one strap clamp across each raw blank end. Indicate the reamed bore, skim the
-# lower hub face and stair-mill the lower hub OD outside its line down to the strap face.
+# P2: turned over about X; face hub side B to the finished length.
 [[setups]]
-id = "S2"
+id = "P2"
 machine = "PM-30MV"
-frame = "down"
+frame = "SD"
 coolant = "cutting oil, brushed on"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S1"
+stock_in = "P1"
 
 [setups.stock_state]
 top_feature = "unknown"
-top_z = 7.9375
-bottom_z = 0.0
+top_z = 5.45
+bottom_z = -2.27825
 
 [setups.hold]
-fixture = "rocker-riser-blocks"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [-0.9999922499544683, -0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.9999922499544683, -0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "the bar on the six riser blocks (turned 180° about Z for the down frame); one strap clamp across each raw blank end (X 160-168 either side), over its end block"
+fixture = "vise-pm-6"
+support = "none"
+grip_on = "AUTHOR'S CHOICE: the strap's two long edges, the hub centred in the jaws"
+grip_mm = 2.5
+fixed_jaw = "rear"
+jaws_along = "x"
+parallels = "parallels-lms-6745/1in"
+parallels_along = "x"
+parallels_centres_mm = [[0.0, -22.0], [0.0, 10.0]]
+jaw_above_parallels_mm = 19.546
+jaw_center_along_mm = 0.0
+stop = "AUTHOR'S CHOICE: none; X and Y indicated in the reamed pivot bore"
+clamp = "AUTHOR'S CHOICE: turned over about X, datum B down on the two 1 in parallels, which stand clear of the faced hub either side; tap down and tighten"
 
 [setups.zero]
-transfer = { from = "S1", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
+transfer = { from = "P1", indicate = ["pivot_bore"], gauge = "dti", runout_limit_mm = 0.02 }
 
 [setups.zero.x]
 edge = "pivot_bore"
@@ -352,12 +834,11 @@ check_jog_mm = 10.0
 
 [setups.zero.z]
 face = "top"
-edge = "raw top, at X+60.0 Y-6.65"
-# Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 7.9375 mm exactly from Online Metals pid 12035, 5/16 in (checklist A1); see S1 zero.z.
+edge = "strap face, at X+20 Y+0"
+edge_mm = 2.5
 method = "paper"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
 paper_mm = 0.05
 check_jog_mm = 1.0
 retouch_after = []
@@ -370,418 +851,33 @@ faces = ["HAF_HUB_FACES__P01"]
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 direction = "climb"
-to_z = 7.497
-doc_mm = 0.4405
+to_z = 4.77825
+doc_mm = 0.67175
 approach_mm = 5.0
-stock_removal_bounds = { x = [-15.5, 15.5], y = [-15.5, 15.5], z = [7.497, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-10.8, 10.8], y = [-2.8, 18.8], z = [-3.96875, -3.52825] } }
+stock_removal_bounds = { x = [-10.5, 10.5], y = [-10.5, 10.5], z = [4.77825, 5.5] }
+contour = { method = "linear_table", step_mm = 7.0, sweep_frame = "model", sweep_bounds = { x = [-6.0, 6.0], y = [2.0, 14.0], z = [-4.2, -3.52825] } }
 
-[[setups.ops]]
-op = 20
-do = "rough_profile"
-feature = "hub_od"
-faces = ["HAF_HUB_OD__P01"]
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-direction = "climb"
-to_z = 5.21875
-doc_mm = 1.0
-approach_mm = 5.0
-# AUTHOR'S CHOICE: as S1 op 20, stairs at 0 allowance, the 0.15 cusp left for the S6 file.
-rough_allowance_mm = 0.0
-contour = { method = "stairs", cusp_mm = 0.15 }
+[setups.ops.checks]
+length = "micrometers/0-1in"
 
 # ---------------------------------------------------------------------------------------
-# S3: mill table, datum-B side up on the raw lower face, a strap across each raw blank
-# end. Face datum B over the whole bar between the clamps, keeping out of the hub, then
-# chain-drill the R816 bottom and the R800 top edge outside the line to 0.12 below the
-# lower strap face (a 2.6 mm skin stays under the holes until S4 faces it). The tapers and
-# tip lands are left whole: they are the tabs that carry the arm, joined to the blank
-# ends, to the bench, where they are hacksawed and filed to the line.
+# F1: finishing bench. Deburr, inspect, send out for black oxide.
 [[setups]]
-id = "S3"
-machine = "PM-30MV"
-frame = "up"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S2"
-
-[setups.stock_state]
-top_feature = "unknown"
-top_z = 7.9375
-bottom_z = 0.0
-
-[setups.hold]
-fixture = "rocker-riser-blocks"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [-164.0, 6.65, 7.9375], x = [-0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [164.0, 6.65, 7.9375], x = [0.9999922499544683, 0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "the bar on the six riser blocks; one strap clamp across each raw blank end (X 160-168 either side), over its end block"
-
-[setups.zero]
-transfer = { from = "S2", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
-
-[setups.zero.x]
-edge = "pivot_bore"
-method = "indicate"
-gauge = "dti"
-tool = "dti"
-from = "indicated"
-edge_mm = 0.0
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "pivot_bore"
-method = "indicate"
-gauge = "dti"
-tool = "dti"
-from = "indicated"
-edge_mm = 0.0
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-# Before op 10 the whole top is raw: the end mill (r 4.76) touches at X+150, 4.2 clear of the
-# clamp (X 160-168). The drills touch after op 10 on the raw strip it leaves (box |X| <= 156.2)
-# at X+157, 0.8 outside the box and >= 1.27 clear of the clamp; both spots are the same raw
-# top 7 mm apart, so the drills keep the end mill's Z.
-edge = "raw top of the right blank end, at X+150.0 Y+6.65"
-# Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 7.9375 mm exactly from Online Metals pid 12035, 5/16 in (checklist A1); see S1 zero.z.
-method = "paper"
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.zero.tool_touches]]
-tool = "drill-index-115/#33"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top of the right blank end, between the op 10 facing and the clamp, at X+157.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 10
-before_ops = [20]
-
-[[setups.zero.tool_touches]]
-tool = "drill-index-115/#29"
-z_face = "top"
-edge_mm = 7.9375
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-method = "spindle stopped; lower the tool on the raw top of the right blank end, between the op 10 facing and the clamp, at X+157.0 Y+6.65, through cigarette paper (0.05) until the paper drags, then Axis Set Z"
-after_op = 20
-before_ops = [30]
-
-[[setups.ops]]
-op = 10
-do = "finish_face"
-feature = "strap_datum_b"
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-direction = "climb"
-to_z = 5.21875
-doc_mm = 1.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-156.2, 156.2], y = [-17.3, 30.5], z = [5.21875, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-146.6, 146.6], y = [-4.4, 33.7], z = [1.25, 3.96875] }, keep_out = [{ at = [0.0, 8.0], dia_mm = 11.0 }] }
-
-[[setups.ops]]
-op = 20
-do = "rough_profile"
-feature = "profile_outer"
-faces = ["HAF_PROFILE_OUTER__P02"]
-tool = "drill-index-115/#33"
-holder = "drill-chuck-r8"
-direction = "climb"
-to_z = 2.6
-approach_mm = 3.0
-# AUTHOR'S CHOICE: #33 (r 1.435) at 0.3 leaves 1.735 for the file, under the shop's 2.0 cap.
-# The convex R816 chain needs 0.3: at 0.25 the #29 chain gouged the arc (prechips#180).
-rough_allowance_mm = 0.3
-# AUTHOR'S CHOICE: the box stops the chain at the R816 arc ends (holes to X+-135.6), so the
-# printed joins up the tapers are clipped off and the tapers and tip lands stay whole as
-# the tabs to the bench; the box is the strip below the arc, which breaks out at S5.
-stock_removal_bounds = { x = [-135.8, 135.8], y = [-13.0, 2.6], z = [2.6, 8.5] }
-contour = { method = "chain_drill", pitch_mm = 4.2 }
-
-[[setups.ops]]
-op = 30
-do = "rough_profile"
-feature = "top_edge"
-tool = "drill-index-115/#29"
-holder = "drill-chuck-r8"
-direction = "climb"
-to_z = 2.6
-approach_mm = 3.0
-rough_allowance_mm = 0.25
-# AUTHOR'S CHOICE: as op 20, the box stops the chain at the R816 arc ends (X+-135.8), so the
-# tab strip beyond them (tapers, tip lands and the R800 ends above them, joined to the raw
-# blank ends) stays whole to S5. The box is the crescent above the R800 line out to the bar
-# edge (Y 25.7); its floor (Y 6.0) clears the op-20 strip (R816 at X135.8 is Y 3.4) and the
-# hub (R 5.1), so all it frees borders the top edge. The skin under it goes at S4.
-stock_removal_bounds = { x = [-135.8, 135.8], y = [6.0, 26.3], z = [2.6, 8.5] }
-contour = { method = "chain_drill", pitch_mm = 4.2 }
-
-# ---------------------------------------------------------------------------------------
-# S4: mill table, turned over onto the raw blank ends (the faced datum B and the upper
-# hub stand clear of the table). Face the lower strap face to size; this takes the skin
-# under the S3 roughing, leaving the arm on its two taper-and-land tabs.
-[[setups]]
-id = "S4"
-machine = "PM-30MV"
-frame = "down"
-coolant = "cutting oil, brushed on"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S3"
-
-[setups.stock_state]
-top_feature = "unknown"
-top_z = 7.9375
-bottom_z = 0.0
-
-[setups.hold]
-fixture = "rocker-riser-blocks"
-pose = { origin_mm = [0.0, 0.0, 0.0], x = [-1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [-164.0, -6.65, 7.9375], x = [-0.9999922499544683, -0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad-mill", restraint = "press", pose = { origin_mm = [164.0, -6.65, 7.9375], x = [0.9999922499544683, -0.003937007874015734, 0.0], z = [0.0, 0.0, 1.0] }, note = "4 in stud; T-nut seated under the centre slot lip" },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-120; seats datum B (prechips#184: locate, not none)", pose = { origin_mm = [-120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X-45", pose = { origin_mm = [-45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X+45", pose = { origin_mm = [45.0, -1.26, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-  { ref = "strap-shim-stack", restraint = "locate", note = "under the strap at X+120", pose = { origin_mm = [120.0, -8.96, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] } },
-]
-clamp_order = [1, 2]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "AUTHOR'S CHOICE: the six riser blocks clamped to the table (turned 180° about Z for the down frame); build the four strap shim stacks on them first (3/32 in ground flat + shim to the measured raw thickness M - 5.219, nominal 2.719, checked with the 0-1 in micrometer) under the S3-faced strap face so the 312 mm span cannot spring under the cutter; the raw blank ends rest on the end blocks; then one strap clamp across each raw blank end (X 160-168 either side)"
-
-[setups.zero]
-transfer = { from = "S3", indicate = ["pivot_bore", "rod_hole"], gauge = "dti", runout_limit_mm = 0.02 }
-
-[setups.zero.x]
-edge = "pivot_bore"
-method = "indicate"
-gauge = "dti"
-tool = "dti"
-from = "indicated"
-edge_mm = 0.0
-check_jog_mm = 10.0
-
-[setups.zero.y]
-edge = "pivot_bore"
-method = "indicate"
-gauge = "dti"
-tool = "dti"
-from = "indicated"
-edge_mm = 0.0
-check_jog_mm = 10.0
-
-[setups.zero.z]
-face = "top"
-edge = "raw top of the right blank end, at X+150.0 Y-6.65"
-# Catalogue-valued placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0-25 mm micrometer, 0.001 mm"; raw thickness 7.9375 mm exactly from Online Metals pid 12035, 5/16 in (checklist A1); see S1 zero.z.
-method = "paper"
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-# Schema-limited placeholder (realistic, remeasure: #1413): 0.05 mm heavy cigarette-paper shim; status="measured", date="2026-10-12", instrument="0-25 mm micrometer, 0.001 mm; ten-sheet stack / 10".
-paper_mm = 0.05
-check_jog_mm = 1.0
-retouch_after = []
-
-[[setups.ops]]
-op = 10
-do = "finish_face"
-feature = "strap_faces"
-tool = "endmills-lms-6784/3-8in-4fl"
-holder = "r8-collets-lms-4860/3-8in"
-direction = "climb"
-to_z = 5.21875
-doc_mm = 1.0
-approach_mm = 5.0
-stock_removal_bounds = { x = [-156.2, 156.2], y = [-30.5, 17.3], z = [5.21875, 8.5] }
-contour = { method = "linear_table", step_mm = 9.0, sweep_frame = "model", sweep_bounds = { x = [-146.6, 146.6], y = [-4.4, 33.7], z = [-3.96875, -1.25] }, keep_out = [{ at = [0.0, 8.0], dia_mm = 11.0 }] }
-
-# ---------------------------------------------------------------------------------------
-# S5: fitting bench, the work on the shop-made filing stand (two end blocks under the raw
-# blank ends, a pedestal under the lower hub face), a clamp across each blank end and one on
-# the upper hub face. The template (MHA-CH-006-TL-13) is laid on the work pinned in the
-# reamed bore by the 0.2558 in Class X minus pin gauge (gauges.vermont-class-x-2558-minus)
-# and clocked by the 0.0780 in Class ZZ minus pin gauge (gauges.pin-gauges) through its
-# radial rod slot into the #47 rod-pin hole, whenever it scribes (ops 10-20) or gauges (ops
-# 70-100). Scribe the outline from it (ops 10-20), break out the chain-drill webs (ops
-# 30-40), hacksaw through the two taper-and-land tabs just outside the scribed line (ops
-# 50-60) and file the outline, tapers and tip lands included, to the line (ops 70-100). The
-# clamped hub holds the arm and the clamped ends hold the frame when the tabs part. prechips
-# 0.1.2 has no break-out or hand-saw action (break-out phase: prechips#213; saw_cut needs a
-# bandsaw and one cut plane, and any action outside its bench set would put the DRO, zero
-# and headroom screens back on this bench setup), so ops 30-60 are bench `deburr` steps
-# whose note is the printed instruction.
-[[setups]]
-id = "S5"
-machine = "fitting-bench"
-frame = "top"
-coolant = "none"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S4"
-
-[setups.stock_state]
-top_z = 0.4405            # the raw blank ends still stand (arm carried on its taper/land tabs)
-bottom_z = -7.4970
-
-[setups.hold]
-fixture = "rocker-filing-stand"
-pose = { origin_mm = [0.0, 0.0, -7.497], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-# Legacy 3 in studs: only 2.0625 mm (ends) / 2.503 mm (hub) enter the bench.
-# No mounting holes or anchors are claimed; this hold is unresolved in #1577.
-clamps = [
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [-158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the left raw blank end, over the end block" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [158.0, 6.65, 0.4405], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "across the right raw blank end, over the end block" },
-  { ref = "clamping-kit-pm-52pcck-14mm/strap-pad", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [0.0, 1.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "on the upper hub face (7.06 thick), over the hub pedestal" },
-]
-clamp_order = [1, 2, 3]
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "none"
-clamp = "AUTHOR'S CHOICE: stand on the bench; lay the work on the two end blocks and the hub pedestal, clamp each raw blank end onto its block, then the upper hub face onto the pedestal; the outline overhangs the stand all round for the hacksaw and the file"
-
-[[setups.ops]]
-op = 10
-do = "scribe"
-feature = "top_edge"
-layout = "template"
-guide = { template = "arm-outline-template" }
-note = "With the two blank ends clamped and the hub clamp still off, lay the template on the work, push the 0.2558 in Class X minus pin gauge through its pivot hole into the reamed bore and the 0.0780 in pin gauge through its rod slot into the rod-pin hole; hold the template against both pins while scribing both edges, then lift it off and clamp the hub."
-
-[[setups.ops]]
-op = 20
-do = "scribe"
-feature = "profile_outer"
-layout = "template"
-guide = { template = "arm-outline-template" }
-
-[[setups.ops]]
-op = 30
-do = "deburr"
-feature = "profile_outer"
-note = "Break out the webs between the S3 op 20 chain-drill holes under the profile_outer arc: drive tools.cold-chisel-1-2in with tools.ball-peen-hammer-16oz along the hole centres from the scrap side, never toward the scribed line, until the scrap below the arc is free of the arm. This leaves stock for the file at op 80; do not file yet."
-
-[[setups.ops]]
-op = 40
-do = "deburr"
-feature = "top_edge"
-note = "Break out the webs between the S3 op 30 chain-drill holes above the top_edge line the same way with tools.cold-chisel-1-2in and tools.ball-peen-hammer-16oz, from the scrap side, until the scrap above the line is free of the arm. This leaves stock for the file at op 70; do not file yet."
-
-[[setups.ops]]
-op = 50
-do = "deburr"
-feature = "tip_land_pos_x"
-note = "Hacksaw through the +X taper-and-land tab with tools.hacksaw-starrett-k145 and a 24 TPI blade, just outside the scribed tip_land_pos_x line on the blank-end side, square to the work; the hub clamp holds the arm and the right blank-end clamp holds the frame as the tab parts. Leave the line for the file at op 90."
-
-[[setups.ops]]
-op = 60
-do = "deburr"
-feature = "tip_land_neg_x"
-note = "Hacksaw through the -X taper-and-land tab the same way, just outside the scribed tip_land_neg_x line on the blank-end side; the left blank-end clamp holds the frame as the tab parts and the arm is free. Leave the line for the file at op 100."
-
-[[setups.ops]]
-op = 70
-do = "file_to_line"
-feature = "top_edge"
-guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
-
-[[setups.ops]]
-op = 80
-do = "file_to_line"
-feature = "profile_outer"
-guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
-
-[[setups.ops]]
-op = 90
-do = "file_to_line"
-feature = "tip_land_pos_x"
-guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
-
-[[setups.ops]]
-op = 100
-do = "file_to_line"
-feature = "tip_land_neg_x"
-guide = { template = "arm-outline-template", gauge = "arm-outline-template" }
-
-# ---------------------------------------------------------------------------------------
-# S6: fitting bench. File both hub ODs to the hardened filing buttons pinned through the
-# reamed pivot bore (Pedro 2026-10-11). The filing stud's tail is gripped in the bench vise;
-# the arm is clamped between the buttons by the #10-24 coupling nut and never touches the jaws.
-[[setups]]
-id = "S6"
-machine = "fitting-bench"
-frame = "top"
-coolant = "none"
-deburr_mm = 0.25
-deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S5"
-
-[setups.stock_state]
-top_z = 0.4405           # prechips carries the S5 offcut frame (raw blank ends) on: no op drops a held-split piece (ledger L33)
-bottom_z = -7.4970
-
-[setups.hold]
-fixture = "bench-vise-4in"
-pose = { origin_mm = [0.0, 0.0, -21.0565], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
-clamps = [
-  { ref = "hub-filing-buttons", restraint = "press", pose = { origin_mm = [0.0, 0.0, 0.0], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }, note = "#10-24 coupling nut on the stud presses the upper button; the lower button seats on the stud head" },
-]
-clamp_order = [1]
-support = "none"
-grip_on = "AUTHOR'S CHOICE: the button stud tail in the vise jaws; the arm is clamped between the buttons and never touches the jaws"
-fixed_jaw = "not_applicable"
-grip_mm = "not_applicable"
-stop = "AUTHOR'S CHOICE: none; steady the arm by hand against the file stroke"
-clamp = "close the bench vise on the stud tail, head up, 5 mm of bare tail between the jaw tops and the head; drop the lower button over the stud onto the head; slide the pivot bore over the stud, lower hub face down on the button; drop the upper button onto the upper hub face and run the #10-24 coupling nut down by hand until it seats the stack. Loosen the nut to turn the arm on the stud as the filing goes round."
-
-[[setups.ops]]
-op = 10
-do = "file_to_line"
-feature = "hub_od"
-guide = { buttons = "hub-filing-buttons", bore = "pivot_bore", gauge = "radius-gauge" }
-note = "File the stairs left by S1 op 20 and S2 op 20 down to the hardened button rims, upper hub against the upper button and lower hub against the lower one; use a safe-edge file, safe edge toward the strap face; stop when the file rides on the button without cutting."
-
-# ---------------------------------------------------------------------------------------
-# S7: finishing bench. Deburr, inspect, send out for black oxide.
-[[setups]]
-id = "S7"
+id = "F1"
 machine = "finishing-bench"
-frame = "top"
+frame = "BM"
 coolant = "none"
 deburr_mm = 0.25
 deburr_cite = "features.toml general_tolerances edge_break R0.25"
-stock_in = "S6"
+stock_in = "P2"
 
 [setups.stock_state]
-top_z = 0.4405           # as S6: the offcut frame is still in the kernel stock (ledger L33)
-bottom_z = -7.4970
+top_z = 3.52825
+bottom_z = -3.52825
 
-# The rest plate holds the part for deburring and the bench checks (ops 10, 20, 40-95, 100) under
-# its own weight; op 97's profile check lies the arm on its template on the granite instead.
-# Op 30's A|B|C position check is not done on it either: the part goes onto the
-# angle-plate fixture that op 30's procedure and inspection views declare (inventory
-# fixtures.angle-plate, ledge removed, with the pivot bracket's shop-made two-stud bridge clamp,
-# which left the shared shop inventory in d35921851 and returns with the bracket's migration).
 [setups.hold]
 fixture = "finishing-rest-plate"
-pose = { origin_mm = [0.0, 0.0, -7.0565], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
+pose = { origin_mm = [0.0, 0.0, -3.52825], x = [1.0, 0.0, 0.0], z = [0.0, 0.0, 1.0] }
 fixed_jaw = "not_applicable"
 grip_mm = "not_applicable"
 stop = "none"
@@ -809,7 +905,7 @@ note = "Off the rest plate: the A|B position check is done on the angle-plate fi
 # distance is toleranced. Its nominal is the drawing's BASIC 133.07 / 8.46 PIN AXIS pair
 # from A combined: features.toml rod_hole.at - pivot_bore.at = (133.0674, 8.4561), D =
 # hypot = 133.336. The two views read X and Y in any clocking; D does not depend on it.
-# S7 gauge-resolution source: gauges.height-gauge.resolution_in = 0.001 in x 25.4 = 0.0254 mm; never substitute the former uncited 0.018 mm.
+# F1 gauge-resolution source: gauges.height-gauge.resolution_in = 0.001 in x 25.4 = 0.0254 mm; never substitute the former uncited 0.018 mm.
 # Schema-limited placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="certified gauge blocks and height gauge"; scale-error estimate 0.0254 mm over the 133.336 mm lever, one displayed count (no calibration nominal; conservative rounding up from the former 0.025 mm estimate).
 # Schema-limited placeholder (realistic, remeasure: #1413): status="measured", date="2026-10-13", instrument="0.001 mm DTI, gauge pins loaded up/down in both bores"; combined pin-clearance sag estimate 0.013 mm, unchanged from the authored inspection method (no certified nominal; compare the two pin-centre readings).
 # Derived guardband: 2*sqrt(2*0.0254^2 + 0.0254^2 + 2*0.013^2 + (0.0254*133.336/100)^2) = 0.116968... mm; round UP to 0.12 mm, so 0.20 - 0.12 = 0.08 mm acceptance. This trial estimate is not calibrated inspection uncertainty.
@@ -878,6 +974,13 @@ checks = { dia = "micrometers/0-1in", coaxiality_dia = "dti" }
 inspection_methods = { coaxiality_dia = "Datum A: arm on a Ø6.5 pin gauge in the reamed bore, pin held in V-blocks on the surface plate; sweep each hub OD half with the DTI while turning the arm on the pin; coaxiality = full indicator movement" }
 
 [[setups.ops]]
+op = 45
+do = "inspect"
+feature = "hub_root"
+checks = { radius = "radius-gauge-small" }
+note = "Both hub roots, each side of the strap: the press leaves the hub-to-strap corner sharp, which R0.2 MAX admits. Seat the R0.2 inside-corner leaf in the corner at four places round the hub; it must bear on both walls without rocking on a larger fillet or burr."
+
+[[setups.ops]]
 op = 50
 do = "inspect"
 feature = "hub_faces"
@@ -901,7 +1004,7 @@ do = "inspect"
 feature = "profile_outer"
 checks = { bottom_radius = "arm-outline-template", mirror_symmetric = "arm-outline-template" }
 
-# Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot (the J row added after main-r1).
+# Each tip land's station is its own BASIC 146.25 "LAND" row from the pivot.
 [[setups.ops]]
 op = 90
 do = "inspect"
@@ -935,7 +1038,6 @@ surface_profile = [
   "Decide each station with its segment's window, o in mm: the R800 top arc (top_edge): accept -0.07 to +0.08, reject below -0.42 or above +0.43; each tip land (tip_land_pos_x, tip_land_neg_x): accept -0.17 to +0.17, reject below -0.33 or above +0.33; each tapered end (profile_outer): accept -0.10 to +0.10, reject below -0.40 or above +0.40; the R816 bottom arc (profile_outer): accept -0.09 to +0.08, reject below -0.42 or above +0.41. Between accept and reject, or off the dial either way, the station is indeterminate: re-check on a CMM. The profile is accepted only when every station accepts.",
   "AUTHOR'S CHOICE guard (ch_rocker_arm_profile_check): each window is the zone, offset by where the template's edge sits in it, shrunk at every point by the template's clocking_error (its own 0.03 mm profile acceptance plus the pins' registration, at most 0.159 mm) and the DTI's 0.0127 mm resolution, rounded inward to 0.01 mm. The template's acceptance and the pin plays are #1413 placeholders, not a calibration; remeasure them before shop acceptance.",
 ]
-
 [[setups.ops]]
 op = 100
 do = "coating"
