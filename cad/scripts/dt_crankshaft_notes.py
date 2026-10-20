@@ -94,7 +94,12 @@ KNOCKOUT_CALLOUT_BELOW = "DRIVE-PIN KNOCKOUT"
 # exact spot is deliberately free.
 FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"
 
-# Where the shop may centre the shaft (drawing-guidelines.md rule 11): the
-# plain Ø9.000 end; never the dome, whose finished sphere carries the punched
-# witness.  Pending owner confirmation (#991).
-CENTRES_NOTE = "CENTRES OK AT PLAIN END ONLY."
+# Where the shop may drill a lathe centre hole (drawing-guidelines.md rule
+# 11): the plain Ø9.000 far end only, never the dome.  The leader to that
+# end's rim is what names the end (rule 7: flag it where it applies); the
+# unleadered "AT PLAIN END" row named an end the sheet never identified.  The
+# restriction is on the centre hole, a turning location: the dome's punched
+# witness (FIDUCIAL_NOTE) is a separate, required mark made by eye on the
+# finished sphere, which a centre hole would destroy.  Three rows fit the
+# field over the isometric.  Pending owner confirmation (#991).
+CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNONE IN DOME"

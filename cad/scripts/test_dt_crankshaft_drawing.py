@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ast
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -374,6 +376,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.PINION_PIN_NOTE_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
+        drawing.CENTRES_NOTE_XY,
         *(symbol for _, symbol in drawing.JOURNAL_FINISHES.values()),
         drawing.COLLAR_REAR_FINISH[1],
         drawing.DRIVE_PIN_CALLOUT_XY,
@@ -619,3 +622,176 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert "    curate_view_dimensions,\n" not in source.replace("\r\n", "\n")
     assert "StationReference" in spec.DRAWING_DIMENSIONS
+
+
+# The isometric's native outline in run 20261020T103553803Z, whose machinist
+# review found the unleadered centres row named no end the sheet identified.
+_RUN_ISO_OUTLINE = (0.3778456, 0.1095392, 0.4181544, 0.2504608)
+# That run's retention-pin note text, measured natively, ended here.
+_RUN_PINION_TEXT_RIGHT = 0.3745611
+
+
+def test_far_end_rim_window_follows_the_native_isometric_projection() -> None:
+    # The outline is the part's bounding box projected (+Y up by sqrt(2/3),
+    # the round Ø20.6 collar's corners by its radius over sqrt(6) each way)
+    # plus one constant margin; the far end's rim centre lies on the axis.
+    x0, y0, x1, y1 = _RUN_ISO_OUTLINE
+    assert ((x0 + x1) / 2.0, (y0 + y1) / 2.0) == pytest.approx(drawing.ISO_CENTER, abs=1e-6)
+    margin = ((x1 - x0) - math.sqrt(2.0) * spec.COLLAR_DIA / 1000.0) / 2.0
+    corner_rise = spec.COLLAR_DIA / math.sqrt(6.0) / 1000.0
+    assert drawing.FAR_END_ISO_XY == pytest.approx(
+        (drawing.ISO_CENTER[0], y1 - margin - corner_rise), abs=1e-5
+    )
+    window = drawing.FAR_END_ISO_RIM_WINDOW
+    assert window[0] < drawing.FAR_END_ISO_XY[0] < window[2]
+    assert window[1] < drawing.FAR_END_ISO_XY[1] < window[3] < y1 - margin
+
+
+def test_centres_note_text_fits_its_field_over_the_isometric() -> None:
+    # Sized like the pin-location rows (2.75 mm a character) at the
+    # retention-pin test's 1.7 x 3.5 mm row pitch, the block needs no shift
+    # in the field left clear of that run's measured retention-pin text.
+    rows = notes.CENTRES_NOTE.splitlines()
+    x, y = drawing.CENTRES_NOTE_XY
+    text = (
+        x,
+        y - 1.7 * 0.0035 * len(rows),
+        x + _CALLOUT_CHAR_WIDTH * max(map(len, rows)),
+        y,
+    )
+    field = drawing._centres_note_field(_RUN_PINION_TEXT_RIGHT)
+    assert drawing._shift_into_field(text, field, drawing.NOTE_FIELD_MARGIN) == (0.0, 0.0)
+    assert drawing.NOTE_TEXT_GAP >= 0.0035  # one 3.5 mm text height of air
+    assert field[0] == pytest.approx(_RUN_PINION_TEXT_RIGHT + drawing.NOTE_TEXT_GAP)
+    assert field[1] == pytest.approx(drawing.FAR_END_ISO_RIM_WINDOW[3] + drawing.NOTE_TEXT_GAP)
+    assert field[2] < 0.4191 and field[3] < 0.2667  # ASME B inner border
+
+
+class _CircleEdge:
+    """IEdge double whose ICurve is a circle (or a line) in model mm."""
+
+    def __init__(
+        self, centre_mm: tuple[float, float, float], radius_mm: float, *, circle: bool = True
+    ) -> None:
+        self.curve = SimpleNamespace(
+            IsCircle=lambda: circle,
+            CircleParams=(*(c / 1000.0 for c in centre_mm), 0.0, 1.0, 0.0, radius_mm / 1000.0),
+        )
+
+    def GetCurve(self):  # noqa: N802 - the COM member name
+        return self.curve
+
+
+def _far_rim(**overrides) -> _CircleEdge:
+    centre = overrides.pop("centre", (0.0, spec.SHAFT_LENGTH, 0.0))
+    radius = overrides.pop("radius", spec.PINION_SEAT_DIA / 2.0)
+    return _CircleEdge(centre, radius, **overrides)
+
+
+def _iso_fakes(monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing,
+        "visible_component_entities",
+        lambda view, component, kind: list(edges) if kind == 1 else [],
+    )
+    view = SimpleNamespace(GetVisibleComponents=lambda: ("dt-crankshaft",))
+    adapter = SimpleNamespace(_attempt=lambda operation, **kwargs: operation())
+    return adapter, view
+
+
+def _iso_distractors() -> list[_CircleEdge]:
+    # The seat step's two circles share the seat's and shank's radii at
+    # SEAT_STEP; the far face's straight seam is no circle.
+    return [
+        _CircleEdge((0.0, spec.SEAT_STEP, 0.0), spec.PINION_SEAT_DIA / 2.0),
+        _CircleEdge((0.0, spec.SEAT_STEP, 0.0), spec.SHAFT_DIA / 2.0),
+        _far_rim(circle=False),
+    ]
+
+
+def test_far_end_rim_is_the_one_plain_end_circle(monkeypatch: pytest.MonkeyPatch) -> None:
+    rim = _far_rim()
+    adapter, view = _iso_fakes(monkeypatch, [*_iso_distractors(), rim])
+    assert drawing._far_end_rim(adapter, view) is rim
+
+
+@pytest.mark.parametrize(
+    "edges",
+    (
+        pytest.param([], id="missing"),
+        pytest.param([_far_rim(), _far_rim()], id="ambiguous"),
+        pytest.param([_far_rim(centre=(0.0, spec.SHAFT_LENGTH - 0.01, 0.0))], id="station"),
+        pytest.param([_far_rim(radius=spec.SHAFT_DIA / 2.0)], id="radius"),
+        pytest.param([_far_rim(centre=(0.01, spec.SHAFT_LENGTH, 0.0))], id="off-axis"),
+    ),
+)
+def test_far_end_rim_refuses_a_missing_or_ambiguous_rim(
+    monkeypatch: pytest.MonkeyPatch, edges: list[_CircleEdge]
+) -> None:
+    adapter, view = _iso_fakes(monkeypatch, [*_iso_distractors(), *edges])
+    with pytest.raises(RuntimeError, match="expected exactly one"):
+        drawing._far_end_rim(adapter, view)
+
+
+def test_centres_note_is_attached_to_the_far_end_rim_on_the_isometric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rim = _far_rim()
+    adapter, iso = _iso_fakes(monkeypatch, [*_iso_distractors(), rim])
+    note, model = object(), object()
+    calls: dict[str, tuple] = {}
+
+    def attach(adapter_, view, **kwargs):
+        calls["attach"] = (adapter_, view, kwargs)
+        return note
+
+    def place(drawing_model, placed, field, *, hole, label):
+        calls["place"] = (drawing_model, placed, field, hole, label)
+        return field
+
+    monkeypatch.setattr(drawing, "add_attached_note", attach)
+    monkeypatch.setattr(drawing, "_place_note_text_in_field", place)
+
+    assert drawing._add_centres_note(adapter, model, iso, clear_of_x=0.37) is note
+    adapter_, view, kwargs = calls["attach"]
+    assert adapter_ is adapter and view is iso
+    assert kwargs["entity"] is rim
+    assert kwargs["text"] is notes.CENTRES_NOTE
+    assert kwargs["note_xy"] == drawing.CENTRES_NOTE_XY
+    assert calls["place"] == (
+        model,
+        note,
+        drawing._centres_note_field(0.37),
+        drawing.FAR_END_ISO_RIM_WINDOW,
+        kwargs["label"],
+    )
+
+
+def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
+    # The unleadered general-note row is gone, not kept beside the leadered one.
+    assert not hasattr(drawing, "add_note")
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    users = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and any(
+            isinstance(arg, ast.Name) and arg.id == "CENTRES_NOTE"
+            for arg in (*node.args, *(kw.value for kw in node.keywords))
+        )
+    ]
+    assert [ast.unparse(node.func) for node in users] == ["add_attached_note"]
+    (build,) = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    ]
+    placements = [
+        node
+        for node in ast.walk(build)
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "_add_centres_note"
+    ]
+    assert len(placements) == 1
+    (clear_of,) = [kw.value for kw in placements[0].keywords if kw.arg == "clear_of_x"]
+    assert ast.unparse(clear_of) == "pinion_text[2]"
