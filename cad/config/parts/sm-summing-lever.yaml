@@ -5,26 +5,31 @@ sm-summing-lever:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock"
+  # Option A: uniform coefficient slab X0..44.45, Y-4.46..2.54, Z+/-76.20,
+  # 7.00 thick downward from the unchanged spring top; counter web stays
+  # 5.08 centred. Shared positive rib: R15.24 wrap, tangent flanks and R1
+  # blends into both coefficient faces at X35.75. R1 MAX root blends are
+  # restricted to reentrant rib-side plate/cylinder junctions, without
+  # tangent propagation onto receiver entry caps or knife shoulders.
+  # Spring/nut seats, Ø0.15 pattern, receiver8.20 and #1769 footprint stay put.
+  # Pad/ledge exceptions are eliminated; knife roots remain separate debt.
+  # Intended drawing reduction 9 -> 6 views awaits native regeneration.
+  # Native underside/swept-clearance and measured installed balance remain open.
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
       where: "the knife-seat and 20-hole spring-pattern position frame (Ø0.15 RFS)"
       finding: "pattern position frame over-specified (rule 5)"
       reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
-    # TODO(#1625): remove RV-02 when the title block gains its inside-corner
-    # default and this lever models R0.5 MAX stub roots / R0.4 MAX rib ends.
+    # Only unchanged knife-stub roots remain under RV-02; the modelled bounded
+    # body-root blends are no longer accepted as sharp internal corners.
     - id: "RV-02"
       kind: "accept"
-      where: "internal corners at the rib, web, boss, cylinder and plate junctions, the plate-to-pad step and the stub-to-end-rib shoulders"
-      finding: "sharp internal corners with no stated fillet or maximum radius (rules 11, 16)"
-      reason: "owner ruling 2026-10-18: machined from solid with an R1.0 MAX inside-corner ceiling; the shop-wide default goes in the title block under #1625, which also adds the local R0.5 MAX stub-root and R0.4 MAX rib-end limits (owner-accepted)"
+      where: "the unchanged knife-stub-to-end-rib shoulders only"
+      finding: "knife-root internal corners remain sharp; local bounded root geometry is still unresolved (rules 11, 16)"
+      reason: "option A models bounded R1 MAX blends at reentrant rib-side plate/cylinder roots without propagating onto knife shoulders; unchanged knife roots retain the separate #1625 local R0.5 MAX stub-root debt and #1611 material/hardness debt (owner-accepted)"
     - id: "RV-03"
       kind: "accept"
       where: "front view, 2X R138.85 web arcs; words added to the Ø19.05 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"
       finding: "the web arc endpoints are defined only in words added to the boss-diameter callout, and the arc centres are never located"
       reason: "owner ruling 2026-10-18: the arcs are non-functional web clearance, located by the boss Ø19.05 and stub geometry they join (owner-accepted)"
-    - id: "RV-04"
-      kind: "accept"
-      where: "View G, end-rib tip, '(0.44) END RIBS ABOVE PLATE TOP FACE'"
-      finding: "the rib-end height that fixes the flank's slope is given only as the reference value (0.44), and no other dimension defines it"
-      reason: "owner ruling 2026-10-18: the ledge is as modelled, a non-functional consequence of the rib taper (owner-accepted)"

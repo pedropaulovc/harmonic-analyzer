@@ -80,14 +80,13 @@ geometry is casting-shaped, not milling-shaped.
   | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
 
-- **Casting-vs-bar substitution (2 T1 parts are castings in the registry):** `sm-summing-lever` and
-  `fr-rocker-arm-support` carry `material: Gray Cast Iron` in `cad/config/parts/*.yaml`
-  (`ch-connecting-rod` is now 1018 plate, Main ruling 2026-10). The support is a **benign**
-  substitution — it cuts fine from bar. The **lever is
-  not** — its ribbed/leaf organic form is casting-native and hogging it from solid means 4–5 setups
-  around cantilevered plates. Decide **cast, fabricate (weld/silver-solder up from simple stock), or
-  accept the multi-setup hog** before you start; the support is just a stock choice, the lever is a
-  real decision.
+- **Casting-vs-bar substitution:** `fr-rocker-arm-support` is a benign stock
+  substitution; the **`sm-summing-lever` now explicitly uses a machined-from-solid
+  route** in its registry. Option A simplifies its coefficient side to a uniform
+  7.00 mm slab and one shared tangent rib profile, but does not turn the retained
+  cylinder, counter web and delicate knife trunnions into a simple plate part.
+  Plan the multi-setup workholding and cutter access for the actual solid; the
+  setup count and machining clearance still need native/CAM qualification.
   - **`sm-knife-mount` is a material *conflict*, not a settled casting:** its registry
     (`parts/sm-knife-mount.yaml`) and assessment §6 say **Brass**, but `build_sm_knife_mount.py` hardcodes
     `MATERIAL = "Gray Cast Iron"`. The registry value is what stamps the BOM/drawing custom property, so
@@ -322,27 +321,73 @@ bottoming-tap lead exceeds two pitches by **0.082857 mm**, and the entire
 **0.076133 mm**. This last value is point containment, not a bottom-wall
 thickness or a reduced rule-17 wall floor.
 
-A bounded depth remains necessary: an unbounded MIN drill could enter the
-**5.08 mm plate** beyond the rib, where the receiver axes are inboard of the
-spring-anchor pad and the plate alone cannot meet the unchanged **1.5 mm**
-wall floor. The ordinary ±0.51 band bounds that reach without a special
-tight drill band. `magnifying_bracket_joint_layout` owns the physical stack
-and point/wander proof; section H-H shows the rib-to-plate transition.
+The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
+and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,
+downward to **Y=−4.46 mm**. It is not a recentered 7 mm plate. The separate
+counter-arm web remains **5.08 mm**, centered on Y=0. Every spring station,
+the **Ø0.15 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
+underside seats** are unchanged, as are all #1769 mounting/joint installation
+coordinates. World spring top remains **982.24 mm** and nut seat **975.24 mm**.
+The full-width lower face eliminates the integral underside pad and its step.
 
-View F retains the top-referenced **2.54 ±0.05 mm** receiver-row location
-and the centreline through both taps and the hex centre. The duplicate
-parenthesized 2.54 reference is omitted; it adds no independent requirement.
+All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
+**R1** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
+the negative-X middle-rib contour is unchanged. Reentrant rib-side
+plate/cylinder roots receive modeled, bounded **R1 MAX** blends without
+tangent propagation onto receiver entry caps or knife shoulders, rather
+than a general accepted sharp-corner waiver.
+There is no end ledge or reference-only **(0.44)** contract: the former
+pad/ledge exceptions are removed. The unchanged knife-stub roots remain
+separate manufacturing debt (#1625); knife material/hardness remains #1611.
+This simplification is not a claim that the knife roots are manufacturable.
 
-Section C-C retains the model-owned **5.08 mm** plate-thickness dimension
-under the title-block two-place band. Both visible extension lines begin
-1 mm outside the partial section's inboard cut edge, rather than continuing
-from the outboard extrusion reference across the integral spring pad.
-Only witness routing changes; the measurement, band and plate/pad geometry
-are unchanged.
+The #1761 receiver proof above is retained, not relaxed by the thicker slab:
+the bounded **6.50 ±0.51 mm** drill and **4.95 ±0.05 mm** full thread stay
+inside the **8.20 mm** receiver rib. An unbounded MIN drill remains
+unacceptable. `magnifying_bracket_joint_layout` owns that physical stack and
+point/wander proof. Receiver-row location remains top-referenced
+**2.54 ±0.05 mm**, placing both axes on unchanged local Y=0; increasing the
+plate downward must not move the axes. No receiver, screw, flange or mount
+pose is changed to buy material.
+
+The intended drawing reduction is **9 → 6 views**, pending native
+regeneration/inspection: remove C-C and H-H entirely, combine knife detail
+D and root detail E into **D at 10:1** with all existing knife dimensions,
+root radius and datum A, and retain the ordinary views and both isometrics.
+`PlateThickness@CoefficientsPlate` stays model-owned at **7.00 mm** under
+the ordinary two-place band; a section solely to distinguish plate and
+pad thickness is no longer required. This is source intent, not evidence
+that the regenerated ink, witnesses or clearances have passed.
+
+**Source-only material/gravity estimate (against #1761, b2c8d954).** The gross
+downward box is 10.080 cm³, but it overlaps the existing cylinder and ribs.
+Integrating the source prism unions gives **+5.808 cm³** for the plate
+extension with the old ribs plus **+0.961 cm³** for the shared-rib reprofile:
+**+6.769 cm³ net**. The signed-delta centroid is approximately
+**(22.744, −3.517, −0.0777) mm**, not the final part CG or the centroid of
+only the added material; some old upper-flank material is removed.
+The source first moment is **∫X dV ≈153,950 mm⁴**. With explicitly
+illustrative density **7.2–7.85 g/cm³**, that is about **49–53 g** and
+**10.87–11.85 N·mm** of additional level-pose gravity moment. The estimate
+includes the R1 in-plane rib transitions and overlap subtraction but
+**excludes out-of-plane root-blend changes**. Unchanged cuts cancel only
+under the retained containment/seat contracts. These are ideal-profile
+estimates, not native mass/CG acceptance values.
+
+Added +X weight **reduces the required counter-spring tension**. Its relevant
+installed margin is the force above the measured **initial-tension floor**,
+not catalog maximum load minus operating force and not the full catalog
+force span. `solve_bank_balance` and the default error budget omit lever
+gravity; neither qualifies this change. Native final mass/CG readback
+(including the implemented blends), underside and full swept-clearance
+qualification, and measured installed balance throughout the operating
+poses remain outstanding. The opt-in
+`diagnostics/diag_stock_spring_gravity.py` is an existing native gravity
+probe, not evidence that it has been run for option A.
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
+| **`sm-summing-lever`** | machined-from-solid organic first-class lever; uniform 7.00 coefficient slab, retained centered 5.08 counter web | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× unchanged hex knife trunnions protruding 21.717 each end; 20× #6-32 through-taps in the 7.00 slab @ 7.0565 pitch (Ø2.705 tap drill), anchors locked by underside MHA-CH-14 jam nuts; one #10-24 tap through the Ø19.05×19.05 summation-anchor boss with its retained top jam nut; shared R15.24 tangent positive ribs and modeled bounded R1 MAX body roots | delicate knife ridge; slender trunnions and cantilevered faces complicate workholding; small through-taps require controlled tapping; unchanged knife-root/tool-access debt is separate | multiple setups; native/CAM route not yet qualified | **machined from solid**, per registry; preserve all spring/bracket/mount seats; evaluate hardened knife insert separately (§6) |
 | **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.15 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus 8.92 ±0.15; 46.70 nominal) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.77–9.07; full-form engagement MIN 7.711667 ≥7.239, tip air MIN 0.45. Retain removable medium-strength threadlocker. Unchanged MHA-SM-VN-53 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
@@ -569,9 +614,10 @@ run. No COM, farm, or generated-traveler certification is claimed here.
    also enclose the manufacturing corners. The guard checks the native web at the maximum allowed
    bore against the retained web requirement; `test_dt_cone_gear_drawing` pins the T006 web exception
    (`WEB_EXCEPTIONS_MM`). Keep both when changing the tooth profile or bore bands.
-2. **Decide the `sm-summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
-   insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
-   critical interface.
+2. **Qualify the selected `sm-summing-lever` solid-stock route and the unchanged
+   knife roots/edge.** Option A removes the pad step and rib ledge, not the
+   multi-setup workholding, cutter-access or hardened-insert debt. Native/CAM
+   clearance, mass/CG, swept fit and measured installed balance remain open.
 3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #10-24 hex-head cutover, 2026-10-13): the
    block is clamped to the top-frame casting's integral crossbar by the cut-to-length 18-8 hex-head Bolt
    and new #10 SAE washer on the whole faced top, into a #10-24 bottoming tap and keyed by two blind pressed dowels; the current route is documented above. Its revised native wizard and dimension import require the scoped farm proof; offline tests alone are not native evidence.

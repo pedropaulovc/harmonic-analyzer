@@ -10,6 +10,30 @@ import build_ch_channel_assembly as channel
 import ch_vn_channel_spring_stock_geom as channel_stock
 import sm_gooseneck_geom
 import spring_mount_geom
+import sm_summing_lever_spec as lever
+from stock_anchor_geom import ANCHOR_9489T111 as anchor
+
+
+def test_uniform_plate_preserves_anchor_and_nut_installation_coordinates() -> None:
+    """Thickening downward must not lift a spring or move any channel seat."""
+    assert spring_mount_geom.KNIFE == (-15.0, 979.7)
+    assert spring_mount_geom.PLATE_TOP_Y == pytest.approx(982.24)
+    assert spring_mount_geom.PLATE_BOTTOM_Y == pytest.approx(975.24)
+    assert (
+        spring_mount_geom.PLATE_TOP_Y - spring_mount_geom.PLATE_BOTTOM_Y
+    ) == pytest.approx(lever.COEFFICIENT_T)
+    assert spring_mount_geom.CHANNEL_ANCHOR_XY == pytest.approx((24.85, 991.765))
+    assert (
+        spring_mount_geom.CHANNEL_ANCHOR_XY[1] + anchor.thread_start_y_mm
+    ) == pytest.approx(spring_mount_geom.PLATE_TOP_Y)
+    assert channel.CHANNEL_ANCHOR_NUT_XY == pytest.approx((24.85, 975.24))
+    # The nut's bearing face is local z=0; +Z must still point downward.
+    assert channel.CHANNEL_ANCHOR_NUT_ROWS[2] == [0.0, -1.0, 0.0]
+    assert lever.HOLE_COUNT == 20
+    for index in range(lever.HOLE_COUNT):
+        station = channel.z_station(index) + channel.ARM_MID_DZ
+        assert station == pytest.approx(-70.62825 + 7.0565 * index)
+        assert station == pytest.approx(lever.HOLE_Z_FIRST + lever.CHANNEL_PITCH * index)
 
 
 def test_counter_leading_half_turn_clears_tube_and_head() -> None:

@@ -567,13 +567,29 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   guide friction. Verify assembly fit and measured force curves before closing
   #747. The minimum magnifier pose remains #748 and the cam-home phase remains
   #749; this preload correction changes neither limitation.
-  Lower anchors are **9489T111 #6-32**, supplied nuts omitted and shank trimmed
-  to 6.668 mm, which stops the cut end 1.588 mm (1/16 in) above the coefficient
-  plate's underside and leaves 3.493 mm of thread engaged, and
-  **9490T1 #10-24**, shank trimmed to 19.05 mm. Both thread directly into the
-  summing lever; there are no nuts at the plate or boss. Existing upper lever
-  holes are retained, with no upper pins. The gooseneck head is Ø12 mm to retain
-  the counter's double loop.
+  Lower anchors are **9489T111 #6-32**, supplied hex nuts discarded, shanks
+  trimmed to **18.6 mm** (**31.3 mm** overall to eye crown), each locked by
+  an **MHA-CH-14 jam nut** on the coefficient plate underside. The neck seats
+  on the fixed plate top; one turn maximum back-out is retained for preload
+  trim, then the nut is tightened while holding eye clocking. The uniform
+  **7.00 mm** coefficient plate spans local **Y=−4.46..+2.54 mm**; it is
+  thickened downward, not recentered. This retains the world top **982.24 mm**,
+  nut seat **975.24 mm**, all twenty stations and the **Ø0.15 RFS** pattern.
+  Worst-case anchor sizing retains two full turns beyond the jam nut through
+  the 6.49–7.51 mm plate limits. The counter **9490T1 #10-24** keeps its
+  boss-through trim and top jam nut; neither counter anchor nor boss pose
+  changes. Existing upper lever holes are retained, with no upper pins.
+  The gooseneck head remains Ø12 mm to retain the counter's double loop.
+  Option A's source-union estimate is **+6.769 cm³**, approximately **49–53 g**
+  only at illustrative density 7.2–7.85 g/cm³; its signed-change centroid is
+  **(22.744, −3.517, −0.0777) mm**, not the final part CG. The corresponding
+  level-pose gravity moment is **10.87–11.85 N·mm**, excluding out-of-plane
+  root-blend changes (derivation and limits in [machining DFM](machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface)).
+  Added +X gravity reduces required counter tension: the installed margin
+  that matters is force above the measured initial-tension floor, not catalog
+  maximum-minus-force or full catalog span. The default static balance/error
+  budget omits lever gravity. Native mass/CG, underside and operating-pose
+  swept-clearance checks, and measured installed balance remain outstanding.
   Assembly seating uses the native supplier surfaces, not the ideal-circle
   offsets used to initialize the model. Supplier and replica probes found the
   same 3.7–4.4 µm departure from the nominal round-wire envelope at the counter

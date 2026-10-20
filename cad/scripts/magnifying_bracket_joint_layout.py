@@ -81,6 +81,9 @@ RIB_DEPTH = 8.2
 POSITION_BAND = 0.05
 DRILLED_DIAMETER_PLUS = 0.10
 RIB_DEPTH_BAND = LINEAR_BAND  # the title block's: the rib takes no native band
+# Independent lateral rule-17 requirement on the receiver's actual asymmetric
+# tangent profile. Axial drill-point reserve below is containment, NOT a wall.
+RECEIVER_WALL_MIN = 2.0
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
 EDGE_BREAK = 0.25

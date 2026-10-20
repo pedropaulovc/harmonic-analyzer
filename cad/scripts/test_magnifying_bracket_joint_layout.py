@@ -13,11 +13,11 @@ import _interference_contracts as interference
 import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
 import build_sm_summing_assembly as summing
-import build_sm_summing_lever as lever_build
 import _cone_axis_constants as installation
 import magnifying_bracket_joint_layout as joint
 import sm_knife_mount_spec as knife_mount
 import sm_summing_lever_spec as lever
+import sm_summing_lever_profile as lever_profile
 import mg_vn_magnifying_bracket_screw_spec as screw
 from _buildgraph import SCRIPTS_DIR, module_deps_of
 from _hole_spec import THREAD_MAJOR_MM
@@ -263,35 +263,39 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
     )
     assert spring_web == pytest.approx(7.3053, abs=1e-4)
     assert spring_web >= 2.0
-    # The receiver rib is the build's own -Z edge-rib profile: a slant from the
-    # arc top, clipped by a vertical end face at RIB_PLATE_REACH. Its x-intercept
-    # comes from two profile points, so a rib pulled in to a point at the end
-    # face (slant_reach == reach) is measured as built, not as the plate's width.
-    reach = lever_build.RIB_PLATE_REACH
-    rise = lever_build.edge_rib_half_height(0.0)
-    end_rise = lever_build.edge_rib_half_height(reach)
-    slant_reach = reach * rise / (rise - end_rise)
-    tap_x = max(point[0] for point in joint.LEVER_HOLE_POINTS)
-    # The whole thread envelope sits inboard of the end face, under the slant.
-    assert tap_x + thread_radius + joint.POSITION_BAND < reach - joint.LINEAR_BAND
-    rib_half_height = lever_build.edge_rib_half_height(tap_x)
-    rib_normal_margin = (
-        rib_half_height / math.hypot(1.0, rise / slant_reach) - thread_radius
+    # Both coefficient faces are fixed by the new asymmetric section. Test
+    # the actual circle/line/R1 union, not the obsolete symmetric half-height.
+    for x, y, _z in joint.LEVER_HOLE_POINTS:
+        lower, upper = lever_profile.rib_bounds(x)
+        assert lower < lever.COEFFICIENT_BOTTOM_Y < y
+        assert y < lever.COEFFICIENT_TOP_Y < upper
+        assert upper != pytest.approx(-lower)
+        assert x + thread_radius + joint.POSITION_BAND < (
+            lever_profile.PROFILE.reach - joint.LINEAR_BAND
+        )
+        # At these two stations the closest nominal boundary lies on a flank,
+        # between its circle and runout tangencies. Use its true normal.
+        flank_margins = []
+        for branch in (lever_profile.UPPER, lever_profile.LOWER):
+            assert branch.wrap_xy[0] < x < branch.flank_xy[0]
+            nx, ny = branch.normal_xy
+            flank_margins.append(
+                lever_profile.PROFILE.wrap_radius - nx * x - ny * y - thread_radius
+            )
+        nominal_wall = lever_profile.receiver_wall_margin(x, y, thread_radius)
+        assert nominal_wall == pytest.approx(min(flank_margins))
+        assert nominal_wall >= 2.0
+    # Enumerate ordinary shape/plate bands and real top/free-edge correlations.
+    # Each result already charges maximum diameter and deepest drill wander.
+    walls = lever_profile.receiver_wall_budget()
+    assert tuple(wall.x_mm for wall in walls) == tuple(
+        point[0] for point in joint.LEVER_HOLE_POINTS
     )
-    assert rib_normal_margin == pytest.approx(3.69158, abs=1e-5)
-    arc_min = rise - joint.LINEAR_BAND
-    width_max = slant_reach + joint.LINEAR_BAND
-    from_slant_end_min = slant_reach - tap_x - joint.POSITION_BAND
-    # The row is located from the plate top, which the plate's title-block
-    # thickness band moves by half that band about the pivot mid-plane; the
-    # drill wanders laterally at its deepest reach.
-    row_max = joint.POSITION_BAND + joint.LINEAR_BAND / 2.0
-    rib_wall_min = (
-        (arc_min * from_slant_end_min - width_max * row_max)
-        / math.hypot(arc_min, width_max) - thread_radius - joint.DRILL_WANDER_MAX
-    )
-    assert rib_wall_min == pytest.approx(3.15502, abs=1e-5)
-    assert rib_wall_min >= 2.0
+    for wall in walls:
+        assert wall.upper_mm >= 2.0
+        assert wall.lower_mm >= 2.0
+        assert wall.minimum_mm >= 2.0
+        assert wall.minimum_mm == pytest.approx(min(wall.upper_mm, wall.lower_mm))
     # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
     # Separate X/Z extremes are conservative.
     spring_position = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0

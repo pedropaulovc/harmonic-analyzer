@@ -31,7 +31,10 @@ KNIFE = (-15.0, 979.7)
 KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
-PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.PLATE_T / 2.0
+# The uniform coefficient slab grows downward from its fixed spring top.
+# Use its authored faces, never +/- half its thickness about the knife.
+PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_TOP_Y
+PLATE_BOTTOM_Y = KNIFE[1] + sm_summing_lever_spec.COEFFICIENT_BOTTOM_Y
 CHANNEL_ANCHOR_XY = (
     KNIFE[0] + sm_summing_lever_spec.HOLE_X,
     PLATE_TOP_Y - ANCHOR_9489T111.thread_start_y_mm,
