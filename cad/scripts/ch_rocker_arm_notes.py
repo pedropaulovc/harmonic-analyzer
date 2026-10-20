@@ -113,7 +113,7 @@ BUILT_UP_PERMISSION_NOTE = (
 
 # Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3). The common arc
 # centre's location is no longer a general note: it rides R800's own
-# below-text rows (TOP_RADIUS_CALLOUT), at the feature it governs (rule 7).
+# below-text callout (TOP_RADIUS_CALLOUT), at the feature it governs (rule 7).
 DRAWING_NOTES = "\n".join(
     (
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
@@ -172,7 +172,7 @@ ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
 # rows under R816 (above-text line breaks print as one run).
 BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{R_TOP:.0f}"
 # That shared centre sits on A's axis (x = 0 in the clocked A|B|C frame; the
-# 1:2 view cannot reach it): below-text rows under R800, the former note 1.
+# 1:2 view cannot reach it): one below-text row under R800, the former note 1.
 # Detail E's native BASIC angle defines the radial lands, so no note narrates
 # their direction either.
-TOP_RADIUS_CALLOUT = "CENTRE DIRECTLY\nABOVE A"
+TOP_RADIUS_CALLOUT = "CENTRE ABOVE A"

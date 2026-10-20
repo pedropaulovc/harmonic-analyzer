@@ -546,16 +546,19 @@ vertical witness does not graze `DETAIL E`; retain the independent 3 mm
 crop/title-rule clearance guards and leave D's caption centred.
 
 The common arc-centre location then left the general notes for the feature
-it governs (drawing-guidelines rule 7): `TOP_RADIUS_CALLOUT` (`CENTRE
-DIRECTLY` / `ABOVE A`) is written as R800's below-text rows through the same
-strict `SetText(4)`/`GetText(4)` readback `_dress_arc_radii` already used for
-R816's `CONCENTRIC WITH R800`, and the notes are two lines (hub wall, built-up
+it governs (drawing-guidelines rule 7): `TOP_RADIUS_CALLOUT` (`CENTRE ABOVE A`)
+is written as one R800 below-text row through the same strict
+`SetText(4)`/`GetText(4)` readback `_dress_arc_radii` already used for R816's
+`CONCENTRIC WITH R800`, and the notes are two lines (hub wall, built-up
 permission). Only presentation moved: the source centre stays (0, 816) and
 the pivot (0, 8), both anchored to x = 0 in `build_ch_rocker_arm`; the native
 BASIC 8, R800, R816, the 2X angle and the profile-frame control scheme are
 unchanged, and no 808 driving dimension or new band exists. R800's text
-request moves from 132/156 to **120/156 mm** so the two below-text blocks
-clear each other (source hypothesis, not native proof). Provenance: the
+request moves from 132/156 to **120/160 mm**. The base native audit shows the
+left 132.76 BASIC box reaches y = 149.8 mm: a two-row R800 callout at y = 156
+would route its shoulder through the box. One row and the 4 mm raise leave
+the projected shoulder about 3.6 mm above it. This projection still requires
+fresh native proof; request coordinates are not ink bounds. Provenance: the
 reviewed main PDF is
 `c70f077f3848ef1eb32a2f94129d33c39cadd7f2e3250587e6a0c73147bc3510`, the
 prior #1704 SHIP PDF

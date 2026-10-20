@@ -325,9 +325,9 @@ _BOT_END_Y = CENTER_Y - math.sqrt(R_BOTTOM**2 - BOT_END_X**2)
 OVERALL_WIDTH_TEXT_XY = (FRONT_CENTER[0], 0.254)
 # Right taper: its BASIC box at 0.132 printed 1.6 mm into Detail D's view box
 # (r3 layout audit; D's top ~0.1309); at 0.137 it clears it.
-# Left taper: a full row clear of the R800/R816 texts, under R800's two
-# CENTRE rows (down to ~0.149 over x 0.100-0.140) and left of R816's two
-# CONCENTRIC rows (down to ~0.149 over x 0.147-0.173).
+# Left taper: its native BASIC box reaches y ~0.1498, not the request y.
+# R800 therefore uses one below-text row above it; a two-row block would
+# route the radius shoulder through this box (PR #1746 native-audit review).
 TAPER_INTERSECTION_TEXT_XY = (0.219, 0.137)
 LEFT_TAPER_TEXT_XY = (0.127, 0.142)
 LAND_LOCATION_TEXT_XY = (0.219, 0.242)
@@ -1893,11 +1893,11 @@ def _pivot_finish_placement(
 # Every marked model dimension has exactly one face-view owner.
 # The radius texts sit below the strap's left half, outside both parent
 # circles, between the left taper row and the strap: R816's leader lands on
-# the lower arc well left of A's centreline (Opus #1020 review). Both carry
-# two below-text rows (TOP_RADIUS_CALLOUT / BOTTOM_RADIUS_CALLOUT), so R800
-# sits 40 mm left of R816 to keep the two blocks apart.
+# the lower arc well left of A's centreline (Opus #1020 review). R800 has one
+# below-text row and sits 40 mm left of R816's two-row block; its extra 4 mm
+# height keeps the shoulder above the left taper's native BASIC box.
 FRONT_KEEP = {
-    "TopRadius": (0.120, 0.156),
+    "TopRadius": (0.120, 0.160),
     "BottomRadius": (0.160, 0.156),
     "TopAbovePivot": (0.165, 0.191),
 }
@@ -2110,9 +2110,8 @@ def _basic_profile_dimensions(adapter: Any, annotations: list[Any]) -> None:
 
 def _dress_arc_radii(adapter: Any, annotations: list[Any]) -> None:
     """Exterior leaders on both BASIC radii; each states the shared centre in
-    below-text rows set after the BASIC box: R800 locates it directly above A
-    (the former general note 1), R816 its concentricity with R800 (Opus #1020
-    r2 B1)."""
+    below text: R800 locates it above A (the former general note 1), R816 its
+    concentricity with R800 (Opus #1020 r2 B1)."""
     remaining = set(ARC_RADIUS_NAMES)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
