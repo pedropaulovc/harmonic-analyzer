@@ -3,33 +3,54 @@
 This edits copies, never the checked-in templates, and never opens a second
 session. The CLI is a run_build entry point; farm bootstrap callers invoke
 maintain_templates(adapter) inside their existing run_build instead. Website,
-inside-corner and line-weight edits are independent selectable operations.
+general-note ("inside-corner") and line-weight edits are independent
+selectable operations.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
 import re
 import sys
-from typing import Any
+from typing import Any, Iterator
 
 from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 from _com import _early_bound, _read_member
+from _drawing_layout_audit import annotation_display
 from _drawing_registry import DRAWING_TEMPLATES
+from _drawing_scan import _zoomed_on
+from _layout_audit import display_box
 from _part_properties import title_block_properties
 from _paths import CAD_ROOT
 
 OLD_WEBSITE = "harmonic-analyzer.vza.net"
 NEW_WEBSITE = "harmonicanalyzer.com"
 INSIDE_CORNER_LINK = 'INSIDE CORNERS $PRPSHEET:"TOL_INSIDE_CORNER"'
+THREAD_LINK = 'THREADS $PRPSHEET:"THREAD_TYPE" CLASS $PRPSHEET:"THREAD_CLASS"'
+EDGE_BREAK_LINK = (
+    'REMOVE BURRS AND BREAK SHARP EDGES $PRPSHEET:"TOL_EDGE_BREAK_R" '
+    'OR CHAMFER $PRPSHEET:"TOL_CHAMFER_MAX" MAX'
+)
+# Issue #1636: ONE general-note text block, top to bottom, in one font run.
+GENERAL_NOTE_LINES = (INSIDE_CORNER_LINK, THREAD_LINK, EDGE_BREAK_LINK)
+GENERAL_NOTE_LINK = "\r\n".join(GENERAL_NOTE_LINES)
+# The installed templates' two notes that the block replaces (native census,
+# farm run 20261020T034919997Z): the edge-break/thread note, and the separate
+# inside-corner row below the tolerance rows, which is deleted.
+_SOURCE_GENERAL_NOTE = "\r\n".join((EDGE_BREAK_LINK, THREAD_LINK))
+_SOURCE_INSIDE_CORNER_NOTE = "HA_INSIDE_CORNERS"
+_SW_NOTE = 6  # swAnnotationType_e.swNote
+_SW_SF_SYMBOL = 7  # swAnnotationType_e.swSFSymbol
 OPERATIONS = ("website", "inside-corner", "line-weights")
 OUTPUT_DIR = CAD_ROOT / "out" / "templates"
 _CLEARANCE = 0.0004  # Native text-box clearance to existing notes and cell rules.
+_UNIFORM_M = 1e-6  # Rendered rows share x and pitch to a micrometre.
 _LINK = re.compile(r'\$PRPSHEET:"([^"]+)"')
 _FONT_FIELDS = (
     "TypeFaceName",
@@ -280,10 +301,9 @@ def _website(drawing: Any) -> None:
         raise RuntimeError("website replacement did not persist")
 
 
-def _cell(geometry: dict[str, Any], note: dict[str, Any]) -> tuple[float, ...]:
-    """Find the existing ruled cell around the edge-break note, never move it."""
-    x, y, _z = note["position_m"]
-    extent = note["extent_m"]
+def _cell(geometry: dict[str, Any], point: list[float]) -> tuple[float, ...]:
+    """Find the existing ruled cell around a sheet point, never move it."""
+    x, y = point[0], point[1]
     horizontal, vertical = [], []
     for segment in geometry["segments"]:
         if "points_m" not in segment:
@@ -296,150 +316,312 @@ def _cell(geometry: dict[str, Any], note: dict[str, Any]) -> tuple[float, ...]:
     try:
         return (
             max(value for value in vertical if value < x),
-            max(value for value in horizontal if value < extent[1]),
+            max(value for value in horizontal if value < y),
             min(value for value in vertical if value > x),
-            min(value for value in horizontal if value > extent[4]),
+            min(value for value in horizontal if value > y),
         )
     except ValueError as exc:
         raise RuntimeError("cannot identify the existing ruled tolerance cell") from exc
 
 
-def _inside_corner(
-    model: Any,
-    drawing: Any,
-    geometry: dict[str, Any],
-    *,
-    evidence: dict[str, Any],
-) -> dict[str, Any]:
-    notes = _notes(drawing)
-    existing = [
-        note for note in notes if "TOL_INSIDE_CORNER" in note.PropertyLinkedText
-    ]
-    if existing:
-        if (
-            len(existing) != 1
-            or str(existing[0].PropertyLinkedText) != INSIDE_CORNER_LINK
-        ):
-            raise RuntimeError(
-                "inside-corner row is duplicated or has unexpected wording"
-            )
-        evidence["already_present"] = True
-        return evidence
-    edge_notes = [
-        note for note in notes if "TOL_EDGE_BREAK_R" in note.PropertyLinkedText
-    ]
-    if len(edge_notes) != 1:
-        raise RuntimeError(
-            f"expected one linked edge-break note, found {len(edge_notes)}"
-        )
-    edge = edge_notes[0]
+@contextlib.contextmanager
+def _resolved_links(model: Any, drawing: Any) -> Iterator[dict[str, str]]:
+    """Show the configured title-block values in every linked note, then restore.
+
+    A blank template resolves no $PRPSHEET link, so native extents and rendered
+    rows are measured with the literal configured values. Every link is
+    restored, and read back, before anything is saved.
+    """
     props = title_block_properties()
-    originals = [(note, str(note.PropertyLinkedText or "")) for note in notes]
-    # Blank templates cannot resolve PRPSHEET links. Measure literal configured
-    # values temporarily, then restore the links BEFORE saving the template.
+    originals = [(note, str(note.PropertyLinkedText or "")) for note in _notes(drawing)]
     try:
         for note, text in originals:
             resolved = _LINK.sub(lambda match: props.get(match[1], match[0]), text)
             if resolved != text:
                 note.PropertyLinkedText = resolved
         model.GraphicsRedraw2()
-        measured = [_note_census(note) for note in notes]
-        evidence["resolved_existing_notes"] = measured
-        edge_data = _note_census(edge)
-        evidence["edge_break"] = edge_data
-        left, bottom, right, top = _cell(geometry, edge_data)
-        evidence["cell_m"] = [left, bottom, right, top]
-        row = _early_bound(
-            model.InsertNote(f"INSIDE CORNERS {props['TOL_INSIDE_CORNER']}"), "INote"
-        )
-        if row is None:
-            raise RuntimeError("failed to insert inside-corner sheet-format row")
-        annotation = _early_bound(row.GetAnnotation(), "IAnnotation")
-        reference = _early_bound(edge.GetAnnotation(), "IAnnotation")
-        if not annotation.SetTextFormat(0, False, reference.GetTextFormat(0)):
-            raise RuntimeError(
-                "failed to copy edge-break row font to inside-corner row"
-            )
-        if not row.SetName("HA_INSIDE_CORNERS"):
-            raise RuntimeError("failed to name inside-corner row")
-        if not annotation.SetPosition2(*edge_data["position_m"]):
-            raise RuntimeError("failed to measure inside-corner row")
-        model.GraphicsRedraw2()
-        trial = _note_census(row)
-        evidence["trial_row"] = trial
-        if not edge_data["text_runs"] or not trial["text_runs"]:
-            raise RuntimeError(
-                "inside-corner row or reference has no rendered font run"
-            )
-        reference_run, row_run = edge_data["text_runs"][0], trial["text_runs"][0]
-        if reference_run["font"] != row_run["font"] or not math.isclose(
-            reference_run["height_m"], row_run["height_m"], abs_tol=1e-10
-        ):
-            raise RuntimeError(
-                "inside-corner row differs from the rendered edge-break font"
-            )
-        bounds = trial["extent_m"]
-        height = bounds[4] - bounds[1]
-        occupied = sorted(
-            (max(bottom, item["extent_m"][1]), min(top, item["extent_m"][4]))
-            for item in measured
-            if item["extent_m"] is not None
-            and item["extent_m"][0] < right
-            and item["extent_m"][3] > left
-            and item["extent_m"][1] < top
-            and item["extent_m"][4] > bottom
-        )
-        gaps = []
-        cursor = bottom
-        for low, high in occupied:
-            if low - cursor >= height + 2 * _CLEARANCE:
-                gaps.append((cursor, low))
-            cursor = max(cursor, high)
-        if top - cursor >= height + 2 * _CLEARANCE:
-            gaps.append((cursor, top))
-        evidence["gaps_m"] = gaps
-        if not gaps:
-            raise RuntimeError(
-                "no native text gap for inside-corner row without moving existing content"
-            )
-        # Prefer the free row immediately below edge-break; otherwise the largest
-        # free gap in that SAME ruled cell. No unrelated title-block cell is used.
-        low, high = min(
-            gaps,
-            key=lambda gap: (
-                abs(gap[1] - edge_data["extent_m"][1]),
-                -(gap[1] - gap[0]),
-            ),
-        )
-        position = trial["position_m"]
-        # Native readback showed the extent changing after placement, rather
-        # than translating rigidly. Centre the trial box to leave headroom on
-        # both sides; the placed native box must still pass the same guards.
-        target_y = position[1] + (low + high - bounds[1] - bounds[4]) / 2
-        if not annotation.SetPosition2(position[0], target_y, position[2]):
-            raise RuntimeError("failed to position inside-corner row in native gap")
-        model.GraphicsRedraw2()
-        placed = _note_census(row)
-        evidence["gap_m"] = [low, high]
-        evidence["resolved_row"] = placed
-        bounds = placed["extent_m"]
-        if not (
-            bounds[0] >= left + _CLEARANCE
-            and bounds[3] <= right - _CLEARANCE
-            and bounds[1] >= low + _CLEARANCE - 1e-8
-            and bounds[4] <= high - _CLEARANCE + 1e-8
-        ):
-            raise RuntimeError(
-                f"inside-corner row does not fit existing tolerance cell: {placed!r}"
-            )
-        row.PropertyLinkedText = INSIDE_CORNER_LINK
-        if str(row.PropertyLinkedText) != INSIDE_CORNER_LINK:
-            raise RuntimeError("inside-corner property link did not persist")
-        return evidence
+        yield props
     finally:
         for note, text in originals:
             if str(note.PropertyLinkedText or "") != text:
                 note.PropertyLinkedText = text
+        model.GraphicsRedraw2()
+        unrestored = [
+            str(note.GetName())
+            for note, text in originals
+            if str(note.PropertyLinkedText or "") != text
+        ]
+        if unrestored:
+            raise RuntimeError(f"property links did not restore on {unrestored!r}")
+
+
+def _rendered_rows(display: dict[str, Any]) -> list[dict[str, Any]]:
+    """Rendered text rows top-down: display runs sharing a baseline, left to right."""
+    rows: dict[float, list[dict[str, Any]]] = {}
+    for run in sorted(display.get("texts", ()), key=lambda run: run["pos"][0]):
+        rows.setdefault(round(run["pos"][1], 6), []).append(run)
+    return [
+        {
+            "text": "".join(run["t"] for run in runs),
+            "x_m": runs[0]["pos"][0],
+            "y_m": y,
+            "fonts": sorted({run["font"] for run in runs}),
+            "heights_m": sorted({run["h"] for run in runs}),
+            "line_spacings": sorted({run["ls"] for run in runs}),
+        }
+        for y, runs in sorted(rows.items(), reverse=True)
+    ]
+
+
+def _block_layout(
+    adapter: Any, drawing: Any, geometry: dict[str, Any], name: str
+) -> dict[str, Any]:
+    """Measure the resolved block, its ruled cell and every other ink in that cell."""
+    notes = _notes(drawing)
+    block = next((note for note in notes if str(note.GetName()) == name), None)
+    if block is None:
+        raise RuntimeError(f"general-note block {name!r} is missing")
+    annotation = _early_bound(block.GetAnnotation(), "IAnnotation")
+    anchor = _numbers(annotation.GetPosition())
+    left, bottom, right, top = _cell(geometry, anchor)
+    # GetExtent reads to the window pixel: measure zoomed onto the cell.
+    half = max(right - left, top - bottom) / 2 + 2 * _CLEARANCE
+    with _zoomed_on(adapter, ((left + right) / 2, (bottom + top) / 2), half):
+        measured = [_note_census(note) for note in notes]
+    record = next(item for item in measured if item["name"] == name)
+    display, refused = annotation_display(adapter, annotation)
+    if refused:
+        raise RuntimeError(f"general-note display data refused reads: {refused!r}")
+    others = [
+        (item["name"], item["extent_m"])
+        for item in measured
+        if item["name"] != name and item["extent_m"] is not None
+    ]
+    # The surface-finish vee is found explicitly (IView.GetFirstSFSymbol /
+    # ISFSymbol.GetNext), never only through GetAnnotations: the cell's one
+    # vee must be present with drawn ink, so its bounds cannot fail open.
+    view = _early_bound(drawing.GetFirstView(), "IView")
+    symbols = []
+    raw = view.GetFirstSFSymbol()
+    while raw is not None:
+        symbol = _early_bound(raw, "ISFSymbol")
+        other = _early_bound(symbol.GetAnnotation(), "IAnnotation")
+        kind = int(other.GetType())
+        label = f"{other.GetName()} (annotation type {kind})"
+        ink, refused = annotation_display(adapter, other)
+        if refused:
+            raise RuntimeError(f"{label} display data refused reads: {refused!r}")
+        box = display_box(ink)
+        if kind != _SW_SF_SYMBOL or box is None:
+            raise RuntimeError(f"surface-finish symbol {label} has no drawn ink")
+        symbols.append(
+            {"annotation": label, "box_m": [box.xmin, box.ymin, box.xmax, box.ymax]}
+        )
+        raw = symbol.GetNext()
+    in_cell = [
+        item
+        for item in symbols
+        if item["box_m"][0] < right
+        and item["box_m"][2] > left
+        and item["box_m"][1] < top
+        and item["box_m"][3] > bottom
+    ]
+    if len(in_cell) != 1:
+        raise RuntimeError(f"expected the cell's one surface-finish vee: {symbols!r}")
+    for item in symbols:
+        xmin, ymin, xmax, ymax = item["box_m"]
+        others.append((item["annotation"], [xmin, ymin, 0.0, xmax, ymax, 0.0]))
+    # Any other non-note sheet-format ink is read as the layout audit reads it.
+    for raw in view.GetAnnotations() or ():
+        other = _early_bound(raw, "IAnnotation")
+        kind = int(other.GetType())
+        if kind in (_SW_NOTE, _SW_SF_SYMBOL):
+            continue
+        label = f"{other.GetName()} (annotation type {kind})"
+        ink, refused = annotation_display(adapter, other)
+        if refused:
+            raise RuntimeError(f"{label} display data refused reads: {refused!r}")
+        box = display_box(ink)
+        if box is not None:
+            others.append((label, [box.xmin, box.ymin, 0.0, box.xmax, box.ymax, 0.0]))
+    occupied = sorted(
+        (max(bottom, extent[1]), min(top, extent[4]), label)
+        for label, extent in others
+        if extent[0] < right
+        and extent[3] > left
+        and extent[1] < top
+        and extent[4] > bottom
+    )
+    free, cursor = [], bottom
+    for low, high, _label in occupied:
+        if low > cursor:
+            free.append([cursor, low])
+        cursor = max(cursor, high)
+    if top > cursor:
+        free.append([cursor, top])
+    spans = [span for span in free if span[0] <= anchor[1] <= span[1]]
+    if len(spans) != 1:
+        raise RuntimeError(
+            f"general-note anchor {anchor!r} is in no single free span: {free!r}"
+        )
+    return {
+        "cell_m": [left, bottom, right, top],
+        "free_spans_m": free,
+        "span_m": spans[0],
+        "occupied": [list(item) for item in occupied],
+        "sf_symbols": symbols,
+        "block": record,
+        "rows": _rendered_rows(display),
+    }
+
+
+def _require_block(layout: dict[str, Any], props: dict[str, str]) -> None:
+    """The block reads the exact ordered lines in one font, uniformly spaced,
+    clear of the cell rules and of every other ink in its cell."""
+    expected = [
+        _LINK.sub(lambda match: props[match[1]], line) for line in GENERAL_NOTE_LINES
+    ]
+    record, rows = layout["block"], layout["rows"]
+    if record["text"].splitlines() != expected:
+        raise RuntimeError(f"general-note text {record['text']!r} is not {expected!r}")
+    if [row["text"].rstrip() for row in rows] != expected:
+        raise RuntimeError(f"general-note rendered rows {rows!r} are not {expected!r}")
+    if len(record["formats"]) != 1 or record["has_multiple_fonts"]:
+        raise RuntimeError(f"general-note block is not one font run: {record!r}")
+    for key in ("fonts", "heights_m", "line_spacings"):
+        values = {value for row in rows for value in row[key]}
+        # A font must be named and a height drawn; spacing need only agree.
+        if len(values) != 1 or (key != "line_spacings" and not all(values)):
+            raise RuntimeError(f"general-note rows differ in {key}: {rows!r}")
+    pitches = [upper["y_m"] - lower["y_m"] for upper, lower in zip(rows, rows[1:])]
+    if (
+        max(row["x_m"] for row in rows) - min(row["x_m"] for row in rows) > _UNIFORM_M
+        or min(pitches) <= 0
+        or max(pitches) - min(pitches) > _UNIFORM_M
+    ):
+        raise RuntimeError(f"general-note rows are not uniformly spaced: {rows!r}")
+    left, _bottom, right, _top = layout["cell_m"]
+    low, high = layout["span_m"]
+    box = record["extent_m"]
+    if not (
+        box[0] >= left + _CLEARANCE
+        and box[3] <= right - _CLEARANCE
+        and box[1] >= low + _CLEARANCE
+        and box[4] <= high - _CLEARANCE
+    ):
+        raise RuntimeError(
+            f"general-note block does not clear its cell and neighbours: {layout!r}"
+        )
+
+
+def _inside_corner(
+    adapter: Any,
+    model: Any,
+    drawing: Any,
+    geometry: dict[str, Any],
+    *,
+    evidence: dict[str, Any],
+) -> dict[str, Any]:
+    """Consolidate the general notes into one ordered, uniformly spaced block."""
+    notes = _notes(drawing)
+    blocks = [
+        note
+        for note in notes
+        if "TOL_EDGE_BREAK_R" in str(note.PropertyLinkedText or "")
+    ]
+    if len(blocks) != 1:
+        raise RuntimeError(f"expected one linked edge-break note, found {len(blocks)}")
+    block = blocks[0]
+    name = str(block.GetName())
+    evidence["block"] = name
+    linked = str(block.PropertyLinkedText)
+    separate = [
+        note
+        for note in notes
+        if str(note.GetName()) != name
+        and "TOL_INSIDE_CORNER" in str(note.PropertyLinkedText or "")
+    ]
+    if linked == GENERAL_NOTE_LINK and not separate:
+        evidence["already_present"] = True
+        return evidence
+    if (
+        linked != _SOURCE_GENERAL_NOTE
+        or [str(note.GetName()) for note in separate] != [_SOURCE_INSIDE_CORNER_NOTE]
+        or str(separate[0].PropertyLinkedText) != INSIDE_CORNER_LINK
+    ):
+        raise RuntimeError(
+            f"unexpected general-note source: {name}={linked!r}, separate "
+            f"{[(str(n.GetName()), str(n.PropertyLinkedText)) for n in separate]!r}"
+        )
+    obsolete = _early_bound(separate[0].GetAnnotation(), "IAnnotation")
+    model.ClearSelection2(True)
+    if not obsolete.Select2(False, 0):
+        raise RuntimeError("failed to select the separate inside-corner note")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    # DeleteSelection2 never prompts; 0 = no absorbed/child/advanced flags.
+    if not extension.DeleteSelection2(0):
+        raise RuntimeError("DeleteSelection2 refused the separate inside-corner note")
+    model.ClearSelection2(True)
+    survivors = [
+        str(note.GetName())
+        for note in _notes(drawing)
+        if str(note.GetName()) == _SOURCE_INSIDE_CORNER_NOTE
+        or (
+            str(note.GetName()) != name
+            and "TOL_INSIDE_CORNER" in str(note.PropertyLinkedText or "")
+        )
+    ]
+    if survivors:
+        raise RuntimeError(
+            f"separate inside-corner note survived deletion: {survivors!r}"
+        )
+    # The same native note keeps its font, justification and anchor x.
+    block.PropertyLinkedText = GENERAL_NOTE_LINK
+    if str(block.PropertyLinkedText) != GENERAL_NOTE_LINK:
+        raise RuntimeError("general-note property links did not persist")
+    annotation = _early_bound(block.GetAnnotation(), "IAnnotation")
+    with _resolved_links(model, drawing) as props:
+        trial = _block_layout(adapter, drawing, geometry, name)
+        evidence["trial"] = trial
+        low, high = trial["span_m"]
+        box = trial["block"]["extent_m"]
+        x, y, z = trial["block"]["position_m"]
+        # Centre the measured block in the free span the two old notes shared;
+        # no neighbour moves and no font shrinks to make room.
+        if not annotation.SetPosition2(x, y + (low + high - box[1] - box[4]) / 2, z):
+            raise RuntimeError("failed to position the general-note block")
+        model.GraphicsRedraw2()
+        placed = _block_layout(adapter, drawing, geometry, name)
+        evidence["placed"] = placed
+        _require_block(placed, props)
+    return evidence
+
+
+def _verify_general_note(
+    adapter: Any, model: Any, drawing: Any, geometry: dict[str, Any]
+) -> dict[str, Any]:
+    """Prove the reopened template's block: exact links, then resolved layout."""
+    linked = {
+        str(note.GetName()): str(note.PropertyLinkedText or "")
+        for note in _notes(drawing)
+    }
+    holders = [
+        name
+        for name, text in linked.items()
+        if any(key in text for key in ("TOL_INSIDE_CORNER", "THREAD_TYPE", "TOL_EDGE"))
+    ]
+    if (
+        len(holders) != 1
+        or linked[holders[0]] != GENERAL_NOTE_LINK
+        or _SOURCE_INSIDE_CORNER_NOTE in linked
+    ):
+        raise RuntimeError(
+            f"reopened template lacks the one general-note block: {holders!r}"
+        )
+    with _resolved_links(model, drawing) as props:
+        layout = _block_layout(adapter, drawing, geometry, holders[0])
+        _require_block(layout, props)
+    return layout
 
 
 def _line_weights(model: Any) -> None:
@@ -474,15 +656,41 @@ def _line_weights(model: Any) -> None:
             raise RuntimeError(f"document line font {name} readback differs")
 
 
-def _preserved(before: dict[str, Any], after: dict[str, Any], *, website: bool) -> None:
+def _preserved(
+    before: dict[str, Any],
+    after: dict[str, Any],
+    *,
+    website: bool,
+    consolidated: bool,
+) -> None:
     for key in ("sheet_names", "sheet_properties", "geometry"):
         if before[key] != after[key]:
             raise RuntimeError(f"template maintenance changed existing {key}")
     by_name = {note["name"]: note for note in after["notes"]}
     if len(by_name) != len(after["notes"]):
         raise RuntimeError("template contains duplicate native note names")
+    added = sorted(set(by_name) - {note["name"] for note in before["notes"]})
+    if added:
+        raise RuntimeError(f"template maintenance added notes {added!r}")
+    # The one intentional exception: the edge-break/thread note becomes the
+    # general-note block (its lines, and its anchor's height in the cell), and
+    # the separate inside-corner note is deleted.
+    block = None
+    if consolidated:
+        blocks = [
+            note["name"]
+            for note in before["notes"]
+            if note["linked_text"] == _SOURCE_GENERAL_NOTE
+        ]
+        if len(blocks) != 1:
+            raise RuntimeError(f"expected one source general note, found {blocks!r}")
+        block = blocks[0]
     for original in before["notes"]:
         current = by_name.get(original["name"])
+        if consolidated and original["name"] == _SOURCE_INSIDE_CORNER_NOTE:
+            if current is not None:
+                raise RuntimeError("separate inside-corner note was not deleted")
+            continue
         if current is None:
             raise RuntimeError(f"lost original template note {original['name']!r}")
         for key in (
@@ -496,6 +704,11 @@ def _preserved(before: dict[str, Any], after: dict[str, Any], *, website: bool) 
             expected = original[key]
             if key == "linked_text" and website:
                 expected = expected.replace(OLD_WEBSITE, NEW_WEBSITE)
+            if original["name"] == block:
+                if key == "linked_text":
+                    expected = GENERAL_NOTE_LINK
+                elif key == "position_m":
+                    expected = [expected[0], current[key][1], expected[2]]
             if current[key] != expected:
                 raise RuntimeError(f"template note {original['name']!r} changed {key}")
 
@@ -550,6 +763,7 @@ def maintain_templates(
                     placement: dict[str, Any] = {}
                     report["inside_corner_placement"] = placement
                     _inside_corner(
+                        adapter,
                         model,
                         drawing,
                         report["before"]["geometry"],
@@ -561,8 +775,12 @@ def maintain_templates(
                 model.ClearSelection2(True)
                 model.GraphicsRedraw2()
                 report["edited"] = _census(model)
+            placement = report.get("inside_corner_placement")
             _preserved(
-                report["before"], report["edited"], website="website" in operations
+                report["before"],
+                report["edited"],
+                website="website" in operations,
+                consolidated=bool(placement) and not placement.get("already_present"),
             )
             original_weights = report["before"]["line_weights"]
             edited_weights = report["edited"]["line_weights"]
@@ -590,6 +808,9 @@ def maintain_templates(
                 }
                 if not ok or errors or not output.is_file():
                     raise RuntimeError(f"template SaveAs3 failed: {report['save']!r}")
+                report["output_sha256"] = hashlib.sha256(
+                    output.read_bytes()
+                ).hexdigest()
             with _telemetry.span("templates.reopen", layout=str(layout)):
                 title = str(model.GetTitle())
                 adapter.currentModel = None
@@ -605,25 +826,23 @@ def maintain_templates(
                 model = _early_bound(model, "IModelDoc2")
                 adapter.currentModel = model
                 report["reopened"] = _census(model)
-                _preserved(report["edited"], report["reopened"], website=False)
+                _preserved(
+                    report["edited"],
+                    report["reopened"],
+                    website=False,
+                    consolidated=False,
+                )
                 if "inside-corner" in operations:
-                    inside_rows = [
-                        note
-                        for note in report["reopened"]["notes"]
-                        if "TOL_INSIDE_CORNER" in note["linked_text"]
-                    ]
-                    if (
-                        len(inside_rows) != 1
-                        or inside_rows[0]["linked_text"] != INSIDE_CORNER_LINK
-                    ):
-                        raise RuntimeError(
-                            "reopened template does not have exactly one linked inside-corner row"
+                    # Resolved readback of the PERSISTED block; never saved.
+                    reopened = _early_bound(model, "IDrawingDoc")
+                    reopened.EditTemplate()
+                    try:
+                        report["inside_corner_reopened"] = _verify_general_note(
+                            adapter, model, reopened, report["reopened"]["geometry"]
                         )
-                    if not report["inside_corner_placement"].get("already_present"):
-                        if inside_rows[0]["name"] != "HA_INSIDE_CORNERS":
-                            raise RuntimeError(
-                                "reopened inside-corner row lost its native name"
-                            )
+                    finally:
+                        reopened.EditSheet()
+                        model.ClearSelection2(True)
                 if (
                     report["edited"]["line_weights"]
                     != report["reopened"]["line_weights"]
@@ -633,7 +852,9 @@ def maintain_templates(
                     )
             if hashlib.sha256(source.read_bytes()).hexdigest() != source_digest:
                 raise RuntimeError("checked-in source template was modified")
-            report["output_sha256"] = hashlib.sha256(output.read_bytes()).hexdigest()
+            saved = hashlib.sha256(output.read_bytes()).hexdigest()
+            if saved != report["output_sha256"]:
+                raise RuntimeError("saved template changed after its readback")
             report["status"] = "readback-passed"
             outputs[f"template_{layout}"] = str(output)
             outputs[f"census_{layout}"] = str(report_path)

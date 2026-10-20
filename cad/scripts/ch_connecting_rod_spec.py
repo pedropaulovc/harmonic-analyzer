@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import channel_frame_geom
 import _rocker_interface as rocker_interface
 import dt_cylinder_gear_spec
@@ -98,6 +99,62 @@ SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
 RULE12_SECTION_MIN = 2.0  # drawing-guidelines.md rule 17 (walls and webs)
 if RING_THICKNESS + RING_THICKNESS_BAND[1] < RULE12_SECTION_MIN:
     raise AssertionError("the rod's thinnest ring/shank section is under drawing-guidelines.md rule 17 (walls and webs)'s 2.0")
+
+# Owner-selected cam-root relief B: ONE mouth, local -Z only. The assembly's
+# Rz(rod tilt) Ry180 maps this face to world +Z, toward the cylinder gear web.
+# The opposite mouth keeps the title-block edge break, not a second relief.
+ROOT_RELIEF_SIZE = 1.2
+ROOT_RELIEF_BAND = (0.1, -0.1)  # native Width; (upper, lower), mm
+ROOT_RELIEF_ANGLE_DEG = 45.0
+ROOT_RELIEF_ANGLE_BAND_DEG = float(_config.title_block("angular")["value_deg"])
+CAM_ROOT_RADIUS_MAX = float(_config.title_block("inside_corner")["radius_mm"])
+OPPOSITE_EDGE_BREAK_MAX = max(
+    float(_config.title_block("edge_break")["radius_mm"]),
+    float(_config.title_block("edge_break")["chamfer_max_mm"]),
+)
+
+
+def root_relief_envelope(
+    size: float = ROOT_RELIEF_SIZE,
+    size_band: tuple[float, float] = ROOT_RELIEF_BAND,
+    angle_deg: float = ROOT_RELIEF_ANGLE_DEG,
+    angle_band_deg: float = ROOT_RELIEF_ANGLE_BAND_DEG,
+    thickness_min: float = RING_THICKNESS + RING_THICKNESS_BAND[1],
+    opposite_break: float = OPPOSITE_EDGE_BREAK_MAX,
+    root_radius: float = CAM_ROOT_RADIUS_MAX,
+) -> dict[str, float]:
+    """Clear the root at zero axial gap AND local radial cam/bore contact.
+
+    Native angle-distance Width controls one leg; the other is Width*tan(a).
+    Which leg is axial depends on the selected edge's face order, so bound
+    BOTH interpretations. The R root lies inside x+y <= R in the radial/axial
+    corner. A relief whose two legs both exceed R contains that whole root
+    triangle, without spending the running fit or assuming an axial gap.
+    Remaining land includes the opposite mouth's permitted edge break.
+    These are geometric invariants, NOT a bearing-load/wear qualification.
+    """
+    size_min, size_max = (size + deviation for deviation in sorted(size_band))
+    low_angle, high_angle = angle_deg - angle_band_deg, angle_deg + angle_band_deg
+    if not (0.0 < low_angle <= high_angle < 90.0 and 0.0 < size_min <= size_max):
+        raise ValueError("root relief requires positive legs and an acute angle")
+    leg_min = min(size_min, size_min * math.tan(math.radians(low_angle)))
+    leg_max = max(size_max, size_max * math.tan(math.radians(high_angle)))
+    land_min = thickness_min - leg_max - opposite_break
+    if leg_min <= root_radius:
+        raise ValueError("root relief does not clear the cam root at local contact")
+    if land_min <= 0.0:
+        raise ValueError("root relief and opposite edge break consume the bore land")
+    return {
+        "leg_min": leg_min,
+        "leg_max": leg_max,
+        "root_leg_reserve": leg_min - root_radius,
+        "root_normal_reserve": (leg_min - root_radius) / math.sqrt(2.0),
+        "straight_land_min": land_min,
+    }
+
+
+ROOT_RELIEF_ENVELOPE = root_relief_envelope()
+
 # The flat slot floor (the crotch) below the pin centre. The arm's curved
 # bottom edge dips into the slot as the arm turns on the pin; the floor clears
 # it by 1.0 MIN at the printed worst case of both parts through the solved

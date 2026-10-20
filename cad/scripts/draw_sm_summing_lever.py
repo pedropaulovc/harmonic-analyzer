@@ -700,7 +700,10 @@ def _assert_native_max_radius(
         float(dimension.SystemValue), radius_mm / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError(f"{name} does not measure its modelled radius")
-    _telemetry.info(f"{name}: native R{radius_mm:g} MAX, text {display.GetText(1)!r}")
+    _telemetry.info(
+        f"{name}: native radius {float(dimension.SystemValue)!r} m, "
+        f"tolerance type {int(tolerance.Type)}, text {display.GetText(1)!r}"
+    )
 
 
 def _assert_radius_arrow_lands(

@@ -2271,11 +2271,11 @@ def test_title_properties_propagate_inside_corner_config(properties, name, monke
 
     def changed_title_block(section):
         if section == "inside_corner":
-            return {"display": "R0.8 MAX UNLESS OTHERWISE SPECIFIED"}
+            return {"radius_mm": 0.8}
         return title_block(section)
 
     monkeypatch.setattr(_config, "title_block", changed_title_block)
-    expected = "R0.8 MAX UNLESS OTHERWISE SPECIFIED"
+    expected = "R0.8 MAX"
     assert properties(name)["TOL_INSIDE_CORNER"] == expected
 
 

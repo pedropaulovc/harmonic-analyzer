@@ -30,7 +30,9 @@ def title_block_properties() -> dict[str, str]:
         # Sheet-format notes link these values rather than hardcoding them.
         "TOL_EDGE_BREAK_R": str(_config.title_block("edge_break")["display_r"]),
         "TOL_CHAMFER_MAX": str(_config.title_block("edge_break")["display_chamfer"]),
-        "TOL_INSIDE_CORNER": str(_config.title_block("inside_corner")["display"]),
+        "TOL_INSIDE_CORNER": (
+            f"R{float(_config.title_block('inside_corner')['radius_mm']):.1f} MAX"
+        ),
         "THREAD_TYPE": str(_config.title_block("thread")["type"]),
         "THREAD_CLASS": str(_config.title_block("thread")["class"]),
         # The DRILLED HOLES row carries the general unilateral tolerance.

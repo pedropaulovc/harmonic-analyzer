@@ -50,7 +50,11 @@ async def _refresh_parts(adapter, asm_name: str) -> dict[str, str]:
     from _interference_contracts import allowed_interference_pairs
 
     native_contact_check = None
-    if asm_name in ("ch-channel", "sm-summing"):
+    if asm_name == "ch-channel":
+        from build_ch_channel_assembly import _assert_channel_native_contacts
+
+        native_contact_check = _assert_channel_native_contacts
+    elif asm_name == "sm-summing":
         from _native_spring_contact import assert_assembly_spring_contacts
 
         native_contact_check = assert_assembly_spring_contacts

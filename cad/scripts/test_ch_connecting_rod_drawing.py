@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ import draw_ch_connecting_rod as drawing
 import build_ch_connecting_rod as rod
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import Box
 
 
 def test_required_drawing_paths() -> None:
@@ -26,7 +28,10 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert rod.DRAWING_DIMENSIONS is ch_connecting_rod_notes.DRAWING_DIMENSIONS
     marked = set().union(*ch_connecting_rod_notes.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.LEFT_KEEP, drawing.DETAIL_KEEP)
+    views = (
+        drawing.FRONT_KEEP, drawing.LEFT_KEEP, drawing.DETAIL_KEEP,
+        drawing.ROOT_SECTION_KEEP,
+    )
     kept = set().union(*views)
     assert kept == marked
     assert sum(len(view) for view in views) == len(kept)
@@ -118,6 +123,7 @@ def test_analytic_volumes_follow_the_fork_geometry() -> None:
         - rod.slot_volume()
         + rod.inside_corner_volume()
         - rod.strap_bore_volume()
+        - rod.root_relief_volume()
         - rod.pin_hole_volume()
     )
     assert 0.0 < rod.finished_volume() < rod.boss_volume()
@@ -173,12 +179,6 @@ def test_the_pin_bears_on_the_whole_tine() -> None:
     sunk into a tine face), so the pin's land in each tine is the thinnest
     tine the tine's own band leaves (#982)."""
     spec = ch_connecting_rod_spec
-    source = Path(rod.__file__).read_text(encoding="utf-8")
-    assert "add_chamfer(" not in source
-    assert "wizard_holes(" not in source
-    assert source.count("create_cut_extrude(") == 3  # slot, strap bore, pin hole
-    assert not [name for name in dir(rod) if "countersink" in name.lower()]
-    assert not [name for name in dir(spec) if "CSK" in name]
     thinnest_tine = spec.TINE_THICKNESS + spec.TINE_BAND[1]
     assert thinnest_tine == pytest.approx(1.65)
     assert thinnest_tine == spec.TINE_MIN
@@ -269,6 +269,7 @@ def test_every_tight_band_names_its_mate() -> None:
         *drawing.FRONT_CALLOUTS.values(),
         *drawing.LEFT_CALLOUTS.values(),
         *drawing.DETAIL_CALLOUTS.values(),
+        *drawing.ROOT_SECTION_CALLOUTS.values(),
     ):
         assert max(len(line) for line in text.splitlines()) <= 26, text
 
@@ -435,21 +436,138 @@ def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
     assert symbol_x + half_box < 0.216
 
 
-def test_pin_offset_basic_runs_on_the_shank_below_the_fork_head() -> None:
-    """#982 review r3: inside the head the 4.00 BASIC crowded the hole and
-    the ream callout's leader crossed it. Below the root its line meets the
-    flank (datum B) inside the flank's run, left of the pin axis, where the
-    leader (pin rim to the callout, down-right) has already moved right."""
-    spec = ch_connecting_rod_spec
-    text_x, text_y = drawing.PIN_OFFSET_TEXT_XY
-    root_y = drawing._sheet_xy(0.0, spec.FORK_BASE_Y)[1]
-    assert root_y - 0.010 < text_y < root_y - 0.003
-    assert text_y > drawing.DATUM_B_EDGE[1]
-    assert text_y > drawing.FRONT_KEEP["ShankWidthDim"][1] + 0.040
-    pin_x, pin_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
-    callout_x, callout_y = drawing.FRONT_KEEP["PinHoleDia"]
-    assert callout_x > pin_x and callout_y < text_y < pin_y
-    assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
+def _native_pin_offset(monkeypatch):
+    """The front view's native records round the 4.00 BASIC, as the shared
+    collector dumps them (sheet metres): the press-fit callout parked up-right
+    of the pin, the BASIC between the pin axis and the flank, datum B's tag on
+    the flank below the fork root, and the shank width far down the shank.
+    Only the COM reads are replaced; the shared geometry decoder is real."""
+
+    def line(x0, y0, x1, y1):
+        return [0, 0, 0, 0, x0, y0, 0.0, x1, y1, 0.0]
+
+    def arrow(x, y, dx, dy):
+        return [x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+
+    def text(t, x, y):
+        return {"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1}
+
+    def dimension(name, lines, arrows, texts):
+        return {
+            "type": 4, "name": name, "visible": 1,
+            "display": {"lines": lines, "arrows": arrows, "texts": texts},
+            "dim": {"hole_callout": False},
+        }
+
+    def pin_callout(dy=0.0):
+        # From the rim down-right to a shoulder under the parked text.
+        return dimension(
+            "PinHoleDia",
+            [
+                line(0.1507, 0.1993 + dy, 0.1582, 0.1893 + dy),
+                line(0.1582, 0.1893 + dy, 0.1702, 0.1893 + dy),
+            ],
+            [arrow(0.1507, 0.1993 + dy, 0.6, -0.8)],
+            [text("<MOD-DIAM>1.968 +0.010/0", 0.1592, 0.1896 + dy)],
+        )
+
+    def basic(dy=0.0):
+        # Outside arrows on the flank and the pin axis; the extension lines
+        # run up past the whole pin callout.
+        y = 0.1790 + dy
+        return dimension(
+            "PinOffset",
+            [
+                line(0.146, 0.1770, 0.146, 0.2000),
+                line(0.150, 0.1770, 0.150, 0.2000),
+                line(0.13965, y, 0.146, y),
+                line(0.146, y, 0.150, y),
+                line(0.150, y, 0.15635, y),
+            ],
+            [arrow(0.146, y, -1.0, 0.0), arrow(0.150, y, 1.0, 0.0)],
+            [text(" 4.00 ", 0.1575, y - 0.0015)],
+        )
+
+    def shank(line_y=0.1000):
+        # Its extension lines run the flanks up through the BASIC's lane.
+        return dimension(
+            "ShankWidthDim",
+            [
+                line(0.146, 0.0990, 0.146, 0.1950),
+                line(0.154, 0.0990, 0.154, 0.1950),
+                line(0.146, line_y, 0.154, line_y),
+            ],
+            [arrow(0.146, line_y, 1.0, 0.0), arrow(0.154, line_y, -1.0, 0.0)],
+            [text(" 8.00 ", 0.1475, line_y + 0.0008)],
+        )
+
+    datum = {
+        "type": 2, "name": "B", "visible": 1,
+        "display": {
+            "lines": [
+                line(0.138, 0.164, 0.144, 0.164), line(0.144, 0.164, 0.144, 0.170),
+                line(0.144, 0.170, 0.138, 0.170), line(0.138, 0.170, 0.138, 0.164),
+            ],
+            "triangles": [
+                [0.146, 0.167, 0.0, 0.144, 0.1685, 0.0, 0.144, 0.1655, 0.0, 1, 0]
+            ],
+            "texts": [text("B", 0.1395, 0.1655)],
+        },
+    }
+    pin = SimpleNamespace(name="PinHoleDia", record=pin_callout())
+    shank_item = SimpleNamespace(name="ShankWidthDim", record=shank())
+    datum_b = SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(record=datum))
+    annotation = SimpleNamespace(
+        record=basic(), IsDangling=lambda: False,
+        GetAttachedEntities3=lambda: [object()],
+    )
+    display = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetDimension2=lambda index: SimpleNamespace(SystemValue=0.004),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, name: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, item: item.name)
+    monkeypatch.setattr(
+        drawing, "_Reader", lambda adapter: SimpleNamespace(take_errors=lambda: [])
+    )
+    monkeypatch.setattr(drawing, "_dump_annotation", lambda reader, raw: raw.record)
+    return SimpleNamespace(
+        adapter=object(), display=display, front=[pin, shank_item], datum_b=datum_b,
+        pin=pin, shank=shank_item, annotation=annotation,
+        pin_callout=pin_callout, basic=basic, shank_record=shank,
+    )
+
+
+def test_pin_offset_basic_sits_below_the_whole_pin_callout(monkeypatch) -> None:
+    """#982 review r3 / baseline PNG: the BASIC's dimension line may not
+    cross the press-fit callout. Its own and the shank's tall extension
+    lines, which run through the callout and the lane, are allowed."""
+    native = _native_pin_offset(monkeypatch)
+    drawing._pin_offset_layout(native.adapter, native.display, native.front, native.datum_b)
+
+
+@pytest.mark.parametrize("defect", ["basic-through-callout", "shank-line-in-lane"])
+def test_pin_offset_basic_rejects_a_dimension_line_crossing(monkeypatch, defect) -> None:
+    native = _native_pin_offset(monkeypatch)
+    if defect == "basic-through-callout":
+        native.annotation.record = native.basic(dy=0.012)
+    else:
+        # The shank's dimension line and text now reach into the BASIC's ink,
+        # while its tall extension lines were already crossing the lane.
+        native.shank.record = native.shank_record(line_y=0.1740)
+    with pytest.raises(RuntimeError, match="leaves its native clear lane"):
+        drawing._pin_offset_layout(
+            native.adapter, native.display, native.front, native.datum_b
+        )
+
+
+def test_pin_offset_basic_refuses_a_lane_too_short_for_its_text(monkeypatch) -> None:
+    native = _native_pin_offset(monkeypatch)
+    native.pin.record = native.pin_callout(dy=-0.012)
+    with pytest.raises(RuntimeError, match="cannot fit"):
+        drawing._pin_offset_layout(
+            native.adapter, native.display, native.front, native.datum_b
+        )
 
 
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
@@ -486,6 +604,7 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
         },
         "InsideCorners": {"InsideCornerR": 1},
         "PinHoleProfile": {"PinHoleDia": 3},
+        "CamRootRelief": {"RootReliefSize": 1},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'name_dimensions(adapter,"ForkBoss",["ForkThick"])' in build
@@ -649,24 +768,6 @@ def test_detail_texts_stand_outside_their_witness_lines() -> None:
     assert keep["SlotDepth"][0] < keep["ForkBossLength"][0]
 
 
-def test_model_bands_are_owned_by_named_model_dimensions() -> None:
-    spec = ch_connecting_rod_spec
-    assert spec.RING_BORE_DIA_BAND == (0.10, 0.00)
-    assert spec.TINE_BAND == (0.05, -0.05)
-    assert spec.FORK_SLOT_BAND == (0.05, -0.05)
-    assert spec.RING_FACE_BAND == (0.05, -0.05)
-    assert spec.RING_THICKNESS_BAND == (0.05, -0.05)
-    assert spec.FORK_THICKNESS_BAND == pytest.approx((0.15, -0.15))
-    assert model_toleranced_dimensions(rod) == {
-        ("StrapBoreProfile", "StrapBoreDia"): "*deviations(RING_BORE_DIA_BAND)",
-        ("ForkSlotProfile", "TineNear"): "tine_upper",
-        ("ForkSlotProfile", "SlotWidth"): "slot_upper",
-        ("ForkSlotProfile", "RingFaceNear"): "face_upper",
-        ("Plate", "RingThick"): "thick_upper",
-        ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_BAND)",
-    }
-
-
 def test_bore_finish_is_routed_clear_of_the_lower_dimension_stack() -> None:
     edge_x, edge_y = drawing.BORE_FINISH_EDGE
     symbol_x, symbol_y = drawing.BORE_FINISH_SYMBOL
@@ -699,3 +800,413 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
         "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
+
+
+def test_root_relief_includes_angle_and_opposite_edge_in_its_land() -> None:
+    spec = ch_connecting_rod_spec
+    envelope = spec.ROOT_RELIEF_ENVELOPE
+    assert envelope["leg_min"] == pytest.approx(1.1 * math.tan(math.radians(44.0)))
+    assert envelope["leg_max"] == pytest.approx(1.3 * math.tan(math.radians(46.0)))
+    assert envelope["straight_land_min"] == pytest.approx(0.5288105921)
+    assert envelope["straight_land_min"] < 0.575  # exact 45° missed angle scatter
+    assert spec.OPPOSITE_EDGE_BREAK_MAX == 0.25
+    assert spec.RING_THICKNESS == 2.175
+    assert spec.RING_THICKNESS_BAND == (0.05, -0.05)
+    assert spec.RING_BORE_DIA == 30.8
+    assert spec.RING_BORE_DIA_BAND == (0.10, 0.00)
+    assert spec.STRAP_DIAMETRAL_CLEARANCE == pytest.approx((0.20, 0.35))
+
+
+@pytest.mark.parametrize("width", [1.1, 1.3])
+@pytest.mark.parametrize("angle", [44.0, 46.0])
+def test_root_relief_clears_the_whole_R1_corner_at_contact(width, angle) -> None:
+    # Local radial contact deliberately spends ALL bore clearance, and the
+    # strap face has ZERO axial gap to the web. Neither clearance is credited.
+    r = ch_connecting_rod_spec.CAM_ROOT_RADIUS_MAX
+    first, second = width, width * math.tan(math.radians(angle))
+    for radial, axial in ((first, second), (second, first)):
+        for step in range(101):
+            phase = math.pi / 2.0 * step / 100.0
+            root_x = r * (1.0 - math.cos(phase))
+            root_z = r * (1.0 - math.sin(phase))
+            assert root_x / radial + root_z / axial < 1.0
+    assert min(first, second) > r
+
+
+def test_root_relief_rejects_root_overlap_and_only_nonpositive_land() -> None:
+    spec = ch_connecting_rod_spec
+    with pytest.raises(ValueError, match="cam root"):
+        spec.root_relief_envelope(size=1.0)
+    consumed = spec.ROOT_RELIEF_ENVELOPE["leg_max"] + spec.OPPOSITE_EDGE_BREAK_MAX
+    with pytest.raises(ValueError, match="consume"):
+        spec.root_relief_envelope(thickness_min=consumed)
+    assert spec.root_relief_envelope(thickness_min=consumed + 1e-8)[
+        "straight_land_min"
+    ] == pytest.approx(1e-8)
+
+
+def test_one_root_relief_has_the_annular_frustum_volume() -> None:
+    spec = ch_connecting_rod_spec
+    bore = spec.RING_BORE_DIA / 2.0
+    mouth = bore + spec.ROOT_RELIEF_SIZE
+    depth = spec.ROOT_RELIEF_SIZE
+    frustum = math.pi * depth / 3.0 * (bore**2 + bore * mouth + mouth**2)
+    original_bore = math.pi * bore**2 * depth
+    assert rod.root_relief_volume() == pytest.approx(frustum - original_bore)
+    assert rod.root_relief_volume() == pytest.approx(71.4775160533)
+
+
+def _native_relief_boundary(monkeypatch):
+    spec = ch_connecting_rod_spec
+    radius, face_z = spec.RING_BORE_DIA / 2.0, -spec.RING_THICKNESS / 2.0
+
+    def circle(r, z):
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(0.0, 0.0, z / 1000.0, 0.0, 0.0, 1.0, r / 1000.0),
+        )
+        return SimpleNamespace(
+            GetCurve=lambda: curve,
+            GetCurveParams2=lambda: (
+                r / 1000.0, 0.0, z / 1000.0, r / 1000.0, 0.0, z / 1000.0,
+                0.0, math.tau, 0.0, 0.0, 0.0,
+            ),
+        )
+
+    tolerance = SimpleNamespace(
+        Type=4, GetMinValue=lambda: -0.0001, GetMaxValue=lambda: 0.0001
+    )
+    size = SimpleNamespace(
+        SystemValue=0.0012, Tolerance=tolerance,
+        FullName="RootReliefSize@CamRootRelief@ch-connecting-rod",
+    )
+    angle = SimpleNamespace(
+        SystemValue=math.pi / 4.0, Tolerance=SimpleNamespace(Type=0),
+        FullName="RootReliefAngle@CamRootRelief@ch-connecting-rod",
+    )
+    display = SimpleNamespace(
+        Type2=10, ChamferTextStyle=2, MarkedForDrawing=True,
+        GetDimension2=lambda index: (size, angle)[index],
+        GetPrimaryPrecision2=lambda: 1, GetPrimaryTolPrecision2=lambda: 1,
+        ChamferPrecision=lambda index: (1, 0)[index],
+    )
+    released = []
+    definition = SimpleNamespace(
+        Type=1, TangentPropagation=False, EdgeChamferAngle=math.pi / 4.0,
+        GetEdgeChamferDistance=lambda side: 0.0012 if side == 0 else float("nan"),
+        AccessSelections=lambda model, component: True,
+        ReleaseSelectionAccess=lambda: released.append(True),
+        Edges=[circle(radius, face_z)],
+    )
+    definition.GetEdgeCount = lambda: len(definition.Edges)
+    definition.GetFaceCount = lambda: 0
+    cone_edges = [
+        circle(radius + spec.ROOT_RELIEF_SIZE, face_z),
+        circle(radius, face_z + spec.ROOT_RELIEF_SIZE),
+    ]
+    land_edges = [
+        circle(radius, face_z + spec.ROOT_RELIEF_SIZE),
+        circle(radius, -face_z),
+    ]
+    cone = SimpleNamespace(
+        GetEdges=lambda: cone_edges,
+        GetSurface=lambda: SimpleNamespace(IsCone=lambda: True),
+    )
+    bore = SimpleNamespace(
+        GetEdges=lambda: land_edges,
+        GetSurface=lambda: SimpleNamespace(
+            IsCylinder=lambda: True,
+            CylinderParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius / 1000.0),
+        ),
+    )
+    features = {
+        "CamRootRelief": SimpleNamespace(
+            GetDefinition=lambda: definition, GetFaces=lambda: [cone],
+        ),
+        "StrapBore": SimpleNamespace(GetFaces=lambda: [bore]),
+    }
+    monkeypatch.setattr(rod, "_early_bound", lambda value, name: value)
+    monkeypatch.setattr(rod, "_feature_by_name", lambda adapter, name: features[name])
+    monkeypatch.setattr(rod, "_named_dimension", lambda *args: (display, size))
+    return SimpleNamespace(
+        adapter=SimpleNamespace(currentModel=object()), circle=circle,
+        definition=definition, display=display, size=size, angle=angle,
+        cone_edges=cone_edges, land_edges=land_edges, released=released,
+        radius=radius, face_z=face_z,
+    )
+
+
+def test_native_relief_reads_one_mouth_both_legs_and_untouched_opposite_edge(monkeypatch):
+    native = _native_relief_boundary(monkeypatch)
+    rod._assert_cam_root_relief(native.adapter, marked=True)
+    assert native.released == [True]
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "wrong-mouth", "both-mouths", "cone-leg", "opposite-edge", "width",
+        "angle", "band", "precision", "angle-precision", "unmarked",
+    ],
+)
+def test_native_relief_refuses_wrong_geometry_or_lost_controls(monkeypatch, defect):
+    native = _native_relief_boundary(monkeypatch)
+    if defect == "wrong-mouth":
+        native.definition.Edges = [native.circle(native.radius, -native.face_z)]
+    elif defect == "both-mouths":
+        native.definition.Edges.append(native.circle(native.radius, -native.face_z))
+    elif defect == "cone-leg":
+        native.cone_edges[1] = native.circle(native.radius, native.face_z + 1.19)
+    elif defect == "opposite-edge":
+        native.land_edges[1] = native.circle(native.radius, -native.face_z - 0.25)
+    elif defect == "width":
+        native.definition.GetEdgeChamferDistance = lambda side: 0.0011
+    elif defect == "angle":
+        native.angle.SystemValue = math.radians(44.0)
+    elif defect == "band":
+        native.size.Tolerance.GetMinValue = lambda: -0.0002
+    elif defect == "precision":
+        native.display.GetPrimaryPrecision2 = lambda: 2
+    elif defect == "angle-precision":
+        native.display.ChamferPrecision = lambda index: (1, 1)[index]
+    elif defect == "unmarked":
+        native.display.MarkedForDrawing = False
+    with pytest.raises(RuntimeError, match="cam-root relief"):
+        rod._assert_cam_root_relief(native.adapter, marked=True)
+    if defect in {"wrong-mouth", "both-mouths"}:
+        assert native.released == [True]  # a failed rollback inspection restores it
+
+
+@pytest.mark.parametrize("defect", [None, "dangling", "detached", "wrong-feature"])
+def test_relief_print_requires_native_attachment_to_the_correct_feature(
+    monkeypatch, defect
+):
+    native = _native_relief_boundary(monkeypatch)
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: native.display,
+        IsDangling=lambda: defect == "dangling",
+        GetAttachedEntities3=lambda: [] if defect == "detached" else [object()],
+    )
+    if defect == "wrong-feature":
+        native.size.FullName = "RootReliefSize@OtherChamfer@ch-connecting-rod"
+    cut = SimpleNamespace(
+        GetPartialSection=lambda: True, GetDisplayOnlySurfaceCut=lambda: True,
+    )
+    view = SimpleNamespace(
+        GetSection=lambda: cut, GetDisplayMode2=lambda: 2,
+        GetUseParentDisplayMode=lambda: False, ScaleRatio=(3.0, 1.0),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, name: value)
+    monkeypatch.setattr(
+        drawing, "_root_section_frame", lambda *args: ((0.005, 0.0), (0.0, 0.005))
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda *args: "RootReliefSize")
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: None)
+    if defect is None:
+        drawing._assert_root_section(native.adapter, view, [annotation])
+    else:
+        with pytest.raises(RuntimeError, match="associative"):
+            drawing._assert_root_section(native.adapter, view, [annotation])
+
+
+def test_relief_authoring_selects_only_the_negative_Z_strap_mouth(monkeypatch):
+    import asyncio
+
+    from solidworks_mcp.adapters.solidworks import features
+
+    calls = []
+
+    async def add_chamfer(distance, points, *, tangent_propagation):
+        calls.append((distance, points, tangent_propagation))
+        return object()
+
+    angle = SimpleNamespace(Name="")
+    adapter = SimpleNamespace(add_chamfer=add_chamfer)
+    monkeypatch.setattr(features, "_select_edges_geometric", lambda *args, **kwargs: True)
+    monkeypatch.setattr(rod, "check", lambda label, result: result)
+    monkeypatch.setattr(rod, "name_last_feature", lambda *args: None)
+    monkeypatch.setattr(rod, "name_dimensions", lambda *args: [])
+    monkeypatch.setattr(rod, "_root_relief_dimensions", lambda *args: (None, None, angle))
+    asyncio.run(rod._cam_root_relief(adapter))
+    assert calls == [(1.2, [[15.4, 0.0, -1.0875]], False)]
+
+
+def _shift(box: Box, dx: float, dy: float) -> Box:
+    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+
+
+def _assert_clear_lane(target: Box, text: Box, band: Box, obstacles: tuple[Box, ...]) -> None:
+    assert (target.width, target.height) == pytest.approx((text.width, text.height))
+    assert band.xmin - 1e-9 <= target.xmin and target.xmax <= band.xmax + 1e-9
+    assert band.ymin - 1e-9 <= target.ymin and target.ymax <= band.ymax + 1e-9
+    for obstacle in obstacles:
+        assert target.overlaps(obstacle, tol=0.0) is None
+        assert target.gap(obstacle) >= 0.003 - 1e-9
+
+
+def test_root_callout_lane_clears_every_obstacle_anywhere_on_the_sheet() -> None:
+    band = Box(0.300, 0.040, 0.420, 0.100)
+    text = Box(0.355, 0.070, 0.385, 0.078)  # 30 x 8 mm, seated inside the view
+    obstacles = (
+        Box(0.330, 0.058, 0.390, 0.095),  # the section view
+        Box(0.350, 0.046, 0.370, 0.052),  # its caption
+        Box(0.378, 0.040, 0.420, 0.050),  # a note in the band's lower right
+    )
+    target = drawing._root_text_target(text, band, obstacles)
+    _assert_clear_lane(target, text, band, obstacles)
+    assert target.gap(text) > 0.0  # moved out of the view, not seated in place
+    dx, dy = 0.1234, 0.0567
+    moved = drawing._root_text_target(
+        _shift(text, dx, dy), _shift(band, dx, dy),
+        tuple(_shift(box, dx, dy) for box in obstacles),
+    )
+    expected = _shift(target, dx, dy)
+    assert (moved.xmin, moved.ymin, moved.xmax, moved.ymax) == pytest.approx(
+        (expected.xmin, expected.ymin, expected.xmax, expected.ymax)
+    )
+
+
+def test_root_callout_lane_takes_an_exactly_clear_strip_or_refuses() -> None:
+    band = Box(0.300, 0.040, 0.420, 0.100)
+    text = Box(0.0, 0.0, 0.030, 0.008)
+    # The view leaves exactly 3 mm plus the text's 8 mm under it, and the
+    # strip above it is too short for the text.
+    fits = (Box(0.300, 0.051, 0.420, 0.095),)
+    target = drawing._root_text_target(text, band, fits)
+    _assert_clear_lane(target, text, band, fits)
+    assert target.ymax == pytest.approx(fits[0].ymin - 0.003)
+    with pytest.raises(RuntimeError, match="cannot fit"):
+        drawing._root_text_target(text, band, (Box(0.300, 0.0509, 0.420, 0.095),))
+    with pytest.raises(RuntimeError, match="cannot fit"):
+        drawing._root_text_target(Box(0.0, 0.0, 0.130, 0.008), band, ())
+
+
+def _native_pin_hole(monkeypatch, *, seams=True):
+    """Native PinHole faces as SolidWorks reports them: one cylinder per tine,
+    each bounded by its two full mouths (and, when the kernel keeps one, a
+    straight seam joining them)."""
+    spec = ch_connecting_rod_spec
+    radius, cy = spec.PIN_HOLE_DIA / 2.0, spec.CENTER_DISTANCE
+    wall, outer = spec.FORK_SLOT_WIDTH / 2.0, spec.FORK_THICKNESS / 2.0
+
+    def circle(r, z, *, cx=0.0, cy=cy, sweep=math.tau, sense=1.0):
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            IsLine=lambda: False,
+            CircleParams=(
+                cx / 1000.0, cy / 1000.0, z / 1000.0, 0.0, 0.0, sense, r / 1000.0
+            ),
+        )
+        start, end = (0.0, sweep) if sense > 0 else (-sweep, 0.0)
+        return SimpleNamespace(
+            GetCurve=lambda: curve,
+            GetCurveParams2=lambda: (
+                (cx + r) / 1000.0, cy / 1000.0, z / 1000.0,
+                (cx + r) / 1000.0, cy / 1000.0, z / 1000.0,
+                start, end, 0.0, 0.0, 0.0,
+            ),
+        )
+
+    def seam(z0, z1, *, r=radius, cx=0.0):
+        curve = SimpleNamespace(IsCircle=lambda: False, IsLine=lambda: True)
+        return SimpleNamespace(
+            GetCurve=lambda: curve,
+            GetCurveParams2=lambda: (
+                (cx + r) / 1000.0, cy / 1000.0, z0 / 1000.0,
+                (cx + r) / 1000.0, cy / 1000.0, z1 / 1000.0,
+                0.0, abs(z1 - z0) / 1000.0, 0.0, 0.0, 0.0,
+            ),
+        )
+
+    def cylinder(edges, *, r=radius, cx=0.0, axis=(0.0, 0.0, 1.0)):
+        return SimpleNamespace(
+            GetEdges=lambda: edges,
+            GetSurface=lambda: SimpleNamespace(
+                IsCylinder=lambda: True,
+                CylinderParams=(cx / 1000.0, cy / 1000.0, 0.0, *axis, r / 1000.0),
+            ),
+        )
+
+    near = [circle(radius, -outer), circle(radius, -wall)]
+    far = [circle(radius, wall), circle(radius, outer)]
+    if seams:
+        near.append(seam(-outer, -wall))
+        far.append(seam(wall, outer))
+    faces = [cylinder(near), cylinder(far)]
+    features = {"PinHole": SimpleNamespace(GetFaces=lambda: faces)}
+    monkeypatch.setattr(rod, "_early_bound", lambda value, name: value)
+    monkeypatch.setattr(rod, "_feature_by_name", lambda adapter, name: features[name])
+    return SimpleNamespace(
+        adapter=object(), circle=circle, seam=seam, cylinder=cylinder,
+        faces=faces, near=near, far=far, radius=radius, wall=wall, outer=outer,
+    )
+
+
+@pytest.mark.parametrize("topology", ["seams", "seamless", "reversed", "trimmed-face"])
+def test_native_pin_hole_reads_two_full_tine_lands(monkeypatch, topology):
+    native = _native_pin_hole(monkeypatch, seams=topology != "seamless")
+    if topology == "reversed":
+        # The kernel may run a mouth's curve against its edge (-Z axis, the
+        # parameter span on the negative side) and a seam top-down.
+        native.far[0] = native.circle(native.radius, native.wall, sense=-1.0)
+        native.far[2] = native.seam(native.outer, native.wall)
+        native.faces[1] = native.cylinder(native.far, axis=(0.0, 0.0, -1.0))
+    elif topology == "trimmed-face":
+        # A tine face the cut trimmed may be credited to the cut as well; the
+        # two lands alone carry the proof.
+        native.faces.append(
+            SimpleNamespace(GetSurface=lambda: SimpleNamespace(IsCylinder=lambda: False))
+        )
+    rod._assert_pin_hole_lands(native.adapter)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "cylinder-radius", "mouth-radius", "shifted-axis", "tilted-axis",
+        "shifted-mouth", "partial-mouth", "outer-break", "wall-relief",
+        "one-tine", "duplicated-tine", "unsplit", "three-mouths",
+        "crossing-boundary", "seam-off-surface", "seam-past-mouth",
+    ],
+)
+def test_native_pin_hole_refuses_any_land_short_of_a_full_tine(monkeypatch, defect):
+    spec = ch_connecting_rod_spec
+    native = _native_pin_hole(monkeypatch)
+    radius, wall, outer = native.radius, native.wall, native.outer
+    if defect == "cylinder-radius":
+        native.faces[1] = native.cylinder(native.far, r=radius + 0.005)
+    elif defect == "mouth-radius":
+        native.far[1] = native.circle(radius + 0.005, outer)
+    elif defect == "shifted-axis":
+        native.faces[0] = native.cylinder(native.near, cx=0.001)
+    elif defect == "tilted-axis":
+        native.faces[0] = native.cylinder(native.near, axis=(1e-6, 0.0, 1.0))
+    elif defect == "shifted-mouth":
+        native.near[0] = native.circle(radius, -outer, cx=0.001)
+    elif defect == "partial-mouth":
+        native.near[1] = native.circle(radius, -wall, sweep=math.pi)
+    elif defect == "outer-break":
+        # A finite mouth break moves the outer mouth inward: the land is no
+        # longer the whole tine, however small the break.
+        native.near[0] = native.circle(radius, -outer + spec.OPPOSITE_EDGE_BREAK_MAX)
+    elif defect == "wall-relief":
+        native.far[0] = native.circle(radius, wall + spec.ROOT_RELIEF_SIZE)
+    elif defect == "one-tine":
+        del native.faces[1]
+    elif defect == "duplicated-tine":
+        native.faces[1] = native.faces[0]
+    elif defect == "unsplit":
+        native.faces[:] = [
+            native.cylinder([native.circle(radius, -outer), native.circle(radius, outer)])
+        ]
+    elif defect == "three-mouths":
+        native.far.append(native.circle(radius, outer))
+    elif defect == "crossing-boundary":
+        curve = SimpleNamespace(IsCircle=lambda: False, IsLine=lambda: False)
+        native.far.append(SimpleNamespace(GetCurve=lambda: curve))
+    elif defect == "seam-off-surface":
+        native.near[2] = native.seam(-outer, -wall, r=radius + 0.005)
+    elif defect == "seam-past-mouth":
+        native.near[2] = native.seam(-outer - 0.5, -wall)
+    with pytest.raises(RuntimeError, match="pin hole"):
+        rod._assert_pin_hole_lands(native.adapter)

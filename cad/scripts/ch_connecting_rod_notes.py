@@ -24,6 +24,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"RingOuterDia", "ShankWidthDim"},
     "Plate": {"RingThick"},
     "StrapBoreProfile": {"StrapBoreDia"},
+    "CamRootRelief": {"RootReliefSize"},
     "ForkProfile": {"ForkWidthDim"},
     "ForkBoss": {"ForkThick"},
     "ForkSlotProfile": {
@@ -52,6 +53,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "InsideCorners": {"InsideCornerR": 1},
     "PinHoleProfile": {"PinHoleDia": 3},
+    "CamRootRelief": {"RootReliefSize": 1},
 }
 
 DRAWING_NOTES = f"1. TINE WALL {TINE_MIN:.2f} MIN."

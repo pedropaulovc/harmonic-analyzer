@@ -95,6 +95,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
         "each",
     ),
+    # _radius_max_limit passes each model-owned radius band to deviations.
+    ("build_sm_summing_lever", "band"): (
+        "(KNIFE_RIDGE_R_BAND, STUB_ROOT_R_BAND, RIB_END_R_BAND)",
+        "each",
+    ),
     # for feature, name, band_for in _BANDED_DIMENSIONS: band = band_for(teeth)
     ("_cone_gear_readback", "band"): (
         "(blank_dia_band(6), tooth_thickness_band(6),"

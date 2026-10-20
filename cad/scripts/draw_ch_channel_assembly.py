@@ -899,6 +899,7 @@ def _fitup_notes() -> tuple[str, str]:
             f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH: PIN EACH {rod} "
             f"ROD FORK TO ITS {arm} ARM WITH ONE {pin}. PRESS IT IN, FAR TINE "
             "BACKED; DRESS BOTH ENDS FLUSH. PIN REMOVABLE WITH PUNCH. "
+            "BORE CHAMFER NORTH, TOWARD ITS CYLINDER-GEAR WEB. "
             "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (

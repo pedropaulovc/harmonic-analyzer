@@ -75,12 +75,17 @@ entry if either block moves or grows.
 
 Left side: the general-tolerance block (**UNLESS OTHERWISE SPECIFIED**;
 linear / angular / drilled-hole / surface rows, linked to the source model's
-`TOL_*` properties from `cad/config/title_block.yaml`); the shared edge-break,
-thread-class and inside-corner rows; FINISH; MATERIAL; the ASME Y14.5-2018
-interpretation note; DO NOT SCALE DRAWING; and the third-angle projection
-symbol. The inside-corner row is `INSIDE CORNERS` followed by
-`$PRPSHEET:"TOL_INSIDE_CORNER"`; its full value (including `MAX UNLESS
-OTHERWISE SPECIFIED`) comes from `inside_corner.display` in the config.
+`TOL_*` properties from `cad/config/title_block.yaml`); the shared
+general-note block; FINISH; MATERIAL; the ASME Y14.5-2018 interpretation note;
+DO NOT SCALE DRAWING; and the third-angle projection symbol. The general-note
+block is ONE native note in one font run, its linked lines in this order:
+
+1. `INSIDE CORNERS $PRPSHEET:"TOL_INSIDE_CORNER"` (`R1.0 MAX`, derived from
+   the numeric `inside_corner.radius_mm`);
+2. `THREADS $PRPSHEET:"THREAD_TYPE" CLASS $PRPSHEET:"THREAD_CLASS"`;
+3. `REMOVE BURRS AND BREAK SHARP EDGES $PRPSHEET:"TOL_EDGE_BREAK_R" OR CHAMFER
+   $PRPSHEET:"TOL_CHAMFER_MAX" MAX`.
+
 Right side: project title; PART name; DWG.
 NO. (`Number`, the MHA-<subsystem>-## registry id (assembly 00; fabricated parts 01 onward; vendor parts MHA-<parent>-VN-50 onward)); REV (the release tag); scale; UNIT;
 copyright + CC BY-SA mark. The source part supplies the linked `$PRPSHEET`
@@ -158,7 +163,8 @@ The `website`, `inside-corner` and `line-weights` operations are independent.
 For example, `maintain_templates(adapter, operations=("website",))` changes
 only the website from `harmonic-analyzer.vza.net` to `harmonicanalyzer.com`;
 the CLI's repeatable `--operation` selects the same operations. This keeps
-the website change separately reviewable from the line-weight change.
+the website change separately reviewable from the line-weight change. The
+issue #1636 bootstrap runs `operations=("inside-corner",)` alone.
 
 The script writes these files under `cad/out/templates` for the caller to
 declare as cache outputs:
@@ -174,13 +180,24 @@ linked/resolved text, position, extent, rich-font flag, font settings/runs, and
 document line-weight slots/scoped mappings. Empty, unrendered notes have an
 explicitly absent extent; populated notes must have a valid native extent.
 Existing note anchors, formatting and sheet
-geometry must remain unchanged. The inside-corner operation measures configured
-property values temporarily and adds its linked row only in a native free gap
-in the existing ruled tolerance cell; it refuses to move or shrink existing
+geometry must remain unchanged. The inside-corner operation is the one
+exception. It accepts only the installed source state: an edge-break/thread
+note plus the separate `HA_INSIDE_CORNERS` note. It deletes `HA_INSIDE_CORNERS`
+and relinks the edge-break/thread note to the three ordered lines above,
+keeping that note's font, height, justification and anchor x. With configured
+property values shown temporarily, it measures every note's native extent zoomed
+onto the ruled cell, plus the display-data ink of the cell's surface-finish
+vee (found through `IView.GetFirstSFSymbol`, and required present, as a
+`swSFSymbol`, with drawn ink, or the run fails) and of any other non-note
+annotation. It then centres the block in the
+cell's free span with 0.4 mm clearance. It refuses to move or shrink other
 content to make space. No temporary literal values are saved. Source-template
 SHA-256 checks ensure the checked-in files were not mutated on the worker.
-The saved document must be confirmed closed before reopening it, and the
-reopened template must contain exactly one inside-corner property-linked row.
+The saved document must be confirmed closed before reopening it. The reopened
+template must hold exactly one general-note block with the exact ordered links
+and no `HA_INSIDE_CORNERS` note. Its resolved text and rendered display-data
+rows must read those lines in order, with one font, height and line spacing,
+one left edge and an even pitch, clear of the cell and its neighbours.
 If maintenance fails, its partial census (including measured placement
 evidence) is also copied to `cad/out/reports/failures/templates`, the farm
 worker's existing failure-artifact return path.
