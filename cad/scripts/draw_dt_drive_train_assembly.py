@@ -932,11 +932,10 @@ BANK_STEPS = _note_text(
         # So the loaded mandrel leaves the base for the drill and tap.
         # The machinist review of 53a7c4266 read "THE STACK IN ORDER" either way
         # round: loaded from the front, the first gear on goes to the back.
-        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-26, THE STACK FROM GEAR 19",
-        "   TO GEAR 0, CAM SIDE FRONT, ITS PAIRS HANGING FREE, THEN THE OTHER",
-        "   MHA-DT-26, THEN MHA-DT-VN-68; IT SLIDES FREE ON THE MANDREL",
-        "   (ELSE STONE THE BURR OFF ITS BORE). PUSH THE BANK BACK, CLOSED UP ON",
-        "   THE BACK MHA-DT-26.",
+        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-26, GEARS 19 TO 0,",
+        "   CAM SIDE FRONT, THEIR PAIRS HANGING FREE, THE OTHER MHA-DT-26,",
+        "   THEN MHA-DT-VN-68; IT SLIDES FREE ON THE MANDREL",
+        "   (ELSE STONE ITS BORE BURR). CLOSE THE BANK ON THE BACK MHA-DT-26.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-02 ON.",
         "9C. SLIDE THE FRONT MHA-DT-02 ON UNTIL A "
