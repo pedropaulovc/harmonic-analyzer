@@ -710,10 +710,34 @@ its final source-clean guard failed. That does not identify which operation
 dirtied the source: a scoped guard allows an already-dirty entry state. In
 that recipe, group isolation, tangent-edge setup and ring fitting still
 followed the BOM. Moving them before the BOM reuses the proven drive-train
-order, but is not proof of MG's dirty operation. Its local
-`magnifier.source_save_flag` trace reads `GetSaveFlag` after each preparation,
-BOM, balloon and final annotation phase and names the first dirty transition;
-the existing final refusal still prevents a dirty-source drawing save.
+order, but is not proof of MG's dirty operation. The `eccfe91249e8` native
+leaf then first sampled the source dirty at 61.5 s, after the assembled views
+and settings and before either exploded view or the BOM. The last nearby
+message was WHEEL ENDSHAKE's Crop2 readback at 60.8 s, but the stage also
+includes later stack callouts, precision/name readbacks and captions; the log
+does not isolate Crop2 or establish changed geometry. This disproves post-BOM
+ordering as the primary cause of that transition, not the released-source
+safety rule.
+
+MG now passes its read-only `magnifier.source_save_flag` callback through the
+assembled/settings operations: each named-view placement and configuration,
+detail position/rebuild/display/isolation, each per-view reference-sketch
+show, model-item import/curation, crop-circle creation, Crop2, crop rebuild,
+display update, each setting callout, and subsequent readbacks/labels.
+The formatting path already uses the shared
+`_drawing_dimensions.set_dimension_callouts` (`IDisplayDimension.SetText`);
+precision is checked by `assert_imported_precision`, and stack tolerances
+are read, not written. Sketch visibility uses the drawing-qualified
+`<sketch>@<component>@<view>` selection, and configuration assignment uses
+`IView.ReferencedConfiguration`, not `IModelDoc2.ShowConfiguration2`.
+Those API targets do not prove that SOLIDWORKS cannot dirty the referenced
+assembly. Do not replace the existing drawing APIs or edit the model on a
+guess. One MG drawing-only native leaf at the checkpointed published head,
+with the same cached assembly input, must capture the first dirty checkpoint
+and its neighboring `magnifier.source_save_flag` events; import and curation
+remain one shared-helper boundary. A dirty flag means “needs save”
+(`IModelDoc2.GetSaveFlag`), not necessarily changed geometry. Keep the final
+refusal before drawing SaveAs3, without a source save or dirty-flag reset.
 Missing explode steps still fail. Do not change geometry, fitter cameras,
 standard views or the shared zero-step guard to conceal this mismatch.
 

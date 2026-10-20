@@ -683,7 +683,9 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
+def _placed_detail(
+    adapter: Any, detail: StackDetail, source_step: Callable[[str], None]
+) -> Any:
     """``detail`` uncropped: an MG LEFT model view at its scale, moved so its
     circle's centre lands on ``detail.centre``."""
     view = _early_bound(
@@ -692,31 +694,40 @@ def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
         ),
         "IView",
     )
+    source_step(f"{detail.title} named view placement and scale")
     label = f"{detail.title} centre"
     apply_view_configuration(adapter, view, role=ViewRole.PLAIN, label=detail.title)
+    source_step(f"{detail.title} view configuration")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     position = tuple(float(value) for value in view.Position)
     target = [position[axis] + detail.centre[axis] - centre[axis] for axis in range(2)]
     if not view.SetViewPosition(double_array(target), False):
         raise RuntimeError(f"failed to move {detail.title} onto its spot")
+    source_step(f"{detail.title} view position")
     adapter.currentModel.EditRebuild3()
+    source_step(f"{detail.title} position rebuild")
     centre = model_point_in_view(adapter, view, detail.model_centre_m, label=label)
     if max(abs(a - b) for a, b in zip(centre, detail.centre)) > DETAIL_POSITION_TOL_M:
         raise RuntimeError(
             f"{detail.title} centre sits at {centre!r}, not {detail.centre!r}"
         )
     set_hidden_lines_removed(adapter, view)
+    source_step(f"{detail.title} hidden lines removed")
     isolate_drawing_view_components(
         adapter, view, visible_stems=detail.stems, label=detail.title
     )
+    source_step(f"{detail.title} component isolation")
     return view
 
 
-def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
+def _crop(
+    adapter: Any, view: Any, detail: StackDetail, source_step: Callable[[str], None]
+) -> None:
     """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
     in the active view's own sketch and Crop2 while it is still selected."""
     view = _early_bound(view, "IView")
     _activate(adapter, view, label=detail.title)
+    source_step(f"{detail.title} crop view activation")
     sketch = _early_bound(view.GetSketch(), "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
@@ -734,15 +745,21 @@ def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
     previous = bool(manager.AddToDB)
     manager.AddToDB = False
     try:
+        source_step(f"{detail.title} crop AddToDB disabled")
         circle = manager.CreateCircle(*points[0], *points[1])
+        source_step(f"{detail.title} crop circle")
     finally:
         manager.AddToDB = previous
+    source_step(f"{detail.title} crop AddToDB restored")
     if circle is None:
         raise RuntimeError(f"failed to sketch the {detail.title} crop circle")
     status = int(view.Crop2(False, False, 1))
+    source_step(f"{detail.title} Crop2")
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
+    source_step(f"{detail.title} crop rebuild")
     view.UpdateViewDisplayGeometry()
+    source_step(f"{detail.title} crop display geometry update")
     cropped = bool(view.IsCropped())
     _telemetry.info(
         f"magnifier: {detail.title} Crop2 status {status}, IsCropped {cropped}",
@@ -756,12 +773,16 @@ def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
 
 
 def _dimensioned_detail(
-    adapter: Any, detail: StackDetail, keep: dict[str, tuple[float, float]]
+    adapter: Any,
+    detail: StackDetail,
+    keep: dict[str, tuple[float, float]],
+    source_step: Callable[[str], None],
 ) -> list[Any]:
     """Place ``detail``, show the stack chain in it, import ``keep``, crop it
     and prove the kept dimensions survived the crop."""
-    view = _placed_detail(adapter, detail)
+    view = _placed_detail(adapter, detail, source_step)
     _show_base_view_sketches(adapter, view, (stack.FEATURE,), label=detail.title)
+    source_step(f"{detail.title} per-view {stack.FEATURE} show")
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -769,7 +790,8 @@ def _dimensioned_detail(
         view_label=detail.title,
         dimensions_by_feature=notes.DRAWING_DIMENSIONS,
     )
-    _crop(adapter, view, detail)
+    source_step(f"{detail.title} model dimension import and curation")
+    _crop(adapter, view, detail, source_step)
     kept = {
         dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
         for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
@@ -779,31 +801,38 @@ def _dimensioned_detail(
         raise RuntimeError(
             f"{detail.title} lost {lost} to its crop; kept {sorted(kept)}"
         )
+    source_step(f"{detail.title} cropped dimension readback")
     _activate(adapter, view, label=detail.title)
+    source_step(f"{detail.title} label view activation")
     if add_note(adapter, detail.label_text, *detail.label_xy) is None:
         raise RuntimeError(f"failed to label {detail.title}")
+    source_step(f"{detail.title} label")
     return annotations
 
 
-def _stack_dimensions(adapter: Any) -> Callable[[], None]:
+def _stack_dimensions(
+    adapter: Any, source_step: Callable[[str], None]
+) -> Callable[[], None]:
     """Both settings, with their callouts, places and bands read back once
     both details are cropped; the returned check re-reads the bands and the
     callouts once the drawing has settled."""
     callouts = _printable_callouts()
     annotations = [
-        *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP),
-        *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP),
+        *_dimensioned_detail(adapter, PRESSED, PRESSED_KEEP, source_step),
+        *_dimensioned_detail(adapter, ENDSHAKE, ENDSHAKE_KEEP, source_step),
     ]
     for name, location in CALLOUT_LOCATION.items():
         set_dimension_callouts(
             adapter, annotations, {name: callouts[name]}, location=location
         )
+        source_step(f"stack {name} {location} callout")
     precision = {
         name: places
         for names in stack.DRAWING_PRECISION.values()
         for name, places in names.items()
     }
     assert_imported_precision(adapter, annotations, precision)
+    source_step("stack imported precision readback")
     displays = [
         (
             dimension_name(adapter, annotation),
@@ -817,6 +846,7 @@ def _stack_dimensions(adapter: Any) -> Callable[[], None]:
     if sorted(name for name, _ in displays) != sorted(stack.DIMENSION_TOLERANCES):
         raise RuntimeError(f"stack details imported {sorted(n for n, _ in displays)}")
     _assert_callouts(displays, callouts)
+    source_step("stack dimension names and callout readback")
 
     def settled() -> None:
         for name, display in displays:
@@ -881,7 +911,9 @@ def lever_keep(
     }
 
 
-def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
+def _lever_settings(
+    adapter: Any, view: Any, source_step: Callable[[str], None]
+) -> Callable[[], None]:
     """The clamp station and the fixture drop on the back view, with their
     callouts; the returned check re-reads the callouts once settled."""
     callouts = _printable_lever_callouts()
@@ -896,8 +928,10 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         label=LEVER_VIEW_LABEL,
         names=("lever tip", "clamp centre", "fixture axis"),
     )
-    _add_setting_axes(adapter, view)
+    source_step("lever setting projection readback")
+    _add_setting_axes(adapter, view, source_step)
     _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
+    source_step(f"lever per-view {stack.LEVER_FEATURE} show")
     annotations = curate_view_dimensions(
         adapter,
         view,
@@ -905,10 +939,12 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
         view_label=LEVER_VIEW_LABEL,
         dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
     )
+    source_step("lever model dimension import and curation")
     for name, location in LEVER_CALLOUT_LOCATION.items():
         set_dimension_callouts(
             adapter, annotations, {name: callouts[name]}, location=location
         )
+        source_step(f"lever {name} {location} callout")
     assert_imported_precision(
         adapter,
         annotations,
@@ -918,6 +954,7 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
             for name, places in names.items()
         },
     )
+    source_step("lever imported precision readback")
     displays = [
         (
             dimension_name(adapter, annotation),
@@ -933,6 +970,7 @@ def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
             f"{LEVER_VIEW_LABEL} imported {sorted(n for n, _ in displays)}"
         )
     _assert_lever_callouts(displays, callouts)
+    source_step("lever dimension names and callout readback")
     return lambda: _assert_lever_callouts(displays, callouts)
 
 
@@ -953,7 +991,9 @@ def setting_axis_picks_m() -> dict[str, tuple[float, float, float]]:
     }
 
 
-def _add_setting_axes(adapter: Any, view: Any) -> None:
+def _add_setting_axes(
+    adapter: Any, view: Any, source_step: Callable[[str], None]
+) -> None:
     """The vertical rod's and the lever's ASME centrelines on the back view.
 
     Machinist review r7 (run 20261016T162927333Z) read the lever setting
@@ -969,6 +1009,7 @@ def _add_setting_axes(adapter: Any, view: Any) -> None:
         add_view_centerline(
             adapter, view, face_xy=(xy[0], xy[1]), label=f"back view {name} axis"
         )
+        source_step(f"lever {name} centreline")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -1584,10 +1625,13 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
             _telemetry.warn(f"{label}: restoring {rest!r}: {cleanup_error}")
 
 
-def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
+def _place_assembled_sheet(
+    adapter: Any, source_step: Callable[[str], None]
+) -> tuple[Callable[[], None], ...]:
     """Preserved back, left and isometric at 1:4, the lever settings on the
     back view and the two axle-stack details."""
     _activate_sheet(adapter, SHEET_NAMES[0])
+    source_step("assembled sheet activation")
     front = None
     captioned = []
     for name, centre in (
@@ -1596,16 +1640,18 @@ def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
         (stack.DRAWING_ISOMETRIC_VIEW, ISO_CENTER),
     ):
         view = place_view(adapter, str(SOURCE), name, *centre, scale=SHEET_SCALE)
+        source_step(f"assembled {name} named view placement and scale")
         # Back and left print the simplified configuration at 1:4; the
         # preserved isometric is the full-detail view.
         role = ViewRole.FULL_DETAIL if name == stack.DRAWING_ISOMETRIC_VIEW else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
+        source_step(f"assembled {name} view configuration")
         if name == stack.DRAWING_BACK_VIEW:
             front = view
         if name in ASSEMBLED_VIEW_CAPTIONS:
             captioned.append((view, name))
-    lever_settled = _lever_settings(adapter, front)
-    stack_settled = _stack_dimensions(adapter)
+    lever_settled = _lever_settings(adapter, front, source_step)
+    stack_settled = _stack_dimensions(adapter, source_step)
     for view, name in captioned:
         _add_note_block(
             adapter,
@@ -1614,6 +1660,7 @@ def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
             caption_under(_view_outline(view, label=name), ASSEMBLED_VIEW_CAPTIONS[name]),
             label=f"{name} caption",
         )
+        source_step(f"assembled {name} caption")
     return lever_settled, stack_settled
 
 
@@ -1693,12 +1740,13 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 
 def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
-    """Observe the released source after each MG drawing phase, without edits.
+    """Observe the released source at MG operation boundaries, without edits.
 
-    Scoped balloon guards cannot identify an earlier dirty transition. Follow
-    the drive-train trace so a native leaf names the first dirty phase without
-    saving the source or clearing its flag. The existing final guard still
-    refuses the save.
+    A dirty flag is not evidence of changed geometry, but drawing SaveAs3 may
+    persist that state. The eccfe91249e8 leaf first sampled it dirty after the
+    entire assembled/settings phase; checkpoints within that phase distinguish
+    placement/configuration, sketch visibility, imported dimensions, crop and
+    callouts. Never save the source or clear the flag; keep the final refusal.
     """
     state = {"dirty": bool(source_model.GetSaveFlag())}
 
@@ -1740,13 +1788,13 @@ async def build(adapter: Any) -> dict[str, str]:
     source_step("validate source and properties")
     _create_sheets(adapter)
     source_step("create sheets")
-    settled_checks = _place_assembled_sheet(adapter)
+    settled_checks = _place_assembled_sheet(adapter, source_step)
     source_step("assembled views and settings")
     # Follow the drive-train package order: place/configure every view, then
     # explode/isolate/fit it, and only then insert the BOM and bind balloons.
     # That recipe's native probes found post-BOM configuration-switch rebuilds
-    # dirty the source. MG's prior final-guard failure did not locate the first
-    # dirty operation, so trace each phase; only guarded source reads may switch later.
+    # dirty the source. MG eccfe91249e8 was already dirty before its explodes/BOM,
+    # so that order is not its primary cause. Keep the narrower settings trace.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
     source_step(f"{WHEEL_LABEL} view configuration and explode")
     reference = _place_collapsed_view(
