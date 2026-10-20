@@ -784,6 +784,49 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
     ]
 
 
+def test_full_id_transfer_lane_budget_replays_1231_and_preserves_table_gap() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # #1231 / 5e14485511: actual qualified-ID ink, including the complete
+    # mate identity and native thread/depth rows. Each lane needs 66.503 mm,
+    # not the former legacy-ID anchor separation of 62 mm.
+    recorded = {
+        "pedestal": (
+            0.16754236146807672,
+            0.24083402720093727,
+            0.23404513853192324,
+            0.26110972263338045,
+        ),
+        "block": (
+            0.22954236146807666,
+            0.24083402720093727,
+            0.2960451385319233,
+            0.26110972263338045,
+        ),
+    }
+    table = {"hole table": E0E287C83_OBSTACLES["table DetailItem460"]}
+    assert sheet.find_callout_clashes(recorded, table) == [
+        "callout block vs callout pedestal: clearance -4.5 mm"
+    ]
+    current = {}
+    for name, old_anchor, new_anchor in (
+        ("pedestal", (0.200, 0.252), sheet.PEDESTAL_CALLOUT_XY),
+        ("block", (0.262, 0.252), sheet.BLOCK_CALLOUT_XY),
+    ):
+        dx, dy = (new_anchor[i] - old_anchor[i] for i in (0, 1))
+        x0, y0, x1, y1 = recorded[name]
+        current[name] = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+    assert sheet.find_callout_clashes(current, table) == []
+    assert sheet.box_gap(current["pedestal"], current["block"]) >= 0.005
+    assert sheet.box_gap(current["pedestal"], table["hole table"]) >= 0.004
+    # Moving the pedestal left to make room is not a valid repair: the
+    # neighboring hole table occupies this same row.
+    x0, y0, x1, y1 = current["pedestal"]
+    assert sheet.find_callout_clashes(
+        {"pedestal": (x0 - 0.010, y0, x1 - 0.010, y1)}, table
+    )
+
+
 def test_callout_check_treats_the_sheet_frame_and_title_block_as_obstacles() -> None:
     import inspect
     from types import SimpleNamespace
@@ -995,40 +1038,34 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     assert "if not note_reaches_final_sheet(text):" in source
 
 
-# The fake sheet's D1 pivot seat note, clear of its table, view and callout.
-_FAKE_PIVOT_SEAT_BOX = (0.150, 0.020, 0.180, 0.040)
-
-
 def _drive_hole_sheet_callout_check(
     monkeypatch,
     note_box,
-    pivot_seat_box: tuple[float, float, float, float] | None = _FAKE_PIVOT_SEAT_BOX,
+    *,
+    numbered_note_box=(0.150, 0.020, 0.180, 0.040),
+    numbered_note_copies=1,
+    leaders=(),
 ) -> None:
-    """Run _check_hole_sheet_callouts on fakes: one callout, one sheet note at
-    ``note_box``, the D1 pivot seat note at ``pivot_seat_box`` (None: absent)
-    and a display dimension, which _iter_view_annotations yields as
-    ``(None, annotation)`` since #902 (a5563c7a0)."""
+    """Exercise ordinary note obstacles without COM; boxes are unit controls."""
     from types import SimpleNamespace
 
     import draw_fr_harmonic_base as sheet
 
-    texts = {"note": "D1", "pivot seat": sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n")}
-
     def annotations(_adapter, view):
         if view != "sheet":
             return iter(())
-        rows = [
-            (None, "display dimension"),
-            (SimpleNamespace(kind="note", label="D1", box=note_box), "note"),
-        ]
-        if pivot_seat_box is not None:
-            rows.append((SimpleNamespace(kind="note", label="PS", box=pivot_seat_box), "pivot seat"))
+        rows = [(None, "display dimension")]
+        if note_box is not None:
+            rows.append((SimpleNamespace(kind="note", label="D1", box=note_box), "note"))
+        rows.extend([
+            (SimpleNamespace(kind="note", label="1", box=numbered_note_box), "numbered note")
+        ] * numbered_note_copies)
         return iter(rows)
 
     for name, value in {
         "_callout_display_data": lambda display, label: (None, (), ()),
         "callout_text_box": lambda anchor, lines, texts, label: (0.100, 0.100, 0.130, 0.110),
-        "leader_segments": lambda lines: [],
+        "leader_segments": lambda lines: list(leaders),
         "callout_text_rows": lambda lines, texts, label: {},
         "_sheet_frame_obstacles": lambda adapter, ddoc: {},
         "_view_geometry_box": lambda adapter, view, label: (0.300, 0.150, 0.400, 0.250),
@@ -1036,11 +1073,13 @@ def _drive_hole_sheet_callout_check(
         "datum_origin_boxes": lambda points: {},
         "_section_line_obstacles": lambda views: {},
         "_iter_view_annotations": annotations,
-        "_note_text": lambda adapter, annotation: texts[annotation],
+        "_note_text": lambda adapter, annotation: (
+            sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n"
+            if annotation == "numbered note" else "D1"
+        ),
         "_iter_tables": lambda adapter, view: (
             [SimpleNamespace(label="holes", box=(0.020, 0.020, 0.090, 0.060))]
-            if view == "sheet"
-            else []
+            if view == "sheet" else []
         ),
     }.items():
         monkeypatch.setattr(sheet, name, value)
@@ -1067,17 +1106,40 @@ def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
         _drive_hole_sheet_callout_check(monkeypatch, (0.110, 0.102, 0.120, 0.108))
 
 
-def test_hole_sheet_callout_check_measures_the_pivot_seat_note_against_obstacles(
-    monkeypatch,
-) -> None:
-    """Fail-first: the D1 pivot seat note is measured like a callout, so the
-    note landing on the hole table fails the build -- a plain note obstacle is
-    never compared with the table -- and a sheet without it fails too."""
-    clear = (0.200, 0.200, 0.220, 0.210)
-    with pytest.raises(RuntimeError, match="callout pivot seat note vs table holes"):
-        _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=(0.030, 0.030, 0.060, 0.050))
-    with pytest.raises(RuntimeError, match="no pivot seat note"):
-        _drive_hole_sheet_callout_check(monkeypatch, clear, pivot_seat_box=None)
+def test_numbered_pivot_note_keeps_ordinary_actual_note_collision_measurement(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="callout pedestal vs note 1"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210),
+            numbered_note_box=(0.110, 0.102, 0.120, 0.108),
+        )
+    with pytest.raises(RuntimeError, match="leader of callout pedestal crosses note 1"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210),
+            leaders=((0.130, 0.105, 0.165, 0.030),),
+        )
+
+
+@pytest.mark.parametrize("copies", (0, 2))
+def test_hole_sheet_requires_exactly_one_numbered_pivot_note(monkeypatch, copies) -> None:
+    with pytest.raises(RuntimeError, match="exactly one numbered pivot seat note"):
+        _drive_hole_sheet_callout_check(
+            monkeypatch, (0.200, 0.200, 0.220, 0.210), numbered_note_copies=copies,
+        )
+
+
+def test_hole_sheet_has_no_special_d1_tag_measurement_requirement(monkeypatch) -> None:
+    _drive_hole_sheet_callout_check(monkeypatch, None)
+
+
+def test_general_leader_guard_rejects_the_recorded_origin_x_crossing() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # Recorded native failure, retained only as a general crossing regression.
+    leader = (0.212226510324, 0.129615170535, 0.257966478570, 0.168792566697)
+    origin = (0.21935, 0.142105, 0.242401, 0.149105)
+    assert sheet.find_leader_crossings(
+        {"historic note": [leader]}, {"origin X axis": origin},
+    ) == ["leader of callout historic note crosses origin X axis"]
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -1147,6 +1209,419 @@ def test_datum_origin_boxes_pad_each_axis_for_its_labels() -> None:
     ]
     with pytest.raises(RuntimeError, match="not 4"):
         sheet.datum_origin_boxes([0.0] * 6)
+
+
+def test_green_top_caption_clears_the_native_height_stack() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # r2b raw display extents include the underlining shelf, not just the
+    # narrower ink boxes. Both height witnesses crossed the old lower row.
+    old_box = (0.0231007, 0.1036656, 0.0625, 0.1182781)
+    rd1_arrow = (0.0425, 0.10635, 0.0425, 0.1127)
+    own_witness = (0.0884, 0.1056, 0.0615, 0.1056)
+    rd1_witness = (0.0415, 0.10635, 0.10384, 0.10635)
+    assert sheet.segment_crosses_box(rd1_arrow, old_box)
+    assert sheet.segment_crosses_box(own_witness, old_box)
+    assert sheet.segment_crosses_box(rd1_witness, old_box)
+    x, y = sheet.SIDE_KEEP["GreenTopHeight"]
+    assert sheet.SIDE_KEEP["BottomThickness"][0] > x == 0.0625 > rd1_arrow[0]
+    dy = y - 0.112
+    box = (old_box[0], old_box[1] + dy, old_box[2], old_box[3] + dy)
+    for line_y in (0.1127, 0.10635, 0.1056):
+        assert box[1] - line_y >= 0.0035
+    assert 0.143512 - box[3] >= 0.0035
+    neighbors = (
+        (0.098, 0.1184229, 0.1425667, 0.1309743),
+        (0.0349604, 0.0962219, 0.0500396, 0.0997219),
+    )
+    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors)
+
+
+# Sheet-2 native extents from r2b, run
+# 20261019T211244551Z-fb69447dfb4048419fd6b021e4f5c124, in sheet metres.
+# Translations and the two offset-anchor readings below are offline controls,
+# not a claim that the proposed placement has already drawn on a native seat.
+_R2B_PIVOT_X_KEEP = (0.257, 0.145)
+_R2B_PIVOT_X_TEXT = (0.2448681, 0.1431558, 0.2690665, 0.1467211)
+_R2B_PIVOT_X_LINE_Y = 0.1422219
+_R2B_PIVOT_X_WITNESS_STARTS = (
+    (0.2583636, 0.1711521),
+    (0.2649016, 0.1740415),
+)
+_R2B_DATUM_X_TEXT = (0.2425598, 0.1438616, 0.2450907, 0.1472636)
+_R2B_DATUM_X_AXIS = (0.22285, 0.145605, 0.238901, 0.145605)
+_R2B_HOLE_PLAN = (0.22285, 0.1591, 0.33715, 0.2309)
+_R2B_D1_TEXT = (0.247406, 0.1834876, 0.251993, 0.1868896)
+_R2B_D1_Y = 0.1690524
+_R2B_PEDESTAL_Y = 0.1719847
+
+
+def _r2b_pivot_x_text_at(keep):
+    dx, dy = keep[0] - _R2B_PIVOT_X_KEEP[0], keep[1] - _R2B_PIVOT_X_KEEP[1]
+    return tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(_R2B_PIVOT_X_TEXT)
+    )
+
+
+def test_pivot_x_keep_replays_clearance_from_both_native_witnesses_and_datum() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
+        witness = (x, start_y, x, _R2B_PIVOT_X_LINE_Y - 0.001)
+        assert sheet.segment_crosses_box(witness, _R2B_PIVOT_X_TEXT)
+    assert sheet.box_gap(_R2B_PIVOT_X_TEXT, _R2B_DATUM_X_TEXT) < 0.0
+
+    keep = sheet.HOLE_TOP_KEEP["PivotSeatX"]
+    box = _r2b_pivot_x_text_at(keep)
+    line_y = _R2B_PIVOT_X_LINE_Y + keep[1] - _R2B_PIVOT_X_KEEP[1]
+    assert _R2B_PIVOT_X_WITNESS_STARTS[0][0] - box[2] >= 0.0035
+    neighbors = {
+        "datum X letter": _R2B_DATUM_X_TEXT,
+        "datum zero": (0.2187063, 0.1437608, 0.2209937, 0.1473261),
+        "datum X axis": _R2B_DATUM_X_AXIS,
+        "datum vertical drop": (0.22285, 0.143605, 0.22285, 0.1581),
+        "plan": _R2B_HOLE_PLAN,
+    }
+    for label, neighbor in neighbors.items():
+        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+    cross_tap_count = (0.2625209, 0.1208449, 0.2676798, 0.1243309)
+    for x, start_y in _R2B_PIVOT_X_WITNESS_STARTS:
+        witness = (x, line_y - 0.001, x, start_y)
+        assert not sheet.segment_crosses_box(witness, box)
+        assert sheet.box_gap(witness, cross_tap_count) >= 0.0035
+    tail = (0.2649016, line_y, 0.2712516, line_y)
+    spring_leader = (0.2717697, 0.1756206, 0.2809549, 0.131634)
+    assert not sheet.segment_crosses_box(spring_leader, tail)
+    # The restored flags-safe X line stays below the finite spring leader's
+    # native endpoint; extending that leader would invent an intersection.
+    assert min(spring_leader[1], spring_leader[3]) - line_y >= 0.002
+
+
+def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    a1_text = (0.2345301, 0.1671557, 0.2393918, 0.1705577)
+    old_d1_witness = (0.256264, _R2B_D1_Y, 0.191, _R2B_D1_Y)
+    assert sheet.segment_crosses_box(old_d1_witness, a1_text)
+    x, y = sheet.HOLE_TOP_KEEP["PivotSeatY"]
+    # Native centre-mark arms plus their 1 mm witness gaps leave only this
+    # 2.38 mm window. A fully right-sided line would run through other ink.
+    assert 0.2604633 < x < 0.2628448
+    assert _R2B_D1_Y < y < _R2B_PEDESTAL_Y
+    # Replay either plausible D1 arm after moving the line across its hole.
+    # The pedestal's measured inner-arm start is 262.8448 mm, not 262.7 mm.
+    witnesses = (
+        (0.2604633, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
+        (0.256264, _R2B_D1_Y, x + 0.001, _R2B_D1_Y),
+        (x - 0.001, _R2B_PEDESTAL_Y, 0.2628448, _R2B_PEDESTAL_Y),
+    )
+    for witness in witnesses:
+        assert 0.256 < witness[0] <= witness[2] <= 0.2628448
+        assert not sheet.segment_crosses_box(witness, a1_text)
+        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_TEXT)
+        assert not sheet.segment_crosses_box(witness, _R2B_DATUM_X_AXIS)
+    # The lower outside-arrow tail remains parallel between the X witnesses.
+    # This is line-to-line air, not the 3.5 mm text-clearance requirement.
+    assert x - _R2B_PIVOT_X_WITNESS_STARTS[0][0] >= 0.003
+    assert _R2B_PIVOT_X_WITNESS_STARTS[1][0] - x >= 0.003
+
+
+@pytest.mark.parametrize("anchor_is_top", (False, True), ids=("centred", "top-centre"))
+def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
+    anchor_is_top,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # r2b's actual Y text was left of its line, not centred on its keep.
+    old_text = (0.166826, 0.1621558, 0.1905016, 0.1657212)
+    width, height = old_text[2] - old_text[0], old_text[3] - old_text[1]
+    x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
+    top = y if anchor_is_top else y + height / 2.0
+    box = (x - width / 2.0, top - height, x + width / 2.0, top)
+    assert box[0] >= sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
+    # Deliberately inboard on blank printed pocket floor: reject nearby ink,
+    # not the whole plan outline, which is not an occupied rectangular box.
+    assert _R2B_HOLE_PLAN[0] < box[0] < box[2] < _R2B_HOLE_PLAN[2]
+    assert _R2B_HOLE_PLAN[1] < box[1] < box[3] < _R2B_HOLE_PLAN[3]
+    neighbors = {
+        "spring centre mark": (0.2708043, 0.1749896, 0.2726196, 0.1768049),
+        "pedestal centre mark": (0.2638448, 0.170928, 0.2659583, 0.1730415),
+        "centre mark 391": (0.2925969, 0.1786569, 0.2951231, 0.1811831),
+        "E1 leader": (0.2943345, 0.1794933, 0.2964761, 0.1879897),
+        "B1 tag": (0.2471988, 0.1904933, 0.2509839, 0.1938953),
+        "former D1 tag": _R2B_D1_TEXT,
+        "X pedestal witness": (
+            0.2649016,
+            _R2B_PIVOT_X_LINE_Y
+            + sheet.HOLE_TOP_KEEP["PivotSeatX"][1]
+            - _R2B_PIVOT_X_KEEP[1]
+            - 0.001,
+            0.2649016,
+            0.1740415,
+        ),
+    }
+    for label, neighbor in neighbors.items():
+        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+
+
+def _pivot_y_placement_fakes(monkeypatch, failure=None):
+    """Unit-only collaborators; they do not establish native layout success."""
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    events = []
+
+    class Display:
+        def __init__(self):
+            self.offset = True  # Prove the helper resets an inherited offset.
+
+        @property
+        def OffsetText(self):  # noqa: N802 - the COM member name
+            events.append(("offset-read", self.offset))
+            return self.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):  # noqa: N802 - the COM member name
+            events.append(("offset-set", value))
+            if not (failure == "reset" and not value):
+                self.offset = value
+
+    class Annotation:
+        name = "PivotSeatY"
+
+        def __init__(self):
+            self.display = Display()
+            self.stage = "line"
+            self.position = (0.192, 0.164, 0.0)
+
+        def GetSpecificAnnotation(self):  # noqa: N802 - the COM member name
+            return self.display
+
+        def SetPosition2(self, x, y, z):  # noqa: N802 - the COM member name
+            events.append(("line-set", (x, y, z)))
+            assert not self.display.offset
+            if failure == "line-set":
+                return False
+            self.position = (x, y, z)
+            return True
+
+        def GetPosition(self):  # noqa: N802 - the COM member name
+            position = self.position
+            if failure == f"{self.stage}-missing":
+                position = None
+            elif failure == f"{self.stage}-drift":
+                position = (position[0] + 0.001, position[1], position[2])
+            elif failure == f"{self.stage}-nan":
+                position = (math.nan, position[1], position[2])
+            events.append(("position-read", position))
+            return position
+
+    adapter = object()
+    annotation = Annotation()
+
+    def offset(adapter_arg, annotations, positions):
+        events.append(("offset-call", adapter_arg, annotations, positions))
+        assert adapter_arg is adapter
+        assert annotations == [annotation]
+        assert positions == {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}
+        if failure == "offset-helper":
+            raise RuntimeError("offset helper refused")
+        annotation.display.OffsetText = True
+        if failure == "offset-state":
+            annotation.display.offset = False
+        annotation.stage = "text"
+        annotation.position = (*positions["PivotSeatY"], 0.0)
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, item: item.name)
+    monkeypatch.setattr(sheet, "offset_dimension_text", offset)
+    other = SimpleNamespace(name="PivotSeatX")
+    return adapter, annotation, other, events
+
+
+def test_pivot_y_placement_resets_then_places_line_offsets_and_reads_back(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
+    sheet._place_pivot_seat_y(adapter, [other, annotation])
+    assert events == [
+        ("offset-set", False),
+        ("offset-read", False),
+        ("line-set", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
+        ("position-read", (*sheet.HOLE_TOP_KEEP["PivotSeatY"], 0.0)),
+        ("offset-call", adapter, [annotation], {"PivotSeatY": sheet.PIVOT_SEAT_Y_TEXT_XY}),
+        ("offset-set", True),
+        ("offset-read", True),
+        ("position-read", (*sheet.PIVOT_SEAT_Y_TEXT_XY, 0.0)),
+    ]
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_pivot_y_placement_requires_one_native_named_annotation(monkeypatch, count) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch)
+    with pytest.raises(RuntimeError, match=f"one native PivotSeatY, got {count}"):
+        sheet._place_pivot_seat_y(adapter, [other, *([annotation] * count)])
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    ("failure", "message", "last_event", "offset_called"),
+    (
+        ("reset", "offset could not be reset", "offset-read", False),
+        ("line-set", "failed to position .* line", "line-set", False),
+        ("line-missing", "line did not persist", "position-read", False),
+        ("line-drift", "line did not persist", "position-read", False),
+        ("line-nan", "line did not persist", "position-read", False),
+        ("offset-helper", "offset helper refused", "offset-call", True),
+        ("offset-state", "text did not stay offset", "offset-read", True),
+        ("text-missing", "text did not persist", "position-read", True),
+        ("text-drift", "text did not persist", "position-read", True),
+        ("text-nan", "text did not persist", "position-read", True),
+    ),
+)
+def test_pivot_y_placement_refuses_failed_state_without_com(
+    monkeypatch, failure, message, last_event, offset_called,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotation, other, events = _pivot_y_placement_fakes(monkeypatch, failure)
+    with pytest.raises(RuntimeError, match=message):
+        sheet._place_pivot_seat_y(adapter, [other, annotation])
+    assert events[-1][0] == last_event
+    assert any(event[0] == "offset-call" for event in events) is offset_called
+
+
+def _pivot_flag_fakes(monkeypatch, *, failed_name=None, readback=None):
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    events = []
+    adapter = object()
+    displays = {}
+
+    class Display:
+        def __init__(self, name):
+            self.name = name
+            self.text = ""
+
+        def GetText(self, part):  # noqa: N802 - the COM member name
+            events.append(("read", self.name, part))
+            assert part == 3
+            return readback if self.name == failed_name else self.text
+
+    annotations = []
+    for name in ("PivotSeatY", "Other", "PivotSeatX"):
+        display = Display(name)
+        displays[name] = display
+        annotations.append(SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display
+        ))
+
+    def set_flags(actual_adapter, actual_annotations, callouts, *, location):
+        assert actual_adapter is adapter
+        assert actual_annotations is annotations
+        events.append(("set", dict(callouts), location))
+        for name, text in callouts.items():
+            displays[name].text = text
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(sheet, "dimension_name", lambda adapter, annotation: annotation.name)
+    monkeypatch.setattr(sheet, "set_dimension_callouts", set_flags)
+    return adapter, annotations, events
+
+
+def test_pivot_offsets_flag_exactly_both_native_above_compartments(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert sheet.PIVOT_SEAT_CALLOUTS == {"PivotSeatX": "SEE NOTE 1", "PivotSeatY": "SEE NOTE 1"}
+    assert events == [
+        ("set", sheet.PIVOT_SEAT_CALLOUTS, "above"),
+        ("read", "PivotSeatY", 3),
+        ("read", "PivotSeatX", 3),
+    ]
+
+
+@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
+@pytest.mark.parametrize("actual", (None, "", "SEE D1", "SEE NOTE 2", "SEE NOTE 1\n", "SEE NOTE 1\r\n"))
+def test_pivot_flags_refuse_silent_or_multiline_native_readback(
+    monkeypatch, name, actual,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(
+        monkeypatch, failed_name=name, readback=actual
+    )
+    with pytest.raises(RuntimeError, match=f"native {name} ABOVE flag did not persist"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events[-1] == ("read", name, 3)
+
+
+@pytest.mark.parametrize("name", ("PivotSeatX", "PivotSeatY"))
+@pytest.mark.parametrize("count", (0, 2))
+def test_pivot_flags_require_exactly_one_of_each_native_offset(monkeypatch, name, count) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    selected = next(annotation for annotation in annotations if annotation.name == name)
+    annotations[:] = [annotation for annotation in annotations if annotation is not selected]
+    annotations.extend([selected] * count)
+    with pytest.raises(RuntimeError, match="missing native D1 offsets|duplicate native D1 offset"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    "callouts",
+    (
+        {"PivotSeatX": "SEE NOTE 1"},
+        {"PivotSeatX": "SEE NOTE 1", "PivotSeatY": "SEE\nNOTE 1"},
+        {"PivotSeatX": "SEE\rNOTE 1", "PivotSeatY": "SEE NOTE 1"},
+        {"PivotSeatX": "", "PivotSeatY": "SEE NOTE 1"},
+    ),
+)
+def test_pivot_flags_refuse_missing_keys_or_nonprintable_caption_rows(monkeypatch, callouts) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    adapter, annotations, events = _pivot_flag_fakes(monkeypatch)
+    monkeypatch.setattr(sheet, "PIVOT_SEAT_CALLOUTS", callouts)
+    with pytest.raises(RuntimeError, match="both one-line ABOVE flags"):
+        sheet._flag_pivot_seat_dimensions(adapter, annotations)
+    assert events == []
+
+
+@pytest.mark.parametrize(
+    ("tag", "old_anchor", "old_box"),
+    [
+        ("A3", (0.325, 0.176), (0.3251, 0.1724, 0.3309, 0.1760)),
+        ("A4", (0.326, 0.215), (0.3261, 0.2115, 0.3319, 0.2150)),
+    ],
+)
+def test_socket_tags_clear_the_native_section_cut_line(tag, old_anchor, old_box) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # r2b native ink, not an estimated label width. The former tags were
+    # both struck by the A-A line through the right-hand socket axes.
+    cut_line = (0.3292, 0.155, 0.3292, 0.235)
+    assert sheet.segment_crosses_box(cut_line, old_box)
+    x, y = sheet.HOLE_TAG_POSITIONS[tag]
+    dx, dy = x - old_anchor[0], y - old_anchor[1]
+    box = tuple(
+        value + (dx if index % 2 == 0 else dy)
+        for index, value in enumerate(old_box)
+    )
+    assert _segment_box_gap((cut_line[:2], cut_line[2:]), box) >= 0.0035
+    neighbors = (
+        (0.22285, 0.1591, 0.33715, 0.2309),
+        (0.363437, 0.093512, 0.386563, 0.176488),
+    )
+    assert all(sheet.box_gap(box, neighbor) >= 0.0035 for neighbor in neighbors)
 
 
 def test_callout_box_rule_refuses_display_data_it_cannot_box() -> None:
@@ -1222,7 +1697,7 @@ def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> Non
         ("TRANSFER_BLOCK_CALLOUT", f"TRANSFER FROM MHA-DT-18\nAFTER {step_ref('rig-set')};\n"),
         ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"),
         ("TRANSFER_SPRING_CALLOUT", f"TRANSFER FROM MHA-DT-24\nAFTER {step_ref('rig-set')};\n"),
-        ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
+        ("CROSS_TAP_PROCESS", "COMMON THREAD LEAD IN BOTH WALLS\n"),
     ],
 )
 def test_base_callout_prefix_is_the_shared_helpers(
@@ -1314,7 +1789,8 @@ def test_cross_tap_callout_carries_hole_facts_only() -> None:
 
     import draw_fr_harmonic_base as sheet
 
-    assert sheet.CROSS_TAP_PROCESS == "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+    assert sheet.CROSS_TAP_PROCESS == "COMMON THREAD LEAD IN BOTH WALLS\n"
+    assert "THRU" not in sheet.CROSS_TAP_PROCESS
     source = inspect.getsource(sheet)
     for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
         assert gone not in source
@@ -1471,6 +1947,26 @@ def test_stamped_id_leader_clears_the_socket_bores() -> None:
         rise = (edge_y - start[1]) / (tip[1] - start[1])
         crossing_x = start[0] + (tip[0] - start[0]) * rise
         assert crossing_x <= witness_x - 0.0015, (half_x, crossing_x, witness_x)
+
+
+def test_deck_finish_leader_takes_the_nearest_face_edge() -> None:
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    # Keep a real native-face attachment, just inside the nearest west edge.
+    source = inspect.getsource(sheet)
+    assert "deck_box[0] + DECK_FINISH_FACE_INSET_M" in source
+    assert "(deck_box[2] + deck_box[5]) / 2.0" in source
+    assert "deck_face.GetClosestPointOn(" in source
+    attach = sheet._plan_xy(
+        -part.DECK_HALF_X + sheet.DECK_FINISH_FACE_INSET_M * 1000.0, 0.0
+    )
+    nearest = sheet._plan_xy(-part.DECK_HALF_X, 0.0)
+    # The attachment is one paper millimetre onto the deck, rather than the
+    # old quarter-face point's 33 mm diagonal run across the plate (#1054).
+    assert 0.0005 <= attach[0] - nearest[0] <= 0.0015
+    assert abs(attach[1] - sheet.DECK_FINISH_XY[1]) <= 0.001
 
 
 # The depths each seat printed before the 2026-09-25 machinist review sized
@@ -2421,65 +2917,396 @@ _NOTE_CHAR_MM = 2.69
 _NOTE_LINE_MM = 4.58
 
 
-def _pivot_seat_note_box(xy: tuple[float, float]) -> tuple[float, float, float, float]:
+def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -> None:
     import draw_fr_harmonic_base as sheet
 
-    lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    width = max(len(line) for line in lines) * _NOTE_CHAR_MM / 1000.0
-    height = len(lines) * _NOTE_LINE_MM / 1000.0
-    return (xy[0], xy[1] - height, xy[0] + width, xy[1])
+    assert sheet.PIVOT_SEAT_NOTE_XY == (0.020, 0.100)
+    assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
+    assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
+    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
+    assert sheet.HOLE_TAG_POSITIONS["D1"] == (0.2456, 0.1550)
+    assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.193, 0.135)
+
+    # Native-r4 embedded-font calibration supplies conservative NEW text-width
+    # estimates. This is not a claim that numbered note 1 has printed natively.
+    row_widths = (0.0930785, 0.0973665, 0.0665752)
+    pitch = 0.0045257
+    x, y = sheet.PIVOT_SEAT_NOTE_XY
+    note = (x, y - len(row_widths) * pitch, x + max(row_widths), y - pitch + 0.0035)
+    neighbors = {
+        "table": (0.018, 0.1630628306, 0.1627633865, 0.260),
+        "plan": (0.22285, 0.1591, 0.33715, 0.2309),
+        "front": (0.22285, 0.08865, 0.33715, 0.10135),
+        "spotface": (0.168835, 0.123861, 0.218752, 0.144083),
+        "title block": _TITLE_BLOCK_M,
+    }
+    for label, box in neighbors.items():
+        assert _box_gap(note, box) >= 0.0035, label
+    assert note[0] - _BORDER_INNER_M[0] >= 0.0035
+    assert note[1] - _BORDER_INNER_M[1] >= 0.0035
+
+    # Values retain their native r4 size. SEE NOTE 1 is conservatively 24.7 mm
+    # wide, not the smaller SEE D1 or the initial 22 mm estimate.
+    x_value = (0.2291351, 0.1292219, 0.2562650, 0.1327219)
+    y_value = (0.2599351, 0.1822219, 0.2870650, 0.1857219)
+    x_flag = (0.2427 - 0.01235, 0.1347819, 0.2427 + 0.01235, 0.1382819)
+    y_flag = (0.2735 - 0.01235, 0.18778, 0.2735 + 0.01235, 0.19128)
+    letters = {
+        "X": (0.242401, 0.142429, 0.245245, 0.148808),
+        "X zero": (0.218557, 0.142407, 0.221143, 0.148787),
+        "Y": (0.207974, 0.175453, 0.210736, 0.181833),
+        "Y zero": (0.208062, 0.152902, 0.210648, 0.159282),
+    }
+    witnesses = [
+        ((wx, x_value[1] - 0.001), (wx, end_y))
+        for wx, end_y in _R2B_PIVOT_X_WITNESS_STARTS
+    ]
+    for label, box in {"X value": x_value, "Y value": y_value, "X flag": x_flag, "Y flag": y_flag}.items():
+        for name, letter in letters.items():
+            assert _box_gap(box, letter) >= 0.0035, (label, name)
+        for witness in witnesses:
+            assert _segment_box_gap(witness, box) >= 0.002, label
+    tags = {
+        "D1": (0.2456, 0.1504743, 0.252004, 0.1539743),
+        "E1": (0.297, 0.1849743, 0.30209, 0.1884743),
+        "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
+        "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
+    }
+    for box in (x_flag, y_value, y_flag):
+        for label, tag in tags.items():
+            assert _box_gap(box, tag) >= 0.0035, label
+    y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
+    assert _segment_box_gap(y_offset_leader, y_flag) >= 0.0035
+    assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
 
 
-def test_pivot_seat_note_locates_it_from_the_near_pedestal_seat() -> None:
-    """The pivot seat is held +-0.05 to the MHA-DT-02 seats, in one setup with
-    them (cone_set_stack); the note's offsets are the model's, measured from
-    the nearer seat in table axes (X right, Y = -z). plate-r1 review: the note
-    names its table tag, D1 (r4), and says its table location is reference,
-    so the two cannot read as competing. Its box heads the notes column clear
-    of the table, views and
-    callouts; fail-first, the same box collides once moved onto the table. The
-    build measures the note's read-back ink against every callout and
-    obstacle the same way."""
-    import inspect
-    import math
+def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
+    """Setup identification stays on the note; dimensions own the location
+    and band. The table's D1 identity still resolves to the actual pivot."""
+    import re
 
     import cone_set_stack
     import draw_fr_harmonic_base as sheet
     import fr_harmonic_base_spec as base_spec
 
-    near = min(sheet.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, sheet.PIVOT_SCREW_XZ))
-    dx = sheet.PIVOT_SCREW_XZ[0] - near[0]
-    dy = near[1] - sheet.PIVOT_SCREW_XZ[1]
-    band = base_spec.PIVOT_SEAT_POSITION_BAND_MM
-    assert band == cone_set_stack.PIVOT_SEAT_POSITION_MM
-    assert f"X {dx:.2f}, Y {dy:.2f} <MOD-PM>{band:.2f}" in sheet.PIVOT_SEAT_STEP
-    assert "ONE SETUP" in sheet.PIVOT_SEAT_STEP
-    assert "MHA-DT-02" in sheet.PIVOT_SEAT_STEP
-    lines = sheet.PIVOT_SEAT_STEP.split("\n")
-    assert sheet.PIVOT_SEAT_TAG == "D1"
-    assert lines[0].startswith("D1 PIVOT SEAT:")
-    assert lines[-1] == "THIS GOVERNS D1; ITS TABLE X/Y ARE REFERENCE."
+    assert sheet.PIVOT_SEAT_STEP is base_spec.PIVOT_SEAT_STEP
+    assert base_spec.PIVOT_SEAT_TAG == "D1"
+    assert base_spec.PIVOT_SEAT_POSITION_BAND_MM == cone_set_stack.PIVOT_SEAT_POSITION_MM
+    assert sheet.PIVOT_SEAT_STEP.split("\n") == [
+        "1. D1 IS LOCATED TO THE MHA-DT-02 SEAT;",
+        "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.",
+        "D1 TABLE X/Y ARE REFERENCE.",
+    ]
+    # Only the note number and part/table identities may contain digits;
+    # the native dimensions remain the sole owners of offsets and bands.
+    identification = sheet.PIVOT_SEAT_STEP.removeprefix("1. ")
+    for identity in (base_spec.PIVOT_SEAT_TAG, "MHA-DT-02"):
+        assert identity in identification
+        identification = identification.replace(identity, "")
+    assert not re.search(r"\d|<MOD-PM>|±", identification)
     # r4 review: the plate-r1 note named C1, the lock seat's 1/4-20 row. D1 is
     # the table's one 10-24 row, the only tabled hole of the pivot's size, and
     # one of the two tabled holes the shallow-boss callout names.
     pivot_size = [h for h in sheet.TABLE_HOLES if h[2] == sheet.PIVOT_SCREW_HOLE_DIA]
     assert pivot_size == [(*sheet.PIVOT_SCREW_XZ, sheet.PIVOT_SCREW_HOLE_DIA)]
     assert "B1, D1," in sheet.UNDERSIDE_BOTTOM_CALLOUTS["ShallowBoss4Dia"]
-    obstacles = dict(E0E287C83_OBSTACLES)
-    obstacles.update((f"callout {name}", b) for name, b in HB_RENDER_4_BOXES.items())
 
-    def clashes(xy: tuple[float, float]) -> list[str]:
-        return sheet.find_callout_clashes({sheet.PIVOT_SEAT_NOTE_LABEL: _pivot_seat_note_box(xy)}, obstacles)
 
-    assert clashes(sheet.PIVOT_SEAT_NOTE_XY) == []
-    on_table = clashes((sheet.PIVOT_SEAT_NOTE_XY[0], 0.140))
-    assert any("table DetailItem460" in finding for finding in on_table), on_table
-    assert _pivot_seat_note_box(sheet.PIVOT_SEAT_NOTE_XY)[1] > 0.02  # above the frame's inner border
-    # The build check boxes the note's own ink, found by its text as read back.
-    assert sheet.is_pivot_seat_note(sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n")
-    assert not sheet.is_pivot_seat_note(sheet.TRANSFER_SPRING_CALLOUT)
-    source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" in source
+def test_numbered_d1_note_is_created_once_as_an_ordinary_free_note() -> None:
+    import ast
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    tree = ast.parse(inspect.getsource(sheet.build))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    notes = [
+        node for node in calls
+        if any(isinstance(arg, ast.Name) and arg.id == "PIVOT_SEAT_STEP" for arg in node.args)
+    ]
+    assert len(notes) == 1
+    assert notes[0].func.id == "add_note"
+    assert [ast.unparse(arg) for arg in notes[0].args] == [
+        "adapter", "PIVOT_SEAT_STEP", "*PIVOT_SEAT_NOTE_XY",
+    ]
+    assert notes[0].keywords == []
+    hole_sheet = [
+        node for node in calls
+        if getattr(node.func, "attr", None) == "ActivateSheet"
+        and ast.unparse(node.args[0]) == "SHEET_NAMES[1]"
+        and node.lineno < notes[0].lineno
+    ]
+    assert hole_sheet
+    underside_sheet = next(
+        node for node in calls
+        if getattr(node.func, "attr", None) == "ActivateSheet"
+        and ast.unparse(node.args[0]) == "SHEET_NAMES[2]"
+    )
+    assert notes[0].lineno < underside_sheet.lineno
+    assert "pivot_seat_rim" not in inspect.getsource(sheet.build)
+    assert not hasattr(sheet, "_route_pivot_seat_note")
+    check = next(node for node in calls if getattr(node.func, "id", None) == "_check_hole_sheet_callouts")
+    assert {keyword.arg for keyword in check.keywords} == {"callouts", "views", "datum_origin"}
+    flags = [node for node in calls if getattr(node.func, "id", None) == "_flag_pivot_seat_dimensions"]
+    assert len(flags) == 1
+    assert [ast.unparse(arg) for arg in flags[0].args] == ["adapter", "hole_top_dimensions"]
+    assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
+
+
+def test_pivot_offsets_share_native_marks_precision_and_authoritative_band() -> None:
+    import ast
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    near = min(part.PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, part.PIVOT_SCREW_XZ))
+    assert part.PIVOT_NEAR_PEDESTAL_XZ == near
+    assert part.PIVOT_SEAT_OFFSETS_MM == pytest.approx(
+        (part.PIVOT_SCREW_XZ[0] - near[0], near[1] - part.PIVOT_SCREW_XZ[1])
+    )
+    names = set(spec.PIVOT_SEAT_DIMENSIONS)
+    assert names == spec.DRAWING_DIMENSIONS["PivotSeatReference"]
+    assert names == set(sheet.HOLE_TOP_KEEP)
+    assert spec.DRAWING_PRECISION["PivotSeatReference"] == dict.fromkeys(names, 2)
+    # Both offsets, not their unprinted origin anchors, receive the unchanged
+    # functional band. This checks bindings rather than a setter's formatting.
+    tree = ast.parse(inspect.getsource(part.build))
+    loops = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.For) and isinstance(node.iter, ast.Name)
+        and node.iter.id == "PIVOT_SEAT_DIMENSIONS"
+    ]
+    assert len(loops) == 1
+    setters = [
+        node for node in ast.walk(loops[0])
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "set_dimension_symmetric_tolerance"
+    ]
+    assert len(setters) == 1
+    assert ast.literal_eval(setters[0].args[1]) == "PivotSeatReference"
+    assert isinstance(setters[0].args[2], ast.Name)
+    assert setters[0].args[2].id == loops[0].target.id
+    assert isinstance(setters[0].args[3], ast.Name)
+    assert getattr(part, setters[0].args[3].id) == spec.PIVOT_SEAT_POSITION_BAND_MM
+    # A blanked owner needs the opt-in importer in this specific top view,
+    # and its result participates in the existing final precision readback.
+    drawing = ast.parse(inspect.getsource(sheet.build))
+    imports = [
+        node for node in ast.walk(drawing)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
+        and any(
+            keyword.arg == "keep" and isinstance(keyword.value, ast.Name)
+            and keyword.value.id == "HOLE_TOP_KEEP"
+            for keyword in node.value.keywords
+        )
+    ]
+    assert len(imports) == 1
+    assert imports[0].value.func.id == "curate_hidden_owner_dimensions"
+    imported_name = imports[0].targets[0].id
+    body = drawing.body[0].body
+    placement = body[body.index(imports[0]) + 1]
+    assert isinstance(placement, ast.Expr) and isinstance(placement.value, ast.Call)
+    assert placement.value.func.id == "_place_pivot_seat_y"
+    assert [ast.unparse(argument) for argument in placement.value.args] == [
+        "adapter", imported_name,
+    ]
+    precision = [
+        node for node in ast.walk(drawing)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", None) == "assert_imported_precision"
+    ]
+    assert len(precision) == 1
+    assert any(
+        isinstance(node, ast.Starred) and isinstance(node.value, ast.Name)
+        and node.value.id == imported_name
+        for node in ast.walk(precision[0])
+    )
+
+
+def test_height_baselines_preserve_the_spotface_top_land_at_loose_limits() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    spec = fr_harmonic_base_spec
+    assert part.HEIGHT_REFERENCE_ORIGIN == (-spec.BOTTOM_LENGTH / 2.0, 0.0)
+    stations = {name: (x, height) for name, x, height, _dx, _dy in part.HEIGHT_REFERENCE_STATIONS}
+    assert stations == {
+        "GreenTopHeight": (-spec.TOP_LENGTH / 2.0, spec.GREEN_TOP),
+        "CrossScrewAxisHeight": (-part.COLUMN_X, part.BASE_SCREW_Y),
+    }
+    assert spec.DRAWING_DIMENSIONS["HeightReference"] == set(stations)
+    assert spec.DRAWING_PRECISION["HeightReference"] == dict.fromkeys(stations, 1)
+    assert "GreenTopHeight" in sheet.SIDE_KEEP
+    assert "CrossScrewAxisHeight" in sheet.HOLE_SIDE_KEEP
+    assert {"BottomThickness", "DeckRise"} <= set(sheet.SIDE_KEEP)
+    kept = set(spec.DRAWING_PRECISION_BY_NAME)
+    assert not {"FlangeToDeck", "Spot0Y"} & kept
+    assert spec.GREEN_TOP + spec.DECK_RISE == pytest.approx(spec.STACK_HEIGHT)
+    band = part._general_band_mm()
+    assert band == pytest.approx(0.8)
+    land = spec.cross_screw_top_land_worst_case_mm(
+        part.BASE_SCREW_Y, part.SCREW_SPOTFACE_DIAMETER, band
+    )
+    assert land == pytest.approx(
+        (47.8 - 0.8) - (38.1 + 0.8) - (9.0 + 0.8) / 2.0
+    )
+    assert land == pytest.approx(3.2)
+    assert land >= spec.CROSS_SCREW_TOP_LAND_MIN_MM == 2.0
+    # The former chain had another independent .X term and left only 1.6:
+    # the unchanged solid was not protected by the old printed dimensions.
+    chained_green_min = (
+        spec.BOTTOM_THICKNESS - band + spec.TOP_THICKNESS - band
+        - (spec.DECK_RISE + band)
+    )
+    chained_land = (
+        chained_green_min - (part.BASE_SCREW_Y + band)
+        - (part.SCREW_SPOTFACE_DIAMETER + band) / 2.0
+    )
+    assert chained_land < spec.CROSS_SCREW_TOP_LAND_MIN_MM
+
+
+@pytest.mark.parametrize("reference", ("pivot", "height"))
+def test_reference_dimensions_measure_actual_points_without_solid_features(
+    monkeypatch, reference,
+) -> None:
+    import ast
+    import asyncio
+    import operator
+    from types import SimpleNamespace
+
+    from _sketch import SketchDims
+
+    expected_plane = "Top" if reference == "pivot" else "Front"
+
+    def result(data=None):
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    class Manager:
+        AddToDB = False
+
+        def CreatePoint(self, x, y, z):
+            assert self.AddToDB
+            return (x, y, z)
+
+    class Adapter:
+        # Deliberately no extrusion, cut, line or circle operation: the
+        # reference must not touch the physical solid or add a printed wire.
+        currentSketchManager = Manager()
+
+        def __init__(self):
+            self.points = {}
+            self.dimensions = []
+            self.named = {}
+            self.globals = {
+                "BottomLength": part.BOTTOM_LENGTH,
+                "TopLength": part.TOP_LENGTH,
+                "BottomThickness": part.BOTTOM_THICKNESS,
+                "TopThickness": part.TOP_THICKNESS,
+                "DeckRise": part.DECK_RISE,
+                "ColumnX": part.COLUMN_X,
+                "BaseScrewY": part.BASE_SCREW_Y,
+            }
+            self.currentModel = SimpleNamespace(Parameter=self.named.get)
+
+        async def set_global_variable(self, request):
+            assert request.expression.endswith("mm")
+            self.globals[request.name] = float(request.expression[:-2])
+            return result({"value": self.globals[request.name]})
+
+        async def create_sketch(self, plane):
+            assert plane == expected_plane
+            return result()
+
+        def _register_sketch_entity(self, kind, raw):
+            assert kind == "Point"
+            identity = f"Point{len(self.points)}"
+            self.points[identity] = raw
+            return identity
+
+        async def add_sketch_dimension(self, first, second, kind, value):
+            axis = {"horizontal_distance": 0, "vertical_distance": 1}[kind]
+            start = self.points[first]
+            end = (0.0, 0.0, 0.0) if second == "origin" else self.points[second]
+            assert value == pytest.approx(abs(end[axis] - start[axis]) * 1000.0)
+            dimension = SimpleNamespace(SystemValue=value / 1000.0, pair=(first, second))
+            self.dimensions.append(dimension)
+            return result(str(len(self.dimensions)))
+
+        async def add_sketch_constraint(self, first, second, kind):
+            assert kind == "horizontal_points"
+            assert self.points[first][1] == 0.0
+            assert second == "origin"
+            return result()
+
+        async def exit_sketch(self):
+            return result()
+
+        async def create_equation(self, request):
+            full_name, expression = request.equation.split(" = ")
+            operations = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Div: operator.truediv}
+
+            def evaluate(node):
+                if isinstance(node, ast.Constant):
+                    return self.globals[node.value] if isinstance(node.value, str) else node.value
+                if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+                    return -evaluate(node.operand)
+                if isinstance(node, ast.BinOp):
+                    return operations[type(node.op)](evaluate(node.left), evaluate(node.right))
+                raise AssertionError(f"unsupported dimension expression: {ast.dump(node)}")
+
+            value = evaluate(ast.parse(expression, mode="eval").body)
+            assert self.named[full_name.strip('"')].SystemValue * 1000.0 == pytest.approx(value)
+            return result()
+
+    class RecordedDimensions(SketchDims):
+        def apply(self, adapter, feature):
+            assert len(self._rows) == len(adapter.dimensions)
+            for (name, _drive), dimension in zip(self._rows, adapter.dimensions, strict=True):
+                adapter.named[f"{name}@{feature}"] = dimension
+            return [(f"{name}@{feature}", drive) for name, drive in self._rows]
+
+    async def native_state_check(_adapter, *_args):
+        return None
+
+    monkeypatch.setattr(part, "SketchDims", RecordedDimensions)
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "ensure_fully_defined", native_state_check)
+    monkeypatch.setattr(part, "force_rebuild", native_state_check)
+    adapter = Adapter()
+    if reference == "pivot":
+        asyncio.run(part._build_pivot_seat_reference(adapter))
+        expected_points = [
+            (x / 1000.0, -z / 1000.0, 0.0)
+            for x, z in (part.PIVOT_NEAR_PEDESTAL_XZ, part.PIVOT_SCREW_XZ)
+        ]
+        expected = {
+            name: (abs(value), ("Point0", "Point1"))
+            for name, value in zip(
+                fr_harmonic_base_spec.PIVOT_SEAT_DIMENSIONS,
+                part.PIVOT_SEAT_OFFSETS_MM, strict=True,
+            )
+        }
+        feature = "PivotSeatReference"
+    else:
+        asyncio.run(part._build_height_reference(adapter))
+        expected_points = [
+            (part.HEIGHT_REFERENCE_ORIGIN[0] / 1000.0, 0.0, 0.0),
+            *((x / 1000.0, height / 1000.0, 0.0)
+              for _name, x, height, _dx, _dy in part.HEIGHT_REFERENCE_STATIONS),
+        ]
+        expected = {
+            name: (height, ("Point0", f"Point{index}"))
+            for index, (name, _x, height, _dx, _dy)
+            in enumerate(part.HEIGHT_REFERENCE_STATIONS, 1)
+        }
+        feature = "HeightReference"
+    assert list(adapter.points.values()) == expected_points
+    assert not adapter.currentSketchManager.AddToDB
+    for name, (value, pair) in expected.items():
+        dimension = adapter.named[f"{name}@{feature}"]
+        assert dimension.SystemValue * 1000.0 == pytest.approx(value)
+        assert dimension.pair == pair
 
 
 def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
@@ -2493,7 +3320,9 @@ def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
     blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
     assert "def _hide_reference_sketches" not in source
     assert source.count(blank) == 1
-    assert part.REFERENCE_SKETCHES == ("HeightReference", "CrossTapReference", "PlanReference")
+    assert set(part.REFERENCE_SKETCHES) == {
+        "HeightReference", "CrossTapReference", "PlanReference", "PivotSeatReference"
+    }
     assert hasattr(_sketch.blank_reference_sketches, "__wrapped__")
 
 

@@ -67,7 +67,10 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _drawing_prefix import set_dimension_prefix
 from _holes import (
     DRILL_POINT_H,
@@ -99,6 +102,8 @@ from fr_harmonic_base_spec import (
     GREEN_TOP,
     HANGING_BOSS_MIN_DIA,
     PART_SURFACE_FINISHES,
+    PIVOT_SEAT_DIMENSIONS,
+    PIVOT_SEAT_POSITION_BAND_MM,
     POCKET_CEILING_Y,
     POCKET_CORNER_FILLET_R,
     POCKET_FILLET_TOL_TYPE,
@@ -384,6 +389,16 @@ _PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
 PEDESTAL_SCREW_XZ = (
     (X_DRUM, BANK_FRONT_STRAP_INNER_Z - _PEDESTAL_LEDGE_OFFSET),
     (X_DRUM, BANK_BACK_STRAP_INNER_Z + _PEDESTAL_LEDGE_OFFSET),
+)
+# The setup offsets use the same live seat stations as the physical cuts.
+# Top-plane sketch/table Y is machine -Z; retain the signs for point placement
+# and use unsigned native dimensions, as every point-distance sketch does.
+PIVOT_NEAR_PEDESTAL_XZ = min(
+    PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ)
+)
+PIVOT_SEAT_OFFSETS_MM = (
+    PIVOT_SCREW_XZ[0] - PIVOT_NEAR_PEDESTAL_XZ[0],
+    PIVOT_NEAR_PEDESTAL_XZ[1] - PIVOT_SCREW_XZ[1],
 )
 # drawing-guidelines.md rule 18 (thread engagement) (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
 # screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw
@@ -1488,7 +1503,138 @@ async def _paint_machined_faces_black(adapter) -> None:
         _telemetry.info(f"{key} face painted black ({area * 1e6:.0f} mm^2)")
 
 
-REFERENCE_SKETCHES = ("HeightReference", "CrossTapReference", "PlanReference")
+HEIGHT_REFERENCE_ORIGIN = (-BOTTOM_LENGTH / 2.0, 0.0)
+HEIGHT_REFERENCE_STATIONS = (
+    (
+        "GreenTopHeight",
+        -TOP_LENGTH / 2.0,
+        GREEN_TOP,
+        '("BottomLength" - "TopLength") / 2',
+        '"BottomThickness" + "TopThickness" - "DeckRise"',
+    ),
+    (
+        "CrossScrewAxisHeight",
+        -COLUMN_X,
+        BASE_SCREW_Y,
+        '"BottomLength" / 2 - "ColumnX"',
+        '"BaseScrewY"',
+    ),
+)
+
+
+async def _build_height_reference(adapter) -> None:
+    """Locate the green land and cross-screw axis from one underside datum.
+
+    Point-only construction geometry keeps the two .X heights independent,
+    with no grey height lines in the drawing or changes to the physical solid.
+    """
+    check("create_sketch height reference", await adapter.create_sketch("Front"))
+    manager = adapter.currentSketchManager
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    points = []
+    try:
+        coordinates = [
+            HEIGHT_REFERENCE_ORIGIN,
+            *((x, height) for _name, x, height, _dx, _dy in HEIGHT_REFERENCE_STATIONS),
+        ]
+        for x, y in coordinates:
+            raw = manager.CreatePoint(x / 1000.0, y / 1000.0, 0.0)
+            if raw is None:
+                raise RuntimeError("height reference point creation failed")
+            points.append(adapter._register_sketch_entity("Point", raw))
+    finally:
+        manager.AddToDB = previous
+
+    dims = SketchDims()
+    await anchor_point_to_origin(
+        adapter, points[0], *HEIGHT_REFERENCE_ORIGIN, "height reference underside datum"
+    )
+    dims.record("HeightOriginX", '"BottomLength" / 2')
+    for point, (name, x, height, x_drive, height_drive) in zip(
+        points[1:], HEIGHT_REFERENCE_STATIONS, strict=True
+    ):
+        await anchor_point_to_point(
+            adapter, points[0], point, x - HEIGHT_REFERENCE_ORIGIN[0], height,
+            f"height reference {name}",
+        )
+        dims.record(f"{name}X", x_drive)
+        dims.record(name, height_drive)
+    await ensure_fully_defined(adapter, "height reference sketch")
+    check("exit_sketch height reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeightReference")
+    for dim_name, expr in dims.apply(adapter, "HeightReference"):
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    for name, _x, height, _dx, _dy in HEIGHT_REFERENCE_STATIONS:
+        _verify_named_dimension(adapter, f"{name}@HeightReference", height)
+
+
+async def _build_pivot_seat_reference(adapter) -> None:
+    """Own D1's setup offsets without adding a wire or changing the solid.
+
+    Two sketch points coincide in projection with the actual pedestal and
+    pivot axes. Globals follow the same stations as the Hole Wizard cuts;
+    only the two point-to-point offsets are marked for drawing.
+    """
+    near_x, near_z = PIVOT_NEAR_PEDESTAL_XZ
+    near_y = -near_z
+    anchor_names = ("PivotPedestalX", "PivotPedestalY")
+    for name, value in zip(anchor_names, (near_x, near_y), strict=True):
+        await set_global(adapter, name, f"{value}mm")
+    for name, value in zip(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_OFFSETS_MM, strict=True):
+        await set_global(adapter, name, f"{value}mm")
+
+    check("create_sketch pivot seat reference", await adapter.create_sketch("Top"))
+    manager = adapter.currentSketchManager
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    points = []
+    try:
+        for label, (x, z) in (
+            ("pedestal", PIVOT_NEAR_PEDESTAL_XZ),
+            ("pivot", PIVOT_SCREW_XZ),
+        ):
+            raw = manager.CreatePoint(x / 1000.0, -z / 1000.0, 0.0)
+            if raw is None:
+                raise RuntimeError(f"pivot seat reference: {label} point creation failed")
+            points.append(adapter._register_sketch_entity("Point", raw))
+    finally:
+        manager.AddToDB = previous
+
+    dims = SketchDims()
+    await anchor_point_to_origin(
+        adapter, points[0], near_x, near_y, "pivot reference pedestal"
+    )
+    for name, value in zip(anchor_names, (near_x, near_y), strict=True):
+        if abs(value) >= 1e-9:
+            dims.record(name, _pos_drive(name, value))
+    for name, direction, value in zip(
+        PIVOT_SEAT_DIMENSIONS,
+        ("horizontal_distance", "vertical_distance"),
+        PIVOT_SEAT_OFFSETS_MM,
+        strict=True,
+    ):
+        await dimension_between(
+            adapter, points[0], points[1], direction, abs(value), f"pivot reference {name}"
+        )
+        dims.record(name, _pos_drive(name, value))
+    await ensure_fully_defined(adapter, "pivot seat reference sketch")
+    check("exit_sketch pivot seat reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotSeatReference")
+    for dim_name, expr in dims.apply(adapter, "PivotSeatReference"):
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    for name, value in zip(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_OFFSETS_MM, strict=True):
+        _verify_named_dimension(adapter, f"{name}@PivotSeatReference", abs(value))
+
+
+REFERENCE_SKETCHES = (
+    "HeightReference",
+    "CrossTapReference",
+    "PlanReference",
+    "PivotSeatReference",
+)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -2648,58 +2794,12 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
 
-    # REFERENCE sketches. The flange-to-deck height is a manufacturing value
-    # the sheet prints, so drawing-simplicity-policy.md `How the repository implements the guidelines` says the model owns it -- but it is
-    # no feature's dimension: the 38.1 spans three features. It therefore
-    # gets a hidden one-line sketch whose single driving dimension IS the
-    # value, marked for drawing like any other. The line is construction and
-    # BLANKED once built:
-    # shown, the height line stood as a tick with two endpoint dots on the
-    # base's end face in every assembly render (top iso, asm round d60107b3).
-    # A blanked sketch's dimensions never reach a plain InsertModelAnnotations3
-    # (the first build failed with "geometry top view is missing model
-    # dimensions: ['RimWidth']"), so draw_fr_harmonic_base imports them through
-    # _drawing_hidden_sketches.curate_view_dimensions, which shows each owner
-    # sketch in its own view only. The pocket's size needs no such sketch (the
-    # sheet prints its own PocketLen/PocketWid in the bottom view); its place
-    # from X0 Y0 does, with the pad's and the deck's: PlanReference below.
-
-    # On the left silhouette (x = -BOTTOM_LENGTH/2), where the front view's
-    # flange-to-deck dimension has always drawn its witness lines.
-    check("create_sketch height reference", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    height_ref = check(
-        "flange-to-deck reference line",
-        await adapter.add_line(
-            -BOTTOM_LENGTH / 2.0, BOTTOM_THICKNESS, -BOTTOM_LENGTH / 2.0, STACK_HEIGHT
-        ),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, height_ref)
-    check(
-        "flange-to-deck reference vertical",
-        await adapter.add_sketch_constraint(height_ref, None, "vertical"),
-    )
-    await dimension_between(
-        adapter,
-        f"{height_ref}.start",
-        f"{height_ref}.end",
-        "vertical_distance",
-        TOP_THICKNESS,
-        "flange-to-deck reference",
-    )
-    await anchor_point_to_origin(
-        adapter,
-        f"{height_ref}.start",
-        -BOTTOM_LENGTH / 2.0,
-        BOTTOM_THICKNESS,
-        "flange-to-deck reference",
-    )
-    await ensure_fully_defined(adapter, "flange-to-deck reference sketch")
-    check("exit_sketch height reference", await adapter.exit_sketch())
-    name_last_feature(adapter, "HeightReference")
-    name_dimensions(adapter, "HeightReference", ["FlangeToDeck"])
-    _verify_named_dimension(adapter, "FlangeToDeck@HeightReference", TOP_THICKNESS)
+    # Reference sketches own manufacturing dimensions with no single source
+    # feature dimension. Save them blanked and import through the existing
+    # hidden-owner curate in each drawing view. HeightReference uses points:
+    # both the green land and cross-screw axis start on the faced underside,
+    # so their .X bands cannot accumulate through flange/deck dimensions.
+    await _build_height_reference(adapter)
 
     # The cross-tap X stations, each a baseline from the flange's west face
     # (the hole table's X0) along the tap axis, both from one start point.
@@ -2869,6 +2969,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     for name, _direction, value, _drive in plan_rows:
         _verify_named_dimension(adapter, f"{name}@PlanReference", value)
+    await _build_pivot_seat_reference(adapter)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     blank_reference_geometry(adapter, tuple((name, "PLANE") for name in ref_planes))
     await apply_material(adapter, MATERIAL)
@@ -2896,6 +2997,10 @@ async def build(adapter) -> dict[str, str]:
         "SpotFaceDepth",
         *deviations(SPOTFACE_DEPTH_BAND_MM),
     )
+    for dimension_name in PIVOT_SEAT_DIMENSIONS:
+        set_dimension_symmetric_tolerance(
+            adapter, "PivotSeatReference", dimension_name, PIVOT_SEAT_POSITION_BAND_MM
+        )
     # Every pocket corner fillet prints as one single limit, "R6.0 MAX":
     # swTolMAX prints the nominal then MAX, so the modelled radius IS the max.
     _display, fillet_radius = _named_dimension(

@@ -251,10 +251,46 @@ UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
     )
     for name in names
 }
+# D1 is located from the nearer transferred MHA-DT-02 seat, not the table
+# origin. The model's point-only PivotSeatReference sketch owns these offsets.
+PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
+PIVOT_SEAT_TAG = "D1"
+PIVOT_SEAT_STEP = (
+    f"1. {PIVOT_SEAT_TAG} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
+    "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
+    f"{PIVOT_SEAT_TAG} TABLE X/Y ARE REFERENCE."
+)
+
+# Both heights are baselines from the same faced underside, never a chain
+# through the flange thickness and deck rise (#1321). Their ordinary .X
+# title-block bands stay unchanged.
+HEIGHT_REFERENCE_DIMENSIONS = ("GreenTopHeight", "CrossScrewAxisHeight")
+HEIGHT_REFERENCE_CALLOUTS = {
+    "GreenTopHeight": "GREEN LAND\nFROM UNDERSIDE",
+    "CrossScrewAxisHeight": "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE",
+}
+CROSS_SCREW_TOP_LAND_MIN_MM = 2.0
+
+
+def cross_screw_top_land_worst_case_mm(
+    axis_height_mm: float, spotface_diameter_mm: float, linear_band_mm: float
+) -> float:
+    """Green-land ligament above a spotface at the printed .X limits.
+
+    Both heights start on the faced underside. Neither the independent
+    flange thickness nor the deck rise adds another height-stack term.
+    """
+    return (
+        GREEN_TOP - linear_band_mm
+        - (axis_height_mm + linear_band_mm)
+        - (spotface_diameter_mm + linear_band_mm) / 2.0
+    )
+
+
 
 # Mark every dimension the drawing imports. drawing-simplicity-policy.md `How the repository implements the guidelines`: a printed nominal
 # whose decimal places state a tolerance is a MODEL dimension, so the deck
-# extent and rise, the flange-to-deck height, the 45-degree edge breaks, the
+# extent and rise, the underside-based green-land height, the edge breaks, the
 # cross-screw axis height, the spotface size and depth and the underside
 # pocket's wall, depth, ribs and bosses are authored on the part and imported
 # -- not drawn on the sheet from picked geometry. Only the hole table and the
@@ -269,12 +305,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Deck": {"DeckRise"},
     "DeckCorners": {"DeckCornerRadius"},
     "DeckEdgeBreak": {"DeckEdgeChamfer"},
-    "HeightReference": {"FlangeToDeck"},
+    "HeightReference": set(HEIGHT_REFERENCE_DIMENSIONS),
     "CrossTapReference": {"CrossTapX", "CrossTapFarX"},
     "PlanReference": {"PadX", "PadY", "DeckX", "DeckY", "PocketX", "PocketY"},
+    "PivotSeatReference": set(PIVOT_SEAT_DIMENSIONS),
     "TopRimBreaks": {"TopRimChamfer"},
     "BottomEdgeBreak": {"BottomEdgeChamfer"},
-    "BaseSpotFaceRearProfile": {"SpotFaceDia", "Spot0Y"},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia"},
     "BaseSpotFaceRear": {"SpotFaceDepth"},
     "PocketProfile": {"PocketLen", "PocketWid"},
     "Pocket": {"PocketDepth"},
@@ -307,13 +344,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them: build_fr_harmonic_base applies this map to the .SLDPRT and
 # draw_fr_harmonic_base only reads it back. Everything on this casting is held to
-# the title block's general .X band, so every imported dimension prints ONE
-# place; the drawing document's two-place default would silently ask the shop
-# for .XX on a sand casting. The one exception is the spotface depth: it
-# carries its OWN bilateral band (SPOTFACE_DEPTH_BAND_MM), so its places state
-# no band and must print the modelled plane exactly -- 4.25, two places.
-# Rounded to 4.3 the printed nominal would put the model's own plane outside
-# the band the sheet prints; rounded to 4.2 it would misstate the model.
+# the title block's general .X band, except the explicitly banded dimensions.
+# The spotface depth prints the modelled plane exactly -- 4.25, two places;
+# rounding it would misstate its limits. The pedestal-to-pivot offsets also
+# retain the two-place nominal formerly printed in the setup note, with their
+# own PIVOT_SEAT_POSITION_BAND_MM on each model dimension.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BottomProfile": {"BottomLen": 1, "BottomWid": 1},
     "TopProfile": {"TopLen": 1, "TopWid": 1},
@@ -324,7 +359,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Deck": {"DeckRise": 1},
     "DeckCorners": {"DeckCornerRadius": 1},
     "DeckEdgeBreak": {"DeckEdgeChamfer": 1},
-    "HeightReference": {"FlangeToDeck": 1},
+    "HeightReference": dict.fromkeys(HEIGHT_REFERENCE_DIMENSIONS, 1),
     "CrossTapReference": {"CrossTapX": 1, "CrossTapFarX": 1},
     # The plan stations from X0 Y0 print their modelled nominal: the 1/4 in
     # flange reveal makes 6.35, 13.35 and 18.35, which one place would misstate.
@@ -336,9 +371,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PocketX": 2,
         "PocketY": 2,
     },
+    "PivotSeatReference": dict.fromkeys(PIVOT_SEAT_DIMENSIONS, 2),
     "TopRimBreaks": {"TopRimChamfer": 1},
     "BottomEdgeBreak": {"BottomEdgeChamfer": 1},
-    "BaseSpotFaceRearProfile": {"SpotFaceDia": 1, "Spot0Y": 1},
+    "BaseSpotFaceRearProfile": {"SpotFaceDia": 1},
     "BaseSpotFaceRear": {"SpotFaceDepth": 2},
     "PocketProfile": {"PocketLen": 1, "PocketWid": 1},
     "Pocket": {"PocketDepth": 1},
@@ -368,9 +404,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PocketFillets": {"PocketFilletRadius": 1},
 }
 
-# The overall 50.8 and the pocket skins are pure REFERENCE dimensions: each
-# the read-only difference or sum of model-owned heights, parenthesised,
-# carrying no tolerance of its own and having no model dimension to import.
+# The overall 50.8 (GreenTopHeight + DeckRise) and the pocket skins are pure
+# REFERENCE dimensions: read-only sums/differences of model-owned heights,
+# parenthesised, with no tolerance or model dimension of their own.
 # Their places are therefore
 # not a tolerance statement -- but they are still specification, so the PART
 # owns the digit and the sheet passes it through instead of writing a literal.

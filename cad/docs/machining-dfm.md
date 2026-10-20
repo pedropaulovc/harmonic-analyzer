@@ -107,6 +107,27 @@ geometry is casting-shaped, not milling-shaped.
   ride free on their stationary arbor. The gears seat against each other,
   without an adhesive joint or spacers, from the collar-supported 64T to T006.
 
+- **`fr-harmonic-base` cross-screw seats:** the green-top height and the
+  cross-screw axis are dimensioned from the same faced underside, rather than
+  deriving the land through the flange, pad and deck-rise chain. With ordinary
+  `.X` ±0.8 mm bands, the minimum ligament above the Ø9.0 spotface is
+  `(47.8 − 0.8) − (38.1 + 0.8) − (9.0 + 0.8)/2 = 3.2 mm`.
+  This changes the dimensioning scheme, not the casting or its interfaces.
+  The #10-32 cross tap is one continuous lead through both casting walls,
+  interrupted by the matched column socket; engagement counts both threaded
+  segments, not only the near wall. Even allowing a 0.762 mm stock-screw length
+  reduction, a Ø26.0 matched socket and two 1.5-pitch end losses, total engagement
+  is `44.45 − 0.762 − 26.0 − 3 × 25.4/32 = 15.31 mm`, above 1.5D = 7.24 mm.
+  The drawing states `COMMON THREAD LEAD IN BOTH WALLS`: the seat remains blind,
+  and its associative full-thread and minimum-drill depth tokens are unchanged.
+  The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
+  near pedestal axis with the existing ±0.05 mm functional band. Both carry
+  one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
+  lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
+  in one setup without repeating the numeric offsets, and states that D1
+  table X/Y are reference. The generated native hole-table coordinates remain
+  unchanged.
+
 ### Blind-thread DFM rule
 
 Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=c1o3ZQY25jI)

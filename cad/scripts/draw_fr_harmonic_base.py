@@ -57,6 +57,7 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -77,6 +78,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -124,15 +126,20 @@ from fr_harmonic_base_spec import (
     BOTTOM_WIDTH,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
+    DECK_RISE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
     GREEN_TOP,
+    HEIGHT_REFERENCE_CALLOUTS,
     PART_SURFACE_FINISHES,
-    PIVOT_SEAT_POSITION_BAND_MM,
+    PIVOT_SEAT_DIMENSIONS,
+    PIVOT_SEAT_STEP,
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_harmonic_base"]
@@ -191,9 +198,10 @@ SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
 # The deck Ra symbol, left of the plan between the flange symbol's text row
 # (top ~0.1805) and the R22.2 FLANGE callout (bottom ~0.2104). Below the plan
 # at (0.040, 0.138) its leader climbed through the X0 Y0 corner where the
-# PlanReference dimensions now stand; from here it runs down-right to the
-# deck over the west flange edge, above the flange symbol's leader.
+# PlanReference dimensions now stand; from here it runs nearly horizontally
+# to the deck's west edge, without a diagonal trip across the machined face.
 DECK_FINISH_XY = (0.040, 0.1855)
+DECK_FINISH_FACE_INSET_M = 0.004
 # The flange-perimeter finish symbol, in sheet 1's open field left of the
 # plan. Its target, "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)", runs ~63 mm at
 # 2.5 mm text, too long for sheet 2's strip between the hole table and the
@@ -343,7 +351,9 @@ GEOMETRY_TOP_KEEP = {
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
-    "FlangeToDeck": (0.0625, 0.112),
+    # r2b's lower caption row crossed its own witness and the overall-height
+    # reference. Lift the whole native text block above both arrow spans.
+    "GreenTopHeight": (0.0625, 0.125),
     # Right of the front view, above the deck step it measures at its right
     # end; the 0.75 mm span on paper puts the arrows outside.
     "DeckRise": (0.228, 0.116),
@@ -354,7 +364,18 @@ SIDE_KEEP = {
     # holds the matching strip on the left.
     "DeckEdgeChamfer": (0.205, 0.138),
 }
-HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
+HOLE_TOP_KEEP = {
+    # D1 is held from the nearer transferred pedestal seat. The point-only
+    # reference sketch supplies real centre-to-centre extension origins;
+    # place X below the plan, left of both witnesses and the datum X letter.
+    "PivotSeatX": (0.2427, 0.1320),
+    # Keep the short native line between the holes; offset only its text
+    # onto the blank pocket floor, clear of the nearby marks and leaders.
+    "PivotSeatY": (0.2616, 0.1705),
+}
+PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
+# ABOVE accepts one printable row; both native offsets cite numbered note 1.
+PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, "SEE NOTE 1")
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear
 # end it cuts.
@@ -385,7 +406,7 @@ HOLE_SIDE_KEEP = {
     "SpotFaceDia": (0.193, 0.135),
     # 4 mm above the old station: three caption lines hang below this value and
     # the lowest reached the title-block band at y 66 mm (audit keep-out).
-    "Spot0Y": (0.196, 0.0785),
+    "CrossScrewAxisHeight": (0.196, 0.0785),
     # Two baselines beneath the front view, above its label, both from the
     # flange's west face (the table's X0), shortest innermost: the near tap
     # reads left of the flange, since its 7.9 mm witness span is narrower than
@@ -399,6 +420,7 @@ GEOMETRY_CALLOUTS = {
     "DeckCornerRadius": "DECK",
     "DeckEdgeChamfer": "X 45 DEG\nDECK EDGE",
     "DeckRise": "DECK ABOVE\nLAND",
+    "GreenTopHeight": HEIGHT_REFERENCE_CALLOUTS["GreenTopHeight"],
 }
 # One chamfer feature breaks both plates' top rims, so its caption names the
 # feature -- in the PLURAL -- rather than whichever of its edges the import
@@ -414,16 +436,18 @@ SECTION_CALLOUTS = {
 }
 HOLE_SIDE_CALLOUTS = {
     "SpotFaceDia": "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR",
-    "Spot0Y": "CROSS-SCREW AXIS\nFROM FLANGE\nUNDERSIDE",
+    "CrossScrewAxisHeight": HEIGHT_REFERENCE_CALLOUTS["CrossScrewAxisHeight"],
 }
 
 # Native table tags keep their source association while short leaders separate
 # the closely spaced screw patterns. Coordinates below are sheet layout only.
 HOLE_TAG_POSITIONS = {
-    "A3": (0.325, 0.176),
-    "A4": (0.326, 0.215),
+    # The A-A cut line at x329.2 mm crossed both old labels. Keep the native
+    # tags in the clear gutter between the plan and section, not on that line.
+    "A3": (0.344, 0.176),
+    "A4": (0.344, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.247, 0.187),
+    "D1": (0.2456, 0.1550),
     # The transferred pinion-rig seats left the table (U28 corollary), and
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
@@ -670,6 +694,77 @@ def _serial_edge(view: Any) -> Any:
     return min(candidates, key=lambda item: item[0])[1]
 
 
+def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the native Y line between its holes and offset only its text."""
+    name = "PivotSeatY"
+    matches = []
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) == name:
+            matches.append(annotation)
+    if len(matches) != 1:
+        raise RuntimeError(f"harmonic base needs one native {name}, got {len(matches)}")
+    annotation = matches[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # An inherited offset would move only text, leaving the old long witnesses.
+    display.OffsetText = False
+    if bool(display.OffsetText):
+        raise RuntimeError("harmonic base PivotSeatY offset could not be reset")
+    if not annotation.SetPosition2(*HOLE_TOP_KEEP[name], 0.0):
+        raise RuntimeError("failed to position the harmonic base PivotSeatY line")
+    line_position = annotation.GetPosition()
+    if (
+        not line_position
+        or not math.dist(
+            (float(line_position[0]), float(line_position[1])), HOLE_TOP_KEEP[name]
+        )
+        <= 1e-5
+    ):
+        raise RuntimeError(
+            f"harmonic base PivotSeatY line did not persist: {line_position!r}"
+        )
+    offset_dimension_text(adapter, [annotation], {name: PIVOT_SEAT_Y_TEXT_XY})
+    if not bool(display.OffsetText):
+        raise RuntimeError("harmonic base PivotSeatY text did not stay offset")
+    position = annotation.GetPosition()
+    if (
+        not position
+        or not math.dist(
+            (float(position[0]), float(position[1])), PIVOT_SEAT_Y_TEXT_XY
+        )
+        <= 1e-5
+    ):
+        raise RuntimeError(f"harmonic base PivotSeatY text did not persist: {position!r}")
+
+
+def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Apply one-line ABOVE flags to both native D1 offsets and read them back."""
+    if set(PIVOT_SEAT_CALLOUTS) != set(PIVOT_SEAT_DIMENSIONS) or any(
+        not text or "\n" in text or "\r" in text
+        for text in PIVOT_SEAT_CALLOUTS.values()
+    ):
+        raise RuntimeError("D1 offsets require both one-line ABOVE flags")
+    matches = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in PIVOT_SEAT_CALLOUTS:
+            continue
+        if name in matches:
+            raise RuntimeError(f"duplicate native D1 offset: {name}")
+        matches[name] = annotation
+    if set(matches) != set(PIVOT_SEAT_CALLOUTS):
+        raise RuntimeError(f"missing native D1 offsets: {set(PIVOT_SEAT_CALLOUTS) - set(matches)}")
+    set_dimension_callouts(
+        adapter, annotations, PIVOT_SEAT_CALLOUTS, location="above"
+    )
+    for name, annotation in matches.items():
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        actual = display.GetText(3)  # swDimensionTextCalloutAbove
+        if actual != PIVOT_SEAT_CALLOUTS[name]:
+            raise RuntimeError(f"native {name} ABOVE flag did not persist: {actual!r}")
+
+
 def _spread_hole_tags(view: Any, table: Any) -> None:
     table_locations = {}
     for row in range(1, int(table.RowCount)):
@@ -768,44 +863,10 @@ TRANSFER_NAMEPLATE_CALLOUT = "TRANSFER FROM MHA-FR-04\nAT ASSEMBLY;"
 TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
-# The cone swing set (cone_set_stack) is made at T120 against the arbor, which
-# the MHA-DT-02 pedestals carry; a pivot-seat error reaches the near cones
-# x (1 - r) after it. The pivot seat is therefore located from the pedestal
-# seats, +-0.05, in one setup with them (Main ruling 2026-10-10, critical
-# interface), not from the table's corner datum: its table row stays the
-# nominal, the offsets below govern, and the note says so in words and names
-# the seat's table tag, so the two locations cannot read as competing
-# (plate-r1 review). The tag is D1, the 10-24 row at X 142.05 Y 39.81 (r4
-# render; C1 is the lock seat's 1/4-20 row, which the plate-r1 note named and
-# the r4 review caught: its offsets from the near pedestal seat land on D1).
-# The note heads the sheet-2 notes column, under the hole table and short of
-# the 38.1 cross-screw-axis callout, with no leader: one would cross the
-# table. The sheet-2 callout check measures its read-back ink like a
-# callout's: against every callout AND every other obstacle (the table, the
-# views, the frame), so the note cannot land on the table or a view any more
-# than a callout can (pc-p1 eye pass).
-_PIVOT_NEAR_PEDESTAL_XZ = min(
-    PEDESTAL_SCREW_XZ, key=lambda xz: math.dist(xz, PIVOT_SCREW_XZ)
-)
-PIVOT_SEAT_TAG = "D1"
-PIVOT_SEAT_STEP = (
-    f"{PIVOT_SEAT_TAG} PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
-    "THE MHA-DT-02 SEATS, IN ONE SETUP WITH THEM;\n"
-    f"X {PIVOT_SCREW_XZ[0] - _PIVOT_NEAR_PEDESTAL_XZ[0]:.2f}, "
-    f"Y {_PIVOT_NEAR_PEDESTAL_XZ[1] - PIVOT_SCREW_XZ[1]:.2f} "
-    f"<MOD-PM>{PIVOT_SEAT_POSITION_BAND_MM:.2f} "
-    "FROM THE NEAR ONE.\n"
-    f"THIS GOVERNS {PIVOT_SEAT_TAG}; ITS TABLE X/Y ARE REFERENCE."
-)
-PIVOT_SEAT_NOTE_XY = (0.020, 0.108)
-PIVOT_SEAT_NOTE_LABEL = "pivot seat note"
-
-
-def is_pivot_seat_note(text: str) -> bool:
-    """Whether a note read back off the sheet is the D1 pivot seat note (INote
-    text reads back with CRLF line breaks)."""
-    return text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP.strip()
-
+# The cone swing set is made against the arbor carried by MHA-DT-02.
+# Both native banded offsets cite spec-owned numbered note 1 in the B4 notes
+# lane; the free note states the assembly setup and table-reference status.
+PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
 # and depth; this instruction; the thread and its depth, on its own row. The
@@ -814,7 +875,7 @@ def is_pivot_seat_note(text: str) -> bool:
 # BASE_SCREW_SEAT_Z), and its depths run from that face. "ON A1-A4 X
 # CENTRES" was a location, now the CrossTapX/CrossTapFarX dimensions, and
 # the spotface callout's 4X FRONT/REAR already counts the faces.
-CROSS_TAP_PROCESS = "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
+CROSS_TAP_PROCESS = "COMMON THREAD LEAD IN BOTH WALLS\n"
 TRANSFER_HOLES = (
     *TRANSFER_BLOCK_HOLES,
     TRANSFER_SPRING_HOLE,
@@ -1748,6 +1809,7 @@ def _check_hole_sheet_callouts(
     obstacles.update(datum_origin_boxes(axis_points))
     obstacles.update(_section_line_obstacles(views))
     sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
+    pivot_seat_notes = 0
     for view in (sheet_view, *views.values()):
         for element, annotation in _iter_view_annotations(adapter, view):
             # Display dimensions come back as (None, annotation) (#902); only
@@ -1760,13 +1822,14 @@ def _check_hole_sheet_callouts(
             text = _note_text(adapter, annotation)
             if not note_reaches_final_sheet(text):
                 continue
-            if is_pivot_seat_note(text):
-                boxes[PIVOT_SEAT_NOTE_LABEL] = element.box
-                continue
+            if text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP:
+                pivot_seat_notes += 1
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
-    if PIVOT_SEAT_NOTE_LABEL not in boxes:
-        raise RuntimeError("callout check found no pivot seat note on the holes sheet")
+    if pivot_seat_notes != 1:
+        raise RuntimeError(
+            f"callout check requires exactly one numbered pivot seat note, found {pivot_seat_notes}"
+        )
     tables = [
         element
         for view in (sheet_view, *views.values())
@@ -1781,7 +1844,8 @@ def _check_hole_sheet_callouts(
     )
     texts = {f"callout {label}": box for label, box in boxes.items()}
     texts.update(
-        (name, box) for name, box in obstacles.items() if name.startswith(_TEXT_OBSTACLE_KINDS)
+        (name, box) for name, box in obstacles.items()
+        if name.startswith(_TEXT_OBSTACLE_KINDS)
     )
     findings = (
         find_callout_clashes(boxes, obstacles)
@@ -1967,10 +2031,8 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    # FlangeToDeck is owned by a construction sketch the part saves blanked
-    # (build_harmonic_base REFERENCE_SKETCHES); the hidden-owner curate shows
-    # it in the one view that dimensions it. The plan's PlanReference sketch
-    # (pad and deck placed from X0 Y0) is saved blanked the same way.
+    # HeightReference's point-only baselines and PlanReference's plan stations
+    # are saved blanked in the model, so their own views use hidden-owner curation.
     top_dimensions = curate_hidden_owner_dimensions(
         adapter,
         top,
@@ -1998,23 +2060,15 @@ async def build(adapter: Any) -> dict[str, str]:
         display.ArcExtensionLineOrOppositeSide = False
         if display.ArcExtensionLineOrOppositeSide:
             raise RuntimeError(f"{name} leader did not stay on its native corner arc")
-    # All three height dimensions stack on the LEFT of the front view,
-    # shortest nearest the outline: the part-owned 12.7 at x 0.073 and 38.1 at
-    # 0.0625 (SIDE_KEEP), this derived overall at 0.0425. At 0.052 the two
-    # outer dimensions sat inside each other's ink -- this text was struck by
-    # the 38.1's lower witness line and its own dimension line ran through the
-    # 38.1's text (native layout audit); 10 mm of extra offset clears both,
-    # and the text still sits below the 50.8 witness lines it belongs to.
-    # The overall is the ONLY dimension this sheet
-    # creates: it is the read-only sum of two model-owned heights (12.7 +
-    # 38.1), so there is no model dimension to import and no tolerance to
-    # carry -- which is why its places are the one precision the part hands
-    # over as a constant.
+    # Independent manufacturing heights start on the faced underside:
+    # BottomThickness and GreenTopHeight, with DeckRise above the green land.
+    # The overall deck height is only their derived GreenTopHeight + DeckRise
+    # reference, not another tolerance chained through the flange thickness.
     overall_height = _add_base_height(
         adapter,
         side,
         _horizontal_base_edge(side, STACK_HEIGHT),
-        STACK_HEIGHT,
+        GREEN_TOP + DECK_RISE,
         (0.0425, 0.099),
         "overall deck height",
     )
@@ -2048,9 +2102,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(deck_box) != 6:
         raise RuntimeError("qualified deck face has no native bounding box")
     deck_point = tuple(float(value) for value in (deck_face.GetClosestPointOn(
-        deck_box[0] + (deck_box[3] - deck_box[0]) / 4.0,
+        deck_box[0] + DECK_FINISH_FACE_INSET_M,
         (deck_box[1] + deck_box[4]) / 2.0,
-        deck_box[2] + 3.0 * (deck_box[5] - deck_box[2]) / 4.0,
+        (deck_box[2] + deck_box[5]) / 2.0,
     ) or ()))
     if len(deck_point) != 5 or abs(deck_point[1] - STACK_HEIGHT / 1000.0) > 1e-7:
         raise RuntimeError(f"native deck leader point is not on the deck plane: {deck_point!r}")
@@ -2131,13 +2185,17 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (hole_top, hole_side, section):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(
+    # The part saves PivotSeatReference blanked; show its point-only owner in
+    # this view to import its dimensions without hiding them again afterward.
+    hole_top_dimensions = curate_hidden_owner_dimensions(
         adapter,
         hole_top,
         keep=HOLE_TOP_KEEP,
         view_label="holes top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    _place_pivot_seat_y(adapter, hole_top_dimensions)
+    _flag_pivot_seat_dimensions(adapter, hole_top_dimensions)
     section_dimensions = curate_view_dimensions(
         adapter,
         section,
@@ -2160,9 +2218,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # junction is not measurable with hobby-shop kit, so the model keeps its
     # fillet and the deck cutter's own corner radius defines it (2026-09
     # review over-specification item).
-    # Sheet-2 left notes column, below the hole table: the C1 pivot seat note
-    # (the rig transfer callouts cite the drive-train rig-set step instead).
-    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     if not auto_center_marks(adapter, hole_top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base hole pattern")
 
@@ -2227,6 +2282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
+    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     _attached_note(
         adapter,
         hole_top,
@@ -2292,17 +2348,10 @@ async def build(adapter: Any) -> dict[str, str]:
         tap_callout, {"hw-tapdrldepth": 0}, label="base cross-tap drill depth"
     )
     _check_cross_tap_callout(tap_callout)
-    # 38.10 is also the deck above the flange (FlangeToDeck), so the axis height
-    # has to SHOW which two features it spans (2026-09 review blocker). The
-    # imported Spot0Y does that natively and for free: it is the spotface
-    # sketch's own dimension, from the sketch origin -- which lies ON the
-    # flange underside -- to the hole CENTRE, whose center mark this view
-    # draws. Its caption (HOLE_SIDE_CALLOUTS) names that Ra 3.2 seating face,
-    # and its text is parked BELOW the extension lines it would otherwise be
-    # struck through by: at 1:4 the two witness lines are 9.5 mm apart on
-    # paper, so a four-line block centred on the dimension line put the value
-    # on the line and each caption line on an extension line. Outside the band
-    # SolidWorks keeps the arrows inside and jogs a leader down to the text.
+    # The point-only HeightReference dimensions this actual cross-screw centre
+    # from the same faced underside as GreenTopHeight. The spec-owned caption
+    # names that seating face; no flange-to-deck chain controls either height.
+    # Keep the axis-height text below its extension-line band.
     if not auto_center_marks(adapter, hole_side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the base cross-screw entries")
     # The four sockets locate the frame columns, so their bores carry the seat
@@ -2474,6 +2523,7 @@ async def build(adapter: Any) -> dict[str, str]:
         [
             *top_dimensions,
             *side_dimensions,
+            *hole_top_dimensions,
             *section_dimensions,
             *hole_side_dimensions,
             *bottom_dimensions,
