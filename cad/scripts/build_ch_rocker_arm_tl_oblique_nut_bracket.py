@@ -11,11 +11,12 @@ extruded -Y by the depth. The same sketch carries two reference points, the
 #8 stations from the -X face's bottom corner: the origin's X is mid-air, so
 the printed stations live there and the Hole Wizard placement dimensions stay
 unprinted, driven from them. Then three native Hole Wizard features: the two
-#8-32 taps blind from the Y = 0 face, the four metric taps on the nut's
+#8-32 taps blind from the Y = 0 face, the four #4-40 taps on the nut's
 circle, and the nut seat (counterbore for the spigot over the screw's THRU
 clearance), both on the -X face, placed from the Y = 0 face and the bottom.
-The seat's placement dimensions print; the M3 taps' run from the edges, so
-they stay unprinted and the taps print from the seat's axis on the hidden
+The seat's placement dimensions print; the #4-40 taps' run from the edges, so
+they stay unprinted and the taps' offsets from the seat's axis print as
+REFERENCE values (spotted from the nut at assembly) on the hidden
 Right-plane sketch ``NutPatternReference``.
 
 Run (SolidWorks already open)::
@@ -220,7 +221,7 @@ def _cbore_diameter_name(adapter: Any) -> str:
 
 
 async def _nut_pattern_reference(adapter: Any) -> SketchDims:
-    """The M3 taps' printed offsets from the nut seat's axis.
+    """The #4-40 taps' printed offsets from the nut seat's axis.
 
     The NutTaps wizard dimensions its placement points from the edges, so
     the printed pattern lives here, on the Right plane (X = 0, the nut face
@@ -389,7 +390,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "block-screw taps", volume - V_BLOCK_TAPS, 0.01 * V_BLOCK_TAPS
     )
 
-    # --- Nut screws: ONE metric tap feature on the -X face, the nut's square
+    # --- Nut screws: ONE #4-40 tap feature on the -X face, the nut's square
     # pattern about the seat. On an X face the placement sketch's x runs
     # along model Z and its y along model Y (build_dt_cone_tip_block); the
     # shared coordinates fail loudly if that ever differs.

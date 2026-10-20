@@ -4,11 +4,11 @@ ch-rocker-arm-tl-vn-oblique-kp08-screw:
   number: MHA-CH-06-TL-VN-65
   stock_name: Black-Oxide Alloy Steel Socket Head Screw
   supplier: McMaster-Carr
-  supplier_skus: ["91290A148"]
+  supplier_skus: ["91251A150"]
   material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, class 12.9, DIN 912 / ISO 4762, Rockwell C41; McMaster-Carr 91290A148"
+  material_specification: "Alloy steel, black oxide, 170,000 psi tensile; McMaster-Carr 91251A150"
   finish: black oxide
-  # The fastener table's KP08_TO_BRACKET count (M4 X 12 SHCS).
+  # The fastener table's KP08_TO_BRACKET count (#6-32 X 5/8 SHCS).
   quantity: 4
   tolerance_class: machined_block
   fit_class: fastener_clearance

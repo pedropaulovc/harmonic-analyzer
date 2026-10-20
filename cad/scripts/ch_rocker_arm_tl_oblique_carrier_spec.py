@@ -9,8 +9,9 @@ The rocker blank, on its riser (MHA-CH-06-TL-24), is located on the HUB pin
 (MHA-CH-06-TL-25) and the CL dowel and clamped by the CR screw; the feed
 lever (MHA-CH-06-TL-26) bolts to the -Y edge.
 
-Material and stock: 6061-T6 aluminium plate, 12 thick (``CARRIER_THICK``,
-printed STOCK), sawn and milled to 520 x 130.
+Material and stock: 1/2 in 6061-T651 aluminium plate, OnlineMetals #1250
+custom cut 5.5 x 21 in; faced to 12.0 (``CARRIER_THICK``) and milled to
+520 x 130. Finished thickness takes the .X title-block band, not STOCK.
 
 Frame (the calculator's carrier frame, and the model frame): origin at the
 midpoint of A1-B1; +X runs A1 -> B1, +Y points toward the part, Z0 is the
@@ -88,10 +89,10 @@ is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
 (``WALLS_MM``). Rule 18 (engagement): every tap runs THRU the 12 plate, so its
 full thread at the worst case is the plate at its .X low limit less the tap
 mouth's title-block edge break and one pitch of incomplete lead
-(``ENGAGEMENT_MM``, build_pd_platen_clip's count). #4-40 keeps 10.31 of the
-4.27 it needs, 1/4-20 9.68 of 9.53. The 5/16-18 feed-lever taps keep 9.53 of
-11.91 (1.20D): 12 of stock cannot hold 1.5D of that thread, so their callout
-states the shortfall (rule 20, ``LEVER_TAP_CALLOUT``).
+(``ENGAGEMENT_MM``, build_pd_platen_clip's count). These are the carrier's
+available full threads, not the screws' actual engagement: #4-40 offers
+10.31 and 1/4-20 offers 9.68. The 5/16-18 feed-lever tap offers 9.53 of the
+11.91 needed (1.20D); its existing RV-01 callout states that shortfall.
 """
 
 from __future__ import annotations
@@ -113,6 +114,8 @@ DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 OUTLINE_X = (-260.0, 260.0)
 OUTLINE_Y = (-45.0, 85.0)
 THICKNESS = trammel.CARRIER_THICK
+THICKNESS_PLACES = trammel.CARRIER_THICK_PLACES
+THICKNESS_BAND = trammel.CARRIER_THICK_BAND
 LEVER_HOLES = ((0.0, -22.0), (0.0, -38.0))
 LEVER_INNER_END_Y = -15.0
 
@@ -176,7 +179,7 @@ if round(PIN_CHAMFER, PIN_CHAMFER_PLACES) != PIN_CHAMFER:
     raise AssertionError("the pin-hole chamfer must print exactly at its places")
 # The hidden reference sketch section A-A imports (fr_nameplate's
 # SectionReference): the printed chamfer leg, which drives the chamfer
-# feature's distance, and the stock thickness, driven from Plate's depth. A
+# feature's distance, and the finished thickness, driven from Plate's depth. A
 # partial section imports a hidden sketch in its plane (pd_platen A-A, pivot
 # block B-B) but not a body feature's depth: jig-r4/r5 asked it for Plate's
 # and got nothing at all, as ms_stick's G-G did for its cut depth. It lies on
@@ -209,7 +212,7 @@ SPOTS = {"Hub": HUB, "Cl": CL}
 # so the spot planes and cones are driven from this sketch instead.
 SPOT_REFERENCE = "SpotReference"
 REFERENCE_SKETCHES = (SECTION_REFERENCE, SPOT_REFERENCE)
-# The CL dowel, pressed flush with the underside once CL is finished in place:
+# The CL dowel is press-set from the actual riser once CL is finished in place:
 # a bought Ø6 m6 dowel in an N7 hole (ISO 286, 3-6 mm row).
 CL_DOWEL_DIA = 6.0
 CL_DOWEL_BAND = (0.012, 0.004)  # m6
@@ -253,9 +256,8 @@ LEVER_SPEC = HoleSpec("tapped", LEVER_THREAD)
 LEVER_TAP_DRILL = TAP_DRILL_MM[LEVER_THREAD]
 
 # --- Rule 18: full thread at the worst case ------------------------------------
-# Every tap runs THRU the stock plate: the plate at its .X low limit, less the
+# Every tap runs THRU the faced plate: its finished .X low limit, less the
 # tap mouth's title-block edge break and one pitch of incomplete lead.
-STOCK_BAND = printed_band_mm(1)
 TAP_MOUTH_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 
 
@@ -264,15 +266,15 @@ def _pitch(thread: str) -> float:
 
 
 ENGAGEMENT_MM = {
-    thread: THICKNESS - STOCK_BAND - TAP_MOUTH_BREAK - _pitch(thread)
+    thread: THICKNESS - THICKNESS_BAND - TAP_MOUTH_BREAK - _pitch(thread)
     for thread in (CR_THREAD, RISER_THREAD, LEVER_THREAD)
 }
 ENGAGEMENT_D = {
     thread: length / THREAD_MAJOR_MM[thread] for thread, length in ENGAGEMENT_MM.items()
 }
-# 12 of stock cannot hold 1.5D of 5/16-18: the lever taps are the one stated
-# shortfall (rule 20), each value floored to two places (a MIN never rounds
-# up, pd_transgear_arm_spec.engagement_line).
+# A finished 12 plate cannot hold 1.5D of 5/16-18: the lever taps are the one
+# stated shortfall (rule 20), each value floored to two places (a MIN never
+# rounds up, pd_transgear_arm_spec.engagement_line).
 SHORT_ENGAGEMENT = (LEVER_THREAD,)
 for _thread, _d in ENGAGEMENT_D.items():
     if (_d < 1.5) != (_thread in SHORT_ENGAGEMENT):
@@ -337,7 +339,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "B2DX": 3,
         "B2DY": 3,
     },
-    SECTION_REFERENCE: {"PinChamferSize": PIN_CHAMFER_PLACES, "StockThick": 1},
+    SECTION_REFERENCE: {
+        "PinChamferSize": PIN_CHAMFER_PLACES,
+        "StockThick": THICKNESS_PLACES,
+    },
     SPOT_REFERENCE: {"SpotDia": 2, "SpotDiaCl": 2, "HubY": 2, "ClX": 2, "ClY": 2},
     "CrTap": {"CrX": 2, "CrY": 2},
     "RiserTaps": {name: RISER_STATION_PLACES for name in RISER_STATIONS},
@@ -364,7 +369,6 @@ CALLOUTS_BELOW = {
     "B2DX": DX_CALLOUT,
     "A2DY": DY_CALLOUT,
     "B2DY": DY_CALLOUT,
-    "StockThick": "STOCK",
     "SpotDia": SPOT_CALLOUT,
     "SpotDiaCl": SPOT_CALLOUT,
     "PinChamferSize": PIN_CHAMFER_CALLOUT,

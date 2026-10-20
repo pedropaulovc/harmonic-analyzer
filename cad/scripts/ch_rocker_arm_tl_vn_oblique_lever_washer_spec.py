@@ -100,7 +100,7 @@ ENGAGEMENT_MIN = min(
 STAND_OUT_MAX = (
     lever_screw.DIMS.length
     - (feed_lever.LEVER_THICK - _THICK_BAND + THICKNESS_MIN)
-    - (carrier.THICKNESS - carrier.STOCK_BAND)
+    - (carrier.THICKNESS - carrier.THICKNESS_BAND)
 )  # 0.23
 
 # --- Fit on the lever -----------------------------------------------------------

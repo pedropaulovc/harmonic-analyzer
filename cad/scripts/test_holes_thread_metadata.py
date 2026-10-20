@@ -283,13 +283,11 @@ def test_radial_plain_hole_leaves_the_definition_alone(fake_seat) -> None:
     assert "ModifyDefinition" not in feature.log
 
 
-def test_metric_tap_initializes_ansi_metric_and_never_writes_a_thread_class(
+def test_every_tap_initializes_ansi_inch_and_writes_its_thread_class(
     fake_seat, monkeypatch
 ) -> None:
-    """Bought metric hardware (KP08 blocks, the leadscrew flange nut) gets an
-    ANSI Metric tap. ThreadClass is an ANSI-inch-only wizard property, so the
-    write-back commits the termination alone and the readback skips the class
-    rather than demanding an inch "2B" the metric standard cannot hold."""
+    """Every shop tap is UNC/UNF (fastener policy, #1630): the wizard starts
+    in the ANSI Inch standard and the write-back commits the class."""
     adapter, feature = fake_seat
     initialized: list[tuple[Any, ...]] = []
     monkeypatch.setattr(
@@ -299,28 +297,27 @@ def test_metric_tap_initializes_ansi_metric_and_never_writes_a_thread_class(
             InitializeHole=lambda *args: initialized.append(args)
         ),
     )
-    spec = HoleSpec("tapped_metric", "M3x0.5", end="through_next")
+    spec = HoleSpec("tapped", "#4-40", end="through_next")
 
     _holes.wizard_hole_on_cylinder(
         adapter,
         spec,
         [0.0, 50.718, 3.0],
-        "metric tap (M3x0.5)",
+        "radial tap (#4-40)",
         point_planes=("SetScrewStationPlane", "Right Plane"),
     )
 
     hole_type, standard, fastener, size, end = initialized[0]
-    assert (hole_type, standard, fastener) == (_TAPPED, _holes._STD_ANSI_METRIC, 43)
-    assert (size, end) == ("M3x0.5", _THROUGH_NEXT)
+    assert (hole_type, standard, fastener) == (_TAPPED, _holes._STD_ANSI_INCH, 27)
+    assert (size, end) == ("#4-40", _THROUGH_NEXT)
     assert feature.committed["ThreadEndCondition"] == _THROUGH_NEXT
-    assert feature.committed["ThreadClass"] == ""
+    assert feature.committed["ThreadClass"] == "2B"
     assert "ModifyDefinition" in feature.log
 
 
-def test_metric_tap_rows_carry_drill_and_major() -> None:
-    from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+def test_no_metric_tap_kind_or_row_remains() -> None:
+    from _hole_spec import TAP_DRILL_MM, TAPPED_KINDS
 
-    for size, drill, major in (("M3x0.5", 2.5, 3.0), ("M4x0.7", 3.3, 4.0)):
-        spec = HoleSpec("tapped_metric", size, end="blind", depth_mm=8.0)
-        assert blind_cut_dia_mm(spec) == drill
-        assert THREAD_MAJOR_MM[size] == major
+    assert TAPPED_KINDS == ("tapped", "tapped_bottoming")
+    assert not any(kind.endswith("metric") for kind in _holes._KINDS)
+    assert not any(size.startswith("M") for size in TAP_DRILL_MM)

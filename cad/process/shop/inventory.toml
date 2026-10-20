@@ -3660,8 +3660,8 @@ verify = true
 purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-600 screw purchase; do not order separately. HW-SC-T8x2-NUT is the vendor's standalone replacement SKU (USD 2.95 in stock live 2026-10-17 UTC), not a second required purchase."
 note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Backlash, dimensional tolerances and received fit remain unverified."
 # Lubrication and backlash acceptance remain shop checks, not catalogue proof.
-# Four plain 3.5 mm holes suit M3 clearance mounting; a shop-made nut bracket
-# is a separate jig part, not a claim of direct mounting to M4 carriage threads.
+# Four plain 3.5 mm holes take #4-40 button head screws, no washers, into the
+# shop-made nut bracket; bought carriage threads remain M4.
 # C4 owner identifies TL-29 (MHA-CH-06-TL-29), defined in
 # cad/scripts/ch_rocker_arm_tl_oblique_nut_bracket_spec.py, as that bracket.
 # Interface authority: NUT_ID and NUT_* in
@@ -3685,7 +3685,7 @@ source = "https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-bl
 present = false
 verify = true
 purchase = "2 x AMPEC KP08 from Bearings Direct, $9.18 each on the live listing; possession unconfirmed."
-note = "Read live 2026-10-16: 8 mm bore rotary insert ball bearing in mini zinc pillow housing; shaft axis height 15 mm, mounting bolt spacing 42 mm, overall length 55 mm and height 29 mm. Two inner-ring set screws 120 degrees apart provide shaft locking; not a press-fit-only bearing. Vendor does not publish bolt-hole diameter or axial housing/inner-ring width: verify these on receipt, do not copy another maker's KP08 drawing. Owner sourcing ruling 2026-10-16 proposes M4 screws at 42 mm spacing; verify received holes clear the chosen screws before mounting. Catalogue gives 3500 rpm and 292/742 lbf static/dynamic load, but no axial-load or endplay rating. Fully threaded screw ends seat on thread crests, not smooth journals: check crest passage, runout, axial creep under feed reversal and set-screw locking before use. Assembled bidirectional axial location is not proven by this listing; no turned journals are specified by this sourcing entry."
+note = "Read live 2026-10-16: 8 mm bore rotary insert ball bearing in mini zinc pillow housing; shaft axis height 15 mm, mounting bolt spacing 42 mm, overall length 55 mm and height 29 mm. Two inner-ring set screws 120 degrees apart provide shaft locking; not a press-fit-only bearing. Vendor does not publish bolt-hole diameter or axial housing/inner-ring width: verify these on receipt, do not copy another maker's KP08 drawing. Issue #1630 replaces the original M4 mounting proposal with #6-32 screws at 42 mm spacing; the bought block's hole diameter remains unverified. Catalogue gives 3500 rpm and 292/742 lbf static/dynamic load, but no axial-load or endplay rating. Fully threaded screw ends seat on thread crests, not smooth journals: check crest passage, runout, axial creep under feed reversal and set-screw locking before use. Assembled bidirectional axial location is not proven by this listing; no turned journals are specified by this sourcing entry."
 cite = ["Bearings Direct / AMPEC KP08 https://bearingsdirect.com/8mm-bore-kp08-mini-zinc-pillow-set-screw-block-bearing-kp8uu/ read live 2026-10-16: 8 mm bore, axis 15 mm, bolt spacing 42 mm, length 55 mm, height 29 mm, two set screws"]
 # Rejected McMaster 4491N33 and 8600N13: 8 mm rotary base-mount bearings,
 # but press-fit shaft mounting would require a turned journal on the rolled
@@ -6342,3 +6342,20 @@ dia_mm = 11.1125
 length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-steel/0-4375-carbon-steel-round-bar-1018-cold-finish/pid/20743 read live 2026-10-16"]
+
+# Oblique-trammel stock requirements (#1619): nominal starting material only.
+# Possession is unknown: omit the optional on_hand field; no receipt measurements.
+[[stock]]
+form = "rectangular_blank"
+material = "6061-T651 aluminium"
+note = "MHA-CH-06-TL-21 carrier: selected 1/2 in plate, OnlineMetals 1250 custom cut 5.5 x 21 in. Face to the drawing's 12.0 thickness and mill to 520 x 130. Purchase and receipt are not recorded."
+# Basis: issue #1619 owner-selected nominal 5.5 x 0.5 x 21 in, times 25.4 mm/in; no supplier tolerance or metrology is assumed.
+section_mm = [139.7, 12.7]
+length_mm = 533.4
+cite = ["Owner stock selection, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619; OnlineMetals part 1250 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651/pid/1250"]
+
+[[stock]]
+form = "rectangular_blank"
+material = "Acetal (Delrin)"
+note = "MHA-CH-06-TL-24 riser requirement: 1/4 in (6.35 mm nominal) acetal stock, faced to 6.0 and milled to finished 40 x 340. Supplier, SKU and starting width/length remain unselected; no stock is claimed purchased or owned. Blank envelope dimensions are intentionally omitted until sourcing is selected."
+cite = ["Unsourced stock requirement, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619"]

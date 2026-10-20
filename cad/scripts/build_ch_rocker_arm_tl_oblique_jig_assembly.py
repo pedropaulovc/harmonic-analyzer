@@ -34,6 +34,10 @@ The named explode JIG_EXPLODED (Default and Default Simplified) is the fitter
 drawing's exploded view: the disassembly order along the machine axes, each
 step read back in world space and the saved pose proven unchanged.
 
+The hidden sketch ``spec.CL_TIP_FEATURE`` carries the CL dowel's round tip
+above the riser top (``cl_dowel.TIP_HEIGHT``) for the elevation's reference
+dimension: the fitter sets the tip against the actual riser.
+
 Run (SolidWorks already open)::
 
     uv run python cad\scripts\build_ch_rocker_arm_tl_oblique_jig_assembly.py
@@ -44,6 +48,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -72,11 +77,21 @@ from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
-from _drawing_marks import DRAWN_BY
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import apply_drawing_precision
+from _feature_tree import name_last_feature
 from _interference_contracts import allowed_interference_pairs
 from _named_views import octant_rotation
 from _session import run_build
 from _simplified_names import simplified_name
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _transforms import euler_from_rows
 from _visibility import blank_reference_geometry
 
@@ -613,6 +628,113 @@ def name_machine_views(adapter: Any) -> None:
     model.ShowNamedView2("*Isometric", _SW_ISOMETRIC_VIEW)
 
 
+def _elevation_sketch_mapper(
+    adapter: Any, *, label: str
+) -> Callable[[float, float], tuple[float, float]]:
+    """Map machine (X, Z) mm, at Y = 0, into the ACTIVE Top-plane sketch.
+
+    The plane's sketch axes are SolidWorks' to state (``ModelToSketchTransform``;
+    build_ch_rocker_arm_tl_oblique_carrier's mapper): machine X must run along
+    sketch u and Z along v, either sign, so a vertical relation runs up Z."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError(f"{label}: no active sketch")
+    sketch = _early_bound(active, "ISketch")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+
+    def raw(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
+        point = utility.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
+            )
+        )
+        moved = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(transform),
+            "IMathPoint",
+        )
+        return tuple(c * 1000.0 for c in moved.ArrayData)
+
+    base = raw((0.0, 0.0, 0.0))
+    for unit, along in (((1.0, 0.0, 0.0), 0), ((0.0, 0.0, 1.0), 1)):
+        delta = [m - b for m, b in zip(raw(unit), base, strict=True)]
+        if abs(abs(delta[along]) - 1.0) > 1e-6:
+            raise RuntimeError(
+                f"{label}: machine {unit} maps to sketch {delta!r}, not along "
+                f"sketch {'uv'[along]}"
+            )
+
+    def to_sketch(x: float, z: float) -> tuple[float, float]:
+        u, v, w = raw((x, 0.0, z))
+        if abs(w) > 1e-4:
+            raise RuntimeError(f"{label}: ({x}, 0, {z}) is {w:g} mm off the sketch")
+        u, v = round(u, 9), round(v, 9)
+        return (0.0 if abs(u) < 1e-9 else u, 0.0 if abs(v) < 1e-9 else v)
+
+    return to_sketch
+
+
+async def _author_cl_tip_setting(adapter: Any) -> None:
+    """CL TIP ABOVE RISER (``spec.CL_TIP_FEATURE``): a construction line on
+    the Top plane (machine X-Z, the operator's elevation's plane) up the CL
+    dowel's axis from the riser top to the round tip the dowel is placed at,
+    its length ``cl_dowel.TIP_HEIGHT``. The fitter sets the tip against the
+    actual riser (step 11), so the elevation prints it as a reference. Marked
+    for the drawing, then blanked. No component, mate or pose edits."""
+    feature = spec.CL_TIP_FEATURE
+    (x, riser_top_z), (tip_x, tip_z) = spec.CL_TIP_LINE
+    tip_height = spec.cl_dowel.TIP_HEIGHT
+    if tip_x != x or abs(tip_z - riser_top_z - tip_height) > 1e-9:
+        raise RuntimeError(f"{feature}: {spec.CL_TIP_LINE} is not TIP_HEIGHT up Z")
+    if abs(x) < 1e-9 or abs(riser_top_z) < 1e-9:
+        # anchor_point_to_origin emits one dimension per nonzero coordinate.
+        raise RuntimeError(f"{feature}: the riser-top end must lie off both axes")
+    dims = SketchDims()
+    check(f"create {feature} sketch", await adapter.create_sketch("Top"))
+    to_sketch = _elevation_sketch_mapper(adapter, label=feature)
+    start, end = to_sketch(x, riser_top_z), to_sketch(x, tip_z)
+    # Direct to the database: inference would snap a 1.6 line's ends.
+    set_sketch_direct_db(adapter, True)
+    try:
+        line = check(f"{feature} line", await adapter.add_line(*start, *end))
+    finally:
+        set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{feature} line is not construction")
+    check(
+        f"{feature} vertical",
+        await adapter.add_sketch_constraint(line, None, "vertical"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{line}.start", *start, "CL dowel axis at the riser top"
+    )
+    dims.record("ClTipAxisX")
+    dims.record("ClTipRiserTopZ")
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "vertical_distance",
+        tip_height,
+        "CL round tip above the riser top",
+    )
+    dims.record(spec.CL_TIP_DIMENSION)
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit {feature} sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    dims.apply(adapter, feature)
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    mark_dimensions_for_drawing(adapter, feature, spec.DRAWING_DIMENSIONS[feature])
+    # Blanked so no view renders the line; the drawing shows it in the
+    # elevation only, for its one imported reference dimension.
+    blank_sketch(adapter, feature)
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -671,6 +793,9 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         allowed_pairs=allowed_interference_pairs(ASM_NAME),
     )
+    # The CL dowel's tip-above-riser reference, after the poses and the
+    # interference check (it touches no component, mate or pose).
+    await _author_cl_tip_setting(adapter)
 
     # Title-block identity for the fitter drawing
     # (draw_ch_rocker_arm_tl_oblique_jig_assembly.py); material and finish are

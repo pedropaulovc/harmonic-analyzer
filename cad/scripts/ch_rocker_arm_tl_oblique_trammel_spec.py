@@ -176,7 +176,7 @@ def at_arc_station(
 # clearance cuts the self-cut band in two): 40 and 120 of arc either side of
 # the apex on the band's centreline, RISER_SCREW_RADIUS. The repo's threads
 # are UNC (memory/fastener-policy-us-customary.md), and they are ASME B18.6.3
-# #4-40 x 1/2 82-degree flat-head machine screws (head Ø0.225 in max), not
+# #4-40 x 5/8 82-degree flat-head machine screws (head Ø0.225 in max), not
 # the plan's M4: an M4 countersunk head (Ø8.96 max) would leave under 1.5 of
 # acetal to a self-cut edge. A B18.3 socket flat head (Ø0.255 in) does not fit
 # the riser's countersink either (TrammelJig, jig-r5).
@@ -218,10 +218,11 @@ RISER_SCREW_WALLS = (
     - _RISER_CSK_MOUTH_MAX
     - _RISER_RADIAL_SHIFT,
 )
-# The supplied riser blank, 340 x 40, lies square on the carrier with its
+# The milled riser blank, 340 x 40, lies square on the carrier with its
 # corner at RISER_BLANK_ORIGIN (carrier frame). The self-cut band runs from
 # y 21.45 (inner edge at the blank's ends) to 50.90 (outer edge at the
-# apex), at least 5 inside both long edges.
+# apex), nominally at least 5 inside both long edges. At the 40.0 width's
+# .X low limit the outer margin is 4.30, not 5.
 RISER_BLANK_LENGTH = 340.0
 RISER_BLANK_WIDTH = 40.0
 RISER_BLANK_ORIGIN = (-RISER_BLANK_LENGTH / 2.0, 16.0)
@@ -387,8 +388,16 @@ PIVOT_BLOCK_HEIGHT = (
 # and stands PIN_COLLAR_PROUD above the block; the carrier rests on it.
 PIN_COLLAR_PROUD = 3.0
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
+# Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
+# CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing
+# dimensions print at .X and take that title-block band, not a supplier-stock
+# tolerance. CL locator height is set from the actual riser at assembly.
 CARRIER_THICK = 12.0
+CARRIER_THICK_PLACES = 1
+CARRIER_THICK_BAND = printed_band_mm(CARRIER_THICK_PLACES)
 RISER_THICK = 6.0
+RISER_THICK_PLACES = 1
+RISER_THICK_BAND = printed_band_mm(RISER_THICK_PLACES)
 # The strap is faced to its finished 2.5 (S0) before it goes on the jig (T3).
 STRAP_THICK = rocker.ARM_THICKNESS
 RAIL_SEAT_Z = BASE_BAR_THICK
@@ -396,6 +405,9 @@ CARRIAGE_TOP_Z = RAIL_SEAT_Z + CARRIAGE_HEIGHT
 PIVOT_BLOCK_TOP_Z = CARRIAGE_TOP_Z + PIVOT_BLOCK_HEIGHT
 CARRIER_UNDERSIDE_Z = PIVOT_BLOCK_TOP_Z + PIN_COLLAR_PROUD
 CARRIER_TOP_Z = CARRIER_UNDERSIDE_Z + CARRIER_THICK
+# Vertical rail clearance for through-screw tips that are also clear of the
+# pivot blocks in plan; their individual specs check that separate envelope.
+CARRIER_TO_RAIL_GAP = CARRIER_UNDERSIDE_Z - (RAIL_SEAT_Z + RAIL_HEIGHT)
 
 # --- PM-30MV table and hold-downs --------------------------------------------
 TABLE_LENGTH = round(33.0 * INCH, 9)  # 838.2
@@ -491,4 +503,4 @@ if not (
     RISER_BLANK_ORIGIN[1] + 5.0 <= RISER_BAND_Y[0]
     and RISER_BAND_Y[1] <= RISER_BLANK_ORIGIN[1] + RISER_BLANK_WIDTH - 5.0
 ):
-    raise AssertionError("the riser's self-cut band runs within 5 of a blank edge")
+    raise AssertionError("the riser's nominal band runs within 5 of a blank edge")

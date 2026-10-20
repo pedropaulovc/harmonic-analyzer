@@ -41,9 +41,10 @@ Lengths print as the lathe reads them (rule 11): the head thickness 4.0 and
 the press seat 12.0 as a baseline from the head's seating face (its top face,
 which bears on the TL-21 carrier). The 8.0 locator is the remainder.
 
-Rule 19: head, carrier and riser (one place, STOCK, STOCK) put the locator's
-top anywhere in 2.0 ± 2.4 above the riser against a 2.5 strap, so the pin is
-supplied long and, after the riser is screwed down, its top is faced in place
+Rule 19: head, faced carrier and faced riser (each at the .X title-block
+band) put the locator's top anywhere in 2.0 ± 2.4 above the riser against a
+2.5 strap, so the pin is supplied long and its top is faced in place after
+the riser is screwed down, to
 ``LOCATOR_SET_MIN``-``LOCATOR_SET_MAX`` (1.80-2.20) above the riser top: the
 g6 cylinder engages the strap hole at least ``STRAP_ENGAGEMENT_MIN`` past the
 chamfer and the top stays under the strap's. The 24.0 overall prints as a
@@ -157,13 +158,13 @@ if not LEAD_CHAMFER < LOCATOR_LENGTH:
     raise AssertionError("the lead chamfer eats the strap locator")
 
 # --- The top, faced to fit at assembly (rule 19) ---------------------------------
-# Head, carrier and riser stack under the locator's top: at one place (head)
-# and STOCK (carrier, riser) each may run 0.8 either way, so the top above the
-# riser could fall anywhere in 2.0 ± 2.4 (± 3.2 with a turned overall's own
-# one-place band) against a 2.5 strap. The pin is
-# supplied long and, once the riser is screwed down, its top is faced in place
-# to a set height above the riser top: the strap engages the cylinder above
-# the riser and the top stays under the strap's top face.
+# Head, faced carrier and faced riser stack under the locator's top. Each
+# native dimension prints at one place (±0.8), so the top above the riser
+# could fall anywhere in 2.0 ± 2.4 (±3.2 with a turned overall's own band)
+# against a 2.5 strap. The inch starting stock does not enter this stack.
+# Supply the pin long and face it in place once the riser is screwed down:
+# the strap engages the cylinder above the riser, and the top stays below
+# the strap's top face.
 LOCATOR_SET_ABOVE_RISER = LOCATOR_LENGTH - trammel.RISER_THICK  # ⚙ 2.0
 LOCATOR_SET_BAND = 0.2
 LOCATOR_SET_MIN = LOCATOR_SET_ABOVE_RISER - LOCATOR_SET_BAND  # 1.8
@@ -174,15 +175,15 @@ if not LOCATOR_SET_MAX < rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]:
 if not LOCATOR_SET_MIN - LEAD_CHAMFER >= STRAP_ENGAGEMENT_MIN:
     raise AssertionError("the faced HUB pin engages the strap hole too little")
 FACING_ALLOWANCE = 0.2
-_STACK_BAND = printed_band_mm(1)  # head at one place; carrier and riser STOCK
+_HEAD_BAND = printed_band_mm(LENGTH_PLACES)
 SUPPLY_LENGTH_MIN = round(
-    (HEAD_LENGTH + _STACK_BAND)
-    + (trammel.CARRIER_THICK + _STACK_BAND)
-    + (trammel.RISER_THICK + _STACK_BAND)
+    (HEAD_LENGTH + _HEAD_BAND)
+    + (trammel.CARRIER_THICK + trammel.CARRIER_THICK_BAND)
+    + (trammel.RISER_THICK + trammel.RISER_THICK_BAND)
     + LOCATOR_SET_MAX
     + FACING_ALLOWANCE,
     6,
-)  # 26.8
+)  # 26.8: the finished .X bands remain ±0.8 after the stock cutover.
 
 # --- Print ---------------------------------------------------------------------
 # One turned profile carries every size; the head fillet carries its radius.

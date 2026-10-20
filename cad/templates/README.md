@@ -91,6 +91,31 @@ rule. When editing this title block, remeasure all four boundaries and update
 `draw_dt_cone_pivot_post._FINISH_CELL` with its offline containment cases; do
 not move the correctly placed note merely to satisfy an obsolete inset.
 
+A purchased-part sheet whose registry number overruns the DWG. NO. cell into
+REV opts in by passing `number_fit=NumberFit.SHRINK_TO_CELL` to
+`build_purchased_fastener_drawing`; the four oblique-trammel vendor screws,
+MHA-CH-06-TL-VN-65 to -68, do. Once the links resolve, the builder measures
+the existing `$PRPSHEET:"Number"` note. Only if it ends less than 1.2 mm
+before the REV divider does one proportional write lower that note's local
+character height, aimed 0.3 mm inside that limit. The link, number, typeface
+and template are unchanged, and `finalize_drawing` re-proves the fit after its
+last rebuild. The fit refuses below 3 mm and on the unmeasured portrait
+template. The landscape cell's rules are at x = 308.351 / 372.310 mm (REV
+divider) and y = 19.969 / 35.906 mm; when editing this title block, remeasure
+`_purchased_fastener_drawing._NUMBER_LIMIT` as well.
+
+The fit scales and writes the note's native `ITextFormat.CharHeight`, whatever
+its authority. The templates-1636 census read the template's 18 pt DWG. NO. as
+`CharHeight` 0.0047625 m and its 15 pt title as 0.00396875 m. 8d9c8dbba
+instead scaled `CharHeightInPts` times 0.0254/72 (6.35 mm) and wrote
+0.00618 m, 1.30 times the note's native height; its readback ran down to
+y = 13.41 mm, below the cell. `INote.GetExtent` is read off the window to the
+pixel (0.48 mm on the fitted sheet), so every DWG. NO. readback is taken
+zoomed onto the cell. Each readback records its extent, position, both height
+authorities, the line and spacing format members and the rendered text rows as
+a `drawing.purchased_number_fit.state` span event, and a failed fit quotes the
+template and settled states.
+
 The UNIT cell links `$PRP:"UnitOfMeasure"`, SolidWorks' drawing-document unit
 property. SolidWorks updates it when the document unit system changes through
 the status-bar unit picker: MMGS displays `mm`, and IPS displays `in`. The

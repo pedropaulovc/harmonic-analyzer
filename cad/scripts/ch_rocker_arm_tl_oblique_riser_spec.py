@@ -5,9 +5,9 @@ is screwed flat on the carrier top (MHA-CH-06-TL-21) under the strap blank,
 so the cutter that profiles the strap runs out into acetal rather than the
 aluminium carrier.
 
-Material and stock: acetal (Delrin) sheet, a supplied blank 6 x 40 x 340
-(``RISER_THICK`` x ``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) ⚙. The
-blank's faces and edges stay as supplied; only the holes are made.
+Material and stock: 1/4 in acetal (Delrin), supplier and stock width/length
+unselected. Face to 6.0 (``RISER_THICK``) and mill the blank to 40.0 x 340.0
+(``RISER_BLANK_WIDTH`` x ``RISER_BLANK_LENGTH``) at the .X title-block band.
 
 Frame (the SolidWorks model): origin at the blank corner, which sits at
 ``RISER_BLANK_ORIGIN`` = (-170, 16) ⚙ in the carrier frame (origin at the
@@ -21,15 +21,16 @@ Hole locations come from the carrier at assembly: the riser is cut in place
 on the carrier, so its seven holes are spotted through the carrier's finished
 holes and taps (the TL-00 assembly sequence). The sheet prints every station
 as a REFERENCE value in parentheses at 2 places, with one note naming the
-mate; the model holds the stations rounded to 0.01 (under 0.005 from the
-calculator). Only the hole sizes carry bands.
+mate; the model retains the unrounded carrier stations so the clearance holes
+and countersinks remain coaxial with the taps and screws. Only hole sizes
+carry bands.
 
 Holes, all THRU from the top face:
 
 * 4 x #4 flat-head countersunk clearance (``RISER_SCREW`` ⚙ #4-40): a native
   Hole Wizard #4 normal-fit clearance (the repo's UNC policy,
   memory/fastener-policy-us-customary.md) with an 82 degree countersink for
-  the ASME B18.6.3 #4-40 x 1/2 flat-head machine screw (Ø0.225 in max,
+  the ASME B18.6.3 #4-40 x 5/8 flat-head machine screw (Ø0.225 in max,
   ``RISER_SCREW_HEAD_DIA`` ⚙; a B18.3 socket flat head, Ø0.255 in, does not
   fit), at ``RISER_SCREWS`` ⚙ = (±39.984, 44.287) and (±119.559, 36.382).
   They take the screws into the carrier's #4-40 tapped holes at the same
@@ -49,7 +50,7 @@ Holes, all THRU from the top face:
 The self-cut band (not modelled): the jig cuts the riser in place on its first
 passes with the 9/16 riser cutter, leaving an arc band between
 ``RISER_INNER_RADIUS`` R802.381 ⚙ and ``RISER_OUTER_RADIUS`` R813.619 ⚙ about the
-arc centre. This part models the supplied blank only. The screws lie on the
+arc centre. This part models the faced and milled blank only. The screws lie on the
 band's centreline ``RISER_SCREW_RADIUS`` R808.0 ⚙; the rule-17 walls from
 each countersink mouth (``RISER_CSK_DIA`` ⚙ at its band's top, the carrier tap
 at its station band's edges) to the band edges are ``RISER_SCREW_WALLS`` ⚙
@@ -77,18 +78,20 @@ INCLUDED_ANGLE_TOL_DEG = angular_band_deg()
 # Reference stations (located from TL-21 at assembly) print at 2 places.
 STATION_PLACES = 2
 
-# --- Blank (supplied, as bought) ---------------------------------------------
+# --- Blank (faced and milled from 1/4 in stock) -------------------------------
 BLANK_LENGTH = trammel.RISER_BLANK_LENGTH  # 340 ⚙
 BLANK_WIDTH = trammel.RISER_BLANK_WIDTH  # 40 ⚙
 THICKNESS = trammel.RISER_THICK  # 6 ⚙
+THICKNESS_PLACES = trammel.RISER_THICK_PLACES
+THICKNESS_BAND = trammel.RISER_THICK_BAND
 BLANK_ORIGIN = trammel.RISER_BLANK_ORIGIN  # (-170, 16) ⚙, carrier frame
 
 
 def to_riser(point: tuple[float, float]) -> tuple[float, float]:
-    """Carrier-frame point -> riser model frame, at the printed places."""
+    """Carrier-frame point -> riser model frame, without presentation rounding."""
     return (
-        round(point[0] - BLANK_ORIGIN[0], STATION_PLACES),
-        round(point[1] - BLANK_ORIGIN[1], STATION_PLACES),
+        point[0] - BLANK_ORIGIN[0],
+        point[1] - BLANK_ORIGIN[1],
     )
 
 
@@ -125,7 +128,7 @@ if SCREW_DIA <= SCREW_BODY_DIA:
 if (CSK_DIA - _XX) / 2.0 < SCREW_HEAD_DIA_MAX / 2.0:
     raise AssertionError("#4 head stands proud of the riser top")
 CSK_DEPTH_MAX = (CSK_DIA + _XX) / 2.0 / math.tan(math.radians(CSK_ANGLE / 2.0))
-if CSK_DEPTH_MAX >= THICKNESS:
+if CSK_DEPTH_MAX >= THICKNESS - THICKNESS_BAND:
     raise AssertionError("riser countersink breaks through the blank")
 
 HOLES: dict[str, tuple[tuple[float, float], float]] = {
@@ -241,6 +244,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         if name in _STATIONS
         else SCREW_DIA_PLACES
         if name == "ScrewDia"
+        else THICKNESS_PLACES
+        if name == "BlankThick"
         else (2 if "Dia" in name else 1)
         for name in names
     }
@@ -252,6 +257,9 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 for _name, _places in DRAWING_PRECISION_BY_NAME.items():
+    # Reference stations display at 2 places without moving the model axes.
+    if _name in _STATIONS:
+        continue
     _value = GLOBALS[_name]
     if abs(_value - round(_value, _places)) > 1e-9:
         raise AssertionError(f"riser {_name} {_value} does not print as modelled")
@@ -280,9 +288,6 @@ CALLOUTS_BELOW = {
     "ScrewDia": f"DRILL THRU\n{CSK_CALLOUT}\n{LOCATE_CALLOUT}",
     "HubDia": f"DRILL THRU\nHUB HOLE\n{LOCATE_CALLOUT}",
     "ClampDia": f"DRILL THRU\nCL AND CR HOLES\n{LOCATE_CALLOUT}",
-    "BlankLength": "STOCK",
-    "BlankWidth": "STOCK",
-    "BlankThick": "STOCK",
 }
 
 SURFACE_FINISHES = ()

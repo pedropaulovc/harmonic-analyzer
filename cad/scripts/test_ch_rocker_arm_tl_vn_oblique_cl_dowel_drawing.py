@@ -122,11 +122,14 @@ def test_frame_puts_the_chamfered_end_at_y0() -> None:
 
 def test_press_contract() -> None:
     assert spec.PRESS_DEPTH + spec.PROUD == pytest.approx(dims.LENGTH)
-    assert spec.PRESS_DEPTH == carrier.THICKNESS
+    assert spec.TIP_BASE_Z + dims.LENGTH == pytest.approx(
+        jig.trammel.CARRIER_TOP_Z + jig.trammel.RISER_THICK + spec.TIP_HEIGHT
+    )
     assert spec.PRESS_ENGAGEMENT_D >= spec.PRESS_ENGAGEMENT_MIN_D
     assert min(spec.DIA_BAND) > 0.0  # a press dowel is oversize, never under
     assert 0.0 < spec.INTERFERENCE[0] <= spec.INTERFERENCE[1]
     assert 0.0 < spec.PRESS_OVERLAP_MM3 < spec.PRESS_ALLOWANCE_MM3
+    assert spec.PRESS_OVERLAP_MM3 < math.pi * dims.DIA**2 * carrier.THICKNESS / 4.0
     assert spec.PRESS_ALLOWANCE_MM3 == pytest.approx(
         1.10 * math.pi * dims.DIA**2 * carrier.THICKNESS / 4.0
     )
@@ -136,8 +139,6 @@ def test_the_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
-    flat = " ".join(lines)
-    assert "CHAMFERED END FIRST" in flat and "FLUSH" in flat
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:
@@ -149,3 +150,25 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+@pytest.mark.parametrize("carrier_sign", (-1.0, 1.0))
+@pytest.mark.parametrize("riser_sign", (-1.0, 1.0))
+@pytest.mark.parametrize("tip_height", (spec.TIP_SET_MIN, spec.TIP_SET_MAX))
+def test_riser_referenced_fitup_covers_the_finished_plate_stack(
+    carrier_sign: float, riser_sign: float, tip_height: float
+) -> None:
+    carrier_thickness = carrier.THICKNESS + carrier_sign * carrier.THICKNESS_BAND
+    riser_thickness = spec.riser.THICKNESS + riser_sign * spec.riser.THICKNESS_BAND
+    pin_bottom = carrier_thickness + riser_thickness + tip_height - dims.LENGTH
+    assert max(0.0, -pin_bottom) < jig.trammel.PIN_COLLAR_PROUD
+    # Independent interval intersection: only the full-diameter pin cylinder
+    # between the plate underside and its entry break provides press contact.
+    cylinder_start = pin_bottom + dims.CROWN_H + dims.CHAMFER_LEN
+    cylinder_end = pin_bottom + dims.LENGTH - dims.DOME_H
+    contact = min(cylinder_end, carrier_thickness - carrier.TAP_MOUTH_BREAK) - max(
+        0.0, cylinder_start
+    )
+    assert contact >= spec.PRESS_ENGAGEMENT_MIN_D * spec.DIA_MAX
+    assert tip_height - dims.DOME_H > 0.0
+    assert tip_height < (spec.rocker.ARM_THICKNESS + spec.rocker.ARM_THICKNESS_BAND[1])

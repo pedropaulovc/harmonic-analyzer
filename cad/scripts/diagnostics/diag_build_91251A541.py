@@ -1,25 +1,24 @@
-r"""McMaster 91290A148 -- black-oxide alloy steel socket head screw, M4 x 0.7 x 12 mm.
+r"""McMaster 91251A541 -- black-oxide alloy steel socket head screw, 1/4"-20 x 7/8".
 
-Catalogue: ``_mcmaster_91290a148`` (its docstring carries the live catalogue reading of
-2026-10-17 and the socket depth's source); every dimension is the catalogue's,
-the socket depth the standard's minimum key engagement.
+Catalogue: ``_mcmaster_91251a541`` (its docstring carries the live catalogue
+reading of 2026-10-19 and the socket depth's source); every dimension is the
+catalogue's, the socket depth the standard's minimum key engagement.
 
 Geometry: the shared fully threaded socket-head recipe in
-``diag_mcmaster_socket_head.py`` (see its docstring).
+``diag_mcmaster_socket_head.py`` (see its docstring): the supplied screw, as
+MHA-CH-06-TL-VN-68 installs it.
 
-The product page's vendor model (SLDPRT SHA-256
-``3d13359e07a7c80cc5290dba1a595739c6c5182caec6dd1020aef94b79f7d4a8``, and its STEP) was
-downloaded on 2026-10-17 and read for dimensions only: it is NOT
-replica-gated (user ruling 2026-10-17) and no copy is kept in the repo.  The
-standalone run is catalog-only: it builds the recipe, checks the solid is
-sane and saves it under cad/out/reference for inspection.
+No vendor model is downloaded or committed (catalogue-only, not
+replica-gated: user ruling 2026-10-17 for this jig's hardware).  The
+standalone run is catalog-only: it builds the supplied screw, checks the
+solid is sane and saves it under cad/out/reference for inspection.
 
 Frame: axis +Y, head up, bearing face (head underside) at y = 0, tip at
 y = -length.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_91290A148.py
+    uv run python cad\scripts\diagnostics\diag_build_91251A541.py
 """
 
 from __future__ import annotations
@@ -30,15 +29,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
-from _mcmaster_91290a148 import DIMS  # noqa: E402
+from _mcmaster_91251a541 import DIMS  # noqa: E402
 from diagnostics.diag_mcmaster_socket_head import (  # noqa: E402
     build_socket_head,
     build_socket_head_catalog,
 )
 
 
-@stock_recipe("91290A148", threaded=True)
-async def build_91290A148(adapter, truth=None):
+@stock_recipe("91251A541", threaded=True)
+async def build_91251A541(adapter, truth=None):
     await build_socket_head(adapter, DIMS)
 
 

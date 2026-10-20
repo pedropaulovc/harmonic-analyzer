@@ -10,7 +10,9 @@ import pytest
 import _config
 import _drawing_contract
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_hub_pin_spec as spec
+import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_hub_pin as drawing
 import export_features
@@ -136,17 +138,19 @@ def test_top_is_faced_to_fit_over_the_stack() -> None:
     """Codex (#1582): head, carrier and riser at their bands would put the
     locator's top anywhere in 2.0 ± 2.4 above the riser against a 2.5 strap;
     rule 19 faces it to fit in place instead."""
-    band = printed_band_mm(1)
+    band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["HeadLength"])
+    carrier_band = printed_band_mm(carrier.DRAWING_PRECISION_BY_NAME["StockThick"])
+    riser_band = printed_band_mm(riser.DRAWING_PRECISION_BY_NAME["BlankThick"])
     low = (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band)
-    low -= (trammel.CARRIER_THICK + band) + trammel.RISER_THICK + band
+    low -= trammel.CARRIER_THICK + carrier_band + trammel.RISER_THICK + riser_band
     assert low - spec.LEAD_CHAMFER < 0.0  # a turned-to-print pin can miss the strap
     assert (spec.LOCATOR_SET_MIN, spec.LOCATOR_SET_MAX) == (1.8, 2.2)
     assert spec.LOCATOR_SET_ABOVE_RISER == spec.LOCATOR_LENGTH - trammel.RISER_THICK
     assert spec.LOCATOR_SET_MAX < rocker.ARM_THICKNESS + rocker.ARM_THICKNESS_BAND[1]
     assert spec.LOCATOR_SET_MIN - spec.LEAD_CHAMFER >= spec.STRAP_ENGAGEMENT_MIN
     # The shortest supply still faces clean at the tallest stack.
-    tallest = (spec.HEAD_LENGTH + band) + (trammel.CARRIER_THICK + band)
-    tallest += trammel.RISER_THICK + band + spec.LOCATOR_SET_MAX
+    tallest = (spec.HEAD_LENGTH + band) + (trammel.CARRIER_THICK + carrier_band)
+    tallest += trammel.RISER_THICK + riser_band + spec.LOCATOR_SET_MAX
     assert spec.SUPPLY_LENGTH_MIN == pytest.approx(tallest + spec.FACING_ALLOWANCE)
     assert spec.SUPPLY_LENGTH_MIN == pytest.approx(26.8)
     # Stacked under the overall's value (close-c3-r3): below, since SOLIDWORKS

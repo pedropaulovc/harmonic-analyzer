@@ -25,8 +25,8 @@ single-body thread route):
    the entry cylinder and the bottom cone.
 6. ``RecessConeTip``: revolve cut of the bottom cone below the drafted cut.
 
-Frame: axis +Y (Front ∩ Right), head up, the flat top (the face that sits
-flush in the countersink) on the Top Plane, the tip at y = -length.
+Frame: axis +Y (Front ∩ Right), head up, the flat top (the face that seats
+in the countersink) on the Top Plane, the tip at y = -length.
 """
 
 from __future__ import annotations

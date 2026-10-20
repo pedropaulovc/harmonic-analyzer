@@ -16,6 +16,7 @@ import export_features
 from _drawing_contract import model_toleranced_dimensions
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_oblique_carrier"
 
@@ -110,12 +111,13 @@ def test_taps_are_unc_and_hold_rule_18() -> None:
     # edge break and one pitch of incomplete lead.
     for thread in (spec.CR_THREAD, spec.RISER_THREAD, spec.LEVER_THREAD):
         pitch = 25.4 / float(thread.rsplit("-", 1)[1])
-        full = spec.THICKNESS - 0.8 - 0.25 - pitch
+        band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StockThick"])
+        full = spec.THICKNESS - band - 0.25 - pitch
         assert math.isclose(spec.ENGAGEMENT_MM[thread], full), thread
     for thread in (spec.CR_THREAD, spec.RISER_THREAD):
         assert spec.ENGAGEMENT_MM[thread] >= 1.5 * THREAD_MAJOR_MM[thread]
-    # Codex P2: 12 of stock cannot hold 1.5D of 5/16-18. The lever callout
-    # states the shortfall as a plain fact (rule 20), floored.
+    # A finished 12 plate still cannot hold 1.5D of 5/16-18. The lever callout
+    # retains the existing RV-01 shortfall as a plain fact, floored (rule 20).
     lever = spec.LEVER_THREAD
     assert spec.ENGAGEMENT_MM[lever] < 1.5 * THREAD_MAJOR_MM[lever]
     assert spec.SHORT_ENGAGEMENT == (lever,)
@@ -250,7 +252,7 @@ def pin_number() -> str:
 
 def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
     """jig-r4/r5: asked for Plate's depth and the reference sketch's leg, the
-    section imported nothing at all; the stock thickness is a
+    section imported nothing at all; the finished thickness is a
     SectionReference dimension driven from Plate's depth, so the section's
     import stays one hidden sketch in its plane (pd_platen A-A, pivot block
     B-B)."""
@@ -261,8 +263,10 @@ def test_section_imports_one_hidden_sketch_and_no_body_feature() -> None:
     }
     assert owners == {spec.SECTION_REFERENCE}
     assert "Plate" not in spec.DRAWING_DIMENSIONS
-    assert spec.DRAWING_PRECISION_BY_NAME["StockThick"] == 1
-    assert spec.CALLOUTS_BELOW["StockThick"] == "STOCK"
+    assert "StockThick" not in spec.CALLOUTS_BELOW
+    assert (spec.SECTION_REFERENCE, "StockThick") not in model_toleranced_dimensions(
+        part
+    )
     source = inspect.getsource(part)
     assert '"StockThick", \'"PlateThick@Plate"\'' in source
     assert "PIN_CHAMFER_REFERENCE" not in source

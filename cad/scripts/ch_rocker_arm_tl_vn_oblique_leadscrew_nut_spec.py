@@ -8,7 +8,7 @@ The item is the shop-inventory ``fixtures.trammel-tr8-flange-nut``: the
 regular brass T8x2 flange nut that ships with the ZYLtech HW-SC-T8x2-600
 screw (standalone replacement SKU HW-SC-T8x2-NUT). It has a round flange with
 four plain holes and a body that runs through it: a short spigot on one side,
-the long body on the other. Four M3 screws fix it to the nut bracket TL-29,
+the long body on the other. Four #4-40 screws fix it to the nut bracket TL-29,
 with the spigot in TL-29's counterbore.
 
 Datasheet-built: no vendor CAD obtained (ZYLtech publishes no STEP, IGES, STL

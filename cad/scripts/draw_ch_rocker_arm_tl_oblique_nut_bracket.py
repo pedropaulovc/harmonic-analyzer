@@ -3,9 +3,10 @@ r"""Create the drawing for the oblique-trammel jig's nut bracket (MHA-CH-06-TL-2
 An 18.5 x 48 x 35.3 block at 2:1, three projected views about the nut face.
 The nut face (*Left, from -X: the Y = 0 face at its top edge, the bottom
 face at its left edge) carries the nut seat's stations from those two faces
-and the four M3 taps' offsets from the seat's axis (the hidden reference
-sketch NutPatternReference) outside its outline, the seat's native callout
-under it and the taps' over its upper right.
+and the four #4-40 taps' offsets from the seat's axis (the hidden reference
+sketch NutPatternReference) as REFERENCE values outside its outline (the
+taps are spotted from the nut's flange holes at assembly), the seat's native
+callout under it and the taps' over its upper right.
 The view over it (*Top, from +Y: the block face, turned so +X runs up, the
 -X face at its bottom edge) carries the finished length and the height,
 with the two #8 taps' native callout over it: spotted from TL-22 at
@@ -45,7 +46,7 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_dimensions import assert_imported_precision
+from _drawing_dimensions import assert_imported_precision, set_reference_dimension
 from _drawing_hole_callout import add_native_hole_callout, compose_hole_callout_prefix
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -78,7 +79,9 @@ from ch_rocker_arm_tl_oblique_nut_bracket_spec import (
     NUT_SEAT_MATE_CALLOUT,
     NUT_SEAT_PROCESS,
     NUT_TAP_DRILL,
+    NUT_TAP_SPEC,
     NUT_TAP_PROCESS,
+    REFERENCE_DIMENSIONS,
     SCREW_X,
     SCREW_Z,
 )
@@ -95,9 +98,9 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
 # Outlines at 2:1 (sheet mm): the nut face (*Left) x 66..137, y 50..146,
-# the seat's Z station and the M3 Z offsets in three lanes over it, its Y
-# station and the M3 Y offsets left of it (lines x 24 and 58), the seat's
-# callout under it and the M3 taps' over the plan, right of it; the block
+# the seat's Z station and the #4-40 Z offsets in three lanes over it, its Y
+# station and the #4-40 Y offsets left of it (lines x 24 and 58), the seat's
+# callout under it and the #4-40 taps' over the plan, right of it; the block
 # face (*Top, turned so +X runs up) in projection over it, x 66..137, y
 # 198..235, its height hanging under it, its length right of it, its #8
 # callout over it; the plan (*Front) right of the nut face, x 166..204, y
@@ -132,7 +135,7 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "BracketLength": (0.0, 0.0, _H + 5.0),
 }
 LEFT_KEEP: dict[str, tuple[float, float, float]] = {
-    # The M3 offsets from the seat's axis (c4 review: located from the seat,
+    # The #4-40 offsets from the seat's axis (c4 review: located from the seat,
     # not the edges), outside the outline (c4-r8/r9, rule 14: inside it all
     # four texts and lines sat on the part). Each 11.3 mm span is narrower
     # than its text, so each text stands outboard. Over the view, three lanes
@@ -141,10 +144,11 @@ LEFT_KEEP: dict[str, tuple[float, float, float]] = {
     # extension line there); the seat's Z station (13.00) next, its text in
     # its span, left of the seat's line and right of the left column's
     # (which ends at the -Z lane); +Z outermost, its text right of the right
-    # column's line.
-    "NutPatternZ1": (FACE_X, 4.0, -6.0),
+    # column's line. The reference text "2X (5.66)" is a character wider
+    # than c4-r9's "2X 5.657", so each Z text stands 7 out.
+    "NutPatternZ1": (FACE_X, 4.0, -7.0),
     "BoreZ": (FACE_X, 9.0, BORE_Z / 2.0),
-    "NutPatternZ2": (FACE_X, 14.0, NUT_HOLE_Z[1] + 6.0),
+    "NutPatternZ2": (FACE_X, 14.0, NUT_HOLE_Z[1] + 7.0),
     # Left of the view: the Y offsets share one line (x 58) 8 off the left
     # edge, each text beyond its span; a text beyond its span hangs on the
     # side away from the features its extension lines leave (r9: right of a
@@ -176,29 +180,29 @@ BLOCK_TAP_EDGE_MODEL = (
     SCREW_Z + 0.8 * _BLOCK_R,
 )
 BLOCK_TAP_CALLOUT_XY = (0.0720, 0.2492)
-# The M3 block's widest row is the mate's inventory id (c4-r9, rule 4), about
+# The #4-40 block's widest row is the mate's inventory id (c4-r9, rule 4), about
 # 69 wide: under the view its shelf would end right of every tap and the
 # leader rise up-left through the rows (c4-r7 struck "HOLES" so). Over the
-# plan, right of the nut face (x ~142..213, y ~152..175), its shelf's left
-# end (the bottom row's) drops down-left to the upper-right tap's upper-right
-# edge, entering through the face's right edge, right of the +Z offset's
-# extension line, crossing none.
+# plan, right of the nut face (x ~142..213, y ~152..180: five rows, the
+# locate-at-assembly row added over c4-r9's four, raised half a row so the
+# shelf stays put), its shelf's left end (the bottom row's) drops down-left
+# to the upper-right tap's upper-right edge, entering through the face's
+# right edge, right of the +Z offset's extension line, crossing none.
 _NUT_R = NUT_TAP_DRILL / 2.0
 NUT_TAP_EDGE_MODEL = (
     FACE_X,
     -NUT_HOLE_Y[0] + 0.8 * _NUT_R,
     NUT_HOLE_Z[1] + 0.6 * _NUT_R,
 )
-NUT_TAP_CALLOUT_XY = (0.1775, 0.1635)
+NUT_TAP_CALLOUT_XY = (0.1775, 0.1663)
 # The seat's five rows run x ~120..198, y ~15..45; its leader rises from the
 # shelf's left end (x ~120, y ~15) to the bore (x 92, y 76), crossing y 64.7
-# at x ~97: left of the lower-right M3 tap (x 103.3).
+# at x ~97: left of the lower-right #4-40 tap (x 103.3).
 _CBORE_R = CBORE_DIA / 2.0
 NUT_SEAT_EDGE_MODEL = (FACE_X, -BORE_Y - 0.8 * _CBORE_R, BORE_Z + 0.6 * _CBORE_R)
 NUT_SEAT_CALLOUT_XY = (0.159, 0.030)
 
 _SEAT_PLACES = part_spec.SEAT_PLACES
-_PATTERN_PLACES = part_spec.PATTERN_PLACES
 _CALLOUT = part_spec.CALLOUT_PLACES
 
 
@@ -340,19 +344,14 @@ for _index, (_x, _y, _z) in enumerate(part_spec.NUT_HOLE_POINTS, start=1):
         f"nut_tap_{_index}",
         kind="hole",
         faces=(CylinderFace(NUT_TAP_DRILL, contains_y_mm=_y, contains_z_mm=_z),),
-        requirements=(
-            "thread",
-            "dia",
-            "depth",
-            "width",
-            "height",
-            "note",
-        ),
+        requirements=("thread", "dia", "depth", "note"),
         fields={
             "at": ([_x, _y, _z], ("NUT_HOLE_POINTS",)),
             "axis": _INTO_NUT_FACE,
-            # Metric: the wizard carries no thread class (ANSI-inch only).
-            "thread": (part_spec.NUT_THREAD, ("NUT_TAP_SPEC", "NUT_THREAD")),
+            "thread": (
+                f"{part_spec.NUT_THREAD} UNC-{NUT_TAP_SPEC.thread_class}",
+                ("NUT_TAP_SPEC", "NUT_THREAD"),
+            ),
             "tap_drill_mm": (NUT_TAP_DRILL, ("NUT_TAP_SPEC",)),
             "dia": (
                 limits(_NUT_DRILL, _CALLOUT, part_spec.DRILLED_BAND),
@@ -366,42 +365,24 @@ for _index, (_x, _y, _z) in enumerate(part_spec.NUT_HOLE_POINTS, start=1):
                 ("NUT_TAP_DRILL_DEPTH", "NUT_TAP_THREAD_DEPTH"),
             ),
             "depth_ref": (part_spec.NUT_TAP_DRILL_DEPTH, ("NUT_TAP_DRILL_DEPTH",)),
-            # On the nut's circle, each way from the seat's axis, within the
-            # nut's float: the counterbore locates its spigot on the pattern.
-            # The offsets print on NUT_PATTERN_REFERENCE. No height_from: a
-            # height_from measures across the two parallel axes (8.0 radial),
-            # not along one offset.
-            "width": (
-                limits(NUT_HOLE_OFFSET, _PATTERN_PLACES),
-                (
-                    "NUT_HOLE_OFFSET",
-                    "PATTERN_PLACES",
-                    "NUT_PATTERN_REFERENCE",
-                    "NUT_PATTERN_ALLOWANCE",
-                ),
+            # Spotted from the nut's flange holes at assembly: the offsets
+            # from the seat's axis print as REFERENCE values on
+            # NUT_PATTERN_REFERENCE, so no banded station; the model's
+            # nominal on the nut's circle.
+            "width_nominal": (
+                NUT_HOLE_OFFSET,
+                ("NUT_HOLE_OFFSET", "NUT_PATTERN_REFERENCE", "REFERENCE_DIMENSIONS"),
             ),
-            "width_nominal": (NUT_HOLE_OFFSET, ("NUT_HOLE_OFFSET",)),
-            "height": (
-                limits(NUT_HOLE_OFFSET, _PATTERN_PLACES),
-                (
-                    "NUT_HOLE_OFFSET",
-                    "PATTERN_PLACES",
-                    "NUT_PATTERN_REFERENCE",
-                    "NUT_PATTERN_ALLOWANCE",
-                ),
+            "height_nominal": (
+                NUT_HOLE_OFFSET,
+                ("NUT_HOLE_OFFSET", "NUT_PATTERN_REFERENCE", "REFERENCE_DIMENSIONS"),
             ),
-            "height_nominal": (NUT_HOLE_OFFSET, ("NUT_HOLE_OFFSET",)),
             "note": (
                 " ".join(NUT_TAP_PROCESS.split()),
-                ("NUT_TAP_PROCESS", "NUT_PATTERN_ALLOWANCE", "POSITION_RADIUS"),
+                ("NUT_TAP_PROCESS", "NUT_ID", "NUT_SPOT_FLOAT", "SPIGOT_FLOAT"),
             ),
         },
-        precision={
-            "dia": _CALLOUT,
-            "depth": _CALLOUT,
-            "width": _PATTERN_PLACES,
-            "height": _PATTERN_PLACES,
-        },
+        precision={"dia": _CALLOUT, "depth": _CALLOUT},
     )
 
 _BLOCK_DRILL = round(BLOCK_TAP_DRILL, 2)
@@ -504,17 +485,15 @@ def _set_nut_seat_callout(display: Any) -> None:
     _telemetry.info(f"nut-seat callout: {resolved!r}")
 
 
-def _omit_block_tap_thread_class(display: Any) -> None:
+def _omit_tap_thread_class(display: Any, *, label: str) -> None:
     """The title block's THREADS row owns the UNC class (rule 2): the #8 row
-    reads ``8-32 UNC``, not ``... - 2B``. The metric callout keeps whatever
-    the wizard prints: the row covers UNC/UNF only."""
-    omit_title_block_thread_class(display, label="block-screw taps")
+    reads ``8-32 UNC`` and the nut row ``4-40 UNC``, not ``... - 2B``."""
+    omit_title_block_thread_class(display, label=label)
     native = _early_bound(display, "IDisplayDimension")
     resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
-    if any(BLOCK_TAP_SPEC.thread_class in text for text in resolved):
-        raise RuntimeError(
-            f"block-screw taps: callout still prints its class: {resolved!r}"
-        )
+    classes = {BLOCK_TAP_SPEC.thread_class, NUT_TAP_SPEC.thread_class}
+    if any(cls in text for text in resolved for cls in classes):
+        raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
 def block_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -631,22 +610,26 @@ def _project_block_face_view(adapter: Any, left: Any, top: Any) -> None:
     _telemetry.success(f"block face in projection: +X up, +Z right; origin {at}")
 
 
-def _set_dimension_prefixes(
-    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
-) -> None:
-    """Write a native prefix on named imported dimensions and read it back."""
-    remaining = dict(prefixes)
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        prefix = remaining.pop(dimension_name(adapter, annotation), None)
-        if prefix is None:
+def _mark_references(adapter: Any, annotations: list[Any]) -> None:
+    """Parenthesise each #4-40 offset as a REFERENCE value (the taps are
+    spotted from the nut at assembly), its count in the same prefix,
+    "2X (5.66)" (the riser's row heights)."""
+    marked: set[str] = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in REFERENCE_DIMENSIONS:
             continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display = set_reference_dimension(adapter, annotation, label=name)
+        prefix = f"{DIMENSION_PREFIXES[name]}("
         display.SetText(1, prefix)  # swDimensionTextPrefix
-        if str(display.GetText(1) or "") != prefix:
-            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
-    if remaining:
-        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+        got = str(display.GetText(1) or "")
+        if got != prefix:
+            raise RuntimeError(f"{name} count prefix did not take: {got!r}")
+        marked.add(name)
+    if marked != REFERENCE_DIMENSIONS:
+        raise RuntimeError(
+            f"reference offsets not marked: {sorted(REFERENCE_DIMENSIONS - marked)}"
+        )
 
 
 def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -718,7 +701,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=view_label,
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-    # The M3 offsets live on NutPatternReference, a sketch the part saves
+    # The #4-40 offsets live on NutPatternReference, a sketch the part saves
     # hidden: the nut face shows it per view (_drawing_hidden_sketches).
     on_left = _view_mapper(adapter, left)
     annotations += hidden_sketches.curate_view_dimensions(
@@ -731,7 +714,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    # The taps are spotted from the nut at assembly: REFERENCE offsets.
+    _mark_references(adapter, annotations)
     _set_arrows_inside(adapter, annotations)
 
     for view, label in ((top, "block face"), (left, "nut face")):
@@ -746,9 +730,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-screw taps",
         process=BLOCK_TAP_PROCESS,
     )
-    _omit_block_tap_thread_class(block_taps)
+    _omit_tap_thread_class(block_taps, label="block-screw taps")
     _set_block_tap_wall_row(block_taps)
-    add_native_hole_callout(
+    nut_taps = add_native_hole_callout(
         adapter,
         left,
         edge_xy=on_left(NUT_TAP_EDGE_MODEL),
@@ -756,6 +740,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="nut-screw taps",
         process=NUT_TAP_PROCESS,
     )
+    _omit_tap_thread_class(nut_taps, label="nut-screw taps")
     _set_nut_seat_callout(
         add_native_hole_callout(
             adapter,
@@ -777,7 +762,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # carrying a hole callout (base bar, end bracket: one per
         # callout). c4-r2's "#8-32 Tapped Hole" (DetailItem349) sat across
         # the #8 leader; each callout already states its thread. Two tap
-        # features with callouts (#8-32, M3x0.5), two notes.
+        # features with callouts (#8-32, #4-40), two notes.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=2,
     )

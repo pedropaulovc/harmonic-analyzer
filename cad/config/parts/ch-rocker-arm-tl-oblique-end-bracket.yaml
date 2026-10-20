@@ -7,4 +7,4 @@ ch-rocker-arm-tl-oblique-end-bracket:
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  process: "saw and face to length; drill and tap the four #8-32 and the two M4 holes through; break edges"
+  process: "saw and face to length; drill and tap the four #8-32 and the two #6-32 holes through; break edges"

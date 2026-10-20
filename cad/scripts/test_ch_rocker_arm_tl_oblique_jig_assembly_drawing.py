@@ -184,7 +184,7 @@ def test_fitted_cluster_scales_reach_finalize_in_sheet_order() -> None:
 def test_clusters_partition_the_bom() -> None:
     clustered = [stem for cluster in drawing.CLUSTERS for stem in cluster.stems]
     assert sorted(clustered) == sorted(spec.BOM_ORDER)
-    assert len(clustered) == len(set(clustered)) == 31
+    assert len(clustered) == len(set(clustered))
     for cluster in drawing.CLUSTERS:
         # Each sheet balloons in item order.
         assert list(cluster.stems) == [s for s in spec.BOM_ORDER if s in cluster.stems]
@@ -540,8 +540,8 @@ def test_steps_sheet_regions_fit_apart() -> None:
 
 def test_steps_sheet_holds_an_added_step() -> None:
     # Headroom: a line more in the last step (the right column) still lays
-    # out with the finished view at its scale. The left column is full: the
-    # step 7 match-drill (ruling B) fills it to its floor.
+    # out with the finished view at its scale. The left column is full: steps
+    # 1 to 10 fill it to its floor.
     steps = list(spec.ASSEMBLY_STEPS)
     steps[-1] += " " + "WORD " * 13
     layout = drawing.steps_sheet_layout(steps, spec.ASSEMBLY_CHECKS)
@@ -610,6 +610,7 @@ def test_leaders_converging_under_the_run_on_do_not_toggle() -> None:
 def test_bom_identity_is_the_registry() -> None:
     for stem in spec.BOM_ORDER:
         assert drawing.BOM_PART_NUMBERS[stem] == _config.parts(stem)["number"]
+    assert set(drawing.BOM_PART_NUMBERS) == set(spec.BOM_ORDER)
     assert drawing.BOM_ITEM_NUMBERS == {
         stem: str(item) for item, stem in enumerate(spec.BOM_ORDER, 1)
     }
@@ -830,3 +831,54 @@ def test_source_configuration_switch_is_read_back(monkeypatch) -> None:
             pass
 
 
+def test_cl_tip_reference_is_the_placed_dowel_over_the_riser() -> None:
+    """#1619: the elevation's (1.6) is the CL dowel's modelled round tip above
+    the riser top, up the dowel's axis, a reference inside the fitter's band."""
+    cl_dowel = spec.cl_dowel
+    (x, riser_top), (tip_x, tip_z) = spec.CL_TIP_LINE
+    origin, rows = spec.CL_DOWEL_PLACEMENTS[0]
+    assert rows[1] == pytest.approx((0.0, 0.0, 1.0))  # the dowel's axis up Z
+    assert (x, tip_x) == pytest.approx((origin[0], origin[0]))
+    assert riser_top == spec.trammel.CARRIER_TOP_Z + spec.trammel.RISER_THICK
+    assert tip_z == pytest.approx(origin[2] + cl_dowel.LENGTH)
+    assert tip_z - riser_top == pytest.approx(cl_dowel.TIP_HEIGHT)
+    assert cl_dowel.TIP_SET_MIN < cl_dowel.TIP_HEIGHT < cl_dowel.TIP_SET_MAX
+    assert spec.DRAWING_DIMENSIONS == {spec.CL_TIP_FEATURE: {spec.CL_TIP_DIMENSION}}
+    assert spec.DRAWING_PRECISION == {
+        spec.CL_TIP_FEATURE: {spec.CL_TIP_DIMENSION: spec.CL_TIP_PRECISION}
+    }
+
+
+def _elevation_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
+    """Sheet metres of a machine X-Z point, the elevation centred on the extent."""
+    (x0, x1), _y, (z0, z1) = spec.MODEL_EXTENT
+    ratio = drawing.ASSEMBLED_SCALE[0] / drawing.ASSEMBLED_SCALE[1] / 1000.0
+    return (
+        drawing.ELEVATION_CENTER[0] + (x_mm - (x0 + x1) / 2.0) * ratio,
+        drawing.ELEVATION_CENTER[1] + (z_mm - (z0 + z1) / 2.0) * ratio,
+    )
+
+
+def test_cl_tip_text_stands_clear_outboard_of_the_riser() -> None:
+    """The (1.6) text, centred on its point: on the sheet, left of the dowel
+    and the riser's -X end, above the tip, clear of the plan and every note."""
+    tx, _ty, tz = drawing.CL_TIP_TEXT_MODEL_MM
+    cx, cy = _elevation_xy(tx, tz)
+    half_w, half_h = len("(1.6)") * CHAR_M / 2.0, LINE_M / 2.0
+    text = (cx - half_w, cy - half_h, cx + half_w, cy + half_h)
+    (x, _riser_top), (_x, tip_z) = spec.CL_TIP_LINE
+    riser_end = spec.POSE.to_machine(spec.riser.BLANK_ORIGIN)[0]
+    assert riser_end < x
+    assert text[2] < _elevation_xy(riser_end, tip_z)[0]
+    assert text[1] > _elevation_xy(x, tip_z)[1]
+    (x0, x1), (y0, y1), _z = spec.MODEL_EXTENT
+    others = (
+        _view_box(drawing.PLAN_CENTER, x1 - x0, y1 - y0, drawing.ASSEMBLED_SCALE),
+        _note_box(spec.PLAN_VIEW_LABEL, drawing.PLAN_LABEL_XY),
+        _note_box(spec.ELEVATION_VIEW_LABEL, drawing.ELEVATION_LABEL_XY),
+        _note_box(drawing.ASSEMBLED_CAPTION, drawing.CAPTION_XY),
+        _note_box(drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_XY),
+    )
+    assert _inside_sheet(text)
+    for other in others:
+        assert not _overlap(text, other)

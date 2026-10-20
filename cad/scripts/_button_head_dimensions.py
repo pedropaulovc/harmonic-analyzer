@@ -23,6 +23,9 @@ class ButtonHeadScrew:
     head_dia: float
     head_h: float
     hex_af: float
+    # The standard's minimum key engagement (ASME B18.3 T), where a SKU
+    # records it; None keeps the family law's SOCKET_PER_HEAD_H depth.
+    key_engagement: float | None = None
 
     @property
     def flat_top_dia(self) -> float:
@@ -39,6 +42,8 @@ class ButtonHeadScrew:
     @property
     def socket_depth(self) -> float:
         """Flat top to the socket floor."""
+        if self.key_engagement is not None:
+            return self.key_engagement
         return SOCKET_PER_HEAD_H * self.head_h
 
     @property

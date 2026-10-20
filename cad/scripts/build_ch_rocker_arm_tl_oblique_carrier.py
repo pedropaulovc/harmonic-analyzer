@@ -8,7 +8,7 @@ Layout (the carrier frame; SolidWorks model X = carrier X, model Y = carrier
 Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
 
 * the plate is a Top-plane rectangle anchored at its (-X, -Y) corner from the
-  origin (the A1-B1 midpoint), extruded down by the stock thickness;
+  origin (the A1-B1 midpoint), extruded down by the finished thickness;
 * the four reamed pin holes are one Top-plane sketch: A1 from the origin, B1
   from A1 by the spacing D1, A2 from A1 and B2 from B1 by their (dX, dY)
   chains, cut through;
@@ -16,7 +16,7 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   clears the pivot pin's collar fillet; its printed leg lives in the hidden
   ``SectionReference``, on ``SectionAPlane`` (section A-A's hidden cutting
   plane, coincident with the Front plane: the A1-B1 pin line), which drives
-  the feature's distance and carries the stock thickness section A-A prints,
+  the feature's distance and carries the finished thickness section A-A prints,
   driven from Plate's depth;
 * the HUB and CL centre-drill spots are 90 degree cones, each revolved on a
   plane through its axis parallel to the Front plane (the plane's offset is
@@ -117,7 +117,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-carrier"
-# The registry row prints 6061-T6 aluminium plate.
+# The registry row prints 6061-T651 aluminium plate.
 MATERIAL = "6061 Alloy"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
@@ -560,7 +560,7 @@ async def _section_reference(adapter) -> list[tuple[str, str]]:
         f"{stock}.end",
         "vertical_distance",
         THICKNESS,
-        f"{feature} stock thickness",
+        f"{feature} finished thickness",
     )
     dims.record("StockThick", '"PlateThick@Plate"')
     await ensure_fully_defined(adapter, feature)
