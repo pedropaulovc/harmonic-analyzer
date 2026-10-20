@@ -108,23 +108,63 @@ def _close_active_documents(sw: Any) -> None:
     falling back to it would silently spin this loop and leave the doc resident.
     Fail loud instead of regressing invisibly.
     """
-    for _ in range(500):
-        doc = sw.IActiveDoc2
-        if doc is None:
-            return
-        title = doc.GetTitle()
-        if not title:
-            raise RuntimeError(
-                f"active document has an empty title ({title!r}) -- refusing "
-                f"CloseDoc(''), which silently no-ops on assemblies and would "
-                f"leave the document resident"
-            )
-        sw.CloseDoc(title)
-    if sw.IActiveDoc2 is not None:
-        raise RuntimeError(
-            "documents are still open after 500 CloseDoc calls -- the seat is "
-            "not empty, so refusing to report it released; close SolidWorks' "
-            "documents by hand"
+    context: dict[str, Any] = {}
+    api = "ISldWorks.IActiveDoc2"
+    try:
+        for iteration in range(1, 501):
+            context = {"close_iteration": iteration}
+            api = "ISldWorks.IActiveDoc2"
+            _telemetry.info("package close: reading active document", api=api, **context)
+            with _telemetry.span("package.close.active", **context):
+                doc = sw.IActiveDoc2
+            if doc is None:
+                return
+            api = "IModelDoc2.GetTitle"
+            _telemetry.info("package close: reading document title", api=api, **context)
+            with _telemetry.span("package.close.title", **context):
+                title = doc.GetTitle()
+            context["document_title"] = title or ""
+            if not title:
+                raise RuntimeError(
+                    f"active document has an empty title ({title!r}) -- refusing "
+                    f"CloseDoc(''), which silently no-ops on assemblies and would "
+                    f"leave the document resident"
+                )
+            # Diagnostic reads must not turn an otherwise valid close into a
+            # failure. Keep the title already obtained even if either read fails.
+            for key, api, read in (
+                ("document_path", "IModelDoc2.GetPathName", lambda: doc.GetPathName()),
+                ("document_count", "ISldWorks.GetDocumentCount", lambda: sw.GetDocumentCount()),
+            ):
+                _telemetry.info("package close: reading document identity", api=api, **context)
+                try:
+                    with _telemetry.span("package.close.identity", api=api, **context):
+                        context[key] = read()
+                except Exception as error:
+                    context[f"{key}_error"] = f"{type(error).__name__}: {error}"
+            api = "ISldWorks.CloseDoc"
+            _telemetry.info(f"package close: closing {title!r}", api=api, **context)
+            with _telemetry.span("package.close.document", **context):
+                sw.CloseDoc(title)
+        api = "ISldWorks.IActiveDoc2"
+        _telemetry.info("package close: checking iteration limit", api=api, **context)
+        with _telemetry.span("package.close.limit", **context):
+            if sw.IActiveDoc2 is not None:
+                raise RuntimeError(
+                    "documents are still open after 500 CloseDoc calls -- the seat is "
+                    "not empty, so refusing to report it released; close SolidWorks' "
+                    "documents by hand"
+                )
+    except Exception as error:
+        # The server may have faulted inside CloseDoc. Do not attach another
+        # adapter or make more COM reads to capture a possibly wedged server.
+        _seat_forensics.capture_com_failure(
+            None,
+            "package-close-documents",
+            str(error),
+            api=api,
+            exception=error,
+            **context,
         )
 
 
@@ -140,7 +180,9 @@ def _discard_open_documents(sw: Any) -> None:
     backstop -- with nothing dirty left, it has nothing to prompt about.
     """
     _close_active_documents(sw)
-    sw.CloseAllDocuments(True)
+    _telemetry.info("package close: closing remaining hidden documents")
+    with _telemetry.span("package.close.all_documents"):
+        sw.CloseAllDocuments(True)
 
 
 def _release_seat(sw: Any) -> None:

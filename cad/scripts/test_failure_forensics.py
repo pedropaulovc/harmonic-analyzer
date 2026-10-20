@@ -478,6 +478,69 @@ def test_capture_raises_even_when_every_step_fails(tmp_path, monkeypatch):
         )
 
 
+def test_no_followup_com_capture_keeps_saved_identity_without_any_native_probe(
+    tmp_path, monkeypatch,
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("no-follow-up-COM capture invoked a native probe")
+
+    for name in (
+        "seat_provenance", "sketch_authoring_preferences", "sketch_manager_state",
+        "display_geometry", "_seat_error_state", "_document_state",
+        "_save_failure_document", "_save_seat_image",
+    ):
+        monkeypatch.setattr(_seat_forensics, name, forbidden)
+    monkeypatch.setattr(_sketch_closure, "_sketch_state", forbidden)
+
+    def desktop(target):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"desktop fixture")
+        return str(target)
+
+    monkeypatch.setattr(_seat_forensics, "_grab_screen", desktop)
+    original = RuntimeError("CloseDoc server fault")
+    with pytest.raises(RuntimeError) as caught:
+        _seat_forensics.capture_com_failure(
+            None, "package-close-documents", str(original),
+            api="ISldWorks.CloseDoc", exception=original,
+            document_title="ha-harmonic-analyzer-assembly.SLDDRW",
+            document_path="C:/fixture/ha-harmonic-analyzer-assembly.SLDDRW",
+            document_count=176, close_iteration=1,
+        )
+
+    assert caught.value is original
+    out = _failure_dir(tmp_path, "package-close-documents")
+    report = json.loads((out / "capture.json").read_text())
+    assert report["capture_mode"] == "no_followup_com"
+    assert report["context"] == {
+        "document_title": "ha-harmonic-analyzer-assembly.SLDDRW",
+        "document_path": "C:/fixture/ha-harmonic-analyzer-assembly.SLDDRW",
+        "document_count": 176,
+        "close_iteration": 1,
+    }
+    assert Path(report["desktop"]["path"]).read_bytes() == b"desktop fixture"
+    assert "seat" not in report
+    assert "document_copy" not in report
+
+
+@pytest.mark.parametrize("failed_step", ["_grab_screen", "_write_failure_report"])
+def test_no_followup_com_capture_failure_cannot_replace_original_exception(
+    tmp_path, monkeypatch, failed_step,
+):
+    def unavailable(*args, **kwargs):
+        raise OSError("capture unavailable")
+
+    monkeypatch.setattr(_seat_forensics, "_grab_screen", lambda target: str(target))
+    monkeypatch.setattr(_seat_forensics, failed_step, unavailable)
+    original = ValueError("original close failure")
+    with pytest.raises(ValueError) as caught:
+        _seat_forensics.capture_com_failure(
+            None, "package-close-documents", str(original),
+            exception=original, document_title="saved title",
+        )
+    assert caught.value is original
+
+
 def test_one_step_failing_does_not_stop_the_others(tmp_path, monkeypatch):
     """A seat that refuses ONE read must still yield the other evidence."""
     monkeypatch.setattr(
