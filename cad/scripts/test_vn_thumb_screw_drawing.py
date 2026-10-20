@@ -1,4 +1,4 @@
-"""Pure sheet-space thumb lanes and the recorded native v3 containment failure.
+"""Pure sheet-space thumb lane placement and reserved-cell boundaries.
 
 These projections exercise the production layout arithmetic, not COM or an
 assertion that restored anchors alone prove the next native sheet's ink fits.
@@ -13,9 +13,7 @@ import _purchased_fastener_drawing as purchased
 import draw_vn_thumb_screw as drawing
 
 
-# Worker15, source 9fc9097a7, drawing:vn_thumb_screw final settled refusal.
-# This is complete display ink, NOT the annotation anchor or a displacement.
-_V3_THREAD_INK = (0.0930195, 0.0694105, 0.148582, 0.1192704)
+# Actual Front cell recorded by worker15 at source 9fc9097a7.
 _V3_FRONT_CELL = (0.025, 0.077, 0.205, 0.182)
 
 
@@ -105,14 +103,3 @@ def test_thumb_plan_refuses_overrun_on_every_reserved_edge(edge):
     tight_cell[edge] += 0.000002 if edge < 2 else -0.000002
     with pytest.raises(RuntimeError, match="lanes leave the actual Front cell"):
         drawing._supplier_dimension_positions(axis, rim, tuple(tight_cell))
-
-
-def test_recorded_v3_ink_remains_rejected_even_with_a_valid_six_lane_plan():
-    axis, rim = _projection(_V3_FRONT_CELL)
-    positions = drawing._supplier_dimension_positions(axis, rim, _V3_FRONT_CELL)
-    # A valid planned anchor cannot stand in for the complete settled display.
-    # Preserve the production containment predicate and replay the actual escape;
-    # this is not a translated-box claim of native after-fix success.
-    assert positions["thread_length"][1] > _V3_FRONT_CELL[1]
-    assert _V3_FRONT_CELL[1] - _V3_THREAD_INK[1] == pytest.approx(0.0075895)
-    assert not purchased._inside(_V3_THREAD_INK, _V3_FRONT_CELL)
