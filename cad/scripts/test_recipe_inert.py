@@ -15,9 +15,10 @@ the claim checkable instead of argued, and fail loud when a change breaks it:
    Create/Edit/Select/... verb, which covers custom-property and dimension
    writes) except three pinned ones, reached only after the artefact is
    settled -- or, for ``PRE_SAVE_EXPORTS`` (a pick-miss screenshot), only the
-   two that export a file and write nothing into the model. It stores no
-   attribute on a foreign object, and nothing reachable from its PRE-SAVE
-   entry points reaches any pinned mutator.
+   two that export a file and write nothing into the model. A separately pinned
+   IMathUtility.CreatePoint allocates only a local math object, not document
+   content. It stores no attribute on a foreign object, and nothing reachable
+   from its PRE-SAVE read-only entry points reaches a document/seat mutator.
 4. Direction: an inert module imports no tracked local module except through
    pinned attribute reads.
 """
@@ -103,6 +104,10 @@ PINNED_MUTATORS = {
     ("_process_handle", "OpenProcess"),  # kernel32, another process: read access
     ("_process_handle", "CloseHandle"),  # kernel32, the handle just opened
 }
+# Not a document/seat mutator: IMathUtility.CreatePoint creates a local math
+# object used only to read the native sheet-to-view projection. Pin the owner
+# and exact member; no other Create* call is exempt.
+LOCAL_MATH_ALLOCATIONS = {("_zoomed_pick_state", "CreatePoint")}
 # Functions holding a pinned document/seat mutator, and the only in-module roots
 # that may reach them. capture_com_failure always raises; teardown_seat runs after
 # the build returned; capture_pick_screens is a PRE_SAVE_EXPORTS root.
@@ -127,6 +132,7 @@ PRE_SAVE = {
     "note_seats_before_connect",
     "record_drawing_display",
     "drawing_pick_state",
+    "_zoomed_pick_state",
 }
 # ctypes structures and prototypes the module builds itself.
 LOCAL_ATTRIBUTE_STORES = {"cb", "argtypes", "restype"}
@@ -298,9 +304,11 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
             and MUTATOR.match(node.func.attr)
         ):
             owner = owners.get(id(node), "<module>")
-            if (owner, node.func.attr) not in PINNED_MUTATORS:
+            pair = (owner, node.func.attr)
+            if pair not in PINNED_MUTATORS | LOCAL_MATH_ALLOCATIONS:
                 violations.append(f"{where}: {owner}() calls COM mutator {node.func.attr}")
-            holders.setdefault(owner, set()).add(node.func.attr)
+            if pair not in LOCAL_MATH_ALLOCATIONS:
+                holders.setdefault(owner, set()).add(node.func.attr)
         elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
             if node.attr not in LOCAL_ATTRIBUTE_STORES:
                 violations.append(f"{where}: stores .{node.attr} on another object")
@@ -484,6 +492,10 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
         "import _part_save\n"
         "def stamp(model):\n"
         "    model.Extension.CustomPropertyManager('').Add3('Generator', 30, 'x', 2)\n"
+        "def _zoomed_pick_state(math):\n"
+        "    math.CreateLine()\n"
+        "def other_owner(math):\n"
+        "    math.CreatePoint((0.0, 0.0, 0.0))\n"
         "def resize(dimension):\n"
         "    dimension.SystemValue = 0.002\n"
         "def peek(adapter):\n"
@@ -497,8 +509,20 @@ def test_the_rules_catch_what_they_claim(tmp_path, monkeypatch):
         test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
     with pytest.raises(AssertionError, match="SystemValue"):
         test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
+    with pytest.raises(AssertionError, match="CreateLine"):
+        test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
+    with pytest.raises(AssertionError, match="other_owner\\(\\) calls COM mutator CreatePoint"):
+        test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
     with pytest.raises(AssertionError, match="save_part_and_images"):
         test_rule4_inert_module_reads_tracked_code_only_through_pinned_names("_fake_inert")
+    # Positive control: only the exact owner/member allocation is permitted,
+    # including when it is a PRE_SAVE root.
+    fake.write_text(
+        "def _zoomed_pick_state(math):\n"
+        "    return math.CreatePoint((0.0, 0.0, 0.0))\n",
+        encoding="utf-8",
+    )
+    test_rule3_inert_module_runs_no_com_mutator_before_a_save("_fake_inert")
 
 
 def test_rule2_rejects_a_geometry_path_call(tmp_path):

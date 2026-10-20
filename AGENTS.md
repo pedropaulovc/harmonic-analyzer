@@ -1178,9 +1178,13 @@ Some code runs inside every COM build but can never change what the build saves:
 seat provenance, failure forensics, the authoring-context snapshot, seat
 parking and teardown. It lives in `cad/scripts/_seat_forensics.py`, which
 `_buildgraph.RECIPE_INERT_MODULES` puts in `_local_modules`' skip set, like
-`_telemetry`/`_watchdog`. So an edit to it re-keys nothing. Before the split,
-8 of the 16 commits to the former shared-helper monolith in two weeks touched only this code, and each
-re-keyed all 227 leaves.
+`_telemetry`/`_watchdog`. An edit confined to that inert module re-keys no CAD
+recipe; this is not a claim about a whole change that also edits tracked callers.
+In particular, passing the required `sheet_xy=` from
+`_drawing_balloons._select_balloon_anchor` changes a tracked drawing helper and
+therefore the source keys of closures containing it. Before the split, 8 of the
+16 commits to the former shared-helper monolith in two weeks touched only this
+code, and each re-keyed all 227 leaves.
 
 For telemetry, "inert" is argued. Here `check:inert` (`test_recipe_inert.py`)
 enforces it, and derives its scope from that one constant:
@@ -1199,6 +1203,23 @@ enforces it, and derives its scope from that one constant:
    `capture_pick_screens` at every miss; `capture_pick_miss` after the last),
    `_drawing_common.new_project_drawing` (`record_drawing_display`,
    read-only) and `package_native._release_seat`.
+   `capture_pick_screens(adapter, label, *, sheet_xy)` captures one bounded
+   `zoomed_pick_state` snapshot per miss, after the two screen grabs and before
+   native BMP/PDF exports, and writes a JSON report beside those artefacts.
+   The existing three-pick ceiling bounds this to three snapshots; hits do no
+   new probing. The snapshot contains at most 64 raw selection-filter IDs,
+   the filter-enable flag, active-view scale, 64-bit HWND, four visible-box
+   pixel coordinates, perspective flag, 16 raw finite transform entries and
+   the two sheet coordinates. A nonperspective view may also supply three
+   finite coordinates from native MathPoint transformation; these are view
+   coordinates, not a guessed desktop position or selection aperture.
+   Unreadable/malformed probes carry explicit `<key>_error` causes; dependent
+   failures name the unavailable prerequisite. A null filter array remains
+   raw `None` with an error, not proof that no filters are active.
+   The existing `drawing.pick_miss_capture` event carries the snapshot once;
+   no per-getter telemetry, extra retries, filter changes, camera moves or
+   selection mutations are introduced. This is failure evidence, not a causal
+   fix, a native runtime proof or a performance claim.
    The pinned failure captures never return, but a caller can catch their
    exceptions and continue: `draw_rocker_arm` retries a missed pivot-bore pick. Therefore
    `capture_pick_miss` preserves the pick's `RuntimeError` and logs WARN, not a
@@ -1214,7 +1235,12 @@ enforces it, and derives its scope from that one constant:
    `teardown_seat`. Nothing reachable from a PRE-save entry point
    (`record_authoring_context`, `record_seat_provenance`,
    `note_seats_before_connect`, `record_drawing_display`,
-   `drawing_pick_state`) reaches any of them. The one PRE-save root that may
+   `drawing_pick_state`, `_zoomed_pick_state`) reaches any of them.
+   `_zoomed_pick_state` alone may call `IMathUtility.CreatePoint` to allocate
+   a local math point: it does not create document geometry. The inert gate
+   pins that function/member pair, not a general `Create*` exemption; all
+   document/seat mutator prohibitions remain.
+   The one PRE-save root that may reach the export writers
    is `capture_pick_screens` (`PRE_SAVE_EXPORTS`), a pick-miss screenshot
    taken before a retry: it reaches only `SaveBMP` and `SaveAs3`, and every
    `SaveAs3` there must pass `swSaveAsOptions_Copy`, so both export a file

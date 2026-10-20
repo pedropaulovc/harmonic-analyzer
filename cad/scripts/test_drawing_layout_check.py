@@ -3377,7 +3377,8 @@ def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
         projected.append((tuple(points), tuple(names or ())))
         return [(round(p[0], 9), round(p[1], 9)) for p in points]
 
-    def screens(adapter, label):
+    def screens(adapter, label, *, sheet_xy):
+        assert sheet_xy == sheet.hits[-1]
         sheet.screens.append((label, adapter.currentModel.span))
         return {"desktop_png": f"failures/{label}/desktop.png", "capture_ms": 0}
 

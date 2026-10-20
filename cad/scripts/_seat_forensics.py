@@ -15,11 +15,11 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
   ``_drawing_common.read_required_properties``, the pick-miss capture behind
   ``_drawing_selection._select_view_entity`` (it always raises), and
   ``capture_com_failure`` as a terminal failure call (it always raises).
-- No COM mutator runs here except three pinned ones, each after the artefact
-  is settled: ``SaveAs3`` (native copy and opt-in failed-sheet PNG) /
-  ``SaveBMP`` of a failing document (only under the always-raising
-  ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
-  (only at teardown).
+- No document/seat COM mutator runs here except the pinned failure exports
+  (``SaveAs3`` copies and ``SaveBMP`` without moving the camera) and teardown's
+  ``SetCurrentWorkingDirectory``. A zoomed miss may also call
+  ``IMathUtility.CreatePoint``: that creates only a local math value for native
+  pixel projection, never document geometry. ``check:inert`` pins that exception.
 - This module reads ``_com``, ``_paths``, ``_preferences``, ``_rebuild``,
   ``_session`` and ``_sketch_closure`` through pinned module attributes only,
   keeping reads cycle-safe when these modules import the forensic hooks.
