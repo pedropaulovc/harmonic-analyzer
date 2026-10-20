@@ -482,6 +482,7 @@ class BalloonAnchor:
 
     point_mm: tuple[float, float, float] | None = None
     instance: str | None = None
+    pose_diagnostic: bool = False
 
 
 @dataclass(frozen=True)
@@ -888,6 +889,7 @@ def _anchor_model_points(
             component_transform=values,
             explode_offset_m=(dx, dy, dz),
             model_points_m=model_points,
+            part_points_m=[tuple(point) for point in points_m],
         )
     return model_points
 
@@ -1031,6 +1033,7 @@ def _hit_test_edge(
     diagnostic_label: str = "",
     observed: dict[str, Any] | None = None,
     on_miss: Callable[[], None] | None = None,
+    post_raw: Callable[[bool], None] | None = None,
 ) -> tuple[Any, str]:
     """Select the edge drawn at ``sheet_xy`` of the active view; return it and its owner.
 
@@ -1040,8 +1043,10 @@ def _hit_test_edge(
     is left in place for the caller to use or clear. ``observed`` receives
     separate zoom, existing Scale2 read, raw pick, fit and owner-read timings.
     No new COM read precedes the baseline pick. ``on_miss`` runs while still
-    zoomed, before any screenshot or fit; it cannot change the baseline result.
-    This is an instrumented baseline, not a claim of identical wall timing.
+    zoomed, before any screenshot or fit. The opt-in ``post_raw`` hook runs
+    on BOTH outcomes inside that zoom and must stop the diagnostic leaf;
+    its exception is never converted to a generic miss. Ordinary callers
+    retain their existing observer sequence.
     """
     draw = adapter.currentModel
     draw.ClearSelection2(True)
@@ -1060,14 +1065,31 @@ def _hit_test_edge(
                 # Fetch Extension/callout outside the raw call's measured interval.
                 extension = draw.Extension
                 callout = null_callout()
+                select_begin_utc_ns = time.time_ns()
                 started = time.perf_counter()
                 selected = extension.SelectByID2(
                     "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
                 )
                 select_ms = (time.perf_counter() - started) * 1000.0
+                select_end_utc_ns = time.time_ns()
                 baseline_missed = not bool(selected)
                 if observed is not None:
-                    observed.update(select_result=bool(selected), select_ms=select_ms)
+                    observed.update(
+                        select_result=bool(selected), select_ms=select_ms,
+                        select_begin_utc_ns=select_begin_utc_ns,
+                        select_end_utc_ns=select_end_utc_ns,
+                    )
+                if post_raw is not None:
+                    with contextlib.suppress(Exception):
+                        _telemetry.event(
+                            "drawing.pick_diagnostic.raw",
+                            label=diagnostic_label, arm="pose_instrumented_baseline",
+                            **(observed or {}),
+                        )
+                    post_raw(bool(selected))
+                    raise RuntimeError(
+                        "ISSUE1667_POSE_DIAGNOSTIC_STOP post_raw unexpectedly returned"
+                    )
                 if not selected and on_miss is not None:
                     # Persist the actual False and raw duration before importing
                     # diagnostics, observer reads, captures, or any intervention.
@@ -1092,8 +1114,16 @@ def _hit_test_edge(
                     on_miss()
             finally:
                 fit_started = time.perf_counter()
-    except Exception as exc:
-        if not baseline_missed or on_miss is None:
+    except BaseException as exc:
+        if post_raw is not None:
+            # Covers cancellation/import failure before collector entry too.
+            # A second idempotent clear after its tagged stop is cleanup only.
+            try:
+                draw.ClearSelection2(True)
+            except BaseException as cleanup:
+                exc.add_note(f"targeted pose selection cleanup also failed: {cleanup!r}")
+            raise
+        if not isinstance(exc, Exception) or not baseline_missed or on_miss is None:
             raise
         # A diagnostic/capture/fit failure cannot replace the known initial miss.
         if observed is not None:
@@ -1293,6 +1323,60 @@ def _select_balloon_anchor(
         observed: dict[str, Any] = {}
         captured: dict[str, Any] = {}
         diagnostic: dict[str, Any] = {}
+
+        if anchor.pose_diagnostic:
+            def diagnose_pose(raw_result: bool) -> None:
+                # A miss's immediate repeat precedes imports and ALL added
+                # native observers. Do not inspect selection or reproject first.
+                repeat: dict[str, Any] | None = None
+                if not raw_result:
+                    repeat = {"arm": "immediate_sameXY_rawrepeat"}
+                    try:
+                        draw = adapter.currentModel
+                        draw.ClearSelection2(True)
+                        extension = draw.Extension
+                        callout = null_callout()
+                        repeat["begin_utc_ns"] = time.time_ns()
+                        started = time.perf_counter()
+                        try:
+                            repeat["select_result"] = bool(extension.SelectByID2(
+                                "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0,
+                                False, 0, callout, 0,
+                            ))
+                        finally:
+                            repeat["end_utc_ns"] = time.time_ns()
+                            repeat["select_ms"] = (time.perf_counter() - started) * 1000.0
+                    except Exception as exc:
+                        repeat["select_error"] = f"{type(exc).__name__}: {exc}"
+                    with contextlib.suppress(Exception):
+                        _telemetry.event(
+                            "drawing.pick_diagnostic.raw", label=stem, **repeat
+                        )
+                try:
+                    from _drawing_sm_pose_diagnostic import collect_and_stop
+
+                    collect_and_stop(
+                        adapter, view, sheet_xy=sheet_xy, instance=instance,
+                        point_mm=anchor.point_mm, baseline=observed,
+                        immediate_repeat=repeat,
+                        projection_inputs=projection_inputs or {},
+                        capture_final=lambda capture_label: _seat_forensics.capture_pick_screens(
+                            adapter, capture_label
+                        ),
+                    )
+                except Exception as exc:
+                    if str(exc).startswith("ISSUE1667_POSE_DIAGNOSTIC_STOP"):
+                        raise
+                    raise RuntimeError(
+                        "ISSUE1667_POSE_DIAGNOSTIC_STOP "
+                        f"baseline={raw_result} incomplete collector_entry_error={exc!r}"
+                    ) from exc
+
+            _hit_test_edge(
+                adapter, sheet_xy, observed=observed,
+                diagnostic_label=stem, post_raw=diagnose_pose,
+            )
+            raise RuntimeError("ISSUE1667_POSE_DIAGNOSTIC_STOP hit test returned")
 
         def diagnose_miss() -> None:
             callback_started = time.perf_counter()
@@ -1735,6 +1819,8 @@ def add_component_bom_balloons(
     offsets = _view_explode_offsets(adapter, view, label=label)
     frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
     projection_inputs: dict[str, dict[str, Any]] = {stem: {} for stem in frozen}
+    projection_frame: dict[str, Any] = {}
+    pose_probe = any(anchors[stem].pose_diagnostic for stem in frozen)
     projected = (
         model_points_in_view(
             adapter,
@@ -1753,11 +1839,21 @@ def add_component_bom_balloons(
             ],
             label=f"{label} balloon anchors",
             names=frozen,
+            **({"observed": projection_frame} if pose_probe else {}),
         )
         if frozen
         else []
     )
     sheet_points: dict[str, tuple[float, float]] = dict(zip(frozen, projected))
+    for stem in frozen:
+        if anchors[stem].pose_diagnostic:
+            projection_inputs[stem].update(
+                model_to_view_transform_handle=projection_frame.get(
+                    "model_to_view_transform_handle"
+                ),
+                retained_drawing_leaves=leaves,
+                retained_explode_offsets=offsets,
+            )
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     activation_view_name = view_name(adapter, view)

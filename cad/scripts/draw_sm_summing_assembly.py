@@ -37,6 +37,7 @@ import _telemetry
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
+import sm_summing_lever_spec as lever_spec
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
@@ -221,6 +222,16 @@ BOM_NORMALIZED_ALIASES = {
 # One balloon per BOM row, each on its own family's visible edge: every family
 # is separated from its neighbours in the explode.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# Issue1667 diagnostic fixture only: historical pad edge, evaluated from the
+# current spec. All other BOM anchors retain the ordinary current auto-walk.
+BALLOON_ANCHORS["sm-summing-lever"] = BalloonAnchor(
+    point_mm=(
+        lever_spec.PLATE_W,
+        lever_spec.PLATE_T / 2.0 - lever_spec.SPRING_SEAT_T,
+        0.0,
+    ),
+    pose_diagnostic=True,
+)
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
