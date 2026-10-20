@@ -40,11 +40,10 @@ from typing import Any
 
 import _telemetry
 from _assembly import (
-    _activate_drawing_configuration,
     _invalidate_massprops_proof,
     _massprops_sidecar,
-    _restore_default_configuration,
     assembly_geometry_digest,
+    author_in_drawing_configurations,
     final_rebuild_before_save,
     reconcile_saved_rebuild_state,
     save_assembly_in_place,
@@ -55,9 +54,7 @@ from _check import check
 from _com import _early_bound
 from _part_save import set_isometric_view
 from _paths import OUT_SLDASM
-from _rebuild import active_configuration_name
 from _saved_display_data import assert_saved_display_data
-from _simplified_names import simplified_name
 from _visibility import assert_reference_geometry_hidden
 
 SW_SEL_EXPLVIEWS = 43  # swSelectType_e.swSelEXPLVIEWS ("EXPLODEDVIEWS")
@@ -145,35 +142,6 @@ def _require_unmoved(
         )
 
 
-@_telemetry.traced("explode_refresh.drawing_configurations", label_param="asm_name")
-def _reauthor_drawing_configurations(
-    adapter: Any, asm_name: str, author: Callable[[str], None]
-) -> None:
-    """Preserve refresh's sync and two configuration-owned authoring passes.
-
-    Unlike a new build, refresh already proved the saved child in sync before
-    entering this authoring traversal. Keep the existing second synchronization
-    and final-Default-solve contract; full-build consolidation does not change
-    this tier's native work or substitute a new simplified verification gate.
-    """
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    rest = "Default"
-    if active_configuration_name(adapter, model) != rest:
-        raise RuntimeError(
-            f"{asm_name}: drawing configurations are authored from {rest!r}"
-        )
-    try:
-        sync_simplified_configuration(adapter, asm_name)
-        with _telemetry.span("simplified.author", asm=asm_name, configuration=rest):
-            author(rest)
-        child = simplified_name(rest)
-        _activate_drawing_configuration(adapter, model, asm_name, child)
-        with _telemetry.span("simplified.author", asm=asm_name, configuration=child):
-            author(child)
-    finally:
-        _restore_default_configuration(adapter, model, asm_name)
-
-
 async def refresh_explode(
     adapter: Any, asm_name: str, author: Callable[[str], None]
 ) -> dict[str, str]:
@@ -203,7 +171,7 @@ async def refresh_explode(
             f"{asm_name}: saved model opened with NeedsRebuild2={opened_status}; "
             "the explode tier only re-authors a clean model"
         )
-    drift = sync_simplified_configuration(adapter, asm_name)
+    drift = sync_simplified_configuration(adapter, asm_name, verify=False)
     if drift:
         raise RuntimeError(
             f"{asm_name}: Default Simplified needed {drift} change(s) on reopen; "
@@ -230,7 +198,7 @@ async def refresh_explode(
         )
         author(configuration)
 
-    _reauthor_drawing_configurations(adapter, asm_name, reauthor)
+    author_in_drawing_configurations(adapter, asm_name, reauthor)
     final_rebuild_before_save(adapter, asm_name)
     assert_reference_geometry_hidden(adapter, asm_name)
     _require_unmoved(
