@@ -5,8 +5,8 @@ to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
 depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  The
-principal view carries the native far-side bore-mouth chamfer dimension,
-identifying the MHA-DT-31 hub side and its press lead-in.
+principal view identifies the hub seat; the rotated top/profile view carries
+the native far-side bore-mouth chamfer leg and its press lead-in intent.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -27,14 +27,16 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 from _check import check
 from _com import _early_bound
-from _drawing_annotation_extent import callout_ink
+from _drawing_annotation_extent import boxes_clear, callout_ink, sheet_region
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -60,15 +62,16 @@ from _drawing_leaders import (
     dimension_text_points,
     distance_to_box,
     landing_distance,
-    leader_segments,
     points_inside,
     segments_cross,
     set_near_side_diameter,
 )
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _hole_spec import blind_cut_dia_mm
+from _layout_audit import display_box
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -78,6 +81,7 @@ from dt_crank_arm_notes import (
     FIDUCIAL_CALLOUT,
     HUB_SEAT_CALLOUT,
     PIVOT_TAP_ROWS,
+    PROFILE_VIEW_CAPTION,
     SEAM_CALLOUT,
 )
 from dt_crank_arm_spec import (
@@ -86,6 +90,7 @@ from dt_crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ARM_C2C,
     ARM_END_X,
+    ARM_THICKNESS,
     AXIAL_PIN_DIA,
     AXIAL_PIN_X,
     BORE_REAR_CHAMFER,
@@ -125,13 +130,17 @@ _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 SHEET_SCALE = (2.0, 1.0)
 
 # Sheet layout (meters).  At 2:1 the 100.4-mm overall arm remains clear of the
-# title block, and the side view shows the 25.4 x 8 stock section.  The
-# principal view sits so its lower edge keeps the dimension rows' height below
+# title block. The profile replaces the old stock end view: Top, turned 90
+# degrees CCW at 1:1, shows the native chamfer in its proven XZ plane.
+# The principal view sits so its lower edge keeps the dimension rows' height below
 # it; the three callouts over the hub end (seat, seam, anchor tap) stand in a
 # row above it so no leader crosses another.
 FRONT_CENTER = (0.145, 0.142)
-RIGHT_CENTER = (0.300, FRONT_CENTER[1])
+PROFILE_CENTER = (0.300, FRONT_CENTER[1])
 ISO_CENTER = (0.360, 0.230)
+PROFILE_SCALE = (1.0, 1.0)
+PROFILE_ANGLE = math.pi / 2.0
+PROFILE_CAPTION_XY = (0.316, 0.160)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -205,14 +214,10 @@ FRONT_KEEP = {
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "Width": (0.279, FRONT_CENTER[1]),
-    # Six millimetres above the old shelf: its native centre-to-arc line
-    # otherwise crosses the new lower-left bore-mouth callout leader.
-    "BossRadius": (0.030, FRONT_CENTER[1] + 0.006),
-    # Below and right of the handle end, clear of the Width row and the
-    # 75.0 station row; its leader lands on the lower-right quarter of the arc.
-    "EndRadius": (0.268, 0.100),
+    "BossRadius": (0.030, FRONT_CENTER[1]),
+    # Below the front view and left of the profile's chamfer text lane.
+    "EndRadius": (0.248, 0.087),
     "HubSeatDia": (0.048, 0.225),
-    "BoreRearChamferSize": (0.02865, 0.111),
 }
 # The hub seat's leader lands on the near rim, upper left of the bore: at
 # 0.054 with both arrows it ran down through the bore centre to the far
@@ -259,17 +264,14 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 # Centre of the four-line pivot callout: its bottom row stays clear above
 # the arm's top edge, its right end left of the isometric view.
 PIVOT_CALLOUT_XY = (0.270, 0.190)
-RIGHT_KEEP = {"Depth": (0.300, 0.108)}
-
-# Native proof 20261020T042443087Z: the overall's left extension is x44.6,
-# R12.7's old shelf y139.22, and the inner border x12.7 (all sheet mm).
-# The old 29.864-mm whole block includes padding beyond its 27.2465-mm
-# widest row. Keeping that padding, the now-longest angle row (24.5243 mm
-# less two 0.9443-mm spaces) budgets 25.2532 mm: over 3 mm air on both sides
-# at x28.65. Seven printed rows at 5.5563 mm pitch stay below R12.7.
-# Crossing the overall's EXTENSION with the leader is conventional (rule 14).
-CHAMFER_TEXT_LANE = (0.0157, 0.080, _sheet_x(-HALF_WIDTH) - 0.002, 0.135)
-CHAMFER_MOUTH_XY = (_sheet_x(-HUB_SEAT_DIA / 2.0), FRONT_CENTER[1])
+PROFILE_KEEP = {
+    "Depth": (0.300, 0.082),
+    "BoreRearChamferSize": (0.263, 0.112),
+}
+# The seven-row native block (two LIMIT rows plus the five short suffix rows)
+# stands between the front and profile silhouettes, below Width and the pivot
+# callout. These are lane limits, not a substitute for whole-ink readback.
+CHAMFER_TEXT_LANE = (0.2498, 0.091, 0.277, 0.133)
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,
     "BoreRearChamferSize": BORE_REAR_CHAMFER_CALLOUT,
@@ -308,10 +310,12 @@ def _assert_chamfer_limits(annotation: Any) -> None:
         raise RuntimeError("imported bore-mouth chamfer lost its native LIMIT band")
 
 
-def _assert_front_chamfer(adapter: Any, front: Any, annotation: Any) -> None:
-    """Require the actual part dimension, visible and owned by the plan view."""
+def _assert_profile_dimension(
+    adapter: Any, profile: Any, annotation: Any, parameter: str
+) -> Any:
+    """Require the visible, live source dimension in this particular view."""
     native = _early_bound(annotation, "IAnnotation")
-    view = _early_bound(front, "IView")
+    view = _early_bound(profile, "IView")
     app = _early_bound(adapter.swApp, "ISldWorks")
     if (
         int(native.GetType()) != 4  # swDisplayDimension
@@ -320,18 +324,28 @@ def _assert_front_chamfer(adapter: Any, front: Any, annotation: Any) -> None:
         or int(app.IsSame(native.Owner, view)) != 1  # swObjectSame
         or native.IsDangling()
     ):
-        raise RuntimeError("bore-mouth chamfer is not visible and attached in the front view")
+        raise RuntimeError(f"{parameter}: dimension is not visible and attached in the profile view")
     display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     source = _early_bound(view.ReferencedDocument, "IModelDoc2")
-    expected = source.Parameter("BoreRearChamferSize@BoreRearChamfer")
+    expected = source.Parameter(parameter)
     if expected is None or int(app.IsSame(dimension, expected)) != 1:
-        raise RuntimeError("bore-mouth chamfer is not the source model dimension")
-    _assert_chamfer_limits(native)
+        raise RuntimeError(f"{parameter}: dimension is not the source model dimension")
+    if display.GetOverride() is not False or display.ShowDimensionValue is not True:
+        raise RuntimeError(f"{parameter}: dimension lost its native displayed value")
+    return display
+
+
+def _assert_profile_chamfer(adapter: Any, profile: Any, annotation: Any) -> None:
+    """Preserve the model's identity, LIMIT band, precision and short suffix."""
+    display = _assert_profile_dimension(
+        adapter, profile, annotation, "BoreRearChamferSize@BoreRearChamfer"
+    )
+    _assert_chamfer_limits(annotation)
     if (
-        display.GetOverride() is not False
-        or display.ShowDimensionValue is not True
-        or display.IsReferenceDim() is not False
+        display.IsReferenceDim() is not False
+        or int(display.GetPrimaryPrecision2())
+        != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
         or int(display.GetPrimaryTolPrecision2())
         != DRAWING_PRECISION_BY_NAME["BoreRearChamferSize"]
         or str(display.GetText(4) or "") != BORE_REAR_CHAMFER_CALLOUT
@@ -339,41 +353,186 @@ def _assert_front_chamfer(adapter: Any, front: Any, annotation: Any) -> None:
         raise RuntimeError("bore-mouth chamfer lost its native value, LIMIT precision or callout")
 
 
-def _place_front_chamfer(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Offset the imported leg's text, retaining its native bore attachment.
+def _profile_geometry(adapter: Any, profile: Any) -> tuple[float, float]:
+    """Read the turned XZ projection, including rear-mouth and stock directions.
 
-    This is rocker-arm support's RimChamferSize pattern: OffsetText keeps the
-    model dimension and its witnesses, unlike a new note or AddChamferDim.
-    InsertModelAnnotations3 is view-targeted but does not promise that a
-    non-parallel annotation plane will import; curation must refuse if absent.
+    The successful native XZ import (20261020T042443087Z) and failed Front
+    import rule out repeating the plan-view prototype. The original Right
+    projection is YZ, not this chamfer's annotation plane. One Top view replaces
+    it; the angle, scale and actual projected axes must agree with its caption.
     """
-    annotation = _early_bound(
-        _named(adapter, annotations, "BoreRearChamferSize"), "IAnnotation"
+    view = _early_bound(profile, "IView")
+    if (
+        str(view.GetOrientationName()).lstrip("*").casefold() != "top"
+        or not math.isclose(math.remainder(float(view.Angle) - PROFILE_ANGLE, math.tau), 0.0, abs_tol=1e-8)
+        or tuple(float(value) for value in view.ScaleRatio) != PROFILE_SCALE
+        or int(view.GetDisplayMode2()) != 1  # swHIDDEN_GREYED: HLV
+    ):
+        raise RuntimeError("profile lost its Top/90 DEG CCW/1:1/HLV projection")
+    radius = HUB_SEAT_DIA / 2.0 + BORE_REAR_CHAMFER
+    origin, x_axis, y_axis, z_axis, low, high, mouth = model_points_in_view(
+        adapter,
+        view,
+        (
+            (0.0, 0.0, 0.0),
+            (0.001, 0.0, 0.0),
+            (0.0, 0.001, 0.0),
+            (0.0, 0.0, 0.001),
+            (-HALF_WIDTH / 1000.0, 0.0, 0.0),
+            (ARM_END_X / 1000.0, 0.0, ARM_THICKNESS / 1000.0),
+            (-radius / 1000.0, 0.0, 0.0),
+        ),
+        label="crank arm turned top profile",
     )
-    _assert_front_chamfer(adapter, front, annotation)
+    axes = [
+        (point[0] - origin[0], point[1] - origin[1])
+        for point in (x_axis, y_axis, z_axis)
+    ]
+    expected = ((0.0, 0.001), (0.0, 0.0), (0.001, 0.0))
+    cx, cy = PROFILE_CENTER
+    half_length = (ARM_END_X + HALF_WIDTH) / 2000.0
+    half_thickness = ARM_THICKNESS / 2000.0
+    if (
+        any(not math.isfinite(value) for point in (origin, *axes, low, high, mouth) for value in point)
+        or any(math.dist(actual, wanted) > 1e-8 for actual, wanted in zip(axes, expected))
+        or math.dist(low, (cx - half_thickness, cy - half_length)) > 1e-6
+        or math.dist(high, (cx + half_thickness, cy + half_length)) > 1e-6
+        or math.dist(
+            mouth, (cx - half_thickness, cy - (ARM_C2C / 2.0 + radius) / 1000.0)
+        ) > 1e-6
+    ):
+        raise RuntimeError("profile does not show the 8 mm stock and rear-Z mouth in the labelled direction")
+    return mouth
+
+
+@_telemetry.traced("drawing.crank_arm_profile_turn")
+def _turn_profile(adapter: Any, profile: Any) -> None:
+    view = _early_bound(profile, "IView")
+    if not math.isclose(float(view.Angle), 0.0, abs_tol=1e-8):
+        raise RuntimeError("Top profile is already rotated; its CCW caption would be false")
+    view.Angle = PROFILE_ANGLE
+    rebuild_drawing(adapter, label="turn crank arm Top profile 90 DEG CCW")
+    _profile_geometry(adapter, view)
+
+
+@_telemetry.traced("drawing.crank_arm_profile_caption")
+def _profile_caption(adapter: Any, profile: Any) -> Any:
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(view_name(adapter, profile)):
+        raise RuntimeError("failed to activate the profile for its rotation caption")
+    note = add_note(adapter, PROFILE_VIEW_CAPTION, *PROFILE_CAPTION_XY)
+    if note is None:
+        raise RuntimeError("failed to insert the rotated Top profile caption")
+    return note
+
+
+def _rendered_chamfer_edges(adapter: Any, profile: Any, annotation: Any) -> None:
+    """Require the actual rear chamfer boundaries in the native rendered set.
+
+    GetVisibleEntities2 excludes completely obscured entities, including an
+    internal mouth; a positive count cannot prove this HLV edge prints.
+    GetPolylines7(1) instead pairs each rendered polyline with its model edge.
+    Its XYZs are used ONLY to reject empty/degenerate rendering, never treated
+    as sheet coordinates. Model geometry is projected by SolidWorks separately.
+    """
+    view = _early_bound(profile, "IView")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    part = _early_bound(view.ReferencedDocument, "IPartDoc")
+    raw_feature = part.FeatureByName("BoreRearChamfer")
+    if raw_feature is None:
+        raise RuntimeError("profile has no source BoreRearChamfer feature")
+    faces = list(_early_bound(raw_feature, "IFeature").GetFaces() or ())
+    expected = (
+        (0.0, HUB_SEAT_DIA / 2.0 + BORE_REAR_CHAMFER),
+        (BORE_REAR_CHAMFER, HUB_SEAT_DIA / 2.0),
+    )
+    boundaries: list[Any] = []
+    for z_mm, radius_mm in expected:
+        matches = []
+        for face in faces:
+            for raw_edge in _early_bound(face, "IFace2").GetEdges() or ():
+                edge = _early_bound(raw_edge, "IEdge")
+                curve = _early_bound(edge.GetCurve(), "ICurve")
+                if not curve.IsCircle():
+                    continue
+                values = tuple(float(value) for value in curve.CircleParams)
+                if (
+                    len(values) == 7
+                    and all(math.isfinite(value) for value in values)
+                    and math.dist(values[:3], (0.0, 0.0, z_mm / 1000.0)) < 1e-8
+                    and abs(abs(values[5]) - 1.0) < 1e-8
+                    and math.hypot(values[3], values[4]) < 1e-8
+                    and abs(values[6] - radius_mm / 1000.0) < 1e-8
+                    and not any(int(app.IsSame(edge, other)) == 1 for other in matches)
+                ):
+                    matches.append(edge)
+        if len(matches) != 1:
+            raise RuntimeError("profile cannot identify both actual rear bore-chamfer boundary edges")
+        boundaries.append(matches[0])
+    native = _early_bound(annotation, "IAnnotation")
+    attached = tuple(native.GetAttachedEntities3() or ())
+    kinds = tuple(int(value) for value in (native.GetAttachedEntityTypes() or ()))
+    if (
+        len(attached) != len(kinds)
+        or len(attached) != int(native.GetAttachedEntityCount3())
+        or not attached
+        or any(item is None for item in attached)
+        or not any(
+            int(app.IsSame(item, receiver)) == 1
+            for item, kind in zip(attached, kinds)
+            for receiver in (boundaries if kind == 1 else faces if kind == 2 else ())
+        )
+    ):
+        raise RuntimeError("native chamfer leg is not attached to its actual rear-mouth feature")
+    # Generated IView binding returns (model edges, out polyline buffer).
+    result = view.GetPolylines7(1)
+    if not isinstance(result, (list, tuple)) or len(result) != 2:
+        raise RuntimeError("profile chamfer rendered-edge readback is unavailable")
+    edges, raw = result
+    data = tuple(float(value) for value in (raw or ()))
+    if not all(math.isfinite(value) for value in data):
+        raise RuntimeError("profile chamfer rendered-edge data is non-finite")
+    rendered = [False, False]
+    cursor = 0
+    for edge in edges or ():
+        if cursor + 2 > len(data):
+            raise RuntimeError("profile rendered-edge buffer is truncated")
+        kind, size = data[cursor:cursor + 2]
+        if (kind, size) not in ((0.0, 0.0), (1.0, 12.0)):
+            raise RuntimeError("profile rendered-edge geometry has an unsupported native shape")
+        count_at = cursor + 2 + int(size) + 6
+        if count_at >= len(data):
+            raise RuntimeError("profile rendered-edge buffer lacks its point count")
+        count = int(data[count_at])
+        end = count_at + 1 + 3 * count
+        if count < 0 or count != data[count_at] or end > len(data):
+            raise RuntimeError("profile rendered-edge buffer has an invalid point count")
+        points = [data[index:index + 3] for index in range(count_at + 1, end, 3)]
+        if edge is not None and any(math.dist(a, b) > 1e-9 for a, b in zip(points, points[1:])):
+            for index, boundary in enumerate(boundaries):
+                if int(app.IsSame(edge, boundary)) == 1:
+                    rendered[index] = True
+        cursor = end
+    if cursor != len(data) or not all(rendered):
+        raise RuntimeError("profile does not render both actual rear bore-chamfer edges")
+
+
+@_telemetry.traced("drawing.crank_arm_profile_chamfer")
+def _place_profile_chamfer(adapter: Any, profile: Any, annotations: list[Any]) -> None:
+    """Offset the imported native leg, never replace it with a note/dimension."""
+    annotation = _early_bound(_named(adapter, annotations, "BoreRearChamferSize"), "IAnnotation")
+    _assert_profile_chamfer(adapter, profile, annotation)
+    mouth = _profile_geometry(adapter, profile)
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     display.OffsetText = False
-    if bool(display.OffsetText) or not annotation.SetPosition2(*CHAMFER_MOUTH_XY, 0.0):
+    if bool(display.OffsetText) or not annotation.SetPosition2(*mouth, 0.0):
         raise RuntimeError("failed to place the native bore-mouth dimension line")
     offset_dimension_text(
-        adapter, [annotation], {"BoreRearChamferSize": FRONT_KEEP["BoreRearChamferSize"]}
+        adapter, [annotation], {"BoreRearChamferSize": PROFILE_KEEP["BoreRearChamferSize"]}
     )
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    if (
-        not bool(display.OffsetText)
-        or len(position) != 3
-        or not all(math.isfinite(value) for value in position)
-        or math.dist(position[:2], FRONT_KEEP["BoreRearChamferSize"]) > 1e-5
-    ):
-        raise RuntimeError("native bore-mouth chamfer text did not stay on its offset leader")
+    _assert_chamfer_offset(annotation)
 
 
-def _front_chamfer_clear(
-    adapter: Any, front: Any, annotations: list[Any], notes: dict[str, Any]
-) -> None:
-    """Read the complete native block and route, not just the requested anchor."""
-    annotation = _named(adapter, annotations, "BoreRearChamferSize")
-    _assert_front_chamfer(adapter, front, annotation)
+def _assert_chamfer_offset(annotation: Any) -> None:
     native = _early_bound(annotation, "IAnnotation")
     display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
     position = tuple(float(value) for value in (native.GetPosition() or ()))
@@ -381,37 +540,122 @@ def _front_chamfer_clear(
         not bool(display.OffsetText)
         or len(position) != 3
         or not all(math.isfinite(value) for value in position)
-        or math.dist(position[:2], FRONT_KEEP["BoreRearChamferSize"]) > 1e-5
+        or math.dist(position[:2], PROFILE_KEEP["BoreRearChamferSize"]) > 1e-5
     ):
         raise RuntimeError("native bore-mouth chamfer lost its final offset leader position")
+
+
+def _dimension_text_bounds(annotation: Any, *, label: str) -> tuple[float, float, float, float]:
+    """Whole native text runs, not requested anchors or estimated glyph widths."""
+    native = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(native.GetSpecificAnnotation(), "IDisplayDimension")
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    texts = []
+    for index in range(int(data.GetTextCount())):
+        text = str(data.GetTextAtIndex(index) or "")
+        if not text.strip():
+            continue
+        position = tuple(float(value) for value in (data.GetTextPositionAtIndex(index) or ()))
+        width = float(data.GetTextInBoxWidthAtIndex(index))
+        height = float(data.GetTextHeightAtIndex(index))
+        angle = float(data.GetTextAngleAtIndex(index))
+        if (
+            len(position) != 3 or width <= 0.0 or height <= 0.0
+            or not all(math.isfinite(value) for value in (*position, width, height, angle))
+        ):
+            raise RuntimeError(f"{label}: native dimension text has no measurable whole bounds")
+        texts.append({"t": text, "pos": position, "w": width, "h": height, "ang": angle})
+    box = display_box({"texts": texts})
+    if box is None:
+        raise RuntimeError(f"{label}: native dimension has no rendered text")
+    return (box.xmin, box.ymin, box.xmax, box.ymax)
+
+
+@_telemetry.traced("drawing.crank_arm_profile_readback")
+def _profile_chamfer_clear(
+    adapter: Any, front: Any, profile: Any, front_annotations: list[Any],
+    profile_annotations: list[Any], callouts: dict[str, Any], caption: Any,
+) -> None:
+    """Fail before review unless the native import, receiver and whole ink survive."""
+    annotation = _named(adapter, profile_annotations, "BoreRearChamferSize")
+    _assert_profile_chamfer(adapter, profile, annotation)
+    _assert_chamfer_offset(annotation)
+    mouth = _profile_geometry(adapter, profile)
+    _rendered_chamfer_edges(adapter, profile, annotation)
+    depth = _named(adapter, profile_annotations, "Depth")
+    stock = _assert_profile_dimension(adapter, profile, depth, "Depth@Arm")
+    stock_dimension = _early_bound(stock.GetDimension2(0), "IDimension")
+    if (
+        stock.IsReferenceDim() is not True
+        or int(stock_dimension.GetType()) != 0
+        or not math.isclose(float(stock_dimension.SystemValue) * 1000.0, ARM_THICKNESS, abs_tol=1e-7)
+        or int(stock.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME["Depth"]
+    ):
+        raise RuntimeError("profile stock thickness lost its native 8 mm reference")
     ink = callout_ink(adapter, annotation, label="far-side bore-mouth chamfer")
     x0, y0, x1, y1 = ink.text
     left, bottom, right, top = CHAMFER_TEXT_LANE
-    if not all(math.isfinite(value) for value in ink.text) or not (
-        left <= x0 < x1 <= right and bottom <= y0 < y1 <= top
+    front_box = tuple(float(value) for value in _early_bound(front, "IView").GetOutline())
+    profile_box = tuple(float(value) for value in _early_bound(profile, "IView").GetOutline())
+    region = sheet_region(adapter)
+    if (
+        len(front_box) != 4 or len(profile_box) != 4
+        or not all(math.isfinite(value) for value in (*ink.text, *front_box, *profile_box))
+        or not (
+            max(left, front_box[2] + 0.002, region.xmin + 0.003) <= x0 < x1
+            <= min(right, profile_box[0] - 0.002, region.xmax - 0.003)
+            and max(bottom, region.ymin + 0.003) <= y0 < y1
+            <= min(top, region.ymax - 0.003)
+        )
     ):
-        raise RuntimeError(f"bore-mouth chamfer text leaves its clear lane: {ink.text}")
+        raise RuntimeError(f"bore-mouth chamfer text leaves its clear profile lane: {ink.text}")
     chamfer = dimension_segments(annotation)
+    if not chamfer or landing_distance(chamfer, mouth) > 0.001:
+        raise RuntimeError("native bore-mouth chamfer leader does not land on the rear-Z mouth")
     others = {
-        name: dimension_segments(_named(adapter, annotations, name))
-        for name in ("HubSeatDia", "BossRadius")
+        name: _named(adapter, front_annotations, name)
+        for name in ("Width", "EndRadius")
     }
-    others.update({
-        name: leader_segments(_early_bound(note, "INote").GetAnnotation())
-        for name, note in notes.items()
-    })
-    # Native witnesses end on the bore mouth. This radial band allows the
-    # normal dimension-line/text gap but rejects a centre/OD/wrong-space route.
-    radius = HUB_SEAT_DIA * SHEET_SCALE[0] / 2000.0
-    if not chamfer or not radius - 0.001 <= landing_distance(chamfer, BORE_CENTER) <= radius + 0.001:
-        raise RuntimeError("native bore-mouth chamfer leader does not land on the seat bore")
-    collisions = [
-        name for name, segments in others.items()
-        if not segments or any(
-            segments_cross(first, second)
-            for first in chamfer for second in segments
-        ) or any(distance_to_box(segment, ink.text) < 0.002 for segment in segments)
-    ]
+    others.update(callouts)
+    others["stock thickness"] = depth
+    other_boxes = {}
+    collisions = []
+    for name, other in others.items():
+        segments = dimension_segments(other)
+        box = _dimension_text_bounds(other, label=name)
+        other_boxes[name] = box
+        if (
+            not segments or not boxes_clear(ink.text, box, 0.002)
+            or any(distance_to_box(segment, ink.text) < 0.002 for segment in segments)
+            or any(distance_to_box(segment, box) < 0.002 for segment in chamfer)
+            or any(segments_cross(first, second) for first in chamfer for second in segments)
+        ):
+            collisions.append(name)
+    note = _early_bound(caption, "INote")
+    note_annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    extent = tuple(float(value) for value in (note.GetExtent() or ()))
+    position = tuple(float(value) for value in (note_annotation.GetPosition() or ()))
+    if (
+        str(note.GetText() or "") != PROFILE_VIEW_CAPTION
+        or int(note_annotation.Visible) != 1 or int(note_annotation.OwnerType) != 0
+        or int(_early_bound(adapter.swApp, "ISldWorks").IsSame(note_annotation.Owner, profile)) != 1
+        or len(position) != 3 or not all(math.isfinite(value) for value in position)
+        or math.dist(position[:2], PROFILE_CAPTION_XY) > 1e-5
+        or len(extent) != 6 or not all(math.isfinite(value) for value in extent)
+    ):
+        raise RuntimeError("rotated Top profile caption did not persist with its view")
+    caption_box = (extent[0], extent[1], extent[3], extent[4])
+    if (
+        caption_box[0] >= caption_box[2] or caption_box[1] >= caption_box[3]
+        or not boxes_clear(ink.text, caption_box, 0.002)
+        or any(not boxes_clear(caption_box, box, 0.002) for box in other_boxes.values())
+        or not boxes_clear(profile_box, caption_box, 0.002)
+        or not (
+            region.xmin + 0.003 <= caption_box[0] < caption_box[2] <= region.xmax - 0.003
+            and region.ymin + 0.003 <= caption_box[1] < caption_box[3] <= region.ymax - 0.003
+        )
+    ):
+        collisions.append("profile caption")
     if collisions:
         raise RuntimeError(f"bore-mouth chamfer crowds existing callouts: {collisions}")
 
@@ -495,14 +739,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    profile = place_view(adapter, str(SOURCE), "*Top", *PROFILE_CENTER, scale=PROFILE_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    for view in (front, right, iso):
+    for view in (front, profile, iso):
         set_hidden_lines_removed(adapter, view)
-    # The far-mouth chamfer is the plan's informative hidden feature. Show it
-    # before importing; right and isometric stay in the HLR loop above.
-    set_hidden_lines_visible(adapter, front)
-    _early_bound(front, "IView").UpdateViewDisplayGeometry()
+    # Only the profile exposes the internal rear mouth. Front and isometric
+    # retain HLR; the replacement profile carries both native chamfer and stock.
+    set_hidden_lines_visible(adapter, profile)
+    _turn_profile(adapter, profile)
 
     front_annotations = curate_view_dimensions(
         adapter,
@@ -511,15 +755,14 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # Right view: stock width by thickness.
-    right_annotations = curate_view_dimensions(
+    profile_annotations = curate_view_dimensions(
         adapter,
-        right,
-        keep=RIGHT_KEEP,
-        view_label="right",
+        profile,
+        keep=PROFILE_KEEP,
+        view_label="rotated Top profile",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    imported_annotations = [*front_annotations, *right_annotations]
+    imported_annotations = [*front_annotations, *profile_annotations]
     set_dimension_callouts(adapter, imported_annotations, DIMENSION_CALLOUTS)
     # The part authored every displayed decimal place.  The hub seat bore
     # is a one-place .X size: MHA-DT-31 is turned to suit it.
@@ -527,10 +770,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # The thickness is the supplied stock's (the stock note governs it).
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
+            adapter, _named(adapter, profile_annotations, name), label="arm stock thickness"
         )
     _hub_seat_leader_clear(adapter, front_annotations)
-    _place_front_chamfer(adapter, front, front_annotations)
+    _place_profile_chamfer(adapter, profile, profile_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
@@ -583,7 +826,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # MHA-DT-VN-59's axial seam is match-drilled in the assembled arm and hub; its
     # callout names the mate, the fit and the pin's nominal size and depth.
-    seam_note = add_attached_note(
+    add_attached_note(
         adapter,
         front,
         text=SEAM_CALLOUT,
@@ -593,7 +836,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The punched fiducial is flagged at the mark itself, from the clear
     # band above the boss end.
-    fiducial_note = add_attached_note(
+    add_attached_note(
         adapter,
         front,
         text=FIDUCIAL_CALLOUT,
@@ -617,12 +860,19 @@ async def build(adapter: Any) -> dict[str, str]:
     _append_callout_rows(pivot_callout, PIVOT_TAP_ROWS)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.185)
-    # Annotation insertion can leave an HLV edge set unregenerated even when
-    # its mode reads correctly. Toggle after the last annotation/rebuild,
-    # then read back the native chamfer's owner, limits, visibility and ink.
-    set_hidden_lines_visible(adapter, front)
-    _front_chamfer_clear(
-        adapter, front, front_annotations, {"seam": seam_note, "fiducial": fiducial_note}
+    caption = _profile_caption(adapter, profile)
+    rebuild_drawing(adapter, label="final crank arm profile annotations")
+    # A real HLR/HLV toggle regenerates the internal edge set after insertion.
+    # Missing imports, receivers, edge ink or text bounds fail BEFORE review.
+    set_hidden_lines_visible(adapter, profile)
+    _profile_chamfer_clear(
+        adapter, front, profile, front_annotations, profile_annotations,
+        {
+            "handle pivot": _early_bound(pivot_callout, "IDisplayDimension").GetAnnotation(),
+            "anchor tap": _early_bound(anchor_callout, "IDisplayDimension").GetAnnotation(),
+            "overall length": _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        },
+        caption,
     )
 
     return await finalize_drawing(

@@ -1,4 +1,4 @@
-r"""Crank-arm drawing prose -- the hub-seat, seam and pivot callouts on its sheet.
+r"""Crank-arm feature callouts and the replacement profile's rotation caption.
 
 Imported ONLY by ``draw_dt_crank_arm`` and its offline test, so a wording edit
 re-keys the drawing, never the part.
@@ -50,10 +50,11 @@ PIVOT_TAP_ROWS = (
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
-# The native leg and LIMIT band identify the bore edge. FAR SIDE names its
-# face against the front view; HUB SIDE identifies its mating face. The same
-# bore's primary seat callout already names MHA-DT-31 and its light press fit.
-# The controlling leg, limits and decimal places are the imported model
-# dimension's, not prose. Keep its approved angle suffix on that dimension.
-# Short intent rows leave border and overall-witness air without smaller text.
+# The native leg and LIMIT band identify the rear-Z bore mouth in the turned
+# Top/profile view. FAR SIDE still names that face against the PRINCIPAL FRONT
+# view, not against this rotated view; HUB SIDE is the same mating face. The
+# principal view's primary bore callout names MHA-DT-31 and its light press fit.
+# The leg, limits and decimal places remain the imported model dimension's,
+# not prose. Five short suffix rows preserve the clear lane at normal text size.
 BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG\nFAR SIDE\nHUB SIDE\nPRESS\nLEAD-IN"
+PROFILE_VIEW_CAPTION = "TOP VIEW\nROTATED 90 DEG CCW\nSCALE 1:1"
