@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import bool_array, bstr_array, dispatch_array
@@ -530,6 +530,14 @@ def _annotate_bom_number_binding(
     observed: dict[tuple[int, str, str], int] = {}
     printed_rows: list[list[Any]] = []
     metadata: list[dict[str, Any]] = []
+
+    def read(call: Callable[[], Any], limit: int = 64) -> dict[str, Any]:
+        try:
+            value = repr(call())
+            return {"value": value[:limit], "truncated": len(value) > limit}
+        except Exception as error:
+            return {"error": f"{type(error).__name__}: {error}"[:limit]}
+
     try:
         from _com import _early_bound
         from _component_references import component_identity
@@ -675,7 +683,55 @@ def _annotate_bom_number_binding(
         attributes[f"{prefix}_rows_after_read"] = int(table.RowCount)
         total_columns = int(table.TotalColumnCount)
         attributes[f"{prefix}_total_column_count"] = total_columns
-        caps["columns"] |= total_columns > 8
+        caps["columns"] |= total_columns + 2 > 8
+        # Native PD reported five total columns but only four documented types.
+        # Include two beyond-count controls without treating any slot as valid,
+        # hidden or disposable. Each accessor must survive another one's error.
+        attributes[f"{prefix}_column_census"] = json.dumps(
+            {
+                "table_type": read(lambda: table.Type),
+                "bom_type": read(lambda: feature.TableType),
+                "configurations": [
+                    {
+                        "only_visible": only_visible,
+                        "count": read(
+                            lambda: feature.GetConfigurationCount(only_visible)
+                        ),
+                        "names_and_visibility": read(
+                            lambda: feature.GetConfigurations(only_visible, None),
+                            192,
+                        ),
+                    }
+                    for only_visible in (False, True)
+                ],
+                "columns": [
+                    {
+                        "index": index,
+                        "type_all": read(lambda: table.GetColumnType3(index, True)),
+                        "type_visible": read(
+                            lambda: table.GetColumnType3(index, False)
+                        ),
+                        "title_all": read(lambda: table.GetColumnTitle2(index, True)),
+                        "title_visible": read(
+                            lambda: table.GetColumnTitle2(index, False)
+                        ),
+                        "header_all": read(
+                            lambda: table.DisplayedText2(0, index, True)
+                        ),
+                        "header_visible": read(
+                            lambda: table.DisplayedText2(0, index, False)
+                        ),
+                        "width": read(lambda: table.GetColumnWidth(index)),
+                        "hidden": read(lambda: table.ColumnHidden(index)),
+                        "custom_property": read(
+                            lambda: annotation.GetColumnCustomProperty(index)
+                        ),
+                    }
+                    for index in range(min(total_columns + 2, 8))
+                ],
+            },
+            separators=(",", ":"),
+        )
         attributes[f"{prefix}_columns"] = json.dumps(
             [
                 [
@@ -729,6 +785,9 @@ def _annotate_bom_number_binding(
             "visible_columns": attributes.get(f"{prefix}_visible_column_count"),
             "total_columns": attributes.get(f"{prefix}_total_column_count"),
             "columns": json.loads(attributes.get(f"{prefix}_columns", "[]")),
+            "column_census": json.loads(
+                attributes.get(f"{prefix}_column_census", "{}")
+            ),
             "grouped": grouped_summary,
             "caps": caps,
             "member_read_errors": attributes.get(f"{prefix}_member_read_errors"),
@@ -775,7 +834,11 @@ def _bind_bom_number_property(
     total_columns = int(table.TotalColumnCount)
     try:
         if visible_columns != total_columns:
-            raise RuntimeError(f"{label} BOM starts with hidden columns")
+            raise RuntimeError(
+                f"{label} BOM physical column count is unresolved: "
+                f"visible={visible_columns}, declared_total={total_columns}; "
+                "retention was not attempted"
+            )
         kind, _property, status = table.GetColumnType3(column, True)
         if int(status) != 0 or int(kind) != 201:
             raise RuntimeError(f"{label} BOM PART NUMBER is not a native column")
@@ -842,7 +905,7 @@ def _bom_number_column(table: Any, *, label: str) -> int:
     native_columns: list[int] = []
     number_columns: list[int] = []
     for index in range(total):
-        kind, property_data, status = table.GetColumnType3(index, True)
+        kind, _property_data, status = table.GetColumnType3(index, True)
         if int(status) != 0:
             raise RuntimeError(f"{label} BOM column type readback failed at {index}")
         hidden = table.ColumnHidden(index)
@@ -857,7 +920,8 @@ def _bom_number_column(table: Any, *, label: str) -> int:
             and str(table.DisplayedText(0, index) or "").strip().upper()
             == "PART NUMBER"
         ):
-            if int(kind) != 204 or str(property_data or "") != "Number":
+            # The BOM property getter proves the binding, not this raw variant.
+            if int(kind) != 204:
                 raise RuntimeError(f"{label} BOM Number column type/property changed")
             number_columns.append(index)
     if native_columns != [total - 1]:

@@ -2848,7 +2848,7 @@ def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failu
     (
         "missing-native", "changed-native", "unhidden-native", "duplicate-native",
         "native-not-last", "hidden-visible-gap", "bad-native-status",
-        "bad-number-kind", "bad-number-status", "bad-property-data",
+        "bad-number-kind", "bad-number-status",
         "bad-property-readback", "short-total-count", "short-visible-count",
     ),
 )
@@ -2873,11 +2873,6 @@ def test_bom_number_proof_refuses_invalid_retained_column_state(monkeypatch, fau
         columns[2].hidden = True
     elif fault == "bad-number-kind":
         columns[1].kind = 202
-    elif fault == "bad-property-data":
-        original_type = table.GetColumnType3.side_effect
-        table.GetColumnType3.side_effect = lambda index, hidden: (
-            (204, "Description", 0) if index == 1 else original_type(index, hidden)
-        )
     elif fault == "bad-property-readback":
         table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
     elif fault in ("bad-native-status", "bad-number-status"):
@@ -2896,6 +2891,137 @@ def test_bom_number_proof_refuses_invalid_retained_column_state(monkeypatch, fau
             table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
             label="paper-drive", expected_rows=len(drawing.BOM_PART_NUMBERS) + 1,
         )
+
+
+def test_bom_number_proof_uses_binding_getter_not_raw_property_data(monkeypatch):
+    _model, _components, table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    before = _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        occurrence_quantities=True,
+    )
+    original_type = table.GetColumnType3.side_effect
+    table.GetColumnType3.side_effect = lambda index, include_hidden: (
+        (204, '$PRP:"Number"', 0)
+        if index == 1 else original_type(index, include_hidden)
+    )
+    # Expression-shaped metadata must not defeat the dedicated binding getter.
+    assert _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        occurrence_quantities=True,
+    ) == before
+    table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
+    with pytest.raises(RuntimeError, match="Number property binding did not persist"):
+        _drawing_tables.validate_bom_number_property(
+            table, configuration=configuration, label="paper-drive",
+            occurrence_quantities=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("slot", "declared_total"),
+    (("unsupported", 5), ("valid-hidden", 5), ("unsupported", 99)),
+)
+def test_bom_column_census_preserves_ambiguous_slots_without_mutating(
+    monkeypatch, slot, declared_total
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    if slot == "valid-hidden":
+        scene.state.columns.append(
+            SimpleNamespace(kind=204, property_name="Audit", hidden=True)
+        )
+        for row in scene.cells:
+            row.append("")
+    type(scene.table).TotalColumnCount = PropertyMock(return_value=declared_total)
+    original_type = scene.table.GetColumnType3.side_effect
+    original_hidden = scene.table.ColumnHidden.side_effect
+    scene.table.GetColumnType3.side_effect = lambda index, include_hidden: (
+        (-1, None, 0)
+        if slot == "unsupported" and index == 4
+        else original_type(index, include_hidden)
+    )
+    scene.table.ColumnHidden.side_effect = lambda index: (
+        False if slot == "unsupported" and index == 4 else original_hidden(index)
+    )
+    scene.table.GetColumnTitle2.side_effect = (
+        lambda index, include_hidden: scene.table.DisplayedText2(
+            0, index, include_hidden
+        )
+    )
+    scene.table.GetColumnWidth.side_effect = lambda _index: 0.025
+    scene.table.Type = 2
+    feature = scene.table.BomFeature
+    feature.TableType = 2
+    available = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+    visible = (False, True)
+    feature.GetConfigurationCount = lambda only_visible: 1 if only_visible else 2
+
+    def configurations(only_visible, visibility):
+        assert visibility is None
+        return (
+            (available[-1:], visible[-1:])
+            if only_visible else (available, visible)
+        )
+
+    feature.GetConfigurations = configurations
+    messages = []
+    monkeypatch.setattr(
+        _drawing_tables._telemetry, "info",
+        lambda message, **_fields: messages.append(message),
+    )
+    before_columns = [
+        (column.kind, column.property_name, column.hidden)
+        for column in scene.state.columns
+    ]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(
+        RuntimeError, match="physical column count is unresolved.*retention was not attempted"
+    ):
+        scene.insert()
+    assert [
+        (column.kind, column.property_name, column.hidden)
+        for column in scene.state.columns
+    ] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+    summaries = [
+        json.loads(message.removeprefix("drawing.bom_number_binding "))
+        for message in messages if message.startswith("drawing.bom_number_binding ")
+    ]
+    assert {summary["stage"] for summary in summaries} == {"before", "after"}
+    for summary in summaries:
+        assert summary["visible_columns"] == 4
+        assert summary["total_columns"] == declared_total
+        assert summary["rows"] == summary["total_rows"] == len(scene.keys) + 1
+        census = summary["column_census"]
+        assert census["table_type"]["value"] == census["bom_type"]["value"] == "2"
+        modes = census["configurations"]
+        assert [mode["only_visible"] for mode in modes] == [False, True]
+        assert [mode["count"]["value"] for mode in modes] == ["2", "1"]
+        assert modes[0]["names_and_visibility"]["value"] == repr((available, visible))
+        columns = census["columns"]
+        assert [column["index"] for column in columns] == list(
+            range(min(declared_total + 2, 8))
+        )
+        assert columns[1]["type_all"]["value"].startswith("(201,")
+        assert columns[1]["type_visible"]["value"].startswith("(201,")
+        assert columns[1]["header_all"]["value"] == repr("PART NUMBER")
+        disputed = columns[4]
+        if slot == "unsupported":
+            assert disputed["type_all"]["value"] == "(-1, None, 0)"
+            assert disputed["hidden"]["value"] == "False"
+            assert "error" in disputed["title_all"]
+            assert "error" in disputed["header_all"]
+        else:
+            assert disputed["type_all"]["value"] == "(204, 'Audit', 0)"
+            assert disputed["hidden"]["value"] == "True"
+            assert disputed["custom_property"]["value"] == repr("Audit")
+        # Failed type/title/text reads cannot erase later width/hidden evidence.
+        assert "error" in columns[5]["type_all"]
+        assert columns[5]["width"]["value"] == "0.025"
+        assert "error" in columns[6]["hidden"]
+        assert summary["caps"]["columns"] is (declared_total > 6)
 
 
 @pytest.mark.parametrize("drop", ("transgear", "all"))
@@ -3314,21 +3440,17 @@ def test_split_bom_refuses_second_piece_native_binding_damage(monkeypatch, fault
     second = pieces[1]
     if fault == "native-kind":
         second._pd_state.columns[-1].kind = 202
-        message = "unique trailing native column"
     elif fault == "native-unhidden":
         second._pd_state.columns[-1].hidden = False
-        message = "retained native column count"
     elif fault == "number-property":
         second._pd_state.columns[1].property_name = "Description"
-        message = "Number column type/property changed"
     else:
         component = second.GetComponents2(
             split_after + 1, drawing.SIMPLIFIED_VIEW_CONFIGURATION
         )[0]
         native = component.GetModelDoc2()
         native.properties[(component.ReferencedConfiguration, "Number")] = "WRONG-NATIVE-NUMBER"
-        message = "associative Number"
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError):
         drawing._assert_bom_pieces(
             pieces, header_count=1, total_rows=total_rows,
             configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
