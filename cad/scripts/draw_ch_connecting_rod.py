@@ -834,6 +834,171 @@ def _assert_root_section(adapter: Any, view: Any, annotations: list[Any]) -> Non
     )
 
 
+def _probe_root_dimension_import(adapter: Any, section: Any, left: Any, front: Any) -> None:
+    """Bounded native diagnostic: no drawing is saved or published by this probe."""
+    from types import SimpleNamespace
+
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    from _com import _bind
+    from _drawing_dimension_import import _model_item_paths, _select_model_feature
+    from _drawing_dimensions import move_model_dimension
+    from _drawing_precision import _named_dimensions
+
+    def census(items: list[Any]) -> list[dict[str, Any]]:
+        rows = []
+        for item in items:
+            annotation = _early_bound(_bind(item, "IAnnotation"), "IAnnotation")
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            row = {
+                "name": str(dimension.Name), "full_name": str(dimension.FullName),
+                "type": int(display.Type2), "value": float(dimension.SystemValue),
+                "marked": bool(display.MarkedForDrawing),
+                "precision": int(display.GetPrimaryPrecision2()),
+                "tolerance_precision": int(display.GetPrimaryTolPrecision2()),
+                "owner_type": int(annotation.OwnerType),
+                "dangling": bool(annotation.IsDangling()),
+                "attached": sum(
+                    entity is not None for entity in (annotation.GetAttachedEntities3() or ())
+                ),
+            }
+            try:
+                row["plane"] = tuple(annotation.GetPlane() or ())
+            except Exception as exc:
+                row["plane_error"] = f"{type(exc).__name__}: {exc!r}"
+            rows.append(row)
+        return rows
+
+    def owned(view: Any) -> list[Any]:
+        return [
+            annotation
+            for annotation in (
+                _early_bound(_bind(item, "IAnnotation"), "IAnnotation")
+                for item in (_early_bound(view, "IView").GetAnnotations() or ())
+            )
+            if dimension_name(adapter, annotation) in ROOT_SECTION_KEEP
+        ]
+
+    source = _early_bound(_early_bound(section, "IView").ReferencedDocument, "IModelDoc2")
+    if source is None:
+        raise RuntimeError("strap import probe: source document is missing")
+    source_dims = _named_dimensions(
+        SimpleNamespace(currentModel=source), "CamRootRelief", set(ROOT_SECTION_KEEP),
+    )
+    _telemetry.info(
+        f"strap import probe source dimensions: "
+        f"{census([display.GetAnnotation() for display, _dimension in source_dims.values()])!r}"
+    )
+    draw = adapter.currentModel
+    document = _early_bound(draw, "IDrawingDoc")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    controls = []
+    for label, view, feature in (
+        ("section", section, "CamRootRelief"),
+        ("left", left, "CamRootRelief"),
+        ("front", front, "CamRootRelief"),
+        ("front-pin-positive-control", front, "PinHoleProfile"),
+    ):
+        name = view_name(adapter, view)
+        try:
+            _telemetry.info(f"strap import probe {label}: before={census(owned(view))!r}")
+            if not document.ActivateView(name):
+                raise RuntimeError(f"cannot activate {name!r}")
+            draw.ClearSelection2(True)
+            if not draw.Extension.SelectByID2(
+                name, "DRAWINGVIEW", 0.0, 0.0, 0.0, False, 0, null_callout(), 0,
+            ):
+                raise RuntimeError(f"cannot select {name!r}")
+            paths = _model_item_paths(adapter, view)
+            selected_feature = _select_model_feature(adapter, feature, paths=paths)
+            count = int(selection.GetSelectedObjectCount2(-1))
+            types = tuple(
+                int(selection.GetSelectedObjectType3(index, -1))
+                for index in range(1, count + 1)
+            )
+            identities = []
+            for index, interface in ((1, "IView"), (2, "IFeature")):
+                try:
+                    selected = selection.GetSelectedObject6(index, -1)
+                    identities.append(
+                        None if selected is None
+                        else str(_early_bound(selected, interface).Name)
+                    )
+                except Exception as exc:
+                    identities.append(f"{interface} identity: {type(exc).__name__}: {exc!r}")
+            # The section repeats the production call exactly. Controls permit
+            # duplicates so one successful donor cannot mask the next view.
+            eliminate_duplicates = label == "section"
+            _telemetry.info(
+                f"strap import probe {label}: view={name!r}; paths={paths!r}; "
+                f"feature={feature!r}; selected_feature={selected_feature!r}; "
+                f"count={count}; types={types!r}; selected_identities={identities!r}; "
+                f"InsertModelAnnotations3 args={(1, 0x28000, False, eliminate_duplicates, True, False)!r}"
+            )
+            # Direct native call: unlike the shared import's adapter._attempt,
+            # an exception is recorded separately from an actual empty result.
+            result = document.InsertModelAnnotations3(
+                1, 0x28000, False, eliminate_duplicates, True, False,
+            )
+            annotations = [
+                _early_bound(_bind(item, "IAnnotation"), "IAnnotation")
+                for item in (result or ())
+            ]
+            rebuild_drawing(adapter, label=f"strap import probe {label}")
+            rows = census(annotations)
+            owned_after = owned(view)
+            _telemetry.info(
+                f"strap import probe {label}: returned={rows!r}; view_owned={census(owned_after)!r}"
+            )
+            controls.append((label, view, annotations, rows))
+        except Exception as exc:
+            _telemetry.info(
+                f"strap import probe {label}: exception={type(exc).__name__}: {exc!r}"
+            )
+        finally:
+            draw.ClearSelection2(True)
+
+    donors = {}
+    for label, view, annotations, rows in controls:
+        if label not in ("left", "front"):
+            continue
+        for annotation, row in zip(annotations, rows, strict=True):
+            if (
+                row["name"] in ROOT_SECTION_KEEP
+                and row["full_name"].split("@")[1:2] == ["CamRootRelief"]
+            ):
+                donors.setdefault(row["name"], (label, view, annotation, row["full_name"]))
+    target_names = {row["name"] for row in census(owned(section))}
+    for name, (label, view, annotation, identity) in donors.items():
+        if name in target_names:
+            continue
+        try:
+            moved = move_model_dimension(
+                adapter, annotation, section, ROOT_SECTION_KEEP[name], source_view=view,
+            )
+            rebuild_drawing(adapter, label=f"strap import probe transfer {name} from {label}")
+            target_rows = census(owned(section))
+            donor_rows = census(owned(view))
+            _telemetry.info(
+                f"strap import probe transfer {name} from {label}: moved={census([moved])!r}; "
+                f"target_view_owned={target_rows!r}; donor_view_owned={donor_rows!r}"
+            )
+            if any(row["full_name"] == identity for row in donor_rows):
+                raise RuntimeError(f"{identity} remains in donor view after native move")
+        except Exception as exc:
+            _telemetry.info(
+                f"strap import probe transfer {name} from {label}: "
+                f"exception={type(exc).__name__}: {exc!r}"
+            )
+    try:
+        _assert_root_section(adapter, section, owned(section))
+        _telemetry.info("strap import probe combined section native contract PASSED")
+    except Exception as exc:
+        _telemetry.info(f"strap import probe combined contract: {type(exc).__name__}: {exc!r}")
+    raise RuntimeError("strap native import probe complete; diagnostic drawing is NOT published")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -912,6 +1077,7 @@ async def build(adapter: Any) -> dict[str, str]:
     root_band = _root_section_band(adapter, _sheet)
     root_section = _root_section(adapter, front, root_band)
     root_view_boxes = _root_section_boxes(root_section)
+    _probe_root_dimension_import(adapter, root_section, left, front)
     root_annotations = curate_view_dimensions(
         adapter,
         root_section,
