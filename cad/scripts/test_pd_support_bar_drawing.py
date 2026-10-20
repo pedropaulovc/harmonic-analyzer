@@ -547,6 +547,220 @@ def test_slot_callout_refuses_text_or_leader_on_section(monkeypatch, collision) 
             drawing._assert_slot_callout_clear(None, [annotation], section)
 
 
+def _outer_clamp_station_lines():
+    # Actual 63fad6340 native audit, sheet metres: both witnesses and the
+    # 440.50 dimension line. These are not rendered/PDF estimates.
+    return [
+        ((0.283, 0.121), (0.283, 0.0772219)),
+        ((0.06275, 0.121), (0.06275, 0.0772219)),
+        ((0.283, 0.0782219), (0.06275, 0.0782219)),
+    ]
+
+
+def test_front_caption_clears_detail_without_following_its_lower_callout() -> None:
+    from _drawing_annotation_extent import boxes_clear
+
+    # Native text positions/widths from the retained 63fad6340 audit. The
+    # far-right slot-width text is BELOW the caption, not an x keep-out.
+    details = {
+        "upper travel": (0.1318882, 0.0662219, 0.1461118, 0.0697219),
+        "counterbore width": (0.074008, 0.057918, 0.107, 0.0770563),
+        "slot width": (0.150, 0.01614, 0.194076, 0.0408344),
+    }
+    caption = (0.1455456, 0.0680173, 0.1948421, 0.0715173)
+    centre, top = drawing._front_caption_target(
+        _outer_clamp_station_lines(), caption, details
+    )
+    half_width = (caption[2] - caption[0]) / 2.0
+    box = (centre - half_width, top - (caption[3] - caption[1]), centre + half_width, top)
+    assert top == pytest.approx(0.0772219 - drawing.FRONT_CAPTION_AIR_M)
+    span_centre = (0.06275 + 0.283) / 2.0
+    assert span_centre <= centre < span_centre + 0.005
+    for detail in details.values():
+        assert boxes_clear(box, detail, gap=drawing.FRONT_CAPTION_AIR_M - 1e-12)
+
+
+def test_front_caption_refuses_a_missing_native_dimension_line() -> None:
+    with pytest.raises(RuntimeError, match="native dimension line"):
+        drawing._front_caption_target([], (0.1, 0.06, 0.15, 0.0635), {})
+
+
+@pytest.mark.parametrize(
+    ("reference", "left", "bottom"),
+    [(0, 0.100, 0.0665), (1, 0.100, 0.070), (2, 0.075, 0.06825),
+     (3, 0.050, 0.0665), (4, 0.050, 0.070), (5, 0.075, 0.0665)],
+)
+def test_caption_bounds_use_the_native_text_reference(monkeypatch, reference, left, bottom):
+    text = {
+        "t": "caption", "pos": (0.100, 0.070, 0.0), "h": 0.0035,
+        "w": 0.050, "ang": 0.0, "ref": reference,
+    }
+    monkeypatch.setattr(
+        drawing, "annotation_display", lambda *_: ({"texts": [text]}, {})
+    )
+    assert drawing._native_text_box(None, object(), label="caption") == pytest.approx(
+        (left, bottom, left + 0.050, bottom + 0.0035)
+    )
+    text["w"] = 0.0
+    with pytest.raises(RuntimeError, match="unreadable native text bounds"):
+        drawing._native_text_box(None, object(), label="caption")
+
+
+@pytest.fixture
+def slot_marker_native(monkeypatch):
+    """Exercise marker placement against stateful native-interface doubles."""
+    def make(direction, reversed_cut=False, persist=True):
+        line = (-0.1795, 0.020, 0.0, -0.1795, -0.027, 0.0)
+        state = {
+            "reversed": reversed_cut,
+            "direction": direction,
+            "events": [],
+            "position": (0.041, 0.074),
+            "outline": (0.042662, 0.028412, 0.063338, 0.067588),
+        }
+
+        def arrows():
+            first_tip = 0.06825 if state["direction"] != "right" else 0.09225
+            second_tip = 0.09225 if state["direction"] != "left" else 0.06825
+            return (
+                0.08025, 0.132, 0.0, first_tip, 0.132, 0.0,
+                0.08025, 0.1085, 0.0, second_tip, 0.1085, 0.0,
+            )
+
+        def read_direction():
+            state["events"].append(("read direction", state["reversed"]))
+            return state["reversed"]
+
+        def set_direction(value):
+            state["events"].append(("write direction", value))
+            if persist:
+                state["reversed"] = value
+                state["direction"] = "right"
+
+        def turn(_adapter, _view, *, label):
+            state["events"].append(("turn", label))
+            # Projection settles off-centre after the native direction/angle
+            # update. Position is deliberately NOT the outline centre.
+            state["outline"] = (0.056662, 0.039412, 0.077338, 0.078588)
+
+        def position(values, relative):
+            target = tuple(values)
+            state["events"].append(("position", target, relative))
+            state["position"] = target
+            return True
+
+        definition = SimpleNamespace(
+            GetLineInfo=lambda: line,
+            GetArrowInfo=arrows,
+            GetReversedCutDirection=read_direction,
+            SetReversedCutDirection=set_direction,
+        )
+        section = SimpleNamespace(
+            GetSection=lambda: definition,
+            GetOutline=lambda: state["outline"],
+            Position=state["position"],
+            SetViewPosition=position,
+        )
+        monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+        monkeypatch.setattr(drawing, "double_array", tuple)
+        monkeypatch.setattr(drawing, "_turn_y_up", turn)
+        monkeypatch.setattr(
+            drawing, "rebuild_drawing",
+            lambda _adapter, *, label: state["events"].append(("rebuild", label)),
+        )
+        return section, line, state
+
+    return make
+
+
+@pytest.mark.parametrize("reversed_cut", [False, True])
+def test_left_b_arrows_flip_and_read_back_before_recentering(slot_marker_native, reversed_cut):
+    section, line, state = slot_marker_native("left", reversed_cut)
+    assert drawing._place_slot_section_markers(None, section) == line
+    assert state["direction"] == "right"
+    assert state["events"][:4] == [
+        ("read direction", reversed_cut),
+        ("write direction", not reversed_cut),
+        ("rebuild", "section B-B arrows right"),
+        ("read direction", not reversed_cut),
+    ]
+    assert state["events"][4] == ("turn", "section B-B")
+    event, target, relative = state["events"][5]
+    assert event == "position"
+    assert target == pytest.approx((0.041 - 0.014, 0.074 - 0.011))
+    assert relative is False
+    assert state["events"][6] == ("rebuild", "section B-B profile centre")
+
+
+@pytest.mark.parametrize("reversed_cut", [False, True])
+def test_right_b_arrows_need_no_direction_write(slot_marker_native, reversed_cut):
+    section, line, state = slot_marker_native("right", reversed_cut)
+    assert drawing._place_slot_section_markers(None, section) == line
+    assert state["reversed"] is reversed_cut
+    assert state["events"][0] == ("turn", "section B-B")
+    assert all(event[0] not in ("read direction", "write direction") for event in state["events"])
+    event, target, relative = state["events"][1]
+    assert event == "position"
+    assert target == pytest.approx((0.041 - 0.014, 0.074 - 0.011))
+    assert relative is False
+
+
+def test_mixed_b_arrow_directions_refuse_before_mutation(slot_marker_native):
+    section, _line, state = slot_marker_native("mixed")
+    with pytest.raises(RuntimeError, match="not horizontal counterparts"):
+        drawing._place_slot_section_markers(None, section)
+    assert state["events"] == []
+
+
+@pytest.mark.parametrize("reversed_cut", [False, True])
+def test_b_arrow_flip_refuses_ignored_native_direction_write(slot_marker_native, reversed_cut):
+    section, _line, state = slot_marker_native("left", reversed_cut, persist=False)
+    with pytest.raises(RuntimeError, match="cut-direction write did not persist"):
+        drawing._place_slot_section_markers(None, section)
+    assert state["events"][-1] == ("read direction", reversed_cut)
+    assert all(event[0] not in ("turn", "position") for event in state["events"])
+
+
+@pytest.mark.parametrize(
+    "case", ["clear", "reversed", "letter", "arrow", "plane", "reversed-plane", "centre"]
+)
+def test_b_marker_refuses_witness_hits_or_section_geometry_drift(monkeypatch, case):
+    # The original line is native 63fad6340 data. Right-facing marker
+    # coordinates below are an offline positive control, not native-after proof.
+    line = (-0.1795, 0.020, 0.0, -0.1795, -0.027, 0.0)
+    actual_line = list(line)
+    if case in ("reversed", "reversed-plane"):
+        actual_line = actual_line[3:] + actual_line[:3]
+    arrows = [0.08025, 0.132, 0.0, 0.09225, 0.132, 0.0,
+              0.08025, 0.1085, 0.0, 0.09225, 0.1085, 0.0]
+    texts = [0.094, 0.137004, 0.0, 0.094, 0.113504, 0.0]
+    outline = [0.042662, 0.028412, 0.063338, 0.067588]
+    if case == "letter":
+        texts[3] = 0.0608632  # original lower B, struck by x=62.75 witness
+    elif case == "arrow":
+        arrows[9] = 0.06275
+    elif case in ("plane", "reversed-plane"):
+        actual_line[0] += 1e-6
+    elif case == "centre":
+        outline[0] += 0.001
+    definition = SimpleNamespace(
+        GetLineInfo=lambda: actual_line,
+        GetArrowInfo=lambda: arrows,
+        GetTextInfo=lambda: texts,
+    )
+    section = SimpleNamespace(
+        GetSection=lambda: definition, GetOutline=lambda: outline
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "_dimension_annotation", lambda *_: object())
+    monkeypatch.setattr(drawing, "dimension_segments", lambda *_: _outer_clamp_station_lines())
+    if case in ("clear", "reversed"):
+        drawing._assert_slot_marker_clear(None, section, line, [])
+    else:
+        with pytest.raises(RuntimeError, match="section B-B"):
+            drawing._assert_slot_marker_clear(None, section, line, [])
+
+
 
 def test_section_letters_and_slot_caption_have_air() -> None:
     """Rules 13 and 14 (r7 review): the section letters stand off the bar's

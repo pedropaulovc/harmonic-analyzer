@@ -536,16 +536,21 @@ def _component_path(adapter: Any, component: Any) -> str:
 def _component_leaf(
     adapter: Any, drawing_component: Any, *, visible: bool = True
 ) -> _ComponentLeaf:
-    """Read one leaf drawing component's model component and identities."""
+    """Read identities from the drawing occurrence's bound ``IComponent2``.
+
+    Call ``GetPathName`` through the bound interface and propagate read failures.
+    A shared reference also needs a readable, non-empty ``Name2`` before its
+    parent scope can be determined.
+    """
     component = adapter._attempt(
         lambda dc=drawing_component: dc.Component, default=None
     )
+    native = _early_bound(component, "IComponent2")
     path = ""
     configuration = ""
     reference = ""
     if component is not None:
-        path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
-        native = _early_bound(component, "IComponent2")
+        path = native.GetPathName() or ""
         configuration = str(
             adapter._attempt(lambda: native.ReferencedConfiguration, default="") or ""
         )
@@ -553,13 +558,23 @@ def _component_leaf(
             adapter._attempt(lambda: native.ComponentReference, default="") or ""
         )
     name = str(drawing_component.Name or "")
-    native_path = _component_path(adapter, component)
+    referenced = reference.split(":", 1)[0] in REFERENCE_IDENTITIES
+    native_path = (
+        str(native.Name2 or "").replace("\\", "/")
+        if referenced
+        else _component_path(adapter, component)
+    )
+    if referenced and not native_path:
+        raise RuntimeError(
+            f"drawing occurrence {name!r}: reference {reference!r} "
+            "has no native occurrence path"
+        )
     stem = PureWindowsPath(str(path)).stem.casefold()
     identities = {stem, _instance_name(name).casefold()} - {""}
     member = member_configuration(configuration)
     if stem and member:
         identities.add(f"{stem}--{member}".casefold())
-    if reference.split(":", 1)[0] in REFERENCE_IDENTITIES:
+    if referenced:
         expected = semantic_reference_identity(f"@{reference}")
         if (stem, member) != expected:
             raise RuntimeError(

@@ -363,12 +363,19 @@ def test_reference_configuration_failure_never_retries_default(
 
 
 @pytest.mark.parametrize("count", (2, 3))
-def test_configuration_cells_preserve_third_angle_panels_and_note_clearance(count) -> None:
-    panels = [configured.configuration_view_cells(index, count) for index in range(count)]
+def test_configuration_cells_preserve_third_angle_panels_and_note_clearance(
+    count,
+) -> None:
+    panels = [
+        configured.configuration_view_cells(index, count) for index in range(count)
+    ]
     panel_bounds = []
     for cells in panels:
         assert [name for name, _, _ in cells] == [
-            "*Front", "*Top", "*Right", "*Isometric"
+            "*Front",
+            "*Top",
+            "*Right",
+            "*Isometric",
         ]
         boxes = {name: cell for name, _, cell in cells}
         for _, center, (x0, y0, x1, y1) in cells:
@@ -435,7 +442,10 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
             "Supplier SKUs": "SKU-1",
             "Material Specification": row["material_specification"],
             "Finish": row["finish"],
-            **{f"{name} Manufacturing Notes": f"{label} ONLY" for name, label in variants},
+            **{
+                f"{name} Manufacturing Notes": f"{label} ONLY"
+                for name, label in variants
+            },
         }
     )
     state = SimpleNamespace(
@@ -489,15 +499,17 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
     monkeypatch.setattr(configured, "place_view", place_view)
     monkeypatch.setattr(configured, "iter_views", lambda _adapter: iter(state.views))
     monkeypatch.setattr(
-        configured, "view_name", lambda _adapter, view: f"view-{state.views.index(view)}"
+        configured,
+        "view_name",
+        lambda _adapter, view: f"view-{state.views.index(view)}",
     )
     monkeypatch.setattr(
         configured, "set_hidden_lines_removed", lambda _adapter, _view: None
     )
     monkeypatch.setattr(
-        configured, "_fit_views", lambda _draw, _views, cells: {
-            name: (1, 1) for name, _, _ in cells
-        }
+        configured,
+        "_fit_views",
+        lambda _draw, _views, cells: {name: (1, 1) for name, _, _ in cells},
     )
 
     def literal_note(_adapter, linked, x, y):
@@ -513,9 +525,11 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
         configured, "add_purchased_footer", lambda *_args, **_kwargs: []
     )
     monkeypatch.setattr(
-        configured, "sheet_drawable_region", lambda *_args, **_kwargs: SimpleNamespace(
+        configured,
+        "sheet_drawable_region",
+        lambda *_args, **_kwargs: SimpleNamespace(
             xmin=0.0127, ymin=0.0127, xmax=0.4191, ymax=0.2667
-        )
+        ),
     )
 
     async def finalize(_adapter, actual_outputs, *, settled_checks, **kwargs):
@@ -561,8 +575,12 @@ def test_configured_sheet_refuses_member_or_quantity_mismatch_before_opening(
     with pytest.raises(ValueError):
         asyncio.run(
             configured.build_purchased_variant_drawing(
-                state.adapter, state.spec, variants=variants,
-                item="ANSI 25 CHAIN", purchase_unit="ONE CHAIN", cut_to_suit=True,
+                state.adapter,
+                state.spec,
+                variants=variants,
+                item="ANSI 25 CHAIN",
+                purchase_unit="ONE CHAIN",
+                cut_to_suit=True,
             )
         )
     assert state.opens == []
@@ -647,8 +665,11 @@ def test_member_caption_native_extents_are_centered_or_refused(
     def build():
         return asyncio.run(
             configured.build_purchased_variant_drawing(
-                state.adapter, state.spec, variants=variants,
-                item="PURCHASED PRODUCT", purchase_unit="ONE PRODUCT",
+                state.adapter,
+                state.spec,
+                variants=variants,
+                item="PURCHASED PRODUCT",
+                purchase_unit="ONE PRODUCT",
             )
         )
 
@@ -670,7 +691,9 @@ def test_member_caption_native_extents_are_centered_or_refused(
         assert 0.255 <= y0 < y1 <= 0.264
 
 
-def test_configured_sheet_refuses_default_fallback_during_final_readback(monkeypatch, tmp_path):
+def test_configured_sheet_refuses_default_fallback_during_final_readback(
+    monkeypatch, tmp_path
+):
     variants = (("InnerLink", "INNER"), ("OuterLink", "OUTER"))
     state = _variant_sheet(
         monkeypatch, tmp_path, variants, {"InnerLink": 34, "OuterLink": 33}, 67
@@ -681,15 +704,20 @@ def test_configured_sheet_refuses_default_fallback_during_final_readback(monkeyp
     with pytest.raises(RuntimeError):
         asyncio.run(
             configured.build_purchased_variant_drawing(
-                state.adapter, state.spec, variants=variants,
-                item="ANSI 25 CHAIN", purchase_unit="ONE CHAIN", cut_to_suit=True,
+                state.adapter,
+                state.spec,
+                variants=variants,
+                item="ANSI 25 CHAIN",
+                purchase_unit="ONE CHAIN",
+                cut_to_suit=True,
             )
         )
     assert not state.finalized
 
 
 @pytest.mark.parametrize(
-    "drift", ("first-angle", "property-source", "missing-view", "extra-view", "duplicate-view")
+    "drift",
+    ("first-angle", "property-source", "missing-view", "extra-view", "duplicate-view"),
 )
 def test_configured_sheet_refuses_projection_or_native_view_inventory_drift(
     monkeypatch, tmp_path, drift
@@ -1082,16 +1110,50 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         assert note._format.CharHeightInPts == 18
 
 
-@pytest.mark.parametrize("drift", ("none", "ignored-move", "text", "lost", "identity", "dangling", "attachment", "collision"))
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "none",
+        "face",
+        "ignored-move",
+        "text",
+        "link",
+        "lost",
+        "identity",
+        "thread-identity",
+        "dangling",
+        "attachment",
+        "attachment-type",
+        "collision",
+        "no-thread",
+        "no-callout",
+        "duplicate",
+        "wrong-feature",
+        "null-attachment",
+        "bad-count",
+        "unsupported-type",
+    ),
+)
 def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift):
     import draw_sh_vn_clamping_kit_hardware as kit
 
+    def face(feature="TNutThreadBore"):
+        return SimpleNamespace(GetFeature=lambda: SimpleNamespace(Name=feature))
+
+    def edge(feature="TNutThreadBore"):
+        return SimpleNamespace(
+            GetTwoAdjacentFaces2=lambda: (face("Body"), face(feature))
+        )
+
     class ThreadNote(_Note):
         def __init__(self):
-            super().__init__("automatic", "1/2-13 Tapped Hole", 0.2631371, 0.2304204)
+            # A semantic callout need not have the old contiguous literal text.
+            super().__init__("automatic", "1/2-13\nTapped Hole", 0.2631371, 0.2304204)
             self._extent = (0.2492598, 0.2173807, 0.0, 0.3074012, 0.2307246, 0.0)
             self.Visible = 1
-            self.entity = object()
+            self.entity = edge()
+            self.attachment_type = 1
+            self.attachment_count = 1
             self.dangling = False
             self.annotation_readback = self
 
@@ -1106,6 +1168,12 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         def GetAttachedEntities3(self):
             return (self.entity,)
 
+        def GetAttachedEntityTypes(self):
+            return (self.attachment_type,)
+
+        def GetAttachedEntityCount3(self):
+            return self.attachment_count
+
         def IsDangling(self):
             return self.dangling
 
@@ -1116,7 +1184,9 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
                 GetTextInBoxWidthAtIndex=lambda _i: 0.0445132,
                 GetTextHeightAtIndex=lambda _i: 0.0048299,
                 GetTextPositionAtIndex=lambda _i: (
-                    self._position[0], self._position[1] - 0.0045257, 0.0,
+                    self._position[0],
+                    self._position[1] - 0.0045257,
+                    0.0,
                 ),
                 GetTextRefPositionAtIndex=lambda _i: 1,
                 GetTextAngleAtIndex=lambda _i: 0.0,
@@ -1126,24 +1196,104 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             # The associated leader arrow does NOT translate with its text.
             text = kit._note_text_box(self)
             return (
-                min(0.2492598, text[0]), min(0.21695, text[1]), 0.0,
-                max(0.2496667, text[2]), max(0.2173807, text[3]), 0.0,
+                min(0.2492598, text[0]),
+                min(0.21695, text[1]),
+                0.0,
+                max(0.2496667, text[2]),
+                max(0.2173807, text[3]),
+                0.0,
             )
+
+    class ThreadAnnotation:
+        def __init__(self, callout):
+            self.callout = callout
+
+        def GetType(self):
+            return 1
+
+        def GetSpecificAnnotation(self):
+            return SimpleNamespace(ThreadCallout=self.callout)
+
+    class AnnotationReadback:
+        def __init__(self, note, identity):
+            self.note = note
+            self.native_identity = identity
+
+        def __getattr__(self, name):
+            return getattr(self.note, name)
 
     note = ThreadNote()
     views = [
         SimpleNamespace(GetOutline=lambda: (0.16, 0.13, 0.19, 0.17)),
         SimpleNamespace(GetOutline=lambda: (0.1647453, 0.201412, 0.1999213, 0.236588)),
         SimpleNamespace(GetOutline=lambda: (0.23, 0.13, 0.26, 0.17)),
-        SimpleNamespace(GetOutline=lambda: (0.2271081, 0.1978993, 0.2722252, 0.2401007)),
+        SimpleNamespace(
+            GetOutline=lambda: (0.2271081, 0.1978993, 0.2722252, 0.2401007)
+        ),
     ]
-    native_notes = [note]
-    views[3].GetNotes = lambda: native_notes
+    native_threads = [ThreadAnnotation(note)]
+    events = []
+
+    def read_annotations():
+        assert events[0] == "final-display-mode"
+        assert events[-1] == "refresh"
+        events.append("inventory")
+        return native_threads
+
+    # GetNotes exposes only an unrelated literal decoy, not ThreadCallout.
+    decoy = _Note("literal", "1/2-13 Tapped Hole", 0.32, 0.23)
+    views[3].GetNotes = lambda: [decoy]
+    views[3].GetAnnotations = read_annotations
+    views[3].UpdateViewDisplayGeometry = lambda: events.append("refresh")
+    monkeypatch.setattr(
+        kit,
+        "set_high_quality_shaded_with_edges",
+        lambda *_args, **_kwargs: events.append("final-display-mode"),
+    )
     monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(
-        getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
-    )))
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            IsSame=lambda a, b: int(
+                getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
+            )
+        )
+    )
     cells = configured.configuration_view_cells(1, 3)
+    if drift == "face":
+        note.entity, note.attachment_type = face(), 2
+    elif drift == "no-thread":
+        native_threads.clear()
+    elif drift == "no-callout":
+        native_threads[0].callout = None
+    elif drift == "duplicate":
+        native_threads.append(ThreadAnnotation(ThreadNote()))
+    elif drift == "wrong-feature":
+        note.entity = edge("FlangeNutThreadBore")
+    elif drift == "null-attachment":
+        note.entity = None
+    elif drift == "bad-count":
+        note.attachment_count = 2
+    elif drift == "unsupported-type":
+        note.attachment_type = 3
+    if drift in {
+        "no-thread",
+        "no-callout",
+        "duplicate",
+        "wrong-feature",
+        "null-attachment",
+        "bad-count",
+        "unsupported-type",
+    }:
+        with pytest.raises(RuntimeError, match="expected one automatic") as refused:
+            kit.annotate_member(adapter, "TNut", cells, views)
+        message = str(refused.value)
+        assert f"found={2 if drift == 'duplicate' else 0}" in message
+        assert "cosmetic_threads=" in message and "callouts=" in message
+        assert "candidates=" in message
+        if drift not in {"no-thread", "no-callout"}:
+            assert f"'text': {note.GetText()!r}" in message
+            assert "'types':" in message and "'features':" in message
+        return
     if drift == "ignored-move":
         with pytest.raises(RuntimeError, match="clearance"):
             kit.annotate_member(adapter, "TNut", cells, views)
@@ -1154,29 +1304,53 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     assert box[2] <= cells[2][2][2] < 0.297412
     assert box[1] > views[3].GetOutline()[3]
     assert note.GetExtent()[1] == pytest.approx(0.21695)
+    assert decoy._position == (0.32, 0.23, 0.0)
     # A fresh Python dispatch wrapper is still the same native annotation.
-    note.annotation_readback = SimpleNamespace(native_identity=note)
+    note.annotation_readback = AnnotationReadback(note, note)
     if drift == "text":
         note._resolved_text = "1/2-20 Tapped Hole"
+    elif drift == "link":
+        note.PropertyLinkedText = "replaced"
     elif drift == "lost":
-        native_notes.clear()
+        native_threads.clear()
     elif drift == "identity":
-        note.annotation_readback = SimpleNamespace(native_identity=object())
+        note.annotation_readback = AnnotationReadback(note, object())
+    elif drift == "thread-identity":
+        native_threads[0] = ThreadAnnotation(note)
     elif drift == "dangling":
         note.dangling = True
     elif drift == "attachment":
-        note.entity = object()
+        note.entity = edge()
+    elif drift == "attachment-type":
+        note.entity, note.attachment_type = face(), 2
     elif drift == "collision":
         note.SetPosition(0.32, 0.23, 0.0)
-    if drift == "none":
+    if drift in {"none", "face"}:
         checks[0]()
     else:
         with pytest.raises(RuntimeError):
             checks[0]()
 
 
-@pytest.mark.parametrize("drift", ("none", "length", "attachment", "identity", "dangling", "hidden", "reference", "lost", "text-border", "stroke-border", "unmeasured-width"))
-def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(monkeypatch, drift):
+@pytest.mark.parametrize(
+    "drift",
+    (
+        "none",
+        "length",
+        "attachment",
+        "identity",
+        "dangling",
+        "hidden",
+        "reference",
+        "lost",
+        "text-border",
+        "stroke-border",
+        "unmeasured-width",
+    ),
+)
+def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
+    monkeypatch, drift
+):
     import draw_sh_vn_clamping_kit_hardware as kit
     import _drawing_edge_dimensions as edge_dimensions
     from solidworks_mcp.adapters import sw_type_info
@@ -1215,7 +1389,11 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(monkeypatch
             # Native VT_VOID returns None, not a success flag.
 
         def GetAnnotations(self):
-            return [SimpleNamespace(native_identity=inventory_identity or state.display)] if present else []
+            return (
+                [SimpleNamespace(native_identity=inventory_identity or state.display)]
+                if present
+                else []
+            )
 
     front = Front()
     assert front.SetViewPosition(0.047667, 0.13395) is True
@@ -1269,30 +1447,66 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(monkeypatch
 
     monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
-    monkeypatch.setattr(kit, "visible_view_entities", lambda *_args, **_kwargs: [rims[0], land, rims[1]])
+    monkeypatch.setattr(
+        sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
+    monkeypatch.setattr(
+        kit, "visible_view_entities", lambda *_args, **_kwargs: [rims[0], land, rims[1]]
+    )
     monkeypatch.setattr(kit, "model_points_in_view", project_points)
     monkeypatch.setattr(kit, "add_edge_dimension", add_dimension)
-    monkeypatch.setattr(dimension_text, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        dimension_text, "rebuild_drawing", lambda *_args, **_kwargs: None
+    )
+
     def native_display(_adapter, annotation):
         x, y = annotation.text_xy
-        return ({
-            "texts": [{"t": "(76.20)", "pos": (x - annotation.width, y, 0.0),
-                       "h": 0.003, "w": annotation.width, "ang": 0.0, "ref": 1}],
-            "lines": [[0, 0, 0, 0, annotation.stroke_x, 0.13395, 0.0,
-                       annotation.stroke_x, 0.17205, 0.0]],
-        }, {})
+        return (
+            {
+                "texts": [
+                    {
+                        "t": "(76.20)",
+                        "pos": (x - annotation.width, y, 0.0),
+                        "h": 0.003,
+                        "w": annotation.width,
+                        "ang": 0.0,
+                        "ref": 1,
+                    }
+                ],
+                "lines": [
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        annotation.stroke_x,
+                        0.13395,
+                        0.0,
+                        annotation.stroke_x,
+                        0.17205,
+                        0.0,
+                    ]
+                ],
+            },
+            {},
+        )
+
     monkeypatch.setattr(kit, "annotation_display", native_display)
     adapter = SimpleNamespace(
-        swApp=SimpleNamespace(IsSame=lambda a, b: int(
-            getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
-        )),
+        swApp=SimpleNamespace(
+            IsSame=lambda a, b: int(
+                getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
+            )
+        ),
         _attempt=lambda operation: operation(),
     )
     present = True
     inventory_identity = None
     checks = kit.annotate_member(
-        adapter, "HoldDownStud", configured.configuration_view_cells(0, 3), [front] * 4,
+        adapter,
+        "HoldDownStud",
+        configured.configuration_view_cells(0, 3),
+        [front] * 4,
     )
     dimension = state.display
     assert dimension.SystemValue * 1000 == pytest.approx(kit.stud.LENGTH)
@@ -1328,16 +1542,34 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(monkeypatch
 
 @pytest.mark.parametrize(
     ("reference", "anchor"),
-    [(0, (0.1, 0.204)), (1, (0.1, 0.2)), (2, (0.11, 0.202)),
-     (3, (0.12, 0.204)), (4, (0.12, 0.2)), (5, (0.11, 0.204))],
+    [
+        (0, (0.1, 0.204)),
+        (1, (0.1, 0.2)),
+        (2, (0.11, 0.202)),
+        (3, (0.12, 0.204)),
+        (4, (0.12, 0.2)),
+        (5, (0.11, 0.204)),
+    ],
 )
-def test_kit_native_text_reference_anchors_preserve_same_measured_ink(reference, anchor):
+def test_kit_native_text_reference_anchors_preserve_same_measured_ink(
+    reference, anchor
+):
     import draw_sh_vn_clamping_kit_hardware as kit
 
-    box = kit._measured_display_box({"texts": [{
-        "t": "1/2-13", "pos": (*anchor, 0.0), "w": 0.02, "h": 0.004,
-        "ref": reference, "ang": 0.0,
-    }]})
+    box = kit._measured_display_box(
+        {
+            "texts": [
+                {
+                    "t": "1/2-13",
+                    "pos": (*anchor, 0.0),
+                    "w": 0.02,
+                    "h": 0.004,
+                    "ref": reference,
+                    "ang": 0.0,
+                }
+            ]
+        }
+    )
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
         (0.1, 0.2, 0.12, 0.204)
     )
@@ -1347,10 +1579,20 @@ def test_kit_rotated_native_text_anchor_rotates_the_reference_offset():
     import math
     import draw_sh_vn_clamping_kit_hardware as kit
 
-    box = kit._measured_display_box({"texts": [{
-        "t": "(76.20)", "pos": (0.04, 0.17, 0.0), "w": 0.02, "h": 0.004,
-        "ref": 4, "ang": math.pi / 2,
-    }]})
+    box = kit._measured_display_box(
+        {
+            "texts": [
+                {
+                    "t": "(76.20)",
+                    "pos": (0.04, 0.17, 0.0),
+                    "w": 0.02,
+                    "h": 0.004,
+                    "ref": 4,
+                    "ang": math.pi / 2,
+                }
+            ]
+        }
+    )
     assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
         (0.036, 0.15, 0.04, 0.17)
     )

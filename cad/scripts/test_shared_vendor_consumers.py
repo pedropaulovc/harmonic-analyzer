@@ -203,6 +203,208 @@ def _leaf(component, *, visible=True, drawing_name=None):
     return balloons._component_leaf(adapter, drawing_component, visible=visible)
 
 
+@pytest.fixture
+def late_bound_drawing_view():
+    """Real pywin32 dispatch/wrappers over an in-memory component, not a seat."""
+    if sys.platform != "win32":
+        pytest.skip("pywin32's dynamic dispatch is only available on Windows")
+    from win32com.client import build, dynamic
+
+    members = (
+        "GetPathName",
+        "ReferencedConfiguration",
+        "ComponentReference",
+        "Name2",
+    )
+    dispids = {member: _com._com_header("IComponent2", member)[0] for member in members}
+
+    class ComponentDispatch:
+        def __init__(self, component):
+            self.values = {
+                dispids[member]: getattr(component, member) for member in members
+            }
+
+        def GetIDsOfNames(self, _lcid, name):
+            return dispids[name]
+
+        def Invoke(self, dispid, _lcid, _flags, _result_wanted):
+            value = self.values[dispid]
+            return value() if callable(value) else value
+
+        def InvokeTypes(self, dispid, lcid, flags, _return_type, _argument_types):
+            return self.Invoke(dispid, lcid, flags, True)
+
+    def make_view(*components):
+        # No method metadata: genuine CDispatch materializes GetPathName as a
+        # string on attribute access. The real IComponent2 wrapper instead
+        # invokes the same backing object's method through InvokeTypes.
+        drawings = [
+            SimpleNamespace(
+                Component=dynamic.CDispatch(
+                    ComponentDispatch(component), build.DispatchItem()
+                ),
+                Name=f"view-root/{component.Name2}@Drawing View1",
+                GetChildren=(),
+                Visible=True,
+            )
+            for component in components
+        ]
+        root = SimpleNamespace(GetChildren=tuple(drawings))
+        view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
+        rebuilds = []
+
+        def attempt(callback, default=None):
+            try:
+                return callback()
+            except Exception:
+                return default
+
+        adapter = SimpleNamespace(
+            _attempt=attempt,
+            currentModel=SimpleNamespace(EditRebuild3=lambda: rebuilds.append(True)),
+        )
+        return adapter, view, drawings, rebuilds
+
+    return make_view
+
+
+@pytest.mark.parametrize("suffix", ["", " Simplified"])
+@pytest.mark.parametrize(
+    "stem, member, reference, other_member, other_reference",
+    [
+        ("sh-vn-clamping-kit-hardware", "FlangeNut", "FlangeNut:4", "TNut", "TNut:4"),
+        (SCREW, "Default", "FootScrew:1", "Default", "SwingStopScrew:1"),
+    ],
+)
+def test_drawing_isolation_and_anchors_read_bound_native_identity(
+    late_bound_drawing_view,
+    suffix,
+    stem,
+    member,
+    reference,
+    other_member,
+    other_reference,
+):
+    def component(name, selected=member, role=reference):
+        return _component(
+            name, stem=stem, configuration=selected + suffix, reference=role
+        )
+
+    adapter, view, drawings, rebuilds = late_bound_drawing_view(
+        component("parent-17/allocator-picked-412"),
+        component("parent-29/allocator-picked-5"),
+        component("parent-17/allocator-picked-900", other_member, other_reference),
+        component("parent-17/allocator-picked-6", role=reference.split(":")[0] + ":2"),
+    )
+    drawings[0].Visible = False
+    selector = f"parent-17/@{reference}"
+    balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({selector}), label="scoped member"
+    )
+    assert [drawing.Visible for drawing in drawings] == [True, False, False, False]
+
+    configured_key = f"{stem}--{member}"
+    balloons.isolate_drawing_view_components(
+        adapter,
+        view,
+        visible_stems=frozenset({configured_key}),
+        label="physical member",
+    )
+    assert [drawing.Visible for drawing in drawings] == [
+        True,
+        True,
+        other_member == member,
+        True,
+    ]
+    leaves = balloons._view_component_leaves(adapter, view, label="bound leaves")
+    chosen = balloons._shown_instances(
+        leaves,
+        configured_key,
+        balloons.BalloonAnchor(instance=selector),
+        label="bound anchor",
+    )
+    assert len(chosen) == 1
+    assert chosen[0].component is drawings[0].Component
+    assert chosen[0].path == "parent-17/allocator-picked-412"
+    assert rebuilds == [True, True]
+
+
+@pytest.mark.parametrize(
+    "fault", ["wrong-file", "wrong-member", "empty-path", "unreadable-path"]
+)
+def test_bound_drawing_identity_refuses_bad_authority(late_bound_drawing_view, fault):
+    stem = "sh-vn-clamping-kit-hardware"
+    component = _component(
+        stem + "-12",
+        stem=stem + "-copy" if fault == "wrong-file" else stem,
+        configuration="TNut" if fault == "wrong-member" else "FlangeNut",
+        reference="FlangeNut:4",
+    )
+    if fault == "empty-path":
+        component.GetPathName = lambda: ""
+    elif fault == "unreadable-path":
+
+        def unreadable():
+            raise TypeError("native saved-path accessor failed")
+
+        component.GetPathName = unreadable
+    adapter, view, _drawings, rebuilds = late_bound_drawing_view(component)
+    error = TypeError if fault == "unreadable-path" else RuntimeError
+    message = (
+        "native saved-path accessor failed"
+        if fault == "unreadable-path"
+        else "requires"
+    )
+    with pytest.raises(error, match=message):
+        balloons.isolate_drawing_view_components(
+            adapter,
+            view,
+            visible_stems=frozenset({"@FlangeNut:4"}),
+            label="bad native identity",
+        )
+    assert rebuilds == []
+
+
+@pytest.mark.parametrize("fault", ["empty-name", "unreadable-name"])
+def test_nested_reference_without_native_name_cannot_bind_an_unscoped_selector(
+    late_bound_drawing_view, fault
+):
+    component = _component(
+        "parent-17/allocator-picked-412",
+        stem="sh-vn-clamping-kit-hardware",
+        configuration="FlangeNut",
+        reference="FlangeNut:4",
+    )
+    adapter, view, drawings, rebuilds = late_bound_drawing_view(component)
+    drawings[0].Visible = False
+
+    def unreadable():
+        raise TypeError("native occurrence-name accessor failed")
+
+    # The drawing still knows this is nested, but only IComponent2.Name2 may
+    # establish the native parent scope. A failed read must not turn it into
+    # the top-level @FlangeNut:4 requested below.
+    name_dispid = _com._com_header("IComponent2", "Name2")[0]
+    drawings[0].Component._oleobj_.values[name_dispid] = (
+        unreadable if fault == "unreadable-name" else ""
+    )
+    error = TypeError if fault == "unreadable-name" else RuntimeError
+    message = (
+        "native occurrence-name accessor failed"
+        if fault == "unreadable-name"
+        else "has no native occurrence path"
+    )
+    with pytest.raises(error, match=message):
+        balloons.isolate_drawing_view_components(
+            adapter,
+            view,
+            visible_stems=frozenset({"@FlangeNut:4"}),
+            label="unknown native scope",
+        )
+    assert drawings[0].Visible is False
+    assert rebuilds == []
+
+
 @pytest.mark.parametrize("suffix", ["", " Simplified"])
 def test_balloon_configured_key_is_case_normalized_from_physical_member(
     unwrapped_com, suffix
@@ -856,8 +1058,12 @@ def native_reference_scene(unwrapped_com, monkeypatch):
     )
     monkeypatch.setattr(assembly, "_POSE_LEDGER", {})
     return SimpleNamespace(
-        Component=Component, adapter=adapter, registry=registry, events=events,
-        rebuilds=rebuilds, state=state,
+        Component=Component,
+        adapter=adapter,
+        registry=registry,
+        events=events,
+        rebuilds=rebuilds,
+        state=state,
     )
 
 
@@ -874,9 +1080,12 @@ def test_reference_preserves_native_name_and_skips_duplicate_write(
     transform = component.Transform2
     pose = ([1.0, 2.0, 3.0], ROWS)
     assembly._POSE_LEDGER[name] = pose
-    assert assembly.set_component_reference(
-        scene.adapter, name, "LeverWire:1", rebuild=rebuild
-    ) == name
+    assert (
+        assembly.set_component_reference(
+            scene.adapter, name, "LeverWire:1", rebuild=rebuild
+        )
+        == name
+    )
     assert component.Name2 == name
     assert component.ReferencedConfiguration == "LeverWire"
     assert component.ComponentReference == "LeverWire:1"
@@ -920,11 +1129,13 @@ def test_reference_rebinds_rebuild_name_and_moves_exact_ledger_entry(
         assert assembly._POSE_LEDGER[old_name] is pose
         assert assembly._POSE_LEDGER[new_name] is unrelated_pose
     else:
-        assert assembly.set_component_reference(
-            scene.adapter, old_name, "LeverWire:1"
-        ) == new_name
+        assert (
+            assembly.set_component_reference(scene.adapter, old_name, "LeverWire:1")
+            == new_name
+        )
         assert assembly._POSE_LEDGER == {
-            new_name: pose, "unrelated-part-4": unrelated_pose
+            new_name: pose,
+            "unrelated-part-4": unrelated_pose,
         }
         assert assembly._POSE_LEDGER[new_name] is pose
     assert component.Name2 == new_name
@@ -934,7 +1145,9 @@ def test_reference_rebinds_rebuild_name_and_moves_exact_ledger_entry(
     assert scene.rebuilds == [False]
 
 
-@pytest.mark.parametrize("fault", ["duplicate", "wrong-member", "missing", "index-drift"])
+@pytest.mark.parametrize(
+    "fault", ["duplicate", "wrong-member", "missing", "index-drift"]
+)
 def test_reference_fresh_binding_rejects_rebuild_identity_damage(
     native_reference_scene, fault
 ):
@@ -954,6 +1167,7 @@ def test_reference_fresh_binding_rejects_rebuild_identity_damage(
         if fault == "index-drift":
             component._reference = "LeverWire:1"
             component._name = "rebuilt-native-wire-999"
+
     scene.state.on_rebuild = damage
     expected_error = {
         "duplicate": "component reference '@LeverWire:1' is duplicated by ",
@@ -967,16 +1181,22 @@ def test_reference_fresh_binding_rejects_rebuild_identity_damage(
             "'native-wire-83' -> 'rebuilt-native-wire-999'"
         ),
     }[fault]
-    with pytest.raises(
-        RuntimeError, match=re.escape(expected_error)
-    ):
+    with pytest.raises(RuntimeError, match=re.escape(expected_error)):
         assembly.set_component_reference(scene.adapter, component.Name2, "LeverWire:1")
     assert scene.rebuilds == [False]
 
 
 @pytest.mark.parametrize(
     "fault",
-    ["none", "duplicate", "wrong-member", "pose-drift", "ledger-collision", "index-drift", "swapped-references"],
+    [
+        "none",
+        "duplicate",
+        "wrong-member",
+        "pose-drift",
+        "ledger-collision",
+        "index-drift",
+        "swapped-references",
+    ],
 )
 def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     placement_scene, native_reference_scene, tmp_path, monkeypatch, fault
@@ -993,7 +1213,9 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     components = [
         scene.Component(
             f"{stem if i < 4 else SCREW}-{index}",
-            stem if i < 4 else SCREW, "Default", position
+            stem if i < 4 else SCREW,
+            "Default",
+            position,
         )
         for i, (index, position) in enumerate(zip(indices, positions, strict=True))
     ]
@@ -1020,13 +1242,15 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
             components[1]._name = "rebuilt-native-part-999"
         elif fault == "swapped-references":
             components[0]._reference, components[1]._reference = (
-                components[1]._reference, components[0]._reference
+                components[1]._reference,
+                components[0]._reference,
             )
 
     scene.state.on_rebuild = rebuild
     scene.adapter.currentModel.AddComponents3 = (
-        lambda _names, _transforms, _coordinates:
-        tuple(components[i] for i in (2, 4, 0, 3, 1))
+        lambda _names, _transforms, _coordinates: tuple(
+            components[i] for i in (2, 4, 0, 3, 1)
+        )
     )
     specs = [
         {
@@ -1034,10 +1258,14 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
             "position": position,
             "rows": ROWS,
             "ground": False,
-            **({
-                "configuration": "HoldDownStud",
-                "component_reference": f"HoldDownStud:{i + 1}",
-            } if i < 4 else {}),
+            **(
+                {
+                    "configuration": "HoldDownStud",
+                    "component_reference": f"HoldDownStud:{i + 1}",
+                }
+                if i < 4
+                else {}
+            ),
         }
         for i, position in enumerate(positions)
     ]
@@ -1066,7 +1294,9 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
             match=re.escape(expected_error),
         ):
             asyncio.run(
-                assembly.place_components_batch(scene.adapter, specs, label="four studs")
+                assembly.place_components_batch(
+                    scene.adapter, specs, label="four studs"
+                )
             )
         assert scene.rebuilds == [False]
         if fault == "ledger-collision":
@@ -1078,7 +1308,9 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
     )
     assert actual == expected_names
     assert [c.Name2 for c in components] == expected_names
-    assert [c.ReferencedConfiguration for c in components] == ["HoldDownStud"] * 4 + ["Default"]
+    assert [c.ReferencedConfiguration for c in components] == ["HoldDownStud"] * 4 + [
+        "Default"
+    ]
     assert [c.ComponentReference for c in components] == [
         f"HoldDownStud:{ordinal}" for ordinal in range(1, 5)
     ] + [""]
@@ -1087,7 +1319,12 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
         for ordinal, component in enumerate(components[:4], 1)
     }
     for component, transform, array, old_name, name, entry in zip(
-        components, transforms, arrays, old_names, expected_names, ledger_entries,
+        components,
+        transforms,
+        arrays,
+        old_names,
+        expected_names,
+        ledger_entries,
         strict=True,
     ):
         assert component.Transform2 is transform
@@ -1095,8 +1332,7 @@ def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
         assert old_name not in assembly._POSE_LEDGER
         assert assembly._POSE_LEDGER[name] is entry
     assert scene.events == [
-        ("reference", components[i], f"HoldDownStud:{i + 1}")
-        for i in (2, 0, 3, 1)
+        ("reference", components[i], f"HoldDownStud:{i + 1}") for i in (2, 0, 3, 1)
     ]
     assert scene.rebuilds == [False]
 

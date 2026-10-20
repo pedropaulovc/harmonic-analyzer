@@ -5,7 +5,7 @@ from itertools import product
 import math
 import re
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
@@ -13,6 +13,7 @@ from _column_clamp_interface import BAR_DEPTH
 import _assembly
 from _assembly_contract import assembly_contract
 import _chain as chain
+import _com
 import _config
 import _component_references
 import _drawing_balloons
@@ -2292,6 +2293,7 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
 
 def _pd_bom_fixture(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(_com, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(
         _drawing_tables._sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj
@@ -2314,6 +2316,11 @@ def _pd_bom_fixture(monkeypatch):
             )
             for index, configuration in enumerate(configurations)
         ]
+        native = SimpleNamespace(
+            GetCustomInfoValue=lambda _configuration, _property, number=drawing.BOM_PART_NUMBERS[key]: number
+        )
+        for component in components_by_key[key]:
+            component.GetModelDoc2 = lambda native=native: native
     components = [
         component for group in components_by_key.values() for component in group
     ]
@@ -2325,7 +2332,12 @@ def _pd_bom_fixture(monkeypatch):
         for row, key in enumerate(keys, 1)
     )
     table = MagicMock()
-    table.RowCount, table.ColumnCount = len(cells), 4
+    table.BomFeature = SimpleNamespace(
+        PartConfigurationGrouping=3, DisplayAsOneItem=False
+    )
+    type(table).RowCount = PropertyMock(side_effect=lambda: len(cells))
+    table.ColumnCount = 4
+    table.GetColumnCustomProperty.return_value = "Number"
     table.DisplayedText.side_effect = lambda row, column: cells[row][column]
     table.SetColumnWidth.side_effect = lambda _column, width, _options: width
     table.GetComponents2.side_effect = lambda row, _configuration: components_by_key[keys[row - 1]]
@@ -2416,5 +2428,226 @@ def test_bom_canonical_numbers_are_read_again_after_the_last_rebuild(monkeypatch
             adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
         )
     table.SetText2.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("swapped-chain-associations", "native associations changed"),
+        ("missing-transgear-association", "has no native component association"),
+        ("missing-spare-quantity", "BOM row.*changed"),
+        ("missing-transgear-row", "dimensions changed"),
+        ("grouping", "configuration grouping changed"),
+        ("column-property", "Number property binding did not persist"),
+        ("native-number", "associative Number"),
+    ),
+)
+def test_bom_rechecks_members_and_quantities_after_the_last_rebuild(
+    monkeypatch, fault, message
+):
+    model, _components, table, adapter, cells, keys = _pd_bom_fixture(monkeypatch)
+    counts = drawing._source_family_counts(model)
+    inner_row = keys.index("sh-vn-chain-link--InnerLink") + 1
+    outer_row = keys.index("sh-vn-chain-link--OuterLink") + 1
+    transgear_row = keys.index("pd-transgear-removable") + 1
+    native_components = table.GetComponents2.side_effect
+
+    def rebuild_with_changed_bom():
+        if fault == "swapped-chain-associations":
+            # Both rows still print the same canonical purchase Number. A
+            # Number-only readback cannot notice the wrong native attachment.
+            table.GetComponents2.side_effect = lambda row, configuration: native_components(
+                {inner_row: outer_row, outer_row: inner_row}.get(row, row),
+                configuration,
+            )
+        elif fault == "missing-transgear-association":
+            table.GetComponents2.side_effect = lambda row, configuration: (
+                () if row == transgear_row else native_components(row, configuration)
+            )
+        elif fault == "missing-spare-quantity":
+            cells[transgear_row][3] = "2"
+        elif fault == "grouping":
+            table.BomFeature.PartConfigurationGrouping = 2
+        elif fault == "column-property":
+            table.GetColumnCustomProperty.return_value = "Description"
+        elif fault == "native-number":
+            native = native_components(
+                inner_row, drawing.SIMPLIFIED_VIEW_CONFIGURATION
+            )[0].GetModelDoc2()
+            native.GetCustomInfoValue = lambda *_: "WRONG-NATIVE-NUMBER"
+        else:
+            cells.pop(transgear_row)
+            table.GetComponents2.side_effect = lambda row, configuration: native_components(
+                row + (row >= transgear_row), configuration
+            )
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild_with_changed_bom
+    with pytest.raises(RuntimeError, match=message):
+        drawing._validate_bom(
+            adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        )
+    table.SetText2.assert_not_called()
+
+
+def _pd_bom_insertion_fixture(monkeypatch):
+    model, components, table, adapter, cells, keys = _pd_bom_fixture(monkeypatch)
+    monkeypatch.setattr(_drawing_tables._sw_type_info, "early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_drawing_tables._sw_type_info, "is_early_bound", lambda *_: True)
+    monkeypatch.setattr(_drawing_tables, "_activate_and_select_view", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_tables, "bom_table_template", lambda _: "native.sldbomtbt")
+    monkeypatch.setattr(_drawing_tables, "bool_array", tuple)
+    monkeypatch.setattr(_drawing_tables, "bstr_array", tuple)
+    table.BomFeature.SetConfigurations = lambda *_: True
+    table.SetColumnType3.return_value = 0
+    table.SetColumnCustomProperty.return_value = True
+    table.SetColumnTitle2.return_value = True
+    table.IsCellTextEditable.return_value = True
+    table.SetText2.side_effect = lambda row, column, _hidden, text: cells[row].__setitem__(
+        column, text
+    )
+    table.DisplayedText2.side_effect = lambda row, column, _hidden: cells[row][column]
+    adapter._get_attr_or_call = lambda obj, name: getattr(obj, name)
+    adapter._attempt = lambda action: action()
+    adapter.currentModel.ClearSelection2 = lambda _: None
+    adapter.currentModel.ForceRebuild3 = lambda _: True
+    view = SimpleNamespace(
+        ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        InsertBomTable6=lambda *_: table,
+    )
+
+    def insert():
+        return _drawing_tables.insert_bom_table(
+            adapter,
+            view,
+            anchor_xy=drawing.BOM_ANCHOR,
+            expected_components=tuple(drawing.BOM_PART_NUMBERS),
+            descriptions=drawing.BOM_DESCRIPTIONS,
+            component_identities=drawing.BOM_COMPONENT_IDENTITIES,
+            part_number_property="Number",
+            configuration_grouping="same-name",
+            label="paper-drive",
+        )
+
+    return SimpleNamespace(
+        model=model, components=components, table=table, adapter=adapter,
+        cells=cells, keys=keys, insert=insert,
+    )
+
+
+@pytest.mark.parametrize("bind_populates_transgear", (False, True))
+def test_bom_insertion_validates_rows_materialized_by_the_number_binding(
+    monkeypatch, bind_populates_transgear
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    counts = drawing._source_family_counts(scene.model)
+    if bind_populates_transgear:
+        transgear_row = scene.keys.index("pd-transgear-removable") + 1
+        native_rows = [
+            scene.table.GetComponents2(row, drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+            for row in range(1, len(scene.cells))
+        ]
+        deferred_cells = scene.cells.pop(transgear_row)
+        deferred_components = native_rows.pop(transgear_row - 1)
+        scene.table.GetComponents2.side_effect = lambda row, _configuration: native_rows[row - 1]
+        restored = False
+
+        def rebuild():
+            nonlocal restored
+            if scene.table.SetColumnType3.called and not restored:
+                scene.cells.insert(transgear_row, deferred_cells)
+                native_rows.insert(transgear_row - 1, deferred_components)
+                restored = True
+            return True
+
+        scene.adapter.currentModel.EditRebuild3 = rebuild
+
+    table = scene.insert()
+    items = dict(
+        drawing._validate_bom(
+            scene.adapter, table, counts,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        )
+    )
+    assert table is scene.table
+    assert "pd-transgear-removable" in items
+    assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
+    if bind_populates_transgear:
+        assert restored
+
+
+@pytest.mark.parametrize("drop", ("transgear", "all"))
+def test_bom_insertion_refuses_row_loss_from_the_number_binding(monkeypatch, drop):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    native_rows = [
+        scene.table.GetComponents2(row, drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+        for row in range(1, len(scene.cells))
+    ]
+    scene.table.GetComponents2.side_effect = lambda row, _configuration: native_rows[row - 1]
+    mapper = MagicMock(wraps=_drawing_tables.bom_row_identities)
+    monkeypatch.setattr(_drawing_tables, "bom_row_identities", mapper)
+    changed = False
+
+    def rebuild():
+        nonlocal changed
+        if scene.table.SetColumnType3.called and not changed:
+            if drop == "all":
+                del scene.cells[1:]
+                native_rows.clear()
+            else:
+                row = scene.keys.index("pd-transgear-removable") + 1
+                scene.cells.pop(row)
+                native_rows.pop(row - 1)
+            changed = True
+        return True
+
+    scene.adapter.currentModel.EditRebuild3 = rebuild
+    message = "Number proof has 1 rows" if drop == "all" else "BOM table is.*expected"
+    with pytest.raises(RuntimeError, match=message) as error:
+        scene.insert()
+    mapper.assert_not_called()
+    if drop == "transgear":
+        contents = tuple(tuple(row) for row in scene.cells)
+        assert repr(contents) in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("native-associations", "native associations changed during finalization"),
+        ("grouping", "configuration grouping changed during finalization"),
+        ("column-property", "Number property binding did not persist"),
+        ("native-number", "associative Number"),
+    ),
+)
+def test_bom_insertion_refuses_changes_from_the_description_rebuild(
+    monkeypatch, fault, message
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    inner_row = scene.keys.index("sh-vn-chain-link--InnerLink") + 1
+    outer_row = scene.keys.index("sh-vn-chain-link--OuterLink") + 1
+    native_components = scene.table.GetComponents2.side_effect
+
+    def rebuild():
+        if scene.table.SetText2.called:
+            if fault == "grouping":
+                scene.table.BomFeature.PartConfigurationGrouping = 2
+            elif fault == "column-property":
+                scene.table.GetColumnCustomProperty.return_value = "Description"
+            elif fault == "native-number":
+                native = native_components(
+                    inner_row, drawing.SIMPLIFIED_VIEW_CONFIGURATION
+                )[0].GetModelDoc2()
+                native.GetCustomInfoValue = lambda *_: "WRONG-NATIVE-NUMBER"
+            else:
+                scene.table.GetComponents2.side_effect = lambda row, configuration: native_components(
+                    {inner_row: outer_row, outer_row: inner_row}.get(row, row),
+                    configuration,
+                )
+        return True
+
+    scene.adapter.currentModel.EditRebuild3 = rebuild
+    with pytest.raises(RuntimeError, match=message):
+        scene.insert()
 
 

@@ -453,35 +453,60 @@ def bom_row_identities(
     )
     row_count = int(table.RowCount)
     result: dict[str, int] = {}
-    for row in range(1, row_count):
-        components = tuple(annotation.GetComponents2(row, configuration) or ())
-        if not components:
-            raise RuntimeError(f"BOM row {row} has no native component association")
-        row_keys: set[str] = set()
-        for component in components:
-            stem, member = component_identity(component)
-            matches = {
-                logical
-                for (file_stem, member_name), logical in expected.items()
-                if file_stem == stem and member_name in (None, member)
-            }
-            if len(matches) != 1:
+    observed: dict[tuple[int, str, str], int] = {}
+    row_count_after = -1
+    try:
+        for row in range(1, row_count):
+            components = tuple(annotation.GetComponents2(row, configuration) or ())
+            if not components:
+                raise RuntimeError(f"BOM row {row} has no native component association")
+            row_keys: set[str] = set()
+            for component in components:
+                stem, member = component_identity(component)
+                native_key = (row, stem, member)
+                if native_key in observed or len(observed) < 64:
+                    observed[native_key] = observed.get(native_key, 0) + 1
+                matches = {
+                    logical
+                    for (file_stem, member_name), logical in expected.items()
+                    if file_stem == stem and member_name in (None, member)
+                }
+                if len(matches) != 1:
+                    raise RuntimeError(
+                        f"BOM row {row} component {(stem, member)!r} matches "
+                        f"{sorted(matches)!r}; expected one logical member"
+                    )
+                row_keys.update(matches)
+            if len(row_keys) != 1:
                 raise RuntimeError(
-                    f"BOM row {row} component {(stem, member)!r} matches "
-                    f"{sorted(matches)!r}; expected one logical member"
+                    f"BOM row {row} merged distinct members {sorted(row_keys)!r}"
                 )
-            row_keys.update(matches)
-        if len(row_keys) != 1:
+            logical = row_keys.pop()
+            if logical in result:
+                raise RuntimeError(f"BOM member {logical!r} appears in multiple rows")
+            result[logical] = row
+        row_count_after = int(table.RowCount)
+        if row_count_after != row_count:
             raise RuntimeError(
-                f"BOM row {row} merged distinct members {sorted(row_keys)!r}"
+                f"BOM row count changed while reading native associations: "
+                f"{row_count} -> {row_count_after}"
             )
-        logical = row_keys.pop()
-        if logical in result:
-            raise RuntimeError(f"BOM member {logical!r} appears in multiple rows")
-        result[logical] = row
-    missing = sorted(set(component_identities) - result.keys())
-    if missing:
-        raise RuntimeError(f"BOM native associations are missing members {missing!r}")
+        missing = sorted(set(component_identities) - result.keys())
+        if missing:
+            raise RuntimeError(
+                f"BOM native associations are missing members {missing!r}"
+            )
+    finally:
+        _telemetry.annotate(
+            configuration=configuration,
+            rows_before=row_count,
+            rows_after=row_count_after,
+            expected_members=len(component_identities),
+            observed_members=tuple(
+                f"{row}:{stem[:96]}@{member[:96]}={count}"
+                for (row, stem, member), count in observed.items()
+            ),
+        )
     return result
 
 
@@ -493,8 +518,6 @@ def _bind_bom_number_property(
     label: str,
 ) -> None:
     """Link the visible Number cells while retaining native member grouping."""
-    from _com import _early_bound
-
     headers = [
         str(table.DisplayedText(0, column) or "").strip().upper()
         for column in range(int(table.ColumnCount))
@@ -526,7 +549,39 @@ def _bind_bom_number_property(
     if not table.SetColumnTitle2(column, "PART NUMBER", True):
         raise RuntimeError(f"{label} BOM PART NUMBER header could not be restored")
     rebuild_drawing(adapter, label="bind_bom_number_property")
-    for row in range(1, int(table.RowCount)):
+    validate_bom_number_property(table, configuration=configuration, label=label)
+
+
+def validate_bom_number_property(
+    table: Any,
+    *,
+    configuration: str,
+    label: str,
+    expected_rows: int | None = None,
+) -> None:
+    """Read-prove the Number column and every native row without mutating it."""
+    from _com import _early_bound
+
+    row_count = int(table.RowCount)
+    if row_count < 2 or (expected_rows is not None and row_count != expected_rows):
+        raise RuntimeError(
+            f"{label} BOM Number proof has {row_count} rows; "
+            f"expected {expected_rows if expected_rows is not None else 'at least 2'}"
+        )
+    headers = [
+        str(table.DisplayedText(0, column) or "").strip().upper()
+        for column in range(int(table.ColumnCount))
+    ]
+    columns = [index for index, title in enumerate(headers) if title == "PART NUMBER"]
+    if len(columns) != 1:
+        raise RuntimeError(f"{label} BOM has no unique PART NUMBER column")
+    column = columns[0]
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty", "GetComponents2"
+    )
+    if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
+        raise RuntimeError(f"{label} BOM Number property binding did not persist")
+    for row in range(1, row_count):
         components = tuple(annotation.GetComponents2(row, configuration) or ())
         if not components:
             raise RuntimeError(f"{label} BOM row {row} has no native components")
@@ -559,6 +614,8 @@ def _bind_bom_number_property(
                 f"{label} BOM row {row}: associative Number {displayed!r} "
                 f"does not match native component Numbers {sorted(numbers)!r}"
             )
+    if int(table.RowCount) != row_count:
+        raise RuntimeError(f"{label} BOM rows changed during its Number proof")
 
 
 @_telemetry.traced("drawing.bom_table", label_param="label")
@@ -650,28 +707,22 @@ def insert_bom_table(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
         )
     # swDisplay_ConfigurationWithSameName_AsOneItem=3 groups the internal BOM
-    # names, not the displayed released Number custom property.
+    # names, not the displayed released Number custom property. Retain the
+    # established setter order and materialize grouped rows before binding it.
     grouping_value = grouping_values[configuration_grouping]
     setattr(feature, "PartConfigurationGrouping", grouping_value)
     setattr(feature, "DisplayAsOneItem", configuration_grouping == "same-part")
-    actual_grouping = int(
-        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
-    )
-    actual_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
-    if actual_grouping != grouping_value or actual_one_item != (
-        configuration_grouping == "same-part"
-    ):
-        raise RuntimeError(
-            f"{label} BOM configuration grouping did not persist: "
-            f"grouping={actual_grouping}, one_item={actual_one_item}"
-        )
     draw.ForceRebuild3(False)
     rebuild_drawing(adapter, label="insert_bom_table")
     table = _sw_type_info.early_bound(bom, "ITableAnnotation")
     if not _sw_type_info.is_early_bound(table, "ITableAnnotation"):
         raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
-    rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
-    columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    _telemetry.annotate(
+        configuration=configuration,
+        rows_before_number_binding=int(table.RowCount),
+        expected_rows=1 + len(expected_components),
+        grouping_requested=grouping_values[configuration_grouping],
+    )
     if part_number_property is not None:
         _bind_bom_number_property(
             adapter,
@@ -679,6 +730,24 @@ def insert_bom_table(
             configuration=configuration,
             label=label,
         )
+    _telemetry.annotate(rows_after_number_binding=int(table.RowCount))
+    actual_grouping = int(
+        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
+    )
+    actual_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
+    _telemetry.annotate(
+        grouping_after_setup=actual_grouping,
+        one_item_after_setup=actual_one_item,
+    )
+    if actual_grouping != grouping_value or actual_one_item != (
+        configuration_grouping == "same-part"
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration grouping did not persist: "
+            f"grouping={actual_grouping}, one_item={actual_one_item}"
+        )
+    rows = int(table.RowCount)
+    columns = int(table.ColumnCount)
     contents = tuple(
         tuple(
             str(
@@ -775,6 +844,47 @@ def insert_bom_table(
                 f"{sorted(remaining)}"
             )
         rebuild_drawing(adapter, label="insert_bom_table")
+    final_rows = int(table.RowCount)
+    final_columns = int(table.ColumnCount)
+    final_grouping = int(
+        adapter._get_attr_or_call(feature, "PartConfigurationGrouping") or 0
+    )
+    final_one_item = bool(adapter._get_attr_or_call(feature, "DisplayAsOneItem"))
+    _telemetry.annotate(
+        rows_after=final_rows,
+        grouping_after=final_grouping,
+        one_item_after=final_one_item,
+    )
+    if (final_rows, final_columns) != (rows, columns):
+        raise RuntimeError(
+            f"{label} BOM dimensions changed during finalization: "
+            f"{rows}x{columns} -> {final_rows}x{final_columns}"
+        )
+    if final_grouping != grouping_value or final_one_item != (
+        configuration_grouping == "same-part"
+    ):
+        raise RuntimeError(
+            f"{label} BOM configuration grouping changed during finalization: "
+            f"grouping={final_grouping}, one_item={final_one_item}"
+        )
+    if descriptions and native_rows is not None:
+        final_native_rows = bom_row_identities(
+            table,
+            configuration=configuration,
+            component_identities=component_identities,
+        )
+        if final_native_rows != native_rows:
+            raise RuntimeError(
+                f"{label} BOM native associations changed during finalization: "
+                f"{native_rows!r} -> {final_native_rows!r}"
+            )
+    if part_number_property is not None:
+        validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label=label,
+            expected_rows=expected_rows,
+        )
     _telemetry.success(
         f"{label} BOM table inserted: {rows - 1} items, {columns} columns"
     )

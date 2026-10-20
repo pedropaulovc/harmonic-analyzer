@@ -17,6 +17,8 @@ lays the sheets out. It never edits the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
+import math
+import struct
 import sys
 import textwrap
 from pathlib import Path
@@ -223,8 +225,8 @@ SECOND_SCREW_BALLOON_ANCHORS = {
 
 # Geometry-owned measurements: overall reference and controlled assembly setting.
 ASSEMBLY_DIMENSIONS = (
-    ("overall length", sheet.REFERENCE_OVERALL_LENGTH, ""),
-    ("stop position", spec.SETTING_NEAR_FACE_MM, sheet.STOP_POSITION_CALLOUT),
+    ("overall length", sheet.REFERENCE_OVERALL_LENGTH),
+    ("stop position", spec.SETTING_NEAR_FACE_MM),
 )
 
 EXPLODED_VIEW_NAMES = {
@@ -551,10 +553,12 @@ def _assert_dimension_ink_on_sheet(display: Any, *, label: str) -> None:
 
 
 def _assert_section_setting_clearance(front: Any, display: Any) -> None:
-    """Keep the upper A/arrow above the setting's native line and arrow ink.
+    """Keep section A above the setting ink and its text on/above its own line.
 
-    Text-anchor spacing alone missed the dimension line through A. Read the
-    actual cutting-plane marker and dimension display after rebuild instead.
+    Text-anchor spacing missed the original section-marker collision; a
+    multiline REF caption later crossed the setting's own dimension line.
+    Read the cutting-plane marker, line/arrow ink and glyph positions after
+    rebuild rather than accepting a requested text anchor as clearance proof.
     """
     front = _early_bound(front, "IView")
     section = tuple(float(value) for value in front.GetSectionLineInfo2())
@@ -576,11 +580,14 @@ def _assert_section_setting_clearance(front: Any, display: Any) -> None:
     )
     data = _early_bound(display.GetDisplayData(), "IDisplayData")
     ink_top = []
+    dimension_line_y = []
     for index in range(int(data.GetLineCount())):
         line = tuple(float(value) for value in data.GetLineAtIndex2(index))
         if len(line) < 10:
             raise RuntimeError("clamped setting: incomplete native dimension line")
         ink_top.extend((line[5], line[8]))
+        if line[5] == line[8] and line[4] != line[7]:
+            dimension_line_y.append(line[5])
     for index in range(int(data.GetArrowHeadCount())):
         arrow = tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
         if len(arrow) != 12:
@@ -590,13 +597,64 @@ def _assert_section_setting_clearance(front: Any, display: Any) -> None:
         )
     if not ink_top:
         raise RuntimeError("clamped setting: missing native dimension ink")
-    clearance = marker_bottom - max(ink_top)
-    if clearance < SECTION_SETTING_CLEARANCE:
+    section_clearance = marker_bottom - max(ink_top)
+    if section_clearance < SECTION_SETTING_CLEARANCE:
         raise RuntimeError(
             f"clamped setting: upper section marker clears dimension ink by "
-            f"{clearance * 1000.0:.3f} mm; "
+            f"{section_clearance * 1000.0:.3f} mm; "
             f"requires {SECTION_SETTING_CLEARANCE * 1000.0:g} mm"
         )
+    # Native RD1's plain value rests ON its dimension line; the witnesses
+    # extend 1 mm above it. Compare glyph bottoms with the horizontal
+    # dimension line, not that complete line/arrow envelope.
+    if not dimension_line_y or not all(math.isfinite(y) for y in dimension_line_y):
+        raise RuntimeError("clamped setting: missing native horizontal dimension line")
+    text_bottom = []
+    for index in range(int(data.GetTextCount())):
+        if not str(data.GetTextAtIndex(index) or "").strip():
+            continue
+        position = tuple(float(value) for value in data.GetTextPositionAtIndex(index))
+        height = float(data.GetTextHeightAtIndex(index))
+        angle = float(data.GetTextAngleAtIndex(index))
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        if (
+            len(position) != 3
+            or not all(math.isfinite(value) for value in (*position, height, angle))
+            or height <= 0.0
+            or angle != 0.0
+            or reference != 1  # swLOWER_LEFT; required before using position[1]
+        ):
+            raise RuntimeError("clamped setting: invalid native horizontal text geometry")
+        text_bottom.append(position[1])
+    if not text_bottom:
+        raise RuntimeError("clamped setting: missing native setting text")
+    line_y = max(dimension_line_y)
+    bottom_y = min(text_bottom)
+    # Display coordinates carry float32 local offsets. Allow one native
+    # float32 ULP, as the existing native-display containment checks do,
+    # rather than a drawing-layout allowance or a blanket micron margin.
+    bits = struct.unpack(">I", struct.pack(">f", max(abs(bottom_y), abs(line_y))))[0]
+    exponent = (bits >> 23) & 0xFF
+    if exponent == 0xFF:
+        raise RuntimeError("clamped setting: nonfinite native text/line precision")
+    coordinate_tolerance = math.ldexp(1.0, -149 if exponent == 0 else exponent - 150)
+    clearance = bottom_y - line_y
+    if not math.isfinite(clearance) or clearance < -coordinate_tolerance:
+        raise RuntimeError(
+            f"clamped setting: native text is {-clearance * 1000.0:.6f} mm "
+            f"below its dimension line; native precision "
+            f"{coordinate_tolerance * 1000.0:.6f} mm"
+        )
+    _telemetry.event(
+        "drawing.ms_measuring_stick_assembly.setting_text_clearance",
+        text_bottom_m=bottom_y,
+        dimension_line_y_m=line_y,
+        clearance_m=clearance,
+        coordinate_tolerance_m=coordinate_tolerance,
+        section_marker_bottom_m=marker_bottom,
+        section_ink_top_m=max(ink_top),
+        section_clearance_m=section_clearance,
+    )
 
 
 def _reference_end_edge(
@@ -706,7 +764,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
         ),
     }
     authored = []
-    for label, expected_mm, callout in ASSEMBLY_DIMENSIONS:
+    for label, expected_mm in ASSEMBLY_DIMENSIONS:
         p0, p1, text_xy = picks[label]
         if label == "overall length":
             display = _early_bound(
@@ -760,10 +818,13 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
             raise RuntimeError(f"measuring-stick {label} precision did not persist")
         if label == "stop position" and int(display.GetPrimaryTolPrecision2()) != spec.SETTING_TOLERANCE_PRECISION:
             raise RuntimeError("assembly setting tolerance precision did not persist")
-        if callout:
-            display.SetText(4, callout)  # swDimensionTextCalloutBelow
-            if str(display.GetText(4) or "") != callout:
-                raise RuntimeError(f"measuring-stick {label} callout did not persist")
+        if label == "stop position":
+            # Keep the imported acceptance plain; do not suppress or replace
+            # its native value, tolerance or physical model attachments.
+            for field in (3, 4):  # swDimensionTextCalloutAbove/Below
+                display.SetText(field, "")
+                if str(display.GetText(field) or ""):
+                    raise RuntimeError("clamped setting: native caption did not clear")
         _assert_dimension_ink_on_sheet(display, label=f"measuring-stick {label}")
         authored.append((label, display, expected_mm))
 
@@ -789,6 +850,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                     or abs(float(saved_tolerance.GetMaxValue()) - band_m) > 1e-9
                 ):
                     raise RuntimeError("settled assembly setting band/reference state changed")
+                if any(str(saved_display.GetText(field) or "") for field in (3, 4)):
+                    raise RuntimeError("clamped setting: settled native caption is not blank")
                 _assert_section_setting_clearance(front, saved_display)
 
     return settled

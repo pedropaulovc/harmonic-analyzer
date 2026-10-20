@@ -2,9 +2,9 @@
 
 Drawing-only: nothing here reaches ms-measuring-stick.SLDASM, so no assembly
 builder imports this module (``test_assembly_sheet_isolation`` pins it) and a
-wording edit rebuilds the drawing alone. Every printed number interpolates a
-symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; none is
-restated here.
+wording edit rebuilds the drawing alone. Printed dimensions interpolate a
+symbol of ``ms_measuring_stick_assembly_spec`` or a part/vendor spec; mate
+drawing numbers come from the part registry.
 
 The near-face setting remains a controlled native model dimension. Its
 attached callout names the measured block face; step 5 explains the
@@ -16,12 +16,14 @@ from __future__ import annotations
 
 from fractions import Fraction
 
+import _config
 import ms_measuring_stick_assembly_spec as spec
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import sh_vn_thumb_screw_spec as thumb
 
 DRAWING_NUMBER = "MHA-MS-00"
+PLATE_DRAWING_NUMBER = str(_config.parts("ms-stop-plate")["number"])
 
 BOM_ORDER = (spec.STICK, spec.BLOCK, spec.PLATE, spec.PLATE_SCREW, spec.THUMB_SCREW)
 
@@ -62,7 +64,8 @@ SETTING_CRITERION = (
 # does. The block and its cover are a match-drilled pair (step 1): neither is
 # interchangeable.
 ASSEMBLY_STEPS = (
-    "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER ITS DRAWING; LEAVE UNDRILLED. "
+    "1. PLATE IS MASTER: LAY OUT STOP COVER PLATE HOLES PER "
+    f"{PLATE_DRAWING_NUMBER}; LEAVE UNDRILLED. "
     f"CLAMP PLATE AND BLOCK WITH {stop.MATCH_DRILL_DATUM_ALIGNMENT}; PILOT "
     f"DIA {stop.PLATE_TAP_DRILL_DIA:.2f} THROUGH PLATE INTO BLOCK TO "
     f"{stop.PLATE_TAP_DRILL_DEPTH:.1f} mm CYLINDRICAL DEPTH INTO BLOCK "

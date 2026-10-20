@@ -83,7 +83,11 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import bom_row_identities, insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
@@ -1823,12 +1827,48 @@ def _validate_bom(
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("paper-drive BOM rebuild failed")
+    if int(table.RowCount) != rows or int(table.ColumnCount) != columns:
+        raise RuntimeError("paper-drive BOM dimensions changed during its final rebuild")
+    bom_feature = _early_bound(table, "IBomTableAnnotation").BomFeature
+    if bom_feature is None:
+        raise RuntimeError("paper-drive BOM lost its native feature")
+    bom_feature = _early_bound(bom_feature, "IBomFeature")
+    grouping = int(bom_feature.PartConfigurationGrouping)
+    one_item = bool(bom_feature.DisplayAsOneItem)
+    if grouping != 3 or one_item:
+        raise RuntimeError(
+            "paper-drive BOM configuration grouping changed during its final rebuild: "
+            f"grouping={grouping}, one_item={one_item}"
+        )
+    final_native_rows = bom_row_identities(
+        table, configuration=configuration, component_identities=BOM_COMPONENT_IDENTITIES
+    )
+    if final_native_rows != native_rows:
+        raise RuntimeError(
+            "paper-drive BOM native associations changed during its final rebuild: "
+            f"{native_rows!r} -> {final_native_rows!r}"
+        )
     for stem, (row_index, *_rest) in actual.items():
         applied = str(table.DisplayedText(row_index, part_column) or "").strip()
         if applied != BOM_PART_NUMBERS[stem]:
             raise RuntimeError(
                 f"paper-drive BOM part number for {stem!r} reads {applied!r}"
             )
+        final_row = tuple(
+            str(table.DisplayedText(row_index, column) or "").strip()
+            for column in range(columns)
+        )
+        if final_row != contents[row_index]:
+            raise RuntimeError(
+                f"paper-drive BOM row for {stem!r} changed during its final rebuild: "
+                f"{contents[row_index]!r} -> {final_row!r}"
+            )
+    validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="paper-drive",
+        expected_rows=len(BOM_PART_NUMBERS) + 1,
+    )
     return tuple((stem, actual[stem][1]) for stem in BOM_PART_NUMBERS)
 
 
@@ -2222,9 +2262,10 @@ def _place_bom_sheet(
         configuration_grouping="same-name",
         label="paper-drive",
     )
+    bom_configuration = str(reference.ReferencedConfiguration)
     items = dict(
         _validate_bom(
-            adapter, table, counts, configuration=str(reference.ReferencedConfiguration)
+            adapter, table, counts, configuration=bom_configuration
         )
     )
     _activate_sheet(adapter, SHEET_NAMES[1])
@@ -2250,7 +2291,9 @@ def _place_bom_sheet(
     apply_view_configuration(adapter, inner, label=inner_label)
     _isolate_instances(adapter, inner, INNER_INSTANCES, label=inner_label)
     _link_view_to_bom(inner, table, label=inner_label)
-    if dict(_validate_bom(adapter, table, counts)) != items:
+    if dict(
+        _validate_bom(adapter, table, counts, configuration=bom_configuration)
+    ) != items:
         raise RuntimeError(
             "paper-drive BOM items moved when the transgear views were isolated"
         )
