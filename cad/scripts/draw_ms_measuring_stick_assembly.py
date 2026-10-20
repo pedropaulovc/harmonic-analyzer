@@ -195,10 +195,11 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# Each balloon walks its own part's body for a visible edge on the exploded
-# view: every family is a single, separated body there. The plate screws are
-# two instances, so each is pinned: the first rides the family ring, the
-# second its own outer pass (one balloon per component on the sheet).
+# Most balloons walk their own part's body for a visible exploded-view edge.
+# Pin the block below the window on its exposed +X/+Z vertical edge: a body
+# extreme on the roof can hide the item-1 arrow behind the graduated stick.
+# The plate screws are two instances, so each is pinned: the first rides the
+# family ring, the second its own outer pass (one balloon per component).
 PLATE_SCREW_INSTANCES = tuple(
     f"{spec.PLATE_SCREW}-{index}"
     for index in range(1, spec.QUANTITIES[spec.PLATE_SCREW] + 1)
@@ -211,6 +212,9 @@ BALLOON_ANCHORS = {
     else BalloonAnchor()
     for stem in BOM_COMPONENTS
 }
+BALLOON_ANCHORS[spec.BLOCK] = BalloonAnchor(
+    point_mm=(stop.BLOCK_LENGTH, stop.FLOOR_THICKNESS / 2.0, stop.BLOCK_DEPTH),
+)
 SECOND_SCREW_BALLOON_ANCHORS = {
     spec.PLATE_SCREW: BalloonAnchor(instance=PLATE_SCREW_INSTANCES[1])
 }
