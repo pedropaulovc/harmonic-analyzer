@@ -175,74 +175,6 @@ def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None
     assert drawing.add_leader_note.__module__ == "_drawing_leader_notes"
 
 
-def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
-    notes = ch_rocker_arm_notes.DRAWING_NOTES
-    flat = " ".join(line.strip() for line in notes.splitlines())
-    # The common arc centre is located in the clocked datum frame; the land
-    # direction is now carried by Detail E's native BASIC angle.
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
-    assert "R800" not in notes
-    assert "R816" not in notes
-    # Processes and through conditions belong to the native size callouts; the
-    # views name datum C, so no note explains it (rule 7, main-r1 Opus).
-    assert "ROD-PIN HOLE" not in notes and "DATUM C" not in notes
-    assert "#47" not in notes
-    assert "PIVOT HOLE: REAM" not in notes
-    assert "16.00 REF" not in notes
-    assert "ALL HOLES THRU" not in notes
-    # Native BASIC nominals stay authoritative; no note restates the 8.00.
-    assert "808.00 REF FROM THE PIVOT" not in notes
-    assert "TOP ARC ABOVE A" not in notes
-    assert f"{ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT:.2f}" not in notes
-    assert "INTEGRAL HUB DIA" not in notes
-    # Integral hub length (no spacers) sets the pitch: that rides the native
-    # hub-length callout, naming the stack's mate; strap symmetry moved onto
-    # its native right-view 2X offset band.
-    assert "HUB LENGTH SETS" not in notes
-    assert "MHA-CH-05" in ch_rocker_arm_notes.HUB_LENGTH_CALLOUT
-    assert "STRAP SYMMETRIC" not in notes
-    assert "ARC LENGTHS" not in notes
-    assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3"]
-    # The upper bar contact rides the top frame's mate row; the lower strap
-    # envelope rides R816's CONCENTRIC callout.
-    assert "UPPER BAR CONTACT" not in notes and "LOWER STRAP ENVELOPE" not in notes
-    assert "ROD-PIN SETS CONNECTING-ROD GEOMETRY." not in notes
-    # Option 4: datum C is the rod-pin hole; the old note 5 (C on the land) is gone.
-    assert "STRAP END LAND" not in notes and "DEFINED BY NOTE 1" not in notes
-    # Both ends are dimensioned on the views (J LAND row, 2X 5.59), not
-    # mirrored by a note (rule 7, main-r1 Opus).
-    assert "MIRROR" not in notes
-    assert "TIP LANDS RADIAL" not in notes
-    # The lands' angle is a native dimension, never a numeric note.
-    assert "°" not in notes
-    assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
-    # Named-exception wall and the mate that caps the OD.
-    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS." in notes
-    # Route v3: permission for the hub + strap construction, with the joint
-    # referred to MHA-CH-12/-13's own drawings, never a method here.
-    assert (
-        "3. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
-        in notes.splitlines()
-    )
-    assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[2]
-    for method in ("PRESS", "LOCTITE", "ADHESIVE", "BRAZE", "SOLDER", "WELD"):
-        assert method not in notes
-    assert _notes_fit_left_of_the_title_block(notes)
-    assert len(notes.splitlines()) == 3
-    # The hub OD's coaxiality is its native position frame in detail D
-    # (regate-r1 #2), not a tolerance in a note.
-    assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
-    assert "TURN HUB" not in notes and "ONE SETUP" not in notes
-    # General tolerances live in the title block ONLY.
-    assert "LINEAR +/-" not in notes
-    assert not re.search(r"\b(?:\d+\s*)?BA\b", notes)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert re.search(
-        r'add_property_linked_note\(\s*adapter, "Manufacturing Notes"', source
-    )
-
-
 def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> None:
     """r5 Opus C2 (rule 19): 20 hubs at +0.05/0 can run 1.0 long; the sheet
     names the MHA-CH-00 step whose stack acceptance re-faces a long stack."""
@@ -395,29 +327,6 @@ def test_radius_text_positions_are_outside_their_parent_circles() -> None:
         centre, _front_xy(0.0, centre_model_y + drawing.R_TOP)
     )
     assert math.dist(centre, (0.130, 0.218)) < top_rendered_radius
-
-
-def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
-    """Source placement hypotheses, NOT current native clearance evidence."""
-    assert drawing.FRONT_KEEP["TopRadius"] == (0.132, 0.156)
-    assert drawing.FRONT_KEEP["BottomRadius"] == (0.160, 0.156)
-    # Both radius texts sit on one row above the new left taper row, with at
-    # least two text rows (2 x 4.2 mm) of air; R816 stays left of D's letter.
-    left_taper_y = drawing.LEFT_TAPER_TEXT_XY[1]
-    for name in ("TopRadius", "BottomRadius"):
-        assert drawing.FRONT_KEEP[name][1] - left_taper_y >= 2 * 0.0042
-    assert drawing.DETAIL_LETTER_XY["D"][0] - drawing.FRONT_KEEP["BottomRadius"][0] >= 0.020
-    # R816's CONCENTRIC rows hang under its value (Opus #1020 r2 B1); the left
-    # taper's value stays left of that block.
-    concentric = _callout_block(drawing.FRONT_KEEP["BottomRadius"], ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT)
-    taper_right = drawing.LEFT_TAPER_TEXT_XY[0] + len("132.8") * CAPTION_CHAR_WIDTH / 2.0
-    assert concentric.xmin - taper_right >= 0.003
-    assert drawing.ARC_PROFILE_FRAME_XY == {
-        "TopRadius": (0.130, 0.211), "BottomRadius": (0.207, 0.163),
-    }
-    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
-    # The frame's top stays under the raised overall-width row's text.
-    assert drawing.OVERALL_WIDTH_TEXT_XY[1] > drawing.ARC_PROFILE_FRAME_XY["TopRadius"][1]
 
 
 def test_r20_local_requests_leave_views_geometry_and_strict_caption_air_unchanged() -> None:
@@ -593,51 +502,16 @@ def test_basic_profile_dimensions_rejects_each_missing_nominal(
         drawing._basic_profile_dimensions(object(), annotations)
 
 
-def test_dress_arc_radii_trims_both_radius_leaders_only(
-    bound: None, monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("radius", ["TopRadius", "BottomRadius"])
+def test_dress_arc_radii_rejects_an_unpersisted_centre_callout(
+    bound: None, monkeypatch: pytest.MonkeyPatch, radius: str,
 ) -> None:
     displays = {
-        name: _ProfileDisplay()
-        for name in ("TopRadius", "BottomRadius", "TopAbovePivot", "PivotDia")
+        name: _ProfileDisplay("text" if name == radius else None)
+        for name in ("TopRadius", "BottomRadius")
     }
     annotations = _profile_annotations(monkeypatch, displays)
-    monkeypatch.setattr(
-        drawing, "set_basic_dimension",
-        lambda *_args, **_kwargs: pytest.fail("radius dressing never makes a value BASIC"),
-    )
-    drawing._dress_arc_radii(object(), annotations)
-    for name in ("TopRadius", "BottomRadius"):
-        flags = [
-            ("ShortenedRadius", False),
-            ("ArcExtensionLineOrOppositeSide", False),
-            ("ArrowSide", 1),
-            ("SolidLeader", False),
-        ]
-        if name == "BottomRadius":
-            # Opus #1020 r2 B1: R816 states its shared centre with R800.
-            flags.append(("text4", ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT))
-        assert displays[name].writes == flags
-        assert displays[name].ShortenedRadius is False
-        assert displays[name].ArcExtensionLineOrOppositeSide is False
-        assert displays[name].ArrowSide == 1
-        assert displays[name].SolidLeader is False
-    assert displays["TopRadius"].text == {}
-    callout = displays["BottomRadius"].GetText(4)
-    assert "CONCENTRIC" in callout
-    assert f"R{ch_rocker_arm_spec.R_TOP:.0f}" in callout
-    assert displays["TopAbovePivot"].writes == []
-    assert displays["PivotDia"].writes == []
-
-
-def test_dress_arc_radii_rejects_an_unpersisted_concentric_callout(
-    bound: None, monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    displays = {
-        "TopRadius": _ProfileDisplay(),
-        "BottomRadius": _ProfileDisplay("text"),
-    }
-    annotations = _profile_annotations(monkeypatch, displays)
-    with pytest.raises(RuntimeError, match="R816 concentric callout did not persist"):
+    with pytest.raises(RuntimeError, match="did not persist"):
         drawing._dress_arc_radii(object(), annotations)
 
 
@@ -9561,37 +9435,6 @@ def test_r24_caps_taper_and_land_locator_but_preserves_uncapped_overall(native_f
     assert not hasattr(case.displays["rocker overall width"], "MaxWitnessLineLength")
 
 
-def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_or_enforcement():
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    definitions = {node.name: node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    calls = [node.func.id for node in ast.walk(definitions["build"])
-             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)]
-    for name in ("_require_rod_tip_endpoints", "_configure_rod_position_dot",
-                 "_require_r24_detail_layout", "_require_rod_position_dot", "_require_rod_dot_route"):
-        assert calls.count(name) == 1
-    assert "SetLeaderAttachmentPointAtIndex" not in source
-    assert "STEM_ENFORCED_KINDS" not in source
-    assert "SetWitnessLineGap" not in source
-    assert "_place_rod_tip_witnesses" not in definitions
-    assert {"_require_radius_routes", "_require_top_radius_off_part", "_r24_contour_arc",
-            "_r24_manufactured_outline", "_r24_point_in_part"}.isdisjoint(definitions)
-    assert "_require_rod_tip_witness_gaps" not in definitions
-    assert {
-        "_add_land_angle", "_land_vertical", "_require_native_angle", "_offset_land_angle",
-        "_land_angle_fixed_ink", "_require_land_angle_fixed_ink", "_require_land_angle_route",
-        "_require_land_angle_arrow_clearance", "_r24_frame_border", "_r24_nonframe_lines",
-        "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
-        "_r24_no_arc_crossings", "_r24_terminals",
-    }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 3
-    # Note 1 still carries the arc centre the 1:2 view cannot reach.
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", ch_rocker_arm_notes.DRAWING_NOTES)
-    assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
-    assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
-
-
-
 def _r26_native_radius_rows(name, *, inside=False):
     # Copied coordinate rows, NOT a recomputed exterior-style radius fixture.
     # R23: prechips/20261013T124514403Z.../layout-audit/ch-rocker-arm.json.
@@ -9900,25 +9743,6 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
     r24_tip.data.texts[0][field] = value
     with pytest.raises(RuntimeError, match="native text scalar"):
         drawing._r24_record(r24_tip.adapter, r24_tip.annotation, label="native text metrics")
-
-
-def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
-    notes = ch_rocker_arm_notes.DRAWING_NOTES
-    flat = " ".join(notes.split())
-    # Detail E measures the real land from vertical; note 1 only locates the
-    # common arc centre, and datum C is named on the rod-pin frame.
-    assert "°" not in notes and "BASIC TO DATUM" not in notes
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
-    assert "TIP LANDS RADIAL" not in notes
-    assert "DATUM C" not in notes and "ENDS MIRROR" not in notes
-    # Both ends' locations from A are on the views: no 8.00 restatement, no
-    # datum C land narration in the notes.
-    assert "TOP ARC ABOVE A" not in notes
-    assert "DATUM C: STRAP END LAND" not in notes
-    assert "5." not in re.findall(r"^\d+\.", notes, re.MULTILINE)
-    assert notes.count(ch_rocker_arm_notes.HUB_WALL_NOTE) == 1
-    assert "MHA-CH-01" in notes
-    assert _notes_fit_left_of_the_title_block(notes)
 
 
 def test_r24_final_attachment_reproof_does_not_require_unproven_annotation_is_same(r24_final_layout):

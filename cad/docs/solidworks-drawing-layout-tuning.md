@@ -538,12 +538,34 @@ dimension. Its native driven angle measures the actual radial land against a
 vertical construction ray in the part sketch; the drawing checks the angular
 type and magnitude of its native radian readback with the builder's `1e-8`
 radian tolerance before adding the BASIC box and `2X` count. The
-construction ray changes neither the solid nor the profile zone. Keep the
-common arc-centre location in the notes, but do not substitute a typed angle
-or ambiguous radial-land prose for this model-owned dimension.
+construction ray changes neither the solid nor the profile zone. Do not
+substitute a typed angle or ambiguous radial-land prose for this model-owned
+dimension.
 Seat E's native linked caption 8 mm left of the crop centre so the angle's
 vertical witness does not graze `DETAIL E`; retain the independent 3 mm
 crop/title-rule clearance guards and leave D's caption centred.
+
+The common arc-centre location then left the general notes for the feature
+it governs (drawing-guidelines rule 7): `TOP_RADIUS_CALLOUT` (`CENTRE ABOVE A`)
+is written as one R800 below-text row through the same strict
+`SetText(4)`/`GetText(4)` readback `_dress_arc_radii` already used for R816's
+`CONCENTRIC WITH R800`, and the notes are two lines (hub wall, built-up
+permission). Only presentation moved: the source centre stays (0, 816) and
+the pivot (0, 8), both anchored to x = 0 in `build_ch_rocker_arm`; the native
+BASIC 8, R800, R816, the 2X angle and the profile-frame control scheme are
+unchanged, and no 808 driving dimension or new band exists. R800's text
+request moves from 132/156 to **120/160 mm**. The base native audit shows the
+left 132.76 BASIC box reaches y = 149.8 mm: a two-row R800 callout at y = 156
+would route its shoulder through the box. One row and the 4 mm raise leave
+the projected shoulder about 3.6 mm above it. This projection still requires
+fresh native proof; request coordinates are not ink bounds. Provenance: the
+reviewed main PDF is
+`c70f077f3848ef1eb32a2f94129d33c39cadd7f2e3250587e6a0c73147bc3510`, the
+prior #1704 SHIP PDF
+`8adf355ae1fdb32ed066d041098201f16b142881f288c3664033ebaf3747d2a6`. The
+earlier judge accepted the off-sheet centre as a note; the fresh judge holds
+rule 7 (state it at the feature). This change claims no native acceptance
+and reran no review; Detail D's faceting stays the shared, non-gating #1141.
 
 **b. `IView::SetDisplayMode4` refusing HLR on a native detail view.**
 Don't: read `False` as "detail views can't do HLR". Two causes, both documented
