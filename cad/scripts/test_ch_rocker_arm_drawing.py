@@ -178,9 +178,11 @@ def test_view_arrow_names_the_removed_right_view_from_the_notes_letter() -> None
 def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> None:
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(line.strip() for line in notes.splitlines())
-    # The common arc centre is located in the clocked datum frame; the land
-    # direction is now carried by Detail E's native BASIC angle.
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
+    # The common arc centre's location left the general notes for R800's own
+    # below-text rows (rule 7: at the feature); the land direction is carried
+    # by Detail E's native BASIC angle.
+    assert not re.search(r"ARC\s+CENTRE", flat) and "ABOVE A" not in flat
+    assert ch_rocker_arm_notes.TOP_RADIUS_CALLOUT == "CENTRE DIRECTLY\nABOVE A"
     assert "R800" not in notes
     assert "R816" not in notes
     # Processes and through conditions belong to the native size callouts; the
@@ -203,7 +205,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "STRAP SYMMETRIC" not in notes
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
-    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2", "3"]
+    assert re.findall(r"^(\d+)\.", notes, re.MULTILINE) == ["1", "2"]
     # The upper bar contact rides the top frame's mate row; the lower strap
     # envelope rides R816's CONCENTRIC callout.
     assert "UPPER BAR CONTACT" not in notes and "LOWER STRAP ENVELOPE" not in notes
@@ -218,18 +220,18 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
-    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS." in notes
+    assert f"1. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS." == notes.splitlines()[0]
     # Route v3: permission for the hub + strap construction, with the joint
     # referred to MHA-CH-12/-13's own drawings, never a method here.
     assert (
-        "3. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
+        "2. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
         in notes.splitlines()
     )
-    assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[2]
+    assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[1]
     for method in ("PRESS", "LOCTITE", "ADHESIVE", "BRAZE", "SOLDER", "WELD"):
         assert method not in notes
     assert _notes_fit_left_of_the_title_block(notes)
-    assert len(notes.splitlines()) == 3
+    assert len(notes.splitlines()) == 2
     # The hub OD's coaxiality is its native position frame in detail D
     # (regate-r1 #2), not a tolerance in a note.
     assert "COAXIAL" not in notes and "WITHIN" not in notes and "Ø" not in notes
@@ -399,7 +401,7 @@ def test_radius_text_positions_are_outside_their_parent_circles() -> None:
 
 def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors() -> None:
     """Source placement hypotheses, NOT current native clearance evidence."""
-    assert drawing.FRONT_KEEP["TopRadius"] == (0.132, 0.156)
+    assert drawing.FRONT_KEEP["TopRadius"] == (0.120, 0.156)
     assert drawing.FRONT_KEEP["BottomRadius"] == (0.160, 0.156)
     # Both radius texts sit on one row above the new left taper row, with at
     # least two text rows (2 x 4.2 mm) of air; R816 stays left of D's letter.
@@ -412,6 +414,15 @@ def test_radius_text_and_profile_requests_use_the_approved_clearance_corridors()
     concentric = _callout_block(drawing.FRONT_KEEP["BottomRadius"], ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT)
     taper_right = drawing.LEFT_TAPER_TEXT_XY[0] + len("132.8") * CAPTION_CHAR_WIDTH / 2.0
     assert concentric.xmin - taper_right >= 0.003
+    # R800's CENTRE DIRECTLY / ABOVE A rows hang under its value (the former
+    # general note 1): the two below-text blocks stay 3 mm apart, R800's block
+    # clears the left taper's numeric row by 3 mm and stays inside the border.
+    # Source placement hypotheses only, not native proof.
+    centre_above_a = _callout_block(drawing.FRONT_KEEP["TopRadius"], ch_rocker_arm_notes.TOP_RADIUS_CALLOUT)
+    assert concentric.xmin - centre_above_a.xmax >= 0.003
+    assert centre_above_a.ymin - (left_taper_y + 0.00175) >= 0.003
+    assert centre_above_a.xmin >= DRAWABLE.xmin + 0.003
+    assert centre_above_a.ymin > DRAWABLE.ymin and centre_above_a.ymax < DRAWABLE.ymax
     assert drawing.ARC_PROFILE_FRAME_XY == {
         "TopRadius": (0.130, 0.211), "BottomRadius": (0.207, 0.163),
     }
@@ -613,15 +624,25 @@ def test_dress_arc_radii_trims_both_radius_leaders_only(
             ("ArrowSide", 1),
             ("SolidLeader", False),
         ]
-        if name == "BottomRadius":
-            # Opus #1020 r2 B1: R816 states its shared centre with R800.
-            flags.append(("text4", ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT))
+        # Each radius states the shared centre once, below its value: R800
+        # locates it directly above A (the former general note 1), R816 its
+        # concentricity with R800 (Opus #1020 r2 B1).
+        callout = {
+            "TopRadius": ch_rocker_arm_notes.TOP_RADIUS_CALLOUT,
+            "BottomRadius": ch_rocker_arm_notes.BOTTOM_RADIUS_CALLOUT,
+        }[name]
+        flags.append(("text4", callout))
         assert displays[name].writes == flags
         assert displays[name].ShortenedRadius is False
         assert displays[name].ArcExtensionLineOrOppositeSide is False
         assert displays[name].ArrowSide == 1
         assert displays[name].SolidLeader is False
-    assert displays["TopRadius"].text == {}
+        # Only the below-callout part changes; prefix/suffix/above stay native.
+        assert displays[name].text == {4: callout}
+    assert displays["TopRadius"].GetText(4) == "CENTRE DIRECTLY\nABOVE A"
+    assert [w for w in displays["TopRadius"].writes if w[0].startswith("text")] == [
+        ("text4", ch_rocker_arm_notes.TOP_RADIUS_CALLOUT),
+    ]
     callout = displays["BottomRadius"].GetText(4)
     assert "CONCENTRIC" in callout
     assert f"R{ch_rocker_arm_spec.R_TOP:.0f}" in callout
@@ -629,16 +650,47 @@ def test_dress_arc_radii_trims_both_radius_leaders_only(
     assert displays["PivotDia"].writes == []
 
 
-def test_dress_arc_radii_rejects_an_unpersisted_concentric_callout(
-    bound: None, monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("radius, message", [
+    ("TopRadius", "R800 centre-above-A callout did not persist"),
+    ("BottomRadius", "R816 concentric callout did not persist"),
+])
+def test_dress_arc_radii_rejects_an_unpersisted_centre_callout(
+    bound: None, monkeypatch: pytest.MonkeyPatch, radius: str, message: str,
 ) -> None:
     displays = {
-        "TopRadius": _ProfileDisplay(),
-        "BottomRadius": _ProfileDisplay("text"),
+        name: _ProfileDisplay("text" if name == radius else None)
+        for name in ("TopRadius", "BottomRadius")
     }
     annotations = _profile_annotations(monkeypatch, displays)
-    with pytest.raises(RuntimeError, match="R816 concentric callout did not persist"):
+    with pytest.raises(RuntimeError, match=message):
         drawing._dress_arc_radii(object(), annotations)
+
+
+def test_arc_centre_sits_directly_above_the_pivot_in_the_source_model() -> None:
+    """CENTRE DIRECTLY ABOVE A is a fact of the builder, not of the callout:
+    the common arc centre and the pivot bore both anchor to x = 0, and the
+    centre's height over the pivot is R800 + the 8.00 BASIC (808, not a
+    driving dimension anywhere). Read-only source checks, never a build."""
+    assert ch_rocker_arm_spec.CENTER_Y == arm.CENTER_Y == 816.0
+    assert ch_rocker_arm_spec.PIVOT_MID_Y == arm.PIVOT_MID_Y == 8.0
+    assert arm.R_TOP == ch_rocker_arm_spec.R_TOP == 800.0
+    assert arm.R_TOP + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 808.0
+    assert arm.CENTER_Y - arm.PIVOT_MID_Y == arm.R_TOP + ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT
+    source = Path(arm.__file__).read_text(encoding="utf-8")
+    # Both sketch anchors pin their x to the origin's (0.0), so the centre
+    # (0, 816) and the pivot (0, 8) share A's vertical.
+    assert re.search(
+        r'anchor_point_to_origin\(\s*adapter, f"\{bottom_arc\}\.center", 0\.0, CENTER_Y, "arc centre"',
+        source,
+    )
+    assert re.search(
+        r'anchor_point_to_origin\(\s*adapter, f"\{top_line\}\.start", 0\.0, PIVOT_MID_Y, "top edge reference foot"',
+        source,
+    )
+    assert re.search(r'define_circle\(\s*adapter, 0\.0, _mid_y\(0\.0\), PIVOT_HOLE_DIA / 2\.0, "pivot hole"', source)
+    # The named arc-centre axis is Right Plane (x = 0) ∩ Top Plane + CenterY.
+    assert re.search(r'adapter, "Right Plane", 0\.0, "Top Plane", CENTER_Y, "arc centre"', source)
+    assert '"CenterY", \'"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"\'' in source
 
 
 @pytest.mark.parametrize("missing", ["TopRadius", "BottomRadius"])
@@ -9584,9 +9636,11 @@ def test_r24_production_wires_all_native_local_guards_without_banned_fcf_setter_
         "_r24_arc_sweep", "_r24_arc_contains", "_r24_arc_intersections",
         "_r24_no_arc_crossings", "_r24_terminals",
     }.isdisjoint(definitions)
-    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 3
-    # Note 1 still carries the arc centre the 1:2 view cannot reach.
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", ch_rocker_arm_notes.DRAWING_NOTES)
+    assert len(ch_rocker_arm_notes.DRAWING_NOTES.splitlines()) == 2
+    # The arc centre the 1:2 view cannot reach is stated under R800 itself
+    # (TOP_RADIUS_CALLOUT), no longer by a general note.
+    assert "ARC CENTRE" not in ch_rocker_arm_notes.DRAWING_NOTES
+    assert "ABOVE A" in ch_rocker_arm_notes.TOP_RADIUS_CALLOUT
     assert ch_rocker_arm_spec.TOP_EDGE_ABOVE_PIVOT == 8.0
     assert drawing.ARC_PROFILE_PICK_X_MM == {"TopRadius": -130.0, "BottomRadius": 40.0}
 
@@ -9905,10 +9959,11 @@ def test_r24_raw_native_text_metric_scalar_types_refuse_before_using_the_dump(r2
 def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
     notes = ch_rocker_arm_notes.DRAWING_NOTES
     flat = " ".join(notes.split())
-    # Detail E measures the real land from vertical; note 1 only locates the
-    # common arc centre, and datum C is named on the rod-pin frame.
+    # Detail E measures the real land from vertical; the common arc centre is
+    # located under R800 (TOP_RADIUS_CALLOUT), and datum C is named on the
+    # rod-pin frame: neither is a general note.
     assert "°" not in notes and "BASIC TO DATUM" not in notes
-    assert re.search(r"ARC\s+CENTRE DIRECTLY ABOVE A", flat)
+    assert "ARC CENTRE" not in flat and "ABOVE A" not in flat
     assert "TIP LANDS RADIAL" not in notes
     assert "DATUM C" not in notes and "ENDS MIRROR" not in notes
     # Both ends' locations from A are on the views: no 8.00 restatement, no

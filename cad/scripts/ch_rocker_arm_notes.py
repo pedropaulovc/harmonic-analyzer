@@ -108,21 +108,18 @@ HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 # -- the note points at them so the joint is defined, not left open (r1
 # machinist review of "MAY BE BUILT UP FROM ...").
 BUILT_UP_PERMISSION_NOTE = (
-    "3. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
+    "2. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
 )
 
-# Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
+# Two lines (drawing-guidelines rule 7; Opus #1020 r3 C3). The common arc
+# centre's location is no longer a general note: it rides R800's own
+# below-text rows (TOP_RADIUS_CALLOUT), at the feature it governs (rule 7).
 DRAWING_NOTES = "\n".join(
     (
-        # Datum C is the rod-pin hole; its BASIC coordinates clock A|B|C.
-        # The common arc centre remains directly above A in that frame.
-        # Detail E's native BASIC angle now defines the two radial lands,
-        # so the note need not narrate their direction.
-        "1. ARC CENTRE DIRECTLY ABOVE A.",
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.
-        f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS.",
+        f"1. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS.",
         BUILT_UP_PERMISSION_NOTE,
     )
 )
@@ -174,3 +171,8 @@ ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
 # The lower arc shares the top edge's centre (Opus #1020 r2 B1): below-text
 # rows under R816 (above-text line breaks print as one run).
 BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{R_TOP:.0f}"
+# That shared centre sits on A's axis (x = 0 in the clocked A|B|C frame; the
+# 1:2 view cannot reach it): below-text rows under R800, the former note 1.
+# Detail E's native BASIC angle defines the radial lands, so no note narrates
+# their direction either.
+TOP_RADIUS_CALLOUT = "CENTRE DIRECTLY\nABOVE A"
