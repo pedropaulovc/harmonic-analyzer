@@ -1,7 +1,7 @@
 r"""Crank-arm drawing prose -- the hub-seat, seam and pivot callouts on its sheet.
 
-Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
-``crank_hub_notes``), so a wording edit re-keys the drawing, never the part.
+Imported ONLY by ``draw_dt_crank_arm`` and its offline test, so a wording edit
+re-keys the drawing, never the part.
 """
 
 from __future__ import annotations
@@ -50,9 +50,9 @@ PIVOT_TAP_ROWS = (
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
-# The native leg prints its LIMIT band; these short rows identify the inboard
-# face and hub-clearance purpose without repeating the hub's radius dimension.
+# The native leg and LIMIT band identify the bore edge. FAR SIDE names its
+# face against the front view; MHA-DT-031 HUB SIDE identifies the mating hub.
 # Outside the cheek this block grows right. Its existing two-space allowance
 # belongs on the LEFT, away from the native upright; moving the padding rather
 # than duplicating it preserves the audited block width.
-BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nINBOARD  \n  CLEARS HUB"
+BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG  \nFAR SIDE  \nMHA-DT-031  \n  HUB SIDE"

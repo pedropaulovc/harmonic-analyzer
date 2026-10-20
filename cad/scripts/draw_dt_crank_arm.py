@@ -4,9 +4,9 @@ Separate through hub MHA-DT-31 is a light press in the arm's seat bore, turned
 to suit it.  Its outboard face
 shows the simple punched alignment witness and the axial seam for MHA-DT-VN-59,
 match-drilled with the hub; the seam's callout gives its nominal size and
-depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Cropped
-full section A-A through the seat's left cheek shows the inboard-mouth chamfer
-that clears the hub's seat-root radius.
+depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  Partial
+XZ section A-A cuts only the seat's -X wall and shows the far-side mouth
+chamfer on the MHA-DT-31 hub side, clearing its seat-root radius.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -27,13 +27,11 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     curate_dimensions,
     dimension_name,
     place_view,
-    view_name,
 )
 
 from _check import check
@@ -65,7 +63,7 @@ from _drawing_leaders import (
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
@@ -143,15 +141,12 @@ def _sheet_x(model_x_mm: float) -> float:
 
 
 def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
-    """Give the one SHEET-derived dimension its PART-authored decimal places.
+    """Give the sheet-derived overall its PART-authored decimal places.
 
-    Every controlling dimension on this print is a model dimension whose
-    places the part authored and ``assert_imported_precision`` reads back.
-    The parenthesised overall (boss extreme to arm end) is the single
-    exception: a read-only sum with no model dimension to import, so its
-    places come from the spec's ``DRAWING_REFERENCE_PRECISION`` -- never a
-    literal typed here.  ``SetPrecision3`` reports rejection through its
-    return status rather than by raising, so the side effect is read back.
+    The overall is a read-only sum with no model dimension to import, so its
+    places come from the spec's ``DRAWING_REFERENCE_PRECISION``. ``SetPrecision3``
+    reports rejection through its return status rather than by raising, so
+    the side effect is read back.
     """
     places = DRAWING_REFERENCE_PRECISION[label]
     display = _early_bound(display, "IDisplayDimension")
@@ -167,34 +162,6 @@ def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
             f"{label}: sheet dimension prints {applied} decimal places, not {places}"
         )
 
-
-def _add_arm_centerline(adapter: Any, view: Any) -> None:
-    """Draw the arm's longitudinal centreline between its two long edges.
-
-    The through-hub seat and handle pivot lie on the arm mid-width axis.  A
-    centreline through their centre marks states that relationship without an
-    invented cross-width dimension.
-    """
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the front view for its centreline")
-    draw.ClearSelection2(True)
-    x = _sheet_x((ANCHOR_SCREW_X + ARM_C2C) / 2.0)
-    for index, side in enumerate((-1.0, 1.0)):
-        y = FRONT_CENTER[1] + side * HALF_WIDTH * SHEET_SCALE[0] / 1000.0
-        if not draw.Extension.SelectByID2(
-            "", "EDGE", x, y, 0.0, index > 0, 0, null_callout(), 0
-        ):
-            raise RuntimeError("failed to select an arm long edge for its centreline")
-    centerline = ddoc.InsertCenterLine2()
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    if centerline is None:
-        raise RuntimeError("failed to insert the arm centreline between its edges")
-    count = int(_early_bound(view, "IView").GetCenterLineCount())
-    if count != 1:
-        raise RuntimeError(f"front view carries {count} centrelines, expected 1")
 
 def _omit_title_block_thread_class(display: Any) -> None:
     """Remove only the redundant Hole Wizard thread-class field."""
@@ -291,17 +258,15 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 
-# A full longitudinal cut through the bore's -X rim imports the chamfer's
-# actual model dimension. The former partial YZ cut imported nothing on
-# sol4; carrier r11 and the crank-drive gear establish the same full-section,
-# annotation-plane constraint. Import before cropping, then retain only the
-# left cheek in the open field over the title block. Keep the native
-# projection: radial X across, axial Z vertical, with no unlabelled rotation.
+# The short horizontal cut crosses only the -X bore wall in the XZ plane
+# containing the chamfer's native model dimension. The prior partial YZ cut
+# used the wrong annotation plane. Keep native radial X across / axial Z
+# vertical, with a genuine partial section rather than a full-cut crop.
 SECTION_SCALE = (4, 1)
-SECTION_LINE_OVERRUN = 0.005
+SECTION_LINE_OVERRUN = 0.002  # sheet metres: 1 mm past each wall face at 2:1
 SECTION_LINE = (
-    (ARM_SILHOUETTE[0] - SECTION_LINE_OVERRUN, BORE_CENTER[1]),
-    (ARM_SILHOUETTE[2] + SECTION_LINE_OVERRUN, BORE_CENTER[1]),
+    (_sheet_x(-HALF_WIDTH) - SECTION_LINE_OVERRUN, BORE_CENTER[1]),
+    (_sheet_x(-HUB_SEAT_DIA / 2.0) + SECTION_LINE_OVERRUN, BORE_CENTER[1]),
 )
 SECTION_CENTER = (0.368, 0.150)
 SECTION_ANCHOR_MM = (
@@ -309,17 +274,13 @@ SECTION_ANCHOR_MM = (
     0.0,
     ARM_THICKNESS / 2.0,
 )
-SECTION_CROP_MODEL_MM = (
-    (-HALF_WIDTH - 1.0, 0.0, -1.0),
-    (-HUB_SEAT_DIA / 2.0 + 1.0, 0.0, ARM_THICKNESS + 1.0),
-)
 # Sol6 proved that the native block flips to the RIGHT outside the cheek.
 # Compact rows measured from the actual Century Gothic PDF glyphs need at
 # most 29.864 mm including padding. At x=385 this leaves 4.236 mm to the inner
 # border and 4.212 mm to the section's audited outline; neither side is guessed.
 CHAMFER_CALLOUT_WIDTH = 0.029864
 SECTION_KEEP = {"BoreRearChamferSize": (0.385, 0.118)}
-SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.098)
+SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.091)
 DIMENSION_CALLOUTS = {
     "HubSeatDia": HUB_SEAT_CALLOUT,
     "BoreRearChamferSize": BORE_REAR_CHAMFER_CALLOUT,
@@ -352,12 +313,22 @@ def _assert_chamfer_limits(annotation: Any) -> None:
         raise RuntimeError("imported bore-mouth chamfer lost its native LIMIT band")
 
 
+def _assert_cheek_section_display(section: Any) -> None:
+    """Require the native short-span cut, not a full cut with a cropped outline."""
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    if cut.GetPartialSection() is not True:
+        raise RuntimeError("section A-A did not retain its partial wall cut")
+    if cut.GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError("section A-A retained geometry beyond the cutting plane")
+
+
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
 
 def _cheek_section(adapter: Any, front: Any) -> Any:
-    """Create the full XZ cut before importing its native chamfer dimension."""
+    """Create a partial XZ wall cut for the native chamfer dimension."""
     section = create_section_view(
         adapter,
         front,
@@ -366,66 +337,21 @@ def _cheek_section(adapter: Any, front: Any) -> Any:
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=SECTION_SCALE,
-        partial=False,
+        partial=True,
         label="hub seat cheek section",
     )
     native = _early_bound(section, "IView")
     cut = _early_bound(native.GetSection(), "IDrSection")
     cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="section A-A cut face only")
-    if not cut.GetDisplayOnlySurfaceCut():
-        raise RuntimeError("section A-A retained geometry beyond the cutting plane")
+    _assert_cheek_section_display(native)
     set_hidden_lines_removed(adapter, native)
     return native
 
 
-def _crop_cheek_section(adapter: Any, section: Any) -> None:
-    """Use the proven carrier crop sequence after the full cut's import."""
-    draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
+def _position_cheek_section(adapter: Any, section: Any) -> None:
+    """Centre the wall's native projected anchor and retain its XZ orientation."""
     native = _early_bound(section, "IView")
-    corners = model_points_in_view(
-        adapter,
-        native,
-        [_metres(point) for point in SECTION_CROP_MODEL_MM],
-        label="cheek section crop corners",
-    )
-    if not ddoc.ActivateView(view_name(adapter, native)):
-        raise RuntimeError("failed to activate cheek section for cropping")
-    draw.ClearSelection2(True)
-    before = tuple(float(value) for value in native.GetOutline())
-    sketch = _early_bound(native.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    sketch_corners = []
-    for x, y in corners:
-        point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
-            "IMathPoint",
-        )
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        sketch_corners.append(tuple(float(value) for value in projected.ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    segments = tuple(
-        manager.CreateCornerRectangle(*sketch_corners[0], *sketch_corners[1]) or ()
-    )
-    if len(segments) != 4:
-        raise RuntimeError(f"cheek crop fence has {len(segments)} segments")
-    for segment in segments:
-        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
-            raise RuntimeError("failed to select cheek crop fence")
-    status = int(native.Crop2(False, True, 0))
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="section A-A cropped to left cheek")
-    native.UpdateViewDisplayGeometry()
-    after = tuple(float(value) for value in native.GetOutline())
-    if (
-        status != 1
-        or not native.IsCropped()
-        or after[2] - after[0] >= (before[2] - before[0]) / 4.0
-    ):
-        raise RuntimeError(f"cheek crop failed: {status=}, {before=}, {after=}")
-    _telemetry.info(f"cheek section cropped: {before=} -> {after=}")
     anchor = _metres(SECTION_ANCHOR_MM)
     origin = model_point_in_view(adapter, native, anchor, label="A-A anchor")
     radial = model_point_in_view(
@@ -572,7 +498,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="section A-A",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _crop_cheek_section(adapter, section)
+    _position_cheek_section(adapter, section)
     section_annotations = curate_dimensions(
         adapter, section_annotations, reposition=SECTION_KEEP
     )
@@ -580,7 +506,7 @@ async def build(adapter: Any) -> dict[str, str]:
         int(_early_bound(item, "IAnnotation").Visible) != 1
         for item in section_annotations
     ):
-        raise RuntimeError("cheek section crop hid its native chamfer dimension")
+        raise RuntimeError("cheek section hid its native chamfer dimension")
     _assert_chamfer_limits(_named(adapter, section_annotations, "BoreRearChamferSize"))
     imported_annotations = [
         *front_annotations,
@@ -597,11 +523,10 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
         )
     _hub_seat_leader_clear(adapter, front_annotations)
-    _texts_off_the_part(adapter, front_annotations)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    _add_arm_centerline(adapter, front)
+    _texts_off_the_part(adapter, front_annotations)
 
     # Handle-pivot callout attaches at the hole's top rim; the pivot's station
     # from the bore axis is the part's PivotStation dim imported above.

@@ -478,9 +478,15 @@ def test_imported_chamfer_rejects_changed_native_limits(monkeypatch, changed, me
             drawing._assert_chamfer_limits(annotation)
 
 
-def test_bore_rear_chamfer_callout_identifies_the_face_and_clearance() -> None:
+def test_bore_rear_chamfer_callout_names_front_view_face_and_mate() -> None:
     rows = [row.strip() for row in notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()]
-    assert rows == ["X 45 DEG", "INBOARD", "CLEARS HUB"]
+    assert "X 45 DEG" in rows
+    assert "FAR SIDE" in rows
+    assert "MHA-DT-031" in rows
+    assert "HUB SIDE" in rows
+    assert "INBOARD" not in notes.BORE_REAR_CHAMFER_CALLOUT
+    assert "CLEARS HUB" not in notes.BORE_REAR_CHAMFER_CALLOUT
+    assert len(rows) == 4
     assert all(len(row) <= 10 for row in rows)
     # This dimension intentionally grows right; its upright is on the left.
     last_row = notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()[-1]
@@ -488,7 +494,7 @@ def test_bore_rear_chamfer_callout_identifies_the_face_and_clearance() -> None:
     assert last_row == last_row.rstrip()
 
 
-def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -> None:
+def test_section_a_a_and_all_chamfer_rows_clear_caption_and_title_block() -> None:
     row_pitch = 0.0055563  # native sol5/sol6 callout row pitch
     sx, sy = drawing.SECTION_CENTER
     k = drawing.SECTION_SCALE[0] / drawing.SECTION_SCALE[1] / 1000.0
@@ -505,25 +511,60 @@ def test_section_a_a_stands_in_open_sheet_and_its_line_clears_the_front_view() -
     # Native text flips right of the cheek. Measured compact rows, rather
     # than translating the old left-growing block, fit entirely in this lane.
     width = drawing.CHAMFER_CALLOUT_WIDTH
+    # Prior native outline is the lane budget, not proof of the new partial
+    # section's rendered extent; the farm layout audit must read that back.
     section_outline_right = 0.380788
     assert tx - section_outline_right >= 0.0035
     assert border_right - (tx + width) >= 0.0035
     assert sy - half_h - (ty + row_pitch) > row_pitch
-    # The prior native second-row baseline is 10.0819 mm below ty. One more
-    # short row still clears the native caption's top by over a text height.
-    block_bottom = ty - 0.0100819 - row_pitch
+    # The native second-row baseline is 10.0819 mm below ty; every additional
+    # printed row consumes one native row pitch, including the new HUB SIDE.
+    rows = notes.BORE_REAR_CHAMFER_CALLOUT.splitlines()
+    block_bottom = ty - 0.0100819 - (len(rows) - 2) * row_pitch
     _cx, cy = drawing.SECTION_CAPTION_XY
     assert block_bottom - (cy + 0.0002385) >= 0.0035
     assert cy - 2.0 * row_pitch > title_block_top
-    # The full cut closes across both ends of the arm, in the model XZ plane
-    # holding the chamfer's defining -X rim. A partial YZ cut imported no native
-    # dimension on sol4; cropping only follows the full native import.
+
+
+def test_partial_section_line_crosses_only_the_negative_x_bore_wall_in_xz() -> None:
+    # Horizontal at model Y=0 retains the native chamfer's XZ annotation plane.
+    # The cut starts outside the OD and stops inside the bore, before its axis.
     (x0, y0), (x1, y1) = drawing.SECTION_LINE
+    outer = drawing._sheet_x(-spec.HALF_WIDTH)
+    bore_wall = drawing._sheet_x(-spec.HUB_SEAT_DIA / 2.0)
     assert y0 == y1 == drawing.BORE_CENTER[1]
-    assert x0 < drawing.ARM_SILHOUETTE[0]
-    assert x1 > drawing.ARM_SILHOUETTE[2]
-    (left, y0, bottom), (right, y1, top) = drawing.SECTION_CROP_MODEL_MM
+    assert x0 < outer < bore_wall < x1 < drawing.BORE_CENTER[0]
+    assert outer - x0 == pytest.approx(x1 - bore_wall)
+    assert x1 - x0 < 2.0 * (bore_wall - outer)
     ax, ay, az = drawing.SECTION_ANCHOR_MM
-    assert y0 == y1 == ay == 0.0
-    assert left < -spec.HALF_WIDTH < ax < -spec.HUB_SEAT_DIA / 2.0 < right < 0.0
-    assert bottom < 0.0 < az < spec.ARM_THICKNESS < top
+    assert -spec.HALF_WIDTH < ax < -spec.HUB_SEAT_DIA / 2.0
+    assert ay == 0.0
+    assert 0.0 < az < spec.ARM_THICKNESS
+    assert drawing.SECTION_SCALE == (4, 1)
+    assert not hasattr(drawing, "SECTION_CROP_MODEL_MM")
+
+
+@pytest.mark.parametrize(
+    ("partial", "surface_only", "message"),
+    (
+        (True, True, None),
+        (False, True, "partial wall cut"),
+        (None, True, "partial wall cut"),
+        (True, False, "beyond the cutting plane"),
+        (True, None, "beyond the cutting plane"),
+    ),
+)
+def test_section_rejects_missing_native_partial_or_surface_cut(
+    monkeypatch, partial, surface_only, message
+) -> None:
+    cut = SimpleNamespace(
+        GetPartialSection=lambda: partial,
+        GetDisplayOnlySurfaceCut=lambda: surface_only,
+    )
+    view = SimpleNamespace(GetSection=lambda: cut)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _: obj)
+    if message is None:
+        drawing._assert_cheek_section_display(view)
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            drawing._assert_cheek_section_display(view)
