@@ -693,8 +693,14 @@ reactivated a captured configuration. Follow the pen/oblique-jig pattern at
 the balloon boundary: activate the exploded view's referenced configuration,
 read it back, let the unchanged balloon reader show/collapse its real named
 explode, then restore the source's prior configuration in `finally` and check
-that the drawing view remains exploded in its intended configuration. The MG
-recipe does this for both exploded groups; collapsed views do not switch.
+that the drawing view remains exploded in its intended configuration. Record
+the source's initial `GetSaveFlag` and refuse a newly dirty source after
+restoration, before drawing `SaveAs3` can persist the released assembly; never
+save the source or clear its dirty flag to conceal the transition. Preserve
+the primary balloon error if cleanup also fails. Drawing-view configurations
+must remain final once the BOM binds: only the source's active configuration
+may switch for these guarded reads. The MG recipe does this for both exploded
+groups; collapsed views do not switch.
 Missing explode steps still fail. Do not change geometry, fitter cameras,
 standard views or the shared zero-step guard to conceal this mismatch.
 

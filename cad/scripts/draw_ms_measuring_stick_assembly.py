@@ -111,15 +111,17 @@ TITLE_BLOCK = (
 
 # Sheet 1: the 200-long stick at full size, working elevation screw-up.
 # The graduated underside sits below Front in aligned third-angle projection.
-# Section A-A shows the actual upright clamp. Both dimension rows remain above
-# Front, with the setting line clear of the upper cutting-plane arrow/letter.
+# Section A-A uses native end-only cutting-line style: its upper arrow sits
+# above the setting witnesses, below the overall reference dimension.
 FRONT_CENTER = (0.135, 0.190)
 UNDERSIDE_CENTER = (FRONT_CENTER[0], 0.130)
 UNDERSIDE_CAPTION_XY = (0.035, 0.145)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
-STOP_POSITION_TEXT_Y = 0.240
+CLAMP_SECTION_TOP_CLEARANCE = 0.018
+CLAMP_SECTION_BOTTOM_CLEARANCE = 0.004
+STOP_POSITION_TEXT_Y = 0.220
 # Fraction of the setting span from the stick end: left of centre, so the
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
@@ -745,6 +747,13 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     """Upright working elevation and clamp section, with the labelled
     graduated-underside inspection and the controlled near-face setting."""
     _activate_sheet(adapter, SHEET_NAMES[0])
+    # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
+    # retain the full cutting plane and both arrows, not a hidden section line.
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(542, 0, 1):
+        raise RuntimeError("failed to set end-only section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 1:
+        raise RuntimeError("section cutting-line style did not persist")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     underside = place_view(
         adapter, str(SOURCE), spec.DRAWING_UNDERSIDE_VIEW,
@@ -760,17 +769,20 @@ def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
     )
 
     _left, y0, _right, y1 = _view_outline(front, label="clamped front")
+    axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
     station_x = model_point_in_view(
-        adapter,
-        front,
-        (spec.THUMB_ORIGIN[0] / 1000.0, 0.0, 0.0),
-        label="thumbscrew-axis cutting-plane station",
+        adapter, front, axis_point, label="thumbscrew-axis cutting-plane station",
     )[0]
+    underside_station_x = model_point_in_view(
+        adapter, underside, axis_point, label="underside thumbscrew-axis alignment",
+    )[0]
+    if abs(station_x - underside_station_x) > 1e-6:
+        raise RuntimeError("Front and underside thumbscrew axes are not aligned")
     section = create_section_view(
         adapter,
         front,
-        line_start=(station_x, y1 + 0.004),
-        line_end=(station_x, y0 - 0.004),
+        line_start=(station_x, y1 + CLAMP_SECTION_TOP_CLEARANCE),
+        line_end=(station_x, y0 - CLAMP_SECTION_BOTTOM_CLEARANCE),
         view_xy=CLAMP_SECTION_CENTER,
         section_label=CLAMP_SECTION_LABEL,
         scale=CLAMP_SECTION_SCALE,
