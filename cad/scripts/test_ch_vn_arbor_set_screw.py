@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 
 import _config
-import _mcmaster_91375a106 as spec
-import build_ch_vn_arbor_set_screw as ch_part
+import sh_vn_arbor_set_screw_spec as spec
+import build_sh_vn_arbor_set_screw as ch_part
 import build_dt_vn_arbor_set_screw as dt_part
-import draw_ch_vn_arbor_set_screw as ch_drawing
+import draw_sh_vn_arbor_set_screw as ch_drawing
 import draw_dt_vn_arbor_set_screw as dt_drawing
 from _appearance import PANEL_BLACK
 from _drawing_registry import DRAWINGS_BY_NAME

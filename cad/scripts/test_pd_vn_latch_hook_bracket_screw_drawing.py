@@ -7,7 +7,7 @@ import pytest
 from _column_clamp_interface import BAR_DEPTH
 import _config
 import build_pd_vn_latch_hook_bracket_screw as part
-import pd_vn_latch_hook_bracket_screw_spec as spec
+import pd_latch_hook_bracket_screw_spec as spec
 import pd_support_bar_spec as bar
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS

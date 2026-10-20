@@ -45,11 +45,11 @@ from _hole_spec import TAP_DRILL_MM
 # Only nominal penetration is shared across assemblies, not the part's full
 # drawing/placement recipe (which depends on the cone/channel station grid).
 from dt_post_mount_stack import POST_SCREW_ENGAGEMENT_NOMINAL as _POST_SCREW_ENGAGEMENT
-from _mcmaster_91375a106 import LENGTH as _ARBOR_SET_SCREW_LENGTH
-from _mcmaster_91375a106 import THREAD as _ARBOR_SET_SCREW_THREAD
-from dt_vn_swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
-from dt_vn_swing_stop_screw_spec import SHANK_DIA as _STOP_SHANK_DIA
-from dt_vn_swing_stop_screw_spec import THREAD as _STOP_THREAD
+from sh_vn_arbor_set_screw_spec import LENGTH as _ARBOR_SET_SCREW_LENGTH
+from sh_vn_arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
+from dt_swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
+from dt_swing_stop_screw_spec import SHANK_DIA as _STOP_SHANK_DIA
+from dt_swing_stop_screw_spec import THREAD as _STOP_THREAD
 from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
@@ -74,6 +74,11 @@ def _smooth_annulus_limit_mm3(
     return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
 
 
+def _occurrence(prefix: str, number: int) -> str:
+    """Append an ordinal to an explicit role prefix or a native family."""
+    return f"{prefix}{number}" if prefix.endswith(":") else f"{prefix}-{number}"
+
+
 def _numbered_pairs(
     first_stem: str,
     numbers: Iterable[int],
@@ -82,12 +87,14 @@ def _numbered_pairs(
     *,
     second_number: int | None = 1,
 ) -> dict[frozenset[str], float]:
-    """Build exact numbered component pairs, optionally matching suffixes."""
+    """Build exact native or explicit ``@Role:N`` pairs, retaining each bound."""
     return {
         frozenset(
             (
-                f"{first_stem}-{number}",
-                f"{second_stem}-{number if second_number is None else second_number}",
+                _occurrence(first_stem, number),
+                _occurrence(
+                    second_stem, number if second_number is None else second_number
+                ),
             )
         ): limit
         for number in numbers
@@ -165,7 +172,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("dt-crank-pin-1", "dt-crank-hub-1")): 1.10 * _CRANK_PIN_HUB_MM3,
     frozenset(("dt-crank-pin-1", "dt-crankshaft-1")): 1.10 * _CRANK_PIN_SHAFT_MM3,
     # Stock 6.35 shank minus the 1.0 eye wire and 0.02 face clearance.
-    frozenset(("dt-vn-fillister-screw-1", "dt-crank-arm-1")): _smooth_annulus_limit_mm3(
+    frozenset(("sh-vn-brass-fillister-screw-1", "dt-crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
     # MHA-DT-32 #6-32 major in the arm's #36 tap drill: the full thread past the
@@ -208,7 +215,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     # measured overlap x 1.10 from the first drive_train leaf, as #838 did for
     # the tip-block pairs.
     **_numbered_pairs(
-        "dt-vn-arbor-set-screw",
+        "sh-vn-arbor-set-screw",
         range(1, 3),
         "dt-arbor-pedestal",
         _smooth_annulus_limit_mm3(
@@ -274,7 +281,7 @@ _FRAME_ALLOWED_PAIRS = {
     ),
     # Four nameplate corners: 6.35-mm stock shank through the 1.5-mm plate.
     **_numbered_pairs(
-        "fr-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         range(1, 5),
         "fr-harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.85),
@@ -322,12 +329,12 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     # arc's mating face stops short of the column axis,
     # sh_column_clamp_back_geom.GRIP_OFFSET) = 4.35 in the back arc's tap.
     **_numbered_pairs(
-        "mg-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 4.35),
     ),
-    frozenset(("mg-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _MG_CLAMP_THUMB_LIMIT,
+    frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _MG_CLAMP_THUMB_LIMIT,
     frozenset(
         ("mg-magnifying-vertical-rod-1", "mg-magnifying-clamp-1")
     ): _MG_ROD_THREAD_LIMIT,
@@ -338,7 +345,7 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1")): _smooth_annulus_limit_mm3(
         4.7625, 4.7371, 9.0
     ),
-    frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
+    frozenset(("sh-vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
     frozenset(
         ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
     ): _MG_LEVER_PRESS_LIMIT,
@@ -502,14 +509,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # The bar-clamp screws: the receiver length past bar, front arc and the
     # 0.5 grip gap (build_pd_paper_drive_assembly's clamp stack).
     **_numbered_pairs(
-        "pd-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         range(1, 3),
         "sh-column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 8.5124),
         second_number=2,
     ),
     **_numbered_pairs(
-        "pd-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         range(3, 5),
         "sh-column-clamp-back",
         _smooth_annulus_limit_mm3(4.1656, 3.454, 8.5124),
@@ -527,13 +534,13 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # MHA-PD-VN-52 guide screws: seed -1, then the grid -2..-10, alternating
     # between the two guide rails.
     **_numbered_pairs(
-        "pd-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         range(1, 11, 2),
         "pd-platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
     ),
     **_numbered_pairs(
-        "pd-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         range(2, 11, 2),
         "pd-platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
@@ -579,7 +586,7 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # MHA-PD-14 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
     # support bar's #43 taps.
     **_numbered_pairs(
-        "pd-vn-latch-hook-bracket-screw",
+        "sh-vn-fillister-screw-90280a108",
         range(1, 3),
         "pd-support-bar",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8),
@@ -689,7 +696,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         _KNIFE_HANGER_SEAT_OVERLAP_LIMIT,
     ),
     frozenset(
-        ("mg-magnifier-1/mg-vn-thumb-screw-2", "mg-magnifier-1/mg-output-fixture-1")
+        ("mg-magnifier-1/sh-vn-thumb-screw-2", "mg-magnifier-1/mg-output-fixture-1")
     ): _MG_FIXTURE_THREAD_LIMIT,
     frozenset(
         (
@@ -732,7 +739,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(6.35, 5.105, 12.7),
     ),
     **_numbered_pairs(
-        "dt-drive-train-1/dt-vn-swing-stop-screw",
+        "dt-drive-train-1/@SwingStopScrew:",
         range(1, 2),
         "fr-frame-1/fr-harmonic-base",
         _smooth_annulus_limit_mm3(
@@ -751,7 +758,7 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         ),
     ),
     **_numbered_pairs(
-        "dt-drive-train-1/dt-vn-foot-screw",
+        "dt-drive-train-1/@FootScrew:",
         range(1, 2),
         "fr-frame-1/fr-harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 8.725),
@@ -843,7 +850,7 @@ _CHANNEL_ALLOWED_PAIRS = {
         second_number=None,
     ),
     **_numbered_pairs(
-        "ch-vn-arbor-set-screw",
+        "sh-vn-arbor-set-screw",
         range(1, 3),
         "ch-pivot-bracket",
         PIVOT_EAR_SET_SCREW_LIMIT,
@@ -885,7 +892,7 @@ _CHANNEL_ALLOWED_PAIRS = {
 MS_THUMB_SCREW_THREAD = (2.8448, 2.261, 8.6)
 MS_PLATE_SCREW_THREAD = (2.1844, 1.85, 6.35 - 1.0)
 _MS_MEASURING_STICK_ALLOWED_PAIRS = {
-    frozenset(("ms-vn-thumb-screw-1", "ms-stop-block-1")): _smooth_annulus_limit_mm3(
+    frozenset(("sh-vn-thumb-screw-1", "ms-stop-block-1")): _smooth_annulus_limit_mm3(
         *MS_THUMB_SCREW_THREAD
     ),
     **_numbered_pairs(
@@ -1021,16 +1028,16 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(*JIG_LEVER_SCREW_THREAD),
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-hold-down-stud",
+        "@HoldDownStud:",
         range(1, 5),
-        f"{_JIG_VENDOR}-t-nut",
+        "@TNut:",
         _smooth_annulus_limit_mm3(*JIG_T_NUT_THREAD),
         second_number=None,
     ),
     **_numbered_pairs(
-        f"{_JIG_VENDOR}-hold-down-stud",
+        "@HoldDownStud:",
         range(1, 5),
-        f"{_JIG_VENDOR}-flange-nut",
+        "@FlangeNut:",
         _smooth_annulus_limit_mm3(*JIG_FLANGE_NUT_THREAD),
         second_number=None,
     ),

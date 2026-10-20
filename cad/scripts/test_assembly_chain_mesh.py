@@ -15,6 +15,7 @@ import pytest
 
 import _assembly
 import _chain
+import _component_references
 import pd_transgear_removable_spec as removable
 import _sprocket_seat_geometry as seat_geometry
 from _chain_mounts import mounted_wheels
@@ -45,9 +46,15 @@ class _Component:
         total=None,
         relative=None,
         error: Exception | None = None,
+        native_stem: str | None = None,
+        component_reference: str = "",
     ) -> None:
         self._name = name
         self._configuration = configuration
+        self.ComponentReference = component_reference
+        self._path = (
+            f"C:/native/{native_stem or name.rsplit('/', 1)[-1].rsplit('-', 1)[0]}.SLDPRT"
+        )
         self.total = total
         self.relative = relative
         self.error = error
@@ -62,6 +69,9 @@ class _Component:
     def ReferencedConfiguration(self) -> str:
         return self._configuration
 
+
+    def GetPathName(self) -> str:
+        return self._path
     def GetTotalTransform(self, include_presentation: bool):
         assert include_presentation is False
         self.total_requests.append(include_presentation)
@@ -158,6 +168,7 @@ def observations(monkeypatch):
         return value
 
     monkeypatch.setattr(_assembly, "_early_bound", bind)
+    monkeypatch.setattr(_component_references, "_early_bound", bind)
     monkeypatch.setattr(_assembly._telemetry, "span", span)
     monkeypatch.setattr(
         _assembly._telemetry,
@@ -191,8 +202,23 @@ def _wheel(role: str, *, name: str = "pd-transgear-removable-17", values=None):
     )
 
 
-def _link(name: str = "pd-vn-chain-inner-link-8") -> _Component:
-    return _Component(name)
+def _link(
+    name: str = "sh-vn-chain-link--InnerLink-88",
+    *,
+    configuration: str = "InnerLink",
+    reference: str | None = None,
+    native_stem: str = "sh-vn-chain-link",
+) -> _Component:
+    return _Component(
+        name,
+        configuration,
+        native_stem=native_stem,
+        component_reference=(
+            f"{configuration.removesuffix(' Simplified')}:1"
+            if reference is None
+            else reference
+        ),
+    )
 
 
 def _mesh_adapter(wheel, *, link=None, volume_mm3: float = 0.4) -> _Adapter:
@@ -225,7 +251,9 @@ def test_selected_mounts_allow_mesh_without_a_configuration_whitelist(
         name=f"{prefix}pd-transgear-removable-17",
         values=_mount_values(role, angle=0.37),
     )
-    link = _link(f"{prefix}pd-vn-chain-outer-link-9")
+    link = _link(
+        f"{prefix}sh-vn-chain-link--OuterLink-99", configuration="OuterLink"
+    )
     # Keep the existing unbounded chain-mesh volume protocol unchanged.
     components = [wheel, link] if reverse_pair else [link, wheel]
     adapter = _Adapter(_Interference(components, volume_mm3=1000.0))
@@ -275,7 +303,7 @@ def test_stored_spare_with_the_active_configuration_remains_a_clash(
         _check(adapter)
     assert observations.spans["gate.interference"].attributes["chain_mesh_contacts"] == 1
     assert observations.spans["gate.interference"].attributes["hits"] == 1
-    assert observations.events[0][1]["configurations"] == ["", equal_config]
+    assert observations.events[0][1]["configurations"] == ["InnerLink", equal_config]
     assert adapter.currentModel.manager.releases == 1
 
 
@@ -302,23 +330,59 @@ def test_unregistered_selection_cannot_qualify_even_at_the_mount(
 
 
 @pytest.mark.parametrize(
-    ("wheel_name", "link_name"),
+    "wheel_name",
     [
-        ("pd-transgear-removable-copy-2", "pd-vn-chain-inner-link-1"),
-        ("pd-transgear-removablex-2", "pd-vn-chain-inner-link-1"),
-        ("pd-transgear-removable-2/ordinary-part-1", "pd-vn-chain-inner-link-1"),
-        ("pd-transgear-removable-2", "pd-vn-chain-inner-linkage-1"),
-        ("pd-transgear-removable-2", "pd-vn-chain-inner-link-copy-1"),
-        ("pd-transgear-removable-2", "pd-vn-chain-inner-link-1/ordinary-part-1"),
-        ("pd-transgear-removable", "pd-vn-chain-inner-link-1"),
-        ("pd-transgear-removable-0", "pd-vn-chain-inner-link-1"),
+        "pd-transgear-removable-copy-2",
+        "pd-transgear-removablex-2",
+        "pd-transgear-removable-2/ordinary-part-1",
+        "pd-transgear-removable",
+        "pd-transgear-removable-0",
     ],
 )
-def test_prefix_false_friends_are_not_chain_mesh(observations, wheel_name, link_name):
+def test_sprocket_prefix_false_friends_are_not_chain_mesh(observations, wheel_name):
     wheel = _wheel("crank", name=wheel_name)
     with pytest.raises(RuntimeError, match="interference"):
-        _check(_mesh_adapter(wheel, link=_link(link_name)))
+        _check(_mesh_adapter(wheel))
     assert wheel.total_requests == []
+
+
+@pytest.mark.parametrize(
+    ("stem", "configuration", "reference"),
+    [
+        ("sh-vn-chain-link-copy", "InnerLink", "InnerLink:1"),
+        ("sh-vn-chain-linkage", "InnerLink", "InnerLink:1"),
+        ("pd-vn-chain-connecting-link", "InnerLink", "InnerLink:1"),
+        ("sh-vn-chain-link", "Default", "InnerLink:1"),
+        ("sh-vn-chain-link", "innerlink", "InnerLink:1"),
+        ("sh-vn-chain-link", "InnerLink ", "InnerLink:1"),
+        ("sh-vn-chain-link", "InnerLink", "OuterLink:1"),
+        ("sh-vn-chain-link", "InnerLink", ""),
+        ("sh-vn-chain-link", "InnerLink", "InnerLink:0"),
+        ("sh-vn-chain-link", "InnerLink", "InnerLink:01"),
+        ("sh-vn-chain-link", "InnerLink", "InnerLink:1-copy"),
+    ],
+)
+def test_chain_native_identity_false_friends_fail_closed(
+    observations, stem, configuration, reference
+):
+    wheel = _wheel("crank")
+    link = _link(configuration=configuration, reference=reference, native_stem=stem)
+    with pytest.raises(RuntimeError, match="interference"):
+        _check(_mesh_adapter(wheel, link=link))
+    assert wheel.total_requests == []
+
+
+@pytest.mark.parametrize("configuration", ["InnerLink", "OuterLink Simplified"])
+def test_chain_member_selection_is_not_inferred_from_native_name(
+    observations, configuration
+):
+    link = _link(
+        "pd-paper-drive-1/unrelated-occurrence-name-407",
+        configuration=configuration,
+        reference=f"{configuration.removesuffix(' Simplified')}:23",
+    )
+    _check(_mesh_adapter(_wheel("crank"), link=link))
+    assert observations.spans["gate.interference"].attributes["chain_mesh_contacts"] == 1
 
 
 @pytest.mark.parametrize(
@@ -428,7 +492,9 @@ def test_nested_pose_uses_active_root_without_fallback_or_double_composition(
     # Correct world data must not be composed again; an actually displaced PD
     # must not qualify just because its purported parent-relative mount agrees.
     wheel.relative = _MathTransform(displaced if world_is_mounted else mounted)
-    adapter = _mesh_adapter(wheel, link=_link("pd-paper-drive-1/pd-vn-chain-inner-link-1"))
+    adapter = _mesh_adapter(
+        wheel, link=_link("pd-paper-drive-1/sh-vn-chain-link--InnerLink-100")
+    )
     if world_is_mounted:
         _check(adapter)
     else:
@@ -497,7 +563,10 @@ def test_link_contacts_and_allowed_pairs_keep_their_aggregate_behavior(
     names = [component.Name2 for component in pair]
     limit = {frozenset(names): 1.0}
     adapter = _Adapter(
-        _Interference([_link(), _link("pd-vn-chain-outer-link-2")], 20.0),
+        _Interference(
+            [_link(), _link("sh-vn-chain-link--OuterLink-77", configuration="OuterLink")],
+            20.0,
+        ),
         _Interference([_link(), _wheel("crank")], 0.5),
         _Interference(pair, pair_total / 2.0),
         _Interference(tuple(reversed(pair)), pair_total / 2.0),
@@ -576,9 +645,8 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
 def test_the_connecting_link_has_no_generic_chain_exemption(observations) -> None:
     """It is not a gate chain-link family: its one T24 mesh is a bounded exact
     pair (test_pd_paper_drive_interference_contracts); any other touch fails."""
-    connecting = _link("pd-vn-chain-connecting-link-1")
-    assert not connecting.Name2.startswith(_assembly._CHAIN_LINK_PREFIXES)
-    for other in (_link("pd-vn-chain-inner-link-1"), _wheel("knob")):
+    connecting = _Component("pd-vn-chain-connecting-link-1")
+    for other in (_link(), _wheel("knob")):
         with pytest.raises(RuntimeError, match="interference"):
             _check(_Adapter(_Interference([connecting, other])))
 

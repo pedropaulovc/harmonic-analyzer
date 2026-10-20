@@ -34,7 +34,7 @@ class ExplodeStep:
 
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -35.0),
-    ExplodeStep("guide screws forward", ("pd-vn-fillister-screw",), "z", -45.0),
+    ExplodeStep("guide screws forward", ("sh-vn-brass-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",
         ("pd-platen-clip", "pd-platen-paper", "pd-vn-platen-clip-screw"),
@@ -58,7 +58,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "pd-support-bar",
             "sh-column-clamp-front",
             "sh-column-clamp-back",
-            "pd-vn-clamp-screw",
+            "sh-vn-clamp-screw",
         ),
         "y",
         200.0,
@@ -70,7 +70,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         30.0,
     ),
     ExplodeStep("back arcs rearward", ("sh-column-clamp-back",), "z", 30.0),
-    ExplodeStep("clamp screws forward", ("pd-vn-clamp-screw",), "z", -45.0),
+    ExplodeStep("clamp screws forward", ("sh-vn-clamp-screw",), "z", -45.0),
 )
 # The platen carries the balloons in place.
 STATIONARY_STEMS = frozenset({"pd-platen"})

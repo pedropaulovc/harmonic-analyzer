@@ -11,7 +11,7 @@ from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
-from _mcmaster_91375a106 import THREAD as SET_SCREW_THREAD
+from sh_vn_arbor_set_screw_spec import THREAD as SET_SCREW_THREAD
 from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
 

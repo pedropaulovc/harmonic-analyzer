@@ -124,9 +124,9 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # magnifier assembly holds it COINCIDENT to the lever-wire's Top plane, tying the
 # wheel's spin to the lever group's travel along the wire (the linearized
 # inextensible-wire constraint -- see build_mg_vn_lever_wire's docstring). The azimuth
-# is layout-derived, so it is imported from mg_vn_lever_wire_geom: a layout move
+# is layout-derived, so it is imported from sh_vn_music_wire_lever_geom: a layout move
 # re-tangents the wire AND re-stamps this point in one rebuild.
-from mg_vn_lever_wire_geom import (  # noqa: E402
+from sh_vn_music_wire_lever_geom import (  # noqa: E402
     WHEEL_X as _YOKE_WHEEL_X,
     YOKE_POINT as _YOKE_POINT,
 )

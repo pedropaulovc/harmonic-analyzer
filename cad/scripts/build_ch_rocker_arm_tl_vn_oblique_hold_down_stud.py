@@ -27,7 +27,7 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import add_line_chain, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_polygon_chain
-from ch_rocker_arm_tl_vn_oblique_hold_down_stud_spec import (
+from sh_vn_clamping_kit_hold_down_stud_spec import (
     DRAWING_NOTES,
     LENGTH,
     MAJOR_DIA,

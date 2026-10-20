@@ -32,7 +32,7 @@ from _mg_wheel_rim_geometry import (
     RIM_INNER_DIA,
     RIM_OUTER_DIA,
 )
-import mg_vn_lever_wire_geom as _lever
+import sh_vn_music_wire_lever_geom as _lever
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,
     CAST_ROUND_R,

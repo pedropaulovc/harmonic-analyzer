@@ -12,7 +12,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A108 import build_90280A108
-from dt_vn_swing_stop_screw_spec import PROUD_LEN
+from dt_swing_stop_screw_spec import PROUD_LEN
 
 PART_NAME = "dt-vn-swing-stop-screw"
 SPEC = fastener(PART_NAME)

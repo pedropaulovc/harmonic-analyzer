@@ -6,7 +6,7 @@ from pathlib import Path
 
 import build_pn_vn_pen_wire as part
 import draw_pn_vn_pen_wire as drawing
-import pn_vn_pen_wire_spec
+import sh_vn_music_wire_pen_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -18,8 +18,8 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is pn_vn_pen_wire_spec.DRAWING_DIMENSIONS
-    marked = set().union(*pn_vn_pen_wire_spec.DRAWING_DIMENSIONS.values())
+    assert part.DRAWING_DIMENSIONS is sh_vn_music_wire_pen_spec.DRAWING_DIMENSIONS
+    marked = set().union(*sh_vn_music_wire_pen_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP)
     assert kept == marked
 
@@ -27,7 +27,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
 def test_notes_name_the_registry_sku() -> None:
     import _config
 
-    notes = pn_vn_pen_wire_spec.DRAWING_NOTES
+    notes = sh_vn_music_wire_pen_spec.DRAWING_NOTES
     (sku,) = _config.parts("pn-vn-pen-wire")["supplier_skus"]
     assert sku in notes
     assert "NOT A CUT" in notes
@@ -42,7 +42,7 @@ def test_view_scale_is_explicit() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "scale=(2, 1)" in source
-    assert pn_vn_pen_wire_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 2:1"
+    assert sh_vn_music_wire_pen_spec.ELEVATION_VIEW_NOTE == "ELEVATION SCALE 2:1"
 
 
 def test_part_stamps_make_critical_properties() -> None:

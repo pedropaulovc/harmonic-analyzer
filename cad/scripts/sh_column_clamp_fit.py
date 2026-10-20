@@ -38,7 +38,7 @@ from fr_tube_frame_spec import MM_PER_IN, OUTER_DIA as COLUMN_DIA
 from sh_column_clamp_back_geom import BLOCK_DEPTH, GRIP_OFFSET
 from _column_clamp_interface import ARC_DEPTH
 from sh_column_clamp_front_geom import COLUMN_BORE, EAR_HOLE_SPEC
-from _mcmaster_90280a201 import SHANK_DIA as CLAMP_SCREW_MAJOR
+from sh_vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 
 COLUMN_MATE = "MHA-FR-03 COLUMN"
 

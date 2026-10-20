@@ -24,5 +24,5 @@ EXPLODE_STEPS = (
     ("cover comes off", ("ms-stop-plate", "ms-vn-stop-plate-screw"), "z", 24.0),
     ("plate screws withdraw", ("ms-vn-stop-plate-screw",), "z", 26.0),
     ("stick leaves window", ("ms-stick",), "z", 12.0),
-    ("thumbscrew backs out", ("ms-vn-thumb-screw",), "y", 22.0),
+    ("thumbscrew backs out", ("sh-vn-thumb-screw",), "y", 22.0),
 )

@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 
 import _config
-import build_mg_vn_clamp_screw as mg_part
+import build_sh_vn_clamp_screw as mg_part
 import build_pd_vn_clamp_screw as pd_part
-import _mcmaster_90280a201 as spec
-from _mcmaster_90280a201 import FILLISTER_SIZE
+import sh_vn_clamp_screw_spec as spec
+from sh_vn_clamp_screw_spec import FILLISTER_SIZE
 from _simplified_part import save_simplified_part
 from _stock_fastener import RigidTransform, StockComponent
 from diagnostics.diag_build_90280A201 import build_90280A201

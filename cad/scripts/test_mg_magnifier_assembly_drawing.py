@@ -421,15 +421,16 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     import math
 
-    import build_mg_vn_lever_wire
-    import mg_vn_lever_wire_geom as wire
+    import sh_vn_music_wire_lever_geom as wire
 
     x, station, z = drawing.WIRE_BALLOON_POINT_MM
     # On the build's split ring, mid-run, on the wire's surface.
-    assert station == pytest.approx(build_mg_vn_lever_wire.BALLOON_RING_STATION)
+    assert station == pytest.approx(
+        drawing.sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION * wire.WIRE_LEN
+    )
     assert station == pytest.approx(wire.WIRE_LEN / 2.0)
     assert math.hypot(x, z) == pytest.approx(wire.WIRE_DIA / 2.0)
-    assert drawing.BALLOON_ANCHORS["mg-vn-lever-wire"].point_mm == drawing.WIRE_BALLOON_POINT_MM
+    assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm == drawing.WIRE_BALLOON_POINT_MM
     # Turned into the machine frame, the point's outward normal faces +X+Y+Z.
     delta = [h - d for h, d in zip(wire.WIRE_START, wire.WIRE_END)]
     axis = [v / math.hypot(*delta) for v in delta]
@@ -650,21 +651,23 @@ def test_plan_explode_resolves_instances_and_refuses_missing_ones() -> None:
 
 
 def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
-    assert drawing.BOM_COMPONENTS == notes.BOM_ORDER
+    assert drawing.BOM_COMPONENTS == tuple(
+        drawing.BOM_ROW_KEYS[stem] for stem in notes.BOM_ORDER
+    )
     assert set(notes.BOM_DESCRIPTIONS) == set(notes.BOM_ORDER)
     for stem, row in drawing.PART_ROWS.items():
         assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
         skus = row.get("supplier_skus") or ()
         assert drawing.BOM_SKUS[stem] == (" / ".join(skus) if skus else "-")
-    assert drawing.BOM_SKUS["mg-vn-thumb-screw"] == "91882A221"
+    assert drawing.BOM_SKUS["sh-vn-thumb-screw"] == "91882A221"
     assert drawing.BOM_SKUS["mg-magnifying-lever"] == "-"
-    assert notes.QUANTITIES["mg-vn-thumb-screw"] == 2
+    assert notes.QUANTITIES["sh-vn-thumb-screw"] == 2
 
 
 def test_the_bom_screw_lengths_are_the_vendor_specs_fractions() -> None:
-    import _mcmaster_90280a201 as clamp_screw
+    import sh_vn_clamp_screw_spec as clamp_screw
     import mg_vn_magnifying_bracket_screw_spec as bracket_screw
-    from _mcmaster_91882a221 import SHANK_LEN as thumb_len
+    from sh_vn_thumb_screw_spec import SHANK_LEN as thumb_len
 
     for stem, length_mm, printed in (
         (notes.CLAMP_SCREW, clamp_screw.SHANK_LEN, "1-1/4"),
@@ -687,7 +690,7 @@ def test_a_stock_screw_length_change_reprints_its_bom_fraction(
     # fraction, not fail an import on a duplicated expected length.
     import importlib
 
-    import _mcmaster_90280a201 as clamp_screw
+    import sh_vn_clamp_screw_spec as clamp_screw
 
     monkeypatch.setattr(clamp_screw, "SHANK_LEN", length_mm)
     try:

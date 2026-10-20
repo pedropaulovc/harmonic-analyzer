@@ -185,17 +185,17 @@ LEVER_ROD_Y = 979.7
 # lever rod, the clamp's thumb screw, the vertical rod, the fixture's wire hook
 # and the drum's wire lane all lie in one plane, so WIRE 1 runs straight down
 # it with no depth lean. LEVER_ROD_Z is therefore the drum lane
-# (mg_vn_lever_wire_geom.DRUM_END_Z, asserted below). It stays a module-level
+# (sh_vn_music_wire_lever_geom.DRUM_END_Z, asserted below). It stays a module-level
 # literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
 # LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
 # casting's front rail imposes no depth bound (the exact-stock thumb-screw
 # reach, asserted below, keeps its head under the rail), and the Ø6 lever's
 # clearance to the front column surface (-124.7) is now ~45.8 -- trivially
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
-# mg_vn_lever_wire_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
+# sh_vn_music_wire_lever_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
 # plate flange (magnifying_bracket_joint_layout).
 LEVER_ROD_Z = -173.51
-from mg_vn_lever_wire_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
+from sh_vn_music_wire_lever_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa: E402
 
 assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
     f"magnifying group plane {LEVER_ROD_Z} left the drum wire lane {LEVER_WIRE_DRUM_Z}"
@@ -225,7 +225,7 @@ assert math.isclose(LEVER_X0 - KNIFE_LOCAL_X, KNIFE[0], abs_tol=1e-9), (
 assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9), (
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
 )
-from _mcmaster_91882a221 import (  # noqa: E402
+from sh_vn_thumb_screw_spec import (  # noqa: E402
     HEAD_STACK_LEN as THUMB_HEAD_STACK_LEN,
     SHANK_LEN as THUMB_SHANK_LEN,
 )
@@ -342,11 +342,12 @@ assert (stack_spec.AXLE_X, stack_spec.AXLE_Y, stack_spec.BAR_FRONT_Z) == (
     BAR_FRONT_Z,
 ), "mg_magnifier_assembly_spec's axle line drifted from the placed axle"
 # --- amplification wire 1 (fixture -> drum) ----------------------------------
-# Endpoints + length live in build_mg_vn_lever_wire.py (the part's length IS the run);
+# Endpoints + length live in sh_vn_music_wire_lever_geom (the part's length IS the run);
 # re-derive the anchors from THIS script's layout and fail loud on drift, so a
 # layout move can never leave a floating wire.
-from mg_vn_lever_wire_geom import (  # noqa: E402
+from sh_vn_music_wire_lever_geom import (  # noqa: E402
     CLEARANCE as WIRE_CLEARANCE,
+    CONFIGURATION as LEVER_WIRE_CONFIGURATION,
     DRUM_DIA,
     RUN_GAPS,
     WIRE_DIA as HUB_WIRE_DIA,
@@ -381,7 +382,7 @@ assert math.isclose(
 ), "lever-wire end is not tangent to the drum"
 # ... inside the drum's axial span (boss front face .. spigot front end, wire
 # r inside each), and the slanted run clears the rim, spokes and boss pen-side
-# faces it passes (RUN_GAPS, asserted >= CLEARANCE in mg_vn_lever_wire_geom).
+# faces it passes (RUN_GAPS, asserted >= CLEARANCE in sh_vn_music_wire_lever_geom).
 assert (
     WHEEL_MID_Z + HUB_STEP_Z - HUB_WIRE_DIA / 2.0
     > HUB_WIRE_END[2]
@@ -706,7 +707,7 @@ async def build(adapter) -> dict[str, str]:
     seed_target = [seed_x, WHEEL_BAR_Y, BAR_FRONT_Z]
     clamp_seed = await place_component(
         adapter,
-        "mg-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -867,7 +868,7 @@ async def build(adapter) -> dict[str, str]:
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(
         adapter,
-        "mg-vn-thumb-screw",
+        "sh-vn-thumb-screw",
         [CLAMP_X, THUMB_SCREW_OUTER_FACE_Y, LEVER_ROD_Z],
         [180.0, 0.0, -90.0],
         _rz90_ry180,
@@ -911,7 +912,7 @@ async def build(adapter) -> dict[str, str]:
     assert_component_placed(adapter, fixture, list(FIXTURE_POSITION), FIXTURE_ROWS)
     fixture_screw = await place_component(
         adapter,
-        "mg-vn-thumb-screw",
+        "sh-vn-thumb-screw",
         list(FIXTURE_SCREW_POSITION),
         euler_from_rows(FIXTURE_SCREW_ROWS),
         FIXTURE_SCREW_ROWS,
@@ -1034,11 +1035,14 @@ async def build(adapter) -> dict[str, str]:
     # origin = the DRUM end, +Y toward the hook.
     hw = await place_component(
         adapter,
-        "mg-vn-lever-wire",
+        "sh-vn-music-wire",
         list(HUB_WIRE_END),
         euler_from_rows(_HW_ROWS),
         _HW_ROWS,
         ground=False,
+        configuration=LEVER_WIRE_CONFIGURATION,
+        component_reference="LeverWire:1",
+        occurrence_basename=f"sh-vn-music-wire--{LEVER_WIRE_CONFIGURATION}",
     )
     hw_o = component_origin(adapter, hw)
     # The wire ARTICULATES instead of riding the lever group rigidly (a locked
@@ -1100,10 +1104,10 @@ async def build(adapter) -> dict[str, str]:
     # WireYokePoint (drum pitch circle @ the wire tangency) held coincident to
     # the lever-wire's Top plane (perpendicular to the wire axis, through the
     # drum end; the coplanar A1 route puts the yoke point on it -- asserted in
-    # mg_vn_lever_wire_geom). The wheel's
+    # sh_vn_music_wire_lever_geom). The wheel's
     # spin -- its one remaining DOF -- is thereby tied to the lever group's
     # travel along the wire: the linearized inextensible-wire constraint, sign
-    # and ratio from geometry (build_mg_vn_lever_wire docstring). With every freed
+    # and ratio from geometry (sh_vn_music_wire_lever_geom). With every freed
     # DOF genuinely free, dragging the lever turns the wheel. The mate is
     # residual-free at the rest pose, so the wheel must NOT move when it
     # solves -- asserted right after.
@@ -1132,7 +1136,7 @@ async def build(adapter) -> dict[str, str]:
         required_stems=(
             "mg-magnifying-lever",
             "mg-magnifying-wheel",
-            "mg-vn-lever-wire",
+            "sh-vn-music-wire",
             "mg-magnifying-bracket",
         ),
     )

@@ -100,9 +100,9 @@ def _helper_names(stem_script: str) -> set[str]:
 # Audited against each builder's insertion calls, local tuple/batch manifests,
 # generated spring family and top-level SUBASSEMBLIES (not the old regex output).
 _INSERTED_SOURCES = {
-    "fr_frame": "fr_vn_fillister_screw fr_vn_frame_cross_screw fr_vn_gooseneck_set_screw fr_harmonic_base "
+    "fr_frame": "sh_vn_brass_fillister_screw fr_vn_frame_cross_screw fr_vn_gooseneck_set_screw fr_harmonic_base "
     "fr_vn_lag_screw fr_nameplate fr_rocker_arm_support fr_top_frame fr_tube_frame fr_vn_tube_frame_cap",
-    "dt_drive_train": "dt_alignment_pinion dt_arbor_pedestal dt_vn_arbor_set_screw dt_cone_gear dt_cone_gear_shaft "
+    "dt_drive_train": "dt_alignment_pinion dt_arbor_pedestal sh_vn_arbor_set_screw dt_cone_gear dt_cone_gear_shaft "
     "dt_vn_cone_lock_knob dt_cone_pivot_post dt_vn_cone_pivot_screw dt_cone_swing_platform "
     "dt_vn_cone_tip_adjuster dt_cone_tip_block dt_vn_cone_tip_block_screw dt_vn_cone_tip_collar dt_vn_cone_tip_pinch_screw "
     "dt_crank_arm dt_crank_drive_gear dt_crank_handle dt_crank_handle_butt_cup dt_crank_handle_ferrule "
@@ -110,25 +110,24 @@ _INSERTED_SOURCES = {
     "dt_crank_pin_eye dt_crank_pin_ring dt_vn_crank_seat_drive_pin "
     "dt_crank_pinion dt_crank_pinion_pin dt_crankshaft dt_cylinder_end_disc dt_cylinder_gear "
     "dt_vn_cylinder_bank_spring dt_cylinder_gear_shaft "
-    "dt_vn_fillister_screw dt_vn_foot_screw dt_vn_keeper_chain dt_vn_keeper_chain_link dt_vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
+    "sh_vn_brass_fillister_screw sh_vn_fillister_screw_90280a108 dt_vn_keeper_chain dt_vn_keeper_chain_link dt_vn_pedestal_hold_down_screw dt_pinion_arbor dt_pinion_arbor_collar dt_pinion_bracket dt_pinion_cam "
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
-    "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw "
-    "dt_vn_swing_stop_screw",
+    "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring dt_vn_pinion_strap_pin dt_vn_post_mount_screw dt_vn_slotted_screw",
     "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever ch_vn_channel_spring_installed ch_connecting_rod "
     "ch_vn_frame_side_screw ch_fulcrum_keeper ch_vn_fulcrum_set_screw ch_fulcrum_shaft ch_vn_bracket_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm ch_vn_rocker_bank_spring ch_vn_rocker_thrust_washer ch_rod_pivot_pin ch_vn_spring_hook "
-    "ch_anchor_jam_nut ch_vn_arbor_set_screw",
+    "ch_anchor_jam_nut sh_vn_arbor_set_screw",
     "sm_summing": "sm_vn_boss_hook sm_vn_boss_hook_jam_nut sm_vn_counter_spring sm_gooseneck sm_gooseneck_spring_screw sm_vn_knife_hanger_stud sm_vn_knife_hanger_washer sm_vn_knife_mount_dowel sm_knife_mount sm_summing_lever",
-    "mg_magnifier": "mg_vn_clamp_screw sh_column_clamp_back sh_column_clamp_front mg_vn_lever_wire "
+    "mg_magnifier": "sh_vn_clamp_screw sh_column_clamp_back sh_column_clamp_front sh_vn_music_wire "
     "mg_magnifying_bracket mg_vn_magnifying_bracket_screw mg_magnifying_clamp mg_magnifying_lever mg_magnifying_vertical_rod "
-    "mg_magnifying_wheel mg_output_fixture mg_vn_thumb_screw mg_wheel_axle mg_wheel_axle_spacer mg_vn_wheel_axle_back_washer "
+    "mg_magnifying_wheel mg_output_fixture sh_vn_thumb_screw mg_wheel_axle mg_wheel_axle_spacer mg_vn_wheel_axle_back_washer "
     "mg_vn_wheel_axle_front_washer mg_vn_wheel_axle_nut mg_wheel_bar mg_wheel_drum",
     "pn_pen": "pn_vn_hanger_screw pn_pen_adjust_screw pn_vn_pen_adjust_nut pn_pen_frame pn_pen_hanger "
     "pn_vn_pen_hanger_jam_nut pn_vn_pen_hanger_nut pn_vn_pen_marker "
-    "pn_pen_rod pn_vn_pen_rod_set_screw pn_vn_pen_set_screw pn_pen_v_block pn_vn_pen_wire",
-    "pd_paper_drive": "pd_vn_chain_connecting_link pd_vn_chain_inner_link pd_vn_chain_outer_link pd_vn_clamp_screw "
-    "sh_column_clamp_back sh_column_clamp_front pd_vn_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
-    "pd_vn_latch_hook_bracket_screw pd_vn_platen_clip_screw "
+    "pn_pen_rod pn_vn_pen_rod_set_screw pn_vn_pen_set_screw pn_pen_v_block sh_vn_music_wire",
+    "pd_paper_drive": "pd_vn_chain_connecting_link sh_vn_chain_link sh_vn_clamp_screw "
+    "sh_column_clamp_back sh_column_clamp_front sh_vn_brass_fillister_screw pd_guide_lock pd_vn_guide_lock_screw pd_latch_hook "
+    "sh_vn_fillister_screw_90280a108 pd_vn_platen_clip_screw "
     "pd_platen pd_platen_clip pd_platen_guide pd_platen_paper pd_platen_rack pd_rack_pinion pd_support_bar "
     "pd_transgear_arm pd_transgear_arm_plate pd_vn_transgear_arm_plate_locating_pin pd_vn_transgear_arm_plate_screw "
     "pd_transgear_disc_hub pd_vn_transgear_disc_screw pd_transgear_drive_collar pd_transgear_feed_pinion "
@@ -138,7 +137,7 @@ _INSERTED_SOURCES = {
     "pd_transgear_front_bushing "
     "pd_transgear_removable pd_vn_transgear_retaining_ring "
     "pd_transgear_thumbnut",
-    "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw ms_vn_thumb_screw",
+    "ms_measuring_stick": "ms_stick ms_stop_block ms_stop_plate ms_vn_stop_plate_screw sh_vn_thumb_screw",
     "ch_rocker_arm_tl_oblique_jig": "ch_rocker_arm_tl_oblique_base_bar ch_rocker_arm_tl_oblique_carrier "
     "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin "
     "ch_rocker_arm_tl_oblique_end_bracket ch_rocker_arm_tl_oblique_nut_bracket "
@@ -146,8 +145,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage ch_rocker_arm_tl_vn_oblique_bearing "
     "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew "
     "ch_rocker_arm_tl_vn_oblique_leadscrew_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
-    "ch_rocker_arm_tl_vn_oblique_handwheel ch_rocker_arm_tl_vn_oblique_hold_down_stud "
-    "ch_rocker_arm_tl_vn_oblique_t_nut ch_rocker_arm_tl_vn_oblique_flange_nut "
+    "ch_rocker_arm_tl_vn_oblique_handwheel sh_vn_clamping_kit_hardware "
     "ch_rocker_arm_tl_vn_oblique_rail_screw ch_rocker_arm_tl_vn_oblique_bracket_screw "
     "ch_rocker_arm_tl_vn_oblique_block_screw ch_rocker_arm_tl_vn_oblique_carriage_screw "
     "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
@@ -162,6 +160,81 @@ _INSERTED_SOURCES = {
 @pytest.mark.parametrize("assembly", ASSEMBLY_ORDER)
 def test_all_assembly_references_match_inserted_source_manifests(assembly):
     assert set(references_of(assembly)) == set(_INSERTED_SOURCES[assembly].split())
+
+
+@pytest.mark.parametrize(
+    ("producer", "consumers"),
+    [
+        ("sh_vn_chain_link", {"pd_paper_drive"}),
+        ("sh_vn_brass_fillister_screw", {"fr_frame", "dt_drive_train", "pd_paper_drive"}),
+        ("sh_vn_fillister_screw_90280a108", {"dt_drive_train", "pd_paper_drive"}),
+        ("sh_vn_clamp_screw", {"mg_magnifier", "pd_paper_drive"}),
+        ("sh_vn_arbor_set_screw", {"ch_channel", "dt_drive_train"}),
+        ("sh_vn_thumb_screw", {"mg_magnifier", "ms_measuring_stick"}),
+        ("sh_vn_music_wire", {"mg_magnifier", "pn_pen"}),
+        ("sh_vn_clamping_kit_hardware", {"ch_rocker_arm_tl_oblique_jig"}),
+    ],
+)
+def test_shared_vendor_producers_have_exact_direct_consumers(producer, consumers):
+    assert producer in part_stems()
+    assert {
+        assembly for assembly in ASSEMBLY_ORDER if producer in references_of(assembly)
+    } == consumers
+    for assembly in consumers:
+        assert references_of(assembly).count(producer) == 1
+    expected_dependents = consumers
+    if any(not bg.is_shop_fixture(assembly) for assembly in consumers):
+        expected_dependents = consumers | {"ha_harmonic_analyzer"}
+    assert set(dependents_of(producer)) == expected_dependents
+
+
+@pytest.mark.parametrize(
+    ("stem", "scope", "expected"),
+    [
+        ("sh_vn_clamping_kit_hardware", None, False),
+        ("sh_vn_clamping_kit_hardware", "machine", False),
+        ("sh_vn_clamping_kit_hardware", "tooling", True),
+        ("ch_rocker_arm_tl_oblique_base_bar", None, True),
+        ("ch_rocker_arm_tl_oblique_base_bar", "machine", True),
+        ("ch_rocker_arm_tl_oblique_base_bar", "tooling", True),
+    ],
+)
+def test_shop_fixture_scope_preserves_tl_and_defaults_shared_parts_to_machine(
+    tmp_path, monkeypatch, stem, scope, expected,
+):
+    parts = tmp_path / "parts"
+    parts.mkdir()
+    dashed = stem.replace("_", "-")
+    row = f"{dashed}:\n  number: MHA-SH-VN-57\n"
+    if scope is not None:
+        row += f"  usage_scope: {scope}\n"
+    (parts / f"{dashed}.yaml").write_text(row, encoding="utf-8")
+    monkeypatch.setattr(bg, "CONFIG_DIR", tmp_path)
+    assert bg.is_shop_fixture(stem) is expected
+
+
+@pytest.mark.parametrize("scope", ["fixture", "Tooling", "null", "true", "7", "[]"])
+@pytest.mark.parametrize(
+    "stem", ["sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_oblique_base_bar"],
+)
+def test_shop_fixture_scope_rejects_invalid_enums_even_for_tl_stems(
+    tmp_path, monkeypatch, scope, stem,
+):
+    parts = tmp_path / "parts"
+    parts.mkdir()
+    dashed = stem.replace("_", "-")
+    (parts / f"{dashed}.yaml").write_text(
+        f"{dashed}:\n  usage_scope: {scope}\n", encoding="utf-8",
+    )
+    monkeypatch.setattr(bg, "CONFIG_DIR", tmp_path)
+    with pytest.raises(ValueError, match="invalid usage_scope"):
+        bg.is_shop_fixture(stem)
+
+
+def test_registered_shared_kit_is_tooling_without_a_tl_identity():
+    assert "_tl_" not in "sh_vn_clamping_kit_hardware"
+    assert bg.is_shop_fixture("sh_vn_clamping_kit_hardware")
+    assert not bg.is_shop_fixture("sh_vn_brass_fillister_screw")
 
 
 def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
@@ -264,19 +337,20 @@ def test_exact_source_name_does_not_reference_shorter_stem(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     "stem",
     (
-        "fr_vn_fillister_screw",
-        "dt_vn_fillister_screw",
-        "ch_rocker_arm_tl_vn_oblique_rail",
+        "sh_vn_brass_fillister_screw",
+        "sh_vn_fillister_screw_90280a108",
+        "sh_vn_chain_link",
+        "pd_vn_chain_connecting_link",
     ),
 )
-def test_parent_scoped_vendor_sources_resolve_only_their_exact_producer(
+def test_vendor_source_matching_selects_only_the_exact_current_producer(
     tmp_path, monkeypatch, stem,
 ):
     parts = (
-        "fr_vn_fillister_screw",
-        "dt_vn_fillister_screw",
-        "ch_rocker_arm_tl_vn_oblique_rail",
-        "ch_rocker_arm_tl_vn_oblique_rail",
+        "sh_vn_brass_fillister_screw",
+        "sh_vn_fillister_screw_90280a108",
+        "sh_vn_chain_link",
+        "pd_vn_chain_connecting_link",
     )
     source = (
         f"await place_component(adapter, '{stem.replace('_', '-')}', pos, rot, rows)"
@@ -284,7 +358,22 @@ def test_parent_scoped_vendor_sources_resolve_only_their_exact_producer(
     assert _source_references(tmp_path, monkeypatch, source, parts) == {stem}
 
 
-def test_parent_scoped_vendor_variant_keeps_its_own_family(
+def test_distinct_chain_member_configurations_reference_one_native_producer(
+    tmp_path, monkeypatch,
+):
+    source = (
+        "await place_component(adapter, 'sh-vn-chain-link', p, r, q, "
+        "configuration='InnerLink')\n"
+        "await place_component(adapter, 'sh-vn-chain-link', p, r, q, "
+        "configuration='OuterLink')\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source,
+        ("sh_vn_chain_link", "pd_vn_chain_connecting_link"),
+    ) == {"sh_vn_chain_link"}
+
+
+def test_generated_vendor_variant_resolves_only_its_stock_family(
     tmp_path, monkeypatch,
 ):
     source = (
@@ -295,7 +384,7 @@ def test_parent_scoped_vendor_variant_keeps_its_own_family(
         tmp_path,
         monkeypatch,
         source,
-        ("ch_vn_channel_spring_installed", "dt_vn_channel_spring_installed"),
+        ("ch_vn_channel_spring_installed", "dt_vn_cylinder_bank_spring"),
     ) == {"ch_vn_channel_spring_installed"}
 
 
@@ -1485,20 +1574,24 @@ def test_top_references_only_subassemblies():
 
 
 def test_leaf_parts_do_not_depend_on_assembly_helpers():
-    """A leaf part must NOT pull in _assembly/_transforms -- the whole point of
-    keeping them separate from _session means assembly-only edits skip every part."""
+    """Assembly-only placement/reference edits must not re-key any leaf part."""
     for stem in part_stems():
         helpers = _helper_names(f"build_{stem}.py")
         assert "_assembly" not in helpers, f"{stem} wrongly depends on _assembly"
         assert "_transforms" not in helpers, f"{stem} wrongly depends on _transforms"
+        assert "_component_references" not in helpers, (
+            f"{stem} wrongly depends on assembly component references"
+        )
         assert "_session" in helpers, f"{stem} lost its _session dependency"
 
 
 def test_assemblies_depend_on_assembly_helpers():
-    """Every assembly imports _assembly (mates/placement) and _session."""
+    """The focused reference helper joins the fleet through core assembly placement."""
     for stem in ASSEMBLY_ORDER:
         helpers = _helper_names(script_for(stem).name)
-        assert {"_assembly", "_session"} <= helpers, f"{stem}: {helpers}"
+        assert {"_assembly", "_session", "_component_references"} <= helpers, (
+            f"{stem}: {helpers}"
+        )
 
 
 @pytest.mark.parametrize(
@@ -1670,7 +1763,9 @@ def test_library_modules_reach_no_builder():
     library = _library_modules()
     names = {path.name for path in library}
     assert {"fr_harmonic_base_fasteners.py", "_interference_contracts.py"} <= names
-    assert {"dt_cone_swing_platform_geometry.py", "_mcmaster_90114a511.py"} <= names
+    assert {
+        "dt_cone_swing_platform_geometry.py", "sh_vn_brass_fillister_screw_spec.py",
+    } <= names
     reached = {
         path.name: builders for path in library if (builders := _reached_builders(path))
     }
@@ -1681,10 +1776,16 @@ def test_a_builder_import_in_a_pure_module_goes_red(tmp_path):
     """Fail-first for the guard above: a synthetic spec that imports a builder
     is caught through the same closure the build graph uses."""
     planted = tmp_path / "planted_spec.py"
-    planted.write_text("from build_dt_vn_foot_screw import THREAD\n", encoding="utf-8")
-    assert _reached_builders(planted) == ["build_dt_vn_foot_screw"]
+    planted.write_text(
+        "from build_sh_vn_fillister_screw_90280a108 import THREAD\n",
+        encoding="utf-8",
+    )
+    assert _reached_builders(planted) == ["build_sh_vn_fillister_screw_90280a108"]
     clean = tmp_path / "clean_spec.py"
-    clean.write_text("from dt_vn_foot_screw_spec import THREAD\n", encoding="utf-8")
+    clean.write_text(
+        "from sh_vn_fillister_screw_90280a108_spec import THREAD\n",
+        encoding="utf-8",
+    )
     assert _reached_builders(clean) == []
 
 
@@ -1713,7 +1814,7 @@ def test_module_deps_are_transitive():
     """The closure follows imports through helper chains: a chain-link part pulls
     _chain_link -> _part_save -> _part_properties, and _config arrives via
     _part_properties' lazy import (registry-driven properties stay tracked)."""
-    links = _helper_names("build_pd_vn_chain_inner_link.py")
+    links = _helper_names("build_sh_vn_chain_link.py")
     assert {"_chain_link", "_chain", "_part_save", "_part_properties"} <= links, links
     assert "_config" in _helper_names("build_dt_vn_cone_tip_collar.py"), (
         "lazy _config edge lost"
@@ -2138,7 +2239,7 @@ def test_part_and_title_property_stampers_are_distinct():
     assert title_stampers == set(ASSEMBLY_ORDER)
     assert part_stampers == {"ch_channel"}
 
-    leaf = SCRIPTS_DIR / "build_dt_vn_fillister_screw.py"
+    leaf = SCRIPTS_DIR / "build_sh_vn_brass_fillister_screw.py"
     assert stamps_part_properties(leaf)
     assert stamps_title_block_properties(leaf)
 
@@ -2584,7 +2685,7 @@ def test_fastener_recipe_ignores_other_rows_and_tracks_its_own():
     selected = frozenset({"ch-vn-frame-side-screw"})
     before = bg.dict_table_recipe(_CATALOG, "FASTENERS", selected)
     assert bg.dict_table_recipe(
-        _row_edited(_CATALOG, "mg-vn-clamp-screw"), "FASTENERS", selected
+        _row_edited(_CATALOG, "sh-vn-clamp-screw"), "FASTENERS", selected
     ) == before, "another row's edit must not move this row's recipe"
     assert (
         bg.dict_table_recipe(
@@ -2748,13 +2849,15 @@ def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None
         # Listed themselves: the root script is not in its own import closure
         # (Codex #1035, PRRT_kwDOPHDy386mV11b).
         ("build_mg_wheel_bar.py", True),
+        # Canonical stock does not own the stop application's printed fit.
+        ("build_sh_vn_fillister_screw_90280a108.py", False),
         # Reads through an imported listed module.
         ("build_sm_vn_boss_hook.py", True),
         ("build_ch_vn_spring_hook.py", True),
         # R9-48: judges its lock taps at the printed worst case.
         ("build_pd_platen_guide.py", True),
         # Stock limits do not read a manufactured receiver's platform allowance.
-        ("build_dt_vn_swing_stop_screw.py", False),
+        ("dt_swing_stop_screw_spec.py", False),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):

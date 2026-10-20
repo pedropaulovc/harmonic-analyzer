@@ -35,7 +35,7 @@ from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
-from ch_rocker_arm_tl_vn_oblique_t_nut_spec import (
+from sh_vn_clamping_kit_t_nut_spec import (
     BLOCK_VOLUME,
     DRAWING_NOTES,
     FOOT_WIDTH,

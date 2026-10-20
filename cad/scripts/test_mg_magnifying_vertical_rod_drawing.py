@@ -250,7 +250,7 @@ def _fixture_screw_reach() -> tuple[float, float]:
     at the shoulder; its bore stays on the body down to the dome tangent), and
     the tip widens the band by its radius."""
     import mg_output_fixture_geom as fixture
-    from _mcmaster_91882a221 import SHANK_DIA
+    from sh_vn_thumb_screw_spec import SHANK_DIA
 
     half = fixture.HEX_CORNER_RADIUS
     tip = SHANK_DIA / 2.0

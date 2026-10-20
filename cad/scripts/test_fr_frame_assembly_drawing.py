@@ -12,7 +12,7 @@ def test_frame_package_bom_identifies_all_29_released_components() -> None:
         "fr-vn-lag-screw": 4,
         "fr-top-frame": 1,
         "fr-nameplate": 1,
-        "fr-vn-fillister-screw": 4,
+        "sh-vn-brass-fillister-screw": 4,
         "fr-vn-frame-cross-screw": 8,
         "fr-vn-gooseneck-set-screw": 1,
     }
@@ -24,7 +24,7 @@ def test_frame_package_bom_identifies_all_29_released_components() -> None:
         "fr-vn-lag-screw": "MHA-FR-VN-51",
         "fr-top-frame": "MHA-FR-02",
         "fr-nameplate": "MHA-FR-04",
-        "fr-vn-fillister-screw": "MHA-FR-VN-50",
+        "sh-vn-brass-fillister-screw": "MHA-SH-VN-51",
         "fr-vn-frame-cross-screw": "MHA-FR-VN-53",
         "fr-vn-gooseneck-set-screw": "MHA-FR-VN-52",
     }
@@ -598,7 +598,7 @@ def test_step_9_sets_the_nameplate_then_spots_its_base_seats_through_it() -> Non
     )
     spot = step.index("SPOT MHA-FR-01 THROUGH ITS FOUR HOLES")
     assert place < step.index("CLAMP.") < spot < step.index("TRANSFER CALLOUT")
-    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-FR-VN-50 HEADS")
+    assert step.index("TRANSFER CALLOUT") < step.index("SEAT ALL FOUR MHA-SH-VN-51 HEADS")
     assert len(_step_lines(9)) <= 4
 
 

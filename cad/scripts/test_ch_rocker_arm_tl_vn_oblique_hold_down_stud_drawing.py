@@ -12,9 +12,9 @@ import _config
 import build_ch_rocker_arm_tl_vn_oblique_hold_down_stud as part
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
-import ch_rocker_arm_tl_vn_oblique_hold_down_stud_spec as spec
+import sh_vn_clamping_kit_hold_down_stud_spec as spec
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
-import draw_ch_rocker_arm_tl_vn_oblique_hold_down_stud as draw
+import draw_sh_vn_clamping_kit_hardware as draw
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _hole_spec import THREAD_MAJOR_MM
 

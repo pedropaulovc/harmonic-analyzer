@@ -145,7 +145,7 @@ from dt_vn_cone_lock_knob_spec import (
     require_seat_fit as require_lock_seat_fit,
 )
 from dt_cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
-from dt_vn_swing_stop_screw_spec import (
+from dt_swing_stop_screw_spec import (
     CONTACT_DIA as STOP_CONTACT_DIA,
     THREAD as STOP_THREAD,
     FULL_THREAD_START_MAX_MM as SMALL_SCREW_THREAD_START_MAX,

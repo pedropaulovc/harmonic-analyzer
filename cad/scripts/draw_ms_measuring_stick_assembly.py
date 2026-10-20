@@ -184,7 +184,7 @@ PART_ROWS = {
     "ms-stop-block": _config.parts("ms-stop-block"),
     "ms-stop-plate": _config.parts("ms-stop-plate"),
     "ms-vn-stop-plate-screw": _config.parts("ms-vn-stop-plate-screw"),
-    "ms-vn-thumb-screw": _config.parts("ms-vn-thumb-screw"),
+    "sh-vn-thumb-screw": _config.parts("sh-vn-thumb-screw"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")

@@ -49,7 +49,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from pn_vn_pen_wire_spec import (
+from sh_vn_music_wire_pen_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ELEVATION_VIEW_NOTE,
@@ -63,7 +63,7 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 # prose-free module build_pn_pen_assembly imports (with the endpoint anchors
 # WIRE_X 3.8 / WIRE_BOTTOM) -- and are re-imported here so the build and the
 # assembly can never drift.
-from pn_vn_pen_wire_geom import WIRE_DIA, WIRE_LEN  # noqa: E402
+from sh_vn_music_wire_pen_geom import WIRE_DIA, WIRE_LEN  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:

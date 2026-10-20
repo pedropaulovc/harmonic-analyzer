@@ -775,7 +775,7 @@ for _label, _end, _outer in (
         raise AssertionError(f"arbor {_label} end is not flush with its strap face")
 # The apex set screws (MHA-DT-VN-64), one per crown at the strap's mid-depth, cup
 # point down on the arbor's top.
-from _mcmaster_91375a106 import LENGTH as SET_SCREW_LEN  # noqa: E402
+from sh_vn_arbor_set_screw_spec import LENGTH as SET_SCREW_LEN  # noqa: E402
 
 SET_SCREW_SOUTH_Z = _bank.FRONT_SET_SCREW_Z
 SET_SCREW_NORTH_Z = _bank.BACK_SET_SCREW_Z
@@ -854,7 +854,7 @@ from dt_crank_pin_eye_spec import (  # noqa: E402
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
-from _mcmaster_90114a511 import (  # noqa: E402
+from sh_vn_brass_fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
@@ -1073,7 +1073,7 @@ from dt_vn_cone_pivot_screw_spec import (  # noqa: E402
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
     TIP_CHAMFER as PSCREW_TIP_INCOMPLETE,
 )
-from dt_vn_swing_stop_screw_spec import (  # noqa: E402
+from dt_swing_stop_screw_spec import (  # noqa: E402
     EMBED_LEN as STOP_EMBED_LEN,
     FULL_THREAD_START_MAX_MM as FSCREW_FULL_THREAD_START_MAX,
     LENGTH_SHORT_ALLOWANCE_MM as FSCREW_LENGTH_SHORT_ALLOWANCE,

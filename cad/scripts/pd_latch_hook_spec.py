@@ -5,7 +5,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Geometry and frame: ``pd_latch_hook_geometry``.
 
 One formed 0.8 (0.032 in) 1095 spring-steel part: a base on the support
-bar's back face under two #4-40 screws (MHA-PD-VN-59), a 90 deg ear at its +X
+bar's back face under two #4-40 screws (MHA-SH-VN-52), a 90 deg ear at its +X
 end, and an arm hanging from the ear's lower edge, rolled R80 flatwise to
 lie square to the MHA-PD-VN-58 latch pin, with a pin hole and a finger tab.
 Latching: pull the tab along +U, the arm flexes flatwise and the strip slides
@@ -78,7 +78,7 @@ from pd_latch_hook_geometry import (
     WIDTH,
 )
 from pd_support_bar_spec import HOLE_POSITION_BAND as BAR_TAP_BAND
-from pd_vn_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
+from pd_latch_hook_bracket_screw_spec import HEAD_DIA, MAJOR_DIA, MAJOR_DIA_MIN
 
 # --- Printed bands -----------------------------------------------------------
 HOLE_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower): drilled, never under
@@ -147,7 +147,7 @@ _POSITION_STEPS = max(
 POSITION_TOL = round(_POSITION_STEPS * _POSITION_STEP, POSITION_PLACES)
 if POSITION_TOL <= 0.0:
     raise AssertionError(
-        "MHA-PD-VN-59 screws in the MHA-PD-07 bar taps through the MHA-PD-14 hook: "
+        "MHA-SH-VN-52 screws in the MHA-PD-07 bar taps through the MHA-PD-14 hook: "
         f"no .XX position band fits the radial clearance {CLEARANCE_RADIAL_MIN:.4f}"
     )
 SCREW_POSITION_RADIAL = _position_radial(POSITION_TOL)

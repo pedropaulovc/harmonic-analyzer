@@ -191,7 +191,7 @@ BOM_QUANTITIES = {
     "fr-vn-lag-screw": 4,
     "fr-top-frame": 1,
     "fr-nameplate": 1,
-    "fr-vn-fillister-screw": 4,
+    "sh-vn-brass-fillister-screw": 4,
     "fr-vn-frame-cross-screw": 8,
     "fr-vn-gooseneck-set-screw": 1,
 }
@@ -206,7 +206,7 @@ BOM_DESCRIPTIONS = {
     "fr-vn-lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
     "fr-top-frame": "TOP-FRAME CASTING",
     "fr-nameplate": "ENGRAVED BRASS MAKER'S NAMEPLATE",
-    "fr-vn-fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
+    "sh-vn-brass-fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
     "fr-vn-frame-cross-screw": (
         "ZINC-PLATED STEEL #10-32 X 1-3/4 NARROW FILLISTER-HEAD SLOTTED SCREW"
     ),
@@ -220,7 +220,7 @@ BOM_PART_NUMBERS = {
     "fr-vn-lag-screw": "MHA-FR-VN-51",
     "fr-top-frame": "MHA-FR-02",
     "fr-nameplate": "MHA-FR-04",
-    "fr-vn-fillister-screw": "MHA-FR-VN-50",
+    "sh-vn-brass-fillister-screw": "MHA-SH-VN-51",
     "fr-vn-frame-cross-screw": "MHA-FR-VN-53",
     "fr-vn-gooseneck-set-screw": "MHA-FR-VN-52",
 }
@@ -292,7 +292,7 @@ ASSEMBLY_STEPS = "\n".join(
         "9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
         "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
         "   SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
-        "   MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-FR-VN-50 HEADS.",
+        "   MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-SH-VN-51 HEADS.",
         "10. START MHA-FR-VN-52 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )

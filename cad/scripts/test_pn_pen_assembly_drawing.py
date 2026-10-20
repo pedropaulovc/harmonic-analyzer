@@ -135,8 +135,10 @@ def test_pen_package_is_three_landscape_sheets_at_half_scale() -> None:
 
 
 def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> None:
-    assert drawing.BOM_COMPONENTS == spec.BOM_ORDER
-    assert set(drawing.BALLOON_ANCHORS) == set(spec.BOM_ORDER)
+    assert drawing.BOM_COMPONENTS == tuple(
+        drawing.BOM_ROW_KEYS[stem] for stem in spec.BOM_ORDER
+    )
+    assert set(drawing.BALLOON_ANCHORS) == set(drawing.BOM_COMPONENTS)
     assert [notes.ITEM[stem] for stem in spec.BOM_ORDER] == list(
         range(1, len(spec.BOM_ORDER) + 1)
     )
@@ -321,7 +323,7 @@ def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
     assert moves[1] > 0.0
     assert moves[0] * sz + moves[2] * -sx < 0.0
     assert moves[0] * -sx + moves[2] * -sz == 0.0
-    assert drawing.BALLOON_ANCHORS[spec.WIRE].point_mm is not None
+    assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm is not None
 
 
 def test_explode_module_qualifies_for_the_explode_tier() -> None:

@@ -212,7 +212,7 @@ def test_quantity_is_one_screw_per_guide_lock_hole() -> None:
 def test_stock_build_takes_the_fillister_frame(monkeypatch) -> None:
     """The paper drive places it as it placed MHA-PD-VN-52: bearing face on the
     origin, shank along +Z."""
-    import build_dt_vn_fillister_screw as fillister
+    import build_sh_vn_brass_fillister_screw as fillister
 
     seen: dict = {}
     fillister_seen: dict = {}

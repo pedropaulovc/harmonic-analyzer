@@ -8,7 +8,7 @@ import _chain
 import _chain_link
 import _config
 import draw_pd_paper_drive_assembly as assembly_drawing
-import draw_pd_vn_chain_inner_link as draw
+import draw_sh_vn_chain_link as draw
 import joint_retention
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 

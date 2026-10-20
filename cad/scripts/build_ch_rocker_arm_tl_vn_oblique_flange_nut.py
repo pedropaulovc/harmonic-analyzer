@@ -36,7 +36,7 @@ from _session import run_build
 from _sketch import add_line_chain, ensure_fully_defined
 from _sketch_chains import define_polygon_chain
 from _sketch_circle import define_circle
-from ch_rocker_arm_tl_vn_oblique_flange_nut_spec import (
+from sh_vn_clamping_kit_flange_nut_spec import (
     DRAWING_NOTES,
     FLANGE_DIA,
     FLANGE_THICK,

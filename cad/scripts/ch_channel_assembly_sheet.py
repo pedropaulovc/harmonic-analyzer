@@ -9,7 +9,7 @@ here does not rebuild the channel assembly. No SolidWorks.
 
 from __future__ import annotations
 
-import _mcmaster_91375a106 as arbor_set_screw
+import sh_vn_arbor_set_screw_spec as arbor_set_screw
 import ch_vn_bracket_hold_down_screw_spec as hold_down_screw
 import ch_vn_frame_side_screw_spec as frame_side_screw
 import ch_vn_fulcrum_set_screw_spec as fulcrum_set_screw

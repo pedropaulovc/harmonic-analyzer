@@ -197,10 +197,31 @@ network data or recovers files from Git.
 Current consumers use `current-native-identity.mjs` and the independently pinned
 `content/current-native-identities.json` at archive ingestion. Current Numbers
 have two identity digits (`MHA-DT-28`, assembly `MHA-DT-00`), while configuration
-qualifiers such as `T006` retain all three digits. Purchased parts use their
-immediate assembly parent (`dt-vn-fillister-screw`, `MHA-DT-VN-50`); the same
-archived vendor may resolve differently under FR, DT or PD. Tooling nests that
-scope (`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
+qualifiers such as `T006` retain all three digits. Repeated supplier-qualified
+SKUs share one native part per SKU across consumers:
+
+| Current stem / Number | Exact native configurations |
+| --- | --- |
+| `sh-vn-chain-link` / `MHA-SH-VN-50` | `InnerLink`, `OuterLink` |
+| `sh-vn-brass-fillister-screw` / `MHA-SH-VN-51` | `Default` |
+| `sh-vn-fillister-screw-90280a108` / `MHA-SH-VN-52` | `Default` |
+| `sh-vn-clamp-screw` / `MHA-SH-VN-53` | `Default` |
+| `sh-vn-arbor-set-screw` / `MHA-SH-VN-54` | `Default` |
+| `sh-vn-thumb-screw` / `MHA-SH-VN-55` | `Default` |
+| `sh-vn-music-wire` / `MHA-SH-VN-56` | `LeverWire`, `PenWire` |
+| `sh-vn-clamping-kit-hardware` / `MHA-SH-VN-57` | `HoldDownStud`, `TNut`, `FlangeNut` |
+
+Member context is explicit: `sh-vn-music-wire--LeverWire-1` under magnifier,
+`sh-vn-music-wire--PenWire-1` under pen, and chain/kit paths use their exact
+`--InnerLink`, `--OuterLink`, `--HoldDownStud`, `--TNut` or `--FlangeNut` member.
+Their bare neutral exports are the actual active first members `InnerLink`,
+`LeverWire` and `HoldDownStud`, respectively, not a `Default` alias.
+Default shared screws have no configuration qualifier. Only colliding DT
+90280A108 roles use `sh-vn-fillister-screw-90280a108__FootScrew-N` and
+`sh-vn-fillister-screw-90280a108__SwingStopScrew-N`; these are role labels,
+not invented `--FootScrew` or `--SwingStopScrew` configurations.
+Unique purchased parts remain parent-scoped; tooling nests that scope
+(`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
 The projection table pins the exact current `../cad/config/current-identity-map.json`
 bytes; Node source authority compares its active rows only with that map's
 `parts_and_assemblies`. The 18 standalone tooling families retired on 2026-10-21
@@ -223,6 +244,16 @@ Browser loading verifies the current table's semantic digest before projecting
 the already byte-verified model's names and declared identity extras. Archived
 GLB bytes, source names, hashes, URLs, inventory matrices and measured geometry
 remain unchanged; current projection provenance is separate from model provenance.
+
+Projection provenance declares `occurrenceNamespace: 'archive-role-local'`.
+Projected paths are logical archive selectors: their historical role-local
+ordinals are not rebuilt-native `Name2` indices. The binding registry checks
+this namespace and rejects a rebuilt-native namespace; neither matching index
+values nor guessed offsets establish correspondence. Refreshing bindings for
+rebuilt-native occurrences first requires checked file identity, exact member
+configuration and `ComponentReference` (`Role:1`, with a 1-based semantic index)
+readback. That gate must establish the actual bridge before a rebuilt-native
+binding refresh; this archive projection supplies no such mapping.
 
 ```sh
 npm --prefix web run verify:identity-evidence

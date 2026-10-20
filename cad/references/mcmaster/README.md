@@ -20,19 +20,19 @@ recipes:
 | 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 5972K41 | `ch-rocker-arm-tl-vn-oblique-bearing` (MHA-CH-06-TL-VN-52; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
 | 6261K108 | `pd-vn-chain-connecting-link` (the loop's one connecting link; catalogue-only, vendor model not downloaded) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
-| 6261K171 | `pd-vn-chain-inner-link`, `pd-vn-chain-outer-link` (cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
+| 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` configurations, cut to length; catalogue-only, vendor model not downloaded) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
 | 90114A124 | `ms-vn-stop-plate-screw`; `pd-vn-platen-clip-screw` until 2026-10-15 (catalogue-only; no vendor model) | Brass Fillister Head Slotted Screw |
-| 90114A511 | `dt-vn-fillister-screw`, `fr-vn-fillister-screw`, `pd-vn-fillister-screw` | Brass Fillister Head Slotted Screw |
+| 90114A511 | `sh-vn-brass-fillister-screw` (MHA-SH-VN-51; shared by dt, fr and pd) | Brass Fillister Head Slotted Screw |
 | 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
-| 90280A108 | `dt-vn-foot-screw`, `dt-vn-swing-stop-screw`, `pd-vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A108 | `sh-vn-fillister-screw-90280a108` (MHA-SH-VN-52; shared by the dt foot and swing-stop roles and the pd latch-hook screws) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | — (diagnostic recipe; a former `ch-vn-frame-side-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A196 | `ch-vn-bracket-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `dt-vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `dt-vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
-| 90280A201 | `mg-vn-clamp-screw`, `pd-vn-clamp-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A201 | `sh-vn-clamp-screw` (MHA-SH-VN-53; shared by mg and pd) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A203 | `dt-vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `fr-vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90480A009 | `pn-vn-pen-hanger-nut` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Nut |
@@ -54,7 +54,7 @@ recipes:
 | 91290A168 | `ch-rocker-arm-tl-vn-oblique-carriage-screw` (MHA-CH-06-TL-VN-64; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 90325A174 | `pd-vn-transgear-pivot-screw` (catalogue-only; CAD download refused) | 18-8 Stainless Steel Precision Shoulder Screw, hex socket |
 | 91375A105 | `pn-vn-pen-rod-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
-| 91375A106 | `ch-vn-arbor-set-screw`, `dt-vn-arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
+| 91375A106 | `sh-vn-arbor-set-screw` (MHA-SH-VN-54; shared by ch and dt) | Alloy Steel Cup-Tip Set Screw |
 | 91375A942 | `ch-vn-fulcrum-set-screw` (catalogue-only; no vendor model) | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | — (diagnostic recipe; `fr-vn-gooseneck-set-screw` until 2026-10-12) | Steel Square-Head Cup-Point Set Screw |
 | 91410A540 | `fr-vn-gooseneck-set-screw` (catalogue-only; no vendor model) | Steel Square-Head Cup-Point Set Screw |
@@ -70,7 +70,7 @@ recipes:
 | 91829A560 | `dt-vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 92314A253 | `sm-vn-knife-hanger-stud` (modified stock; catalogue-only, no vendor model) | 18-8 Stainless Steel Hex Head Screw, #10-24 × 2 in, cut to length |
 | 92446A077 | `pd-vn-platen-clip-screw` (catalogue-only; no vendor model) | Brass Pan Head Slotted Screw |
-| 91882A221 | `mg-vn-thumb-screw`, `ms-vn-thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
+| 91882A221 | `sh-vn-thumb-screw` (MHA-SH-VN-55; shared by mg and ms) | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `dt-vn-cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `fr-vn-tube-frame-cap` | Metal Round Cap |
 | 92671A005 | `mg-vn-wheel-axle-nut` (catalogue-only; no vendor model) | Brass Hex Nut |
@@ -87,7 +87,7 @@ recipes:
 | 94025A150 | — (diagnostic recipe; `dt-vn-cone-tip-adjuster` until drawing-guidelines.md rule 18 (thread engagement) E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `dt-vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 93600A189 | `pd-vn-transgear-arm-plate-locating-pin` (catalogue-only; no vendor model) | Passivated 316 Stainless Steel ISO 2338-m6 Dowel Pin |
-| 9666K56 | `mg-vn-lever-wire`, `pn-vn-pen-wire` (cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
+| 9666K56 | `sh-vn-music-wire` (MHA-SH-VN-56; `LeverWire` and `PenWire` configurations cut from one coil; catalogue-only, no vendor model) | Lubricated 1080 Spring Steel Wire, 0.031 in, 1/4 lb coil |
 | 9714K24 | `ch-vn-rocker-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9714K392 | `dt-vn-cylinder-bank-spring` (catalogue-only; no vendor model) | Wave Disc Spring |
 | 9715K43 | `pd-vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
@@ -103,7 +103,7 @@ recipes:
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_dt_vn_cone_lock_knob.py`
-and `cad/scripts/build_dt_vn_swing_stop_screw.py`.
+and `cad/scripts/build_sh_vn_fillister_screw_90280a108.py` (the shared 90280A108 screw; the swing-stop's placement is applied in its `dt-drive-train` occurrence).
 
 Oblique trammel jig shop-fixture hardware (MHA-CH-06-TL-VN-52/53 and
 TL-VN-61 to TL-VN-69), modelled as purchased parts so the jig assembly can run
@@ -1334,15 +1334,17 @@ Catalog specifications checked on September 10, 2026:
   `diag_build_90760A140.py` extrudes the hexagon with a plain bore at the
   #10-24 basic major, so it is catalogue-only.
 - [9666K56](https://www.mcmaster.com/9666K56/) supplies both amplification
-  wires, `mg-vn-lever-wire` (MHA-MG-VN-56) and `pn-vn-pen-wire` (MHA-PN-VN-57), both
-  cut from one coil. Their end terminations, wraps and developed cut lengths
-  are not yet modelled, so both sheets stay DO NOT RELEASE. Read live
+  wires, the `LeverWire` and `PenWire` configurations of `sh-vn-music-wire`
+  (MHA-SH-VN-56; `mg-vn-lever-wire` MHA-MG-VN-56 and `pn-vn-pen-wire`
+  MHA-PN-VN-57 until 2026-10-20), both cut from one coil. Their end
+  terminations, wraps and developed cut lengths
+  are not yet modelled, so both sheets of the package stay DO NOT RELEASE. Read live
   on October 14, 2026: lubricated 1080 spring steel music wire, ASTM A228,
   cold drawn, spring temper, phosphate coated, 261,000 psi tensile, diameter
   0.031 in with -0.001/+0.001 in tolerance, 110 ft in a 1/4 lb coil;
   straightness is not rated. The models keep the Ø0.8 design nominal, which
   lies inside that 0.762-0.813 band (`_mcmaster_9666k56.py`, asserted by
-  `mg_vn_lever_wire_geom.py` and `pn_vn_pen_wire_geom.py`). 8907K32, the same wire
+  `sh_vn_music_wire_lever_geom.py` and `sh_vn_music_wire_pen_geom.py`). 8907K32, the same wire
   in 1 ft straight lengths, was rejected: the lever wire's straight rest run
   alone is about 353, longer than 304.8. McMaster offers no metric 0.8 music
   wire. No vendor solid is used; the wire is a plain cylinder.
@@ -1377,8 +1379,10 @@ Catalog specifications checked on September 10, 2026:
   off McMaster's 3606T811 photograph. The rod and the link's wall and openings are assumptions named in
   `dt_vn_keeper_chain_spec.py`, so neither part has a replica gate.
 
-- [6261K171](https://www.mcmaster.com/6261K171/) (`pd-vn-chain-inner-link`,
-  MHA-PD-VN-50, and `pd-vn-chain-outer-link`, MHA-PD-VN-51) and
+- [6261K171](https://www.mcmaster.com/6261K171/) (`sh-vn-chain-link`,
+  MHA-SH-VN-50, in its `InnerLink` and `OuterLink` configurations; the
+  parent-scoped `pd-vn-chain-inner-link` MHA-PD-VN-50 and
+  `pd-vn-chain-outer-link` MHA-PD-VN-51 until 2026-10-20) and
   [6261K108](https://www.mcmaster.com/6261K108/) (`pd-vn-chain-connecting-link`,
   MHA-PD-VN-66) are
   the paper-drive chain between the T12 and T24 MHA-PD-09 sprockets. Both
@@ -1386,9 +1390,10 @@ Catalog specifications checked on September 10, 2026:
   strand, ANSI 25, 1/4 in pitch, 0.130 in roller diameter, 1/8 in roller width
   and 140 lb working load; neither states a grade, plate size or coating.
   6261K171 is sold by the foot. The selected 68-pitch loop (17 in) is cut from
-  2 ft with an inner link at each end. This gives 34 inner and 33 outer links;
+  2 ft with an inner link at each end. This gives 34 inner and 33 outer links,
+  the `InnerLink` and `OuterLink` configuration quantities of one purchased chain;
   6261K108, the connecting link, closes the loop as its last outer link. The
-  cut is the only modification, so all three identities stay vendor (`-vn-`) parts
+  cut is the only modification, so both identities stay vendor (`-vn-`) parts
   (`cad/docs/subsystem-identities.md`). The modelled links are the clearance
   stand-ins in `_chain.py`, not vendor replicas. McMaster offers CAD for both
   items, but none was downloaded and no replica equivalence is claimed. Evidence:

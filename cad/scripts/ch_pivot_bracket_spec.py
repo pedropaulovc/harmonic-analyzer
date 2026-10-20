@@ -14,7 +14,7 @@ wide as the foot, so their sides are one flat each side. Each ear's inner
 face bears on a MHA-CH-VN-56 thrust washer: hub 19's at the north ear (the
 bank's datum), the preload spring's at the south one (``rocker_bank_layout``).
 
-One MHA-CH-VN-53 #4-40 cup-point set screw drops through the arch apex, on the
+One MHA-SH-VN-54 #4-40 cup-point set screw drops through the arch apex, on the
 ear's mid-plane, into the bore and onto the pivot shaft's flat (user,
 2026-10-10). EAR_T is 8.0 (was 6.0) so the tap keeps its walls to both ear
 faces; the apex stands 35.00 over the seat, 9.80 over the bore (was the R8
@@ -124,7 +124,7 @@ ARCH_R_BAND = 0.508
 BORE_RADIUS_MAX = (BORE_DIA + DRILL_GROWTH) / 2.0
 
 # --- apex set screw (user, 2026-10-10) ----------------------------------------
-# One MHA-CH-VN-53 #4-40 x 1/4 cup-point set screw drops radially through the
+# One MHA-SH-VN-54 #4-40 x 1/4 cup-point set screw drops radially through the
 # arch apex on the ear's mid-plane, onto the pivot shaft's flat. The tap runs
 # THROUGH to the bore and stops there (through-next), the arbor pedestal's
 # idiom (dt_arbor_pedestal_spec), never into the ear below the bore.
@@ -133,7 +133,7 @@ SET_SCREW_PITCH = 25.4 / 40.0
 SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
 SET_SCREW_MAJOR_DIA = THREAD_MAJOR_MM[SET_SCREW_THREAD]
 # The cup end the flat must take: the vendor's 45 deg x one-pitch point
-# chamfer off the major (_mcmaster_91375a106.POINT_LENGTH).
+# chamfer off the major (sh_vn_arbor_set_screw_spec.POINT_LENGTH).
 SET_SCREW_POINT_DIA = SET_SCREW_MAJOR_DIA - 2.0 * SET_SCREW_PITCH  # 1.575
 # The tap sits on the ear's mid-plane, held +/-0.10 from the inboard face;
 # that face's mid-plane is itself half the thickness band off, so the tap

@@ -58,18 +58,18 @@ UNCHANGED_FAMILIES = {
     "pd-support-bar",
     "sh-column-clamp-front",
     "sh-column-clamp-back",
-    "pd-vn-clamp-screw",
+    "sh-vn-clamp-screw",
     "pd-platen",
     "pd-platen-rack",
     "pd-platen-guide",
     "pd-guide-lock",
     "pd-platen-clip",
     "pd-platen-paper",
-    "pd-vn-fillister-screw",
+    "sh-vn-brass-fillister-screw",
     "pd-vn-platen-clip-screw",  # the four #2-56 clip screws leave MHA-PD-VN-52
     "pd-vn-guide-lock-screw",  # R9-31: the eight lock screws leave MHA-PD-VN-52
-    "pd-vn-chain-inner-link",
-    "pd-vn-chain-outer-link",
+    "sh-vn-chain-link--InnerLink",
+    "sh-vn-chain-link--OuterLink",
     "pd-vn-chain-connecting-link",  # MHA-PD-VN-66 closes the loop as its last outer link
     "pd-transgear-removable",
 }
@@ -83,7 +83,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-pivot-spring": 1,
     "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
-    "pd-vn-latch-hook-bracket-screw": 2,
+    "sh-vn-fillister-screw-90280a108": 2,
     "pd-latch-hook": 1,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
@@ -132,7 +132,7 @@ def _step_body(key: str) -> str:
 
 
 def _number(stem: str) -> str:
-    return _config.parts(stem)["number"]
+    return _config.parts(drawing.BOM_COMPONENT_IDENTITIES.get(stem, (stem, None))[0])["number"]
 
 
 def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
@@ -273,7 +273,7 @@ def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
     for stem, number in drawing.BOM_PART_NUMBERS.items():
         assert number == _number(stem), stem
     for stem, description in drawing.BOM_DESCRIPTIONS.items():
-        registry = _config.parts(stem)
+        registry = _config.parts(drawing.BOM_COMPONENT_IDENTITIES[stem][0])
         skus = registry.get("supplier_skus") or ()
         # A fabricated part from purchased stock (the SDP/SI platen rack) is
         # not itself a McMaster purchase line.
@@ -281,8 +281,10 @@ def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
             assert description.endswith(f"MCMASTER {skus[0]}"), stem
         else:
             assert "MCMASTER" not in description, stem
-    # A number never repeats, so the alias map is total.
-    assert len(drawing.BOM_NORMALIZED_ALIASES) == len(drawing.BOM_PART_NUMBERS)
+    # Distinct physical members deliberately share one canonical purchase Number.
+    inner, outer = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
+    assert drawing.BOM_PART_NUMBERS[inner] == drawing.BOM_PART_NUMBERS[outer]
+    assert drawing.BOM_COMPONENT_IDENTITIES[inner] != drawing.BOM_COMPONENT_IDENTITIES[outer]
 
 
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
@@ -1457,14 +1459,14 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
         "pd-support-bar",
         "sh-column-clamp-front",
         "sh-column-clamp-back",
-        "pd-vn-clamp-screw",
+        "sh-vn-clamp-screw",
         "pd-platen",
         "pd-platen-rack",
         "pd-platen-guide",
         "pd-guide-lock",
         "pd-platen-clip",
         "pd-platen-paper",
-        "pd-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         "pd-vn-platen-clip-screw",
         "pd-vn-guide-lock-screw",
     }
@@ -1490,7 +1492,7 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
     # The guide screws leave with the guides' step, the clip screws with the
     # clips': the two screw families never share a step.
     for _step, names in plan:
-        assert not {"pd-vn-fillister-screw-1", "pd-vn-platen-clip-screw-1"} <= set(names)
+        assert not {"sh-vn-brass-fillister-screw-1", "pd-vn-platen-clip-screw-1"} <= set(names)
 
 
 def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
@@ -1551,14 +1553,14 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
         chain.LINK_COUNT * sprocket.CHAIN_PITCH
     )
     assert drawing.CHAIN_QUANTITIES == {
-        "pd-vn-chain-inner-link": chain.LINK_COUNT // 2,
-        "pd-vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+        "sh-vn-chain-link--InnerLink": chain.LINK_COUNT // 2,
+        "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
         "pd-vn-chain-connecting-link": 1,
     }
     assert sum(drawing.CHAIN_QUANTITIES.values()) == chain.LINK_COUNT
     assert (
-        f"{chain.LINK_COUNT // 2} {_number('pd-vn-chain-inner-link')} INNER AND "
-        f"{chain.LINK_COUNT // 2 - 1} {_number('pd-vn-chain-outer-link')} OUTER LINKS"
+        f"{chain.LINK_COUNT // 2} {_number('sh-vn-chain-link--InnerLink')} INNER AND "
+        f"{chain.LINK_COUNT // 2 - 1} {_number('sh-vn-chain-link--OuterLink')} OUTER LINKS"
     ) in closed
     assert f"THE {_number('pd-vn-chain-connecting-link')} #25 CONNECTING LINK" in closed
     for stem in drawing.CHAIN_QUANTITIES:

@@ -10,7 +10,7 @@ from pathlib import Path
 import _config
 import build_ch_rocker_arm_tl_vn_oblique_flange_nut as part
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
-import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as spec
+import sh_vn_clamping_kit_flange_nut_spec as spec
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_vn_oblique_flange_nut as draw

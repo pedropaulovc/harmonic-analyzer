@@ -19,7 +19,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
 from diagnostics.diag_build_90280A108 import build_90280A108
-from pd_vn_latch_hook_bracket_screw_spec import SKU
+from pd_latch_hook_bracket_screw_spec import SKU
 
 PART_NAME = "pd-vn-latch-hook-bracket-screw"
 SPEC = fastener(PART_NAME)

@@ -7,9 +7,9 @@ import math
 import pytest
 
 import build_mg_magnifier_assembly as assembly
-import mg_vn_lever_wire_geom as wire
+import sh_vn_music_wire_lever_geom as wire
 import mg_output_fixture_geom as fixture
-from _mcmaster_91882a221 import HEAD_STACK_LEN, SHANK_LEN, THUMB_SPEC
+from sh_vn_thumb_screw_spec import HEAD_STACK_LEN, SHANK_LEN, THUMB_SPEC
 from mg_magnifying_vertical_rod_geom import ROD_DIA
 
 
@@ -115,7 +115,7 @@ def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
         allowed_interference_pairs,
     )
     from _hole_spec import TAP_DRILL_MM
-    from _mcmaster_91882a221 import SHANK_DIA
+    from sh_vn_thumb_screw_spec import SHANK_DIA
     import mg_magnifying_clamp_geom as clamp
     import mg_rod_clamp_joint as rod_joint
     from mg_lever_press_fit_geom import COLLAR_BORE_DIA, COLLAR_ENGAGEMENT_MAX, PRESS_ZONE_DIA

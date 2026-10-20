@@ -23,7 +23,7 @@ from _mcmaster_90114a124 import (
     PITCH as PLATE_SCREW_PITCH,
     THREAD as PLATE_SCREW_THREAD,
 )
-from _mcmaster_91882a221 import SHANK_DIA as THUMB_MAJOR_DIA
+from sh_vn_thumb_screw_spec import SHANK_DIA as THUMB_MAJOR_DIA
 
 BLOCK_LENGTH = 21.0
 BLOCK_HEIGHT = 14.1

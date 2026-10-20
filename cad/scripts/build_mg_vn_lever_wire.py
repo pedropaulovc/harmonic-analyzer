@@ -78,7 +78,7 @@ from _drawing_marks import (
 )
 from _visibility import blank_reference_geometry
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from mg_vn_lever_wire_spec import (
+from sh_vn_music_wire_lever_spec import (
     BALLOON_RING_FRACTION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -93,7 +93,7 @@ MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 # (codex #360): the wheel + assembly import the anchors from THERE, so this
 # build script's drawing-contract imports (``mg_vn_lever_wire_spec``) never enter
 # their recipe closures. Re-exported here unchanged for this build's own use.
-from mg_vn_lever_wire_geom import (  # noqa: E402
+from sh_vn_music_wire_lever_geom import (  # noqa: E402
     WIRE_DIA,
     WIRE_LEN,
 )

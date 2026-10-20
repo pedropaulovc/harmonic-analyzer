@@ -351,7 +351,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Frame** `fr-harmonic-base`, `fr-top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
 | **Springs** `ch-vn-channel-spring-installed`, `sm-vn-counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
 | **Measuring stick** `ms-stick` (+ its clamped stop `ms-stop-block` / `ms-stop-plate`) | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
-| **Fasteners / misc** `fr-vn-lag-screw`, `pn-vn-hanger-screw`, `dt-vn-fillister-screw`, `fr-vn-fillister-screw`, `pd-vn-fillister-screw`, `mg-vn-thumb-screw`, `ms-vn-thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
+| **Fasteners / misc** `fr-vn-lag-screw`, `pn-vn-hanger-screw`, `sh-vn-brass-fillister-screw` (shared by dt, fr, pd), `sh-vn-thumb-screw` (shared by mg, ms), `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
 
 ---
 

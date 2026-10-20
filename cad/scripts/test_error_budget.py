@@ -743,7 +743,7 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
     reproduces mg_vn_lever_wire_geom's own numbers at the as-built pose."""
-    import mg_vn_lever_wire_geom
+    import sh_vn_music_wire_lever_geom
 
     mag = report["closed_form"]["mg-magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
@@ -764,10 +764,10 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
-    assert built["hook_x_mm"] == pytest.approx(mg_vn_lever_wire_geom.HOOK_X)
-    assert built["wire_length_mm"] == pytest.approx(mg_vn_lever_wire_geom.WIRE_LEN, abs=1e-3)
+    assert built["hook_x_mm"] == pytest.approx(sh_vn_music_wire_lever_geom.HOOK_X)
+    assert built["wire_length_mm"] == pytest.approx(sh_vn_music_wire_lever_geom.WIRE_LEN, abs=1e-3)
     assert built["wire_arm_mm"] == pytest.approx(mag["wire_arm_built_mm"])
-    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_vn_lever_wire_geom.HOOK_X
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < sh_vn_music_wire_lever_geom.HOOK_X
     assert mag["minimum_pose_wire_estimate"]["wire_arm_mm"] == mag["wire_arm_min_mm"]
 
 
@@ -777,7 +777,7 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
     drum tangent determine that arm. Independent endpoint and finite-rotation
     calculations agree at minimum, built and maximum stations, while full-band
     monotonicity makes the setup's inverse solve well posed."""
-    import mg_vn_lever_wire_geom
+    import sh_vn_music_wire_lever_geom
     import mg_output_fixture_geom
     import spring_mount_geom
 
@@ -786,14 +786,14 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
     assert nom.hook_offset_x < 0.0
     assert eb.KNIFE_AXIS_XY == (spring_mount_geom.KNIFE[0], spring_mount_geom.KNIFE_CONTACT_Y)
     assert eb.KNIFE_AXIS_XY[0] + nom.lever_r_built + nom.hook_offset_x == pytest.approx(
-        mg_vn_lever_wire_geom.HOOK_X
+        sh_vn_music_wire_lever_geom.HOOK_X
     )
     hook, end = eb.wire_rest_run(nom, nom.lever_r_built)
-    assert tuple(hook) == pytest.approx(mg_vn_lever_wire_geom.WIRE_START)
-    assert tuple(end) == pytest.approx(mg_vn_lever_wire_geom.WIRE_END)
+    assert tuple(hook) == pytest.approx(sh_vn_music_wire_lever_geom.WIRE_START)
+    assert tuple(end) == pytest.approx(sh_vn_music_wire_lever_geom.WIRE_END)
 
     # the arm at the built station, from the module's own endpoints
-    start, stop = np.array(mg_vn_lever_wire_geom.WIRE_START), np.array(mg_vn_lever_wire_geom.WIRE_END)
+    start, stop = np.array(sh_vn_music_wire_lever_geom.WIRE_START), np.array(sh_vn_music_wire_lever_geom.WIRE_END)
     u = (stop - start) / np.linalg.norm(stop - start)
     rx = start[0] - eb.KNIFE_AXIS_XY[0]
     ry = start[1] - eb.KNIFE_AXIS_XY[1]
@@ -810,11 +810,11 @@ def test_pen_gain_runs_on_the_wire_moment_arm_not_the_clamp_station(nom):
         start = np.array(
             [
                 eb.KNIFE_AXIS_XY[0] + radius + mg_output_fixture_geom.HOOK_OFFSET_X,
-                mg_vn_lever_wire_geom.HOOK_Y,
-                mg_vn_lever_wire_geom.HOOK_Z,
+                sh_vn_music_wire_lever_geom.HOOK_Y,
+                sh_vn_music_wire_lever_geom.HOOK_Z,
             ]
         )
-        stop = np.array(mg_vn_lever_wire_geom.tangent_end(float(start[0]), float(start[1])))
+        stop = np.array(sh_vn_music_wire_lever_geom.tangent_end(float(start[0]), float(start[1])))
         pivot = np.array([*eb.KNIFE_AXIS_XY, start[2]])
         radial = start - pivot
         direction = (stop - start) / np.linalg.norm(stop - start)

@@ -117,7 +117,7 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
-    from _mcmaster_90280a201 import SHANK_DIA
+    from sh_vn_clamp_screw_spec import SHANK_DIA
 
     # The mate: #8-32 taps in the back arc, located ±0.1 on both axes.
     assert (BACK_ARC_TAP.kind, BACK_ARC_TAP.size) == ("tapped", "#8-32")
@@ -519,7 +519,7 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     from sh_column_clamp_back_geom import BLOCK_DEPTH as back_block
     from sh_column_clamp_back_geom import GRIP_OFFSET as grip_gap
     from _column_clamp_interface import ARC_DEPTH as front_arc
-    from _mcmaster_90280a201 import SHANK_DIA, SHANK_LEN
+    from sh_vn_clamp_screw_spec import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
     thick = BAR_DEPTH + spec.BAR_DEPTH_BAND
@@ -547,7 +547,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
         EAR_HEIGHT_BAND,
         EAR_STATION_BAND,
     )
-    from _mcmaster_90280a201 import SHANK_DIA
+    from sh_vn_clamp_screw_spec import SHANK_DIA
 
     # The pitch's sources: the top frame dimensions its socket pitch at .XX;
     # the base's hole table prints each socket's X at .XX, two bands apart.
@@ -598,7 +598,7 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     holes' own least (the same Ø4.98 +0.10/-0), and anywhere the shank reaches
     in the longest slot it stays inside the narrowest, shortest counterbore."""
     from _printed_tolerance import printed_band_mm
-    from _mcmaster_90280a201 import HEAD_DIA, SHANK_DIA
+    from sh_vn_clamp_screw_spec import HEAD_DIA, SHANK_DIA
 
     head_r = HEAD_DIA / 2.0
     widest = 4.98 + 0.10

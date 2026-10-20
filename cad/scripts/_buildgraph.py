@@ -32,6 +32,8 @@ from enum import Enum
 from pathlib import Path
 from typing import NamedTuple
 
+import yaml
+
 SCRIPTS_DIR = Path(__file__).resolve().parent
 CAD_OUT = SCRIPTS_DIR.parent / "out"
 CONFIG_DIR = SCRIPTS_DIR.parent / "config"
@@ -71,12 +73,22 @@ ASSEMBLY_ORDER = (
 
 
 def is_shop_fixture(stem: str) -> bool:
-    """True for a shop-fixture stem (``_tl_``: cad/docs/subsystem-identities.md).
+    """Classify tooling by its existing TL stem or explicit registry usage scope.
 
-    A fixture part must belong to a registered shop-fixture assembly; a fixture
-    assembly never enters a machine assembly or a machine BOM
-    (test_part_coverage.py, #1239)."""
-    return "_tl_" in stem
+    Shared supplier hardware can serve a fixture without carrying its parent's
+    TL stem. Its own row declares ``usage_scope: tooling``; omitted scopes are
+    ``machine``. A fixture part may appear only in a shop-fixture assembly, which
+    never enters a machine assembly or BOM (test_part_coverage.py, #1239).
+    """
+    dashed = stem.replace("_", "-")
+    registry = CONFIG_DIR / "parts" / f"{dashed}.yaml"
+    scope = "machine"
+    if registry.is_file():
+        row = yaml.safe_load(registry.read_text(encoding="utf-8"))[dashed]
+        scope = row.get("usage_scope", "machine")
+        if not isinstance(scope, str) or scope not in {"machine", "tooling"}:
+            raise ValueError(f"{registry}: invalid usage_scope {scope!r}")
+    return "_tl_" in stem or scope == "tooling"
 
 
 # The machine's own assemblies: the harmonic-analyzer and the subs it places.

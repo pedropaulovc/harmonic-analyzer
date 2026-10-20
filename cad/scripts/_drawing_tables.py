@@ -418,6 +418,73 @@ def _bom_identity_map(
     return identities
 
 
+@_telemetry.traced("drawing.bom_row_identities")
+def bom_row_identities(
+    table: Any,
+    *,
+    configuration: str,
+    component_identities: dict[str, tuple[str, str | None]],
+) -> dict[str, int]:
+    """Associate logical rows through native components, never displayed Number.
+
+    Different members of a shared purchased file have the same released Number.
+    Conversely, interchangeable occurrences of one member must share a row. The
+    native row association proves both without depending on a mutable cell value.
+    ``None`` permits any configuration of an otherwise unambiguous file family
+    (for example, the deliberately grouped transgear wheels).
+    """
+    from _component_references import component_identity, member_configuration
+
+    if not configuration:
+        raise ValueError("a top-level BOM requires its assembly configuration")
+    expected: dict[tuple[str, str | None], str] = {}
+    for logical, (stem, member) in component_identities.items():
+        identity = (
+            stem.casefold(),
+            member_configuration(member) if member is not None else None,
+        )
+        if identity in expected:
+            raise ValueError(
+                f"BOM rows {expected[identity]!r} and {logical!r} share {identity!r}"
+            )
+        expected[identity] = logical
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetComponents2"
+    )
+    row_count = int(table.RowCount)
+    result: dict[str, int] = {}
+    for row in range(1, row_count):
+        components = tuple(annotation.GetComponents2(row, configuration) or ())
+        if not components:
+            raise RuntimeError(f"BOM row {row} has no native component association")
+        row_keys: set[str] = set()
+        for component in components:
+            stem, member = component_identity(component)
+            matches = {
+                logical
+                for (file_stem, member_name), logical in expected.items()
+                if file_stem == stem and member_name in (None, member)
+            }
+            if len(matches) != 1:
+                raise RuntimeError(
+                    f"BOM row {row} component {(stem, member)!r} matches "
+                    f"{sorted(matches)!r}; expected one logical member"
+                )
+            row_keys.update(matches)
+        if len(row_keys) != 1:
+            raise RuntimeError(
+                f"BOM row {row} merged distinct members {sorted(row_keys)!r}"
+            )
+        logical = row_keys.pop()
+        if logical in result:
+            raise RuntimeError(f"BOM member {logical!r} appears in multiple rows")
+        result[logical] = row
+    missing = sorted(set(component_identities) - result.keys())
+    if missing:
+        raise RuntimeError(f"BOM native associations are missing members {missing!r}")
+    return result
+
+
 @_telemetry.traced("drawing.bom_table", label_param="label")
 def insert_bom_table(
     adapter: Any,
@@ -427,7 +494,8 @@ def insert_bom_table(
     expected_components: Sequence[str],
     descriptions: dict[str, str] | None = None,
     identity_aliases: dict[str, str] | None = None,
-    configuration_grouping: Literal["separate", "same-part"] = "separate",
+    component_identities: dict[str, tuple[str, str | None]] | None = None,
+    configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
     label: str,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
@@ -439,11 +507,22 @@ def insert_bom_table(
     number present, so a BOM that silently dropped a component can never ship.
     ``identity_aliases`` maps alternate displayed identities (such as released
     part numbers) back to the expected component stems.
+    ``component_identities`` instead binds logical member rows to native
+    (file stem, configuration) identities; use it when Numbers repeat across
+    configured members. ``same-name`` groups by the model's BOM part-number key,
+    retaining distinct member keys while combining the transgear variants.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
     table rebound as ``ITableAnnotation``.
     """
+    grouping_values = {"separate": 1, "same-part": 2, "same-name": 3}
+    if configuration_grouping not in grouping_values:
+        raise ValueError(f"unsupported BOM grouping {configuration_grouping!r}")
+    if component_identities is not None and set(component_identities) != set(
+        expected_components
+    ):
+        raise ValueError("BOM native identities must cover exactly the expected rows")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     configuration = str(
@@ -487,7 +566,9 @@ def insert_bom_table(
         raise RuntimeError(
             f"failed to bind {label} BOM table to configuration {configuration!r}"
         )
-    grouping_value = 2 if configuration_grouping == "same-part" else 1
+    # swDisplay_ConfigurationWithSameName_AsOneItem=3 groups the internal BOM
+    # names, not the displayed released Number custom property.
+    grouping_value = grouping_values[configuration_grouping]
     setattr(feature, "PartConfigurationGrouping", grouping_value)
     setattr(feature, "DisplayAsOneItem", configuration_grouping == "same-part")
     actual_grouping = int(
@@ -526,10 +607,30 @@ def insert_bom_table(
             f"{label} BOM table is {rows}x{columns}, expected {expected_rows} rows: "
             f"{contents!r}"
         )
-    identities = _bom_identity_map(expected_components, identity_aliases)
+    native_rows = (
+        bom_row_identities(
+            table,
+            configuration=configuration,
+            component_identities=component_identities,
+        )
+        if component_identities is not None
+        else None
+    )
+    identities = (
+        _bom_identity_map(expected_components, identity_aliases)
+        if native_rows is None
+        else {}
+    )
+    row_keys = (
+        {row: logical.strip().lower() for logical, row in native_rows.items()}
+        if native_rows is not None
+        else {}
+    )
     header = [cell.strip().upper() for cell in contents[0]]
     part_column = header.index("PART NUMBER") if "PART NUMBER" in header else None
-    if part_column is None:
+    if native_rows is not None:
+        observed = {logical.strip().lower() for logical in native_rows}
+    elif part_column is None:
         observed = {cell.strip().lower() for row in contents[1:] for cell in row}
     else:
         observed = {
@@ -564,7 +665,7 @@ def insert_bom_table(
                 .strip()
                 .lower()
             )
-            text = remaining.pop(identities.get(part, part), None)
+            text = remaining.pop(row_keys.get(row, identities.get(part, part)), None)
             if text is None:
                 continue
             if not table.IsCellTextEditable(row, description_column):

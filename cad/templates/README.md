@@ -90,7 +90,7 @@ block is ONE native note in one font run, its linked lines in this order:
    $PRPSHEET:"TOL_CHAMFER_MAX" MAX`.
 
 Right side: project title; PART name; DWG.
-NO. (`Number`, the MHA-<subsystem>-## registry id (assembly 00; fabricated parts 01 onward; vendor parts MHA-<parent>-VN-50 onward)); REV (the release tag); scale; UNIT;
+NO. (`Number`, the MHA-<subsystem>-## registry id (assembly 00; fabricated parts 01 onward; vendor parts unique to one assembly MHA-<parent>-VN-50 onward; shared vendor SKUs MHA-SH-VN-50 onward, one Number for every member configuration)); REV (the release tag); scale; UNIT;
 copyright + CC BY-SA mark. The source part supplies the linked `$PRPSHEET`
 fields. `_part_properties.part_properties` stamps `Number`, `Revision`, `Title`, and
 the `TOL_*` set. `_drawing_marks.apply_drawing_properties` stamps `Drawn By`

@@ -2,7 +2,7 @@
 
 The ch16 measuring stick and its clamped stop (user-approved re-derivation,
 2026-10-09): the graduated bar, the brass block, its cover plate, the two
-MHA-MS-VN-51 plate screws and one MHA-MS-VN-50 knurled thumbscrew. The assembly
+MHA-MS-VN-51 plate screws and one MHA-SH-VN-55 knurled thumbscrew. The assembly
 frame turns ``ms_stop_spec`` half a turn about the stick's X axis: the
 thumbscrew is above the stick (+Y), the block below it, and the cover faces
 +Z. The builder, the top-level park pose and the fitter drawing all read
@@ -25,7 +25,7 @@ from __future__ import annotations
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
-import _mcmaster_91882a221 as thumb
+import sh_vn_thumb_screw_spec as thumb
 
 ASM_NAME = "ms-measuring-stick"
 
@@ -33,7 +33,7 @@ STICK = "ms-stick"
 BLOCK = "ms-stop-block"
 PLATE = "ms-stop-plate"
 PLATE_SCREW = "ms-vn-stop-plate-screw"
-THUMB_SCREW = "ms-vn-thumb-screw"
+THUMB_SCREW = "sh-vn-thumb-screw"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory.
@@ -75,7 +75,7 @@ BLOCK_ROWS = WORKING_ROWS
 PLATE_ROWS = WORKING_ROWS
 
 # --- Thumbscrew -------------------------------------------------------------
-# ms-vn-thumb-screw's frame: outer head face at X=0, axis +X, collar bearing face
+# sh-vn-thumb-screw's frame: outer head face at X=0, axis +X, collar bearing face
 # at HEAD_STACK_LEN, tip at OVERALL_LEN. The screw points down: part X -> -Y.
 THUMB_ROWS: Rows = ((0.0, -1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, -1.0))
 THUMB_TIP_Y = STICK_TOP_Y  # the tip clamps the bar's plain face

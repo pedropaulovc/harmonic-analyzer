@@ -33,7 +33,7 @@ import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
-import _mcmaster_91882a221 as thumb
+import sh_vn_thumb_screw_spec as thumb
 from _transforms import rows_from_euler
 from _named_views import octant_axes
 
@@ -157,7 +157,7 @@ def test_thumb_screw_spec_is_the_recipe_table_row() -> None:
     assert thumb.COLLAR_H == pytest.approx(row["collar_h"])
     assert thumb.HEAD_DIA == pytest.approx(2.0 * row["head_r"])
     assert thumb.HEAD_H == pytest.approx(row["head_h"])
-    assert _config.parts("ms-vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
+    assert _config.parts("sh-vn-thumb-screw")["supplier_skus"] == [thumb.SKU]
 
 
 def test_every_rotation_is_proper() -> None:
@@ -249,7 +249,7 @@ def test_thread_allowances_are_the_spec_values() -> None:
     )
     pairs = contracts.allowed_interference_pairs(spec.ASM_NAME)
     assert set(pairs) == {
-        frozenset(("ms-vn-thumb-screw-1", "ms-stop-block-1")),
+        frozenset(("sh-vn-thumb-screw-1", "ms-stop-block-1")),
         frozenset(("ms-vn-stop-plate-screw-1", "ms-stop-block-1")),
         frozenset(("ms-vn-stop-plate-screw-2", "ms-stop-block-1")),
     }

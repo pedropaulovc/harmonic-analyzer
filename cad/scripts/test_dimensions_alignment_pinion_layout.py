@@ -37,7 +37,7 @@ import dt_vn_post_mount_screw_spec as post_screw
 import dt_vn_cone_tip_collar_spec as tip_collar
 import _mcmaster_94025a164 as tip_adjuster
 import dt_vn_cone_pivot_screw_spec as pivot_screw
-import dt_vn_swing_stop_screw_spec as stop_screw
+import dt_swing_stop_screw_spec as stop_screw
 
 DIMENSIONS = Path(__file__).resolve().parents[1] / "config" / "dimensions.yaml"
 
@@ -356,7 +356,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     ):
         assert fragment in adjuster_row[1], fragment
     assert f"model apex/tip station is {cone_shaft.T006_TIP_STATION:.12f}" in adjuster_row[2]
-    stop_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-swing-stop-screw`")
+    stop_row = gen_dimensions.find_row(record, "Chapter 13", "`sh-vn-fillister-screw-90280a108`")
     assert stop_row is not None
     for fragment in (
         f"{stop_screw.STOCK_STANDARD} #4-40 UNC-{stop_screw.THREAD_CLASS}",

@@ -4,7 +4,7 @@ From the repository root, after generating current parts with doit, run::
 
     uv run python cad/scripts/diagnostics/diag_stock_spring_gravity.py
 
-Reads the twenty existing cad/out/sldprt parts; never builds missing artifacts.
+Reads the requested native part/member identities; never builds missing artifacts.
 The caller must make those artifacts current through doit. This uses the standard
 run_build session (including its initial document cleanup); save user work first.
 COM is serialized by dodo._com_seat, and each measured document is closed without
@@ -37,6 +37,7 @@ else:
     import _script_paths  # noqa: F401
 from _check import check
 from _com import _early_bound
+from _purchased_part_variants import activate_member, require_active_member
 from _session import run_build
 import _telemetry
 import build_mg_magnifier_assembly as m
@@ -48,7 +49,7 @@ import spring_mount_geom as s
 
 ROOT = Path(__file__).resolve().parents[3]
 
-STEMS = (
+DEFAULT_STEMS = (
     "ch-vn-channel-spring-installed",
     "sm-vn-counter-spring",
     "ch-vn-spring-hook",
@@ -60,8 +61,7 @@ STEMS = (
     "mg-magnifying-clamp",
     "mg-magnifying-vertical-rod",
     "mg-output-fixture",
-    "mg-vn-thumb-screw",
-    "mg-vn-lever-wire",
+    "sh-vn-thumb-screw",
     "mg-magnifying-wheel",
     "pn-pen-rod",
     "pn-pen-v-block",
@@ -71,7 +71,13 @@ STEMS = (
     "pn-vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
     "pn-vn-pen-adjust-nut",
-    "pn-vn-pen-wire",
+)
+PART_IDENTITIES = {stem: (stem, "Default") for stem in DEFAULT_STEMS}
+PART_IDENTITIES.update(
+    {
+        "sh-vn-music-wire--LeverWire": ("sh-vn-music-wire", "LeverWire"),
+        "sh-vn-music-wire--PenWire": ("sh-vn-music-wire", "PenWire"),
+    }
 )
 PEN_STEMS = (
     "pn-pen-rod",
@@ -82,21 +88,27 @@ PEN_STEMS = (
     "pn-vn-pen-rod-set-screw",
     "pn-pen-adjust-screw",
     "pn-vn-pen-adjust-nut",
-    "pn-vn-pen-wire",
+    "sh-vn-music-wire--PenWire",
 )
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"
 
 
-async def build(adapter):
+async def _native_masses(adapter):
+    """Measure each requested file/member without conflating same-file members."""
     parts = {}
-    for stem in STEMS:
+    for result_key, (stem, configuration) in PART_IDENTITIES.items():
         path = ROOT / "cad/out/sldprt" / f"{stem}.SLDPRT"
-        with _telemetry.span("gravity.native_mass", part=stem):
+        with _telemetry.span(
+            "gravity.native_mass", part=stem, configuration=configuration
+        ):
             check(f"open built part {stem}", await adapter.open_model(str(path)))
             model = _early_bound(adapter.currentModel, "IModelDoc2")
             try:
                 if model is None:
                     raise RuntimeError(f"opened part has no native document: {stem}")
+                await activate_member(adapter, configuration)
+                model.EditRebuild3()
+                require_active_member(adapter, configuration)
                 model.ClearSelection2(True)
                 ext = _early_bound(model.Extension, "IModelDocExtension")
                 mp = _early_bound(ext.CreateMassProperty2(), "IMassProperty2")
@@ -115,6 +127,7 @@ async def build(adapter):
                     )
                 row = {
                     "path": str(path),
+                    "identity": {"stem": stem, "configuration": configuration},
                     "mass_kg": float(mp.Mass),
                     "density_kg_m3": float(mp.Density),
                     "volume_mm3": float(mp.Volume) * 1e9,
@@ -136,14 +149,22 @@ async def build(adapter):
                     raise RuntimeError(
                         f"invalid native mass/density/COM: {stem}: {row}"
                     )
-                parts[stem] = row
+                parts[result_key] = row
                 _telemetry.info(
-                    "read native gravity mass", part=stem, mass_kg=row["mass_kg"]
+                    "read native gravity mass",
+                    part=stem,
+                    configuration=configuration,
+                    mass_kg=row["mass_kg"],
                 )
             finally:
                 if model is not None:
                     adapter.swApp.CloseDoc(str(model.GetTitle()))
                 adapter.currentModel = None
+    return parts
+
+
+async def build(adapter):
+    parts = await _native_masses(adapter)
 
     with _telemetry.span("gravity.counter_force_interval"):
         rows = []
@@ -181,14 +202,14 @@ async def build(adapter):
         weight("mg-magnifying-clamp", m.CLAMP_POS, m.IDENTITY)
         rotation = m.compose_rows(m.rot_z_rows(-90), m.ROT_Y_180)
         weight(
-            "mg-vn-thumb-screw",
+            "sh-vn-thumb-screw",
             (m.CLAMP_X, m.THUMB_SCREW_OUTER_FACE_Y, m.LEVER_ROD_Z),
             rotation,
         )
         weight("mg-magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
         weight("mg-output-fixture", m.FIXTURE_POSITION, m.FIXTURE_ROWS)
         weight(
-            "mg-vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
+            "sh-vn-thumb-screw", m.FIXTURE_SCREW_POSITION, m.FIXTURE_SCREW_ROWS
         )
         positive = sum(max(0, row["gravity_torque_n_mm"]) for row in rows)
         negative = sum(min(0, row["gravity_torque_n_mm"]) for row in rows)
@@ -221,7 +242,7 @@ async def build(adapter):
         flexible_bound = 9.80665 * (
             20 * parts["ch-vn-channel-spring-installed"]["mass_kg"] * channel_radius
             + parts["sm-vn-counter-spring"]["mass_kg"] * counter_radius
-            + parts["mg-vn-lever-wire"]["mass_kg"] * hook_radius
+            + parts["sh-vn-music-wire--LeverWire"]["mass_kg"] * hook_radius
         )
         arm = -s.COUNTER_REFERENCE_POSE.moment_arm_mm
         reference = s.counter_force_n(s.COUNTER_REFERENCE_POSE.length_mm)
@@ -245,7 +266,7 @@ async def build(adapter):
             "flexible_part_counts": {
                 "ch-vn-channel-spring-installed": 20,
                 "sm-vn-counter-spring": 1,
-                "mg-vn-lever-wire": 1,
+                "sh-vn-music-wire--LeverWire": 1,
             },
             "pen_mass_kg": pen_mass,
             "pen_gravity_torque_bound_n_mm": pen_torque_bound,
@@ -287,7 +308,7 @@ def main():
     with dodo._com_seat("stock-spring-gravity"):
         missing = [
             str(ROOT / "cad/out/sldprt" / f"{stem}.SLDPRT")
-            for stem in STEMS
+            for stem in dict.fromkeys(stem for stem, _cfg in PART_IDENTITIES.values())
             if not (ROOT / "cad/out/sldprt" / f"{stem}.SLDPRT").is_file()
         ]
         if missing:

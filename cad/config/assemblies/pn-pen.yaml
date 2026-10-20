@@ -29,7 +29,7 @@ flip_invert:
 allowed_free_stems:
   - pn-pen-rod
   - pn-vn-pen-marker
-  - pn-vn-pen-wire
+  - sh-vn-music-wire
   - pn-pen-v-block
   - pn-pen-frame
   - pn-vn-pen-set-screw
@@ -42,7 +42,7 @@ allowed_free_stems:
 required_free_stems:
   - pn-pen-rod
   - pn-vn-pen-marker
-  - pn-vn-pen-wire
+  - sh-vn-music-wire
   - pn-pen-v-block
   - pn-pen-frame
   - pn-vn-pen-set-screw

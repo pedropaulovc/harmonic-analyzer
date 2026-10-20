@@ -103,6 +103,7 @@ from _assembly_postbuild import (
     load_dof_manifest,
 )
 from _chain_mounts import mounted_wheels
+from _component_references import bind_component_selectors
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
 from _native_bank_retention import measure as measure_bank_retention
@@ -1563,7 +1564,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """
     import build_mg_magnifier_assembly as _mag
     from mg_output_fixture_geom import HOOK_LOCAL
-    import mg_vn_lever_wire_geom as _wire
+    import sh_vn_music_wire_lever_geom as _wire
 
     name = "mg-magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -1587,6 +1588,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check(f"open {name}", await adapter.open_model(str(sldasm)))
     model = adapter.currentModel
+    wire_name = bind_component_selectors(model, ("@LeverWire:1",))["@LeverWire:1"]
     log("--- live chain: magnifier lever sweep (knife rock, WIRE 1) ---")
 
     # Machine anchors for the invariants (the magnifier is authored
@@ -1606,7 +1608,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("mg-vn-lever-wire-1")
+        rows, pos = _xform(wire_name)
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat
@@ -1883,7 +1885,7 @@ def verify_base_footprint(report: Report) -> None:
         import dt_cone_swing_platform_geometry as platform
         import build_dt_drive_train_assembly as train
         import fr_harmonic_base_spec as base
-        import dt_vn_swing_stop_screw_spec as sscrew
+        import dt_swing_stop_screw_spec as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1925,7 +1927,7 @@ def verify_base_footprint(report: Report) -> None:
                 pscrew.HEAD_DIA / 2.0,
             ),
             (
-                "dt-vn-swing-stop-screw",
+                "@SwingStopScrew:1",
                 train.STOP_X,
                 train.STOP_Z,
                 sscrew.HEAD_DIA / 2.0,

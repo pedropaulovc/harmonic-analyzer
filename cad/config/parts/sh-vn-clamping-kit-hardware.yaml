@@ -1,0 +1,20 @@
+sh-vn-clamping-kit-hardware:
+  title: Clamping Kit Hardware
+  number: MHA-SH-VN-57
+  stock_name: 52 Pc Clamping Kit, 14 mm (9/16 in) T-Slot, 1/2-13 Studs
+  supplier: Precision Matthews
+  supplier_skus: [52PCCK-9/16-14mm]
+  # SOLIDWORKS library stand-in for the kit's hardened steel.
+  material: Plain Carbon Steel
+  material_specification: "Hardened steel"
+  finish: black oxide, as supplied
+  # Installed members (3 in studs, T-nuts and flange nuts), not purchased kits.
+  quantity: 12
+  default_configuration: HoldDownStud
+  configuration_quantities:
+    HoldDownStud: 4
+    TNut: 4
+    FlangeNut: 4
+  usage_scope: tooling
+  tolerance_class: visual_noncritical
+  process: purchased

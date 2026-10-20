@@ -16,16 +16,17 @@ from _check import log
 from _com import _flag, _read_member
 from _paths import OUT_SLDASM
 from _assembly import component_transform
+from _component_references import bind_component_selectors
 
 
 SCREWS = (
     "dt-vn-cone-pivot-screw-1",
-    "dt-vn-swing-stop-screw-1",
+    "@SwingStopScrew:1",
     "dt-vn-slotted-screw-1",
     "dt-vn-slotted-screw-2",
     "dt-vn-slotted-screw-3",
     "dt-vn-slotted-screw-4",
-    "dt-vn-foot-screw-1",
+    "@FootScrew:1",
     "dt-vn-pedestal-hold-down-screw-1",
     "dt-vn-pedestal-hold-down-screw-2",
 )
@@ -41,10 +42,12 @@ async def main():
     doc = adapter.currentModel
     _flag(doc, "IModelDoc2")
     log(f"opened {str(_read_member(doc, 'GetTitle'))!r}")
-    for name in SCREWS:
+    names = bind_component_selectors(doc, SCREWS)
+    for selector in SCREWS:
+        name = names[selector]
         try:
             a = component_transform(adapter, name)
-            log(f"{name}: origin=({a[9]*1000:.2f}, {a[10]*1000:.2f}, {a[11]*1000:.2f})")
+            log(f"{selector} [{name}]: origin=({a[9]*1000:.2f}, {a[10]*1000:.2f}, {a[11]*1000:.2f})")
         except Exception as e:  # noqa: BLE001
             log(f"{name}: <{e}>")
     await adapter.disconnect()

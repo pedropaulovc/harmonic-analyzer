@@ -10,7 +10,7 @@ import pen_driver
 import pn_pen_carriage_geom as g
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as vb
-import pn_vn_pen_wire_geom as wire
+import sh_vn_music_wire_pen_geom as wire
 from _mg_wheel_rim_geometry import RIM_WIRE_R
 from mg_wheel_bar_geom import WHEEL_BAR_Y, WHEEL_X
 from _recording_geometry import PAPER_FRONT_Z, PEN_ROD_X, PEN_Z_MID

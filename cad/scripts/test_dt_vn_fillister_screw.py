@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 import _config
-import build_dt_vn_fillister_screw as dt_part
+import build_sh_vn_brass_fillister_screw as dt_part
 import build_fr_vn_fillister_screw as fr_part
 import build_pd_vn_fillister_screw as pd_part
-import _mcmaster_90114a511 as spec
-from _mcmaster_90114a511 import BF_HEAD_R, BF_HH, BF_LEN, BF_MAJOR_R
+import sh_vn_brass_fillister_screw_spec as spec
+from sh_vn_brass_fillister_screw_spec import BF_HEAD_R, BF_HH, BF_LEN, BF_MAJOR_R
 from _simplified_part import save_simplified_part
 from _stock_fastener import RigidTransform, StockComponent
 from diagnostics.diag_build_90114A511 import build_90114A511

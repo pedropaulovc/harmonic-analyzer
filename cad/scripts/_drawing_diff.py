@@ -332,8 +332,8 @@ def _pdfs(directory: Path) -> dict[str, Path]:
     }
 
 
-def _drawing_pairs(old_files: dict[str, Path], new_files: dict[str, Path]) -> dict[str, str]:
-    """Reuse release identity pairing without flattening relative PDF directories."""
+def _drawing_pairs(old_files: dict[str, Path], new_files: dict[str, Path]) -> dict[str, tuple[str, ...]]:
+    """Pair every prior PDF, retaining directories and all shared drawing members."""
     tool = Path(__file__).resolve().parents[1] / "comparisons" / "tools" / "release_diff.py"
     spec = importlib.util.spec_from_file_location("_drawing_release_pairing", tool)
     assert spec is not None and spec.loader is not None
@@ -352,10 +352,12 @@ def _drawing_pairs(old_files: dict[str, Path], new_files: dict[str, Path]) -> di
             (Path(name).stem for name in old_names),
             (Path(name).stem for name in new_names),
             mapping,
+            drawing=True,
         )
         old_stems = {Path(name).stem: name for name in old_names}
         new_stems = {Path(name).stem: name for name in new_names}
-        pairs.update({new_stems[new]: old_stems[old] for new, old in matched.items()})
+        pairs.update({new_stems[new]: tuple(old_stems[old] for old in sources)
+                      for new, sources in matched.items()})
     return pairs
 
 
@@ -374,7 +376,8 @@ def _index(summary: dict[str, Any]) -> bytes:
     for page in summary["pages"]:
         if page["image"] is None:
             continue
-        title = f"{page['drawing']} — page {page['page']} ({page['status']})"
+        title = (f"{page['drawing']} ← {page['old_drawing'] or '(new)'} "
+                 f"— page {page['page']} ({page['status']})")
         source = escape(quote(page["image"], safe="/"), quote=True)
         text_note = "<p>Printed text changed.</p>" if page["text_changed"] else ""
         articles.append(
@@ -434,9 +437,9 @@ def create_drawing_diff(
     Drawing classifications are disjoint: ``changed_drawings`` contains common
     PDFs with changed/added/removed pages; additions/removals have their own lists.
     Names use current relative PDF paths (including their extension), with
-    ``renamed_drawings`` recording the actual prior paths. Pages are paired by
-    ordinal within each paired PDF, never by extracted text. ``asset_path`` is a
-    string so the returned facts are JSON serializable.
+    ``renamed_drawings`` recording every actual prior path. Each candidate PDF
+    is compared, with pages paired by ordinal, never by extracted text.
+    ``asset_path`` is a string so returned facts are JSON serializable.
     Corrupt/unrenderable inputs raise, without replacing a previous output ZIP.
     With ``include_unchanged``, every page has an RGB overlay, including shared
     gray ink on unchanged pages. Image presence does not affect classifications.
@@ -444,7 +447,7 @@ def create_drawing_diff(
     old_files = {} if old_pdf_dir is None else _pdfs(old_pdf_dir)
     new_files = _pdfs(new_pdf_dir)
     pairs = _drawing_pairs(old_files, new_files)
-    removed = sorted(old_files.keys() - set(pairs.values()))
+    removed = sorted(old_files.keys() - {old for sources in pairs.values() for old in sources})
     summary: dict[str, Any] = {
         "schema_version": 1,
         "old_label": old_label,
@@ -467,7 +470,7 @@ def create_drawing_diff(
         ],
         "images": [],
         "changed_drawings": [],
-        "renamed_drawings": {new: old for new, old in sorted(pairs.items()) if new != old},
+        "renamed_drawings": {new: list(old) for new, old in sorted(pairs.items()) if old != (new,)},
         "added_drawings": sorted(new_files.keys() - pairs.keys()),
         "removed_drawings": removed,
         "unchanged_drawings": [],
@@ -480,8 +483,12 @@ def create_drawing_diff(
     temporary_path = Path(temporary)
     try:
         with ZipFile(temporary_path, "w") as archive:
-            for name in sorted(new_files.keys() | set(removed)):
-                old_name = pairs.get(name) if name in new_files else name
+            comparisons = [
+                (name, old_name)
+                for name in sorted(new_files)
+                for old_name in pairs.get(name, (None,))
+            ] + [(name, name) for name in removed]
+            for name, old_name in comparisons:
                 old_path, new_path = old_files.get(old_name), new_files.get(name)
                 # Explicitly nest renderer ownership; neither a page nor a
                 # bitmap may outlive its document or retain a shared buffer.
@@ -505,7 +512,8 @@ def create_drawing_diff(
                             status = "changed" if changed else "unchanged"
                         member = None
                         if png is not None:
-                            member = f"images/{name}/page-{index + 1:04d}.png"
+                            source = f"/from/{old_name}" if len(pairs.get(name, ())) > 1 else ""
+                            member = f"images/{name}{source}/page-{index + 1:04d}.png"
                             _member(archive, member, png)
                             summary["images"].append(member)
                         drawing_changed |= changed
@@ -523,9 +531,10 @@ def create_drawing_diff(
                                 "new_size_points": list(new.size_points) if new else None,
                             }
                         )
-                    if old_path is not None and new_path is not None:
-                        category = "changed_drawings" if drawing_changed else "unchanged_drawings"
-                        summary[category].append(name)
+                    if old_path is not None and new_path is not None and drawing_changed:
+                        if name not in summary["changed_drawings"]:
+                            summary["changed_drawings"].append(name)
+            summary["unchanged_drawings"] = sorted(pairs.keys() - set(summary["changed_drawings"]))
             summary["drawing_counts"] = {
                 status: len(summary[f"{status}_drawings"])
                 for status in ("changed", "added", "removed", "unchanged")

@@ -1,5 +1,6 @@
 /**
- * Current qualified native component names are the articulation authority.
+ * Current-projected archive-role-local paths are the articulation authority.
+ * They retain historical role-local ordinals, not rebuilt-native Name2 indices.
  * scene.ts projects archived hierarchy names at ingestion, never using a glTF
  * node index or a mesh-array position to choose a binding.
  * Source: SOLIDWORKSGLTF release 39 / 81539e53f5146c06a77541415bd79da673806d96.
@@ -8,6 +9,13 @@
  * The separate current-native-identity projection changes path metadata only;
  * archived model bytes, geometry and this source identity remain unchanged.
  */
+import { CURRENT_NATIVE_IDENTITY_PROJECTION, requireCurrentNativeOccurrenceNamespace } from '../current-native-identity.mjs'
+
+// This registry is not a rebuilt-native occurrence map. Refuse that namespace
+// until checked file + exact configuration + ComponentReference Role:1 readback
+// supplies an actual bridge; no index equality or offset is implied here.
+requireCurrentNativeOccurrenceNamespace(CURRENT_NATIVE_IDENTITY_PROJECTION.occurrenceNamespace)
+
 export type Motion =
   | 'crank' | 'cone-spin' | 'cone-swing' | 'cylinder' | 'rod' | 'rocker'
   | 'bar' | 'lever' | 'channel-spring' | 'summing' | 'counter-spring'
@@ -44,7 +52,7 @@ function group(id: string, path: string, names: string, motion: Motion, expected
 export const BINDINGS: readonly Binding[] = [
   // build_drive_train_assembly:5464-5501,5695-5745,5785-5795:
   // keeper loop, seat hardware and bonded grip parts ride the keyed crank rig.
-  group('crank', drive, '(?:dt-crankshaft|dt-crank-arm|dt-crank-hub|dt-vn-crank-hub-pin|dt-crank-pin|dt-crank-pin-eye|dt-crank-handle-pivot-screw|dt-crank-pin-ring|dt-crank-handle|dt-crank-handle-butt-cup|dt-crank-handle-ferrule|dt-crank-pinion|dt-crank-pinion-pin|dt-crank-seat-washer|dt-vn-keeper-chain|dt-vn-keeper-chain-link|dt-vn-fillister-screw)-1|dt-vn-crank-seat-drive-pin-[12]', 'crank', 19),
+  group('crank', drive, '(?:dt-crankshaft|dt-crank-arm|dt-crank-hub|dt-vn-crank-hub-pin|dt-crank-pin|dt-crank-pin-eye|dt-crank-handle-pivot-screw|dt-crank-pin-ring|dt-crank-handle|dt-crank-handle-butt-cup|dt-crank-handle-ferrule|dt-crank-pinion|dt-crank-pinion-pin|dt-crank-seat-washer|dt-vn-keeper-chain|dt-vn-keeper-chain-link|sh-vn-brass-fillister-screw)-1|dt-vn-crank-seat-drive-pin-[12]', 'crank', 19),
   family('coneGears', drive, 'dt-cone-gear', 'cone-spin'),
   // :5994-6023 keys the tip collar to the spinning shaft, not the tip block.
   group('coneShaft', drive, '(?:dt-cone-gear-shaft|dt-crank-drive-gear|dt-vn-cone-tip-collar)-1', 'cone-spin', 3),
@@ -62,16 +70,16 @@ export const BINDINGS: readonly Binding[] = [
   group('gooseneck', summing, 'sm-gooseneck-1', 'gooseneck', 1),
   group('counterSpring', summing, 'sm-vn-counter-spring-1', 'counter-spring', 1),
   group('magnifierLever', magnifier, '(?:mg-magnifying-lever|mg-magnifying-bracket)-1', 'magnifier-fixed', 2),
-  group('magnifierClamp', magnifier, '(?:mg-magnifying-clamp|mg-vn-thumb-screw)-1', 'magnifier-clamp', 2),
+  group('magnifierClamp', magnifier, '(?:mg-magnifying-clamp|sh-vn-thumb-screw)-1', 'magnifier-clamp', 2),
   group('magnifierRod', magnifier, 'mg-magnifying-vertical-rod-1', 'magnifier-rod', 1),
   group('magnifyingWheel', magnifier, 'mg-magnifying-wheel-1', 'wheel', 1),
-  group('leverWire', magnifier, 'mg-vn-lever-wire-1', 'lever-wire', 1),
-  group('penWire', pen, 'pn-vn-pen-wire-1', 'pen-wire', 1),
+  group('leverWire', magnifier, 'sh-vn-music-wire--LeverWire-1', 'lever-wire', 1),
+  group('penWire', pen, 'sh-vn-music-wire--PenWire-1', 'pen-wire', 1),
   group('pen', pen, '(?:pn-pen-rod|pn-pen-v-block|pn-pen-frame|pn-vn-pen-marker|pn-vn-pen-set-screw)-1', 'pen', 5),
   // build_paper_drive_assembly:2185-2476 locks all 33 native carriage bodies
   // to the platen: four clip and ten guide fillisters, eight low lock screws.
   // The guide-lock screws are distinct released parts, not fillisters 15..22.
-  group('platen', paper, '(?:pd-platen|pd-platen-rack|pd-platen-paper)-1|(?:pd-platen-clip|pd-platen-guide)-[12]|pd-guide-lock-[1-4]|pd-vn-fillister-screw-(?:[1-9]|1[0-4])|pd-vn-guide-lock-screw-[1-8]', 'platen', 33),
+  group('platen', paper, '(?:pd-platen|pd-platen-rack|pd-platen-paper)-1|(?:pd-platen-clip|pd-platen-guide)-[12]|pd-guide-lock-[1-4]|sh-vn-brass-fillister-screw-(?:[1-9]|1[0-4])|pd-vn-guide-lock-screw-[1-8]', 'platen', 33),
   group('alignmentPinionSwing', drive, 'dt-pinion-bracket-[12]|dt-alignment-pinion-1|dt-pinion-arbor-1|dt-vn-pinion-strap-pin-[123]|dt-pinion-handle-1|dt-pinion-arbor-collar-1', 'pinion-swing', 9),
   group('alignmentPinionCam', drive, 'dt-pinion-cam-[12]|dt-pinion-lift-rod-1|dt-pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'dt-pinion-lever-1|dt-pinion-lever-pin-1', 'pinion-lever', 2),
@@ -84,28 +92,29 @@ export const BINDINGS: readonly Binding[] = [
   // :56-58,2478-2571,2663-2679 fixes the structure at its authored latched pose.
   // Physical hanger release/swing is not a published MechanismInput DOF.
   group('paperHanger', paper, '(?:pd-transgear-arm|pd-transgear-arm-plate|pd-vn-transgear-latch-pin|pd-transgear-pin|pd-transgear-front-bushing|pd-transgear-rear-bushing|pd-vn-transgear-retaining-ring)-1|pd-vn-transgear-arm-plate-screw-[12]', 'paper-fixed', 9),
-  group('paperLatchSupport', paper, '(?:pd-latch-hook|pd-latch-hook-bracket)-1|(?:pd-vn-latch-hook-bracket-screw|pd-vn-latch-hook-rivet)-[12]', 'paper-fixed', 6),
+  group('paperLatchSupport', paper, '(?:pd-latch-hook|pd-latch-hook-bracket)-1|(?:sh-vn-fillister-screw-90280a108|pd-vn-latch-hook-rivet)-[12]', 'paper-fixed', 6),
   // transgear_pivot_spring_spec:18-24,46-52: installed disc-spring geometry,
   // not a channel/counter swept-wire spring and not a runtime deformation law.
   group('paperPivotSupport', paper, '(?:pd-vn-transgear-pivot-screw|pd-transgear-pivot-spacer|pd-vn-transgear-pivot-spring)-1', 'paper-fixed', 3),
   // _chain:154-185 / build_paper_drive_assembly:1936-2004: 34 inner + 34 outer.
-  group('paperChain', paper, 'pd-vn-chain-(?:outer|inner)-link-(?:[1-9]|[12][0-9]|3[0-4])', 'chain-link', 68),
+  group('paperChain', paper, 'sh-vn-chain-link--(?:OuterLink|InnerLink)-(?:[1-9]|[12][0-9]|3[0-4])', 'chain-link', 68),
   group('paperSprockets', paper, 'pd-transgear-removable-[123]', 'paper-sprocket', 3),
   group('magnifierFixture', magnifier, 'mg-output-fixture-1', 'magnifier-fixture', 1),
 ]
 
 /**
  * Every magnifier thumb-screw instance the model actually contains must ride a
- * declared motion. The output fixture's axial screw (mg-vn-thumb-screw-2, placed by
+ * declared motion. The output fixture's axial screw (sh-vn-thumb-screw-2, placed by
  * build_mg_magnifier_assembly as 'thumb-screw (output fixture)') is absent from
  * release 39; binding it needs the refreshed GLB census, so until then a model
  * that carries it is reported unverified rather than drawn permanently fixed.
  */
 export const UNBOUND_THUMB_SCREW_ISSUE = 'web: bind magnifier fixture thumb-screw-2 to the output fixture at next GLB refresh (https://github.com/pedropaulovc/harmonic-analyzer/issues/1351)'
-const MAGNIFIER_THUMB_SCREW = new RegExp(`^${magnifier}mg-vn-thumb-screw-\\d+$`)
+const MAGNIFIER_THUMB_SCREW = new RegExp(`^${magnifier}sh-vn-thumb-screw-\\d+$`)
 
 /** Present magnifier thumb-screw paths no binding resolves, as unverified-binding messages. */
-export function unboundThumbScrewFailures(paths: Iterable<string>): string[] {
+export function unboundThumbScrewFailures(paths: Iterable<string>, occurrenceNamespace: unknown = CURRENT_NATIVE_IDENTITY_PROJECTION.occurrenceNamespace): string[] {
+  requireCurrentNativeOccurrenceNamespace(occurrenceNamespace)
   const failures: string[] = []
   for (const path of paths) {
     if (!MAGNIFIER_THUMB_SCREW.test(path) || BINDINGS.some(binding => binding.pattern.test(path))) continue

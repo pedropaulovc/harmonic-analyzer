@@ -136,11 +136,19 @@ function assemblyState(controls) {
 test('source-track ingestion projects archived native paths without rewriting source/model evidence', () => {
   const track = fixture()
   const aliases = [
-    ['mg-magnifier/mg-lever-wire-1', 'mg-magnifier/mg-vn-lever-wire-1'],
-    ['pn-pen/pn-pen-wire-1', 'pn-pen/pn-vn-pen-wire-1'],
+    ['mg-magnifier/mg-lever-wire-1', 'mg-magnifier/sh-vn-music-wire--LeverWire-1'],
+    ['pn-pen/pn-pen-wire-1', 'pn-pen/sh-vn-music-wire--PenWire-1'],
     ['pn-pen/pn-pen-marker-1', 'pn-pen/pn-vn-pen-marker-1'],
-    ['dt-drive-train/vn-fillister-screw-1', 'dt-drive-train/dt-vn-fillister-screw-1'],
-    ['pd-paper-drive/vn-fillister-screw-1', 'pd-paper-drive/pd-vn-fillister-screw-1'],
+    ['dt-drive-train/vn-fillister-screw-1', 'dt-drive-train/sh-vn-brass-fillister-screw-1'],
+    ['pd-paper-drive/vn-fillister-screw-1', 'pd-paper-drive/sh-vn-brass-fillister-screw-1'],
+    ['dt-drive-train/vn-foot-screw-1', 'dt-drive-train/sh-vn-fillister-screw-90280a108__FootScrew-1'],
+    ['dt-drive-train/vn-swing-stop-screw-1', 'dt-drive-train/sh-vn-fillister-screw-90280a108__SwingStopScrew-1'],
+    ['mg-magnifier/vn-clamp-screw-1', 'mg-magnifier/sh-vn-clamp-screw-1'],
+    ['ch-channel/vn-arbor-set-screw-1', 'ch-channel/sh-vn-arbor-set-screw-1'],
+    ['mg-magnifier/vn-thumb-screw-1', 'mg-magnifier/sh-vn-thumb-screw-1'],
+    ['pd-paper-drive/vn-chain-inner-link-1', 'pd-paper-drive/sh-vn-chain-link--InnerLink-1'],
+    ['pd-paper-drive/vn-chain-outer-link-1', 'pd-paper-drive/sh-vn-chain-link--OuterLink-1'],
+    ['ch-rocker-arm-tl-oblique-jig/ch-rocker-arm-tl-oblique-hold-down-stud-1', 'ch-rocker-arm-tl-oblique-jig/sh-vn-clamping-kit-hardware--HoldDownStud-1'],
     ['pd-paper-drive/vn-transgear-collar-cross-pin-1', 'pd-paper-drive/pd-vn-transgear-collar-cross-pin-1'],
     ['pd-paper-drive/vn-latch-hook-rivet-1', 'pd-paper-drive/pd-vn-latch-hook-rivet-1'],
   ]

@@ -63,9 +63,9 @@ from dt_crank_pin_ring_spec import RING_CENTRE_X, RING_FAR_X, RING_ID_MAX, RING_
 from dt_crank_pin_ring_spec import WIRE_DIA as RING_WIRE_DIA
 from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_DIA
 from dt_crank_pin_spec import RING_HOLE_X, SMALL_END_DIA
-from _mcmaster_90114a511 import HEAD_DIA as SCREW_HEAD_DIA
-from _mcmaster_90114a511 import HEAD_H as SCREW_HEAD_H
-from _mcmaster_90114a511 import SHANK_DIA as SCREW_SHANK_DIA
+from sh_vn_brass_fillister_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
+from sh_vn_brass_fillister_screw_spec import HEAD_H as SCREW_HEAD_H
+from sh_vn_brass_fillister_screw_spec import SHANK_DIA as SCREW_SHANK_DIA
 
 
 Vec = tuple[float, float, float]

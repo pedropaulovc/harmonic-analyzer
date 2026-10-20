@@ -1,16 +1,18 @@
 # Subsystem identities
 
-Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains both cutovers; it does not replace either source of truth.
+Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities and the 2026-10-20 consolidation of repeated supplier SKUs into shared `sh-vn-*` identities: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains all three cutovers; it does not replace either source of truth.
 
 ## Naming and numbering
 
 Use `<prefix>-<descriptive-name>` for native model and exported asset basenames, and `<prefix>_<descriptive_name>` for Python module and doit task stems. Assembly builders and drawing artefacts retain their `_assembly` or `-assembly` suffix. For example, `dt-drive-train.SLDASM` is built by `build_dt_drive_train_assembly.py`; its drawing artefact stem is `dt-drive-train-assembly`.
 
-Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the category's assembly drawing; fabricated parts start at `01`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. SH contains fabricated parts only. Numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the family Number, such as `MHA-DT-03-T006` for a cone-gear configuration: `T006` is a tooth count, not an identity sequence, so it keeps its three digits. Installed channel spring stretch variants retain the unqualified base Number.
+Drawing Numbers use `MHA-<CATEGORY>-<NN>`, with two-digit sequences. `00` is the category's assembly drawing; fabricated parts start at `01`. HA, CH, DT, FR, MG, MS, PD, PN and SM have assemblies. SH contains fabricated parts and shared vendor parts; it has no assembly. Numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the family Number, such as `MHA-DT-03-T006` for a cone-gear configuration: `T006` is a tooth count, not an identity sequence, so it keeps its three digits. Installed channel spring stretch variants retain the unqualified base Number. Named member configurations of a shared vendor part (`InnerLink`, `LeverWire`, `TNut`) are selections within one Number, not qualifiers on it.
 
-Vendor parts are purchased finished parts. Supplier, SKU and commercial-process evidence decides that a part is a vendor part. Each vendor part belongs to the assembly that uses it directly. Its stem is the parent assembly's prefix, then `vn`, then the descriptive name, such as `dt-vn-cone-lock-knob`; a name that already began with the parent prefix drops the repeat, so the measuring stick's stop-plate screw is `ms-vn-stop-plate-screw`. Its Number puts `VN` after the parent's category and counts from `50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. When several assemblies use one vendor family directly, each of those assemblies has its own vendor identity, registry row and native model. The identities may share one supplier and SKU geometry recipe; see [Vendor families used by several assemblies](#vendor-families-used-by-several-assemblies). Containment through a sub-assembly or the top assembly is not direct use.
+Vendor parts are purchased finished parts. Supplier, SKU and commercial-process evidence decides that a part is a vendor part. A vendor part that one assembly uses directly belongs to that assembly. Its stem is the parent assembly's prefix, then `vn`, then the descriptive name, such as `dt-vn-cone-lock-knob`; a name that already began with the parent prefix drops the repeat, so the measuring stick's stop-plate screw is `ms-vn-stop-plate-screw`. Its Number puts `VN` after the parent's category and counts from `50` within that parent: `dt-vn-cone-lock-knob` is `MHA-DT-VN-51`. Containment through a sub-assembly or the top assembly is not direct use.
 
-Parent-scoped native parts keep separate identities even when they use the same purchased SKU. Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules, not in a helper named after one consuming parent.
+SH means Shared. One supplier-qualified SKU (supplier plus SKU) used directly by more than one assembly, or by more than one role whose members differ in form, is one shared vendor identity: stem `sh-vn-<descriptive-name>`, Number `MHA-SH-VN-<NN>` from `50`, one registry row, one native model and one drawing package. Every consuming assembly references that identity; a parent-scoped copy of a shared SKU is never created, and no compatibility alias or module stands in for a retired parent-scoped identity. A unique SKU, used by one assembly only, stays parent-scoped. Members of one SKU that differ in form (the chain's inner and outer links, the two wire forms, the clamping kit's stud, T-nut and flange nut) are explicit named configurations of the one shared model; a consumer selects its member configuration explicitly and never relies on the default. Members that share one form use the `Default` configuration. The registry `quantity` of a shared vendor part counts installed member occurrences across the machine, and `configuration_quantities` splits that count per member; neither counts purchase units such as chains, coils or kits, which the drawing package and the supplier evidence disclose separately. Members share one purchase Number; their BOM rows differ by Description. A shared vendor part used only by shop fixtures carries `usage_scope: tooling`, never enters a machine assembly or BOM and is excluded from the machine part counts. See [Shared vendor families](#shared-vendor-families).
+
+Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules and in the shared part's own `sh_vn_<name>_spec.py` (or per-member `sh_vn_<name>_<member>_spec.py`) modules, not in a helper named after one consuming parent.
 
 Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the only current fixture kit is the oblique trammel jig, whose 31 TL and TL-VN families below are the only current tooling parts. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; where a shop route still describes one, its geometry lives in `cad/process/shop/inventory.toml` without a CAD owner. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-72` (VN-72 retired, never reissued).
 
@@ -18,24 +20,28 @@ The 2026-10-21 standalone-tooling retirement removes CAD ownership, while retain
 
 Surviving native builders, drawings and specs also cite retired implementations as examples: the outline-template reference sketches and slot marks, the trammel-pivot-plate coordinate mapper and dimension text, `_trammel_block_drawing` edge selector, the trammel-pivot-point angle placement, the filing-stud single-limit setter, the filing-button center-mark audit, the trammel-setting-bar angle orientation, and the cone-post bond-cradle mapper/captions and soft-jaw hole callout. Read each such reference as `fcfc947c4:cad/scripts/<cited module>.py`, not as a live module or dependency. Keeping these historical example comments does not require re-keying every native recipe.
 
+TL-VN-58 to TL-VN-60 are reserved; their Precision Matthews clamping-kit members are now configurations of the shared tooling-only `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57).
+
 Components of a built-up part are the detail parts a finished part may be made from when its own drawing notes permit it (`BUILT_UP_PERMISSION_NOTE` in its notes module). They are ordinary machine parts: each takes the next free Number in its category and its own stem, such as `ch-rocker-hub` (MHA-CH-12) and `ch-rocker-strap` (MHA-CH-13) for the rocker arm MHA-CH-06, and the table's part counts include them. The finished part stays the assembly's part, so a component never enters an assembly or BOM. Its registry row instead names its parent's stem in `component_of`, and the coverage contract (`test_part_coverage.py`) counts it reachable through that parent and refuses a `component_of` parent whose notes do not permit the built-up route. A component's drawing gives it as supplied to the joint; sizes finished after joining print on the parent's drawing only.
 
 | Prefix | Category | Fabricated parts | Vendor parts |
 |---|---|---:|---:|
 | `ha` / `HA` | Harmonic analyzer | 0 | 0 |
-| `ch` / `CH` | Channel | 13 | 8 |
-| `dt` / `DT` | Drive train | 35 | 19 |
-| `fr` / `FR` | Frame | 5 | 5 |
-| `mg` / `MG` | Magnifier | 10 | 7 |
-| `pd` / `PD` | Paper drive | 23 | 18 |
-| `pn` / `PN` | Pen | 5 | 8 |
-| `ms` / `MS` | Measuring stick | 3 | 2 |
+| `ch` / `CH` | Channel | 13 | 7 |
+| `dt` / `DT` | Drive train | 35 | 15 |
+| `fr` / `FR` | Frame | 5 | 4 |
+| `mg` / `MG` | Magnifier | 10 | 4 |
+| `pd` / `PD` | Paper drive | 23 | 13 |
+| `pn` / `PN` | Pen | 5 | 7 |
+| `ms` / `MS` | Measuring stick | 3 | 1 |
 | `sm` / `SM` | Summing | 4 | 6 |
-| `sh` / `SH` | Shared fabricated parts | 2 | 0 |
+| `sh` / `SH` | Shared parts | 2 | 7 (+1 tooling-only kit family) |
 
-SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
+The vendor column counts machine vendor families. The 2026-10-20 shared-vendor consolidation moved nineteen parent-scoped vendor identities into eight shared ones: CH lost 1 (8 to 7), DT lost 4 (19 to 15), FR lost 1 (5 to 4), MG lost 3 (7 to 4), PD lost 5 (18 to 13), PN lost 1 (8 to 7) and MS lost 1 (2 to 1); SM is unchanged. SH gained seven machine vendor families (MHA-SH-VN-50 to MHA-SH-VN-56) plus one tooling-only family, `sh-vn-clamping-kit-hardware` (MHA-SH-VN-57, `usage_scope: tooling`), which replaced three oblique-jig fixture identities and is listed separately because fixture hardware is excluded from machine counts. Count it neither as a machine vendor family nor twice.
 
-Purchased ANSI #25 inner, outer and connecting chain links and finished ISO 2338 m6 crank
+SH contains fabricated parts used directly by several assemblies, currently the front and back column clamps, `sh-column-clamp-front` (MHA-SH-01) and `sh-column-clamp-back` (MHA-SH-02), and the shared vendor parts listed under [Shared vendor families](#shared-vendor-families). Each keeps one shared identity. The wheel axle nut, `mg-vn-wheel-axle-nut`, is a vendor part by commercial-process evidence. HA holds the top assembly only: its two former parts, the measuring stick and its stop, moved into the MS category on 2026-10-09 when the stop was re-derived as a block, a plate and stock screws inside their own `ms-measuring-stick` sub-assembly.
+
+Purchased ANSI #25 inner and outer chain links (configurations of `sh-vn-chain-link`), the connecting link `pd-vn-chain-connecting-link` and finished ISO 2338 m6 crank
 hub dowel stock are vendor parts, including cut-to-length modifications. Pins machined
 from raw drill rod remain owned by their subsystem.
 
@@ -44,6 +50,7 @@ Doit selection uses the underscore stem:
 ```powershell
 uv run python -m doit part:dt_cone_gear
 uv run python -m doit part:dt_vn_cone_lock_knob
+uv run python -m doit part:sh_vn_chain_link
 uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit drawing:dt_drive_train_assembly
 ```
@@ -112,19 +119,20 @@ budgets do not replace the native audit or complete-package visual review.
 
 ## Historical evidence
 
-Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Their identifiers come from one of three epochs:
+Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Their identifiers come from one of four epochs:
 
 - v39 release identifiers: unprefixed stems with `MHA-NNN` part and `MHA-ANN` assembly Numbers, recorded in `identity-migration-map.json`.
 - Category identifiers, current from `bfde892a5` (2026-10-02) until 2026-10-19: prefixed stems, three-digit `MHA-<CATEGORY>-<NNN>` Numbers such as `MHA-DT-005` and `MHA-DT-005-TL-01`, assembly Numbers ending `000`, and one machine-wide vendor category with `vn-` stems and `MHA-VN-<NNN>` Numbers.
-- Current identifiers, from 2026-10-19, as described above.
+- Two-digit parent-scoped identifiers, current from 2026-10-19 until 2026-10-20: as described above, but with every vendor family parent-scoped, so one repeated SKU had one `<parent>-vn-` identity per consuming assembly (`dt-vn-fillister-screw` MHA-DT-VN-50, `fr-vn-fillister-screw` MHA-FR-VN-50, `pd-vn-fillister-screw` MHA-PD-VN-52) and the chain, wire and clamping-kit members were separate identities. Only the nineteen identities in the [shared vendor transition table](#shared-vendor-families) belong to this epoch; every other two-digit identity is unchanged and current.
+- Current identifiers, from 2026-10-20, as described above, with repeated SKUs shared under SH.
 
 Read older identifiers through the table below when locating a current model. Current instructions, registry references, commands and asset links use current identities. A migration notice on a historical document does not change the evidence or certify it against the current model.
 
 ## Identity migration table
 
-The table translates every v39 and category identity to its two-digit identity or reserved Number, including retired families, shop fixtures and assemblies; a reserved Number does not make a retired family current. The v39 and category columns are lookup keys for historical evidence, not supported aliases for current commands or files. The 18 standalone tooling families retired on 2026-10-21 live only in the current map's `retired_identities`, outside the active `parts_and_assemblies` and web projection. Historical release comparisons deliberately consume both collections, rejecting duplicate stems or Numbers across their union; current projection validation rejects active/reserved collisions and reappearing retired registries. A family created after the v39 release has no v39 stem or Number (—). A category vendor family that several assemblies use directly has one row per current identity, so its v39 and category cells repeat. Every other category Number maps to the same sequence written with two digits: MHA-DT-005 is now MHA-DT-05, MHA-DT-000 is MHA-DT-00 and MHA-CH-006-TL-000 is MHA-CH-06-TL-00.
+The table translates every v39 and category identity to its current identity or reserved Number, including retired families, shop fixtures and assemblies; a reserved Number does not make a retired family current. The v39 and category columns are lookup keys for historical evidence, not supported aliases for current commands or files. The 18 standalone tooling families retired on 2026-10-21 live only in the current map's `retired_identities`, outside the active `parts_and_assemblies` and web projection. Historical release comparisons deliberately consume both collections, rejecting undeclared duplicate stems or Numbers across their union; current projection validation rejects active/reserved collisions and reappearing retired registries. A family created after the v39 release has no v39 stem or Number (—). A category vendor family that several assemblies used directly now has one row, resolving to the shared `sh-vn-` identity; its earlier parent-scoped two-digit identities are in the [shared vendor transition table](#shared-vendor-families). Where several category families converged on one shared identity (the chain links, the wire forms, the three 90280A108 screws, the kit members), the current cells name the member configuration. Every other category Number maps to the same sequence written with two digits: MHA-DT-005 is now MHA-DT-05, MHA-DT-000 is MHA-DT-00 and MHA-CH-006-TL-000 is MHA-CH-06-TL-00.
 
-Retired Numbers keep their rows here for historical lookup and are never reissued; a retired machine or fixture Number stays reserved in its two-digit form. MHA-PD-21 `pd-latch-hook-bracket` (category MHA-PD-021, v39 MHA-170) and the category vendor family `vn-latch-hook-rivet` (MHA-VN-045, v39 MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-14 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with the two MHA-PD-VN-59 screws. The old 1/2-inch `vn-knife-hanger-washer` (MHA-VN-026, v39 MHA-131) remains retired. The #10 18-8 washer that replaced it took the new category Number MHA-VN-060 under the same functional stem and is now `sm-vn-knife-hanger-washer`, MHA-SM-VN-54; it did not revive VN-026. `sm-vn-knife-hanger-stud` (MHA-SM-VN-52, category MHA-VN-024) keeps the drawing title **Bolt**; it is made by cutting #10-24 hex-head stock 92314A253 and is seated on the new washer on the MHA-FR-02 faced top. The former #6 socket-head/counterbore-floor route is obsolete. The category vendor family `vn-transgear-collar-cross-pin` (MHA-VN-037, v39 MHA-154) is retired: the true D-bore of the MHA-PD-22 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains. MHA-PN-03 `pn-pen-marker` (category MHA-PN-003, v39 MHA-050) is retired: the pen is a purchased Sharpie Fine Point, `pn-vn-pen-marker` MHA-PN-VN-56, not a turned brass barrel. Retired category vendor Numbers (MHA-VN-008, MHA-VN-026, MHA-VN-037 and MHA-VN-045) have no current form.
+Retired Numbers keep their rows here for historical lookup and are never reissued; a retired machine or fixture Number stays reserved in its two-digit form. MHA-PD-21 `pd-latch-hook-bracket` (category MHA-PD-021, v39 MHA-170) and the category vendor family `vn-latch-hook-rivet` (MHA-VN-045, v39 MHA-175) have no registry, builder or drawing: the one-piece formed spring-steel latch hook MHA-PD-14 `pd-latch-hook` replaces the bracket, its rivets and the old riveted strip, and screws to the support bar with two MHA-SH-VN-52 `sh-vn-fillister-screw-90280a108` screws (formerly MHA-PD-VN-59). The old 1/2-inch `vn-knife-hanger-washer` (MHA-VN-026, v39 MHA-131) remains retired. The #10 18-8 washer that replaced it took the new category Number MHA-VN-060 under the same functional stem and is now `sm-vn-knife-hanger-washer`, MHA-SM-VN-54; it did not revive VN-026. `sm-vn-knife-hanger-stud` (MHA-SM-VN-52, category MHA-VN-024) keeps the drawing title **Bolt**; it is made by cutting #10-24 hex-head stock 92314A253 and is seated on the new washer on the MHA-FR-02 faced top. The former #6 socket-head/counterbore-floor route is obsolete. The category vendor family `vn-transgear-collar-cross-pin` (MHA-VN-037, v39 MHA-154) is retired: the true D-bore of the MHA-PD-22 drive collar carries the torque on the knob shaft's D-flat, so no front cross-pin remains. MHA-PN-03 `pn-pen-marker` (category MHA-PN-003, v39 MHA-050) is retired: the pen is a purchased Sharpie Fine Point, `pn-vn-pen-marker` MHA-PN-VN-56, not a turned brass barrel. Retired category vendor Numbers (MHA-VN-008, MHA-VN-026, MHA-VN-037 and MHA-VN-045) have no current form.
 
 The measuring-stick cutover is recorded here and in the current registries, not in the sealed release identity map: `ha-measuring-stick` MHA-HA-001 became `ms-stick` MHA-MS-001 and `ha-measuring-stick-stop` MHA-HA-002 became `ms-stop-block` MHA-MS-002 on 2026-10-09, so the `measuring-stick` rows below carry their MS category Numbers, and the HA part Numbers (MHA-HA-01 and MHA-HA-02 in two-digit form) are never reissued. `cad/config/identity-migration-map.json` retains its released v39 bytes for provenance and release pairing; the v39 web model keeps its release-pinned identities until the next model release.
 
@@ -197,11 +205,11 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `output-fixture` | MHA-047 | `mg-output-fixture` | MHA-MG-006 | `mg-output-fixture` | MHA-MG-06 |
 | part | `wheel-axle` | MHA-084 | `mg-wheel-axle` | MHA-MG-007 | `mg-wheel-axle` | MHA-MG-07 |
 | part | `wheel-bar` | MHA-085 | `mg-wheel-bar` | MHA-MG-008 | `mg-wheel-bar` | MHA-MG-08 |
-| retired part | `lever-wire` | MHA-115 | `mg-lever-wire` | MHA-MG-009 | — (replaced by `mg-vn-lever-wire`, MHA-MG-VN-56) | MHA-MG-09 (retired; never reissued) |
+| retired part | `lever-wire` | MHA-115 | `mg-lever-wire` | MHA-MG-009 | — (replaced by the purchased wire, now `sh-vn-music-wire` `LeverWire`, MHA-SH-VN-56) | MHA-MG-09 (retired; never reissued) |
 | part | — | — | `mg-wheel-drum` | MHA-MG-010 | `mg-wheel-drum` | MHA-MG-10 |
 | part | — | — | `mg-wheel-axle-spacer` | MHA-MG-011 | `mg-wheel-axle-spacer` | MHA-MG-11 |
-| part | `chain-inner-link` | MHA-006 | `vn-chain-inner-link` | MHA-VN-002 | `pd-vn-chain-inner-link` | MHA-PD-VN-50 |
-| part | `chain-outer-link` | MHA-007 | `vn-chain-outer-link` | MHA-VN-003 | `pd-vn-chain-outer-link` | MHA-PD-VN-51 |
+| part | `chain-inner-link` | MHA-006 | `vn-chain-inner-link` | MHA-VN-002 | `sh-vn-chain-link` (`InnerLink`) | MHA-SH-VN-50 |
+| part | `chain-outer-link` | MHA-007 | `vn-chain-outer-link` | MHA-VN-003 | `sh-vn-chain-link` (`OuterLink`) | MHA-SH-VN-50 |
 | retired part | `chain-sprocket` | MHA-008 | `pd-chain-sprocket` | MHA-PD-001 | — | MHA-PD-01 (retired; never reissued) |
 | part | `platen` | MHA-066 | `pd-platen` | MHA-PD-002 | `pd-platen` | MHA-PD-02 |
 | part | `platen-clip` | MHA-067 | `pd-platen-clip` | MHA-PD-003 | `pd-platen-clip` | MHA-PD-03 |
@@ -232,7 +240,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | retired part | `pen-marker` | MHA-050 | `pn-pen-marker` | MHA-PN-003 | — (replaced by `pn-vn-pen-marker`, MHA-PN-VN-56) | MHA-PN-03 (retired; never reissued) |
 | part | `pen-rod` | MHA-051 | `pn-pen-rod` | MHA-PN-004 | `pn-pen-rod` | MHA-PN-04 |
 | part | `pen-v-block` | MHA-053 | `pn-pen-v-block` | MHA-PN-005 | `pn-pen-v-block` | MHA-PN-05 |
-| retired part | `pen-wire` | MHA-100 | `pn-pen-wire` | MHA-PN-006 | — (replaced by `pn-vn-pen-wire`, MHA-PN-VN-57) | MHA-PN-06 (retired; never reissued) |
+| retired part | `pen-wire` | MHA-100 | `pn-pen-wire` | MHA-PN-006 | — (replaced by the purchased wire, now `sh-vn-music-wire` `PenWire`, MHA-SH-VN-56) | MHA-PN-06 (retired; never reissued) |
 | part | — | — | `pn-pen-adjust-screw` | MHA-PN-007 | `pn-pen-adjust-screw` | MHA-PN-07 |
 | part | `gooseneck` | MHA-032 | `sm-gooseneck` | MHA-SM-001 | `sm-gooseneck` | MHA-SM-01 |
 | part | `knife-mount` | MHA-037 | `sm-knife-mount` | MHA-SM-002 | `sm-knife-mount` | MHA-SM-02 |
@@ -241,26 +249,22 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `boss-hook` | MHA-005 | `vn-boss-hook` | MHA-VN-001 | `sm-vn-boss-hook` | MHA-SM-VN-50 |
 | part | `channel-spring-installed` | MHA-011 | `vn-channel-spring-installed` | MHA-VN-004 | `ch-vn-channel-spring-installed` | MHA-CH-VN-50 |
 | part | `counter-spring` | MHA-019 | `vn-counter-spring` | MHA-VN-005 | `sm-vn-counter-spring` | MHA-SM-VN-51 |
-| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `dt-vn-fillister-screw` | MHA-DT-VN-50 |
-| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `fr-vn-fillister-screw` | MHA-FR-VN-50 |
-| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `pd-vn-fillister-screw` | MHA-PD-VN-52 |
+| part | `fillister-screw` | MHA-030 | `vn-fillister-screw` | MHA-VN-006 | `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 |
 | part | `hanger-screw` | MHA-034 | `vn-hanger-screw` | MHA-VN-007 | `pn-vn-hanger-screw` | MHA-PN-VN-50 |
 | retired part | `hex-bolt` | MHA-036 | `vn-hex-bolt` | MHA-VN-008 | — | — (retired; MHA-VN-008 never reissued) |
 | part | `lag-screw` | MHA-039 | `vn-lag-screw` | MHA-VN-009 | `fr-vn-lag-screw` | MHA-FR-VN-51 |
 | part | `pen-set-screw` | MHA-052 | `vn-pen-set-screw` | MHA-VN-010 | `pn-vn-pen-set-screw` | MHA-PN-VN-51 |
-| part | `thumb-screw` | MHA-075 | `vn-thumb-screw` | MHA-VN-011 | `mg-vn-thumb-screw` | MHA-MG-VN-50 |
-| part | `thumb-screw` | MHA-075 | `vn-thumb-screw` | MHA-VN-011 | `ms-vn-thumb-screw` | MHA-MS-VN-50 |
+| part | `thumb-screw` | MHA-075 | `vn-thumb-screw` | MHA-VN-011 | `sh-vn-thumb-screw` | MHA-SH-VN-55 |
 | part | `spring-hook` | MHA-090 | `vn-spring-hook` | MHA-VN-012 | `ch-vn-spring-hook` | MHA-CH-VN-51 |
 | part | `cone-lock-knob` | MHA-093 | `vn-cone-lock-knob` | MHA-VN-013 | `dt-vn-cone-lock-knob` | MHA-DT-VN-51 |
 | part | `cone-pivot-screw` | MHA-094 | `vn-cone-pivot-screw` | MHA-VN-014 | `dt-vn-cone-pivot-screw` | MHA-DT-VN-52 |
-| part | `swing-stop-screw` | MHA-095 | `vn-swing-stop-screw` | MHA-VN-015 | `dt-vn-swing-stop-screw` | MHA-DT-VN-53 |
+| part | `swing-stop-screw` | MHA-095 | `vn-swing-stop-screw` | MHA-VN-015 | `sh-vn-fillister-screw-90280a108` (`Default`) | MHA-SH-VN-52 |
 | part | `cone-tip-collar` | MHA-096 | `vn-cone-tip-collar` | MHA-VN-016 | `dt-vn-cone-tip-collar` | MHA-DT-VN-54 |
 | part | `cone-tip-adjuster` | MHA-097 | `vn-cone-tip-adjuster` | MHA-VN-017 | `dt-vn-cone-tip-adjuster` | MHA-DT-VN-55 |
 | part | `cone-tip-pinch-screw` | MHA-098 | `vn-cone-tip-pinch-screw` | MHA-VN-018 | `dt-vn-cone-tip-pinch-screw` | MHA-DT-VN-56 |
 | part | `slotted-screw` | MHA-101 | `vn-slotted-screw` | MHA-VN-019 | `dt-vn-slotted-screw` | MHA-DT-VN-57 |
-| part | `foot-screw` | MHA-103 | `vn-foot-screw` | MHA-VN-020 | `dt-vn-foot-screw` | MHA-DT-VN-58 |
-| part | `clamp-screw` | MHA-107 | `vn-clamp-screw` | MHA-VN-021 | `mg-vn-clamp-screw` | MHA-MG-VN-51 |
-| part | `clamp-screw` | MHA-107 | `vn-clamp-screw` | MHA-VN-021 | `pd-vn-clamp-screw` | MHA-PD-VN-53 |
+| part | `foot-screw` | MHA-103 | `vn-foot-screw` | MHA-VN-020 | `sh-vn-fillister-screw-90280a108` (`Default`) | MHA-SH-VN-52 |
+| part | `clamp-screw` | MHA-107 | `vn-clamp-screw` | MHA-VN-021 | `sh-vn-clamp-screw` | MHA-SH-VN-53 |
 | part | `frame-side-screw` | MHA-117 | `vn-frame-side-screw` | MHA-VN-022 | `ch-vn-frame-side-screw` | MHA-CH-VN-52 |
 | part | `gooseneck-set-screw` | MHA-118 | `vn-gooseneck-set-screw` | MHA-VN-023 | `fr-vn-gooseneck-set-screw` | MHA-FR-VN-52 |
 | part | `knife-hanger-stud` | MHA-119 | `vn-knife-hanger-stud` | MHA-VN-024 | `sm-vn-knife-hanger-stud` | MHA-SM-VN-52 |
@@ -272,8 +276,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `post-mount-screw` | MHA-142 | `vn-post-mount-screw` | MHA-VN-031 | `dt-vn-post-mount-screw` | MHA-DT-VN-61 |
 | part | `pedestal-hold-down-screw` | MHA-143 | `vn-pedestal-hold-down-screw` | MHA-VN-032 | `dt-vn-pedestal-hold-down-screw` | MHA-DT-VN-62 |
 | part | `pinion-strap-pin` | MHA-145 | `vn-pinion-strap-pin` | MHA-VN-033 | `dt-vn-pinion-strap-pin` | MHA-DT-VN-63 |
-| part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `ch-vn-arbor-set-screw` | MHA-CH-VN-53 |
-| part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `dt-vn-arbor-set-screw` | MHA-DT-VN-64 |
+| part | `arbor-set-screw` | MHA-147 | `vn-arbor-set-screw` | MHA-VN-034 | `sh-vn-arbor-set-screw` | MHA-SH-VN-54 |
 | part | `keeper-chain` | MHA-149 | `vn-keeper-chain` | MHA-VN-035 | `dt-vn-keeper-chain` | MHA-DT-VN-65 |
 | part | `keeper-chain-link` | MHA-150 | `vn-keeper-chain-link` | MHA-VN-036 | `dt-vn-keeper-chain-link` | MHA-DT-VN-66 |
 | retired part | `transgear-collar-cross-pin` | MHA-154 | `vn-transgear-collar-cross-pin` | MHA-VN-037 | — | — (retired; MHA-VN-037 never reissued) |
@@ -282,7 +285,7 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | `transgear-arm-plate-screw` | MHA-166 | `vn-transgear-arm-plate-screw` | MHA-VN-040 | `pd-vn-transgear-arm-plate-screw` | MHA-PD-VN-56 |
 | part | `transgear-pivot-screw` | MHA-168 | `vn-transgear-pivot-screw` | MHA-VN-041 | `pd-vn-transgear-pivot-screw` | MHA-PD-VN-57 |
 | part | `transgear-latch-pin` | MHA-169 | `vn-transgear-latch-pin` | MHA-VN-042 | `pd-vn-transgear-latch-pin` | MHA-PD-VN-58 |
-| part | `latch-hook-bracket-screw` | MHA-171 | `vn-latch-hook-bracket-screw` | MHA-VN-043 | `pd-vn-latch-hook-bracket-screw` | MHA-PD-VN-59 |
+| part | `latch-hook-bracket-screw` | MHA-171 | `vn-latch-hook-bracket-screw` | MHA-VN-043 | `sh-vn-fillister-screw-90280a108` (`Default`) | MHA-SH-VN-52 |
 | part | `crank-seat-drive-pin` | MHA-173 | `vn-crank-seat-drive-pin` | MHA-VN-044 | `dt-vn-crank-seat-drive-pin` | MHA-DT-VN-67 |
 | retired part | `latch-hook-rivet` | MHA-175 | `vn-latch-hook-rivet` | MHA-VN-045 | — | — (retired; MHA-VN-045 never reissued) |
 | part | `guide-lock-screw` | MHA-176 | `vn-guide-lock-screw` | MHA-VN-046 | `pd-vn-guide-lock-screw` | MHA-PD-VN-60 |
@@ -304,8 +307,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | part | — | — | `vn-pen-adjust-nut` | MHA-VN-062 | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 |
 | part | — | — | `vn-pen-hanger-nut` | MHA-VN-063 | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 |
 | part | — | — | `vn-pen-hanger-jam-nut` | MHA-VN-064 | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 |
-| part | — | — | `vn-lever-wire` | MHA-VN-066 | `mg-vn-lever-wire` | MHA-MG-VN-56 |
-| part | — | — | `vn-pen-wire` | MHA-VN-067 | `pn-vn-pen-wire` | MHA-PN-VN-57 |
+| part | — | — | `vn-lever-wire` | MHA-VN-066 | `sh-vn-music-wire` (`LeverWire`) | MHA-SH-VN-56 |
+| part | — | — | `vn-pen-wire` | MHA-VN-067 | `sh-vn-music-wire` (`PenWire`) | MHA-SH-VN-56 |
 | part | — | — | `vn-transgear-pivot-shim` | MHA-VN-069 | `pd-vn-transgear-pivot-shim` | MHA-PD-VN-67 |
 | part | — | — | `vn-rocker-thrust-washer` | MHA-VN-070 | `ch-vn-rocker-thrust-washer` | MHA-CH-VN-56 |
 | part | — | — | `vn-bracket-hold-down-screw` | MHA-VN-071 | `ch-vn-bracket-hold-down-screw` | MHA-CH-VN-57 |
@@ -350,9 +353,9 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-leadscrew-nut` | MHA-CH-006-TL-35 | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-pillow-block` | MHA-CH-006-TL-36 | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-handwheel` | MHA-CH-006-TL-37 | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 |
-| tooling part | — | — | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-hold-down-stud` | MHA-CH-006-TL-38 | `sh-vn-clamping-kit-hardware` (`HoldDownStud`) | MHA-SH-VN-57 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-t-nut` | MHA-CH-006-TL-39 | `sh-vn-clamping-kit-hardware` (`TNut`) | MHA-SH-VN-57 |
+| tooling part | — | — | `ch-rocker-arm-tl-oblique-flange-nut` | MHA-CH-006-TL-40 | `sh-vn-clamping-kit-hardware` (`FlangeNut`) | MHA-SH-VN-57 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-rail-screw` | MHA-CH-006-TL-41 | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-bracket-screw` | MHA-CH-006-TL-42 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` | MHA-CH-06-TL-VN-62 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-block-screw` | MHA-CH-006-TL-43 | `ch-rocker-arm-tl-vn-oblique-block-screw` | MHA-CH-06-TL-VN-63 |
@@ -381,26 +384,58 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | assembly | `harmonic-analyzer` | MHA-A08 | `ha-harmonic-analyzer` | MHA-HA-000 | `ha-harmonic-analyzer` | MHA-HA-00 |
 | tooling assembly | — | — | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-006-TL-000 | `ch-rocker-arm-tl-oblique-jig` | MHA-CH-06-TL-00 |
 
-### Vendor families used by several assemblies
+### Shared vendor families
 
-At the 2026-10-19 cutover, four category vendor families were in direct use by more than one assembly. Each consuming assembly now has its own identity:
+At the 2026-10-19 cutover, four category vendor families were in direct use by more than one assembly, and each consuming assembly received its own parent-scoped identity. On 2026-10-20 that duplication was reversed: every supplier-qualified SKU in repeated use became one shared SH vendor identity, and heterogeneous members of one SKU became named configurations of it. The eight current shared families are, in stable allocation order (sorted by supplier and SKU):
 
-| Category stem | Category Number | Current identities |
-|---|---|---|
-| `vn-fillister-screw` | MHA-VN-006 | `dt-vn-fillister-screw` MHA-DT-VN-50 (in `dt-drive-train`); `fr-vn-fillister-screw` MHA-FR-VN-50 (in `fr-frame`); `pd-vn-fillister-screw` MHA-PD-VN-52 (in `pd-paper-drive`) |
-| `vn-thumb-screw` | MHA-VN-011 | `mg-vn-thumb-screw` MHA-MG-VN-50 (in `mg-magnifier`); `ms-vn-thumb-screw` MHA-MS-VN-50 (in `ms-measuring-stick`) |
-| `vn-clamp-screw` | MHA-VN-021 | `mg-vn-clamp-screw` MHA-MG-VN-51 (in `mg-magnifier`); `pd-vn-clamp-screw` MHA-PD-VN-53 (in `pd-paper-drive`) |
-| `vn-arbor-set-screw` | MHA-VN-034 | `ch-vn-arbor-set-screw` MHA-CH-VN-53 (in `ch-channel`); `dt-vn-arbor-set-screw` MHA-DT-VN-64 (in `dt-drive-train`) |
+| Current stem | Current Number | Supplier and SKU | Configurations (installed members) | Direct consumers |
+|---|---|---|---|---|
+| `sh-vn-chain-link` | MHA-SH-VN-50 | McMaster-Carr 6261K171, sold by the foot | `InnerLink` 34; `OuterLink` 33 | `pd-paper-drive` (one cut 68-pitch loop closed by `pd-vn-chain-connecting-link` MHA-PD-VN-66, which stays parent-scoped: 6261K108 has one consumer) |
+| `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 | McMaster-Carr 90114A511 | `Default` | `dt-drive-train`, `fr-frame`, `pd-paper-drive` |
+| `sh-vn-fillister-screw-90280a108` | MHA-SH-VN-52 | McMaster-Carr 90280A108 | `Default` (foot's unshifted stock frame; the swing-stop's PROUD_LEN placement and application colours live in the consuming occurrences) | `dt-drive-train` (foot and swing-stop roles), `pd-paper-drive` (latch-hook screws) |
+| `sh-vn-clamp-screw` | MHA-SH-VN-53 | McMaster-Carr 90280A201 | `Default` | `mg-magnifier`, `pd-paper-drive` |
+| `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | McMaster-Carr 91375A106 | `Default` (alloy steel, Rockwell C45, black oxide, unchanged) | `ch-channel`, `dt-drive-train` |
+| `sh-vn-thumb-screw` | MHA-SH-VN-55 | McMaster-Carr 91882A221 | `Default` | `mg-magnifier`, `ms-measuring-stick` |
+| `sh-vn-music-wire` | MHA-SH-VN-56 | McMaster-Carr 9666K56, one 1/4 lb coil | `LeverWire` 1; `PenWire` 1 (one two-sheet reference package; DO NOT RELEASE, developed cut lengths not modelled) | `mg-magnifier` (lever wire), `pn-pen` (pen wire) |
+| `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | Precision Matthews 52PCCK-9/16-14mm, one kit | `HoldDownStud` 4; `TNut` 4; `FlangeNut` 4 | `ch-rocker-arm-tl-oblique-jig` only; `usage_scope: tooling`, no machine assembly or BOM, excluded from machine counts |
+
+The registry `quantity` is the sum of the installed member counts (67 links, 2 wire forms, 12 kit members), never the purchase units (one chain cut from 2 ft, one coil, one kit). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
+
+#### Shared vendor transition table
+
+The two-digit parent-scoped identities below were current from 2026-10-19 to 2026-10-20 and appear in evidence dated in that window. They are lookup keys, not aliases: no registry row, builder, drawing, module or current map entry carries them, and their Numbers stay reserved in their parents and are never reissued. Read a historical reference through this table to the current shared identity and, where the shared part is configured, to the member configuration.
+
+| Former stem (2026-10-19) | Former Number | Former parent | Current stem | Configuration | Current Number |
+|---|---|---|---|---|---|
+| `pd-vn-chain-inner-link` | MHA-PD-VN-50 | `pd-paper-drive` | `sh-vn-chain-link` | `InnerLink` | MHA-SH-VN-50 |
+| `pd-vn-chain-outer-link` | MHA-PD-VN-51 | `pd-paper-drive` | `sh-vn-chain-link` | `OuterLink` | MHA-SH-VN-50 |
+| `dt-vn-fillister-screw` | MHA-DT-VN-50 | `dt-drive-train` | `sh-vn-brass-fillister-screw` | `Default` | MHA-SH-VN-51 |
+| `fr-vn-fillister-screw` | MHA-FR-VN-50 | `fr-frame` | `sh-vn-brass-fillister-screw` | `Default` | MHA-SH-VN-51 |
+| `pd-vn-fillister-screw` | MHA-PD-VN-52 | `pd-paper-drive` | `sh-vn-brass-fillister-screw` | `Default` | MHA-SH-VN-51 |
+| `dt-vn-foot-screw` | MHA-DT-VN-58 | `dt-drive-train` | `sh-vn-fillister-screw-90280a108` | `Default` | MHA-SH-VN-52 |
+| `dt-vn-swing-stop-screw` | MHA-DT-VN-53 | `dt-drive-train` | `sh-vn-fillister-screw-90280a108` | `Default` | MHA-SH-VN-52 |
+| `pd-vn-latch-hook-bracket-screw` | MHA-PD-VN-59 | `pd-paper-drive` | `sh-vn-fillister-screw-90280a108` | `Default` | MHA-SH-VN-52 |
+| `mg-vn-clamp-screw` | MHA-MG-VN-51 | `mg-magnifier` | `sh-vn-clamp-screw` | `Default` | MHA-SH-VN-53 |
+| `pd-vn-clamp-screw` | MHA-PD-VN-53 | `pd-paper-drive` | `sh-vn-clamp-screw` | `Default` | MHA-SH-VN-53 |
+| `ch-vn-arbor-set-screw` | MHA-CH-VN-53 | `ch-channel` | `sh-vn-arbor-set-screw` | `Default` | MHA-SH-VN-54 |
+| `dt-vn-arbor-set-screw` | MHA-DT-VN-64 | `dt-drive-train` | `sh-vn-arbor-set-screw` | `Default` | MHA-SH-VN-54 |
+| `mg-vn-thumb-screw` | MHA-MG-VN-50 | `mg-magnifier` | `sh-vn-thumb-screw` | `Default` | MHA-SH-VN-55 |
+| `ms-vn-thumb-screw` | MHA-MS-VN-50 | `ms-measuring-stick` | `sh-vn-thumb-screw` | `Default` | MHA-SH-VN-55 |
+| `mg-vn-lever-wire` | MHA-MG-VN-56 | `mg-magnifier` | `sh-vn-music-wire` | `LeverWire` | MHA-SH-VN-56 |
+| `pn-vn-pen-wire` | MHA-PN-VN-57 | `pn-pen` | `sh-vn-music-wire` | `PenWire` | MHA-SH-VN-56 |
+| `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | `ch-rocker-arm-tl-oblique-jig` | `sh-vn-clamping-kit-hardware` | `HoldDownStud` | MHA-SH-VN-57 |
+| `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 | `ch-rocker-arm-tl-oblique-jig` | `sh-vn-clamping-kit-hardware` | `TNut` | MHA-SH-VN-57 |
+| `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 | `ch-rocker-arm-tl-oblique-jig` | `sh-vn-clamping-kit-hardware` | `FlangeNut` | MHA-SH-VN-57 |
 
 ## Changes after the category cutover
 
-A retired Number is never reused. A family added after a cutover takes the next free Number in its namespace: the next fabricated Number in its category, the next vendor Number from `50` under its direct parent assembly, or the next TL Number under its fixture's parent part. It has no v39 stem or Number. This log uses current stems and Numbers. Retired machine and fixture Numbers appear in their reserved two-digit form; retired category vendor families keep their category stem and Number, which have no current form. The table above gives each family's earlier identities.
+A retired Number is never reused. A family added after a cutover takes the next free Number in its namespace: the next fabricated Number in its category, the next vendor Number from `50` under its direct parent assembly, the next shared vendor Number from `50` under SH, or the next TL Number under its fixture's parent part. It has no v39 stem or Number. This log is chronological: each entry uses the stem and Number current when it was written, so the `added` entries for the nineteen parent-scoped vendor identities of 2026-10-19 stand as written, and the `shared` entries at the end record their 2026-10-20 consolidation. Retired machine and fixture Numbers appear in their reserved two-digit form; retired category vendor families keep their category stem and Number, which have no current form. The tables above give each family's earlier identities, and the shared vendor transition table resolves a superseded parent-scoped identity to its shared identity and configuration.
 
 | Change | Stem | Number | Note |
 |---|---|---|---|
 | retired | `pd-chain-sprocket` | MHA-PD-01 | orphan removed from assemblies in `29025dd34`; superseded by the MHA-PD-09 `pd-transgear-removable` sprocket configurations (#68; delivery #507 retired) |
 | retired | `vn-hex-bolt` | MHA-VN-008 | orphan removed from the frame in `2ab7dc109`; no assembly uses this family (delivery #543 retired) |
-| retired | `pd-latch-hook-bracket` | MHA-PD-21 | replaced by the one-piece formed spring-steel MHA-PD-14 latch hook, screwed to the support bar by the two MHA-PD-VN-59 screws |
+| retired | `pd-latch-hook-bracket` | MHA-PD-21 | replaced by the one-piece formed spring-steel MHA-PD-14 latch hook, screwed to the support bar by two MHA-SH-VN-52 screws (MHA-PD-VN-59 when this entry was written) |
 | retired | `vn-latch-hook-rivet` | MHA-VN-045 | no replacement: the one-piece MHA-PD-14 latch hook has no riveted joint |
 | retired | `vn-knife-hanger-washer` (old 1/2-inch family) | MHA-VN-026 | retired with the former 90126A211 washer; the new #10 washer took category Number MHA-VN-060 (now MHA-SM-VN-54), not a revived VN-026 |
 | retired | `vn-transgear-collar-cross-pin` | MHA-VN-037 | no replacement: the MHA-PD-22 drive collar's true D-bore carries the torque on the knob shaft's D-flat |
@@ -424,11 +459,11 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `pn-vn-pen-marker` | MHA-PN-VN-56 | purchased Sharpie permanent marker, fine point (regular size), used uncapped; its cap-seat grip lies in the MHA-PN-05 v-block groove |
 | added | `pn-vn-pen-rod-set-screw` | MHA-PN-VN-52 | #4-40 x 3/16 cup-point set screw in the MHA-PN-05 v-block, locking the MHA-PN-04 pen rod's pivot end |
 | added | `pn-vn-pen-adjust-nut` | MHA-PN-VN-53 | brass #0-80 jam nut on the MHA-PN-07 adjuster stud in the MHA-PN-04 pen rod's top |
-| added | `pn-pen-adjust-screw` | MHA-PN-07 | turned brass #0-80 eye stud in the MHA-PN-04 pen rod's top, locked by the MHA-PN-VN-53 jam nut; the MHA-PN-VN-57 pen wire ties through its eye |
+| added | `pn-pen-adjust-screw` | MHA-PN-07 | turned brass #0-80 eye stud in the MHA-PN-04 pen rod's top, locked by the MHA-PN-VN-53 jam nut; the pen wire (now MHA-SH-VN-56 `PenWire`, then MHA-PN-VN-57) ties through its eye |
 | added | `pn-vn-pen-hanger-nut` | MHA-PN-VN-54 | zinc-plated steel #8-32 hex nut on the strap front; holds the MHA-PN-02 pen hanger on the MHA-PN-VN-50 hanger screw through the strap's clearance hole |
 | added | `pn-vn-pen-hanger-jam-nut` | MHA-PN-VN-55 | thin zinc-plated steel #8-32 hex nut jammed against the MHA-PN-VN-54 nut, locking the MHA-PN-VN-50 hanger screw |
-| retired | `mg-lever-wire` | MHA-MG-09 | replaced by the purchased MHA-MG-VN-56 lever wire |
-| retired | `pn-pen-wire` | MHA-PN-06 | replaced by the purchased MHA-PN-VN-57 pen wire |
+| retired | `mg-lever-wire` | MHA-MG-09 | replaced by the purchased lever wire, MHA-MG-VN-56 when written and now MHA-SH-VN-56 `LeverWire` |
+| retired | `pn-pen-wire` | MHA-PN-06 | replaced by the purchased pen wire, MHA-PN-VN-57 when written and now MHA-SH-VN-56 `PenWire` |
 | added | `mg-vn-lever-wire` | MHA-MG-VN-56 | ASTM A228 music wire, 0.031 in, cut from McMaster-Carr 9666K56 coil; hooks on the MHA-MG-06 output fixture and wraps the MHA-MG-10 drum |
 | added | `pn-vn-pen-wire` | MHA-PN-VN-57 | ASTM A228 music wire, 0.031 in, cut from the same McMaster-Carr 9666K56 coil; runs from the MHA-MG-05 wheel rim groove to the MHA-PN-07 adjuster stud's eye |
 | added | `pd-vn-chain-connecting-link` | MHA-PD-VN-66 | McMaster 6261K108 clip-retained connecting link that joins the cut 6261K171 chain's two inner-link ends; MHA-PD-VN-51 keeps only the cut chain's 33 outer links |
@@ -482,3 +517,11 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | retired | `dt-cone-pivot-post-tl-saw-cradle` | MHA-DT-05-TL-02 | standalone cone-pivot-post S10 saw fixture no registered assembly references (tooling retirement 2026-10-21); no registry, builder or drawing; its print references and geometry in `cad/process/shop/inventory.toml` are historical provenance, not a CAD owner |
 | retired | `dt-cone-pivot-post-tl-cap-jaw-button` | MHA-DT-05-TL-03 | standalone cone-pivot-post S11 vise-hold fixture no registered assembly references (tooling retirement 2026-10-21); no registry, builder or drawing; its print references and geometry in `cad/process/shop/inventory.toml` are historical provenance, not a CAD owner |
 | retired | `dt-cone-pivot-post-tl-soft-jaw` | MHA-DT-05-TL-04 | standalone cone-pivot-post S11 vise-hold fixture no registered assembly references (tooling retirement 2026-10-21); no registry, builder or drawing |
+| shared | `sh-vn-chain-link` | MHA-SH-VN-50 | 2026-10-20: McMaster 6261K171 chain members consolidated from `pd-vn-chain-inner-link` MHA-PD-VN-50 (`InnerLink`, 34 installed) and `pd-vn-chain-outer-link` MHA-PD-VN-51 (`OuterLink`, 33 installed); one cut 2 ft chain, closed by the parent-scoped MHA-PD-VN-66 connecting link; PD-VN-50 and PD-VN-51 reserved |
+| shared | `sh-vn-brass-fillister-screw` | MHA-SH-VN-51 | 2026-10-20: McMaster 90114A511 consolidated from `dt-vn-fillister-screw` MHA-DT-VN-50, `fr-vn-fillister-screw` MHA-FR-VN-50 and `pd-vn-fillister-screw` MHA-PD-VN-52 (`Default`); those Numbers reserved |
+| shared | `sh-vn-fillister-screw-90280a108` | MHA-SH-VN-52 | 2026-10-20: McMaster 90280A108 consolidated from `dt-vn-foot-screw` MHA-DT-VN-58, `dt-vn-swing-stop-screw` MHA-DT-VN-53 and `pd-vn-latch-hook-bracket-screw` MHA-PD-VN-59 (`Default`, the foot's unshifted stock frame; the swing-stop placement and application colours stay in its occurrences); those Numbers reserved |
+| shared | `sh-vn-clamp-screw` | MHA-SH-VN-53 | 2026-10-20: McMaster 90280A201 consolidated from `mg-vn-clamp-screw` MHA-MG-VN-51 and `pd-vn-clamp-screw` MHA-PD-VN-53 (`Default`); those Numbers reserved |
+| shared | `sh-vn-arbor-set-screw` | MHA-SH-VN-54 | 2026-10-20: McMaster 91375A106 consolidated from `ch-vn-arbor-set-screw` MHA-CH-VN-53 and `dt-vn-arbor-set-screw` MHA-DT-VN-64 (`Default`; alloy steel, Rockwell C45, black oxide unchanged); those Numbers reserved |
+| shared | `sh-vn-thumb-screw` | MHA-SH-VN-55 | 2026-10-20: McMaster 91882A221 consolidated from `mg-vn-thumb-screw` MHA-MG-VN-50 and `ms-vn-thumb-screw` MHA-MS-VN-50 (`Default`); those Numbers reserved |
+| shared | `sh-vn-music-wire` | MHA-SH-VN-56 | 2026-10-20: McMaster 9666K56 wire forms consolidated from `mg-vn-lever-wire` MHA-MG-VN-56 (`LeverWire`) and `pn-vn-pen-wire` MHA-PN-VN-57 (`PenWire`); one two-sheet reference package, still DO NOT RELEASE with developed cut lengths unmodelled; those Numbers reserved |
+| shared | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | 2026-10-20: Precision Matthews 52PCCK-9/16-14mm kit members consolidated from `ch-rocker-arm-tl-vn-oblique-hold-down-stud` MHA-CH-06-TL-VN-58 (`HoldDownStud` x4), `ch-rocker-arm-tl-vn-oblique-t-nut` MHA-CH-06-TL-VN-59 (`TNut` x4) and `ch-rocker-arm-tl-vn-oblique-flange-nut` MHA-CH-06-TL-VN-60 (`FlangeNut` x4); `usage_scope: tooling`, jig only, never a machine BOM row; TL-VN-58 to TL-VN-60 reserved |

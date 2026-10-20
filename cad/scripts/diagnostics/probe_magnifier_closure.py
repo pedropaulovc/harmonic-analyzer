@@ -19,6 +19,7 @@ else:
     import _script_paths  # noqa: F401
 from _check import log
 from _com import _early_bound, _flag, _flag_only, _read_member
+from _component_references import bind_component_selectors
 from _paths import OUT_SLDASM
 from _assembly_postbuild import author_dof_drives, load_dof_manifest
 
@@ -99,7 +100,8 @@ async def main():
     # plane) (the spin angle) -- compare against the recorded spec scalars.
     import math
     from _assembly import component_transform
-    arr = component_transform(adapter, "mg-vn-lever-wire-1")
+    wire = bind_component_selectors(model, ("@LeverWire:1",))["@LeverWire:1"]
+    arr = component_transform(adapter, wire)
     zrow = arr[6:9]  # part z-axis image = Front@hw normal
     org_z = arr[11] * 1000.0
     log(f"=== MEASURED at pose: hub z={org_z:.4f} (spec 142.77); "

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import math
 
-import mg_vn_lever_wire_geom as _lever
+import sh_vn_music_wire_lever_geom as _lever
 import mg_magnifying_wheel_geom as _wheel
 import mg_wheel_axle_spacer_spec as _spacer
 import mg_wheel_axle_spec as _pin

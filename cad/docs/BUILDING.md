@@ -1,6 +1,6 @@
 # Building the model
 
-Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 00 and retain the `-assembly` artifact suffix; fabricated parts start at 01 within each subsystem, and vendor parts start at VN-50 within their direct parent assembly.
+Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 00 and retain the `-assembly` artifact suffix; fabricated parts start at 01 within each subsystem; a vendor part unique to one assembly starts at VN-50 within that direct parent; a supplier-qualified SKU used by several assemblies (or by several differing members) is one shared `sh_vn_*` part numbered MHA-SH-VN-50 onward, with heterogeneous members as named configurations, so `part:sh_vn_chain_link` builds both the `InnerLink` and `OuterLink` members and every consuming assembly or drawing selects its member configuration explicitly rather than building a parent-scoped copy.
 
 The CAD model is generated headlessly from a clean checkout. Every task that
 drives COM needs a SolidWorks seat, and there are two ways to have one:
@@ -107,6 +107,10 @@ uv run python -m doit build_bare
 # Just one part (doit selection does NOT run reverse dependents — the dependent
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
 uv run python -m doit part:dt_cone_gear
+
+# One shared vendor part: every consuming assembly (here mg, pn) stays stale
+# until rebuilt; there is no per-parent copy to select instead
+uv run python -m doit part:sh_vn_music_wire
 
 # Just one assembly (+ its stale prerequisites), or a single gate
 uv run python -m doit assembly:pd_paper_drive

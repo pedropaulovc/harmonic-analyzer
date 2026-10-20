@@ -254,7 +254,7 @@ def test_apex_set_screw_socket_and_cup_point_are_named() -> None:
     named layout constant (the drive train places it exactly), and the cup
     point, not the thread, spans the running clearance with the arbor pushed
     to the bottom of a largest bore on a smallest arbor."""
-    import _mcmaster_91375a106 as screw
+    import sh_vn_arbor_set_screw_spec as screw
     import dt_cylinder_gear_shaft_spec as shaft
 
     assert bank.SET_SCREW_SOCKET_PROUD == pytest.approx(

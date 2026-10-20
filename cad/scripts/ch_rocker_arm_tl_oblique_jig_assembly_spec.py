@@ -92,9 +92,9 @@ import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
-import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as flange_nut
+import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
-import ch_rocker_arm_tl_vn_oblique_hold_down_stud_spec as hold_down_stud
+import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as leadscrew_nut
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
@@ -111,7 +111,7 @@ import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as rail_screw
 import ch_rocker_arm_tl_vn_oblique_rail_spec as guide_rail
 import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_vn_oblique_t_nut_spec as t_nut
+import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"

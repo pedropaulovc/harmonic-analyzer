@@ -140,7 +140,7 @@ def test_installed_hook_sits_on_the_wire_start() -> None:
     # Option A1: the hook lies in the rod's own plane (dz = 0), on the bracket
     # side, and the run heads further from the rod, so the wire clears it.
     from mg_magnifying_vertical_rod_geom import ROD_DIA
-    import mg_vn_lever_wire_geom as wire
+    import sh_vn_music_wire_lever_geom as wire
 
     assert geom.HOOK_TARGET_Z == geom.VROD_Z
     assert -geom.HOOK_OFFSET_X - ROD_DIA / 2.0 - geom.WIRE_DIA / 2.0 >= geom.WIRE_CLEARANCE
@@ -303,7 +303,7 @@ def test_a_bottoming_tap_reaches_full_thread_through_the_wall_and_stops_short() 
 
 
 def test_the_bore_datum_holds_the_screw_reach_and_the_rejected_datums_fail() -> None:
-    from _mcmaster_91882a221 import PITCH, SHANK_DIA, SHANK_LEN
+    from sh_vn_thumb_screw_spec import PITCH, SHANK_DIA, SHANK_LEN
     from mg_magnifying_vertical_rod_geom import ROD_STOCK_DIA_LOW
 
     rod_min = geom.VROD_DIA - ROD_STOCK_DIA_LOW

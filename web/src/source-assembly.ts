@@ -10,8 +10,8 @@ import type { PartOverride, Point3, Quaternion4 } from './scene'
  * Source: jfH-NbsmvD4 setup 43..74, service 170..230, photos 234..285,
  * pen assembly 565..649; approved CAD 81539e53 / raw 60a62a2e.
  * Archived inventory/model bytes, transforms and identity-map hashes stay
- * pinned. Current parent-scoped paths are an ingestion-only metadata projection,
- * not regenerated geometry or a replacement claim about the historical model.
+ * pinned. Current shared/member paths are archive-role-local logical selectors,
+ * not rebuilt-native Name2 or regenerated geometry or historical model claims.
  *
  * Runtime contract: on EVERY view/state change, Machine.update first restores
  * every native part, performs the normal operating solve, then calls this solver
@@ -157,7 +157,7 @@ const CHANNEL_STATIONS = Object.freeze(Array.from({ length: 20 }, (_, index) => 
   lever: `${CHANNEL_CHASSIS}/ch-channel-lever-${index + 1}`,
 })))
 const MARKER = `${PEN}pn-vn-pen-marker-1`
-const WIRE = `${PEN}pn-vn-pen-wire-1`
+const WIRE = `${PEN}sh-vn-music-wire--PenWire-1`
 const SPARE = `${PAPER}pd-transgear-removable-3`
 const GEAR_IDS: readonly SourceGearId[] = ['T24', 'T12', 'T18-upper', 'T18-crank']
 /** Sole declaration of the two genuine existing Scene/template instances. */
@@ -189,7 +189,7 @@ function bindingGroup(id: string): readonly string[] {
 }
 const CRANK_CARRIER = Object.freeze([
   HUB, `${DRIVE}dt-crank-arm-1`, `${DRIVE}dt-vn-crank-hub-pin-1`, `${DRIVE}dt-crank-pin-eye-1`,
-  `${DRIVE}dt-vn-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
+  `${DRIVE}sh-vn-brass-fillister-screw-1`, `${DRIVE}dt-crank-handle-1`, `${DRIVE}dt-crank-handle-ferrule-1`,
   `${DRIVE}dt-crank-handle-butt-cup-1`, `${DRIVE}dt-crank-handle-pivot-screw-1`,
 ])
 const CRANK_PIN = Object.freeze([PIN, `${DRIVE}dt-crank-pin-ring-1`])

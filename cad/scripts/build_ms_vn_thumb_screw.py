@@ -10,7 +10,7 @@ from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from _simplified_part import save_simplified_part
 from diagnostics.diag_build_91882A221 import build_91882A221
-from _mcmaster_91882a221 import HEAD_STACK_LEN
+from sh_vn_thumb_screw_spec import HEAD_STACK_LEN
 
 PART_NAME = "ms-vn-thumb-screw"
 SPEC = fastener(PART_NAME)

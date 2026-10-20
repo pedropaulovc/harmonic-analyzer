@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Current naming cutover from the prior category identities to two-digit, immediate-parent vendor identities. Prior identity-migration-map.json remains immutable release provenance.",
+  "description": "Current two-digit identities, with one Shared vendor native part per repeated supplier-qualified SKU. Prior identity-migration-map.json remains immutable release provenance.",
   "rules": {
     "part_number_width": 2,
     "machine_vendor_pattern": "MHA-<PARENT_CATEGORY>-VN-<NN>",
@@ -12,7 +12,11 @@
     "tooling_vendor_stem_pattern": "<fixture-parent-stem>-tl-vn-<old-tool-stem-after-tl->",
     "allocation": "Within each direct-parent namespace, assign NN from 50 upward in ascending previous vendor Number (MHA-VN-NN); for tool purchases, ascending prior TL-NN. Sequences reset per parent namespace.",
     "identity_segments": "Shrink every numeric identity segment, including parent 005->05 and assembly 000->00. Do not treat configuration qualifier T006 as an identity sequence; retain it.",
-    "cloning": "Each direct consuming assembly gets a separate registry/native model identity. Reuse the same supplier/SKU geometry recipe where it supports a parameterized part identity; do not alias one native part or keep a shared identity."
+    "cloning": "One registry/native identity per repeated supplier-qualified SKU; SH means Shared. Distinct physical members use explicit named configurations. Unique supplier SKUs remain immediate-parent scoped.",
+    "shared_vendor_pattern": "MHA-SH-VN-<NN>",
+    "shared_vendor_stem_pattern": "sh-vn-<shared-supplier-SKU-description>",
+    "occurrence_namespace": "archive-role-local",
+    "native_occurrence_reference": "Role:ordinal; ordinal is 1-based and role-local, not a native Component2 instance index. Resolve rebuilt native Name2 only from checked file, configuration and ComponentReference readback."
   },
   "parts_and_assemblies": [
     {
@@ -53,8 +57,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
-          "number": "MHA-CH-06-TL-VN-58"
+          "stem": "sh-vn-clamping-kit-hardware",
+          "number": "MHA-SH-VN-57",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
+          "prior_number": "MHA-CH-06-TL-VN-58",
+          "configuration": "HoldDownStud",
+          "role": "HoldDownStud"
         }
       ]
     },
@@ -139,8 +147,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-flange-nut",
-          "number": "MHA-CH-06-TL-VN-60"
+          "stem": "sh-vn-clamping-kit-hardware",
+          "number": "MHA-SH-VN-57",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-flange-nut",
+          "prior_number": "MHA-CH-06-TL-VN-60",
+          "configuration": "FlangeNut",
+          "role": "FlangeNut"
         }
       ]
     },
@@ -883,8 +895,12 @@
       "new_identities": [
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-swing-stop-screw",
-          "number": "MHA-DT-VN-53"
+          "stem": "sh-vn-fillister-screw-90280a108",
+          "number": "MHA-SH-VN-52",
+          "prior_stem": "dt-vn-swing-stop-screw",
+          "prior_number": "MHA-DT-VN-53",
+          "configuration": "Default",
+          "role": "SwingStopScrew"
         }
       ]
     },
@@ -894,13 +910,21 @@
       "new_identities": [
         {
           "parent": "mg-magnifier",
-          "stem": "mg-vn-thumb-screw",
-          "number": "MHA-MG-VN-50"
+          "stem": "sh-vn-thumb-screw",
+          "number": "MHA-SH-VN-55",
+          "prior_stem": "mg-vn-thumb-screw",
+          "prior_number": "MHA-MG-VN-50",
+          "configuration": "Default",
+          "role": "ThumbScrew"
         },
         {
           "parent": "ms-measuring-stick",
-          "stem": "ms-vn-thumb-screw",
-          "number": "MHA-MS-VN-50"
+          "stem": "sh-vn-thumb-screw",
+          "number": "MHA-SH-VN-55",
+          "prior_stem": "ms-vn-thumb-screw",
+          "prior_number": "MHA-MS-VN-50",
+          "configuration": "Default",
+          "role": "ThumbScrew"
         }
       ]
     },
@@ -1067,8 +1091,12 @@
       "new_identities": [
         {
           "parent": "pn-pen",
-          "stem": "pn-vn-pen-wire",
-          "number": "MHA-PN-VN-57"
+          "stem": "sh-vn-music-wire",
+          "number": "MHA-SH-VN-56",
+          "prior_stem": "pn-vn-pen-wire",
+          "prior_number": "MHA-PN-VN-57",
+          "configuration": "PenWire",
+          "role": "PenWire"
         }
       ]
     },
@@ -1266,8 +1294,12 @@
       "new_identities": [
         {
           "parent": "mg-magnifier",
-          "stem": "mg-vn-lever-wire",
-          "number": "MHA-MG-VN-56"
+          "stem": "sh-vn-music-wire",
+          "number": "MHA-SH-VN-56",
+          "prior_stem": "mg-vn-lever-wire",
+          "prior_number": "MHA-MG-VN-56",
+          "configuration": "LeverWire",
+          "role": "LeverWire"
         }
       ]
     },
@@ -1403,8 +1435,12 @@
       "new_identities": [
         {
           "parent": "pd-paper-drive",
-          "stem": "pd-vn-latch-hook-bracket-screw",
-          "number": "MHA-PD-VN-59"
+          "stem": "sh-vn-fillister-screw-90280a108",
+          "number": "MHA-SH-VN-52",
+          "prior_stem": "pd-vn-latch-hook-bracket-screw",
+          "prior_number": "MHA-PD-VN-59",
+          "configuration": "Default",
+          "role": "LatchHookBracketScrew"
         }
       ]
     },
@@ -1527,18 +1563,30 @@
       "new_identities": [
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-fillister-screw",
-          "number": "MHA-DT-VN-50"
+          "stem": "sh-vn-brass-fillister-screw",
+          "number": "MHA-SH-VN-51",
+          "prior_stem": "dt-vn-fillister-screw",
+          "prior_number": "MHA-DT-VN-50",
+          "configuration": "Default",
+          "role": "FillisterScrew"
         },
         {
           "parent": "fr-frame",
-          "stem": "fr-vn-fillister-screw",
-          "number": "MHA-FR-VN-50"
+          "stem": "sh-vn-brass-fillister-screw",
+          "number": "MHA-SH-VN-51",
+          "prior_stem": "fr-vn-fillister-screw",
+          "prior_number": "MHA-FR-VN-50",
+          "configuration": "Default",
+          "role": "FillisterScrew"
         },
         {
           "parent": "pd-paper-drive",
-          "stem": "pd-vn-fillister-screw",
-          "number": "MHA-PD-VN-52"
+          "stem": "sh-vn-brass-fillister-screw",
+          "number": "MHA-SH-VN-51",
+          "prior_stem": "pd-vn-fillister-screw",
+          "prior_number": "MHA-PD-VN-52",
+          "configuration": "Default",
+          "role": "FillisterScrew"
         }
       ]
     },
@@ -1548,8 +1596,12 @@
       "new_identities": [
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-foot-screw",
-          "number": "MHA-DT-VN-58"
+          "stem": "sh-vn-fillister-screw-90280a108",
+          "number": "MHA-SH-VN-52",
+          "prior_stem": "dt-vn-foot-screw",
+          "prior_number": "MHA-DT-VN-58",
+          "configuration": "Default",
+          "role": "FootScrew"
         }
       ]
     },
@@ -1814,13 +1866,21 @@
       "new_identities": [
         {
           "parent": "mg-magnifier",
-          "stem": "mg-vn-clamp-screw",
-          "number": "MHA-MG-VN-51"
+          "stem": "sh-vn-clamp-screw",
+          "number": "MHA-SH-VN-53",
+          "prior_stem": "mg-vn-clamp-screw",
+          "prior_number": "MHA-MG-VN-51",
+          "configuration": "Default",
+          "role": "ClampScrew"
         },
         {
           "parent": "pd-paper-drive",
-          "stem": "pd-vn-clamp-screw",
-          "number": "MHA-PD-VN-53"
+          "stem": "sh-vn-clamp-screw",
+          "number": "MHA-SH-VN-53",
+          "prior_stem": "pd-vn-clamp-screw",
+          "prior_number": "MHA-PD-VN-53",
+          "configuration": "Default",
+          "role": "ClampScrew"
         }
       ]
     },
@@ -1861,8 +1921,12 @@
       "new_identities": [
         {
           "parent": "pd-paper-drive",
-          "stem": "pd-vn-chain-inner-link",
-          "number": "MHA-PD-VN-50"
+          "stem": "sh-vn-chain-link",
+          "number": "MHA-SH-VN-50",
+          "prior_stem": "pd-vn-chain-inner-link",
+          "prior_number": "MHA-PD-VN-50",
+          "configuration": "InnerLink",
+          "role": "InnerLink"
         }
       ]
     },
@@ -1872,8 +1936,12 @@
       "new_identities": [
         {
           "parent": "pd-paper-drive",
-          "stem": "pd-vn-chain-outer-link",
-          "number": "MHA-PD-VN-51"
+          "stem": "sh-vn-chain-link",
+          "number": "MHA-SH-VN-50",
+          "prior_stem": "pd-vn-chain-outer-link",
+          "prior_number": "MHA-PD-VN-51",
+          "configuration": "OuterLink",
+          "role": "OuterLink"
         }
       ]
     },
@@ -1905,13 +1973,21 @@
       "new_identities": [
         {
           "parent": "ch-channel",
-          "stem": "ch-vn-arbor-set-screw",
-          "number": "MHA-CH-VN-53"
+          "stem": "sh-vn-arbor-set-screw",
+          "number": "MHA-SH-VN-54",
+          "prior_stem": "ch-vn-arbor-set-screw",
+          "prior_number": "MHA-CH-VN-53",
+          "configuration": "Default",
+          "role": "ArborSetScrew"
         },
         {
           "parent": "dt-drive-train",
-          "stem": "dt-vn-arbor-set-screw",
-          "number": "MHA-DT-VN-64"
+          "stem": "sh-vn-arbor-set-screw",
+          "number": "MHA-SH-VN-54",
+          "prior_stem": "dt-vn-arbor-set-screw",
+          "prior_number": "MHA-DT-VN-64",
+          "configuration": "Default",
+          "role": "ArborSetScrew"
         }
       ]
     },
@@ -1952,8 +2028,12 @@
       "new_identities": [
         {
           "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-t-nut",
-          "number": "MHA-CH-06-TL-VN-59"
+          "stem": "sh-vn-clamping-kit-hardware",
+          "number": "MHA-SH-VN-57",
+          "prior_stem": "ch-rocker-arm-tl-vn-oblique-t-nut",
+          "prior_number": "MHA-CH-06-TL-VN-59",
+          "configuration": "TNut",
+          "role": "TNut"
         }
       ]
     },
@@ -2435,12 +2515,12 @@
     {
       "old_stem": "mg-lever-wire",
       "prior_current_stem": "vn-lever-wire",
-      "current_stem": "mg-vn-lever-wire"
+      "current_stem": "sh-vn-music-wire"
     },
     {
       "old_stem": "pn-pen-wire",
       "prior_current_stem": "vn-pen-wire",
-      "current_stem": "pn-vn-pen-wire"
+      "current_stem": "sh-vn-music-wire"
     },
     {
       "old_stem": "pn-pen-marker",
@@ -2451,5 +2531,135 @@
   "classification_decisions": {
     "ch-pivot-bracket-tl-angle-plate": "Shop-reworked bought stock remains fabricated tooling; only numeric width changes.",
     "pd-platen-rack": "Fabricated from purchased rack stock; finished part remains fabricated."
-  }
+  },
+  "shared_vendor_groups": [
+    {
+      "stem": "sh-vn-chain-link",
+      "number": "MHA-SH-VN-50",
+      "supplier": "McMaster",
+      "supplier_sku": "6261K171",
+      "configurations": [
+        "InnerLink",
+        "OuterLink"
+      ],
+      "neutral_export_configuration": "InnerLink"
+    },
+    {
+      "stem": "sh-vn-brass-fillister-screw",
+      "number": "MHA-SH-VN-51",
+      "supplier": "McMaster",
+      "supplier_sku": "90114A511",
+      "configurations": [
+        "Default"
+      ],
+      "neutral_export_configuration": "Default"
+    },
+    {
+      "stem": "sh-vn-fillister-screw-90280a108",
+      "number": "MHA-SH-VN-52",
+      "supplier": "McMaster",
+      "supplier_sku": "90280A108",
+      "configurations": [
+        "Default"
+      ],
+      "neutral_export_configuration": "Default"
+    },
+    {
+      "stem": "sh-vn-clamp-screw",
+      "number": "MHA-SH-VN-53",
+      "supplier": "McMaster",
+      "supplier_sku": "90280A201",
+      "configurations": [
+        "Default"
+      ],
+      "neutral_export_configuration": "Default"
+    },
+    {
+      "stem": "sh-vn-arbor-set-screw",
+      "number": "MHA-SH-VN-54",
+      "supplier": "McMaster",
+      "supplier_sku": "91375A106",
+      "configurations": [
+        "Default"
+      ],
+      "neutral_export_configuration": "Default"
+    },
+    {
+      "stem": "sh-vn-thumb-screw",
+      "number": "MHA-SH-VN-55",
+      "supplier": "McMaster",
+      "supplier_sku": "91882A221",
+      "configurations": [
+        "Default"
+      ],
+      "neutral_export_configuration": "Default"
+    },
+    {
+      "stem": "sh-vn-music-wire",
+      "number": "MHA-SH-VN-56",
+      "supplier": "McMaster",
+      "supplier_sku": "9666K56",
+      "configurations": [
+        "LeverWire",
+        "PenWire"
+      ],
+      "neutral_export_configuration": "LeverWire"
+    },
+    {
+      "stem": "sh-vn-clamping-kit-hardware",
+      "number": "MHA-SH-VN-57",
+      "supplier": "Precision Matthews",
+      "supplier_sku": "52PCCK-9/16-14mm",
+      "configurations": [
+        "HoldDownStud",
+        "TNut",
+        "FlangeNut"
+      ],
+      "neutral_export_configuration": "HoldDownStud"
+    }
+  ],
+  "current_source_files": [
+    {
+      "current_path": "cad/scripts/sh_vn_music_wire_lever_geom.py",
+      "source_path": "cad/scripts/mg_lever_wire_geom.py",
+      "configuration": "LeverWire",
+      "role": "LeverWire"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_music_wire_lever_spec.py",
+      "source_path": "cad/scripts/mg_lever_wire_spec.py",
+      "configuration": "LeverWire",
+      "role": "LeverWire"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_music_wire_pen_geom.py",
+      "source_path": "cad/scripts/pn_pen_wire_geom.py",
+      "configuration": "PenWire",
+      "role": "PenWire"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_music_wire_pen_spec.py",
+      "source_path": "cad/scripts/pn_pen_wire_spec.py",
+      "configuration": "PenWire",
+      "role": "PenWire"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_clamping_kit_hold_down_stud_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_hold_down_stud_spec.py",
+      "configuration": "HoldDownStud",
+      "role": "HoldDownStud"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_clamping_kit_t_nut_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_t_nut_spec.py",
+      "configuration": "TNut",
+      "role": "TNut"
+    },
+    {
+      "current_path": "cad/scripts/sh_vn_clamping_kit_flange_nut_spec.py",
+      "source_path": "cad/scripts/ch_rocker_arm_tl_oblique_flange_nut_spec.py",
+      "configuration": "FlangeNut",
+      "role": "FlangeNut"
+    }
+  ]
 }

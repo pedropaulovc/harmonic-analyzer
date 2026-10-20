@@ -571,12 +571,10 @@ def main() -> int:
 THREADED_PARTS: frozenset[str] = frozenset(
     {
         "dt_arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-DT-VN-64); its #8 ledge hole is clearance only
-        "ch_vn_arbor_set_screw",  # #4-40 x 1/4 cup point (91375A106), channel pivot bracket
-        "dt_vn_arbor_set_screw",  # same SKU, separate drive-train pedestal identity
+        "sh_vn_arbor_set_screw",  # #4-40 x 1/4 cup point (91375A106), channel brackets and drive-train pedestals
         "ch_pivot_bracket",  # #4-40 UNC-2B apex tap through the ear's arch into the bore (receiver of MHA-CH-VN-53); #8 foot hole is clearance only
         "sm_vn_boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
-        "mg_vn_clamp_screw",  # #8-32 UNC (90280A201), 2 magnifier column-clamp screws
-        "pd_vn_clamp_screw",  # same SKU, 4 paper-drive column-clamp screws
+        "sh_vn_clamp_screw",  # #8-32 UNC (90280A201), magnifier and paper-drive column clamps
         "sh_column_clamp_back",  # #8-32 UNC tapped ear holes, receiver of clamp_screw (magnifier and paper_drive)
         "dt_cone_gear_shaft",  # receiver: Sec4 D-flat gripped by cone_tip_collar's #2-56 set screw
         "dt_vn_cone_lock_knob",  # 1/4-20 UNC knurled thumb screw (93585A190), member into harmonic_base (top level)
@@ -589,10 +587,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
         "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-DT-VN-50)
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-32), member into crank_arm
-        "dt_vn_fillister_screw",  # #4-40 brass fillister (90114A511), keeper eye into crank arm
-        "fr_vn_fillister_screw",  # same SKU, nameplate into harmonic base
-        "pd_vn_fillister_screw",  # same SKU, paper-drive guide screws
-        "dt_vn_foot_screw",  # #4-40 fillister (90280A108), member into harmonic_base via pinion_spring foot (top level)
+        "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), keeper eye, nameplate and paper guides
+        "sh_vn_fillister_screw_90280a108",  # #4-40 (90280A108), spring foot, swing stop and latch-hook bracket
         "fr_vn_frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
@@ -607,12 +603,11 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_vn_knife_hanger_stud",  # #10-24 UNC cut plain hex bolt (McMaster 92314A253 x 2), member into the knife-mount top tap
         "sm_knife_mount",  # #10-24 UNC-2B bottoming tap (9.65 full thread, 11.24 drill) in the top seat, receiver of the knife-hanger bolt; two plain reamed dowel holes
         "fr_vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
-        "pd_vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-PD-VN-59), member: 2 into the support_bar's #4-40 through taps
         "mg_vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
         "pd_vn_platen_clip_screw",  # #2-56 brass slotted pan head (92446A077, MHA-PD-VN-65), member: 4 into the platen's through taps, clamping the paper clips
         "mg_magnifying_clamp",  # MHA-MG-02 hex: #4-40 top-face thumb tap (receiver of thumb_screw) + #4-40 bottom-face blind tap (receiver of vertical_rod)
         "mg_magnifying_vertical_rod",  # MHA-MG-04: #4-40 UNC-2A turned top end with relief, member into the clamp's bottom tap, seats on its shoulder
-        "ms_stop_block",  # MHA-MS-02: #4-40 UNC-2B tapped through the floor (receiver of ms_vn_thumb_screw) + 2x #2-56 UNC blind taps (receiver of ms_vn_stop_plate_screw)
+        "ms_stop_block",  # MHA-MS-02: #4-40 UNC-2B floor tap for the shared thumbscrew + 2x #2-56 cover taps
         "ms_vn_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-MS-VN-51), member: 2 into ms_stop_block through the cover plate
         "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
         "dt_vn_pedestal_hold_down_screw",  # #8-32 x 3/4 fillister (90280A197, MHA-DT-VN-62), member: 2 arbor-pedestal seats in harmonic_base
@@ -637,9 +632,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_anchor_jam_nut",  # MHA-CH-14 made brass round nut, #6-32 tapped through, member: x20 jammed on the summing-lever plate underside, locking each channel anchor (top-level row)
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
-        "dt_vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
-        "mg_vn_thumb_screw",  # #4-40 UNC (91882A221), magnifier clamp and output fixture
-        "ms_vn_thumb_screw",  # same SKU, measuring-stick stop block
+        "sh_vn_thumb_screw",  # #4-40 UNC (91882A221), magnifier clamp/output fixture and measuring-stick stop
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #2-56 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-18: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-23 is pressed in a reamed hole
         "pd_vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A199, MHA-PD-VN-56), 1-in stock cut to fit; member: 2 into transgear_arm
@@ -658,8 +651,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_alignment_pinion",  # bonded to pinion_arbor (Loctite 638, drum-bonded)
         "ch_amplitude_bar",  # reamed top pin hole (pressed MHA-CH-11 pin), end notches; pinned/sliding only
         "ch_bar_pivot_pin",  # plain 5/64 drill-rod pin pressed in the bar cheeks, runs in the lever
-        "pd_vn_chain_inner_link",  # roller-chain plate, no thread
-        "pd_vn_chain_outer_link",  # roller-chain plate, no thread
+        "sh_vn_chain_link",  # InnerLink and OuterLink members; pins and rollers, no thread
         "pd_vn_chain_connecting_link",  # clip-retained roller-chain link, no thread
         "ch_channel_lever",  # Ø6.5 fulcrum bore, #47 bar-pin hole, #21 spring-eye hole; no taps
         "ch_vn_channel_spring_installed",  # 9432K31 extension spring, hook ends in lever hole / eyebolt eye
@@ -691,7 +683,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "sm_vn_knife_mount_dowel",  # MHA-SM-VN-53 1/8 dowels, two pressed into each knife mount's reamed top-seat holes, slip in the crossbar hole and slot
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
-        "mg_vn_lever_wire",  # wire, wrapped in the fixture's spigot groove; no thread
+        "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
         "mg_magnifying_bracket",  # 1018 steel MHA-MG-03 collar light-press seat (press only, #1570); flange has two plain #2 clearance holes (heads on its front face), no thread
         "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-01 collar onto its east cylinder while holding the rod near its end; the press alone retains it
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
@@ -701,7 +693,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ms_stop_plate",  # MHA-MS-03 brass cover plate: 2 plain clearance holes for the #2-56 screws; no thread
         "fr_nameplate",  # brass plate, #4 clearance holes only
         "pn_vn_pen_marker",  # purchased Sharpie Fine Point; plain barrel, the thumb-screw tip bears on it (no thread)
-        "pn_vn_pen_wire",  # purchased 9666K56 music wire, tied off (tie-off not modelled)
         "dt_pinion_arbor",  # journal + grip head, crossrod bonded, collar spring-pinned
         "dt_pinion_arbor_collar",  # spring-pinned by MHA-DT-VN-63 (arbor-collar-pinned)
         "dt_pinion_bracket",  # straps: plain bores, pinned to MHA-DT-19 by MHA-DT-VN-63
@@ -754,8 +745,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
 UNTHREADED_STOCK: dict[str, str] = {
     "ch_vn_channel_spring_installed": "extension spring; its hook ends hang in plain holes and eyes",
     "sm_vn_counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
-    "pd_vn_chain_inner_link": "roller-chain link; its rollers ride sprocket teeth, carrying no thread",
-    "pd_vn_chain_outer_link": "roller-chain link; pins only, no thread",
+    "sh_vn_chain_link": "InnerLink and OuterLink roller-chain members; pins/rollers only, no thread",
     "pd_vn_chain_connecting_link": "clip-retained roller-chain link; pins only, no thread",
     "dt_vn_keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
     "dt_vn_crank_seat_drive_pin": "dowel pin pressed into a plain hole",
@@ -777,8 +767,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "mg_vn_wheel_axle_back_washer": "plain washer loose on the wheel-axle pin; no thread",
     "mg_vn_wheel_axle_front_washer": "plain washer loose on the wheel-axle's threaded end; no thread",
     "pn_vn_pen_marker": "felt-tip marker; its barrel lies in the v-block groove under the thumb screw; no thread",
-    "mg_vn_lever_wire": "music wire hooked in the fixture's spigot groove and wrapped on the drum; no thread",
-    "pn_vn_pen_wire": "music wire seated in the rim groove and tied through the adjuster stud's eye; no thread",
+    "sh_vn_music_wire": "LeverWire and PenWire music-wire members; hooked/wrapped or tied through the adjuster eye, no thread",
 }
 
 JOINTS: tuple[Joint, ...] = (
@@ -828,7 +817,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="fr-frame/nameplate-screw-in-base",
         assembly="fr_frame",
-        member="fr_vn_fillister_screw",
+        member="sh_vn_brass_fillister_screw",
         receiver="fr_harmonic_base",
         thread="#4-40 UNC",
         quantity=4,
@@ -1097,7 +1086,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="ha-harmonic-analyzer/swing-stop-screw-in-base",
         assembly="ha_harmonic_analyzer",
-        member="dt_vn_swing_stop_screw",
+        member="sh_vn_fillister_screw_90280a108",
         receiver="fr_harmonic_base",
         thread="#4-40",
         quantity=1,
@@ -1119,7 +1108,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="ha-harmonic-analyzer/spring-foot-screw-in-base",
         assembly="ha_harmonic_analyzer",
-        member="dt_vn_foot_screw",
+        member="sh_vn_fillister_screw_90280a108",
         receiver="fr_harmonic_base",
         thread="#4-40",
         quantity=1,
@@ -1140,15 +1129,15 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "build_dt_drive_train_assembly.py spring_foot_screw placement, _FOOT_SCREW_XZ, "
             "_require_clearance_size('pinion spring foot'), _require_tapped_thread('foot-screw "
-            "base seat'); dt_vn_foot_screw_spec.THREAD; draw_dt_drive_train_assembly.py rig_steps "
-            "rig-seats-transferred ('FIT ... 1X MHA-DT-VN-58'), INTERFACE_NOTES"
+            "base seat'); sh_vn_fillister_screw_90280a108_spec.THREAD; draw_dt_drive_train_assembly.py rig_steps "
+            "rig-seats-transferred ('FIT ... 1X MHA-SH-VN-52'), INTERFACE_NOTES"
         ),
     ),
     # --- drive_train (MHA-DT-00): cylinder bank and pinion rig, and their screws into the base ---
     Joint(
         id="dt-drive-train/arbor-apex-set-screw",
         assembly="dt_drive_train",
-        member="dt_vn_arbor_set_screw",
+        member="sh_vn_arbor_set_screw",
         receiver="dt_arbor_pedestal",
         thread="#4-40 UNC",
         quantity=2,
@@ -1206,7 +1195,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="dt-drive-train/keeper-eye-anchor-screw",
         assembly="dt_drive_train",
-        member="dt_vn_fillister_screw",
+        member="sh_vn_brass_fillister_screw",
         receiver="dt_crank_arm",
         thread="#4-40 UNC",
         quantity=1,
@@ -1296,7 +1285,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="ch-channel/pivot-bracket-apex-set-screw",
         assembly="ch_channel",
-        member="ch_vn_arbor_set_screw",
+        member="sh_vn_arbor_set_screw",
         receiver="ch_pivot_bracket",
         thread="#4-40 UNC",
         quantity=2,
@@ -1314,7 +1303,7 @@ JOINTS: tuple[Joint, ...] = (
         # out, 2026-10-16. Mirrors the keeper set screws' stake below.
         lock=Lock.STAKED,
         lock_part="ch_pivot_bracket:staked tap mouth",
-        lock_binds=("ch_vn_arbor_set_screw", "ch_pivot_bracket"),
+        lock_binds=("sh_vn_arbor_set_screw", "ch_pivot_bracket"),
         lock_step="set-screws-driven",
         evidence=(
             "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-CH-VN-53 DOWN EACH APEX TAP "
@@ -1835,7 +1824,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="ms-measuring-stick/stop-thumbscrew",
         assembly="ms_measuring_stick",
-        member="ms_vn_thumb_screw",
+        member="sh_vn_thumb_screw",
         receiver="ms_stop_block",
         thread="#4-40 UNC",
         quantity=1,
@@ -1947,7 +1936,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="mg-magnifier/clamp-thumb-screw",
         assembly="mg_magnifier",
-        member="mg_vn_thumb_screw",
+        member="sh_vn_thumb_screw",
         receiver="mg_magnifying_clamp",
         thread="#4-40 UNC",
         quantity=1,
@@ -2003,7 +1992,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="mg-magnifier/fixture-thumb-screw",
         assembly="mg_magnifier",
-        member="mg_vn_thumb_screw",
+        member="sh_vn_thumb_screw",
         receiver="mg_output_fixture",
         thread="#4-40 UNC",
         quantity=1,
@@ -2032,7 +2021,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="mg-magnifier/wheel-bar-clamp-screws",
         assembly="mg_magnifier",
-        member="mg_vn_clamp_screw",
+        member="sh_vn_clamp_screw",
         receiver="sh_column_clamp_back",
         thread="#8-32 UNC",
         quantity=2,
@@ -2059,7 +2048,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pd-paper-drive/clamp-screw-in-back-arc",
         assembly="pd_paper_drive",
-        member="pd_vn_clamp_screw",
+        member="sh_vn_clamp_screw",
         receiver="sh_column_clamp_back",
         thread="#8-32 UNC",
         quantity=4,
@@ -2090,7 +2079,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pd-paper-drive/guide-screw-in-guide",
         assembly="pd_paper_drive",
-        member="pd_vn_fillister_screw",
+        member="sh_vn_brass_fillister_screw",
         receiver="pd_platen_guide",
         thread="#4-40 UNC",
         quantity=10,
@@ -2239,7 +2228,7 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="pd-paper-drive/latch-hook-bracket-screws-in-bar",
         assembly="pd_paper_drive",
-        member="pd_vn_latch_hook_bracket_screw",
+        member="sh_vn_fillister_screw_90280a108",
         receiver="pd_support_bar",
         thread="#4-40 UNC",
         quantity=2,
@@ -2348,7 +2337,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "dt_drive_train", "build_dt_drive_train_assembly.py", '"dt-crank-handle-pivot-screw"'
     ),
     "dt-drive-train/arbor-apex-set-screw": Occurrence(
-        "dt_drive_train", "build_dt_drive_train_assembly.py", '"dt-vn-arbor-set-screw"'
+        "dt_drive_train", "build_dt_drive_train_assembly.py", '"sh-vn-arbor-set-screw"'
     ),
     "dt-drive-train/pinion-cam-set-screw": Occurrence(
         "dt_drive_train", "draw_dt_drive_train_assembly.py", "cam-collars-set"
@@ -2377,7 +2366,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "build_dt_drive_train_assembly.py", '"dt-vn-slotted-screw"'
     ),
     "ch-channel/pivot-bracket-apex-set-screw": Occurrence(
-        "ch_channel", "build_ch_channel_assembly.py", '"ch-vn-arbor-set-screw"'
+        "ch_channel", "build_ch_channel_assembly.py", '"sh-vn-arbor-set-screw"'
     ),
     "ha-harmonic-analyzer/north-pivot-bracket-hold-down": Occurrence(
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"

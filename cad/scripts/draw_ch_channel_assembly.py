@@ -302,7 +302,7 @@ PART_ROWS = {
     "ch-pivot-shaft": _config.parts("ch-pivot-shaft"),
     "ch-fulcrum-shaft": _config.parts("ch-fulcrum-shaft"),
     "ch-pivot-bracket": _config.parts("ch-pivot-bracket"),
-    "ch-vn-arbor-set-screw": _config.parts("ch-vn-arbor-set-screw"),
+    "sh-vn-arbor-set-screw": _config.parts("sh-vn-arbor-set-screw"),
     "ch-vn-rocker-thrust-washer": _config.parts("ch-vn-rocker-thrust-washer"),
     "ch-vn-rocker-bank-spring": _config.parts("ch-vn-rocker-bank-spring"),
     "ch-vn-bracket-hold-down-screw": _config.parts("ch-vn-bracket-hold-down-screw"),
@@ -820,7 +820,7 @@ def _fitup_notes() -> tuple[str, str]:
     bracket = _config.parts("ch-pivot-bracket")["number"]
     washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
     spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
-    pivot_set_screw = _config.parts("ch-vn-arbor-set-screw")["number"]
+    pivot_set_screw = _config.parts("sh-vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     hold_down = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
     keeper = _config.parts("ch-fulcrum-keeper")["number"]

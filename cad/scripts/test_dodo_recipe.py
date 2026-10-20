@@ -2318,10 +2318,12 @@ def test_config_deps_are_fine_grained():
     # on its own row + shared defaults + title_block.yaml + release.yaml, nothing
     # else.
     screw = dodo._config_deps(
-        scripts / "build_dt_vn_fillister_screw.py", "dt_vn_fillister_screw", "part"
+        scripts / "build_sh_vn_brass_fillister_screw.py",
+        "sh_vn_brass_fillister_screw",
+        "part",
     )
     assert _rel(screw, cfg) == {
-        "parts/dt-vn-fillister-screw.yaml",
+        "parts/sh-vn-brass-fillister-screw.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",

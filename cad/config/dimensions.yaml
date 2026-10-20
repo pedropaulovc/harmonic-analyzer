@@ -715,10 +715,10 @@ sections:
         - 'Base-threaded STATIC at cone_line.PIVOT_XZ, current nominal (−86.545443621, +103.790253281). Shoulder seats on base top; open pivot-bearing relief leaves 6.10 nominal plate thickness / 0.25 nominal axial air. Match relief depth to finished plate and actual shoulder: platform must swing freely with minimal axial play. This relief is not a crank-gear pocket. Former pivot (−88.395202708, +95.995327545) preceded the tip extension.'
         - 'dt_vn_cone_pivot_screw_spec owns harvested MODEL_SOURCE geometry, sourced shoulder bands and thread limits. v4 top stills preserve the slotted-head role; no unprovided supplier head/tail/profile grade follows from the CAD nominal.'
         - high stock identity and sourced shoulder grades; matched installed pivot acceptance separate
-      - - '`dt-vn-swing-stop-screw` (p1 travel limit)'
+      - - '`sh-vn-fillister-screw-90280a108` (p1 travel limit, `@SwingStopScrew:1`)'
         - 'McMaster-Carr 90280A108 steel slotted narrow fillister, foot-screw SKU (user, 2026-09-29), ASME B18.6.3 #4-40 UNC-2A. Model nominal head Ø4.6482 ×2.7178 / shank Ø2.8448 ×9.525. Sourced stock limits: head diameter 4.21640..4.64820, total height 2.23520..2.71780, under-head length 9.01700..9.52500, bearing circle MIN Ø3.79476 and unslotted head height MIN 1.01600 mm; external thread major MAX Ø2.82448 / pitch diameter MIN Ø2.34950 constrain threaded material, not the raw depicted shank. Installation requires full-form useful engagement MIN 4.27 mm (1.5D) with head fully seated on base; head remains inside the 6.35 platform edge and is the stop. Base full-thread/drill references 10.3 / 14.5 mm.'
         - 'Base-threaded STATIC at build_fr_harmonic_base.STOP_SCREW_XZ, from swing_hardware_geometry and the selected 231.103840373345 outline. The east taper meets the actual head after the stud clears the notch; assembled all-P1 head/platform seating and stop pose remain the installation contract. Earlier 223.103840373345 / 227.103840373345 outlines and the nominal 9.525 embed / 3.35D description were prior model references, not stock full-form engagement evidence.'
-        - '_mcmaster_90280a108 owns the shared nominal 90280A108 row; dt_vn_swing_stop_screw_spec owns the ASME slotted-fillister/length/thread limits with its recorded supplier/table provenance; native foot/latch recipes consume the same row. Base receiver is build_fr_harmonic_base-owned. v4 preserves the small-screw stop role; sourced bounds are not proof of a measured installed screw or raw shank-profile grade.'
+        - 'sh_vn_fillister_screw_90280a108_spec owns the shared nominal 90280A108 row; dt_swing_stop_screw_spec owns the ASME slotted-fillister/length/thread application limits with its recorded supplier/table provenance. Stop, spring-foot and latch-hook bracket occurrences use the same canonical native stock part; the stop retains its application placement and static lock. Base receiver is build_fr_harmonic_base-owned. v4 preserves the small-screw stop role; sourced bounds are not proof of a measured installed screw or raw shank-profile grade.'
         - high stock identity and sourced limits; nominal depiction and installed acceptance separate
       - - '`dt-vn-cone-tip-collar` (custom MHA-DT-VN-54 gear-stack retainer)'
         - 'Custom stepped steel collar turned from 3/4 in bar, with geometry and printed limits owned by dt_vn_cone_tip_collar_spec. The reader derives OUTER_DIA from its bore/tap/flat/wall envelope; the selected source-design body OD17.48 ±0.51 mm is not a frozen purchased-collar diameter or native/full-P1 acceptance. Shared cone_shaft_land_bands owns the 1/32 in terminal, width 11.500 at the title-block ±0.13 band, south nose length 3.500 and tap station 7.500; collar spec owns the Ø6.40 nose. Stock McMaster 94355A213 #2-56 ×5/16 UNC3A 18-8 flat-tip screw is fitted as supplied; its point must overlap the D-flat face at every printed limit (SCREW_LANDING_MARGIN_MM) and the through tap holds the 2.0 wall target.'
@@ -1395,9 +1395,9 @@ sections:
         - scaled + engineered joint
         - low (photo size); high (specified stock and walls)
       - - Thumb screw
-        - 'MHA-MG-VN-50, McMaster 91882A221 #4-40 UNC: Ø9.525 × 2.38125 knurled head, Ø6.35 × 2.38125 collar, 11.1125 shank under collar; ×2 placed (sliding lever clamp + axial output-fixture clamp)'
+        - 'MHA-SH-VN-55, McMaster 91882A221 #4-40 UNC: Ø9.525 × 2.38125 knurled head, Ø6.35 × 2.38125 collar, 11.1125 shank under collar; ×2 placed (sliding lever clamp + axial output-fixture clamp)'
         - —
-        - 'ch20_images/page001_img01.jpeg front close-up and page002_img07.jpeg vertical-rod/fixture close-up; stock dimensions from cad/scripts/_mcmaster_91882a221.py'
+        - 'ch20_images/page001_img01.jpeg front close-up and page002_img07.jpeg vertical-rod/fixture close-up; stock dimensions from cad/scripts/sh_vn_thumb_screw_spec.py'
         - stock + photo topology
         - high (stock); med (two clamp functions); low (photo-scaled original size)
       - - Output fixture
@@ -1472,7 +1472,7 @@ sections:
       the hook lands at (139.98, 919.7, −173.51) in the rod plane. Hook X,
       yaw, wire length (354.683), drum tangent (clock 15.82°) and the yoke
       point are derived in cad/scripts/mg_output_fixture_geom.py and
-      mg_vn_lever_wire_geom.py. The drawing-free route checks clearance behind
+      sh_vn_music_wire_lever_geom.py. The drawing-free route checks clearance behind
       the rim (6.61), spokes (8.61) and boss (4.10). The straight rest wire
       clears the fixture groove flanks, spigot and screw head numerically,
       and the farm assembly interference gate checks the installed solids.
@@ -1554,11 +1554,11 @@ sections:
 
       Wires modeled (2026-07-04, re-derived rev 10): the two amplification wires are
       geometry — straight rest-pose Ø0.8 rods of purchased McMaster 9666K56 0.031 in
-      music wire (`mg-vn-lever-wire` MHA-MG-VN-56:
+      music wire (`sh-vn-music-wire` MHA-SH-VN-56, configuration `LeverWire`:
       fixture's derived spigot-groove front tangent → tangent to the drum at about
       2:25 seen from the front, on the pen side, at the drum mid-plane z −173.51;
       the hook lies in that same plane (#1559 A1), set by mg_output_fixture_geom.py;
-      `pn-vn-pen-wire` MHA-PN-VN-57: rim groove 3-o'clock tangent at x 3.8 → plumb
+      configuration `PenWire` of the same part: rim groove 3-o'clock tangent at x 3.8 → plumb
       down 60.5 to the pen-rod adjuster stud's eye head at y 515.2). The lever-wire ARTICULATES (ball joint at the
       hook + axis-axis stand-off tangency to the drum) and carries the WIRE-1
       yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
@@ -1784,7 +1784,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (current roller-chain model)
-        - 'Selected physical chain is 68 links of ANSI #25 (`pd_transgear_removable_spec.CHAIN_LINK_COUNT`) at exact 6.35 pitch, centreline length 431.8, on unchanged crank T12 (McMaster 6793K4 blank) and knob T24 (McMaster 6793K17 blank). Alternating `pd-vn-chain-inner-link`/`pd-vn-chain-outer-link` form the native connected-linkage pattern over 66 stations; the closing inner link of the cut chain and the `pd-vn-chain-connecting-link` (MHA-PD-VN-66) are seated at stations 66 and 67, giving 34 inner, 33 outer and 1 connecting link. Physical qualification must close the discrete pinned-link cycle at the final centres; neither a different nearest-even count nor stretched pitch satisfies the selection. Knob centre follows `_paper_drive_placement.KNOB_SHAFT_XY`; crank centre follows `cone_line.X_CRANK/Y_CRANK`. The inherited `_chain.py` smooth three-arc visual guide and its continuous sag closure are not proof of a physical standard-pitch cycle. Link pin plane z −155.7 (`_sprocket_seat_geometry.CHAIN_MID_Z`) is shared by both shafts. The selected quantity is not a completed physical/native qualification result.'
+        - 'Selected physical chain is 68 links of ANSI #25 (`pd_transgear_removable_spec.CHAIN_LINK_COUNT`) at exact 6.35 pitch, centreline length 431.8, on unchanged crank T12 (McMaster 6793K4 blank) and knob T24 (McMaster 6793K17 blank). Alternating `InnerLink`/`OuterLink` configurations of `sh-vn-chain-link` (MHA-SH-VN-50) form the native connected-linkage pattern over 66 stations; the closing inner link of the cut chain and the `pd-vn-chain-connecting-link` (MHA-PD-VN-66) are seated at stations 66 and 67, giving 34 inner, 33 outer and 1 connecting link. Physical qualification must close the discrete pinned-link cycle at the final centres; neither a different nearest-even count nor stretched pitch satisfies the selection. Knob centre follows `_paper_drive_placement.KNOB_SHAFT_XY`; crank centre follows `cone_line.X_CRANK/Y_CRANK`. The inherited `_chain.py` smooth three-arc visual guide and its continuous sag closure are not proof of a physical standard-pitch cycle. Link pin plane z −155.7 (`_sprocket_seat_geometry.CHAIN_MID_Z`) is shared by both shafts. The selected quantity is not a completed physical/native qualification result.'
         - —
         - 'Physical chain selection and pitch: `pd_transgear_removable_spec`; centres: `_paper_drive_placement` and `cone_line`; inherited visual guide only: `_chain.py`. Historical ch30 p002/p005/p006 show a taut run and visibly drooping slack run; ch23 p.58–59 show chain wider than the sprocket. The preceding DP38 reducer placement K (−43.788, 256.893), c-c 44.766 at −168°, is photograph-derived provenance, not the selected 48DP reducer placement.'
         - scaled + derived

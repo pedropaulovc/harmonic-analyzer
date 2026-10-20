@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import build_mg_vn_lever_wire as part
-import draw_mg_vn_lever_wire as drawing
-import mg_vn_lever_wire_spec
+import draw_sh_vn_music_wire as drawing
+import sh_vn_music_wire_lever_spec
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -18,9 +18,9 @@ def test_required_drawing_paths() -> None:
 
 
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert part.DRAWING_DIMENSIONS is mg_vn_lever_wire_spec.DRAWING_DIMENSIONS
-    marked = set().union(*mg_vn_lever_wire_spec.DRAWING_DIMENSIONS.values()) if (
-        mg_vn_lever_wire_spec.DRAWING_DIMENSIONS
+    assert part.DRAWING_DIMENSIONS is sh_vn_music_wire_lever_spec.DRAWING_DIMENSIONS
+    marked = set().union(*sh_vn_music_wire_lever_spec.DRAWING_DIMENSIONS.values()) if (
+        sh_vn_music_wire_lever_spec.DRAWING_DIMENSIONS
     ) else set()
     kept = set(drawing.FRONT_KEEP)
     # Note-based wire: nothing is marked, nothing is kept.
@@ -44,7 +44,7 @@ def test_form_and_finish_are_note_based_on_the_unpickable_wire() -> None:
 def test_notes_do_not_misrepresent_the_rest_run_as_a_cut_length() -> None:
     import _config
 
-    notes = mg_vn_lever_wire_spec.DRAWING_NOTES
+    notes = sh_vn_music_wire_lever_spec.DRAWING_NOTES
     (sku,) = _config.parts("mg-vn-lever-wire")["supplier_skus"]
     assert sku in notes
     assert "ASTM A228" not in notes
@@ -90,8 +90,8 @@ def test_part_stamps_make_critical_properties() -> None:
 def test_the_balloon_ring_is_a_shape_neutral_mid_run_split() -> None:
     # MHA-MG-00 lands the wire's balloon on this ring; it must not change the
     # wire, so it is a split line (no added solid feature) at mid-run.
-    assert part.BALLOON_RING_STATION == mg_vn_lever_wire_spec.BALLOON_RING_FRACTION * part.WIRE_LEN
-    assert 0.0 < mg_vn_lever_wire_spec.BALLOON_RING_FRACTION < 1.0
+    assert part.BALLOON_RING_STATION == sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION * part.WIRE_LEN
+    assert 0.0 < sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION < 1.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("InsertSplitLineProject(") == 1
     assert "create_extrusion(" in source and source.count("create_extrusion(") == 1

@@ -8,7 +8,7 @@ supplier-model nominals, not inferred supplied tolerance limits.
 
 from __future__ import annotations
 
-from _mcmaster_90280a108 import FILLISTER_SIZE
+from sh_vn_fillister_screw_90280a108_spec import FILLISTER_SIZE
 
 THREAD = "#4-40"
 SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZE

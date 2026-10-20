@@ -568,7 +568,7 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     import mg_lever_press_fit_geom as press
     import mg_magnifying_clamp_geom as clamp
     import mg_magnifying_lever_geom as geom
-    from _mcmaster_91882a221 import SHANK_DIA
+    from sh_vn_thumb_screw_spec import SHANK_DIA
     from _surface_finish import SEAT_UM
 
     spec = mg_magnifying_lever_spec

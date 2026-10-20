@@ -17,7 +17,7 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import SharedCoordinate
 from _printed_tolerance import printed_band_mm
 from machinist_exceptions import load_exceptions
-from _mcmaster_90114a511 import HEAD_H as FILLISTER_HEAD_H
+from sh_vn_brass_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 # ASME B landscape field and title block (sheet metres).
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)

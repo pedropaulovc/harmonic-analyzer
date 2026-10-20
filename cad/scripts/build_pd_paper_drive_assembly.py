@@ -102,18 +102,21 @@ from _chain import (
 )
 from _check import check, log
 from _com import _early_bound
+from _component_references import component_identity, component_reference_names
+from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
+from _appearance import POLISHED_STEEL
 from _custom_properties import apply_custom_properties
 from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
+    apply_component_color,
     author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
     check_no_interference,
-    component_names,
     component_origin,
     coincident_mate,
     component_transform,
@@ -252,13 +255,13 @@ from build_pd_platen_clip import (  # noqa: E402
     HOLE_Y as CLIP_HOLE_Y,
     HOLE_DIA as CLIP_HOLE_DIA,
 )
-from _mcmaster_90280a201 import (  # noqa: E402
+from sh_vn_clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
     HEAD_H as CLAMP_SCREW_HEAD_H,
     SHANK_DIA as CLAMP_SCREW_DIA,
     SHANK_LEN as CLAMP_SCREW_LEN,
 )
-from _mcmaster_90114a511 import (  # noqa: E402
+from sh_vn_brass_fillister_screw_spec import (  # noqa: E402
     HEAD_DIA as FILLISTER_HEAD_DIA,
     HEAD_H as FILLISTER_HEAD_H,
     SHANK_DIA as FILLISTER_SHANK_DIA,
@@ -369,7 +372,7 @@ import pd_vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
 import pd_vn_transgear_pivot_shim_spec as PIVOT_SHIM  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import pd_vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
-import pd_vn_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
+import pd_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import pd_latch_hook_spec as HOOK_SPEC  # noqa: E402
 
 FEED_PD = FEED.PITCH_DIA
@@ -2034,15 +2037,101 @@ def _assert_chain_slack_clearance() -> None:
     )
 
 
-# Every link family the closed loop holds (instance names start with these).
-_CHAIN_PARTS = (
-    "pd-vn-chain-inner-link",
-    "pd-vn-chain-outer-link",
-    "pd-vn-chain-connecting-link",
-)
+CHAIN_LINK_STEM = "sh-vn-chain-link"
+CONNECTING_LINK_STEM = "pd-vn-chain-connecting-link"
+CHAIN_COMPONENT_REFERENCES = {
+    f"@{configuration}:{ordinal}": (CHAIN_LINK_STEM, configuration)
+    for configuration, count in (
+        (INNER_LINK_CONFIGURATION, LINK_COUNT // 2),
+        (OUTER_LINK_CONFIGURATION, LINK_COUNT // 2 - 1),
+    )
+    for ordinal in range(1, count + 1)
+}
 
 
-async def _place_chain_seed(adapter, part: str, station: int) -> str:
+def _chain_station_point(station: int) -> tuple[float, float, float]:
+    x, y, _ = loop_point_tangent(
+        station * LINK_PITCH,
+        dx=CHAIN_KNOB_CENTRE[0],
+        dy=CHAIN_KNOB_CENTRE[1],
+        mirror_x=True,
+    )
+    return x, y, CHAIN_MID_Z
+
+
+def _chain_station_components(model) -> dict[int, object]:
+    """Associate native members with unique loop stations, never Name2 indices.
+
+    A station is the link's pin-0 position on the inherited visual guide.
+    The nearest station must be less than half a pitch away, all stations must
+    occur once, and the native member and plate plane must match that station.
+    This is an occurrence-identity check, not a discrete-chain fit certificate.
+    """
+    assembly = _early_bound(model, "IAssemblyDoc")
+    points = tuple(_chain_station_point(station) for station in range(LINK_COUNT))
+    stations = {}
+    for raw in tuple(assembly.GetComponents(True) or ()):
+        component = _early_bound(raw, "IComponent2")
+        stem, configuration = component_identity(component)
+        if stem not in (CHAIN_LINK_STEM, CONNECTING_LINK_STEM):
+            continue
+        transform = tuple(float(value) for value in component.Transform2.ArrayData)
+        origin = tuple(value * 1000.0 for value in transform[9:12])
+        distances = tuple(math.dist(origin, point) for point in points)
+        station = min(range(LINK_COUNT), key=distances.__getitem__)
+        if distances[station] >= LINK_PITCH / 2.0:
+            raise RuntimeError(f"{component.Name2}: no unambiguous chain loop station")
+        if abs(origin[2] - CHAIN_MID_Z) > 0.5 or abs(transform[8] - 1.0) > 1e-6:
+            raise RuntimeError(f"{component.Name2}: chain member leaves its native plate plane")
+        expected = (
+            (CONNECTING_LINK_STEM, "Default")
+            if station == LINK_COUNT - 1
+            else (
+                CHAIN_LINK_STEM,
+                INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION,
+            )
+        )
+        if (stem, configuration) != expected:
+            raise RuntimeError(
+                f"chain station {station}: {(stem, configuration)!r} != {expected!r}"
+            )
+        if station in stations:
+            raise RuntimeError(f"duplicate chain loop station {station}")
+        stations[station] = component
+    if set(stations) != set(range(LINK_COUNT)):
+        raise RuntimeError(
+            f"chain loop stations missing: {sorted(set(range(LINK_COUNT)) - stations.keys())!r}"
+        )
+    return stations
+
+
+def _chain_reference_names(model) -> dict[str, str]:
+    """Read every saved semantic role and prove its native loop association."""
+    stations = _chain_station_components(model)
+    names = component_reference_names(model, CHAIN_COMPONENT_REFERENCES)
+    for station, component in stations.items():
+        if station == LINK_COUNT - 1:
+            continue
+        role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
+        selector = f"@{role}:{station // 2 + 1}"
+        if names[selector] != str(component.Name2):
+            raise RuntimeError(f"chain reference {selector} does not identify loop station {station}")
+    return names
+
+
+def _assign_chain_references(model) -> dict[str, str]:
+    """Overwrite inherited pattern references only after every member exists."""
+    for station, component in _chain_station_components(model).items():
+        if station != LINK_COUNT - 1:
+            role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
+            component.ComponentReference = f"{role}:{station // 2 + 1}"
+    model.ForceRebuild3(False)
+    return _chain_reference_names(model)
+
+
+async def _place_chain_seed(
+    adapter, part: str, station: int, *, configuration: str = "Default"
+) -> str:
     """Seat ONE chain link at path ``station``, oriented along the forward CHORD
     (pin0->pin1) so both pin axes sit ~on the loop: the two pattern seeds, and
     the two closing links the connected-linkage chain pattern does not fill.
@@ -2071,6 +2160,10 @@ async def _place_chain_seed(adapter, part: str, station: int) -> str:
         [x0, y0, CHAIN_MID_Z],
         [0.0, 0.0, ang],
         rot_z_rows(ang),
+        configuration=configuration,
+        occurrence_basename=(
+            f"{CHAIN_LINK_STEM}--{configuration}" if part == CHAIN_LINK_STEM else None
+        ),
         ground=True,
         label=f"{part} seed @ station {station}",
     )
@@ -2154,8 +2247,12 @@ async def _insert_roller_chain(adapter) -> None:
     sketch_name = "chain-path"
 
     # 2. Two seed links, tangent at the first two stations.
-    inner = await _place_chain_seed(adapter, "pd-vn-chain-inner-link", 0)
-    outer = await _place_chain_seed(adapter, "pd-vn-chain-outer-link", 1)
+    inner = await _place_chain_seed(
+        adapter, CHAIN_LINK_STEM, 0, configuration=INNER_LINK_CONFIGURATION
+    )
+    outer = await _place_chain_seed(
+        adapter, CHAIN_LINK_STEM, 1, configuration=OUTER_LINK_CONFIGURATION
+    )
 
     # 3. Native connected-linkage chain pattern fills the loop.
     pattern = check(
@@ -2205,22 +2302,20 @@ async def _insert_roller_chain(adapter) -> None:
 
     # The cut chain's closing inner link and the connecting link that joins
     # it to the seed inner link, its forward pin on the T24 at pin 0.
-    await _place_chain_seed(adapter, "pd-vn-chain-inner-link", LINK_COUNT - 2)
-    await _place_chain_seed(adapter, "pd-vn-chain-connecting-link", LINK_COUNT - 1)
+    await _place_chain_seed(
+        adapter, CHAIN_LINK_STEM, LINK_COUNT - 2, configuration=INNER_LINK_CONFIGURATION
+    )
+    await _place_chain_seed(adapter, CONNECTING_LINK_STEM, LINK_COUNT - 1)
 
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
     check("blank chain path sketch", await adapter.blank_sketch("chain-path"))
     blank_reference_geometry(adapter, ((plane_name, "PLANE"),))
 
-    # 4. Gates: enough links, on the chain plane, on the loop centreline.
-    links = [n for n in component_names(adapter) if n.startswith(_CHAIN_PARTS)]
-    # Selected component count only. The continuous guide's arc length does
-    # not prove that a real pinned cycle closes or seats on either sprocket.
-    if len(links) != LINK_COUNT:
-        raise RuntimeError(
-            f"chain pattern produced {len(links)} links, expected exactly {LINK_COUNT}"
-        )
+    # Pattern copies may inherit a seed's ComponentReference. Assign all
+    # role-local ordinals from validated loop poses after the final copy exists.
+    _assign_chain_references(adapter.currentModel)
+    links = [str(component.Name2) for component in _chain_station_components(adapter.currentModel).values()]
     worst = 0.0
     for name in links:
         array = component_transform(adapter, name)
@@ -2450,6 +2545,20 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
             raise RuntimeError("actual paired locating cylinder axes are not parallel")
 
 
+async def _place_latch_hook_bracket_screws(adapter) -> None:
+    """Install unchanged stock at the latch seats with the latch's appearance."""
+    for x, y, z in HOOK_BRACKET_SCREW_POS:
+        screw = await place_component(
+            adapter,
+            "sh-vn-fillister-screw-90280a108",
+            [x, y, z],
+            [90.0, 0.0, 0.0],
+            ROT_X_POS90,
+            label=f"latch-hook-bracket-screw (x{x:.1f})",
+        )
+        await apply_component_color(adapter, screw, POLISHED_STEEL)
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -2499,7 +2608,7 @@ async def build(adapter) -> dict[str, str]:
         target = [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
         seed = await place_component(
             adapter,
-            "pd-vn-clamp-screw",
+            "sh-vn-clamp-screw",
             target,
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -2731,7 +2840,7 @@ async def build(adapter) -> dict[str, str]:
     )
     guide_seed = await place_component(
         adapter,
-        "pd-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         guide_seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -2939,15 +3048,7 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="latch-hook (spring latch of the swing cluster)",
     )
-    for x, y, z in HOOK_BRACKET_SCREW_POS:
-        await place_component(
-            adapter,
-            "pd-vn-latch-hook-bracket-screw",
-            [x, y, z],
-            [90.0, 0.0, 0.0],
-            ROT_X_POS90,
-            label=f"latch-hook-bracket-screw (x{x:.1f})",
-        )
+    await _place_latch_hook_bracket_screws(adapter)
     log(
         f"latch hook x {HOOK.BBOX_X[0]:.2f}..{HOOK.BBOX_X[1]:.2f},"
         f" y {HOOK.BBOX_Y[0]:.2f}..{HOOK.BBOX_Y[1]:.2f},"
@@ -3399,7 +3500,11 @@ async def build(adapter) -> dict[str, str]:
         ASM_NAME,
         lambda configuration: create_paper_drive_explode(adapter, configuration),
     )
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    outputs = await save_assembly_and_images(adapter, ASM_NAME)
+    # Saving authors the drawing configurations and rebuilds the pattern.
+    # Re-read native references afterwards; the parent gate additionally reopens.
+    _chain_reference_names(adapter.currentModel)
+    return outputs
 
 
 if __name__ == "__main__":

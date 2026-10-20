@@ -9,7 +9,7 @@ import magnifying_bracket_joint_layout as joint
 import mg_magnifying_bracket_arm_check as arm
 import mg_magnifying_lever_geom as lever
 import spring_force_model
-import mg_vn_lever_wire_geom
+import sh_vn_music_wire_lever_geom
 from build_mg_magnifying_bracket import ARM_Z
 from mg_magnifying_wheel_geom import WIRE_RATIO
 
@@ -34,7 +34,7 @@ def _spring_compliance_along_wire() -> float:
 
 
 def test_a1_pose_and_arm_length():
-    assert joint.BRACKET_ORIGIN[2] == mg_vn_lever_wire_geom.DRUM_END_Z == -173.51
+    assert joint.BRACKET_ORIGIN[2] == sh_vn_music_wire_lever_geom.DRUM_END_Z == -173.51
     assert arm.COLLAR == joint.BRACKET_ORIGIN
     # The arm starts buried in the collar's wall (r4: at Z 4.0 its +Y corner
     # stepped the collar root); only its end, 103.51 from the axis, prints.
@@ -49,9 +49,9 @@ def test_loads_from_their_sources():
     assert arm.WIRE1_TENSION_MAX_N == pytest.approx(10.68, abs=0.01)
     assert arm.LEVER_GROUP_G == pytest.approx(110.2, abs=0.1)
     assert arm.HOOK == (
-        mg_vn_lever_wire_geom.HOOK_X,
-        mg_vn_lever_wire_geom.HOOK_Y,
-        mg_vn_lever_wire_geom.HOOK_Z,
+        sh_vn_music_wire_lever_geom.HOOK_X,
+        sh_vn_music_wire_lever_geom.HOOK_Y,
+        sh_vn_music_wire_lever_geom.HOOK_Z,
     )
 
 

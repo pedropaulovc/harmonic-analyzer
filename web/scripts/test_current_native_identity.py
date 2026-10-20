@@ -11,12 +11,57 @@ from unittest.mock import patch
 from current_native_identity import (
     CURRENT_NATIVE_IDENTITY_MAP_SHA256, SOURCE_MAP_SHA256, TABLE_PATH,
     CurrentNativeIdentity, current_inventory_parts, project_current_anchor,
-    project_current_native_path,
+    project_current_native_path, require_current_native_occurrence_namespace,
 )
 from native_identity_source import CadIdentityMap, MAP_SHA256
 
 ROOT = Path(__file__).resolve().parents[2]
 PREFIX = "ha-harmonic-analyzer/"
+
+# Explicit expected behaviors remain independent of the implementation's table.
+SHARED_CASES = [
+    ("pd-paper-drive", "vn-chain-inner-link", "MHA-VN-002", "pd-vn-chain-inner-link", "MHA-PD-VN-50",
+     "sh-vn-chain-link--InnerLink", "MHA-SH-VN-50"),
+    ("pd-paper-drive", "vn-chain-outer-link", "MHA-VN-003", "pd-vn-chain-outer-link", "MHA-PD-VN-51",
+     "sh-vn-chain-link--OuterLink", "MHA-SH-VN-50"),
+    ("dt-drive-train", "vn-fillister-screw", "MHA-VN-006", "dt-vn-fillister-screw", "MHA-DT-VN-50",
+     "sh-vn-brass-fillister-screw", "MHA-SH-VN-51"),
+    ("fr-frame", "vn-fillister-screw", "MHA-VN-006", "fr-vn-fillister-screw", "MHA-FR-VN-50",
+     "sh-vn-brass-fillister-screw", "MHA-SH-VN-51"),
+    ("pd-paper-drive", "vn-fillister-screw", "MHA-VN-006", "pd-vn-fillister-screw", "MHA-PD-VN-52",
+     "sh-vn-brass-fillister-screw", "MHA-SH-VN-51"),
+    ("dt-drive-train", "vn-foot-screw", "MHA-VN-020", "dt-vn-foot-screw", "MHA-DT-VN-58",
+     "sh-vn-fillister-screw-90280a108__FootScrew", "MHA-SH-VN-52"),
+    ("dt-drive-train", "vn-swing-stop-screw", "MHA-VN-015", "dt-vn-swing-stop-screw", "MHA-DT-VN-53",
+     "sh-vn-fillister-screw-90280a108__SwingStopScrew", "MHA-SH-VN-52"),
+    ("pd-paper-drive", "vn-latch-hook-bracket-screw", "MHA-VN-043", "pd-vn-latch-hook-bracket-screw", "MHA-PD-VN-59",
+     "sh-vn-fillister-screw-90280a108", "MHA-SH-VN-52"),
+    ("mg-magnifier", "vn-clamp-screw", "MHA-VN-021", "mg-vn-clamp-screw", "MHA-MG-VN-51",
+     "sh-vn-clamp-screw", "MHA-SH-VN-53"),
+    ("pd-paper-drive", "vn-clamp-screw", "MHA-VN-021", "pd-vn-clamp-screw", "MHA-PD-VN-53",
+     "sh-vn-clamp-screw", "MHA-SH-VN-53"),
+    ("ch-channel", "vn-arbor-set-screw", "MHA-VN-034", "ch-vn-arbor-set-screw", "MHA-CH-VN-53",
+     "sh-vn-arbor-set-screw", "MHA-SH-VN-54"),
+    ("dt-drive-train", "vn-arbor-set-screw", "MHA-VN-034", "dt-vn-arbor-set-screw", "MHA-DT-VN-64",
+     "sh-vn-arbor-set-screw", "MHA-SH-VN-54"),
+    ("mg-magnifier", "vn-thumb-screw", "MHA-VN-011", "mg-vn-thumb-screw", "MHA-MG-VN-50",
+     "sh-vn-thumb-screw", "MHA-SH-VN-55"),
+    ("ms-measuring-stick", "vn-thumb-screw", "MHA-VN-011", "ms-vn-thumb-screw", "MHA-MS-VN-50",
+     "sh-vn-thumb-screw", "MHA-SH-VN-55"),
+    ("mg-magnifier", "mg-lever-wire", "MHA-MG-009", "mg-vn-lever-wire", "MHA-MG-VN-56",
+     "sh-vn-music-wire--LeverWire", "MHA-SH-VN-56"),
+    ("pn-pen", "pn-pen-wire", "MHA-PN-006", "pn-vn-pen-wire", "MHA-PN-VN-57",
+     "sh-vn-music-wire--PenWire", "MHA-SH-VN-56"),
+    ("ch-rocker-arm-tl-oblique-jig", "ch-rocker-arm-tl-oblique-hold-down-stud", "MHA-CH-006-TL-38",
+     "ch-rocker-arm-tl-vn-oblique-hold-down-stud", "MHA-CH-06-TL-VN-58",
+     "sh-vn-clamping-kit-hardware--HoldDownStud", "MHA-SH-VN-57"),
+    ("ch-rocker-arm-tl-oblique-jig", "ch-rocker-arm-tl-oblique-t-nut", "MHA-CH-006-TL-39",
+     "ch-rocker-arm-tl-vn-oblique-t-nut", "MHA-CH-06-TL-VN-59",
+     "sh-vn-clamping-kit-hardware--TNut", "MHA-SH-VN-57"),
+    ("ch-rocker-arm-tl-oblique-jig", "ch-rocker-arm-tl-oblique-flange-nut", "MHA-CH-006-TL-40",
+     "ch-rocker-arm-tl-vn-oblique-flange-nut", "MHA-CH-06-TL-VN-60",
+     "sh-vn-clamping-kit-hardware--FlangeNut", "MHA-SH-VN-57"),
+]
 
 
 class CurrentNativeIdentityTests(unittest.TestCase):
@@ -33,7 +78,7 @@ for index, filename in enumerate(sys.argv[1:-1]):
     spec.loader.exec_module(module)
     modules[Path(filename).name] = module
 old = "ha-harmonic-analyzer/pd-paper-drive/vn-fillister-screw-1"
-current = "ha-harmonic-analyzer/pd-paper-drive/pd-vn-fillister-screw-1"
+current = "ha-harmonic-analyzer/pd-paper-drive/sh-vn-brass-fillister-screw-1"
 assert modules["compact-source-common.py"].project_current_native_path(old) == current
 assert modules["fit-source.py"].project_current_native_path(old) == current
 root = Path(sys.argv[-1])
@@ -58,6 +103,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             "kind": "current-native-identity-projection",
             "mapSha256": CURRENT_NATIVE_IDENTITY_MAP_SHA256,
             "sourceMapSha256": MAP_SHA256,
+            "occurrenceNamespace": "archive-role-local",
         })
         with self.assertRaises(TypeError):
             projection.provenance["mapSha256"] = "0" * 64
@@ -118,16 +164,31 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             with patch("current_native_identity.CURRENT_NATIVE_IDENTITY_MAP_SHA256", digest):
                 return CurrentNativeIdentity(path)
 
-    def test_duplicate_mapping_target_is_refused_even_for_same_source(self):
-        for same_source in (True, False):
+    def test_duplicate_same_source_context_is_refused(self):
+        for source in ("vn-boss-hook", "vn-chain-inner-link"):
             mapping = json.loads(TABLE_PATH.read_text())
-            row = mapping["machineVendors"][0]
-            duplicate = json.loads(json.dumps(row))
-            if not same_source:
-                duplicate["sourceStem"] += "-other"
-            mapping["machineVendors"].append(duplicate)
-            with self.subTest(same_source=same_source), self.assertRaisesRegex(ValueError, "Colliding"):
+            row = next(row for row in mapping["machineVendors"] if row["sourceStem"] == source)
+            mapping["machineVendors"].append(json.loads(json.dumps(row)))
+            with self.subTest(source=source), self.assertRaisesRegex(ValueError, "Colliding|Duplicate"):
                 self.load_mapping(mapping)
+
+    def test_many_sources_share_declared_target_but_not_conflicting_number_or_configuration(self):
+        mapping = json.loads(TABLE_PATH.read_text())
+        row = next(row for row in mapping["machineVendors"]
+                   if row["sourceStem"] == "vn-chain-inner-link")
+        duplicate = json.loads(json.dumps(row))
+        duplicate["sourceStem"] = "vn-test-shared-inner-link"
+        duplicate["identities"][0]["priorStem"] = "pd-vn-test-shared-inner-link"
+        mapping["machineVendors"].append(duplicate)
+        identity = self.load_mapping(mapping)
+        self.assertEqual(identity.project_path(PREFIX + "pd-paper-drive/vn-test-shared-inner-link-1"),
+                         PREFIX + "pd-paper-drive/sh-vn-chain-link--InnerLink-1")
+        for field, value in (("number", "MHA-SH-VN-99"), ("configuration", "UnknownMember"),
+                             ("role", "OuterLink")):
+            changed = json.loads(json.dumps(mapping))
+            changed["machineVendors"][-1]["identities"][0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.load_mapping(changed)
 
     def test_conflicting_source_number_is_refused(self):
         mapping = json.loads(TABLE_PATH.read_text())
@@ -164,8 +225,15 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             expected = PREFIX + parent + "/test-shared-1"
             self.assertEqual(identity.project_path(PREFIX + parent + "/" + source + "-1"), expected)
             self.assertEqual(identity.project_path(expected), expected)
-        with self.assertRaisesRegex(ValueError, "Ambiguous composed"):
-            identity.source_aliases(set())
+        aliases = identity.source_aliases({
+            "cad/scripts/build_vn_test_first.py", "cad/scripts/build_vn_test_second.py"})
+        self.assertEqual(set(aliases["cad/scripts/build_test_shared.py"]), {
+            "cad/scripts/build_vn_test_first.py", "cad/scripts/build_vn_test_second.py"})
+        self.assertIsInstance(aliases["cad/scripts/build_test_shared.py"], tuple)
+        self.assertEqual(identity.source_aliases({"cad/scripts/build_vn_test_first.py",
+                                                "cad/scripts/build_vn_test_second.py"},
+                                               parent="dt-drive-train")["cad/scripts/build_test_shared.py"],
+                         ("cad/scripts/build_vn_test_first.py",))
 
     def test_multiple_targets_for_one_source_parent_are_ambiguous(self):
         mapping = json.loads(TABLE_PATH.read_text())
@@ -188,7 +256,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                 self.assertIsNone(row[field])
             sealed = "cad/config/parts/" + row["sourceStem"] + ".yaml"
             logical = "cad/config/parts/" + row["stem"] + ".yaml"
-            self.assertEqual(identity.source_aliases({sealed})[logical], sealed)
+            self.assertEqual(identity.source_aliases({sealed})[logical], (sealed,))
 
     def test_retired_tooling_is_reserved_history_not_a_current_projection_or_registry(self):
         cad_map = json.loads((ROOT / "cad/config/current-identity-map.json").read_text(encoding="utf-8"))
@@ -214,16 +282,173 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                     unknown = PREFIX + "ch-channel/" + stem + "-1"
                     self.assertEqual(identity.project_path(unknown), unknown)
 
-    def test_parent_scoped_paths_are_idempotent_and_keep_configuration(self):
-        for parent in ("dt-drive-train", "fr-frame", "pd-paper-drive"):
-            path = PREFIX + parent + "/vn-fillister-screw--T006-7"
-            expected = PREFIX + parent + "/" + parent[:2] + "-vn-fillister-screw--T006-7"
-            self.assertEqual(project_current_native_path(path), expected)
-            self.assertEqual(project_current_native_path(expected), expected)
-        self.assertEqual(project_current_native_path(PREFIX + "mg-magnifier/mg-lever-wire-1"),
-                         PREFIX + "mg-magnifier/mg-vn-lever-wire-1")
+    def test_all_shared_paths_and_numbers_are_exact_and_idempotent(self):
+        identity = CurrentNativeIdentity()
+        self.assertEqual(len(SHARED_CASES), 19)
+        self.assertEqual(len({row[-1] for row in SHARED_CASES}), 8)
+        for parent, source, source_number, prior, prior_number, occurrence, number in SHARED_CASES:
+            with self.subTest(parent=parent, source=source):
+                expected = PREFIX + parent + "/" + occurrence + "-1"
+                for stem in (source, prior, occurrence):
+                    self.assertEqual(identity.project_path(PREFIX + parent + "/" + stem + "-1"), expected)
+                for value, stem in ((source_number, source), (prior_number, prior),
+                                    (number, occurrence), (number, occurrence + "-1")):
+                    self.assertEqual(identity.project_number(value, stem, parent), number)
+        self.assertEqual(project_current_native_path(PREFIX + "mg-magnifier/mg-lever-wire--T006-1@upper"),
+                         PREFIX + "mg-magnifier/sh-vn-music-wire--LeverWire--T006-1@upper")
         self.assertEqual(project_current_native_path(PREFIX + "pd-paper-drive/vn-latch-hook-rivet-1"),
                          PREFIX + "pd-paper-drive/pd-vn-latch-hook-rivet-1")
+
+    def test_js_and_python_execute_the_same_explicit_shared_behaviors_in_subprocesses(self):
+        payload = {"paths": [], "numbers": [], "failures": []}
+        expected_paths, expected_numbers = [], []
+        for parent, source, source_number, prior, prior_number, occurrence, number in SHARED_CASES:
+            current = PREFIX + parent + "/" + occurrence + "-1"
+            for stem in (source, prior, occurrence):
+                payload["paths"].append(PREFIX + parent + "/" + stem + "-1")
+                expected_paths.append(current)
+            for value, stem in ((source_number, source), (prior_number, prior),
+                                (number, occurrence), (number, occurrence + "-1")):
+                payload["numbers"].append([value, stem, parent])
+                expected_numbers.append(number)
+        payload["paths"].append(PREFIX + "mg-magnifier/mg-lever-wire--T006-1@upper")
+        expected_paths.append(PREFIX + "mg-magnifier/sh-vn-music-wire--LeverWire--T006-1@upper")
+        payload["numbers"] += [
+            ["MHA-DT-003-T006", "dt-cone-gear", None],
+            ["MHA-VN-032", "vn-pedestal-hold-down-screw", "ch-channel"],
+        ]
+        expected_numbers += ["MHA-DT-03-T006", None]
+        payload["failures"] = [
+            ["path", [PREFIX + "pn-pen/vn-fillister-screw-1"]],
+            ["path", [PREFIX + "pd-paper-drive/vn-unknown-1"]],
+            ["path", [PREFIX + "pd-paper-drive/../vn-fillister-screw-1"]],
+            ["number", ["MHA-SH-VN-99", "vn-chain-inner-link", "pd-paper-drive"]],
+            ["number", ["MHA-DT-003-T06", "dt-cone-gear", None]],
+            ["number", ["MHA-VN-006", "vn-fillister-screw", None]],
+            ["number", ["MHA-SH-VN-52", "sh-vn-fillister-screw-90280a108", "dt-drive-train"]],
+            ["number", ["MHA-SH-VN-50", "sh-vn-chain-link", "pd-paper-drive"]],
+            ["number", ["MHA-SH-VN-50", "sh-vn-chain-link--UnknownMember", "pd-paper-drive"]],
+            ["number", ["MHA-SH-VN-52", "sh-vn-fillister-screw-90280a108__WrongRole", "dt-drive-train"]],
+            ["path", [PREFIX + "pd-paper-drive/sh-vn-chain-link--UnknownMember-1"]],
+            ["path", [PREFIX + "dt-drive-train/sh-vn-fillister-screw-90280a108__WrongRole-1"]],
+            ["path", [PREFIX + "pd-paper-drive/sh-vn-chain-link--innerlink-1"]],
+            ["number", ["MHA-SH-VN-50", "sh-vn-chain-link--innerlink", "pd-paper-drive"]],
+            ["guard", ["rebuilt-native"]],
+            ["guard", [""]],
+            ["guard", [None]],
+            ["path", [PREFIX + "dt-drive-train/vn-foot-screw-1", "rebuilt-native"]],
+            ["path", ["Camera", "rebuilt-native"]],
+        ]
+        python_code = """
+import json
+from pathlib import Path
+import sys
+sys.path.insert(0, sys.argv[1])
+from current_native_identity import CurrentNativeIdentity, require_current_native_occurrence_namespace
+identity = CurrentNativeIdentity()
+payload = json.load(sys.stdin)
+def path(value, namespace="archive-role-local"):
+    return identity.project_path(value, occurrence_namespace=namespace)
+def refuses(kind, args):
+    try:
+        {"path": path, "number": identity.project_number,
+         "guard": require_current_native_occurrence_namespace}[kind](*args)
+    except ValueError:
+        return True
+    return False
+print(json.dumps({
+    "paths": [path(value) for value in payload["paths"]],
+    "numbers": [identity.project_number(*args) for args in payload["numbers"]],
+    "failures": [refuses(kind, args) for kind, args in payload["failures"]],
+}))
+"""
+        javascript_code = """
+import { readFileSync } from 'node:fs'
+const projection = await import(process.argv[1])
+const payload = JSON.parse(readFileSync(0, 'utf8'))
+const calls = {
+  path: projection.projectCurrentNativePath,
+  number: projection.projectCurrentNativeNumber,
+  guard: projection.requireCurrentNativeOccurrenceNamespace,
+}
+const refuses = ([kind, args]) => {
+  try { calls[kind](...args) } catch { return true }
+  return false
+}
+console.log(JSON.stringify({
+  paths: payload.paths.map(value => calls.path(value)),
+  numbers: payload.numbers.map(args => calls.number(...args)),
+  failures: payload.failures.map(refuses),
+}))
+"""
+        scripts = Path(__file__).resolve().parent
+        expected = {"paths": expected_paths, "numbers": expected_numbers,
+                    "failures": [True] * len(payload["failures"])}
+        observed = []
+        with tempfile.TemporaryDirectory() as directory:
+            for language, command in (
+                ("Python", [sys.executable, "-I", "-c", python_code, str(scripts)]),
+                ("JavaScript", ["node", "--input-type=module", "-e", javascript_code,
+                                (ROOT / "web/current-native-identity.mjs").as_uri()]),
+            ):
+                with self.subTest(language=language):
+                    result = subprocess.run(command, input=json.dumps(payload), cwd=directory,
+                                            capture_output=True, text=True, check=False, timeout=60)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    actual = json.loads(result.stdout)
+                    self.assertEqual(actual, expected)
+                    observed.append(actual)
+        self.assertEqual(observed[0], observed[1])
+
+    def test_logical_member_selectors_reject_lowercase_physical_filename_spelling(self):
+        identity = CurrentNativeIdentity()
+        exact = PREFIX + "pd-paper-drive/sh-vn-chain-link--InnerLink-1"
+        self.assertEqual(identity.project_path(exact), exact)
+        with self.assertRaisesRegex(ValueError, "No unique immediate parent"):
+            identity.project_path(PREFIX + "pd-paper-drive/sh-vn-chain-link--innerlink-1")
+        with self.assertRaisesRegex(ValueError, "No unique immediate parent"):
+            identity.project_number("MHA-SH-VN-50", "sh-vn-chain-link--innerlink", "pd-paper-drive")
+
+    def test_archive_namespace_guard_and_path_helper_reject_rebuilt_native(self):
+        identity = CurrentNativeIdentity()
+        require_current_native_occurrence_namespace("archive-role-local")
+        old = PREFIX + "dt-drive-train/vn-foot-screw-1"
+        self.assertEqual(identity.project_path(old, occurrence_namespace="archive-role-local"),
+                         PREFIX + "dt-drive-train/sh-vn-fillister-screw-90280a108__FootScrew-1")
+        for namespace in ("rebuilt-native", "", None):
+            with self.subTest(namespace=namespace):
+                with self.assertRaisesRegex(ValueError, "namespace"):
+                    require_current_native_occurrence_namespace(namespace)
+                for path in (old, "Camera"):
+                    with self.assertRaisesRegex(ValueError, "namespace"):
+                        identity.project_path(path, occurrence_namespace=namespace)
+                    with self.assertRaisesRegex(ValueError, "namespace"):
+                        project_current_native_path(path, occurrence_namespace=namespace)
+        with self.assertRaisesRegex(ValueError, "namespace"):
+            current_inventory_parts({"occurrenceNamespace": "rebuilt-native", "inventory": []})
+
+    def test_all_457_archive_occurrences_keep_exact_measurements_and_source_metadata(self):
+        inventory = json.loads((ROOT / "web/content/v39-source/native-inventory.json").read_text())
+        before = json.dumps(inventory, separators=(",", ":"))
+        identity = CurrentNativeIdentity()
+        projected = [identity.project_path(row["path"]) for row in inventory["inventory"]]
+        self.assertEqual(len(projected), 457)
+        self.assertEqual(len(set(projected)), 457)
+        indexed = current_inventory_parts(inventory)
+        for row, current in zip(inventory["inventory"], projected):
+            self.assertEqual(current.rsplit("/", 1)[0], row["path"].rsplit("/", 1)[0])
+            self.assertEqual(identity.project_path(current), current)
+            self.assertIs(indexed[current], row)
+            self.assertIs(indexed[current]["world"], row["world"])
+            self.assertEqual(indexed[current]["sourcePath"], row["sourcePath"])
+        for old, current in (
+            ("dt-drive-train/vn-foot-screw-1", "dt-drive-train/sh-vn-fillister-screw-90280a108__FootScrew-1"),
+            ("dt-drive-train/vn-swing-stop-screw-1", "dt-drive-train/sh-vn-fillister-screw-90280a108__SwingStopScrew-1"),
+            ("pd-paper-drive/vn-chain-inner-link-1", "pd-paper-drive/sh-vn-chain-link--InnerLink-1"),
+            ("pd-paper-drive/vn-chain-outer-link-1", "pd-paper-drive/sh-vn-chain-link--OuterLink-1"),
+        ):
+            self.assertIs(indexed[PREFIX + old], indexed[PREFIX + current])
+        self.assertEqual(json.dumps(inventory, separators=(",", ":")), before)
 
     def test_wrong_parent_unknown_vendor_and_traversal_refuse(self):
         for path in (PREFIX + "pn-pen/vn-fillister-screw-1",
@@ -234,7 +459,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
 
     def test_inventory_index_preserves_numeric_measurements_and_hashes(self):
         old = PREFIX + "pd-paper-drive/vn-fillister-screw-1"
-        current = PREFIX + "pd-paper-drive/pd-vn-fillister-screw-1"
+        current = PREFIX + "pd-paper-drive/sh-vn-brass-fillister-screw-1"
         matrix = [float(value) for value in range(16)]
         row = {"path": old, "world": matrix}
         inventory = {"sha256": "a" * 64, "inventory": [row]}
@@ -254,7 +479,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
 
     def test_duplicate_inventory_entries_are_refused_even_when_equal(self):
         old = PREFIX + "pd-paper-drive/vn-fillister-screw-1"
-        current = PREFIX + "pd-paper-drive/pd-vn-fillister-screw-1"
+        current = PREFIX + "pd-paper-drive/sh-vn-brass-fillister-screw-1"
         row = {"path": old, "world": list(range(16))}
         for duplicate in (row, dict(row), {**row, "path": current}):
             with self.subTest(path=duplicate["path"]), self.assertRaisesRegex(ValueError, "Colliding"):
@@ -263,7 +488,7 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         self.assertIs(indexed[old], row)
         self.assertIs(indexed[current], row)
 
-    def test_current_logical_sources_compose_to_one_exact_archive_file(self):
+    def test_single_source_shared_logical_names_compose_to_exact_archive_bytes(self):
         identity = CadIdentityMap(ROOT)
         for template in ("scripts/build_{}.py", "config/parts/{}.yaml"):
             sealed_stem = "vn_fillister_screw" if template.endswith(".py") else "vn-fillister-screw"
@@ -274,18 +499,17 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
                 cad.mkdir()
                 with self.assertRaisesRegex(ValueError, "Missing archived CAD source"):
                     identity.source_file(cad, template.format(
-                        "pd_vn_fillister_screw" if template.endswith(".py") else "pd-vn-fillister-screw"))
+                        "sh_vn_brass_fillister_screw" if template.endswith(".py") else "sh-vn-brass-fillister-screw"))
                 archived = cad.parent / original
                 archived.parent.mkdir(parents=True, exist_ok=True)
                 raw = b"# exact archived source\r\nvalue = 1.250\r\n"
                 archived.write_bytes(raw)
                 digest = hashlib.sha256(raw).hexdigest()
-                for parent in ("dt", "fr", "pd"):
-                    stem = parent + ("_vn_fillister_screw" if template.endswith(".py") else "-vn-fillister-screw")
-                    selected = identity.source_file(cad, template.format(stem))
+                logical = template.format("sh_vn_brass_fillister_screw" if template.endswith(".py") else "sh-vn-brass-fillister-screw")
+                for parent in (None, "dt-drive-train", "fr-frame", "pd-paper-drive"):
+                    selected = identity.source_file(cad, logical, parent=parent)
                     self.assertEqual(selected, archived)
                     self.assertEqual(hashlib.sha256(selected.read_bytes()).hexdigest(), digest)
-                logical = template.format("pd_vn_fillister_screw" if template.endswith(".py") else "pd-vn-fillister-screw")
                 duplicate = cad / logical
                 duplicate.parent.mkdir(parents=True, exist_ok=True)
                 duplicate.write_bytes(raw)

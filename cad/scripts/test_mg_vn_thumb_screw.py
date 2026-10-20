@@ -9,9 +9,9 @@ from pathlib import Path
 import pytest
 
 import _config
-import build_mg_vn_thumb_screw as mg_part
+import build_sh_vn_thumb_screw as mg_part
 import build_ms_vn_thumb_screw as ms_part
-from _mcmaster_91882a221 import HEAD_STACK_LEN
+from sh_vn_thumb_screw_spec import HEAD_STACK_LEN
 from _simplified_part import save_simplified_part
 from _stock_fastener import RigidTransform, StockComponent
 from diagnostics.diag_build_91882A221 import build_91882A221

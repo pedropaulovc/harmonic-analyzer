@@ -1,9 +1,13 @@
 """Refusal boundaries for exact-source CAD/native identity projection."""
 import copy
+import sys
 import types
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+
+from current_native_identity import CurrentNativeIdentity
 
 from native_identity_source import (
     CadIdentityMap,
@@ -53,6 +57,153 @@ class NativeIdentitySourceTests(unittest.TestCase):
             (cad / logical).write_text("WIRE_DIA = 9.0\n")
             with self.assertRaisesRegex(ValueError, "Ambiguous archived CAD source"):
                 self.identity_map.source_file(cad, logical)
+
+    def test_shared_source_aliases_are_candidate_tuples_not_a_global_ambiguity_error(self):
+        projection = CurrentNativeIdentity()
+        sealed = set(self.identity_map.original_paths)
+        aliases = projection.source_aliases(sealed)
+        logical = "cad/scripts/sh_vn_music_wire_geom.py"
+        self.assertEqual(aliases[logical], (
+            "cad/scripts/mg_lever_wire_geom.py", "cad/scripts/pn_pen_wire_geom.py"))
+        self.assertEqual(aliases["cad/scripts/build_sh_vn_music_wire.py"], (
+            "cad/scripts/build_mg_lever_wire.py", "cad/scripts/build_pn_pen_wire.py"))
+        self.assertEqual(aliases["cad/config/parts/sh-vn-music-wire.yaml"], (
+            "cad/config/parts/mg-lever-wire.yaml", "cad/config/parts/pn-pen-wire.yaml"))
+        self.assertEqual(projection.source_aliases(sealed, parent="mg-magnifier")[logical],
+                         ("cad/scripts/mg_lever_wire_geom.py",))
+        self.assertEqual(projection.source_aliases(
+            sealed, configuration="PenWire", role="PenWire")[logical],
+            ("cad/scripts/pn_pen_wire_geom.py",))
+        self.assertEqual(projection.source_aliases(
+            sealed, configuration="LeverWire", role="PenWire")[logical], ())
+        self.assertEqual(projection.source_aliases(
+            sealed, parent="mg-magnifier", configuration="PenWire", role="PenWire")[logical], ())
+
+    def test_shared_wire_selectors_resolve_exact_original_bytes_without_using_file_presence_as_identity(self):
+        logical = "scripts/sh_vn_music_wire_geom.py"
+        sources = {
+            "cad/scripts/mg_lever_wire_geom.py": b'MARKER = "lever"\r\nVALUE = 1.250\r\n',
+            "cad/scripts/pn_pen_wire_geom.py": b'MARKER = "pen"\r\nVALUE = 2.500\r\n',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            cad = Path(directory) / "cad"
+            originals = {}
+            for sealed, raw in sources.items():
+                original = cad.parent / self.identity_map.original_paths[sealed]
+                original.parent.mkdir(parents=True, exist_ok=True)
+                original.write_bytes(raw)
+                originals[sealed] = original
+            for sealed, selectors in (
+                ("cad/scripts/mg_lever_wire_geom.py", {"parent": "mg-magnifier"}),
+                ("cad/scripts/mg_lever_wire_geom.py", {"role": "LeverWire"}),
+                ("cad/scripts/mg_lever_wire_geom.py", {"configuration": "LeverWire", "role": "LeverWire"}),
+                ("cad/scripts/pn_pen_wire_geom.py", {"parent": "pn-pen", "configuration": "PenWire", "role": "PenWire"}),
+            ):
+                with self.subTest(selectors=selectors):
+                    selected = self.identity_map.source_file(cad, logical, **selectors)
+                    self.assertEqual(selected, originals[sealed])
+                    self.assertEqual(selected.read_bytes(), sources[sealed])
+            # An unrelated exact source remains usable although the shared lookup is ambiguous.
+            unrelated = self.identity_map.source_file(cad, "scripts/mg_lever_wire_geom.py")
+            self.assertEqual(unrelated.read_bytes(), sources["cad/scripts/mg_lever_wire_geom.py"])
+            with self.assertRaisesRegex(ValueError, "Ambiguous archived CAD source identity"):
+                self.identity_map.source_file(cad, logical)
+            originals["cad/scripts/pn_pen_wire_geom.py"].unlink()
+            with self.assertRaisesRegex(ValueError, "Ambiguous archived CAD source identity"):
+                self.identity_map.source_file(cad, logical)
+            self.assertEqual(self.identity_map.source_file(cad, logical, parent="mg-magnifier").read_bytes(),
+                             sources["cad/scripts/mg_lever_wire_geom.py"])
+            with self.assertRaisesRegex(ValueError, "Missing archived CAD source"):
+                self.identity_map.source_file(cad, logical, parent="pn-pen")
+            (cad / logical).write_bytes(b'WRONG = "canonical fallback must never select a member"\r\n')
+            for selectors in (
+                {"configuration": "LeverWire", "role": "PenWire"},
+                {"parent": "mg-magnifier", "configuration": "PenWire", "role": "PenWire"},
+            ):
+                with self.subTest(selectors=selectors), self.assertRaisesRegex(
+                        ValueError, "Missing archived CAD source identity"):
+                    self.identity_map.source_file(cad, logical, **selectors)
+
+    def test_shared_import_and_registry_selectors_keep_the_exact_archived_member(self):
+        members = (
+            ("mg-magnifier", "LeverWire", "mg_lever_wire_geom", "mg-lever-wire", "lever"),
+            ("pn-pen", "PenWire", "pn_pen_wire_geom", "pn-pen-wire", "pen"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            cad = Path(directory) / "cad"
+            originals = {}
+            for parent, configuration, module, registry, marker in members:
+                for sealed, raw in (
+                    (f"cad/scripts/{module}.py", f'MARKER = "{marker}"\r\n'.encode()),
+                    (f"cad/config/parts/{registry}.yaml", f"member: {marker}\r\n".encode()),
+                ):
+                    original = cad.parent / self.identity_map.original_paths[sealed]
+                    original.parent.mkdir(parents=True, exist_ok=True)
+                    original.write_bytes(raw)
+                    originals[sealed] = (original, raw)
+            with patch.object(sys, "path", [str(cad / "scripts"), *sys.path]), patch.dict(sys.modules):
+                for parent, configuration, module, registry, marker in members:
+                    original, raw = originals[f"cad/scripts/{module}.py"]
+                    sys.modules.pop(original.stem, None)
+                    selectors = {"parent": parent, "configuration": configuration, "role": configuration}
+                    imported = self.identity_map.import_module(cad, "sh_vn_music_wire_geom", **selectors)
+                    self.assertEqual(imported.MARKER, marker)
+                    self.assertEqual(Path(imported.__file__).resolve(), original.resolve())
+                    self.assertEqual(original.read_bytes(), raw)
+                    original_registry, registry_raw = originals[f"cad/config/parts/{registry}.yaml"]
+                    self.assertEqual(self.identity_map.registry_name(cad, "sh-vn-music-wire", **selectors),
+                                     original_registry.stem)
+                    self.assertEqual(original_registry.read_bytes(), registry_raw)
+                for operation, name in ((self.identity_map.import_module, "sh_vn_music_wire_geom"),
+                                        (self.identity_map.registry_name, "sh-vn-music-wire")):
+                    with self.assertRaisesRegex(ValueError, "Ambiguous archived CAD source identity"):
+                        operation(cad, name)
+                    with self.assertRaisesRegex(ValueError, "Missing archived CAD source identity"):
+                        operation(cad, name, configuration="LeverWire", role="PenWire")
+
+    def test_explicit_shared_pure_member_sources_preserve_historic_names_and_bytes(self):
+        members = (
+            ("sh_vn_music_wire_lever_geom", "mg_lever_wire_geom", "LeverWire", "mg-magnifier"),
+            ("sh_vn_music_wire_lever_spec", "mg_lever_wire_spec", "LeverWire", "mg-magnifier"),
+            ("sh_vn_music_wire_pen_geom", "pn_pen_wire_geom", "PenWire", "pn-pen"),
+            ("sh_vn_music_wire_pen_spec", "pn_pen_wire_spec", "PenWire", "pn-pen"),
+            ("sh_vn_clamping_kit_hold_down_stud_spec", "ch_rocker_arm_tl_oblique_hold_down_stud_spec",
+             "HoldDownStud", "ch-rocker-arm-tl-oblique-jig"),
+            ("sh_vn_clamping_kit_t_nut_spec", "ch_rocker_arm_tl_oblique_t_nut_spec",
+             "TNut", "ch-rocker-arm-tl-oblique-jig"),
+            ("sh_vn_clamping_kit_flange_nut_spec", "ch_rocker_arm_tl_oblique_flange_nut_spec",
+             "FlangeNut", "ch-rocker-arm-tl-oblique-jig"),
+        )
+        projection = CurrentNativeIdentity()
+        sealed_paths = set(self.identity_map.original_paths)
+        aliases = projection.source_aliases(sealed_paths)
+        with tempfile.TemporaryDirectory() as directory:
+            cad = Path(directory) / "cad"
+            for logical, source, configuration, parent in members:
+                sealed = f"cad/scripts/{source}.py"
+                with self.subTest(member=logical):
+                    self.assertEqual(aliases[f"cad/scripts/{logical}.py"], (sealed,))
+                    original = cad.parent / self.identity_map.original_paths.get(sealed, sealed)
+                    original.parent.mkdir(parents=True, exist_ok=True)
+                    raw = f'# exact historic member {source}\r\nVALUE = 1.250\r\n'.encode()
+                    original.write_bytes(raw)
+                    selectors = {"parent": parent, "configuration": configuration, "role": configuration}
+                    selected = self.identity_map.source_file(cad, f"scripts/{logical}.py", **selectors)
+                    self.assertEqual(selected, original)
+                    self.assertEqual(selected.read_bytes(), raw)
+                    self.assertEqual(self.identity_map.source_file(cad, f"scripts/{logical}.py"), original)
+                    self.assertEqual(projection.source_aliases(sealed_paths, **selectors)[
+                        f"cad/scripts/{logical}.py"], (sealed,))
+                    wrong = {**selectors, "role": "WrongMember"}
+                    self.assertEqual(projection.source_aliases(sealed_paths, **wrong)[
+                        f"cad/scripts/{logical}.py"], ())
+                    with self.assertRaisesRegex(ValueError, "Missing archived CAD source identity"):
+                        self.identity_map.source_file(cad, f"scripts/{logical}.py", **wrong)
+                    wrong_parent = {**selectors, "parent": "fr-frame"}
+                    self.assertEqual(projection.source_aliases(sealed_paths, **wrong_parent)[
+                        f"cad/scripts/{logical}.py"], ())
+                    with self.assertRaisesRegex(ValueError, "Missing archived CAD source identity"):
+                        self.identity_map.source_file(cad, f"scripts/{logical}.py", **wrong_parent)
 
     def projection_fixture(self):
         raw = {

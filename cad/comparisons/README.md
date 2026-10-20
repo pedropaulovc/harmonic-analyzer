@@ -30,29 +30,66 @@ submodule).
 
 ## Identity boundaries
 
-Current export and gallery inputs use canonical subsystem-prefixed stems.
-Historical released bundles remain unchanged: `release_diff.py` and
-`render_diff.py` pair their actual member names through the sealed schema-2
+Current export and gallery inputs use canonical subsystem-prefixed stems;
+repeated supplier-qualified SKUs use the eight `sh-vn-*` shared identities.
+Historical released bundles remain unchanged. `release_diff.py`,
+`render_diff.py`, drawing overlays and pose source resolution compose the
+additive schema-1 [`current-identity-map.json`](../config/current-identity-map.json)
+with the sealed schema-2
 [`identity-migration-map.json`](../config/identity-migration-map.json).
-Only the part stem is translated. For every non-default configuration the
-exporter appends `--` plus the sanitized configuration name; the entire suffix
-from the first `--` is retained, not just three-digit tooth counts. Thus
-`transgear-removable--t12` pairs with `pd-transgear-removable--t12`,
-`crank-handle-ferrule--installed` with
+The current map retains each prior stem/Number, semantic role and exact member
+configuration. Repeated shared target stems/Numbers are legitimate convergence,
+not duplicate physical files. Conflicting identities and case-insensitive
+duplicate archive members remain errors.
+
+The chain, wire and clamping-kit members stay distinct: `InnerLink`/`OuterLink`,
+`LeverWire`/`PenWire`, and `HoldDownStud`/`TNut`/`FlangeNut`. Exporter mesh keys
+lowercase full configuration names, e.g. historical `pd-vn-chain-outer-link`
+pairs with `sh-vn-chain-link--outerlink`, not with the bare shared file. A bare
+neutral artifact represents **only** its declared active member: `InnerLink`,
+`LeverWire` or `HoldDownStud`, respectively. There is no heterogeneous `Default`
+alias. Ordinary shared screws retain `Default` and bare geometry names, without
+invented role configurations. Every distinct member must ship its STEP and PNG:
+the first member uses the bare export, while nonfirst STEP/PNG exports use the
+exact configuration spelling (for example `--OuterLink`); STL mesh keys remain
+lowercase. Geometry lookup is case-insensitive but never first-match ambiguous.
+
+For unrelated configurations the entire suffix from the first `--` remains
+intact. Thus `transgear-removable--t12` pairs with
+`pd-transgear-removable--t12`, `crank-handle-ferrule--installed` with
 `dt-crank-handle-ferrule--installed`, and `cone-gear--t006` with
 `dt-cone-gear--t006`. Generated `-stretchN` qualifiers are also retained, for
 example `channel-spring-installed-stretch07` becomes
 `ch-vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
-precedence over that generated suffix rule. Geometry verdicts and red highlights
+precedence over that generated suffix rule. Geometry verdicts and highlights
 remain per exact qualified mesh. The changed-part summary groups only trailing
-`--t<digits>` and `-stretch<digits>` variants by base stem; other configuration
-qualifiers, such as `--installed`, remain distinct summary entries.
-The map is an archive-input boundary, not an old-name alias for current files
-or commands.
-Scene and GLB readers resolve actual historical/current bundle members.
-With an explicit release tag, `pose_to_meshprobe.py` reuses an extracted
-mapped cache member without contacting GitHub. Ambiguous old/current copies
-are rejected rather than silently selected.
+`--t<digits>` and `-stretch<digits>` variants by base stem.
+
+Many-to-one comparisons retain **all** historical candidates, including old
+parent-specific clones and archive spellings. Release geometry output compares
+each actual source; render summaries preserve every source deviation in
+`candidate_mesh_deviations_mm`, and any changed candidate highlights the target.
+`renamed_meshes` and drawing-overlay `renamed_drawings` contain lists of actual
+prior names. Drawing overlays compare every prior PDF with the shared reference
+drawing, which depicts all its member configurations, and source-qualify image
+paths when multiple historical PDFs converge. One equal candidate cannot hide a
+different clone.
+
+The release CLI inventories STEP **and** STL. A configured STL with a missing
+exact STEP still receives mesh comparison, while its exact STEP boolean is
+explicitly skipped; a bare STEP is never substituted for another member. This
+honest diagnostic is not permission to omit required member STEP/PNG exports.
+Single-file pose/GLB/boxes/PDF resolution rejects multiple candidate sources
+rather than selecting a clone. With an explicit release tag it reuses a cached
+complete bundle without GitHub access and checks that bundle's full inventory
+even if one candidate was previously extracted.
+
+These maps are archive-input boundaries, not current-file or command aliases.
+Geometry selectors are artifact mesh keys, not occurrence paths. Projected
+`archive-role-local` ordinals (including `--Member-N` and `__FootScrew-N`) are
+not native `Component2.Name2` ordinals and are rejected here, never silently
+joined to raw native paths. Native linkage requires independently checked
+file/configuration plus a semantic `ComponentReference` such as `Role:1`.
 
 Historical curation catalogs likewise remain immutable provenance.
 `seed_manifest.py` normalizes catalog components only when their

@@ -29,7 +29,6 @@ import argparse
 from collections import Counter
 from dataclasses import dataclass
 import math
-from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Callable, Iterable, Sequence
@@ -45,6 +44,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _chain as chain
 from _check import check
 from _com import _com_invoke, _early_bound
+from _component_references import component_identity
+from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
@@ -77,7 +78,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import insert_bom_table
+from _drawing_tables import bom_row_identities, insert_bom_table
 from _drawing_view_configuration import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     ViewRole,
@@ -473,18 +474,18 @@ BOM_PART_NUMBERS = {
     "pd-support-bar": _config.parts("pd-support-bar")["number"],
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front")["number"],
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back")["number"],
-    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["number"],
+    "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["number"],
     "pd-platen": _config.parts("pd-platen")["number"],
     "pd-platen-rack": _config.parts("pd-platen-rack")["number"],
     "pd-platen-guide": _config.parts("pd-platen-guide")["number"],
     "pd-guide-lock": _config.parts("pd-guide-lock")["number"],
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
-    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["number"],
+    "sh-vn-brass-fillister-screw": _config.parts("sh-vn-brass-fillister-screw")["number"],
     "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["number"],
     "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["number"],
-    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["number"],
-    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["number"],
+    "sh-vn-chain-link--InnerLink": _config.parts("sh-vn-chain-link")["number"],
+    "sh-vn-chain-link--OuterLink": _config.parts("sh-vn-chain-link")["number"],
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")["number"],
     "pd-transgear-removable": _config.parts("pd-transgear-removable")["number"],
     "pd-transgear-arm": _config.parts("pd-transgear-arm")["number"],
@@ -498,7 +499,7 @@ BOM_PART_NUMBERS = {
     "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["number"],
     "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")["number"],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["number"],
-    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")["number"],
+    "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
     "pd-transgear-pin": _config.parts("pd-transgear-pin")["number"],
     "pd-transgear-rear-bushing": _config.parts("pd-transgear-rear-bushing")["number"],
@@ -516,14 +517,27 @@ BOM_PART_NUMBERS = {
     "pd-transgear-knob-cup": _config.parts("pd-transgear-knob-cup")["number"],
     "pd-vn-transgear-knob-cup-pin": _config.parts("pd-vn-transgear-knob-cup-pin")["number"],
 }
+# Logical rows retain member identity even though both print one purchase Number.
+BOM_COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    key: (key, None) for key in BOM_PART_NUMBERS
+}
+BOM_COMPONENT_IDENTITIES.update(
+    {
+        "sh-vn-chain-link--InnerLink": ("sh-vn-chain-link", INNER_LINK_CONFIGURATION),
+        "sh-vn-chain-link--OuterLink": ("sh-vn-chain-link", OUTER_LINK_CONFIGURATION),
+        "sh-vn-brass-fillister-screw": ("sh-vn-brass-fillister-screw", "Default"),
+        "sh-vn-clamp-screw": ("sh-vn-clamp-screw", "Default"),
+        "sh-vn-fillister-screw-90280a108": ("sh-vn-fillister-screw-90280a108", "Default"),
+    }
+)
 # A purchased part's registry SKU, printed in its description.
 _SKU = {
-    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["supplier_skus"][0],
-    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["supplier_skus"][0],
+    "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw")["supplier_skus"][0],
+    "sh-vn-brass-fillister-screw": _config.parts("sh-vn-brass-fillister-screw")["supplier_skus"][0],
     "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["supplier_skus"][0],
     "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["supplier_skus"][0],
-    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["supplier_skus"][0],
-    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["supplier_skus"][0],
+    "sh-vn-chain-link--InnerLink": _config.parts("sh-vn-chain-link")["supplier_skus"][0],
+    "sh-vn-chain-link--OuterLink": _config.parts("sh-vn-chain-link")["supplier_skus"][0],
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")[
         "supplier_skus"
     ][0],
@@ -541,7 +555,7 @@ _SKU = {
         "supplier_skus"
     ][0],
     "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["supplier_skus"][0],
-    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")[
+    "sh-vn-fillister-screw-90280a108": _config.parts("sh-vn-fillister-screw-90280a108")[
         "supplier_skus"
     ][0],
     "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
@@ -560,7 +574,7 @@ BOM_DESCRIPTIONS = {
     "pd-support-bar": "PAPER-DRIVE SUPPORT BAR",
     "sh-column-clamp-front": "COLUMN CLAMP, FRONT",
     "sh-column-clamp-back": "COLUMN CLAMP, BACK",
-    "pd-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-clamp-screw']}",
+    "sh-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-clamp-screw']}",
     "pd-platen": "PLATEN",
     "pd-platen-rack": (
         f"PLATEN RACK + BACKER, {feed_pinion.DIAMETRAL_PITCH:g}DP "
@@ -570,13 +584,13 @@ BOM_DESCRIPTIONS = {
     "pd-guide-lock": "PLATEN GUIDE LOCK",
     "pd-platen-clip": "PLATEN PAPER CLIP",
     "pd-platen-paper": "PLATEN PAPER",
-    "pd-vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['pd-vn-fillister-screw']}",
+    "sh-vn-brass-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['sh-vn-brass-fillister-screw']}",
     "pd-vn-platen-clip-screw": (
         f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-platen-clip-screw']}"
     ),
     "pd-vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-guide-lock-screw']}",
-    "pd-vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['pd-vn-chain-inner-link']}",
-    "pd-vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['pd-vn-chain-outer-link']}",
+    "sh-vn-chain-link--InnerLink": f"ANSI #25 INNER LINK, MCMASTER {_SKU['sh-vn-chain-link--InnerLink']}",
+    "sh-vn-chain-link--OuterLink": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['sh-vn-chain-link--OuterLink']}",
     "pd-vn-chain-connecting-link": (
         f"ANSI #25 CONN. LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}"
     ),
@@ -601,8 +615,8 @@ BOM_DESCRIPTIONS = {
     ),
     "pd-vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['pd-vn-transgear-pivot-shim']}",
     "pd-vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['pd-vn-transgear-latch-pin']}",
-    "pd-vn-latch-hook-bracket-screw": (
-        f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-latch-hook-bracket-screw']}"
+    "sh-vn-fillister-screw-90280a108": (
+        f"FILLISTER SCREW, MCMASTER {_SKU['sh-vn-fillister-screw-90280a108']}"
     ),
     "pd-latch-hook": "LATCH HOOK",
     "pd-transgear-pin": "TRANSGEAR PIN",
@@ -648,9 +662,6 @@ _LONG = sorted(
 )
 if _LONG:
     raise AssertionError(f"paper-drive BOM descriptions wrap: {_LONG}")
-BOM_NORMALIZED_ALIASES = {
-    number.casefold(): stem for stem, number in BOM_PART_NUMBERS.items()
-}
 
 # The transgear instances the contract inserts (instance ``<stem>-<n>``), each
 # count read from the geometry that holds its holes: sheet 2 shows and
@@ -666,7 +677,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-pivot-spring": spring.COUNT,
     "pd-vn-transgear-pivot-shim": 1,
     "pd-vn-transgear-latch-pin": 1,
-    "pd-vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
+    "sh-vn-fillister-screw-90280a108": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
@@ -689,8 +700,8 @@ TRANSGEAR_QUANTITIES = {
 # inner link at each end, and the connecting link closes the loop as its last
 # outer link.
 CHAIN_QUANTITIES = {
-    "pd-vn-chain-inner-link": chain.LINK_COUNT // 2,
-    "pd-vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+    "sh-vn-chain-link--InnerLink": chain.LINK_COUNT // 2,
+    "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
@@ -970,8 +981,8 @@ def _uncross_ring(
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
 ASSEMBLED_BALLOON_ANCHORS = {
-    "pd-vn-chain-inner-link": BalloonAnchor(),
-    "pd-vn-chain-outer-link": BalloonAnchor(),
+    "sh-vn-chain-link--InnerLink": BalloonAnchor(instance="@InnerLink:1"),
+    "sh-vn-chain-link--OuterLink": BalloonAnchor(instance="@OuterLink:1"),
     "pd-vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
@@ -1205,7 +1216,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "bar-clamped": (
             f"CLAMP THE {_N['pd-support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
-            f"ARC, WITH THE {_N['pd-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
+            f"ARC, WITH THE {_N['sh-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
             f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
             # Rule 19 fit-up for the slotted west pair (owner ruling
             # 2026-10-15, #1471 option A): the round pair locates.  Named by
@@ -1224,7 +1235,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "guides-screwed": (
             f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['pd-platen-guide']} GUIDES TO "
-            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['pd-vn-fillister-screw']} SCREWS "
+            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['sh-vn-brass-fillister-screw']} SCREWS "
             "FROM THE FRONT, HEADS IN THE COUNTERBORES."
         ),
         "clips-fitted": (
@@ -1361,8 +1372,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "latch-hook-fitted": (
             f"SCREW THE {_N['pd-latch-hook']} HOOK'S BASE TO THE BAR'S BACK FACE "
-            f"WITH {TRANSGEAR_QUANTITIES['pd-vn-latch-hook-bracket-screw']} "
-            f"{_N['pd-vn-latch-hook-bracket-screw']} SCREWS, ARM HANGING DOWN; ITS "
+            f"WITH {TRANSGEAR_QUANTITIES['sh-vn-fillister-screw-90280a108']} "
+            f"{_N['sh-vn-fillister-screw-90280a108']} SCREWS, ARM HANGING DOWN; ITS "
             "PIN HOLE IS NOT YET DRILLED."
         ),
         "hanger-meshed": (
@@ -1470,8 +1481,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
-            f"{CHAIN_QUANTITIES['pd-vn-chain-inner-link']} {_N['pd-vn-chain-inner-link']} INNER "
-            f"AND {CHAIN_QUANTITIES['pd-vn-chain-outer-link']} {_N['pd-vn-chain-outer-link']} "
+            f"{CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} {_N['sh-vn-chain-link--InnerLink']} INNER "
+            f"AND {CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} {_N['sh-vn-chain-link--OuterLink']} "
             f"OUTER LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
             f"JOIN THE ENDS WITH THE {_N['pd-vn-chain-connecting-link']} #25 CONNECTING "
             f"LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}, ITS CLIP'S CLOSED END "
@@ -1673,15 +1684,27 @@ def _place_sheet_note(
 
 
 def _source_family_counts(model: Any) -> Counter[str]:
-    """Top-level component count per referenced part file stem."""
+    """Count physical file/member identities, not colliding printed Numbers."""
     assembly = _early_bound(model, "IAssemblyDoc")
     counts: Counter[str] = Counter()
+    seen_names: set[str] = set()
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
-        path = str(component.GetPathName() or "")
-        if not path:
-            raise RuntimeError(f"component {component.Name2!r} has no referenced path")
-        counts[Path(path).stem.casefold()] += 1
+        name = str(component.Name2)
+        if name in seen_names:
+            raise RuntimeError(f"paper-drive repeats native component {name!r}")
+        seen_names.add(name)
+        stem, configuration = component_identity(component)
+        matches = [
+            key for key, (native_stem, member) in BOM_COMPONENT_IDENTITIES.items()
+            if stem == native_stem and (member is None or configuration == member)
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"paper-drive component {name!r} has no unique BOM identity: "
+                f"{(stem, configuration)!r}"
+            )
+        counts[matches[0]] += 1
     if set(counts) != set(BOM_PART_NUMBERS):
         raise RuntimeError(
             f"paper-drive families {sorted(counts)!r} != BOM {sorted(BOM_PART_NUMBERS)!r}"
@@ -1722,9 +1745,9 @@ def _create_sheets(adapter: Any) -> None:
 
 
 def _validate_bom(
-    adapter: Any, table: Any, counts: Counter[str]
+    adapter: Any, table: Any, counts: Counter[str], *, configuration: str
 ) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers, prove identities/quantities; return (stem, item)."""
+    """Prove native row identities, associative Numbers and actual quantities."""
     table = _early_bound(table, "ITableAnnotation")
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
@@ -1763,17 +1786,12 @@ def _validate_bom(
             raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
 
     actual: dict[str, tuple[int, str, str, str]] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[part_column].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in actual:
-            raise RuntimeError(f"paper-drive BOM repeats component family {stem!r}")
-        actual[stem] = (
-            row_index,
-            row[item_column],
-            row[description_column],
-            row[quantity_column],
-        )
+    native_rows = bom_row_identities(
+        table, configuration=configuration, component_identities=BOM_COMPONENT_IDENTITIES
+    )
+    for stem, row_index in native_rows.items():
+        row = contents[row_index]
+        actual[stem] = (row_index, row[item_column], row[description_column], row[quantity_column])
     if set(actual) != set(BOM_PART_NUMBERS):
         raise RuntimeError(
             f"paper-drive BOM identities {sorted(actual)!r} != {sorted(BOM_PART_NUMBERS)!r}"
@@ -1786,11 +1804,10 @@ def _validate_bom(
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
-            if not table.IsCellTextEditable(row_index, part_column):
-                raise RuntimeError(
-                    f"paper-drive BOM part-number cell for {stem!r} is locked"
-                )
-            table.SetText2(row_index, part_column, False, number)
+            raise RuntimeError(
+                f"paper-drive associative Number for {stem!r} reads "
+                f"{contents[row_index][part_column]!r}, expected {number!r}"
+            )
         if description != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(f"paper-drive BOM description mismatch for {stem!r}")
         if quantity != str(counts[stem]):
@@ -2196,11 +2213,16 @@ def _place_bom_sheet(
         anchor_xy=BOM_ANCHOR,
         expected_components=tuple(BOM_PART_NUMBERS),
         descriptions=BOM_DESCRIPTIONS,
-        identity_aliases={number: stem for stem, number in BOM_PART_NUMBERS.items()},
-        configuration_grouping="same-part",
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        configuration_grouping="same-name",
         label="paper-drive",
     )
-    items = dict(_validate_bom(adapter, table, counts))
+    items = dict(
+        _validate_bom(
+            adapter, table, counts, configuration=str(reference.ReferencedConfiguration)
+        )
+    )
     _activate_sheet(adapter, SHEET_NAMES[1])
     label = "transgear isometric"
     view = place_view(

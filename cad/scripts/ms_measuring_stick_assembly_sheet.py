@@ -19,7 +19,7 @@ from fractions import Fraction
 import ms_measuring_stick_assembly_spec as spec
 import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
-import _mcmaster_91882a221 as thumb
+import sh_vn_thumb_screw_spec as thumb
 
 DRAWING_NUMBER = "MHA-MS-00"
 

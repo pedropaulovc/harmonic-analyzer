@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _stock_recipe import stock_recipe  # noqa: E402
 
-from _mcmaster_90280a108 import FILLISTER_SIZE  # noqa: E402
+from sh_vn_fillister_screw_90280a108_spec import FILLISTER_SIZE  # noqa: E402
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 from diagnostics.diag_mcmaster_lib import replica_main  # noqa: E402
 

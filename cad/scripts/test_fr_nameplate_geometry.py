@@ -25,7 +25,7 @@ import pytest
 import _dxf_text as dxf
 import build_fr_nameplate as part
 import fr_nameplate_spec as spec
-from _mcmaster_90114a511 import HEAD_DIA
+from sh_vn_brass_fillister_screw_spec import HEAD_DIA
 
 
 def _read(path: Path) -> str:

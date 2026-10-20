@@ -76,9 +76,9 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_dev
 from sh_column_clamp_fit import BORE_DIAMETRAL_CLEARANCE
 from sh_column_clamp_fit import EAR_HEIGHT_BAND as BACK_ARC_TAP_HEIGHT_BAND
 from sh_column_clamp_fit import EAR_STATION_BAND as BACK_ARC_TAP_STATION_BAND
-from _mcmaster_90280a201 import HEAD_DIA as CLAMP_HEAD_DIA
-from _mcmaster_90280a201 import HEAD_H as CLAMP_HEAD_H
-from _mcmaster_90280a201 import SHANK_DIA as CLAMP_SCREW_MAJOR
+from sh_vn_clamp_screw_spec import HEAD_DIA as CLAMP_HEAD_DIA
+from sh_vn_clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
+from sh_vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
 from _column_clamp_interface import BAR_DEPTH
 from pd_support_bar_spec import (
     BACK_FACE_Z,

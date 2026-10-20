@@ -53,12 +53,13 @@ import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
-import mg_vn_lever_wire_geom
-import mg_vn_lever_wire_spec
+import sh_vn_music_wire_lever_geom
+import sh_vn_music_wire_lever_spec
 import mg_vn_wheel_axle_front_washer_spec as front_washer
 import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
+from _component_references import component_identity, component_reference_names
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
@@ -83,7 +84,7 @@ from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import insert_bom_table
+from _drawing_tables import bom_row_identities, insert_bom_table
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -302,9 +303,9 @@ FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
 # the wire's only model edges were its two end circles, so balloon 19 landed
-# on the drum end inside the wheel and read as pointing at a spoke. MHA-MG-VN-56
+# on the drum end inside the wheel and read as pointing at a spoke. MHA-SH-VN-56
 # now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
-# (build_mg_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
+# (the LeverWire member's BalloonRingSplit), and the balloon is frozen to the
 # ring's point facing the preserved fitter isometric viewer (wire_facing_point). The balloon
 # then stands right of the view, its leader dropping this little from the
 # ring so it passes under the vertical rod's lower end, the one part right of
@@ -344,13 +345,21 @@ def wire_facing_point(
 
 
 WIRE_BALLOON_POINT_MM = wire_facing_point(
-    mg_vn_lever_wire_geom.WIRE_START,
-    mg_vn_lever_wire_geom.WIRE_END,
-    radius=mg_vn_lever_wire_geom.WIRE_DIA / 2.0,
-    station=mg_vn_lever_wire_spec.BALLOON_RING_FRACTION * mg_vn_lever_wire_geom.WIRE_LEN,
+    sh_vn_music_wire_lever_geom.WIRE_START,
+    sh_vn_music_wire_lever_geom.WIRE_END,
+    radius=sh_vn_music_wire_lever_geom.WIRE_DIA / 2.0,
+    station=sh_vn_music_wire_lever_spec.BALLOON_RING_FRACTION * sh_vn_music_wire_lever_geom.WIRE_LEN,
 )
 
-BOM_QUANTITIES = {stem: notes.QUANTITIES[stem] for stem in notes.BOM_ORDER}
+WIRE_ROW = f"sh-vn-music-wire--{sh_vn_music_wire_lever_geom.CONFIGURATION}"
+BOM_ROW_KEYS = {stem: WIRE_ROW if stem == notes.WIRE else stem for stem in notes.BOM_ORDER}
+BOM_QUANTITIES = {BOM_ROW_KEYS[stem]: notes.QUANTITIES[stem] for stem in notes.BOM_ORDER}
+BOM_COMPONENT_IDENTITIES = {
+    BOM_ROW_KEYS[stem]: (
+        stem, sh_vn_music_wire_lever_geom.CONFIGURATION if stem == notes.WIRE else None
+    )
+    for stem in notes.BOM_ORDER
+}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
@@ -358,7 +367,7 @@ PART_ROWS = {
     "mg-wheel-bar": _config.parts("mg-wheel-bar"),
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front"),
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back"),
-    "mg-vn-clamp-screw": _config.parts("mg-vn-clamp-screw"),
+    "sh-vn-clamp-screw": _config.parts("sh-vn-clamp-screw"),
     "mg-wheel-drum": _config.parts("mg-wheel-drum"),
     "mg-magnifying-wheel": _config.parts("mg-magnifying-wheel"),
     "mg-wheel-axle-spacer": _config.parts("mg-wheel-axle-spacer"),
@@ -369,14 +378,14 @@ PART_ROWS = {
     "mg-magnifying-bracket": _config.parts("mg-magnifying-bracket"),
     "mg-vn-magnifying-bracket-screw": _config.parts("mg-vn-magnifying-bracket-screw"),
     "mg-magnifying-clamp": _config.parts("mg-magnifying-clamp"),
-    "mg-vn-thumb-screw": _config.parts("mg-vn-thumb-screw"),
+    "sh-vn-thumb-screw": _config.parts("sh-vn-thumb-screw"),
     "mg-magnifying-vertical-rod": _config.parts("mg-magnifying-vertical-rod"),
     "mg-output-fixture": _config.parts("mg-output-fixture"),
-    "mg-vn-lever-wire": _config.parts("mg-vn-lever-wire"),
+    WIRE_ROW: _config.parts("sh-vn-music-wire"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
-if set(BOM_COMPONENTS) != explode.SHOWN_STEMS:
+if set(BOM_ROW_KEYS) != explode.SHOWN_STEMS:
     raise AssertionError("every BOM family must show on one of the package's views")
 BOM_PART_NUMBERS = {stem: str(row["number"]) for stem, row in PART_ROWS.items()}
 # The registry owns part numbers and vendor SKU; components own material/finish.
@@ -384,11 +393,8 @@ BOM_SKUS = {
     stem: " / ".join(str(sku) for sku in row.get("supplier_skus") or ()) or MADE_PART_SKU
     for stem, row in PART_ROWS.items()
 }
-BOM_DESCRIPTIONS = dict(notes.BOM_DESCRIPTIONS)
+BOM_DESCRIPTIONS = {BOM_ROW_KEYS[stem]: text for stem, text in notes.BOM_DESCRIPTIONS.items()}
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
-BOM_NORMALIZED_ALIASES = {
-    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
-}
 # One balloon per family (row); each walks its family's lowest-named shown
 # instance for a visible edge, except the two rods.
 #
@@ -459,7 +465,7 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
-    explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
+    WIRE_ROW: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM, instance="@LeverWire:1"),
 }
 
 EXPLODED_VIEW_NAMES = {
@@ -1100,13 +1106,23 @@ def _validate_source(
             raise RuntimeError(
                 f"magnifier {owner} exploded views {names!r} != {(wanted,)!r}"
             )
+    component_reference_names(
+        source_model,
+        {"@LeverWire:1": (notes.WIRE, sh_vn_music_wire_lever_geom.CONFIGURATION)},
+    )
     counts: dict[str, int] = {}
     instances = []
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
         stem = _component_stem(component)
         instances.append(explode.Instance(str(component.Name2), stem))
-        counts[stem] = counts.get(stem, 0) + 1
+        if stem == notes.WIRE:
+            selected = component_identity(component)
+            expected = (notes.WIRE, sh_vn_music_wire_lever_geom.CONFIGURATION)
+            if selected != expected:
+                raise RuntimeError(f"magnifier wire member {selected!r} != {expected!r}")
+        row_key = BOM_ROW_KEYS.get(stem, stem)
+        counts[row_key] = counts.get(row_key, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
         if any(
@@ -1179,17 +1195,18 @@ def _bom_rows(table: Any) -> dict[str, tuple[int, str, str, str]]:
     contents = _bom_cells(table)
     header = contents[0]
     item_column = _bom_column(header, lambda cell: cell.startswith("ITEM NO"), "ITEM NO.")
-    part_column = _bom_column(header, lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = _bom_column(
         header, lambda cell: cell == "DESCRIPTION", "DESCRIPTION"
     )
     quantity_column = _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY.")
     rows: dict[str, tuple[int, str, str, str]] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[part_column].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in rows:
-            raise RuntimeError(f"magnifier BOM repeats component family {stem!r}")
+    identities = bom_row_identities(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    )
+    for stem, row_index in identities.items():
+        row = contents[row_index]
         rows[stem] = (
             row_index,
             row[item_column],
@@ -1208,9 +1225,9 @@ def _bom_items(table: Any) -> dict[str, str]:
 
 
 def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
-    """Rewrite part numbers, prove identities/descriptions/quantities, add the
-    registry's VENDOR SKU column after DESCRIPTION; return each family's item
-    number. Material and finish remain on the component drawings."""
+    """Prove associative Numbers, native identities, descriptions and quantities;
+    add the registry's VENDOR SKU column after DESCRIPTION and return each row's
+    item number. Material and finish remain on the component drawings."""
     table = _early_bound(table, "ITableAnnotation")
     contents = _bom_cells(table)
     rows = len(contents)
@@ -1235,9 +1252,10 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
     for stem, (row_index, _item, description, quantity) in actual.items():
         number = BOM_PART_NUMBERS[stem]
         if contents[row_index][part_column] != number:
-            if not table.IsCellTextEditable(row_index, part_column):
-                raise RuntimeError(f"magnifier BOM part-number cell for {stem!r} is locked")
-            table.SetText2(row_index, part_column, False, number)
+            raise RuntimeError(
+                f"magnifier BOM Number for {stem!r} is "
+                f"{contents[row_index][part_column]!r}, expected {number!r}"
+            )
         if description != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(f"magnifier BOM description mismatch for {stem!r}")
         if quantity != str(BOM_QUANTITIES[stem]):
@@ -1495,7 +1513,11 @@ def balloon_items(
     items: dict[str, str], stems: frozenset[str]
 ) -> tuple[tuple[str, str], ...]:
     """(stem, item) for each BOM family in ``stems``, in BOM order."""
-    return tuple((stem, items[stem]) for stem in BOM_COMPONENTS if stem in stems)
+    return tuple(
+        (BOM_ROW_KEYS[stem], items[BOM_ROW_KEYS[stem]])
+        for stem in notes.BOM_ORDER
+        if stem in stems
+    )
 
 
 def _view_source_explode_offsets(
@@ -1807,7 +1829,9 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
         identity_aliases=BOM_IDENTITY_ALIASES,
-        configuration_grouping="same-part",
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        part_number_property="Number",
+        configuration_grouping="same-name",
         label="magnifier",
     )
     source_step("BOM insertion")
@@ -1850,7 +1874,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"magnifier package carries {len(landings)} balloons, expected one per "
             f"BOM row ({len(BOM_COMPONENTS)})"
         )
-    (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
+    (wire_landing,) = (landing for landing in landings if landing.stem == WIRE_ROW)
     _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
     source_step(f"{FINISHED_LABEL} wire balloon placement")
 

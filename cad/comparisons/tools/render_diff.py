@@ -23,10 +23,10 @@ Pipeline:
   3. render N camera angles to PNG with an offscreen VTK context and write a
      diff_summary.json (changed parts + per-mesh deviation + image names).
 
-The current identity map, composed with the sealed historical map, pairs actual
-STL inventory members while retaining configuration qualifiers. Every current
-vendor clone is compared with its own prior physical source; clones keep separate
-geometry verdicts. Renames are separate from new/deleted files and geometry changes.
+The composed identity maps pair exact STL members/configurations. Every
+historical candidate of a converged shared vendor identity receives its own
+geometry verdict; a changed clone cannot be hidden by an equal sibling.
+Renames are separate from new/deleted files and geometry changes.
 
     # release vs release
     uv run cad/comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
@@ -88,6 +88,8 @@ def _scene_member(names, mapping):
     scene_names = {f"boxes/{stem}.json" for stem in top_assemblies}
     matches = [name for name in names if name.lower() in scene_names]
     identity_inventory((Path(name).stem for name in matches), mapping)
+    if len(matches) > 1:
+        raise ValueError(f"ambiguous top-assembly scene: {matches!r}")
     return matches[0] if matches else None
 
 
@@ -100,7 +102,11 @@ class ReleaseSource:
         self.url = ("https://github.com/pedropaulovc/harmonic-analyzer/releases/"
                     f"download/{tag}/harmonic-analyzer-{tag}.zip")
         self.cd = self._central_dir()
-        self._ci = {n.lower(): e for n, e in self.cd.items()}
+        self._ci = {}
+        for name, entry in self.cd.items():
+            if name.lower() in self._ci:
+                raise ValueError(f"ambiguous case-insensitive release member: {name!r}")
+            self._ci[name.lower()] = (name, entry)
 
     def _get(self, start, end):
         req = urllib.request.Request(self.url,
@@ -151,8 +157,7 @@ class ReleaseSource:
         return out
 
     def _entry(self, rel):
-        e = self._ci.get(rel.lower())
-        return None if e is None else (rel, e)
+        return self._ci.get(rel.lower())
 
     def _stl_entry(self, key):
         return self._entry(f"stl/{key}.stl")
@@ -206,9 +211,14 @@ class LocalSource:
     def __init__(self, root):
         self.root = Path(root)
         self.label = f"local:{self.root.name}"
-        self._stls = {p.stem.lower(): p
-                      for p in (self.root / "stl").glob("*")
-                      if p.suffix.lower() == ".stl"}
+        self._stls = {}
+        for path in (self.root / "stl").glob("*"):
+            if path.suffix.lower() != ".stl":
+                continue
+            key = path.stem.lower()
+            if key in self._stls:
+                raise ValueError(f"ambiguous case-insensitive STL member: {path.name!r}")
+            self._stls[key] = path
         self._crc = {}
 
     def _path(self, key):
@@ -303,67 +313,53 @@ def _auto_jobs(n_pending):
 
 
 def classify(old, new, keys, pairs, tol=0.01, jobs=0):
-    """Return ({changed mesh keys}, {key: hausdorff_mm}) using actual-file pairs.
+    """Return changed keys and every {new: {historical_candidate: deviation}}.
 
-    A cheap CRC pass first -- identical signature is unchanged for free, a missing
-    old mesh is a new part. Only meshes whose signature differs need the expensive
-    Hausdorff confirmation; those are mutually independent, so they run across a
-    process pool (``jobs`` workers; 0 = auto = one per CPU capped at 8, 1 = inline
-    serial). This is the SolidWorks-free hot path -- parallelising it is the
-    release-time win. The serial CRC pass also materialises the STL paths, so the
-    pool workers receive plain file paths and never touch the network.
+    Equal CRCs have zero deviation. All unequal candidates are checked, even if
+    another old clone is byte-identical. Per-candidate results survive the
+    aggregate highlight, whose verdict is changed if ANY candidate changed.
     """
-    changed, devs = set(), {}
-    # Cheap CRC32 pass first (zip CRC / file hash): an identical signature is an
-    # unchanged mesh for free, so the expensive Hausdorff verify -- and the
-    # per-key HTTP range fetch of the OLD release -- only runs on the meshes
-    # whose bytes actually differ. Surface those counts up front so the verify
-    # loop below reads as measurable progress, not a stall.
-    to_verify = []                # [key] -- CRC signature differs, needs geometry verify
-    pending = []                  # [(key, old_path, new_path)] -- materialised for the pool
-    for k in sorted(keys):
-        old_key = pairs.get(k)
-        c_old = old.crc(old_key) if old_key is not None else None
-        if c_old is None:
-            changed.add(k)            # new part -> changed
-            devs[k] = float("inf")
-            continue
-        if c_old == new.crc(k):
-            continue                  # identical signature -> unchanged (free)
-        to_verify.append(k)
-    identical = len(keys) - len(changed) - len(to_verify)
-    print(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
-          f"{identical} identical (of {len(keys)} meshes)", flush=True)
-    for k in to_verify:
-        po, pn = old.stl(pairs[k]), new.stl(k)
-        if not (po and pn):
-            changed.add(k)            # signature differs but a side is missing
-            devs[k] = float("inf")
-            continue
-        pending.append((k, str(po), str(pn)))
+    changed, devs, pending = set(), {}, []
+    for key in sorted(keys):
+        candidates = pairs.get(key, ())
+        devs[key] = {}
+        if not candidates:
+            changed.add(key)
+        for previous in candidates:
+            c_old, c_new = old.crc(previous), new.crc(key)
+            if c_old is None or c_new is None:
+                changed.add(key)
+                devs[key][previous] = float("inf")
+            elif c_old == c_new:
+                devs[key][previous] = 0.0
+            else:
+                po, pn = old.stl(previous), new.stl(key)
+                if not (po and pn):
+                    changed.add(key)
+                    devs[key][previous] = float("inf")
+                else:
+                    pending.append(((key, previous), str(po), str(pn)))
+    print(f"CRC pass: {len(keys)} meshes, {sum(map(len, devs.values()))} resolved "
+          f"candidate comparisons, {len(pending)} to geometry-verify", flush=True)
 
-    if not pending:
-        return changed, devs
-
-    def record(i, k, d):
-        devs[k] = d
-        verdict = "CHANGED" if d > tol else "identical"
-        if d > tol:
-            changed.add(k)
-        print(f"  [{i}/{len(pending)}] verify {k:34s} ~Hausdorff={d:8.3f} mm "
-              f"-> {verdict}", flush=True)
+    def record(index, pair, distance):
+        key, previous = pair
+        devs[key][previous] = distance
+        if distance > tol:
+            changed.add(key)
+        verdict = "CHANGED" if distance > tol else "identical"
+        print(f"  [{index}/{len(pending)}] verify {key} <- {previous} "
+              f"~Hausdorff={distance:8.3f} mm -> {verdict}", flush=True)
 
     n_jobs = jobs if jobs > 0 else _auto_jobs(len(pending))
-    if n_jobs == 1 or len(pending) == 1:
-        for i, task in enumerate(pending, 1):
-            record(i, *_hausdorff_job(task))
+    if n_jobs == 1 or len(pending) <= 1:
+        for index, task in enumerate(pending, 1):
+            record(index, *_hausdorff_job(task))
     else:
-        print(f"  (Hausdorff over {len(pending)} meshes on {n_jobs} workers)",
-              flush=True)
-        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
-            futures = [ex.submit(_hausdorff_job, task) for task in pending]
-            for i, fut in enumerate(as_completed(futures), 1):
-                record(i, *fut.result())
+        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+            futures = [executor.submit(_hausdorff_job, task) for task in pending]
+            for index, future in enumerate(as_completed(futures), 1):
+                record(index, *future.result())
     return changed, devs
 
 
@@ -400,10 +396,12 @@ def main():
     scene = new.scene(mapping)
     comps = scene["components"]
     keys = {(c.get("mesh") or c["part"]).lower() for c in comps}
+    for key in keys:
+        canonical_keys(key, mapping)  # Scene mesh IDs are not occurrence paths.
     old_keys, new_keys = old.mesh_keys(), new.mesh_keys()
     pairs = paired_keys(old_keys, new_keys, mapping)
-    renamed = {k: v for k, v in pairs.items() if k != v}
-    deleted = sorted(set(old_keys) - set(pairs.values()))
+    renamed = {key: sources for key, sources in pairs.items() if sources != (key,)}
+    deleted = sorted(set(old_keys) - {old for sources in pairs.values() for old in sources})
     added = sorted(set(new_keys) - set(pairs))
     print(f"scene: {len(comps)} components, {len(keys)} unique meshes")
 
@@ -464,8 +462,16 @@ def main():
         "new_meshes": added,
         "deleted_meshes": deleted,
         "changed_parts": changed_bases,
-        "changed_meshes": {k: (None if devs[k] == float("inf") else devs[k])
-                           for k in sorted(changed)},
+        "changed_meshes": {
+            key: (None if not devs[key] or max(devs[key].values()) == float("inf")
+                  else max(devs[key].values()))
+            for key in sorted(changed)
+        },
+        "candidate_mesh_deviations_mm": {
+            key: {previous: (None if distance == float("inf") else distance)
+                  for previous, distance in sorted(candidates.items())}
+            for key, candidates in sorted(devs.items())
+        },
         "instances_highlighted": int(n_hi),
         "images": images,
     }

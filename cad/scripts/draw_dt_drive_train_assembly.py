@@ -7,15 +7,16 @@ position it prints from the opened model; nothing pending on a sibling branch
 (crank hub, lever pin, pinion tooth count, bracket placement) is typed here.
 
 Sheet numbers are fixed; cross-references come from the ``*_SHEET`` constants.
-Separate BOM identities retain the swing-stop and spring-foot roles even when
-they use the same catalogue screw. Fit-up steps give the measured acceptance
-and the cut that answers it, not the design's worst-case clearance narration.
+One physical BOM family combines the swing-stop and spring-foot screws; native
+occurrence references retain their distinct installation and explode roles.
+Fit-up steps give the measured acceptance and the cut that answers it.
 """
 
 from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from fractions import Fraction
 import hashlib
@@ -37,6 +38,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _component_references import component_reference_names
 import _config
 from _drawing_balloons import (
     BalloonLanding,
@@ -114,11 +116,16 @@ from dt_drive_train_assembly_sheet import (
 )
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
+    COMPONENT_IDENTITIES,
     EXPLODED_VIEW_NAME,
+    FOOT_SCREW_SELECTOR,
     PENDING_STEMS,
     SOURCE_CONFIGURATION,
+    SWING_STOP_SCREW_SELECTOR,
     Cluster,
     Instance,
+    component_stem,
+    instance_selector,
     unclassified_stems,
 )
 import dt_drive_train_steps as steps
@@ -134,7 +141,7 @@ import dt_vn_cone_pivot_screw_spec as pivot_screw
 import dt_vn_cone_tip_collar_spec as tip_collar
 from dt_vn_keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 import dt_vn_post_mount_screw_spec as post_screw
-import dt_vn_swing_stop_screw_spec as stop_screw
+import dt_swing_stop_screw_spec as stop_screw
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -437,8 +444,8 @@ BOM_PART_NUMBERS = {
     "dt-vn-cylinder-bank-spring": "MHA-DT-VN-68",
     "dt-cylinder-gear": "MHA-DT-12",
     "dt-vn-pedestal-hold-down-screw": "MHA-DT-VN-62",
-    "dt-vn-arbor-set-screw": "MHA-DT-VN-64",
-    "dt-vn-foot-screw": "MHA-DT-VN-58",
+    "sh-vn-arbor-set-screw": "MHA-SH-VN-54",
+    "sh-vn-fillister-screw-90280a108": "MHA-SH-VN-52",
     "dt-cone-gear-shaft": "MHA-DT-04",
     "dt-cone-gear": "MHA-DT-03",
     "dt-crank-drive-gear": "MHA-DT-07",
@@ -452,7 +459,6 @@ BOM_PART_NUMBERS = {
     "dt-vn-post-mount-screw": str(_config.parts("dt-vn-post-mount-screw")["number"]),
     "dt-vn-cone-lock-knob": "MHA-DT-VN-51",
     "dt-vn-cone-pivot-screw": "MHA-DT-VN-52",
-    "dt-vn-swing-stop-screw": "MHA-DT-VN-53",
     "dt-crankshaft": "MHA-DT-11",
     "dt-crank-pinion": "MHA-DT-10",
     "dt-crank-pinion-pin": "MHA-DT-29",
@@ -462,7 +468,7 @@ BOM_PART_NUMBERS = {
     "dt-crank-pin-eye": "MHA-DT-28",
     "dt-vn-keeper-chain": "MHA-DT-VN-65",
     "dt-vn-keeper-chain-link": "MHA-DT-VN-66",
-    "dt-vn-fillister-screw": "MHA-DT-VN-50",
+    "sh-vn-brass-fillister-screw": "MHA-SH-VN-51",
     "dt-crank-handle": "MHA-DT-08",
     "dt-crank-handle-ferrule": "MHA-DT-34",
     "dt-crank-handle-butt-cup": "MHA-DT-35",
@@ -493,8 +499,8 @@ BOM_DESCRIPTIONS = {
     "dt-vn-cylinder-bank-spring": "WAVE DISC SPRING, MCMASTER 9714K392",
     "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "dt-vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
-    "dt-vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
-    "dt-vn-foot-screw": "#4-40 SPRING FOOT, MCMASTER 90280A108",
+    "sh-vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
+    "sh-vn-fillister-screw-90280a108": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "dt-cone-gear-shaft": "CONE GEAR SHAFT",
     "dt-cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
     "dt-crank-drive-gear": f"CRANK DRIVE GEAR, {gear64.TEETH}T",
@@ -508,7 +514,6 @@ BOM_DESCRIPTIONS = {
     "dt-vn-post-mount-screw": f"{post_screw.THREAD} FILLISTER SCREW, MSC {post_screw.SKU}",
     "dt-vn-cone-lock-knob": f"{lock_knob.THREAD} THUMB SCREW, MCMASTER 93585A190",
     "dt-vn-cone-pivot-screw": f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER 91829A560",
-    "dt-vn-swing-stop-screw": "#4-40 SWING STOP, MCMASTER 90280A108",
     "dt-crankshaft": "CRANKSHAFT",
     "dt-crank-pinion": f"CRANK PINION, {pinion.TEETH}T",
     "dt-crank-pinion-pin": "CRANK PINION RETENTION PIN",
@@ -518,7 +523,7 @@ BOM_DESCRIPTIONS = {
     "dt-crank-pin-eye": "KEEPER CHAIN ANCHOR EYE",
     "dt-vn-keeper-chain": "#3 BRASS BEAD CHAIN, MCMASTER 3606T118",
     "dt-vn-keeper-chain-link": "LOOP LINK, MCMASTER 3606T811",
-    "dt-vn-fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
+    "sh-vn-brass-fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
     "dt-crank-handle": "CRANK HANDLE",
     "dt-crank-handle-ferrule": "CRANK HANDLE FERRULE",
     "dt-crank-handle-butt-cup": "CRANK HANDLE BUTT CUP",
@@ -548,7 +553,7 @@ BOM_DESCRIPTIONS = {
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("drive-train BOM description coverage is incomplete")
-if set(BOM_PART_NUMBERS) != {stem for stems in CLUSTERS.values() for stem in stems}:
+if set(BOM_PART_NUMBERS) != {component_stem(key) for keys in CLUSTERS.values() for key in keys}:
     raise AssertionError("drive-train BOM identities must cover exactly the clusters")
 BOM_NORMALIZED_ALIASES = {
     number.casefold(): stem for stem, number in BOM_PART_NUMBERS.items()
@@ -861,7 +866,7 @@ CONE_CRANK_STEPS = _note_text(
         "   SHAFT; LIGHT-DRIVE MHA-DT-09, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        "   MHA-DT-27 FROM THE PIN HEAD; CLAMP MHA-DT-28 UNDER MHA-DT-VN-50. CUT MHA-DT-VN-65",
+        "   MHA-DT-27 FROM THE PIN HEAD; CLAMP MHA-DT-28 UNDER MHA-SH-VN-51. CUT MHA-DT-VN-65",
         f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27; SNAP",
         "   ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
         # Local review of 747487c71: the cup cures centred on the screw, or
@@ -951,7 +956,7 @@ BANK_STEPS = _note_text(
         "9E. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
         f"   THE MANDREL IS OUT AND EACH DOME STANDS {bank.ARBOR_DOME_HEIGHT:.1f} PROUD (DEPTH GAUGE).",
         "   SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
-        "   BLOW OUT CHIPS. RUN THE FRONT MHA-DT-VN-64 IN TIGHT, THEN THE BACK ONE.",
+        "   BLOW OUT CHIPS. RUN THE FRONT MHA-SH-VN-54 IN TIGHT, THEN THE BACK ONE.",
         "9F. EACH GEAR TURNS FREE BY HAND, THE BANK HELD SOUTH BY MHA-DT-VN-68.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-08 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
@@ -1072,7 +1077,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "rig-seats-transferred",
             f"SPOT MHA-FR-01 THROUGH THE {slotted} MHA-DT-18 HOLES AND THE MHA-DT-24 "
             "FOOT HOLE; DRILL AND TAP EACH PER ITS MHA-FR-01 TRANSFER CALLOUT. "
-            f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-DT-VN-58.",
+            f"FIT {slotted}X MHA-DT-VN-57 AND 1X MHA-SH-VN-52 AT THE SPRING FOOT.",
         ),
         # The cams' phase is set with the lever parked; the cam set then sets
         # each cam along the rod, tightens its set screw and stakes the tap.
@@ -1089,7 +1094,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "CONE SET ON THE BASE: OIL THE MHA-DT-VN-52 SHOULDER. STAND MHA-DT-20 ON "
             "MHA-FR-01 OVER THE STEP 9C PIVOT SEAT; RUN MHA-DT-VN-52 DOWN THROUGH ITS "
             "PIVOT BORE, SHOULDER SEATED HARD ON THE BASE; MHA-DT-20 SWINGS FREELY "
-            "UNDER THE HEAD. RUN MHA-DT-VN-53 INTO ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), "
+            "UNDER THE HEAD. RUN 1X MHA-SH-VN-52 AS SWING STOP INTO ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), "
             "HEAD SEATED. SWING THE CONE SET IN; RUN MHA-DT-VN-51 THROUGH THE MHA-DT-20 "
             "NOTCH INTO ITS TAPPED MHA-FR-01 SEAT (HOLE TABLE), FINGER-LOOSE. CHECK 4 "
             f"(SHEET {CHECKS_SHEET}) SETS THE SWING.",
@@ -1115,7 +1120,7 @@ CHECKS = _note_text(
         # Prove the reversed preload seats on the south disc.
         "   PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE; THE BANK SPRINGS",
         "   BACK ONTO THE FRONT MHA-DT-26.",
-        # MHA-DT-VN-53 is the DISENGAGED stop (build_cone_swing_platform
+        # MHA-SH-VN-52 is the DISENGAGED stop (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
         # it. The engaged mesh is SET here with MHA-DT-VN-51, not by the stop:
         # cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-13
@@ -1126,7 +1131,7 @@ CHECKS = _note_text(
         # (#1691 review r4).  Stoning is T012's only remedy: backing the swing
         # off would undo the T120 set (#1691 review r2).
         "4. CONE SWING SET (P1): LOOSEN MHA-DT-VN-51; SWING THE CONE SET ON MHA-DT-VN-52",
-        "   TO THE MHA-DT-VN-53 STOP, CLEAR OF EVERY MHA-DT-12. ZERO AN INDICATOR ON",
+        "   TO THE MHA-SH-VN-52 STOP, CLEAR OF EVERY MHA-DT-12. ZERO AN INDICATOR ON",
         "   EACH MHA-DT-02 IN X AND ONE ON THE FRONT MHA-DT-02 IN Y. EASE THE",
         "   MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
         f"   TIP TO MHA-DT-12 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
@@ -1150,7 +1155,7 @@ CHECKS = _note_text(
         "   THE T012 TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
         "   VERIFY MHA-DT-VN-52 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
-        "   VERIFY MHA-DT-VN-53 FULL-FORM THREAD ENGAGEMENT "
+        "   VERIFY THE MHA-SH-VN-52 SWING STOP FULL-FORM THREAD ENGAGEMENT "
         f"{stop_screw.MIN_USEFUL_ENGAGEMENT_TEXT};",
         "   HEAD FULLY SEATED; MHA-DT-20 REMAINS SEATED THROUGH P1.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-12 BY HAND",
@@ -1189,7 +1194,8 @@ INTERFACE_NOTES = _note_text(
     (
         "EXTERNAL INTERFACES (RECEIVING PARTS NOT IN THIS BOM)",
         "BASE MHA-FR-01 (FRAME ASSEMBLY MHA-FR-00) RECEIVES MHA-DT-VN-52, MHA-DT-VN-51,",
-        "MHA-DT-VN-53, {slotted}X MHA-DT-VN-57, {foot}X MHA-DT-VN-58 AND {hold_down}X MHA-DT-VN-62.",
+        "MHA-SH-VN-52 ({stop} SWING STOP + {foot} SPRING FOOT), {slotted}X MHA-DT-VN-57 AND",
+        "{hold_down}X MHA-DT-VN-62.",
         f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11.",
         "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE NORTH MHA-CH-08 "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
@@ -1605,10 +1611,10 @@ def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
 def cluster_members(
     instances: Sequence[Instance],
 ) -> dict[Cluster, tuple[str, ...]]:
-    """Component names per drawing cluster; every family sits in exactly one."""
+    """Component names per drawing cluster; each occurrence sits in exactly one."""
     members: dict[Cluster, list[str]] = {cluster: [] for cluster in CLUSTERS}
     for instance in instances:
-        owners = [c for c, stems in CLUSTERS.items() if instance.stem in stems]
+        owners = [c for c, keys in CLUSTERS.items() if instance_selector(instance) in keys]
         if not owners:
             raise ValueError(f"{instance.name}: family {instance.stem!r} has no cluster")
         if len(owners) != 1:
@@ -1626,7 +1632,7 @@ def instance_counts(instances: Sequence[Instance]) -> dict[str, int]:
 
 def bom_components(counts: dict[str, int]) -> tuple[str, ...]:
     """The BOM families the model carries, in cluster order."""
-    ordered = [stem for stems in CLUSTERS.values() for stem in stems]
+    ordered = [component_stem(key) for keys in CLUSTERS.values() for key in keys]
     seen: list[str] = []
     for stem in ordered:
         if stem in counts and stem not in seen:
@@ -1814,7 +1820,8 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                     "external interfaces",
                     INTERFACE_NOTES.format(
                         slotted=facts.count("dt-vn-slotted-screw"),
-                        foot=facts.count("dt-vn-foot-screw"),
+                        foot=facts.role_count(FOOT_SCREW_SELECTOR),
+                        stop=facts.role_count(SWING_STOP_SCREW_SELECTOR),
                         hold_down=facts.count("dt-vn-pedestal-hold-down-screw"),
                     ),
                 ),
@@ -2471,6 +2478,11 @@ class SourceFacts:
         self.counts = instance_counts(instances)
         self.components = bom_components(self.counts)
         self.clusters = cluster_members(instances)
+        self.reference_names = {
+            f"@{instance.role}": instance.name
+            for instance in instances
+            if f"@{instance.role}" in COMPONENT_IDENTITIES
+        }
 
     def cone_rows(self) -> list[tuple[int, str]]:
         return cone_station_rows(
@@ -2483,6 +2495,9 @@ class SourceFacts:
 
     def count(self, stem: str) -> int:
         return self.counts.get(stem, 0)
+
+    def role_count(self, selector: str) -> int:
+        return sum(instance_selector(instance) == selector for instance in self.instances)
 
 
 def _validate_source(source_model: Any) -> SourceFacts:
@@ -2506,6 +2521,8 @@ def _validate_source(source_model: Any) -> SourceFacts:
     instances = []
     configurations = {}
     numbers: dict[str, set[str]] = {}
+    reference_names = component_reference_names(source_model, COMPONENT_IDENTITIES)
+    roles = {name: selector[1:] for selector, name in reference_names.items()}
     for raw_component in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw_component, "IComponent2")
         name = _component_name(component)
@@ -2515,7 +2532,7 @@ def _validate_source(source_model: Any) -> SourceFacts:
         if any(abs(float(a) - float(b)) > 1e-9 for a, b in zip(total, base, strict=True)):
             raise RuntimeError(f"drive-train source must open collapsed: {name!r} is displaced")
         origin = tuple(float(value) * 1000.0 for value in tuple(base)[9:12])
-        instances.append(Instance(name=name, stem=stem, origin_mm=origin))
+        instances.append(Instance(name=name, stem=stem, origin_mm=origin, role=roles.get(name)))
         configurations[name] = str(component.ReferencedConfiguration or "")
         # A lightweight component has no loaded model; its Number is then
         # unreadable here (the offline registry test still pins it).
@@ -2994,7 +3011,12 @@ def _balloon_cluster_sheet(
         adapter,
         view,
         items=balloon_items,
-        anchors=DRIVE_TRAIN_BALLOON_ANCHORS[cluster],
+        anchors={
+            stem: replace(anchor, instance=facts.reference_names[anchor.instance])
+            if anchor.instance in COMPONENT_IDENTITIES
+            else anchor
+            for stem, anchor in DRIVE_TRAIN_BALLOON_ANCHORS[cluster].items()
+        },
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGIN,
     )
