@@ -7,6 +7,7 @@ drawings without tables stay independent.
 from __future__ import annotations
 
 import json
+from math import isfinite
 from pathlib import Path
 from typing import Any, Callable, Literal, Sequence
 
@@ -808,6 +809,109 @@ def _annotate_bom_number_binding(
     return watched
 
 
+def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], ...]:
+    """Read the complete typed prefix, proving any advertised empty tail."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty"
+    )
+
+    def unsupported(index: int, physical_type: Any) -> tuple[Any, ...]:
+        visible_type = table.GetColumnType3(index, False)
+        titles = (
+            table.GetColumnTitle2(index, True),
+            table.GetColumnTitle2(index, False),
+        )
+        headers = (
+            table.DisplayedText2(0, index, True),
+            table.DisplayedText2(0, index, False),
+        )
+        width = table.GetColumnWidth(index)
+        hidden = table.ColumnHidden(index)
+        binding = annotation.GetColumnCustomProperty(index)
+        for kind, property_data, status in (physical_type, visible_type):
+            if (
+                type(kind) is not int
+                or kind != -1
+                or property_data is not None
+                or type(status) is not int
+                or status not in (0, 1)  # Observed Success / documented InvalidIndex.
+            ):
+                raise RuntimeError(
+                    f"{label} BOM unsupported column type at physical index {index}"
+                )
+        if (
+            titles != ("", "")
+            or headers != ("", "")
+            or type(width) is not float
+            or width != 0.0
+            or hidden is not False
+            or binding != ""
+        ):
+            raise RuntimeError(
+                f"{label} BOM nonempty unsupported column at physical index {index}"
+            )
+        return (physical_type, visible_type, titles, headers, width, hidden, binding)
+
+    try:
+        visible = int(table.ColumnCount)
+        declared = int(table.TotalColumnCount)
+        if not 1 <= visible <= declared <= 16:
+            raise RuntimeError(
+                f"{label} BOM physical column census bounds are {visible}/{declared}"
+            )
+        # Native PD advertises an empty extra slot. Its full signature must
+        # agree with two independently read beyond-count controls; never total-1.
+        control = unsupported(declared, table.GetColumnType3(declared, True))
+        if control != unsupported(
+            declared + 1, table.GetColumnType3(declared + 1, True)
+        ):
+            raise RuntimeError(f"{label} BOM unsupported column controls disagree")
+        physical: list[tuple[int, bool]] = []
+        in_tail = False
+        for index in range(declared):
+            physical_type = table.GetColumnType3(index, True)
+            kind, _property_data, status = physical_type
+            if type(kind) is int and kind == -1:
+                if unsupported(index, physical_type) != control:
+                    raise RuntimeError(
+                        f"{label} BOM unsupported column tail disagrees at {index}"
+                    )
+                in_tail = True
+                continue
+            if (
+                in_tail
+                or type(kind) is not int
+                or not (kind == 0 or 201 <= kind <= 211)
+                or type(status) is not int
+                or status != 0
+            ):
+                raise RuntimeError(
+                    f"{label} BOM invalid typed column prefix at physical index {index}"
+                )
+            hidden = table.ColumnHidden(index)
+            width = table.GetColumnWidth(index)
+            if (
+                type(hidden) is not bool
+                or type(width) is not float
+                or not isfinite(width)
+                or width < 0.0
+                or (not hidden and width == 0.0)
+            ):
+                raise RuntimeError(
+                    f"{label} BOM invalid column visibility/width at physical index {index}"
+                )
+            physical.append((kind, hidden))
+        if not physical or sum(not hidden for _kind, hidden in physical) != visible:
+            raise RuntimeError(
+                f"{label} BOM typed column visibility count does not match {visible}"
+            )
+        return tuple(physical)
+    except RuntimeError:
+        raise
+    except Exception as error:
+        raise RuntimeError(f"{label} BOM physical column census read failed") from error
+
+
 def _bind_bom_number_property(
     adapter: Any,
     table: Any,
@@ -831,26 +935,28 @@ def _bind_bom_number_property(
         grouped_components=None,
     )
     visible_columns = int(table.ColumnCount)
-    total_columns = int(table.TotalColumnCount)
     try:
-        if visible_columns != total_columns:
-            raise RuntimeError(
-                f"{label} BOM physical column count is unresolved: "
-                f"visible={visible_columns}, declared_total={total_columns}; "
-                "retention was not attempted"
-            )
-        kind, _property, status = table.GetColumnType3(column, True)
-        if int(status) != 0 or int(kind) != 201:
-            raise RuntimeError(f"{label} BOM PART NUMBER is not a native column")
+        physical = _bom_physical_columns(table, label=label)
+        if any(hidden for _kind, hidden in physical):
+            raise RuntimeError(f"{label} BOM starts with typed hidden columns")
+        if [index for index, (kind, _hidden) in enumerate(physical) if kind == 201] != [
+            column
+        ]:
+            raise RuntimeError(f"{label} BOM has no unique native PART NUMBER column")
         # Converting the native PartNumber column to a custom property removes
         # same-name configured rows in SOLIDWORKS. Keep that column intact and
         # physically last, so visible consumers still use a contiguous prefix.
-        if column != total_columns - 1 and not table.MoveColumn(
-            column,
-            3,
-            total_columns - 1,  # swTableItemInsertPosition_After
-        ):
-            raise RuntimeError(f"{label} BOM native column could not be moved")
+        native_column = len(physical) - 1
+        moved = physical[:column] + physical[column + 1 :] + (physical[column],)
+        if column != native_column:
+            if not table.MoveColumn(
+                column,
+                3,
+                native_column,  # swTableItemInsertPosition_After
+            ):
+                raise RuntimeError(f"{label} BOM native column could not be moved")
+            if _bom_physical_columns(table, label=label) != moved:
+                raise RuntimeError(f"{label} BOM column sequence changed during move")
         if not table.InsertColumn2(
             2,
             column,
@@ -858,9 +964,17 @@ def _bind_bom_number_property(
             0,  # Before; swInsertColumn_DefaultWidth
         ):
             raise RuntimeError(f"{label} BOM Number column could not be inserted")
-        native_column = total_columns
+        inserted = _bom_physical_columns(table, label=label)
+        if (
+            len(inserted) != len(moved) + 1
+            or inserted[column] not in ((0, False), (204, False))
+            or inserted != moved[:column] + (inserted[column],) + moved[column:]
+        ):
+            raise RuntimeError(f"{label} BOM column sequence changed during insertion")
+        native_column = len(inserted) - 1
         table.SetColumnHidden(native_column, True)  # Indexed property; VT_VOID.
-        if table.ColumnHidden(native_column) is not True:
+        retained = inserted[:-1] + ((201, True),)
+        if _bom_physical_columns(table, label=label) != retained:
             raise RuntimeError(f"{label} BOM retained native column is not hidden")
         status = int(
             table.SetColumnType3(
@@ -897,18 +1011,14 @@ def _bind_bom_number_property(
 def _bom_number_column(table: Any, *, label: str) -> int:
     """Rediscover physical columns after SKU insertion, splitting or rebuilding."""
     visible = int(table.ColumnCount)
-    total = int(table.TotalColumnCount)
-    if visible < 1 or total != visible + 1:
+    physical = _bom_physical_columns(table, label=label)
+    if len(physical) != visible + 1:
         raise RuntimeError(
-            f"{label} BOM retained native column count is {visible}/{total}"
+            f"{label} BOM retained native column count is {visible}/{len(physical)}"
         )
     native_columns: list[int] = []
     number_columns: list[int] = []
-    for index in range(total):
-        kind, _property_data, status = table.GetColumnType3(index, True)
-        if int(status) != 0:
-            raise RuntimeError(f"{label} BOM column type readback failed at {index}")
-        hidden = table.ColumnHidden(index)
+    for index, (kind, hidden) in enumerate(physical):
         if hidden is not (index == visible):
             raise RuntimeError(
                 f"{label} BOM visible columns are not a contiguous prefix"
@@ -924,7 +1034,7 @@ def _bom_number_column(table: Any, *, label: str) -> int:
             if int(kind) != 204:
                 raise RuntimeError(f"{label} BOM Number column type/property changed")
             number_columns.append(index)
-    if native_columns != [total - 1]:
+    if native_columns != [len(physical) - 1]:
         raise RuntimeError(f"{label} BOM has no unique trailing native column")
     if len(number_columns) != 1:
         raise RuntimeError(f"{label} BOM has no unique PART NUMBER column")

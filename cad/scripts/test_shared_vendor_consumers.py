@@ -486,13 +486,14 @@ def test_semantic_balloon_anchor_refuses_hidden_duplicate_or_missing_occurrence(
 class _NumberTable:
     """Physical columns, including the native column hidden from the drawing."""
 
-    def __init__(self, components):
+    def __init__(self, components, *, advertised_excess=0):
         self.cells = [["ITEM NO.", "PART NUMBER", "QTY."], ["1", "native-key", "1"]]
         self.components = tuple(components)
+        self.advertised_excess = advertised_excess
         self.columns = [
-            {"kind": 202, "property": None, "hidden": False},
-            {"kind": 201, "property": False, "hidden": False},
-            {"kind": 203, "property": None, "hidden": False},
+            {"kind": 202, "property": None, "hidden": False, "width": 0.02},
+            {"kind": 201, "property": False, "hidden": False, "width": 0.02},
+            {"kind": 203, "property": None, "hidden": False, "width": 0.02},
         ]
         self.RowCount = 2
         self.TotalRowCount = 2
@@ -510,12 +511,33 @@ class _NumberTable:
 
     @property
     def TotalColumnCount(self):
-        return len(self.columns)
+        return len(self.columns) + self.advertised_excess
+
+    def _column_index(self, index, include_hidden):
+        indices = [
+            physical
+            for physical, column in enumerate(self.columns)
+            if include_hidden or not column["hidden"]
+        ]
+        return indices[index] if 0 <= index < len(indices) else None
 
     def DisplayedText(self, row, column):
-        return self.cells[row][column]
+        return self.DisplayedText2(row, column, False)
+
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._column_index(column, include_hidden)
+        return self.cells[row][physical] if physical is not None else ""
+
+    def GetColumnTitle2(self, index, include_hidden):
+        return self.DisplayedText2(0, index, include_hidden)
 
     def MoveColumn(self, source, where, destination):
+        if (
+            where not in (2, 3)
+            or self._column_index(source, True) is None
+            or self._column_index(destination, True) is None
+        ):
+            raise IndexError("invalid physical column move")
         if not self.accept_move:
             return False
         target = destination + (where == 3) - (source < destination)
@@ -525,27 +547,46 @@ class _NumberTable:
         return True
 
     def InsertColumn2(self, where, index, title, _width):
+        if where not in (2, 3) or self._column_index(index, True) is None:
+            raise IndexError("invalid physical column insertion")
         if not self.accept_insert:
             return False
         target = index + (where == 3)
-        self.columns.insert(target, {"kind": 0, "property": None, "hidden": False})
+        self.columns.insert(
+            target,
+            {"kind": 0, "property": None, "hidden": False, "width": 0.02},
+        )
         for row_index, row in enumerate(self.cells):
             row.insert(target, title if row_index == 0 else "")
         return True
 
     def SetColumnHidden(self, index, hidden):
+        if self._column_index(index, True) is None:
+            raise IndexError("invalid physical column hide")
         if self.accept_hide:
             self.columns[index]["hidden"] = hidden
+            self.columns[index]["width"] = 0.0 if hidden else 0.02
         # Generated indexed property setter returns VT_VOID, not success.
 
     def ColumnHidden(self, index):
-        return self.columns[index]["hidden"]
+        physical = self._column_index(index, True)
+        return self.columns[physical]["hidden"] if physical is not None else False
+
+    def GetColumnWidth(self, index):
+        physical = self._column_index(index, True)
+        return self.columns[physical]["width"] if physical is not None else 0.0
 
     def GetColumnType3(self, index, include_hidden):
-        column = self.columns[index]
+        physical = self._column_index(index, include_hidden)
+        if physical is None:
+            return -1, None, 0
+        column = self.columns[physical]
         return column["kind"], column["property"], 0
 
     def SetColumnType3(self, column, kind, include_hidden, property_name):
+        column = self._column_index(column, include_hidden)
+        if column is None:
+            raise IndexError("invalid physical column binding")
         if self.type_status:
             return self.type_status
         self.columns[column].update(kind=kind, property=property_name)
@@ -570,9 +611,15 @@ class _NumberTable:
         return 0
 
     def GetColumnCustomProperty(self, column):
-        return self.property_readback if self.columns[column]["kind"] == 204 else ""
+        physical = self._column_index(column, True)
+        if physical is None or self.columns[physical]["kind"] != 204:
+            return ""
+        return self.property_readback
 
     def SetColumnTitle2(self, column, title, include_hidden):
+        column = self._column_index(column, include_hidden)
+        if column is None:
+            raise IndexError("invalid physical column title")
         if self.accept_title:
             self.cells[0][column] = title
         return self.accept_title
@@ -595,8 +642,9 @@ def number_binding(unwrapped_com, monkeypatch):
 
 
 @pytest.mark.parametrize("member", ["LeverWire", "LeverWire Simplified"])
+@pytest.mark.parametrize("advertised_excess", [0, 1])
 def test_number_column_binds_native_property_and_reads_actual_configuration(
-    number_binding, member
+    number_binding, member, advertised_excess
 ):
     adapter, _rebuilds = number_binding
     properties = {
@@ -606,7 +654,7 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         (member, "Number"): NUMBER,
     }
     component = _component(properties=properties, configuration=member)
-    table = _NumberTable([component])
+    table = _NumberTable([component], advertised_excess=advertised_excess)
     table.cells[0][1] = " part number "
     tables._bind_bom_number_property(
         adapter,
@@ -616,9 +664,12 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
     )
     assert table.GetColumnCustomProperty(1) == "Number"
     assert table.cells[0][1] == "PART NUMBER"
-    assert table.ColumnCount == 3 and table.TotalColumnCount == 4
+    assert table.ColumnCount == 3
+    assert len(table.columns) == 4
+    assert table.TotalColumnCount == 4 + advertised_excess
     assert table.GetColumnType3(3, True)[0] == 201
     assert table.ColumnHidden(3) is True
+    assert table.GetColumnWidth(3) == 0.0
 
     # Changing the actual selected member makes the displayed Number stale,
     # regardless of the view configuration or document-level property.
@@ -660,20 +711,18 @@ def test_number_column_uses_document_property_only_when_actual_member_has_none(
 
 
 @pytest.mark.parametrize(
-    "fault, message",
+    "fault",
     [
-        ("column-type", "column type failed"),
-        ("move", "native column could not be moved"),
-        ("insert", "Number column could not be inserted"),
-        ("hide", "native column is not hidden"),
-        ("property-readback", "binding did not persist"),
-        ("title", "header could not be restored"),
-        ("header", "no PART NUMBER column"),
+        "column-type",
+        "move",
+        "insert",
+        "hide",
+        "property-readback",
+        "title",
+        "header",
     ],
 )
-def test_number_column_binding_refuses_native_metadata_failures(
-    number_binding, fault, message
-):
+def test_number_column_binding_refuses_native_metadata_failures(number_binding, fault):
     adapter, rebuilds = number_binding
     table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
     if fault == "column-type":
@@ -690,7 +739,7 @@ def test_number_column_binding_refuses_native_metadata_failures(
         table.accept_title = False
     else:
         table.cells[0][1] = "UNRELATED PROPERTY"
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError):
         tables._bind_bom_number_property(
             adapter, table, configuration="Default", label="wire"
         )

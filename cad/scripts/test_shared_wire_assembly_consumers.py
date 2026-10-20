@@ -230,16 +230,17 @@ def test_source_census_requires_the_wire_presentation_to_be_collapsed(
 
 
 class _Bom:
-    def __init__(self, drawing, member):
+    def __init__(self, drawing, member, *, advertised_excess=0):
         self.cells = [
             ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY.", "NATIVE PART NUMBER"]
         ]
+        self.advertised_excess = advertised_excess
         self.columns = [
-            (202, None, False),
-            (204, "Number", False),
-            (204, "Description", False),
-            (203, None, False),
-            (201, False, True),
+            {"kind": 202, "property": None, "hidden": False, "width": 0.02},
+            {"kind": 204, "property": "Number", "hidden": False, "width": 0.02},
+            {"kind": 204, "property": "Description", "hidden": False, "width": 0.02},
+            {"kind": 203, "property": None, "hidden": False, "width": 0.02},
+            {"kind": 201, "property": False, "hidden": True, "width": 0.0},
         ]
         self.components = {}
         self.writes = []
@@ -286,50 +287,96 @@ class _Bom:
 
     @property
     def ColumnCount(self):
-        return sum(not hidden for _kind, _property, hidden in self.columns)
+        return sum(not column["hidden"] for column in self.columns)
 
     @property
     def TotalColumnCount(self):
-        return len(self.columns)
+        return len(self.columns) + self.advertised_excess
+
+    def _column_index(self, index, include_hidden):
+        indices = [
+            physical
+            for physical, column in enumerate(self.columns)
+            if include_hidden or not column["hidden"]
+        ]
+        return indices[index] if 0 <= index < len(indices) else None
 
     def GetColumnType3(self, index, include_hidden):
-        kind, property_data, _hidden = self.columns[index]
-        return kind, property_data, 0
+        physical = self._column_index(index, include_hidden)
+        if physical is None:
+            return -1, None, 0
+        column = self.columns[physical]
+        return column["kind"], column["property"], 0
 
     def ColumnHidden(self, index):
-        return self.columns[index][2]
+        physical = self._column_index(index, True)
+        return self.columns[physical]["hidden"] if physical is not None else False
+
+    def GetColumnWidth(self, index):
+        physical = self._column_index(index, True)
+        return self.columns[physical]["width"] if physical is not None else 0.0
+
+    def GetColumnTitle2(self, index, include_hidden):
+        return self.DisplayedText2(0, index, include_hidden)
 
     def GetColumnCustomProperty(self, index):
-        return self.columns[index][1]
+        physical = self._column_index(index, True)
+        if physical is None or self.columns[physical]["kind"] != 204:
+            return ""
+        return self.columns[physical]["property"]
 
     def DisplayedText(self, row, column):
-        return self.cells[row][column]
+        return self.DisplayedText2(row, column, False)
+
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._column_index(column, include_hidden)
+        return self.cells[row][physical] if physical is not None else ""
 
     def GetComponents2(self, row, configuration):
         return self.components[row] if configuration == "Default Simplified" else ()
 
     def IsCellTextEditable(self, _row, column):
-        return column != 1
+        physical = self._column_index(column, False)
+        if physical is None:
+            raise IndexError("invalid displayed column")
+        return self.columns[physical]["property"] != "Number"
 
-    def SetText2(self, row, column, _include_hidden, text):
-        assert column != 1, "the associative Number column must never be overwritten"
+    def SetText2(self, row, column, include_hidden, text):
+        physical = self._column_index(column, include_hidden)
+        if physical is None:
+            raise IndexError("invalid displayed column write")
+        assert self.columns[physical]["property"] != "Number", (
+            "the associative Number column must never be overwritten"
+        )
         self.writes.append((row, column, text))
-        self.cells[row][column] = text
+        self.cells[row][physical] = text
 
     def InsertColumn2(self, position, column, title, _width):
         if position not in (2, 3):
             raise ValueError("this fixture supports native Before/After insertion")
+        if self._column_index(column, True) is None:
+            raise IndexError("invalid physical column insertion")
         index = column + (position == 3)
-        self.columns.insert(index, (0, None, False))
+        self.columns.insert(
+            index,
+            {"kind": 0, "property": None, "hidden": False, "width": 0.02},
+        )
         for row_index, row in enumerate(self.cells):
             row.insert(index, title if row_index == 0 else "")
         return True
 
-    def SetColumnTitle2(self, column, title, _include_hidden):
-        self.cells[0][column] = title
+    def SetColumnTitle2(self, column, title, include_hidden):
+        physical = self._column_index(column, include_hidden)
+        if physical is None:
+            raise IndexError("invalid physical column title")
+        self.cells[0][physical] = title
         return True
 
-    def SetColumnWidth(self, _column, width, _options):
+    def SetColumnWidth(self, column, width, _options):
+        physical = self._column_index(column, True)
+        if physical is None:
+            raise IndexError("invalid physical column width")
+        self.columns[physical]["width"] = width
         return width
 
     def SetRowHeight(self, _row, _height, _options):
@@ -337,11 +384,12 @@ class _Bom:
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+@pytest.mark.parametrize("advertised_excess", [0, 1])
 def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
-    monkeypatch, drawing, member, _assembly
+    monkeypatch, drawing, member, _assembly, advertised_excess
 ):
     _unwrapped_com(monkeypatch, drawing)
-    table = _Bom(drawing, member + " Simplified")
+    table = _Bom(drawing, member + " Simplified", advertised_excess=advertised_excess)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     items = dict(drawing._validate_bom(adapter, table))
     assert items == {
@@ -349,6 +397,12 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
     }
     assert table.cells[int(items[drawing.WIRE_ROW])][1] == "MHA-SH-VN-56"
     assert all(column != 1 for _row, column, _text in table.writes)
+    assert len(table.columns) == table.ColumnCount + 1
+    assert table.TotalColumnCount == len(table.columns) + advertised_excess
+    native_column = len(table.columns) - 1
+    assert table.GetColumnType3(native_column, True)[0] == 201
+    assert table.ColumnHidden(native_column) is True
+    assert table.GetColumnWidth(native_column) == 0.0
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)

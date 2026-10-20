@@ -17,7 +17,7 @@ from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_variant_drawing import build_purchased_variant_drawing
 from _com import _early_bound, _read_member
-from _drawing_attachment import _is_same_attachment
+from _drawing_attachment import _assert_leader_lands, _is_same_attachment
 from _drawing_common import set_high_quality_shaded_with_edges
 from _drawing_dimensions import set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
@@ -25,6 +25,8 @@ from _drawing_edges import visible_view_entities
 from _drawing_projection import model_points_in_view
 from _purchased_fastener_drawing import _box, _inside
 import sh_vn_clamping_kit_hold_down_stud_spec as stud
+import sh_vn_clamping_kit_t_nut_spec as tnut
+import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
 
@@ -139,6 +141,30 @@ def _stud_length_reference(
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     set_reference_dimension(adapter, annotation, label="kit stud overall length")
 
+    def display_bounds() -> tuple[Any, Any]:
+        rendered, errors = annotation_display(adapter, annotation)
+        ink = _measured_display_box(rendered)
+        text_ink = _measured_display_box({"texts": rendered.get("texts", ())})
+        if errors or estimated_text_runs(rendered) or ink is None or text_ink is None:
+            raise RuntimeError("kit stud: reference display is unreadable")
+        return ink, text_ink
+
+    _ink, text_ink = display_bounds()
+    front_left = _box(front.GetOutline(), label="kit stud FRONT")[0]
+    # Native83 centred the 17.67 mm reference text on its dimension line,
+    # across the stud outline. Seat its measured right edge left of the view;
+    # 2.5 mm authoring air retains a strict 2 mm settled clearance.
+    shift = min(0.0, front_left - 0.0025 - text_ink.xmax)
+    if shift < 0.0:
+        position = tuple(
+            float(value) for value in _read_member(annotation, "GetPosition")
+        )
+        if (
+            annotation.SetPosition2(position[0] + shift, position[1], position[2])
+            is not True
+        ):
+            raise RuntimeError("kit stud: reference relocation refused")
+
     def settled() -> None:
         present = [
             raw
@@ -160,24 +186,23 @@ def _stud_length_reference(
             or (display.GetText(1), display.GetText(2)) != ("(", ")")
         ):
             raise RuntimeError("kit stud: overall reference display was lost")
-        rendered, errors = annotation_display(adapter, annotation)
-        ink = _measured_display_box(rendered)
+        ink, text_ink = display_bounds()
         if (
-            errors
-            or not rendered.get("texts")
-            or estimated_text_runs(rendered)
-            or ink is None
-            or not _inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), cell)
+            not _inside((ink.xmin, ink.ymin, ink.xmax, ink.ymax), cell)
+            or text_ink.xmax
+            > _box(front.GetOutline(), label="kit stud FRONT")[0] - 0.002
         ):
             raise RuntimeError(
-                "kit stud: reference text/strokes leave the FRONT cell or are unreadable"
+                "kit stud: reference text/strokes leave the FRONT cell or cross its model clearance"
             )
 
     settled()
     return settled
 
 
-def _note_text_box(annotation: Any) -> tuple[float, float, float, float]:
+def _note_text_box(
+    annotation: Any, *, label: str = "kit thread note"
+) -> tuple[float, float, float, float]:
     """Native rendered text only: INote.GetExtent also includes its fixed leader."""
     data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
     texts = []
@@ -192,7 +217,7 @@ def _note_text_box(annotation: Any) -> tuple[float, float, float, float]:
             or not math.isfinite(height)
             or min(width, height) <= 0
         ):
-            raise RuntimeError("kit T-nut: native thread text size is unreadable")
+            raise RuntimeError(f"{label}: native thread text size is unreadable")
         texts.append(
             {
                 "t": text,
@@ -205,12 +230,12 @@ def _note_text_box(annotation: Any) -> tuple[float, float, float, float]:
         )
     box = _measured_display_box({"texts": texts})
     if box is None:
-        raise RuntimeError("kit T-nut: native thread text is missing")
+        raise RuntimeError(f"{label}: native thread text is missing")
     return (box.xmin, box.ymin, box.xmax, box.ymax)
 
 
-def _tnut_thread_note(
-    adapter: Any, cells: tuple, views: list[Any]
+def _member_thread_note(
+    adapter: Any, cells: tuple, views: list[Any], *, member: str, spec: Any
 ) -> Callable[[], None]:
     """Author and relocate the native cosmetic-thread callout, never free text.
 
@@ -220,11 +245,13 @@ def _tnut_thread_note(
     owning thread annotation's bore attachments. Preserve both identities and
     the thread's geometry through relocation and read-only settled checks.
     """
+    label = f"kit {member}"
+    bore_feature = f"{spec.CONFIGURATION}ThreadBore"
     iso = _early_bound(views[3], "IView")
     # The member hook follows HLR fitting, before the finalizer authors this
     # mode. Inspect the same display mode that will print, then flush its
     # geometry before reading annotations. This is not a note-generation retry.
-    set_high_quality_shaded_with_edges(adapter, iso, label="kit T-nut isometric")
+    set_high_quality_shaded_with_edges(adapter, iso, label=f"{label} isometric")
 
     def attachment_state(annotation: Any) -> tuple:
         attached = tuple(annotation.GetAttachedEntities3() or ())
@@ -258,8 +285,168 @@ def _tnut_thread_note(
             and count == len(attached) == len(types)
             and all(entity is not None for entity in attached)
             and all(kind in (1, 2) for kind in types)
-            and any("TNutThreadBore" in names for names in features)
+            and any(bore_feature in names for names in features)
         )
+
+    def bore_definition() -> tuple[Any, float]:
+        part = _early_bound(iso.ReferencedDocument, "IPartDoc")
+        raw_feature = part.FeatureByName(bore_feature)
+        if raw_feature is None:
+            raise RuntimeError(
+                f"{label}: native bore feature {bore_feature!r} is missing"
+            )
+        feature = _early_bound(raw_feature, "IFeature")
+        raw_definition = feature.GetDefinition()
+        if feature.GetTypeName2() != "HoleWzd" or raw_definition is None:
+            raise RuntimeError(f"{label}: native bore has no Hole Wizard definition")
+        definition = _early_bound(raw_definition, "IWizardHoleFeatureData2")
+        # Match _holes.wizard_holes' documented through-tap readback, not the
+        # rounded catalogue drill. Native83 cut 10.71626 mm, not 10.716 mm.
+        diameter = float(definition.ThruTapDrillDiameter)
+        if not math.isfinite(diameter) or diameter <= 0.0:
+            raise RuntimeError(
+                f"{label}: native through-tap drill diameter is unreadable: {diameter!r}"
+            )
+        return feature, diameter
+
+    def same_geometry(before: tuple, after: tuple) -> bool:
+        return (
+            before[1:3] == after[1:3]
+            and len(before[0]) == len(after[0])
+            and all(
+                _is_same_attachment(
+                    adapter, actual, expected, "EDGE" if kind == 1 else "FACE"
+                )
+                for expected, actual, kind in zip(
+                    before[0], after[0], before[1], strict=True
+                )
+            )
+        )
+
+    def non_iso_callouts() -> list[tuple]:
+        found = []
+        for raw_view in views[:3]:
+            view = _early_bound(raw_view, "IView")
+            view.UpdateViewDisplayGeometry()
+            for raw in view.GetAnnotations() or ():
+                thread_annotation = _early_bound(raw, "IAnnotation")
+                if int(thread_annotation.GetType()) != 1:  # swCThread
+                    continue
+                thread = _early_bound(
+                    thread_annotation.GetSpecificAnnotation(), "ICThread"
+                )
+                raw_note = _read_member(thread, "ThreadCallout")
+                if raw_note is None:
+                    continue
+                note = _early_bound(raw_note, "INote")
+                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+                state = attachment_state(thread_annotation)
+                if not belongs_to_bore(state):
+                    raise RuntimeError(
+                        f"{label}: cannot retire a non-isometric callout without "
+                        f"{bore_feature} association; types={state[1][:8]!r}, "
+                        f"count={state[2]}, features={state[3][:4]!r}"
+                    )
+                owner = _read_member(annotation, "Owner")
+                if int(annotation.OwnerType) != 0 or owner is None:
+                    raise RuntimeError(
+                        f"{label}: native thread callout has no drawing-view owner"
+                    )
+                owner = _early_bound(owner, "IView")
+                if int(adapter.swApp.IsSame(owner, view)) != 1:
+                    raise RuntimeError(
+                        f"{label}: non-isometric thread callout has an unexpected owner; "
+                        f"view={str(view.GetName2())[:80]!r}, "
+                        f"owner={str(owner.GetName2())[:80]!r}"
+                    )
+                if not any(
+                    int(adapter.swApp.IsSame(annotation, item[3])) == 1
+                    for item in found
+                ):
+                    found.append((view, thread_annotation, note, annotation, state))
+        return found
+
+    def retire_non_iso_callouts() -> None:
+        # Native83's flange-nut RIGHT view cannot show the bore opening.
+        # Deliberately author the callout in ISO, not a free-text replacement
+        # or an undocumented transfer of the old CThread -> INote relationship.
+        draw = _early_bound(adapter.currentModel, "IModelDoc2")
+        for view, old_thread, old_note, old_annotation, before in non_iso_callouts():
+            diagnostic = {
+                "view": str(view.GetName2())[:80],
+                "thread": str(old_thread.GetName())[:80],
+                "text": str(old_note.GetText())[:120],
+            }
+            try:
+                draw.ClearSelection2(True)
+                selected = old_annotation.Select2(False, 0)
+                manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+                count = int(manager.GetSelectedObjectCount2(-1))
+                kind = int(manager.GetSelectedObjectType3(1, -1)) if count else 0
+                picked = manager.GetSelectedObject6(1, -1) if count == 1 else None
+                picked_annotation = (
+                    _early_bound(
+                        _early_bound(picked, "INote").GetAnnotation(), "IAnnotation"
+                    )
+                    if kind == 15 and picked is not None  # swSelNOTES
+                    else None
+                )
+                if (
+                    selected is not True
+                    or count != 1
+                    or kind != 15
+                    or picked_annotation is None
+                    or int(adapter.swApp.IsSame(picked_annotation, old_annotation)) != 1
+                ):
+                    raise RuntimeError(
+                        f"{label}: cannot select the non-isometric native note for retirement; "
+                        f"count={count}, type={kind}, callout={diagnostic!r}"
+                    )
+                draw.EditDelete()  # VT_VOID: fresh native inventories below prove deletion.
+                view.UpdateViewDisplayGeometry()
+                fresh = [
+                    annotation
+                    for raw in view.GetAnnotations() or ()
+                    if int((annotation := _early_bound(raw, "IAnnotation")).GetType())
+                    == 1
+                    and int(adapter.swApp.IsSame(annotation, old_thread)) == 1
+                ]
+                after = attachment_state(fresh[0]) if len(fresh) == 1 else None
+                survivors = [
+                    raw
+                    for raw in view.GetNotes() or ()
+                    if int(
+                        adapter.swApp.IsSame(
+                            _early_bound(
+                                _early_bound(raw, "INote").GetAnnotation(),
+                                "IAnnotation",
+                            ),
+                            old_annotation,
+                        )
+                    )
+                    == 1
+                ]
+                if (
+                    after is None
+                    or not belongs_to_bore(after)
+                    or not same_geometry(before, after)
+                    or _read_member(
+                        _early_bound(fresh[0].GetSpecificAnnotation(), "ICThread"),
+                        "ThreadCallout",
+                    )
+                    is not None
+                    or survivors
+                ):
+                    raise RuntimeError(
+                        f"{label}: native callout retirement failed or changed its CThread/model "
+                        f"geometry; matching_threads={len(fresh)}, surviving_notes={len(survivors)}, "
+                        f"callout={diagnostic!r}"
+                    )
+                _telemetry.info(
+                    f"{label}: retired non-isometric native thread note; {diagnostic!r}"
+                )
+            finally:
+                draw.ClearSelection2(True)
 
     insertion_before: dict[str, Any] = {}
 
@@ -304,7 +491,7 @@ def _tnut_thread_note(
         try:
             if drawing.ActivateView(iso.GetName2()) is not True:
                 raise RuntimeError(
-                    f"kit T-nut: cannot activate thread-callout view; {insertion_before!r}"
+                    f"{label}: cannot activate thread-callout view; {insertion_before!r}"
                 )
             draw.ClearSelection2(True)
             manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
@@ -337,12 +524,12 @@ def _tnut_thread_note(
             )
             if selected is not True or count != 1 or kind != 39 or not same:
                 raise RuntimeError(
-                    f"kit T-nut: cannot select cosmetic thread; {insertion_before!r}"
+                    f"{label}: cannot select cosmetic thread; {insertion_before!r}"
                 )
             insertion_before["selected"] = True
             insertion_before["requested"] = True
             _telemetry.info(
-                f"kit T-nut: requesting native thread callout; {insertion_before!r}"
+                f"{label}: requesting native thread callout; {insertion_before!r}"
             )
             # VT_VOID. Native canary 2267 proved this creates the callout;
             # the same ICThread's subsequent ThreadCallout is the proof.
@@ -380,7 +567,7 @@ def _tnut_thread_note(
                     )
             except Exception as restore_error:
                 message = (
-                    f"kit T-nut: cannot restore drawing activation: {restore_error!r}; "
+                    f"{label}: cannot restore drawing activation: {restore_error!r}; "
                     f"insertion_before={insertion_before!r}"
                 )
                 if primary_error is not None:
@@ -418,7 +605,7 @@ def _tnut_thread_note(
                     ]
                     if len(fresh) != 1:
                         raise RuntimeError(
-                            "kit T-nut: selected cosmetic thread lost identity after "
+                            f"{label}: selected cosmetic thread lost identity after "
                             f"insertion; matching_annotations={len(fresh)}, "
                             f"insertion_before={insertion_before!r}"
                         )
@@ -462,7 +649,7 @@ def _tnut_thread_note(
                     }
                 )
             if belongs_to_bore((attached, types, count, features)):
-                found.append((note, annotation, thread_annotation, attached, types))
+                found.append((note, annotation, thread_annotation, state))
         if len(found) != 1:
             # Diagnostic only: ordinary view notes are not a substitute for the
             # native ICThread -> ThreadCallout relationship.
@@ -472,8 +659,8 @@ def _tnut_thread_note(
                 for raw in view_notes[:4]
             )
             raise RuntimeError(
-                "kit T-nut: expected one automatic isometric thread note from a "
-                f"cosmetic thread attached to TNutThreadBore; found={len(found)}, "
+                f"{label}: expected one automatic isometric thread note from a "
+                f"cosmetic thread attached to {bore_feature}; found={len(found)}, "
                 f"cosmetic_threads={threads}, "
                 f"callouts={callouts}, candidates={observed!r}, "
                 f"view_notes={len(view_notes)}, view_note_texts={view_note_texts!r}, "
@@ -481,18 +668,20 @@ def _tnut_thread_note(
             )
         return found
 
-    note, annotation, thread_annotation, attachments, attachment_types = notes(
+    native_bore, native_diameter = bore_definition()
+    retire_non_iso_callouts()
+    note, annotation, thread_annotation, geometry = notes(
         author_missing=True,
     )[0]
     text, linked = note.GetText(), note.PropertyLinkedText
     if not text.strip():
-        raise RuntimeError("kit T-nut: native thread callout has no text")
+        raise RuntimeError(f"{label}: native thread callout has no text")
 
     def region() -> tuple[float, float, float, float]:
-        top = max(_box(view.GetOutline(), label="T-nut")[3] for view in views)
+        top = max(_box(view.GetOutline(), label=label)[3] for view in views)
         return (cells[0][2][0] + 0.002, top + 0.002, cells[2][2][2] - 0.002, 0.253)
 
-    bounds = _note_text_box(annotation)
+    bounds = _note_text_box(annotation, label=label)
     clear = region()
     position = tuple(float(value) for value in _read_member(annotation, "GetPosition"))
     target = (
@@ -501,11 +690,152 @@ def _tnut_thread_note(
         0.0,
     )
     if annotation.SetPosition2(*target) is not True:
-        raise RuntimeError("kit T-nut: native thread-note relocation refused")
+        raise RuntimeError(f"{label}: native thread-note relocation refused")
+
+    def bore_landing(note_annotation: Any) -> tuple[Any, tuple[float, float]]:
+        iso.UpdateViewDisplayGeometry()
+        current_bore, diameter = bore_definition()
+        if (
+            int(adapter.swApp.IsSame(current_bore, native_bore)) != 1
+            or diameter != native_diameter
+        ):
+            raise RuntimeError(
+                f"{label}: native bore feature/diameter changed; "
+                f"expected_diameter_m={native_diameter!r}, actual_diameter_m={diameter!r}"
+            )
+        rims = []
+        circles_seen, observed, matching_features = 0, [], []
+        for raw in visible_view_entities(iso, 1, label=f"{label} visible bore rim"):
+            edge = _early_bound(raw, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if curve is None or curve.IsCircle() is not True:
+                continue
+            circle = tuple(
+                float(value) for value in (_read_member(curve, "CircleParams") or ())
+            )
+            circles_seen += 1
+            if len(observed) < 6:
+                observed.append(circle[:7])
+            if (
+                len(circle) != 7
+                or not all(math.isfinite(value) for value in circle)
+                or not math.isclose(circle[0], 0.0, abs_tol=1e-9)
+                or not math.isclose(circle[1] * 1000, spec.HEIGHT, abs_tol=1e-5)
+                or not math.isclose(circle[2], 0.0, abs_tol=1e-9)
+                or not math.isclose(circle[3], 0.0, abs_tol=1e-9)
+                or not math.isclose(abs(circle[4]), 1.0, abs_tol=1e-9)
+                or not math.isclose(circle[5], 0.0, abs_tol=1e-9)
+                or not math.isclose(circle[6] * 2, diameter, rel_tol=0.0, abs_tol=1e-8)
+            ):
+                continue
+            features = []
+            bore_owned = False
+            for face in edge.GetTwoAdjacentFaces2() or ():
+                if face is not None:
+                    feature = _early_bound(face, "IFace2").GetFeature()
+                    if feature is not None:
+                        feature = _early_bound(feature, "IFeature")
+                        features.append(str(feature.Name))
+                        bore_owned |= (
+                            int(adapter.swApp.IsSame(feature, native_bore)) == 1
+                        )
+            if len(matching_features) < 4:
+                matching_features.append(tuple(name[:64] for name in features[:4]))
+            if bore_owned:
+                rims.append((edge, circle))
+        if not rims:
+            raise RuntimeError(
+                f"{label}: expected one visible top bore rim owned by {bore_feature}; "
+                f"found={len(rims)}, visible_circles={circles_seen}, "
+                f"circle_params={observed!r}, matching_geometry_features={matching_features!r}"
+            )
+        edge, circle = rims[0]
+        x, y, z, _ax, _ay, _az, radius = circle
+        center, along_x, along_z = model_points_in_view(
+            adapter,
+            iso,
+            ((x, y, z), (x + radius, y, z), (x, y, z + radius)),
+            label=f"{label} native bore-rim projection",
+        )
+        text_box = _note_text_box(note_annotation, label=label)
+        toward_text = (
+            (text_box[0] + text_box[2]) / 2 - center[0],
+            (text_box[1] + text_box[3]) / 2 - center[1],
+        )
+        basis_x = (along_x[0] - center[0], along_x[1] - center[1])
+        basis_z = (along_z[0] - center[0], along_z[1] - center[1])
+        weights = (
+            sum(a * b for a, b in zip(basis_x, toward_text, strict=True)),
+            sum(a * b for a, b in zip(basis_z, toward_text, strict=True)),
+        )
+        magnitude = math.hypot(*weights)
+        if not math.isfinite(magnitude) or magnitude <= 0.0:
+            raise RuntimeError(
+                f"{label}: bore-rim landing has no readable projection toward its text"
+            )
+        # A support point of the projected REAL circle, facing the note.
+        # This cannot select an arbitrary nearby exterior/silhouette edge.
+        tip = tuple(
+            center[index]
+            + (basis_x[index] * weights[0] + basis_z[index] * weights[1]) / magnitude
+            for index in range(2)
+        )
+        model_tip = (
+            x + radius * weights[0] / magnitude,
+            y,
+            z + radius * weights[1] / magnitude,
+        )
+        eligible, trim_observed = [], []
+        for candidate, _circle in rims:
+            # CircleParams describes the underlying circle, not its trim.
+            # Follow the native physical-edge proof used by the cone platform:
+            # GetCurve must precede GetCurveParams3; GetClosestPointOn is on
+            # IEdge (not the untrimmed ICurve).
+            candidate.GetCurve()
+            raw_trim = candidate.GetCurveParams3()
+            if raw_trim is None:
+                raise RuntimeError(
+                    f"{label}: native bore-rim curve parameters are missing"
+                )
+            trim = _early_bound(raw_trim, "ICurveParamData")
+            interval = (float(trim.UMinValue), float(trim.UMaxValue))
+            closest = tuple(
+                float(value)
+                for value in (candidate.GetClosestPointOn(*model_tip) or ())
+            )
+            if (
+                not all(math.isfinite(value) for value in interval)
+                or interval[0] >= interval[1]
+                or len(closest) < 4
+                or not all(math.isfinite(value) for value in closest[:4])
+            ):
+                raise RuntimeError(
+                    f"{label}: native bore-rim trim/closest point is unreadable; "
+                    f"interval={interval!r}, closest={closest[:4]!r}"
+                )
+            distance = math.dist(model_tip, closest[:3])
+            if len(trim_observed) < 6:
+                trim_observed.append((interval, closest[3], distance))
+            if distance <= 1e-8:
+                eligible.append(candidate)
+        if len(eligible) != 1:
+            raise RuntimeError(
+                f"{label}: expected one visible physical bore-rim edge at the leader tip; "
+                f"circle_edges={len(rims)}, eligible_edges={len(eligible)}, "
+                f"model_tip={model_tip!r}, trims={trim_observed!r}"
+            )
+        return eligible[0], tip
+
+    native_rim, tip = bore_landing(annotation)
+    # The SDK supports this setter on INote, not CThread. Whether this native
+    # callout preserves its parent relationship is proved below, never assumed
+    # from the setter result or the note's zero direct attachments.
+    if annotation.SetLeaderAttachmentPointAtIndex(0, tip[0], tip[1], 0.0) is not True:
+        raise RuntimeError(f"{label}: native bore-rim leader placement refused")
 
     def settled() -> None:
         current = notes()
-        current_note, current_annotation, current_thread, attached, types = current[0]
+        current_note, current_annotation, current_thread, current_geometry = current[0]
         if (
             current_note.GetText() != text
             # swObjectEquality.swObjectSame = 1 (SOLIDWORKS API Help).
@@ -514,30 +844,50 @@ def _tnut_thread_note(
             or current_note.PropertyLinkedText != linked
             or current_annotation.IsDangling() is not False
             or int(current_annotation.Visible) != 1
-            or types != attachment_types
-            # The returned geometry snapshot belongs to the owning ICThread,
-            # not the callout INote (which natively has no direct attachments).
-            or len(attached) != len(attachments)
-            or any(
-                not _is_same_attachment(
-                    adapter,
-                    actual,
-                    expected,
-                    "EDGE" if kind == 1 else "FACE",
-                )
-                for actual, expected, kind in zip(
-                    attached, attachments, attachment_types, strict=True
+            or int(current_annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
+            or int(
+                adapter.swApp.IsSame(
+                    _early_bound(_read_member(current_annotation, "Owner"), "IView"),
+                    iso,
                 )
             )
-            or not _inside(_note_text_box(annotation), region())
+            != 1
+            or not same_geometry(geometry, current_geometry)
+            or not _inside(_note_text_box(current_annotation, label=label), region())
             or not _inside(
-                _box(note.GetExtent(), label=text, kind="note"),
+                _box(current_note.GetExtent(), label=text, kind="note"),
                 (cells[0][2][0], cells[3][2][1], cells[2][2][2], 0.255),
             )
         ):
             raise RuntimeError(
-                "kit T-nut: thread note lost identity, attachment or clearance"
+                f"{label}: thread note lost identity, attachment or clearance"
             )
+        remaining = non_iso_callouts()
+        if remaining:
+            raise RuntimeError(
+                f"{label}: non-isometric native thread callout survived/returned; "
+                f"count={len(remaining)}, views="
+                f"{tuple(str(item[0].GetName2())[:80] for item in remaining[:4])!r}"
+            )
+        current_rim, current_tip = bore_landing(current_annotation)
+        if int(adapter.swApp.IsSame(current_rim, native_rim)) != 1:
+            raise RuntimeError(f"{label}: visible bore rim lost native identity")
+        points = tuple(
+            float(value) for value in current_annotation.GetLeaderPointsAtIndex(0) or ()
+        )
+        if (
+            len(points) < 6
+            or len(points) % 3
+            or not all(math.isfinite(value) for value in points)
+        ):
+            raise RuntimeError(f"{label}: native thread-note leader is unreadable")
+        _assert_leader_lands(
+            current_annotation,
+            current_tip,
+            what="native thread note",
+            label=label,
+            tolerance=0.0001,
+        )
 
     settled()
     return settled
@@ -552,7 +902,13 @@ def annotate_member(
     if configuration == "HoldDownStud":
         return (_stud_length_reference(adapter, cells, views),)
     if configuration == "TNut":
-        return (_tnut_thread_note(adapter, cells, views),)
+        return (_member_thread_note(adapter, cells, views, member="T-nut", spec=tnut),)
+    if configuration == "FlangeNut":
+        return (
+            _member_thread_note(
+                adapter, cells, views, member="flange nut", spec=flange_nut
+            ),
+        )
     return ()
 
 

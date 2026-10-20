@@ -1110,6 +1110,7 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         assert note._format.CharHeightInPts == 18
 
 
+@pytest.mark.parametrize("configuration", ("TNut", "FlangeNut"))
 @pytest.mark.parametrize(
     "drift",
     (
@@ -1121,6 +1122,65 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "none",
         "face",
         "create-face",
+        "edge",
+        "create-edge",
+        "retire-right",
+        "retire-selection-refused",
+        "retire-selection-ignored",
+        "retire-selection-neighbour",
+        "retire-selection-wrong-type",
+        "retire-selection-extra",
+        "retire-ignored-delete",
+        "retire-thread-lost",
+        "retire-thread-identity",
+        "retire-geometry",
+        "retire-callout-survives",
+        "retire-note-survives",
+        "retire-wrong-feature",
+        "retire-owner-type",
+        "retire-owner-missing",
+        "retire-owner-neighbour",
+        "noniso-reappears",
+        "noniso-shared-iso-note",
+        "setter-refused",
+        "setter-ignored",
+        "setter-parent-detached",
+        "setter-geometry-detached",
+        "setter-note-identity",
+        "setter-owner-detached",
+        "rim-wrong-feature",
+        "rim-feature-identity",
+        "rim-wrong-height",
+        "rim-wrong-radius",
+        "rim-duplicate",
+        "rim-missing",
+        "rim-identity",
+        "rim-split",
+        "rim-off-arc",
+        "rim-params-missing",
+        "rim-params-nan",
+        "rim-params-empty",
+        "rim-closest-missing",
+        "rim-closest-nan",
+        "rim-closest-short",
+        "rim-closest-u-nan",
+        "rim-unused-nan",
+        "bore-feature-missing",
+        "bore-feature-type",
+        "bore-definition-missing",
+        "bore-diameter-nan",
+        "bore-diameter-zero",
+        "bore-feature-drift",
+        "bore-diameter-drift",
+        "bore-fresh-wrapper",
+        "leader-drift",
+        "leader-within-tolerance",
+        "leader-nan",
+        "leader-inf",
+        "leader-truncated",
+        "leader-multiple",
+        "text-nan",
+        "projection-nan",
         "ignored-move",
         "text",
         "link",
@@ -1154,33 +1214,191 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "unsupported-type",
     ),
 )
-def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift):
+def test_kit_native_member_note_relocation_and_settled_refusals(
+    monkeypatch, configuration, drift
+):
+    import math
     import draw_sh_vn_clamping_kit_hardware as kit
 
-    def face(feature="TNutThreadBore"):
-        return SimpleNamespace(GetFeature=lambda: SimpleNamespace(Name=feature))
+    spec = kit.tnut if configuration == "TNut" else kit.flange_nut
+    bore_feature = f"{configuration}ThreadBore"
+    other_feature = (
+        "FlangeNutThreadBore" if configuration == "TNut" else "TNutThreadBore"
+    )
+    # Use each member's real panel, with the same native83 local geometry.
+    offset = 0.0 if configuration == "TNut" else 0.396 / 3 + 0.008 / 3
+    iso_name = f"{configuration}-Isometric"
+    # Native83's vendor STEP bore is 0.21095 in, not nominal TAP_DRILL_DIA / 2.
+    native_bore_radius = 0.00535813
+    bore_definition = SimpleNamespace(ThruTapDrillDiameter=0.01071626)
+    source_bore = SimpleNamespace(
+        Name=bore_feature,
+        GetTypeName2=lambda: "HoleWzd",
+        GetDefinition=lambda: bore_definition,
+    )
+    feature_readback = source_bore
+    native_features = {
+        bore_feature: source_bore,
+        other_feature: SimpleNamespace(Name=other_feature),
+        "Body": SimpleNamespace(Name="Body"),
+    }
 
-    def edge(feature="TNutThreadBore"):
+    def face(feature=bore_feature):
+        native = native_features[feature] if isinstance(feature, str) else feature
+        return SimpleNamespace(GetFeature=lambda: native)
+
+    def edge(feature=bore_feature):
         return SimpleNamespace(
             GetTwoAdjacentFaces2=lambda: (face("Body"), face(feature))
         )
 
+    class BoreRim:
+        def __init__(self):
+            self.feature = bore_feature
+            self.parameter_range = (0.0, 2 * math.pi)
+            self.curve_read = False
+            self.closest_queries = []
+            self.CircleParams = (
+                0.0,
+                spec.HEIGHT / 1000,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                native_bore_radius,
+            )
+
+        def GetCurve(self):
+            self.curve_read = True
+            return self
+
+        def IsCircle(self):
+            return True
+
+        def GetCurveParams3(self):
+            assert self.curve_read
+            if self is rim and drift == "rim-params-missing":
+                return None
+            low, high = self.parameter_range
+            return SimpleNamespace(UMinValue=low, UMaxValue=high)
+
+        def GetClosestPointOn(self, x, y, z):
+            self.closest_queries.append((x, y, z))
+            if self is rim and drift == "rim-closest-missing":
+                return None
+            cx, cy, cz, _ax, _ay, _az, radius = self.CircleParams
+            angle = math.atan2(z - cz, x - cx) % (2 * math.pi)
+            low, high = self.parameter_range
+            if not low <= angle <= high:
+                # Choose the physically closest trimmed arc endpoint, not a
+                # requested point on its untrimmed supporting circle.
+                angle = min(
+                    (low, high),
+                    key=lambda endpoint: (
+                        (cx + radius * math.cos(endpoint) - x) ** 2
+                        + (cz + radius * math.sin(endpoint) - z) ** 2
+                    ),
+                )
+            closest = (cx + radius * math.cos(angle), cy, cz + radius * math.sin(angle))
+            if self is rim and drift == "rim-closest-nan":
+                closest = (float("nan"), cy, closest[2])
+            elif self is rim and drift == "rim-closest-short":
+                return closest
+            elif self is rim and drift == "rim-closest-u-nan":
+                angle = float("nan")
+            unused = float("nan") if drift == "rim-unused-nan" else 0.0
+            return (*closest, angle, unused)
+
+        def GetTwoAdjacentFaces2(self):
+            return (face("Body"), face(self.feature))
+
+    rim = BoreRim()
+    outer_rim, bottom_rim = BoreRim(), BoreRim()
+    outer_rim.feature = "Body"
+    outer_rim.CircleParams = (*rim.CircleParams[:6], 0.02)
+    bottom_rim.CircleParams = (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, native_bore_radius)
+    # Exterior and opposite-end circles are real native geometry, not eligible
+    # substitute landings when the actual visible top opening is wrong/missing.
+    visible_rims = [outer_rim, bottom_rim, rim]
+    projection_calls = []
+
+    def project_point(point):
+        x, y, z = point
+        # An oblique, scaled affine model-to-sheet projection. Nonzero Y
+        # and unequal X/Z bases expose height, radius and silhouette guesses.
+        return (
+            offset + 0.249 + 0.4 * x + 0.12 * y - 0.3 * z,
+            0.213 + 0.18 * x + 0.25 * y + 0.28 * z,
+        )
+
+    def project_points(_adapter, view, points, **_kwargs):
+        assert view is views[3]
+        projection_calls.append(tuple(points))
+        projected = [project_point(point) for point in points]
+        if drift == "projection-nan":
+            projected[0] = (float("nan"), projected[0][1])
+        return projected
+
     class ThreadNote(_Note):
         def __init__(self):
             # A semantic callout need not have the old contiguous literal text.
-            super().__init__("automatic", "1/2-13\nTapped Hole", 0.2631371, 0.2304204)
-            self._extent = (0.2492598, 0.2173807, 0.0, 0.3074012, 0.2307246, 0.0)
+            super().__init__(
+                "automatic", "1/2-13\nTapped Hole", offset + 0.2631371, 0.2304204
+            )
             self.Visible = 1
             self.dangling = False
             self.annotation_readback = self
+            self.OwnerType = 0
+            self.Owner = None
+            self.leader_tip = (offset + 0.2492598, 0.21695, 0.0)
+            self.leader_count = 1
+            self.setter_calls = []
 
         def GetAnnotation(self):
             return self.annotation_readback
+
+        def GetType(self):
+            return 6
 
         def SetPosition2(self, *xyz):
             if drift != "ignored-move":
                 self.SetPosition(*xyz)
             return True
+
+        def Select2(self, append, mark):
+            assert append is False and mark == 0
+            events.append("select-note")
+            if drift == "retire-selection-refused":
+                return False
+            if drift != "retire-selection-ignored":
+                drawing_state.selected = (
+                    ThreadNote() if drift == "retire-selection-neighbour" else self
+                )
+            return True
+
+        def SetLeaderAttachmentPointAtIndex(self, index, x, y, z):
+            assert index == 0
+            self.setter_calls.append((x, y, z))
+            if drift == "setter-refused":
+                return False
+            if drift != "setter-ignored":
+                self.leader_tip = (x, y, z)
+            if drift == "setter-parent-detached":
+                native_threads[0].callout = None
+            elif drift == "setter-geometry-detached":
+                native_threads[0].entity = None
+            elif drift == "setter-note-identity":
+                self.annotation_readback = AnnotationReadback(self, object())
+            elif drift == "setter-owner-detached":
+                self.Owner = views[2]
+            return True
+
+        def GetLeaderPointsAtIndex(self, index):
+            assert index == 0
+            return (*self._position, *self.leader_tip)
+
+        def GetLeaderCount(self):
+            return self.leader_count
 
         def GetAttachedEntities3(self):
             # The native inserted INote has no direct geometry attachments.
@@ -1211,22 +1429,25 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             )
 
         def GetExtent(self):
-            # The associated leader arrow does NOT translate with its text.
-            text = kit._note_text_box(self)
+            # The leader is native geometry, not translated with its text.
+            data = self.GetDisplayData()
+            x, y, _z = data.GetTextPositionAtIndex(0)
+            right = x + data.GetTextInBoxWidthAtIndex(0)
+            top = y + data.GetTextHeightAtIndex(0)
             return (
-                min(0.2492598, text[0]),
-                min(0.21695, text[1]),
+                min(self.leader_tip[0], x),
+                min(self.leader_tip[1], y),
                 0.0,
-                max(0.2496667, text[2]),
-                max(0.2173807, text[3]),
+                max(self.leader_tip[0], right),
+                max(self.leader_tip[1], top),
                 0.0,
             )
 
     class ThreadAnnotation:
         def __init__(self, callout):
             self.callout = callout
-            self.entity = edge()
-            self.attachment_type = 1
+            self.entity = face()
+            self.attachment_type = 2
             self.attachment_count = 1
             self.native_identity = object()
 
@@ -1278,17 +1499,41 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             return getattr(self.note, name)
 
     note = ThreadNote()
+    outlines = (
+        (0.16, 0.13, 0.19, 0.17),
+        (0.1647453, 0.201412, 0.1999213, 0.236588),
+        (0.23, 0.13, 0.26, 0.17),
+        (0.2271081, 0.1978993, 0.2722252, 0.2401007),
+    )
     views = [
-        SimpleNamespace(GetOutline=lambda: (0.16, 0.13, 0.19, 0.17)),
-        SimpleNamespace(GetOutline=lambda: (0.1647453, 0.201412, 0.1999213, 0.236588)),
-        SimpleNamespace(GetOutline=lambda: (0.23, 0.13, 0.26, 0.17)),
         SimpleNamespace(
-            GetOutline=lambda: (0.2271081, 0.1978993, 0.2722252, 0.2401007)
-        ),
+            GetOutline=lambda box=box: (
+                box[0] + offset,
+                box[1],
+                box[2] + offset,
+                box[3],
+            )
+        )
+        for box in outlines
     ]
+    note.Owner = views[3]
     native_threads = [ThreadAnnotation(note)]
     original_thread = native_threads[0]
     events = []
+    right_threads, right_notes = [], []
+    old_note = ThreadNote()
+    old_note.Owner = views[2]
+    old_note.SetPosition(offset + 0.29, 0.16, 0.0)
+    old_thread = ThreadAnnotation(old_note)
+    original_right_geometry = old_thread.entity
+    retiring = drift.startswith("retire-")
+    if retiring:
+        right_threads.append(old_thread)
+        right_notes.append(old_note)
+        native_threads[0].callout = None
+    elif drift == "noniso-shared-iso-note":
+        # An undocumented owner alias must not authorize deleting the ISO note.
+        right_threads.append(ThreadAnnotation(note))
     drawing_state = SimpleNamespace(
         selected=None,
         active=None
@@ -1313,10 +1558,12 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             assert mark == -1
             if drawing_state.selected is None:
                 return 0
-            return 2 if drift == "selection-extra" else 1
+            return 2 if drift in {"selection-extra", "retire-selection-extra"} else 1
 
         def GetSelectedObjectType3(self, index, mark):
             assert index == 1 and mark == -1
+            if isinstance(drawing_state.selected, ThreadNote):
+                return 39 if drift == "retire-selection-wrong-type" else 15
             return 2 if drift == "selection-wrong-type" else 39
 
         def GetSelectedObject6(self, index, mark):
@@ -1337,7 +1584,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
 
         def ActivateView(self, name):
             events.append(f"activate:{name}")
-            if name == "TNut-Isometric" and drift == "activation-refused":
+            if name == iso_name and drift == "activation-refused":
                 return False
             if name == "previous-view":
                 if drift == "restore-view-ignored":
@@ -1361,10 +1608,39 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             drawing_state.selected = None
             events.append("clear")
 
+        def EditDelete(self):
+            assert drawing_state.selected is old_note
+            events.append("delete-note")
+            if drift == "retire-ignored-delete":
+                return
+            if drift != "retire-note-survives":
+                right_notes.clear()
+            if drift == "retire-thread-lost":
+                right_threads.clear()
+                return
+            # Native inventory refresh may return a different dispatch wrapper.
+            fresh = ThreadAnnotation(None)
+            fresh.native_identity = old_thread.native_identity
+            fresh.entity = old_thread.entity
+            fresh.attachment_type = old_thread.attachment_type
+            if drift == "retire-thread-identity":
+                fresh.native_identity = object()
+            elif drift == "retire-geometry":
+                fresh.entity = face()
+            elif drift == "retire-callout-survives":
+                fresh.callout = old_note
+            right_threads[:] = [fresh]
+            # Like the real API, success is VT_VOID and must be read back.
+
         def InsertThreadCallout(self):
             events.append("insert")
-            assert drawing_state.active == "TNut-Isometric"
+            assert drawing_state.active == iso_name
             assert drawing_state.selected is native_threads[0]
+            if retiring:
+                # Immediate deletion/readback must precede any new authoring.
+                assert events.index("delete-note") < events.index("right-notes")
+                assert not right_notes and right_threads[0].callout is None
+                assert right_threads[0].entity is original_right_geometry
             if drift == "insert-error-restore-error":
                 raise native_error
             if drift in {"create-fresh-wrapper", "create-replaced-thread"}:
@@ -1378,6 +1654,11 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             # Native insertion is VT_VOID; a None return is not failure.
 
     def source_feature(name):
+        if name == bore_feature:
+            events.append("bore-definition")
+            if drift == "bore-fresh-wrapper":
+                return AnnotationReadback(feature_readback, feature_readback)
+            return feature_readback
         assert name == "CosmeticThread1"
         events.append("source-definition")
         if drift == "create-without-source-definition":
@@ -1398,12 +1679,33 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         return native_threads
 
     # GetNotes exposes only an unrelated literal decoy, not ThreadCallout.
-    decoy = _Note("literal", "1/2-13 Tapped Hole", 0.32, 0.23)
+    decoy = _Note("literal", "1/2-13 Tapped Hole", offset + 0.32, 0.23)
     views[3].GetNotes = lambda: [decoy]
     views[3].GetAnnotations = read_annotations
     views[3].UpdateViewDisplayGeometry = lambda: events.append("refresh")
-    views[3].GetName2 = lambda: "TNut-Isometric"
+    views[3].GetName2 = lambda: iso_name
     views[3].ReferencedDocument = SimpleNamespace(FeatureByName=source_feature)
+
+    def right_annotations():
+        assert events[-1] == "refresh-right"
+        events.append("right-inventory")
+        return [*right_threads, *(item.GetAnnotation() for item in right_notes)]
+
+    def read_right_notes():
+        events.append("right-notes")
+        return right_notes
+
+    for index, view in enumerate(views[:3]):
+        view.GetName2 = lambda index=index: f"{configuration}-{index}"
+        view.UpdateViewDisplayGeometry = lambda index=index: events.append(
+            "refresh-right" if index == 2 else f"refresh-{index}"
+        )
+        view.GetAnnotations = right_annotations if index == 2 else lambda: ()
+        view.GetNotes = read_right_notes if index == 2 else lambda: ()
+    monkeypatch.setattr(
+        kit, "visible_view_entities", lambda *_args, **_kwargs: visible_rims
+    )
+    monkeypatch.setattr(kit, "model_points_in_view", project_points)
     monkeypatch.setattr(
         kit,
         "set_high_quality_shaded_with_edges",
@@ -1418,10 +1720,14 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             )
         ),
     )
-    cells = configured.configuration_view_cells(1, 3)
+    cells = configured.configuration_view_cells(1 if configuration == "TNut" else 2, 3)
     if drift in {"face", "create-face"}:
         native_threads[0].entity, native_threads[0].attachment_type = face(), 2
         if drift == "create-face":
+            native_threads[0].callout = None
+    elif drift in {"edge", "create-edge"}:
+        native_threads[0].entity, native_threads[0].attachment_type = edge(), 1
+        if drift == "create-edge":
             native_threads[0].callout = None
     elif drift == "no-thread":
         native_threads.clear()
@@ -1446,20 +1752,131 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         native_threads[0].callout = None
     elif drift == "wrong-thread":
         native_threads[0].callout = None
-        native_threads[0].entity = edge("FlangeNutThreadBore")
+        native_threads[0].entity = face(other_feature)
     elif drift == "duplicate":
         native_threads.append(ThreadAnnotation(ThreadNote()))
     elif drift == "duplicate-uncreated":
         native_threads[0].callout = None
         native_threads.append(ThreadAnnotation(None))
     elif drift == "wrong-feature":
-        native_threads[0].entity = edge("FlangeNutThreadBore")
+        native_threads[0].entity = face(other_feature)
     elif drift == "null-attachment":
         native_threads[0].entity = None
     elif drift == "bad-count":
         native_threads[0].attachment_count = 2
     elif drift == "unsupported-type":
         native_threads[0].attachment_type = 3
+    if drift == "retire-wrong-feature":
+        old_thread.entity = face(other_feature)
+    elif drift == "retire-owner-type":
+        old_note.OwnerType = 1
+    elif drift == "retire-owner-missing":
+        old_note.Owner = None
+    elif drift == "retire-owner-neighbour":
+        old_note.Owner = views[0]
+    elif drift == "rim-wrong-feature":
+        rim.feature = other_feature
+    elif drift in {"rim-wrong-height", "rim-wrong-radius"}:
+        circle = list(rim.CircleParams)
+        circle[1 if drift == "rim-wrong-height" else 6] += 0.001
+        rim.CircleParams = tuple(circle)
+    elif drift == "rim-duplicate":
+        visible_rims.append(BoreRim())
+    elif drift == "rim-missing":
+        visible_rims.remove(rim)
+    elif drift == "rim-feature-identity":
+        rim.feature = SimpleNamespace(Name=bore_feature)
+    elif drift == "rim-split":
+        rim.parameter_range = (0.0, math.pi)
+        other_arc = BoreRim()
+        other_arc.parameter_range = (math.pi, 2 * math.pi)
+        visible_rims.append(other_arc)
+    elif drift == "rim-off-arc":
+        rim.parameter_range = (math.pi, 2 * math.pi)
+    elif drift == "rim-params-nan":
+        rim.parameter_range = (0.0, float("nan"))
+    elif drift == "rim-params-empty":
+        rim.parameter_range = (0.0, 0.0)
+    elif drift == "bore-feature-missing":
+        feature_readback = None
+    elif drift == "bore-feature-type":
+        source_bore.GetTypeName2 = lambda: "Cut"
+    elif drift == "bore-definition-missing":
+        source_bore.GetDefinition = lambda: None
+    elif drift == "bore-diameter-nan":
+        bore_definition.ThruTapDrillDiameter = float("nan")
+    elif drift == "bore-diameter-zero":
+        bore_definition.ThruTapDrillDiameter = 0.0
+    if drift in {
+        "retire-selection-refused",
+        "retire-selection-ignored",
+        "retire-selection-neighbour",
+        "retire-selection-wrong-type",
+        "retire-selection-extra",
+        "retire-wrong-feature",
+        "retire-owner-type",
+        "retire-owner-missing",
+        "retire-owner-neighbour",
+        "noniso-shared-iso-note",
+    }:
+        with pytest.raises(
+            RuntimeError,
+            match="cannot select the non-isometric|association|owner",
+        ):
+            kit.annotate_member(adapter, configuration, cells, views)
+        assert "delete-note" not in events and "insert" not in events
+        assert drawing_state.selected is None
+        assert drawing_state.active == previous_active
+        return
+    if drift in {
+        "retire-ignored-delete",
+        "retire-thread-lost",
+        "retire-thread-identity",
+        "retire-geometry",
+        "retire-callout-survives",
+        "retire-note-survives",
+    }:
+        with pytest.raises(RuntimeError, match="retirement failed or changed"):
+            kit.annotate_member(adapter, configuration, cells, views)
+        assert events.count("delete-note") == 1 and "insert" not in events
+        assert "right-notes" in events
+        assert drawing_state.selected is None
+        assert drawing_state.active == previous_active
+        return
+    initial_refusals = {
+        "setter-refused": "placement refused",
+        "setter-ignored": "leader attachment moved",
+        "setter-parent-detached": "expected one automatic",
+        "setter-geometry-detached": "expected one automatic",
+        "setter-note-identity": "lost identity, attachment or clearance",
+        "setter-owner-detached": "lost identity, attachment or clearance",
+        "rim-wrong-feature": "visible top bore rim",
+        "rim-feature-identity": "visible top bore rim",
+        "rim-wrong-height": "visible top bore rim",
+        "rim-wrong-radius": "visible top bore rim",
+        "rim-duplicate": "visible physical bore-rim edge",
+        "rim-missing": "visible top bore rim",
+        "rim-off-arc": "visible physical bore-rim edge",
+        "rim-params-missing": "curve parameters are missing",
+        "rim-params-nan": "trim/closest point is unreadable",
+        "rim-params-empty": "trim/closest point is unreadable",
+        "rim-closest-missing": "trim/closest point is unreadable",
+        "rim-closest-nan": "trim/closest point is unreadable",
+        "rim-closest-short": "trim/closest point is unreadable",
+        "rim-closest-u-nan": "trim/closest point is unreadable",
+        "bore-feature-missing": "native bore feature .* is missing",
+        "bore-feature-type": "no Hole Wizard definition",
+        "bore-definition-missing": "no Hole Wizard definition",
+        "bore-diameter-nan": "drill diameter is unreadable",
+        "bore-diameter-zero": "drill diameter is unreadable",
+        "projection-nan": "no readable projection",
+    }
+    if drift in initial_refusals:
+        with pytest.raises(RuntimeError, match=initial_refusals[drift]):
+            kit.annotate_member(adapter, configuration, cells, views)
+        assert "insert" not in events and "delete-note" not in events
+        return
+    original_geometry = native_threads[0].entity if native_threads else None
     if drift in {
         "activation-refused",
         "selection-refused",
@@ -1471,7 +1888,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         with pytest.raises(
             RuntimeError, match="cannot activate|cannot select"
         ) as refused:
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         message = str(refused.value)
         if drift == "selection-ignored":
             assert "'selection_count': 0" in message
@@ -1495,7 +1912,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         with pytest.raises(
             RuntimeError, match="cannot restore drawing activation"
         ) as refused:
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         message = str(refused.value)
         assert "actual view=" in message and "expected view=" in message
         assert "CosmeticThread1" in message
@@ -1504,11 +1921,11 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             assert drawing_state.active is None and drawing_state.sheet == "OtherSheet"
             assert "OtherSheet" in message
         else:
-            assert drawing_state.active == "TNut-Isometric"
+            assert drawing_state.active == iso_name
         return
     if drift == "insert-error-restore-error":
         with pytest.raises(NativeInsertError) as refused:
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         assert refused.value is native_error
         restore_notes = "\n".join(refused.value.__notes__)
         assert "native restore failed" in restore_notes
@@ -1519,7 +1936,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         return
     if drift == "create-replaced-thread":
         with pytest.raises(RuntimeError, match="lost identity after insertion"):
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         assert events.count("insert") == 1
         assert (
             drawing_state.selected is None and drawing_state.active == previous_active
@@ -1537,7 +1954,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         "unsupported-type",
     }:
         with pytest.raises(RuntimeError, match="expected one automatic") as refused:
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         message = str(refused.value)
         assert f"found={2 if drift == 'duplicate' else 0}" in message
         assert "cosmetic_threads=" in message and "callouts=" in message
@@ -1560,15 +1977,17 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         return
     if drift == "ignored-move":
         with pytest.raises(RuntimeError, match="clearance"):
-            kit.annotate_member(adapter, "TNut", cells, views)
+            kit.annotate_member(adapter, configuration, cells, views)
         return
-    checks = kit.annotate_member(adapter, "TNut", cells, views)
+    checks = kit.annotate_member(adapter, configuration, cells, views)
     created = drift in {
         "create",
         "create-face",
+        "create-edge",
         "create-from-sheet",
         "create-without-source-definition",
         "create-fresh-wrapper",
+        "retire-right",
     }
     assert events.count("insert") == int(created)
     assert drawing_state.selected is None and drawing_state.active == previous_active
@@ -1578,12 +1997,56 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         assert (
             original_thread.callout is None and native_threads[0] is not original_thread
         )
+    if drift == "retire-right":
+        assert events.count("delete-note") == 1
+        assert events.index("delete-note") < events.index("insert")
+        assert not right_notes and right_threads[0].callout is None
+        assert right_threads[0] is not old_thread
+        assert right_threads[0].native_identity is old_thread.native_identity
+        assert right_threads[0].entity is original_right_geometry
+        assert old_note.Owner is views[2]
+    else:
+        assert "delete-note" not in events
+    assert len(native_threads) == 1 and native_threads[0].callout is note
+    assert native_threads[0].entity is original_geometry
+    assert note.GetAttachedEntities3() == ()
+    assert note.GetAttachedEntityTypes() == ()
+    assert note.GetAttachedEntityCount3() == 0
+    assert note.OwnerType == 0 and note.Owner is views[3]
+    assert rim.closest_queries
+    if drift == "rim-split":
+        assert other_arc.closest_queries
+    # Independently derive the circle's support point through the affine
+    # projection. A setter that just echoes a requested arbitrary point is not
+    # sufficient: the requested point itself must face the actual text.
+    radius = native_bore_radius
+    height = spec.HEIGHT / 1000
+    center = (offset + 0.249 + 0.12 * height, 0.213 + 0.25 * height)
+    dx = note._position[0] + 0.0445132 / 2 - center[0]
+    dy = note._position[1] - 0.0045257 + 0.0048299 / 2 - center[1]
+    angle = math.atan2(-0.3 * dx + 0.28 * dy, 0.4 * dx + 0.18 * dy)
+    expected_model_tip = (radius * math.cos(angle), height, radius * math.sin(angle))
+    expected_tip = project_point(expected_model_tip)
+    assert all(
+        point == pytest.approx(expected_model_tip) for point in rim.closest_queries
+    )
+    if drift == "rim-split":
+        assert all(
+            point == pytest.approx(expected_model_tip)
+            for point in other_arc.closest_queries
+        )
+    assert note.setter_calls == [pytest.approx((*expected_tip, 0.0))]
+    assert projection_calls[0] == (
+        (0.0, height, 0.0),
+        (radius, height, 0.0),
+        (0.0, height, radius),
+    )
     box = kit._note_text_box(note)
     assert box[0] >= cells[0][2][0]
-    assert box[2] <= cells[2][2][2] < 0.297412
+    assert box[2] <= cells[2][2][2] < offset + 0.297412
     assert box[1] > views[3].GetOutline()[3]
-    assert note.GetExtent()[1] == pytest.approx(0.21695)
-    assert decoy._position == (0.32, 0.23, 0.0)
+    assert note.GetExtent()[1] == pytest.approx(expected_tip[1])
+    assert decoy._position == (offset + 0.32, 0.23, 0.0)
     # A fresh Python dispatch wrapper is still the same native annotation.
     note.annotation_readback = AnnotationReadback(note, note)
     if drift == "text":
@@ -1603,24 +2066,87 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     elif drift == "callout-neighbour":
         native_threads[0].callout = ThreadNote()
     elif drift == "attachment":
-        native_threads[0].entity = edge()
+        native_threads[0].entity = face()
     elif drift == "attachment-type":
-        native_threads[0].entity, native_threads[0].attachment_type = face(), 2
+        native_threads[0].entity, native_threads[0].attachment_type = edge(), 1
     elif drift == "collision":
-        note.SetPosition(0.32, 0.23, 0.0)
-    if drift in {"none", "face"} or created:
+        note.SetPosition(offset + 0.32, 0.23, 0.0)
+    elif drift == "noniso-reappears":
+        right_threads.append(old_thread)
+        right_notes.append(old_note)
+    elif drift == "rim-identity":
+        visible_rims[:] = [BoreRim()]
+    elif drift == "bore-feature-drift":
+        feature_readback = SimpleNamespace(
+            Name=bore_feature,
+            GetTypeName2=lambda: "HoleWzd",
+            GetDefinition=lambda: bore_definition,
+        )
+    elif drift == "bore-diameter-drift":
+        bore_definition.ThruTapDrillDiameter += 0.000001
+    elif drift in {"leader-drift", "leader-within-tolerance"}:
+        x, y, z = note.leader_tip
+        distance = 0.0001001 if drift == "leader-drift" else 0.0000999
+        note.leader_tip = (x + distance, y, z)
+    elif drift in {"leader-nan", "leader-inf"}:
+        x, y, z = note.leader_tip
+        note.leader_tip = (
+            x,
+            y,
+            float("nan") if drift == "leader-nan" else float("inf"),
+        )
+    elif drift == "leader-truncated":
+        note.GetLeaderPointsAtIndex = lambda _index: (*note._position, 0.0)
+    elif drift == "leader-multiple":
+        note.leader_count = 2
+    elif drift == "text-nan":
+        note._position = (float("nan"), note._position[1], 0.0)
+    if (
+        drift
+        in {
+            "none",
+            "face",
+            "edge",
+            "leader-within-tolerance",
+            "rim-split",
+            "rim-unused-nan",
+            "bore-fresh-wrapper",
+        }
+        or created
+    ):
         checks[0]()
     else:
-        with pytest.raises(RuntimeError):
+        expected_error = {
+            "noniso-reappears": "survived/returned",
+            "rim-identity": "visible bore rim lost native identity",
+            "bore-feature-drift": "native bore feature/diameter changed",
+            "bore-diameter-drift": "native bore feature/diameter changed",
+            "leader-drift": "leader attachment moved",
+            "leader-nan": "leader is unreadable",
+            "leader-inf": "leader is unreadable",
+            "leader-truncated": "leader is unreadable",
+            "leader-multiple": "leader did not survive",
+            "text-nan": "unreadable",
+        }.get(drift)
+        with pytest.raises(RuntimeError, match=expected_error):
             checks[0]()
     # Missing callouts during settled readback are failures, not repair requests.
     assert events.count("insert") == int(created)
+    assert events.count("delete-note") == int(drift == "retire-right")
+    assert len(note.setter_calls) == 1
 
 
 @pytest.mark.parametrize(
     "drift",
     (
         "none",
+        "wide-text",
+        "ignored-move",
+        "move-refused",
+        "text-model",
+        "model-moves-left",
+        "clearance-below-2mm",
+        "clearance-above-2mm",
         "length",
         "attachment",
         "identity",
@@ -1662,6 +2188,7 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
         def __init__(self):
             self.position_y = 0.10895
             self.projection_y = self.position_y
+            self.outline_left = 0.044492
 
         def SetViewPosition(self, _x, y):
             self.position_y = y
@@ -1678,6 +2205,14 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
                 [SimpleNamespace(native_identity=inventory_identity or state.display)]
                 if present
                 else []
+            )
+
+        def GetOutline(self):
+            return (
+                self.outline_left,
+                self.position_y,
+                self.outline_left + 0.00635,
+                self.position_y + 0.0381,
             )
 
     front = Front()
@@ -1698,6 +2233,20 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
             self.SystemValue = entities[1].station - entities[0].station
             self.text = {1: "", 2: ""}
             self.dangling = False
+            self.moves = []
+
+        def GetPosition(self):
+            return (*self.text_xy, 0.0)
+
+        def SetPosition2(self, x, y, z):
+            self.moves.append((x, y, z))
+            if drift == "move-refused":
+                return False
+            if drift != "ignored-move":
+                dx = x - self.text_xy[0]
+                self.text_xy = (x, y)
+                self.stroke_x += dx
+            return True
 
         def GetAnnotation(self):
             return self
@@ -1727,7 +2276,9 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
         state.display = Dimension(kwargs["entities"])
         state.display.text_xy = kwargs["text_xy"]
         state.display.stroke_x = kwargs["text_xy"][0]
-        state.display.width = 0.018
+        # Native83 centred 17.67 mm of text on the requested dimension line.
+        state.display.width = 0.022 if drift == "wide-text" else 0.01767
+        state.display.initial_position = (*kwargs["text_xy"], 0.0)
         return state.display
 
     monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
@@ -1751,11 +2302,11 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
                 "texts": [
                     {
                         "t": "(76.20)",
-                        "pos": (x - annotation.width, y, 0.0),
+                        "pos": (x, y, 0.0),
                         "h": 0.003,
                         "w": annotation.width,
                         "ang": 0.0,
-                        "ref": 1,
+                        "ref": 2,
                     }
                 ],
                 "lines": [
@@ -1787,17 +2338,35 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
     )
     present = True
     inventory_identity = None
-    checks = kit.annotate_member(
-        adapter,
-        "HoldDownStud",
-        configured.configuration_view_cells(0, 3),
-        [front] * 4,
-    )
+    cells = configured.configuration_view_cells(0, 3)
+    if drift in {"ignored-move", "move-refused"}:
+        with pytest.raises(
+            RuntimeError,
+            match="clearance" if drift == "ignored-move" else "relocation refused",
+        ):
+            kit.annotate_member(adapter, "HoldDownStud", cells, [front] * 4)
+        assert len(state.display.moves) == 1
+        assert state.display.GetPosition() == state.display.initial_position
+        assert (
+            state.display.text_xy[0] + state.display.width / 2 > front.GetOutline()[0]
+        )
+        return
+    checks = kit.annotate_member(adapter, "HoldDownStud", cells, [front] * 4)
     dimension = state.display
     assert dimension.SystemValue * 1000 == pytest.approx(kit.stud.LENGTH)
     assert dimension.entities == (rims[1], rims[0])
     assert projection_events == ["move", "update", "project"]
     assert dimension.text_xy[1] == pytest.approx(0.13395 + kit.stud.LENGTH / 4000)
+    assert dimension.initial_position[0] == pytest.approx(cells[0][2][0] + 0.022)
+    assert dimension.initial_position[0] + dimension.width / 2 > front.GetOutline()[0]
+    expected_x = front.GetOutline()[0] - 0.0025 - dimension.width / 2
+    assert dimension.moves == [
+        pytest.approx((expected_x, dimension.initial_position[1], 0.0))
+    ]
+    assert dimension.GetPosition()[0] < dimension.initial_position[0]
+    assert dimension.text_xy[0] + dimension.width / 2 == pytest.approx(
+        front.GetOutline()[0] - 0.0025
+    )
     if drift == "length":
         dimension.SystemValue -= 0.002
     elif drift == "attachment":
@@ -1818,7 +2387,17 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
         dimension.stroke_x = 0.010
     elif drift == "unmeasured-width":
         dimension.width = 0.0
-    if drift == "none":
+    elif drift == "text-model":
+        # Return the native centred text to the requested dimension line.
+        dimension.SetPosition2(*dimension.initial_position)
+    elif drift == "model-moves-left":
+        front.outline_left -= 0.001
+    elif drift in {"clearance-below-2mm", "clearance-above-2mm"}:
+        right = front.GetOutline()[0] - (
+            0.0019999 if drift == "clearance-below-2mm" else 0.0020001
+        )
+        dimension.text_xy = (right - dimension.width / 2, dimension.text_xy[1])
+    if drift in {"none", "wide-text", "clearance-above-2mm"}:
         checks[0]()
     else:
         with pytest.raises(RuntimeError):

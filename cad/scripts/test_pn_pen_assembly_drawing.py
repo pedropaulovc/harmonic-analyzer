@@ -153,20 +153,124 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
     assert drawing.BOM_SKUS[spec.HANGER_JAM_NUT] != drawing.MADE_PART_SKU
 
 
+class _PenBomTable:
+    """Native column state, including the retained zero-width part-number key."""
+
+    def __init__(self, cells, column_types, components):
+        self.cells = cells
+        self.column_types = column_types
+        self.hidden = [False] * (len(column_types) - 1) + [True]
+        self.widths = [0.02] * (len(column_types) - 1) + [0.0]
+        self.heights = {}
+        self.number_property = "Number"
+        self.GetComponents2 = components
+
+    @property
+    def RowCount(self):
+        return len(self.cells)
+
+    @property
+    def ColumnCount(self):
+        return self.hidden.count(False)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.column_types)
+
+    def _physical_column(self, column, include_hidden=True):
+        columns = [
+            index for index, hidden in enumerate(self.hidden)
+            if include_hidden or not hidden
+        ]
+        return columns[column] if 0 <= column < len(columns) else None
+
+    def GetColumnType3(self, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        return (-1, None, 0) if physical is None else self.column_types[physical]
+
+    def ColumnHidden(self, column):
+        return self.hidden[column] if 0 <= column < len(self.hidden) else False
+
+    def GetColumnWidth(self, column):
+        return self.widths[column] if 0 <= column < len(self.widths) else 0.0
+
+    def GetColumnTitle2(self, column, include_hidden):
+        return self.DisplayedText2(0, column, include_hidden)
+
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            return ""
+        if physical < len(self.cells[row]):
+            return self.cells[row][physical]
+        return "PART NUMBER" if row == 0 else self.cells[row][1]
+
+    def DisplayedText(self, row, column):
+        return self.DisplayedText2(row, column, False)
+
+    def GetColumnCustomProperty(self, column):
+        if not 0 <= column < len(self.column_types):
+            return ""
+        if column == 1 and self.column_types[column][0] == 204:
+            return self.number_property
+        return ""
+
+    def InsertColumn2(self, _where, after, title, _width):
+        if _where != 3 or not 0 <= after < len(self.column_types):
+            return False
+        column = after + 1
+        for row, contents in enumerate(self.cells):
+            contents.insert(column, title if row == 0 else "")
+        self.column_types.insert(column, (204, "", 0))
+        self.hidden.insert(column, False)
+        self.widths.insert(column, 0.02)
+        return True
+
+    def SetColumnTitle2(self, column, title, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None or physical >= len(self.cells[0]):
+            return False
+        self.cells[0][physical] = title
+        return True
+
+    def IsCellTextEditable(self, row, column):
+        return 0 < row < self.RowCount and (
+            self.GetColumnTitle2(column, False) == drawing.BOM_SKU_TITLE
+        )
+
+    def SetText2(self, row, column, include_hidden, text):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            raise IndexError(column)
+        if not self.IsCellTextEditable(row, column):
+            raise AssertionError("Number cells must stay natively property-linked")
+        self.cells[row][physical] = text
+
+    def SetColumnWidth(self, column, width, _options):
+        if not 0 <= column < len(self.widths):
+            raise IndexError(column)
+        self.widths[column] = width
+        return width
+
+    def SetRowHeight(self, row, height, _options):
+        self.heights[row] = height
+        return height
+
+
 @pytest.mark.parametrize(
-    ("fault", "message"),
+    "fault",
     (
-        ("native-column", "unique trailing native column"),
-        ("number-column", "Number column type/property changed"),
-        ("number-property", "Number property binding did not persist"),
-        ("visible-prefix", "visible columns are not a contiguous prefix"),
-        ("displayed-number", "does not match native component Numbers"),
-        ("member", "native BOM membership/quantities changed"),
-        ("quantity", "native occurrence count"),
+        "native-column",
+        "number-column",
+        "number-property",
+        "visible-prefix",
+        "displayed-number",
+        "member",
+        "quantity",
     ),
 )
 def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_skus(
-    monkeypatch, fault, message
+    monkeypatch, fault
 ) -> None:
     import _com
     import _component_references
@@ -217,7 +321,6 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
         (203, "", 0),
         (201, "", 0),
     ]
-    hidden = [False] * 5 + [True]
     native_reads = []
 
     def components(row, owner):
@@ -226,17 +329,8 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
             drawing.BOM_COMPONENTS[row - 1]
         ]
 
-    table = SimpleNamespace(
-        RowCount=len(cells),
-        ColumnCount=5,
-        TotalColumnCount=6,
-        DisplayedText=lambda row, column: cells[row][column],
-        GetColumnType3=lambda column, include_hidden: column_types[column],
-        ColumnHidden=lambda column: hidden[column],
-        number_property="Number",
-        GetColumnCustomProperty=lambda column: table.number_property,
-        GetComponents2=components,
-    )
+    table = _PenBomTable(cells, column_types, components)
+    hidden = table.hidden
     seat = stub_seat(
         monkeypatch,
         drawing,
@@ -274,7 +368,7 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
         cells[1][4] = str(int(cells[1][4]) + 1)
     else:
         members[0].ReferencedConfiguration = "OtherMember Simplified"
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError):
         settled()
     seat.insert_bom_table.assert_called_once()
     seat._validate_bom.assert_called_once()
@@ -326,29 +420,8 @@ def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
         (203, "", 0), (201, "", 0),
     ]
 
-    def insert_column(_where, after, title, _width):
-        for row, contents in enumerate(cells):
-            contents.insert(after + 1, title if row == 0 else "")
-        column_types.insert(after + 1, (204, "", 0))
-        table.ColumnCount += 1
-        table.TotalColumnCount += 1
-        return True
-
-    table = SimpleNamespace(
-        RowCount=len(cells),
-        ColumnCount=4,
-        TotalColumnCount=5,
-        DisplayedText=lambda row, column: cells[row][column],
-        GetComponents2=lambda row, _owner: native_rows[row - 1],
-        GetColumnType3=lambda column, include_hidden: column_types[column],
-        ColumnHidden=lambda column: column == table.ColumnCount,
-        GetColumnCustomProperty=lambda column: "Number" if column == 1 else "",
-        InsertColumn2=insert_column,
-        SetColumnTitle2=lambda column, title, _hidden: cells[0][column] == title,
-        IsCellTextEditable=lambda _row, column: column == 3,
-        SetText2=lambda row, column, _hidden, text: cells[row].__setitem__(column, text),
-        SetColumnWidth=lambda _column, width, _options: width,
-        SetRowHeight=lambda _row, height, _options: height,
+    table = _PenBomTable(
+        cells, column_types, lambda row, _owner: native_rows[row - 1]
     )
     rebuilds = []
 

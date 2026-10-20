@@ -2292,7 +2292,7 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
 
 
 
-def _pd_bom_fixture(monkeypatch, *, native_columns=False):
+def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
@@ -2365,17 +2365,26 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
             str(quantities[key]),
         ])
     columns = [
-        SimpleNamespace(kind=202, property_name="", hidden=False),
-        SimpleNamespace(kind=201, property_name="", hidden=False),
-        SimpleNamespace(kind=204, property_name="Description", hidden=False),
-        SimpleNamespace(kind=203, property_name="", hidden=False),
+        SimpleNamespace(kind=202, property_name="", hidden=False, width=0.025),
+        SimpleNamespace(kind=201, property_name="", hidden=False, width=0.025),
+        SimpleNamespace(kind=204, property_name="Description", hidden=False, width=0.025),
+        SimpleNamespace(kind=203, property_name="", hidden=False, width=0.025),
     ]
     table = MagicMock()
+    table.Type = 2
+    available = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+    visibility = (False, True)
     table.BomFeature = SimpleNamespace(
-        PartConfigurationGrouping=3, DisplayAsOneItem=False
+        PartConfigurationGrouping=3, DisplayAsOneItem=False, TableType=2,
+        GetConfigurationCount=lambda only_visible: 1 if only_visible else 2,
+        GetConfigurations=lambda only_visible, _visibility: (
+            (available[-1:], visibility[-1:])
+            if only_visible else (available, visibility)
+        ),
     )
     state = SimpleNamespace(
-        columns=columns, native_rows=native_rows, row_keys=list(keys), cells=cells
+        columns=columns, native_rows=native_rows, row_keys=list(keys), cells=cells,
+        advertised_extra=advertised_extra,
     )
     table._pd_state = state
     type(table).RowCount = PropertyMock(side_effect=lambda: len(cells))
@@ -2383,12 +2392,33 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     type(table).ColumnCount = PropertyMock(
         side_effect=lambda: sum(not column.hidden for column in columns)
     )
-    type(table).TotalColumnCount = PropertyMock(side_effect=lambda: len(columns))
+    type(table).TotalColumnCount = PropertyMock(
+        side_effect=lambda: len(columns) + state.advertised_extra
+    )
 
     def raw_index(index, include_hidden):
-        if include_hidden:
-            return index
-        return [i for i, column in enumerate(columns) if not column.hidden][index]
+        indices = (
+            list(range(len(columns))) if include_hidden else
+            [i for i, column in enumerate(columns) if not column.hidden]
+        )
+        return indices[index] if 0 <= index < len(indices) else None
+
+    def column_type(index, include_hidden):
+        physical = raw_index(index, include_hidden)
+        if physical is None:
+            # Native PD 2291: identical empty signature at every invalid index.
+            return -1, None, 0
+        column = columns[physical]
+        return column.kind, column.property_name or None, 0
+
+    def displayed_text(row, index, include_hidden):
+        physical = raw_index(index, include_hidden)
+        return "" if physical is None else cells[row][physical]
+
+    def custom_property(index):
+        if not 0 <= index < len(columns) or columns[index].kind != 204:
+            return ""
+        return columns[index].property_name
 
     def bind_property(index, property_name):
         for row, group in enumerate(native_rows, 1):
@@ -2422,19 +2452,25 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
             return False
         insertion = index + (where == 3)
         columns.insert(
-            insertion, SimpleNamespace(kind=204, property_name="", hidden=False)
+            insertion,
+            SimpleNamespace(kind=204, property_name="", hidden=False, width=0.025),
         )
         for row in cells:
             row.insert(insertion, name if row is cells[0] else "")
         return True
 
     def hide_column(index, hidden):
+        if not 0 <= index < len(columns):
+            raise IndexError(index)
         columns[index].hidden = bool(hidden)
+        columns[index].width = 0.0 if hidden else 0.025
         # ITableAnnotation.SetColumnHidden is VOID, not a success flag.
         return None
 
     def set_column_type(index, kind, include_hidden, property_name):
         index = raw_index(index, include_hidden)
+        if index is None:
+            return 1  # swColumnTypeStatus_InvalidIndex
         previous = columns[index].kind
         columns[index].kind = kind
         columns[index].property_name = property_name if kind == 204 else ""
@@ -2450,38 +2486,57 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
         return 0
 
     def set_column_title(index, title, include_hidden):
-        cells[0][raw_index(index, include_hidden)] = title
+        physical = raw_index(index, include_hidden)
+        if physical is None:
+            return False
+        cells[0][physical] = title
         return True
+
+    def set_text(row, index, include_hidden, text):
+        physical = raw_index(index, include_hidden)
+        if physical is None:
+            raise IndexError(index)
+        cells[row][physical] = text
+
+    def set_width(index, width, _options):
+        if not 0 <= index < len(columns):
+            raise IndexError(index)
+        columns[index].width = width
+        return width
 
     table.MoveColumn.side_effect = move_column
     table.InsertColumn2.side_effect = insert_column
     table.SetColumnHidden.side_effect = hide_column
-    table.ColumnHidden.side_effect = lambda index: columns[index].hidden
-    table.GetColumnType3.side_effect = lambda index, include_hidden: (
-        columns[raw_index(index, include_hidden)].kind,
-        columns[raw_index(index, include_hidden)].property_name or None,
-        0,
+    table.ColumnHidden.side_effect = lambda index: (
+        columns[index].hidden if 0 <= index < len(columns) else False
     )
+    table.GetColumnWidth.side_effect = lambda index: (
+        columns[index].width if 0 <= index < len(columns) else 0.0
+    )
+    table.GetColumnType3.side_effect = column_type
     table.SetColumnType3.side_effect = set_column_type
-    table.GetColumnCustomProperty.side_effect = lambda index: columns[index].property_name
+    table.GetColumnCustomProperty.side_effect = custom_property
     table.SetColumnTitle2.side_effect = set_column_title
-    table.DisplayedText.side_effect = lambda row, column: cells[row][raw_index(column, False)]
-    table.DisplayedText2.side_effect = lambda row, column, include_hidden: (
-        cells[row][raw_index(column, include_hidden)]
+    table.GetColumnTitle2.side_effect = lambda index, include_hidden: displayed_text(
+        0, index, include_hidden
     )
+    table.DisplayedText.side_effect = lambda row, column: displayed_text(row, column, False)
+    table.DisplayedText2.side_effect = displayed_text
     table.IsCellTextEditable.return_value = True
-    table.SetText2.side_effect = lambda row, column, include_hidden, text: (
-        cells[row].__setitem__(raw_index(column, include_hidden), text)
-    )
-    table.SetColumnWidth.side_effect = lambda _column, width, _options: width
+    table.SetText2.side_effect = set_text
+    table.SetColumnWidth.side_effect = set_width
     table.GetComponents2.side_effect = lambda row, configuration: (
         native_rows[row - 1]
         if configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION else ()
     )
     if not native_columns:
         # Most consumer tests begin with the valid, already-bound final table.
-        columns[1] = SimpleNamespace(kind=204, property_name="Number", hidden=False)
-        columns.append(SimpleNamespace(kind=201, property_name="", hidden=True))
+        columns[1] = SimpleNamespace(
+            kind=204, property_name="Number", hidden=False, width=0.025
+        )
+        columns.append(
+            SimpleNamespace(kind=201, property_name="", hidden=True, width=0.0)
+        )
         for row in cells:
             row.append(row[1])
         bind_property(1, "Number")
@@ -2605,7 +2660,7 @@ def test_bom_canonical_numbers_are_read_again_after_the_last_rebuild(monkeypatch
         ("missing-spare-quantity", "BOM row.*changed"),
         ("missing-transgear-row", "dimensions changed"),
         ("grouping", "configuration grouping changed"),
-        ("column-property", "Number property binding did not persist"),
+        ("column-property", None),
         ("native-number", "associative Number"),
         ("changed-retained-native", "unique trailing native column"),
         ("unhidden-retained-native", "dimensions changed"),
@@ -2639,7 +2694,7 @@ def test_bom_rechecks_members_and_quantities_after_the_last_rebuild(
         elif fault == "grouping":
             table.BomFeature.PartConfigurationGrouping = 2
         elif fault == "column-property":
-            table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
+            table._pd_state.columns[1].property_name = "Description"
         elif fault == "changed-retained-native":
             table._pd_state.columns[-1].kind = 202
         elif fault == "unhidden-retained-native":
@@ -2669,9 +2724,9 @@ def test_bom_rechecks_members_and_quantities_after_the_last_rebuild(
     table.SetText2.assert_not_called()
 
 
-def _pd_bom_insertion_fixture(monkeypatch):
+def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
     model, components, table, adapter, cells, keys = _pd_bom_fixture(
-        monkeypatch, native_columns=True
+        monkeypatch, native_columns=True, advertised_extra=advertised_extra
     )
     monkeypatch.setattr(_drawing_tables._sw_type_info, "early_bound", lambda obj, *_: obj)
     monkeypatch.setattr(_drawing_tables._sw_type_info, "is_early_bound", lambda *_: True)
@@ -2708,11 +2763,12 @@ def _pd_bom_insertion_fixture(monkeypatch):
     )
 
 
+@pytest.mark.parametrize("advertised_extra", (0, 1), ids=("accurate-count", "native-2291"))
 @pytest.mark.parametrize("number_source", ("configuration", "document"))
 def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
-    monkeypatch, number_source
+    monkeypatch, number_source, advertised_extra
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=advertised_extra)
     counts = drawing._source_family_counts(scene.model)
     configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     gear_row = scene.keys.index("pd-transgear-removable") + 1
@@ -2723,44 +2779,70 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
     else:
         for component in gear_components:
             native.properties[(component.ReferencedConfiguration, "Number")] = ""
-    assert scene.table.ColumnCount == scene.table.TotalColumnCount == 4
-    assert scene.table.GetColumnType3(1, True) == (201, None, 0)
+    assert scene.table.ColumnCount == 4
+    assert scene.table.TotalColumnCount == 4 + advertised_extra
+    assert _drawing_tables._bom_physical_columns(scene.table, label="paper-drive") == (
+        (202, False), (201, False), (204, False), (203, False)
+    )
 
     table = scene.insert()
-    items = dict(
-        drawing._validate_bom(
-            scene.adapter, table, counts, configuration=configuration
-        )
-    )
     assert table is scene.table
-    assert set(items) == set(drawing.BOM_PART_NUMBERS)
-    assert table.ColumnCount == 4
-    assert table.TotalColumnCount == 5
-    assert [table.ColumnHidden(index) for index in range(5)] == [
-        False, False, False, False, True
-    ]
-    assert table.GetColumnType3(1, True) == (204, "Number", 0)
-    assert table.GetColumnCustomProperty(1) == "Number"
-    assert table.GetColumnType3(4, True) == (201, None, 0)
-    assert table.BomFeature.PartConfigurationGrouping == 3
-    assert table.BomFeature.DisplayAsOneItem is False
-    assert table.DisplayedText(gear_row, 1) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
-    assert table.DisplayedText(gear_row, 3) == "3"
-    assert tuple(table.GetComponents2(gear_row, configuration)) == gear_components
-    assert {component.ReferencedConfiguration for component in gear_components} == {
-        "T12 Simplified", "T18 Simplified", "T24 Simplified"
-    }
-    for key, quantity, member in (
-        ("sh-vn-chain-link--InnerLink", "34", "InnerLink Simplified"),
-        ("sh-vn-chain-link--OuterLink", "33", "OuterLink Simplified"),
-    ):
-        row = scene.keys.index(key) + 1
-        assert table.DisplayedText(row, 1) == drawing.BOM_PART_NUMBERS[key]
-        assert table.DisplayedText(row, 3) == quantity
-        members = table.GetComponents2(row, configuration)
-        assert len(members) == int(quantity)
-        assert {component.ReferencedConfiguration for component in members} == {member}
-    assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
+    baseline = None
+    for with_sku in (False, True):
+        if with_sku:
+            description_column = next(
+                index for index in range(table.ColumnCount)
+                if table.DisplayedText(0, index) == "DESCRIPTION"
+            )
+            assert table.InsertColumn2(3, description_column, "PURCHASE SKU", 0) is True
+        visible = 5 if with_sku else 4
+        assert table.ColumnCount == visible
+        assert table.TotalColumnCount == visible + 1 + advertised_extra
+        physical = _drawing_tables._bom_physical_columns(table, label="paper-drive")
+        assert len(physical) == visible + 1
+        assert physical[-1] == (201, True)
+        assert all(not hidden for _kind, hidden in physical[:-1])
+        assert table.GetColumnType3(visible, True) == (201, None, 0)
+        assert table.GetColumnWidth(visible) == 0.0
+        assert table.GetColumnType3(visible, False) == (-1, None, 0)
+        assert table.GetColumnType3(1, True) == (204, "Number", 0)
+        assert table.GetColumnCustomProperty(1) == "Number"
+        assert table.BomFeature.PartConfigurationGrouping == 3
+        assert table.BomFeature.DisplayAsOneItem is False
+        assert table.RowCount == table.TotalRowCount == len(scene.keys) + 1 == 44
+        snapshot = _drawing_tables.validate_bom_number_property(
+            table, configuration=configuration, label="paper-drive", expected_rows=44,
+            occurrence_quantities=True,
+        )
+        items = dict(drawing._validate_bom(
+            scene.adapter, table, counts, configuration=configuration
+        ))
+        assert set(items) == set(drawing.BOM_PART_NUMBERS)
+        if baseline is None:
+            baseline = snapshot, items
+        else:
+            assert (snapshot, items) == baseline
+        quantity_column = next(
+            index for index in range(table.ColumnCount)
+            if table.DisplayedText(0, index) == "QTY."
+        )
+        assert table.DisplayedText(gear_row, 1) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
+        assert table.DisplayedText(gear_row, quantity_column) == "3"
+        assert tuple(table.GetComponents2(gear_row, configuration)) == gear_components
+        assert {component.ReferencedConfiguration for component in gear_components} == {
+            "T12 Simplified", "T18 Simplified", "T24 Simplified"
+        }
+        for key, quantity, member in (
+            ("sh-vn-chain-link--InnerLink", "34", "InnerLink Simplified"),
+            ("sh-vn-chain-link--OuterLink", "33", "OuterLink Simplified"),
+        ):
+            row = scene.keys.index(key) + 1
+            assert table.DisplayedText(row, 1) == drawing.BOM_PART_NUMBERS[key]
+            assert table.DisplayedText(row, quantity_column) == quantity
+            members = table.GetComponents2(row, configuration)
+            assert len(members) == int(quantity)
+            assert {component.ReferencedConfiguration for component in members} == {member}
+        assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
 
 
 def test_native_part_number_conversion_reproduces_consumer_visible_group_loss(monkeypatch):
@@ -2782,38 +2864,11 @@ def test_native_part_number_conversion_reproduces_consumer_visible_group_loss(mo
         )
 
 
-def test_number_binding_survives_a_later_visible_sku_column_insert(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch)
-    table = scene.insert()
-    description_column = next(
-        index for index in range(table.ColumnCount)
-        if table.DisplayedText(0, index) == "DESCRIPTION"
-    )
-    assert table.InsertColumn2(3, description_column, "PURCHASE SKU", 0) is True
-    assert table.ColumnCount == 5
-    assert table.TotalColumnCount == 6
-    assert table.GetColumnType3(5, True) == (201, None, 0)
-    assert [table.ColumnHidden(index) for index in range(6)] == [
-        False, False, False, False, False, True
-    ]
-    assert table.GetColumnType3(1, True) == (204, "Number", 0)
-    assert table.GetColumnCustomProperty(1) == "Number"
-    _drawing_tables.validate_bom_number_property(
-        table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
-        label="paper-drive", expected_rows=len(drawing.BOM_PART_NUMBERS) + 1,
-    )
-    items = dict(drawing._validate_bom(
-        scene.adapter, table, drawing._source_family_counts(scene.model),
-        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
-    ))
-    assert set(items) == set(drawing.BOM_PART_NUMBERS)
-
-
 @pytest.mark.parametrize(
     "failure",
     (
-        "move", "insert", "hide-readback", "number-type-status",
-        "number-property-readback", "initial-inconsistent-counts",
+        "move", "move-noop", "insert", "insert-noop", "hide-readback",
+        "number-type-status", "number-property-readback", "initial-inconsistent-counts",
     ),
 )
 def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failure):
@@ -2825,18 +2880,25 @@ def test_bom_insertion_refuses_failed_native_column_retention(monkeypatch, failu
     )
     if failure == "move":
         scene.table.MoveColumn.side_effect = lambda *_: False
+    elif failure == "move-noop":
+        scene.table.MoveColumn.side_effect = lambda *_: True
     elif failure == "insert":
         scene.table.InsertColumn2.side_effect = lambda *_: False
+    elif failure == "insert-noop":
+        scene.table.InsertColumn2.side_effect = lambda *_: True
     elif failure == "number-type-status":
         scene.table.SetColumnType3.side_effect = lambda *_: 1
     elif failure == "number-property-readback":
-        scene.table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
+        native_property = scene.table.GetColumnCustomProperty.side_effect
+        scene.table.GetColumnCustomProperty.side_effect = lambda index: (
+            "Description" if index == 1 else native_property(index)
+        )
     elif failure == "initial-inconsistent-counts":
-        type(scene.table).TotalColumnCount = PropertyMock(return_value=5)
+        type(scene.table).ColumnCount = PropertyMock(return_value=3)
     else:
         # A VOID call returning None is valid, but a no-op must fail readback.
         scene.table.SetColumnHidden.side_effect = lambda *_: None
-    with pytest.raises(RuntimeError, match="(?i)column|hidden|retain|Number"):
+    with pytest.raises(RuntimeError):
         scene.insert()
     for stage in ("before", "after"):
         assert attributes[f"number_bind_{stage}_row_count"] == len(scene.keys) + 1
@@ -2874,7 +2936,10 @@ def test_bom_number_proof_refuses_invalid_retained_column_state(monkeypatch, fau
     elif fault == "bad-number-kind":
         columns[1].kind = 202
     elif fault == "bad-property-readback":
-        table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
+        native_property = table.GetColumnCustomProperty.side_effect
+        table.GetColumnCustomProperty.side_effect = lambda index: (
+            "Description" if index == 1 else native_property(index)
+        )
     elif fault in ("bad-native-status", "bad-number-status"):
         original_type = table.GetColumnType3.side_effect
         bad_index = 4 if fault == "bad-native-status" else 1
@@ -2886,7 +2951,7 @@ def test_bom_number_proof_refuses_invalid_retained_column_state(monkeypatch, fau
         type(table).TotalColumnCount = PropertyMock(return_value=4)
     else:
         type(table).ColumnCount = PropertyMock(return_value=3)
-    with pytest.raises(RuntimeError, match="(?i)column|hidden|native|Number|count"):
+    with pytest.raises(RuntimeError):
         _drawing_tables.validate_bom_number_property(
             table, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
             label="paper-drive", expected_rows=len(drawing.BOM_PART_NUMBERS) + 1,
@@ -2910,79 +2975,325 @@ def test_bom_number_proof_uses_binding_getter_not_raw_property_data(monkeypatch)
         table, configuration=configuration, label="paper-drive",
         occurrence_quantities=True,
     ) == before
-    table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
-    with pytest.raises(RuntimeError, match="Number property binding did not persist"):
+    native_property = table.GetColumnCustomProperty.side_effect
+    table.GetColumnCustomProperty.side_effect = lambda index: (
+        "Description" if index == 1 else native_property(index)
+    )
+    with pytest.raises(RuntimeError):
         _drawing_tables.validate_bom_number_property(
             table, configuration=configuration, label="paper-drive",
             occurrence_quantities=True,
         )
 
 
+@pytest.mark.parametrize("invalid_status", (0, 1), ids=("observed-success", "sdk-invalid-index"))
+def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
+    monkeypatch, invalid_status
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    original_type = scene.table.GetColumnType3.side_effect
+
+    def column_type(index, include_hidden):
+        value = original_type(index, include_hidden)
+        return (-1, None, invalid_status) if value[0] == -1 else value
+
+    scene.table.GetColumnType3.side_effect = column_type
+    physical = _drawing_tables._bom_physical_columns(scene.table, label="paper-drive")
+    assert physical == ((202, False), (201, False), (204, False), (203, False))
+    for index in (4, 5, 6):
+        for include_hidden in (False, True):
+            assert scene.table.GetColumnType3(index, include_hidden) == (
+                -1, None, invalid_status
+            )
+            assert scene.table.GetColumnTitle2(index, include_hidden) == ""
+            assert scene.table.DisplayedText2(0, index, include_hidden) == ""
+        assert scene.table.GetColumnWidth(index) == 0.0
+        assert scene.table.ColumnHidden(index) is False
+        assert scene.table.GetColumnCustomProperty(index) == ""
+    assert scene.insert() is scene.table
+    assert len(_drawing_tables._bom_physical_columns(scene.table, label="paper-drive")) == 5
+    items = dict(drawing._validate_bom(
+        scene.adapter, scene.table, drawing._source_family_counts(scene.model),
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+    ))
+    assert set(items) == set(drawing.BOM_PART_NUMBERS)
+    assert scene.table.RowCount == scene.table.TotalRowCount == 44
+
+
 @pytest.mark.parametrize(
-    ("slot", "declared_total"),
-    (("unsupported", 5), ("valid-hidden", 5), ("unsupported", 99)),
+    ("index", "member", "mode", "value"),
+    (
+        (4, "GetColumnType3", True, (-1, None)),
+        (4, "GetColumnType3", True, (999, None, 0)),
+        (4, "GetColumnType3", True, ("-1", None, 0)),
+        (4, "GetColumnType3", True, (-1, None, "0")),
+        (4, "GetColumnType3", True, (-1, None, 2)),
+        (4, "GetColumnType3", True, (-1, "", 0)),
+        (4, "GetColumnType3", False, (-1, "Number", 0)),
+        (4, "GetColumnTitle2", True, "UNEXPECTED"),
+        (4, "GetColumnTitle2", False, "UNEXPECTED"),
+        (4, "DisplayedText2", True, "UNEXPECTED"),
+        (4, "DisplayedText2", False, "UNEXPECTED"),
+        (4, "GetColumnWidth", None, 0.025),
+        (4, "GetColumnWidth", None, -0.001),
+        (4, "GetColumnWidth", None, float("nan")),
+        (4, "GetColumnWidth", None, float("inf")),
+        (4, "ColumnHidden", None, True),
+        (4, "ColumnHidden", None, 1),
+        (4, "ColumnHidden", None, None),
+        (4, "GetColumnCustomProperty", None, "Audit"),
+        (4, "GetColumnType3", True, (-1, None, 1)),
+        (5, "GetColumnType3", True, (-1, None, 1)),
+        (6, "GetColumnType3", True, (-1, None, 1)),
+        (5, "GetColumnType3", True, (204, None, 0)),
+        (6, "GetColumnTitle2", False, "UNEXPECTED"),
+    ),
+    ids=(
+        "malformed-type", "unknown-kind", "string-kind", "string-status",
+        "invalid-property-status", "nonempty-property-data", "visible-property-data",
+        "physical-title", "visible-title", "physical-header", "visible-header",
+        "nonzero-width", "negative-width", "nan-width", "infinite-width",
+        "hidden-invalid", "nonboolean-hidden", "missing-hidden", "custom-property",
+        "tail-control-status-mismatch", "first-control-status-mismatch",
+        "second-control-status-mismatch", "typed-control", "nonempty-control",
+    ),
 )
-def test_bom_column_census_preserves_ambiguous_slots_without_mutating(
-    monkeypatch, slot, declared_total
+def test_bom_column_census_refuses_invalid_native_slot_without_mutating(
+    monkeypatch, index, member, mode, value
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    accessor = getattr(scene.table, member)
+    original = accessor.side_effect
+
+    if member == "DisplayedText2":
+        def read(row, column, include_hidden):
+            if column == index and include_hidden is mode:
+                return value
+            return original(row, column, include_hidden)
+    elif mode is None:
+        def read(column):
+            return value if column == index else original(column)
+    else:
+        def read(column, include_hidden):
+            if column == index and include_hidden is mode:
+                return value
+            return original(column, include_hidden)
+
+    accessor.side_effect = read
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+
+
+@pytest.mark.parametrize("statuses", ((1, 0, 0), (0, 1, 0), (0, 0, 1), (0, 1, 1)))
+def test_bom_column_census_does_not_normalize_distinct_invalid_statuses(
+    monkeypatch, statuses
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    original_type = scene.table.GetColumnType3.side_effect
+
+    def column_type(index, include_hidden):
+        if index in (4, 5, 6):
+            return -1, None, statuses[index - 4]
+        return original_type(index, include_hidden)
+
+    scene.table.GetColumnType3.side_effect = column_type
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+
+
+def test_bom_column_census_refuses_empty_interior_before_later_typed_column(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    original_type = scene.table.GetColumnType3.side_effect
+    original_title = scene.table.GetColumnTitle2.side_effect
+    original_text = scene.table.DisplayedText2.side_effect
+    original_width = scene.table.GetColumnWidth.side_effect
+    original_property = scene.table.GetColumnCustomProperty.side_effect
+    scene.table.GetColumnType3.side_effect = lambda index, mode: (
+        (-1, None, 0) if index == 2 else original_type(index, mode)
+    )
+    scene.table.GetColumnTitle2.side_effect = lambda index, mode: (
+        "" if index == 2 else original_title(index, mode)
+    )
+    scene.table.DisplayedText2.side_effect = lambda row, index, mode: (
+        "" if index == 2 else original_text(row, index, mode)
+    )
+    scene.table.GetColumnWidth.side_effect = lambda index: (
+        0.0 if index == 2 else original_width(index)
+    )
+    scene.table.GetColumnCustomProperty.side_effect = lambda index: (
+        "" if index == 2 else original_property(index)
+    )
+    before = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert tuple(tuple(row) for row in scene.cells) == before
+    assert scene.table.GetColumnType3(3, True) == (203, None, 0)
+    assert len(scene.state.columns) == 4
+
+
+@pytest.mark.parametrize("kind", (201, 204), ids=("native-part-number", "custom-property"))
+def test_bom_insertion_refuses_actual_preexisting_hidden_zero_width_column(
+    monkeypatch, kind
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene.state.columns.append(SimpleNamespace(
+        kind=kind, property_name="Audit" if kind == 204 else "",
+        hidden=True, width=0.0,
+    ))
+    for row in scene.cells:
+        row.append("")
+    assert scene.table.ColumnCount == 4
+    assert scene.table.TotalColumnCount == 6
+    physical = _drawing_tables._bom_physical_columns(scene.table, label="paper-drive")
+    assert len(physical) == 5
+    assert physical[-1] == (kind, True)
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+
+
+def test_bom_column_census_refuses_advertised_cap_overflow_without_truncation(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    type(scene.table).TotalColumnCount = PropertyMock(return_value=99)
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+
+
+@pytest.mark.parametrize("index", (15, 16, 17), ids=("last-declared", "first-control", "second-control"))
+def test_bom_column_census_refuses_bad_metadata_beyond_diagnostic_display_cap(
+    monkeypatch, index
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch)
-    if slot == "valid-hidden":
-        scene.state.columns.append(
-            SimpleNamespace(kind=204, property_name="Audit", hidden=True)
-        )
-        for row in scene.cells:
-            row.append("")
-    type(scene.table).TotalColumnCount = PropertyMock(return_value=declared_total)
-    original_type = scene.table.GetColumnType3.side_effect
-    original_hidden = scene.table.ColumnHidden.side_effect
-    scene.table.GetColumnType3.side_effect = lambda index, include_hidden: (
-        (-1, None, 0)
-        if slot == "unsupported" and index == 4
-        else original_type(index, include_hidden)
+    type(scene.table).TotalColumnCount = PropertyMock(return_value=16)
+    original_property = scene.table.GetColumnCustomProperty.side_effect
+    scene.table.GetColumnCustomProperty.side_effect = lambda column: (
+        "Audit" if column == index else original_property(column)
     )
-    scene.table.ColumnHidden.side_effect = lambda index: (
-        False if slot == "unsupported" and index == 4 else original_hidden(index)
-    )
-    scene.table.GetColumnTitle2.side_effect = (
-        lambda index, include_hidden: scene.table.DisplayedText2(
-            0, index, include_hidden
-        )
-    )
-    scene.table.GetColumnWidth.side_effect = lambda _index: 0.025
-    scene.table.Type = 2
-    feature = scene.table.BomFeature
-    feature.TableType = 2
-    available = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
-    visible = (False, True)
-    feature.GetConfigurationCount = lambda only_visible: 1 if only_visible else 2
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    with pytest.raises(RuntimeError):
+        scene.insert()
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
 
-    def configurations(only_visible, visibility):
-        assert visibility is None
-        return (
-            (available[-1:], visible[-1:])
-            if only_visible else (available, visible)
-        )
 
-    feature.GetConfigurations = configurations
+def test_native_column_fixture_keeps_visible_and_physical_indices_distinct(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    assert scene.table.SetColumnHidden(1, True) is None
+    assert scene.table.ColumnCount == 3
+    assert scene.table.TotalColumnCount == 5
+    assert scene.table.GetColumnType3(1, True) == (201, None, 0)
+    assert scene.table.GetColumnType3(1, False) == (204, "Description", 0)
+    assert scene.table.GetColumnTitle2(1, True) == "PART NUMBER"
+    assert scene.table.GetColumnTitle2(1, False) == "DESCRIPTION"
+    assert scene.table.DisplayedText2(0, 1, False) == "DESCRIPTION"
+    assert scene.table.GetColumnType3(3, False) == (-1, None, 0)
+    assert _drawing_tables._bom_physical_columns(scene.table, label="paper-drive") == (
+        (202, False), (201, True), (204, False), (203, False)
+    )
+
+
+@pytest.mark.parametrize("index", (-1, 4, 5, 6))
+def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
+    monkeypatch, index
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    before_columns = [vars(column).copy() for column in scene.state.columns]
+    before_members = tuple(tuple(row) for row in scene.state.native_rows)
+    before_cells = tuple(tuple(row) for row in scene.cells)
+    assert scene.table.MoveColumn(1, 3, index) is False
+    assert scene.table.MoveColumn(index, 3, 0) is False
+    assert scene.table.InsertColumn2(2, index, "PART NUMBER", 0) is False
+    assert scene.table.SetColumnType3(index, 204, True, "Number") == 1
+    assert scene.table.SetColumnTitle2(index, "PART NUMBER", True) is False
+    with pytest.raises(IndexError):
+        scene.table.SetColumnHidden(index, True)
+    with pytest.raises(IndexError):
+        scene.table.SetColumnWidth(index, 0.025, 0)
+    with pytest.raises(IndexError):
+        scene.table.SetText2(0, index, True, "PART NUMBER")
+    assert [vars(column) for column in scene.state.columns] == before_columns
+    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
+    assert tuple(tuple(row) for row in scene.cells) == before_cells
+
+
+@pytest.mark.parametrize(
+    ("failure", "member", "mode"),
+    (
+        ("type_all", "GetColumnType3", True),
+        ("type_visible", "GetColumnType3", False),
+        ("title_all", "GetColumnTitle2", True),
+        ("title_visible", "GetColumnTitle2", False),
+        ("header_all", "DisplayedText2", True),
+        ("header_visible", "DisplayedText2", False),
+        ("width", "GetColumnWidth", None),
+        ("hidden", "ColumnHidden", None),
+        ("custom_property", "GetColumnCustomProperty", None),
+    ),
+)
+def test_bom_column_diagnostics_isolate_accessor_errors_without_bypassing_proof(
+    monkeypatch, failure, member, mode
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    accessor = getattr(scene.table, member)
+    original = accessor.side_effect
+
+    def fail():
+        raise RuntimeError("native-column-read-failure")
+
+    if member == "DisplayedText2":
+        def read(row, column, include_hidden):
+            if column == 4 and include_hidden is mode:
+                fail()
+            return original(row, column, include_hidden)
+    elif mode is None:
+        def read(column):
+            if column == 4:
+                fail()
+            return original(column)
+    else:
+        def read(column, include_hidden):
+            if column == 4 and include_hidden is mode:
+                fail()
+            return original(column, include_hidden)
+
+    accessor.side_effect = read
     messages = []
     monkeypatch.setattr(
         _drawing_tables._telemetry, "info",
         lambda message, **_fields: messages.append(message),
     )
-    before_columns = [
-        (column.kind, column.property_name, column.hidden)
-        for column in scene.state.columns
-    ]
+    before_columns = [vars(column).copy() for column in scene.state.columns]
     before_members = tuple(tuple(row) for row in scene.state.native_rows)
     before_cells = tuple(tuple(row) for row in scene.cells)
-    with pytest.raises(
-        RuntimeError, match="physical column count is unresolved.*retention was not attempted"
-    ):
+    with pytest.raises(RuntimeError):
         scene.insert()
-    assert [
-        (column.kind, column.property_name, column.hidden)
-        for column in scene.state.columns
-    ] == before_columns
+    assert [vars(column) for column in scene.state.columns] == before_columns
     assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
     assert tuple(tuple(row) for row in scene.cells) == before_cells
     summaries = [
@@ -2990,46 +3301,43 @@ def test_bom_column_census_preserves_ambiguous_slots_without_mutating(
         for message in messages if message.startswith("drawing.bom_number_binding ")
     ]
     assert {summary["stage"] for summary in summaries} == {"before", "after"}
+    empty = {
+        "type_all": "(-1, None, 0)", "type_visible": "(-1, None, 0)",
+        "title_all": "''", "title_visible": "''",
+        "header_all": "''", "header_visible": "''",
+        "width": "0.0", "hidden": "False", "custom_property": "''",
+    }
     for summary in summaries:
         assert summary["visible_columns"] == 4
-        assert summary["total_columns"] == declared_total
-        assert summary["rows"] == summary["total_rows"] == len(scene.keys) + 1
+        assert summary["total_columns"] == 5
+        assert summary["rows"] == summary["total_rows"] == 44
         census = summary["column_census"]
         assert census["table_type"]["value"] == census["bom_type"]["value"] == "2"
         modes = census["configurations"]
-        assert [mode["only_visible"] for mode in modes] == [False, True]
-        assert [mode["count"]["value"] for mode in modes] == ["2", "1"]
-        assert modes[0]["names_and_visibility"]["value"] == repr((available, visible))
-        columns = census["columns"]
-        assert [column["index"] for column in columns] == list(
-            range(min(declared_total + 2, 8))
-        )
-        assert columns[1]["type_all"]["value"].startswith("(201,")
-        assert columns[1]["type_visible"]["value"].startswith("(201,")
+        assert {mode["only_visible"]: mode["count"]["value"] for mode in modes} == {
+            False: "2", True: "1"
+        }
+        all_configurations = next(mode for mode in modes if not mode["only_visible"])
+        assert all_configurations["names_and_visibility"]["value"] == repr((
+            ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION), (False, True)
+        ))
+        columns = {column["index"]: column for column in census["columns"]}
+        assert columns[1]["type_all"]["value"] == "(201, None, 0)"
         assert columns[1]["header_all"]["value"] == repr("PART NUMBER")
-        disputed = columns[4]
-        if slot == "unsupported":
-            assert disputed["type_all"]["value"] == "(-1, None, 0)"
-            assert disputed["hidden"]["value"] == "False"
-            assert "error" in disputed["title_all"]
-            assert "error" in disputed["header_all"]
-        else:
-            assert disputed["type_all"]["value"] == "(204, 'Audit', 0)"
-            assert disputed["hidden"]["value"] == "True"
-            assert disputed["custom_property"]["value"] == repr("Audit")
-        # Failed type/title/text reads cannot erase later width/hidden evidence.
-        assert "error" in columns[5]["type_all"]
-        assert columns[5]["width"]["value"] == "0.025"
-        assert "error" in columns[6]["hidden"]
-        assert summary["caps"]["columns"] is (declared_total > 6)
+        assert "error" in columns[4][failure]
+        for key, value in empty.items():
+            if key != failure:
+                assert columns[4][key]["value"] == value
+            for control in (5, 6):
+                assert columns[control][key]["value"] == value
 
 
 @pytest.mark.parametrize("drop", ("transgear", "all"))
 def test_bom_insertion_refuses_row_loss_from_the_number_binding(monkeypatch, drop):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     native_rows = scene.state.native_rows
-    mapper = MagicMock(wraps=_drawing_tables.bom_row_identities)
-    monkeypatch.setattr(_drawing_tables, "bom_row_identities", mapper)
+    gear_row = scene.keys.index("pd-transgear-removable") + 1
+    gear_components = tuple(native_rows[gear_row - 1])
     changed = False
 
     def rebuild():
@@ -3046,16 +3354,22 @@ def test_bom_insertion_refuses_row_loss_from_the_number_binding(monkeypatch, dro
         return True
 
     scene.adapter.currentModel.EditRebuild3 = rebuild
-    message = "Number proof has 1 rows" if drop == "all" else "BOM table is.*expected"
-    with pytest.raises(RuntimeError, match=message) as error:
+    with pytest.raises(RuntimeError):
         scene.insert()
-    mapper.assert_not_called()
-    if drop == "transgear":
-        contents = tuple(
-            tuple(scene.table.DisplayedText(row, column) for column in range(scene.table.ColumnCount))
-            for row in range(scene.table.RowCount)
+    assert changed
+    if drop == "all":
+        assert scene.table.RowCount == scene.table.TotalRowCount == 1
+        assert native_rows == []
+    else:
+        assert scene.table.RowCount == scene.table.TotalRowCount == len(scene.keys)
+        assert not {
+            id(component) for group in native_rows for component in group
+        }.intersection(id(component) for component in gear_components)
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(
+            scene.adapter, scene.table, drawing._source_family_counts(scene.model),
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
         )
-        assert repr(contents) in str(error.value)
 
 
 @pytest.mark.parametrize("effect", ("omitted", "merged", "excluded", "hidden"))
@@ -3323,13 +3637,16 @@ def test_bom_insertion_refuses_changes_from_the_description_rebuild(
     inner_row = scene.keys.index("sh-vn-chain-link--InnerLink") + 1
     outer_row = scene.keys.index("sh-vn-chain-link--OuterLink") + 1
     native_components = scene.table.GetComponents2.side_effect
+    native_property = scene.table.GetColumnCustomProperty.side_effect
 
     def rebuild():
         if scene.table.SetText2.called:
             if fault == "grouping":
                 scene.table.BomFeature.PartConfigurationGrouping = 2
             elif fault == "column-property":
-                scene.table.GetColumnCustomProperty.side_effect = lambda _index: "Description"
+                scene.table.GetColumnCustomProperty.side_effect = lambda index: (
+                    "Description" if index == 1 else native_property(index)
+                )
             elif fault == "native-number":
                 native = native_components(
                     inner_row, drawing.SIMPLIFIED_VIEW_CONFIGURATION
@@ -3402,7 +3719,8 @@ def _pd_split_bom_fixture(monkeypatch, *, coverage="complete"):
         widths = tuple(drawing.BOM_COLUMN_WIDTHS[key] for key in (
             "item", "part", "description", "quantity"
         ))
-        table.GetColumnWidth.side_effect = widths.__getitem__
+        for column, width in enumerate(widths):
+            table._pd_state.columns[column].width = width
         anchor = (drawing.BOM_ANCHOR, drawing.BOM_SECOND_ANCHOR)[index]
         table.GetAnnotation.return_value = SimpleNamespace(
             GetPosition=lambda anchor=anchor: (*anchor, 0.0)

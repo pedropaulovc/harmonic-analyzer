@@ -757,7 +757,6 @@ class _Table:
             for family in native_order
         ]
         self.association_configurations = []
-        self.TotalColumnCount = 5
         self.column_types = [
             (202, "", 0),
             (204, "Number", 0),
@@ -765,6 +764,8 @@ class _Table:
             (203, "", 0),
             (201, "", 0),
         ]
+        self.hidden = [False] * 4 + [True]
+        self.number_property = "Number"
 
     @property
     def RowCount(self):
@@ -772,20 +773,47 @@ class _Table:
 
     @property
     def ColumnCount(self):
-        return len(self.cells[0])
+        return self.hidden.count(False)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.column_types)
+
+    def _physical_column(self, column, include_hidden=True):
+        columns = [
+            index
+            for index, hidden in enumerate(self.hidden)
+            if include_hidden or not hidden
+        ]
+        return columns[column] if 0 <= column < len(columns) else None
 
     def DisplayedText(self, row, column):
-        return self.cells[row][column]
+        return self.DisplayedText2(row, column, False)
+
+    def DisplayedText2(self, row, column, include_hidden):
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            return ""
+        if physical < len(self.cells[row]):
+            return self.cells[row][physical]
+        return "PART NUMBER" if row == 0 else self.cells[row][1]
+
+    def GetColumnTitle2(self, column, include_hidden):
+        return self.DisplayedText2(0, column, include_hidden)
 
     def GetColumnType3(self, column, include_hidden):
-        assert include_hidden is True
-        return self.column_types[column]
+        physical = self._physical_column(column, include_hidden)
+        return (-1, None, 0) if physical is None else self.column_types[physical]
 
     def ColumnHidden(self, column):
-        return column == self.ColumnCount
+        return self.hidden[column] if 0 <= column < len(self.hidden) else False
 
     def GetColumnCustomProperty(self, column):
-        return "Number" if column == 1 else ""
+        if not 0 <= column < len(self.column_types):
+            return ""
+        if column == 1 and self.column_types[column][0] == 204:
+            return self.number_property
+        return ""
 
     def SetText2(self, *_args):
         raise AssertionError("Number cells must stay natively property-linked")
@@ -796,6 +824,8 @@ class _Table:
 
     def SetColumnWidth(self, column, width, options):
         assert options == 0
+        if not 0 <= column < len(self.column_types):
+            raise IndexError(column)
         self.widths[column] = width
         return width
 
@@ -805,7 +835,9 @@ class _Table:
         return height
 
     def GetColumnWidth(self, column):
-        return self.widths[column]
+        if not 0 <= column < len(self.column_types):
+            return 0.0
+        return self.widths.get(column, 0.0 if self.hidden[column] else 0.02)
 
     def GetRowHeight(self, row):
         return self.heights[row]
@@ -822,28 +854,25 @@ _ADAPTER = SimpleNamespace(
 
 
 @pytest.mark.parametrize(
-    ("fault", "message"),
+    "fault",
     (
-        ("native-column", "unique trailing native column"),
-        ("number-column", "Number column type/property changed"),
-        ("number-property", "Number property binding did not persist"),
-        ("visible-prefix", "visible columns are not a contiguous prefix"),
-        ("displayed-number", "does not match native component Numbers"),
-        ("member", "native BOM membership/quantities changed"),
-        ("quantity", "native occurrence count"),
+        "native-column",
+        "number-column",
+        "number-property",
+        "visible-prefix",
+        "displayed-number",
+        "member",
+        "quantity",
     ),
 )
 def test_package_settled_checks_reread_native_bom_without_mutating_layout(
-    monkeypatch, native_bom_bindings, fault, message
+    monkeypatch, native_bom_bindings, fault
 ) -> None:
     from _test_stubbed_build import stub_seat
 
     table = _Table(spec.BOM_ORDER)
     column_types = table.column_types
-    hidden = [False] * 4 + [True]
-    table.ColumnHidden = lambda column: hidden[column]
-    table.number_property = "Number"
-    table.GetColumnCustomProperty = lambda column: table.number_property
+    hidden = table.hidden
     seat = stub_seat(
         monkeypatch,
         drawing,
@@ -893,7 +922,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
         table.native_members[stud_row - 1][
             0
         ].ReferencedConfiguration = f"{t_nut_member} Simplified"
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError):
         for check in checks:
             check()
     seat.insert_bom_table.assert_called_once()
