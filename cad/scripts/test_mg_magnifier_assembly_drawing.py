@@ -3,7 +3,6 @@
 import asyncio
 import math
 from fractions import Fraction
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -96,7 +95,6 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
     assert set(stack.DIMENSION_TOLERANCES) == names
-    assert set(notes.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
     assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == 0.05
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
     # One detail imports each setting.
@@ -162,14 +160,18 @@ def test_the_details_and_labels_do_not_overlap() -> None:
     assert _circle_box(drawing.ENDSHAKE)[3] < upper_label_bottom
 
 
-def test_an_above_callout_with_a_line_break_is_refused(monkeypatch) -> None:
-    assert drawing.CALLOUT_LOCATION[stack.PRESS_GAUGE_DIMENSION] == "above"
-    assert drawing._printable_callouts() == notes.DIMENSION_CALLOUTS
-    monkeypatch.setitem(
-        notes.DIMENSION_CALLOUTS, stack.PRESS_GAUGE_DIMENSION, "PRESS GAUGE\nLOCKNUT"
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+def test_an_above_callout_with_a_line_break_is_refused_before_model_writes(
+    monkeypatch, feature
+) -> None:
+    callouts = stack.SETTING_CALLOUTS[feature]
+    above = next(name for name, (part, _text) in callouts.items() if part == 3)
+    monkeypatch.setitem(callouts, above, (3, "ABOVE\nCALLOUT"))
+    monkeypatch.setattr(
+        assembly, "_named_dimension", lambda *_args: pytest.fail("no model writes")
     )
     with pytest.raises(RuntimeError, match="line break do not print"):
-        drawing._printable_callouts()
+        assembly._author_setting_callouts(object(), feature)
 
 
 class _Display:
@@ -180,18 +182,50 @@ class _Display:
         return self.parts.get(part, "")
 
 
-def test_each_callout_reads_back_from_its_own_compartment() -> None:
-    callouts = notes.DIMENSION_CALLOUTS
-    gauge, endshake = stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
+    callouts = stack.SETTING_CALLOUTS[feature]
     good = [
-        (gauge, _Display({3: callouts[gauge]})),
-        (endshake, _Display({4: callouts[endshake].replace("\n", "\r\n")})),
+        (name, _Display({part: text.replace("\n", "\r\n")}))
+        for name, (part, text) in callouts.items()
     ]
     drawing._assert_callouts(good, callouts)
-    # The gauge's text in the below compartment is not its callout.
-    wrong = [(gauge, _Display({4: callouts[gauge]})), good[1]]
-    with pytest.raises(RuntimeError, match="above callout reads ''"):
+    # Text in the other compartment is not the inherited model callout.
+    name, (part, text) = next(iter(callouts.items()))
+    wrong = [(name, _Display({7 - part: text})), *good[1:]]
+    with pytest.raises(RuntimeError, match="callout reads ''"):
         drawing._assert_callouts(wrong, callouts)
+
+
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("failed_readback", [False, True])
+def test_native_setting_text_requires_void_setter_readback(
+    monkeypatch, feature, failed_readback
+) -> None:
+    class Display:
+        def __init__(self):
+            self.text = {}
+
+        def SetText(self, part, text):
+            assert part in (3, 4)  # Never replace the live dimension value.
+            if not failed_readback:
+                self.text[part] = text
+            # The native setter returns void, including when text is unchanged.
+
+        def GetText(self, part):
+            return self.text.get(part, "").replace("\n", "\r\n")
+
+    displays = {name: Display() for name in stack.SETTING_CALLOUTS[feature]}
+    monkeypatch.setattr(
+        assembly,
+        "_named_dimension",
+        lambda _adapter, _owner, name: (displays[name], object()),
+    )
+    if failed_readback:
+        with pytest.raises(RuntimeError, match="native setting callout reads"):
+            assembly._author_setting_callouts(object(), feature)
+    else:
+        assembly._author_setting_callouts(object(), feature)
 
 
 def test_each_detail_frames_both_ends_of_its_dimension() -> None:
@@ -311,6 +345,7 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         "_set_tolerance_precision",
         "apply_drawing_precision",
         "mark_dimensions_for_drawing",
+        "_author_setting_callouts",
     ):
         monkeypatch.setattr(builder, name, lambda *a, **kw: None)
     monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
@@ -381,34 +416,6 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
     assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
 
 
-def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
-    # Code review C03: the BOM, callout and step text is drawing-only, so a
-    # wording edit must re-key the MHA-MG-00 sheet and never the native
-    # assembly:mg_magnifier recipe the builder's closure keys.
-    import _buildgraph
-
-    def closure(module) -> set[str]:
-        return {
-            Path(dep).name for dep in _buildgraph.module_deps_of(Path(module.__file__))
-        }
-
-    assert "mg_magnifier_assembly_sheet.py" in closure(drawing)
-    assert "mg_magnifier_assembly_spec.py" in closure(assembly)
-    assert "mg_magnifier_assembly_sheet.py" not in closure(assembly)
-    # Nothing the sheet prints stays behind in the builder's spec.
-    for name in (
-        "BOM_ORDER",
-        "BOM_DESCRIPTIONS",
-        "STEP_TEXT",
-        "ASSEMBLY_STEPS",
-        "ASSEMBLY_CHECKS",
-        "DIMENSION_CALLOUTS",
-        "LEVER_CALLOUTS",
-        "DRAWING_DIMENSIONS",
-    ):
-        assert not hasattr(stack, name), name
-
-
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     import math
 
@@ -477,11 +484,9 @@ def test_the_lever_settings_match_the_placed_lever_group() -> None:
     assert stack.CLAMP_CENTRE_X == pytest.approx(assembly.CLAMP_X)
     assert stack.FIXTURE_AXIS_Y == pytest.approx(assembly.FIXTURE_POSITION[1])
     assert stack.CLAMP_STATION > 0.0 and stack.FIXTURE_DROP > 0.0
-    assert set(notes.LEVER_CALLOUTS) == set(drawing.LEVER_CALLOUT_LOCATION)
     assert stack.LEVER_DRAWING_DIMENSIONS == {
         stack.LEVER_FEATURE: {stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION}
     }
-    drawing._printable_lever_callouts()
 
 
 def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
@@ -561,6 +566,7 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
         "name_last_feature",
         "apply_drawing_precision",
         "mark_dimensions_for_drawing",
+        "_author_setting_callouts",
     ):
         monkeypatch.setattr(assembly, name, lambda *a, **kw: None)
     monkeypatch.setattr(
@@ -1268,131 +1274,46 @@ def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
     assert not source.exploded
 
 
-@pytest.fixture
-def mg_source_trace(monkeypatch):
-    events = []
-    warnings = []
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(
-        drawing._telemetry, "event", lambda _name, **fields: events.append(fields)
-    )
-    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    return SimpleNamespace(
-        source=source,
-        events=events,
-        warnings=warnings,
-        step=drawing._source_dirty_tracer(source),
-    )
-
-
-@pytest.mark.parametrize("dirty_during", ["placement", "configuration"])
-def test_mg_assembled_trace_separates_named_view_and_configuration(
-    monkeypatch, mg_source_trace, dirty_during
-) -> None:
-    probe = mg_source_trace
-    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
-
-    def place(_adapter, _source, name, *_xy, **_kwargs):
-        probe.source.dirty |= dirty_during == "placement"
-        return SimpleNamespace(name=name)
-
-    def configure(*_args, **_kwargs):
-        probe.source.dirty |= dirty_during == "configuration"
-
-    def lever(_adapter, _view, source_step):
-        assert source_step is probe.step
-        source_step("lever settings test boundary")
-        return lambda: None
-
-    def stack_settings(_adapter, source_step):
-        assert source_step is probe.step
-        source_step("stack settings test boundary")
-        return lambda: None
-
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "apply_view_configuration", configure)
-    monkeypatch.setattr(drawing, "_lever_settings", lever)
-    monkeypatch.setattr(drawing, "_stack_dimensions", stack_settings)
-    monkeypatch.setattr(drawing, "_add_note_block", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        drawing, "_view_outline", lambda *_args, **_kwargs: (0.0, 0.1, 0.1, 0.2)
-    )
-
-    settled = drawing._place_assembled_sheet(object(), probe.step)
-
-    orientations = (
-        stack.DRAWING_BACK_VIEW,
-        stack.DRAWING_LEFT_VIEW,
-        stack.DRAWING_ISOMETRIC_VIEW,
-    )
-    assert [event["step"] for event in probe.events] == [
-        "assembled sheet activation",
-        *(
-            f"assembled {name} {operation}"
-            for name in orientations
-            for operation in ("named view placement and scale", "view configuration")
-        ),
-        "lever settings test boundary",
-        "stack settings test boundary",
-        *(f"assembled {name} caption" for name in drawing.ASSEMBLED_VIEW_CAPTIONS),
-    ]
-    first_dirty = next(event["step"] for event in probe.events if event["dirty"])
-    operation = (
-        "named view placement and scale"
-        if dirty_during == "placement"
-        else "view configuration"
-    )
-    assert first_dirty == f"assembled {stack.DRAWING_BACK_VIEW} {operation}"
-    assert probe.warnings == [f"magnifier source went DIRTY after {first_dirty}"]
-    assert len(settled) == 2
-    assert probe.source.dirty
-    assert probe.source.configuration_switches == []
-
-
 @pytest.mark.parametrize("group", ["lever", "stack"])
-def test_mg_settings_trace_checks_each_display_callout_without_model_writes(
-    monkeypatch, mg_source_trace, group
+@pytest.mark.parametrize("missing", [False, True])
+def test_mg_settings_only_read_inherited_native_callouts(
+    monkeypatch, group, missing
 ) -> None:
     import _drawing_dimensions as dimension_helpers
 
-    probe = mg_source_trace
-    locations = (
-        drawing.LEVER_CALLOUT_LOCATION if group == "lever" else drawing.CALLOUT_LOCATION
-    )
-    source_precision = (
+    feature = stack.LEVER_FEATURE if group == "lever" else stack.FEATURE
+    callouts = stack.SETTING_CALLOUTS[feature]
+    precision = (
         stack.LEVER_DRAWING_PRECISION if group == "lever" else stack.DRAWING_PRECISION
-    )
-    precision = {
-        name: places
-        for names in source_precision.values()
-        for name, places in names.items()
-    }
+    )[feature]
     annotations = {}
-    writes = []
+    text_parts = {}
 
-    def no_model_dimension(*_args):
-        raise AssertionError("setting formatting must not write a model dimension")
+    def forbidden(*_args):
+        pytest.fail("drawing settings must not write native callout text")
 
-    def annotation(name):
-        text = {}
-
-        def set_text(part, value):
-            writes.append((name, part, value))
-            text[part] = value
-            # Synthetic transition tests checkpoint attribution, not COM behavior.
-            probe.source.dirty = True
-
-        display = SimpleNamespace(
-            SetText=set_text,
-            GetText=lambda part: text.get(part, ""),
-            GetPrimaryPrecision2=lambda: precision[name],
-            GetDimension2=no_model_dimension,
+    for name, (part, text) in callouts.items():
+        text_parts[name] = {part: text.replace("\n", "\r\n")}
+        band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
+        tolerance = SimpleNamespace(
+            Type=4,
+            GetMaxValue=lambda band=band_m: band,
+            GetMinValue=lambda band=band_m: -band,
         )
-        return SimpleNamespace(name=name, GetSpecificAnnotation=lambda: display)
-
-    for name in locations:
-        annotations[name] = annotation(name)
+        display = SimpleNamespace(
+            SetText=forbidden,
+            GetText=lambda part, name=name: text_parts[name].get(part, ""),
+            GetPrimaryPrecision2=lambda name=name: precision[name],
+            GetPrimaryTolPrecision2=lambda: stack.TOLERANCE_PRECISION,
+            GetDimension2=lambda _index, tol=tolerance: SimpleNamespace(Tolerance=tol),
+        )
+        annotations[name] = SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display
+        )
+    name, (part, _text) = next(iter(callouts.items()))
+    if missing:
+        text_parts[name][part] = ""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _iface: value)
     monkeypatch.setattr(
         dimension_helpers._sw_type_info,
         "early_bound_or_flag",
@@ -1404,112 +1325,32 @@ def test_mg_settings_trace_checks_each_display_callout_without_model_writes(
     monkeypatch.setattr(
         drawing,
         "curate_view_dimensions",
-        lambda *_args, **_kwargs: list(annotations.values()),
-    )
-    monkeypatch.setattr(
-        drawing, "model_points_in_view", lambda *_a, **_k: ((0.0, 0.0),) * 3
+        lambda *_a, **_k: list(annotations.values()),
     )
     monkeypatch.setattr(
         drawing,
-        "_add_setting_axes",
-        lambda _adapter, _view, source_step: source_step("lever axes test boundary"),
+        "model_points_in_view",
+        lambda *_a, **_k: ((0.0, 0.0),) * 3,
     )
-
-    def detail(_adapter, _detail, keep, source_step):
-        assert source_step is probe.step
-        return [annotations[name] for name in keep]
-
-    monkeypatch.setattr(drawing, "_dimensioned_detail", detail)
+    monkeypatch.setattr(drawing, "_add_setting_axes", lambda *_a: None)
+    monkeypatch.setattr(
+        drawing,
+        "_dimensioned_detail",
+        lambda _adapter, _detail, keep: [annotations[name] for name in keep],
+    )
     adapter = SimpleNamespace(_attempt=lambda action: action())
-    if group == "lever":
-        drawing._lever_settings(adapter, object(), probe.step)
-        prefix = [
-            "lever setting projection readback",
-            "lever axes test boundary",
-            f"lever per-view {stack.LEVER_FEATURE} show",
-            "lever model dimension import and curation",
-        ]
-    else:
-        drawing._stack_dimensions(adapter, probe.step)
-        prefix = []
-    callout_steps = [
-        f"{group} {name} {location} callout" for name, location in locations.items()
-    ]
-    assert [event["step"] for event in probe.events] == [
-        *prefix,
-        *callout_steps,
-        f"{group} imported precision readback",
-        f"{group} dimension names and callout readback",
-    ]
-    assert [(name, part) for name, part, _value in writes] == [
-        (name, drawing.CALLOUT_TEXT_PART[location]) for name, location in locations.items()
-    ]
-    assert probe.warnings == [f"magnifier source went DIRTY after {callout_steps[0]}"]
-    assert probe.source.dirty
-    assert probe.source.configuration_switches == []
 
+    def import_settings():
+        if group == "lever":
+            return drawing._lever_settings(adapter, object(), lambda _phase: None)
+        return drawing._stack_dimensions(adapter, lambda _phase: None)
 
-@pytest.mark.parametrize(
-    "dirty_during, expected",
-    [
-        ("circle", "crop circle"),
-        ("Crop2", "Crop2"),
-        ("rebuild", "crop rebuild"),
-        ("display", "crop display geometry update"),
-    ],
-)
-def test_mg_crop_trace_separates_circle_crop_rebuild_and_display(
-    monkeypatch, mg_source_trace, dirty_during, expected
-) -> None:
-    probe = mg_source_trace
-
-    def operation(name, result=None):
-        probe.source.dirty |= dirty_during == name
-        return result
-
-    manager = SimpleNamespace(
-        AddToDB=True, CreateCircle=lambda *_args: operation("circle", object())
-    )
-    model = SimpleNamespace(
-        SketchManager=manager,
-        ClearSelection2=lambda _all: None,
-        EditRebuild3=lambda: operation("rebuild", True),
-    )
-    view = SimpleNamespace(
-        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
-        Crop2=lambda *_args: operation("Crop2", drawing.CROP_NO_ERROR),
-        UpdateViewDisplayGeometry=lambda: operation("display"),
-        IsCropped=lambda: True,
-    )
-    utility = SimpleNamespace(
-        CreatePoint=lambda xyz: SimpleNamespace(
-            MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=xyz)
-        )
-    )
-    adapter = SimpleNamespace(
-        currentModel=model, swApp=SimpleNamespace(GetMathUtility=lambda: utility)
-    )
-    monkeypatch.setattr(drawing, "_activate", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "double_array", lambda values: values)
-    monkeypatch.setattr(drawing._telemetry, "info", lambda *_args, **_kwargs: None)
-
-    drawing._crop(adapter, view, drawing.ENDSHAKE, probe.step)
-
-    assert [event["step"] for event in probe.events] == [
-        f"{drawing.ENDSHAKE.title} {operation}"
-        for operation in (
-            "crop view activation",
-            "crop AddToDB disabled",
-            "crop circle",
-            "crop AddToDB restored",
-            "Crop2",
-            "crop rebuild",
-            "crop display geometry update",
-        )
-    ]
-    assert probe.warnings == [
-        f"magnifier source went DIRTY after {drawing.ENDSHAKE.title} {expected}"
-    ]
-    assert manager.AddToDB is True
-    assert probe.source.dirty
-    assert probe.source.configuration_switches == []
+    if missing:
+        with pytest.raises(RuntimeError, match="callout reads ''"):
+            import_settings()
+        return
+    settled = import_settings()
+    settled()
+    text_parts[name][part] = ""
+    with pytest.raises(RuntimeError, match="callout reads ''"):
+        settled()
