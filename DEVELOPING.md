@@ -448,6 +448,12 @@ explicit way to stop a run, `-Cancel` (see
 - **A protocol- and identity-compatible pool checkout** at `-PoolHome`, holding
   `farm.py`, `pyproject.toml` and `agent/protocol.py`, plus Azure credentials for
   the cache (`az login`; `off` is refused).
+  `build.py` runs admission and fleet queries in that pool project's own uv
+  environment; the launcher's tracking and cancellation pool commands follow
+  the same rule. These subprocess boundaries exclude the caller's
+  `VIRTUAL_ENV` and `UV_PROJECT_ENVIRONMENT`; an external build environment is
+  not a pool-environment override. The caller's values are preserved, and
+  other environment settings are inherited.
   Preflight checks every would-be leaf in the entire requested closure with
   that checkout's authoritative `agent.protocol.leaf_admitted`; refused tasks
   and prefixes exit 2 before joining the FIFO. Preflight normalizes PoolHome's
