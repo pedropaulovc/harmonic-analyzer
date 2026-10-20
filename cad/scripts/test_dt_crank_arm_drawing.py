@@ -534,8 +534,11 @@ def test_partial_section_line_crosses_only_the_negative_x_bore_wall_in_xz() -> N
     bore_wall = drawing._sheet_x(-spec.HUB_SEAT_DIA / 2.0)
     assert y0 == y1 == drawing.BORE_CENTER[1]
     assert x0 < outer < bore_wall < x1 < drawing.BORE_CENTER[0]
-    assert outer - x0 == pytest.approx(x1 - bore_wall)
-    assert x1 - x0 < 2.0 * (bore_wall - outer)
+    assert outer - x0 == pytest.approx(0.005)
+    assert x1 - bore_wall == pytest.approx(0.002)
+    # Native armfix1 A text ran 2.94 mm right of its endpoint and struck the
+    # overall's witness line at the OD extreme. Retain at least 1 mm of air.
+    assert outer - (x0 + 0.00294) >= 0.001
     ax, ay, az = drawing.SECTION_ANCHOR_MM
     assert -spec.HALF_WIDTH < ax < -spec.HUB_SEAT_DIA / 2.0
     assert ay == 0.0

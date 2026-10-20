@@ -263,10 +263,14 @@ RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 # used the wrong annotation plane. Keep native radial X across / axial Z
 # vertical, with a genuine partial section rather than a full-cut crop.
 SECTION_SCALE = (4, 1)
-SECTION_LINE_OVERRUN = 0.002  # sheet metres: 1 mm past each wall face at 2:1
+# Armfix1 measured the left A glyph ending 2.94 mm right of its endpoint.
+# Extend that end into air so it clears the overall's outer witness line;
+# the right end stays 1 mm into the bore at the front view's 2:1 scale.
+SECTION_LINE_LEFT_OVERRUN = 0.005
+SECTION_LINE_RIGHT_OVERRUN = 0.002
 SECTION_LINE = (
-    (_sheet_x(-HALF_WIDTH) - SECTION_LINE_OVERRUN, BORE_CENTER[1]),
-    (_sheet_x(-HUB_SEAT_DIA / 2.0) + SECTION_LINE_OVERRUN, BORE_CENTER[1]),
+    (_sheet_x(-HALF_WIDTH) - SECTION_LINE_LEFT_OVERRUN, BORE_CENTER[1]),
+    (_sheet_x(-HUB_SEAT_DIA / 2.0) + SECTION_LINE_RIGHT_OVERRUN, BORE_CENTER[1]),
 )
 SECTION_CENTER = (0.368, 0.150)
 SECTION_ANCHOR_MM = (
