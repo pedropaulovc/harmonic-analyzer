@@ -1723,6 +1723,19 @@ def test_module_deps_are_transitive():
     )
 
 
+def test_swing_stop_stock_builder_does_not_reach_receiver_validation():
+    """Track stock authority without re-keying the native screw for base edits."""
+    stock_authorities = {"dt_vn_swing_stop_screw_spec", "_mcmaster_90280a108"}
+    receiver_geometry = {"fr_harmonic_base_fasteners", "fr_harmonic_base_spec"}
+    native = _helper_names("build_dt_vn_swing_stop_screw.py")
+    assert stock_authorities <= native, native
+    assert native.isdisjoint(receiver_geometry), native & receiver_geometry
+
+    # Receiver validation remains a real assembly input, not a graph exclusion.
+    assembly = _helper_names("build_dt_drive_train_assembly.py")
+    assert stock_authorities | receiver_geometry <= assembly, assembly
+
+
 def test_specialized_helper_blast_radius_is_narrow():
     """_gear reaches only its real importers, not the fleet."""
     gear_users = [s for s in part_stems() if "_gear" in _helper_names(f"build_{s}.py")]
@@ -2738,12 +2751,13 @@ def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None
         # Listed themselves: the root script is not in its own import closure
         # (Codex #1035, PRRT_kwDOPHDy386mV11b).
         ("build_mg_wheel_bar.py", True),
-        ("build_dt_vn_swing_stop_screw.py", True),
         # Reads through an imported listed module.
         ("build_sm_vn_boss_hook.py", True),
         ("build_ch_vn_spring_hook.py", True),
         # R9-48: judges its lock taps at the printed worst case.
         ("build_pd_platen_guide.py", True),
+        # Stock limits do not read a manufactured receiver's platform allowance.
+        ("build_dt_vn_swing_stop_screw.py", False),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):

@@ -152,7 +152,6 @@ from dt_vn_swing_stop_screw_spec import (
     LENGTH_MIN_MM as SMALL_SCREW_LENGTH_MIN,
     LENGTH_MAX_MM as SMALL_SCREW_LENGTH_MAX,
     TIP_CHAMFER as SMALL_SCREW_TIP_CHAMFER,
-    require_seat_fit as require_stop_seat_fit,
 )
 from dt_vn_slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN, TIP_CHAMFER as BLOCK_TIP_CHAMFER
 from dt_vn_pedestal_hold_down_screw_spec import TIP_CHAMFER as PEDESTAL_TIP_CHAMFER
@@ -190,6 +189,7 @@ from fr_harmonic_base_fasteners import (
     retained_material_segments_mm,
     through_seat_material,
     through_seat_pocket_clearances_mm,
+    require_stop_seat_fit,
     require_through_seat_fit,
     title_block_band_mm,
 )

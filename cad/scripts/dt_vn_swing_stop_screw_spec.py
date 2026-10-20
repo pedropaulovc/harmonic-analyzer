@@ -1,10 +1,10 @@
-r"""Pure McMaster 90280A108 stock dimensions and swing-stop seat checks.
+r"""Pure McMaster 90280A108 stock dimensions and swing-stop inspection data.
 
-PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure. The fillister row in mm is the per-SKU vendor source
-(``_mcmaster_90280a108.py``, SolidWorks-free at import), which the native
+PURE DATA, no SolidWorks/COM calls, receiving-base geometry or ``build_*``
+module in its import closure. The fillister row in mm is the per-SKU vendor
+source (``_mcmaster_90280a108.py``, SolidWorks-free at import), which the native
 recipe and the same-SKU foot and latch-hook bracket specs also read; this
-module adds the stock limits and the seat checks.
+module adds the stock limits and installed-joint inspection constants.
 
 The stop seats fully home on the base top; the platform edge bears on its
 head only when DISENGAGED. It limits the disengage swing and plays no part
@@ -15,23 +15,18 @@ standard and corroborated for the slotted fillister form; they are not
 manufactured title-block grades. They bound head size, slot depth, length,
 the underside bearing circle and where full thread form starts near the
 head, not the supplier's complete curved head/rounded-tip profile.
-Only the manufactured platform's thickness uses its title-block allowance.
 The two-place MIN engagement callout below owns the installed-joint limit
 printed by the assembly drawing; it does not qualify supplier tail geometry.
+``fr_harmonic_base_fasteners.require_stop_seat_fit`` owns receiver validation,
+including the manufactured platform's thickness allowance.
 """
 
 from __future__ import annotations
 
 from math import ceil
-from typing import TYPE_CHECKING
 
-import _config
 from _fit_deviations import deviations
 from _mcmaster_90280a108 import FILLISTER_SIZE
-from fr_harmonic_base_fasteners import ThroughSeatMaterial, require_through_seat_fit
-
-if TYPE_CHECKING:
-    from _hole_spec import HoleSpec
 
 SOURCE = "McMaster 90280A108 vendor-model fillister dimensions"
 THREAD_FIT_SOURCE = "https://www.mcmaster.com/90280A108/ (live product page, 2026-10-08)"
@@ -98,39 +93,3 @@ MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "at least 1.5D, rounded upward to 0.01 mm; head fully seated"
 )
 MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
-PLATE_THICKNESS_ALLOWANCE = 25.4 * float(_config.title_block("linear_2pl")["value_in"])
-
-
-def require_seat_fit(
-    seat: HoleSpec,
-    plate_thickness: float,
-    *,
-    material: ThroughSeatMaterial,
-) -> None:
-    """Check the seated stop against the finite through-threaded receiver.
-
-    Stock length and head-end runout use their qualified B18.6.3 limits.
-    The harvested tip chamfer remains nominal; the installed full-form
-    engagement and fully seated head still require the existing inspection.
-    """
-    if (
-        seat.kind != "tapped"
-        or seat.size != THREAD
-        or seat.thread_class != "2B"
-        or seat.end != "through_all"
-    ):
-        raise AssertionError("swing stop requires a through #4-40 UNC-2B seat")
-    fit = require_through_seat_fit(
-        "swing stop",
-        seat,
-        material,
-        insertion_min_mm=LENGTH_MIN_MM,
-        insertion_max_mm=LENGTH_MAX_MM,
-        tip_loss_mm=TIP_CHAMFER,
-        full_thread_start_mm=FULL_THREAD_START_MAX_MM,
-    )
-    if fit.full_thread_engagement_min_mm < MIN_USEFUL_ENGAGEMENT_MM - 1e-9:
-        raise AssertionError("swing stop has less than the minimum useful thread engagement")
-    # The whole head must bear on the edge of a tolerance-low platform.
-    if PROUD_LEN + HEAD_H > plate_thickness - PLATE_THICKNESS_ALLOWANCE + 1e-9:
-        raise AssertionError("swing-stop head stands above the tolerance-low platform")

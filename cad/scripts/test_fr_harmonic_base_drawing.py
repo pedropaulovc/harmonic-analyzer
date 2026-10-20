@@ -216,7 +216,9 @@ def test_stop_head_seats_on_the_base_inside_the_platform_edge() -> None:
     import dt_vn_swing_stop_screw_spec as stop
 
     material = part.THROUGH_SEAT_MATERIAL["StopSeat"][0]
-    stop.require_seat_fit(part.STOP_SEAT_SPEC, platform.PLATE_T, material=material)
+    fr_harmonic_base_fasteners.require_stop_seat_fit(
+        part.STOP_SEAT_SPEC, platform.PLATE_T, material=material
+    )
     assert (stop.THREAD, stop.SHANK_LEN) == (foot.THREAD, foot.SHANK_LEN)
     assert stop.PROUD_LEN == 0.0
     assert stop.CONTACT_DIA == stop.HEAD_DIA
@@ -224,7 +226,9 @@ def test_stop_head_seats_on_the_base_inside_the_platform_edge() -> None:
     # A short full-thread receiver still fails even if the tip has free air.
     thin = replace(material, guaranteed_segments_mm=((0.25, 4.0),))
     with pytest.raises(AssertionError, match="full-form overlap"):
-        stop.require_seat_fit(part.STOP_SEAT_SPEC, platform.PLATE_T, material=thin)
+        fr_harmonic_base_fasteners.require_stop_seat_fit(
+            part.STOP_SEAT_SPEC, platform.PLATE_T, material=thin
+        )
 
 
 def test_nameplate_seats_are_derived_from_the_plate_mount() -> None:

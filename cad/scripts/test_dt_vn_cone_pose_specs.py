@@ -385,7 +385,7 @@ def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check() -> None:
     fasteners = _pure_spec("fr_harmonic_base_fasteners")
     seat = holes.HoleSpec("tapped", stop.THREAD, thread_class="2B")
     material = fasteners.through_seat_material(seat, (100.0, 50.0))
-    stop.require_seat_fit(seat, 5.0, material=material)
+    fasteners.require_stop_seat_fit(seat, 5.0, material=material)
     # Retain the distinction between a true1.5D minimum and the upward-rounded
     # existing installation acceptance. The nominal stock window is ample;
     # this boundary control makes only the female overlap fall between them.
@@ -396,7 +396,7 @@ def test_stop_inspection_floor_is_shared_by_the_nominal_seat_check() -> None:
     start = stop.FULL_THREAD_START_MAX_MM
     limited = replace(material, guaranteed_segments_mm=((start, start + between),))
     with pytest.raises(AssertionError, match="minimum useful thread engagement"):
-        stop.require_seat_fit(seat, 5.0, material=limited)
+        fasteners.require_stop_seat_fit(seat, 5.0, material=limited)
 
 
 def test_pivot_thread_limits_and_installed_inspection_are_separately_qualified() -> None:

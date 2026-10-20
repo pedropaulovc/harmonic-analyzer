@@ -1073,7 +1073,6 @@ from dt_vn_swing_stop_screw_spec import (  # noqa: E402
     SHANK_LEN as STOP_SHANK_LEN,
     THREAD as STOP_THREAD,
     TIP_CHAMFER as FSCREW_TIP_INCOMPLETE,
-    require_seat_fit as require_stop_seat_fit,
 )
 from build_fr_harmonic_base import (  # noqa: E402
     BLOCK_SEAT_SPEC as BASE_BLOCK_SEAT_SPEC,
@@ -1095,6 +1094,7 @@ from build_fr_harmonic_base import (  # noqa: E402
 from fr_harmonic_base_fasteners import (  # noqa: E402
     PEDESTAL_INSERTION_MAX_MM,
     PEDESTAL_INSERTION_MIN_MM,
+    require_stop_seat_fit,
     require_through_seat_fit,
     through_seat_material,
 )
