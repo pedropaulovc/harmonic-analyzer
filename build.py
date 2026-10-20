@@ -54,6 +54,7 @@ from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
 
 from cad.scripts._undefined_names import scan_undefined_names
+from cad.scripts import _machinist_review_settings as _review_settings
 
 REPO_ROOT = Path(__file__).resolve().parent
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
@@ -70,6 +71,9 @@ _HELP = ("--help", "-h")
 _USAGE = (
     "build.py [--verbosity LEVEL] [--executor {local,farm}] "
     "[--display-name LABEL] [--leaf-timeout MINUTES] "
+    "[--machinist-reviewer PROVIDER --machinist-model MODEL --machinist-effort EFFORT] "
+    "[--machinist-judge-reviewer PROVIDER --machinist-judge-model MODEL "
+    "--machinist-judge-effort EFFORT] "
     "[--force-cache-refresh LABELS --force-cache-refresh-reason TEXT] [doit arguments ...]"
 )
 _DESCRIPTION = """\
@@ -160,12 +164,29 @@ def _parser() -> argparse.ArgumentParser:
         help="required refresh audit reason: nonblank single-line text, no control "
         "characters, at most 160 characters",
     )
+    for field in _review_settings.SETTING_FIELDS:
+        parser.add_argument(
+            "--machinist-" + field.replace("_", "-"),
+            help=(
+                "machinist review " + field.replace("_", " ")
+                + " (defaults independently to the selected provider's model/effort; "
+                "provider default: claude)"
+            ),
+        )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     options, doit_args = parser.parse_known_args(argv)
+    try:
+        review_settings = _review_settings.resolve_settings(**{
+            field: getattr(options, "machinist_" + field)
+            for field in _review_settings.SETTING_FIELDS
+        })
+    except ValueError as problem:
+        print(f"machinist review: {problem}", file=sys.stderr)
+        return 2
     doit_args = list(doit_args)
     refresh_labels = list(dict.fromkeys(
         label.strip()
@@ -196,48 +217,56 @@ def main(argv: Sequence[str] | None = None) -> int:
         refresh_request = json.dumps(
             {"labels": refresh_labels, "reason": reason}, separators=(",", ":")
         )
-    if _asks_for_help(doit_args):
-        parser.print_help()
-        print()
-        return DoitMain().run(["--help"])
-    if options.verbosity is not None:
-        os.environ["HARMONIC_VERBOSITY"] = options.verbosity
-    if options.leaf_timeout is not None:
-        os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
-    # dodo reads the executor while loading the graph; an explicit
-    # --executor must win over an inherited HARMONIC_EXECUTOR.
-    os.environ["HARMONIC_EXECUTOR"] = options.executor
-
-    if options.executor == "farm":
-        doit = _FarmDoitMain()
-        doit.display_name = options.display_name
-    elif refresh_labels:
-        doit = _RefreshDoitMain()
-    else:
-        doit = DoitMain()
-    if refresh_labels:
-        doit.refresh_labels = refresh_labels
-    executing = _executing_command(doit_args, doit)
-    if refresh_labels and executing is None:
-        print("cache refresh: requires a command that executes selected tasks", file=sys.stderr)
-        return 2
-    refusal = _release_refusal(doit_args, executing)
-    if refusal:
-        print(f"release: {refusal}", file=sys.stderr)
-        return 2
-    if options.executor == "farm" and executing is not None:
-        doit_args = _with_farm_parallelism(doit_args, *executing)
-    previous_refresh = os.environ.get("HARMONIC_CACHE_REFRESH")
-    if refresh_request is not None:
-        os.environ["HARMONIC_CACHE_REFRESH"] = refresh_request
+    previous_settings = os.environ.get(_review_settings.SETTINGS_ENV)
+    os.environ[_review_settings.SETTINGS_ENV] = review_settings.canonical()
     try:
-        return doit.run(doit_args)
-    finally:
+        if _asks_for_help(doit_args):
+            parser.print_help()
+            print()
+            return DoitMain().run(["--help"])
+        if options.verbosity is not None:
+            os.environ["HARMONIC_VERBOSITY"] = options.verbosity
+        if options.leaf_timeout is not None:
+            os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = str(options.leaf_timeout * 60)
+        # dodo reads the executor while loading the graph; an explicit
+        # --executor must win over an inherited HARMONIC_EXECUTOR.
+        os.environ["HARMONIC_EXECUTOR"] = options.executor
+
+        if options.executor == "farm":
+            doit = _FarmDoitMain()
+            doit.display_name = options.display_name
+        elif refresh_labels:
+            doit = _RefreshDoitMain()
+        else:
+            doit = DoitMain()
+        if refresh_labels:
+            doit.refresh_labels = refresh_labels
+        executing = _executing_command(doit_args, doit)
+        if refresh_labels and executing is None:
+            print("cache refresh: requires a command that executes selected tasks", file=sys.stderr)
+            return 2
+        refusal = _release_refusal(doit_args, executing)
+        if refusal:
+            print(f"release: {refusal}", file=sys.stderr)
+            return 2
+        if options.executor == "farm" and executing is not None:
+            doit_args = _with_farm_parallelism(doit_args, *executing)
+        previous_refresh = os.environ.get("HARMONIC_CACHE_REFRESH")
         if refresh_request is not None:
-            if previous_refresh is None:
-                os.environ.pop("HARMONIC_CACHE_REFRESH", None)
-            else:
-                os.environ["HARMONIC_CACHE_REFRESH"] = previous_refresh
+            os.environ["HARMONIC_CACHE_REFRESH"] = refresh_request
+        try:
+            return doit.run(doit_args)
+        finally:
+            if refresh_request is not None:
+                if previous_refresh is None:
+                    os.environ.pop("HARMONIC_CACHE_REFRESH", None)
+                else:
+                    os.environ["HARMONIC_CACHE_REFRESH"] = previous_refresh
+    finally:
+        if previous_settings is None:
+            os.environ.pop(_review_settings.SETTINGS_ENV, None)
+        else:
+            os.environ[_review_settings.SETTINGS_ENV] = previous_settings
 
 
 def _release_refusal(

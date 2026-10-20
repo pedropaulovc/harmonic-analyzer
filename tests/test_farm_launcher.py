@@ -23,6 +23,14 @@ pytestmark = pytest.mark.skipif(
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = REPO_ROOT / "scripts" / "farm-run.ps1"
 DISPLAY_NAME = "Fixture build: pen and drawing"
+MACHINIST_OPTIONS = (
+    ("MachinistReviewer", "--machinist-reviewer"),
+    ("MachinistModel", "--machinist-model"),
+    ("MachinistEffort", "--machinist-effort"),
+    ("MachinistJudgeReviewer", "--machinist-judge-reviewer"),
+    ("MachinistJudgeModel", "--machinist-judge-model"),
+    ("MachinistJudgeEffort", "--machinist-judge-effort"),
+)
 
 # A hang guard, never a correctness budget. Every wait below ends on the event
 # it is waiting for (the launcher exits, a record appears, a line reaches the
@@ -784,9 +792,22 @@ def _observe_held_launch(
 # 6 s variant pins that the test waits for the output rather than for a fixed
 # budget: the old 5 s window failed it with "assert 'uv-stdout' in ''", which is
 # what a contended full-suite run hit on 82aa3330d.
-@pytest.mark.parametrize("start_delay", ["0", "6"], ids=["prompt-child", "slow-child"])
+@pytest.mark.parametrize(
+    ("start_delay", "machinist_values"),
+    [
+        pytest.param("0", (None,) * 6, id="prompt-child-defaults"),
+        pytest.param("6", (None,) * 6, id="slow-child-defaults"),
+        pytest.param(
+            "0",
+            ("codex", "gpt-6-astra", "high", "codex", "gpt-6-astra", "high"),
+            id="codex-reviewer-and-judge",
+        ),
+        pytest.param("0", ("",) * 6, id="explicit-empty-selections"),
+        pytest.param("0", (None, "", None, None, None, None), id="only-empty-model"),
+    ],
+)
 def test_success_records_start_before_completion_and_preserves_native_arguments(
-    tmp_path: Path, start_delay: str
+    tmp_path: Path, start_delay: str, machinist_values: tuple[str | None, ...]
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
     release = tmp_path / "release uv stub"
@@ -795,6 +816,19 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     environment["UV_STUB_RELEASE"] = str(release)
     environment["UV_STUB_RELEASE_GUARD"] = str(HANG_GUARD_S)
     command = _command(fixture, "part:pen_rod, drawing:pen", tag="spaces-ok")
+    requested_selection = []
+    for (parameter, option), value in zip(
+        MACHINIST_OPTIONS, machinist_values, strict=True
+    ):
+        if value is not None:
+            command.extend([f"-{parameter}", value])
+            requested_selection.append(f"{option}={value}")
+
+    def edit_the_caller(running: dict[str, object]) -> None:
+        assert Path(running["snapshot"]) != Path(fixture["worktree"])
+        (Path(fixture["worktree"]) / "build.py").write_text(
+            "# edited caller while private snapshot runs\n", encoding="utf-8"
+        )
 
     process = subprocess.Popen(
         command,
@@ -805,7 +839,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     )
     try:
         stdout, stderr, running, run_path = _observe_held_launch(
-            process, fixture, release
+            process, fixture, release, edit_the_caller
         )
     finally:
         release.touch()
@@ -858,6 +892,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "--executor",
         "farm",
         f"--display-name={DISPLAY_NAME}",
+        *requested_selection,
         "--leaf-timeout",
         "90",
         "--verbosity",
@@ -868,6 +903,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     ]
     assert running["argv"] == expected
     invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert finished["argv"] == expected
     assert invocation["argv"] == expected[1:]
     assert invocation["environment"] == {
         "SOLIDWORKS_POOL_HOME": str(Path(fixture["pool"]).resolve()),
@@ -878,6 +914,8 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "VIRTUAL_ENV": running["environment"],
     }
     assert Path(invocation["cwd"]) == Path(running["snapshot"])
+    assert invocation["head"] == running["commit"]
+    assert invocation["build_py_at_exit"] == BUILD_PY
     launch_log = Path(finished["log"]).read_text(encoding="utf-8")
     assert "uv-stdout" in launch_log
     assert "uv-stderr" in launch_log

@@ -99,6 +99,31 @@ param(
     })]
     [string]$ForceCacheRefreshReason,
 
+    # Transport only explicitly bound selection; build.py owns validation and defaults.
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistReviewer,
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistModel,
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistEffort,
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistJudgeReviewer,
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistJudgeModel,
+
+    [Parameter(ParameterSetName = 'Launch')]
+    [AllowEmptyString()]
+    [string]$MachinistJudgeEffort,
+
     # Launch: the label recorded with the run. Status/Watch/Cancel: select the
     # newest run carrying it. List: filter by it.
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
@@ -2033,6 +2058,19 @@ try {
             $buildArgs += '--force-cache-refresh=' + $label
         }
         $buildArgs += '--force-cache-refresh-reason=' + $ForceCacheRefreshReason
+    }
+    $machinistOptions = [ordered]@{
+        MachinistReviewer = '--machinist-reviewer'
+        MachinistModel = '--machinist-model'
+        MachinistEffort = '--machinist-effort'
+        MachinistJudgeReviewer = '--machinist-judge-reviewer'
+        MachinistJudgeModel = '--machinist-judge-model'
+        MachinistJudgeEffort = '--machinist-judge-effort'
+    }
+    foreach ($parameterName in $machinistOptions.Keys) {
+        if ($PSBoundParameters.ContainsKey($parameterName)) {
+            $buildArgs += $machinistOptions[$parameterName] + '=' + $PSBoundParameters[$parameterName]
+        }
     }
     $buildArgs += @(
         '--leaf-timeout', [string]$LeafTimeout,

@@ -740,8 +740,8 @@ def test_review_main_uses_registry_pdf_basename(
     case = cases[0]
     calls = []
 
-    def aggregate(package, **kwargs):
-        calls.append((package, kwargs))
+    def aggregate(package, **_kwargs):
+        calls.append(package)
         return {
             "name": package.name, "verdict": "SHIP", "confirmed": [],
             "gating_count": 0, "duration_s": 0, "error": None,
@@ -768,18 +768,12 @@ def test_review_main_uses_registry_pdf_basename(
         == 0
     )
     assert len(calls) == 1
-    package, controls = calls[0]
+    package = calls[0]
     assert package.name == case["package"]
     assert package.kind == case["kind"]
     assert package.sources == (
         pdf_dir / mr.DRAWINGS_BY_NAME[case["package"]].outputs["pdf"].name,
     )
-    assert controls["report_dir"] == report_dir
-    assert controls["reviewer"] == "claude"
-    assert controls["runs"] == 3
-    assert controls["judge_reviewer"] == "claude"
-    assert controls["judge_model"] is None
-    assert controls["judge_effort"] is None
 
 
 @pytest.mark.parametrize("uses_tool", [False, True])
