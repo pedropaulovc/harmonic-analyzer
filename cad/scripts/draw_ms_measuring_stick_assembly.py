@@ -121,6 +121,7 @@ CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
 CLAMP_SECTION_TOP_CLEARANCE = 0.018
 CLAMP_SECTION_BOTTOM_CLEARANCE = 0.004
+SECTION_SETTING_CLEARANCE = 0.002
 STOP_POSITION_TEXT_Y = 0.220
 # Fraction of the setting span from the stick end: left of centre, so the
 # callout clears the section-A label standing over the block's near face.
@@ -549,6 +550,55 @@ def _assert_dimension_ink_on_sheet(display: Any, *, label: str) -> None:
         )
 
 
+def _assert_section_setting_clearance(front: Any, display: Any) -> None:
+    """Keep the upper A/arrow above the setting's native line and arrow ink.
+
+    Text-anchor spacing alone missed the dimension line through A. Read the
+    actual cutting-plane marker and dimension display after rebuild instead.
+    """
+    front = _early_bound(front, "IView")
+    section = tuple(float(value) for value in front.GetSectionLineInfo2())
+    if len(section) < 3 or section[0] != 1:
+        raise RuntimeError("clamped setting: expected one native cutting-plane line")
+    segments = int(section[2])
+    offset = 3 + 7 * segments
+    if segments < 1 or len(section) != offset + 25:
+        raise RuntimeError("clamped setting: incomplete native cutting-plane display")
+    arrows = (section[offset:offset + 9], section[offset + 9:offset + 18])
+    text = (section[offset + 18:offset + 21], section[offset + 21:offset + 24])
+    height = section[-1]
+    if height <= 0 or any(arrow[7] <= 0 for arrow in arrows):
+        raise RuntimeError("clamped setting: missing native cutting-plane marker size")
+    upper = max(range(2), key=lambda index: text[index][1])
+    marker_bottom = min(
+        text[upper][1] - height,
+        min(arrows[upper][1], arrows[upper][4]) - arrows[upper][7] / 2.0,
+    )
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    ink_top = []
+    for index in range(int(data.GetLineCount())):
+        line = tuple(float(value) for value in data.GetLineAtIndex2(index))
+        if len(line) < 10:
+            raise RuntimeError("clamped setting: incomplete native dimension line")
+        ink_top.extend((line[5], line[8]))
+    for index in range(int(data.GetArrowHeadCount())):
+        arrow = tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
+        if len(arrow) != 12:
+            raise RuntimeError("clamped setting: incomplete native dimension arrow")
+        ink_top.append(
+            arrow[1] + abs(arrow[4]) * arrow[6] + abs(arrow[3]) * arrow[7] / 2.0
+        )
+    if not ink_top:
+        raise RuntimeError("clamped setting: missing native dimension ink")
+    clearance = marker_bottom - max(ink_top)
+    if clearance < SECTION_SETTING_CLEARANCE:
+        raise RuntimeError(
+            f"clamped setting: upper section marker clears dimension ink by "
+            f"{clearance * 1000.0:.3f} mm; "
+            f"requires {SECTION_SETTING_CLEARANCE * 1000.0:g} mm"
+        )
+
+
 def _reference_end_edge(
     adapter: Any,
     view: Any,
@@ -739,6 +789,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                     or abs(float(saved_tolerance.GetMaxValue()) - band_m) > 1e-9
                 ):
                     raise RuntimeError("settled assembly setting band/reference state changed")
+                _assert_section_setting_clearance(front, saved_display)
 
     return settled
 

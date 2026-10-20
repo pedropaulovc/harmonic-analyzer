@@ -438,11 +438,18 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     band = printed_band_mm(3)
     overrun = ((3.0 + band) - (3.0 - band)) / 2.0
     reach = head_r + shift + overrun
-    room = (8.5 - band) / 2.0
+    places = sheet_spec.DRAWING_PRECISION["ClampSlotCboreProfile"]["ClampSlotCboreWidth"]
+    lower, upper = sheet_spec.CLAMP_SLOT_CBORE_WIDTH_LIMITS
+    printed_width = round(part.CLAMP_SLOT_CBORE_WIDTH, places)
+    room = (printed_width + lower) / 2.0
     assert room - reach == pytest.approx(0.1688, abs=1e-4)
     assert part.clamp_slot_head_clearance() == pytest.approx(room - reach)
-    # At .XX the counterbore's width would not hold the head.
-    assert (8.5 - printed_band_mm(2)) / 2.0 < reach
+    # A symmetric routine band would foul the head at its full slot float.
+    assert (printed_width - printed_band_mm(2)) / 2.0 < reach
+    # The relaxed maximum no longer pays for .XXX on a clearance feature;
+    # the explicit minimum preserves the proven head envelope.
+    assert lower == -printed_band_mm(3)
+    assert upper >= printed_band_mm(2)
     # The slot counterbore is the round one's width, cut as deep.
     assert part.CLAMP_SLOT_CBORE_WIDTH == part.CLAMP_CBORE_DIA == 8.5
     assert part.CLAMP_SLOT_CBORE_RUN == part.CLAMP_SLOT_RUN
@@ -455,13 +462,17 @@ def test_slot_counterbores_leave_rule_17_walls() -> None:
     from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(3)
-    cbore_reach = (3.0 + band) / 2.0 + (8.5 + band) / 2.0
+    places = sheet_spec.DRAWING_PRECISION["ClampSlotCboreProfile"]["ClampSlotCboreWidth"]
+    cbore_max = round(part.CLAMP_SLOT_CBORE_WIDTH, places) + (
+        sheet_spec.CLAMP_SLOT_CBORE_WIDTH_LIMITS[1]
+    )
+    cbore_reach = (part.CLAMP_SLOT_CBORE_RUN + band) / 2.0 + cbore_max / 2.0
     end_wall = (452.0 - printed_band_mm(1)) - (440.5 + 0.18) - cbore_reach
-    assert end_wall == pytest.approx(4.64, abs=5e-3)
+    assert end_wall == pytest.approx(4.45, abs=5e-3)
     web = (440.5 - 405.5) - 2.0 * 0.18 - 2.0 * cbore_reach
-    assert web == pytest.approx(22.88, abs=5e-3)
-    side = (spec.BAR_HEIGHT - spec.BAR_HEIGHT_BAND) / 2.0 - 0.18 - (8.5 + band) / 2.0
-    assert side == pytest.approx(9.44, abs=5e-3)
+    assert web == pytest.approx(22.50, abs=5e-3)
+    side = (spec.BAR_HEIGHT - spec.BAR_HEIGHT_BAND) / 2.0 - 0.18 - cbore_max / 2.0
+    assert side == pytest.approx(9.25, abs=5e-3)
     for wall in (end_wall, web, side):
         assert wall >= 2.0
     # Nominally 5.75 to the end, 23.5 between.
@@ -495,19 +506,46 @@ def test_slot_views_frame_the_slots() -> None:
     letter_x, letter_top = drawing.DETAIL_LETTER_TOP
     assert drawing.BACK_KEEP["ClampRowHeight"][0] < letter_x < drawing.LEFT_END
     assert letter_top < drawing.BACK_CENTER[1]
-    # Detail C's counterbore-width text stands over the counterbore's upper
-    # edge, left of the detail's crop (inside its span it met its own
-    # extension line and arrow, r6 review). Its shoulder (28.5 mm on the r7
-    # sheet) ends right of section B-B's back face, so the section rises
-    # beside the text rather than under it.
+    # Its counterbore-width callout stays outside the detail, over its upper
+    # edge. The final native text/leader guard checks section B-B rather than
+    # trusting the old shoulder-length estimate.
     cbore_x, cbore_y = drawing.DETAIL_KEEP["ClampSlotCboreWidth"]
     assert cbore_x < drawing.DETAIL_CENTER[0] - radius
     cbore_edge = (
         drawing.DETAIL_CENTER[1] + part.CLAMP_SLOT_CBORE_WIDTH * drawing.DETAIL_MM / 2.0
     )
     assert cbore_y > cbore_edge
-    back_face = drawing.SLOT_SECTION_CENTER[0] + BAR_DEPTH * scale / 2000.0
-    assert cbore_x - 0.0285 - back_face >= 0.0025
+    assert drawing.DETAIL_LABEL_XY[1] > drawing.DETAIL_KEEP["ClampSlotWidth"][1]
+
+
+@pytest.mark.parametrize("collision", ["clear", "text", "leader"])
+def test_slot_callout_refuses_text_or_leader_on_section(monkeypatch, collision) -> None:
+    from _drawing_annotation_extent import CalloutInk
+    from _drawing_layout_check import LeaderSegment
+
+    section_box = (0.0485, 0.034, 0.0575, 0.062)
+    text = (0.073, 0.056, 0.107, 0.080)
+    if collision == "text":
+        text = (0.056, 0.056, 0.090, 0.080)
+    line = (0.106, 0.048, 0.106, 0.056)
+    if collision == "leader":
+        line = (0.053, 0.048, 0.106, 0.056)
+    ink = CalloutInk(
+        "slot counterbore width",
+        text,
+        (LeaderSegment("width", "dim", *line, ""),),
+    )
+    annotation = object()
+    section = SimpleNamespace(GetOutline=lambda: section_box)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_: "ClampSlotCboreWidth")
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "callout_ink", lambda *_args, **_kwargs: ink)
+    if collision == "clear":
+        drawing._assert_slot_callout_clear(None, [annotation], section)
+    else:
+        with pytest.raises(RuntimeError, match="section B-B"):
+            drawing._assert_slot_callout_clear(None, [annotation], section)
+
 
 
 def test_section_letters_and_slot_caption_have_air() -> None:

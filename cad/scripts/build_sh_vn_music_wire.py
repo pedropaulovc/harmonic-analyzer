@@ -82,11 +82,7 @@ DESCRIPTIONS = {
 }
 MEMBER_PROPERTIES = {
     lever.CONFIGURATION: {
-        "Manufacturing Notes": (
-            lever_spec.DRAWING_NOTES
-            + f"\nSTRAIGHT REST-RUN LENGTH {WIRE_LEN:.1f} END FACE TO END FACE;"
-            + " NOT A CUT LENGTH."
-        ),
+        "Manufacturing Notes": lever_spec.DRAWING_NOTES,
         "Front View Note": lever_spec.FRONT_VIEW_NOTE,
         "Isometric View Note": lever_spec.ISOMETRIC_VIEW_NOTE,
     },

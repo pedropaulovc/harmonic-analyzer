@@ -783,14 +783,41 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
 def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
     unwrapped_com,
     monkeypatch,
+    tmp_path,
     initial_preference,
     fault,
 ):
-    import _preferences
+    from solidworks_mcp.adapters import sw_type_info
 
     old_name = "parent-17/original-native-wire-83"
     new_name = "parent-17/sh-vn-music-wire--LeverWire-83"
-    state = {"preference": initial_preference, "selected": False}
+    native_preference_id = 9876  # Fake typelib ordinal, not a production fallback.
+    preferences = {native_preference_id: initial_preference}
+    state = {"selected": False}
+    metadata = [("swExtRefUpdateCompNames", native_preference_id)]
+    path = tmp_path / "swconst.tlb"
+    loads = []
+    info = SimpleNamespace(
+        GetTypeAttr=lambda: SimpleNamespace(cVars=len(metadata)),
+        GetVarDesc=lambda index: (index, metadata[index][1]),
+        GetNames=lambda memid: (metadata[memid][0],),
+    )
+    typelib = SimpleNamespace(
+        GetTypeInfoCount=lambda: 1,
+        GetTypeInfoType=lambda _index: 0,
+        GetTypeInfo=lambda _index: info,
+    )
+    pythoncom = SimpleNamespace(
+        TKIND_ENUM=0,
+        LoadTypeLib=lambda actual_path: loads.append(actual_path) or typelib,
+    )
+    client = SimpleNamespace(constants=SimpleNamespace())
+    monkeypatch.setitem(sys.modules, "pythoncom", pythoncom)
+    monkeypatch.setitem(sys.modules, "win32com", SimpleNamespace(client=client))
+    monkeypatch.setitem(sys.modules, "win32com.client", client)
+    monkeypatch.setattr(sw_type_info, "PYWIN32_AVAILABLE", True)
+    monkeypatch.setattr(sw_type_info, "_constants", None)
+    monkeypatch.setattr(sw_type_info, "_find_aux_tlb", lambda _filename: path)
 
     class Component:
         ReferencedConfiguration = "LeverWire"
@@ -805,7 +832,7 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
 
         @Name2.setter
         def Name2(self, basename):
-            assert state["preference"] is False
+            assert preferences[native_preference_id] is False
             assert state["selected"] is True
             if fault == "rename-rejected":
                 raise RuntimeError("native rename rejected")
@@ -824,14 +851,14 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
 
     preference_writes = []
 
-    def set_preference(_identifier, value) -> None:
+    def set_preference(identifier, value) -> None:
         preference_writes.append(value)
         if fault == "disable-preference-refused" and len(preference_writes) == 1:
             return
         if fault == "restore-preference-refused" and len(preference_writes) == 2:
-            state["preference"] = not value
+            preferences[identifier] = not value
         else:
-            state["preference"] = value
+            preferences[identifier] = value
 
     def clear_selection(_all):
         state["selected"] = False
@@ -845,8 +872,9 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
     )
     adapter = SimpleNamespace(
         currentModel=model,
+        constants={"swDocDRAWING": 3, "swSketchAcceptNumericInput": 372},
         swApp=SimpleNamespace(
-            GetUserPreferenceToggle=lambda _identifier: state["preference"],
+            GetUserPreferenceToggle=preferences.__getitem__,
             SetUserPreferenceToggle=set_preference,
         ),
     )
@@ -854,7 +882,6 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
     unrelated_pose = ([7.0, 8.0, 9.0], [list(row) for row in ROWS])
     ledger = {old_name: pose, "unrelated-part-4": unrelated_pose}
     monkeypatch.setattr(assembly, "_POSE_LEDGER", ledger)
-    monkeypatch.setattr(_preferences, "_preference_id", lambda *_args: 77)
 
     def rename():
         return assembly.set_component_reference(
@@ -893,4 +920,6 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
         if fault == "restore-preference-refused"
         else initial_preference
     )
-    assert state == {"preference": expected_preference, "selected": False}
+    assert preferences == {native_preference_id: expected_preference}
+    assert state == {"selected": False}
+    assert loads == [str(path)]

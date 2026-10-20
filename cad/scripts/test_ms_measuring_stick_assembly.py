@@ -928,6 +928,75 @@ def test_fitter_text_has_room_for_setting_and_pilot_depths() -> None:
     _assert_fitter_text_spacing(SimpleNamespace(**{**vars(spec), **vars(sheet)}))
 
 
+def _section_setting_geometry(upper_shift):
+    """Replay sheet-1 collision coordinates in the native API array layout.
+
+    The retained 73cdcc037 PDF has a setting line at Y211.6656 mm, an
+    upper section arrow at Y210.0755 mm and A's ink at Y206.1884..217.7623.
+    Its text envelope is conservative, not a claimed native audit capture.
+    Translating the marker is an offline control, not an after-fix render.
+    """
+    arrow_y = 0.2100755 + upper_shift
+    section = [
+        1, 0, 1,
+        0, 0.1199, arrow_y, 0, 0.1199, 0.1699245, 0,
+        0.1199, arrow_y, 0, 0.1079, arrow_y, 0, 0.006, 0.003, 0,
+        0.1199, 0.1699245, 0, 0.1079, 0.1699245, 0, 0.006, 0.003, 0,
+        0.0999105, 0.2177623 + upper_shift, 0,
+        0.0999105, 0.1776114, 0,
+        0.0115739,
+    ]
+    lines = [
+        (0, 0, 0, 0, 0.035, 0.2116656, 0, 0.1094, 0.2116656, 0),
+        (0, 0, 0, 0, 0.1094, 0.198, 0, 0.1094, 0.2116656, 0),
+    ]
+    arrows = [
+        (0.1094, 0.2116656, 0, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1)
+    ]
+    data = SimpleNamespace(
+        GetLineCount=lambda: len(lines),
+        GetLineAtIndex2=lambda index: lines[index],
+        GetArrowHeadCount=lambda: len(arrows),
+        GetArrowHeadAtIndex2=lambda index: arrows[index],
+    )
+    front = SimpleNamespace(GetSectionLineInfo2=lambda: section)
+    display = SimpleNamespace(GetDisplayData=lambda: data)
+    return front, display, section, lines, arrows
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (None, "old placement", "witness intrusion", "arrow intrusion", "truncated section",
+     "missing section", "missing ink", "truncated line", "truncated arrow"),
+)
+def test_section_marker_clears_native_setting_ink(monkeypatch, defect) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    shift = drawing.CLAMP_SECTION_UPPER_EXTENSION - 0.004
+    front, display, section, lines, arrows = _section_setting_geometry(shift)
+    if defect == "old placement":
+        front, display, section, lines, arrows = _section_setting_geometry(0.0)
+    elif defect == "witness intrusion":
+        lines.append((0, 0, 0, 0, 0.1094, 0.198, 0, 0.1094, 0.224, 0))
+    elif defect == "arrow intrusion":
+        arrows[0] = (0.1094, 0.217, 0, 0, 1, 0, 0.004, 0.000762, 0, 0, 0, 1)
+    elif defect == "truncated section":
+        section.pop()
+    elif defect == "missing section":
+        section[0] = 0
+    elif defect == "missing ink":
+        lines.clear()
+        arrows.clear()
+    elif defect == "truncated line":
+        lines[0] = lines[0][:8]
+    elif defect == "truncated arrow":
+        arrows[0] = arrows[0][:8]
+    if defect is None:
+        drawing._assert_section_setting_clearance(front, display)
+    else:
+        with pytest.raises(RuntimeError, match="clamped setting:"):
+            drawing._assert_section_setting_clearance(front, display)
+
+
 @pytest.mark.parametrize(
     "dimension_types",
     (
@@ -1024,6 +1093,9 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         def GetPrimaryPrecision2(self):
             return self.precision
 
+        def GetDisplayData(self):
+            return _section_setting_geometry(0.012)[1].GetDisplayData()
+
     class Draw:
         Extension = SimpleNamespace(
             SelectByID2=lambda *args: pytest.fail("coordinate hit-test used")
@@ -1085,7 +1157,8 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         GetPathName=lambda: f"C:\\models\\{spec.BLOCK}.SLDPRT", edges=()
     )
     front = SimpleNamespace(
-        GetVisibleComponents=lambda: (block_component, stick_component)
+        GetVisibleComponents=lambda: (block_component, stick_component),
+        GetSectionLineInfo2=_section_setting_geometry(0.012)[0].GetSectionLineInfo2,
     )
     adapter = SimpleNamespace(
         currentModel=Draw(), _attempt=lambda operation, **kwargs: operation()

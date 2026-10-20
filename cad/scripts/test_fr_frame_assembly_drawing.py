@@ -956,3 +956,127 @@ def test_height_dimensions_stand_clear_of_the_cutting_plane_letters() -> None:
     top_right = drawing.TOP_SECTION_CENTER[0] + section_half
     assert top_left - base_right >= 0.006
     assert top_right <= 0.4191 - 0.002  # B-size inner border, 17 in less 0.5 in
+
+
+class _FrameBomExtent:
+    def __init__(self, heights):
+        self.heights = heights
+        self.RowCount = len(heights)
+
+    def GetAnnotation(self):  # noqa: N802
+        return SimpleNamespace(GetPosition=lambda: (0.018, 0.414, 0.0))
+
+    def GetRowHeight(self, row):  # noqa: N802
+        return self.heights[row]
+
+
+@pytest.mark.parametrize("last_row_height", [0.018, 0.038])
+def test_set_screw_balloon_uses_measured_wrapped_bom_and_keeps_native_tip(
+    monkeypatch, last_row_height
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    table = _FrameBomExtent([0.008] * 10 + [last_row_height])
+    tip = (0.116, 0.277)
+    leader = (0.127, 0.315, 0.0, *tip, 0.0)
+    note = SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(
+        GetLeaderPointsAtIndex=lambda _index: leader,
+    ))
+    landings = [SimpleNamespace(stem="fr-vn-gooseneck-set-screw", note=note)]
+    monkeypatch.setattr(drawing, "rendered_balloon_circle", lambda *_a, **_k: (0.127, 0.315, 0.005))
+    monkeypatch.setattr(drawing, "_balloon_item_number", lambda *_a, **_k: "10")
+    placed = []
+
+    def short(adapter, view, actual_note, item, offset):
+        placed.append((actual_note, item, (tip[0] + offset[0], tip[1] + offset[1])))
+        return "proof"
+
+    monkeypatch.setattr(drawing, "_short_frame_balloon", short)
+    assert drawing._place_frame_set_screw_balloon(None, None, table, landings) == "proof"
+    [(actual_note, item, target)] = placed
+    assert actual_note is note and item == "10"
+    assert target == pytest.approx((
+        0.127, min(0.414 - sum(table.heights) - 0.005 - 0.004, tip[1] + 0.020),
+    ))
+    assert target[1] + 0.005 <= 0.414 - sum(table.heights) - 0.003
+    assert math.dist(target, tip) < 0.030
+    assert leader[-3:-1] == tip
+
+
+@pytest.mark.parametrize("height", [0.0, -0.001, float("nan"), float("inf")])
+def test_frame_bom_extent_refuses_unreadable_native_row_heights(monkeypatch, height) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    with pytest.raises(RuntimeError):
+        drawing._frame_bom_bottom(_FrameBomExtent([0.008, height]))
+
+
+def _frame_balloon_clearance_fixture():
+    # Sheet metres, matching the two adjacent lanes on the reviewed sheet 2.
+    return {
+        "bottom": 0.314,
+        "circle": (0.127, 0.297, 0.005),
+        "cap_circle": (0.114, 0.306, 0.005),
+        "leader": (0.125, 0.2925, 0.0, 0.116, 0.277, 0.0),
+        "cap_leader": (0.1135, 0.301, 0.0, 0.112, 0.280, 0.0),
+    }
+
+
+def test_lowered_set_screw_balloon_clears_bom_and_cap_leader() -> None:
+    assert drawing._frame_bom_balloon_failures(**_frame_balloon_clearance_fixture()) == []
+
+
+@pytest.mark.parametrize(
+    ("change", "failure"),
+    [
+        ({"circle": (0.127, 0.315, 0.005)}, "bom_rule_clearance"),
+        ({"bottom": 0.303}, "bom_rule_clearance"),
+        ({"circle": (0.119, 0.306, 0.005)}, "cap_balloon_clearance"),
+        ({"leader": (0.125, 0.2925, 0.0, 0.105, 0.280, 0.0)}, "cap_leader_collision"),
+        ({"cap_leader": (0.127, 0.300, 0.0, 0.127, 0.280, 0.0)}, "cap_leader_collision"),
+        ({"cap_leader": ()}, "missing_leader"),
+    ],
+)
+def test_native_bom_or_neighbour_collision_refuses_set_screw_placement(change, failure) -> None:
+    state = _frame_balloon_clearance_fixture()
+    state.update(change)
+    assert failure in drawing._frame_bom_balloon_failures(**state)
+
+
+@pytest.mark.parametrize("bottom", [0.314, 0.303])
+def test_final_native_clearance_guard_reads_rebuilt_table_and_both_leaders(
+    monkeypatch, bottom
+) -> None:
+    from contextlib import nullcontext
+
+    state = _frame_balloon_clearance_fixture()
+    reads = []
+
+    def note(name):
+        leader = state["leader" if name == "set" else "cap_leader"]
+        return SimpleNamespace(
+            name=name, GetAnnotation=lambda: SimpleNamespace(
+                GetLeaderPointsAtIndex=lambda _index: leader,
+            ),
+        )
+
+    screw, cap = note("set"), note("cap")
+    proof = SimpleNamespace(
+        annotation=SimpleNamespace(GetSpecificAnnotation=lambda: screw),
+        target=state["circle"][:2],
+    )
+    landings = [SimpleNamespace(stem="fr-vn-tube-frame-cap", note=cap)]
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_zoomed_on", lambda *_a: nullcontext())
+    monkeypatch.setattr(drawing, "_frame_bom_bottom", lambda _table: bottom)
+
+    def rendered(actual_note, **_kwargs):
+        reads.append(actual_note.name)
+        return state["circle" if actual_note is screw else "cap_circle"]
+
+    monkeypatch.setattr(drawing, "rendered_balloon_circle", rendered)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
+    if bottom == 0.314:
+        drawing._assert_frame_bom_balloon_clearance(adapter, object(), landings, proof)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_frame_bom_balloon_clearance(adapter, object(), landings, proof)
+    assert "set" in reads and "cap" in reads

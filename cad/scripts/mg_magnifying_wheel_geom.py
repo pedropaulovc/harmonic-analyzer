@@ -37,7 +37,7 @@ HUB_DIA = 25.0
 HUB_LEN = 19.6  # back face to spigot front face, both faced
 # The hub sits off-centre toward the pen, its back face 0.09 proud of the
 # rim's back face (RIM_AXIAL / 2), so the lever wire's slant down to the drum
-# clears the rim's pen face (mg_vn_lever_wire_geom.RUN_GAPS) with the wheel on the
+# clears the rim's pen face (sh_vn_music_wire_lever_geom.RUN_GAPS) with the wheel on the
 # pen-rod line; at 7.09 (hub about centred) that run hit the rim.
 HUB_BACK_Z = 4.09
 SPIGOT_DIA = DRUM_BORE

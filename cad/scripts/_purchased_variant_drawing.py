@@ -7,6 +7,7 @@ configuration's quantity is never interpreted as a number of chains or kits.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,9 @@ async def build_purchased_variant_drawing(
     item: str,
     purchase_unit: str,
     cut_to_suit: bool = False,
+    annotate_member: Callable[
+        [Any, str, tuple, list[Any]], tuple[Callable[[], None], ...]
+    ] | None = None,
 ) -> dict[str, str]:
     """Draw every configured member of one purchase without fabrication PMI.
 
@@ -95,6 +99,8 @@ async def build_purchased_variant_drawing(
 
     Member headers are centered by their measured native text extents inside
     their reserved band; an insertion point alone is not proof of containment.
+    A caller may add member-specific native reference annotations after fitting;
+    its returned readbacks run again after the final drawing rebuild.
     """
     configurations = tuple(configuration for configuration, _ in variants)
     if len(set(configurations)) != len(configurations):
@@ -188,12 +194,15 @@ async def build_purchased_variant_drawing(
 
     placed = []
     configured_views = []
+    member_checks = []
     sheet_scale = (1, 1)
     for index, (configuration, label, cells, views) in enumerate(groups):
         scales = _fit_views(draw, views, cells)
         center_marks = _center_marks_without_lines(views, cells)
         if index == 0:
             sheet_scale = scales["*Front"]
+        if annotate_member is not None:
+            member_checks.extend(annotate_member(adapter, configuration, cells, views))
         left, right = cells[0][2][0], cells[2][2][2]
         caption = f"{label}  QTY {int(quantities[configuration])} INSTALLED"
         caption_cell = (left, 0.255, right, 0.264)
@@ -361,5 +370,5 @@ async def build_purchased_variant_drawing(
         layout=spec.layout,
         pdf_title=title,
         scale=sheet_scale,
-        settled_checks=(assert_reference_sheet,),
+        settled_checks=(assert_reference_sheet, *member_checks),
     )

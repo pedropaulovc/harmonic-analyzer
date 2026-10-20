@@ -47,7 +47,7 @@ NUT_D = FRONT_WASHER_D + _front.MODEL_THICKNESS
 LOCKNUT_D = NUT_D + _nut.THICKNESS
 LOCKNUT_FACE_D = LOCKNUT_D + _nut.THICKNESS
 # The wheel's mid-plane IS the pen-rod line: the pen wire leaves the rim
-# groove plumb onto the rod (pn_vn_pen_wire_geom).
+# groove plumb onto the rod (sh_vn_music_wire_pen_geom).
 WHEEL_MID_Z = PEN_Z_MID
 _SPOKE_MID_Z = _bar.BAR_FRONT_Z - SPOKE_MID_D
 if not math.isclose(_SPOKE_MID_Z, WHEEL_MID_Z, abs_tol=1e-9):

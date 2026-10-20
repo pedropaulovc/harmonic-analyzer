@@ -96,6 +96,8 @@ from pd_support_bar_spec import (
 from pd_support_bar_drawing_spec import (
     CLAMP_HOLE_CALLOUT_PLACES,
     CLAMP_POSITION_PLACES,
+    CLAMP_SLOT_CBORE_WIDTH_LIMITS,
+    CLAMP_SLOT_CBORE_WIDTH_PLACES,
     CLAMP_SLOT_PLACES,
     CLAMP_SLOT_WIDTH_PLACES,
     CLAMP_STATION_NAMES,
@@ -202,7 +204,7 @@ CLAMP_POSITION_BAND = round(
 )
 if CLAMP_POSITION_BAND <= 0.0:
     raise AssertionError(
-        "MHA-PD-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
+        "MHA-SH-VN-53 screws in the MHA-SH-02 taps through the support bar: no "
         f".XX clamp-hole position band fits the {CLAMP_HOLE_FLOAT:.4f} float"
     )
 
@@ -303,7 +305,11 @@ def clamp_slot_head_clearance() -> float:
     )
     _, longest_run = _printed_limits(CLAMP_SLOT_RUN, CLAMP_SLOT_PLACES)
     shortest_cbore_run, _ = _printed_limits(CLAMP_SLOT_CBORE_RUN, CLAMP_SLOT_PLACES)
-    narrowest_cbore, _ = _printed_limits(CLAMP_SLOT_CBORE_WIDTH, CLAMP_SLOT_PLACES)
+    narrowest_cbore, _ = _printed_limits(
+        CLAMP_SLOT_CBORE_WIDTH,
+        CLAMP_SLOT_CBORE_WIDTH_PLACES,
+        CLAMP_SLOT_CBORE_WIDTH_LIMITS,
+    )
     float_across = (widest - CLAMP_SCREW_MAJOR) / 2.0
     overrun = max(0.0, (longest_run - shortest_cbore_run) / 2.0)
     return narrowest_cbore / 2.0 - (CLAMP_HEAD_DIA / 2.0 + float_across + overrun)
@@ -316,12 +322,12 @@ CLAMP_HEAD_BEARING_MIN = clamp_head_bearing(
 )
 if clamp_east_pair_margin() < 0.0:
     raise AssertionError(
-        "MHA-PD-VN-53 screws in one MHA-SH-02 clamp: the round east holes' "
+        "MHA-SH-VN-53 screws in one MHA-SH-02 clamp: the round east holes' "
         f"spacing over-runs their float by {-clamp_east_pair_margin():.3f}"
     )
 if clamp_slot_closure_margin(max(COLUMN_PITCH_DEVIATIONS.values())) < 0.0:
     raise AssertionError(
-        "MHA-PD-VN-53 screws in the two MHA-SH-02 clamps: the west slots do not "
+        "MHA-SH-VN-53 screws in the two MHA-SH-02 clamps: the west slots do not "
         "take up the worst column pitch "
         f"({max(COLUMN_PITCH_DEVIATIONS.values()):.2f})"
     )
@@ -333,10 +339,10 @@ if (
     )
     < CLAMP_HEAD_BEARING_MIN
 ):
-    raise AssertionError("MHA-PD-VN-53 heads bear less beside a slot than a round hole")
+    raise AssertionError("MHA-SH-VN-53 heads bear less beside a slot than a round hole")
 if clamp_slot_head_clearance() < 0.0:
     raise AssertionError(
-        "MHA-PD-VN-53 heads reach past the slot counterbores' walls by "
+        "MHA-SH-VN-53 heads reach past the slot counterbores' walls by "
         f"{-clamp_slot_head_clearance():.3f}"
     )
 
@@ -959,6 +965,13 @@ async def build(adapter) -> dict[str, str]:
         "ClampSlotWidth",
         *CLAMP_SLOT_WIDTH_LIMITS,
         places=CLAMP_SLOT_WIDTH_PLACES,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "ClampSlotCboreProfile",
+        "ClampSlotCboreWidth",
+        *CLAMP_SLOT_CBORE_WIDTH_LIMITS,
+        places=CLAMP_SLOT_CBORE_WIDTH_PLACES,
     )
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)

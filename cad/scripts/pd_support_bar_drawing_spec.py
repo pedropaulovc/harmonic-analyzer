@@ -56,14 +56,16 @@ CLAMP_CBORE_DEPTH_PLACES = 2
 # The round counterbores' native callout prints its Ø at the document's two
 # places, under the title block's DRILLED HOLES row.
 CLAMP_HOLE_CALLOUT_PLACES = 2
-# The west clamp slots (build_pd_support_bar, owner ruling 2026-10-15 option
-# A): the width is the round hole's, carrying its drilled +0.10/-0 at .XX;
-# the travel and the counterbore's width and travel print .XXX, the places
-# whose title-block band still closes the slots' worst-case column span and
-# keeps the screw head inside the counterbore
-# (build_pd_support_bar.clamp_slot_closure_margin, clamp_slot_head_clearance).
+# The west slots' runs still need .XXX to close the column-pitch stack.
+# Their counterbore width instead carries explicit asymmetric limits: retain
+# the proven 8.37 mm minimum for the head's full-float envelope, while allowing
+# the ordinary .XX upper deviation. A symmetric .XX band would let the width
+# fall to 7.99 mm and foul the head; .XXX on both sides needlessly limits the
+# maximum. Geometry and the runs remain unchanged.
 CLAMP_SLOT_WIDTH_PLACES = 2
 CLAMP_SLOT_PLACES = 3
+CLAMP_SLOT_CBORE_WIDTH_PLACES = 2
+CLAMP_SLOT_CBORE_WIDTH_LIMITS = (-0.13, 0.51)
 HANGER_STATION_NAMES = ("PivotTapStation", "BracketTapStation1", "BracketTapStation2")
 CLAMP_STATION_NAMES = (
     "ClampStation1",
@@ -103,9 +105,10 @@ SHEET_PRECISION: dict[str, dict[str, int]] = {
         "ClampSlotWidth": CLAMP_SLOT_WIDTH_PLACES,
         "ClampSlotTravel": CLAMP_SLOT_PLACES,
     },
-    "ClampSlotCboreProfile": dict.fromkeys(
-        ("ClampSlotCboreWidth", "ClampSlotCboreTravel"), CLAMP_SLOT_PLACES
-    ),
+    "ClampSlotCboreProfile": {
+        "ClampSlotCboreWidth": CLAMP_SLOT_CBORE_WIDTH_PLACES,
+        "ClampSlotCboreTravel": CLAMP_SLOT_PLACES,
+    },
     "ClampSlotCounterbores": {"ClampSlotCboreDepth": CLAMP_CBORE_DEPTH_PLACES},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {

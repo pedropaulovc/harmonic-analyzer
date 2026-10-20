@@ -51,6 +51,7 @@ from _drawing_common import (
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
+from _drawing_leaders import distance_to_point, segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
@@ -180,6 +181,9 @@ SHEET_SCALES = {
     SHEET_NAMES[2]: ASSEMBLY_ISO_SCALE,
 }
 BOM_ANCHOR = (0.018, 0.414)
+# Keep the complete set-screw balloon below the measured BOM, not its nominal
+# row heights: shared-SKU descriptions can wrap and lower the bottom rule.
+_BOM_BALLOON_CLEARANCE_M = 0.003
 
 # Drawing-selection coordinate only. The manufacturing column pitch remains
 # defined by the released source assembly and the part drawings.
@@ -1575,6 +1579,100 @@ def _assert_frame_balloons_settled(
         raise RuntimeError(
             "frame balloons changed after the final rebuild: " + "; ".join(failures)
         )
+
+
+def _frame_bom_bottom(table: Any) -> float:
+    """Read the unsplit, top-left-anchored BOM's actual lower rule."""
+    table = _early_bound(table, "ITableAnnotation")
+    position = tuple(_early_bound(table.GetAnnotation(), "IAnnotation").GetPosition() or ())
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    if (
+        len(position) != 3 or not all(map(math.isfinite, position))
+        or not heights or any(not math.isfinite(height) or height <= 0 for height in heights)
+    ):
+        raise RuntimeError("frame BOM has unreadable native extents")
+    return position[1] - sum(heights)
+
+
+def _frame_bom_balloon_failures(
+    bottom: float, circle: Sequence[float], cap_circle: Sequence[float],
+    leader: Sequence[float], cap_leader: Sequence[float],
+) -> list[str]:
+    """Keep item 10's complete ring below the BOM and clear of item 6's route."""
+    failures = []
+    if any(
+        len(points) < 6 or len(points) % 3 or not all(map(math.isfinite, points))
+        for points in (leader, cap_leader)
+    ):
+        return ["missing_leader"]
+    if bottom - circle[1] - circle[2] < _BOM_BALLOON_CLEARANCE_M:
+        failures.append("bom_rule_clearance")
+    if math.dist(circle[:2], cap_circle[:2]) - circle[2] - cap_circle[2] < 0.002:
+        failures.append("cap_balloon_clearance")
+    routes = [
+        [(tuple(points[i:i + 2]), tuple(points[i + 3:i + 5]))
+         for i in range(0, len(points) - 3, 3)]
+        for points in (leader, cap_leader)
+    ]
+    if not all(routes):
+        failures.append("missing_leader")
+    elif (
+        any(segments_cross(a, b) for a in routes[0] for b in routes[1])
+        or any(distance_to_point(segment, circle[:2]) < circle[2] + 0.001
+               for segment in routes[1])
+        or any(distance_to_point(segment, cap_circle[:2]) < cap_circle[2] + 0.001
+               for segment in routes[0])
+    ):
+        failures.append("cap_leader_collision")
+    return failures
+
+
+def _place_frame_set_screw_balloon(
+    adapter: Any, view: Any, table: Any, landings: Sequence[BalloonLanding],
+) -> _ShortBalloonProof:
+    landing = next(row for row in landings if row.stem == "fr-vn-gooseneck-set-screw")
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    leader = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+    if len(leader) < 6:
+        raise RuntimeError("frame set-screw balloon has no native leader")
+    circle = rendered_balloon_circle(note, label="frame set-screw balloon")
+    # Retain its right-hand lane beside the cap balloon. Lower it far enough
+    # for both a full-ring BOM gap and a short leader, without changing the tip.
+    target = (
+        circle[0],
+        min(_frame_bom_bottom(table) - circle[2] - 0.004, leader[-2] + 0.020),
+    )
+    return _short_frame_balloon(
+        adapter, view, note,
+        _balloon_item_number(adapter, note, label="frame set-screw balloon"),
+        (target[0] - leader[-3], target[1] - leader[-2]),
+    )
+
+
+def _assert_frame_bom_balloon_clearance(
+    adapter: Any, table: Any, landings: Sequence[BalloonLanding], proof: _ShortBalloonProof,
+) -> None:
+    """Check actual native circles and leader routes again after final rebuild."""
+    cap = next(row for row in landings if row.stem == "fr-vn-tube-frame-cap")
+    states = []
+    for raw_note, target in ((proof.annotation.GetSpecificAnnotation(), proof.target),
+                             (cap.note, None)):
+        note = _early_bound(raw_note, "INote")
+        if target is None:
+            target = rendered_balloon_circle(note, label="frame cap balloon")[:2]
+        with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
+            adapter.currentModel.GraphicsRedraw2()
+            circle = rendered_balloon_circle(note, label="frame BOM balloon clearance")
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            leader = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+            states.append((circle, leader))
+    failures = _frame_bom_balloon_failures(
+        _frame_bom_bottom(table), states[0][0], states[1][0], states[0][1], states[1][1],
+    )
+    if failures:
+        raise RuntimeError(f"frame set-screw balloon clearance: {failures}")
+
 
 
 def _reattach_frame_balloons(

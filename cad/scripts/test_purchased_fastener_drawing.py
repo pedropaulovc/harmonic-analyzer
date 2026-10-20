@@ -1080,3 +1080,277 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         _fit(_TitleSheet(*notes), layout=layout, number=number)
     for note in notes:
         assert note._format.CharHeightInPts == 18
+
+
+@pytest.mark.parametrize("drift", ("none", "ignored-move", "text", "lost", "identity", "dangling", "attachment", "collision"))
+def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift):
+    import draw_sh_vn_clamping_kit_hardware as kit
+
+    class ThreadNote(_Note):
+        def __init__(self):
+            super().__init__("automatic", "1/2-13 Tapped Hole", 0.2631371, 0.2304204)
+            self._extent = (0.2492598, 0.2173807, 0.0, 0.3074012, 0.2307246, 0.0)
+            self.Visible = 1
+            self.entity = object()
+            self.dangling = False
+            self.annotation_readback = self
+
+        def GetAnnotation(self):
+            return self.annotation_readback
+
+        def SetPosition2(self, *xyz):
+            if drift != "ignored-move":
+                self.SetPosition(*xyz)
+            return True
+
+        def GetAttachedEntities3(self):
+            return (self.entity,)
+
+        def IsDangling(self):
+            return self.dangling
+
+        def GetDisplayData(self):
+            return SimpleNamespace(
+                GetTextCount=lambda: 1,
+                GetTextAtIndex=lambda _i: self._resolved_text,
+                GetTextInBoxWidthAtIndex=lambda _i: 0.0445132,
+                GetTextHeightAtIndex=lambda _i: 0.0048299,
+                GetTextPositionAtIndex=lambda _i: (
+                    self._position[0], self._position[1] - 0.0045257, 0.0,
+                ),
+                GetTextRefPositionAtIndex=lambda _i: 1,
+                GetTextAngleAtIndex=lambda _i: 0.0,
+            )
+
+        def GetExtent(self):
+            # The associated leader arrow does NOT translate with its text.
+            text = kit._note_text_box(self)
+            return (
+                min(0.2492598, text[0]), min(0.21695, text[1]), 0.0,
+                max(0.2496667, text[2]), max(0.2173807, text[3]), 0.0,
+            )
+
+    note = ThreadNote()
+    views = [
+        SimpleNamespace(GetOutline=lambda: (0.16, 0.13, 0.19, 0.17)),
+        SimpleNamespace(GetOutline=lambda: (0.1647453, 0.201412, 0.1999213, 0.236588)),
+        SimpleNamespace(GetOutline=lambda: (0.23, 0.13, 0.26, 0.17)),
+        SimpleNamespace(GetOutline=lambda: (0.2271081, 0.1978993, 0.2722252, 0.2401007)),
+    ]
+    native_notes = [note]
+    views[3].GetNotes = lambda: native_notes
+    monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(
+        getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
+    )))
+    cells = configured.configuration_view_cells(1, 3)
+    if drift == "ignored-move":
+        with pytest.raises(RuntimeError, match="clearance"):
+            kit.annotate_member(adapter, "TNut", cells, views)
+        return
+    checks = kit.annotate_member(adapter, "TNut", cells, views)
+    box = kit._note_text_box(note)
+    assert box[0] >= cells[0][2][0]
+    assert box[2] <= cells[2][2][2] < 0.297412
+    assert box[1] > views[3].GetOutline()[3]
+    assert note.GetExtent()[1] == pytest.approx(0.21695)
+    # A fresh Python dispatch wrapper is still the same native annotation.
+    note.annotation_readback = SimpleNamespace(native_identity=note)
+    if drift == "text":
+        note._resolved_text = "1/2-20 Tapped Hole"
+    elif drift == "lost":
+        native_notes.clear()
+    elif drift == "identity":
+        note.annotation_readback = SimpleNamespace(native_identity=object())
+    elif drift == "dangling":
+        note.dangling = True
+    elif drift == "attachment":
+        note.entity = object()
+    elif drift == "collision":
+        note.SetPosition(0.32, 0.23, 0.0)
+    if drift == "none":
+        checks[0]()
+    else:
+        with pytest.raises(RuntimeError):
+            checks[0]()
+
+
+@pytest.mark.parametrize("drift", ("none", "length", "attachment", "identity", "dangling", "hidden", "reference", "lost", "text-border", "stroke-border", "unmeasured-width"))
+def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(monkeypatch, drift):
+    import draw_sh_vn_clamping_kit_hardware as kit
+    import _drawing_edge_dimensions as edge_dimensions
+    from solidworks_mcp.adapters import sw_type_info
+    import _drawing_dimensions as dimension_text
+
+    class Rim:
+        def __init__(self, station, radius):
+            self.station = station
+            self.CircleParams = (0.0, station, 0.0, 0.0, 1.0, 0.0, radius)
+
+        def GetCurve(self):
+            return self
+
+        def IsCircle(self):
+            return True
+
+    radius = (kit.stud.RADIUS - kit.stud.END_CHAMFER) / 1000
+    rims = [Rim(kit.stud.LENGTH / 1000, radius), Rim(0.0, radius)]
+    land = Rim(kit.stud.END_CHAMFER / 1000, kit.stud.RADIUS / 1000)
+    state = SimpleNamespace(display=None)
+    projection_events = []
+
+    class Front:
+        def __init__(self):
+            self.position_y = 0.10895
+            self.projection_y = self.position_y
+
+        def SetViewPosition(self, _x, y):
+            self.position_y = y
+            projection_events.append("move")
+            return True
+
+        def UpdateViewDisplayGeometry(self):
+            self.projection_y = self.position_y
+            projection_events.append("update")
+            # Native VT_VOID returns None, not a success flag.
+
+        def GetAnnotations(self):
+            return [SimpleNamespace(native_identity=inventory_identity or state.display)] if present else []
+
+    front = Front()
+    assert front.SetViewPosition(0.047667, 0.13395) is True
+    assert front.projection_y != front.position_y
+
+    def project_points(_adapter, view, points, **_kwargs):
+        projection_events.append("project")
+        # Moving/rebuilding alone leaves native projection geometry stale.
+        return [(0.047667, view.projection_y + y / 2) for _x, y, _z in points]
+
+    class Dimension:
+        Visible = 1
+        DrivenState = 1
+
+        def __init__(self, entities):
+            self.entities = entities
+            self.SystemValue = entities[1].station - entities[0].station
+            self.text = {1: "", 2: ""}
+            self.dangling = False
+
+        def GetAnnotation(self):
+            return self
+
+        def GetSpecificAnnotation(self):
+            return self
+
+        def GetDimension2(self, _index):
+            return self
+
+        def GetAttachedEntities3(self):
+            return self.entities
+
+        def GetAttachedEntityTypes(self):
+            return (1, 1)
+
+        def IsDangling(self):
+            return self.dangling
+
+        def GetText(self, index):
+            return self.text[index]
+
+        def SetText(self, index, text):
+            self.text[index] = text
+
+    def add_dimension(adapter, view, **kwargs):
+        state.display = Dimension(kwargs["entities"])
+        state.display.text_xy = kwargs["text_xy"]
+        state.display.stroke_x = kwargs["text_xy"][0]
+        state.display.width = 0.018
+        return state.display
+
+    monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
+    monkeypatch.setattr(kit, "visible_view_entities", lambda *_args, **_kwargs: [rims[0], land, rims[1]])
+    monkeypatch.setattr(kit, "model_points_in_view", project_points)
+    monkeypatch.setattr(kit, "add_edge_dimension", add_dimension)
+    monkeypatch.setattr(dimension_text, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    def native_display(_adapter, annotation):
+        x, y = annotation.text_xy
+        return ({
+            "texts": [{"t": "(76.20)", "pos": (x - annotation.width, y, 0.0),
+                       "h": 0.003, "w": annotation.width, "ang": 0.0, "ref": 1}],
+            "lines": [[0, 0, 0, 0, annotation.stroke_x, 0.13395, 0.0,
+                       annotation.stroke_x, 0.17205, 0.0]],
+        }, {})
+    monkeypatch.setattr(kit, "annotation_display", native_display)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(
+            getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
+        )),
+        _attempt=lambda operation: operation(),
+    )
+    present = True
+    inventory_identity = None
+    checks = kit.annotate_member(
+        adapter, "HoldDownStud", configured.configuration_view_cells(0, 3), [front] * 4,
+    )
+    dimension = state.display
+    assert dimension.SystemValue * 1000 == pytest.approx(kit.stud.LENGTH)
+    assert dimension.entities == (rims[1], rims[0])
+    assert projection_events == ["move", "update", "project"]
+    assert dimension.text_xy[1] == pytest.approx(0.13395 + kit.stud.LENGTH / 4000)
+    if drift == "length":
+        dimension.SystemValue -= 0.002
+    elif drift == "attachment":
+        dimension.entities = (rims[1], land)
+    elif drift == "identity":
+        inventory_identity = object()
+    elif drift == "dangling":
+        dimension.dangling = True
+    elif drift == "hidden":
+        dimension.Visible = 3
+    elif drift == "reference":
+        dimension.text[1] = ""
+    elif drift == "lost":
+        present = False
+    elif drift == "text-border":
+        dimension.text_xy = (0.024, dimension.text_xy[1])
+    elif drift == "stroke-border":
+        dimension.stroke_x = 0.010
+    elif drift == "unmeasured-width":
+        dimension.width = 0.0
+    if drift == "none":
+        checks[0]()
+    else:
+        with pytest.raises(RuntimeError):
+            checks[0]()
+
+
+@pytest.mark.parametrize(
+    ("reference", "anchor"),
+    [(0, (0.1, 0.204)), (1, (0.1, 0.2)), (2, (0.11, 0.202)),
+     (3, (0.12, 0.204)), (4, (0.12, 0.2)), (5, (0.11, 0.204))],
+)
+def test_kit_native_text_reference_anchors_preserve_same_measured_ink(reference, anchor):
+    import draw_sh_vn_clamping_kit_hardware as kit
+
+    box = kit._measured_display_box({"texts": [{
+        "t": "1/2-13", "pos": (*anchor, 0.0), "w": 0.02, "h": 0.004,
+        "ref": reference, "ang": 0.0,
+    }]})
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
+        (0.1, 0.2, 0.12, 0.204)
+    )
+
+
+def test_kit_rotated_native_text_anchor_rotates_the_reference_offset():
+    import math
+    import draw_sh_vn_clamping_kit_hardware as kit
+
+    box = kit._measured_display_box({"texts": [{
+        "t": "(76.20)", "pos": (0.04, 0.17, 0.0), "w": 0.02, "h": 0.004,
+        "ref": 4, "ang": math.pi / 2,
+    }]})
+    assert (box.xmin, box.ymin, box.xmax, box.ymax) == pytest.approx(
+        (0.036, 0.15, 0.04, 0.17)
+    )

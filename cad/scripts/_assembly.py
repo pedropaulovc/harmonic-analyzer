@@ -1231,7 +1231,7 @@ def _set_component_reference(
     reference: str,
     occurrence_basename: str,
 ) -> str:
-    from _preferences import _preference_id
+    from solidworks_mcp.adapters import sw_type_info
 
     component = _early_bound(component, "IComponent2")
     expected = semantic_reference_identity(f"@{reference}")
@@ -1265,9 +1265,8 @@ def _set_component_reference(
         expected_name = f"{parent}/{expected_name}"
     if name == expected_name:
         return name
-    preference = _preference_id(adapter, "swExtRefUpdateCompNames")
-    if preference is None:
-        raise RuntimeError("swExtRefUpdateCompNames is unavailable in the type library")
+    # Generated interface wrappers do not populate makepy's swconst globals.
+    preference = sw_type_info.constant("swExtRefUpdateCompNames")
     previous = bool(adapter.swApp.GetUserPreferenceToggle(preference))
     try:
         # ISldWorks.SetUserPreferenceToggle is void; verify the getter instead.

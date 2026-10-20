@@ -60,7 +60,12 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_annotation_extent import move_annotation
+from _drawing_annotation_extent import (
+    callout_ink,
+    move_annotation,
+    require_clear,
+    require_leader_clear,
+)
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
@@ -250,26 +255,20 @@ CAPTION_SETTLE_M = 0.0006
 # counterbore (r7 machinist review).
 DETAIL_SLOT_X = max(CLAMP_SLOT_X)
 DETAIL_FOCUS = (DETAIL_SLOT_X, 0.0, -BAR_DEPTH / 2.0)  # model mm
-DETAIL_CENTER = (0.106, 0.048)
+DETAIL_CENTER = (0.124, 0.048)
 DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
-DETAIL_LABEL_XY = (0.195, 0.040)  # top centre
+DETAIL_LABEL_XY = (0.200, 0.060)  # top centre, above the slot-width text
 DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
-# Measured on the r4, r6 and r7 sheets (2.55-2.65 mm a character, 5.5 mm a
-# line): a kept text outside its extension lines hangs beside its dimension
-# line, on the side away from the feature, its block centred on the keep's
-# height (ClampRowHeight, and the r6 slot width: keep 31.0, block 21.9-41.1);
-# inside them it centres on the keep. The counterbore's block (27.4 mm by
-# 14.7, its shoulder 28.5 long; r7, line at x 78: 49.7-77.1) hangs left of
-# its line at x 89, 3 mm right of section B-B's back face so the section can
-# rise beside it, and 1.9 mm under the 440.50 extension line's end; the
-# slot's (46 mm by 24.7) right of its line at x 132, 1 mm under the slot's
-# lower edge.
+# The counterbore's shouldered callout stands left of detail C, clear of
+# section B-B even with the full shared vendor identity and native limit
+# rows. Read back both its text and leader against the section before export;
+# fixed character-width estimates missed the previous collision.
 DETAIL_KEEP = {
     "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.017, DETAIL_CENTER[1] + 0.020),
     "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.019),
@@ -643,6 +642,29 @@ def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, flo
     }
 
 
+def _assert_slot_callout_clear(adapter: Any, annotations: list[Any], section: Any) -> None:
+    """Prove detail C's native width text and leader clear section B-B."""
+    matches = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+        == "ClampSlotCboreWidth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one slot counterbore width, found {len(matches)}")
+    outline = tuple(float(value) for value in _early_bound(section, "IView").GetOutline())
+    if len(outline) != 4 or outline[0] >= outline[2] or outline[1] >= outline[3]:
+        raise RuntimeError(f"section B-B has no usable native outline: {outline!r}")
+    ink = callout_ink(adapter, matches[0], label="slot counterbore width")
+    others = {"section B-B": outline}
+    require_clear(ink.label, ink.text, others)
+    require_leader_clear(ink, others)
+    _telemetry.info(
+        f"slot counterbore width clearance: text={ink.text!r}, "
+        f"segments={ink.leader!r}, section B-B outline={outline!r}"
+    )
+
+
 _THREAD_CLASS_TOKEN = " <hw-threadclass>"
 
 
@@ -890,6 +912,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_caption(adapter, FRONT_FINISH_REASON, FRONT_REASON_TOP)
     _place_caption(adapter, STATION_END_LABEL, FACE_END_LABEL_TOP)
     _place_caption(adapter, STATION_END_LABEL, BACK_END_LABEL_TOP)
+    rebuild_drawing(adapter, label="slot callout clearance")
+    _assert_slot_callout_clear(adapter, detail_annotations, slot_section)
 
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
