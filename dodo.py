@@ -3641,6 +3641,8 @@ def task_check():
         # attributes the sheet no longer defines, and every check:* gate stayed
         # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
+        # Exact native and rigidly transformed assembly inspection cameras.
+        SCRIPTS_DIR / "test_assembly_named_views.py",
         # Intended chain mesh follows the actual mounted instance pose, not
         # configuration labels that may also name the loose spare.
         SCRIPTS_DIR / "test_assembly_chain_mesh.py",

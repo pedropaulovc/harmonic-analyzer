@@ -42,11 +42,12 @@ QUANTITIES = {STICK: 1, BLOCK: 1, PLATE: 1, PLATE_SCREW: 2, THUMB_SCREW: 1}
 Rows = tuple[tuple[float, float, float], ...]
 WORKING_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, -1.0))
 
-# Preserve the graduation inspection and exploded sheet projections explicitly;
-# the principal elevation and finished working isometric use standard views.
+# Only the graduated-underside inspection follows the old stop frame.
+# The exploded camera looks down from -X+Y+Z, keeping the thumbscrew above.
 DRAWING_UNDERSIDE_VIEW = "MS GRADUATED UNDERSIDE"
-DRAWING_EXPLODED_VIEW = "MS CLAMP EXPLODED ISOMETRIC"
-DRAWING_STANDARD_VIEWS = {DRAWING_UNDERSIDE_VIEW: 5, DRAWING_EXPLODED_VIEW: 7}
+DRAWING_STANDARD_VIEWS = {DRAWING_UNDERSIDE_VIEW: 5}
+DRAWING_EXPLODED_VIEW = "ISO FRONT-TOP-LEFT"
+DRAWING_EXPLODED_OCTANTS = {"FRONT-TOP-LEFT": (-1, 1, 1)}
 
 # --- Stick ------------------------------------------------------------------
 # ms-stick's frame: X along the 200 bar, Y across its 8 width (the ticks hang
