@@ -341,6 +341,7 @@ def _selected_drawing_spec(tree: ast.Module, argument: str) -> str | None:
 
 def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
+    import _config
 
     dodo = _load_dodo()
 
@@ -348,13 +349,39 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
     def source_facts(source: Path):
         # A shared helper can occur in every drawing closure. Source is unchanged
         # throughout this scan; cache immutable facts, not a production AST oracle.
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        config_aliases = {"_config"} | {
+            alias.asname or alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+            if alias.name == "_config"
+        }
+        # Unknown literals widen dependency tokens to "**"; that is cache-safe,
+        # but it must not hide a registry lookup that will fail on the worker.
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in config_aliases
+                and node.func.attr == "parts"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and isinstance(node.args[0].value, str)
+            ):
+                try:
+                    _config.parts(node.args[0].value)
+                except KeyError as exc:
+                    raise AssertionError(
+                        f"{source.name}:{node.lineno}: invalid literal registry read"
+                    ) from exc
         try:
             tokens = bg._config_tokens_in_source(source)
         except bg._UnknownConfigUse:
             return None  # the whole-config fallback narrows nothing
         if source.name in _DRAWING_OWN_ROW_READERS:
             return tokens, (), None, ()  # forwards its caller's name
-        tree = ast.parse(source.read_text(encoding="utf-8"))
         spec_calls = tuple(
             (name, _selected_drawing_spec(tree, argument))
             for name, argument in _helper_name_arguments(

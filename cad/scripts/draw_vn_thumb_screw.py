@@ -194,7 +194,7 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
         right + 0.045,
         center_y + radius + 0.023,
     )
-    notes = str(_config.parts("vn_thumb_screw").get("installation_notes", ""))
+    notes = str(_config.parts("vn-thumb-screw").get("installation_notes", ""))
     cell = next(
         bounds
         for name, _, bounds in fastener_view_cells(
