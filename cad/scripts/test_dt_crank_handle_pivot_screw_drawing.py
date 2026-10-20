@@ -2591,6 +2591,53 @@ def test_relief_note_is_owned_once_by_its_activated_view(relief_native, parent):
         assert state.model.clears == [True, True]
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "native-crlf"])
+def test_relief_view_label_accepts_native_line_endings_only(relief_native, monkeypatch, newline):
+    state = relief_native
+    original = state.Note.GetText
+    monkeypatch.setattr(
+        state.Note, "GetText", lambda note: original(note).replace("\n", newline)
+    )
+    drawing.label_relief_view(state.adapter, state.view)
+    assert state.note_calls == [(drawing.DETAIL_VIEW_LABEL, *drawing.DETAIL_LABEL_XY)]
+    assert [note.GetText() for note in state.view.notes] == [
+        drawing.DETAIL_VIEW_LABEL.replace("\n", newline)
+    ]
+    assert drawing._note_texts(state.view) == [drawing.DETAIL_VIEW_LABEL]
+
+
+def test_relief_view_label_rejects_duplicate_mixed_lf_and_crlf_notes(relief_native):
+    state = relief_native
+    native_text = drawing.DETAIL_VIEW_LABEL.replace("\n", "\r\n")
+    state.view.notes.append(state.Note(native_text))
+    with pytest.raises(RuntimeError, match="^relief view label did not land in the relief view: "):
+        drawing.label_relief_view(state.adapter, state.view)
+    assert [note.GetText() for note in state.view.notes] == [native_text, drawing.DETAIL_VIEW_LABEL]
+    assert drawing._note_texts(state.view) == [drawing.DETAIL_VIEW_LABEL] * 2
+
+
+@pytest.mark.parametrize("native_text", [
+    "DETAIL B\r\nSCALE 10:1",
+    "DETAIL A\r\nSCALE 1:1",
+    " DETAIL A\r\nSCALE 10:1",
+    "DETAIL A\rSCALE 10:1",
+    "DETAIL A\r\nSCALE 10:1\n",
+])
+def test_relief_view_label_rejects_other_native_text_changes(relief_native, monkeypatch, native_text):
+    state = relief_native
+
+    def add(adapter, text, x, y):
+        assert adapter is state.adapter and text == drawing.DETAIL_VIEW_LABEL
+        assert (x, y) == drawing.DETAIL_LABEL_XY
+        note = state.Note(native_text)
+        state.view.notes.append(note)
+        return note
+
+    monkeypatch.setattr(drawing, "add_note", add)
+    with pytest.raises(RuntimeError, match="^relief view label did not land in the relief view: "):
+        drawing.label_relief_view(state.adapter, state.view)
+
+
 @pytest.mark.parametrize("parent", [False, True])
 def test_relief_note_refuses_add_note_none_with_otherwise_valid_ownership(relief_native, parent):
     state = relief_native

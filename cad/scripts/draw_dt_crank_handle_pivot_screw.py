@@ -391,8 +391,9 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
 
 
 def _note_texts(view: Any) -> list[str]:
+    """Canonicalize native CRLF without relaxing exact note text or ownership."""
     return [
-        str(_early_bound(note, "INote").GetText())
+        str(_early_bound(note, "INote").GetText()).replace("\r\n", "\n")
         for note in (_early_bound(view, "IView").GetNotes() or ())
     ]
 
