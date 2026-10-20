@@ -128,7 +128,7 @@ def create_channel_explode(adapter: Any, configuration_name: str) -> None:
     and restore the working model.
 
     The builder runs this in Default and in Default Simplified
-    (``_assembly.save_assembly_and_images``): each owns its explode."""
+    (``_assembly.author_in_drawing_configurations``): each owns its explode."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
     view_name = exploded_view_name(configuration_name)
@@ -187,112 +187,190 @@ def create_channel_explode(adapter: Any, configuration_name: str) -> None:
             label = step.label
             distance = step.distance_mm / 1000.0
             with _telemetry.span(
-                "assembly.channel_explode.step", label=label, moved=len(names)
+                "assembly.channel_explode.step",
+                label=label,
+                moved=len(names),
+                configuration=configuration_name,
+                step_index=step_index,
             ):
-                model.ClearSelection2(True)
-                selection = _early_bound(model.SelectionManager, "ISelectionMgr")
-                data = _early_bound(selection.CreateSelectData(), "ISelectData")
-                if data is None:
-                    raise RuntimeError(
-                        f"{label}: cannot create component selection data"
-                    )
-                data.Mark = 1
-                if int(data.Mark) != 1:
-                    raise RuntimeError(
-                        f"{label}: component selection mark did not persist"
-                    )
-                for name in names:
-                    if not by_name[name].Select4(True, data, False):
-                        raise RuntimeError(f"{label}: cannot select {name}")
-                direction = directions[step.axis]
-                if not model.Extension.SelectByID2(
-                    direction.select_name,
-                    "AXIS",
-                    0.0,
-                    0.0,
-                    0.0,
-                    True,
-                    2,
-                    null_callout(),
-                    0,
+                with _telemetry.span(
+                    "assembly.channel_explode.step.selection", selected_expected=len(names)
                 ):
-                    raise RuntimeError(
-                        f"{label}: cannot select direction {direction.select_name} with mark 2"
-                    )
-                # Explicit entity only; -1 omits the component-local manipulator.
-                # Early-bound wrapper returns (IExplodeStep, error); omit [out].
-                result = configuration.AddExplodeStep2(
-                    abs(distance),
-                    -1,
-                    (distance > 0.0) != direction.positive,
-                    0.0,
-                    -1,
-                    False,
-                    True,
-                    False,
-                )
-                model.ClearSelection2(True)
-                if not isinstance(result, tuple) or len(result) != 2:
-                    raise RuntimeError(
-                        f"{label}: incomplete AddExplodeStep2 result {result!r}"
-                    )
-                raw_step, error = result
-                if int(error) != 0 or raw_step is None:
-                    raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
-                native = _early_bound(raw_step, "IExplodeStep")
-                # Distinct per explode: Default Simplified's copy carries the suffix.
-                step_name = f"CHANNEL {label.upper()}"
-                if configuration_name != SOURCE_CONFIGURATION:
-                    step_name = simplified_name(step_name)
-                native.Name = step_name
-                if str(native.Name) != step_name or not model.EditRebuild3():
-                    raise RuntimeError(f"{label}: step name/rebuild failed")
-                if int(configuration.GetNumberOfExplodeSteps()) != step_index:
-                    raise RuntimeError(
-                        f"{label}: authored step count is not {step_index}"
-                    )
-                actual = {
-                    str(_early_bound(component, "IComponent2").Name2)
-                    for component in (native.GetComponents() or ())
-                }
-                if (
-                    actual != set(names)
-                    or abs(float(native.ExplodeDistance) - abs(distance)) > 1e-9
-                ):
-                    raise RuntimeError(
-                        f"{label}: step component/distance readback mismatch: {actual!r}"
-                    )
-                for name in names:
-                    for i in range(3):
-                        expected[name][i] += distance * direction.unit[i]
-                # Read every instance, the unmoved ones too: the pressed pins
-                # and the mated chain must never move unasked.
-                mismatches = []
-                for name, component in by_name.items():
-                    current = _presentation_transform(component)
-                    delta = tuple(
-                        current[i + 9] - baseline[name][i + 9] for i in range(3)
-                    )
-                    if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
-                        mismatches.append(
-                            f"{name} moved {tuple(v * 1000.0 for v in delta)!r} mm, "
-                            f"expected {tuple(v * 1000.0 for v in expected[name])!r}"
+                    selected_attempted = selected_completed = 0
+                    axis_attempted = axis_selected = False
+                    try:
+                        model.ClearSelection2(True)
+                        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+                        if data is None:
+                            raise RuntimeError(
+                                f"{label}: cannot create component selection data"
+                            )
+                        data.Mark = 1
+                        if int(data.Mark) != 1:
+                            raise RuntimeError(
+                                f"{label}: component selection mark did not persist"
+                            )
+                        for name in names:
+                            selected_attempted += 1
+                            if not by_name[name].Select4(True, data, False):
+                                raise RuntimeError(f"{label}: cannot select {name}")
+                            selected_completed += 1
+                        direction = directions[step.axis]
+                        axis_attempted = True
+                        if not model.Extension.SelectByID2(
+                            direction.select_name,
+                            "AXIS",
+                            0.0,
+                            0.0,
+                            0.0,
+                            True,
+                            2,
+                            null_callout(),
+                            0,
+                        ):
+                            raise RuntimeError(
+                                f"{label}: cannot select direction {direction.select_name} with mark 2"
+                            )
+                        axis_selected = True
+                    finally:
+                        _telemetry.annotate(
+                            selected_attempted=selected_attempted,
+                            selected_completed=selected_completed,
+                            axis_attempted=int(axis_attempted),
+                            axis_completed=int(axis_selected),
                         )
-                    elif any(
-                        abs(current[i] - baseline[name][i]) > 1e-9
-                        for i in (*range(9), 12)
+                with _telemetry.span(
+                    "assembly.channel_explode.step.create",
+                    create_calls=1,
+                    step_name_state="unverified",
+                ):
+                    # Explicit entity only; -1 omits the component-local manipulator.
+                    # Early-bound wrapper returns (IExplodeStep, error); omit [out].
+                    result = configuration.AddExplodeStep2(
+                        abs(distance),
+                        -1,
+                        (distance > 0.0) != direction.positive,
+                        0.0,
+                        -1,
+                        False,
+                        True,
+                        False,
+                    )
+                    model.ClearSelection2(True)
+                    if not isinstance(result, tuple) or len(result) != 2:
+                        raise RuntimeError(
+                            f"{label}: incomplete AddExplodeStep2 result {result!r}"
+                        )
+                    raw_step, error = result
+                    _telemetry.annotate(add_explode_error=error)
+                    if int(error) != 0 or raw_step is None:
+                        raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
+                    native = _early_bound(raw_step, "IExplodeStep")
+                    # Distinct per explode: Default Simplified's copy carries the suffix.
+                    step_name = f"CHANNEL {label.upper()}"
+                    if configuration_name != SOURCE_CONFIGURATION:
+                        step_name = simplified_name(step_name)
+                    native.Name = step_name
+                    if str(native.Name) != step_name:
+                        raise RuntimeError(f"{label}: step name/rebuild failed")
+                    _telemetry.annotate(step_name_state="verified")
+                # This phase includes the status observation and required rebuild.
+                # An unreadable observation is not clean and must not prevent rebuilding.
+                with _telemetry.span(
+                    "assembly.channel_explode.step.rebuild",
+                    rebuild_calls=0,
+                    rebuild_state="not_completed",
+                ):
+                    try:
+                        needs_rebuild_before = int(model.Extension.NeedsRebuild2)
+                    except Exception as observation_error:
+                        rebuild_attributes = {
+                            "needs_rebuild_before_state": "unreadable",
+                            "needs_rebuild_before_error_type": type(observation_error).__name__,
+                            "needs_rebuild_before_error_message": str(observation_error),
+                        }
+                    else:
+                        rebuild_attributes = {
+                            "needs_rebuild_before_state": "measured",
+                            "needs_rebuild_before": needs_rebuild_before,
+                        }
+                    _telemetry.annotate(rebuild_calls=1, **rebuild_attributes)
+                    rebuilt = model.EditRebuild3()
+                    _telemetry.annotate(
+                        rebuild_state="succeeded" if rebuilt else "failed"
+                    )
+                    if not rebuilt:
+                        raise RuntimeError(f"{label}: step name/rebuild failed")
+                with _telemetry.span(
+                    "assembly.channel_explode.step.metadata", membership_expected=len(names)
+                ):
+                    actual_step_count = int(configuration.GetNumberOfExplodeSteps())
+                    _telemetry.annotate(step_count_actual=actual_step_count)
+                    if actual_step_count != step_index:
+                        raise RuntimeError(
+                            f"{label}: authored step count is not {step_index}"
+                        )
+                    actual = {
+                        str(_early_bound(component, "IComponent2").Name2)
+                        for component in (native.GetComponents() or ())
+                    }
+                    _telemetry.annotate(membership_count=len(actual))
+                    if (
+                        actual != set(names)
+                        or abs(float(native.ExplodeDistance) - abs(distance)) > 1e-9
                     ):
-                        mismatches.append(f"{name} presentation rotated or scaled")
-                _telemetry.event(
-                    "assembly.channel_explode.readback",
-                    step=label,
-                    moved=names,
-                    axis=direction.select_name,
-                    signed_distance_mm=step.distance_mm,
-                    mismatches=tuple(mismatches),
-                )
-                if mismatches:
-                    raise RuntimeError(f"{label}: " + "; ".join(mismatches))
+                        raise RuntimeError(
+                            f"{label}: step component/distance readback mismatch: {actual!r}"
+                        )
+                with _telemetry.span(
+                    "assembly.channel_explode.step.readback", instances_expected=len(by_name)
+                ):
+                    transform_reads_attempted = transform_reads_completed = 0
+                    readback_completed = False
+                    try:
+                        for name in names:
+                            for i in range(3):
+                                expected[name][i] += distance * direction.unit[i]
+                        # Read every instance, the unmoved ones too: the pressed pins
+                        # and the mated chain must never move unasked.
+                        mismatches = []
+                        for name, component in by_name.items():
+                            transform_reads_attempted += 1
+                            current = _presentation_transform(component)
+                            transform_reads_completed += 1
+                            delta = tuple(
+                                current[i + 9] - baseline[name][i + 9] for i in range(3)
+                            )
+                            if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                                mismatches.append(
+                                    f"{name} moved {tuple(v * 1000.0 for v in delta)!r} mm, "
+                                    f"expected {tuple(v * 1000.0 for v in expected[name])!r}"
+                                )
+                            elif any(
+                                abs(current[i] - baseline[name][i]) > 1e-9
+                                for i in (*range(9), 12)
+                            ):
+                                mismatches.append(f"{name} presentation rotated or scaled")
+                        _telemetry.event(
+                            "assembly.channel_explode.readback",
+                            step=label,
+                            moved=names,
+                            axis=direction.select_name,
+                            signed_distance_mm=step.distance_mm,
+                            mismatches=tuple(mismatches),
+                        )
+                        if mismatches:
+                            raise RuntimeError(f"{label}: " + "; ".join(mismatches))
+                        readback_completed = True
+                    finally:
+                        _telemetry.annotate(
+                            transform_reads_attempted=transform_reads_attempted,
+                            transform_reads_completed=transform_reads_completed,
+                            proof_state=(
+                                "completed" if readback_completed else "incomplete"
+                            ),
+                        )
     finally:
         primary_error = sys.exception()
         try:
