@@ -461,7 +461,7 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # G19 is now the free end: its north face carries the accepted full
     # stack deviation as well as the south datum chain.
     terms.update({f"bank {name}": value for name, value in bank.DATUM_CHAIN_STACK.items()})
-    terms["bank accepted stack length"] = bank.G19_BACK_FACE_BAND[1]
+    terms["bank accepted stack length"] = bank.STACK_L20_ACCEPT_BAND[0]
     manufactured = _tilted_fixed_support(fixed, Z, 0.0)
     nominal = cylinder_support((0.0, 0.0, 0.0), Z, fixed.south_mm, fixed.north_mm,
                                fixed.radius_mm, Z, maximum=True)
