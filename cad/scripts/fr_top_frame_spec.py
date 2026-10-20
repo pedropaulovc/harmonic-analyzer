@@ -222,8 +222,9 @@ HANGER_PIN_DEPTH_CALLOUT = "4X"
 # Milled to width: a reamer cannot make a slot 0.71 longer than it is wide
 # (machinist review r1, 2026-10-18).
 HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT WIDTH\nSLIP FIT MHA-SM-VN-53 DOWEL"
-# The length's three places are functional (above): name the travel it holds.
-HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH,\nMHA-SM-VN-53 DOWEL TRAVEL"
+# The overall length's three places are functional (above); the reference
+# radius-centre span adds no tolerance or independent acceptance criterion.
+HANGER_SLOT_LENGTH_CALLOUT = "2X OVERALL SLOT LENGTH,\nMHA-SM-VN-53 DOWEL TRAVEL"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
@@ -411,7 +412,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # own contract, instead of as a literal in the drawing script.  Keyed by the
 # recipe's own dimension label.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    # Sheet 1, GEOMETRY: envelope, windows, T-rail section B-B and side
+    # Sheet 1, GEOMETRY: envelope, windows, T-rail section H-H and side
     # section E-E with the crossbar T and its pockets -- cast stock under the
     # title block's general band.
     "overall casting width": 1,
@@ -457,7 +458,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     # (build_fr_top_frame.COUNTERBORE_PRINTED_CAP_LIGAMENT).
     "counterbore floor from socket axis": 2,
     # Sheet 5, HUB-SET-SCREW: hub station, set-tap axis, gusset ramp and the
-    # cropped set-screw boss section D-D (spot face, boss face, thread run).
+    # removed set-screw boss section K-K (spot face, boss face, thread run).
     "hub from left front socket": 1,
     "set screw axis from rail top": 1,
     "hub boss underside drop": 1,
@@ -467,8 +468,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw thread length": 1,
     "set-screw boss face from bore axis": 1,
     # Sheet 6, UNDERSIDE: the junction lands and the knife-hanger section F-F
-    # -- the native finished-top grip is imported, while dowel stations and slot
-    # length are measured associatively from their visible model features.
+    # -- the native finished-top grip is imported.  Stations and overall slot
+    # length are measured, while radius-centre spacing is source-derived REF.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
     "crossbar pocket from front socket": 1,
@@ -476,6 +477,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
     "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
     "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
+    "dowel slot radius centres": 3,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.

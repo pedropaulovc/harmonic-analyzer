@@ -94,9 +94,9 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # callout; the shaded isometric stands at the upper right.
 #
 # Section arrows point away from their view (A's up), and SolidWorks prints
-# each letter 15-22 mm past its arrow's tail (draw_fr_top_frame
-# SECTION_LETTER_EXTENTS), so A's letters stand above the cutting line's
-# two ends. Farm run jig-r1 (fa975d169) failed with a hole-size shoulder
+# each letter 15-22 mm past its arrow's tail (draw_fr_top_frame's historical
+# SECTION_CUT_BASELINE_LETTER_EXTENTS), so A's letters stand above both ends.
+# Farm run jig-r1 (fa975d169) failed with a hole-size shoulder
 # across a second section line and the size callouts over the top border.
 # Jig-r2 (c2f7d1c03) put the five-row BoreDia block over the plan: its
 # "2X" and tolerance stack printed over the top border (ink top 270.2 mm),

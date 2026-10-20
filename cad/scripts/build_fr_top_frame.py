@@ -23,7 +23,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
   rulings 2026-10-11 and 2026-10-14, one linked manufacturing note), the
   keeper rail flat within the keeper-owned 0.04 zone so both keeper feet
   land on one face wherever fit-up puts them. The nominal rail-top plane
-  stays fixed; the B-B top flange thickness (TYP, .X, minimum 7.2) is the
+  stays fixed; the H-H top flange thickness (TYP, .X, minimum 7.2) is the
   finished flange under it.
 * Integral crossbar 25 wide at x -27.5..-2.5 spanning the window along Z,
   flush with BOTH faces at its junctions (the faced underside 999.7 is the
@@ -1243,7 +1243,7 @@ KEEPER_MIN_WEB_HALF_WIDTH = (
     round(WEB_T, DRAWING_REFERENCE_PRECISION["side rail web thickness"])
     - PRINTED_LINEAR_BAND_MM[DRAWING_REFERENCE_PRECISION["side rail web thickness"]]
 ) / 2.0
-# B-B prints the top flange thickness TYP: one .X FINAL dimension binds
+# H-H prints the top flange thickness TYP: one .X FINAL dimension binds
 # every rail, the faced keeper-rail top included, so facing cannot subtract
 # a second allowance from its printed minimum, and cap-floor and boss-height
 # bands do not enter. (An untyped flange would need its own facing

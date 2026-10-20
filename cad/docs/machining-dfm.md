@@ -181,6 +181,24 @@ states that the near and far casting walls are threaded **in phase for
 MHA-VN-027**. The requirement travels with the feature, not a detached A-A
 note; the Hole Wizard still owns the thread and tap-drill depths.
 
+The top-frame's live view identifiers are **H-H** (front/rear rail section),
+**DETAIL J** (underside enlargement) and **K-K** (set-screw boss section).
+Datums B/C/D and A-A/E-E/F-F/VIEW G are unchanged. Section stations, endpoints,
+profiles, orientations and scales retain the historical B/E/D placement
+calibration; old B/D glyph bounds do not establish H/K glyph clearance.
+
+In F-F, the ordinary **2X 15.264 ±0.13 mm** slot station names its actual
+mate, the **MHA-SM-002 knife-mount dowel pattern**. It is neither BASIC nor
+REF. The controlling **3.950 ±0.13 mm overall slot length** retains its
+MHA-VN-051 dowel-travel purpose, and **3.240 ±0.030 mm width** is unchanged.
+The added native **(0.710) radius-centre spacing** is a noncontrolling
+reference between source-derived stadium axes, `SLOT_X ± SLOT_FLAT/2`,
+where `SLOT_FLAT = HANGER_SLOT_LENGTH - HANGER_SLOT_WIDTH`. The original
+overall/width limits still alone permit **0.550–0.870 mm** centre spacing;
+the reference adds no tolerance or acceptance criterion. Its outside arrows
+and outboard text, and the renamed letters/captions, need native clearance
+inspection rather than extrapolated historical glyph measurements.
+
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores
 align. The finished underside and knife-mount pose remain unchanged.
