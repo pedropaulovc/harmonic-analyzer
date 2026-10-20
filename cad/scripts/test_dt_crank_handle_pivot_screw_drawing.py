@@ -3200,9 +3200,9 @@ def test_fitted_span_reuses_native_model_carrier_and_all_three_reference_guards(
     assert {name for name, _ in calls} == set(names)
     assert len(calls) == 3
     assert all(kwargs == {"label": f"MHA-DT-32 {name}"} for name, kwargs in calls)
-    for annotations in (names[1:], [*names, "ShoulderLength"]):
+    for native_annotations in (names[1:], [*names, "ShoulderLength"]):
         with pytest.raises(RuntimeError, match="expected one MHA-DT-32 ShoulderLength reference dimension"):
-            exec(code, {**context, "annotations": annotations})
+            exec(code, {**context, "annotations": native_annotations})
     assert spec.SHOULDER_LENGTH == 53.0
     assert "ShoulderLength" not in drawing.DETAIL_KEEP
     assert "ShoulderLength" not in drawing.END_KEEP
