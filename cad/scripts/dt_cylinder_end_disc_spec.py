@@ -53,5 +53,7 @@ def installed_clearance_budget(datum_band: float) -> dict[str, float]:
                 f"< {RUNNING_AIR_MM + CLEARANCE_SPARE_MM:.2f} mm"
             )
     if budget["retaining land"] <= 0.0:
-        raise AssertionError("south disc no longer captures the ring's complete bore edge")
+        raise AssertionError(
+            "south disc no longer captures the ring's complete bore edge"
+        )
     return budget
