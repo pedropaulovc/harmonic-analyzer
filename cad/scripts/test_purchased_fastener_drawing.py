@@ -1120,6 +1120,7 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "create-replaced-thread",
         "none",
         "face",
+        "create-face",
         "ignored-move",
         "text",
         "link",
@@ -1128,6 +1129,7 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "lost-callout",
         "thread-identity",
         "dangling",
+        "callout-neighbour",
         "attachment",
         "attachment-type",
         "collision",
@@ -1169,9 +1171,6 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             super().__init__("automatic", "1/2-13\nTapped Hole", 0.2631371, 0.2304204)
             self._extent = (0.2492598, 0.2173807, 0.0, 0.3074012, 0.2307246, 0.0)
             self.Visible = 1
-            self.entity = edge()
-            self.attachment_type = 1
-            self.attachment_count = 1
             self.dangling = False
             self.annotation_readback = self
 
@@ -1184,13 +1183,14 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             return True
 
         def GetAttachedEntities3(self):
-            return (self.entity,)
+            # The native inserted INote has no direct geometry attachments.
+            return ()
 
         def GetAttachedEntityTypes(self):
-            return (self.attachment_type,)
+            return ()
 
         def GetAttachedEntityCount3(self):
-            return self.attachment_count
+            return 0
 
         def IsDangling(self):
             return self.dangling
@@ -1226,6 +1226,8 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         def __init__(self, callout):
             self.callout = callout
             self.entity = edge()
+            self.attachment_type = 1
+            self.attachment_count = 1
             self.native_identity = object()
 
         def GetName(self):
@@ -1235,10 +1237,10 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
             return (self.entity,)
 
         def GetAttachedEntityTypes(self):
-            return (1,)
+            return (self.attachment_type,)
 
         def GetAttachedEntityCount3(self):
-            return 1
+            return self.attachment_count
 
         def Select2(self, append, mark):
             assert append is False and mark == 0
@@ -1417,8 +1419,10 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         ),
     )
     cells = configured.configuration_view_cells(1, 3)
-    if drift == "face":
-        note.entity, note.attachment_type = face(), 2
+    if drift in {"face", "create-face"}:
+        native_threads[0].entity, native_threads[0].attachment_type = face(), 2
+        if drift == "create-face":
+            native_threads[0].callout = None
     elif drift == "no-thread":
         native_threads.clear()
     elif drift in {
@@ -1449,13 +1453,13 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         native_threads[0].callout = None
         native_threads.append(ThreadAnnotation(None))
     elif drift == "wrong-feature":
-        note.entity = edge("FlangeNutThreadBore")
+        native_threads[0].entity = edge("FlangeNutThreadBore")
     elif drift == "null-attachment":
-        note.entity = None
+        native_threads[0].entity = None
     elif drift == "bad-count":
-        note.attachment_count = 2
+        native_threads[0].attachment_count = 2
     elif drift == "unsupported-type":
-        note.attachment_type = 3
+        native_threads[0].attachment_type = 3
     if drift in {
         "activation-refused",
         "selection-refused",
@@ -1561,6 +1565,7 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
     checks = kit.annotate_member(adapter, "TNut", cells, views)
     created = drift in {
         "create",
+        "create-face",
         "create-from-sheet",
         "create-without-source-definition",
         "create-fresh-wrapper",
@@ -1595,10 +1600,12 @@ def test_kit_native_tnut_note_relocation_and_settled_refusals(monkeypatch, drift
         native_threads[0] = ThreadAnnotation(note)
     elif drift == "dangling":
         note.dangling = True
+    elif drift == "callout-neighbour":
+        native_threads[0].callout = ThreadNote()
     elif drift == "attachment":
-        note.entity = edge()
+        native_threads[0].entity = edge()
     elif drift == "attachment-type":
-        note.entity, note.attachment_type = face(), 2
+        native_threads[0].entity, native_threads[0].attachment_type = face(), 2
     elif drift == "collision":
         note.SetPosition(0.32, 0.23, 0.0)
     if drift in {"none", "face"} or created:

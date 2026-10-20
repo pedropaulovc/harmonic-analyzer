@@ -214,10 +214,11 @@ def _tnut_thread_note(
 ) -> Callable[[], None]:
     """Author and relocate the native cosmetic-thread callout, never free text.
 
-    The b3c709 native canary had one cosmetic thread but no drawing callout.
-    Select that bore-owned thread and request its native callout once during
-    authoring. ICThread.ThreadCallout is the creation proof; later settled
-    checks only read it and must not recreate a lost note.
+    Select the bore-owned cosmetic thread and request its native callout once
+    if absent. Native canary 2267 proved that the returned INote has no direct
+    geometry attachments: association is ICThread.ThreadCallout plus the
+    owning thread annotation's bore attachments. Preserve both identities and
+    the thread's geometry through relocation and read-only settled checks.
     """
     iso = _early_bound(views[3], "IView")
     # The member hook follows HLR fitting, before the finalizer authors this
@@ -343,9 +344,8 @@ def _tnut_thread_note(
             _telemetry.info(
                 f"kit T-nut: requesting native thread callout; {insertion_before!r}"
             )
-            # VT_VOID. Method docs give no eligibility remarks; the UI command
-            # documents no-standard/nonempty-text restrictions, so only the
-            # same ICThread's subsequent ThreadCallout readback proves success.
+            # VT_VOID. Native canary 2267 proved this creates the callout;
+            # the same ICThread's subsequent ThreadCallout is the proof.
             drawing.InsertThreadCallout()
         except BaseException as error:
             primary_error = error
@@ -399,10 +399,10 @@ def _tnut_thread_note(
         ]
         threads, callouts = len(thread_annotations), 0
         for thread_annotation in thread_annotations:
+            state = attachment_state(thread_annotation)
             thread = _early_bound(thread_annotation.GetSpecificAnnotation(), "ICThread")
             raw_note = _read_member(thread, "ThreadCallout")
             if raw_note is None:
-                state = attachment_state(thread_annotation)
                 if author_missing and threads == 1 and belongs_to_bore(state):
                     insert_callout(thread_annotation, state)
                     iso.UpdateViewDisplayGeometry()
@@ -423,6 +423,7 @@ def _tnut_thread_note(
                             f"insertion_before={insertion_before!r}"
                         )
                     thread_annotation = fresh[0]
+                    state = attachment_state(thread_annotation)
                     thread = _early_bound(
                         thread_annotation.GetSpecificAnnotation(),
                         "ICThread",
@@ -445,11 +446,12 @@ def _tnut_thread_note(
             callouts += 1
             note = _early_bound(raw_note, "INote")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-            attached, types, count, features = attachment_state(annotation)
+            attached, types, count, features = state
             if len(observed) < 4:
                 observed.append(
                     {
                         "text": str(note.GetText())[:120],
+                        "geometry_owner": "ICThread",
                         "count": count,
                         "types": types[:8],
                         "features": tuple(
@@ -470,8 +472,9 @@ def _tnut_thread_note(
                 for raw in view_notes[:4]
             )
             raise RuntimeError(
-                "kit T-nut: expected one automatic isometric thread note attached "
-                f"to TNutThreadBore; found={len(found)}, cosmetic_threads={threads}, "
+                "kit T-nut: expected one automatic isometric thread note from a "
+                f"cosmetic thread attached to TNutThreadBore; found={len(found)}, "
+                f"cosmetic_threads={threads}, "
                 f"callouts={callouts}, candidates={observed!r}, "
                 f"view_notes={len(view_notes)}, view_note_texts={view_note_texts!r}, "
                 f"insertion_before={insertion_before!r}"
@@ -512,6 +515,8 @@ def _tnut_thread_note(
             or current_annotation.IsDangling() is not False
             or int(current_annotation.Visible) != 1
             or types != attachment_types
+            # The returned geometry snapshot belongs to the owning ICThread,
+            # not the callout INote (which natively has no direct attachments).
             or len(attached) != len(attachments)
             or any(
                 not _is_same_attachment(
