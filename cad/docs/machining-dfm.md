@@ -156,16 +156,27 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
-MHA-SM-03's two MHA-MG-01 bracket receivers retain the owner-ruled
-**6.05 +0.10/0 mm** tap-drill depth (2026-10-18). Its lower limit clears the
-MHA-MG-VN-53 screw tip and bottoming-tap lead; its upper limit keeps the drill
-point in the **7.3 mm end rib**, before section H-H steps down to the
-**5.08 mm plate**. Both receiver axes are inboard of the spring-anchor pad,
-which does not back those bore walls. The callout names retaining the plate
-walls as the upper limit's function; "solid plate beyond" did not explain it.
-`magnifying_bracket_joint_layout.DRILL_POINT_RIB_MARGIN_MIN` includes the
-printed bands and drill wander. This clarification changes no geometry,
-depth limit or accepted wall threshold.
+MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
+cylindrical tap-drill depth, explicitly symmetric in the native dimension.
+The native hole callout prints **6.50** at two places, inheriting the same
+ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
+accepted tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
+to **8.20 mm**: its entry remains **−76.20 mm**, its inner boundary is
+**−68.00 mm**, and the opposite end rib remains **5.08 mm**. The axes and
+13.7 mm pitch, MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged.
+Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**.
+At the printed limits the full-thread containment margin is **2.69 mm**,
+bottoming-tap lead exceeds two pitches by **0.082857 mm**, and the entire
+118° point plus conservative 0.3° wander stays inside the shortest rib by
+**0.076133 mm**. This last value is point containment, not a bottom-wall
+thickness or a reduced rule-17 wall floor.
+
+A bounded depth remains necessary: an unbounded MIN drill could enter the
+**5.08 mm plate** beyond the rib, where the receiver axes are inboard of the
+spring-anchor pad and the plate alone cannot meet the unchanged **1.5 mm**
+wall floor. The ordinary ±0.51 band bounds that reach without a special
+tight drill band. `magnifying_bracket_joint_layout` owns the physical stack
+and point/wander proof; section H-H shows the rib-to-plate transition.
 
 View F retains the top-referenced **2.54 ±0.05 mm** receiver-row location
 and the centreline through both taps and the hex centre. The duplicate

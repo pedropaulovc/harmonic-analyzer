@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
+import _config
 from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
@@ -257,12 +258,15 @@ TAP_SECTION_LINE_Y = (-11.0, 16.0)
 TAP_SECTION_SCALE = (4, 1)
 TAP_SECTION_PLATE_BEYOND = 4.0
 _TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
-# The crop circle's centre, on the mid-plane 4.75 in from the end face, lands
-# on TAP_SECTION_CENTER; its radius holds the end face's corners (5.06
-# half-height at x 29.7, 6.94 from the centre) and leaves the plate's faces
-# 0.19 past the break, so the plate ends at the break line.
-_TAP_SECTION_ANCHOR_MM = (TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + 4.75)
-TAP_SECTION_CROP_RADIUS = 7.2
+# Centre the crop relative to the receiver depth, not the superseded rib.
+# Its radius leaves the plate faces 0.20 beyond the break while retaining
+# both full-height rib end corners. These are view extents, not part sizes.
+_TAP_SECTION_ANCHOR_MM = (
+    TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + RIB_DEPTH / 2.0 + 1.1
+)
+TAP_SECTION_CROP_RADIUS = math.hypot(
+    _TAP_SECTION_FAR_Z + 0.20 - _TAP_SECTION_ANCHOR_MM[2], PLATE_T / 2.0
+)
 TAP_SECTION_CENTER = (0.140, 0.064)
 TAP_SECTION_CAPTION_XY = (0.145, 0.037)
 # A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
@@ -282,7 +286,7 @@ TAP_SECTION_BREAK = (
 TAP_THREAD_LAYER = "TAP-THREAD-SECTION"
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 
-# The -Z end rib's banded depth is named by
+# The -Z end rib's ordinary depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
 # its hidden coordinate sketch, outside the marked-dimension contract.
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
@@ -1620,11 +1624,11 @@ TOP_KEEP = {
     "EdgeRibThickness": (0.2095, 0.1035),
     # Outside the part, right of the free edge (machinist review b4df34ad9
     # r2/r3: inside the web, between the R138.85, the boss and the cylinder,
-    # it read as crowded), as the -Z rib's 7.30 does: its extension lines run
+    # it read as crowded), as the -Z receiver rib's depth does: its extension lines run
     # from the rib's end across the hole column (one hole sits on the rib's
     # mid-plane, its rim 0.5 mm inside them) to the line 8 mm past the free
     # edge (x 0.2576), and the text stands right of the line, 6.2 mm over the
-    # rib's upper face as the 7.30's does: 4.8 mm right of section C-C's
+    # rib's upper face as the receiver depth's does: 4.8 mm right of section C-C's
     # outboard arrow (x 0.2617, tail y 0.139) and 4 mm over the 20X callout's
     # first line, whose left end moved to 0.277 for its extension lines.
     "MiddleRibThickness": (0.2655, 0.1374),
@@ -1702,6 +1706,65 @@ VIEW_G_ARROW = (
 # leader (x 0.2452), 1 cm over the 20X frame's leader.  The point is its top
 # left.
 FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
+
+
+def _dress_bracket_depth_callout(callout: Any) -> None:
+    """Keep native receiver depths; let the drill's decimals carry its general band."""
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+
+    required_depths = {
+        "hw-threaddepth": THREAD_DEPTH,
+        "hw-tapdrldepth": DRILL_DEPTH,
+    }
+    for raw in callout.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        variable_name = str(variable.VariableName)
+        if variable_name not in required_depths:
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        expected_depth = required_depths.pop(variable_name)
+        if abs(float(length.Length) * 1000.0 - expected_depth) > 1e-5:
+            raise RuntimeError(f"bracket mounting callout has wrong {variable_name}")
+        observed = (
+            int(variable.ToleranceType),
+            float(variable.ToleranceMin) * 1000.0,
+            float(variable.ToleranceMax) * 1000.0,
+        )
+        _telemetry.info(
+            f"bracket mounting callout {variable_name} imported tolerance "
+            f"(type, lower mm, upper mm) = {observed!r}"
+        )
+        # Callout variables own their presentation, independently of the
+        # source-model dimension tolerance. Keep the full thread's MIN.
+        if variable_name == "hw-threaddepth":
+            variable.ToleranceType = 5  # swTolType_e.swTolMIN
+            if int(variable.ToleranceType) != 5:
+                raise RuntimeError(
+                    "bracket mounting callout full-thread depth did not "
+                    "persist as a MIN limit"
+                )
+            continue
+        lower, upper = DRILL_DEPTH_DEVIATIONS
+        ordinary_band = float(_config.title_block("linear_2pl")["display"].removeprefix("±"))
+        if not (
+            math.isclose(lower, -ordinary_band)
+            and math.isclose(upper, ordinary_band)
+        ):
+            raise RuntimeError("bracket tap drill depth must retain its ordinary symmetric band")
+        # As for the knife-mount drill-angle callout, suppress only the
+        # variable's explicit band. Native 6.50 then inherits .XX ±0.51;
+        # the source Hole Wizard dimension keeps its bounded symmetric band.
+        variable.ToleranceType = 0  # swTolType_e.swTolNONE
+        length.Precision = 2
+        if int(variable.ToleranceType) != 0 or int(length.Precision) != 2:
+            raise RuntimeError(
+                f"bracket mounting callout tolerance for {variable_name} did not "
+                f"persist: wanted inherited .XX band {DRILL_DEPTH_DEVIATIONS!r} "
+                "mm at 2 places"
+            )
+    if required_depths:
+        raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -2185,64 +2248,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.292, 0.115), label="two blind bracket mounting taps",
         process=BRACKET_TAP_CALLOUT_PROCESS,
     )
-    from win32com.client.dynamic import Dispatch as dynamic_dispatch
-    required_depths = {
-        "hw-threaddepth": THREAD_DEPTH,
-        "hw-tapdrldepth": DRILL_DEPTH,
-    }
-    for raw in mounting_callout.GetHoleCalloutVariables() or ():
-        # Concrete callout interfaces alias the generic metadata DISPIDs.
-        variable = dynamic_dispatch(raw._oleobj_)
-        variable_name = str(variable.VariableName)
-        if variable_name not in required_depths:
-            continue
-        length = _early_bound(raw, "ICalloutLengthVariable")
-        expected_depth = required_depths.pop(variable_name)
-        if abs(float(length.Length) * 1000.0 - expected_depth) > 1e-5:
-            raise RuntimeError(f"bracket mounting callout has wrong {variable_name}")
-        observed = (
-            int(variable.ToleranceType),
-            float(variable.ToleranceMin) * 1000.0,
-            float(variable.ToleranceMax) * 1000.0,
-        )
-        _telemetry.info(
-            f"bracket mounting callout {variable_name} imported tolerance "
-            f"(type, lower mm, upper mm) = {observed!r}"
-        )
-        # A hole callout variable carries its OWN tolerance (SW 2016+:
-        # ICalloutVariable.ToleranceType; the model IDimensionTolerance does
-        # not override it). Farm 2026-10-09: the cosmetic-thread depth band
-        # did not reach hw-threaddepth, so author it here.  The full thread
-        # prints as a minimum (machinist review r5/r6, rule 4): the drill's
-        # own band bounds how deep a bottoming tap can cut, and the joint
-        # proofs' shallowest thread (4.90) is under the printed 4.95.
-        if variable_name == "hw-threaddepth":
-            variable.ToleranceType = 5  # swTolType_e.swTolMIN
-            if int(variable.ToleranceType) != 5:
-                raise RuntimeError(
-                    "bracket mounting callout full-thread depth did not "
-                    "persist as a MIN limit"
-                )
-            continue
-        # The drill depth is one-sided, +0.10/0 (joint DRILL_DEPTH_DEVIATIONS).
-        lower, upper = DRILL_DEPTH_DEVIATIONS
-        variable.ToleranceType = 2  # swTolType_e.swTolBILAT
-        variable.ToleranceMin = lower / 1000.0
-        variable.ToleranceMax = upper / 1000.0
-        length.TolerancePrecision = 2
-        if (
-            int(variable.ToleranceType) != 2
-            or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
-            or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
-            or int(length.TolerancePrecision) != 2
-        ):
-            raise RuntimeError(
-                f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted swTolBILAT (lower, upper) {DRILL_DEPTH_DEVIATIONS!r} "
-                "mm at 2 places"
-            )
-    if required_depths:
-        raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
+    _dress_bracket_depth_callout(mounting_callout)
     back_annotations = curate_hidden_dimensions(
         adapter,
         back,

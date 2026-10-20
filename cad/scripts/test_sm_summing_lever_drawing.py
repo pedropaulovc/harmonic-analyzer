@@ -178,10 +178,10 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert '"hw-tapdrldepth": DRILL_DEPTH' in drawing_source
     assert "bracket tap callout omits native depths" in drawing_source
     assert part.TAP_SPEC.size == "#2-56"
-    assert part.TAP_SPEC.depth_mm == 6.05
+    assert part.TAP_SPEC.depth_mm == 6.50
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
-    assert joint.DRILL_DEPTH_DEVIATIONS == (0.0, 0.10)  # one-sided, +0.10/0
+    assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)  # ordinary .XX width
     # The -Z rib's depth rides the title block (no native band of its own).
     assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND
     assert not hasattr(joint, "RECEIVER_DIMENSION_BANDS")
@@ -809,7 +809,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
 
     # Native shape observed on the farm (2026-10-09): the tap drill depth lives
     # on a sketch subfeature, and each hole gets its own cosmetic thread.
-    drill = Dimension("Tap Drill Depth", "Sketch14", 6.05)
+    drill = Dimension("Tap Drill Depth", "Sketch14", 6.50)
     thread = Dimension("D1", "Hole Thread22", 4.95)
     thread_b = Dimension("D1", "Hole Thread23", 4.95)
     unrelated = Dimension("Depth", "ReferencePlane", 4.95)
@@ -873,7 +873,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     assert held == [
         (True, thread, (-0.05, 0.05), "D1@Hole Thread22"),
         (True, thread_b, (-0.05, 0.05), "D1@Hole Thread23"),
-        (True, drill, (0.0, 0.10), "Tap Drill Depth@Sketch14"),
+        (True, drill, (-0.51, 0.51), "Tap Drill Depth@Sketch14"),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
         "Tap Drill Depth", "D1", "D1", "Depth"
@@ -901,6 +901,343 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         part._receiver_model_bands(adapter)
 
 
+def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeypatch) -> None:
+    import _com
+    import _drawing_tolerances
+    import magnifying_bracket_joint_layout as joint
+
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, lower, upper):
+            self.lower, self.upper = lower, upper
+            return True
+
+        def GetMinValue(self):
+            return self.lower
+
+        def GetMaxValue(self):
+            return self.upper
+
+    tolerance = Tolerance()
+    display = SimpleNamespace(
+        SetPrecision3=lambda *args: True,
+        GetPrimaryPrecision2=lambda: 2,
+    )
+    monkeypatch.setattr(_com, "_bind", lambda value, _kind: value)
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_tolerances, "_set_tolerance_precision", lambda *args, **kwargs: None)
+    lever_build._band_held_dimension(
+        display, SimpleNamespace(Tolerance=tolerance),
+        joint.DRILL_DEPTH_DEVIATIONS, "native receiver drill",
+    )
+    assert tolerance.Type == 4  # swTolSYMMETRIC, not bilateral or MIN
+    assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.00051, 0.00051))
+
+
+@pytest.fixture
+def bracket_depth_callout(monkeypatch):
+    """Keep late-bound metadata distinct from the native length interface."""
+    import sys
+
+    class Interface:
+        def __init__(self, **values):
+            object.__setattr__(self, "values", values)
+            object.__setattr__(self, "ignored", set())
+            object.__setattr__(self, "writes", [])
+
+        def __getattr__(self, name):
+            return self.values[name]
+
+        def __setattr__(self, name, value):
+            self.writes.append((name, value))
+            if name not in self.ignored:
+                self.values[name] = value
+
+    def native(name, depth):
+        metadata = Interface(
+            VariableName=name, ToleranceType=4, ToleranceMin=0.0, ToleranceMax=0.0,
+        )
+        length = Interface(Length=depth / 1000.0, Precision=1, TolerancePrecision=1)
+        return SimpleNamespace(raw=SimpleNamespace(_oleobj_=metadata), metadata=metadata, length=length)
+
+    thread = native("hw-threaddepth", 4.95)
+    drill = native("hw-tapdrldepth", 6.50)
+    unrelated = native("hw-threaddia", 2.1844)
+    variables = [unrelated.raw, thread.raw, drill.raw]
+    dispatched = []
+    bound = []
+
+    def dispatch(ole):
+        assert any(ole is item.metadata for item in (unrelated, thread, drill))
+        dispatched.append(ole)
+        return ole
+
+    def early_bound(raw, kind):
+        assert kind == "ICalloutLengthVariable"
+        for item in (thread, drill):
+            if raw is item.raw:
+                bound.append(raw)
+                return item.length
+        raise AssertionError("unrelated callout variable must not be dressed")
+
+    monkeypatch.setitem(sys.modules, "win32com.client.dynamic", SimpleNamespace(Dispatch=dispatch))
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    callout = SimpleNamespace(GetHoleCalloutVariables=lambda: variables)
+    return SimpleNamespace(
+        dress=lambda: drawing._dress_bracket_depth_callout(callout),
+        thread=thread, drill=drill, unrelated=unrelated, variables=variables,
+        dispatched=dispatched, bound=bound,
+    )
+
+
+def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_callout) -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    case = bracket_depth_callout
+    unrelated_before = (dict(case.unrelated.metadata.values), dict(case.unrelated.length.values))
+    case.dress()
+    assert case.drill.metadata.ToleranceType == 0  # swTolNONE: title-block presentation
+    assert case.drill.length.Precision == 2
+    assert case.drill.length.Length == pytest.approx(0.00650)
+    # NONE hides the native variable's unused tolerance fields; dressing must
+    # not write them or assume SOLIDWORKS retains hidden deviations.
+    assert case.drill.metadata.writes == [("ToleranceType", 0)]
+    assert case.drill.length.writes == [("Precision", 2)]
+    assert case.thread.metadata.ToleranceType == 5  # swTolMIN, not a bilateral thread depth
+    assert case.thread.length.Length == pytest.approx(0.00495)
+    assert case.thread.length.writes == []
+    assert (case.thread.metadata.ToleranceMin, case.thread.metadata.ToleranceMax) == (0.0, 0.0)
+    assert (case.unrelated.metadata.values, case.unrelated.length.values) == unrelated_before
+    assert case.unrelated.metadata.writes == case.unrelated.length.writes == []
+    assert case.bound == [case.thread.raw, case.drill.raw]
+    assert case.dispatched == [case.unrelated.metadata, case.thread.metadata, case.drill.metadata]
+
+    # Derive the effective band from the printed nominal and the actual sheet
+    # row, not value_in (whose metric conversion is intentionally rounded).
+    printed_nominal = f"{case.drill.length.Length * 1000.0:.{case.drill.length.Precision}f}"
+    assert printed_nominal == "6.50"
+    display = _config.title_block("linear_2pl")["display"]
+    assert display.startswith("±")
+    printed_band = float(display.removeprefix("±"))
+    effective_limits = (float(printed_nominal) - printed_band, float(printed_nominal) + printed_band)
+    assert effective_limits == pytest.approx((5.99, 7.01))
+    physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
+    assert effective_limits == pytest.approx(physical_limits)
+
+
+@pytest.mark.parametrize(("member", "wrong_mm"), [("thread", 4.90), ("drill", 6.00)])
+def test_bracket_depth_callout_rejects_wrong_native_length(
+    bracket_depth_callout, member, wrong_mm,
+) -> None:
+    case = bracket_depth_callout
+    getattr(case, member).length.values["Length"] = wrong_mm / 1000.0
+    with pytest.raises(RuntimeError):
+        case.dress()
+
+
+@pytest.mark.parametrize("missing", ["thread", "drill", "both"])
+def test_bracket_depth_callout_requires_both_native_depth_variables(
+    bracket_depth_callout, missing,
+) -> None:
+    case = bracket_depth_callout
+    removed = (case.thread.raw, case.drill.raw) if missing == "both" else (getattr(case, missing).raw,)
+    case.variables[:] = [raw for raw in case.variables if all(raw is not item for item in removed)]
+    with pytest.raises(RuntimeError):
+        case.dress()
+
+
+@pytest.mark.parametrize(
+    ("member", "interface", "setter"),
+    [
+        ("thread", "metadata", "ToleranceType"),
+        ("drill", "metadata", "ToleranceType"),
+        ("drill", "length", "Precision"),
+    ],
+)
+def test_bracket_depth_callout_rejects_ignored_native_setters(
+    bracket_depth_callout, member, interface, setter,
+) -> None:
+    case = bracket_depth_callout
+    target = getattr(getattr(case, member), interface)
+    target.ignored.add(setter)
+    with pytest.raises(RuntimeError):
+        case.dress()
+    assert any(name == setter for name, _value in target.writes)
+
+
+@pytest.mark.parametrize("band", [(-0.51, 0.40), (-0.40, 0.40)])
+def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
+    monkeypatch, bracket_depth_callout, band,
+) -> None:
+    monkeypatch.setattr(drawing, "DRILL_DEPTH_DEVIATIONS", band)
+    with pytest.raises(RuntimeError):
+        bracket_depth_callout.dress()
+
+
+def test_rib_added_area_matches_independent_cross_section_integration() -> None:
+    """Integrate profile minus the existing cylinder/plate/pad union by strips.
+
+    Midpoint strips avoid the production circle-lens and pad-area formulae.
+    The 0.002 mm² allowance covers quadrature at the curved boundary and
+    rectangle edges, but resolves either overlap term being omitted.
+    """
+    part = lever_build
+    strip_count = 40_000
+    dx = (part.ARC_R + part.RIB_PLATE_REACH) / strip_count
+    area = 0.0
+    for index in range(strip_count):
+        x = -part.ARC_R + (index + 0.5) * dx
+        half_height = (
+            math.sqrt(part.ARC_R**2 - x**2) if x < 0
+            else part.ARC_R * (1 - x / part.PLATE_W)
+        )
+        occupied_low = occupied_high = 0.0
+        if abs(x) < part.CYL_R:
+            occupied_high = math.sqrt(part.CYL_R**2 - x**2)
+            occupied_low = -occupied_high
+        if 0 <= x <= part.PLATE_W:
+            occupied_low = min(occupied_low, -part.PLATE_T / 2)
+            occupied_high = max(occupied_high, part.PLATE_T / 2)
+        if part.PLATE_W - part.SPRING_PAD_W <= x <= part.PLATE_W:
+            occupied_low = min(occupied_low, part.PLATE_T / 2 - part.SPRING_SEAT_T)
+        # Every existing interval contains y=0, so their union has no gaps.
+        covered = max(0.0, min(half_height, occupied_high) - max(-half_height, occupied_low))
+        area += (2 * half_height - covered) * dx
+    assert part.edge_rib_added_area_mm2() == pytest.approx(area, abs=0.002)
+
+
+@pytest.mark.asyncio
+async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch) -> None:
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
+    part = lever_build
+    calls, volumes = [], []
+    events = []
+    state = SimpleNamespace(volume=1000.0)
+
+    async def success(*args, **kwargs):
+        return AdapterResult(status=AdapterResultStatus.SUCCESS, data="entity")
+
+    async def arc(*args):
+        return "arc", None, None
+
+    async def measured(*args):
+        events.append("measure")
+        return state.volume
+
+    def extrude(adapter, depth, offset, **kwargs):
+        events.append("extrude")
+        calls.append((depth, offset, kwargs))
+        state.volume += 17.0 * depth
+
+    async def volume_check(adapter, label, expected, tolerance):
+        events.append("check")
+        volumes.append((label, expected, tolerance))
+
+    class SketchDims:
+        def record(self, *args):
+            pass
+
+        def apply(self, *args):
+            return []
+
+    adapter = SimpleNamespace(**{
+        name: success for name in (
+            "create_sketch", "add_line", "add_sketch_constraint",
+            "add_sketch_dimension", "exit_sketch",
+        )
+    })
+    monkeypatch.setattr(part, "SketchDims", SketchDims)
+    monkeypatch.setattr(part, "_three_point_arc", arc)
+    monkeypatch.setattr(part, "_measured_volume", measured)
+    monkeypatch.setattr(part, "force_rebuild", success)
+    monkeypatch.setattr(part, "volume_check", volume_check)
+    for name in ("anchor_point_to_origin", "dimension_between", "ensure_fully_defined"):
+        monkeypatch.setattr(part, name, success)
+    monkeypatch.setattr(part, "set_sketch_direct_db", lambda *args: None)
+    monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
+    monkeypatch.setattr(part, "name_dimensions", lambda *args: ["front thickness"])
+    monkeypatch.setattr(part, "extrude_at_offset", extrude)
+    jobs = []
+    await part._edge_rib(adapter, True, "receiver", "EdgeRibBack", jobs)
+    await part._edge_rib(adapter, False, "opposite", "EdgeRibFront", jobs)
+    assert len(calls) == 2
+    for (depth, offset, _), expected in zip(calls, ((8.2, 68.0), (5.08, 71.12)), strict=True):
+        assert (depth, offset) == pytest.approx(expected)
+    assert [kwargs for _, _, kwargs in calls] == [{"flip": True}, {}]
+    assert -calls[0][1] - calls[0][0] == pytest.approx(-76.2)
+    assert calls[1][1] + calls[1][0] == pytest.approx(76.2)
+    area = part.edge_rib_added_area_mm2()
+    assert area > 0
+    baselines = [1000.0, 1000.0 + 17.0 * 8.2]
+    assert [value - baseline for (_, value, _), baseline in zip(volumes, baselines, strict=True)] == pytest.approx(
+        [area * 8.2, area * 5.08]
+    )
+    assert events == ["measure", "extrude", "check", "measure", "extrude", "check"]
+    assert jobs == [("front thickness", '"RibT"')]
+
+
+@pytest.mark.parametrize(
+    "damage",
+    (
+        None, "outer-caps-absent", "missing", "empty", "receiver-entry",
+        "receiver-inner", "opposite-inner", "extra", "receiver-depth",
+        "opposite-depth", "missing-depth",
+    ),
+)
+def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) -> None:
+    def face(z):
+        surface = SimpleNamespace(
+            IsPlane=lambda: True, PlaneParams=(0.0, 0.0, 1.0, 0.0, 0.0, z / 1000.0),
+        )
+        return SimpleNamespace(GetSurface=lambda: surface)
+
+    planes = {"EdgeRibBack": [-76.2, -68.0], "EdgeRibFront": [71.12, 76.2]}
+    depths = {"EdgeRibBack": 8.2, "EdgeRibFront": 5.08}
+    if damage == "outer-caps-absent":
+        planes = {"EdgeRibBack": [-68.0], "EdgeRibFront": [71.12]}
+    elif damage == "receiver-depth":
+        depths["EdgeRibBack"] = 7.3
+    elif damage == "opposite-depth":
+        depths["EdgeRibFront"] = 8.2
+    elif damage == "receiver-entry":
+        planes["EdgeRibBack"][0] -= 0.9
+    elif damage == "receiver-inner":
+        planes["EdgeRibBack"][1] = -68.9
+    elif damage == "opposite-inner":
+        planes["EdgeRibFront"][0] = 68.0
+    elif damage == "extra":
+        planes["EdgeRibBack"].append(-70.0)
+    elif damage == "empty":
+        planes["EdgeRibBack"] = []
+
+    def feature(name, values):
+        expected_parameter = "RibDepth" if name == "EdgeRibBack" else "EdgeRibThickness"
+
+        def parameter(parameter_name):
+            assert parameter_name == expected_parameter
+            if damage == "missing-depth" and name == "EdgeRibBack":
+                return None
+            return SimpleNamespace(SystemValue=depths[name] / 1000.0)
+
+        return SimpleNamespace(
+            GetFaces=lambda: tuple(face(z) for z in values),
+            Parameter=parameter,
+        )
+
+    features = {name: feature(name, values) for name, values in planes.items()}
+    if damage == "missing":
+        del features["EdgeRibBack"]
+    monkeypatch.setattr(lever_build, "_early_bound", lambda value, _kind: value)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
+    if damage in (None, "outer-caps-absent"):
+        lever_build._assert_edge_rib_end_planes(adapter)
+    else:
+        with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront"):
+            lever_build._assert_edge_rib_end_planes(adapter)
+
+
 def test_receiver_row_sits_inside_the_end_rib_height() -> None:
     """The row is located from the plate top, which the plate's title-block
     thickness band moves by half that band about the rib's mid-plane; both
@@ -917,7 +1254,7 @@ def test_receiver_row_sits_inside_the_end_rib_height() -> None:
         - joint.LINEAR_BAND / 2.0
     )
     wall = rib_half_min - row_offset_max - drill_radius_max - joint.DRILL_WANDER_MAX
-    assert wall == pytest.approx(3.18390, abs=1e-5)
+    assert wall == pytest.approx(3.17940, abs=1e-5)
     assert wall >= 2.0
 
 
