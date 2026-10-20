@@ -3197,6 +3197,21 @@ def _settled_native_records(*, r17=False):
     return [root, *references, note, *_under_head_native_records()]
 
 
+def _settled_native_record(records, role):
+    """Select one synthetic fixture role, independent of annotation order.
+
+    The thread note's native item name is opaque; select its note carrier,
+    not its mutable text, so wrong-text and duplicate tests retain their
+    original negative behavior.
+    """
+    if role == "ThreadNote":
+        matches = [record for record in records if record.get("type") == 6 and "note" in record]
+    else:
+        matches = [record for record in records if record.get("name") == role]
+    assert len(matches) == 1, f"settled fixture role {role!r}: expected one carrier, got {len(matches)}"
+    return matches[0]
+
+
 def test_fitted_span_reuses_native_model_carrier_and_all_three_reference_guards():
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
@@ -3261,7 +3276,7 @@ def test_r17_root_contact_and_both_tip_reference_crossings_collect_in_one_refusa
             assert f"ThreadNote/{inventory} vs {reference}: tip-leader/reference-witness crossing" in message
     assert "missing" not in message and "malformed" not in message
     assert "outside inner border" not in message
-    actual = records[-1]["display"]["lines"][1]
+    actual = _settled_native_record(records, "ThreadNote")["display"]["lines"][1]
     crossing_y = actual[5] + (0.0595 - actual[4]) * (actual[8] - actual[5]) / (actual[7] - actual[4])
     assert crossing_y == pytest.approx(0.186048, abs=0.000001)
 
@@ -3269,7 +3284,7 @@ def test_r17_root_contact_and_both_tip_reference_crossings_collect_in_one_refusa
 def test_synthetic_gap_route_and_shifted_native_metric_text_pass_required_settlement():
     records = _settled_native_records()
     drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
-    root = records[0]["display"]["texts"][0]
+    root = _settled_native_record(records, "ReliefDia")["display"]["texts"][0]
     box = drawing._layout_audit.display_box({"texts": [root]})
     assert box.ymin == pytest.approx(0.0684719)
     assert drawing._relief_lower_thread_profile()[0][1] - box.ymax == pytest.approx(0.0032468)
@@ -3281,8 +3296,8 @@ def test_synthetic_gap_route_and_shifted_native_metric_text_pass_required_settle
 @pytest.mark.parametrize("count", [0, 2])
 def test_required_settled_inventories_refuse_missing_or_duplicate_annotations(name, count):
     records = _settled_native_records()
-    index = {"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]
-    annotation = records.pop(index)
+    annotation = _settled_native_record(records, name)
+    records.remove(annotation)
     records.extend([annotation] * count)
     with pytest.raises(RuntimeError, match=f"{name}: expected one settled native annotation; count={count}"):
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
@@ -3294,14 +3309,15 @@ def test_required_settled_inventories_refuse_missing_or_duplicate_annotations(na
 ])
 def test_settled_tip_note_only_normalizes_crlf_not_wrong_text(text):
     records = _settled_native_records()
-    records[-1]["note"]["text"] = text
+    _settled_native_record(records, "ThreadNote")["note"]["text"] = text
     with pytest.raises(RuntimeError, match="ThreadNote: expected one settled native annotation; count=0"):
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
 
 
 def test_settled_tip_note_rejects_mixed_lf_crlf_duplicate():
     records = _settled_native_records()
-    records.append({**records[-1], "note": {**records[-1]["note"], "text": drawing.THREAD_NOTE_TEXT}})
+    note = _settled_native_record(records, "ThreadNote")
+    records.append({**note, "note": {**note["note"], "text": drawing.THREAD_NOTE_TEXT}})
     with pytest.raises(RuntimeError, match="ThreadNote: expected one settled native annotation; count=2"):
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
 
@@ -3313,7 +3329,7 @@ def test_settled_tip_note_rejects_mixed_lf_crlf_duplicate():
 @pytest.mark.parametrize("bad", [None, [], 42, [None], [[math.nan] * 10]])
 def test_required_native_ink_refuses_malformed_empty_or_missing_data_without_fallback(name, kind, bad):
     records = _settled_native_records()
-    annotation = records[{"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]]
+    annotation = _settled_native_record(records, name)
     target = annotation if kind == "leaders" else annotation["display"]
     if bad is None:
         target.pop(kind)
@@ -3327,7 +3343,7 @@ def test_required_native_ink_refuses_malformed_empty_or_missing_data_without_fal
 
 def test_tip_arrow_outline_is_checked_even_when_both_native_leader_routes_miss():
     records = _settled_native_records()
-    records[-1]["display"]["arrows"] = [
+    _settled_native_record(records, "ThreadNote")["display"]["arrows"] = [
         [0.0596, 0.1885, 0, -1, 0, 0, 0.003556, 0.000762, 1, 0, 0, 1]
     ]
     with pytest.raises(RuntimeError) as caught:
@@ -3340,8 +3356,8 @@ def test_tip_arrow_outline_is_checked_even_when_both_native_leader_routes_miss()
 
 def test_required_settlement_collects_malformed_text_routes_border_and_foreign_pairs_together():
     records = _settled_native_records(r17=True)
-    records[0]["display"]["texts"].append({**_r17_root_text(), "w": math.nan})
-    records[-1]["leaders"].append([math.nan] * 6)
+    _settled_native_record(records, "ReliefDia")["display"]["texts"].append({**_r17_root_text(), "w": math.nan})
+    _settled_native_record(records, "ThreadNote")["leaders"].append([math.nan] * 6)
     groups = _approved_detail_ink()
     groups["ReliefLead"].append(groups["SeatEdgeBreak"][0])
     records.append(_ink_annotation("off border", lines=[_actual_line((0.1, 0.1), (0.001, 0.1))]))
@@ -3377,8 +3393,8 @@ def test_production_settled_callback_collects_required_native_records_without_ne
     records = _settled_native_records(r17=fault == "r17")
     if fault != "r17":
         action, name = fault.split("-", 1)
-        index = {"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]
-        annotation = records.pop(index)
+        annotation = _settled_native_record(records, name)
+        records.remove(annotation)
         records.extend([annotation] * (2 if action == "duplicate" else 0))
 
     class View:
@@ -3424,10 +3440,10 @@ def test_production_settled_callback_collects_required_native_records_without_ne
         assert f"{name}: expected one settled native annotation; count={count}" in message
 
 
-@pytest.mark.parametrize("index", [1, 2], ids=["63", "67"])
-def test_required_reference_inventory_refuses_a_missing_witness_not_just_empty_lines(index):
+@pytest.mark.parametrize("name", ["UnderHeadLocation", "OverallLength"], ids=["63", "67"])
+def test_required_reference_inventory_refuses_a_missing_witness_not_just_empty_lines(name):
     records = _settled_native_records()
-    annotation = records[index]
+    annotation = _settled_native_record(records, name)
     del annotation["display"]["lines"][0]
     with pytest.raises(RuntimeError, match=f"{annotation['name']}: expected two actual reference witnesses"):
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
@@ -3435,7 +3451,7 @@ def test_required_reference_inventory_refuses_a_missing_witness_not_just_empty_l
 
 def test_settled_unreadable_text_reference_keeps_all_other_native_offenders():
     records = _settled_native_records(r17=True)
-    records[0]["display"]["texts"].append({**_r17_root_text(), "ref": "unreadable"})
+    _settled_native_record(records, "ReliefDia")["display"]["texts"].append({**_r17_root_text(), "ref": "unreadable"})
     with pytest.raises(RuntimeError) as caught:
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
     message = str(caught.value)
@@ -3532,12 +3548,23 @@ def test_option2_imported_boundary_mutations_fail_the_independent_screw_guard(mo
     ("HEAD_DIA_TOL = 0.10", "HEAD_DIA_TOL = 0.11"),
     ("SHOULDER_DIA_BAND = (-0.03, -0.08)", "SHOULDER_DIA_BAND = (-0.03, -0.09)"),
 ])
-def test_option2_actual_screw_minima_cannot_be_replaced_by_acceptance_constants(previous, replacement):
+def test_option2_actual_screw_minima_cannot_be_replaced_by_acceptance_constants(monkeypatch, previous, replacement):
     source = Path(spec.__file__).read_text(encoding="utf-8")
     assert source.count(previous) == 1
+    probe = source.replace(previous, replacement)
+    if previous == "HEAD_DIA_TOL = 0.10":
+        # Widening the head band first violates the existing cup-wall floor.
+        # Preserve that refusal, then grow only this hypothetical cup's body
+        # by the same .01 so the independent head-minimum guard is reachable.
+        with pytest.raises(AssertionError, match="pocket bored to suit the largest head leaves under its 1.5 wall"):
+            exec(compile(probe, spec.__file__, "exec"), {"__name__": "_option2_head_wall_prerequisite"})
+        monkeypatch.setattr(cup, "BODY_DIA", round(cup.BODY_DIA + 0.01, 6))
+        candidate_pocket_max = spec.HEAD_DIA + 0.11 + cup.POCKET_CLEARANCE[1]
+        candidate_wall_min = round(((cup.BODY_DIA - cup.BODY_DIA_TOL) - candidate_pocket_max) / 2.0, 6)
+        assert candidate_wall_min >= cup.POCKET_WALL_FLOOR_MM
+        assert cup.BODY_DIA + cup.BODY_DIA_TOL < cup.STOCK_DIA - 0.2
     with pytest.raises(AssertionError, match="actual head/shoulder minima violate"):
-        exec(compile(source.replace(previous, replacement), spec.__file__, "exec"),
-             {"__name__": "_option2_actual_inputs_probe"})
+        exec(compile(probe, spec.__file__, "exec"), {"__name__": "_option2_actual_inputs_probe"})
 
 
 @pytest.mark.asyncio
@@ -3782,10 +3809,10 @@ def test_option2_actual_metric_text_requires_three_mm_from_foreign_native_witnes
 
 def test_option2_actual_corridors_collect_malformed_and_all_simultaneous_old_and_new_failures():
     records = _settled_native_records(r17=True)
-    for record in records[4:]:
-        record["display"]["lines"] = [_actual_line((0.2, 0.20), (0.2, 0.22))]
-    records[4]["display"]["texts"].append({**_actual_text(), "w": math.nan})
-    records[5]["display"]["arrows"] = []
+    for name in (*drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS):
+        _settled_native_record(records, name)["display"]["lines"] = [_actual_line((0.2, 0.20), (0.2, 0.22))]
+    _settled_native_record(records, "UnderHeadCornerRadius")["display"]["texts"].append({**_actual_text(), "w": math.nan})
+    _settled_native_record(records, "HeadOuterChamfer")["display"]["arrows"] = []
     with pytest.raises(RuntimeError) as caught:
         drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
     message = str(caught.value)
@@ -3989,3 +4016,18 @@ def test_option2_model_nominal_and_native_band_cannot_diverge_from_proved_chamfe
     with pytest.raises(AssertionError, match="invalid outer under-head chamfer range"):
         exec(compile(source.replace(previous, replacement), spec.__file__, "exec"),
              {"__name__": "_option2_actual_chamfer_probe"})
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_settled_native_fixture_roles_do_not_depend_on_annotation_order(reverse):
+    records = _settled_native_records()
+    if reverse:
+        records.reverse()
+    for role in ("ReliefDia", "UnderHeadLocation", "OverallLength",
+                 *drawing.UNDER_HEAD_DIMENSIONS, *drawing.UNDER_HEAD_FOREIGN_DIMENSIONS):
+        assert _settled_native_record(records, role)["name"] == role
+    note = _settled_native_record(records, "ThreadNote")
+    assert note["type"] == 6
+    assert note["note"]["text"] == drawing.THREAD_NOTE_TEXT.replace("\n", "\r\n")
+    assert len(note["display"]["lines"]) == 2
+    assert note["leaders"]

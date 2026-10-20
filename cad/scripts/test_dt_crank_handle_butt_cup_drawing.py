@@ -828,7 +828,10 @@ def test_model_mouth_chamfer_sets_and_reads_native_two_place_limit(monkeypatch) 
     part._floor_hole_mouth_chamfer_limit(adapter)
     named.assert_called_once_with(adapter, "CupProfile", "FloorHoleMouthChamfer")
     assert dimension.Tolerance.Type == 3
-    dimension.Tolerance.SetValues.assert_called_once_with(-0.00014, 0.0)
+    dimension.Tolerance.SetValues.assert_called_once()
+    assert dimension.Tolerance.SetValues.call_args.args == pytest.approx(
+        (-0.00014, 0.0), rel=0.0, abs=1e-12
+    )
     display.SetPrecision3.assert_called_once_with(-1, -1, 2, -1)
 
 
@@ -1164,7 +1167,10 @@ def test_drawing_transfers_only_the_new_model_leg_and_runs_settled_guards(monkey
     display = SimpleNamespace(SetText=MagicMock())
     imported = [SimpleNamespace(name=name) for name in drawing.ALL_KEEP]
     moved = SimpleNamespace(name="FloorHoleMouthChamfer", GetSpecificAnnotation=lambda: display)
-    adapter = SimpleNamespace(currentModel=object(), open_model=AsyncMock(return_value=SimpleNamespace(is_success=True)))
+    adapter = SimpleNamespace(
+        currentModel=object(),
+        open_model=AsyncMock(return_value=SimpleNamespace(is_success=True, data=None)),
+    )
     monkeypatch.setattr(drawing, "SOURCE", source)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
