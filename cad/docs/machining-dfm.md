@@ -181,6 +181,14 @@ states that the near and far casting walls are threaded **in phase for
 MHA-FR-VN-53**. The requirement travels with the feature, not a detached A-A
 note; the Hole Wizard still owns the thread and tap-drill depths.
 
+The A-A cap-recess-depth callout retains its full **MHA-FR-VN-54** skirt
+mate, three qualifier rows and **16.30 +0.3/0.0 mm** band. Its native sheet
+anchor is **(382, 158) mm**, 4 mm left of the former placement, with the
+same boss-face and recess-floor attachments. The longer parent-scoped name
+left only **0.21 mm** between the underline and border strokes at the old
+anchor. The shift projects **4.21 mm** of border air; regenerated native
+ink must still verify that gap and the neighbouring boss-height callouts.
+
 The top-frame's live view identifiers are **H-H** (front/rear rail section),
 **DETAIL J** (underside hub enlargement), **K-K** (set-screw boss section)
 and **DETAIL L** (front-slot radius-centre enlargement).
@@ -204,8 +212,8 @@ and is created before the locator's authored annotations; native inspection
 must still rule out copied controls. Its outside arrows, outboard text and
 native linked caption, and the renamed letters/captions, need native
 clearance inspection rather than extrapolated historical glyph measurements.
-Only the Bottom view note moves, 4 mm up, to reserve L's caption lane;
-the six-sheet layout and existing control positions remain unchanged.
+On UNDERSIDE, only the Bottom view note moves, 4 mm up, to reserve L's caption
+lane; the six-sheet layout and F-F control positions remain unchanged.
 
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
 (west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores

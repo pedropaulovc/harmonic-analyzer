@@ -1079,7 +1079,9 @@ DETAIL_SECTION_KEEP = {
     # The recess depth reads beside its own band, not under it: the column
     # below belongs to the 47.3 boss height, whose three-line text is 37 mm
     # wide and has nowhere else to sit on this sheet.
-    "CapRecessDepth": (0.386, 0.158),
+    # The full parent-scoped cap number left only 0.21 mm stroke-to-stroke
+    # at x386 in the native PDF; move left without shortening the mate.
+    "CapRecessDepth": (0.382, 0.158),
 }
 DETAIL_CALLOUTS = {
     "C0Dia": "4X BOSS",
