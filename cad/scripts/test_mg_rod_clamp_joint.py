@@ -84,10 +84,11 @@ def test_rod_tap_floor_leaves_two_millimetres_under_the_lever_bore() -> None:
 
 
 def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
-    top_to_bore_min = clamp.TOP_TO_BORE - 2.0 * 0.51
-    thread = top_to_bore_min - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - 0.25 - clamp.BORE_WANDER
-    assert clamp.THUMB_ENGAGEMENT_WORST == pytest.approx(thread)
-    assert thread >= 1.5 * _D
+    # Female wall alone is NOT installed FULL overlap: the stock screw's
+    # chamfered male end starts above its contact with the lever.
+    female_wall = clamp.TOP_TO_BORE - 2.0 * 0.51 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - 0.25 - clamp.BORE_WANDER
+    assert clamp.THUMB_ENGAGEMENT_WORST < female_wall
+    assert clamp.THUMB_ENGAGEMENT_WORST >= 1.5 * _D
     assert clamp.THUMB_TAP_SPEC.size == joint.ROD_TAP_SPEC.size
     assert clamp.THUMB_TAP_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(clamp.TOP_TO_BORE - clamp.LEVER_BORE_DIA / 2.0)
 
@@ -95,12 +96,12 @@ def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
 def test_hex_stock_and_extent_along_the_lever() -> None:
     assert clamp.HEX_AF == pytest.approx(7.0 / 16.0 * _IN)
     assert clamp.BLOCK_DEPTH == pytest.approx(clamp.HEX_AF * 2.0 / math.sqrt(3.0))
-    # The bore centred between the flats by symmetry: its far wall on the
-    # thinnest stock at the largest drilled Ø, off centre by the drill's
-    # wander to mid-block, holds the 2.0 target.
-    wander = 0.10 + clamp.HEX_AC / 2.0 * math.tan(math.radians(0.3))
+    # Spend wander through the entire maximum-stock drilling depth: the
+    # exit-side flats extend past the central tap/floor section.
+    depth_max = (clamp.HEX_AF + clamp.HEX_AF_BAND) * 2.0 / math.sqrt(3.0)
+    wander = 0.10 + depth_max * math.tan(math.radians(0.3))
     far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) / 2.0 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - wander
-    assert far_wall == pytest.approx(2.0577, abs=1e-4)
+    assert wander == pytest.approx(clamp.BORE_FULL_WANDER)
     assert far_wall >= 2.0
 
 

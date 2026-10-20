@@ -59,7 +59,7 @@ async def build_thumb_screw(adapter, s: dict[str, float]):
     head_r, head_h = s["head_r"], s["head_h"]
     h_sharp = pitch * math.sqrt(3.0) / 2.0
     root_r = major_r - 0.75 * h_sharp
-    tip_ch = pitch * 0.75
+    tip_ch = s.get("tip_chamfer", pitch * 0.75)
     tip_y = -length
     head_top = collar_h + head_h
     ch2 = head_h / 10.0

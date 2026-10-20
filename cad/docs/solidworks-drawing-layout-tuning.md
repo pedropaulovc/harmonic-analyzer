@@ -996,7 +996,9 @@ Use current-main axis-to-seat **100.3975878**, not the superseded 55.1876
 sketch; preserve the 3.175 stock mounting grip at its native `.XXX` ±0.13.
 The foot's right face merges flush with the centred 12.50 ±0.10 neck.
 Native mounting dimensions stay attached to their witness sketch, imported
-on the visible mounting face; the Hole Wizard callout attaches to its real rim.
+on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
+the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
+lookups bind `IPartDoc`: `IModelDoc2` does not declare `FeatureByName`.
 
 The through tap's ordinary locations are 5.50 ±0.05 from the physical nose tip
 and neck side. These are not zero datum dimensions and not a GD&T frame.
@@ -1019,6 +1021,27 @@ specifies installation depth: the flat tip reaches through the far face,
 with no shoulder or added relief groove. Full engaged overlap excludes
 mouth chamfers, incomplete male thread at both ends, and root runout.
 There is no press-fit force/finish/elastic-yield contract or added lock.
+
+The dependent MHA-MG-02 clamp keeps its bore at 19.95 from the bottom seat and
+grows only its overall height to **29.50**; neither `.XX` ±0.51 band tightens.
+The hook stays at 919.7. Spend 0.10 + 0.3° drill run-off over maximum-stock
+half depth at the central tap/floor, and conservatively over complete maximum
+corner-to-corner depth at exit-side flats and loaded contact. The resulting
+whole-flat and rod-tap floor lower bounds are **2.023277** and **2.036697**.
+Do not mistake available female wall for installed FULL engagement. Intersect
+male and female full-profile intervals, excluding the actual stock screw's
+**0.47625** tip chamfer and the top mouth break. Bound the finite flat-tip
+contact by the bore envelope, even for a diagonal/tilted rod; the conservative
+1° general-angle + 0.3° run-off contact allowance is not a newly tightened
+manufacturing tolerance. The guaranteed modeled intersection is **4.313456**
+against 1.5D = 4.2675, with **3.373677** minimum axial collar clearance.
+The 29.20 alternative's centreline-only 0.0023 margin is not a 3D contact proof.
+
+Clamp travel remains a nominal setting range under the existing fit-up waiver,
+not a tolerance-safe endpoint or positive stop. Keep the entire bore clear of
+the **as-made** incomplete runout/thread. Accepted shortest-rod/longest-thread
+dimensions move the nominal runout boundary X149.50 to X148.19; such parts have
+less usable travel. Native minimum-pose/kinematics closure is still required.
 
 The retention and wall checks are not a brass strength certification. Wire
 force below the lever produces bending even though there is no torque about

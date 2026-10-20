@@ -288,8 +288,8 @@ _FRAME_ALLOWED_PAIRS = {
 _MG_LEVER_THREAD_TRIPLE_MM = (6.35, 5.105, 12.5)
 _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
 # #1559 clamp (MHA-MG-02): the 91882A221 #4-40 shank in the thumb tap's
-# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 5.75).
-_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.75)
+# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 6.30).
+_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 6.3)
 # The vertical rod's #4-40 end (modelled at the 2.845 major) in the clamp's
 # bottom-face Ø2.261 tap drill. Envelope 6.0 = ROD_THREAD_LEN - RELIEF_WIDTH:
 # the full-major section from the tip to the relief, which also covers the tip

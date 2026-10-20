@@ -1359,7 +1359,7 @@ sections:
         - scaled + engineered joint
         - low (photo length); high (specified joint)
       - - Clamp block
-        - 'Vertical 7/16 in hex brass, AF11.1125 ±0.13, across corners12.832, overall28.95 and lever bore height19.95 from the bottom seat, both .XX ±0.51. Ø6.50 +0.10/0 drilled bore through corners; start0.10 plus angular0.3 degree wander included in every direction. Minimum bore-to-flat wall2.057657, bottom-tap floor2.037090 and thumb full engagement4.296407 ≥1.5D4.2675. Top-to-bore9 nominal; thumb tap5.75 REF thread,9 drill. Bottom rod tap unchanged:8.55 thread/12.75 drill. Rod top967.25 and fixture47.55 from tip preserve the installed hook at919.7.'
+        - 'Vertical 7/16 in hex brass, AF11.1125 ±0.13, across corners12.832, overall29.50 and lever bore height19.95 from the bottom seat, both .XX ±0.51. Ø6.50 +0.10/0 drilled bore through corners; start0.10 plus angular0.3 degree wander, using maximum-stock half depth at the central tap/floor and full depth at exit-side flats/loaded contact. Conservative minimum bore-to-flat wall2.023277, bottom-tap floor2.036697 and actual installed male/female FULL overlap4.313456 ≥1.5D4.2675. Thumb calculation includes production screw tip chamfer0.47625, finite flat-tip contact and conservative1.3 degree angle allowance; collar clearance3.373677 minimum. Top-to-bore9.55 nominal; thumb tap6.30 REF thread,9.55 drill. Bottom rod tap unchanged:8.55 thread/12.75 drill. Rod top967.25 and fixture47.55 from tip preserve installed hook919.7.'
         - —
         - 'p.48 close-up; owner ruling #1559 (hex block, coaxial thumb screw and rod); cad/scripts/mg_magnifying_clamp_geom.py'
         - scaled + engineered joint

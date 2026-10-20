@@ -23,6 +23,7 @@ from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
     BORE_WANDER,
+    BORE_FULL_WANDER,
     DRILL_WANDER_MAX,
     DRILL_WANDER_DEG,
     EDGE_BREAK,
@@ -83,9 +84,8 @@ def _wander(depth_mm: float) -> float:
 
 
 # --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) --
-# The lever bore is centred between the flats by symmetry, so its axis stands
-# off the hex axis only by the drill's run-off over its half-length to the
-# middle of the block.
+# The central tap/floor use midpoint run-off. A flat extends beyond that
+# section, so its wall conservatively spends complete-depth run-off instead.
 BORE_OFFSET_MAX = BORE_WANDER
 # (nominal, worst).  The bore to a flat: its largest drilled Ø on the thinnest
 # stock, off centre by its wander.  The taps run on the hex axis: their thread
@@ -95,7 +95,7 @@ BORE_OFFSET_MAX = BORE_WANDER
 WALLS: dict[str, tuple[float, float]] = {
     "lever bore to a flat": (
         (HEX_AF - LEVER_BORE_DIA) / 2.0,
-        _THIN_HALF_AF - _LEVER_BORE_R_MAX - BORE_WANDER,
+        _THIN_HALF_AF - _LEVER_BORE_R_MAX - BORE_FULL_WANDER,
     ),
     "rod-tap drill point to the lever bore": (
         LEVER_BORE_Y
