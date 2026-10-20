@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
 
 import _farm  # noqa: E402
 import build  # noqa: E402
+import _machinist_review_settings as review_settings  # noqa: E402
 
 _RealFarmDoitMain = build._FarmDoitMain
 _RealRefreshDoitMain = build._RefreshDoitMain
@@ -2637,3 +2638,89 @@ def test_check_pytest_process_does_not_apply_its_builds_refresh_carrier():
         timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_build_selection_is_canonical_before_graph_inspection_and_inherited_by_child(monkeypatch):
+    inherited = '{"untrusted":"ambient selection"}'
+    monkeypatch.setenv(review_settings.SETTINGS_ENV, inherited)
+    selected = review_settings.resolve_settings(
+        reviewer="codex", model="gpt-6-astra", effort="high",
+        judge_reviewer="codex", judge_model="gpt-6-astra", judge_effort="high",
+    )
+    observed = []
+    forwarded = []
+
+    class FixtureDoit:
+        def run(self, arguments):
+            forwarded.append(arguments)
+            result = subprocess.run(
+                [sys.executable, "-c", "import os; print(os.environ['HARMONIC_MACHINIST_REVIEW_SETTINGS'])"],
+                capture_output=True, text=True, check=True, timeout=10,
+            )
+            observed.append(result.stdout.strip())
+            return 0
+
+    def inspect_graph(_arguments, _doit):
+        observed.append(os.environ[review_settings.SETTINGS_ENV])
+        return None
+
+    monkeypatch.setattr(build, "DoitMain", FixtureDoit)
+    monkeypatch.setattr(build, "_executing_command", inspect_graph)
+    monkeypatch.setattr(build, "_release_refusal", lambda *_args: None)
+    options = [
+        "--machinist-" + field.replace("_", "-") + "=" + getattr(selected, field)
+        for field in review_settings.SETTING_FIELDS
+    ]
+    assert build.main(["--executor", "local", *options, "list", "--all"]) == 0
+    assert observed == [selected.canonical(), selected.canonical()]
+    assert forwarded == [["list", "--all"]]
+    assert os.environ[review_settings.SETTINGS_ENV] == inherited
+    observed.clear()
+    assert build.main(["--executor", "local", "list"]) == 0
+    assert observed == [review_settings.resolve_settings().canonical()] * 2
+    assert os.environ[review_settings.SETTINGS_ENV] == inherited
+
+
+@pytest.mark.parametrize("previous", [None, "previous-value"])
+@pytest.mark.parametrize("outcome", ["success", "help", "refusal", "exception"])
+def test_build_restores_selection_carrier_on_every_graph_boundary(monkeypatch, previous, outcome):
+    if previous is None:
+        monkeypatch.delenv(review_settings.SETTINGS_ENV, raising=False)
+    else:
+        monkeypatch.setenv(review_settings.SETTINGS_ENV, previous)
+    seen = []
+
+    class FixtureDoit:
+        def run(self, _arguments):
+            seen.append(os.environ[review_settings.SETTINGS_ENV])
+            if outcome == "exception":
+                raise RuntimeError("fixture graph failure")
+            return 0
+
+    monkeypatch.setattr(build, "DoitMain", FixtureDoit)
+    monkeypatch.setattr(build, "_executing_command", lambda *_args: None)
+    monkeypatch.setattr(
+        build, "_release_refusal",
+        lambda *_args: "fixture refusal" if outcome == "refusal" else None,
+    )
+    arguments = ["--executor", "local", "--machinist-reviewer", "codex"]
+    arguments += ["--help"] if outcome == "help" else ["list"]
+    if outcome == "exception":
+        with pytest.raises(RuntimeError, match="fixture graph failure"):
+            build.main(arguments)
+    else:
+        assert build.main(arguments) == (2 if outcome == "refusal" else 0)
+    assert os.environ.get(review_settings.SETTINGS_ENV) == previous
+    assert all(review_settings.from_carrier(value).reviewer == "codex" for value in seen)
+
+
+@pytest.mark.parametrize("field", review_settings.SETTING_FIELDS)
+def test_build_rejects_invalid_selection_before_any_graph_or_preflight(monkeypatch, field, capsys):
+    monkeypatch.setattr(
+        build, "_executing_command", lambda *_args: pytest.fail("invalid selection inspected graph"),
+    )
+    monkeypatch.setattr(
+        build, "_farm_preflight", lambda: pytest.fail("invalid selection reached farm"),
+    )
+    assert build.main(["--machinist-" + field.replace("_", "-") + "=", "build"]) == 2
+    assert field.replace("_", "-") in capsys.readouterr().err

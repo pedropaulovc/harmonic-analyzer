@@ -22,6 +22,7 @@ import pytest
 from mcp.server.fastmcp.exceptions import ToolError
 from PIL import Image, ImageDraw
 
+import _machinist_review_settings as review_settings
 import machinist_review as mr
 import machinist_review_sheets_mcp as sheets
 
@@ -1235,7 +1236,7 @@ def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None
     tails: dict[str, set[str]] = {}
     for package, sheet_count in packages:
         prefix = mr.load_prompt(package.kind)
-        for reviewer in mr.REVIEWERS:
+        for reviewer in review_settings.REVIEWERS:
             prompt = mr._review_prompt(package, sheet_count, reviewer=reviewer)
             assert prompt.startswith(prefix)
             tail = prompt[len(prefix) :]
@@ -1443,7 +1444,7 @@ def test_review_prompt_injects_declared_exceptions(
 # --- blind evidence ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_evidence_accepts_in_range_views_and_crops(reviewer: str) -> None:
     events = [
         *_views(reviewer, (1, 2, 3)),
@@ -1556,7 +1557,7 @@ _MALFORMED_CROPS: dict[str, tuple[Any, dict[str, Any]]] = {
 }
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 @pytest.mark.parametrize("case", sorted(_MALFORMED_VIEWS))
 def test_malformed_view_is_authorized_but_never_proves_a_sheet(
     reviewer: str, case: str
@@ -1574,7 +1575,7 @@ def test_malformed_view_is_authorized_but_never_proves_a_sheet(
     assert not evidence["inspection_proven"]
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_every_named_crop_call_counts_once_with_its_raw_arguments(
     reviewer: str,
 ) -> None:
@@ -1626,7 +1627,7 @@ def test_codex_started_and_completed_call_counts_once() -> None:
     assert evidence["tool_events"] == 1
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_inspection_requires_a_successful_image_view_of_every_sheet(
     reviewer: str,
 ) -> None:
@@ -2308,7 +2309,7 @@ def test_markdown_reports_crop_count_and_cache_read_share(
 # --- review runs -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -3303,7 +3304,7 @@ def test_codex_missing_rollout_after_session_start_fails_closed(
         assert review.extra["sheets_viewed"] == []
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_provider_failures_stay_blind_but_never_pass(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str
 ) -> None:
@@ -3877,7 +3878,7 @@ def _session_reply(
     )
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str,
 ) -> None:
@@ -3934,7 +3935,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     assert saved == aggregate
     assert (directory / "sample.aggregate.md").is_file()
     assert "sample.aggregate.md" in mr.write_index(directory).read_text(encoding="utf-8")
-    assert aggregate["judge"]["model"] == mr.DEFAULT_MODELS[reviewer]
+    assert aggregate["judge"]["model"] == review_settings.DEFAULT_MODELS[reviewer]
     assert aggregate["judge"]["prompt_sha256"]
 
 
@@ -3961,7 +3962,7 @@ def test_judge_rejects_incomplete_or_invalid_coverage(
         )
 
 
-@pytest.mark.parametrize("judge_reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("judge_reviewer", review_settings.REVIEWERS)
 def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, judge_reviewer: str,
 ) -> None:
@@ -4227,3 +4228,62 @@ def test_missing_source_still_writes_an_error_aggregate(
     assert "source snapshot failed" in aggregate["error"]
     assert (directory / "missing.aggregate.json").is_file()
     assert Path(aggregate["runs"][0]["report"]).is_file()
+
+
+def test_main_codex_selection_matches_every_reviewer_and_executed_judge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    selected = review_settings.resolve_settings(
+        reviewer="codex", model="gpt-6-astra", effort="high",
+        judge_reviewer="codex", judge_model="gpt-6-astra", judge_effort="high",
+    )
+    commands = []
+
+    def reply(command: list[str], **kwargs: Any):
+        commands.append(command)
+        assert command[command.index("-m") + 1] == "gpt-6-astra"
+        assert "model_reasoning_effort=high" in command
+        findings = _judge_inputs(kwargs["input"])
+        value = (
+            {"clusters": [_judge_cluster([finding["id"] for finding in findings])]}
+            if findings is not None else _finding_verdict()
+        )
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    monkeypatch.setattr(mr.shutil, "which", lambda _reviewer: "codex-test")
+    directory = tmp_path / "reports"
+    assert mr.main([
+        "--png", str(source), "--report-dir", str(directory), "--retries", "0",
+        *selected.cli_args(),
+    ]) == 1
+    name = mr._package_for_pngs([source], "part").name
+    aggregate = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
+    assert len(commands) == 4
+    assert len(aggregate["runs"]) == 3
+    assert aggregate["verdict"] == "FIX" and not aggregate["judge"]["skipped"]
+    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == (
+        "codex", "gpt-6-astra", "high",
+    )
+    assert {key: aggregate["judge"][key] for key in ("reviewer", "model", "effort")} == {
+        "reviewer": "codex", "model": "gpt-6-astra", "effort": "high",
+    }
+
+
+@pytest.mark.parametrize("field", review_settings.SETTING_FIELDS)
+def test_cli_rejects_empty_selection_before_review_sources(field, monkeypatch):
+    monkeypatch.setattr(
+        mr, "_package_for_pngs", lambda *_args: pytest.fail("invalid selection prepared sources"),
+    )
+    with pytest.raises(SystemExit) as failure:
+        mr.main(["--png", "absent.png", "--" + field.replace("_", "-"), ""])
+    assert failure.value.code == 2
+
+
+@pytest.mark.parametrize("entry", [mr._review_session, mr.aggregate_package])
+def test_programmatic_selection_is_validated_before_source_copy(entry, monkeypatch):
+    monkeypatch.setattr(mr, "_validate_package", lambda *_args: pytest.fail("invalid selection read source"))
+    monkeypatch.setattr(mr.shutil, "copyfile", lambda *_args: pytest.fail("invalid selection copied source"))
+    with pytest.raises(ValueError, match="effort"):
+        entry(mr.ReviewPackage("sample", "part", ()), reviewer="codex", effort="")

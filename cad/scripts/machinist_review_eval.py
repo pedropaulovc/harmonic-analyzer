@@ -57,6 +57,7 @@ import tempfile
 from typing import Any, Sequence
 
 import _telemetry as telemetry
+import _machinist_review_settings as review_settings
 import machinist_review as mr
 
 DEFAULT_CASES = mr.CAD_ROOT / "comparisons" / "bench" / "machinist_review" / "manifest.json"
@@ -726,7 +727,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     parser.add_argument("--report-dir", type=Path, required=True)
-    parser.add_argument("--reviewer", choices=mr.REVIEWERS, required=True)
+    parser.add_argument("--reviewer", choices=review_settings.REVIEWERS, required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--effort", required=True)
     parser.add_argument("--jobs", type=int, default=3)
