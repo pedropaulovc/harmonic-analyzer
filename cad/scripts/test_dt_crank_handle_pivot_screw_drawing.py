@@ -2734,6 +2734,8 @@ def relief_donor(monkeypatch):
         state.events.append(("curate",))
         if state.fault == "import":
             return []
+        if state.fault == "duplicate-import":
+            return [state.source, state.source]
         return [state.source]
 
     def delete(adapter, view):
@@ -2788,6 +2790,16 @@ def test_relief_donor_import_moves_only_true_circle_to_side_then_deletes(relief_
 def test_relief_donor_refuses_missing_import_before_move_or_deletion(relief_donor):
     state = relief_donor
     state.fault = "import"
+    with pytest.raises(
+        RuntimeError, match="^MHA-DT-032 relief diameter donor did not own exactly ReliefDia$"
+    ):
+        drawing.import_relief_diameter(state.adapter, state.side)
+    assert state.events == [("place", "*Front"), ("curate",)]
+
+
+def test_relief_donor_refuses_duplicate_import_before_move_or_deletion(relief_donor):
+    state = relief_donor
+    state.fault = "duplicate-import"
     with pytest.raises(
         RuntimeError, match="^MHA-DT-032 relief diameter donor did not own exactly ReliefDia$"
     ):
