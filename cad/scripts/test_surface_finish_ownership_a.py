@@ -86,7 +86,12 @@ CASES = (
                 SEAT_UM,
                 PlanarFace((0, 1, 0), dt_cone_swing_platform_spec.PLATE_THICKNESS),
             ),
-            SurfaceFinishControl("base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)),
+            SurfaceFinishControl(
+                "base_slide",
+                MACHINED_UM,
+                PlanarFace((0, -1, 0), 0.0),
+                production_method="SLIDING FACE",
+            ),
         ),
     ),
     (

@@ -54,12 +54,21 @@ PIVOT_BEARING_RELIEF_DEPTH = 0.25  # Reference nominal; the finished matched fit
 PIVOT_HEAD_RADIAL_CLEARANCE = 0.4875
 PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # User decision relayed by Main, 2026-09-22: fit the actual purchased shoulder
-# and finished plate; do not invent a numerical axial-clearance band.
+# and finished plate; do not invent a numerical axial-clearance band.  The
+# sheet flags this on a leader to the relief in section A-A, names the mate
+# by part number, and states an acceptance a machinist can check by hand
+# (machinist review r1: unflagged under section C-C, "MINIMAL AXIAL PLAY"
+# uncheckable).  Four lines (the layout audit's tall-block limit; r3's six
+# gated) of at most 23 characters: the note stands between the 213.56
+# dimension line and the bore gap it leads into, and its leader (from the
+# note's right end) must pass left of A-A's Ra 1.6 leader.  The plate is
+# the part being fitted, so the mate is the one thing the depth fits to.
+# r16: screw locking belongs to assembly installation, not plate acceptance.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
-    "TOP PIVOT RELIEF: MATCH DEPTH TO FINISHED PLATE\n"
-    "AND McMASTER 91829A560 CONE-PIVOT-SCREW.\n"
-    "WITH SHOULDER SEATED ON BASE, LOCK KNOB RELEASED:\n"
-    "PLATFORM SWINGS FREELY WITH MINIMAL AXIAL PLAY."
+    "TOP RELIEF: FIT DEPTH\n"
+    "TO MHA-VN-014 SHOULDER;\n"
+    "SWINGS FREE,\n"
+    "NO AXIAL SHAKE."
 )
 
 
@@ -140,10 +149,10 @@ POST_MOUNT_THREAD_DIA = 0.25 * 25.4
 # The title block's R0.25/0.25 edge break would take up to 0.25 of thread off
 # each end of the through tap (0.85D worst case, under the audit floor), so the
 # two tapped holes carry a local override: deburr only (Main, 2026-09-24).
+# It is printed under the taps' own callout, not in a general note
+# (machinist review r1: an override belongs on the feature it overrides).
 POST_MOUNT_TAP_EDGE_BREAK = 0.1
-POST_MOUNT_TAP_BREAK_NOTE = (
-    f"1/4-20 TAPPED HOLES: DEBURR ONLY, {POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END."
-)
+POST_MOUNT_TAP_BREAK_CALLOUT = f"{POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END"
 # U37 (2026-09-23): the user accepted short engagement for MHA-VN-031 as a named
 # exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
 # add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
@@ -166,12 +175,12 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 # band must not print below it without a new ruling.
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
     raise AssertionError("MHA-VN-031 engagement fell below the audited 0.87D floor")
-# The sheet states the shortfall as a plain fact, worded like MHA-DT-032's,
-# over the break override it depends on: one line each.
+# The sheet states the shortfall as a plain fact, worded like MHA-DT-032's.
+# The taps' callout names the post they mount and carries the break override
+# the figure depends on, so the line names no screw (machinist review r1).
 # Pending exception ruling: MHA-VN-031 engagement (#1019).
 POST_MOUNT_ENGAGEMENT_NOTE = (
-    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN (MHA-VN-031).\n"
-    f"{POST_MOUNT_TAP_BREAK_NOTE}"
+    f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
 # Pending exception ruling: MHA-VN-031 engagement (#1019).
@@ -257,11 +266,18 @@ if HOLDDOWN_LEDGE_RANGE[0] < 2.0:
 # Only functional sliding/locating surfaces carry roughness.  The existing
 # close-clearance pivot hole needs no bearing-finish control; the top locates
 # the post and tip block, and the underside slides on the harmonic-base deck.
+# The slide face's symbol says why it carries Ra 1.6 (machinist review r7:
+# nothing on the sheet said the underside runs, so the finish read as meant
+# for the bore), as fr_harmonic_base and dt_pinion_cam name their targets.
+BASE_SLIDE_FINISH_TARGET = "SLIDING FACE"
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "post_seat", SEAT_UM, PlanarFace((0, 1, 0), PLATE_THICKNESS)
     ),
     SurfaceFinishControl(
-        "base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)
+        "base_slide",
+        MACHINED_UM,
+        PlanarFace((0, -1, 0), 0.0),
+        production_method=BASE_SLIDE_FINISH_TARGET,
     ),
 )
