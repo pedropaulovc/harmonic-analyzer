@@ -1,4 +1,4 @@
-"""Read-only, historical paper-drive evidence for the isolated digest experiment.
+"""Read-only historical paper-drive evidence and paired raw-matrix experiment.
 
 Importing this module neither initializes COM nor connects to a seat. The caller
 owns the supervised session; this probe owns only documents opened after its
@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from importlib import metadata
 import json
 import math
 import os
 from pathlib import Path, PurePosixPath
 import stat
+import statistics
 import sys
 import traceback
+import time
 
-from _com import _early_bound
+from _com import _com_header, _com_invoke, _early_bound
 import _telemetry
 
 
@@ -36,6 +39,9 @@ _DEFAULT = "Default"
 _CHILD = "Default Simplified"
 _PART_COUNT = 43
 _INSTANCE_COUNT = 145
+_MATRIX_BENCHMARK_PROTOCOL = "paper-drive-collapsed-raw-matrix-pairs/1"
+_HISTORICAL_PROBE_PARENT = "645f955cd60a6d7580fe3f63c06a6485d28427a1"
+_MATRIX_PAIR_ORDERS = ("AB", "BA", "AB", "BA", "AB", "BA")
 
 
 def _require(condition, message):
@@ -53,6 +59,22 @@ def _error(report, location, error, *, required=True):
     }
     report["errors"].append(evidence)
     return evidence
+
+
+def _clear_exception_frames(error):
+    """Release frame locals across an exception graph without changing its evidence."""
+    pending = [error]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        identity = id(current)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        traceback.clear_frames(current.__traceback__)
+        for linked in (current.__cause__, current.__context__):
+            if linked is not None:
+                pending.append(linked)
 
 
 def _capture(target, key, operation, report, location, *, required=True):
@@ -904,6 +926,498 @@ def _historical_digest(snapshot):
     }
 
 
+def _benchmark_matrix_values(value):
+    """Common timed validator: primitives only, with no hex/report allocation."""
+    _require(
+        type(value) in (tuple, list) and len(value) == 16,
+        "benchmark requires exactly 16 numeric array entries",
+    )
+    values = []
+    for item in value:
+        _require(type(item) in (int, float), "benchmark matrix entry is not numeric")
+        converted = float(item)
+        _require(math.isfinite(converted), "benchmark matrix entry is not finite")
+        values.append(converted)
+    return tuple(values)
+
+
+def _benchmark_matrix_evidence(matrix):
+    return {"values": list(matrix), "hex": [value.hex() for value in matrix]}
+
+
+def _benchmark_read_matrix(component, arm, dispatch_type):
+    raw = transform = data = None
+    try:
+        if arm == "A":
+            raw = component.GetTotalTransform(True)
+            transform = _bound(raw, "IMathTransform")
+            data = transform.ArrayData
+        else:
+            _require(arm == "B", "unknown benchmark arm")
+            raw = _com_invoke(component, "IComponent2", "GetTotalTransform", True)
+            _require(raw is not None, "benchmark total transform was null")
+            _require(
+                isinstance(raw, dispatch_type),
+                "raw total transform was not a PythonCOM PyIDispatch",
+            )
+            data = _com_invoke(raw, "IMathTransform", "ArrayData")
+        return _benchmark_matrix_values(data)
+    except BaseException as error:
+        # Completed Invoke/Dispatch frames can otherwise retain the transform.
+        _clear_exception_frames(error)
+        raise
+    finally:
+        raw = transform = data = component = None
+
+
+def _benchmark_compare_matrices(reference, actual, names, evidence):
+    _require(
+        len(reference) == len(actual) == len(names),
+        "benchmark matrix comparison has incomplete inventory",
+    )
+    evidence.update(compared_components=len(names), values_equal=True, hex_equal=True)
+    mismatches = evidence["mismatches"] = []
+    for name, expected, observed in zip(names, reference, actual):
+        _require(len(expected) == len(observed) == 16, "incomplete matrix comparison")
+        values_equal = expected == observed
+        hex_equal = [v.hex() for v in expected] == [v.hex() for v in observed]
+        evidence["values_equal"] &= values_equal
+        evidence["hex_equal"] &= hex_equal
+        if not values_equal or not hex_equal:
+            mismatches.append(
+                {
+                    "name": name,
+                    "expected": _benchmark_matrix_evidence(expected),
+                    "observed": _benchmark_matrix_evidence(observed),
+                }
+            )
+    _require(not mismatches, "benchmark full-16-value/hex comparison failed")
+
+
+def _benchmark_primitive_equal(before, after):
+    _require(
+        type(before) in (dict, list, tuple, str, int, float, bool, type(None))
+        and type(after) in (dict, list, tuple, str, int, float, bool, type(None)),
+        "benchmark state contains a nonprimitive object",
+    )
+    if type(before) is not type(after):
+        return False
+    if type(before) is dict:
+        return before.keys() == after.keys() and all(
+            _benchmark_primitive_equal(value, after[key])
+            for key, value in before.items()
+        )
+    if type(before) in (tuple, list):
+        return len(before) == len(after) and all(
+            _benchmark_primitive_equal(left, right)
+            for left, right in zip(before, after)
+        )
+    if type(before) is float:
+        return (
+            math.isfinite(before)
+            and math.isfinite(after)
+            and before == after
+            and before.hex() == after.hex()
+        )
+    return before == after
+
+
+def _benchmark_require_equal(before, after, evidence):
+    evidence["equal"] = _benchmark_primitive_equal(before, after)
+    if not evidence["equal"]:
+        evidence.update(before=before, after=after)
+    _require(evidence["equal"], "benchmark state changed")
+
+
+def _benchmark_document_state(state, source_key):
+    keys = (
+        "root_path", "root_title", "active_document", "opened_read_only",
+        "needs_rebuild", "save_flag", "model_is_exploded", "extension_is_exploded",
+        "active_exploded_view_owner", "enable_presentation",
+        "active_configuration", "selection_count",
+    )
+    _require(all(key in state for key in keys), "incomplete benchmark document state")
+    _check_state(state, source_key, _DEFAULT, clean=True)
+    _string(state["root_title"], nonempty=True)
+    _integer(state["needs_rebuild"])
+    _integer(state["selection_count"])
+    for key in (
+        "opened_read_only", "save_flag", "model_is_exploded", "enable_presentation"
+    ):
+        _boolean(state[key])
+    active = state["active_document"]
+    _string(active["path"], nonempty=True)
+    _string(active["title"], nonempty=True)
+    exploded = state["extension_is_exploded"]
+    _require(type(exploded) is dict, "missing benchmark exploded-state observation")
+    _boolean(exploded["is_exploded"])
+    _string(exploded["view_name"])
+    _require(
+        state["model_is_exploded"] is False and exploded["is_exploded"] is False,
+        "benchmark requires collapsed Default; no repair permitted",
+    )
+    if state["active_exploded_view_owner"] is None:
+        _require(exploded["view_name"] == "", "missing named exploded-view owner")
+    else:
+        _string(state["active_exploded_view_owner"], nonempty=True)
+    return {key: state[key] for key in keys}
+
+
+def _benchmark_component_state(component, allowed_parts):
+    loaded = None
+    try:
+        loaded = _bound(component.GetModelDoc2(), "IModelDoc2")
+        loaded_path = _string(loaded.GetPathName(), nonempty=True)
+        loaded_key = _absolute_native_path(loaded_path)
+        _require(loaded_key in allowed_parts, "benchmark loaded model is unauthenticated")
+        return {
+            "name": _string(component.Name2, nonempty=True),
+            "reference_path": _string(component.GetPathName(), nonempty=True),
+            "referenced_configuration": _string(
+                component.ReferencedConfiguration, nonempty=True
+            ),
+            "suppression": _integer(component.GetSuppression2()),
+            "fixed": _boolean(component.IsFixed()),
+            "visible": _integer(component.Visible),
+            "loaded_model": {
+                "status": "nonnull", "authenticated": True,
+                "path": loaded_path, "path_key": loaded_key,
+            },
+            "transform": _matrix(component.Transform2),
+            "total_transform_without_presentation": _matrix(
+                component.GetTotalTransform(False)
+            ),
+            "total_transform_with_presentation": _matrix(
+                component.GetTotalTransform(True)
+            ),
+            "presentation_transform": _matrix(
+                component.PresentationTransform, nullable=True
+            ),
+        }
+    finally:
+        loaded = component = None
+
+
+def _benchmark_observe(model, extension, assembly, app, source_key, report, location):
+    start = len(report["errors"])
+    state = _state(model, extension, assembly, app, report, location)
+    report["raw_matrix_benchmark"].setdefault("document_observations", {})[location] = state
+    _require(
+        not any(error["required"] for error in report["errors"][start:]),
+        "benchmark required state read failed",
+    )
+    return _benchmark_document_state(state, source_key)
+
+
+def _benchmark_controls(cohort, names, dispatch_type, reference, benchmark):
+    controls = benchmark["controls"]
+    references = []
+    component = None
+    try:
+        for index, component in enumerate(cohort):
+            control = {"name": names[index], "status": "observing", "comparisons": {}}
+            controls["components"].append(control)
+            acquired = {}
+            try:
+                for label in ("A1", "A2", "B", "A3"):
+                    arm = label[0]
+                    controls["attempted_reads"][arm] += 1
+                    acquired[label] = _benchmark_read_matrix(component, arm, dispatch_type)
+                    controls["completed_reads"][arm] += 1
+                for label, matrix in acquired.items():
+                    comparison = control["comparisons"][label] = {}
+                    _benchmark_compare_matrices(
+                        [reference[index]], [matrix], [names[index]], comparison
+                    )
+                references.append(acquired["A1"])
+                control["reference"] = _benchmark_matrix_evidence(acquired["A1"])
+                control["raw_PyIDispatch_receipt"] = True
+                control["status"] = "complete"
+            finally:
+                if control["status"] != "complete":
+                    control["status"] = "failed"
+                    control["available_reads"] = {
+                        label: _benchmark_matrix_evidence(matrix)
+                        for label, matrix in acquired.items()
+                    }
+        controls["status"] = "complete"
+        return references
+    finally:
+        component = None
+
+
+def _benchmark_pass(cohort, arm, dispatch_type, record):
+    matrices = []
+    component = None
+    attempted = 0
+    complete = False
+    started = time.perf_counter_ns()
+    try:
+        for component in cohort:
+            attempted += 1
+            matrices.append(_benchmark_read_matrix(component, arm, dispatch_type))
+        complete = True
+        return matrices
+    except BaseException as error:
+        _clear_exception_frames(error)
+        raise
+    finally:
+        component = None
+        elapsed = time.perf_counter_ns() - started
+        # Everything below, including evidence conversion, is outside timing.
+        record.update(
+            status="complete" if complete else "failed",
+            attempted_reads=attempted,
+            completed_reads=len(matrices),
+            elapsed_ns=elapsed,
+        )
+        if complete:
+            hex_rows = [[value.hex() for value in matrix] for matrix in matrices]
+            record["matrix_hex_sha256"] = hashlib.sha256(
+                json.dumps(hex_rows, separators=(",", ":")).encode("ascii")
+            ).hexdigest()
+        else:
+            record["partial_matrices"] = [
+                _benchmark_matrix_evidence(matrix) for matrix in matrices
+            ]
+
+
+def _benchmark_rounds(cohort, names, dispatch_type, reference, benchmark):
+    for index, order in enumerate(_MATRIX_PAIR_ORDERS, 1):
+        pair = {"round": index, "order": order, "arms": {}, "status": "failed"}
+        benchmark["pairs"].append(pair)
+        matrices = {}
+        for arm in order:
+            record = pair["arms"][arm] = {"status": "not_started"}
+            matrices[arm] = _benchmark_pass(cohort, arm, dispatch_type, record)
+        for label, expected, actual in (
+            ("pair", matrices["A"], matrices["B"]),
+            ("A_against_control", reference, matrices["A"]),
+            ("B_against_control", reference, matrices["B"]),
+        ):
+            comparison = pair[label] = {}
+            _benchmark_compare_matrices(expected, actual, names, comparison)
+        a_ns = pair["arms"]["A"]["elapsed_ns"]
+        b_ns = pair["arms"]["B"]["elapsed_ns"]
+        _require(a_ns > 0 and b_ns > 0, "benchmark timer did not advance")
+        pair.update(
+            status="complete",
+            a_minus_b_seconds=(a_ns - b_ns) / 1e9,
+            one_minus_b_over_a=1.0 - b_ns / a_ns,
+        )
+    summary = benchmark["summary"] = {}
+    for label, orders in (("all", ("AB", "BA")), ("AB", ("AB",)), ("BA", ("BA",))):
+        pairs = [pair for pair in benchmark["pairs"] if pair["order"] in orders]
+        a_ns = sum(pair["arms"]["A"]["elapsed_ns"] for pair in pairs)
+        b_ns = sum(pair["arms"]["B"]["elapsed_ns"] for pair in pairs)
+        summary[label] = {
+            "pairs": len(pairs),
+            "A_seconds": a_ns / 1e9, "B_seconds": b_ns / 1e9,
+            "a_minus_b_seconds": (a_ns - b_ns) / 1e9,
+            "one_minus_b_over_a": 1.0 - b_ns / a_ns,
+            "median_paired_difference_seconds": statistics.median(
+                pair["a_minus_b_seconds"] for pair in pairs
+            ),
+        }
+
+
+def _benchmark_report():
+    return {
+        "protocol": _MATRIX_BENCHMARK_PROTOCOL,
+        "historical_probe_parent_revision": _HISTORICAL_PROBE_PARENT,
+        "status": "not_started",
+        "scope": "warm same-seat collapsed-PD matrix microbenchmark, not DT or build speed",
+        "rpc_saving": "not_assessed",
+        "ordering_limit": "balanced ordering reduces but does not eliminate temporal/cache bias",
+        "timer": {
+            "clock": "time.perf_counter_ns",
+            "includes": "full-inventory acquisition, common primitive validation, result retention, transform release",
+            "excludes": "collection, authentication, state reads, hex/equality/checksums, evidence and summaries",
+            "B_only_overhead": "per-read isinstance(raw, PythonCOM dispatch type); not subtracted",
+        },
+        "expected_controls": {"A": 435, "B": 145},
+        "expected_measured_reads": {"A": 870, "B": 870},
+        "controls": {
+            "status": "not_started", "sequence": ["A1", "A2", "B", "A3"],
+            "attempted_reads": {"A": 0, "B": 0},
+            "completed_reads": {"A": 0, "B": 0}, "components": [],
+        },
+        "pairs": [],
+        "measured_attempted_reads": {"A": 0, "B": 0},
+        "measured_completed_reads": {"A": 0, "B": 0},
+        "state_observation_reads": "excluded from control and measured-read counts",
+        "document_observations": {},
+    }
+
+
+def _run_matrix_benchmark(
+    model, extension, assembly, app, source_key, allowed_parts, default, report
+):
+    """Observe only: no save, rebuild, activation, selection or presentation writes."""
+    import pythoncom
+    from solidworks_mcp.adapters import sw_type_info
+
+    benchmark = report["raw_matrix_benchmark"]
+    cohort = []
+    names = []
+    raw_components = raw = component = None
+    primary = None
+    try:
+        _require(
+            report["historical_digest"]["historical_digest_reproduced"] is True,
+            "benchmark requires original Default digest reproduction",
+        )
+        _raise_required(report, "benchmark admission")
+        _require(
+            report["authentication"].get("complete") is True
+            and len(allowed_parts) == _PART_COUNT
+            and len(report["files_before"]) == 91,
+            "benchmark requires the complete authenticated 91-file closure",
+        )
+        benchmark["status"] = "observing"
+        dispatch_type = pythoncom.TypeIIDs[pythoncom.IID_IDispatch]
+        benchmark["dispatch_receipt_contract"] = (
+            f"{dispatch_type.__module__}.{dispatch_type.__name__}"
+        )
+        source_files = {
+            "probe": Path(__file__).resolve(),
+            "com_helpers": Path(sys.modules[_early_bound.__module__].__file__).resolve(),
+            "binding_helpers": Path(sw_type_info.__file__).resolve(),
+            "generated_wrapper": Path(sw_type_info.__file__).resolve().parent
+            / "_generated/sldworks_2026.py",
+        }
+        benchmark["source_identity"] = {
+            "artifact_source_revision": _SOURCE_REVISION,
+            "python_version": sys.version,
+            "pywin32_version": metadata.version("pywin32"),
+            "pythoncom_module": str(pythoncom.__file__),
+            "files": {
+                label: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                for label, path in source_files.items()
+            },
+        }
+        for interface, member, expected in (
+            ("IComponent2", "GetTotalTransform", (77, 0, 1, (9, 0), ((11, 1),))),
+            ("IMathTransform", "ArrayData", (3, 0, 2, (12, 0), ())),
+        ):
+            actual = _com_header(interface, member)
+            _require(actual == expected, f"unexpected generated {interface}.{member} header")
+            benchmark.setdefault("generated_headers", {})[f"{interface}.{member}"] = actual
+        benchmark["state_before"] = before = {
+            "document": _benchmark_observe(
+                model, extension, assembly, app, source_key, report, "benchmark.before"
+            ),
+            "components": [],
+        }
+        _benchmark_require_equal(
+            _benchmark_document_state(default["after"], source_key),
+            before["document"],
+            benchmark.setdefault("default_document_matches", {}),
+        )
+        captured = {row["name"]: row for row in default["components"]["instances"]}
+        _require(len(captured) == _INSTANCE_COUNT, "incomplete captured Default inventory")
+        raw_components = assembly.GetComponents(True)
+        _require(
+            type(raw_components) in (tuple, list)
+            and len(raw_components) == _INSTANCE_COUNT,
+            "benchmark requires all 145 components",
+        )
+        for raw in raw_components:
+            component = _bound(raw, "IComponent2")
+            _require(
+                sw_type_info.is_early_bound(component, "IComponent2")
+                and isinstance(component._oleobj_, dispatch_type),
+                "benchmark component is not a generated wrapper over real PyIDispatch",
+            )
+            cohort.append(component)
+            row = _benchmark_component_state(component, allowed_parts)
+            name = row["name"]
+            _require(name in captured and name not in names, "benchmark cohort identity mismatch")
+            _benchmark_require_equal(
+                {key: captured[name][key] for key in row},
+                row,
+                benchmark.setdefault("default_component_matches", {}).setdefault(name, {}),
+            )
+            names.append(name)
+            before["components"].append(row)
+        raw_components = raw = component = None
+        _require(len(names) == _INSTANCE_COUNT, "incomplete benchmark cohort")
+        benchmark["component_order"] = names
+        benchmark["generated_component_dispatch_receipts"] = len(cohort)
+        sensitive = [
+            row["name"] for row in before["components"]
+            if not _benchmark_primitive_equal(
+                row["total_transform_without_presentation"],
+                row["total_transform_with_presentation"],
+            )
+        ]
+        benchmark["presentation_coverage"] = {
+            "configuration": _DEFAULT, "model_collapsed": True,
+            "presentation_sensitive_components": sensitive,
+            "true_false_equal_count": len(names) - len(sensitive),
+            "coverage": (
+                "already-present true/false presentation distinction"
+                if sensitive
+                else "collapsed-only coverage; presentation inclusion was not discriminated"
+            ),
+        }
+        reference = [
+            tuple(row["total_transform_with_presentation"]["values"])
+            for row in before["components"]
+        ]
+        benchmark["controls"]["status"] = "observing"
+        reference = _benchmark_controls(cohort, names, dispatch_type, reference, benchmark)
+        _benchmark_rounds(cohort, names, dispatch_type, reference, benchmark)
+    except BaseException as error:
+        primary = error
+        _error(report, "raw_matrix_benchmark", error)
+        _clear_exception_frames(error)
+    finally:
+        # State reads are untimed and attempted even after a failed control/round.
+        try:
+            benchmark["state_after"] = after = {
+                "document": _benchmark_observe(
+                    model, extension, assembly, app, source_key, report, "benchmark.after"
+                ),
+                "components": [],
+            }
+            for component in cohort:
+                after["components"].append(_benchmark_component_state(component, allowed_parts))
+            if "state_before" in benchmark:
+                _benchmark_require_equal(
+                    benchmark["state_before"], after,
+                    benchmark.setdefault("state_unchanged", {}),
+                )
+            _require(len(cohort) == _INSTANCE_COUNT, "benchmark cohort remained incomplete")
+        except BaseException as error:
+            _error(report, "raw_matrix_benchmark.post_state", error)
+            _clear_exception_frames(error)
+            if primary is None:
+                primary = error
+        finally:
+            raw_components = raw = component = None
+            cohort.clear()
+            benchmark["component_handles_released_before_child_activation"] = True
+        for arm in ("A", "B"):
+            for kind in ("attempted", "completed"):
+                benchmark[f"measured_{kind}_reads"][arm] = sum(
+                    pair["arms"].get(arm, {}).get(f"{kind}_reads", 0)
+                    for pair in benchmark["pairs"]
+                )
+        if primary is None and not (
+            benchmark["controls"]["completed_reads"] == benchmark["expected_controls"]
+            and benchmark["measured_completed_reads"] == benchmark["expected_measured_reads"]
+            and len(benchmark["pairs"]) == 6
+        ):
+            primary = RuntimeError("benchmark completed-read counts were incomplete")
+            _error(report, "raw_matrix_benchmark.counts", primary)
+        benchmark["status"] = "complete" if primary is None else "failed"
+        if primary is not None:
+            if benchmark["controls"]["status"] == "observing":
+                benchmark["controls"]["status"] = "failed"
+            raise primary
+
+
 def _close_owned(app, allowed, source_key, report):
     cleanup = report["cleanup"]
     cleanup["close_calls"] = []
@@ -1093,6 +1607,7 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
         "schema": "paper-drive-historical-digest-probe/1",
         "role": _ROLE,
         "source_revision": _SOURCE_REVISION,
+        "raw_matrix_benchmark": _benchmark_report(),
         "original_assembly_cache_key": _ORIGINAL_ASSEMBLY_KEY,
         "original_cache_epoch": "3",
         "original_cache_salt": "sw2024-sp3",
@@ -1212,6 +1727,14 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
             )
         report["default_checkpoint_complete"] = True
         _write_report(safe_report_path, report)
+        if historical["historical_digest_reproduced"]:
+            _run_matrix_benchmark(
+                model, extension, assembly, app, source_key, allowed_parts, default, report
+            )
+        else:
+            report["raw_matrix_benchmark"].update(
+                status="not_admitted", reason="original Default digest did not reproduce"
+            )
 
         # Digest mismatch alone does not discard a safe, completed Default dump
         # or prevent the discriminating child observation. No adapter activation.
@@ -1256,7 +1779,7 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
         _error(report, "observation", error)
         # Completed traceback frames may otherwise retain mass/component/config
         # wrappers until after CloseDoc. The report retains their text, not COM.
-        traceback.clear_frames(error.__traceback__)
+        _clear_exception_frames(error)
     finally:
         model = extension = assembly = opened = raw_model = None
         try:
@@ -1264,14 +1787,14 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
             report["cleanup"]["adapter_current_model_cleared"] = True
         except BaseException as error:
             _error(report, "cleanup.adapter_currentModel", error)
-            traceback.clear_frames(error.__traceback__)
+            _clear_exception_frames(error)
         if initial_empty and open_attempted and app is not None:
             try:
                 _close_owned(app, allowed_parts | {source_key}, source_key, report)
             except BaseException as error:
                 report["cleanup"]["status"] = "failed"
                 _error(report, "cleanup.close_owned", error)
-                traceback.clear_frames(error.__traceback__)
+                _clear_exception_frames(error)
         else:
             report["cleanup"]["status"] = "no_close_attempted"
             report["cleanup"]["reason"] = (
@@ -1286,13 +1809,13 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
             except BaseException as error:
                 report["cleanup"]["status"] = "failed"
                 _error(report, "cleanup.ending_inventory", error)
-                traceback.clear_frames(error.__traceback__)
+                _clear_exception_frames(error)
         app = None
         try:
             _hash_after(report)
         except BaseException as error:
             _error(report, "preservation", error)
-            traceback.clear_frames(error.__traceback__)
+            _clear_exception_frames(error)
 
     if primary is None and _required_errors(report):
         primary = RuntimeError(

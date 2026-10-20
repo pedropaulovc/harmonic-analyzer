@@ -3469,6 +3469,8 @@ def task_check():
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
+        # Isolated PD matrix-probe validation, state and failure-path ownership.
+        SCRIPTS_DIR / "test_verify_pd_matrix_benchmark.py",
         # Builder gates handed to save's final deep rebuild (drive-train) must
         # read AFTER it, cost no second rebuild, and still block the save.
         SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
