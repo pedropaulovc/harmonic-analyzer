@@ -109,9 +109,9 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import _telemetry  # noqa: E402
+import machinist_review_config as _review_settings  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
-import machinist_review_config as review_config  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     SheetStore,
     create_server as _create_sheet_server,
@@ -139,7 +139,6 @@ CODEX_HOME = Path(tempfile.gettempdir()) / "machinist-review-codex-home"
 # Parallel reviews share CODEX_HOME; one thread repairs its auth link at a time.
 _CODEX_AUTH_LOCK = threading.Lock()
 
-REVIEWERS = tuple(review_config.DEFAULT_MODELS)
 FINDING_KEYS = ("blockers", "over_specification", "clarity", "minor")
 GATING_KEYS = ("blockers", "over_specification", "clarity")
 # Owner ruling 2026-10-18: a confirmed finding gates only when two blind runs
@@ -1365,7 +1364,7 @@ def evaluate_sheet_evidence(
     The empty, sheets-only MCP registry may permit scoped resource helpers as
     neutral calls. They never prove inspection; text-only graders remain strict.
     """
-    if reviewer not in REVIEWERS:
+    if reviewer not in _review_settings.REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}")
     image_results: set[tuple[int, str]] = set()
     for row in events:
@@ -1839,8 +1838,8 @@ def _review_session(
     precheck_diff: dict[str, Any] | None = None,
     resume_review: Review | None = None,
 ) -> Review:
-    if reviewer not in REVIEWERS:
-        raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
+    settings = _review_settings.resolve_settings(reviewer=reviewer, model=model, effort=effort)
+    reviewer, model, effort = settings.reviewer, settings.model, settings.effort
     if precheck_diff is not None and (judge_findings is not None or resume_review is not None):
         raise ValueError("precheck must start its own judge lifecycle")
     resume_id = None
@@ -1850,8 +1849,8 @@ def _review_session(
         if (
             judge_findings is None or not resume_review.passed or not resume_id
             or resume_review.reviewer != reviewer
-            or resume_review.model != (model or review_config.DEFAULT_MODELS[reviewer])
-            or resume_review.effort != (effort or review_config.DEFAULT_EFFORTS[reviewer])
+            or resume_review.model != model
+            or resume_review.effort != effort
             or resume_review.source_sha256 != [_sha256(source) for source in package.sources]
         ):
             raise ValueError("judge continuation requires its successful, unchanged precheck session")
@@ -1870,8 +1869,6 @@ def _review_session(
     snapshot = ReviewPackage(package.name, package.kind, tuple(snapshot_sources))
     mcp_catalog = _sheet_resource_manifest(snapshot.sources)
     neutral_resources = reviewer == "codex" and _resource_neutrality_permitted(mcp_catalog)
-    model = model or review_config.DEFAULT_MODELS[reviewer]
-    effort = effort or review_config.DEFAULT_EFFORTS[reviewer]
     executable = (claude if reviewer == "claude" else codex) or shutil.which(reviewer)
     if not executable:
         raise RuntimeError(f"{reviewer} CLI not found on PATH")
@@ -2286,10 +2283,13 @@ def aggregate_package(
     """Collect independent blind runs, then adjudicate all their finding claims."""
     if runs < 1:
         raise ValueError("runs must be at least 1")
-    model = model or review_config.DEFAULT_MODELS[reviewer]
-    effort = effort or review_config.DEFAULT_EFFORTS[reviewer]
-    judge_model = judge_model or review_config.DEFAULT_MODELS[judge_reviewer]
-    judge_effort = judge_effort or review_config.DEFAULT_EFFORTS[judge_reviewer]
+    settings = _review_settings.resolve_settings(
+        reviewer=reviewer, model=model, effort=effort, judge_reviewer=judge_reviewer,
+        judge_model=judge_model, judge_effort=judge_effort,
+    )
+    reviewer, model, effort = settings.reviewer, settings.model, settings.effort
+    judge_reviewer = settings.judge_reviewer
+    judge_model, judge_effort = settings.judge_model, settings.judge_effort
     with _telemetry.span(
         "machinist_review.aggregate", name=package.name, run_count=runs
     ) as span:
@@ -2759,22 +2759,22 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="read registry-named PDFs from this directory instead of cad/out/pdf",
     )
-    parser.add_argument("--reviewer", choices=REVIEWERS, default="claude")
+    parser.add_argument("--reviewer", choices=_review_settings.REVIEWERS, default="claude")
     parser.add_argument(
         "--model",
         help=(
-            f"reviewer model (defaults: {review_config.DEFAULT_MODELS}; "
+            f"reviewer model (defaults: {_review_settings.DEFAULT_MODELS}; "
             "claude also takes claude-fable-5-1)"
         ),
     )
     parser.add_argument(
         "--effort",
-        help=f"reasoning effort (defaults: {review_config.DEFAULT_EFFORTS})",
+        help=f"reasoning effort (defaults: {_review_settings.DEFAULT_EFFORTS})",
     )
     parser.add_argument("--runs", type=int, default=3, help="parallel blind runs per package")
-    parser.add_argument("--judge-reviewer", choices=REVIEWERS, default="claude")
-    parser.add_argument("--judge-model", help=f"judge model (defaults: {review_config.DEFAULT_MODELS})")
-    parser.add_argument("--judge-effort", help=f"judge effort (defaults: {review_config.DEFAULT_EFFORTS})")
+    parser.add_argument("--judge-reviewer", choices=_review_settings.REVIEWERS, default="claude")
+    parser.add_argument("--judge-model", help=f"judge model (defaults: {_review_settings.DEFAULT_MODELS})")
+    parser.add_argument("--judge-effort", help=f"judge effort (defaults: {_review_settings.DEFAULT_EFFORTS})")
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--retries", type=int, default=1)
     parser.add_argument(
@@ -2793,6 +2793,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="skip packages with missing AFTER or BEFORE PDFs (only AFTER is required with --force)",
     )
     args = parser.parse_args(argv)
+    try:
+        settings = _review_settings.resolve_settings(**{
+            field: getattr(args, field) for field in _review_settings.SETTING_FIELDS
+        })
+    except ValueError as error:
+        parser.error(str(error))
+    for setting_name in _review_settings.SETTING_FIELDS:
+        setattr(args, setting_name, getattr(settings, setting_name))
     if args.runs < 1:
         parser.error("--runs must be at least 1")
     if args.pdf:

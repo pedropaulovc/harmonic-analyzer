@@ -12,6 +12,7 @@ from PIL import Image
 
 import _drawing_diff as drawing_diff
 import machinist_review as mr
+import machinist_review_config as review_settings
 from test_machinist_review import (
     _claude_stdout,
     _clean_verdict,
@@ -165,7 +166,7 @@ def _main_status(args: list[str]) -> int:
     ("part", "rendering_noise"), ("assembly", "rendering_noise"),
     ("assembly", "assembly_single_part"),
 ])
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_precheck_skip_inspects_after_and_rgb_overlay_without_review_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, skip_kind: str, reviewer: str,
 ) -> None:
@@ -195,7 +196,7 @@ def test_precheck_skip_inspects_after_and_rgb_overlay_without_review_runs(
     assert saved == aggregate
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 @pytest.mark.parametrize("confirmed_runs,expected", [(1, "SHIP"), (2, "FIX")])
 def test_doubt_reviews_then_resumes_precheck_session_preserving_ensemble_threshold(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str, confirmed_runs: int, expected: str,
@@ -225,7 +226,7 @@ def test_doubt_reviews_then_resumes_precheck_session_preserving_ensemble_thresho
         assert sum(payload.get("role") == "user" for payload in prompts) == 2
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 @pytest.mark.parametrize("failure", ["judge_provider", "judge_inspection", "judge_after_only", "judge_wrong_session"])
 def test_continuation_failure_never_falls_back_or_reuses_precheck_inspection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str, failure: str,
@@ -255,7 +256,7 @@ def test_codex_continuation_only_authorizes_exact_two_prompts(
 
 
 @pytest.mark.parametrize("failure", ["precheck_provider", "precheck_inspection", "schema"])
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_precheck_failure_is_error_not_skip_or_full_review(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str, reviewer: str,
 ) -> None:
@@ -270,7 +271,7 @@ def test_precheck_failure_is_error_not_skip_or_full_review(
 
 
 @pytest.mark.parametrize("baseline", ["absent", "present", "missing", "unreadable"])
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_force_bypasses_precheck_and_runs_after_only_unconditionally(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, baseline: str, reviewer: str,
 ) -> None:
@@ -575,7 +576,7 @@ def test_cli_pairs_repeated_pdfs_by_position_not_by_basename(
     assert harness.calls[0]["sheet_count"] == 4
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_precheck_retry_uses_new_session_before_any_independent_runs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str,
 ) -> None:
@@ -597,7 +598,7 @@ def test_precheck_retry_uses_new_session_before_any_independent_runs(
     assert aggregate["precheck"]["session_id"] == second["session_id"]
 
 
-@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+@pytest.mark.parametrize("reviewer", review_settings.REVIEWERS)
 def test_reordered_dimension_characters_still_receive_full_review_when_precheck_has_doubt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str,
 ) -> None:
