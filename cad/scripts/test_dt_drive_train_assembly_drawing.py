@@ -575,6 +575,18 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "REAM" not in step
 
 
+def test_lever_pin_hole_text_tracks_the_pin_spec(monkeypatch) -> None:
+    from runpy import run_path
+
+    import dt_pinion_lever_pin_spec as pin
+
+    monkeypatch.setattr(pin, "PIN_DIA", 25.4 / 8.0)
+    sheet = run_path(str(SCRIPTS / "dt_drive_train_assembly_sheet.py"))
+    text = sheet["LEVER_PIN_HOLE_FIT"]
+    assert "1/8 IN DRILL THRU" in text
+    assert "1/16" not in text
+
+
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
     """Main's TbPB ruling (Q1 b): the rig's east-west feeler is the bench
     rest gap (pins on the cams), to the gage's leaf step, made up only of
