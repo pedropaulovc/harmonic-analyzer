@@ -1621,7 +1621,7 @@ def _place_exploded_view(
     adapter: Any, sheet_name: str, field: Box, *, label: str
 ) -> Any:
     """MG_MAGNIFIER_EXPLODED at EXPLODED_SCALE, configured and exploded before
-    anything binds to it; isolated and fitted after the BOM exists."""
+    anything binds to it; isolation and ring fitting also precede the BOM."""
     _activate_sheet(adapter, sheet_name)
     view = place_view(
         adapter,
@@ -1692,6 +1692,28 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: tangent edges read {after}, not visible")
 
 
+def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
+    """Observe the released source after each MG drawing phase, without edits.
+
+    Scoped balloon guards cannot identify an earlier dirty transition. Follow
+    the drive-train trace so a native leaf names the first dirty phase without
+    saving the source or clearing its flag. The existing final guard still
+    refuses the save.
+    """
+    state = {"dirty": bool(source_model.GetSaveFlag())}
+
+    def step(name: str) -> None:
+        dirty = bool(source_model.GetSaveFlag())
+        _telemetry.event("magnifier.source_save_flag", step=name, dirty=dirty)
+        if dirty == state["dirty"]:
+            return
+        state["dirty"] = dirty
+        report = _telemetry.warn if dirty else _telemetry.info
+        report(f"magnifier source went {'DIRTY' if dirty else 'clean'} after {name}")
+
+    return step
+
+
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -1702,6 +1724,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             "magnifier source assembly is already dirty; refusing to discard user changes"
         )
+    source_step = _source_dirty_tracer(source_model)
+    source_step("open source")
     properties = read_required_properties(
         source_model,
         ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity"),
@@ -1713,12 +1737,18 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{notes.DRAWING_NUMBER!r}"
         )
     _validate_source(source_model)
+    source_step("validate source and properties")
     _create_sheets(adapter)
+    source_step("create sheets")
     settled_checks = _place_assembled_sheet(adapter)
-    # Every drawing view's configuration and exploded state is final before
-    # the BOM binds. Never switch a drawing view's configuration after the BOM:
-    # only the source's active configuration may change for guarded reads.
+    source_step("assembled views and settings")
+    # Follow the drive-train package order: place/configure every view, then
+    # explode/isolate/fit it, and only then insert the BOM and bind balloons.
+    # That recipe's native probes found post-BOM configuration-switch rebuilds
+    # dirty the source. MG's prior final-guard failure did not locate the first
+    # dirty operation, so trace each phase; only guarded source reads may switch later.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
+    source_step(f"{WHEEL_LABEL} view configuration and explode")
     reference = _place_collapsed_view(
         adapter,
         SHEET_NAMES[1],
@@ -1726,10 +1756,13 @@ async def build(adapter: Any) -> dict[str, str]:
         BOM_REFERENCE_SCALE_LADDER[0],
         label=BOM_REFERENCE_LABEL,
     )
+    source_step(f"{BOM_REFERENCE_LABEL} view configuration")
     lever = _place_exploded_view(adapter, SHEET_NAMES[2], LEVER_FIELD, label=LEVER_LABEL)
+    source_step(f"{LEVER_LABEL} view configuration and explode")
     finished = _place_collapsed_view(
         adapter, SHEET_NAMES[3], FINISHED_FIELD, SHEET_SCALE, label=FINISHED_LABEL
     )
+    source_step(f"{FINISHED_LABEL} view configuration")
     assert_full_detail_view(adapter, label=PDF_TITLE)
 
     # The reference carries no balloons, so its ring is its outline: fit the
@@ -1742,6 +1775,47 @@ async def build(adapter: Any) -> dict[str, str]:
         _grown(BOM_REFERENCE_FIELD, BALLOON_RING_REACH),
         label=BOM_REFERENCE_LABEL,
     )
+    source_step(f"{BOM_REFERENCE_LABEL} ring fit")
+    for sheet_name, view, stems, label in (
+        (SHEET_NAMES[1], wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
+        (SHEET_NAMES[2], lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
+        source_step(f"{label} isolation")
+    _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
+    source_step(f"{LEVER_LABEL} tangent edges")
+
+    scales = {}
+    for sheet_name, view, ladder, field, label in (
+        (
+            SHEET_NAMES[1],
+            wheel,
+            EXPLODED_SCALE_LADDER,
+            WHEEL_FIELD,
+            WHEEL_LABEL,
+        ),
+        (
+            SHEET_NAMES[2],
+            lever,
+            LEVER_SCALE_LADDER,
+            LEVER_FIELD,
+            LEVER_LABEL,
+        ),
+        (
+            SHEET_NAMES[3],
+            finished,
+            FINISHED_SCALE_LADDER,
+            FINISHED_FIELD,
+            FINISHED_LABEL,
+        ),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        source_step(f"{label} ring fit")
+
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    source_step("BOM sheet activation")
     table = insert_bom_table(
         adapter,
         reference,
@@ -1752,54 +1826,29 @@ async def build(adapter: Any) -> dict[str, str]:
         configuration_grouping="same-part",
         label="magnifier",
     )
+    source_step("BOM insertion")
     items = _validate_bom(adapter, table)
     _assert_bom_clears_reference_field(table)
+    source_step("BOM validation and layout")
     for view, label in (
         (wheel, WHEEL_LABEL),
         (lever, LEVER_LABEL),
         (finished, FINISHED_LABEL),
     ):
         _link_view_to_bom(view, table, label=label)
-    for view, stems, label in (
-        (wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
-        (lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
-    ):
-        isolate_drawing_view_components(adapter, view, visible_stems=stems, label=label)
-    _show_tangent_edges(adapter, lever, label=LEVER_LABEL)
-    # View-only isolation must leave the logical parts list alone.
+        source_step(f"{label} BOM link")
+    # The full reference must keep every row after isolation and BOM linking.
     if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
-        raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
+        raise RuntimeError("magnifier BOM items moved when its isolated views were linked")
 
     landings = []
-    scales = {}
-    for sheet_name, view, ladder, field, stems, label in (
-        (
-            SHEET_NAMES[1],
-            wheel,
-            EXPLODED_SCALE_LADDER,
-            WHEEL_FIELD,
-            explode.WHEEL_GROUP_STEMS,
-            WHEEL_LABEL,
-        ),
-        (
-            SHEET_NAMES[2],
-            lever,
-            LEVER_SCALE_LADDER,
-            LEVER_FIELD,
-            explode.LEVER_GROUP_STEMS,
-            LEVER_LABEL,
-        ),
-        (
-            SHEET_NAMES[3],
-            finished,
-            FINISHED_SCALE_LADDER,
-            FINISHED_FIELD,
-            frozenset({explode.WIRE_STEM}),
-            FINISHED_LABEL,
-        ),
+    for sheet_name, view, stems, label in (
+        (SHEET_NAMES[1], wheel, explode.WHEEL_GROUP_STEMS, WHEEL_LABEL),
+        (SHEET_NAMES[2], lever, explode.LEVER_GROUP_STEMS, LEVER_LABEL),
+        (SHEET_NAMES[3], finished, frozenset({explode.WIRE_STEM}), FINISHED_LABEL),
     ):
         _activate_sheet(adapter, sheet_name)
-        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
+        source_step(f"{label} balloon sheet activation")
         with _source_configuration_active(view, label=label):
             landings += add_component_bom_balloons(
                 adapter,
@@ -1809,6 +1858,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 label=f"magnifier {label} BOM coverage",
                 margin=BALLOON_MARGIN,
             )
+        source_step(f"{label} balloons")
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
             f"magnifier package carries {len(landings)} balloons, expected one per "
@@ -1816,6 +1866,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
     _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
+    source_step(f"{FINISHED_LABEL} wire balloon placement")
 
     _add_note_block(
         adapter,
@@ -1824,6 +1875,7 @@ async def build(adapter: Any) -> dict[str, str]:
         WHEEL_CAPTION_XY,
         label="wheel caption",
     )
+    source_step("wheel caption")
     lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
     _add_note_block(
         adapter,
@@ -1832,6 +1884,7 @@ async def build(adapter: Any) -> dict[str, str]:
         lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), lever_caption),
         label="lever caption",
     )
+    source_step("lever caption")
     finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
     _add_note_block(
         adapter,
@@ -1840,14 +1893,19 @@ async def build(adapter: Any) -> dict[str, str]:
         caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
         label="finished caption",
     )
+    source_step("finished caption")
     _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
     )
+    source_step("assembly sequence")
     _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
     )
+    source_step("assembly checks")
     _activate_sheet(adapter, SHEET_NAMES[1])
+    source_step("BOM sheet activation before reference hide")
     _hide_bom_reference(adapter, reference, table, items)
+    source_step("hide BOM reference")
     if bool(source_model.GetSaveFlag()):
         raise RuntimeError(
             "magnifier drawing dirtied the source assembly; refusing to save it"
