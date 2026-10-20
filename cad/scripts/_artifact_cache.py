@@ -1,8 +1,8 @@
 r"""Remote build-artefact cache for cache-keyed doit leaves.
 
 The expensive tasks in this pipeline -- ``part:<stem>`` / ``assembly:<stem>`` /
-``drawing:<stem>`` -- drive a live SolidWorks seat. Their
-outputs are a pure function of *hashed inputs*: a part's ``.SLDPRT`` is determined
+``drawing:<stem>`` -- drive a live SolidWorks seat. Their hashed inputs determine
+reusable geometry, not identical native bytes. A part's ``.SLDPRT`` is determined
 by its build script + helper closure + the cad/config files it reads; an
 assembly's ``.SLDASM`` by its recipe files + the recipe-stable referenced CAD
 digests + the exact identities of those referenced artefacts; and a drawing by
@@ -54,9 +54,11 @@ Design notes / invariants:
   (RBAC denies a machine without the data-plane role) -- falls through to the
   real build. Explicit forced refreshes instead require successful publication.
 
-* **Fail-soft unless explicitly refreshing.** Backend errors normally warn and
-  become misses/no-op pushes. A reasoned forced refresh deliberately replaces an
-  existing result and MUST publish successfully; a failed upload fails that task.
+* **Canonical publication.** Ordinary writes create only. After any upload error,
+  a present entry means ``lost``: the action MUST adopt the winner's full archive,
+  or fail. Absent-entry ordinary push failures remain soft. Explicit refresh alone
+  may replace bytes, by CAS against its first pre-work ETag/absence snapshot.
+  Downloads verify atomically committed archive hash/size metadata before unpack.
 
 * **Observable.** A cache miss must be explainable WITHOUT scrollback archaeology
   (issue #73). Three knobs, all best-effort and never able to fail a build:
@@ -127,7 +129,10 @@ from pathlib import Path
 #        fail on missing drive specs. (The recipe-digest shift from the same
 #        change already keys new lookups away from old blobs; the bump makes
 #        the archive-contract change explicit and unconditional -- codex #221.)
-_CACHE_EPOCH = "3"
+#   4 -- canonical first-writer publication with mandatory loser adoption and
+#        atomically committed archive SHA-256/size metadata. No epoch-3 fallback:
+#        old unconditional writers must never overwrite canonical native bytes.
+_CACHE_EPOCH = "4"
 
 # Project-wide defaults, committed so a machine opts in by setting only a MODE --
 # never by rediscovering where the cache lives. Each is still overridable by the
@@ -170,6 +175,10 @@ _KEY_INPUTS: dict[tuple[str, str], list[tuple[str, str]]] = {}
 _KEY_CONTEXT: dict[tuple[str, str], tuple[str, str]] = {}
 # Canonical snapshots are private/read-only and shared by telemetry + cache.jsonl.
 _KEY_MANIFESTS: dict[tuple[str, str], tuple[dict, str, dict]] = {}
+# Intentional refresh snapshots are captured at the FIRST probe, before work or
+# seat wait, and never recaptured by an under-seat probe or upload. Alias entries
+# use their root label with their own key. None means the entry was absent.
+_REFRESH_ETAGS: dict[tuple[str, str], str | None] = {}
 
 # Azure customDimensions values allow 8192 characters. ASCII JSON fragments keep
 # both the character and UTF-8 byte size below that limit, including escaped paths.
@@ -456,7 +465,18 @@ class _BlobBackend:
         from azure.core.exceptions import ResourceNotFoundError
         try:
             blob = self._cc.get_blob_client(self._name(key))
-            return blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY).readall()
+            download = blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY)
+            payload = download.readall()
+            # These are the download response's properties, not a racy second
+            # HEAD. The SDK pins that response's ETag across ranged requests.
+            metadata = download.properties.metadata
+            if (
+                metadata.get("epoch") != _CACHE_EPOCH
+                or metadata.get("archive_size") != str(len(payload))
+                or metadata.get("archive_sha256") != hashlib.sha256(payload).hexdigest()
+            ):
+                raise RuntimeError(f"cache archive integrity mismatch for {key}")
+            return payload
         except ResourceNotFoundError:
             return None
 
@@ -465,25 +485,37 @@ class _BlobBackend:
         # probes every key, so a HEAD (exists) instead of a GET (download) keeps it cheap.
         return self._cc.get_blob_client(self._name(key)).exists()
 
-    def put(self, key: str, blob: bytes) -> None:
-        # The key hashes INPUTS, not these bytes: two writers of one key (a
-        # local rw seat and a farm leaf, or old and new code during a rollout)
-        # upload different archives -- tar mtimes differ, the gzip level may too.
-        # Last-writer-wins is fine; a MIXED archive is not. A single Put Blob is
-        # atomic, so small entries go in one request. A large one is staged as
-        # blocks, and the SDK derives block IDs from the chunk offset alone --
-        # the same IDs for every writer -- so interleaved writers could each
-        # commit a list that resolves to the other's blocks: a torn archive (CRC
-        # failure on restore). Each publish therefore stages under IDs only it
-        # uses and commits exactly that list. A competing commit
-        # garbage-collects this writer's still-uncommitted blocks, which makes
-        # this commit fail (store_error) rather than tear; the winner's archive
-        # stands whole. 48 raw characters encode to 64 on the wire, the same
-        # length as the SDK's own IDs: Azure rejects a Put Block whose ID length
-        # differs from uncommitted blocks an older writer left on the blob.
+    def etag(self, key: str) -> str | None:
+        """Snapshot a refresh precondition; None denotes an absent entry."""
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            return self._cc.get_blob_client(self._name(key)).get_blob_properties().etag
+        except ResourceNotFoundError:
+            return None
+
+    def put(self, key: str, blob: bytes, *, replace_etag: str | None = None) -> None:
+        # Input identity does not imply identical native bytes. Ordinary writers
+        # create only; explicit refresh is the sole CAS replacement. Writer-unique
+        # blocks also prevent interleaved uploads from committing a torn archive.
+        from azure.core import MatchConditions
+
+        metadata = {
+            "archive_sha256": hashlib.sha256(blob).hexdigest(),
+            "archive_size": str(len(blob)),
+            "epoch": _CACHE_EPOCH,
+        }
+        condition = (
+            {"etag": replace_etag, "match_condition": MatchConditions.IfNotModified}
+            if replace_etag is not None
+            else {"match_condition": MatchConditions.IfMissing}
+        )
         client = self._cc.get_blob_client(self._name(key))
         if len(blob) <= _SINGLE_PUT_MAX:
-            client.upload_blob(blob, overwrite=True)
+            client.upload_blob(
+                blob, overwrite=replace_etag is not None, metadata=metadata,
+                **(condition if replace_etag is not None else {}),
+            )
             return
         from azure.storage.blob import BlobBlock
 
@@ -498,7 +530,10 @@ class _BlobBackend:
         with concurrent.futures.ThreadPoolExecutor(_TRANSFER_CONCURRENCY) as pool:
             for _ in pool.map(stage, range(count)):
                 pass
-        client.commit_block_list([BlobBlock(block_id=block_id) for block_id in ids])
+        client.commit_block_list(
+            [BlobBlock(block_id=block_id) for block_id in ids],
+            metadata=metadata, **condition,
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -557,8 +592,19 @@ def forced_refresh(label: str) -> str | None:
     return reason if label in labels else None
 
 
+def capture_refresh(label: str, key: str) -> None:
+    """Capture a root/alias CAS once, before intentional refresh work begins."""
+    if forced_refresh(label) is None or (label, key) in _REFRESH_ETAGS:
+        return
+    backend = _backend()
+    if backend is None:
+        raise RuntimeError(f"{label}: cannot snapshot forced cache refresh ({key[:12]})")
+    _REFRESH_ETAGS[(label, key)] = backend.etag(key)
+
+
 def note_refresh(label: str, key: str, reason: str) -> None:
     """Expose an intentionally skipped restore through every cache diagnostic."""
+    capture_refresh(label, key)
     _warn(f"refresh {label} ({key[:12]}): {reason}")
     _event("cache.refresh", label, key, reason=reason)
     _record("refresh", label, key, reason=reason)
@@ -1053,22 +1099,35 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         return False
 
 
-def store(key: str, outputs: list[Path], label: str) -> str:
-    """Publish outputs; an explicit refresh must never swallow a failed upload."""
-    forced_refresh(label)  # Validate the carrier/mode before touching the backend.
-    return require_refresh_store(label, _store(key, outputs, label))
+def store(
+    key: str, outputs: list[Path], label: str, *, refresh_label: str | None = None
+) -> str:
+    """Publish canonical outputs, or CAS a previously snapshotted root/alias."""
+    authority = refresh_label or label
+    refreshing = forced_refresh(authority) is not None
+    replace_etag = None
+    if refreshing:
+        if (authority, key) not in _REFRESH_ETAGS:
+            raise RuntimeError(f"{authority}: forced cache refresh was not probed before work")
+        replace_etag = _REFRESH_ETAGS[(authority, key)]
+    return require_refresh_store(
+        authority, _store(key, outputs, label, replace_etag=replace_etag)
+    )
 
 
-def _store(key: str, outputs: list[Path], label: str) -> str:
+def _store(
+    key: str, outputs: list[Path], label: str, *, replace_etag: str | None = None
+) -> str:
     """Pack+upload the just-built outputs under ``key``. No-op unless mode=rw.
-    Swallows every error -- a failed push must not fail the build. Records the event
-    in cache.jsonl and stamps the per-label "last published key" sidecar so a later
+    Absent-entry push failures remain soft; a present canonical entry returns
+    ``lost`` for mandatory caller adoption. Records the event in cache.jsonl and
+    stamps the per-label "last published key" sidecar so a later
     HIT under a shifted key can be flagged as drift.
 
-    RETURNS the outcome (``stored``/``skip``/``empty``/``error``/``off``) so the
-    caller's ``cache.store`` phase span can carry it as an attribute: swallowing the
-    failure keeps the build alive, but a publish, a deliberate read-only skip and a
-    failed upload must not all look like the same OK span (codex #424)."""
+    RETURNS the outcome (``stored``/``lost``/``skip``/``empty``/``error``/``off``).
+    A lost publication REQUIRES the action to adopt the entire canonical archive;
+    the caller's ``cache.store`` phase span carries the outcome so a publication,
+    a deliberate read-only skip and a failed upload remain distinguishable."""
     if not writable():
         if enabled():  # ro: pulled but deliberately won't publish -- note the skip
             _record("store_skip", label, key)
@@ -1088,7 +1147,18 @@ def _store(key: str, outputs: list[Path], label: str) -> str:
             blob = _pack(present)
             pack.set_attribute("bytes", len(blob))
         with _phase("cache.upload", bytes=len(blob)):
-            backend.put(key, blob)
+            try:
+                backend.put(key, blob, replace_etag=replace_etag)
+            except Exception:
+                # Includes ambiguous success/timeouts and InvalidBlockList after
+                # a competing commit discarded our staged blocks. The canonical
+                # postcondition, not an Azure error-code taxonomy, decides loss.
+                if not backend.exists(key):
+                    raise
+                _log(f"lost  {label} ({key[:12]}): canonical entry present")
+                _event("cache.store_lost", label, key)
+                _record("store_lost", label, key)
+                return "lost"
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)

@@ -2295,6 +2295,16 @@ def _reprobe_under_seat(
         released = True
 
 
+def _adopt_canonical(key: str, outputs: list[Path], label: str) -> None:
+    """A publication loser must leave the seat with the winner's whole archive."""
+    with _com_seat(label):
+        if not _reprobe_under_seat(key, outputs, label, "miss"):
+            raise RuntimeError(
+                f"{label}: lost cache publication but canonical outputs "
+                f"could not be restored ({key[:12]})"
+            )
+
+
 @_farm.leaf_action
 @_cache.keyed_action
 def _cached_com_action(
@@ -2359,6 +2369,8 @@ def _cached_com_action(
         outcome = _cache.store(key, outputs, label)
         store.set_attribute("cache", outcome)
         _cache.require_refresh_store(label, outcome)
+    if outcome == "lost":
+        _adopt_canonical(key, outputs, label)
 
 
 @_farm.leaf_action
@@ -2463,7 +2475,8 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
         _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
             absent = (
-                f"{label}: farm reported success but cache key {key[:12]} is absent"
+                f"{label}: farm reported success but cache key {key[:12]} is "
+                "absent or failed integrity/restore"
             )
             drift = _farm.checkout_drift()
             if drift is not None:
@@ -2537,6 +2550,9 @@ def _cached_part_action(stem: str, script: Path) -> None:
         outcome = _cache.store(key, outputs, label)
         store.set_attribute("cache", outcome)
         _cache.require_refresh_store(label, outcome)
+    if outcome == "lost":
+        _adopt_canonical(key, outputs, label)
+        _stamp_part_execution(stem)
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -2842,10 +2858,18 @@ def build_or_refresh(stem, dependencies, changed, targets):
     # rewritten from the current inputs, exactly as the success tail does. The
     # per-input digests are taken only where a ledger is written or read.
     cache_outputs = _assembly_cache_outputs(stem)
+    forced = _cache.forced_refresh(label) is not None
+    plan = explode_plan(stem) if forced else None
+    base_key = _explode_base_key(file_deps, plan) if plan is not None and plan.closure else ""
+    base_label = f"{label} explode-base"
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
         cache_key = _cache_key(file_deps, label)
+        if base_key:
+            # Snapshot the alias with its root authority BEFORE work/seat wait;
+            # the under-seat root probe must not advance either precondition.
+            _cache.capture_refresh(label, base_key)
         probed = _probe_cache(cache_key, cache_outputs, label, probe)
         if probed == "hit":
             _stamp_assembly_execution(stem)
@@ -2857,10 +2881,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
         _stamp_assembly_execution(stem)
         _write_input_ledger(ledger, _ledger_inputs(file_deps))
         return
+    if plan is None:
+        # Ordinary hits and farm submitters do not need an explode closure walk.
+        plan = explode_plan(stem)
+        base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
 
-    plan = explode_plan(stem)
-    base_key = _explode_base_key(file_deps, plan) if plan.closure else ""
-    base_label = f"{label} explode-base"
     with _com_seat(label) as waited:
         if _reprobe_under_seat(cache_key, cache_outputs, label, probed):
             _stamp_assembly_execution(stem)
@@ -2870,7 +2895,6 @@ def build_or_refresh(stem, dependencies, changed, targets):
         current = _ledger_inputs(file_deps)
         # A forced refresh recomputes the result: never re-author or republish a
         # reloaded target, so it skips both the tier choice and the base restore.
-        forced = _cache.forced_refresh(label) is not None
         if forced:
             tier, why = RefreshTier.FULL, "forced cache refresh"
         else:
@@ -2955,6 +2979,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
         outcome = _cache.store(cache_key, outputs, label)
         store.set_attribute("cache", outcome)
         _cache.require_refresh_store(label, outcome)
+    if outcome == "lost":
+        _adopt_canonical(cache_key, outputs, label)
+        _stamp_assembly_execution(stem)
+        _write_input_ledger(ledger, _ledger_inputs(file_deps))
+        outputs = _assembly_cache_outputs(stem)
     # The same archive is the explode base for this operational model. An
     # EXPLODE run started from that base, which the cache already holds.
     if not base_key or tier is RefreshTier.EXPLODE:
@@ -2963,7 +2992,11 @@ def build_or_refresh(stem, dependencies, changed, targets):
         f"cache.store {base_label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, base_key)
-        store.set_attribute("cache", _cache.store(base_key, outputs, base_label))
+        outcome = _cache.store(base_key, outputs, base_label, refresh_label=label)
+        store.set_attribute("cache", outcome)
+        _cache.require_refresh_store(label, outcome)
+        # An ordinary alias loss is publish-only: adopting it here would replace
+        # this full key's canonical outputs with a different explode variant.
 
 
 def _close_sw_documents() -> None:
@@ -3333,7 +3366,23 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
                     service=_telemetry.BUILD_INFRA_SERVICE,
                 ) as store:
                     _tag_cache_key(store, key)
-                    store.set_attribute("cache", _cache.store(key, [directory], label))
+                    outcome = _cache.store(key, [directory], label)
+                    store.set_attribute("cache", outcome)
+                    _cache.require_refresh_store(label, outcome)
+                if outcome == "lost":
+                    try:
+                        shutil.rmtree(directory)
+                        if not _cache.restore(key, [directory], label):
+                            raise RuntimeError(
+                                f"{label}: lost cache publication but canonical reports "
+                                "could not be restored"
+                            )
+                        aggregate = _read_machinist_aggregate(stem)
+                    except (OSError, ValueError) as error:
+                        # LEARN may soften a review verdict, never failed adoption.
+                        raise RuntimeError(
+                            f"{label}: could not adopt canonical reports: {error}"
+                        ) from error
         else:
             aggregate = _read_machinist_aggregate(stem)
     except (OSError, ValueError) as error:

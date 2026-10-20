@@ -38,7 +38,16 @@ class _FakeBackend:
     def get(self, key):
         return self.blobs.get(key)
 
-    def put(self, key, blob):
+    def etag(self, key):
+        blob = self.blobs.get(key)
+        return None if blob is None else hashlib.sha256(blob).hexdigest()
+
+    def put(self, key, blob, *, replace_etag=None):
+        if replace_etag is None:
+            if self.exists(key):
+                raise RuntimeError("already exists")
+        elif self.etag(key) != replace_etag:
+            raise RuntimeError("ETag changed")
         self.blobs[key] = blob
 
     def exists(self, key):
@@ -66,6 +75,7 @@ def fake(tmp_path, monkeypatch, real_unpack):
     monkeypatch.setattr(cache, "_KEY_INPUTS", {})
     monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
     monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
+    monkeypatch.setattr(cache, "_REFRESH_ETAGS", {})
     backend = _FakeBackend()
     monkeypatch.setattr(cache, "_BACKEND", backend)
     return backend
@@ -472,23 +482,70 @@ class _BlockBlobService:
     def __init__(self):
         self.committed: dict[str, list[tuple[str, bytes]]] = {}
         self.uncommitted: dict[str, dict[str, bytes]] = {}
+        self.metadata = {}
+        self.etags = {}
+        self.calls = []
         self.on_stage = None
 
     def get_blob_client(self, name):
         service = self
 
         class _Client:
-            def upload_blob(self, data, overwrite):
-                assert overwrite
-                service.committed[name] = [("single", bytes(data))]
+            def _condition(self, *, match_condition, etag=None):
+                from azure.core import MatchConditions
+
+                if match_condition == MatchConditions.IfMissing:
+                    assert etag is None  # the SDK must not receive a wildcard etag
+                    if name in service.committed:
+                        raise RuntimeError("condition failed: already exists")
+                elif match_condition == MatchConditions.IfNotModified:
+                    if etag != service.etags.get(name):
+                        raise RuntimeError("condition failed: ETag changed")
+                else:
+                    pytest.fail("unconditional block commit or replacement")
+
+            def _published(self, metadata):
+                service.metadata[name] = dict(metadata)
+                service.etags[name] = str(int(service.etags.get(name, "0")) + 1)
                 service.uncommitted.pop(name, None)
+
+            def upload_blob(self, data, *, overwrite, metadata, **condition):
+                service.calls.append(("upload", name, {"overwrite": overwrite, **condition}, metadata))
+                if overwrite:
+                    self._condition(**condition)
+                elif name in service.committed:
+                    raise RuntimeError("condition failed: already exists")
+                service.committed[name] = [("single", bytes(data))]
+                self._published(metadata)
+
+            def exists(self):
+                return name in service.committed
+
+            def get_blob_properties(self):
+                from azure.core.exceptions import ResourceNotFoundError
+
+                service.calls.append(("etag", name))
+                if name not in service.committed:
+                    raise ResourceNotFoundError("missing")
+                return types.SimpleNamespace(etag=service.etags[name])
+
+            def download_blob(self, **kwargs):
+                from azure.core.exceptions import ResourceNotFoundError
+
+                if name not in service.committed:
+                    raise ResourceNotFoundError("missing")
+                # Snapshot body and response metadata together, like the SDK.
+                data = service.content(name)
+                properties = types.SimpleNamespace(metadata=dict(service.metadata[name]))
+                return types.SimpleNamespace(readall=lambda: data, properties=properties)
 
             def stage_block(self, block_id, data):
                 service.uncommitted.setdefault(name, {})[block_id] = bytes(data)
                 if service.on_stage is not None:
                     service.on_stage()
 
-            def commit_block_list(self, blocks):
+            def commit_block_list(self, blocks, *, metadata, **condition):
+                service.calls.append(("commit", name, condition, metadata))
                 staged = service.uncommitted.get(name, {})
                 old = dict(service.committed.get(name, []))
                 resolved = []
@@ -499,8 +556,9 @@ class _BlockBlobService:
                         resolved.append((block.id, old[block.id]))
                     else:
                         raise RuntimeError(f"InvalidBlockList: {block.id}")
+                self._condition(**condition)
                 service.committed[name] = resolved
-                service.uncommitted.pop(name, None)
+                self._published(metadata)
 
         return _Client()
 
@@ -526,12 +584,11 @@ def test_interleaved_chunked_publishes_never_commit_a_torn_archive(monkeypatch):
         backend.put(key, second)
 
     service.on_stage = competing_publish
-    try:
+    with pytest.raises(RuntimeError, match="InvalidBlockList|condition failed"):
         backend.put(key, first)
-    except RuntimeError:
-        pass  # losing the race is a store_error, which store() swallows
 
-    assert service.content(backend._name(key)) in (first, second)
+    assert service.content(backend._name(key)) == second
+    assert backend.get(key) == second
 
 
 _LEAF_RESOURCE = "microsoft.applicationId=app,farm.worker=w@1,farm.execution=wf/run/1"
@@ -1232,24 +1289,332 @@ def test_refresh_diagnostics_carry_label_key_and_reason(
     )
 
 
-def test_refresh_overwrites_the_same_key_and_requires_publication(fake, tmp_path, monkeypatch):
+def test_refresh_cas_replaces_the_same_key_and_requires_publication(fake, tmp_path, monkeypatch):
     key = "a" * 64
     output = tmp_path / "output.bin"
     output.write_bytes(b"replacement")
     fake.blobs[key] = b"old cached bytes"
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", '{"labels":["part:x"],"reason":"Audit"}')
+    cache.capture_refresh("part:x", key)
     assert cache.store(key, [output], "part:x") == "stored"
     assert fake.blobs[key] != b"old cached bytes"
     assert cache.last_stored_key("part:x") == key
 
-    def fail_upload(*_args):
+    def fail_upload(*_args, **_kwargs):
         raise OSError("upload denied")
 
     monkeypatch.setattr(fake, "put", fail_upload)
-    with pytest.raises(RuntimeError, match="forced cache refresh did not store outputs \\(error\\)"):
+    with pytest.raises(RuntimeError, match="forced cache refresh did not store outputs \\(lost\\)"):
         cache.store(key, [output], "part:x")
-    # Ordinary leaves retain their original fail-soft publication behavior.
-    assert cache.store(key, [output], "part:ordinary") == "error"
+    # An ordinary ambiguous publish with a canonical entry is a loss, not success.
+    assert cache.store(key, [output], "part:ordinary") == "lost"
+    # Absent-entry publication failures remain soft for ordinary leaves.
+    assert cache.store("b" * 64, [output], "part:ordinary") == "error"
+
+
+@pytest.mark.parametrize("large", [False, True], ids=["put-blob", "put-block-list"])
+@pytest.mark.parametrize("refresh", [False, True], ids=["create", "cas"])
+def test_blob_publication_conditions_and_atomic_metadata(monkeypatch, large, refresh):
+    from azure.core import MatchConditions
+
+    monkeypatch.setattr(cache, "_SINGLE_PUT_MAX", 8 if large else 1024)
+    monkeypatch.setattr(cache, "_BLOCK_SIZE", 4)
+    service = _BlockBlobService()
+    backend = cache._BlobBackend(service)
+    key, payload = "c" * 64, b"new native bytes"
+    if refresh:
+        backend.put(key, b"old native bytes")
+        before = backend.etag(key)
+    else:
+        before = None
+    backend.put(key, payload, replace_etag=before)
+    name = backend._name(key)
+    operation, written_name, condition, metadata = service.calls[-1]
+    assert operation == ("commit" if large else "upload")
+    assert written_name == name
+    expected = {
+        **({"etag": before} if refresh else {}),
+        "match_condition": MatchConditions.IfNotModified if refresh else MatchConditions.IfMissing,
+    }
+    if not large:
+        expected = {"overwrite": refresh, **(expected if refresh else {})}
+    assert condition == expected
+    assert metadata == service.metadata[name] == {
+        "archive_sha256": hashlib.sha256(payload).hexdigest(),
+        "archive_size": str(len(payload)), "epoch": "4",
+    }
+    assert backend.get(key) == payload
+    winner_etag = service.etags[name]
+    with pytest.raises(RuntimeError, match="condition failed"):
+        backend.put(key, b"late writer bytes")
+    assert backend.get(key) == payload
+    assert service.etags[name] == winner_etag
+
+
+@pytest.mark.parametrize("field,value", [
+    ("archive_sha256", "0" * 64), ("archive_size", "999"), ("epoch", "3"),
+    ("archive_sha256", None),
+])
+def test_download_checks_response_metadata_before_unpack(monkeypatch, fake, field, value):
+    service = _BlockBlobService()
+    backend = cache._BlobBackend(service)
+    key = "d" * 64
+    backend.put(key, b"archive")
+    metadata = service.metadata[backend._name(key)]
+    if value is None:
+        metadata.pop(field)
+    else:
+        metadata[field] = value
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    monkeypatch.setattr(cache, "_unpack", lambda _blob: pytest.fail("unpacked corrupt payload"))
+    assert cache.restore(key, [], "part:x") is False
+    assert not any(call[0] == "etag" for call in service.calls)
+
+
+def test_download_uses_its_response_not_a_second_head():
+    service = _BlockBlobService()
+    backend = cache._BlobBackend(service)
+    key = "e" * 64
+    backend.put(key, b"old response")
+    client = service.get_blob_client(backend._name(key))
+    original_download = client.download_blob
+
+    def concurrent_refresh(**kwargs):
+        response = original_download(**kwargs)
+        backend.put(key, b"new canonical", replace_etag=backend.etag(key))
+        return response
+
+    client.download_blob = concurrent_refresh
+    original_client = service.get_blob_client
+    service.get_blob_client = lambda _name: client
+    try:
+        assert backend.get(key) == b"old response"
+    finally:
+        service.get_blob_client = original_client
+
+
+@pytest.mark.parametrize("message", ["InvalidBlockList", "ambiguous timeout"])
+@pytest.mark.parametrize("present", [False, True])
+def test_every_failed_publish_classifies_canonical_presence(
+    fake, tmp_path, monkeypatch, message, present
+):
+    key = "f" * 64
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"loser")
+    if present:
+        fake.blobs[key] = b"winner"
+
+    def fail(*_args, **_kwargs):
+        raise OSError(message)
+
+    monkeypatch.setattr(fake, "put", fail)
+    assert cache.store(key, [output], "part:x") == ("lost" if present else "error")
+    assert cache.last_stored_key("part:x") is None
+    assert _events(tmp_path)[-1]["event"] == ("store_lost" if present else "store_error")
+    if present:
+        assert fake.blobs[key] == b"winner"
+
+
+def test_failed_presence_check_is_an_ordinary_error(fake, tmp_path, monkeypatch):
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"loser")
+
+    def fail(*_args, **_kwargs):
+        raise OSError("unreachable")
+
+    monkeypatch.setattr(fake, "put", fail)
+    monkeypatch.setattr(fake, "exists", fail)
+    assert cache.store("f" * 64, [output], "part:x") == "error"
+
+
+@pytest.mark.parametrize("initially_present", [False, True])
+def test_refresh_never_recaptures_changed_or_absent_snapshot(
+    fake, tmp_path, monkeypatch, initially_present
+):
+    key, label = "a" * 64, "part:x"
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"refresh")
+    if initially_present:
+        fake.put(key, b"original")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": [label], "reason": "Owner - CAS snapshot",
+    }))
+    heads = []
+    original_etag = fake.etag
+
+    def etag(key):
+        heads.append(key)
+        return original_etag(key)
+
+    monkeypatch.setattr(fake, "etag", etag)
+    cache.note_refresh(label, key, "Owner - CAS snapshot")
+    snapshot = cache._REFRESH_ETAGS[(label, key)]
+    fake.blobs[key] = b"concurrent winner"
+    cache.note_refresh(label, key, "Owner - CAS snapshot")
+    assert heads == [key]
+    assert cache._REFRESH_ETAGS[(label, key)] == snapshot
+    with pytest.raises(RuntimeError, match="did not store outputs \\(lost\\)"):
+        cache.store(key, [output], label)
+    assert fake.blobs[key] == b"concurrent winner"
+
+
+def test_ambiguous_own_commit_is_lost_without_a_published_key_sidecar(
+    fake, tmp_path, monkeypatch
+):
+    key = "a" * 64
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"server accepted these bytes")
+    put = fake.put
+
+    def commit_then_timeout(key, blob, *, replace_etag=None):
+        put(key, blob, replace_etag=replace_etag)
+        raise TimeoutError("reply lost after commit")
+
+    monkeypatch.setattr(fake, "put", commit_then_timeout)
+    assert cache.store(key, [output], "part:x") == "lost"
+    assert fake.blobs[key].startswith(b"\x1f\x8b")
+    assert cache.last_stored_key("part:x") is None
+    assert _events(tmp_path)[-1]["event"] == "store_lost"
+
+
+def test_refresh_requires_an_early_probe_not_a_preupload_head(fake, tmp_path, monkeypatch):
+    output = tmp_path / "output.bin"
+    output.write_bytes(b"refresh")
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", '{"labels":["part:x"],"reason":"Audit"}')
+    monkeypatch.setattr(fake, "etag", lambda _key: pytest.fail("late refresh snapshot"))
+    with pytest.raises(RuntimeError, match="not probed before work"):
+        cache.store("a" * 64, [output], "part:x")
+
+
+@pytest.fixture
+def sdk_wire():
+    """Real SDK -> RequestsTransport -> Session.request -> socket-free adapter."""
+    import base64
+    import io
+    from urllib.parse import parse_qs, urlsplit
+    import requests
+    from azure.core.pipeline.transport import RequestsTransport
+    from azure.storage.blob import ContainerClient
+
+    class Adapter(requests.adapters.BaseAdapter):
+        def __init__(self):
+            self.requests = []
+            self.status = 201
+
+        def send(self, request, **kwargs):
+            self.requests.append(request)
+            query = parse_qs(urlsplit(request.url).query)
+            staged = query.get("comp") == ["block"]
+            code = 200 if request.method == "HEAD" else 201 if staged else self.status
+            body = b""
+            response = requests.Response()
+            response.status_code = code
+            response.reason = {200: "OK", 201: "Created", 409: "Conflict", 412: "Precondition Failed"}[code]
+            response.url = request.url
+            response.request = request
+            response.headers = requests.structures.CaseInsensitiveDict({
+                "ETag": '"snapshot-etag"',
+                "Last-Modified": "Mon, 19 Oct 2026 00:00:00 GMT",
+                "x-ms-request-id": "offline-contract",
+                "x-ms-version": "2025-11-05",
+                "x-ms-blob-type": "BlockBlob",
+                "Content-Type": "application/xml",
+                "Content-Length": "0",
+            })
+            if code in (409, 412):
+                error = "BlobAlreadyExists" if code == 409 else "ConditionNotMet"
+                response.headers["x-ms-error-code"] = error
+                body = f"<Error><Code>{error}</Code><Message>Conflict</Message></Error>".encode()
+                response.headers["Content-Length"] = str(len(body))
+            response._content = body
+            response._content_consumed = True
+            response.raw = io.BytesIO(body)
+            return response
+
+        def close(self):
+            pass
+
+    adapter = Adapter()
+    with requests.Session() as session:
+        session.trust_env = False
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        transport = RequestsTransport(session=session, session_owner=False)
+        with ContainerClient(
+            account_url="https://offline.blob.core.windows.net", container_name="cache",
+            credential={
+                "account_name": "offline",
+                "account_key": base64.b64encode(b"offline-test-key-no-credentials").decode(),
+            },
+            transport=transport, retry_total=0,
+        ) as container:
+            yield types.SimpleNamespace(
+                container=container, backend=cache._BlobBackend(container), adapter=adapter,
+            )
+
+
+@pytest.mark.parametrize("large", [False, True], ids=["put-blob", "put-block-list"])
+@pytest.mark.parametrize("refresh", [False, True], ids=["if-missing", "if-match"])
+@pytest.mark.parametrize("status", [201, 409, 412], ids=["created", "exists", "precondition"])
+def test_real_azure_sdk_emits_wire_conditions_and_metadata(
+    monkeypatch, sdk_wire, large, refresh, status
+):
+    """The adapter sits BELOW real Session.request, which rejects leaked kwargs."""
+    from urllib.parse import parse_qs, urlsplit
+    from azure.core.exceptions import HttpResponseError
+
+    backend, adapter = sdk_wire.backend, sdk_wire.adapter
+    adapter.status = status
+    monkeypatch.setattr(cache, "_SINGLE_PUT_MAX", 8 if large else 1024)
+    monkeypatch.setattr(cache, "_BLOCK_SIZE", 4)
+    monkeypatch.setattr(cache, "_TRANSFER_CONCURRENCY", 1)
+    payload, key = b"native publication archive", "c" * 64
+    snapshot = backend.etag(key) if refresh else None
+    if status != 201:
+        with pytest.raises(HttpResponseError):
+            backend.put(key, payload, replace_etag=snapshot)
+    else:
+        backend.put(key, payload, replace_etag=snapshot)
+    writes = [
+        request for request in adapter.requests
+        if request.method == "PUT"
+        and parse_qs(urlsplit(request.url).query).get("comp") != ["block"]
+    ]
+    assert len(writes) == 1
+    request = writes[0]
+    query = parse_qs(urlsplit(request.url).query)
+    assert query.get("comp") == (["blocklist"] if large else None)
+    if refresh:
+        assert snapshot == '"snapshot-etag"'
+        assert request.headers["If-Match"] == snapshot
+        assert "If-None-Match" not in request.headers
+    else:
+        assert request.headers["If-None-Match"] == "*"
+        assert "If-Match" not in request.headers
+    assert request.headers["x-ms-meta-archive_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert request.headers["x-ms-meta-archive_size"] == str(len(payload))
+    assert request.headers["x-ms-meta-epoch"] == "4"
+    assert request.headers["Authorization"].startswith("SharedKey offline:")
+    staged = [
+        request for request in adapter.requests
+        if parse_qs(urlsplit(request.url).query).get("comp") == ["block"]
+    ]
+    assert bool(staged) == large
+    assert all("x-ms-meta-archive_sha256" not in request.headers for request in staged)
+
+
+def test_real_sdk_rejects_pre_fix_wildcard_etag_before_adapter(sdk_wire):
+    """Negative control for B1: the old kwargs fail below the real SDK pipeline."""
+    from azure.core import MatchConditions
+    from azure.storage.blob import BlobBlock
+
+    client = sdk_wire.container.get_blob_client("negative-control.tar.gz")
+    with pytest.raises(TypeError, match="unexpected keyword argument 'etag'"):
+        client.commit_block_list(
+            [BlobBlock(block_id="offline-block")],
+            etag="*", match_condition=MatchConditions.IfMissing,
+        )
+    assert sdk_wire.adapter.requests == []
 
 
 if __name__ == "__main__":

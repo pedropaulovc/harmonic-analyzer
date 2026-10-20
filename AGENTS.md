@@ -621,8 +621,9 @@ verdict passes its stamp path as `stamp=` and that stamp IS the cached artefact.
 This is enforced loud at runtime: a doit-launched build that reaches
 `sw.connect` without `HARMONIC_COM_SEAT` set raises in `_session.run_build` (the
 successor to the removed `_assert_spine_complete` tripwire). The cache RESTORE/STORE
-(Azure transfers) run **outside** the lock, so cache hits stay parallel; only the COM
-subprocess holds the seat.
+(Azure transfers) normally run **outside** the lock, so cache hits stay parallel;
+COM work and mandatory publication-loser adoption hold the seat. Adoption reuses
+the release-once/reprobe path and fails if the canonical archive cannot be restored.
 
 **Serializes but does NOT isolate:** SolidWorks keys open documents by *filename* and
 carries session-global state, so the lock is a safety belt — not a green light for
@@ -883,6 +884,22 @@ or a gitignored `.harmonic-remote-cache-mode` file at the repo root
 details — roles, auth, salt-busting, provisioning, caveats — in
 [`DEVELOPING.md`](DEVELOPING.md).
 
+**Canonical publication (epoch 4, #1428).** Ordinary writes are create-only:
+the first complete archive wins. A failed upload with a canonical entry returns
+`lost`, never `stored`; the action restores that whole archive before succeeding.
+Part/assembly execution tokens are re-stamped from the restored native bytes,
+assembly ledgers are rewritten for current inputs, and machinist verdicts are
+re-read from winning reports. Machinist canonical-adoption failure is fatal even
+in LEARN mode; LEARN softens review verdicts, never failure to adopt winning evidence.
+Ordinary explode-base alias conflicts are publish-only: never adopt the alias
+over full-key outputs. Missing-entry ordinary
+push failures remain soft; `ro`/`off` roles are unchanged. Archive SHA-256, byte
+size and epoch are committed atomically with both small and staged uploads and
+verified from download response properties before unpacking. Epoch 4 isolates old
+unconditional writers: **every leaf key changes once, with no epoch-3 fallback**.
+Use fresh build snapshots for cutover; do not mix persistent old native outputs
+with epoch-4 identities. A cold full build requires separate authorization.
+
 **Per-seat part order — two cold builders split the work, not duplicate it.**
 Parts have no inter-part deps, so the order in which their tasks are offered to the
 scheduler is free. Two seats cold-building in the *same* order march in lock-step,
@@ -938,9 +955,16 @@ including the under-seat re-probe, and fails unless publication returns `stored`
 Forced assembly refreshes rerun the full recipe and hooks, not a reload of the
 previous local assembly, even when its recipe sidecar is unchanged.
 The farm submitter still restores the newly published bytes after success.
-Refresh intentionally overwrites the same key (last writer wins), without changing
-workflow IDs. It is scoped to the invocation: every dispatch of a listed label
-refreshes; nothing persists in source or changes the cache salt. The submitter
+Refresh is the sole explicit same-key replacement: the first refresh probe captures
+the ETag (or absence) **before work/seat wait**, and publication compares against
+that unchanged snapshot. A conflict or upload failure is fatal. Forced assembly
+refresh also snapshots the explode-base alias before work and CAS-publishes it
+after the root. This pair is **not atomic**: an alias failure can leave the root
+replaced while the alias is old. Existing explode-variant full keys are not replaced.
+Concurrent consumers may fail strict `cache_missing`; never accept a different key.
+Each new process/redispatch snapshots independently before work. An overlapping
+stale/zombie attempt whose precondition changed fails CAS loudly, not last-writer-wins.
+Refresh is invocation-scoped; nothing persists in source or changes the salt. The submitter
 and the matching worker leaf receive `HARMONIC_CACHE_REFRESH` JSON containing
 `labels` and `reason`; never hand-edit that carrier to evade wrapper validation.
 Each skipped restore emits a `!!` warning naming label, 12-hex key and reason,
@@ -1437,7 +1461,7 @@ scripts that `from _check import log, check` are instrumented unchanged.
   is another full download, so it is never inside the work span), `task <label>` (the
   work, starting once the seat is HELD) and `cache.store <label>` (the publish, whose
   `cache` attribute carries the outcome `_cache.store` returns —
-  `stored`/`skip`/`empty`/`error`/`off` — since a swallowed upload failure must not
+  `stored`/`lost`/`skip`/`empty`/`error`/`off` — since a swallowed upload failure must not
   look like a successful publish). Each
   phase is then timed for what it is: the `task` span can no longer absorb queueing
   or network transfer, so "how long does this part take to build?" is finally

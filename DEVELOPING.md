@@ -1302,12 +1302,31 @@ Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,
 `drawing:<stem>`, the gates (`verify_soundness:<stem>`, `verify:kinematics`,
 `preflight`), the neutral `export` and the release Pack-and-Go
 (`package:release`). They are the slow part of the pipeline — a part is ~20 s and
-a full assembly ~500 s. Their outputs are a pure
-function of their hashed inputs, so a shared cache lets one machine **download a
+a full assembly ~500 s. Hashed inputs identify reusable geometry, not necessarily
+identical native bytes. A shared cache lets one machine **download a
 prebuilt `.SLDPRT`/`.SLDASM`/`.SLDDRW`/`.STL`/`.PDF`** for an unchanged input set
 instead of
 driving SolidWorks. A seat-less machine can pull; a builder pulls **and**
 publishes. Implementation: `cad/scripts/_artifact_cache.py`.
+
+**Canonical first-writer publication (#1428).** An ordinary publisher creates only
+if the key is absent. Both single-upload and staged-block commits are conditional;
+they attach `archive_sha256`, `archive_size` and `epoch` metadata atomically with
+the archive. Downloads validate hash/size/epoch from the SDK response properties
+before unpacking (the SDK pins the initial ETag across ranged downloads).
+
+After any upload error, including an ambiguous timeout or `InvalidBlockList`,
+a present canonical entry means `lost`, not `stored`. The action must restore the
+entire winning archive before succeeding. Native adoption takes the COM seat and
+uses the existing release-once/reprobe recovery; unavailable, still-locked or
+hash-invalid canonical bytes are fatal. Part and assembly execution tokens are
+re-stamped; assembly input ledgers are rewritten. Drawing/generic COM bundles
+adopt all archived outputs, and machinist review re-reads the winning aggregate
+before enforcing/stamping it. LEARN softens machinist verdicts, not adoption
+failures: inability to clean/restore/read winning evidence is fatal even in LEARN.
+Ordinary explode-base alias loss is ignored without adopting it over the current
+full-key outputs. An ordinary upload failure with no canonical entry remains
+fail-soft; `ro` and `off` contracts are unchanged.
 
 A gate produces no CAD artefact, so **its stamp is its cached output**
 (`cad/out/reports/verify-*.ok`, `preflight.ok`): identical inputs imply an
@@ -1482,7 +1501,8 @@ build):
   it on for the build you're diagnosing rather than reasoning after the fact.
 - **`cad/out/reports/cache.jsonl`** — an append-only event log (one JSON object per
   restore/store: `ts`, `event`, `label`, `key`, `epoch`, `salt`). Events:
-  `store` / `store_skip` (ro seat) / `store_empty` / `store_error`,
+  `store` / `store_lost` (canonical adoption required) / `store_skip` (ro seat) /
+  `store_empty` / `store_error`,
   `restore_hit` / `restore_miss` / `restore_hit_drift` / `restore_error` /
   `restore_locked` (a HIT whose extract a share lock refused — the one restore
   failure that raises instead of "building locally", see AGENTS.md's seat
@@ -1648,6 +1668,13 @@ hit. Mix-ins guard this:
 - **`_CACHE_EPOCH`** — bump to invalidate *every* entry pipeline-wide (e.g. a
   pack-format change).
 
+**Epoch 4 cutover:** canonical publication and payload-integrity metadata invalidate
+every leaf key once. There is no epoch-3 fallback or copy-warming; old unconditional
+writers cannot overwrite epoch-4 entries. Use fresh snapshots rather than mixing
+persistent pre-cutover native outputs with the new identity graph. This is a
+pipeline-wide cold cutover, not a narrow drawing/render closure; cold native/full
+build validation is a separately authorized operation.
+
 ### Refreshing one unchanged leaf
 
 Use a forced refresh when the input key must stay unchanged but its cached result
@@ -1681,10 +1708,22 @@ mode other than `rw` exit 2 before any fleet query or action. The request is sco
 to this invocation, overriding doit freshness as well as both cache probes; every
 dispatch of a listed label refreshes again. A successful execution must publish
 (`store` returns `stored`), otherwise the task fails rather than swallowing an
-upload failure. Publication deliberately overwrites the existing key (last writer
-wins); it is not a salt change or a persistent invalidation.
+upload failure. Refresh is the sole same-key replacement: the first intentional
+refresh probe captures the entry's ETag or absence **before expensive work or seat
+wait**. Under-seat re-probes and publication reuse it, never recapture it. Existing
+entries replace only with that ETag; initially absent entries create only if still
+absent. Any conflict/error fails the refresh loudly. This is not a salt change or
+persistent invalidation.
 For an assembly, refresh reruns the full recipe and its hooks rather than reloading
 the previous local target; an unchanged sidecar must not republish suspect bytes.
+For an explode-qualified root assembly, refresh also snapshots its base alias before
+work, then CAS-publishes the alias after root publication. A conflict/error on either
+is fatal. **Root + alias are not an atomic pair:** alias failure may leave a new
+root with the old alias. Other already-published explode-variant full keys are not
+replaced. Concurrent consumers can fail strict `cache_missing` if an identity was
+replaced; the requested-key contract is unchanged and never substitutes other keys.
+Every new process/redispatch captures its own first snapshot. Overlapping stale
+or zombie attempts fail CAS loudly when their precondition changes.
 
 `HARMONIC_CACHE_REFRESH` carries compact JSON `{"labels":["part:pn_pen_rod"],
 "reason":"Owner - Re-evaluate unchanged-input result"}` during the submitter run.
