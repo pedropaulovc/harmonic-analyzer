@@ -145,7 +145,7 @@ DRUM_BACK_ADVANCE_STACK = {
     + DRUM_END_SHIM_SET_ERROR,
     "rig-set leaf D, thinnest setting": FEELER_SET_ERROR,
 }
-DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # the bank is held north
+DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # bank held south; set follows actual g19
 DRUM_FRONT_RETREAT_STACK = {
     "MHA-DT-01 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,

@@ -3066,9 +3066,9 @@ if Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 > APINION_Z_BACK + 0.5:
 # and must stay 1.0 south of g0's front face.  Both spares join RIG_MARGINS
 # (below), and one leaf step thinner would leave j = 19 short of
 # RIG_MARGIN_SPARE (D is the thinnest setting that holds).  D is set with the
-# bank held north (preloaded, #948 ruling R, PR #1292), so the bank adds
-# nothing to j = 19; at the front g0 sits south by a long g0 -> g19 pitch
-# stack (RIG.G0_FRONT_SOUTH_STACK), so the j = 0 row carries it beside the
+# bank held south on its disc (user ruling 2026-10-20), and D follows the
+# actual g19 back face, so the bank adds nothing to j = 19; at the front g0
+# sits south by a long g0 -> g19 pitch stack (RIG.G0_FRONT_SOUTH_STACK), beside the
 # drum's own retreat (Codex #858, PRRT_kwDOPHDy386mUjhU).
 _G19_FACE_Z = (
     Z_DRUM0 + 19 * Z_PITCH - DRUM_FACE / 2.0,
