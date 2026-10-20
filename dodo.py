@@ -1933,6 +1933,15 @@ def _drawing_file_deps(stem: str) -> list[str]:
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
+    if stem == "ch_channel_assembly":
+        # Branch-only native contract fixture: two read-only part inputs, with
+        # their exact execution identities, inside this existing drawing leaf.
+        source_deps += (
+            _sldprt("ch_rod_pivot_pin"),
+            _part_execution_token("ch_rod_pivot_pin"),
+            _sldprt("ch_pivot_shaft"),
+            _part_execution_token("ch_pivot_shaft"),
+        )
     deps = sorted(
         {
             str(script),
@@ -3637,6 +3646,7 @@ def task_check():
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
+        SCRIPTS_DIR / "test_bulk_visibility_contract_probe.py",
         # A fresh detail view's projection is read behind the view barrier
         # and settled within a time budget, not a read count (#1336).
         SCRIPTS_DIR / "test_drawing_detail_projection.py",

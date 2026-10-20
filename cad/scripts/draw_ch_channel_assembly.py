@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+from _bulk_visibility_contract_probe import run_bulk_visibility_probe
 from _check import check
 from _com import _early_bound
 import _config
@@ -1834,6 +1835,7 @@ async def build(adapter: Any) -> dict[str, str]:
     require_single_spring_variant(
         SPRING_STEMS, str(_config.machine("amplitude", "preset"))
     )
+    await run_bulk_visibility_probe(adapter)
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
 
