@@ -109,6 +109,7 @@ from _custom_properties import apply_custom_properties
 from _session import run_build
 from _drawing_marks import DRAWN_BY
 from _assembly import (
+    _rebuilt_component_name,
     activate_assembly_contract,
     angle_driver,
     apply_component_color,
@@ -2121,9 +2122,11 @@ def _chain_reference_names(model) -> dict[str, str]:
 
 
 def _assign_chain_references(adapter) -> dict[str, str]:
-    """Assign checked pattern references only after every member exists."""
+    """Assign pattern references and preserve placed pose witnesses across rebuild."""
     model = adapter.currentModel
-    for station, component in _chain_station_components(model).items():
+    stations = _chain_station_components(model)
+    before = {station: str(component.Name2) for station, component in stations.items()}
+    for station, component in stations.items():
         if station != LINK_COUNT - 1:
             role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
             set_component_reference(
@@ -2134,7 +2137,16 @@ def _assign_chain_references(adapter) -> dict[str, str]:
             )
     if not bool(model.ForceRebuild3(False)):
         raise RuntimeError("chain component reference rebuild failed")
-    return _chain_reference_names(model)
+    names = _chain_reference_names(model)
+    after = {
+        station: str(component.Name2)
+        for station, component in _chain_station_components(model).items()
+    }
+    # The connector has no shared Role:N; the validated station census still
+    # carries its placement witness through the same native address change.
+    for station in sorted(before):
+        _rebuilt_component_name(before[station], after[station])
+    return names
 
 
 async def _place_chain_seed(

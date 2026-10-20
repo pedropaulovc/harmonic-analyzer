@@ -411,6 +411,8 @@ SOLIDWORKS owns occurrence names and native instance indices. Shared components 
 
 Reference writes are idempotent and read back independently. After an explicit rebuild, bind semantic references to current native names again and verify parent scope, native instance index, configuration and pose. Move any existing pose-ledger entry unchanged to its current name, refusing collisions; never accept a stale name through a compatibility alias.
 
+The paper-drive chain assigns references after the pattern exists. At that late rebuild, match pre- and post-rebuild occurrences by checked loop station and apply the same name/index/scope/ledger checks to every station, including the unreferenced connecting link. Preserve the four existing seed/closing-link ledger entries exactly; do not replace them with newly observed poses.
+
 A configured part that loses a create-only cache publication adopts the winner's complete native/member archive, stamps the adopted execution identity, then validates its STEP/PNG certificate before succeeding. Pre-publication validation of the losing outputs is not evidence for the adopted winner. Missing or mismatched winner members fail closed; never regenerate them or rewrite their certificate from the losing build.
 
 Longer shared identities are checked against native drawing geometry. Support-bar slot counterbores retain their proven screw-head clearance minimum with native asymmetric model limits; Detail C's text and leader must clear Section B-B. The measuring-stick section-A marker must clear the setting dimension without changing its value or section plane. Frame sheet 2 places the set-screw balloon below the measured BOM extent and verifies its ring and leader remain clear of the cap balloon after rebuilding.

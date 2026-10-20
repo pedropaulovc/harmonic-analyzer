@@ -2172,6 +2172,122 @@ def test_chain_reference_assignment_refuses_failed_native_rebuild(monkeypatch):
     ] == transforms_before
 
 
+def test_chain_pattern_rebuild_rebinds_existing_pose_witnesses(monkeypatch):
+    adapter, components = _native_chain_fixture(monkeypatch)
+    model = adapter.currentModel
+    placed_stations = (0, 1, chain.LINK_COUNT - 2, chain.LINK_COUNT - 1)
+    before = {station: component.Name2 for station, component in enumerate(components)}
+    arrays = [list(component.Transform2.ArrayData) for component in components]
+    transforms = [component.Transform2 for component in components]
+    configurations = [component.ReferencedConfiguration for component in components]
+    connecting_reference = components[-1].ComponentReference
+    entries = {}
+    for station in placed_stations:
+        array = arrays[station]
+        _assembly._ledger_record(
+            before[station],
+            [value * 1000.0 for value in array[9:12]],
+            [array[0:3], array[3:6], array[6:9]],
+        )
+        entries[station] = _assembly._POSE_LEDGER[before[station]]
+
+    def rename_after_reference_assignment(_top_only):
+        for station in (*placed_stations, 2):
+            index = before[station].rsplit("-", 1)[-1]
+            components[station].Name2 = f"rebuilt-native-chain-{index}"
+        return True
+
+    model.ForceRebuild3.side_effect = rename_after_reference_assignment
+    names = assembly._assign_chain_references(adapter)
+    model.ForceRebuild3.assert_called_once_with(False)
+    assert len(names) == chain.LINK_COUNT - 1
+    assert names["@InnerLink:1"] == components[0].Name2
+    assert names["@OuterLink:1"] == components[1].Name2
+    assert names["@InnerLink:34"] == components[-2].Name2
+    assert not {
+        before[station] for station in placed_stations
+    }.intersection(_assembly._POSE_LEDGER), (
+        "old chain pose ledger keys survived collective rebuild"
+    )
+    assert set(_assembly._POSE_LEDGER) == {
+        components[station].Name2 for station in placed_stations
+    }
+    for station in placed_stations:
+        assert _assembly._POSE_LEDGER[components[station].Name2] is entries[station]
+    assert components[2].Name2 not in _assembly._POSE_LEDGER
+    assert before[2] not in _assembly._POSE_LEDGER
+    assert all(
+        component.Transform2 is transform
+        and list(component.Transform2.ArrayData) == array
+        for component, transform, array in zip(
+            components, transforms, arrays, strict=True
+        )
+    )
+    assert [
+        component.ReferencedConfiguration for component in components
+    ] == configurations
+    assert components[-1].ComponentReference == connecting_reference
+    # This is the real save-time guard, with native lookup accepting live names
+    # only. Migrating keys must preserve the existing solved pose witnesses.
+    _assembly.assert_pose_ledger(adapter)
+    assert _assembly._POSE_LEDGER == {}
+
+
+@pytest.mark.parametrize(
+    ("station", "fault"),
+    (
+        (2, "index-drift"),
+        (chain.LINK_COUNT - 1, "index-drift"),
+        (chain.LINK_COUNT - 1, "ledger-collision"),
+    ),
+)
+def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
+    monkeypatch, station, fault
+):
+    adapter, components = _native_chain_fixture(monkeypatch)
+    model = adapter.currentModel
+    component = components[station]
+    previous = component.Name2
+    array = list(component.Transform2.ArrayData)
+    index = previous.rsplit("-", 1)[-1]
+    current = f"rebuilt-native-chain-{index if fault == 'ledger-collision' else '9999'}"
+    entry = None
+    if station == chain.LINK_COUNT - 1:
+        _assembly._ledger_record(
+            previous,
+            [value * 1000.0 for value in array[9:12]],
+            [array[0:3], array[3:6], array[6:9]],
+        )
+        entry = _assembly._POSE_LEDGER[previous]
+    collision = ([999.0, 999.0, 999.0], list(array[0:9]))
+
+    def damage_after_reference_assignment(_top_only):
+        component.Name2 = current
+        if fault == "ledger-collision":
+            _assembly._POSE_LEDGER[current] = collision
+        return True
+
+    model.ForceRebuild3.side_effect = damage_after_reference_assignment
+    expected_error = (
+        f"component binding collides with pose ledger {current!r}"
+        if fault == "ledger-collision"
+        else f"rebuild changed native component index or scope: {previous!r} -> {current!r}"
+    )
+    with pytest.raises(RuntimeError, match=re.escape(expected_error)):
+        assembly._assign_chain_references(adapter)
+    model.ForceRebuild3.assert_called_once_with(False)
+    assert component.Name2 == current
+    assert list(component.Transform2.ArrayData) == array
+    if entry is not None:
+        assert _assembly._POSE_LEDGER[previous] is entry
+    else:
+        assert previous not in _assembly._POSE_LEDGER
+    if fault == "ledger-collision":
+        assert _assembly._POSE_LEDGER[current] is collision
+    else:
+        assert current not in _assembly._POSE_LEDGER
+
+
 
 
 def _pd_bom_fixture(monkeypatch):
