@@ -16,8 +16,9 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import math
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -41,7 +42,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_notes import add_property_linked_note, property_link
-from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _fastener_catalog import fastener
@@ -91,6 +92,25 @@ _CAPTION_CLEARANCE = 0.011
 # A caption's top edge sits this far under its cell; its text hangs below.
 _CAPTION_TO_CELL = 0.004
 _CAPTION_BELOW = 0.006
+
+
+class NumberFit(StrEnum):
+    """How a sheet prints its template's DWG. NO. note."""
+
+    # The template's authored format, unmeasured.
+    TEMPLATE = "template"
+    # Measured once the link resolves; shrunk only when it runs into REV.
+    SHRINK_TO_CELL = "shrink-to-cell"
+
+
+# The landscape DWG. NO. cell: its exported rules (x = 308.351 / 372.310 mm,
+# the REV divider; y = 19.969 / 35.906 mm) rounded inward, less the 1.2 mm the
+# REV value keeps on its side of the divider.
+_NUMBER_LIMIT = (0.3084, 0.0200, 0.3723 - 0.0012, 0.0359)
+# Never smaller than the sheet's 3 mm notes.
+_NUMBER_MIN_HEIGHT = 0.003
+_NUMBER_HEIGHT_TOL = 1e-7
+_POINT = 0.0254 / 72.0
 
 
 def _box(
@@ -379,6 +399,116 @@ def _purchased_title_block(
     return notes
 
 
+def _number_note(draw: Any) -> tuple[Any, Any]:
+    """The template's one note that links Number and nothing else."""
+    link = property_link("Number")
+    sheet_view = _early_bound(draw, "IDrawingDoc").GetFirstView()
+    if sheet_view is None:
+        raise RuntimeError("DWG. NO.: drawing has no sheet view")
+    found = []
+    for annotation in _early_bound(sheet_view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(annotation, "IAnnotation")
+        if annotation.GetType() != 6:  # swAnnotationType_e.swNote
+            continue
+        specific = annotation.GetSpecificAnnotation()
+        if specific is None:
+            raise RuntimeError("DWG. NO.: sheet note has no INote")
+        note = _early_bound(specific, "INote")
+        raw = note.PropertyLinkedText
+        if type(raw) is not str:
+            raise RuntimeError(f"DWG. NO.: unreadable note link {raw!r}")
+        if link in raw:
+            found.append((note, annotation, raw))
+    if [raw for _note, _annotation, raw in found] != [link]:
+        raise RuntimeError(
+            f"DWG. NO.: the sheet must carry one note linking only {link}: "
+            f"{[raw for _note, _annotation, raw in found]!r}"
+        )
+    return found[0][:2]
+
+
+def _number_format(annotation: Any) -> tuple[Any, float, str]:
+    """The note's format, its authoritative height in metres, and its face."""
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError("DWG. NO.: note has no text format")
+    text_format = _early_bound(text_format, "ITextFormat")
+    in_points = text_format.IsHeightSpecifiedInPts()
+    if type(in_points) is not bool:
+        raise RuntimeError(f"DWG. NO.: unreadable height authority {in_points!r}")
+    height = text_format.CharHeightInPts if in_points else text_format.CharHeight
+    face = text_format.TypeFaceName
+    if (
+        type(height) not in (int, float)
+        or not math.isfinite(height)
+        or height <= 0
+        or type(face) is not str
+        or not face.strip()
+    ):
+        raise RuntimeError(f"DWG. NO.: unreadable font {height!r}, {face!r}")
+    return text_format, float(height) * (_POINT if in_points else 1.0), face
+
+
+@_telemetry.traced("drawing.purchased_number_fit")
+def _fit_number(draw: Any, *, layout: DrawingLayout, number: str) -> Callable[[], None]:
+    """Shrink this drawing's DWG. NO. note, never the template, clear of REV.
+
+    One proportional write from the measured extent, in the note's own face.
+    Returns the settled check that re-proves the link, number, face, height
+    and fit after the final rebuild.
+    """
+    if layout is not DrawingLayout.LANDSCAPE:
+        raise ValueError(f"DWG. NO.: the {layout} template's cell is unmeasured")
+    link = property_link("Number")
+    note, annotation = _number_note(draw)
+
+    def measure() -> tuple[float, float, float, float]:
+        if note.PropertyLinkedText != link or note.GetText() != number:
+            raise RuntimeError(
+                f"DWG. NO.: readback {note.PropertyLinkedText!r} = "
+                f"{note.GetText()!r}, expected {link!r} = {number!r}"
+            )
+        return _box(note.GetExtent(), label="DWG. NO.", kind="note")
+
+    text_format, height, face = _number_format(annotation)
+    box = measure()
+    # Only an overrun across the REV divider is this fit's to repair.
+    if not _inside(box, (*_NUMBER_LIMIT[:2], math.inf, _NUMBER_LIMIT[3])):
+        raise RuntimeError(f"DWG. NO.: note leaves its cell: {box!r}")
+    if box[2] > _NUMBER_LIMIT[2]:
+        ratio = (_NUMBER_LIMIT[2] - box[0]) / (box[2] - box[0])
+        target = math.floor(height * ratio * 1e5) / 1e5  # 0.01 mm, downward
+        if target < _NUMBER_MIN_HEIGHT:
+            raise RuntimeError(
+                f"DWG. NO.: {number!r} needs {target!r} m, under the note height"
+            )
+        # This note's local format: the metre setter, as add_property_linked_note.
+        text_format.CharHeight = target
+        if annotation.SetTextFormat(0, False, text_format) is not True:
+            raise RuntimeError(f"DWG. NO.: font setter refused {target!r} m")
+        _rebuild(draw, phase="DWG. NO. fit")
+        if annotation.GetUseDocTextFormat(0) is not False:
+            raise RuntimeError("DWG. NO.: local font did not persist")
+        height = target
+
+    def settled() -> None:
+        _format, actual, actual_face = _number_format(annotation)
+        box = measure()
+        if (
+            abs(actual - height) > _NUMBER_HEIGHT_TOL
+            or actual_face != face
+            or not _inside(box, _NUMBER_LIMIT)
+        ):
+            raise RuntimeError(
+                f"DWG. NO.: note left its fit: {actual!r} m {actual_face!r} at "
+                f"{box!r}, fitted {height!r} m {face!r} within {_NUMBER_LIMIT!r}"
+            )
+
+    settled()
+    _telemetry.info(f"DWG. NO. fit: {number!r} at {height!r} m, extent {measure()!r}")
+    return settled
+
+
 @_telemetry.traced("drawing.purchased_footer")
 def add_purchased_footer(
     adapter: Any,
@@ -450,6 +580,7 @@ async def build_purchased_fastener_drawing(
     *,
     item: str | None = None,
     cut_to_suit: bool = False,
+    number_fit: NumberFit = NumberFit.TEMPLATE,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -457,7 +588,8 @@ async def build_purchased_fastener_drawing(
     ``#4-40 x 1/4 SOCKET SET SCREW, CUP POINT``; without one the row prints
     the registry stock name (pd_vn_transgear_pivot_screw, reworked in PR #1477).
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
-    assembly.
+    assembly.  ``number_fit`` opts a sheet whose registry number overruns the
+    DWG. NO. cell into the measured fit (:func:`_fit_number`).
     """
     stock = fastener(spec.artifact_stem)
     source = spec.source
@@ -503,6 +635,7 @@ async def build_purchased_fastener_drawing(
         notes=str(registry.get("installation_notes", "")),
         cut_to_suit=cut_to_suit,
         document_title=str(registry["title"]),
+        number_fit=number_fit,
     )
 
 
@@ -547,12 +680,15 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
+    number_fit: NumberFit = NumberFit.TEMPLATE,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
     label = spec.artifact_stem
-    # Validate the footer text before any native work.
+    # Validate the footer text and Number fit choice before any native work.
     check_item(item, label=label)
+    if not isinstance(number_fit, NumberFit):
+        raise TypeError(f"{label}: number_fit must be a NumberFit: {number_fit!r}")
     caption_y = view_band_bottom(notes, label=label)
     cells = (spring_view_cells if spring else fastener_view_cells)(caption_y)
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
@@ -692,6 +828,13 @@ async def _build_reference_sheet(
                     "purchased title-block property did not resolve from its "
                     f"expected source: {linked_text!r}"
                 )
+        # The links resolve at the rebuild above; an opted-in DWG. NO. is
+        # measured and fitted here, then re-proved after the final rebuild.
+        settled_checks: tuple[Callable[[], None], ...] = ()
+        if number_fit is NumberFit.SHRINK_TO_CELL:
+            settled_checks = (
+                _fit_number(draw, layout=spec.layout, number=properties["Number"]),
+            )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:
@@ -743,4 +886,5 @@ async def _build_reference_sheet(
         layout=spec.layout,
         pdf_title=title,
         scale=scale,
+        settled_checks=settled_checks,
     )

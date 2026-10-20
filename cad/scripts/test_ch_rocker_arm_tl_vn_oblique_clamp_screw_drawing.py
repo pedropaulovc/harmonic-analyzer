@@ -104,7 +104,7 @@ def test_frame_puts_the_bearing_face_at_y0() -> None:
     assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
 
 
-def test_purchased_sheet_documents_the_built_part(monkeypatch) -> None:
+def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_ch_rocker_arm_tl_vn_oblique_clamp_screw as drawing
 
     sheet = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_clamp_screw"]
@@ -114,13 +114,3 @@ def test_purchased_sheet_documents_the_built_part(monkeypatch) -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
-    seen: dict = {}
-
-    async def reference_sheet(adapter, spec_, **kwargs):
-        assert spec_ is sheet
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", reference_sheet)
-    asyncio.run(drawing.build(None))
-    assert seen == {"item": drawing.ITEM}

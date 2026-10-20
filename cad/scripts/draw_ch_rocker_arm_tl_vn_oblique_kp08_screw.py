@@ -9,7 +9,7 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_kp08_screw"]
@@ -18,7 +18,11 @@ ITEM = "#6-32 X 5/8 SHCS"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_fastener_drawing(adapter, SPEC, item=ITEM)
+    # The 18-character registry number overruns the template's DWG. NO.
+    # cell into REV; fit it there, measured.
+    return await build_purchased_fastener_drawing(
+        adapter, SPEC, item=ITEM, number_fit=NumberFit.SHRINK_TO_CELL
+    )
 
 
 def _parse_args() -> argparse.Namespace:

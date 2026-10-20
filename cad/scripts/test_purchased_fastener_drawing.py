@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
+import copy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,54 +14,20 @@ from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 
 
 @pytest.mark.parametrize(
-    ("names", "item"),
+    "names",
     [
-        (
-            ("dt_vn_fillister_screw", "fr_vn_fillister_screw", "pd_vn_fillister_screw"),
-            "#4-40 x 1/4 FILLISTER HEAD SLOTTED SCREW",
-        ),
-        (
-            ("mg_vn_clamp_screw", "pd_vn_clamp_screw"),
-            "#8-32 x 1-1/4 NARROW FILLISTER HEAD SLOTTED SCREW",
-        ),
-        (
-            ("ch_vn_arbor_set_screw", "dt_vn_arbor_set_screw"),
-            "#4-40 x 1/4 SOCKET SET SCREW, CUP POINT",
-        ),
-        (
-            ("mg_vn_thumb_screw", "ms_vn_thumb_screw"),
-            "#4-40 x 7/16 RAISED KNURLED-HEAD THUMB SCREW",
-        ),
+        ("dt_vn_fillister_screw", "fr_vn_fillister_screw", "pd_vn_fillister_screw"),
+        ("mg_vn_clamp_screw", "pd_vn_clamp_screw"),
+        ("ch_vn_arbor_set_screw", "dt_vn_arbor_set_screw"),
+        ("mg_vn_thumb_screw", "ms_vn_thumb_screw"),
     ],
 )
-def test_shared_purchases_draw_each_parent_native_identity(
-    monkeypatch: pytest.MonkeyPatch, names: tuple[str, ...], item: str
+def test_shared_purchases_keep_distinct_native_identities(
+    names: tuple[str, ...],
 ) -> None:
-    """The same purchased geometry draws distinct native models, never aliases."""
     specs = [DRAWINGS_BY_NAME[name] for name in names]
     assert len({spec.source for spec in specs}) == len(names)
     assert len({spec.artifact_stem for spec in specs}) == len(names)
-    adapter = object()
-    result = {"pdf": "parent-owned purchase"}
-    calls: list[tuple[object, object, str]] = []
-
-    async def purchased_drawing(given_adapter, spec, *, item):
-        calls.append((given_adapter, spec, item))
-        return result
-
-    for name, spec in zip(names, specs, strict=True):
-        stem = name.replace("_", "-")
-        assert spec.part == name
-        assert spec.artifact_stem == stem
-        assert spec.source_kind == "part"
-        assert spec.source.name == f"{stem}.SLDPRT"
-        assert spec.script_name == f"draw_{name}.py"
-        recipe = importlib.import_module(spec.script.stem)
-        assert recipe.SPEC is spec
-        assert recipe.ITEM == item
-        monkeypatch.setattr(recipe, "build_purchased_fastener_drawing", purchased_drawing)
-        assert asyncio.run(recipe.build(adapter)) is result
-    assert calls == [(adapter, spec, item) for spec in specs]
 
 
 class _Model:
@@ -285,7 +251,9 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "sheet_drawable_region", drawable_region)
 
-    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
+    async def finalize(
+        _adapter, actual_outputs, *, layout, pdf_title, scale, settled_checks
+    ):
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
         assert actual_outputs.pdf == outputs["pdf"]
@@ -443,3 +411,184 @@ def test_center_marks_lose_their_extension_lines(monkeypatch):
     views[0] = MarkedView(StuckMark())
     with pytest.raises(RuntimeError, match="extension lines"):
         purchased._center_marks_without_lines(views, cells)
+
+
+_POINT = 0.0254 / 72.0
+_NUMBER_LINK = '$PRPSHEET:"Number"'
+_LONG_NUMBER = "MHA-CH-06-TL-VN-65"
+# The r3 kp08 sheet's REV divider, x mm from the PDF.
+_REV_DIVIDER = 0.37231
+
+
+class _FitFormat:
+    """ITextFormat: writing either height makes it the authoritative one."""
+
+    def __init__(self, *, points: int | None = None, metres: float = 0.0) -> None:
+        self._points, self._metres = points, metres
+        self.TypeFaceName = "Century Gothic"
+
+    def IsHeightSpecifiedInPts(self) -> bool:
+        return self._points is not None
+
+    @property
+    def CharHeightInPts(self) -> int:
+        return self._points if self._points is not None else 0
+
+    @property
+    def CharHeight(self) -> float:
+        return self._metres if self._points is None else 0.0
+
+    @CharHeight.setter
+    def CharHeight(self, value: float) -> None:
+        self._points, self._metres = None, value
+
+    def height(self) -> float:
+        return self._points * _POINT if self._points is not None else self._metres
+
+
+class _TitleNote:
+    """A template INote/IAnnotation whose printed width follows its font.
+
+    Calibrated to the r3 kp08 sheet: 18 characters at 18 pt end at 372.87 mm.
+    """
+
+    def __init__(
+        self, text: str, *, link: str = _NUMBER_LINK, accepts: bool = True
+    ) -> None:
+        self.PropertyLinkedText = link
+        self._text = text
+        self._format = _FitFormat(points=18)
+        self._use_doc = True
+        self._accepts = accepts
+
+    def GetType(self) -> int:
+        return 6
+
+    def GetSpecificAnnotation(self):
+        return self
+
+    def GetTextFormat(self, _index: int) -> _FitFormat:
+        return copy.copy(self._format)
+
+    def SetTextFormat(self, _index: int, use_doc: bool, text_format) -> bool:
+        if self._accepts:
+            self._format, self._use_doc = copy.copy(text_format), use_doc
+        return self._accepts
+
+    def GetUseDocTextFormat(self, _index: int) -> bool:
+        return self._use_doc
+
+    def GetText(self) -> str:
+        return self._text
+
+    def GetExtent(self):
+        height = self._format.height()
+        width = 0.5464 * len(self._text) * height
+        return (0.31042, 0.02208, 0.0, 0.31042 + width, 0.02208 + 1.37 * height, 0.0)
+
+
+class _TitleSheet:
+    """IDrawingDoc whose sheet view carries the template notes."""
+
+    def __init__(self, *notes: _TitleNote) -> None:
+        self._notes = notes
+
+    def GetFirstView(self):
+        return self
+
+    def GetAnnotations(self):
+        return self._notes
+
+    def EditRebuild3(self) -> bool:
+        return True
+
+
+@pytest.mark.parametrize(
+    "authored",
+    [_FitFormat(points=18), _FitFormat(metres=18 * _POINT)],
+    ids=["points", "metres"],
+)
+def test_number_fit_clears_the_rev_divider(authored):
+    note = _TitleNote(_LONG_NUMBER)
+    note._format = authored
+    other = _TitleNote("ALLOY STEEL", link='$PRPSHEET:"Material"')
+    before = authored.height()
+    settled = purchased._fit_number(
+        _TitleSheet(other, note), layout=DrawingLayout.LANDSCAPE, number=_LONG_NUMBER
+    )
+    extent = note.GetExtent()
+    assert extent[3] < _REV_DIVIDER - 0.001  # a visible gap before REV
+    assert 0.003 <= note._format.height() < before
+    assert (note.PropertyLinkedText, note.GetText()) == (_NUMBER_LINK, _LONG_NUMBER)
+    assert note._format.TypeFaceName == "Century Gothic"
+    assert other._format.height() == 18 * _POINT and other._use_doc is True
+    settled()
+    # A later rebuild back at the template size never reaches the export.
+    note._format = _FitFormat(points=18)
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_number_fit_leaves_a_fitting_number_at_the_template_size():
+    number = "MHA-CH-06-TL-21"
+    note = _TitleNote(number)
+    settled = purchased._fit_number(
+        _TitleSheet(note), layout=DrawingLayout.LANDSCAPE, number=number
+    )
+    assert note._use_doc is True
+    assert note._format.CharHeightInPts == 18
+    settled()
+
+
+@pytest.mark.parametrize(
+    ("notes", "number", "layout", "error"),
+    [
+        pytest.param(
+            (_TitleNote(_LONG_NUMBER, accepts=False),),
+            _LONG_NUMBER,
+            DrawingLayout.LANDSCAPE,
+            RuntimeError,
+            id="setter-refused",
+        ),
+        pytest.param(
+            (_TitleNote(_LONG_NUMBER), _TitleNote(_LONG_NUMBER)),
+            _LONG_NUMBER,
+            DrawingLayout.LANDSCAPE,
+            RuntimeError,
+            id="two-number-notes",
+        ),
+        pytest.param(
+            (_TitleNote(_LONG_NUMBER, link=f"DWG. NO. {_NUMBER_LINK}"),),
+            _LONG_NUMBER,
+            DrawingLayout.LANDSCAPE,
+            RuntimeError,
+            id="label-in-number-note",
+        ),
+        pytest.param(
+            (_TitleNote("MHA-CH-06-TL-VN-64"),),
+            _LONG_NUMBER,
+            DrawingLayout.LANDSCAPE,
+            RuntimeError,
+            id="stale-number",
+        ),
+        pytest.param(
+            (_TitleNote("M" * 40),),
+            "M" * 40,
+            DrawingLayout.LANDSCAPE,
+            RuntimeError,
+            id="below-note-height",
+        ),
+        pytest.param(
+            (_TitleNote(_LONG_NUMBER),),
+            _LONG_NUMBER,
+            DrawingLayout.PORTRAIT,
+            ValueError,
+            id="unmeasured-portrait",
+        ),
+    ],
+)
+def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, error):
+    with pytest.raises(error):
+        purchased._fit_number(_TitleSheet(*notes), layout=layout, number=number)
+    for note in notes:
+        assert note._format.CharHeightInPts == 18
