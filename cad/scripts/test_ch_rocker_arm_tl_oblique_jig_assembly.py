@@ -559,7 +559,7 @@ def kit_placement_scene(monkeypatch):
         batches.append((label, rows))
         names = []
         for suffix, row in zip((41, 7, 103, 28), rows, strict=True):
-            name = f"{row['occurrence_basename']}-{suffix}"
+            name = f"{row['part']}-{suffix + 200 * len(batches)}"
             components.append(types.SimpleNamespace(
                 Name2=name,
                 ComponentReference=row["component_reference"],
@@ -604,10 +604,10 @@ def test_builder_batches_each_member_with_explicit_native_identity(kit_placement
                 "ground": True,
                 "configuration": configuration,
                 "component_reference": f"{configuration}:{index + 1}",
-                "occurrence_basename": family,
             }
-        assert names[f"@{configuration}:1"] == family + "-41"
-        assert names[f"@{configuration}:4"] == family + "-28"
+        offset = 200 * (list(spec.KIT_IDENTITIES).index(family) + 1)
+        assert names[f"@{configuration}:1"] == f"{physical}-{41 + offset}"
+        assert names[f"@{configuration}:4"] == f"{physical}-{28 + offset}"
     builder._verify_kit_references(adapter, names)
 
 

@@ -2176,9 +2176,6 @@ async def _place_chain_seed(
         component_reference=(
             f"{configuration}:{station // 2 + 1}" if part == CHAIN_LINK_STEM else ""
         ),
-        occurrence_basename=(
-            f"{CHAIN_LINK_STEM}--{configuration}" if part == CHAIN_LINK_STEM else ""
-        ),
         ground=True,
         label=f"{part} seed @ station {station}",
     )

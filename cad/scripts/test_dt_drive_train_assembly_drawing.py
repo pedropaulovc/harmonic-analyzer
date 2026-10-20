@@ -431,9 +431,6 @@ def test_shared_stop_frame_preserves_world_geometry_and_static_lock(proud: float
         assert ast.literal_eval(call.args[1]) == SCREW_STEM
         options = {keyword.arg: keyword.value for keyword in call.keywords}
         assert ast.literal_eval(options["component_reference"]) == reference
-        assert ast.literal_eval(options["occurrence_basename"]) == (
-            f"{SCREW_STEM}__{reference.split(':')[0]}"
-        )
         assert ast.literal_eval(options["ground"]) is False
         assert isinstance(call.args[4], ast.Name) and call.args[4].id == "IDENTITY"
     namespace = {**vars(assembly), "STOP_PROUD_LEN": proud}

@@ -1545,10 +1545,17 @@ def test_new_source_in_imported_helper_fails_even_when_old_manifest_still_matche
 )
 def test_batch_source_proof_ignores_later_readonly_member_metadata_loops(metadata):
     source = (SCRIPTS_DIR / "_assembly.py").read_text(encoding="utf-8")
-    marker = "    grounded_comps: list[Any] = []\n"
-    assert source.count(marker) == 1
-    source = source.replace(marker, marker + metadata, 1)
-    _assert_source_import_contract({"_assembly": source})
+    tree = ast.parse(source)
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name == "place_components_batch"
+    ]
+    assert len(functions) == 1
+    metadata_function = ast.parse("async def readonly_metadata():\n" + metadata).body[0]
+    functions[0].body.extend(metadata_function.body)
+    _assert_source_import_contract({"_assembly": ast.unparse(tree)})
 
 
 @pytest.mark.parametrize(

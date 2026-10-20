@@ -7,6 +7,7 @@ construct an adapter, connect to SOLIDWORKS or read production native files.
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from types import ModuleType, SimpleNamespace
 
@@ -466,6 +467,7 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
     monkeypatch.setattr(assembly, "part_path", lambda stem: tmp_path / f"{stem}.SLDPRT")
     monkeypatch.setattr(assembly, "check", lambda _label, result: result)
     placements = []
+    native_assert_component_placed = assembly.assert_component_placed
     monkeypatch.setattr(
         assembly, "assert_component_placed", lambda *args: placements.append(args)
     )
@@ -480,6 +482,7 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
 
     model = SimpleNamespace(
         GetComponentByName=lambda name: component if name == component.Name2 else None,
+        GetComponents=lambda _top_only: (component,),
         ForceRebuild3=rebuild,
         EditRebuild3=lambda: rebuild(False),
     )
@@ -488,6 +491,7 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
         return {"name": component.Name2, "fixed": False}
 
     adapter = SimpleNamespace(
+        native_assert_component_placed=native_assert_component_placed,
         currentModel=model,
         insert_component=insert,
         _attempt=lambda callback, default=None: callback(),
@@ -626,7 +630,6 @@ def test_individual_insertion_reads_member_and_persists_reference(placement_scen
             ground=False,
             configuration="LeverWire",
             component_reference="LeverWire:1",
-            occurrence_basename=WIRE + "--LeverWire",
         )
     )
     assert actual == component.Name2 == WIRE + "--LeverWire-73"
@@ -675,9 +678,16 @@ def test_individual_insertion_refuses_metadata_lost_during_rebuild(
         return True
 
     adapter.currentModel.ForceRebuild3 = rebuild
+    expected_error = {
+        "reference-loss": "missing native component references: ['@LeverWire:1']",
+        "configuration-drift": (
+            f"component reference '@LeverWire:1' on {component.Name2!r} "
+            f"selects {(WIRE, 'PenWire')!r}, expected {(WIRE, 'LeverWire')!r}"
+        ),
+    }[fault]
     with pytest.raises(
         RuntimeError,
-        match="rebuild lost component reference|rebuild changed component reference",
+        match=re.escape(expected_error),
     ):
         asyncio.run(
             assembly.place_component(
@@ -724,6 +734,7 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
 
     adapter.currentModel.AddComponents3 = add_components
     adapter.currentModel.ForceRebuild3 = rebuild
+    adapter.currentModel.GetComponents = lambda _top_only: components
     adapter.currentModel.GetComponentByName = lambda name: next(
         (component for component in components if component.Name2 == name),
         None,
@@ -743,12 +754,21 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
             "ground": False,
             "configuration": member,
             "component_reference": member + ":1",
-            "occurrence_basename": WIRE + "--" + member,
         }
         for position, member in zip(positions, ("LeverWire", "PenWire"), strict=True)
     ]
     if fault != "none":
-        with pytest.raises(RuntimeError, match="rebuild changed|rebuild lost"):
+        expected_error = {
+            "reference-loss": "missing native component references: ['@PenWire:1']",
+            "configuration-drift": (
+                f"component reference '@PenWire:1' on {second.Name2!r} "
+                f"selects {(WIRE, 'LeverWire')!r}, expected {(WIRE, 'PenWire')!r}"
+            ),
+        }[fault]
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(expected_error),
+        ):
             asyncio.run(
                 assembly.place_components_batch(adapter, specs, label="wire members")
             )
@@ -767,195 +787,12 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
 
 
 @pytest.fixture
-def native_name_preferences(unwrapped_com, monkeypatch, tmp_path):
-    from solidworks_mcp.adapters import sw_type_info
-
-    identifier = 9876
-    preferences = {identifier: True}
-    path = tmp_path / "swconst.tlb"
-    loads = []
-    info = SimpleNamespace(
-        GetTypeAttr=lambda: SimpleNamespace(cVars=1),
-        GetVarDesc=lambda _index: (0, identifier),
-        GetNames=lambda _memid: ("swExtRefUpdateCompNames",),
-    )
-    typelib = SimpleNamespace(
-        GetTypeInfoCount=lambda: 1,
-        GetTypeInfoType=lambda _index: 0,
-        GetTypeInfo=lambda _index: info,
-    )
-    pythoncom = SimpleNamespace(
-        TKIND_ENUM=0,
-        VT_ARRAY=0x2000,
-        VT_BSTR=8,
-        VT_R8=5,
-        LoadTypeLib=lambda actual_path: loads.append(actual_path) or typelib,
-    )
-    client = SimpleNamespace(
-        constants=SimpleNamespace(), VARIANT=lambda _kind, values: list(values)
-    )
-    monkeypatch.setitem(sys.modules, "pythoncom", pythoncom)
-    monkeypatch.setitem(sys.modules, "win32com", SimpleNamespace(client=client))
-    monkeypatch.setitem(sys.modules, "win32com.client", client)
-    monkeypatch.setattr(sw_type_info, "PYWIN32_AVAILABLE", True)
-    monkeypatch.setattr(sw_type_info, "_constants", None)
-    monkeypatch.setattr(sw_type_info, "_find_aux_tlb", lambda _filename: path)
-    return identifier, preferences, path, loads
-
-
-@pytest.mark.parametrize(
-    ("initial_preference", "fault"),
-    [
-        (False, "none"),
-        (True, "none"),
-        (False, "rename-rejected"),
-        (True, "rename-rejected"),
-        (False, "selection-cleanup"),
-        (True, "selection-cleanup"),
-        (True, "disable-preference-refused"),
-        (False, "restore-preference-refused"),
-        (True, "restore-preference-refused"),
-    ],
-)
-def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
-    native_name_preferences,
-    monkeypatch,
-    tmp_path,
-    initial_preference,
-    fault,
-):
-    native_preference_id, preferences, path, loads = native_name_preferences
-    preferences[native_preference_id] = initial_preference
-    native_transform = SimpleNamespace(
-        ArrayData=assembly._placement_transform(ROWS, [1.0, 2.0, 3.0])
-    )
-    old_name = "parent-17/original-native-wire-83"
-    new_name = "parent-17/sh-vn-music-wire--LeverWire-83"
-    state = {"selected": False}
-
-    class Component:
-        Transform2 = native_transform
-        ReferencedConfiguration = "LeverWire"
-        ComponentReference = ""
-
-        def __init__(self):
-            self._name = old_name
-
-        @property
-        def Name2(self):
-            return self._name
-
-        @Name2.setter
-        def Name2(self, basename):
-            assert preferences[native_preference_id] is False
-            assert state["selected"] is True
-            if self.ComponentReference:
-                raise RuntimeError("native rename of referenced occurrence refused")
-            if fault == "rename-rejected":
-                raise RuntimeError("native rename rejected")
-            parent, _separator, leaf = self._name.rpartition("/")
-            index = leaf.rsplit("-", 1)[-1]
-            self._name = f"{parent}/{basename}-{index}"
-
-        def GetPathName(self):
-            return f"C:/native/{WIRE}.SLDPRT"
-
-        def Select2(self, _append, _mark):
-            state["selected"] = True
-            return True
-
-    component = Component()
-
-    preference_writes = []
-
-    def set_preference(identifier, value) -> None:
-        preference_writes.append(value)
-        if fault == "disable-preference-refused" and len(preference_writes) == 1:
-            return
-        if fault == "restore-preference-refused" and len(preference_writes) == 2:
-            preferences[identifier] = not value
-        else:
-            preferences[identifier] = value
-
-    def clear_selection(_all):
-        state["selected"] = False
-        if fault == "selection-cleanup":
-            raise RuntimeError("selection cleanup failed")
-
-    model = SimpleNamespace(
-        GetComponentByName=lambda name: component if name == component.Name2 else None,
-        ClearSelection2=clear_selection,
-        ForceRebuild3=lambda _top_only: True,
-    )
-    adapter = SimpleNamespace(
-        currentModel=model,
-        constants={"swDocDRAWING": 3, "swSketchAcceptNumericInput": 372},
-        swApp=SimpleNamespace(
-            GetUserPreferenceToggle=preferences.__getitem__,
-            SetUserPreferenceToggle=set_preference,
-        ),
-    )
-    pose = ([1.0, 2.0, 3.0], [list(row) for row in ROWS])
-    unrelated_pose = ([7.0, 8.0, 9.0], [list(row) for row in ROWS])
-    ledger = {old_name: pose, "unrelated-part-4": unrelated_pose}
-    monkeypatch.setattr(assembly, "_POSE_LEDGER", ledger)
-
-    def rename():
-        return assembly.set_component_reference(
-            adapter,
-            old_name,
-            "LeverWire:1",
-            occurrence_basename=WIRE + "--LeverWire",
-        )
-
-    if fault != "none":
-        message = {
-            "rename-rejected": "native rename rejected",
-            "selection-cleanup": "selection cleanup failed",
-            "disable-preference-refused": (
-                "component-name replacement updates remain enabled"
-            ),
-            "restore-preference-refused": (
-                "component-name replacement preference did not restore"
-            ),
-        }[fault]
-        with pytest.raises(RuntimeError, match=message):
-            rename()
-        unrenamed = fault in {"rename-rejected", "disable-preference-refused"}
-        assert component.Name2 == (old_name if unrenamed else new_name)
-        assert ledger == {old_name: pose, "unrelated-part-4": unrelated_pose}
-        assert component.ComponentReference == ""
-    else:
-        assert rename() == new_name
-        assert component.Name2 == new_name
-        assert component.ComponentReference == "LeverWire:1"
-        assert old_name not in ledger
-        assert ledger[new_name] is pose
-        assert ledger["unrelated-part-4"] is unrelated_pose
-        assert len(ledger) == 2
-    expected_preference = (
-        not initial_preference
-        if fault == "restore-preference-refused"
-        else initial_preference
-    )
-    assert component.ReferencedConfiguration == "LeverWire"
-    assert component.Transform2 is native_transform
-    assert list(component.Transform2.ArrayData) == assembly._placement_transform(
-        ROWS, [1.0, 2.0, 3.0]
-    )
-    assert preferences == {native_preference_id: expected_preference}
-    assert state == {"selected": False}
-    assert loads == [str(path)]
-
-
-@pytest.fixture
-def native_reference_scene(native_name_preferences, monkeypatch):
-    identifier, preferences, _path, _loads = native_name_preferences
+def native_reference_scene(unwrapped_com, monkeypatch):
     registry = {}
     events = []
     components = []
-    selected = []
     rebuilds = []
+    state = SimpleNamespace(on_rebuild=lambda: None)
 
     class Component:
         def __init__(self, name, stem, configuration, position, reference=""):
@@ -976,18 +813,6 @@ def native_reference_scene(native_name_preferences, monkeypatch):
         def Name2(self):
             return self._name
 
-        @Name2.setter
-        def Name2(self, basename):
-            events.append(("name", self, basename))
-            if self._reference:
-                raise RuntimeError("native rename of referenced occurrence refused")
-            assert preferences[identifier] is False
-            assert selected == [self]
-            parent, separator, leaf = self._name.rpartition("/")
-            index = leaf.rsplit("-", 1)[-1]
-            self._name = (parent + separator) + basename + "-" + index
-            assert sum(c.Name2 == self.Name2 for c in components) == 1
-
         @property
         def ComponentReference(self):
             return self._reference
@@ -997,8 +822,6 @@ def native_reference_scene(native_name_preferences, monkeypatch):
             events.append(("reference", self, value))
             if value in registry:
                 raise RuntimeError("native duplicate-reference warning")
-            assert not selected
-            assert preferences[identifier] is True
             if self._reference:
                 del registry[self._reference]
             self._reference = value
@@ -1010,46 +833,41 @@ def native_reference_scene(native_name_preferences, monkeypatch):
         def GetPathName(self):
             return f"C:/native/{self.stem}.SLDPRT"
 
-        def Select2(self, _append, _mark):
-            selected[:] = [self]
-            return True
-
     def rebuild(top_only):
         rebuilds.append(top_only)
+        state.on_rebuild()
         return True
 
+    pythoncom = ModuleType("pythoncom")
+    pythoncom.VT_ARRAY, pythoncom.VT_BSTR, pythoncom.VT_R8 = 0x2000, 8, 5
+    client = ModuleType("win32com.client")
+    client.VARIANT = lambda _kind, values: list(values)
+    monkeypatch.setitem(sys.modules, "pythoncom", pythoncom)
+    monkeypatch.setitem(sys.modules, "win32com.client", client)
     adapter = SimpleNamespace(
         _attempt=lambda operation, default=None: operation(),
         currentModel=SimpleNamespace(
             GetComponentByName=lambda name: next(
                 (c for c in components if c.Name2 == name), None
             ),
-            ClearSelection2=lambda _all: selected.clear(),
+            GetComponents=lambda _top_only: tuple(reversed(components)),
             ForceRebuild3=rebuild,
-        ),
-        swApp=SimpleNamespace(
-            GetUserPreferenceToggle=preferences.__getitem__,
-            SetUserPreferenceToggle=lambda key, value: preferences.__setitem__(
-                key, value
-            ),
         ),
     )
     monkeypatch.setattr(assembly, "_POSE_LEDGER", {})
     return SimpleNamespace(
         Component=Component, adapter=adapter, registry=registry, events=events,
-        rebuilds=rebuilds, selected=selected, preferences=preferences,
-        identifier=identifier,
+        rebuilds=rebuilds, state=state,
     )
 
 
-@pytest.mark.parametrize("with_basename", [False, True])
 @pytest.mark.parametrize("existing_reference", ["", "LeverWire:1"])
-def test_reference_without_rename_skips_duplicate_native_write(
-    native_reference_scene, with_basename, existing_reference
+@pytest.mark.parametrize("rebuild", [False, True])
+def test_reference_preserves_native_name_and_skips_duplicate_write(
+    native_reference_scene, existing_reference, rebuild
 ):
     scene = native_reference_scene
-    basename = WIRE + "--LeverWire"
-    name = "parent-17/" + basename + "-83"
+    name = "parent-17/arbitrary-native-wire-83"
     component = scene.Component(
         name, WIRE, "LeverWire", [1.0, 2.0, 3.0], existing_reference
     )
@@ -1057,8 +875,7 @@ def test_reference_without_rename_skips_duplicate_native_write(
     pose = ([1.0, 2.0, 3.0], ROWS)
     assembly._POSE_LEDGER[name] = pose
     assert assembly.set_component_reference(
-        scene.adapter, name, "LeverWire:1",
-        occurrence_basename=basename if with_basename else "",
+        scene.adapter, name, "LeverWire:1", rebuild=rebuild
     ) == name
     assert component.Name2 == name
     assert component.ReferencedConfiguration == "LeverWire"
@@ -1070,134 +887,233 @@ def test_reference_without_rename_skips_duplicate_native_write(
     assert scene.events == (
         [] if existing_reference else [("reference", component, "LeverWire:1")]
     )
-    assert scene.rebuilds == [False]
-    assert scene.selected == []
-    assert scene.preferences == {scene.identifier: True}
+    assert scene.rebuilds == ([False] if rebuild else [])
 
 
-@pytest.mark.parametrize("existing_reference", ["LeverWire:1", "LeverWire:2"])
-def test_reference_requires_unreferenced_occurrence_before_rename(
-    native_reference_scene, existing_reference
+@pytest.mark.parametrize("existing_reference", ["", "LeverWire:1"])
+@pytest.mark.parametrize("collision", [False, True])
+def test_reference_rebinds_rebuild_name_and_moves_exact_ledger_entry(
+    native_reference_scene, collision, existing_reference
 ):
     scene = native_reference_scene
-    name = "parent-17/original-native-wire-83"
+    old_name = "parent-17/native-wire-83"
+    new_name = "parent-17/rebuilt-native-wire-83"
     component = scene.Component(
-        name, WIRE, "LeverWire", [1.0, 2.0, 3.0], existing_reference
+        old_name, WIRE, "LeverWire", [1.0, 2.0, 3.0], existing_reference
     )
+    # Another parent may legitimately own the same role-local ordinal.
+    scene.Component(
+        "other-parent-4/other-wire-207", WIRE, "LeverWire", [4.0, 5.0, 6.0]
+    )._reference = "LeverWire:1"
     transform = component.Transform2
     pose = ([1.0, 2.0, 3.0], ROWS)
-    assembly._POSE_LEDGER[name] = pose
-    with pytest.raises(RuntimeError, match="cannot rename component.*existing reference"):
-        assembly.set_component_reference(
-            scene.adapter, name, "LeverWire:1",
-            occurrence_basename=WIRE + "--LeverWire",
-        )
-    assert component.Name2 == name
-    assert component.ComponentReference == existing_reference
-    assert component.ReferencedConfiguration == "LeverWire"
+    unrelated_pose = ([7.0, 8.0, 9.0], ROWS)
+    assembly._POSE_LEDGER.update({old_name: pose, "unrelated-part-4": unrelated_pose})
+    if collision:
+        assembly._POSE_LEDGER[new_name] = unrelated_pose
+    original_ledger = dict(assembly._POSE_LEDGER)
+    scene.state.on_rebuild = lambda: setattr(component, "_name", new_name)
+    if collision:
+        with pytest.raises(RuntimeError, match="colli"):
+            assembly.set_component_reference(scene.adapter, old_name, "LeverWire:1")
+        assert assembly._POSE_LEDGER == original_ledger
+        assert assembly._POSE_LEDGER[old_name] is pose
+        assert assembly._POSE_LEDGER[new_name] is unrelated_pose
+    else:
+        assert assembly.set_component_reference(
+            scene.adapter, old_name, "LeverWire:1"
+        ) == new_name
+        assert assembly._POSE_LEDGER == {
+            new_name: pose, "unrelated-part-4": unrelated_pose
+        }
+        assert assembly._POSE_LEDGER[new_name] is pose
+    assert component.Name2 == new_name
     assert component.Transform2 is transform
-    assert assembly._POSE_LEDGER[name] is pose
-    assert scene.registry == {existing_reference: component}
-    assert scene.events == []
-    assert scene.rebuilds == []
-    assert scene.selected == []
-    assert scene.preferences == {scene.identifier: True}
+    assert component.ReferencedConfiguration == "LeverWire"
+    assert component.ComponentReference == "LeverWire:1"
+    assert scene.rebuilds == [False]
 
 
-def test_batch_four_reordered_studs_preserves_native_identity_and_local_ordinals(
-    placement_scene, native_reference_scene, monkeypatch, tmp_path
+@pytest.mark.parametrize("fault", ["duplicate", "wrong-member", "missing", "index-drift"])
+def test_reference_fresh_binding_rejects_rebuild_identity_damage(
+    native_reference_scene, fault
+):
+    scene = native_reference_scene
+    component = scene.Component("native-wire-83", WIRE, "LeverWire", [1.0, 2.0, 3.0])
+    other = scene.Component("another-wire-207", WIRE, "LeverWire", [4.0, 5.0, 6.0])
+
+    def damage():
+        component._name = "rebuilt-native-wire-83"
+        if fault == "duplicate":
+            other._reference = "LeverWire:1"
+        elif fault == "wrong-member":
+            component.ReferencedConfiguration = "PenWire"
+        else:
+            component._reference = ""
+
+        if fault == "index-drift":
+            component._reference = "LeverWire:1"
+            component._name = "rebuilt-native-wire-999"
+    scene.state.on_rebuild = damage
+    expected_error = {
+        "duplicate": "component reference '@LeverWire:1' is duplicated by ",
+        "wrong-member": (
+            "component reference '@LeverWire:1' on 'rebuilt-native-wire-83' "
+            f"selects {(WIRE, 'PenWire')!r}, expected {(WIRE, 'LeverWire')!r}"
+        ),
+        "missing": "missing native component references: ['@LeverWire:1']",
+        "index-drift": (
+            "rebuild changed native component index or scope: "
+            "'native-wire-83' -> 'rebuilt-native-wire-999'"
+        ),
+    }[fault]
+    with pytest.raises(
+        RuntimeError, match=re.escape(expected_error)
+    ):
+        assembly.set_component_reference(scene.adapter, component.Name2, "LeverWire:1")
+    assert scene.rebuilds == [False]
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["none", "duplicate", "wrong-member", "pose-drift", "ledger-collision", "index-drift", "swapped-references"],
+)
+def test_batch_rebinds_four_reordered_studs_and_ordinary_row_after_rebuild(
+    placement_scene, native_reference_scene, tmp_path, monkeypatch, fault
 ):
     _adapter, _component, _rebuilds, placements = placement_scene
     scene = native_reference_scene
+    monkeypatch.setattr(
+        assembly, "assert_component_placed", _adapter.native_assert_component_placed
+    )
     stem = "sh-vn-clamping-kit-hardware"
     (tmp_path / f"{stem}.SLDPRT").touch()
-    positions = [[float(i * 41), float(i * 13), float(i * 7)] for i in range(4)]
-    indices = [83, 12, 207, 41]
+    positions = [[float(i * 41), float(i * 13), float(i * 7)] for i in range(5)]
+    indices = [83, 12, 207, 41, 119]
     components = [
         scene.Component(
-            f"original-stud-{index}", stem, "Default", position
+            f"{stem if i < 4 else SCREW}-{index}",
+            stem if i < 4 else SCREW, "Default", position
         )
-        for index, position in zip(indices, positions, strict=True)
+        for i, (index, position) in enumerate(zip(indices, positions, strict=True))
     ]
+    old_names = [c.Name2 for c in components]
+    expected_names = [f"rebuilt-native-part-{index}" for index in indices]
     transforms = [c.Transform2 for c in components]
     arrays = [list(t.ArrayData) for t in transforms]
+    ledger_entries = []
+    collision_pose = ([999.0, 999.0, 999.0], ROWS)
+
+    def rebuild():
+        ledger_entries[:] = [assembly._POSE_LEDGER[name] for name in old_names]
+        for component, name in zip(components, expected_names, strict=True):
+            component._name = name
+        if fault == "duplicate":
+            components[1]._reference = "HoldDownStud:1"
+        elif fault == "wrong-member":
+            components[1].ReferencedConfiguration = "TNut"
+        elif fault == "pose-drift":
+            components[1].Transform2.ArrayData[9] += 0.01
+        elif fault == "ledger-collision":
+            assembly._POSE_LEDGER[expected_names[0]] = collision_pose
+        elif fault == "index-drift":
+            components[1]._name = "rebuilt-native-part-999"
+        elif fault == "swapped-references":
+            components[0]._reference, components[1]._reference = (
+                components[1]._reference, components[0]._reference
+            )
+
+    scene.state.on_rebuild = rebuild
     scene.adapter.currentModel.AddComponents3 = (
         lambda _names, _transforms, _coordinates:
-        (components[2], components[0], components[3], components[1])
+        tuple(components[i] for i in (2, 4, 0, 3, 1))
     )
     specs = [
         {
-            "part": stem,
+            "part": stem if i < 4 else SCREW,
             "position": position,
             "rows": ROWS,
             "ground": False,
-            "configuration": "HoldDownStud",
-            "component_reference": f"HoldDownStud:{ordinal}",
-            "occurrence_basename": stem + "--HoldDownStud",
+            **({
+                "configuration": "HoldDownStud",
+                "component_reference": f"HoldDownStud:{i + 1}",
+            } if i < 4 else {}),
         }
-        for ordinal, position in enumerate(positions, 1)
+        for i, position in enumerate(positions)
     ]
+    if fault != "none":
+        expected_error = {
+            "duplicate": "component reference '@HoldDownStud:1' is duplicated by ",
+            "wrong-member": (
+                "component reference '@HoldDownStud:2' on 'rebuilt-native-part-12' "
+                f"selects {(stem, 'TNut')!r}, expected {(stem, 'HoldDownStud')!r}"
+            ),
+            "pose-drift": "rebuilt-native-part-12: origin ",
+            "ledger-collision": (
+                "component binding collides with pose ledger 'rebuilt-native-part-83'"
+            ),
+            "index-drift": (
+                "rebuild changed native component index or scope: "
+                f"{old_names[1]!r} -> 'rebuilt-native-part-999'"
+            ),
+            "swapped-references": (
+                "rebuild changed native component index or scope: "
+                f"{old_names[0]!r} -> 'rebuilt-native-part-12'"
+            ),
+        }[fault]
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape(expected_error),
+        ):
+            asyncio.run(
+                assembly.place_components_batch(scene.adapter, specs, label="four studs")
+            )
+        assert scene.rebuilds == [False]
+        if fault == "ledger-collision":
+            assert assembly._POSE_LEDGER[expected_names[0]] is collision_pose
+            assert assembly._POSE_LEDGER[old_names[0]] is ledger_entries[0]
+        return
     actual = asyncio.run(
         assembly.place_components_batch(scene.adapter, specs, label="four studs")
     )
-    expected_names = [f"{stem}--HoldDownStud-{index}" for index in indices]
     assert actual == expected_names
     assert [c.Name2 for c in components] == expected_names
-    assert [c.ReferencedConfiguration for c in components] == ["HoldDownStud"] * 4
+    assert [c.ReferencedConfiguration for c in components] == ["HoldDownStud"] * 4 + ["Default"]
     assert [c.ComponentReference for c in components] == [
         f"HoldDownStud:{ordinal}" for ordinal in range(1, 5)
-    ]
+    ] + [""]
     assert scene.registry == {
         f"HoldDownStud:{ordinal}": component
-        for ordinal, component in enumerate(components, 1)
+        for ordinal, component in enumerate(components[:4], 1)
     }
-    for component, transform, array in zip(
-        components, transforms, arrays, strict=True
+    for component, transform, array, old_name, name, entry in zip(
+        components, transforms, arrays, old_names, expected_names, ledger_entries,
+        strict=True,
     ):
         assert component.Transform2 is transform
         assert list(component.Transform2.ArrayData) == array
+        assert old_name not in assembly._POSE_LEDGER
+        assert assembly._POSE_LEDGER[name] is entry
     assert scene.events == [
-        event
-        for ordinal, component in (
-            (i + 1, components[i]) for i in (2, 0, 3, 1)
-        )
-        for event in (
-            ("name", component, stem + "--HoldDownStud"),
-            ("reference", component, f"HoldDownStud:{ordinal}"),
-        )
+        ("reference", components[i], f"HoldDownStud:{i + 1}")
+        for i in (2, 0, 3, 1)
     ]
     assert scene.rebuilds == [False]
-    assert [call[1] for call in placements] == expected_names
-    assert scene.selected == []
-    assert scene.preferences == {scene.identifier: True}
 
 
-@pytest.mark.parametrize("rename_required", [False, True])
-def test_reference_write_rejects_native_name_drift_without_retry(
-    native_reference_scene, rename_required
+def test_reference_write_rejects_immediate_native_name_drift_without_retry(
+    native_reference_scene,
 ):
     scene = native_reference_scene
-    basename = WIRE + "--LeverWire"
-    name = "parent-17/" + (
-        "original-native-wire-83" if rename_required else basename + "-83"
-    )
-    component = scene.Component(name, WIRE, "LeverWire", [1.0, 2.0, 3.0])
+    component = scene.Component("native-wire-83", WIRE, "LeverWire", [1.0, 2.0, 3.0])
     component.rename_on_reference = True
     transform = component.Transform2
     with pytest.raises(RuntimeError, match="changed native name"):
-        assembly.set_component_reference(
-            scene.adapter, name, "LeverWire:1",
-            occurrence_basename=basename if rename_required else "",
-        )
-    # Preserve native partial state for diagnosis; never retry/clear a reference.
+        assembly.set_component_reference(scene.adapter, component.Name2, "LeverWire:1")
     assert component.Name2 == "unexpected-native-name-999"
     assert component.ComponentReference == "LeverWire:1"
     assert component.ReferencedConfiguration == "LeverWire"
     assert component.Transform2 is transform
     assert scene.registry == {"LeverWire:1": component}
-    assert scene.events == (
-        [("name", component, basename)] if rename_required else []
-    ) + [("reference", component, "LeverWire:1")]
+    assert scene.events == [("reference", component, "LeverWire:1")]
     assert scene.rebuilds == []
-    assert scene.selected == []
-    assert scene.preferences == {scene.identifier: True}

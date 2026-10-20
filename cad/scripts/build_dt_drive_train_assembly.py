@@ -140,6 +140,7 @@ import _config
 import _telemetry
 from _check import check, log
 from _com import _early_bound
+from _component_references import bind_component_selectors
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, set_global
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
@@ -4938,7 +4939,6 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
         component_reference="SwingStopScrew:1",
-        occurrence_basename="sh-vn-fillister-screw-90280a108__SwingStopScrew",
         label="swing-stop-screw (p1 travel limit)",
     )
     await _lock_static(adapter, stop_screw, arbor)
@@ -5147,7 +5147,6 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         ground=False,
         component_reference="FootScrew:1",
-        occurrence_basename="sh-vn-fillister-screw-90280a108__FootScrew",
         label="foot-screw (spring foot)",
     )
     await apply_component_color(adapter, spring_foot_screw, _config.palette("panel_black"))
@@ -7089,19 +7088,22 @@ async def build(adapter) -> dict[str, str]:
     # The explode is authored in both drawing configurations: the package's
     # small exploded views reference Default Simplified.
     _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
-    author_in_drawing_configurations(
-        adapter,
-        ASM_NAME,
-        lambda configuration: create_drive_train_explode(
+
+    def _create_drawing_explode(configuration: str) -> None:
+        names = bind_component_selectors(
+            adapter.currentModel, ("@SwingStopScrew:1", "@FootScrew:1")
+        )
+        create_drive_train_explode(
             adapter,
             {
                 collar_pin: COLLAR_PIN_ROLE,
-                stop_screw: "SwingStopScrew:1",
-                spring_foot_screw: "FootScrew:1",
+                names["@SwingStopScrew:1"]: "SwingStopScrew:1",
+                names["@FootScrew:1"]: "FootScrew:1",
             },
             configuration,
-        ),
-    )
+        )
+
+    author_in_drawing_configurations(adapter, ASM_NAME, _create_drawing_explode)
     return await save_assembly_and_images(
         adapter, ASM_NAME, solved_gates=_certify_as_built, dof_manifest=True
     )

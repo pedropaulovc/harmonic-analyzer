@@ -464,9 +464,6 @@ async def build(adapter) -> dict[str, str]:
             ground=False,
             configuration=PEN_WIRE_CONFIGURATION if part == spec.WIRE else "",
             component_reference="PenWire:1" if part == spec.WIRE else "",
-            occurrence_basename=(
-                f"{spec.WIRE}--{PEN_WIRE_CONFIGURATION}" if part == spec.WIRE else ""
-            ),
         )
         await lock_mate(
             adapter,

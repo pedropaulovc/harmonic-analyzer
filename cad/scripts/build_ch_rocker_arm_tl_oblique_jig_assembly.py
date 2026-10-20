@@ -216,7 +216,6 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
                     "ground": ground,
                     "configuration": configuration or "",
                     "component_reference": selector[1:] if configuration else "",
-                    "occurrence_basename": family if configuration else "",
                 }
             )
         names = await place_components_batch(adapter, rows_spec, label=family)
@@ -234,7 +233,6 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
                     ground=ground,
                     configuration=configuration or "",
                     component_reference=selector[1:] if configuration else "",
-                    occurrence_basename=family if configuration else "",
                     label=selector,
                 )
             )

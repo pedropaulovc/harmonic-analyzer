@@ -442,6 +442,34 @@ def _ledger_record(name: str, position: list[float], rows: list[list[float]]) ->
     _POSE_LEDGER[name] = (list(position), [c for row in rows for c in row])
 
 
+def _rebuilt_component_name(previous: str, current: str) -> str:
+    """Keep the observed native occurrence and its pose witness across a rebuild."""
+    if current == previous:
+        return current
+    _telemetry.event(
+        "assembly.component_name.observed_change",
+        previous_name=previous,
+        current_name=current,
+    )
+    previous_parent, _, previous_leaf = previous.replace("\\", "/").rpartition("/")
+    current_parent, _, current_leaf = current.replace("\\", "/").rpartition("/")
+    previous_index = previous_leaf.rsplit("-", 1)[-1]
+    current_index = current_leaf.rsplit("-", 1)[-1]
+    if (
+        not previous_index.isdigit()
+        or previous_index != current_index
+        or previous_parent != current_parent
+    ):
+        raise RuntimeError(
+            f"rebuild changed native component index or scope: {previous!r} -> {current!r}"
+        )
+    if previous in _POSE_LEDGER:
+        if current in _POSE_LEDGER:
+            raise RuntimeError(f"component binding collides with pose ledger {current!r}")
+        _POSE_LEDGER[current] = _POSE_LEDGER.pop(previous)
+    return current
+
+
 def reledger_to_solved(adapter: Any, name: str) -> None:
     """Re-anchor a placed component's pose-ledger entry to its CURRENT solved pose.
 
@@ -1225,14 +1253,7 @@ async def lock_mate(
     return await _mate(adapter, label, "lock", [ref_a, ref_b])
 
 
-def _set_component_reference(
-    adapter: Any,
-    component: Any,
-    reference: str,
-    occurrence_basename: str,
-) -> str:
-    from solidworks_mcp.adapters import sw_type_info
-
+def _set_component_reference(component: Any, reference: str) -> str:
     component = _early_bound(component, "IComponent2")
     expected = semantic_reference_identity(f"@{reference}")
     actual = component_identity(component)
@@ -1241,25 +1262,6 @@ def _set_component_reference(
             f"reference {reference!r} requires {expected!r}, not {actual!r}"
         )
     name = str(component.Name2)
-    expected_name = name
-    if occurrence_basename:
-        role = reference.split(":", 1)[0]
-        expected_basename = (
-            f"{actual[0]}__{role}"
-            if actual[1] == "Default"
-            else f"{actual[0]}--{actual[1]}"
-        )
-        if occurrence_basename != expected_basename:
-            raise ValueError(
-                f"{reference}: occurrence basename must be {expected_basename!r}"
-            )
-        parent, separator, leaf = name.replace("\\", "/").rpartition("/")
-        index = leaf.rsplit("-", 1)[-1]
-        if not index.isdigit():
-            raise RuntimeError(f"component name has no native instance index: {name!r}")
-        expected_name = f"{occurrence_basename}-{index}"
-        if separator:
-            expected_name = f"{parent}/{expected_name}"
     with _telemetry.span(
         "assembly.component_reference.read", component=name, reference=reference
     ):
@@ -1269,48 +1271,7 @@ def _set_component_reference(
         component=name,
         reference=current_reference,
         requested_reference=reference,
-        expected_name=expected_name,
     )
-    if name != expected_name:
-        if current_reference:
-            raise RuntimeError(
-                f"cannot rename component {name!r} with existing reference "
-                f"{current_reference!r}"
-            )
-        # Use the documented unindexed setter; prove the native index survives.
-        preference = sw_type_info.constant("swExtRefUpdateCompNames")
-        previous = bool(adapter.swApp.GetUserPreferenceToggle(preference))
-        try:
-            # ISldWorks.SetUserPreferenceToggle is void; verify the getter instead.
-            adapter.swApp.SetUserPreferenceToggle(preference, False)
-            if bool(adapter.swApp.GetUserPreferenceToggle(preference)):
-                raise RuntimeError("component-name replacement updates remain enabled")
-            if not component.Select2(False, 0):
-                raise RuntimeError(f"could not select component {name!r} for its role name")
-            with _telemetry.span(
-                "assembly.component_name.write",
-                component=name,
-                basename=occurrence_basename,
-                expected_name=expected_name,
-            ):
-                component.Name2 = occurrence_basename
-            with _telemetry.span("assembly.component_name.readback", component=name):
-                renamed = str(component.Name2)
-                if renamed != expected_name:
-                    raise RuntimeError(
-                        f"role basename readback {renamed!r} != {expected_name!r}"
-                    )
-            name = renamed
-        finally:
-            try:
-                adapter.currentModel.ClearSelection2(True)
-            finally:
-                adapter.swApp.SetUserPreferenceToggle(preference, previous)
-                if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
-                    raise RuntimeError(
-                        "component-name replacement preference did not restore"
-                    )
-    # A native rename must finish before its new semantic reference is written.
     if current_reference != reference:
         with _telemetry.span(
             "assembly.component_reference.write",
@@ -1336,17 +1297,22 @@ def _set_component_reference(
     return name
 
 
+def _component_reference_selector(name: str, reference: str) -> str:
+    parent, separator, _leaf = name.replace("\\", "/").rpartition("/")
+    return f"{parent}/@{reference}" if separator else f"@{reference}"
+
+
 @_telemetry.traced("assembly.set_component_reference", label_param="reference")
 def set_component_reference(
     adapter: Any,
     name: str,
     reference: str,
     *,
-    occurrence_basename: str = "",
     rebuild: bool = True,
 ) -> str:
     """Assign a shared member's role-local reference, returning its live name.
 
+    Native names are selection addresses, never semantic display aliases.
     Pattern callers assign every member with ``rebuild=False``, then force one
     rebuild and resolve all references again. A seed's inherited reference is
     never evidence that its generated occurrences have unique references.
@@ -1355,23 +1321,14 @@ def set_component_reference(
     component = assembly.GetComponentByName(name)
     if component is None:
         raise RuntimeError(f"component not found for reference {reference!r}: {name!r}")
-    result = _set_component_reference(
-        adapter, component, reference, occurrence_basename
-    )
-    if result != name and name in _POSE_LEDGER:
-        if result in _POSE_LEDGER:
-            raise RuntimeError(f"component rename collides with pose ledger {result!r}")
-        _POSE_LEDGER[result] = _POSE_LEDGER.pop(name)
+    result = _set_component_reference(component, reference)
     if rebuild:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if not model.ForceRebuild3(False):
             raise RuntimeError(f"rebuilding component reference {reference!r} failed")
-        if str(component.ComponentReference or "") != reference:
-            raise RuntimeError(f"rebuild lost component reference {reference!r}")
-        if component_identity(component) != semantic_reference_identity(f"@{reference}"):
-            raise RuntimeError(
-                f"rebuild changed component reference {reference!r}'s member"
-            )
+        selector = _component_reference_selector(result, reference)
+        resolved = bind_component_selectors(model, (selector,))[selector]
+        result = _rebuilt_component_name(result, resolved)
     return result
 
 
@@ -1390,7 +1347,6 @@ async def place_component(
     ground: bool = True,
     configuration: str = "",
     component_reference: str = "",
-    occurrence_basename: str = "",
     label: str = "",
 ) -> str:
     """Insert a part at its exact final machine transform and assert it.
@@ -1443,7 +1399,7 @@ async def place_component(
             ),
         )
         name = data["name"]
-        if expected_configuration or component_reference or occurrence_basename:
+        if expected_configuration or component_reference:
             assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
             component = assembly.GetComponentByName(name)
             if component is None:
@@ -1457,19 +1413,16 @@ async def place_component(
                     f"{label}: selected configuration {actual_configuration!r}, "
                     f"expected {expected_configuration!r}"
                 )
-            if occurrence_basename and not component_reference:
-                raise ValueError("an occurrence basename requires a semantic reference")
             if component_reference:
-                name = set_component_reference(
-                    adapter,
-                    name,
-                    component_reference,
-                    occurrence_basename=occurrence_basename,
-                )
+                name = set_component_reference(adapter, name, component_reference)
             elif configuration:
                 model = _early_bound(adapter.currentModel, "IModelDoc2")
                 if not model.EditRebuild3():
                     raise RuntimeError(f"{label}: configuration rebuild failed")
+                name = _rebuilt_component_name(name, str(component.Name2))
+            component = assembly.GetComponentByName(name)
+            if component is None:
+                raise RuntimeError(f"rebuilt component not found: {name!r}")
         psp.set_attribute("component", name)
         if ground and not data.get("fixed"):
             check(
@@ -1535,7 +1488,6 @@ async def place_components_batch(
       * ``ground`` -- fix the component (default ``True``),
       * ``configuration`` -- explicit member, set and read back after insertion,
       * ``component_reference`` -- stable shared role and local ordinal,
-      * ``occurrence_basename`` -- optional display-only member/role name,
       * ``label`` -- log label (optional).
 
     An omitted shared vendor configuration is valid only when the native
@@ -1599,7 +1551,7 @@ async def place_components_batch(
     # segmented into insert | readback+assert | fix child spans so the slow batch
     # op is never an unsegmented hole under the task span.
     out_names: list[str] = [""] * len(specs)
-    grounded_comps: list[Any] = []
+    matched_components: list[Any] = [None] * len(specs)
     async with _telemetry.aspan(
         f"batch {label}",
         count=len(specs),
@@ -1673,6 +1625,7 @@ async def place_components_batch(
                         f"(drift {rot_drift:.4f})"
                     )
                 used[best_i] = True
+                matched_components[best_i] = comp
                 configuration = str(specs[best_i].get("configuration", ""))
                 if configuration:
                     comp.ReferencedConfiguration = configuration
@@ -1693,11 +1646,8 @@ async def place_components_batch(
                         f"expected {expected_configuration!r}"
                     )
                 reference = str(specs[best_i].get("component_reference", ""))
-                basename = str(specs[best_i].get("occurrence_basename", ""))
-                if basename and not reference:
-                    raise ValueError("an occurrence basename requires a semantic reference")
                 if reference:
-                    _set_component_reference(adapter, comp, reference, basename)
+                    _set_component_reference(comp, reference)
                 out_names[best_i] = str(_read_member(comp, "Name2"))
                 # Same save-time pose guarantee as the per-part path: batched
                 # components (grounded or not) enter the ledger too (Codex,
@@ -1706,8 +1656,6 @@ async def place_components_batch(
                     list(finals[best_i]),
                     list(expected_rows[best_i]),
                 )
-                if grounds[best_i]:
-                    grounded_comps.append(comp)
 
         if any(
             _inserted_configuration(
@@ -1719,12 +1667,30 @@ async def place_components_batch(
             with _telemetry.span("batch.member_rebuild", count=len(specs)):
                 if not model_doc.ForceRebuild3(False):
                     raise RuntimeError(f"{label}: configured member rebuild failed")
-                for spec, name in zip(specs, out_names, strict=True):
+                reference_selectors = {
+                    index: _component_reference_selector(
+                        out_names[index], str(spec["component_reference"])
+                    )
+                    for index, spec in enumerate(specs)
+                    if spec.get("component_reference")
+                }
+                resolved_names = bind_component_selectors(
+                    raw_model, reference_selectors.values()
+                )
+                for index, spec in enumerate(specs):
+                    current_name = (
+                        resolved_names[reference_selectors[index]]
+                        if index in reference_selectors
+                        else str(matched_components[index].Name2)
+                    )
+                    name = _rebuilt_component_name(out_names[index], current_name)
                     component = asm.GetComponentByName(name)
                     if component is None:
                         raise RuntimeError(
                             f"{label}: configured member disappeared: {name!r}"
                         )
+                    matched_components[index] = component
+                    out_names[index] = name
                     configuration = _inserted_configuration(
                         str(spec["part"]), str(spec.get("configuration", ""))
                     )
@@ -1745,6 +1711,12 @@ async def place_components_batch(
                         list(spec["position"]),
                         [list(row) for row in spec["rows"]],
                     )
+
+        grounded_comps: list[Any] = [
+            component
+            for component, ground in zip(matched_components, grounds, strict=True)
+            if ground
+        ]
 
         # Append every grounded component to the selection (IComponent2::Select2,
         # one cheap call per component -- no mate solve), then fix the WHOLE

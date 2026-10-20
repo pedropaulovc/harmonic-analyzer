@@ -1042,7 +1042,6 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         configuration=LEVER_WIRE_CONFIGURATION,
         component_reference="LeverWire:1",
-        occurrence_basename=f"sh-vn-music-wire--{LEVER_WIRE_CONFIGURATION}",
     )
     hw_o = component_origin(adapter, hw)
     # The wire ARTICULATES instead of riding the lever group rigidly (a locked
