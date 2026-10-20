@@ -17,7 +17,8 @@ prints there.  The stations stack above it in a baseline from the tenon end
 face, with the tangency-fixed radii as references beneath them; the diameters
 are dimensioned across their own cut, their text on shelves clear of the
 section; the fitted tenon and counterbore carry their mates and clearances as
-callouts.  The end
+callouts, and the tenon root and the counterbore's floor corner their R0.3 MAX
+single limits with the part that seats on each.  The end
 view stands on the section's axis and carries the cutting plane.
 
 Run with SolidWorks open::
@@ -66,14 +67,16 @@ import _telemetry
 from dt_crank_handle_spec import (
     COUNTERBORE_DEPTH,
     COUNTERBORE_FIT_NOTE,
-    DOME_CENTER,
-    DOME_R,
+    COUNTERBORE_FLOOR_CALLOUT,
+    COUNTERBORE_FLOOR_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     END_ROUND_CENTER,
     FLARE_CENTER,
     HANDLE_MAX_DIA,
     INFLECTION,
+    INSIDE_CORNER_R_MAX,
+    INSIDE_CORNER_R_TOL_TYPE,
     OAK_END_X,
     PEAK_X,
     PIVOT_BORE_CALLOUT,
@@ -84,6 +87,8 @@ from dt_crank_handle_spec import (
     S_CONVEX_R,
     SHOULDER_X,
     TENON_FIT_NOTE,
+    TENON_R,
+    TENON_ROOT_CALLOUT,
     TENON_X0,
     WAIST_X,
 )
@@ -170,7 +175,10 @@ FRONT_KEEP = {
     "FlareR": _on_radius(FLARE_CENTER, 5.3, 245.0),
     "SConcaveR": _on_radius(S_CONCAVE_CENTER, 15.5, 285.0),
     "SConvexR": _on_radius(S_CONVEX_CENTER, S_CONVEX_R + 5.0, 100.0),
-    "DomeR": _on_radius(DOME_CENTER, DOME_R + 5.0, 78.0),
+    # Ruling-B native audit: the R77.3 text is 14.2 mm wide.  Its former
+    # radial keep straddled the oak-end extension at x 0.274; this left-side
+    # keep leaves 5.4 mm of air and separates it from the end-round callout.
+    "DomeR": (_front_x(OAK_END_X) - 0.0125, 0.185),
     "EndRoundR": _on_radius(END_ROUND_CENTER, 8.1, 42.5),
     # Diameters across their own cut.  The shoulder and waist shelves sit
     # under the section; the fitted tenon's and the counterbore's callout
@@ -188,17 +196,48 @@ FRONT_KEEP = {
     # The swell's diameter reads above the section, clear of the bore's
     # callout, beside the 40.0 station's extension line.
     "PeakDia": (_front_x(PEAK_X) + 2.0 * _SHELF, 0.225),
-    # Right of the oak end, above the crest, under the R1.5 and clear of the
-    # end view and of the counterbore's callout block.
-    "CrestDia": (_front_x(OAK_END_X) + 0.0095, 0.165),
+    # Ruling-B's longer diameter tail ends at y 0.09325, beside the fitted
+    # bore's text (right edge x 0.295).  Put the crest line at x 0.299:
+    # 4 mm clear of that text, with another 4 mm from its own text to the
+    # end view's x 0.320 outline.
+    "CrestDia": (_front_x(OAK_END_X) + 0.025, 0.165),
+    # The inside corners' three-row blocks (R0.3 MAX / mate / SEAT), 8 x 2.75 =
+    # 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on the keep (were
+    # the rows to hang from the keep instead, each box drops ~7 mm and stays
+    # clear):
+    #   Tenon root, left of the tenon end: box x 0.024..0.046, y 0.1607..
+    #   0.1753 -- 4.0 mm clear of the tenon end's extension line (x 0.050),
+    #   11.3 inside the border, 16.9 under the 5.0's outside tail (y 0.1922).
+    #   Its leader runs down-right through the air over the tenon to the
+    #   corner, crossing that extension line at y ~0.158 (4 mm from the text)
+    #   and passing ~9 mm over the tenon diameter's extension line (y 0.1452).
+    "TenonRootRadius": (_front_x(TENON_X0) - 0.015, _front_y(TENON_R) + 0.0228),
+    #   Counterbore floor, above the section between the swell diameter's
+    #   dimension line (x 0.213) and the 8.1's floor extension line (x
+    #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023
+    #   -- 15.8 above the silhouette (y <= 0.1719 there), 19.9 under the
+    #   swell diameter's text (y 0.2222).  Its leader drops ~23 mm through the
+    #   oak to the corner (under the corner's 25.4 approach to the section's
+    #   top edge) and crosses the 8.1's floor extension line at y ~0.157,
+    #   31 mm from either text.
+    "CounterboreFloorRadius": (_front_x(COUNTERBORE_FLOOR_X) - 0.0143, 0.195),
 }
 # Every band renders from its model dimension; the callouts carry the reamed
-# bore's mate and the fitted tenon's and counterbore's mates and clearances
-# (drawing-guidelines.md rules 4 and 7).
+# bore's mate, the fitted tenon's and counterbore's mates and clearances, and
+# the part seating on each inside corner (drawing-guidelines.md rules 4 and 7).
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
     "TenonDia": TENON_FIT_NOTE,
     "CounterboreDia": COUNTERBORE_FIT_NOTE,
+    "TenonRootRadius": TENON_ROOT_CALLOUT,
+    "CounterboreFloorRadius": COUNTERBORE_FLOOR_CALLOUT,
+}
+# Each inside corner's text stands up-left of its arc's centre: the tenon
+# root's (the arc's lower-right quarter) off the arc's span, the counterbore
+# floor's (its upper-left quarter) inside it.
+INSIDE_CORNER_ARC_EXTENSION = {
+    "TenonRootRadius": True,
+    "CounterboreFloorRadius": False,
 }
 RADII = (*sorted(REFERENCE_RADII), "EndRoundR")
 CUT_START = (RIGHT_CENTER[0], RIGHT_CENTER[1] - END_R - 0.006)
@@ -235,6 +274,43 @@ def _style_radius(adapter: Any, annotation: Any, *, name: str, reference: bool) 
         or bool(display.SolidLeader)
     ):
         raise RuntimeError(f"MHA-DT-008 {name} kept its leader to the arc's centre")
+
+
+def _dress_inside_corner(adapter: Any, annotation: Any, *, name: str) -> None:
+    """Prove an imported inside-corner radius prints the part's R0.3 MAX with
+    its mate callout, and land its leader on the corner
+    (draw_mg_magnifying_vertical_rod._dress_relief_roots).
+
+    Read back: radial (not a diameter), measuring INSIDE_CORNER_R_MAX, the
+    native swTolMAX the part set, and the callout under the value.
+    SolidWorks ends a radial leader at the circle point facing its text, so a
+    text standing off the arc's span takes ``ArcExtensionLineOrOppositeSide``
+    True to draw the arc's extension out to that point (farm r4 of the
+    magnifying rod); one inside the span lands on the arc itself."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError(f"MHA-DT-008 {name} imported as a diameter")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if int(tolerance.Type) != INSIDE_CORNER_R_TOL_TYPE:
+        raise RuntimeError(
+            f"MHA-DT-008 {name} lost its native MAX type: {int(tolerance.Type)}"
+        )
+    if not math.isclose(
+        float(dimension.SystemValue), INSIDE_CORNER_R_MAX / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError(f"MHA-DT-008 {name} does not measure the inside corner")
+    callout = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
+    if callout != DIMENSION_CALLOUTS[name]:
+        raise RuntimeError(f"MHA-DT-008 {name} callout did not persist: {callout!r}")
+    extension = INSIDE_CORNER_ARC_EXTENSION[name]
+    display.ArcExtensionLineOrOppositeSide = extension
+    if bool(display.ArcExtensionLineOrOppositeSide) is not extension:
+        raise RuntimeError(f"MHA-DT-008 {name} refused its arc extension setting")
+    _telemetry.info(
+        f"{name}: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -318,6 +394,8 @@ async def build(adapter: Any) -> dict[str, str]:
         _style_radius(
             adapter, front_by_name[name], name=name, reference=name in REFERENCE_RADII
         )
+    for name in sorted(INSIDE_CORNER_ARC_EXTENSION):
+        _dress_inside_corner(adapter, front_by_name[name], name=name)
     rebuild_drawing(adapter, label="crank-handle radii")
     create_section_axis_centerline(
         adapter, front, length_mm=OAK_END_X - TENON_X0, label="crank handle axis"

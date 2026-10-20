@@ -9,10 +9,10 @@ the crank arm MHA-DT-006.
 The oak tenon is turned to suit this bore, and the handle's end play is set by
 facing the MHA-DT-032 shoulder at assembly (user ruling 2026-09-29, after the
 MHA-DT-034 machinist review), so no length here is a stack term and every size
-but the bore is routine (.X).  The bore keeps a +/-0.10 band (Codex P1/P2 on
-#1139, user ruling 2026-09-30): at .X a large bore let the fitted tenon
-outgrow the MHA-DT-008 shoulder it seats on, and a small one thinned the oak
-round the pivot bore under 1.5.
+but the bore and the seat mouth's chamfer is routine (.X).  The bore keeps a
++/-0.10 band (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X a large
+bore let the fitted tenon outgrow the MHA-DT-008 shoulder it seats on, and a
+small one thinned the oak round the pivot bore under 1.5.
 
 Local frame: the axis is local +X, the part's origin plane is the arm-bearing
 end face (x=0), and the seat face against the oak shoulder is at x=LENGTH --
@@ -22,6 +22,10 @@ PURE DATA, no SolidWorks/COM imports.
 """
 
 from __future__ import annotations
+
+import math
+
+from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 
 # The ring leaves the bench at the 9/16-in rod's own OD and is skimmed to the
 # Ø12.5 grip contour with the MHA-DT-008 shoulder after the epoxy cures (user
@@ -43,6 +47,37 @@ INSTALLED_CONFIG = "INSTALLED"
 BORE_DIA = 7.7
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
+# Joint dimensions shared with MHA-DT-008, whose spec imports this one.
+# The shortest tenon must retain this much uninterrupted bonded length.
+TENON_LENGTH = 5.0
+TENON_GLUE_LENGTH_FLOOR = 3.5
+# Owner ruling A on #1661: the seat-mouth chamfer clears the R0.3 tenon root.
+# Its maximum is the glue-length budget rounded DOWN to a one-place limit:
+# 5.0 - 0.8 - 0.25 - 3.5 = 0.45, hence 0.4.  Derive it here rather than
+# tightening it independently of the handle's joint-length requirement.
+SEAT_MOUTH_CHAMFER_MIN = 0.3
+SEAT_MOUTH_CHAMFER_MAX = (
+    math.floor(
+        round(
+            (
+                TENON_LENGTH
+                - GENERAL_1PL_TOL_MM
+                - EDGE_BREAK_MAX_MM
+                - TENON_GLUE_LENGTH_FLOOR
+            )
+            * 10.0,
+            6,
+        )
+    )
+    / 10.0
+)
+if SEAT_MOUTH_CHAMFER_MAX < SEAT_MOUTH_CHAMFER_MIN:
+    raise AssertionError("MHA-DT-034 glue-length budget cannot clear the tenon root")
+# Modelled at the midpoint; the native band prints both functional limits.
+SEAT_MOUTH_CHAMFER = round((SEAT_MOUTH_CHAMFER_MIN + SEAT_MOUTH_CHAMFER_MAX) / 2.0, 6)
+SEAT_MOUTH_CHAMFER_TOL = round(
+    (SEAT_MOUTH_CHAMFER_MAX - SEAT_MOUTH_CHAMFER_MIN) / 2.0, 6
+)
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-008's check.
@@ -51,10 +86,10 @@ if WALL_WORST < 1.5:
     raise AssertionError("MHA-DT-034 ferrule wall is under 1.5 at the worst case")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
+    "FerruleProfile": {"OuterDia", "BoreDia", "Length", "SeatMouthChamfer"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1},
+    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1, "SeatMouthChamfer": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -71,6 +106,18 @@ REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-DT-008"
 HANDLE_NAME = "CRANK HANDLE"
+# The tenon root's largest radius on MHA-DT-008, quoted for the chamfer's
+# callout: dt_crank_handle_spec.INSIDE_CORNER_R_MAX, which cannot be imported
+# here (that spec imports this one); the offline test checks it.
+HANDLE_ROOT_R_MAX = 0.3
+# The chamfer's band names its end and its reason at the callout (rule 4).
+SEAT_MOUTH_CHAMFER_CALLOUT = "\n".join(
+    (
+        "X 45 DEG SEAT END",
+        f"CLEARS {HANDLE_NUMBER}",
+        f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f}",
+    )
+)
 # The oak tenon is turned to suit this bore for an epoxy line (the handle spec
 # reads it from here); stated on this sheet too, so the fitted joint has its
 # acceptance (MHA-DT-034 re-review).

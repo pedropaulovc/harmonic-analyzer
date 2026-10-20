@@ -9,6 +9,7 @@ import pytest
 
 import _config
 import build_dt_crank_handle_pivot_screw as part
+import dt_crank_handle_butt_cup_spec as cup
 import dt_crank_handle_pivot_screw_spec as spec
 import dt_crank_handle_spec as handle
 import dt_crank_hub_geometry as geometry
@@ -291,6 +292,18 @@ def test_head_bearing_acceptance_accounts_for_running_offset() -> None:
     assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(0.3)
     assert spec.HEAD_RUNNING_OFFSET_MAX == pytest.approx(min(0.4 / 2.0, (4.3 - 3.92) / 2.0))
     assert spec.HEAD_BEARING_RADIAL_MIN == pytest.approx(0.11)
+
+
+def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
+    # Owner ruling B on #1375 grows the cup, not any MHA-DT-032 geometry.
+    assert (spec.HEAD_DIA, spec.HEAD_DIA_TOL) == (6.0, 0.10)
+    assert spec.CUP_BODY_DIA == cup.BODY_DIA == 9.6
+    assert spec.CUP_BODY_DIA_TOL == cup.BODY_DIA_TOL == 0.10
+    assert spec.CUP_POCKET_CLEARANCE == cup.POCKET_CLEARANCE == (0.2, 0.4)
+    assert spec.POCKET_MAX == pytest.approx(cup.POCKET_DIA_MAX)
+    assert spec.CUP_POCKET_WALL_FLOOR_MM == cup.POCKET_WALL_FLOOR_MM == 1.5
+    assert spec.CUP_POCKET_WALL_MIN == cup.POCKET_WALL_MIN
+    assert spec.CUP_POCKET_WALL_MIN >= spec.CUP_POCKET_WALL_FLOOR_MM
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:

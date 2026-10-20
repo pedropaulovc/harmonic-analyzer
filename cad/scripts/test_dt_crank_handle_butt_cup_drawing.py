@@ -2,17 +2,29 @@
 
 from __future__ import annotations
 
+import asyncio
+import math
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 import _config
 import build_dt_crank_handle_butt_cup as part
+import dt_crank_handle_butt_cup_notes as notes
 import dt_crank_handle_butt_cup_spec as spec
 import dt_crank_handle_pivot_screw_spec as screw
 import draw_dt_crank_handle_butt_cup as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import (
+    Box,
+    Segment,
+    point_segment_distance,
+    segment_box_distance,
+    segment_box_overlap_length,
+)
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -31,38 +43,72 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
-    assert drawing.DIMENSION_CALLOUTS == {"FloorHoleDia": "DRILL THRU"}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    # Two bands: the body diameter that holds the pocket wall, and the pocket
-    # depth that keeps the MHA-DT-032 head below the face (Codex P2 on #1139).
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BodyChamfer": notes.BODY_CHAMFER_CALLOUT,
+        "BodyDia": notes.BODY_FIT_CALLOUT,
+        "FloorHoleDia": "DRILL THRU",
+        "PocketDepth": notes.POCKET_DEPTH_CALLOUT,
+        "PocketDia": notes.POCKET_FIT_CALLOUT,
+    }
+    # Three symmetric bands, plus the separate native radial MAX limit.
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
         ("CupProfile", "PocketDepth"): "POCKET_DEPTH_TOL",
+        ("CupProfile", "BodyChamfer"): "BODY_CHAMFER_TOL",
     }
     assert {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 2
     } == {"BodyDia", "PocketDepth"}
-    assert "set_dimension_bilateral_tolerance" not in source
 
 
-def test_the_floor_holds_1_5_and_the_wall_its_named_exception() -> None:
-    # User rulings 2026-09-30 (ch30 eight-views-4, concept v4): a plain cup
-    # sized to the photographed Ø6 head.  The pocket wall is the named 0.8
-    # exception; the floor keeps the 1.5 floor.
+def test_bottom_chamfer_clears_the_handle_counterbore_corner() -> None:
+    # Owner ruling A on #1661: 0.3-0.5 X 45 DEG, so its smallest leg still
+    # clears the MHA-DT-008 counterbore floor's R0.3 MAX corner.
+    assert (spec.BODY_CHAMFER_MIN, spec.BODY_CHAMFER_MAX) == (0.3, 0.5)
+    assert notes.BODY_CHAMFER_CALLOUT.splitlines() == [
+        "X 45 DEG",
+        "CLEARS MHA-DT-008",
+        "COUNTERBORE CORNER",
+    ]
+
+
+def test_floor_and_pocket_wall_hold_their_floors_at_the_printed_limits() -> None:
+    # Owner ruling B on #1375 grows only the body around the unchanged pocket.
     assert not hasattr(spec, "FLANGE_DIA") and not hasattr(spec, "FLANGE_THICKNESS")
     # The floor is what the overall (.X) leaves after the banded pocket depth,
     # both from the face (re-review: one faced end).
     assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.7)
-    assert spec.POCKET_WALL_FLOOR_MM == 0.8
-    assert spec.POCKET_WALL_MIN == pytest.approx(0.8)
-    assert screw.CUP_POCKET_WALL_MIN == pytest.approx(0.8)
+    assert spec.FLOOR_THICKNESS_MIN >= spec.WALL_FLOOR_MM
+    assert spec.POCKET_WALL_FLOOR_MM == spec.WALL_FLOOR_MM == 1.5
+    assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
+    assert spec.POCKET_WALL_MIN >= spec.POCKET_WALL_FLOOR_MM
+    assert screw.CUP_POCKET_WALL_MIN == spec.POCKET_WALL_MIN
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
-    # 3/8-in stock clears the Ø8.20 body at its upper limit.
-    assert "3/8 in" in _config.parts("dt-crank-handle-butt-cup")["material"]
-    assert spec.BODY_DIA + spec.BODY_DIA_TOL < 0.375 * 25.4
+    assert (spec.BODY_DIA, spec.BODY_DIA_TOL) == (9.6, 0.10)
+    assert spec.BODY_DIA == pytest.approx(
+        spec.POCKET_DIA_MAX + 2.0 * spec.POCKET_WALL_FLOOR_MM + spec.BODY_DIA_TOL
+    )
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
+
+
+def test_ruling_b_keeps_the_head_pocket_and_axial_geometry() -> None:
+    assert (screw.HEAD_DIA, screw.HEAD_DIA_TOL) == (6.0, 0.10)
+    assert (spec.POCKET_DIA, spec.POCKET_DIA_MAX) == (6.3, 6.5)
+    assert spec.POCKET_CLEARANCE == (0.2, 0.4)
+    assert spec.OVERALL_LENGTH == 8.1
+    assert spec.FLOOR_THICKNESS == pytest.approx(2.6)
+    assert spec.FLOOR_HOLE_DIA == 4.2
+
+
+def test_half_inch_stock_cleans_up_over_the_largest_body() -> None:
+    # Owner ruling B on #1375 preserves both low-carbon steel alternatives.
+    row = _config.parts("dt-crank-handle-butt-cup")
+    for field in ("material", "material_specification"):
+        for requirement in ("1/2 in", "12L14", "1018"):
+            assert requirement in row[field]
+    assert spec.STOCK_DIA == pytest.approx(0.5 * 25.4)
+    assert spec.BODY_DIA + spec.BODY_DIA_TOL < spec.STOCK_DIA - 0.2
 
 
 def test_head_sits_recessed_and_end_play_is_fitted() -> None:
@@ -83,30 +129,46 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert "create_section_view(" in source
     assert "set_hidden_lines_visible" not in source
     assert "create_section_axis_centerline(" in source
+    # R5's confirmed projection finding: the view at the left must show the
+    # chamfered floor end, not the counterbore end.  Reversing the cut with
+    # the parent view preserves the existing +X-right section and keeps.
+    assert 'str(SOURCE), "*Left", *END_CENTER' in source
+    assert drawing.END_CENTER[0] < drawing.SECTION_CENTER[0]
+    assert drawing.CUT_START[0] == drawing.CUT_END[0] == drawing.END_CENTER[0]
+    assert drawing.CUT_START[1] > drawing.CUT_END[1]
 
 
-def test_notes_name_the_mates_and_the_band_reason() -> None:
-    assert spec.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
-    assert spec.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
-    notes = spec.DRAWING_NOTES
-    assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
-    assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
-    assert "TO SUIT" in notes
-    assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
-    # Codex P1 on #1139 (c81d97280): the depth band's reason stays in the
-    # spec, not on the sheet. A short functional reason would be allowed by
-    # drawing-guidelines.md rule 7; this sheet does not carry one.
-    assert "DEPTH BAND" not in notes
-    # crank-v4-17: a 78-character line pushed the block 4.8 mm into the title
-    # block (2.55 mm a character from x=21.9, title block at x=216).
-    assert max(len(line.replace("<MOD-DIAM>", "@")) for line in notes.splitlines()) <= 74
+def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:
+    assert notes.HANDLE_NUMBER == _config.parts("dt-crank-handle")["number"]
+    assert notes.SCREW_NUMBER == _config.parts("dt-crank-handle-pivot-screw")["number"]
+    assert notes.SCREW_NAME in _config.parts("dt-crank-handle-pivot-screw")["title"].upper()
+    # MHA-DT-035 machinist ENFORCE r1: each band names its mate at the callout
+    # (rule 4), the matched pocket fit states name, number, diametral
+    # clearance and its hard limit.  The floor corner's maximum is a separate
+    # model-owned radial dimension, not an unrelated axial callout.
+    assert notes.BODY_FIT_CALLOUT == "EPOXY FIT IN MHA-DT-008"
+    assert notes.POCKET_FIT_CALLOUT.splitlines() == [
+        "BORE TO SUIT MHA-DT-032",
+        "PIVOT SCREW HEAD, 0.2-0.4",
+        "DIAMETRAL CLEARANCE,",
+        "<MOD-DIAM>6.5 MAX",
+    ]
+    assert notes.POCKET_DEPTH_CALLOUT.splitlines() == [
+        "KEEPS MHA-DT-032 HEAD",
+        "BELOW FACE",
+    ]
+    assert spec.POCKET_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
+    assert spec.POCKET_FLOOR_CORNER_R_MAX <= spec.POCKET_CLEARANCE[0] / 2
+    assert spec.POCKET_FLOOR_CORNER_R_BAND == (0.0, -0.1)
+    assert spec.POCKET_FLOOR_CORNER_R_TOL_TYPE == 6  # swTolMAX
+    assert "PocketFloorRadius" in spec.DRAWING_DIMENSIONS["CupProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["PocketFloorRadius"] == 1
+    assert "PocketFloorRadius" not in spec.REFERENCE_DIMENSIONS
     assert "turned clear of it" in _config.parts("dt-crank-handle-butt-cup")["process"]
-    assert "6.5 MAX" in notes
-    assert "FACE FLUSH, CENTRED ON THE" in notes
-    # The oak's end round is turned clear of the cup (local review of
-    # fbf82ad96): its face stays flat.
-    assert "WAXED MHA-DT-032 SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT." in notes
-    assert all(len(line) <= 90 for line in notes.splitlines())
+    # The DT-008 and DT-032 specs import the cup spec; its prose lives in the
+    # notes module so a wording edit never re-keys those parts.
+    for name in ("DRAWING_NOTES", "ISOMETRIC_VIEW_NOTE", "FLOOR_HOLE_CALLOUT"):
+        assert not hasattr(spec, name)
 
 
 def test_registry_row_is_the_title_block_source() -> None:
@@ -120,7 +182,6 @@ def test_registry_row_is_the_title_block_source() -> None:
 def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     for x, y in (
         *drawing.SECTION_KEEP.values(),
-        drawing.MANUFACTURING_NOTES_POS,
         drawing.ISO_NOTE_POS,
         drawing.CAPTION_XY,
     ):
@@ -144,8 +205,447 @@ def test_cup_is_one_configuration_the_oak_rounds_clear_of() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "create_configuration" not in source
     # The oak round the largest counterbore, the crest turned its .X band
-    # small and the bore's eccentricity both ways, holds the 2.0 wall target
-    # (MHA-DT-008 machinist review of 2026-10-18).
-    assert handle.BUTT_WALL_MIN >= 2.0
-    assert handle.END_ROUND_CY - 0.4 - 0.20 >= handle.COUNTERBORE_DIA_MAX / 2.0 + 2.0
+    # small and the bore's eccentricity both ways, holds the 2.0 target plus
+    # the 0.05 owner-ruling-B margin (#1375).
+    assert handle.BUTT_WALL_DESIGN_MIN_MM == 2.05
+    assert handle.BUTT_WALL_MIN >= handle.BUTT_WALL_DESIGN_MIN_MM
+    assert (
+        handle.END_ROUND_CY - handle.GENERAL_1PL_TOL_MM / 2.0
+        - 2.0 * handle.BORE_ECCENTRICITY
+    ) == pytest.approx(
+        handle.COUNTERBORE_DIA_MAX / 2.0 + handle.BUTT_WALL_DESIGN_MIN_MM
+    )
     assert _config.parts("dt-crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"
+
+
+@pytest.fixture
+def cup_build(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """Capture the real profile recipe, not a replacement geometric model."""
+    entities: dict[str, tuple[str, tuple[float, ...]]] = {}
+    dimensions: list[tuple[object, ...]] = []
+
+    def success(data: object = None) -> SimpleNamespace:
+        return SimpleNamespace(is_success=True, data=data)
+
+    def entity(kind: str, *coordinates: float) -> SimpleNamespace:
+        assert adapter.currentSketchManager.AddToDB
+        key = f"{kind}_{len(entities)}"
+        entities[key] = (kind, coordinates)
+        return success(key)
+
+    def dimension(*args: object) -> SimpleNamespace:
+        dimensions.append(args)
+        return success(f"Dim_{len(dimensions)}")
+
+    adapter = SimpleNamespace(
+        currentSketchManager=SimpleNamespace(AddToDB=False),
+        _attempt=lambda read, default=None: read(),
+        create_part=AsyncMock(return_value=success()),
+        create_sketch=AsyncMock(return_value=success()),
+        add_centerline=AsyncMock(side_effect=lambda *p: entity("axis", *p)),
+        add_line=AsyncMock(side_effect=lambda *p: entity("line", *p)),
+        add_arc=AsyncMock(side_effect=lambda *p: entity("arc", *p)),
+        add_sketch_constraint=AsyncMock(return_value=success("constraint")),
+        add_sketch_dimension=AsyncMock(side_effect=dimension),
+        check_sketch_fully_defined=AsyncMock(
+            return_value=success({"definition_state": "fully_defined"})
+        ),
+        exit_sketch=AsyncMock(return_value=success()),
+        create_revolve=AsyncMock(return_value=success()),
+    )
+    helpers = {}
+    for name in (
+        "set_global", "drive_dimension", "force_rebuild", "volume_check", "name_bore_axis",
+        "apply_material", "apply_color", "report_mass_properties",
+        "save_part_and_images",
+    ):
+        helpers[name] = AsyncMock()
+        monkeypatch.setattr(part, name, helpers[name])
+    for name in (
+        "name_last_feature", "set_dimension_symmetric_tolerance",
+        "clear_dimensions_for_drawing", "mark_dimensions_for_drawing",
+        "apply_drawing_precision", "apply_drawing_properties", "_pocket_floor_max_limit",
+    ):
+        helpers[name] = MagicMock()
+        monkeypatch.setattr(part, name, helpers[name])
+
+    async def diameter(_adapter, axis, line, position, name):
+        return dimension(line, axis, "diameter", getattr(spec, {
+            "BodyDia": "BODY_DIA", "PocketDia": "POCKET_DIA",
+            "FloorHoleDia": "FLOOR_HOLE_DIA",
+        }[name]))
+
+    monkeypatch.setattr(part, "add_diametric_linear_dimension", diameter)
+    named = {}
+
+    def apply(rows, _adapter, feature):
+        assert feature == "CupProfile"
+        assert len(rows._rows) == len(dimensions)
+        for (name, equation), arguments in zip(rows._rows, dimensions, strict=True):
+            named[name] = (arguments, equation)
+        return [
+            (f"{name}@{feature}", equation)
+            for name, (_arguments, equation) in named.items()
+        ]
+
+    monkeypatch.setattr(part.SketchDims, "apply", apply)
+    asyncio.run(part.build(adapter))
+    return SimpleNamespace(
+        adapter=adapter, helpers=helpers, entities=entities, dimensions=named
+    )
+
+
+def test_profile_has_a_driving_tangent_quarter_arc_and_true_floor_depth(cup_build) -> None:
+    captured = cup_build
+    arcs = [(name, points) for name, (kind, points) in captured.entities.items()
+            if kind == "arc"]
+    assert len(arcs) == 1
+    arc, (cx, cy, sx, sy, ex, ey) = arcs[0]
+    assert (cx, cy) == pytest.approx((-5.4, 3.05))
+    assert (sx, sy) == pytest.approx((-5.4, 3.15))  # wall tangent
+    assert (ex, ey) == pytest.approx((-5.5, 3.05))  # floor tangent
+    assert math.hypot(sx - cx, sy - cy) == pytest.approx(0.1)
+    assert math.hypot(ex - cx, ey - cy) == pytest.approx(0.1)
+    # add_arc is CCW; the 90-degree sweep, not its 270-degree complement.
+    sweep = (math.atan2(ey - cy, ex - cx) - math.atan2(sy - cy, sx - cx)) % math.tau
+    assert sweep == pytest.approx(math.pi / 2)
+    lines = {name: points for name, (kind, points) in captured.entities.items()
+             if kind == "line"}
+    floor = next(name for name, p in lines.items()
+                 if p == pytest.approx((-5.5, 2.1, -5.5, 3.05)))
+    wall = next(name for name, p in lines.items()
+                if p == pytest.approx((-5.4, 3.15, 0.0, 3.15)))
+    face = next(name for name, p in lines.items()
+                if p == pytest.approx((0.0, 3.15, 0.0, 4.8)))
+    constraints = [call.args for call in captured.adapter.add_sketch_constraint.call_args_list]
+    assert (floor, arc, "tangent") in constraints
+    assert (arc, wall, "tangent") in constraints
+    assert (floor, None, "vertical") in constraints
+    assert (wall, None, "horizontal") in constraints
+    assert not any(relation == "fix" for _first, _second, relation in constraints)
+    assert captured.dimensions["PocketDepth"] == (
+        (f"{face}.start", f"{floor}.start", "horizontal_distance", 5.5),
+        '"PocketDepth"',
+    )
+    assert lines[wall][2] - lines[wall][0] == pytest.approx(5.4)
+    assert captured.dimensions["PocketFloorRadius"] == (
+        (arc, None, "radial", 0.1), '"PocketFloorRadius"',
+    )
+    assert any(
+        call.args[1:] == ("PocketFloorRadius", "0.1mm")
+        for call in captured.helpers["set_global"].call_args_list
+    )
+    assert any(
+        call.args[1:] == ("PocketFloorRadius@CupProfile", '"PocketFloorRadius"')
+        for call in captured.helpers["drive_dimension"].call_args_list
+    )
+    captured.helpers["_pocket_floor_max_limit"].assert_called_once_with(captured.adapter)
+    captured.helpers["apply_drawing_precision"].assert_called_once_with(
+        captured.adapter, spec.DRAWING_PRECISION
+    )
+    captured.helpers["mark_dimensions_for_drawing"].assert_called_once_with(
+        captured.adapter, "CupProfile", spec.DRAWING_DIMENSIONS["CupProfile"]
+    )
+    captured.adapter.check_sketch_fully_defined.assert_awaited_once()
+    assert captured.adapter.currentSketchManager.AddToDB is False
+
+
+def test_bottom_chamfer_has_real_legs_and_a_sound_root_at_the_new_body(cup_build) -> None:
+    # Owner ruling B on #1375 changes the OD, not the 0.4 +/-0.1 chamfer.
+    chamfer, = (
+        points for kind, points in cup_build.entities.values()
+        if kind == "line" and points[0] != points[2] and points[1] != points[3]
+    )
+    assert chamfer == pytest.approx((-7.7, 4.8, -8.1, 4.4))
+    assert abs(chamfer[2] - chamfer[0]) == pytest.approx(spec.BODY_CHAMFER)
+    assert abs(chamfer[3] - chamfer[1]) == pytest.approx(spec.BODY_CHAMFER)
+    assert spec.BODY_CHAMFER_MIN >= 0.3
+    assert spec.BODY_CHAMFER_MAX == 0.5
+    # Smallest body, longest radial leg and largest drilled floor hole.
+    root_radial_min = (
+        (spec.BODY_DIA - spec.BODY_DIA_TOL) / 2.0
+        - spec.BODY_CHAMFER_MAX - (spec.FLOOR_HOLE_DIA + 0.10) / 2.0
+    )
+    assert root_radial_min == pytest.approx(2.1)
+    assert root_radial_min >= spec.WALL_FLOOR_MM
+
+
+def test_model_properties_need_no_general_manufacturing_note(cup_build) -> None:
+    # Owner ruling B on #1375 resolves the wall in geometry, not a note or exception.
+    properties = cup_build.helpers["apply_drawing_properties"].call_args.args[2]
+    assert properties == {"Isometric View Note": notes.ISOMETRIC_VIEW_NOTE}
+    assert not hasattr(notes, "DRAWING_NOTES")
+    assert not _config.parts("dt-crank-handle-butt-cup").get("machinist_exceptions")
+
+
+def test_concave_floor_round_adds_the_exact_revolved_corner_material() -> None:
+    # Independently integrate disks over the quarter arc; the angle substitution
+    # avoids the square-root endpoint singularity of direct axial integration.
+    radius = 0.1
+    pocket_r = spec.POCKET_DIA / 2.0
+    n = 1000
+    step = math.pi / (2.0 * n)
+
+    def disk(theta: float) -> float:
+        profile_r = pocket_r - radius + radius * math.sin(theta)
+        return math.pi * (pocket_r**2 - profile_r**2) * radius * math.sin(theta)
+
+    filled = step / 3.0 * sum(
+        (1 if index in (0, n) else 4 if index % 2 else 2) * disk(index * step)
+        for index in range(n + 1)
+    )
+    assert filled > 0
+    assert part.V_POCKET_FLOOR_CORNER == pytest.approx(filled, abs=1e-10)
+    sharp = math.pi * (
+        (spec.BODY_DIA / 2) ** 2 * spec.OVERALL_LENGTH
+        - pocket_r**2 * spec.POCKET_DEPTH
+        - (spec.FLOOR_HOLE_DIA / 2) ** 2 * spec.FLOOR_THICKNESS
+        - spec.BODY_CHAMFER**2 * (spec.BODY_DIA / 2 - spec.BODY_CHAMFER / 3)
+    )
+    assert part.V_CUP == pytest.approx(sharp + filled, abs=1e-10)
+
+
+def _native_radius() -> SimpleNamespace:
+    tolerance = SimpleNamespace(
+        Type=0,
+        GetMinValue=MagicMock(return_value=-0.0001),
+        GetMaxValue=MagicMock(return_value=0.0),
+    )
+    tolerance.SetValues = MagicMock(return_value=True)
+    # Equation-owned does NOT imply DrivenState 2: the native reference flag
+    # is false even when the equation reports DrivenState 1.
+    return SimpleNamespace(
+        SystemValue=0.0001, DrivenState=1, IsReference=MagicMock(return_value=False),
+        Tolerance=tolerance,
+    )
+
+
+def test_model_floor_radius_sets_and_reads_back_native_max(monkeypatch) -> None:
+    dimension = _native_radius()
+    named = MagicMock(return_value=(object(), dimension))
+    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    adapter = object()
+    part._pocket_floor_max_limit(adapter)
+    named.assert_called_once_with(adapter, "CupProfile", "PocketFloorRadius")
+    assert dimension.Tolerance.Type == 6
+    dimension.Tolerance.SetValues.assert_called_once_with(-0.0001, 0.0)
+    dimension.Tolerance.GetMinValue.assert_called_once()
+    dimension.Tolerance.GetMaxValue.assert_called_once()
+
+
+@pytest.mark.parametrize("fault", ["nominal", "reference", "reject", "type", "lower", "upper"])
+def test_model_floor_radius_refuses_false_native_limits(monkeypatch, fault: str) -> None:
+    dimension = _native_radius()
+    tolerance = dimension.Tolerance
+    if fault == "nominal":
+        dimension.SystemValue = 0.00005
+    elif fault == "reference":
+        dimension.IsReference.return_value = True
+    elif fault == "reject":
+        tolerance.SetValues.return_value = False
+    elif fault == "type":
+        tolerance.SetValues.side_effect = lambda *_args: setattr(tolerance, "Type", 0) or True
+    elif fault == "lower":
+        tolerance.GetMinValue.return_value = -0.00005
+    else:
+        tolerance.GetMaxValue.return_value = 0.00005
+    monkeypatch.setattr(part, "_named_dimension", lambda *_args: (object(), dimension))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    with pytest.raises(RuntimeError, match="PocketFloorRadius@CupProfile"):
+        part._pocket_floor_max_limit(object())
+
+
+def _imported_radius() -> SimpleNamespace:
+    dimension = _native_radius()
+    dimension.Tolerance.Type = 6
+    return SimpleNamespace(
+        dimension=dimension, Diametric=False, Type2=5, ShowParenthesis=False,
+        GetDimension2=lambda _index: dimension,
+        GetText=MagicMock(return_value=""),
+        ArcExtensionLineOrOppositeSide=True, ArrowSide=0, SolidLeader=True,
+    )
+
+
+def test_imported_floor_radius_keeps_its_controlling_max_and_actual_arc(monkeypatch) -> None:
+    display = _imported_radius()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    drawing._dress_pocket_floor_radius(
+        SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    )
+    assert display.ArcExtensionLineOrOppositeSide is False
+    assert display.ArrowSide == 1
+    assert display.SolidLeader is False
+
+
+@pytest.mark.parametrize(
+    "fault", [
+        "diameter", "linear", "nominal", "reference", "parentheses",
+        "native_parentheses", "type", "lower", "upper",
+    ]
+)
+def test_imported_floor_radius_refuses_changed_native_semantics(monkeypatch, fault) -> None:
+    display = _imported_radius()
+    if fault == "diameter":
+        display.Diametric = True
+    elif fault == "linear":
+        display.Type2 = 2
+    elif fault == "nominal":
+        display.dimension.SystemValue = 0.00005
+    elif fault == "reference":
+        display.dimension.IsReference.return_value = True
+    elif fault == "parentheses":
+        display.GetText.return_value = "("
+    elif fault == "native_parentheses":
+        display.ShowParenthesis = True
+    elif fault == "type":
+        display.dimension.Tolerance.Type = 0
+    elif fault == "lower":
+        display.dimension.Tolerance.GetMinValue.return_value = -0.00005
+    else:
+        display.dimension.Tolerance.GetMaxValue.return_value = 0.00005
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    with pytest.raises(RuntimeError, match="MHA-DT-035 PocketFloorRadius"):
+        drawing._dress_pocket_floor_radius(
+            SimpleNamespace(GetSpecificAnnotation=lambda: display)
+        )
+
+
+# Native r2 at 22821a1d2, leaf 20261019T131953.462543Z-db20eea3ec6447c0b3aa1b2fa338062b.
+# These are the actual finding footprints recovered from layout-finding DEBUG
+# records, not the previous idealized 22 mm centred box.  The records round
+# sheet mm to one decimal; expand glyph boxes by 0.05 mm and reserve another
+# 0.05 mm when measuring them against a rounded line.  Translations below are
+# placement contracts, NOT evidence that the next native solver preserved them.
+_R2_KEEP = {
+    "PocketFloorRadius": (0.21775, 0.19075),
+    "OverallLength": (0.225, 0.1975),
+    "PocketDepth": (0.27825, 0.1365),
+    "BodyChamfer": (0.17525, 0.2016),
+    "PocketDia": (0.28425, 0.166),
+}
+_R2_RADIUS_GLYPHS = Box(0.20725, 0.18885, 0.22835, 0.19255)
+_R2_OVERALL_GLYPHS = Box(0.22185, 0.19565, 0.22725, 0.19925)
+_R2_DEPTH_GLYPHS = Box(0.26875, 0.14015, 0.28695, 0.14385)
+_R2_RADIUS_SHOULDER = Segment(0.2315, 0.188, 0.2056, 0.188)
+_R2_CHAMFER_WITNESS = Segment(0.2068, 0.1865, 0.2068, 0.1915)
+_R2_CHAMFER_TAIL = Segment(0.2068, 0.1905, 0.2131, 0.1905)
+_R2_OVERALL_BARB = Segment(0.2083, 0.1951, 0.2083, 0.1943)
+_R2_POCKET_DIA_TAIL = Segment(0.2842, 0.1492, 0.2842, 0.1429)
+
+
+def _r2_delta(name: str) -> tuple[float, float]:
+    x, y = drawing.SECTION_KEEP[name]
+    old_x, old_y = _R2_KEEP[name]
+    return x - old_x, y - old_y
+
+
+def _moved_r2_box(name: str, box: Box) -> Box:
+    dx, dy = _r2_delta(name)
+    return Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+
+
+def _moved_r2_segment(name: str, segment: Segment) -> Segment:
+    dx, dy = _r2_delta(name)
+    return Segment(
+        segment.x0 + dx, segment.y0 + dy, segment.x1 + dx, segment.y1 + dy
+    )
+
+
+def test_measured_r2_footprints_reproduce_every_new_collision() -> None:
+    # The old test overlooked both the shoulder's full width and the actual
+    # glyph top.  Retain failing controls for both text strikes, the shoulder
+    # crossing, the foreign arrow, and the insufficient block separation.
+    assert _R2_RADIUS_SHOULDER.length == pytest.approx(0.0259)
+    assert segment_box_overlap_length(_R2_CHAMFER_TAIL, _R2_RADIUS_GLYPHS) > 0.005
+    crossing = (0.2068, 0.188)
+    assert point_segment_distance(crossing, _R2_RADIUS_SHOULDER) == pytest.approx(0)
+    assert point_segment_distance(crossing, _R2_CHAMFER_WITNESS) == pytest.approx(0)
+    assert segment_box_distance(_R2_OVERALL_BARB, _R2_RADIUS_GLYPHS) < 0.002
+    assert _R2_OVERALL_GLYPHS.gap(_R2_RADIUS_GLYPHS) < 0.00357
+    assert segment_box_overlap_length(_R2_POCKET_DIA_TAIL, _R2_DEPTH_GLYPHS) > 0.0008
+
+
+def test_radius_full_native_shoulder_and_glyphs_clear_chamfer_and_overall() -> None:
+    radius = _moved_r2_box("PocketFloorRadius", _R2_RADIUS_GLYPHS)
+    shoulder = _moved_r2_segment("PocketFloorRadius", _R2_RADIUS_SHOULDER)
+    chamfer_witness = _moved_r2_segment("BodyChamfer", _R2_CHAMFER_WITNESS)
+    chamfer_tail = _moved_r2_segment("BodyChamfer", _R2_CHAMFER_TAIL)
+    overall_barb = _moved_r2_segment("OverallLength", _R2_OVERALL_BARB)
+    overall = _moved_r2_box("OverallLength", _R2_OVERALL_GLYPHS)
+    # Two rounded line coordinates cost 0.10 mm; the expanded glyph box has
+    # already paid its 0.05 mm.  These are actual required gaps, not slack.
+    assert shoulder.box().gap(chamfer_witness.box()) >= 0.0021
+    assert segment_box_distance(chamfer_tail, radius) >= 0.00205
+    assert segment_box_distance(overall_barb, radius) >= 0.00205
+    assert overall.gap(radius) >= 0.00357
+    # Overall's full left/right witnesses rise with its line, so the complete
+    # shoulder must stay between them, not merely put its elbow on one side.
+    floor_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    assert shoulder.box().xmin - floor_x > 0.0001
+    assert drawing.FACE_X - shoulder.box().xmax > 0.0001
+    overall_line_y = drawing.SECTION_KEEP["OverallLength"][1] - 0.0027781
+    assert overall_line_y - radius.ymax >= 0.00205
+    corner_r = spec.POCKET_FLOOR_CORNER_R_MAX
+    center_x = drawing.FACE_X - (spec.POCKET_DEPTH - corner_r) * drawing._S
+    center_y = drawing.SECTION_CENTER[1] + (spec.POCKET_DIA / 2 - corner_r) * drawing._S
+    x, y = drawing.SECTION_KEEP["PocketFloorRadius"]
+    bearing = math.degrees(math.atan2(y - center_y, x - center_x))
+    assert 90 < bearing < 180
+
+
+def test_depth_upper_native_row_clears_the_entire_pocket_diameter_arrow_tail() -> None:
+    # The nominal/band is the highest of the three native rows.  Clearing
+    # only the PocketDia witness at y149.25 misses its 6.35 mm outside tail.
+    depth = _moved_r2_box("PocketDepth", _R2_DEPTH_GLYPHS)
+    tail = _moved_r2_segment("PocketDia", _R2_POCKET_DIA_TAIL)
+    assert depth.ymax < min(tail.y0, tail.y1)
+    assert segment_box_distance(tail, depth) >= 0.00205
+
+
+def test_floor_hole_native_hung_rows_nest_without_either_dimension_crossing() -> None:
+    # 031202 native GetPosition (136.75,141): the full DRILL THRU width is
+    # 24.0285 mm LEFT of the keep.  Its value's two glyph runs span
+    # keep_x-17.8861..keep_x-6.1424, not a symmetric box around the column.
+    # The r2 position changed only X; retain this exact below-witness flow.
+    x, y = drawing.SECTION_KEEP["FloorHoleDia"]
+    drill = Box(x - 0.0240285, y - 0.005583, x, y - 0.002083)
+    value = Box(x - 0.0178861, y - 0.0000267, x - 0.0061424, y + 0.0035267)
+    axis_y = drawing.SECTION_CENTER[1]
+    hole_r = spec.FLOOR_HOLE_DIA * drawing._S / 2
+    lower_y, upper_y = axis_y - hole_r, axis_y + hole_r
+    assert y < lower_y  # no unproved switch to native inline/centred text
+    floor_x = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    assert floor_x - max(drill.xmax, value.xmax) >= 0.002
+    # r2 BodyDia's lower text-break boundary is y160.4 (rounded); the new
+    # value top y156.0267 has >4.3 mm air even after its 0.05 mm uncertainty.
+    assert 0.16035 - value.ymax >= 0.00357
+    body_x = drawing.SECTION_KEEP["BodyDia"][0]
+    hole_line = Segment(x, drill.ymin, x, upper_y)
+    for body_y in (axis_y - drawing.BODY_R, axis_y + drawing.BODY_R):
+        body_witness = Segment(floor_x - 0.001, body_y, body_x - 0.001, body_y)
+        assert segment_box_distance(hole_line, body_witness.box()) >= 0.002
+        assert all(
+            segment_box_distance(body_witness, box) >= 0.002
+            for box in (drill, value)
+        )
+    # Conversely, both hole witnesses end right of the outboard body column.
+    # The old r2 span x216.8..127.8 crossed that column at y154.5.
+    for hole_y in (lower_y, upper_y):
+        hole_witness = Segment(
+            drawing.FACE_X - spec.POCKET_DEPTH * drawing._S - 0.001,
+            hole_y,
+            x - 0.001,
+            hole_y,
+        )
+        assert hole_witness.box().xmin - body_x >= 0.002
+
+
+def test_measured_layout_preserves_generous_views_and_asme_alignment() -> None:
+    assert drawing.SHEET_SCALE == (5.0, 1.0)
+    assert drawing.VIEW_SCALE == (5, 1)
+    assert drawing.ISO_SCALE == (4, 1)
+    assert drawing.END_CENTER == (0.074, 0.165)
+    assert drawing.SECTION_CENTER == (0.225, 0.165)
+    assert drawing.ISO_CENTER == (0.368, 0.215)
+    assert drawing.END_CENTER[1] == drawing.SECTION_CENTER[1]

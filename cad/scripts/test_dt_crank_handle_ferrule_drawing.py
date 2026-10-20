@@ -14,6 +14,10 @@ import draw_dt_crank_handle_ferrule as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
+# The 45-degree seat-mouth chamfer at the Ø7.7 bore: legs 0.35, centroid
+# 0.35/3 outside the bore radius.
+_SEAT_MOUTH = math.pi * 0.35**2 * (3.85 + 0.35 / 3.0)
+
 
 def test_required_drawing_paths_and_registry_entry() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-crank-handle-ferrule.SLDDRW")
@@ -28,13 +32,14 @@ def test_required_drawing_paths_and_registry_entry() -> None:
 
 def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SECTION_KEEP) == marked == {"OuterDia", "BoreDia", "Length"}
+    expected = {"OuterDia", "BoreDia", "Length", "SeatMouthChamfer"}
+    assert set(drawing.SECTION_KEEP) == marked == expected
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
-def test_only_the_bore_is_banded_the_od_is_stock() -> None:
+def test_bore_and_seat_mouth_are_banded_the_od_is_stock() -> None:
     # User ruling 2026-09-29 (MHA-DT-034 review): the tenon is turned to suit this
     # bore and the end play is fitted on the MHA-DT-032 shoulder.  The bore keeps
     # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
@@ -42,14 +47,21 @@ def test_only_the_bore_is_banded_the_od_is_stock() -> None:
     # pivot bore to 1.45.  Local review of 1f3067ef2: the bore grows to 7.7
     # for the bore's eccentricity.  User ruling 2026-10-01 (local review of
     # 47cb8a46b): the OD is the 9/16-in rod as supplied, a reference, skimmed
-    # to the grip contour with the oak after cure.
-    assert spec.DRAWING_PRECISION_BY_NAME == {"OuterDia": 2, "BoreDia": 2, "Length": 1}
+    # to the grip contour with the oak after cure.  Owner ruling A on #1661:
+    # the seat mouth's chamfer prints 0.35 +/-0.05 (see below).
+    assert spec.DRAWING_PRECISION_BY_NAME == {
+        "OuterDia": 2,
+        "BoreDia": 2,
+        "Length": 1,
+        "SeatMouthChamfer": 2,
+    }
     assert (spec.BORE_DIA, spec.BORE_DIA_TOL) == (7.7, 0.10)
     assert spec.OUTER_DIA == spec.STOCK_DIA == pytest.approx(14.2875)
     assert not hasattr(spec, "OUTER_DIA_TOL")
     assert spec.REFERENCE_DIMENSIONS == {"OuterDia"}
     assert model_toleranced_dimensions(part) == {
         ("FerruleProfile", "BoreDia"): "BORE_DIA_TOL",
+        ("FerruleProfile", "SeatMouthChamfer"): "SEAT_MOUTH_CHAMFER_TOL",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "set_dimension_bilateral_tolerance" not in source
@@ -63,7 +75,9 @@ def test_installed_configuration_is_the_skimmed_ring() -> None:
 
     assert spec.INSTALLED_CONFIG == "INSTALLED"
     assert spec.INSTALLED_OUTER_DIA == pytest.approx(12.5)
-    assert part.V_INSTALLED == pytest.approx(math.pi * (6.25**2 - 3.85**2) * 7.0)
+    assert part.V_INSTALLED == pytest.approx(
+        math.pi * (6.25**2 - 3.85**2) * 7.0 - _SEAT_MOUTH
+    )
     source = Path(part.__file__).read_text(encoding="utf-8")
     split = source.index("create_configuration {INSTALLED_CONFIG}")
     for edit in (
@@ -93,6 +107,11 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
     # 0.10 of eccentricity.  The Ø12.5 holds the title block's .X band
     # (MHA-DT-008 machinist review of 2026-10-18); off the bore by 0.175, the
     # skimmed ring keeps 1.675 of brass, and the smallest stock still cleans up.
+    # Owner ruling B on #1375 enlarges the cup fit and butt contour only;
+    # the ferrule's shoulder, fitted tenon and running bore stay unchanged.
+    assert (handle.TENON_LENGTH, handle.TENON_DIA, handle.PIVOT_BORE_DIA) == pytest.approx(
+        (5.0, 7.6, 4.10)
+    )
     assert handle.SHOULDER_R == pytest.approx(spec.INSTALLED_OUTER_DIA / 2.0)
     assert handle.FERRULE_OFFSET_MAX == pytest.approx(0.10 + 0.15 / 2.0)
     assert handle.FERRULE_SKIMMED_WALL_MIN == pytest.approx(
@@ -114,7 +133,9 @@ def test_ring_matches_the_photographed_brass_collar() -> None:
     # eight-views-4, user 2026-09-30: Ø12.5 as installed, skimmed from rod.
     assert spec.INSTALLED_OUTER_DIA == pytest.approx(12.5)
     assert spec.LENGTH == pytest.approx(7.0)
-    assert part.V_FERRULE == pytest.approx(math.pi * ((14.2875 / 2.0) ** 2 - 3.85**2) * 7.0)
+    assert part.V_FERRULE == pytest.approx(
+        math.pi * ((14.2875 / 2.0) ** 2 - 3.85**2) * 7.0 - _SEAT_MOUTH
+    )
     assert part.MATERIAL == "Brass"
 
 
@@ -133,6 +154,57 @@ def test_note_names_the_mating_tenon() -> None:
     assert "BAND" not in flat
     assert "OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>12.5 WITH MHA-DT-008 AFTER CURE." in flat
     assert "TURNED TO SUIT THIS BORE" in spec.DRAWING_NOTES
+
+
+def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
+    import dt_crank_handle_spec as handle
+
+    # Owner ruling A on #1661: the MHA-DT-008 tenon root is R0.3 MAX, so the
+    # bore's mouth at the seat face is chamfered 45 degrees, its shortest leg
+    # no smaller than the root, for the ring to seat on the shoulder.  Its
+    # callout names the end and the root it clears (rule 4); the R it quotes
+    # is MHA-DT-008's own, which this spec cannot import.
+    assert (spec.SEAT_MOUTH_CHAMFER, spec.SEAT_MOUTH_CHAMFER_TOL) == (0.35, 0.05)
+    assert spec.HANDLE_ROOT_R_MAX == handle.INSIDE_CORNER_R_MAX
+    assert spec.SEAT_MOUTH_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
+    assert spec.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines() == [
+        "X 45 DEG SEAT END",
+        "CLEARS MHA-DT-008",
+        "TENON ROOT R0.3",
+    ]
+    # The callout carries the chamfer; the notes do not repeat it.
+    flat = " ".join(spec.DRAWING_NOTES.split())
+    for fragment in ("45 DEG", "CHAMFER", "TENON ROOT"):
+        assert fragment not in flat, fragment
+    # Modelled in the revolve profile at 45 degrees by equation, before the
+    # INSTALLED split, so the skimmed ring keeps it too.
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert '("SeatMouthChamfer", SEAT_MOUTH_CHAMFER)' in source
+    assert """profile.record("SeatMouthChamferRise", '"SeatMouthChamfer"')""" in source
+    assert source.index("SeatMouthChamferRise") < source.index(
+        "create_configuration {INSTALLED_CONFIG}"
+    )
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '{"SeatMouthChamfer": SEAT_MOUTH_CHAMFER_CALLOUT}' in drawing_source
+    assert 'location="below"' in drawing_source
+
+
+def test_seat_mouth_maximum_comes_from_the_glue_length_budget() -> None:
+    import dt_crank_handle_spec as handle
+    from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
+
+    budget = (
+        handle.TENON_LENGTH
+        - GENERAL_1PL_TOL_MM
+        - EDGE_BREAK_MAX_MM
+        - spec.TENON_GLUE_LENGTH_FLOOR
+    )
+    assert budget == pytest.approx(0.45)
+    assert spec.SEAT_MOUTH_CHAMFER_MAX == pytest.approx(0.4)
+    assert spec.SEAT_MOUTH_CHAMFER_MAX <= budget
+    assert spec.SEAT_MOUTH_CHAMFER_MAX + 0.1 > budget
+    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(3.55)
+    assert handle.TENON_GLUE_LENGTH_MIN >= spec.TENON_GLUE_LENGTH_FLOOR
 
 
 def test_registry_row_is_the_title_block_source() -> None:
@@ -155,3 +227,16 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
         assert not (x > 0.216 and y < 0.070)
     assert drawing.END_CENTER[0] + drawing.OUTER_R < drawing.SECTION_KEEP["OuterDia"][0] - 0.010
     assert drawing.SECTION_KEEP["BoreDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]
+    # The chamfer's value and callout rows (5.55 pitch, ~2.75 per character,
+    # centred on the keep point) stand 3 clear of the seat face, of the bore
+    # edge's extension line and of the isometric note.
+    x, y = drawing.SECTION_KEEP["SeatMouthChamfer"]
+    rows = [
+        f"{spec.SEAT_MOUTH_CHAMFER:.2f} ±{spec.SEAT_MOUTH_CHAMFER_TOL:.2f}",
+        *spec.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines(),
+    ]
+    half_width = max(len(row) for row in rows) * 0.00275 / 2.0
+    half_height = len(rows) * 0.00555 / 2.0
+    assert x - half_width >= drawing.SEAT_FACE_X + 0.003
+    assert y - half_height >= drawing.BORE_TOP_Y + 0.003
+    assert x + half_width <= drawing.ISO_NOTE_POS[0] - 0.003

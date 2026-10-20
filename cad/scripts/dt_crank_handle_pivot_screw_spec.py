@@ -32,7 +32,6 @@ from dt_crank_handle_butt_cup_spec import (
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
-    POCKET_DIA as CUP_POCKET_DIA,
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
@@ -434,8 +433,9 @@ for _ok, _what in (
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
     (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
     (
+        # Owner ruling B on #1375: the cup body grows; the head and fit stay unchanged.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-035 pocket bored to suit the largest head leaves under its 0.8 wall",
+        "the MHA-DT-035 pocket bored to suit the largest head leaves under its 1.5 wall",
     ),
     (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 of under-head bearing on the cup floor"),
     (

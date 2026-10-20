@@ -11,15 +11,15 @@ concept v4): the cup is a plain cup, no flange, seated flush with the oak's
 end; after the epoxy cures the handle's end round is turned on the oak, clear of the
 cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
 the cup together, so wood and steel read as one rounded butt.  The smaller
-MHA-DT-032 head (Ø6) lets the cup shrink to the photographed size, and the pocket
-wall is thin -- 0.8 at its worst case -- a named drawing-simplicity-policy
-exception: the wall carries no load (the head bears on the floor, and the oak
-round the bonded body backs it), and a 1.5 wall would push the butt to Ø13.4
-against the photograph's ~Ø10.
+MHA-DT-032 head (Ø6) sets the pocket's matched fit.  Owner ruling B on #1375
+enlarges the body to retain a 1.5 pocket wall at the smallest body and largest
+pocket, with the existing +/-0.10 body band.  The head, pocket, floor, axial
+sizes, corner radius and bottom chamfer remain unchanged.
 
 The pocket is bored to suit the MHA-DT-032 head; the handle's end play is fitted
 on the screw shoulder at assembly, so no length here is a stack term.  The
-body diameter keeps a +/-0.10 band because it sets the pocket wall; the pocket
+body diameter keeps a +/-0.10 band because it sets the pocket wall and the
+MHA-DT-008 counterbore bored to suit it (that handle's butt wall); the pocket
 depth keeps one because it sets how far the head sits below the face (Codex P2
 on #1139, user ruling 2026-09-30).
 
@@ -33,7 +33,7 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-BODY_DIA = 8.2
+WALL_FLOOR_MM = 1.5
 BODY_DIA_TOL = 0.10
 # Every axial size reads from the outer face, the one faced end (MHA-DT-035
 # re-review): overall and pocket depth.  The floor is what remains, so the
@@ -51,30 +51,45 @@ POCKET_DEPTH_TOL = 0.10
 POCKET_DIA = 6.3
 POCKET_CLEARANCE = (0.2, 0.4)
 POCKET_DIA_MAX = 6.5
+# Owner ruling B on #1375: the cup grows around the unchanged head and pocket,
+# rather than retaining a sub-floor wall or tightening the body band.
+POCKET_WALL_FLOOR_MM = WALL_FLOOR_MM
+BODY_DIA = round(POCKET_DIA_MAX + 2.0 * POCKET_WALL_FLOOR_MM + BODY_DIA_TOL, 6)
+# The head bears on the floor: the floor-to-wall corner may round no more than
+# the tightest radial clearance, so a sharp-edged, centred head still seats on
+# the flat (rule 16: the largest radius acceptable; MHA-DT-035 r1 finding 5).
+POCKET_FLOOR_CORNER_R_MAX = POCKET_CLEARANCE[0] / 2.0
+POCKET_FLOOR_CORNER_R_BAND = (0.0, -POCKET_FLOOR_CORNER_R_MAX)  # (upper, lower)
+POCKET_FLOOR_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: nominal is the limit
 # The floor hole passes the MHA-DT-032 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 4.2
+# The body's bottom edge, broken 45 degrees (owner ruling A on #1661): the
+# MHA-DT-008 counterbore floor's corner is rounded up to R0.3, so the leg's
+# lower limit clears it and the cup still seats on the floor, face flush.
+# Modelled at the middle; printed as BODY_CHAMFER +/- its tolerance.
+BODY_CHAMFER = 0.4
+BODY_CHAMFER_TOL = 0.1
+BODY_CHAMFER_MIN = round(BODY_CHAMFER - BODY_CHAMFER_TOL, 6)
+BODY_CHAMFER_MAX = round(BODY_CHAMFER + BODY_CHAMFER_TOL, 6)
 
 FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
 GENERAL_1PL_MM = 0.8
-WALL_FLOOR_MM = 1.5
-# The pocket wall is a named drawing-simplicity-policy exception (the sheet
-# states it below); the floor still holds the 1.5 floor.
-POCKET_WALL_FLOOR_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
-# Turned from 3/8-in cold-finished rod: the largest body plus a cleanup cut.
-STOCK_DIA = 0.375 * 25.4
+# Owner ruling B on #1375: 1/2-in cold-finished rod leaves a cleanup cut over
+# the largest body.
+STOCK_DIA = 0.5 * 25.4
 
 for _ok, _what in (
     (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under 1.5 at .X"),
     (
         POCKET_WALL_MIN >= POCKET_WALL_FLOOR_MM,
-        "pocket wall is under the 0.8 baseline pending ruling #1375 at its limits",
+        "pocket wall is under 1.5 at its limits (owner ruling B on #1375)",
     ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
-    (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 3/8-in rod"),
+    (BODY_DIA + BODY_DIA_TOL < STOCK_DIA - 0.2, "body is not turnable from 1/2-in rod"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-DT-035: {_what}")
@@ -86,6 +101,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PocketDepth",
         "PocketDia",
         "FloorHoleDia",
+        "BodyChamfer",
+        "PocketFloorRadius",
     },
 }
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the body diameter and the
@@ -96,8 +113,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BodyDia": 2,
         "OverallLength": 1,
         "PocketDepth": 2,
+        "BodyChamfer": 1,
         "PocketDia": 1,
         "FloorHoleDia": 1,
+        "PocketFloorRadius": 1,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -108,24 +127,3 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-035 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"PocketDia"})
-
-# The mating parts, quoted only to identify them (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)); the offline test
-# checks them against the registry.
-HANDLE_NUMBER = "MHA-DT-008"
-HANDLE_NAME = "CRANK HANDLE"
-SCREW_NUMBER = "MHA-DT-032"
-SCREW_NAME = "CRANK HANDLE PIVOT SCREW"
-FLOOR_HOLE_CALLOUT = "DRILL THRU"
-# Pending exception ruling: MHA-DT-035 pocket wall (#1375).
-DRAWING_NOTES = "\n".join(
-    (
-        f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",
-        f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE,"
-        f" <MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX; THE HEAD BEARS ON THE FLOOR.",
-        f"MIN POCKET WALL {POCKET_WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}; "
-        "CORNERS EXCEPTED.",
-        f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT, FACE FLUSH, CENTRED ON THE",
-        f"  WAXED {SCREW_NUMBER} SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

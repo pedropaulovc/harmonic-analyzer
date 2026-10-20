@@ -15,11 +15,13 @@ cup.  Circumferentially smooth after the revolve.
 
 Layout: handle axis along +X; x=0 is the ferrule's arm face (the handle's
 seat on the arm), so the oak starts at the tenon end, short of it.  One
-revolve carries the tenon, the reamed bore, the grip and the counterbore.  The
-profile is defined by what the sheet prints -- stations from the tenon end
-face, the shoulder, waist, swell and crest diameters and the end round -- with
-the waist and swell centres on their stations; the tangencies fix the other
-four radii, which are driven references.
+revolve carries the tenon, the reamed bore, the grip and the counterbore, the
+tenon root and the counterbore's floor corner rounded in the profile to their
+single-limit R0.3 MAX (owner ruling A on #1661).  The profile is defined by
+what the sheet prints -- stations from the tenon end face, the shoulder,
+waist, swell and crest diameters and the end round -- with the waist and
+swell centres on their stations; the tangencies fix the other four radii,
+which are driven references.
 
 Run (SolidWorks already open)::
 
@@ -31,6 +33,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import PANEL_BLACK, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -49,7 +52,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
@@ -77,6 +80,9 @@ from dt_crank_handle_spec import (  # noqa: E402
     FLARE_CENTER,
     FLARE_R,
     INFLECTION,
+    INSIDE_CORNER_R_BAND,
+    INSIDE_CORNER_R_MAX,
+    INSIDE_CORNER_R_TOL_TYPE,
     ISOMETRIC_VIEW_NOTE,
     OAK_END_X,
     PEAK_R,
@@ -115,7 +121,13 @@ def _nominal_volume() -> float:
     tenon = math.pi * TENON_R**2 * TENON_LENGTH
     counterbore = math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
     bore = math.pi * (PIVOT_BORE_DIA / 2.0) ** 2 * (COUNTERBORE_FLOOR_X - TENON_X0)
-    return grip + tenon - counterbore - bore
+    # Pappus (build_pn_pen_rod's shoulder root): each inside corner's fillet
+    # adds the spandrel R^2 (1 - pi/4), its centroid R (10 - 3 pi) / (3 (4 -
+    # pi)) off each face -- outside the tenon OD, inside the counterbore wall.
+    spandrel = INSIDE_CORNER_R_MAX**2 * (1.0 - math.pi / 4.0)
+    offset = INSIDE_CORNER_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+    corners = 2.0 * math.pi * spandrel * ((TENON_R + offset) + (COUNTERBORE_R - offset))
+    return grip + tenon - counterbore - bore + corners
 
 
 V_HANDLE = _nominal_volume()
@@ -137,6 +149,35 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
     dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
     if int(dimension.DrivenState) != 1:
         raise RuntimeError(f"{label}: dimension did not become driven")
+
+
+def _inside_corner_max_limit(adapter, dimension_name: str) -> None:
+    """An inside corner's radius as a MAX single limit carrying the band's
+    deviations (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
+    lower, upper = deviations(INSIDE_CORNER_R_BAND)
+    _, dimension = _named_dimension(adapter, "HandleProfile", dimension_name)
+    label = f"{dimension_name}@HandleProfile"
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, INSIDE_CORNER_R_MAX / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
+            f"{INSIDE_CORNER_R_MAX}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = INSIDE_CORNER_R_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != INSIDE_CORNER_R_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {INSIDE_CORNER_R_MAX:g} MAX")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -163,6 +204,7 @@ async def build(adapter) -> dict[str, str]:
         ("CounterboreDia", COUNTERBORE_DIA),
         ("CounterboreDepth", COUNTERBORE_DEPTH),
         ("PivotBoreDia", PIVOT_BORE_DIA),
+        ("InsideCornerR", INSIDE_CORNER_R_MAX),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -175,6 +217,17 @@ async def build(adapter) -> dict[str, str]:
     peak_pt = (PEAK_X, PEAK_R)
     oak_end_pt = (OAK_END_X, COUNTERBORE_R)
     crest_pt = (OAK_END_X, END_ROUND_CENTER[1])
+    # The two inside corners, each a quarter arc of INSIDE_CORNER_R_MAX
+    # tangent to its faces: the tenon root rises from the tenon OD into the
+    # shoulder, the counterbore's floor corner turns from its wall into its
+    # floor.
+    corner_r = INSIDE_CORNER_R_MAX
+    tenon_root_start = (SHOULDER_X - corner_r, TENON_R)
+    tenon_root_end = (SHOULDER_X, TENON_R + corner_r)
+    tenon_root_center = (SHOULDER_X - corner_r, TENON_R + corner_r)
+    floor_round_start = (COUNTERBORE_FLOOR_X + corner_r, COUNTERBORE_R)
+    floor_round_end = (COUNTERBORE_FLOOR_X, COUNTERBORE_R - corner_r)
+    floor_round_center = (COUNTERBORE_FLOOR_X + corner_r, COUNTERBORE_R - corner_r)
 
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
@@ -184,16 +237,21 @@ async def build(adapter) -> dict[str, str]:
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, COUNTERBORE_FLOOR_X, 0.0),
     )
-    # Tenon: end face (from the reamed bore) -> OD -> shoulder step up to the
-    # ferrule's OD.
-    tenon_end, tenon_top, shoulder = await add_line_chain(
-        adapter,
-        [(TENON_X0, bore_r), tenon_corner, (SHOULDER_X, TENON_R), shoulder_pt],
-        close=False,
+    # Tenon: end face (from the reamed bore) -> OD -> the root round -> the
+    # shoulder step up to the ferrule's OD.
+    tenon_end, tenon_top = await add_line_chain(
+        adapter, [(TENON_X0, bore_r), tenon_corner, tenon_root_start], close=False
     )
     # add_arc sweeps CCW from start to end; each is ordered so the sweep is the
     # minor arc on the silhouette side.  Concave arcs (centre above) run left
     # to right under their centre; convex ones (centre below) right to left.
+    tenon_root = check(
+        "tenon root arc",
+        await adapter.add_arc(*tenon_root_center, *tenon_root_start, *tenon_root_end),
+    )
+    (shoulder,) = await add_line_chain(
+        adapter, [tenon_root_end, shoulder_pt], close=False
+    )
     flare = check(
         "flare arc", await adapter.add_arc(*FLARE_CENTER, *shoulder_pt, *waist_pt)
     )
@@ -209,18 +267,22 @@ async def build(adapter) -> dict[str, str]:
     end_round = check(
         "end round arc", await adapter.add_arc(*END_ROUND_CENTER, *crest_pt, *DOME_END)
     )
-    # Crest -> flat oak end face -> counterbore wall -> counterbore floor ->
-    # the reamed bore back to the tenon end face: the bore is part of the
-    # revolve, so its diameter prints on the section with the rest.
-    oak_end_face, counterbore_wall, counterbore_floor, bore_wall = await add_line_chain(
+    # Crest -> flat oak end face -> counterbore wall -> the floor round ->
+    # counterbore floor -> the reamed bore back to the tenon end face: the
+    # bore is part of the revolve, so its diameter prints on the section with
+    # the rest.
+    oak_end_face, counterbore_wall = await add_line_chain(
+        adapter, [crest_pt, oak_end_pt, floor_round_start], close=False
+    )
+    floor_round = check(
+        "counterbore floor round arc",
+        await adapter.add_arc(
+            *floor_round_center, *floor_round_start, *floor_round_end
+        ),
+    )
+    counterbore_floor, bore_wall = await add_line_chain(
         adapter,
-        [
-            crest_pt,
-            oak_end_pt,
-            (COUNTERBORE_FLOOR_X, COUNTERBORE_R),
-            (COUNTERBORE_FLOOR_X, bore_r),
-            (TENON_X0, bore_r),
-        ],
+        [floor_round_end, (COUNTERBORE_FLOOR_X, bore_r), (TENON_X0, bore_r)],
         close=False,
     )
     set_sketch_direct_db(adapter, False)
@@ -295,9 +357,15 @@ async def build(adapter) -> dict[str, str]:
         "PivotBoreDia",
     )
     profile.record("PivotBoreDia", '"PivotBoreDia"')
-    check(
+    # To the shoulder's foot at the root round's end: the tenon OD line stops
+    # short of the shoulder by the round.
+    await dimension_between(
+        adapter,
+        f"{tenon_end}.end",
+        f"{shoulder}.start",
+        "horizontal_distance",
+        TENON_LENGTH,
         "tenon length",
-        await adapter.add_sketch_dimension(tenon_top, None, "linear", TENON_LENGTH),
     )
     profile.record("TenonLength", '"TenonLength"')
     # To the tenon end face's corner, not the OD line: the drawing hangs the
@@ -349,6 +417,18 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(end_round, None, "radial", END_ROUND_R),
     )
     profile.record("EndRoundR", '"EndRoundR"')
+    # The inside corners at their single limit, both from the one knob.
+    for arc, name, label in (
+        (tenon_root, "TenonRootRadius", "tenon root radius"),
+        (floor_round, "CounterboreFloorRadius", "counterbore floor radius"),
+    ):
+        check(
+            label,
+            await adapter.add_sketch_dimension(
+                arc, None, "radial", INSIDE_CORNER_R_MAX
+            ),
+        )
+        profile.record(name, '"InsideCornerR"')
     # The oak overall, tenon end face to the oak's end at the counterbore
     # mouth.
     await dimension_between(
@@ -360,11 +440,15 @@ async def build(adapter) -> dict[str, str]:
         "oak overall from the tenon end",
     )
     profile.record("OverallLength", '"TenonLength" + "WoodLength"')
-    check(
+    # From the oak end to the floor below the floor round, the wall line
+    # stopping short of the floor by the round.
+    await dimension_between(
+        adapter,
+        f"{counterbore_wall}.start",
+        f"{counterbore_floor}.start",
+        "horizontal_distance",
+        COUNTERBORE_DEPTH,
         "counterbore depth",
-        await adapter.add_sketch_dimension(
-            counterbore_wall, None, "linear", COUNTERBORE_DEPTH
-        ),
     )
     profile.record("CounterboreDepth", '"CounterboreDepth"')
     await add_diametric_linear_dimension(
@@ -381,6 +465,10 @@ async def build(adapter) -> dict[str, str]:
         (s_convex, dome, "swell"),
         (dome, end_round, "end round"),
         (end_round, oak_end_face, "end round crest"),
+        (tenon_top, tenon_root, "tenon root on the tenon OD"),
+        (tenon_root, shoulder, "tenon root on the shoulder"),
+        (counterbore_wall, floor_round, "floor round on the counterbore wall"),
+        (floor_round, counterbore_floor, "floor round on the counterbore floor"),
     ):
         check(
             f"{label} tangent",
@@ -416,7 +504,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the model owns the one printed band
     # (drawing-simplicity-policy.md `How the repository implements the guidelines`), the reamed bore, and the places every mark prints with.
-    # The tenon and the counterbore are fitted to the parts they take.
+    # The tenon and the counterbore are fitted to the parts they take; the two
+    # inside corners carry their single MAX limit.
     set_dimension_bilateral_tolerance(
         adapter,
         "HandleProfile",
@@ -427,6 +516,8 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    for name in ("TenonRootRadius", "CounterboreFloorRadius"):
+        _inside_corner_max_limit(adapter, name)
 
     await apply_material(adapter, MATERIAL)
     # ch11 pp.20-21 + ch30 plates: the pear grip is EBONIZED (painted/stained

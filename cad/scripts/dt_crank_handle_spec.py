@@ -25,6 +25,12 @@ title block's .X band; the tangencies fix the other radii, which print as
 references (MHA-DT-008 machinist review of 2026-10-18: the contour had lived in
 a note).
 
+Owner ruling B on #1375 enlarges the cup body to retain its pocket wall and
+derives the butt crest from that cup's largest counterbore, the ordinary .X
+band, both eccentricities, and the 2.0 oak wall target plus 0.05 radial margin.
+The oak feather was already fixed in #1650; this ruling preserves the full
+wall target without changing the swell, axial stations or end-round radius.
+
 Frame: the handle axis is local +X and x=0 is the ferrule's arm-bearing face,
 the plane the drive train seats on the arm.  No oak reaches x=0: the tenon
 stops short of the ferrule's end, so only brass bears on the arm.
@@ -36,6 +42,7 @@ import math
 
 from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 from dt_crank_handle_butt_cup_spec import (
+    BODY_CHAMFER_MIN as CUP_BODY_CHAMFER_MIN,
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
     OVERALL_LENGTH as CUP_LENGTH,
@@ -46,7 +53,11 @@ from dt_crank_handle_ferrule_spec import (
     LENGTH as FERRULE_LENGTH,
     INSTALLED_OUTER_DIA as FERRULE_OUTER_DIA,
     STOCK_DIA_MIN as FERRULE_STOCK_DIA_MIN,
+    SEAT_MOUTH_CHAMFER_MAX as FERRULE_SEAT_MOUTH_CHAMFER_MAX,
+    SEAT_MOUTH_CHAMFER_MIN as FERRULE_SEAT_MOUTH_CHAMFER_MIN,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
+    TENON_GLUE_LENGTH_FLOOR,
+    TENON_LENGTH,
 )
 
 # 2026-09-02 user re-read: overall 58 from the arm face; the ferrule and the
@@ -72,9 +83,17 @@ TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # Short enough that the longest tenon stops short of the shortest ferrule's
 # arm face, so the oak never bears on the arm.
-TENON_LENGTH = 5.0
 TENON_X0 = SHOULDER_X - TENON_LENGTH
 TENON_R = TENON_DIA / 2.0
+# Owner ruling A on #1661, drawing-guidelines.md rule 16 (design for the
+# cutter: say the largest acceptable inside radius): the tenon root and the
+# counterbore's floor corner are each modelled AT this limit and print the
+# single limit "R0.3 MAX" (swTolMAX prints the nominal, so nominal = limit;
+# the band runs from sharp up to it).  The ferrule's seat-mouth chamfer and
+# the cup's body chamfer each clear it (asserted below).
+INSIDE_CORNER_R_MAX = 0.3
+INSIDE_CORNER_R_BAND = (0.0, -INSIDE_CORNER_R_MAX)  # (upper, lower)
+INSIDE_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.3 MAX"
 
 # Grip stations (x from the arm face) and radii, fitted to eight-views-4.
 WAIST_X = 12.0
@@ -104,13 +123,19 @@ CUP_OFFSET_MAX = BORE_ECCENTRICITY + COUNTERBORE_GLUE_LINE[1] / 2.0
 COUNTERBORE_DIA_MAX = round(
     CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1] + 0.05, 1
 )
-# The butt: a flat oak end on the cup-face plane, the end round cresting on it
-# at this diameter.  Wide enough that the oak round the largest counterbore
-# holds the 2.0 wall target with the crest turned its .X band small and the
-# outside and the counterbore each off the bore by the eccentricity in opposite
-# directions (MHA-DT-008 machinist review of 2026-10-18: a Ø9.4 crest left a
-# 0.45 lip over the counterbore, feathering to nothing).
-CREST_DIA = 14.0
+# Owner ruling B on #1375: the flat oak end on the cup-face plane keeps the
+# rule-17 wall target plus a radial design margin.  Derive its crest from the
+# cup-driven counterbore limit, the ordinary .X diameter band and the outside
+# and counterbore each off the bore by the eccentricity in opposite directions.
+WALL_TARGET_MM = 2.0
+BUTT_WALL_RULING_MARGIN_MM = 0.05
+BUTT_WALL_DESIGN_MIN_MM = round(WALL_TARGET_MM + BUTT_WALL_RULING_MARGIN_MM, 6)
+CREST_DIA = round(
+    COUNTERBORE_DIA_MAX
+    + _GENERAL_1PL
+    + 2.0 * (2.0 * BORE_ECCENTRICITY + BUTT_WALL_DESIGN_MIN_MM),
+    6,
+)
 END_ROUND_R = 1.5
 END_ROUND_CY = CREST_DIA / 2.0
 
@@ -180,13 +205,12 @@ WOOD_LENGTH = OAK_END_X - SHOULDER_X
 # The oak round the largest counterbore at the butt, its thinnest place: the
 # crest turned its .X band small, off the bore by the eccentricity one way and
 # the counterbore the other.
-BUTT_WALL_MIN = (
+BUTT_WALL_MIN = round(
     (CREST_DIA - _GENERAL_1PL) / 2.0
     - 2.0 * BORE_ECCENTRICITY
-    - COUNTERBORE_DIA_MAX / 2.0
+    - COUNTERBORE_DIA_MAX / 2.0,
+    6,
 )
-# drawing-guidelines.md rule 17's target wall for wood.
-WALL_TARGET_MM = 2.0
 # The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
 # the largest banded bore with the tightest glue line gives the largest tenon,
 # and the smallest bore with the widest line the smallest.
@@ -196,9 +220,13 @@ TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LIN
 # its .X band small at the shoulder over the largest tenon.
 FERRULE_SEAT_RADIAL_MIN = ((2.0 * SHOULDER_R - _GENERAL_1PL) - TENON_DIA_MAX) / 2.0
 # The shortest tenon's unbroken bonded length inside the ferrule, less the
-# title-block edge break on the tenon end and on the ferrule's bore mouth
-# (local review of 21bb244c5): 3.7, half the ferrule's length and more.
-TENON_GLUE_LENGTH_MIN = round(TENON_LENGTH - _GENERAL_1PL - 2.0 * EDGE_BREAK_MAX_MM, 6)
+# title-block edge break on the tenon end and the ferrule's seat-mouth chamfer
+# at its largest (owner ruling A on #1661; the 0.4 upper limit is what keeps
+# this at 3.55, half the ferrule's length and more).  The tenon root's R0.3
+# MAX sits inside that chamfer, so it costs no further length.
+TENON_GLUE_LENGTH_MIN = round(
+    TENON_LENGTH - _GENERAL_1PL - EDGE_BREAK_MAX_MM - FERRULE_SEAT_MOUTH_CHAMFER_MAX, 6
+)
 # The ferrule rides the tenon (true to the bore within the eccentricity) on
 # its glue line, so it can sit this far off the bore; the skim, true to the
 # bore, takes it down to the contour (local review of 47cb8a46b, user ruling
@@ -233,8 +261,8 @@ for _ok, _what in (
         "the longest tenon reaches the shortest ferrule's arm face",
     ),
     (
-        TENON_GLUE_LENGTH_MIN >= 3.5,
-        "the shortest tenon leaves under 3.5 of unbroken glue length",
+        TENON_GLUE_LENGTH_MIN >= TENON_GLUE_LENGTH_FLOOR,
+        f"the shortest tenon leaves under {TENON_GLUE_LENGTH_FLOOR:g} of unbroken glue length",
     ),
     (
         FERRULE_SEAT_RADIAL_MIN >= 0.5,
@@ -255,8 +283,9 @@ for _ok, _what in (
     ),
     (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
-        BUTT_WALL_MIN >= WALL_TARGET_MM,
-        "the butt leaves under 2.0 of oak round the counterbore",
+        BUTT_WALL_MIN >= BUTT_WALL_DESIGN_MIN_MM >= WALL_TARGET_MM,
+        f"the butt leaves under {BUTT_WALL_DESIGN_MIN_MM:g} of oak round the counterbore "
+        "(owner ruling B on #1375)",
     ),
     (WAIST_R < SHOULDER_R and WAIST_R < PEAK_R, "the waist is not the neck's minimum"),
     (
@@ -267,6 +296,16 @@ for _ok, _what in (
         DOME_END[0] > PEAK_X and DOME_END[1] > END_ROUND_CY,
         "the dome does not run from the swell down to the end round",
     ),
+    # A 45-degree chamfer of leg c clears an inside fillet of radius R when
+    # c >= R: the fillet ends R along each face.
+    (
+        FERRULE_SEAT_MOUTH_CHAMFER_MIN >= INSIDE_CORNER_R_MAX,
+        "the smallest ferrule seat-mouth chamfer fouls the tenon root radius",
+    ),
+    (
+        CUP_BODY_CHAMFER_MIN >= INSIDE_CORNER_R_MAX,
+        "the smallest cup body chamfer fouls the counterbore floor radius",
+    ),
     (COUNTERBORE_R > PIVOT_BORE_DIA / 2.0, "counterbore is inside the pivot bore"),
 ):
     if not _ok:
@@ -274,7 +313,8 @@ for _ok, _what in (
 
 # Marked dimensions, all on the one revolve profile: the tenon, the reamed bore,
 # the stations from the tenon end face, the grip diameters and the end round,
-# the counterbore, and the tangency-fixed radii as references.
+# the counterbore, the two inside corners' single limits, and the
+# tangency-fixed radii as references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HandleProfile": {
         "PivotBoreDia",
@@ -295,12 +335,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "SConcaveR",
         "SConvexR",
         "DomeR",
+        "TenonRootRadius",
+        "CounterboreFloorRadius",
     },
 }
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places
 # carry the tolerance)): the reamed bore prints its band at two places; every
 # other size is routine (.X), the fitted tenon and counterbore as references
-# under their to-suit notes.
+# under their to-suit notes, and the inside corners' R0.3 MAX limits print at
+# one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HandleProfile": {
         name: 2 if name == "PivotBoreDia" else 1
@@ -343,5 +386,10 @@ COUNTERBORE_FIT_NOTE = (
     f"DIAMETRAL CLEARANCE, <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX;\n"
     "DEPTH SEATS ITS FACE FLUSH"
 )
+# The inside corners' single limits name the part that seats on each
+# (drawing-guidelines.md rule 4): short lines, each block standing in a narrow
+# gap beside the section.
+TENON_ROOT_CALLOUT = f"{FERRULE_NAME}\nSEAT"
+COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NAME}\nSEAT"
 PIVOT_BORE_CALLOUT = f"REAM THRU\nRUNS ON {SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
