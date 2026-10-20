@@ -84,6 +84,7 @@ from _drawing_tolerances import (
     _set_tolerance_precision,
 )
 from _feature_tree import name_last_feature
+from _named_views import name_standard_views
 from _sketch import (
     SketchDims,
     anchor_point_to_origin,
@@ -108,6 +109,7 @@ from _assembly import (
     named_ref,
     place_component,
     reset_dof_manifest,
+    remap_front_to_machine_front,
     save_assembly_and_images,
     write_dof_manifest,
     world_point,
@@ -1138,6 +1140,12 @@ async def build(adapter) -> dict[str, str]:
         ASM_NAME,
         lambda configuration: create_mg_magnifier_explode(adapter, configuration),
     )
+    # Keep the fitter projections independent of the saved machine-front views.
+    # Only cameras change: +Y remains up and the physical front remains -Z.
+    name_standard_views(
+        adapter, views=stack_spec.DRAWING_STANDARD_VIEWS, label=ASM_NAME
+    )
+    remap_front_to_machine_front(adapter)
     artefacts = await save_assembly_and_images(adapter, ASM_NAME)
     return artefacts
 
