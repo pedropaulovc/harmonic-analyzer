@@ -129,6 +129,13 @@ def test_pocket_and_floor_hole_read_on_a_section() -> None:
     assert "create_section_view(" in source
     assert "set_hidden_lines_visible" not in source
     assert "create_section_axis_centerline(" in source
+    # R5's confirmed projection finding: the view at the left must show the
+    # chamfered floor end, not the counterbore end.  Reversing the cut with
+    # the parent view preserves the existing +X-right section and keeps.
+    assert 'str(SOURCE), "*Left", *END_CENTER' in source
+    assert drawing.END_CENTER[0] < drawing.SECTION_CENTER[0]
+    assert drawing.CUT_START[0] == drawing.CUT_END[0] == drawing.END_CENTER[0]
+    assert drawing.CUT_START[1] > drawing.CUT_END[1]
 
 
 def test_feature_callouts_name_the_mates_and_their_fit_acceptance() -> None:

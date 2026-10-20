@@ -96,6 +96,8 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
+# Third angle: the end view left of the section looks at the chamfered
+# floor face (*Left), not the counterbore mouth on the opposite end.
 END_CENTER = (0.074, 0.165)
 # 10 mm right of the r1 sheet: the body-fit callout needs the room between the
 # floor-hole dimension and the section.
@@ -169,8 +171,10 @@ DIMENSION_CALLOUTS = {
     "PocketDepth": POCKET_DEPTH_CALLOUT,
     "PocketDia": POCKET_FIT_CALLOUT,
 }
-CUT_START = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
-CUT_END = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
+# *Left reverses *Right's horizontal basis.  Reverse the cut as well to
+# retain the section's physical viewing direction and +X-right orientation.
+CUT_START = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
+CUT_END = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
 
 
 def _dress_pocket_floor_radius(annotation: Any) -> None:
@@ -257,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Left", *END_CENTER, scale=VIEW_SCALE)
     section = create_section_view(
         adapter,
         end,
