@@ -60,6 +60,7 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
+    author_in_drawing_configurations,
     check_no_interference,
     coincident_mate,
     distance_driver,
@@ -376,7 +377,7 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
-    (``_assembly.save_assembly_and_images``): a drawing view shows the
+    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
     explode of the configuration it references."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
@@ -813,12 +814,13 @@ async def build(adapter) -> dict[str, str]:
     )
     # The fitter drawing's exploded view references Default Simplified, so
     # the explode is authored in both drawing configurations.
-    name_machine_views(adapter)
-    return await save_assembly_and_images(
+    author_in_drawing_configurations(
         adapter,
         ASM_NAME,
-        author=lambda configuration: _create_jig_explode(adapter, configuration),
+        lambda configuration: _create_jig_explode(adapter, configuration),
     )
+    name_machine_views(adapter)
+    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":

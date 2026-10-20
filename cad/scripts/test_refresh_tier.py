@@ -150,7 +150,7 @@ def test_the_planned_function_is_the_one_the_builder_calls(stem):
 CANONICAL = """
 from _x_explode import create
 def build(adapter):
-    save_assembly_and_images(adapter, NAME, author=lambda c: create(adapter, c))
+    author_in_drawing_configurations(adapter, NAME, lambda c: create(adapter, c))
 """
 
 
@@ -165,25 +165,11 @@ def build(adapter):
         (CANONICAL.replace("lambda c: create(adapter, c)", "create"), "found 0"),
         (
             CANONICAL
-            + "    save_assembly_and_images(adapter, N, author=lambda c: create(adapter, c))\n",
+            + "    author_in_drawing_configurations(adapter, N, lambda c: create(adapter, c))\n",
             "found 2",
         ),
         ("import _x_explode\n" + CANONICAL, "module object"),
         (CANONICAL.replace("import create", "import *"), "star-imports"),
-        (
-            CANONICAL.replace("author=lambda", "lambda"),
-            "found 0",
-        ),
-        (
-            CANONICAL.replace("author=lambda", "**options, author=lambda"),
-            "found 0",
-        ),
-        (
-            CANONICAL.replace(
-                "create(adapter, c))", "create(adapter, c), solved_gates=create)"
-            ),
-            "outside the explode",
-        ),
     ],
 )
 def test_entangled_builders_decline(source, reason):
@@ -194,19 +180,6 @@ def test_entangled_builders_decline(source, reason):
 def test_canonical_builder_names_its_function():
     aliased = CANONICAL.replace("import create", "import make as create")
     assert _author_function(aliased, "_x_explode") == "make"
-
-
-@pytest.mark.parametrize(
-    "call",
-    [
-        "save_assembly_and_images(adapter, NAME, author=lambda c: create(adapter, c), solved_gates=gate)",
-        "save_assembly_and_images(adapter, NAME, views, author=lambda c: create(adapter, c))",
-        "await save_assembly_and_images(adapter, NAME, views=[], author=lambda c: create(adapter, c))",
-    ],
-)
-def test_save_options_do_not_entangle_the_explode_author(call):
-    source = f"from _x_explode import create\nasync def build(adapter):\n    {call}\n"
-    assert _author_function(source, "_x_explode") == "create"
 
 
 class _Selection:
@@ -230,16 +203,9 @@ class _Model:
         self.poses = poses
         self.selected = None
         self.SelectionManager = _Selection()
-        self.ConfigurationManager = SimpleNamespace(
-            ActiveConfiguration=SimpleNamespace(Name="Default")
-        )
         self.Extension = SimpleNamespace(
             SelectByID2=self._select, DeleteSelection2=self._delete
         )
-
-    def ShowConfiguration2(self, name):
-        self.ConfigurationManager.ActiveConfiguration.Name = name
-        return True
 
     def _select(self, name, kind, *_rest):
         assert kind == "EXPLODEDVIEWS"
@@ -300,6 +266,10 @@ def _fake_session(monkeypatch, tmp_path, *, digests, resaved_pin=PIN_POSE):
         events.append(("reconcile",))
         adapter.currentModel = _Model(events, views, {PIN: resaved_pin})
 
+    def author_both(_adapter, _name, author):
+        for configuration in ("Default", "Default Simplified"):
+            author(configuration)
+
     module = _explode_refresh
     monkeypatch.setattr(module, "OUT_SLDASM", tmp_path)
     monkeypatch.setattr(module, "_massprops_sidecar", lambda _name: proof)
@@ -308,6 +278,7 @@ def _fake_session(monkeypatch, tmp_path, *, digests, resaved_pin=PIN_POSE):
     monkeypatch.setattr(module, "saved_rebuild_status", lambda _adapter: 0)
     monkeypatch.setattr(module, "sync_simplified_configuration", lambda *_a, **_k: 0)
     monkeypatch.setattr(module, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(module, "author_in_drawing_configurations", author_both)
     monkeypatch.setattr(module, "final_rebuild_before_save", lambda *_a: None)
     monkeypatch.setattr(module, "assert_reference_geometry_hidden", lambda *_a: None)
     monkeypatch.setattr(module, "assembly_geometry_digest", geometry)
@@ -321,7 +292,6 @@ def _fake_session(monkeypatch, tmp_path, *, digests, resaved_pin=PIN_POSE):
     adapter = SimpleNamespace(currentModel=model, open_model=open_model)
 
     def author(configuration):
-        assert model.ConfigurationManager.ActiveConfiguration.Name == configuration
         assert model.GetExplodedViewNames2(configuration) == ()
         views[configuration].append(f"NEW {configuration}")
         events.append(("author", configuration))

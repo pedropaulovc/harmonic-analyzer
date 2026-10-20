@@ -109,6 +109,7 @@ from _assembly import (
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
+    author_in_drawing_configurations,
     check_no_interference,
     lock_mate,
     named_ref,
@@ -448,7 +449,7 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
-    (``_assembly.save_assembly_and_images``): a drawing view shows the
+    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
     explode of the configuration it references, and the drawing's small
     exploded view references the teeth/thread-free one."""
     from solidworks_mcp.adapters.com_variant import null_callout
@@ -978,11 +979,10 @@ async def build(adapter) -> dict[str, str]:
     )
     # Both drawing configurations own the explode: the drawing's small
     # exploded view references Default Simplified.
-    return await save_assembly_and_images(
-        adapter,
-        ASM_NAME,
-        author=lambda configuration: _create_frame_explode(adapter, configuration),
+    author_in_drawing_configurations(
+        adapter, ASM_NAME, lambda configuration: _create_frame_explode(adapter, configuration)
     )
+    return await save_assembly_and_images(adapter, ASM_NAME)
 
 
 if __name__ == "__main__":
