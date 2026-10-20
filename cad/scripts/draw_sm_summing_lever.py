@@ -724,20 +724,31 @@ def _plate_thickness_check(
             raise RuntimeError(f"{label}: missing native model dimension")
         dimension = _early_bound(raw_dimension, "IDimension")
         name, value = dimension.FullName, dimension.SystemValue
+        # FullName is Name@Feature@Model; the model title need not use SLDPRT.
         if (
             type(name) is not str
             or name.split("@")[:2] != ["PlateThickness", "PlateProfile"]
             or not finite(value)
             or abs(value - COEFFICIENT_T / 1000.0) > 1e-12
         ):
-            raise RuntimeError(f"{label}: wrong model identity or thickness")
+            raise RuntimeError(
+                f"{label}: wrong model identity or thickness; "
+                f"FullName={name!r} ({type(name).__name__}), "
+                "expected first two @ fields ['PlateThickness', 'PlateProfile']; "
+                f"SystemValue={value!r} ({type(value).__name__}) m, "
+                f"expected {COEFFICIENT_T / 1000.0!r} m (abs_tol=1e-12 m)"
+            )
         raw_tolerance = dimension.Tolerance
         if raw_tolerance is None:
             raise RuntimeError(f"{label}: missing native model band")
         tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
         band = (tolerance.Type, tolerance.GetMinValue(), tolerance.GetMaxValue())
         if type(band[0]) is not int or not all(finite(v) for v in band[1:]):
-            raise RuntimeError(f"{label}: invalid native model band")
+            raise RuntimeError(
+                f"{label}: invalid native model band for FullName={name!r}; "
+                f"(Type, GetMinValue[m], GetMaxValue[m])={band!r}, "
+                f"types={tuple(type(value).__name__ for value in band)!r}"
+            )
         return display, dimension, name, value, band
 
     def geometry() -> tuple[tuple[float, float], tuple[float, float]]:
@@ -848,11 +859,18 @@ def _plate_thickness_check(
 
     def check_thickness() -> None:
         current, owner, current_name, current_value, current_band = model_state()
+        same_display, same_dimension = same(current, display), same(owner, dimension)
         if (
-            not same(current, display) or not same(owner, dimension)
+            not same_display or not same_dimension
             or (current_name, current_value, current_band) != (name, value, band)
         ):
-            raise RuntimeError(f"{label}: native model identity, value or band changed")
+            raise RuntimeError(
+                f"{label}: native model identity, value or band changed; "
+                f"same_display={same_display}, same_dimension={same_dimension}; "
+                "(FullName, SystemValue[m], band[Type, min_m, max_m]) "
+                f"expected={(name, value, band)!r}, "
+                f"observed={(current_name, current_value, current_band)!r}"
+            )
         actual_gaps, actual_tips, actual_tails = ink(current)
         gaps, tips, tails = original_ink
         if (
