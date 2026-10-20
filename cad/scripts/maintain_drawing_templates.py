@@ -412,11 +412,16 @@ def _inside_corner(
             ),
         )
         position = trial["position_m"]
-        target_y = position[1] + high - _CLEARANCE - bounds[4]
+        # Native readback showed the extent changing after placement, rather
+        # than translating rigidly. Centre the trial box to leave headroom on
+        # both sides; the placed native box must still pass the same guards.
+        target_y = position[1] + (low + high - bounds[1] - bounds[4]) / 2
         if not annotation.SetPosition2(position[0], target_y, position[2]):
             raise RuntimeError("failed to position inside-corner row in native gap")
         model.GraphicsRedraw2()
         placed = _note_census(row)
+        evidence["gap_m"] = [low, high]
+        evidence["resolved_row"] = placed
         bounds = placed["extent_m"]
         if not (
             bounds[0] >= left + _CLEARANCE
@@ -430,12 +435,6 @@ def _inside_corner(
         row.PropertyLinkedText = INSIDE_CORNER_LINK
         if str(row.PropertyLinkedText) != INSIDE_CORNER_LINK:
             raise RuntimeError("inside-corner property link did not persist")
-        evidence.update(
-            {
-                "gap_m": [low, high],
-                "resolved_row": placed,
-            }
-        )
         return evidence
     finally:
         for note, text in originals:
