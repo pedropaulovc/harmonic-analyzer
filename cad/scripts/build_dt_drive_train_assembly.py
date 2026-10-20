@@ -1093,6 +1093,8 @@ from build_fr_harmonic_base import (  # noqa: E402
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
 )
 from fr_harmonic_base_fasteners import (  # noqa: E402
+    PEDESTAL_INSERTION_MAX_MM,
+    PEDESTAL_INSERTION_MIN_MM,
     require_through_seat_fit,
     through_seat_material,
 )
@@ -4267,8 +4269,6 @@ _require_tapped_thread(
 # Keep the original stock/flange limits, now intersected with the real finite
 # through-threaded casting and its transfer envelope. Excess reach is pocket
 # protrusion, not bottoming in an invented blind full-thread depth.
-_HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)
-_HDSCREW_MAX_REACH = HDSCREW_SHANK_LEN - (ARBOR_PED_FLANGE_T - 0.8)
 PEDESTAL_SCREW_BASE_FITS = tuple(
     require_through_seat_fit(
         "pedestal hold-down",
@@ -4276,11 +4276,13 @@ PEDESTAL_SCREW_BASE_FITS = tuple(
         through_seat_material(
             BASE_PEDESTAL_SEAT_SPEC, xz, envelope_xz=BASE_PEDESTAL_TRANSFER_XZ,
         ),
-        insertion_min_mm=_HDSCREW_MIN_ENGAGEMENT,
-        insertion_max_mm=_HDSCREW_MAX_REACH,
+        insertion_min_mm=PEDESTAL_INSERTION_MIN_MM,
+        insertion_max_mm=PEDESTAL_INSERTION_MAX_MM,
         tip_loss_mm=HDSCREW_TIP_INCOMPLETE,
         full_thread_start_mm=max(
-            0.0, HDSCREW_FULL_THREAD_START - (ARBOR_PED_FLANGE_T - 0.8),
+            0.0,
+            HDSCREW_FULL_THREAD_START
+            - (HDSCREW_SHANK_LEN - PEDESTAL_INSERTION_MAX_MM),
         ),
     )
     for xz in BASE_PEDESTAL_XZ

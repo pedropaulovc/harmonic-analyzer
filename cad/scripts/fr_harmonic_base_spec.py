@@ -65,8 +65,8 @@ DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
 # Underside lightening (same ruling): one cored pocket from the underside
 # inside a POCKET_WALL perimeter wall, its ceiling POCKET_SKIN under the deck
 # top (so GREEN_SKIN under the green ends), crossed by two ribs that stop
-# RIB_RELIEF above the underside. Deck seats are through-tapped into the
-# retained skin, ribs and walls; no separate deck-seat islands remain.
+# RIB_RELIEF above the underside. All 18 deck seats are through-tapped through
+# the retained skin and exit into pocket air; no deck-seat islands remain.
 # Each column socket retains its full-height boss merged into the walls.
 POCKET_WALL = 12.0
 POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 210.25
@@ -78,6 +78,10 @@ POCKET_SKIN = 13.0
 POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 37.8: also the pocket depth
 GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 10.0
 RIB_THICKNESS = 10.0
+# Whole-rib relocation, not local seat notches: the 10 mm cross rib spans
+# X=6..16, still joins both end walls and the long rib at Z=0. Its native
+# CrossRibX dimension locates the west face from the common table origin.
+CROSS_RIB_CENTER_X = 11.0
 RIB_RELIEF = 3.0  # rib bottoms clear the bench by this much
 SOCKET_BOSS_DIA = 41.5
 CROSS_TAP_LUG_BOTTOM_Y = 26.5

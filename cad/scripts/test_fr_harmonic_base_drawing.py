@@ -63,6 +63,8 @@ def test_retained_skin_books_the_three_loose_heights_and_both_edge_breaks() -> N
             assert material == fasteners.through_seat_material(seat, xz, envelope_xz=bounds)
             assert material.station_xz == xz
             assert material.nominal_segments_mm == fasteners.retained_material_segments_mm(*xz)
+            assert material.nominal_segments_mm == ((0.0, spec.POCKET_SKIN),), (tag, xz)
+            assert material.exit_depth_max_mm == pytest.approx(15.4), (tag, xz)
             capacity = sum(end - start for start, end in material.guaranteed_segments_mm)
             assert capacity >= 1.5 * part.THREAD_MAJOR_MM[seat.size]
             assert material.exit_depth_min_mm >= 13.0 - 3.0 * 0.8 - 1e-9
@@ -84,8 +86,16 @@ def test_material_queries_distinguish_skin_ribs_walls_fillets_and_transfer_bound
     assert fasteners.retained_material_segments_mm(100.0, spec.POCKET_HALF_Z + 1.0) == (
         (0.0, spec.STACK_HEIGHT),
     )
-    assert fasteners.retained_material_segments_mm(6.0, 6.0, fillet_radius_mm=0.0)[0] == pytest.approx((0.0, 13.0))
-    assert fasteners.retained_material_segments_mm(6.0, 6.0)[0][1] > 13.0
+    left_face = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
+    beside_junction = (left_face - 1.0, spec.RIB_THICKNESS / 2.0 + 1.0)
+    assert fasteners.retained_material_segments_mm(
+        *beside_junction, fillet_radius_mm=0.0,
+    ) == ((0.0, spec.POCKET_SKIN),)
+    assert fasteners.retained_material_segments_mm(*beside_junction)[0][1] > spec.POCKET_SKIN
+    assert fasteners.retained_material_segments_mm(0.0, 50.0) == ((0.0, spec.POCKET_SKIN),)
+    assert fasteners.retained_material_segments_mm(spec.CROSS_RIB_CENTER_X, 50.0) == (
+        (0.0, spec.STACK_HEIGHT - spec.RIB_RELIEF),
+    )
     for xz in part.PEDESTAL_SCREW_XZ:
         material = fasteners.through_seat_material(
             part.PEDESTAL_SEAT_SPEC, xz, envelope_xz=part.PEDESTAL_TRANSFER_XZ,
@@ -2104,18 +2114,22 @@ def test_hold_down_is_the_specified_screw() -> None:
 
 
 def test_specified_hold_down_retains_engagement_and_reports_underside_protrusion() -> None:
-    from fr_vn_lag_screw_spec import LENGTH_MM
+    from fr_vn_lag_screw_spec import LENGTH_MM, TIP_CHAMFER
 
+    fasteners = fr_harmonic_base_fasteners
     assert LENGTH_MM == 19.05
-    insertion = LENGTH_MM - fr_harmonic_base_fasteners.SUPPORT_FOOT_THICKNESS - fr_harmonic_base_fasteners.HOLD_DOWN_BEARING_OFFSET
     material = part.THROUGH_SEAT_MATERIAL["SupportHoldDownSeats"][0]
     fit = fr_harmonic_base_fasteners.require_through_seat_fit(
         "specified rocker support", part.HOLD_DOWN_SEAT_SPEC, material,
-        insertion_min_mm=insertion, insertion_max_mm=insertion,
+        insertion_min_mm=fasteners.HOLD_DOWN_INSERTION_MIN_MM,
+        insertion_max_mm=fasteners.HOLD_DOWN_INSERTION_MAX_MM,
+        tip_loss_mm=TIP_CHAMFER,
     )
-    assert fit.full_thread_engagement_min_mm == pytest.approx(10.10)
+    assert fit.full_thread_engagement_min_mm == pytest.approx(9.9476875)
     assert fit.full_thread_engagement_min_mm >= 1.5 * 6.35
-    assert fit.protrusion_max_mm == pytest.approx(insertion - material.exit_depth_min_mm)
+    assert fit.protrusion_max_mm == pytest.approx(
+        fasteners.HOLD_DOWN_INSERTION_MAX_MM - material.exit_depth_min_mm,
+    )
     assert fit.protrusion_max_mm > 0.0
     assert fit.clearance_min_mm > 0.0
 
@@ -2518,12 +2532,20 @@ def test_underside_lug_sheet_preserves_retained_locations_from_x0_y0() -> None:
     printed = {name: round(value, 1) for name, value in _lug_printed().items()}
     assert printed == {
         "Lug1X": 39.6,
-        "CrossRibX": 223.6,
+        "CrossRibX": 234.6,
         "Lug3X": 417.6,
         "Lug1Y": 68.6,
         "LongRibY": 138.6,
         "Lug0Y": 218.6,
     }
+    assert spec.CROSS_RIB_CENTER_X == 11.0
+    assert _lug_vertices()["CrossRibX"][0] == pytest.approx(
+        spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0,
+    )
+    assert printed["CrossRibX"] == pytest.approx(
+        spec.BOTTOM_LENGTH / 2.0 + spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0,
+    )
+    assert dict(sheet.LUGS_X_ROWS)["CrossRibX"] == spec.CROSS_RIB_CENTER_X - 90.0
     assert sheet.LUGS_DATUM == pytest.approx(
         sheet._lugs_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z)
     )
@@ -3194,7 +3216,7 @@ def test_through_cut_volume_integrates_skin_full_rib_and_half_rib_without_drill_
 def test_pedestal_thread_interference_budget_stops_at_actual_retained_skin() -> None:
     import _interference_contracts as contracts
 
-    assert part.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(14.05)
+    assert fr_harmonic_base_fasteners.PEDESTAL_SCREW_ENGAGEMENT == pytest.approx(14.05)
     for xz in part.PEDESTAL_SCREW_XZ:
         assert fr_harmonic_base_fasteners.retained_material_segments_mm(*xz)[0] == pytest.approx((0.0, 13.0))
     allowed = contracts.allowed_interference_pairs("ha-harmonic-analyzer")
@@ -3295,21 +3317,32 @@ def test_uncut_material_control_rejects_missing_short_or_extra_metal(monkeypatch
         )
 
 
-def _breakthrough_adapter(monkeypatch, *, cylinder=None, closest=None, faces=True):
+def _breakthrough_adapter(
+    monkeypatch, *, tag="FootScrewHoles", cylinder=None, closest=None, faces=True,
+):
+    """Behavioral native-interface doubles, never a claim of a native build."""
     from types import SimpleNamespace
 
-    x, z = part.FOOT_SCREW_XZ[0]
-    radius = part.FOOT_SCREW_HOLE_DIA / 2.0
-    params = (x / 1000.0, 0.0, z / 1000.0, 0.0, 1.0, 0.0, radius / 1000.0)
-    surface = SimpleNamespace(IsCylinder=lambda: True, CylinderParams=params if cylinder is None else cylinder)
-    face = SimpleNamespace(
-        GetSurface=lambda: surface,
-        GetClosestPointOn=lambda *point: (*point, 0.0, 0.0) if closest is None else closest,
-    )
-    body = SimpleNamespace(GetFaces=lambda: (face,) if faces else ())
+    _tag, seat, stations, _envelope = next(group for group in part.THROUGH_SEAT_GROUPS if group[0] == tag)
+    radius = part.blind_cut_dia_mm(seat) / 2.0
+    cylinder_faces = []
+    cylinder_points = []
+
+    def closest_point(*point):
+        cylinder_points.append(point)
+        return (*point, 0.0, 0.0) if closest is None else closest
+
+    for x, z in stations:
+        params = (x / 1000.0, 0.0, z / 1000.0, 0.0, 1.0, 0.0, radius / 1000.0)
+        surface = SimpleNamespace(IsCylinder=lambda: True, CylinderParams=params if cylinder is None else cylinder)
+        cylinder_faces.append(SimpleNamespace(
+            GetSurface=lambda surface=surface: surface,
+            GetClosestPointOn=closest_point,
+        ))
+    body = SimpleNamespace(GetFaces=lambda: tuple(cylinder_faces) if faces else ())
     model = SimpleNamespace(GetBodies2=lambda *_args: (body,))
     monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
-    return SimpleNamespace(currentModel=model)
+    return SimpleNamespace(currentModel=model, cylinder_points=cylinder_points)
 
 
 def test_native_through_proof_requires_open_bore_and_real_wall_positive_controls(monkeypatch) -> None:
@@ -3364,3 +3397,359 @@ def test_native_through_proof_refuses_missing_or_bad_finite_cylinder(monkeypatch
     )
     with pytest.raises(RuntimeError, match="cylinder"):
         part._verify_through_breakthrough(adapter, "FootScrewHoles", part.FOOT_SEAT_SPEC, part.FOOT_SCREW_XZ)
+
+
+@pytest.mark.parametrize(
+    ("tag", "seat", "stations", "envelope"), part.THROUGH_SEAT_GROUPS,
+    ids=[group[0] for group in part.THROUGH_SEAT_GROUPS],
+)
+def test_native_contract_proves_all_eighteen_skin_only_exits_and_transfer_probes(
+    monkeypatch, tag, seat, stations, envelope,
+) -> None:
+    adapter = _breakthrough_adapter(monkeypatch, tag=tag)
+    seen = {}
+
+    def rays(_adapter, points, label):
+        seen[label] = points
+        return tuple(
+            () if label.endswith("breakthrough") else ((0.0, fr_harmonic_base_spec.POCKET_SKIN),)
+            for _point in points
+        )
+
+    monkeypatch.setattr(part, "_native_vertical_segments", rays)
+    part._verify_uncut_material(adapter, tag, seat, stations)
+    part._verify_through_breakthrough(adapter, tag, seat, stations)
+    assert seen[tag] == tuple(stations) + part._material_probe_points(seat, stations, envelope)
+    assert len(seen[tag]) == len(stations) * (81 if envelope != (0.0, 0.0) else 17)
+    assert len(seen[f"{tag} breakthrough"]) == len(stations) * 16
+    assert seen[f"{tag} wall control"] == part._material_probe_points(seat, stations)
+    assert len(adapter.cylinder_points) == 48 * len(stations)
+    assert {round(part.STACK_HEIGHT - 1000.0 * point[1], 6) for point in adapter.cylinder_points} == {
+        0.05, 6.5, 12.95,
+    }
+    radius = part.THREAD_MAJOR_MM[seat.size] / 2.0
+    for x, z in stations:
+        for ex in (-envelope[0], envelope[0]):
+            for ez in (-envelope[1], envelope[1]):
+                assert any(
+                    radius < math.dist((x + ex, z + ez), point) < radius + 0.051
+                    for point in seen[tag]
+                )
+
+
+@pytest.mark.parametrize(
+    ("tag", "seat", "stations", "envelope", "station_index"),
+    [(tag, seat, stations, envelope, index)
+     for tag, seat, stations, envelope in part.THROUGH_SEAT_GROUPS
+     for index in range(len(stations))],
+    ids=[f"{tag}-{index}" for tag, _seat, stations, _envelope in part.THROUGH_SEAT_GROUPS
+         for index in range(len(stations))],
+)
+@pytest.mark.parametrize("stage", ("uncut", "wall"))
+def test_native_contract_rejects_off_axis_rib_or_fillet_metal_at_every_seat(
+    monkeypatch, tag, seat, stations, envelope, station_index, stage,
+) -> None:
+    adapter = _breakthrough_adapter(monkeypatch, tag=tag)
+
+    def interrupted(_adapter, points, label):
+        if label.endswith("breakthrough"):
+            return tuple(() for _point in points)
+        result = [((0.0, fr_harmonic_base_spec.POCKET_SKIN),) for _point in points]
+        # Keep every axis correct; put extra retained metal on the first
+        # circumference probe for the selected station, including transfers.
+        stride = 80 if envelope != (0.0, 0.0) and stage == "uncut" else 16
+        start = len(stations) if stage == "uncut" else 0
+        result[start + station_index * stride] = (
+            (0.0, fr_harmonic_base_spec.STACK_HEIGHT - fr_harmonic_base_spec.RIB_RELIEF),
+        )
+        return tuple(result)
+
+    monkeypatch.setattr(part, "_native_vertical_segments", interrupted)
+    with pytest.raises(RuntimeError, match="actual material"):
+        if stage == "uncut":
+            part._verify_uncut_material(adapter, tag, seat, stations)
+        else:
+            part._verify_through_breakthrough(adapter, tag, seat, stations)
+
+
+def test_native_rib_sketch_and_equations_place_the_actual_shifted_cross_rib() -> None:
+    """Run only the real local sketch helpers and rib loop against recorders.
+
+    This proves the emitted profile, native dimension measurements, equation
+    dependencies and offset extrusion, not a SolidWorks rebuild or print.
+    """
+    import ast
+    import asyncio
+    import inspect
+    import operator
+    from types import SimpleNamespace
+
+    build = ast.parse(inspect.getsource(part.build)).body[0]
+    helper_names = {"_table_origin", "_from_origin", "_pad"}
+    helpers = [node for node in build.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+               and node.name in helper_names]
+    assert {node.name for node in helpers} == helper_names
+    loops = [node for node in build.body if isinstance(node, ast.For)
+             and isinstance(node.target, ast.Tuple)
+             and [getattr(item, "id", None) for item in node.target.elts]
+             == ["tag", "rib_shape", "label", "names", "drives", "location_drives"]]
+    assert len(loops) == 1
+    initializers = [node for node in build.body
+                    if isinstance(node, ast.Expr) and isinstance(node.value, ast.Await)
+                    and isinstance(node.value.value, ast.Call)
+                    and getattr(node.value.value.func, "id", None) == "set_global"
+                    and len(node.value.value.args) >= 2
+                    and isinstance(node.value.value.args[1], ast.Constant)
+                    and node.value.value.args[1].value == "CrossRibCenterX"]
+    assert len(initializers) == 1
+    module = ast.parse(
+        "async def record(adapter):\n"
+        "    drive_jobs = []\n"
+        "    hung = ()\n"
+        "    after = 0.0\n"
+        "    return drive_jobs\n"
+    )
+    wrapper = module.body[0]
+    wrapper.body = [*wrapper.body[:3], *helpers, *initializers, loops[0], wrapper.body[-1]]
+    ast.fix_missing_locations(module)
+    profiles, anchors, extrusions, verified, dimensions = [], [], [], [], {}
+    globals_mm = {
+        "BottomLength": part.BOTTOM_LENGTH, "BottomWidth": part.BOTTOM_WIDTH,
+        "TopLength": part.TOP_LENGTH, "TopWidth": part.TOP_WIDTH,
+        "PocketWall": part.POCKET_WALL, "RibThickness": part.RIB_THICKNESS,
+        "RibRelief": part.RIB_RELIEF, "PocketDepth": part.POCKET_CEILING_Y,
+    }
+
+    def result(data=None):
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    class Manager:
+        AddToDB = False
+
+        def CreatePoint(self, x, y, z):
+            assert self.AddToDB
+            assert (x, y, z) == pytest.approx(
+                (-part.BOTTOM_LENGTH / 2000.0, -part.BOTTOM_WIDTH / 2000.0, 0.0),
+            )
+            return (x, y, z)
+
+    class Adapter:
+        currentSketchManager = Manager()
+
+        def _register_sketch_entity(self, kind, raw):
+            assert kind == "Point" and raw is not None
+            return "table-origin"
+
+        async def create_sketch(self, plane):
+            assert plane == "Top"
+            return result()
+
+        async def add_sketch_constraint(self, _first, second, kind):
+            assert second is None and kind in ("horizontal", "vertical")
+            return result()
+
+        async def exit_sketch(self):
+            return result()
+
+    class RecordedDimensions:
+        def __init__(self):
+            self.rows = []
+
+        def record(self, name, drive):
+            self.rows.append((name, drive))
+
+        def apply(self, _adapter, feature):
+            dimensions[feature] = dict(self.rows)
+            return [(f"{name}@{feature}", drive) for name, drive in self.rows]
+
+    async def set_global(_adapter, name, expression):
+        assert expression.endswith("mm")
+        globals_mm[name] = float(expression[:-2])
+
+    async def chain(_adapter, points):
+        profiles.append(points)
+        return [f"line{len(profiles)}-{index}" for index in range(4)]
+
+    async def dimension(_adapter, first, second, kind, span, _label):
+        points = profiles[-1]
+        index = int(first.split("-")[-1].split(".")[0])
+        assert second == first.removesuffix(".start") + ".end"
+        axis = 0 if kind == "horizontal_distance" else 1
+        assert span == pytest.approx(abs(points[(index + 1) % 4][axis] - points[index][axis]))
+
+    async def anchor_origin(_adapter, _point, x, y, _label):
+        assert (x, y) == (-part.BOTTOM_LENGTH / 2.0, -part.BOTTOM_WIDTH / 2.0)
+
+    async def anchor(_adapter, first, second, x, y, _label):
+        assert first == "table-origin" and second.endswith("-0.start")
+        assert (x, y) == pytest.approx(
+            (profiles[-1][0][0] + part.BOTTOM_LENGTH / 2.0,
+             profiles[-1][0][1] + part.BOTTOM_WIDTH / 2.0),
+        )
+        anchors.append((x, y))
+
+    async def fully_defined(_adapter, _label):
+        return None
+
+    async def volume(_adapter, _label, expected, _tolerance):
+        return expected
+
+    namespace = {
+        **vars(part), "SketchDims": RecordedDimensions, "set_global": set_global,
+        "add_line_chain": chain, "dimension_between": dimension,
+        "anchor_point_to_origin": anchor_origin, "anchor_point_to_point": anchor,
+        "ensure_fully_defined": fully_defined, "volume_check": volume,
+        "name_last_feature": lambda *_args: None,
+        "name_dimensions": lambda _adapter, feature, names: [f"{name}@{feature}" for name in names],
+        "_verify_named_dimension": lambda _adapter, name, value: verified.append((name, value)),
+        "extrude_at_offset": lambda _adapter, height, offset: extrusions.append((height, offset)),
+    }
+    exec(compile(module, "<native rib sketch contract>", "exec"), namespace)
+    jobs = dict(asyncio.run(namespace["record"](Adapter())))
+    spec = fr_harmonic_base_spec
+    left, right = (spec.CROSS_RIB_CENTER_X + sign * spec.RIB_THICKNESS / 2.0 for sign in (-1.0, 1.0))
+    assert profiles[1] == [
+        (left, -part.RIB_HALF_LENGTH_Z), (right, -part.RIB_HALF_LENGTH_Z),
+        (right, part.RIB_HALF_LENGTH_Z), (left, part.RIB_HALF_LENGTH_Z),
+    ]
+    assert globals_mm["CrossRibCenterX"] == spec.CROSS_RIB_CENTER_X == 11.0
+    assert anchors[1] == pytest.approx((234.6, part.BOTTOM_WIDTH / 2.0 - part.RIB_HALF_LENGTH_Z))
+    expected = {
+        "CrossRibOriginX": part.BOTTOM_LENGTH / 2.0,
+        "CrossRibOriginY": part.BOTTOM_WIDTH / 2.0,
+        "CrossRibThickness": right - left,
+        "CrossRibLength": 2.0 * part.RIB_HALF_LENGTH_Z,
+        "CrossRibX": anchors[1][0], "CrossRibY": anchors[1][1],
+    }
+    operations = {ast.Add: operator.add, ast.Sub: operator.sub,
+                  ast.Mult: operator.mul, ast.Div: operator.truediv}
+
+    def evaluate(node):
+        if isinstance(node, ast.Constant):
+            return globals_mm[node.value] if isinstance(node.value, str) else node.value
+        if isinstance(node, ast.BinOp):
+            return operations[type(node.op)](evaluate(node.left), evaluate(node.right))
+        raise AssertionError(f"unsupported native equation: {ast.dump(node)}")
+
+    assert set(dimensions["CrossRibProfile"]) == set(expected)
+    for name, value in expected.items():
+        expression = jobs[f"{name}@CrossRibProfile"]
+        assert evaluate(ast.parse(expression, mode="eval").body) == pytest.approx(value)
+    globals_mm["CrossRibCenterX"] += 3.0
+    assert evaluate(ast.parse(jobs["CrossRibX@CrossRibProfile"], mode="eval").body) == pytest.approx(237.6)
+    assert extrusions == [(spec.POCKET_CEILING_Y - spec.RIB_RELIEF, spec.RIB_RELIEF)] * 2
+    assert dict(verified)["CrossRibHeight@CrossRib"] == pytest.approx(34.8)
+    assert dict(verified)["CrossRibRelief@CrossRib"] == spec.RIB_RELIEF
+
+
+def test_shifted_cross_rib_volume_and_all_eighteen_skin_only_cut_footprints() -> None:
+    spec = fr_harmonic_base_spec
+    skin = spec.STACK_HEIGHT - spec.POCKET_CEILING_Y
+    rib = spec.STACK_HEIGHT - spec.RIB_RELIEF
+    seat = part.FOOT_SEAT_SPEC
+    area = math.pi * (part.FOOT_SCREW_HOLE_DIA / 2.0) ** 2
+    for x, depth in (
+        (0.0, skin), (spec.CROSS_RIB_CENTER_X, rib),
+        (spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0, (skin + rib) / 2.0),
+        (spec.CROSS_RIB_CENTER_X + spec.RIB_THICKNESS / 2.0, (skin + rib) / 2.0),
+    ):
+        assert part._through_holes_volume_mm3(seat, ((x, 50.0),)) == pytest.approx(
+            area * depth, rel=2e-4,
+        )
+    counted = 0
+    for tag, seat, stations, _envelope in part.THROUGH_SEAT_GROUPS:
+        expected = len(stations) * math.pi * (part.blind_cut_dia_mm(seat) / 2.0) ** 2 * skin
+        assert part._through_holes_volume_mm3(seat, stations) == pytest.approx(
+            expected, rel=2e-4,
+        ), tag
+        counted += len(stations)
+    assert counted == 18
+    # The moved rectangle still crosses the long rib and reaches both walls;
+    # only the shared 10x10 patch is subtracted from its hanging volume.
+    cross_volume = part.hanging_volume(
+        (part.CROSS_RIB_SHAPE,), (part.LONG_RIB_SHAPE,), spec.RIB_RELIEF,
+    )
+    expected_cross = (
+        2.0 * spec.POCKET_HALF_Z * spec.RIB_THICKNESS - spec.RIB_THICKNESS**2
+    ) * (spec.POCKET_CEILING_Y - spec.RIB_RELIEF)
+    assert cross_volume == pytest.approx(expected_cross)
+    assert cross_volume == pytest.approx(83694.0)
+
+
+@pytest.mark.parametrize(
+    ("tag", "seat", "stations", "station_index"),
+    [pytest.param(tag, seat, stations, index, id=f"{tag}-{index}")
+     for tag, seat, stations, _envelope in part.THROUGH_SEAT_GROUPS
+     for index in range(len(stations))],
+)
+def test_native_cylinder_proof_rejects_a_single_missing_exit_wall_sector_at_every_seat(
+    monkeypatch, tag, seat, stations, station_index,
+) -> None:
+    adapter = _breakthrough_adapter(monkeypatch, tag=tag)
+    x, z = stations[station_index]
+    radius = part.blind_cut_dia_mm(seat) / 2.0
+    angle = 0.071 + 15.0 * math.tau / 16.0
+    target = (
+        (x + radius * math.cos(angle)) / 1000.0,
+        (fr_harmonic_base_spec.POCKET_CEILING_Y + 0.05) / 1000.0,
+        (z + radius * math.sin(angle)) / 1000.0,
+    )
+
+    def trimmed(*point):
+        if math.dist(point, target) < 1e-10:
+            return (point[0], point[1] + 0.001, point[2], 0.0, 0.0)
+        return (*point, 0.0, 0.0)
+
+    body = adapter.currentModel.GetBodies2(0, False)[0]
+    for face in body.GetFaces():
+        face.GetClosestPointOn = trimmed
+    monkeypatch.setattr(
+        part, "_native_vertical_segments",
+        lambda _adapter, points, label: tuple(
+            () if label.endswith("breakthrough") else ((0.0, fr_harmonic_base_spec.POCKET_SKIN),)
+            for _point in points
+        ),
+    )
+    with pytest.raises(RuntimeError, match="missing retained tap-drill cylinder"):
+        part._verify_through_breakthrough(adapter, tag, seat, stations)
+
+
+@pytest.mark.parametrize("bad_control", (None, *range(9)))
+def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old_footprint(
+    monkeypatch, bad_control,
+) -> None:
+    spec = fr_harmonic_base_spec
+    expected = (
+        (11.0, -62.625, 47.8), (11.0, 62.625, 47.8),
+        (-105.125, 0.0, 47.8), (105.125, 0.0, 47.8),
+        (11.0, 0.0, 47.8),
+        (11.0, -128.25, 50.8), (11.0, 128.25, 50.8),
+        (1.0, -62.625, 13.0), (1.0, 62.625, 13.0),
+    )
+    dimensions = {}
+    monkeypatch.setattr(
+        part, "_verify_named_dimension",
+        lambda _adapter, name, value: dimensions.__setitem__(name, value),
+    )
+
+    def rays(_adapter, points, label):
+        assert label == "retained rib controls"
+        assert points == tuple((x, z) for x, z, _depth in expected)
+        depths = [depth for _x, _z, depth in expected]
+        if bad_control is not None:
+            depths[bad_control] = spec.POCKET_SKIN if depths[bad_control] > 13.0 else 47.8
+        return tuple(((0.0, depth),) for depth in depths)
+
+    monkeypatch.setattr(part, "_native_vertical_segments", rays)
+    if bad_control is None:
+        part._verify_rib_material(object())
+    else:
+        with pytest.raises(RuntimeError, match="actual material"):
+            part._verify_rib_material(object())
+    assert dimensions == pytest.approx({
+        "CrossRibX@CrossRibProfile": 234.6,
+        "CrossRibThickness@CrossRibProfile": 10.0,
+        "CrossRibLength@CrossRibProfile": 262.5,
+        "CrossRibHeight@CrossRib": 34.8,
+        "CrossRibRelief@CrossRib": 3.0,
+    })

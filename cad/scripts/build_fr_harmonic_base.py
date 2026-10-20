@@ -87,6 +87,7 @@ from fr_harmonic_base_spec import (
     BOTTOM_WIDTH,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
+    CROSS_RIB_CENTER_X,
     DECK_CORNER_R,
     DECK_EDGE_BREAK,
     DECK_HALF_X,
@@ -177,15 +178,18 @@ from fr_harmonic_base_fasteners import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
     ThroughSeatMaterial,
-    HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_INSERTION_MIN_MM,
+    HOLD_DOWN_INSERTION_MAX_MM,
     HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD,
     NAMEPLATE_SEAT_SPEC,
     NAMEPLATE_SCREW_XZ,
-    PEDESTAL_SCREW_ENGAGEMENT,
+    PEDESTAL_INSERTION_MIN_MM,
+    PEDESTAL_INSERTION_MAX_MM,
     retained_material_segments_mm,
     through_seat_material,
+    through_seat_pocket_clearances_mm,
     require_through_seat_fit,
     title_block_band_mm,
 )
@@ -677,7 +681,8 @@ LONG_RIB_SHAPE = _rect(
     (-RIB_HALF_LENGTH_X, RIB_HALF_LENGTH_X), (-RIB_THICKNESS / 2.0, RIB_THICKNESS / 2.0)
 )
 CROSS_RIB_SHAPE = _rect(
-    (-RIB_THICKNESS / 2.0, RIB_THICKNESS / 2.0), (-RIB_HALF_LENGTH_Z, RIB_HALF_LENGTH_Z)
+    (CROSS_RIB_CENTER_X - RIB_THICKNESS / 2.0, CROSS_RIB_CENTER_X + RIB_THICKNESS / 2.0),
+    (-RIB_HALF_LENGTH_Z, RIB_HALF_LENGTH_Z),
 )
 CROSS_TAP_LUG_SHAPES = tuple(
     _rect(
@@ -709,6 +714,27 @@ THROUGH_SEAT_MATERIAL: dict[str, tuple[ThroughSeatMaterial, ...]] = {
 if sum(len(stations) for _tag, _seat, stations, _envelope in THROUGH_SEAT_GROUPS) != 18:
     raise AssertionError("base must retain all18 deck-seat stations")
 
+# Complete circular exits, not just nominal axes: scan every drill/thread,
+# transfer rectangle, wall, rib, socket, lug and all 28 finite R MAX patches.
+THROUGH_SEAT_POCKET_CLEARANCES = {
+    tag: tuple(through_seat_pocket_clearances_mm(seat, xz, envelope_xz=envelope)
+               for xz in stations)
+    for tag, seat, stations, envelope in THROUGH_SEAT_GROUPS
+}
+for _tag, _clearances in THROUGH_SEAT_POCKET_CLEARANCES.items():
+    for _i, _gaps in enumerate(_clearances):
+        if min(_gaps.values()) <= 0.0:
+            raise AssertionError(f"{_tag}[{_i}]: interrupted through exit {_gaps}")
+        # The relocation specifically requires 2 mm around the block seats;
+        # other unchanged hardware retains its existing wall/fillet contracts.
+        if _tag == "BlockScrewHoles" and min(_gaps.values()) < 2.0:
+            raise AssertionError(f"{_tag}[{_i}]: block-seat air falls below 2 mm {_gaps}")
+        _segments = THROUGH_SEAT_MATERIAL[_tag][_i].nominal_segments_mm
+        if len(_segments) != 1 or max(
+            abs(_segments[0][0]), abs(_segments[0][1] - (STACK_HEIGHT - POCKET_CEILING_Y)),
+        ) > 1e-9:
+            raise AssertionError(f"{_tag}[{_i}]: expected skin-only through axis, got {_segments}")
+
 # Capacity is a female-material condition, not a fictitious screw insertion.
 # Real hardware windows remain separate so inherited installed-joint rulings
 # (including the nameplate's accepted short engagement) are not overwritten.
@@ -725,8 +751,8 @@ for _tag, _seat, _stations, _envelope in THROUGH_SEAT_GROUPS:
 # shoulder undercut and tip already preclude1.5D before this geometry change.
 _SPRING_THICKNESS_MAX = SPRING_THICKNESS + deviations(SPRING_THICKNESS_BAND)[1]
 _NOMINAL_STOCK_WINDOWS = (
-    ("SupportHoldDownSeats", HOLD_DOWN_ENGAGEMENT - title_block_band_mm("linear_2pl"),
-     HOLD_DOWN_ENGAGEMENT + title_block_band_mm("linear_2pl"), HOLD_DOWN_TIP_CHAMFER, 0.0, 1.5),
+    ("SupportHoldDownSeats", HOLD_DOWN_INSERTION_MIN_MM,
+     HOLD_DOWN_INSERTION_MAX_MM, HOLD_DOWN_TIP_CHAMFER, 0.0, 1.5),
     ("PivotSeat", PIVOT_THREAD_ENGAGEMENT, PIVOT_THREAD_ENGAGEMENT,
      PIVOT_TIP_CHAMFER, PIVOT_THREAD_START,
      PIVOT_MIN_USEFUL_ENGAGEMENT / THREAD_MAJOR_MM[PIVOT_THREAD]),
@@ -735,8 +761,8 @@ _NOMINAL_STOCK_WINDOWS = (
     ("FootScrewHoles", SMALL_SCREW_LENGTH_MIN - _SPRING_THICKNESS_MAX,
      SMALL_SCREW_LENGTH_MAX - SPRING_THICKNESS_MIN, SMALL_SCREW_TIP_CHAMFER,
      max(0.0, SMALL_SCREW_THREAD_START_MAX - SPRING_THICKNESS_MIN), 1.5),
-    ("PedestalSeats", PEDESTAL_SCREW_ENGAGEMENT - title_block_band_mm("linear_1pl"),
-     PEDESTAL_SCREW_ENGAGEMENT + title_block_band_mm("linear_1pl"),
+    ("PedestalSeats", PEDESTAL_INSERTION_MIN_MM,
+     PEDESTAL_INSERTION_MAX_MM,
      PEDESTAL_TIP_CHAMFER, 0.0, 1.5),
 )
 THROUGH_SEAT_SOURCE_MODEL_FITS = {}
@@ -990,8 +1016,8 @@ def _disc_rect_corners(
 def _pocket_corner_fillets(fillet_r: float) -> list[tuple[list[float], float, float]]:
     """(pick,edge length,plan section) for retained rib and lug reentrants.
 
-    Removed deck islands contribute no corners. Socket-to-wall junctions
-    remain in PocketFillets; all retained picks and radii are unchanged.
+    Socket-to-wall junctions remain in PocketFillets. Only the cross rib's
+    wall and long-rib junctions translate in X; no corner is removed.
     """
     square = _fillet_section_area(fillet_r)
     half_rib = RIB_THICKNESS / 2.0
@@ -1000,8 +1026,8 @@ def _pocket_corner_fillets(fillet_r: float) -> list[tuple[list[float], float, fl
         for sb in (-1.0, 1.0):
             corners += [
                 (sa * POCKET_HALF_X, sb * half_rib, RIB_RELIEF, square),
-                (sa * half_rib, sb * POCKET_HALF_Z, RIB_RELIEF, square),
-                (sa * half_rib, sb * half_rib, RIB_RELIEF, square),
+                (CROSS_RIB_CENTER_X + sa * half_rib, sb * POCKET_HALF_Z, RIB_RELIEF, square),
+                (CROSS_RIB_CENTER_X + sa * half_rib, sb * half_rib, RIB_RELIEF, square),
             ]
     for (x, z), lug in zip(COLUMN_SOCKET_XZ, CROSS_TAP_LUG_SHAPES, strict=True):
         lug_z = z - math.copysign(CROSS_TAP_LUG_LENGTH, z)
@@ -1112,13 +1138,13 @@ def _through_holes_volume_mm3(seat: HoleSpec, stations) -> float:
         xx, zz = x + dx, z + dz
         bottom = np.full(dz.shape, POCKET_CEILING_Y)
         bottom = np.where((np.abs(xx) >= POCKET_HALF_X) | (np.abs(zz) >= POCKET_HALF_Z), 0.0, bottom)
-        bottom = np.where((np.abs(xx) <= half) | (np.abs(zz) <= half), np.minimum(bottom, RIB_RELIEF), bottom)
+        bottom = np.where((np.abs(xx - CROSS_RIB_CENTER_X) <= half) | (np.abs(zz) <= half), np.minimum(bottom, RIB_RELIEF), bottom)
         for sx in (-1.0, 1.0):
             for sz in (-1.0, 1.0):
                 for cx, cz, ax, az in (
                     (sx * POCKET_HALF_X, sz * half, -sx, sz),
-                    (sx * half, sz * POCKET_HALF_Z, sx, -sz),
-                    (sx * half, sz * half, sx, sz),
+                    (CROSS_RIB_CENTER_X + sx * half, sz * POCKET_HALF_Z, sx, -sz),
+                    (CROSS_RIB_CENTER_X + sx * half, sz * half, sx, sz),
                 ):
                     u, v = (xx - cx) * ax, (zz - cz) * az
                     patch = (u >= 0) & (u <= fillet) & (v >= 0) & (v <= fillet) & (
@@ -1214,7 +1240,9 @@ def _verify_uncut_material(adapter, tag: str, seat: HoleSpec, stations) -> None:
     envelope = next(bounds for name, _seat, _stations, bounds in THROUGH_SEAT_GROUPS if name == tag)
     points = tuple(stations) + _material_probe_points(seat, stations, envelope)
     for point, segments in zip(points, _native_vertical_segments(adapter, points, tag), strict=True):
-        _require_native_segments(segments, retained_material_segments_mm(*point), f"{tag} at {point}")
+        expected = ((0.0, STACK_HEIGHT - POCKET_CEILING_Y),)
+        _require_native_segments(retained_material_segments_mm(*point), expected, f"{tag} source at {point}")
+        _require_native_segments(segments, expected, f"{tag} at {point}")
 
 
 def _verify_through_breakthrough(adapter, tag: str, seat: HoleSpec, stations) -> None:
@@ -1229,7 +1257,9 @@ def _verify_through_breakthrough(adapter, tag: str, seat: HoleSpec, stations) ->
         raise RuntimeError(f"{tag}: bore retains material below its entry (not through)")
     wall_points = _material_probe_points(seat, stations)
     for point, segments in zip(wall_points, _native_vertical_segments(adapter, wall_points, f"{tag} wall control"), strict=True):
-        _require_native_segments(segments, retained_material_segments_mm(*point), f"{tag} wall at {point}")
+        expected = ((0.0, STACK_HEIGHT - POCKET_CEILING_Y),)
+        _require_native_segments(retained_material_segments_mm(*point), expected, f"{tag} source wall at {point}")
+        _require_native_segments(segments, expected, f"{tag} wall at {point}")
     part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = part.GetBodies2(0, False)
     faces = _early_bound(bodies[0], "IBody2").GetFaces()
@@ -1253,14 +1283,57 @@ def _verify_through_breakthrough(adapter, tag: str, seat: HoleSpec, stations) ->
         for i, (x, z) in enumerate(stations):
             if math.dist((1000 * cylinder[0], 1000 * cylinder[2]), (x, z)) > 0.005:
                 continue
-            target = (x + radius, STACK_HEIGHT - 2.0, z)
-            closest = face.GetClosestPointOn(*(value / 1000.0 for value in target))
-            if not isinstance(closest, (tuple, list)) or len(closest) != 5 or not all(math.isfinite(float(v)) for v in closest):
-                raise RuntimeError(f"{tag}: finite cylinder closest-point unavailable")
-            if math.dist(tuple(1000 * float(v) for v in closest[:3]), target) <= 0.005:
+            complete = True
+            for depth in (0.05, (STACK_HEIGHT - POCKET_CEILING_Y) / 2.0,
+                          STACK_HEIGHT - POCKET_CEILING_Y - 0.05):
+                for angle in (0.071 + j * math.tau / 16 for j in range(16)):
+                    target = (x + radius * math.cos(angle), STACK_HEIGHT - depth,
+                              z + radius * math.sin(angle))
+                    closest = face.GetClosestPointOn(*(value / 1000.0 for value in target))
+                    if not isinstance(closest, (tuple, list)) or len(closest) != 5 or not all(
+                        math.isfinite(float(v)) for v in closest
+                    ):
+                        raise RuntimeError(f"{tag}: finite cylinder closest-point unavailable")
+                    if math.dist(tuple(1000 * float(v) for v in closest[:3]), target) > 0.005:
+                        complete = False
+            if complete:
                 found.add(i)
     if found != set(range(len(stations))):
         raise RuntimeError(f"{tag}: missing retained tap-drill cylinder at stations {set(range(len(stations))) - found}")
+
+
+def _verify_rib_material(adapter) -> None:
+    """Read both retained ribs, their shared crossing and end-wall joins.
+
+    Skin-only controls west of the shifted rib reject the former placement.
+    Solid controls independently reject a deleted/shortened rib even when
+    every seat still breaks through correctly.
+    """
+    for name, expected in (
+        ("CrossRibX@CrossRibProfile",
+         BOTTOM_LENGTH / 2.0 + CROSS_RIB_CENTER_X - RIB_THICKNESS / 2.0),
+        ("CrossRibThickness@CrossRibProfile", RIB_THICKNESS),
+        ("CrossRibLength@CrossRibProfile", 2.0 * RIB_HALF_LENGTH_Z),
+        ("CrossRibHeight@CrossRib", POCKET_CEILING_Y - RIB_RELIEF),
+        ("CrossRibRelief@CrossRib", RIB_RELIEF),
+    ):
+        _verify_named_dimension(adapter, name, expected)
+    controls = (
+        *((CROSS_RIB_CENTER_X, sz * POCKET_HALF_Z / 2.0, STACK_HEIGHT - RIB_RELIEF)
+          for sz in (-1.0, 1.0)),
+        *((sx * POCKET_HALF_X / 2.0, 0.0, STACK_HEIGHT - RIB_RELIEF)
+          for sx in (-1.0, 1.0)),
+        (CROSS_RIB_CENTER_X, 0.0, STACK_HEIGHT - RIB_RELIEF),
+        *((CROSS_RIB_CENTER_X, sz * (POCKET_HALF_Z + POCKET_WALL / 4.0), STACK_HEIGHT)
+          for sz in (-1.0, 1.0)),
+        *((CROSS_RIB_CENTER_X - RIB_THICKNESS, sz * POCKET_HALF_Z / 2.0,
+           STACK_HEIGHT - POCKET_CEILING_Y) for sz in (-1.0, 1.0)),
+    )
+    points = tuple((x, z) for x, z, _depth in controls)
+    for (x, z, depth), actual in zip(
+        controls, _native_vertical_segments(adapter, points, "retained rib controls"), strict=True,
+    ):
+        _require_native_segments(actual, ((0.0, depth),), f"retained rib at {(x, z)}")
 
 
 async def _define_fixed_edge_rectangle(
@@ -1337,7 +1410,7 @@ async def _paint_machined_faces_black(adapter) -> None:
     # The deck's flat ends where its break starts; the underside is the
     # perimeter foot inside the underside break: the flange outline less the
     # pocket opening, plus the socket bosses and pocket fillets that come
-    # down flush with it. Seat openings and the stamp are well inside the band.
+    # down flush with it. The deck area subtracts every opening and the stamp.
     deck_flat = _rounded_rect_area(
         DECK_LENGTH - 2.0 * DECK_EDGE_BREAK,
         DECK_WIDTH - 2.0 * DECK_EDGE_BREAK,
@@ -1561,6 +1634,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PocketDepth", '"BottomThickness" + "TopThickness" - "PocketSkin"'
     )
     await set_global(adapter, "RibThickness", f"{RIB_THICKNESS}mm")
+    await set_global(adapter, "CrossRibCenterX", f"{CROSS_RIB_CENTER_X}mm")
     await set_global(adapter, "RibRelief", f"{RIB_RELIEF}mm")
     await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
     await set_global(adapter, "CrossTapLugBottom", f"{CROSS_TAP_LUG_BOTTOM_Y}mm")
@@ -1830,11 +1904,11 @@ async def build(adapter) -> dict[str, str]:
         dims.record(location[0], location_drives[0])
         dims.record(location[1], location_drives[1])
 
-    # Two ribs on the centre lines, RIB_RELIEF clear of the bench and ending
+    # Both ribs keep their full span, RIB_RELIEF clear of the bench and ending
     # mid-wall. Each is an offset-start boss, so its start offset IS the relief.
     # Each rib's NW corner is placed from X0 Y0 (CrossRibX locates the cross
-    # rib's west face, LongRibY the long rib's rear face), driven to hold the
-    # rib centred as the flange and the pocket change.
+    # rib's west face, LongRibY the long rib's rear face). The cross rib alone
+    # translates by the spec-owned CrossRibCenterX; no local reliefs are cut.
     for tag, rib_shape, label, names, drives, location_drives in (
         (
             "LongRib",
@@ -1850,11 +1924,11 @@ async def build(adapter) -> dict[str, str]:
         (
             "CrossRib",
             CROSS_RIB_SHAPE,
-            "cross rib (x = 0)",
+            f"cross rib (x = {CROSS_RIB_CENTER_X:g})",
             ("CrossRibThickness", "CrossRibLength"),
             ('"RibThickness"', '"TopWidth" - "PocketWall"'),
             (
-                '("BottomLength" - "RibThickness") / 2',
+                '("BottomLength" - "RibThickness") / 2 + "CrossRibCenterX"',
                 '("BottomWidth" - ("TopWidth" - "PocketWall")) / 2',
             ),
         ),
@@ -2024,7 +2098,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "PocketCornerFillets")
     v_corner_fillets = _pocket_corner_fillet_volume(POCKET_CORNER_FILLET_R)
-    # 2 % + 5 (about 106 mm^3 at R6): a dropped rib corner (about 277 mm^3)
+    # 2 % + 5 (about 78 mm^3 at R6): a dropped rib corner (about 269 mm^3)
     # fails the step; check() on add_fillet guards the shallower corners.
     after = await volume_check(
         adapter,
@@ -2505,6 +2579,7 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven base (equations neutral)", after, 0.005 * after)
+    _verify_rib_material(adapter)
     # Deferred equations must not close a hole or move its material boundary.
     for tag, seat, stations, _envelope in THROUGH_SEAT_GROUPS:
         _verify_through_breakthrough(adapter, tag, seat, stations)

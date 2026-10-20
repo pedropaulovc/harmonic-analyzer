@@ -133,6 +133,8 @@ from fr_harmonic_base_fasteners import (
     BASE_CROSS_TAP_SPEC,
     EDGE_BREAK_MAX_MM,
     HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_INSERTION_MAX_MM,
+    HOLD_DOWN_INSERTION_MIN_MM,
     HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_THREAD,
     HOLD_DOWN_THREAD_CLASS,
@@ -255,16 +257,15 @@ if not math.isclose(LAG_BASE_ENGAGEMENT, HOLD_DOWN_ENGAGEMENT, abs_tol=1e-9):
     raise AssertionError(
         "stock hold-down engagement must follow its exact bearing-face geometry"
     )
-# The washer face/stock tip are nominal supplier geometry. Charge the
-# manufactured foot's ordinary .XX band without inventing supplier limits.
-_LAG_FOOT_LOW, _LAG_FOOT_HIGH = printed_deviations(LAG_FOOT_THICKNESS, 2)
+# Use the same stock-length/printed-foot window as the base receiver; tip
+# loss remains the harvested source-model geometry, not a stock-tip limit.
 LAG_BASE_THREAD_FITS = tuple(
     require_through_seat_fit(
         "rocker support",
         HOLD_DOWN_SEAT_SPEC,
         through_seat_material(HOLD_DOWN_SEAT_SPEC, xz),
-        insertion_min_mm=HOLD_DOWN_ENGAGEMENT - _LAG_FOOT_HIGH,
-        insertion_max_mm=HOLD_DOWN_ENGAGEMENT - _LAG_FOOT_LOW,
+        insertion_min_mm=HOLD_DOWN_INSERTION_MIN_MM,
+        insertion_max_mm=HOLD_DOWN_INSERTION_MAX_MM,
         tip_loss_mm=LAG_TIP_CHAMFER,
     )
     for xz in LAG_SCREW_XZ

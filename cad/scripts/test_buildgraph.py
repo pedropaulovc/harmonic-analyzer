@@ -2773,7 +2773,10 @@ def test_requirement_declarations_do_not_read_title_block_geometry():
     assert "title_block" not in config_files_of(script)
 
 
-@pytest.mark.parametrize("module", ["_printed_limits", "_printed_tolerance"])
+@pytest.mark.parametrize(
+    "module",
+    ["_printed_limits", "_printed_tolerance", "dt_vn_cone_lock_knob_spec"],
+)
 def test_numeric_tolerance_title_block_readers_are_classified(module):
     script = SCRIPTS_DIR / f"{module}.py"
     assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES

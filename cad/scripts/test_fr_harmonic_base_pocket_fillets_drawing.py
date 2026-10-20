@@ -31,7 +31,10 @@ import numpy as np
 import pytest
 
 import _config
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 import build_fr_harmonic_base as base
+import fr_harmonic_base_spec as spec
+import fr_harmonic_base_fasteners as fasteners
 
 # Standard casting-fillet radii, largest first, capped at the R6 the
 # socket-boss junctions already carry.
@@ -483,7 +486,7 @@ class CrossTap:
 
 
 def _seat_radius(size: str, drill_dia: float) -> float:
-    return max(base.THREAD_MAJOR_MM[size] / 2.0, drill_dia / 2.0 + _DRILL_OVERSIZE_R)
+    return max(THREAD_MAJOR_MM[size] / 2.0, drill_dia / 2.0 + _DRILL_OVERSIZE_R)
 
 
 @cache
@@ -497,7 +500,7 @@ def pocket_holes() -> tuple[VerticalHole | CrossTap, ...]:
                 VerticalHole(
                     f"{tag} seat {_at(xz)}",
                     xz,
-                    _seat_radius(seat.size, base.TAP_DRILL_MM[seat.size]),
+                    _seat_radius(seat.size, TAP_DRILL_MM[seat.size]),
                     base.STACK_HEIGHT - bottom_depth,
                     base.STACK_HEIGHT,
                     _HOLE_SHIFT + math.hypot(*envelope),
@@ -696,6 +699,33 @@ def chosen_radius() -> float:
     )
 
 
+def _skin_exit_clearances(seat, xz: Point, envelope: Point = (0.0, 0.0)) -> dict[str, float]:
+    """Independent full-footprint air gaps to every retained shape and R6 patch.
+
+    Enclose the transfer rectangle in its circumscribed circle. Three printed
+    .X bands, their half-last-place rounding and the edge break bound each
+    axial separating face; sqrt(2) encloses both adverse coordinate shifts.
+    The native corner polygons need a chord allowance as well: an arc sample
+    must never turn a touching bore into a clear one.
+    """
+    radius = _seat_radius(seat.size, TAP_DRILL_MM[seat.size])
+    rounding = 0.05
+    edge_break = max(float(_config.title_block("edge_break")[key])
+                     for key in ("radius_mm", "chamfer_max_mm"))
+    axial_shift = 3.0 * (_BAND + rounding) + edge_break
+    reach = radius + math.hypot(*envelope) + math.sqrt(2.0) * axial_shift
+    point = np.array([xz])
+    gaps = {f.name: float(f.clearance(point)[0]) - reach for f in pocket_features()}
+    chord = max(spec.SOCKET_BOSS_DIA / 2.0, spec.POCKET_CORNER_FILLET_R) * (
+        1.0 - math.cos(math.pi / (2.0 * (_ARC_SAMPLES - 1)))
+    )
+    for corner in pocket_corners():
+        zone = fillet(corner, spec.POCKET_CORNER_FILLET_R).zone
+        gap = 0.0 if _inside(zone, xz)[0] else float(_point_polygon_distance(zone, point)[0])
+        gaps[f"R6 {corner.name}"] = gap - reach - chord
+    return gaps
+
+
 # --- Tests. ---
 
 _RIB_H = base.POCKET_CEILING_Y - base.RIB_RELIEF
@@ -758,8 +788,8 @@ def test_chosen_radius_is_the_largest_standard_one_that_clears() -> None:
         assert r == max(STANDARD_RADII)
 
 
-def test_every_hole_keeps_the_ligament_floor_to_every_new_fillet() -> None:
-    fillets = [fillet(c, base.POCKET_CORNER_FILLET_R) for c in new_corners()]
+def test_every_hole_keeps_the_ligament_floor_to_every_modelled_max_fillet() -> None:
+    fillets = [fillet(c, spec.POCKET_CORNER_FILLET_R) for c in pocket_corners()]
     worst = min(
         (hole_ligament(h, f), h.label, f.corner.name)
         for h in pocket_holes()
@@ -821,6 +851,144 @@ def test_through_seat_axis_material_matches_the_independent_retained_profile() -
         }
         for f in features
     )
+
+
+def test_shifted_whole_rib_keeps_its_full_section_and_eight_real_connections() -> None:
+    cross = next(f for f in pocket_features() if f.kind == "cross rib")
+    left = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
+    right = spec.CROSS_RIB_CENTER_X + spec.RIB_THICKNESS / 2.0
+    assert (left, right) == (6.0, 16.0)
+    assert cross.shape == (
+        "rect", left, right, -base.RIB_HALF_LENGTH_Z, base.RIB_HALF_LENGTH_Z,
+    )
+    assert cross.shape[4] - cross.shape[3] == pytest.approx(
+        2.0 * spec.POCKET_HALF_Z + spec.POCKET_WALL,
+    )
+    assert cross.bottom_y == spec.RIB_RELIEF
+    assert _CEILING - cross.bottom_y == pytest.approx(34.8)
+    long = next(f for f in pocket_features() if f.kind == "long rib")
+    wall = next(f for f in pocket_features() if f.wall)
+    for x in (left + 0.1, spec.CROSS_RIB_CENTER_X, right - 0.1):
+        assert cross.contains(x, 0.0) and long.contains(x, 0.0)
+        for sign in (-1.0, 1.0):
+            z = sign * (spec.POCKET_HALF_Z + spec.POCKET_WALL / 4.0)
+            assert cross.contains(x, z) and wall.contains(x, z)
+    corners = [c for c in pocket_corners() if "cross rib" in c.kind]
+    assert {c.point for c in corners} == {
+        (x, z) for x in (left, right)
+        for z in (-spec.POCKET_HALF_Z, -spec.RIB_THICKNESS / 2.0,
+                  spec.RIB_THICKNESS / 2.0, spec.POCKET_HALF_Z)
+    }
+    assert len(corners) == 8
+    for corner in corners:
+        assert corner.y_lo == spec.RIB_RELIEF and corner.y_hi == _CEILING
+        patch = fillet(corner, spec.POCKET_CORNER_FILLET_R).zone
+        assert patch[:, 0].min() >= left - spec.POCKET_CORNER_FILLET_R - 1e-9
+        assert patch[:, 0].max() <= right + spec.POCKET_CORNER_FILLET_R + 1e-9
+        air = np.array(corner.face_a.normal) + np.array(corner.face_b.normal)
+        sample = np.array(corner.point) + 0.1 * air
+        assert fasteners.retained_material_segments_mm(
+            *sample, fillet_radius_mm=0.0,
+        ) == ((0.0, spec.POCKET_SKIN),)
+        assert fasteners.retained_material_segments_mm(*sample) == (
+            (0.0, spec.STACK_HEIGHT - spec.RIB_RELIEF),
+        )
+    # The former west-side junction is now open pocket, not a leftover root.
+    assert fasteners.retained_material_segments_mm(-5.1, 5.1) == ((0.0, spec.POCKET_SKIN),)
+
+
+def test_all_eighteen_full_hole_envelopes_exit_only_the_skin_at_max_r6() -> None:
+    checked = []
+    for tag, seat, stations, envelope in base.THROUGH_SEAT_GROUPS:
+        for xz, material in zip(stations, base.THROUGH_SEAT_MATERIAL[tag], strict=True):
+            gaps = _skin_exit_clearances(seat, xz, envelope)
+            assert len(gaps) == len(pocket_features()) + len(pocket_corners())
+            tightest = min(gaps, key=gaps.__getitem__)
+            assert gaps[tightest] > 0.0, (tag, xz, tightest, gaps[tightest])
+            if tag == "BlockScrewHoles":
+                assert gaps[tightest] >= 2.0, (tag, xz, tightest, gaps[tightest])
+            pure = fasteners.through_seat_pocket_clearances_mm(seat, xz, envelope_xz=envelope)
+            index = stations.index(xz)
+            assert base.THROUGH_SEAT_POCKET_CLEARANCES[tag][index] == pure
+            assert min(pure.values()) > 0.0, (tag, xz, pure)
+            if tag == "BlockScrewHoles":
+                assert min(pure.values()) >= 2.0, (tag, xz, pure)
+            assert material.nominal_segments_mm == ((0.0, spec.POCKET_SKIN),)
+            assert material.exit_depth_min_mm == pytest.approx(10.6)
+            assert material.exit_depth_max_mm == pytest.approx(15.4)
+            checked.append((tag, xz))
+    assert len(checked) == len(set(checked)) == 18
+
+
+def test_nominal_face_gaps_and_a_clear_axis_cannot_hide_a_max_r6_interruption() -> None:
+    seat = base.BLOCK_SEAT_SPEC
+    radius = _seat_radius(seat.size, TAP_DRILL_MM[seat.size])
+    left = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
+    top = spec.RIB_THICKNESS / 2.0
+    centre = (left - radius - 0.1, top + radius + 0.1)
+    # The entire circular footprint clears both sharp ribs nominally, and
+    # even the axis clears the real fillet. Its circumference does not.
+    for feature in pocket_features():
+        if feature.kind in ("long rib", "cross rib"):
+            assert float(feature.clearance(np.array([centre]))[0]) - radius > 0.0
+    assert base.retained_material_segments_mm(*centre) == ((0.0, spec.POCKET_SKIN),)
+    corner = next(
+        c for c in pocket_corners()
+        if c.kind == ("cross rib", "long rib") and c.point == (left, top)
+    )
+    zone = fillet(corner, spec.POCKET_CORNER_FILLET_R).zone
+    assert not _inside(zone, centre)[0]
+    assert float(_point_polygon_distance(zone, np.array([centre]))[0]) - radius < 0.0
+    assert _skin_exit_clearances(seat, centre)[f"R6 {corner.name}"] < 0.0
+
+
+def test_skin_exit_scan_refuses_nominal_only_and_transfer_envelope_counterexamples() -> None:
+    seat = base.BLOCK_SEAT_SPEC
+    radius = _seat_radius(seat.size, TAP_DRILL_MM[seat.size])
+    left = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
+    right = spec.CROSS_RIB_CENTER_X + spec.RIB_THICKNESS / 2.0
+    nominal_only = (left - radius - 1.0, 50.0)
+    assert left - nominal_only[0] - radius == pytest.approx(1.0)
+    assert base.retained_material_segments_mm(*nominal_only) == ((0.0, spec.POCKET_SKIN),)
+    assert _skin_exit_clearances(seat, nominal_only)["cross rib"] < 0.0
+    transferred = (right + radius + 5.0, 50.0)
+    assert _skin_exit_clearances(seat, transferred)["cross rib"] > 0.0
+    assert _skin_exit_clearances(seat, transferred, (6.0, 0.0))["cross rib"] < 0.0
+
+
+def test_pure_max_fillet_bounds_enclose_each_independently_enumerated_patch() -> None:
+    bounds = fasteners._fillet_footprint_bounds_mm()
+    assert len(bounds) == len(pocket_corners()) == 28
+    covered = set()
+    for corner in pocket_corners():
+        zone = fillet(corner, spec.POCKET_CORNER_FILLET_R).zone
+        matching = {
+            index for index, (x0, x1, z0, z1, bottom) in enumerate(bounds)
+            if bottom == corner.y_lo
+            and np.all(zone[:, 0] >= x0 - 1e-9) and np.all(zone[:, 0] <= x1 + 1e-9)
+            and np.all(zone[:, 1] >= z0 - 1e-9) and np.all(zone[:, 1] <= z1 + 1e-9)
+        }
+        assert matching, corner.name
+        covered.update(matching)
+    assert covered == set(range(len(bounds)))
+
+
+def test_inner_block_gap_books_printed_location_size_rounding_and_edge_break() -> None:
+    seat = base.BLOCK_SEAT_SPEC
+    left = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
+    radius = _seat_radius(seat.size, TAP_DRILL_MM[seat.size])
+    inner = sorted(base.BLOCK_SCREW_XZ, key=lambda xz: abs(xz[0]))[:2]
+    assert len(inner) == 2 and inner[0][1] * inner[1][1] < 0.0
+    for xz in inner:
+        nominal = left - xz[0] - radius
+        conservative = nominal - 3.0 * _BAND
+        edge_break = fasteners.EDGE_BREAK_MAX_MM
+        printed = nominal - 3.0 * (_BAND + 0.05) - edge_break
+        gap = fasteners.through_seat_pocket_clearances_mm(seat, xz)["retained rectangle 1"]
+        assert nominal > 8.56
+        assert conservative > 6.16
+        assert printed == pytest.approx(gap)
+        assert printed > 5.76 > 2.0
 
 
 @pytest.mark.parametrize("r", STANDARD_RADII)

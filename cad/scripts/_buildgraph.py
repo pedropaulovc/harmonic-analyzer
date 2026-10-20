@@ -2351,6 +2351,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "dt_cone_tip_block_spec",
         # Drilled-hole and angular rows size the collar-to-bank air stack.
         "dt_tip_collar_air",
+        # Printed platform thickness band bounds the knob's plate-clamp insertion.
+        "dt_vn_cone_lock_knob_spec",
         # Angular row sets the through tap's angle in the screw landing gate.
         "dt_vn_cone_tip_collar_spec",
         "crank_boss_rim",

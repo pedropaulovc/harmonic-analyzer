@@ -15,15 +15,19 @@ import _config
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
-from dt_vn_pedestal_hold_down_screw_spec import SHANK_LEN as PEDESTAL_SCREW_LEN
+from dt_vn_pedestal_hold_down_screw_spec import (
+    LENGTH_SHORT_ALLOWANCE_MM as PEDESTAL_LENGTH_SHORT_ALLOWANCE,
+    SHANK_LEN as PEDESTAL_SCREW_LEN,
+)
 from fr_vn_lag_screw_spec import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
+    LENGTH_SHORT_ALLOWANCE_MM as HOLD_DOWN_LENGTH_SHORT_ALLOWANCE,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 from fr_harmonic_base_spec import (
-    COLUMN_SOCKET_XZ, CROSS_TAP_LUG_BOTTOM_Y, CROSS_TAP_LUG_INNER_X,
+    COLUMN_SOCKET_XZ, CROSS_RIB_CENTER_X, CROSS_TAP_LUG_BOTTOM_Y, CROSS_TAP_LUG_INNER_X,
     CROSS_TAP_LUG_LENGTH, CROSS_TAP_LUG_WIDTH, DECK_HALF_X, DECK_HALF_Z,
     POCKET_CEILING_Y, POCKET_CORNER_FILLET_R, POCKET_HALF_X,
     POCKET_HALF_Z, RIB_RELIEF, RIB_THICKNESS, SOCKET_BOSS_DIA, STACK_HEIGHT,
@@ -65,9 +69,17 @@ HOLD_DOWN_PITCH = IN / 20.0
 HOLD_DOWN_ENGAGEMENT = (
     HOLD_DOWN_SCREW_LEN - SUPPORT_FOOT_THICKNESS - HOLD_DOWN_BEARING_OFFSET
 )
+HOLD_DOWN_INSERTION_MIN_MM = (
+    HOLD_DOWN_ENGAGEMENT - HOLD_DOWN_LENGTH_SHORT_ALLOWANCE - title_block_band_mm("linear_2pl")
+)
+HOLD_DOWN_INSERTION_MAX_MM = HOLD_DOWN_ENGAGEMENT + title_block_band_mm("linear_2pl")
 HOLD_DOWN_SEAT_SPEC = HoleSpec("tapped", HOLD_DOWN_THREAD, thread_class=HOLD_DOWN_THREAD_CLASS)
 HOLD_DOWN_TAP_DRILL_DIA = TAP_DRILL_MM[HOLD_DOWN_THREAD]
 PEDESTAL_SCREW_ENGAGEMENT = PEDESTAL_SCREW_LEN - PEDESTAL_FLANGE_THICKNESS
+PEDESTAL_INSERTION_MIN_MM = (
+    PEDESTAL_SCREW_ENGAGEMENT - PEDESTAL_LENGTH_SHORT_ALLOWANCE - title_block_band_mm("linear_1pl")
+)
+PEDESTAL_INSERTION_MAX_MM = PEDESTAL_SCREW_ENGAGEMENT + title_block_band_mm("linear_1pl")
 NAMEPLATE_SCREW_XZ = fr_nameplate_spec.MOUNT_HOLE_XZ
 NAMEPLATE_SEAT_SPEC = HoleSpec("tapped_bottoming", "#4-40", thread_class="2B")
 
@@ -76,8 +88,8 @@ NAMEPLATE_SEAT_SPEC = HoleSpec("tapped_bottoming", "#4-40", thread_class="2B")
 _RETAINED_REGIONS = (
     ("rect", -POCKET_HALF_X, POCKET_HALF_X, -RIB_THICKNESS / 2,
      RIB_THICKNESS / 2, RIB_RELIEF),
-    ("rect", -RIB_THICKNESS / 2, RIB_THICKNESS / 2, -POCKET_HALF_Z,
-     POCKET_HALF_Z, RIB_RELIEF),
+    ("rect", CROSS_RIB_CENTER_X - RIB_THICKNESS / 2,
+     CROSS_RIB_CENTER_X + RIB_THICKNESS / 2, -POCKET_HALF_Z, POCKET_HALF_Z, RIB_RELIEF),
     *(("disc", x, z, SOCKET_BOSS_DIA / 2, 0.0) for x, z in COLUMN_SOCKET_XZ),
     *(("rect", *sorted((math.copysign(CROSS_TAP_LUG_INNER_X, x),
                        math.copysign(CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH, x))),
@@ -135,8 +147,8 @@ def _fillet_bottoms(x: float, z: float, radius: float) -> list[float]:
         for sz in (-1.0, 1.0):
             for corner_x, corner_z, air_x, air_z in (
                 (sx * POCKET_HALF_X, sz * half, -sx, sz),
-                (sx * half, sz * POCKET_HALF_Z, sx, -sz),
-                (sx * half, sz * half, sx, sz),
+                (CROSS_RIB_CENTER_X + sx * half, sz * POCKET_HALF_Z, sx, -sz),
+                (CROSS_RIB_CENTER_X + sx * half, sz * half, sx, sz),
             ):
                 u, v = (x - corner_x) * air_x, (z - corner_z) * air_z
                 if 0 <= u <= radius and 0 <= v <= radius and (
@@ -177,6 +189,117 @@ def _fillet_bottoms(x: float, z: float, radius: float) -> list[float]:
             ):
                 bottoms.append(CROSS_TAP_LUG_BOTTOM_Y)
     return bottoms
+
+
+def _fillet_footprint_bounds_mm() -> tuple[tuple[float, ...], ...]:
+    """Finite plan bounds of all 28 actual R MAX added patches, plus bottom Y.
+
+    The twelve rib and four lug/wall patches fit their tangent squares.
+    Each round junction fits the centre/tangent/corner polygon used above;
+    clipping to the adjoining finite face excludes the hidden other branch.
+    These are conservative clearance bounds, not extra casting geometry.
+    In particular there is no horizontal rib/ceiling root fillet.
+    """
+    radius = POCKET_CORNER_FILLET_R
+    half = RIB_THICKNESS / 2.0
+    bounds = []
+
+    def square(cx, cz, ax, az, bottom):
+        bounds.append((*sorted((cx, cx + ax * radius)),
+                       *sorted((cz, cz + az * radius)), bottom))
+
+    for sx in (-1.0, 1.0):
+        for sz in (-1.0, 1.0):
+            square(sx * POCKET_HALF_X, sz * half, -sx, sz, RIB_RELIEF)
+            square(CROSS_RIB_CENTER_X + sx * half, sz * POCKET_HALF_Z, sx, -sz, RIB_RELIEF)
+            square(CROSS_RIB_CENTER_X + sx * half, sz * half, sx, sz, RIB_RELIEF)
+    for cx, cz in COLUMN_SOCKET_XZ:
+        sx, sz = math.copysign(1.0, cx), math.copysign(1.0, cz)
+        inner_z = cz - sz * CROSS_TAP_LUG_LENGTH
+        square(sx * POCKET_HALF_X, inner_z, -sx, -sz, CROSS_TAP_LUG_BOTTOM_Y)
+        for along_x, wall, air_sign, lo, hi, bottom in (
+            (False, sx * POCKET_HALF_X, -sx, -POCKET_HALF_Z, POCKET_HALF_Z, 0.0),
+            (True, sz * POCKET_HALF_Z, -sz, -POCKET_HALF_X, POCKET_HALF_X, 0.0),
+            (False, sx * CROSS_TAP_LUG_INNER_X, -sx,
+             min(inner_z, cz), max(inner_z, cz), CROSS_TAP_LUG_BOTTOM_Y),
+            (True, inner_z, -sz,
+             min(sx * CROSS_TAP_LUG_INNER_X, sx * (CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH)),
+             max(sx * CROSS_TAP_LUG_INNER_X, sx * (CROSS_TAP_LUG_INNER_X + CROSS_TAP_LUG_WIDTH)),
+             CROSS_TAP_LUG_BOTTOM_Y),
+        ):
+            across, along = (cz, cx) if along_x else (cx, cz)
+            inset = -air_sign * (wall - across)
+            boss_r = SOCKET_BOSS_DIA / 2.0
+            if abs(inset) >= boss_r:
+                continue
+            cv = inset - radius
+            cu = math.sqrt((boss_r + radius) ** 2 - cv ** 2)
+            wu = math.sqrt(boss_r ** 2 - inset ** 2)
+            across_bounds = tuple(across - air_sign * v for v in (0.0, cv, inset))
+            v0, v1 = min(across_bounds), max(across_bounds)
+            for sign in (-1.0, 1.0):
+                if not lo < along + sign * wu < hi:
+                    continue
+                u0, u1 = sorted((along, along + sign * cu))
+                u0, u1 = max(lo, u0), min(hi, u1)
+                x0, x1, z0, z1 = (u0, u1, v0, v1) if along_x else (v0, v1, u0, u1)
+                bounds.append((max(-POCKET_HALF_X, x0), min(POCKET_HALF_X, x1),
+                               max(-POCKET_HALF_Z, z0), min(POCKET_HALF_Z, z1), bottom))
+    if len(bounds) != 28:
+        raise AssertionError("pocket clearance must cover all 28 retained R MAX junctions")
+    return tuple(bounds)
+
+
+def through_seat_pocket_clearances_mm(
+    seat: HoleSpec, xz: tuple[float, float], *, envelope_xz: tuple[float, float] = (0.0, 0.0),
+) -> dict[str, float]:
+    """Worst-case air from the full drill/thread/break envelope to retained metal.
+
+    Book every .X hole-location band and its 0.05 rounding, plus TWO .X cast
+    bands and roundings per axis (a located face and its far face's full size).
+    This exceeds the inner cross-rib face's location + half-width allowance.
+    The larger of thread major and drill +0.10, plus the printed edge break,
+    encloses both complete exit circumferences. Transfer rectangles are added
+    per axis, never replaced by a nominal-axis or corner-only sample.
+    Fillet bounds are finite actual vertical junctions; R MAX allows all
+    smaller patches inside them and never licenses a new horizontal root.
+    A positive result proves open air, not a material-wall policy waiver.
+    Structural walls/fillets keep their independent existing minimum checks;
+    the moved block-seat interface additionally requires 2 mm of clear air.
+    """
+    if len(xz) != 2 or len(envelope_xz) != 2 or not all(
+        math.isfinite(v) for v in (*xz, *envelope_xz)
+    ) or min(envelope_xz) < 0:
+        raise ValueError("finite station and nonnegative transfer bounds required")
+    if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "through_all":
+        raise AssertionError("pocket clearance requires a through-all tapped seat")
+    band = title_block_band_mm("linear_1pl")
+    # All these locations/sizes print at least .X; .XX is bounded too.
+    relative = 3.0 * (band + 0.05)
+    hx, hz = (bound + relative for bound in envelope_xz)
+    radius = max(THREAD_MAJOR_MM[seat.size], TAP_DRILL_MM[seat.size] + 0.10) / 2.0
+    radius += EDGE_BREAK_MAX_MM
+    x, z = xz
+
+    def rect_gap(x0, x1, z0, z1):
+        return math.hypot(max(0.0, x0 - x - hx, x - hx - x1),
+                          max(0.0, z0 - z - hz, z - hz - z1)) - radius
+
+    gaps = {
+        "pocket X wall": POCKET_HALF_X - abs(x) - hx - radius,
+        "pocket Z wall": POCKET_HALF_Z - abs(z) - hz - radius,
+    }
+    for i, region in enumerate(_RETAINED_REGIONS):
+        if region[0] == "rect":
+            gaps[f"retained rectangle {i}"] = rect_gap(*region[1:5])
+        else:
+            _, cx, cz, r, _bottom = region
+            gaps[f"socket boss {i}"] = math.hypot(
+                max(0.0, abs(x - cx) - hx), max(0.0, abs(z - cz) - hz),
+            ) - r - radius
+    for i, (x0, x1, z0, z1, _bottom) in enumerate(_fillet_footprint_bounds_mm()):
+        gaps[f"R MAX fillet {i}"] = rect_gap(x0, x1, z0, z1)
+    return gaps
 
 
 def retained_material_segments_mm(
@@ -260,7 +383,7 @@ def through_seat_material(
     for region in _RETAINED_REGIONS:
         if region[0] == "rect":
             _, x0, x1, z0, z1, bottom = region
-            outline = 1.5 * band  # .X location plus half the .X size band
+            outline = 2.0 * band  # located face plus its full .X size band
             contains = x - hx >= x0 + outline and x + hx <= x1 - outline and (
                 z - hz >= z0 + outline and z + hz <= z1 - outline
             )
@@ -280,6 +403,14 @@ def through_seat_material(
         bottom_high = 0.0
     if abs(z) + hz >= POCKET_HALF_Z - 1.5 * band or abs(x) + hx >= POCKET_HALF_X - 1.5 * band:
         bottom_low = 0.0
+    # Optional fillets never increase guaranteed engagement, but their full
+    # R MAX footprint must lower the conservative exit plane if intersected.
+    for x0, x1, z0, z1, bottom in _fillet_footprint_bounds_mm():
+        outline = 2.0 * band
+        if x + hx >= x0 - outline and x - hx <= x1 + outline and (
+            z + hz >= z0 - outline and z - hz <= z1 + outline
+        ):
+            bottom_low = min(bottom_low, max(0.0, bottom - band))
     depth_min = STACK_HEIGHT - DECK_HEIGHT_BAND_MM - bottom_high
     depth_max = STACK_HEIGHT + DECK_HEIGHT_BAND_MM - bottom_low
     return ThroughSeatMaterial(

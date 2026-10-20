@@ -123,6 +123,7 @@ from fr_harmonic_base_spec import (
     BOTTOM_WIDTH,
     COLUMN_SOCKET_XZ,
     COLUMN_X,
+    CROSS_RIB_CENTER_X,
     DECK_RISE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -1081,7 +1082,7 @@ UNDERSIDE_BOTTOM_KEEP = {
     "SocketBossDia": (0.055, 0.140),
     "PocketFilletRadius": (0.050, 0.165),
     "LongRibThickness": (0.070, 0.198),
-    "CrossRibThickness": (0.128, 0.247),
+    "CrossRibThickness": (0.128 + CROSS_RIB_CENTER_X * VIEW_SCALE / 1000.0, 0.247),
 }
 UNDERSIDE_BOTTOM_NOTE_XY = (0.030, 0.258)
 UNDERSIDE_BOTTOM_CALLOUTS = {
@@ -1131,7 +1132,7 @@ LUGS_BASELINE_ROW_M = 0.0057
 # keep the proven positions so their texts remain clear of extension lines.
 LUGS_X_ROWS = (
     ("Lug1X", -166.5),
-    ("CrossRibX", -90.0),
+    ("CrossRibX", CROSS_RIB_CENTER_X - 90.0),
     ("Lug3X", -19.8),
 )
 LUGS_Y_COLUMNS = (
@@ -1143,7 +1144,7 @@ LUGS_Y_COLUMNS = (
 LUGS_LEVEL_NOTES = {
     "cross-tap lug bottoms": (
         "LUG BOTTOMS:\nSECTION B-B, SHEET 3",
-        (0.070, 0.071),
+        (0.067, 0.071),
         (-200.0, -109.0),
     ),
 }
