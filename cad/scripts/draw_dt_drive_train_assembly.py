@@ -15,6 +15,7 @@ and the cut that answers it, not the design's worst-case clearance narration.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from fractions import Fraction
 import hashlib
@@ -24,7 +25,7 @@ from pathlib import Path
 import re
 import sys
 import textwrap
-from typing import Any, Callable, Literal, NamedTuple, Sequence
+from typing import Any, Callable, Iterator, Literal, NamedTuple, Sequence
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -57,7 +58,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_layout_collect import (
@@ -3063,18 +3064,24 @@ def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
 def _bank_setting_view(
     adapter: Any, facts: SourceFacts, *, centre: tuple[float, float],
     model_z: float, scale: tuple[float, float], label: str,
+    step: Callable[[str], None],
 ) -> Any:
     view = _early_bound(
         place_view(adapter, str(SOURCE), "*Right", *centre, scale=scale), "IView"
     )
+    step(f"{label}: place_view")
     set_hidden_lines_removed(adapter, view)
+    step(f"{label}: set_hidden_lines_removed")
     _configure_view(adapter, view, exploded=False, label=label)
+    step(f"{label}: configure_view")
     _isolate_instances(adapter, view, frozenset(facts.clusters["cylinder-bank"]), label=label)
+    step(f"{label}: isolate_instances")
     projected = model_point_in_view(
         adapter, view, (cone_line.X_DRUM / 1000.0, bank_settings.AXIS_Y / 1000.0,
                         model_z / 1000.0), label=label
     )
     _shift_view(adapter, view, (centre[0] - projected[0], centre[1] - projected[1]), label=label)
+    step(f"{label}: shift_view")
     return view
 
 
@@ -3105,23 +3112,72 @@ def _bank_setting_circle(
         raise RuntimeError("cannot create bank setting crop circle")
 
 
-def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], None]:
+@contextmanager
+def _bank_dimension_source_trace(
+    adapter: Any, step: Callable[[str], None], *, label: str
+) -> Iterator[None]:
+    """Observe existing import/curation COM calls without changing their semantics.
+
+    The rack source-save probe established the observer pattern; unlike that
+    probe, delegate to the original _attempt so its error handling is unchanged.
+    Direct view/sketch operations have separate checkpoints in the sheet recipe.
+    """
+    original_attempt = adapter._attempt
+    ordinal = 0
+    mutators = frozenset({
+        "InsertModelAnnotations3", "EditDelete", "SetPosition", "EditRebuild3", "SetText",
+    })
+
+    def observed(operation: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal ordinal
+        names = getattr(getattr(operation, "__code__", None), "co_names", ())
+        mutations = mutators.intersection(names)
+        if not mutations:
+            return original_attempt(operation, *args, **kwargs)
+        ordinal += 1
+        phase = f"{label}: COM {ordinal} {'+'.join(sorted(mutations))}"
+        step(f"before {phase}")
+        try:
+            return original_attempt(operation, *args, **kwargs)
+        finally:
+            # Also identify a source mutation if the existing operation raises.
+            step(f"after {phase}")
+
+    adapter._attempt = observed
+    try:
+        yield
+    finally:
+        adapter._attempt = original_attempt
+
+
+def _place_bank_setting_sheet(
+    adapter: Any, facts: SourceFacts, step: Callable[[str], None]
+) -> Callable[[], None]:
     """Full bank at 1:1 and a 4:1 north bearing-face detail; no scaled-down views.
 
     Captions follow measured view outlines; the ordinary crop's identifier is
     owned by its parent view and its rendered clearance survives final rebuilds.
+
+    R7 first marked the source dirty somewhere in this sheet. Keep checkpoints
+    around its operations rather than assigning that observation to SetText,
+    sketch visibility or model-item import without native evidence. These read
+    the source's save flag only; the package's pre-export guard still owns failure.
     """
     _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+    step("bank settings: activate sheet")
     _heading(adapter, BANK_SETTINGS_SHEET)
+    step("bank settings: heading")
     overall = _bank_setting_view(
         adapter, facts, centre=BANK_SETTING_CENTER,
         model_z=(bank.FRONT_STRAP_INNER_Z + bank.BACK_STRAP_INNER_Z) / 2.0,
         scale=BANK_SETTING_SCALE, label="cylinder bank setting",
+        step=step,
     )
     spring_z = sum(bank.BANK_SPRING_Z) / 2.0
     detail = _bank_setting_view(
         adapter, facts, centre=BANK_SPRING_DETAIL_CENTER, model_z=spring_z,
         scale=BANK_SPRING_DETAIL_SCALE, label="north spring setting",
+        step=step,
     )
     annotations = []
     for view, feature, keep, label in (
@@ -3129,15 +3185,13 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         (detail, bank_settings.SPRING_FEATURE, BANK_SPRING_KEEP, "north spring gap"),
     ):
         _show_base_view_sketches(adapter, view, (feature,), label=label)
-        imported = curate_view_dimensions(
-            adapter, view, keep=keep, view_label=label,
-            dimensions_by_feature=bank_settings.DRAWING_DIMENSIONS,
-        )
-        set_dimension_callouts(adapter, imported, {
-            name: ("CLOSED GEAR STACK" if name == bank_settings.STACK_DIMENSION
-                   else "GEAR 19 TO NORTH PEDESTAL / SET WITH BLADE")
-            for name in keep
-        })
+        step(f"{label}: show base-view sketch {feature}")
+        with _bank_dimension_source_trace(adapter, step, label=f"{label} / {feature}"):
+            imported = curate_view_dimensions(
+                adapter, view, keep=keep, view_label=label,
+                dimensions_by_feature=bank_settings.DRAWING_DIMENSIONS,
+            )
+            step(f"{label}: curate_view_dimensions")
         annotations.extend(imported)
     radius = BANK_SPRING_CROP_RADIUS_MM / 1000.0
     parent_centre = model_point_in_view(
@@ -3146,12 +3200,17 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         label="spring detail boundary",
     )
     _bank_setting_circle(adapter, overall, parent_centre, radius)
+    step("bank settings: overall boundary circle")
     adapter.currentModel.ClearSelection2(True)
     _bank_setting_circle(adapter, detail, BANK_SPRING_DETAIL_CENTER, radius * 4.0)
+    step("bank settings: detail crop circle")
     status = int(detail.Crop2(False, False, 1))
+    step("bank settings: detail Crop2")
     adapter.currentModel.ClearSelection2(True)
     rebuild_drawing(adapter, label="bank setting crop")
+    step("bank settings: crop rebuild")
     detail.UpdateViewDisplayGeometry()
+    step("bank settings: detail UpdateViewDisplayGeometry")
     if status != 1 or not bool(detail.IsCropped()):
         raise RuntimeError(f"north spring setting Crop2 failed: {status}")
     # Follow the rebuilt outlines, not insertion coordinates. Centering the
@@ -3167,14 +3226,19 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         (detail, "DETAIL A 4:1 - NORTH SPRING SET", False, "spring detail caption"),
     ):
         view.UpdateViewDisplayGeometry()
+        step(f"{label}: UpdateViewDisplayGeometry")
         outline = _view_outline(view)
         _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+        step(f"{label}: activate sheet")
         note = _add_note_block(adapter, text, (outline[0], outline[1]), label=label)
+        step(f"{label}: add note")
         extent = _note_extent(adapter, note, label=label)
+        step(f"{label}: note extent redraw")
         width = extent[2] - extent[0]
         left = outline[2] - width if right_aligned else (outline[0] + outline[2] - width) / 2.0
         corner = (left, outline[1] - placement_gap)
         _anchor_note(adapter, note, corner, label=label)
+        step(f"{label}: anchor note")
         captions.append((note, view, label))
 
     # This is the channel package's ordinary cropped-view/boundary pattern,
@@ -3184,8 +3248,11 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
     overall_name = view_name(adapter, overall)
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(overall_name):
         raise RuntimeError("cannot activate bank setting view for its detail identifier")
+    step("spring detail letter: ActivateView")
     letter = _add_note_block(adapter, "A", parent_centre, label="spring detail letter")
+    step("spring detail letter: add note")
     letter_extent = _note_extent(adapter, letter, label="spring detail letter")
+    step("spring detail letter: note extent redraw")
     # Seed inside the clear region, not on its minimum-air boundary: the
     # bounded anchor helper does not guarantee its requested text-box corner.
     letter_corner = (
@@ -3193,6 +3260,7 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         parent_centre[1] + radius + placement_gap + (letter_extent[3] - letter_extent[1]),
     )
     _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
+    step("spring detail letter: anchor note")
     placements = []
     for note, label, owner_type in (
         *((note, label, 1) for note, _view, label in captions),
@@ -3207,6 +3275,7 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
 
     def settled() -> None:
         _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+        step("bank settings settled: activate sheet")
         # Preserve the actual native position and independently check current
         # ink clearance, not the helper's requested point (R4's harmless
         # rendered target error was +0.186/-0.185 mm).
@@ -3221,7 +3290,9 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
                 raise RuntimeError(f"{label} has the wrong native owner: {annotation.OwnerType!r}")
         for note, view, label in captions:
             view.UpdateViewDisplayGeometry()
+            step(f"{label} settled: UpdateViewDisplayGeometry")
             extent = _note_extent(adapter, note, label=label)
+            step(f"{label} settled: note extent redraw")
             violations = bank_setting_caption_violations(extent, _view_outline(view))
             if violations:
                 raise RuntimeError(f"{label}: {'; '.join(violations)}; actual extent {extent!r}")
@@ -3236,11 +3307,19 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
             adapter, annotations,
             {name: 2 for names in bank_settings.DRAWING_DIMENSIONS.values() for name in names},
         )
+        step("bank settings settled: imported precision readback")
         for annotation in annotations:
             name = dimension_name(adapter, annotation)
             display = _early_bound(
                 _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
             )
+            # Read only: SetText on an imported dimension can dirty its source.
+            text = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
+            if text != bank_settings.DIMENSION_CALLOUTS[name]:
+                raise RuntimeError(
+                    f"{name} lost its model-authored setting callout: {text!r}; "
+                    "rebuild the source assembly"
+                )
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
             upper, lower = bank_settings.DIMENSION_BANDS[name]
@@ -3253,6 +3332,7 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         }
         if bank_settings.SPRING_DIMENSION not in names:
             raise RuntimeError("north spring setting dimension did not survive its crop")
+        step("bank settings settled: callout, tolerance and crop readback")
 
     settled()
     return settled
@@ -3465,7 +3545,7 @@ def _place_package(
     step("sequence sheet")
     findings += _place_bank_sheet(adapter, facts)
     step("bank sheet")
-    settings_settled = _place_bank_setting_sheet(adapter, facts)
+    settings_settled = _place_bank_setting_sheet(adapter, facts, step)
     step("bank setting dimensions")
     findings += _place_fit_sheet(adapter, facts)
     step("fit sheet")

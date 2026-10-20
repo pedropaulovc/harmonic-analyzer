@@ -3,7 +3,8 @@
 Two hidden Right-plane construction legs follow the actual bearing faces:
 gear 0 cam face to gear 19 north face, then gear 19 to the north strap.
 Separate sketches let the full-bank view and enlarged spring view each show
-only the leg it dimensions. No note text belongs in the assembly recipe.
+only the leg it dimensions. The model also owns their native below-callout
+text: writing it through an imported display dimension can dirty the source.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ DIMENSION_BANDS = {
     SPRING_DIMENSION: (bank.BANK_SPRING_SET_BAND, -bank.BANK_SPRING_SET_BAND),
 }
 TOLERANCE_PRECISION = 2
+DIMENSION_CALLOUTS = {
+    STACK_DIMENSION: "CLOSED GEAR STACK",
+    SPRING_DIMENSION: "GEAR 19 TO NORTH PEDESTAL / SET WITH BLADE",
+}
 
 if abs(LEGS[0][3] - LEGS[0][2] - bank.STACK_L20) > bank.PITCH_LOCKSTEP_TOLERANCE:
     raise AssertionError("the bank setting leg is not the closed stack length")

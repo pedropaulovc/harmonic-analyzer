@@ -4640,6 +4640,12 @@ async def _author_bank_settings_reference(adapter) -> None:
         _set_tolerance_precision(
             display, (lower, upper), label=name, places=bank_settings.TOLERANCE_PRECISION
         )
+        # Imported SetText can write through to the released model (the rack
+        # source-save controls); author this annotation before the assembly save.
+        text = bank_settings.DIMENSION_CALLOUTS[name]
+        display.SetText(4, text)  # swDimensionTextParts_e.swDimensionTextCalloutBelow
+        if str(display.GetText(4) or "") != text:
+            raise RuntimeError(f"{name}@{feature}: setting callout did not persist")
     apply_drawing_precision(adapter, bank_settings.DRAWING_PRECISION)
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     for feature, names in bank_settings.DRAWING_DIMENSIONS.items():
