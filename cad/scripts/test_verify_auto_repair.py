@@ -350,9 +350,17 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
         asyncio.run(getattr(_assembly, operation)(None, assembly_name))
 
 
-@pytest.mark.parametrize("persisted_failure", ["ch-channel", "sm-summing", None])
+@pytest.mark.parametrize(
+    "persisted_failure, retention_gate",
+    [
+        ("ch-channel", "pass"),
+        ("sm-summing", "pass"),
+        (None, "pass"),
+        (None, "fail"),
+    ],
+)
 def test_auto_repair_saves_every_document_before_persisted_contact_gate(
-    persisted_failure, monkeypatch, tmp_path, saved_native_bytes
+    persisted_failure, retention_gate, monkeypatch, tmp_path, saved_native_bytes
 ) -> None:
     import os
 
@@ -492,6 +500,19 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     monkeypatch.setattr(verify, "assert_channel_independence", lambda *_args: None)
     monkeypatch.setattr(verify, "_dangling_faults", lambda _adapter: ["top:dangle"])
 
+    def bank_retention(_adapter, *, assembly_kind):
+        assert assembly_kind == "top_assembly"
+        model = _adapter.currentModel
+        if model.closed or model.name != "ha-harmonic-analyzer":
+            raise RuntimeError("retention gate requires the active top assembly")
+        events.append(("bank-retention", model.name))
+        if retention_gate == "fail":
+            raise RuntimeError("native retention failed")
+
+    # This fixture exercises persistence, not native component metrology. Keep
+    # the new pre-save gate observable without inventing a COM geometry double.
+    monkeypatch.setattr(verify, "measure_bank_retention", bank_retention)
+
     def repair(_adapter, _name):
         documents = []
         for name in repaired_names:
@@ -548,11 +569,28 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         )
     )
 
+    if retention_gate == "fail":
+        failed_label = "ha-harmonic-analyzer:bank-retention-native"
+        assert (failed_label, "native retention failed") in report.failed
+        assert failed_label not in report.passed
+        assert not any(
+            event[0] in {"contact-pre-save", "contact-persisted", "save", "render"}
+            for event in events
+        )
+        assert ordinary_saved_states == {}
+        assert rendered == {}
+        assert all(not files[name].repaired for name in repaired_names)
+        assert all(proof.exists() for proof in proofs.values())
+        assert adapter.currentModel is None
+        assert adapter.open_documents == []
+        return
+
     pre_save_indices = [
         events.index(("contact-pre-save", name)) for name in ("ch-channel", "sm-summing")
     ]
     save_indices = [events.index(("save", name)) for name in repaired_names]
     assert max(pre_save_indices) < min(save_indices)
+    assert events.index(("bank-retention", "ha-harmonic-analyzer")) < min(save_indices)
     assert ordinary_saved_states == {
         name: {"Default": True, "Default Simplified": True} for name in repaired_names
     }
