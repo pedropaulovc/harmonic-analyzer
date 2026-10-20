@@ -858,6 +858,16 @@ height. A span shorter than its row (the 6.35 mm hole-row offset, witnesses at
 y 88.65 and 95 mm) requested AT a witness's coordinate prints centred on its own
 column, the witness and dimension line through the text: request it beyond the
 span so it hangs like the others.
+
+The crank pin's `3.70` station is another short-span case: in the cached
+sheet reviewed on 2026-10-19 (source `290d89a72`, PR #1651), its PDF text is
+9.051 mm wide but its witnesses are only 7.4 mm apart at 2:1. Both witnesses
+touch a digit when the text is centred between them. Move the native text
+beside the span, allowing for its full width, the 6.35 mm outside-arrow tail
+and neighbouring leaders; moving the same centred text up does not widen the
+span. The part-specific offline placement contract bounds that envelope;
+only the regenerated native audit and printed sheet prove the repair.
+
 A genuine diameter hangs the same way and stops READING as one. The output
 fixture's groove root Ø7 is a doubled distance (`AddSpecificDimension`
 `swDiametricLinearDimension`, `Diametric` proven on the part); requested under

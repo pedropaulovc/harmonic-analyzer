@@ -41,6 +41,24 @@ def test_cross_hole_prints_natively_not_in_a_note() -> None:
         assert f"{value:.1f}" not in spec.DRAWING_NOTES
 
 
+def test_cross_hole_station_text_clears_its_extension_lines() -> None:
+    """Rule 14: the 3.70 text must not straddle its 7.4-mm paper span."""
+    text_x, text_y = drawing.FRONT_KEEP["RingHoleX"]
+    # The unchanged template's copied PDF measures 9.051 mm across "3.70".
+    text_half_width = 0.0046
+    outside_arrow_tail = 0.00635
+    clearance = 0.002
+    right_witness = max(drawing.BIG_END_EDGE[0], drawing.RING_HOLE_CENTER[0])
+    assert text_x - text_half_width >= right_witness + outside_arrow_tail + clearance
+    # Keep the whole row left of the taper leader and above the pin outline.
+    assert text_x + text_half_width + clearance < drawing.TAPER_SILHOUETTE_PICK[0]
+    pin_top = (
+        drawing.FRONT_CENTER[1]
+        + dt_crank_pin_spec.BIG_END_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert text_y > pin_top + clearance
+
+
 def test_end_diameters_are_drawing_native_true_diameter_callouts() -> None:
     """The model's end dims are half-profile radii, so the print measures the
     projected end-face circles instead — one Ø dimension per pin end."""
