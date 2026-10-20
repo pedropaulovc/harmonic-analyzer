@@ -3488,6 +3488,9 @@ def task_check():
         # must survive its own failure. Both are pure-Python contracts of
         # _seat_forensics.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
+        # Release packaging's fail-loud document cleanup (#1713): offline
+        # contracts against fake documents, no COM.
+        SCRIPTS_DIR / "test_package_native_cleanup.py",
         # The connect-time seat startup gate (a fresh seat is held until
         # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
         # and the missing-source-property census (2026-09-28 crank_hub).
