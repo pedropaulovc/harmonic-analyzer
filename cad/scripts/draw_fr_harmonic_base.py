@@ -465,6 +465,13 @@ HOLE_TAG_STATION_POSITIONS = {
     )),
     STOP_SCREW_XZ: (0.247, 0.216),
     PIVOT_SCREW_XZ: (0.2456, 0.1550),
+    # Native R5: the lock's default tag (then C1) crossed the pedestal leader.
+    # Put its text between the measured A2 and stop-tag boxes, not over A2 at
+    # x232 mm. The R5 replay includes the fixed lock rim and the whole proposed
+    # text/shoulder/leader envelope: 1.04 mm west of the unchanged pedestal
+    # diagonal, 1.80 mm east of A2 and 1.78 mm above the stop tag. These are
+    # source-calculated clearances; the rebuilt native route must confirm them.
+    LOCK_KNOB_XZ: (0.2425, 0.2230),
     # West pair, then east pair; larger Z before smaller Z in each pair.
     # These are the support pattern's source geometry semantics, not native
     # table row order. The west/larger-Z label stays short of its east neighbor

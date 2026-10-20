@@ -802,6 +802,277 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
     ]
 
 
+# Native R5 at af0b5d14744d, artifact 150 (2026-10-20T22:30:25Z), sheet metres.
+# Keep every display segment, including each tip stub and horizontal shoulder,
+# and every logged obstacle. This is the observed failure, not an after-fix dump.
+NATIVE_R5_CALLOUTS = {
+    "MHA-DT-18 block transfer": (
+        [0.272, 0.252],
+        [
+            (0.27915094466515766, 0.2166936360781131, 0.3047520828187466, 0.24086076360940933),
+            (0.2785229525512869, 0.21610082003167358, 0.27915094466515766, 0.2166936360781131),
+            (0.3047520828187466, 0.24086076360940933, 0.24083541718125345, 0.24086076360940933),
+        ],
+        [
+            ("4X ", [0.25012050208449366, 0.2575829862249084, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.2568434189334512, 0.25752951404824853, -0.00635], 0.0035),
+            (" 3.45 THRU ALL", [0.2621218563318253, 0.2575829862249084, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-18", [0.24083541718125345, 0.25197326388256625, -0.00635], 0.0035),
+            ("AFTER MHA-DT-00 STEP 19;", [0.24319062393903734, 0.24641701389150694, -0.00635], 0.0035),
+            (" 8-32 UNC - 2B THRU ALL", [0.245494790494442, 0.24086076390044764, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-DT-02 pedestal transfer": (
+        [0.2, 0.252],
+        [
+            (0.26455096384012916, 0.21800673182009217, 0.23275208281874657, 0.24086076360940933),
+            (0.2652522350924292, 0.21750272428969447, 0.26455096384012916, 0.21800673182009217),
+            (0.23275208281874657, 0.24086076360940933, 0.16883541718125344, 0.24086076360940933),
+        ],
+        [
+            ("2X ", [0.17812050208449365, 0.2575829862249084, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.1848434189334512, 0.25752951404824853, -0.00635], 0.0035),
+            (" 3.45 THRU ALL", [0.19012185633182527, 0.2575829862249084, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-02", [0.16883541718125344, 0.25197326388256625, -0.00635], 0.0035),
+            ("AT ASSEMBLY;", [0.1847458340227604, 0.24641701389150694, -0.00635], 0.0035),
+            (" 8-32 UNC - 2B THRU ALL", [0.173494790494442, 0.24086076390044764, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-DT-24 spring transfer": (
+        [0.315, 0.1428],
+        [
+            (0.27177741922575815, 0.17562234220792322, 0.2822479171812534, 0.13166076360940931),
+            (0.2716464779906864, 0.17617211390186344, 0.27177741922575815, 0.17562234220792322),
+            (0.2822479171812534, 0.13166076360940931, 0.3461645828187465, 0.13166076360940931),
+        ],
+        [
+            ("<MOD-DIAM>", [0.29648196190595627, 0.14832951404824854, -0.00635], 0.0035),
+            (" 2.26 THRU ALL", [0.30176039930433035, 0.1483829862249084, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-DT-24", [0.28383541718125344, 0.14277326388256625, -0.00635], 0.0035),
+            ("AFTER MHA-DT-00 STEP 19;", [0.2861906239390373, 0.13721701389150695, -0.00635], 0.0035),
+            (" 4-40 UNC - 2B THRU ALL", [0.288494790494442, 0.13166076390044765, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-FR-04 nameplate transfer": (
+        [0.362, 0.255],
+        [
+            (0.3197042937236577, 0.20674424134689828, 0.3186531282424926, 0.246638888604939),
+            (0.3197191794315407, 0.2061792874211656, 0.3197042937236577, 0.20674424134689828),
+            (0.3186531282424926, 0.246638888604939, 0.4037593717575072, 0.246638888604939),
+        ],
+        [
+            ("4X ", [0.3401205020844935, 0.25780486122937873, -0.00635], 0.0035),
+            ("<MOD-DIAM>", [0.34684341893345105, 0.2577513890527189, -0.00635], 0.0035),
+            (" 2.26 THRU ALL", [0.35212185633182513, 0.25780486122937873, -0.00635], 0.0035),
+            ("TRANSFER FROM MHA-FR-04", [0.3310177086740731, 0.2521951388870366, -0.00635], 0.0035),
+            ("AT ASSEMBLY; 4-40 UNC - 2B THRU ALL", [0.32024062824249255, 0.2466388888959773, -0.00635], 0.0035),
+        ],
+    ),
+    "MHA-FR-VN-53 cross-tap": (
+        [0.285, 0.117],
+        [
+            (0.32936898242057217, 0.09866560316368712, 0.33178124668598175, 0.10861215219646692),
+            (0.3291310175794279, 0.0976843968363129, 0.32936898242057217, 0.09866560316368712),
+            (0.33178124668598175, 0.10861215219646692, 0.23980625331401823, 0.10861215219646692),
+        ],
+        [
+            ("4X ", [0.26240421816706655, 0.11983159763785078, 0.0], 0.0035),
+            ("<MOD-DIAM>", [0.2691271350160241, 0.11977812546119093, 0.0], 0.0035),
+            (" 4.04 ", [0.27440557241439817, 0.11983159763785078, 0.0], 0.0035),
+            ("<HOLE-DEPTH>", [0.28604307197034357, 0.11977812546119093, 0.0], 0.0035),
+            (" 49 MIN", [0.2910436967760324, 0.11983159763785078, 0.0], 0.0035),
+            ("COMMON THREAD LEAD IN BOTH WALLS", [0.23980625331401823, 0.11422187529550865, 0.0], 0.0035),
+            (" 10-32 UNF - 2B ", [0.25906183928251264, 0.10866562530444934, 0.0], 0.0035),
+            ("<HOLE-DEPTH>", [0.2930069787800312, 0.10861215312778949, 0.0], 0.0035),
+            (" 46.00", [0.29800760358572004, 0.10866562530444934, 0.0], 0.0035),
+        ],
+    ),
+}
+NATIVE_R5_CALLOUT_BOXES = {
+    "MHA-DT-18 block transfer": (0.24083541718125345, 0.24086076360940933, 0.3047520828187466, 0.2610829862249084),
+    "MHA-DT-02 pedestal transfer": (0.16883541718125344, 0.24086076360940933, 0.23275208281874657, 0.2610829862249084),
+    "MHA-DT-24 spring transfer": (0.2822479171812534, 0.13166076360940931, 0.3461645828187465, 0.1518829862249084),
+    "MHA-FR-04 nameplate transfer": (0.3186531282424926, 0.246638888604939, 0.4037593717575072, 0.26130486122937874),
+    "MHA-FR-VN-53 cross-tap": (0.23980625331401823, 0.10861215219646692, 0.33178124668598175, 0.12333159763785079),
+}
+NATIVE_R5_OBSTACLES = {
+    "frame left": (0.0, 0.0, 0.0127, 0.2794),
+    "frame right": (0.41910000000000003, 0.0, 0.4318, 0.2794),
+    "frame bottom": (0.0, 0.0, 0.4318, 0.0127),
+    "frame top": (0.0, 0.2667, 0.4318, 0.2794),
+    "title block": (0.216, 0.0, 0.4318, 0.066),
+    "view holes top": (0.22285000000000002, 0.1591, 0.33715, 0.23090000000000005),
+    "view holes front": (0.22285000000000002, 0.08865, 0.33715, 0.10135000000000001),
+    "view section A-A": (0.3690249999999998, 0.0991, 0.3817250000000005, 0.17090000000000005),
+    "origin X axis": (0.21935000000000002, 0.142105, 0.24240100000000003, 0.14910500000000002),
+    "origin Y axis": (0.205855, 0.15560000000000002, 0.21285500000000002, 0.17865100000000003),
+    "section A arrow 1": (0.32725000000000004, 0.153, 0.34325000000000006, 0.157),
+    "section A arrow 2": (0.32725000000000004, 0.233, 0.34325000000000006, 0.23700000000000002),
+    "label section A 1": (0.3431562742474917, 0.15365396989966557, 0.3495062742474917, 0.16000396989966556),
+    "label section A 2": (0.3431562742474917, 0.23365396989966558, 0.3495062742474917, 0.24000396989966558),
+    "note DetailItem244 'LOW-CARBON STEEL OR GRAY IRON'": (0.2178062742474916, 0.0267532508361204, 0.2711819531772575, 0.030089230769230757),
+    "note DetailItem245 'fr-harmonic-base'": (0.3102605752508361, 0.03771432775919731, 0.353151745819398, 0.042956581939799315),
+    "note DetailItem246 'v44'": (0.37316762541806026, 0.022464133779264206, 0.3836521337792642, 0.028659525083612025),
+    "label DetailItem247 'DO NOT SCALE DRAWING\\r\\nBUILD '": (0.23257989966555181, 0.013885899665551815, 0.258314602006689, 0.01817501672240801),
+    "note DetailItem248 'MHA-FR-01'": (0.3102605752508361, 0.022940702341137098, 0.3421906688963211, 0.029136093645484917),
+    "note DetailItem260 'UNLESS OTHERWISE SPECIFIED, TOLERANCES'": (0.2178062742474916, 0.0615427558528428, 0.2654631304347826, 0.06440216722408026),
+    "label DetailItem261 'SCALE: 1:5'": (0.39699605351170575, 0.03056579933110365, 0.41319938461538464, 0.03390177926421403),
+    "note DetailItem263 'REV'": (0.37316762541806026, 0.03151893645484949, 0.379363016722408, 0.03485491638795987),
+    "note DetailItem264 'DWG.  NO.'": (0.3102605752508361, 0.03056579933110365, 0.3278936120401338, 0.03390177926421403),
+    "note DetailItem267 'PART'": (0.3102605752508361, 0.043909719063545155, 0.31788567224080266, 0.04724569899665551),
+    "note DetailItem277 'ALKYD PRIME/ENAMEL: RAL6000 BODY; BLACK DECK/UNDERSIDE; MASK+OIL BORES/THREADS/ID'": (0.2178062742474916, 0.03485491638795987, 0.28976812709030103, 0.04105030769230769),
+    "note DetailItem278 'FINISH'": (0.2178062742474916, 0.0420034448160535, 0.22304852842809364, 0.04438628762541805),
+    "note DetailItem279 'MATERIAL'": (0.2178062742474916, 0.03056579933110365, 0.22733764548494984, 0.03342521070234114),
+    "note DetailItem280 'DRAWN PER ASME Y14.100\\r\\nDIMENSIONING AND TOLERANCING PER ASME Y14.5-2018'": (0.21828284280936455, 0.020081290969899634, 0.27261165886287625, 0.02532354515050167),
+    "note DetailItem312 'SHEET 2 OF 4'": (0.39508977926421407, 0.014839036789297655, 0.4151056588628763, 0.01817501672240801),
+    "note DetailItem314 '.XXX\\r\\n±0.13'": (0.24449411371237456, 0.05391765886287625, 0.2502129364548495, 0.05963648160535118),
+    "note DetailItem315 '.XX\\r\\n±0.51'": (0.23210333110367892, 0.05391765886287625, 0.23782215384615385, 0.05963648160535118),
+    "note DetailItem316 '<GGTOL-ANGULAR>\\r\\n±1°'": (0.2754710702341137, 0.05391765886287625, 0.2802367558528428, 0.05963648160535118),
+    "note DetailItem319 'REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX\\r\\nTHREADS UNC/UNF CLASS 2A/2B'": (0.2173297056856187, 0.04581599331103678, 0.2888149899665552, 0.049628541806020054),
+    "note DetailItem320 '© 2026 Pedro Paulo Vezza Campos'": (0.3102605752508361, 0.014839036789297655, 0.36315968561872913, 0.01817501672240801),
+    'note DetailItem321 "Albert Michelson\'s Harmonic Analyzer\\r\\nA Project For Hobby Machinists\\r\\nharmonic-analyzer.vza.net"': (0.32026851505016724, 0.04819883612040132, 0.4074805618729097, 0.06440216722408026),
+    "note DetailItem323 'CAST/MACHINED'": (0.28547901003344484, 0.057730207357859525, 0.3059714581939799, 0.06011305016722407),
+    "note DetailItem326 'A'": (0.0028738528428093046, 0.03056579933110365, 0.009069244147157124, 0.03819089632107023),
+    "note DetailItem327 'A'": (0.42225418729097, 0.03056579933110365, 0.42844957859531774, 0.03819089632107023),
+    "note DetailItem328 'B'": (0.0038269899665551166, 0.1001448093645485, 0.008592675585284204, 0.10824647491638797),
+    "note DetailItem329 'B'": (0.4227307558528428, 0.1001448093645485, 0.42749644147157195, 0.10824647491638797),
+    "note DetailItem330 'C'": (0.0028738528428093046, 0.17020038795986625, 0.009545812709030044, 0.1778254849498328),
+    "note DetailItem331 'C'": (0.421777618729097, 0.17020038795986625, 0.42844957859531774, 0.1778254849498328),
+    "note DetailItem332 'D'": (0.0028738528428093046, 0.23977939799331108, 0.009069244147157124, 0.24788106354515055),
+    "note DetailItem333 'D'": (0.42225418729097, 0.23977939799331108, 0.42844957859531774, 0.24788106354515055),
+    "note DetailItem334 '4'": (0.0514838461538461, 0.0019716856187290688, 0.0557729632107023, 0.00959678260869562),
+    "note DetailItem335 '4'": (0.0514838461538461, 0.2683735117056857, 0.0557729632107023, 0.27647517725752513),
+    "note DetailItem336 '3'": (0.1596649096989966, 0.0019716856187290688, 0.1639540267558528, 0.00959678260869562),
+    "note DetailItem337 '3'": (0.1596649096989966, 0.2683735117056857, 0.1639540267558528, 0.27647517725752513),
+    "note DetailItem338 '2'": (0.26736940468227427, 0.0019716856187290688, 0.27165852173913047, 0.00959678260869562),
+    "note DetailItem339 '2'": (0.26736940468227427, 0.2683735117056857, 0.27165852173913047, 0.27647517725752513),
+    "note DetailItem340 '1'": (0.37555046822742477, 0.0019716856187290688, 0.37983958528428097, 0.00959678260869562),
+    "note DetailItem341 '1'": (0.37555046822742477, 0.2683735117056857, 0.37983958528428097, 0.27647517725752513),
+    "note DetailItem342 'DRILLED HOLES\\r\\n+0.10 / 0'": (0.2554551906354515, 0.05391765886287625, 0.27213509030100336, 0.05963648160535118),
+    "note DetailItem345 '.X\\r\\n±0.8'": (0.22018911705685618, 0.05391765886287625, 0.22495480267558526, 0.05963648160535118),
+    "note DetailItem346 'UNIT: mm'": (0.39794919063545153, 0.021987565217391314, 0.4127228160535118, 0.02532354515050167),
+    "note DetailItem446 'A1'": (0.23400960535117055, 0.16638783946488298, 0.24020499665551837, 0.17067695652173914),
+    "note DetailItem447 'A2'": (0.23400960535117055, 0.22214636120401343, 0.24020499665551837, 0.22691204682274252),
+    "note DetailItem455 'A3'": (0.3317061605351171, 0.16543470234113716, 0.34981576588628766, 0.17639577926421407),
+    "note DetailItem456 'A4'": (0.3317061605351171, 0.21070871571906358, 0.34981576588628766, 0.2211932240802676),
+    "note DetailItem448 'B1'": (0.2449706822742475, 0.19212254180602012, 0.2521192107023411, 0.2164275384615385),
+    "note DetailItem449 'C1'": (0.2559317591973244, 0.2207166555183947, 0.2626037190635451, 0.22500577257525087),
+    "note DetailItem451 'C2'": (0.2940572441471572, 0.17973175919732443, 0.3031120468227425, 0.18973969899665555),
+    "note DetailItem452 'C3'": (0.2888149899665552, 0.2016539130434783, 0.2954869498327759, 0.20975557859531777),
+    "note DetailItem453 'C4'": (0.30263547826086956, 0.16877068227424752, 0.3183622408026756, 0.17973175919732443),
+    "note DetailItem454 'C5'": (0.30263547826086956, 0.20975557859531777, 0.3183622408026756, 0.21404469565217393),
+    "note DetailItem450 'D1'": (0.2454472508361204, 0.15066107692307695, 0.258314602006689, 0.16877068227424752),
+    "note DetailItem458 '1. D1 IS LOCATED TO THE MHA-DT-02 SEAT;\\r\\nDRILL AND TAP AT ASSEMBLY IN ONE SETUP.\\r\\nD1 TABLE X/Y ARE REFERENCE.'": (0.01955375250836114, 0.08680088963210703, 0.11534403344481603, 0.1001448093645485),
+    "note DetailItem459 '4X: FIT TO ASSIGNED\\r\\nMHA-FR-03 TUBE:\\r\\nCLOSE HAND-SLIP, NO\\r\\nPERCEPTIBLE ROCK.\\r\\nTABLE <MOD-DIAM> REF.\\r\\nRETAIN MATCH MARKS.'": (0.16871971237458194, 0.19927107023411375, 0.22829078260869562, 0.2264354782608696),
+    "label DetailItem465 'TOP VIEW SCALE 1:4'": (0.16967284949832773, 0.23263086956521745, 0.21447029431438125, 0.23739655518394653),
+    "label DetailItem466 'FRONT CROSS-TAP VIEW SCALE 1:4'": (0.2449706822742475, 0.06869128428093646, 0.32169822073578597, 0.07345696989966555),
+    "note DetailItem467 'ORIGIN: FLANGE\\r\\nOUTER SHARP\\r\\nCORNER (X0 Y0)'": (0.16490716387959864, 0.1725832307692308, 0.20160294314381272, 0.1864037190635452),
+    "table DetailItem457": (0.018, 0.16737522039776861, 0.16276338643434313, 0.26),
+}
+
+
+def test_native_r5_lock_tag_layout_replays_all_callouts_with_attached_extent() -> None:
+    """Observed collision, then a conditional placement control, not native proof."""
+    import draw_fr_harmonic_base as sheet
+
+    anchors = {
+        "MHA-DT-18 block transfer": sheet.BLOCK_CALLOUT_XY,
+        "MHA-DT-02 pedestal transfer": sheet.PEDESTAL_CALLOUT_XY,
+        "MHA-DT-24 spring transfer": sheet.SPRING_CALLOUT_XY,
+        "MHA-FR-04 nameplate transfer": sheet.NAMEPLATE_CALLOUT_XY,
+        "MHA-FR-VN-53 cross-tap": sheet.CROSS_TAP_CALLOUT_XY,
+    }
+    assert set(anchors) == set(NATIVE_R5_CALLOUTS) == set(NATIVE_R5_CALLOUT_BOXES)
+    callouts, leaders, own_rows = {}, {}, {}
+    for label, (anchor, lines, texts) in NATIVE_R5_CALLOUTS.items():
+        assert tuple(anchor) == anchors[label]  # no callout moves to make this pass
+        callouts[label] = sheet.callout_text_box(anchor, lines, texts, label)
+        assert callouts[label] == pytest.approx(NATIVE_R5_CALLOUT_BOXES[label])
+        leaders[label] = sheet.leader_segments(lines)
+        own_rows[label] = sheet.callout_text_rows(lines, texts, label)
+    text_obstacles = {
+        name: box for name, box in NATIVE_R5_OBSTACLES.items()
+        if name.startswith(sheet._TEXT_OBSTACLE_KINDS)
+    }
+    foreign_texts = {f"callout {label}": box for label, box in callouts.items()}
+    assert sheet.find_callout_clashes(callouts, NATIVE_R5_OBSTACLES) == []
+    assert sheet.find_merged_blocks(callouts) == []
+    assert sheet.find_tall_callouts(own_rows) == []
+    lock_tag = "note DetailItem449 'C1'"  # captured native identity only
+    assert sheet.find_leader_crossings(
+        leaders, {**foreign_texts, **text_obstacles}, own_rows,
+    ) == [
+        f"leader of callout MHA-DT-02 pedestal transfer crosses {lock_tag}"
+    ]
+
+    # Do NOT translate the old whole GetBox: B1/D1's measured boxes include
+    # their attached leaders. Move only the printed-text estimate, with the
+    # full measured C1 width/height plus 0.5 mm on every side, while retaining
+    # the physical lock rim. The proposed envelope also reserves a right-side
+    # shoulder up to half that measured width (3.336 mm), at any text-row Y.
+    # Its convex hull covers the tip/stub and a monotone straight/bent route
+    # between that shoulder and ANY point on the original rim. Native rebuild
+    # must prove the actual text and complete leader stay within this envelope;
+    # no synthetic leader here is represented as an observed after-fix route.
+    old = NATIVE_R5_OBSTACLES[lock_tag]
+    width, height = old[2] - old[0], old[3] - old[1]
+    x, y = sheet.HOLE_TAG_STATION_POSITIONS[sheet.LOCK_KNOB_XZ]
+    assert (x, y) == (0.2425, 0.2230)
+    text_box = (x - 0.0005, y - height - 0.0005, x + width + 0.0005, y + 0.0005)
+    centre = sheet._plan_xy(*sheet.LOCK_KNOB_XZ, center=sheet.HOLE_TOP_CENTER)
+    assert centre == pytest.approx((0.25439117028799675, 0.22292914718948796), abs=1e-12)
+    # Native table's rounded-up 5.11 mm drill encloses the source drill.
+    assert sheet.LOCK_SCREW_HOLE_DIA <= 5.11
+    radius = 5.11 * sheet.VIEW_SCALE / 2000.0
+    rim_box = (centre[0] - radius, centre[1] - radius, centre[0] + radius, centre[1] + radius)
+    shoulder_box = (text_box[2], text_box[1], text_box[2] + width / 2.0, text_box[3])
+    extent = (
+        min(text_box[0], rim_box[0], shoulder_box[0]),
+        min(text_box[1], rim_box[1], shoulder_box[1]),
+        max(text_box[2], rim_box[2], shoulder_box[2]),
+        max(text_box[3], rim_box[3], shoulder_box[3]),
+    )
+    assert extent == pytest.approx(
+        (0.242, 0.21821088294314384, 0.25502992028799676, 0.22356789718948794),
+        abs=1e-12,
+    )
+    # Guard the attached extent, not just the letter, against the neighbors.
+    neighbors = {name: box for name, box in text_obstacles.items() if name != lock_tag}
+    assert sheet.find_callout_clashes({"lock tag": extent}, neighbors) == []
+    assert sheet.box_gap(extent, NATIVE_R5_OBSTACLES["note DetailItem447 'A2'"]) == pytest.approx(
+        0.0017950033444816271,
+    )
+    assert sheet.box_gap(extent, NATIVE_R5_OBSTACLES["note DetailItem448 'B1'"]) == pytest.approx(
+        0.0017833444816053312,
+    )
+    socket_fit = next(box for name, box in NATIVE_R5_OBSTACLES.items() if name.startswith("note DetailItem459 "))
+    assert sheet.box_gap(extent, socket_fit) >= sheet.CALLOUT_CLEARANCE_M
+    assert sheet.box_gap(
+        extent, NATIVE_R5_OBSTACLES["label DetailItem465 'TOP VIEW SCALE 1:4'"],
+    ) >= sheet.CALLOUT_CLEARANCE_M
+    # Exact signed distance to the infinite pedestal diagonal; its NE corner
+    # is the nearest corner of the whole west-side envelope. An infinite line
+    # is conservative for the finite native segment, including its tip stub.
+    x0, y0, x1, y1 = NATIVE_R5_CALLOUTS["MHA-DT-02 pedestal transfer"][1][0]
+    dx, dy = x1 - x0, y1 - y0
+    gap = (dy * (x0 - extent[2]) - dx * (y0 - extent[3])) / math.hypot(dx, dy)
+    assert gap == pytest.approx(0.0010407506307039711, abs=1e-12)
+    assert gap >= sheet.CALLOUT_CLEARANCE_M
+    proposed = {**NATIVE_R5_OBSTACLES, lock_tag: extent}
+    proposed_texts = {**text_obstacles, lock_tag: extent}
+    assert sheet.find_callout_clashes(callouts, proposed) == []
+    assert sheet.find_leader_crossings(
+        leaders, {**foreign_texts, **proposed_texts}, own_rows,
+    ) == []
+    # Horizontal shoulders are retained too, even though the runtime's leader
+    # predicate separates them from the sloped lines and tip stubs.
+    assert sheet.find_leader_crossings(
+        {label: lines for label, (_anchor, lines, _texts) in NATIVE_R5_CALLOUTS.items()},
+        {lock_tag: extent},
+    ) == []
+
+
+
 def test_full_id_transfer_lane_budget_replays_1231_and_preserves_table_gap() -> None:
     import draw_fr_harmonic_base as sheet
 
@@ -1957,6 +2228,8 @@ def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
     sheet._spread_hole_tags(view, table)
     assert table.cells == before
     assert len(by_station) == len(sheet.TABLE_HOLES) == 11
+    assert len(sheet.HOLE_TAG_STATION_POSITIONS) == 9
+    assert by_station[sheet.LOCK_KNOB_XZ].position == (0.2425, 0.2230, 0.0)
     for station, annotation in by_station.items():
         assert annotation.text == table.station_tags[station]
         position = sheet.HOLE_TAG_STATION_POSITIONS.get(station)
