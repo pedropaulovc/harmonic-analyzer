@@ -1174,8 +1174,8 @@ CHECKS = _note_text(
         f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}). IF A STATION IS OUT,",
         "   EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE FEELER AT BOTH STATIONS",
         f"   AS STEP {steps.step_number('rig-located')}, WITH THE STEP "
-        f"{steps.step_number('rig-set')} LEAVES STILL SNUG.",
-        "   TIGHTEN, RECHECK THOSE LEAVES AND REPEAT CHECKS 4, 5, 6 AND 7.",
+        f"{steps.step_number('rig-set')} LEAVES REFITTED SNUG;",
+        "   TIGHTEN, RECHECK THOSE LEAVES AND REPEAT CHECKS 6 AND 7.",
     )
 )
 

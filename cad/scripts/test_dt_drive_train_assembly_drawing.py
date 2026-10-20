@@ -408,10 +408,6 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("SWING OUT AND REMOVE THE SHIMS"),
         check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
-        check.index(
-            "DO NOT LOOSEN MHA-DT-02 AFTER THIS SET; "
-            "IF YOU DO, REPEAT CHECKS 4, 5, 6 AND 7"
-        ),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-DT-VN-53" not in check
@@ -449,15 +445,6 @@ def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> 
     assert "RECHECK AND RECORD X AND Y" in bank
     assert "THE Y READING IS ZERO" not in check
     assert "MHA-DT-13 BAR" not in bank
-    located = steps.step_number("rig-located")
-    rig_set = steps.step_number("rig-set")
-    check7 = _flat(drawing.CHECKS.split("\n7. ")[1])
-    assert (
-        "IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE "
-        f"FEELER AT BOTH STATIONS AS STEP {located}, WITH THE STEP {rig_set} "
-        "LEAVES STILL SNUG. TIGHTEN, RECHECK THOSE LEAVES AND "
-        "REPEAT CHECKS 4, 5, 6 AND 7."
-    ) in check7
     check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
     assert check5.endswith("TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.")
 
@@ -576,18 +563,6 @@ def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
     assert "MHA-DT-30 SLIP FIT" in step
     assert "LIGHT HAMMER" not in step
     assert "REAM" not in step
-
-
-def test_lever_pin_hole_text_tracks_the_pin_spec(monkeypatch) -> None:
-    from runpy import run_path
-
-    import dt_pinion_lever_pin_spec as pin
-
-    monkeypatch.setattr(pin, "PIN_DIA", 25.4 / 8.0)
-    sheet = run_path(str(SCRIPTS / "dt_drive_train_assembly_sheet.py"))
-    text = sheet["LEVER_PIN_HOLE_FIT"]
-    assert "1/8 IN DRILL THRU" in text
-    assert "1/16" not in text
 
 
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:

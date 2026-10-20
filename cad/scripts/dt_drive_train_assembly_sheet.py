@@ -6,6 +6,7 @@ Kept separate from the explode contract so text changes do not rebuild CAD.
 """
 
 import dt_crank_pinion_spec as pinion
+import dt_pinion_lever_geometry as _lever
 import dt_pinion_lever_pin_spec as _lever_pin
 from _inch_fraction import inch_fraction
 
@@ -27,7 +28,7 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
 LEVER_PIN_HOLE_FIT = "\n".join(
     (
         f"HOLE AT {_lever_pin.LEVER_NUMBER}'S PRINTED STATION: "
-        f"{inch_fraction(_lever_pin.PIN_DIA, what='lever pin hole')} IN DRILL THRU;",
+        f"{inch_fraction(_lever.PIN_HOLE_DIA, what='lever pin hole')} IN DRILL THRU;",
         f"{_lever_pin.PIN_NUMBER} SLIP FIT.",
     )
 )
