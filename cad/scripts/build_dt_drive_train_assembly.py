@@ -192,6 +192,7 @@ from _assembly import (
     apply_component_color,
     assert_component_placed,
     assert_free_dof_necessity,
+    author_in_drawing_configurations,
     check_no_interference,
     coincident_mate,
     component_transform,
@@ -6975,14 +6976,15 @@ async def build(adapter) -> dict[str, str]:
     # The explode is authored in both drawing configurations: the package's
     # small exploded views reference Default Simplified.
     _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
-    return await save_assembly_and_images(
+    author_in_drawing_configurations(
         adapter,
         ASM_NAME,
-        author=lambda configuration: create_drive_train_explode(
+        lambda configuration: create_drive_train_explode(
             adapter, {collar_pin: COLLAR_PIN_ROLE}, configuration
         ),
-        solved_gates=_certify_as_built,
-        dof_manifest=True,
+    )
+    return await save_assembly_and_images(
+        adapter, ASM_NAME, solved_gates=_certify_as_built, dof_manifest=True
     )
 
 

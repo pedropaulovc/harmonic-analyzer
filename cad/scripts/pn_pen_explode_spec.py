@@ -2,7 +2,7 @@
 ``PN_EXPLODED`` presentation and the ordered native steps that open it.
 
 Only ``_pn_pen_explode`` (through the builder's canonical
-``save_assembly_and_images(author=...)`` call) and the drawing read this module,
+``author_in_drawing_configurations`` call) and the drawing read this module,
 so an explode-only edit takes the EXPLODE refresh tier (``_refresh_tier``):
 the saved model is reopened and its named explodes are re-authored, with no
 insert/mate loop. Distances are presentation offsets, not dimensions;
