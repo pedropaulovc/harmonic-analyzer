@@ -180,13 +180,16 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                 step_index=step_index,
             ):
                 with _telemetry.span(
-                    "assembly.mg_magnifier_explode.step.selection", selected_expected=len(names)
+                    "assembly.mg_magnifier_explode.step.selection",
+                    selected_expected=len(names),
                 ):
                     selected_attempted = selected_completed = 0
                     axis_attempted = axis_selected = False
                     try:
                         model.ClearSelection2(True)
-                        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                        selection = _early_bound(
+                            model.SelectionManager, "ISelectionMgr"
+                        )
                         data = _early_bound(selection.CreateSelectData(), "ISelectData")
                         if data is None:
                             raise RuntimeError(
@@ -273,8 +276,12 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                     except Exception as observation_error:
                         rebuild_attributes = {
                             "needs_rebuild_before_state": "unreadable",
-                            "needs_rebuild_before_error_type": type(observation_error).__name__,
-                            "needs_rebuild_before_error_message": str(observation_error),
+                            "needs_rebuild_before_error_type": type(
+                                observation_error
+                            ).__name__,
+                            "needs_rebuild_before_error_message": str(
+                                observation_error
+                            ),
                         }
                     else:
                         rebuild_attributes = {
@@ -289,7 +296,8 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                     if not rebuilt:
                         raise RuntimeError(f"{label}: step name/rebuild failed")
                 with _telemetry.span(
-                    "assembly.mg_magnifier_explode.step.metadata", membership_expected=len(names)
+                    "assembly.mg_magnifier_explode.step.metadata",
+                    membership_expected=len(names),
                 ):
                     actual_step_count = int(configuration.GetNumberOfExplodeSteps())
                     _telemetry.annotate(step_count_actual=actual_step_count)
@@ -310,7 +318,8 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                             f"{label}: step component/distance readback mismatch: {actual!r}"
                         )
                 with _telemetry.span(
-                    "assembly.mg_magnifier_explode.step.readback", instances_expected=len(by_name)
+                    "assembly.mg_magnifier_explode.step.readback",
+                    instances_expected=len(by_name),
                 ):
                     transform_reads_attempted = transform_reads_completed = 0
                     readback_completed = False
@@ -328,7 +337,10 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                             delta = tuple(
                                 current[i + 9] - baseline[name][i + 9] for i in range(3)
                             )
-                            if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                            if any(
+                                abs(delta[i] - expected[name][i]) > 1e-7
+                                for i in range(3)
+                            ):
                                 mismatches.append(
                                     f"{name} moved {tuple(v * 1000.0 for v in delta)!r} mm, "
                                     f"expected {tuple(v * 1000.0 for v in expected[name])!r}"
@@ -337,7 +349,9 @@ def create_mg_magnifier_explode(adapter: Any, configuration_name: str) -> None:
                                 abs(current[i] - baseline[name][i]) > 1e-9
                                 for i in (*range(9), 12)
                             ):
-                                mismatches.append(f"{name} presentation rotated or scaled")
+                                mismatches.append(
+                                    f"{name} presentation rotated or scaled"
+                                )
                         _telemetry.event(
                             "assembly.mg_magnifier_explode.readback",
                             step=label,
