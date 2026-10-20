@@ -8,6 +8,11 @@ depth.  The handle pivot is tapped for the MHA-DT-32 shoulder screw.  The
 principal view identifies the hub seat; the existing rotated Top/profile gets
 one local breakout to the bore axis, exposing the far-side chamfer in solid
 HLR ink while retaining its imported model leg and press lead-in intent.
+Rendered proof matches the feature's exact native circles and the complete
+section stroke in view-local coordinates placed by GetXform, independently
+controlled by native model projection. Fonts use the visible stock outline,
+not legacy line-font decoding. Collected refusals capture a forensic sheet
+PNG before the original aggregate exception, never an approved export.
 The MHA-DT-09 taper-pin cross-hole belongs to the hub and shaft drawings.
 
 The sheet remains deliberately plain: no datums, feature-control frames or
@@ -22,6 +27,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import contextlib
 import math
 import re
 import sys
@@ -63,7 +69,6 @@ from _drawing_leaders import (
     dimension_segments,
     dimension_text_points,
     distance_to_box,
-    distance_to_point,
     landing_distance,
     points_inside,
     segments_cross,
@@ -79,6 +84,7 @@ from _layout_geometry import estimate_text_box, union_boxes
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
+import _seat_forensics
 import _telemetry
 from dt_crank_arm_notes import (
     BORE_REAR_CHAMFER_CALLOUT,
@@ -321,9 +327,21 @@ def _arm_check(
         errors.append(label)
 
 
-def _raise_arm_errors(errors: list[str]) -> None:
-    if errors:
-        raise RuntimeError("crank arm native guard violations:\n- " + "\n- ".join(errors))
+def _raise_arm_errors(adapter: Any, errors: list[str]) -> None:
+    if not errors:
+        return
+    exc = RuntimeError("crank arm native guard violations:\n- " + "\n- ".join(errors))
+    try:
+        _seat_forensics.capture_com_failure(
+            adapter, f"{PART_STEM}-native-guard", str(exc),
+            api="crank arm native drawing guards", exception=exc, sheet_png=True,
+            phase="before-finalize", violations=tuple(errors),
+        )
+    except Exception as capture_exc:  # noqa: BLE001 - retain the original refusal
+        if capture_exc is not exc:
+            with contextlib.suppress(Exception):
+                _telemetry.warn(f"crank arm native guard secondary capture failure: {capture_exc!r}")
+    raise exc
 
 
 def _finite_tuple(values: Any, size: int) -> bool:
@@ -661,54 +679,15 @@ def _create_profile_breakout(adapter: Any, profile: Any, *, errors: list[str]) -
     _assert_profile_breakout(adapter, view, errors=errors)
 
 
-def _solid_record(ddoc: Any, style: tuple[float, ...], cache: dict[tuple[str, int], Any], *, label: str, errors: list[str]) -> bool:
-    """Use each record's documented decoder namespace; never retry another."""
-    decoder = "GetLineFontInfo2" if style[1] == -1.0 else "GetLineFontInfo"
-    raw_index = style[2] if style[1] == -1.0 else style[1]
-    valid_index = math.isfinite(raw_index) and raw_index >= 0.0 and raw_index.is_integer()
-    _arm_check(errors, f"{label} has no native font index", style, "nonnegative integral LineStyle, or LineFont when LineStyle=-1", valid_index)
-    if not valid_index:
-        return False
-    index = int(raw_index)
-    key = (decoder, index)
-    if key not in cache:
-        raw = _arm_read(errors, f"line font {index} {decoder} raw return",
-                        lambda: getattr(ddoc, decoder)(index), required=True)
-        # Keep unexpected legacy payloads diagnosable BEFORE any numeric or
-        # shape interpretation. Only a flat segment-count/length array is valid.
-        _telemetry.info(f"line font decoder={decoder!r}, index={index}, native_raw_return={raw!r}")
-        cache[key] = _arm_read(
-            errors, f"line font {index} {decoder} flat numeric pattern",
-            lambda: tuple(float(value) for value in raw) if isinstance(raw, (list, tuple)) else None,
-            required=True,
-        )
-    pattern = cache[key]
-    valid = (
-        isinstance(pattern, tuple) and len(pattern) >= 2 and all(math.isfinite(value) for value in pattern)
-        and pattern[0] >= 1 and pattern[0].is_integer() and int(pattern[0]) == len(pattern) - 1
-    )
-    solid = valid and all(value > 0.0 for value in pattern[1:])
-    _telemetry.info(f"{label} style fields (color/style/font/weight/layer/override)={style!r}, decoder={decoder!r}, effective_font={index}, native_pattern={pattern!r}, solid={solid!r}")
-    _arm_check(errors, f"{label} does not have a measured continuous native line font",
-               pattern, "integral positive segment count; matching finite positive lengths; no gaps", solid)
-    return solid
+def _view_local_points(points: Any, xform: Any) -> Any:
+    """GetPolylines7 XY is view-local; GetXform places/scales it on the sheet."""
+    if xform is None:
+        return None
+    return tuple((xform[0] + point[0] * xform[2],
+                  xform[1] + point[1] * xform[2]) for point in points)
 
 
-def _circle_record(points: Any, circle: Any, *, label: str, errors: list[str]) -> bool:
-    """Establish MODEL coordinates against the actual native circle, pointwise."""
-    valid_circle = _finite_tuple(circle, 7)
-    residuals = tuple((
-        abs(sum((point[axis] - circle[axis]) * circle[axis + 3] for axis in range(3))),
-        abs(math.dist(point, circle[:3]) - circle[6]),
-    ) for point in points) if valid_circle else ()
-    valid = valid_circle and len(points) >= 2 and all(plane <= 1e-8 and radial <= 1e-8 for plane, radial in residuals)
-    maximum = tuple(max((pair[axis] for pair in residuals), default=math.inf) for axis in range(2))
-    _telemetry.info(f"{label} MODEL circle frame: native_circle={circle!r}, raw_samples={points[:3]!r}/{points[-2:]!r}, measured_point_count={len(residuals)}, max_plane/radius_residual={maximum!r}, expected each<=1e-8m")
-    _arm_check(errors, f"{label} raw polyline points are not measured MODEL-circle coordinates", (len(residuals), maximum), "every plane/radius residual <= 1e-8 m", valid)
-    return valid
-
-
-def _model_segment_distance(point: Any, first: Any, last: Any) -> float:
+def _segment_distance(point: Any, first: Any, last: Any) -> float:
     delta = tuple(b - a for a, b in zip(first, last))
     length_sq = sum(value * value for value in delta)
     if length_sq == 0.0:
@@ -717,41 +696,101 @@ def _model_segment_distance(point: Any, first: Any, last: Any) -> float:
     return math.dist(point, tuple(a + fraction * d for a, d in zip(first, delta)))
 
 
-def _within_contour_tolerance(distance: float) -> bool:
-    return distance <= 5e-5 or math.isclose(distance, 5e-5, rel_tol=0.0, abs_tol=1e-12)
+def _endpoint_errors(points: Any, expected: Any) -> tuple[float, float]:
+    if points is None or len(points) < 2 or expected is None or len(expected) != 2:
+        return (math.inf, math.inf)
+    forward = (math.dist(points[0], expected[0]), math.dist(points[-1], expected[1]))
+    reverse = (math.dist(points[-1], expected[0]), math.dist(points[0], expected[1]))
+    return min((forward, reverse), key=max)
+
+
+def _record_on_segment(points: Any, expected: Any) -> bool:
+    return (
+        points is not None and len(points) >= 2 and expected is not None
+        and max((math.dist(a, b) for a, b in zip(points, points[1:])), default=0.0) > 1e-9
+        and all(_segment_distance(point, *expected) <= 1e-6 for point in points)
+    )
+
+
+def _typed_record_styles(view: Any, controls: Any, records: Any, xform: Any, *, errors: list[str]) -> None:
+    """Measure correspondence BEFORE using the documented swLineStyles channel.
+
+    Zero native lines is an absent optional line channel. A failed accessor,
+    malformed payload, or nonzero but unmeasurable channel is not absence.
+    GetLineAtIndex3's enum is never compared numerically with legacy LineStyle.
+    """
+    data = _arm_read(errors, "profile visible GetDisplayData4",
+                     lambda: _early_bound(view.GetDisplayData4(), "IDisplayData"), required=True)
+    count = _arm_read(errors, "profile visible GetLineCount", lambda: data.GetLineCount(), required=True)
+    valid_count = type(count) is int and count >= 0
+    _arm_check(errors, "profile typed line channel has an invalid native count",
+               count, "nonnegative integer; zero means no optional lines", valid_count)
+    if not valid_count:
+        return
+    if count == 0:
+        _telemetry.info("profile typed line channel absent: native GetLineCount=0; visible stock outline remains the font control")
+        return
+    lines = []
+    for index in range(count):
+        raw = _arm_read(errors, f"typed visible line {index} GetLineAtIndex3",
+                        lambda: data.GetLineAtIndex3(index), required=True)
+        _telemetry.info(f"typed visible line {index} GetLineAtIndex3 native_raw_return={repr(raw)[:512]}")
+        line = _arm_read(errors, f"typed visible line {index} numeric descriptor",
+                         lambda: tuple(float(value) for value in raw) if isinstance(raw, (list, tuple)) else None)
+        valid = _finite_tuple(line, 10)
+        _arm_check(errors, f"typed visible line {index} has malformed native data",
+                   line, "ten finite doubles [color,type,swLineStyles,weight,startXYZ,endXYZ]", valid)
+        if valid:
+            lines.append((index, line))
+    correspondence = {}
+    for frame in ("sheet", "view-local/GetXform"):
+        for index, _signature, _raw, points, _style, _kind in (*controls, *records):
+            matched = []
+            residuals = []
+            for line_index, line in lines:
+                native = (line[4:7], line[7:10])
+                endpoints = tuple(point[:2] for point in native) if frame == "sheet" else _view_local_points(native, xform)
+                distances = _endpoint_errors(endpoints, None if points is None or len(points) < 2 else (points[0], points[-1]))
+                residuals.append(max(distances))
+                if max(distances) <= 1e-6:
+                    matched.append((line_index, line[2], distances))
+            correspondence[frame, index] = matched
+            _telemetry.info(f"rendered edge {index} typed endpoint calibration: frame={frame!r}, matches={matched!r}, closest_endpoint_error={min(residuals, default=math.inf)!r}")
+    # Calibrate solely on independently native-projected stock, not on a
+    # coordinate interpretation chosen because it makes the chamfer fit.
+    frames = [frame for frame in ("sheet", "view-local/GetXform")
+              if controls and all(len(correspondence[frame, record[0]]) == 1 for record in controls)]
+    _arm_check(errors, "profile typed line coordinate channel is unmeasured or ambiguous on the visible stock outline",
+               frames, "one coordinate channel calibrated by actual stock-outline endpoints", len(frames) == 1)
+    if len(frames) != 1:
+        return
+    frame = frames[0]
+    for index, _signature, _raw, _points, _style, _kind in (*controls, *records):
+        matched = correspondence[frame, index]
+        _telemetry.info(f"rendered edge {index} typed stroke endpoint correspondence: chosen_frame={frame!r}, matches={matched!r}; swLineCONTINUOUS=0")
+        unique = len(matched) == 1
+        _arm_check(errors, f"rendered edge {index} typed line channel is missing or ambiguous",
+                   matched, "one actual endpoint-corresponding native line in the stock-calibrated channel", unique)
+        if unique:
+            style = matched[0][1]
+            _arm_check(errors, f"rendered edge {index} documented typed style is not continuous / disagrees with the stock outline",
+                       style, "swLineStyles_e.swLineCONTINUOUS (0), independently of legacy IDs", style == 0.0)
 
 
 def _rendered_chamfer_edges(
     adapter: Any, profile: Any, annotation: Any, *, errors: list[str],
 ) -> None:
-    """Prove solid actual polyline coverage, never joining clipped records."""
+    """Prove unique source circles and one complete visible view-local bevel."""
     view = _arm_read(errors, "rendered chamfer view", lambda: _early_bound(profile, "IView"), required=True)
-    app = _arm_read(errors, "rendered chamfer application", lambda: _early_bound(adapter.swApp, "ISldWorks"), required=True)
-    ddoc = _arm_read(errors, "rendered chamfer drawing", lambda: _early_bound(adapter.currentModel, "IDrawingDoc"), required=True)
     matches = _chamfer_sources(adapter, view, errors=errors)
-    boundaries = []
+    circles = tuple(found[0][1] if len(found) == 1 else None for found in matches)
+    # Derived breakout boundaries need not map back to a pre-cut IEdge.
     for index, found in enumerate(matches):
-        if len(found) == 1:
-            if index == 0:
-                try:
-                    mapped = view.GetCorrespondingEntity(found[0][0])
-                except Exception as exc:
-                    mapped = None
-                    _telemetry.info(f"profile chamfer outer mapping telemetry: UNMEASURED {type(exc).__name__}: {str(exc)[:512]}")
-            else:
-                mapped = _arm_read(errors, f"chamfer boundary {index} GetCorrespondingEntity part-to-view",
-                                   lambda: view.GetCorrespondingEntity(found[0][0]), required=True)
-        else:
-            mapped = None
-            errors.append(f"UNMEASURED chamfer boundary {index} mapping: source boundary is not unique")
-        _telemetry.info(f"profile chamfer boundary {index} mapping: source_count={len(found)}, view_entity_present={mapped is not None}, expected source_count=1; inner mapping mandatory, outer telemetry only")
-        boundaries.append(mapped)
-    if all(boundary is not None for boundary in boundaries):
-        same = _arm_read(errors, "mapped chamfer boundary pair IsSame", lambda: int(app.IsSame(*boundaries)))
-        _arm_check(errors, "mapped rear chamfer boundaries are not distinct", same, 0, same == 0)
-
-    # Attachment support varies for imported feature dimensions. Each field is
-    # independent telemetry, including an exception; none contributes a gate.
+        try:
+            mapped = view.GetCorrespondingEntity(found[0][0]) if len(found) == 1 else None
+            _telemetry.info(f"profile chamfer boundary {index} mapping telemetry: source_count={len(found)}, view_entity_present={mapped is not None}; not a derived-edge gate")
+        except Exception as exc:
+            _telemetry.info(f"profile chamfer boundary {index} mapping telemetry: UNMEASURED {type(exc).__name__}: {str(exc)[:512]}")
     inventory = {}
     for member, read in (
         ("GetAttachedEntities3", lambda: len(tuple(_early_bound(annotation, "IAnnotation").GetAttachedEntities3() or ()))),
@@ -767,6 +806,40 @@ def _rendered_chamfer_edges(
         f"profile chamfer native attachments: count={inventory['GetAttachedEntityCount3']}, "
         f"types={inventory['GetAttachedEntityTypes']}, entities={inventory['GetAttachedEntities3']}"
     )
+    raw_xform = _arm_read(errors, "profile native GetXform", lambda: view.GetXform(), required=True)
+    _telemetry.info(f"profile native GetXform raw={raw_xform!r}; expected finite (sheet X, sheet Y, positive scale)")
+    xform = _arm_read(errors, "profile native GetXform numeric values",
+                      lambda: tuple(float(value) for value in raw_xform) if isinstance(raw_xform, (list, tuple)) else None)
+    valid_xform = _finite_tuple(xform, 3) and xform[2] > 0.0
+    _arm_check(errors, "profile native GetXform is not a measured finite positive-scale placement",
+               xform, "exactly three finite values; scale > 0", valid_xform)
+    if not valid_xform:
+        xform = None
+    controls = _project_native_points(
+        adapter, view, ((0.0, 0.0, 0.0), (0.001, 0.0, 0.0),
+                        (0.0, 0.001, 0.0), (0.0, 0.0, 0.001)),
+        label="view-local native projection controls", errors=errors,
+    )
+    control_errors = None
+    if xform is not None and controls is not None:
+        scale = xform[2]
+        origin = (xform[0] - ARM_THICKNESS / 2000.0 * scale,
+                  xform[1] - ARM_C2C / 2000.0 * scale)
+        expected = (origin, (origin[0], origin[1] + 0.001 * scale),
+                    origin, (origin[0] + 0.001 * scale, origin[1]))
+        control_errors = tuple(math.dist(actual, wanted) for actual, wanted in zip(controls, expected))
+    projection_valid = control_errors is not None and all(value <= 1e-6 for value in control_errors)
+    _arm_check(errors, "view-local placement disagrees with actual native projection controls",
+               (xform, controls, control_errors), "Top/90-CCW native origin and XYZ controls each <= 1e-6 m", projection_valid)
+    diameters = tuple(
+        _project_native_points(
+            adapter, view, ((circle[0] - circle[6], circle[1], circle[2]),
+                            (circle[0] + circle[6], circle[1], circle[2])),
+            label=f"rendered chamfer source boundary {index}", errors=errors,
+        ) if circle is not None else None
+        for index, circle in enumerate(circles)
+    )
+    mouths = tuple(diameter[0] for diameter in diameters) if all(diameter is not None for diameter in diameters) else None
     result = _arm_read(errors, "profile GetPolylines7(1)", lambda: view.GetPolylines7(1), required=True)
     valid_result = isinstance(result, (list, tuple)) and len(result) == 2
     _arm_check(errors, "profile chamfer rendered-edge readback is unavailable",
@@ -776,26 +849,14 @@ def _rendered_chamfer_edges(
     data = _arm_read(errors, "profile rendered polyline data", lambda: tuple(float(value) for value in (result[1] or ()))) if valid_result else None
     finite = data is not None and all(math.isfinite(value) for value in data)
     _arm_check(errors, "profile chamfer rendered-edge data is non-finite or unavailable",
-               (None if data is None else len(data), None if data is None else tuple(index for index, value in enumerate(data) if not math.isfinite(value))),
-               "available, all finite", finite)
-    rendered = [False, False]
+               None if data is None else len(data), "available, all finite", finite)
     cursor = 0
     poly_count = 0
     offsets_known = finite
+    records = []
     candidates = []
-    stock_rendered = False
-    stock_records = []
-    outer_circle = matches[0][0][1] if len(matches[0]) == 1 else None
-    inner_circle = matches[1][0][1] if len(matches[1]) == 1 else None
-    source_points = tuple((circle[0] - circle[6], circle[1], circle[2])
-                          for circle in (outer_circle, inner_circle) if circle is not None)
-    source_sheet = _project_native_points(adapter, view, source_points, label="rendered chamfer source endpoints", errors=errors) if len(source_points) == 2 else None
-    bevel_rendered = False
-    fonts: dict[tuple[str, int], Any] = {}
     for edge_index, edge in enumerate(edges if edges is not None else ()):
         signature = None
-        # Circle signatures also identify the actual stock candidate below;
-        # unreadable unrelated curves remain bounded diagnostic telemetry.
         try:
             if edge is None:
                 signature = "silhouette"
@@ -807,13 +868,6 @@ def _rendered_chamfer_edges(
         except Exception as exc:
             if len(candidates) < 32:
                 candidates.append((edge_index, "UNMEASURED", type(exc).__name__, str(exc)[:160]))
-        identities = tuple(
-            _arm_read(errors, f"rendered edge {edge_index} / mapped boundary {index} IsSame",
-                      lambda boundary=boundary: int(app.IsSame(edge, boundary)))
-            if edge is not None and boundary is not None else None
-            for index, boundary in enumerate(boundaries)
-        )
-        _telemetry.info(f"profile rendered edge {edge_index}: entity_present={edge is not None}, mapped_boundary_IsSame={identities!r}, expected match=1")
         if not offsets_known:
             errors.append(f"UNMEASURED rendered edge {edge_index} polyline: invalid preceding buffer dependency")
             continue
@@ -822,7 +876,7 @@ def _rendered_chamfer_edges(
                    (cursor, len(data)), "cursor+2 <= rawlen", header_ok)
         if not header_ok:
             offsets_known = False
-            continue  # Identities/signatures of subsequent edges remain measurable.
+            continue
         kind, size = data[cursor:cursor + 2]
         shape_ok = (kind, size) in ((0.0, 0.0), (1.0, 12.0))
         _arm_check(errors, f"profile rendered-edge geometry has an unsupported native shape (edge {edge_index})",
@@ -846,79 +900,88 @@ def _rendered_chamfer_edges(
             offsets_known = False
             continue
         points = tuple(data[index:index + 3] for index in range(count_at + 1, end, 3))
-        longest = max((math.dist(a, b) for a, b in zip(points, points[1:])), default=0.0)
+        sheet = _view_local_points(points, xform)
         style = data[count_at - 6:count_at]
-        _telemetry.info(f"profile rendered edge {edge_index}: cursor={cursor}, end={end}, point_count={count}, longest_segment={longest!r}, style={style!r}, raw_samples={points[:3]!r}/{points[-2:]!r}, expected>1e-9")
-        stock_circle = (
-            _finite_tuple(signature, 7)
-            and math.dist(signature[:3], (0.0, 0.0, 0.0)) < 1e-8
-            and abs(abs(signature[5]) - 1.0) < 1e-8
-            and math.hypot(signature[3], signature[4]) < 1e-8
-            and abs(signature[6] - HALF_WIDTH / 1000.0) < 1e-8
-        )
-        outer_match = identities[0] == 1
-        inner_match = identities[1] == 1
-        selected_circle = outer_match or inner_match
-        if stock_circle:
-            stock_records.append((edge_index, signature, points, style))
-        projected = None
-        solid = False
-        if selected_circle:
-            solid = _solid_record(ddoc, style, fonts, label=f"rendered edge {edge_index}", errors=errors)
-            circle = outer_circle if outer_match else inner_circle
-            if _circle_record(points, circle, label=f"rendered edge {edge_index}", errors=errors):
-                projected = _project_native_points(adapter, view, points, label=f"rendered edge {edge_index} MODEL circle ink", errors=errors)
-            segments = tuple((a, b) for a, b in zip(projected, projected[1:]) if math.dist(a, b) > 1e-9) if projected is not None else ()
-            if inner_match and solid and segments:
-                rendered[1] = True
-            if outer_match:
-                distances = tuple(distance_to_point(segment, source_sheet[0]) for segment in segments) if source_sheet is not None else ()
-                distance = min(distances, default=math.inf)
-                _telemetry.info(f"rendered edge {edge_index} direct outer boundary: projected_record={projected!r}, source_outer={None if source_sheet is None else source_sheet[0]!r}, adjacent_segment_distances={distances!r}, actual_distance={distance!r}, expected<=5e-5m (equality roundoff<=1e-12m)")
-                rendered[0] = rendered[0] or (solid and bool(segments) and _within_contour_tolerance(distance))
-        # A section-created bevel may have no original IEdge counterpart. Its
-        # ACTUAL non-hatch ink must lie on the bounded source generatrix at Y=0.
-        bevel_residuals = tuple(_model_segment_distance(point, *source_points) for point in points) if len(source_points) == 2 else ()
-        bevel_candidate = longest > 1e-9 and bool(bevel_residuals) and all(value <= 1e-8 for value in bevel_residuals)
-        if bevel_candidate:
-            bevel_solid = _solid_record(ddoc, style, fonts, label=f"rendered bevel edge {edge_index}", errors=errors)
-            bevel_points = _project_native_points(adapter, view, points, label=f"rendered bevel edge {edge_index} MODEL ink", errors=errors)
-            segments = tuple((a, b) for a, b in zip(bevel_points, bevel_points[1:]) if math.dist(a, b) > 1e-9) if bevel_points is not None else ()
-            coverage = tuple(min((distance_to_point(segment, endpoint) for segment in segments), default=math.inf) for endpoint in source_sheet) if source_sheet is not None else ()
-            _telemetry.info(f"rendered bevel edge {edge_index}: source_endpoints={source_points!r}, raw_samples={points[:3]!r}/{points[-2:]!r}, model_residuals={bevel_residuals!r}, projected_record={bevel_points!r}, endpoint_distances={coverage!r}, expected both<=5e-5m on same solid record")
-            bevel_rendered = bevel_rendered or (bevel_solid and bool(segments) and len(coverage) == 2 and all(_within_contour_tolerance(distance) for distance in coverage))
+        _telemetry.info(f"profile rendered edge {edge_index}: cursor={cursor}, end={end}, point_count={count}, style={style!r}, raw_view_local_samples={points[:3]!r}/{points[-2:]!r}, sheet_samples={None if sheet is None else (sheet[:3], sheet[-2:])!r}")
+        records.append((edge_index, signature, points, sheet, style, kind))
         cursor = end
         poly_count += 1
-    # A local cut may expose the real outer rim while clipping away the old
-    # stock contour. Prefer its authoritative mapped source identity; measure
-    # the coincident stock representation only when no direct record proves it.
-    stock_contours = len(stock_records)
-    if not rendered[0]:
-        for edge_index, circle, points, style in stock_records:
-            solid = _solid_record(ddoc, style, fonts, label=f"rendered stock edge {edge_index}", errors=errors)
-            projected = None
-            if _circle_record(points, circle, label=f"rendered stock edge {edge_index}", errors=errors):
-                projected = _project_native_points(adapter, view, points, label=f"rendered stock edge {edge_index} MODEL circle ink", errors=errors)
-            segments = tuple((a, b) for a, b in zip(projected, projected[1:]) if math.dist(a, b) > 1e-9) if projected is not None else ()
-            distances = tuple(distance_to_point(segment, source_sheet[0]) for segment in segments) if source_sheet is not None else ()
-            distance = min(distances, default=math.inf)
-            _telemetry.info(f"rendered edge {edge_index} actual stock contour: projected_record={projected!r}, source_outer={None if source_sheet is None else source_sheet[0]!r}, adjacent_segment_distances={distances!r}, actual_distance={distance!r}, expected<=5e-5m (equality roundoff<=1e-12m)")
-            stock_rendered = stock_rendered or (solid and bool(segments) and _within_contour_tolerance(distance))
-    representation = "direct mapped outer boundary" if rendered[0] else "coincident rendered stock contour" if stock_rendered else "UNPROVEN"
-    _telemetry.info(f"profile chamfer outer representation={representation!r}, direct_proven={rendered[0]!r}, stock_record_count={stock_contours}, stock_proven={stock_rendered!r}")
+    selected = []
+    rendered = []
+    for index, (circle, diameter) in enumerate(zip(circles, diameters)):
+        found = [record for record in records if circle is not None and record[1] == circle]
+        _arm_check(errors, f"profile rendered source circle is missing or duplicate (boundary {index})",
+                   tuple(record[0] for record in found), "one exact native source CircleParams match", len(found) == 1)
+        record = found[0] if len(found) == 1 else None
+        sheet = None if record is None else record[3]
+        mouth_error = min((math.dist(point, diameter[0]) for point in (sheet[0], sheet[-1])), default=math.inf) if sheet and diameter is not None else math.inf
+        valid = projection_valid and _record_on_segment(sheet, diameter) and mouth_error <= 1e-6
+        _arm_check(errors, f"profile does not render the actual {'outer' if index == 0 else 'inner'} rear bore-chamfer edge (boundary {index})",
+                   (None if record is None else record[0], mouth_error), "unique source circle; whole projected ink and mouth endpoint <= 1e-6 m", valid)
+        rendered.append(valid)
+        if record is not None:
+            selected.append(record)
+    bevels = [record for record in records if record[5] == 0.0
+              and _record_on_segment(record[3], mouths)
+              and max(_endpoint_errors(record[3], mouths)) <= 1e-6]
+    bevel_valid = projection_valid and len(bevels) == 1
+    _arm_check(errors, "profile lacks a unique solid actual chamfer section stroke at the bore axis",
+               tuple((record[0], _endpoint_errors(record[3], mouths)) for record in bevels),
+               "one nonzero whole record with BOTH projected mouth endpoints <= 1e-6 m", bevel_valid)
+    selected.extend(bevels)
+    # Split visible stock arcs are one control only when their actual native
+    # circle identity and descriptors agree. Anchor that contour at the
+    # independently projected negative-X stock extreme; never join its ink.
+    stock_controls = []
+    stock_extremes = []
+    for record in records:
+        circle = record[1]
+        stock_circle = (
+            _finite_tuple(circle, 7)
+            and math.dist(circle[:3], (0.0, 0.0, 0.0)) < 1e-8
+            and abs(abs(circle[5]) - 1.0) < 1e-8
+            and math.hypot(circle[3], circle[4]) < 1e-8
+            and abs(circle[6] - HALF_WIDTH / 1000.0) < 1e-8
+        )
+        if not stock_circle:
+            continue
+        diameter = _project_native_points(
+            adapter, view, ((circle[0] - circle[6], circle[1], circle[2]),
+                            (circle[0] + circle[6], circle[1], circle[2])),
+            label=f"visible stock outline {record[0]} control", errors=errors,
+        )
+        sheet = record[3]
+        endpoint_error = min((math.dist(point, diameter[0]) for point in (sheet[0], sheet[-1])), default=math.inf) if sheet and diameter is not None else math.inf
+        measured = projection_valid and _record_on_segment(sheet, diameter)
+        _telemetry.info(f"visible stock outline {record[0]} positive control: native_circle={circle!r}, projected_diameter={diameter!r}, endpoint_error={endpoint_error!r}, measured={measured}")
+        _arm_check(errors, f"visible stock outline {record[0]} has unmeasured native projection geometry",
+                   measured, "nonzero whole visible record on its native projected stock diameter", measured)
+        if measured:
+            stock_controls.append(record)
+            if endpoint_error <= 1e-6:
+                stock_extremes.append(record[0])
+    stock_identities = {record[1] for record in stock_controls}
+    stock_styles = {record[4] for record in stock_controls}
+    unique_stock = len(stock_identities) == 1 and len(stock_styles) == 1 and bool(stock_extremes)
+    _arm_check(errors, "profile visible stock-outline font positive control is missing or ambiguous",
+               (tuple(record[0] for record in stock_controls), stock_extremes, tuple(stock_styles)),
+               "one proven native stock contour, concordant descriptors, measured stock extreme", unique_stock)
+    control_style = next(iter(stock_styles)) if unique_stock else None
+    for record in (*stock_controls, *selected):
+        style = record[4]
+        readable = (
+            _finite_tuple(style, 6) and all(value.is_integer() for value in style)
+            and (style[1] >= 0.0 or (style[1] == -1.0 and style[2] >= 0.0))
+        )
+        _arm_check(errors, f"rendered edge {record[0]} has an unreadable or mismatched native outline font descriptor",
+                   (style, control_style), "six integral native fields identical to the unique visible stock outline", readable and style == control_style)
+    _typed_record_styles(view, stock_controls if unique_stock else (), selected, xform, errors=errors)
     _telemetry.info(f"profile chamfer rendered candidate circle signatures (first 32): {candidates!r}; edge_count={None if edges is None else len(edges)}")
-    _telemetry.info(f"profile chamfer rendered proof: flags={tuple(rendered)}, cursor={cursor}, rawlen={None if data is None else len(data)}, edge_count={None if edges is None else len(edges)}, poly_count={poly_count}")
+    _telemetry.info(f"profile chamfer rendered proof: flags={tuple(rendered)}, bevel={bevel_valid}, cursor={cursor}, rawlen={None if data is None else len(data)}, edge_count={None if edges is None else len(edges)}, poly_count={poly_count}")
     _arm_check(errors, "profile rendered-edge buffer was not fully measured",
                (cursor, None if data is None else len(data), poly_count, None if edges is None else len(edges)),
                "cursor=rawlen and poly_count=edge_count",
                data is not None and edges is not None and cursor == len(data) and poly_count == len(edges))
-    _arm_check(errors, "profile does not render the actual inner rear bore-chamfer edge (boundary 1)",
-               rendered[1], True, rendered[1])
-    _arm_check(errors, "profile lacks a solid directly rendered outer boundary or actual rendered stock-face contour for the outer chamfer mouth",
-               (rendered[0], stock_contours, stock_rendered), "solid MODEL-validated mapped outer or stock record; adjacent segment distance <= 0.05 mm",
-               rendered[0] or stock_rendered)
-    _arm_check(errors, "profile lacks a solid actual chamfer section stroke at the bore axis",
-               bevel_rendered, "one MODEL-validated solid record covering both source chamfer endpoints", bevel_rendered)
 
 
 @_telemetry.traced("drawing.crank_arm_profile_chamfer")
@@ -1390,7 +1453,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         caption, errors=arm_errors,
     )
-    _raise_arm_errors(arm_errors)
+    _raise_arm_errors(adapter, arm_errors)
 
     return await finalize_drawing(
         adapter,

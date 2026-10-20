@@ -22,6 +22,17 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import drill_process
 
 
+@pytest.fixture(autouse=True)
+def forensic_calls(monkeypatch):
+    """Offline guards must never capture a real seat or write failure artefacts."""
+    calls = []
+    def capture(adapter, label, message, **context):
+        calls.append((adapter, label, message, context))
+        raise context["exception"]
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    return calls
+
+
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-crank-arm.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-crank-arm.pdf")
@@ -534,7 +545,7 @@ def _check_arm_guard(guard, *args, **kwargs):
     """Exercise a collector at the same single failure boundary as build."""
     errors = []
     result = guard(*args, errors=errors, **kwargs)
-    drawing._raise_arm_errors(errors)
+    drawing._raise_arm_errors(None, errors)
     return result
 
 
@@ -694,12 +705,14 @@ def _native_chamfer(monkeypatch, **changed):
 def _project_profile(_adapter, view, points, **_kwargs):
     """Independent Top basis: +X right and +Z down before its native turn."""
     cosine, sine = math.cos(view.Angle), math.sin(view.Angle)
+    placement = getattr(view, "projection_placement", drawing.PROFILE_CENTER)
+    scale = getattr(view, "projection_scale", 1.0)
     result = []
     for x, _y, z in points:
         dx, dy = x - spec.ARM_C2C / 2000.0, -(z - spec.ARM_THICKNESS / 2000.0)
         result.append((
-            drawing.PROFILE_CENTER[0] + cosine * dx - sine * dy,
-            drawing.PROFILE_CENTER[1] + sine * dx + cosine * dy,
+            placement[0] + scale * (cosine * dx - sine * dy),
+            placement[1] + scale * (sine * dx + cosine * dy),
         ))
     return result
 
@@ -857,12 +870,56 @@ def test_profile_chamfer_refuses_ignored_native_text_placement(monkeypatch, refu
         _check_arm_guard(drawing._place_profile_chamfer, adapter, profile, [annotation])
 
 
-def _polyline_record(points, style=(0.0, -1.0, 7.0, 0.0, 0.0, 0.0)):
+# Native source signatures and logged point samples from run
+# 20261020T112243344Z-8b17a8fe19fd40658a14301a7e2888db (artifact://6715).
+# The log retains first-three/last-two samples, NOT the entire 633-double
+# packet. Replay those exact samples in a polyline envelope; never invent
+# the omitted circle tessellation or its twelve arc-geometry values.
+_NATIVE_OUTER = (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.009950000038999998)
+_NATIVE_INNER = (0.0, 0.0, 0.0002500000080000002, -0.0, -0.0, -1.0, 0.009700000031)
+_NATIVE_STYLE = (0.0, 0.0, -1.0, 1.0, -1.0, 0.0)
+_NATIVE_SAMPLES = {
+    "stock": (
+        (-0.004000000001000004, -0.04844093663488029, 0.006448713577047853),
+        (-0.004000000001000004, -0.04889405986941188, 0.005609402908615206),
+        (-0.004000000001000004, -0.049282914427867724, 0.0047384521659291825),
+        (-0.004000000001000004, -0.05019971082211258, 8.571162396932753e-05),
+        (-0.004000000001000004, -0.050200000057, 1.421085471875472e-17),
+    ),
+    "stock_split": (
+        (-0.004000000001000004, -0.037500000057, 0.012700000000000013),
+        (-0.004000000001000004, -0.03845874708314772, 0.012663759478916726),
+        (-0.004000000001000004, -0.039412022378301007, 0.01255524474643354),
+        (-0.004000000001000004, -0.045486402523133615, 0.009874582302504504),
+        (-0.004000000001000037, -0.046209063549119724, 0.00924349571808348),
+    ),
+    "inner": (
+        (-0.003749999993000004, -0.04624394172740298, -0.004199224293365415),
+        (-0.003749999993000004, -0.0463231325169851, -0.004030177935892764),
+        (-0.003749999993000004, -0.04663569760951304, -0.003260219445130464),
+        (-0.003749999993000004, -0.04716440560282695, -0.0008302204810705247),
+        (-0.003749999993000004, -0.047200000088, 1.7680301670708336e-17),
+    ),
+    "bevel": (
+        (-0.004000000001000002, -0.047450000096, 1.7294807553970557e-17),
+        (-0.003749999993000004, -0.047200000088, 1.7680301670708336e-17),
+    ),
+    "outer": (
+        (-0.004000000001000002, -0.047450000096, 1.7294807553970557e-17),
+        (-0.004000000001000002, -0.04741409711655973, -0.000844500011680925),
+        (-0.004000000001000002, -0.04730664727852588, -0.0016829055376457172),
+        (-0.004000000001000002, -0.046565315314656276, -0.004101531428064908),
+        (-0.004000000001000004, -0.04621071604262393, -0.004808942481865998),
+    ),
+}
+
+
+def _polyline_record(points, style=_NATIVE_STYLE):
     return (0.0, 0.0, *style, float(len(points)), *(value for point in points for value in point))
 
 
-def _circle_ink(radius, z, xs):
-    return tuple((x, math.sqrt(max(0.0, radius * radius - x * x)), z) for x in xs)
+def _packet(profile, edges, records):
+    profile.packet = (tuple(edges), tuple(value for record in records for value in record))
 
 
 def _native_breakout(monkeypatch, adapter, profile, changed):
@@ -942,15 +999,12 @@ def _native_breakout(monkeypatch, adapter, profile, changed):
 def _chamfer_edge_case(monkeypatch, **changed):
     adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
     monkeypatch.setattr(drawing, "model_points_in_view", _project_profile)
-    def circle(z_mm, radius_mm, *, center=None, axis=(0.0, 0.0, 1.0)):
-        curve = SimpleNamespace(
-            IsCircle=lambda: True,
-            CircleParams=(*(center if center is not None else (0.0, 0.0, z_mm / 1000.0)), *axis, radius_mm / 1000.0),
-        )
+    def circle(params):
+        curve = SimpleNamespace(IsCircle=lambda: True, CircleParams=params)
         return SimpleNamespace(GetCurve=lambda: curve)
-    outer = circle(changed.get("outer_z", 0.0), changed.get("outer_r", 9.95))
-    inner = circle(changed.get("inner_z", 0.25), 9.7)
-    near = circle(spec.ARM_THICKNESS, 9.7)
+    outer = circle(changed.get("source_outer", _NATIVE_OUTER))
+    inner = circle(changed.get("source_inner", _NATIVE_INNER))
+    near = circle((0.0, 0.0, 0.008, 0.0, 0.0, 1.0, 0.0097))
     face = SimpleNamespace(GetEdges=lambda: changed.get("feature_edges", (outer, inner)))
     feature = SimpleNamespace(GetFaces=lambda: (face,))
     profile.ReferencedDocument.FeatureByName = lambda name: (
@@ -962,424 +1016,376 @@ def _chamfer_edge_case(monkeypatch, **changed):
     annotation.GetAttachedEntityTypes = lambda: changed.get(
         "attached_types", (2,) if changed.get("face_attachment") else (1,)
     )
-    # Part and view identities are DISTINCT. The outer rim is suppressed in
-    # this edge-on view; real rendered stock, not a null mapping, proves it.
-    view_outer = SimpleNamespace(GetCurve=outer.GetCurve)
-    view_inner = SimpleNamespace(GetCurve=inner.GetCurve)
+    view_outer = circle(changed.get("rendered_outer", _NATIVE_OUTER))
+    view_inner = circle(changed.get("rendered_inner", _NATIVE_INNER))
     view_near = SimpleNamespace(GetCurve=near.GetCurve)
-    view_stock = circle(
-        changed.get("stock_z", 0.0), changed.get("stock_r", spec.HALF_WIDTH),
-        center=changed.get("stock_center"), axis=changed.get("stock_axis", (0.0, 0.0, 1.0)),
-    )
-    view_stock.raw_points = changed.get("stock_points", _circle_ink(0.0127, 0.0, (-0.0127, -0.0105, -0.0094, 0.0)))
-    view_inner.raw_points = changed.get("inner_points", _circle_ink(0.0097, 0.00025, (-0.0097, -0.0095)))
-    view_outer.raw_points = changed.get("outer_points", _circle_ink(0.00995, 0.0, (-0.00995, -0.0098)))
-    view_near.raw_points = _circle_ink(0.0097, spec.ARM_THICKNESS / 1000.0, (-0.0097, -0.0095))
-    view_bevel = SimpleNamespace(
-        GetCurve=lambda: SimpleNamespace(IsCircle=lambda: False),
-        raw_points=changed.get("bevel_points", ((-0.00995, 0.0, 0.0), (-0.0097, 0.0, 0.00025))),
-    )
-    mapped = changed.get("mapping", (view_outer if changed.get("outer_mapped") or changed.get("direct_outer") else None, view_inner))
-    profile.GetCorrespondingEntity = lambda source: (
-        mapped[0] if source is outer else mapped[1] if source is inner else None
-    )
+    stock_params = changed.get("stock_circle", (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0127))
+    view_stock = circle(stock_params)
+    view_stock_split = circle(changed.get("stock_split_circle", stock_params))
+    view_bevel = SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: False))
+    names = ("stock", "stock_split", "inner", "bevel", "outer")
+    rendered = (view_stock, view_stock_split, view_inner, view_bevel, view_outer)
+    for name, edge in zip(names, rendered):
+        points = changed.get(f"{name}_points", _NATIVE_SAMPLES[name])
+        if points and (changed.get("degenerate") or changed.get(f"{name}_degenerate")):
+            points = (points[0], points[0])
+        edge.raw_points = points
+    profile.record_edges = rendered
+    profile.record_data = tuple(_polyline_record(edge.raw_points, changed.get(f"{name}_style", _NATIVE_STYLE))
+                                for name, edge in zip(names, rendered))
+    _packet(profile, rendered, profile.record_data)
+    if "raw" in changed:
+        profile.packet = (rendered, changed["raw"])
+    if "result" in changed:
+        profile.packet = changed["result"]
+    profile.GetPolylines7 = lambda option: profile.packet if option == 1 else pytest.fail("crosshatch option")
+    # The actual breakout maps neither source circle. Mapping is telemetry.
+    mapped = changed.get("mapping", (None, None))
+    profile.GetCorrespondingEntity = lambda source: mapped[0] if source is outer else mapped[1] if source is inner else None
     profile.source_edges = (outer, inner)
     profile.view_edges = (view_outer, view_inner)
     profile.stock_contour = view_stock
+    profile.stock_split = view_stock_split
     profile.bevel = view_bevel
-    def record(edge):
-        points = getattr(edge, "raw_points", ())
-        name = "stock" if edge is view_stock else "inner" if edge is view_inner else "outer" if edge is view_outer else "bevel"
-        if edge is view_stock and changed.get("stock_no_ink"):
-            points = ()
-        elif points and (changed.get("degenerate", False) or changed.get(f"{name}_degenerate", False)):
-            points = (points[0], points[0])
-        style = changed.get(f"{name}_style", (0.0, -1.0, float(changed.get(f"{name}_font", 7)), 0.0, 0.0, 0.0))
-        return _polyline_record(points, style)
-    rendered = changed.get("rendered", (view_outer if changed.get("direct_outer") else view_stock, view_inner, view_bevel))
-    profile.record_data = tuple(record(edge) for edge in rendered)
-    raw = changed.get("raw", tuple(value for item in profile.record_data for value in item))
-    font_calls = []
-    decoder_calls = []
-    def font(decoder, index):
-        font_calls.append(index)
-        decoder_calls.append((decoder, index))
-        failure = "legacy_font_error" if decoder == "GetLineFontInfo" else "modern_font_error"
-        if changed.get("font_error") or changed.get(failure):
-            raise OSError("native font decoder unavailable")
-        pattern_key = "legacy_patterns" if decoder == "GetLineFontInfo" else "patterns"
-        defaults = {7: (1.0, 0.5), 8: (2.0, 0.25, -0.25)}
-        return changed.get(pattern_key, defaults).get(index)
+    profile.projection_placement = changed.get("placement", drawing.PROFILE_CENTER)
+    profile.projection_scale = changed.get("projection_scale", 1.0)
+    profile.GetXform = lambda: changed.get("xform", (*profile.projection_placement, profile.projection_scale))
+    # Optional typed-line absence is tested separately from the observed
+    # packet; no GetDisplayData4 return was captured in that native run.
+    profile.line_data = SimpleNamespace(GetLineCount=lambda: 0)
+    profile.GetDisplayData4 = lambda: profile.line_data
     adapter.currentModel = SimpleNamespace(
-        GetLineFontInfo=lambda index: font("GetLineFontInfo", index),
-        GetLineFontInfo2=lambda index: font("GetLineFontInfo2", index),
-        font_calls=font_calls, decoder_calls=decoder_calls,
+        GetLineFontInfo=lambda _index: pytest.fail("legacy font must not be decoded"),
+        GetLineFontInfo2=lambda _index: pytest.fail("font must use the actual visible outline"),
     )
     _native_breakout(monkeypatch, adapter, profile, changed)
-    profile.GetPolylines7 = lambda option: (
-        changed.get("result", (rendered, raw)) if option == 1 else pytest.fail("crosshatch option")
-    )
     return adapter, profile, annotation, view_outer, view_inner, view_near
 
 
+def _typed_lines(profile, *, frame="view-local", styles=None):
+    """Synthetic documented channel, independently calibrated on stock ink."""
+    styles = styles or {}
+    lines = []
+    for name, edge in zip(("stock", "stock_split", "inner", "bevel", "outer"), profile.record_edges):
+        endpoints = (edge.raw_points[0], edge.raw_points[-1])
+        if frame == "sheet":
+            tx, ty, scale = profile.GetXform()
+            endpoints = tuple((tx + scale * x, ty + scale * y, z) for x, y, z in endpoints)
+        lines.append((0.0, 0.0, float(styles.get(name, 0)), 1.0, *endpoints[0], *endpoints[1]))
+    profile.line_data = SimpleNamespace(GetLineCount=lambda: len(lines), GetLineAtIndex3=lambda index: lines[index])
+    return lines
+
+
 @pytest.mark.parametrize("face_attachment", (False, True))
-@pytest.mark.parametrize("outer_mapped", (False, True))
-@pytest.mark.parametrize("stock_axis", ((0.0, 0.0, 1.0), (0.0, 0.0, -1.0)))
-def test_chamfer_edge_guard_proves_inner_mapping_and_coincident_rendered_stock(
-    monkeypatch, face_attachment, outer_mapped, stock_axis,
-) -> None:
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, face_attachment=face_attachment, outer_mapped=outer_mapped, stock_axis=stock_axis,
-    )
-    assert all(adapter.swApp.IsSame(source, target) == 0
-               for source, target in zip(profile.source_edges, profile.view_edges))
-    assert (profile.GetCorrespondingEntity(profile.source_edges[0]) is None) is (not outer_mapped)
+def test_actual_native_chamfer_samples_and_complete_record13_pass_without_mapping(monkeypatch, face_attachment):
+    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, face_attachment=face_attachment)
+    assert tuple(profile.GetCorrespondingEntity(edge) for edge in profile.source_edges) == (None, None)
     logged = []
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert adapter.currentModel.font_calls == [7]  # decoder is cached per native index
-    assert any("actual stock contour: projected_record=" in entry and "actual_distance=" in entry for entry in logged)
-    assert any("rendered bevel edge 2" in entry and "endpoint_distances=" in entry for entry in logged)
+    assert math.dist(*_NATIVE_SAMPLES["bevel"]) == pytest.approx(0.00035355340190697883)
+    mouths = tuple((0.300 + x, 0.142 + y) for x, y, _z in _NATIVE_SAMPLES["bevel"])
+    assert mouths[0] == pytest.approx((0.295999999999, 0.094549999904))
+    assert mouths[1] == pytest.approx((0.296250000007, 0.094799999912))
+    assert any("GetXform raw=" in entry for entry in logged)
+    assert any("positive control:" in entry and "measured=True" in entry for entry in logged)
+    assert any("flags=(True, True), bevel=True" in entry for entry in logged)
 
 
-def test_breakout_direct_outer_boundary_does_not_require_clipped_stock_contour(monkeypatch):
-    adapter, profile, annotation, outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, direct_outer=True,
-    )
-    assert profile.GetCorrespondingEntity(profile.source_edges[0]) is outer
-    edges, _raw = profile.GetPolylines7(1)
-    assert all(edge is not profile.stock_contour for edge in edges)
-    logged = []
-    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+def test_source_matching_is_independent_of_native_record_indices_and_order(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    _packet(profile, reversed(profile.record_edges), reversed(profile.record_data))
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert any("direct outer boundary: projected_record=" in entry and "actual_distance=" in entry for entry in logged)
-    assert any("outer representation='direct mapped outer boundary'" in entry for entry in logged)
-    assert not any("actual stock contour:" in entry for entry in logged)
 
 
-def test_proven_direct_outer_ignores_unselected_stock_frame_and_font(monkeypatch):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, direct_outer=True)
-    edges, raw = profile.GetPolylines7(1)
-    unused_stock = _polyline_record(
-        ((4.0, 5.0, 6.0), (7.0, 8.0, 9.0)),
-        (0.0, -1.0, 8.0, 0.0, 0.0, 0.0),
+@pytest.mark.parametrize("placement", ((0.413, -0.025), (0.175, 0.205)))
+@pytest.mark.parametrize("scale", (1.0, 2.0))
+def test_native_getxform_not_layout_constants_places_view_local_ink(monkeypatch, placement, scale):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(
+        monkeypatch, placement=placement, projection_scale=scale,
     )
-    profile.GetPolylines7 = lambda _option: ((*edges, profile.stock_contour), (*raw, *unused_stock))
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert adapter.currentModel.font_calls == [7]
 
 
-@pytest.mark.parametrize("correct_identity", (True, False))
-def test_direct_outer_proof_handles_a_real_gap_between_same_edge_stock_records(monkeypatch, correct_identity):
-    adapter, profile, annotation, outer, inner, _near = _chamfer_edge_case(monkeypatch, direct_outer=True)
-    stock = profile.stock_contour
-    left = _polyline_record(_circle_ink(0.0127, 0.0, (-0.0127, -0.0101)))
-    right = _polyline_record(_circle_ink(0.0127, 0.0, (-0.0098, 0.0)))
-    profile.GetPolylines7 = lambda _option: (
-        (stock, outer, stock, inner, profile.bevel),
-        (*left, *profile.record_data[0], *right, *profile.record_data[1], *profile.record_data[2]),
-    )
-    if not correct_identity:
-        unrelated = object()
-        profile.GetCorrespondingEntity = lambda source: (
-            unrelated if source is profile.source_edges[0] else inner
-        )
-        with pytest.raises(RuntimeError, match="directly rendered outer"):
-            _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+@pytest.mark.parametrize("xform", (
+    None, (), (0.3, 0.142), (0.3, 0.142, 1.0, 0.0),
+    (0.3, 0.142, 0.0), (0.3, 0.142, -1.0),
+    (float("nan"), 0.142, 1.0), (0.3, 0.142, float("inf")),
+    lambda: (0.3, 0.142, 1.0), (0.3, 0.142, lambda: 1.0),
+))
+def test_native_getxform_requires_measured_finite_exact_shape_and_positive_scale(monkeypatch, xform):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, xform=xform)
+    with pytest.raises(RuntimeError, match="GetXform"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_getxform_access_failure_cannot_reuse_layout_placement(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    def unreadable():
+        raise OSError("native placement unmeasured")
+    profile.GetXform = unreadable
+    with pytest.raises(RuntimeError, match="native placement unmeasured"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("projection", (None, (), ((float("nan"), 0.0),), ((0.296,),)))
+def test_native_projection_cannot_be_missing_or_malformed(monkeypatch, projection):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_kw: projection)
+    with pytest.raises(RuntimeError, match="projection"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_native_projection_controls_reject_a_fitting_chamfer_in_the_wrong_basis(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    def wrong_axes(adapter, view, points, **kwargs):
+        result = _project_profile(adapter, view, points, **kwargs)
+        if kwargs["label"] == "view-local native projection controls":
+            return tuple((x + 0.000002, y) for x, y in result)
+        return result
+    monkeypatch.setattr(drawing, "model_points_in_view", wrong_axes)
+    with pytest.raises(RuntimeError, match="actual native projection controls"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("boundary", ("inner", "outer"))
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "wrong_signature", "wrong_ink", "degenerate"))
+def test_both_rendered_circles_need_unique_exact_source_params_and_actual_mouth_ink(monkeypatch, boundary, fault):
+    adapter, profile, annotation, outer, inner, near = _chamfer_edge_case(monkeypatch)
+    target = inner if boundary == "inner" else outer
+    edges, records = list(profile.record_edges), list(profile.record_data)
+    index = next(index for index, edge in enumerate(edges) if edge is target)
+    if fault == "missing":
+        edges.pop(index)
+        records.pop(index)
+    elif fault == "duplicate":
+        edges.append(SimpleNamespace(GetCurve=target.GetCurve))
+        records.append(records[index])
+    elif fault == "wrong_signature":
+        # Even a <nominal feature tolerance difference is not the ACTUAL
+        # source CircleParams identity. Opposite-mouth circles also fail.
+        params = list(target.GetCurve().CircleParams)
+        params[6] += 1e-10
+        edges[index] = SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: True, CircleParams=tuple(params)))
+    elif fault == "wrong_ink":
+        records[index] = _polyline_record(tuple((x + 0.000002, y, z) for x, y, z in target.raw_points))
     else:
-        logged = []
-        monkeypatch.setattr(drawing._telemetry, "info", logged.append)
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-        assert any("outer representation='direct mapped outer boundary'" in entry
-                   and "stock_record_count=2" in entry for entry in logged)
-        assert not any("actual stock contour:" in entry for entry in logged)
-
-
-@pytest.mark.parametrize(
-    "changed",
-    (
-        {"outer_font": 8}, {"outer_degenerate": True}, {"outer_points": ()},
-        {"outer_points": _circle_ink(0.00995, 0.0, (-0.0098, -0.0096))},
-        {"outer_points": _circle_ink(0.0127, 0.0, (-0.0127, -0.0105))},
-        {"outer_points": ((-0.00995, 0.0, 0.0001), (-0.0098, 0.0, 0.0001))},
-    ),
-)
-def test_direct_outer_still_requires_solid_model_frame_and_actual_mouth_coverage(monkeypatch, changed):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, direct_outer=True, **changed,
-    )
-    with pytest.raises(RuntimeError, match="continuous native line font|MODEL-circle|directly rendered outer"):
+        records[index] = _polyline_record((target.raw_points[0], target.raw_points[0]))
+    _packet(profile, edges, records)
+    with pytest.raises(RuntimeError, match=f"boundary {0 if boundary == 'outer' else 1}"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-def test_rendered_outer_circle_without_mapping_cannot_claim_direct_identity(monkeypatch):
-    adapter, profile, annotation, _outer, inner, _near = _chamfer_edge_case(monkeypatch, direct_outer=True)
-    profile.GetCorrespondingEntity = lambda source: inner if source is profile.source_edges[1] else None
-    with pytest.raises(RuntimeError, match="directly rendered outer"):
+@pytest.mark.parametrize("boundary", (0, 1))
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "wrong"))
+def test_actual_feature_source_circles_must_remain_unique_and_measured(monkeypatch, boundary, fault):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    sources = list(profile.source_edges)
+    target = sources[boundary]
+    if fault == "missing":
+        sources.pop(boundary)
+    elif fault == "duplicate":
+        sources.append(SimpleNamespace(GetCurve=target.GetCurve))
+    else:
+        params = list(target.GetCurve().CircleParams)
+        params[2] += 0.0001
+        sources[boundary] = SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: True, CircleParams=tuple(params)))
+    face = SimpleNamespace(GetEdges=lambda: sources)
+    profile.ReferencedDocument.FeatureByName = lambda _name: SimpleNamespace(GetFaces=lambda: (face,))
+    with pytest.raises(RuntimeError, match="cannot identify both actual rear bore-chamfer boundary"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-@pytest.mark.parametrize("mapping", ((None, None), (None, object()), (object(), object())))
-def test_chamfer_mapping_refuses_missing_or_nonrendered_inner_view_entity(monkeypatch, mapping):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, mapping=mapping,
-    )
-    with pytest.raises(RuntimeError, match="part-to-view|actual inner"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_chamfer_mapping_refuses_two_boundaries_mapped_to_one_entity(monkeypatch):
-    adapter, profile, annotation, outer, _inner, _near = _chamfer_edge_case(monkeypatch)
-    profile.GetCorrespondingEntity = lambda _source: outer
-    with pytest.raises(RuntimeError, match="not distinct"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_source_feature_boundary_geometry_must_be_unique_not_just_equivalent(monkeypatch):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch)
-    outer, inner = profile.source_edges
-    duplicate = SimpleNamespace(GetCurve=outer.GetCurve)
-    face = SimpleNamespace(GetEdges=lambda: (outer, duplicate, inner))
-    profile.ReferencedDocument.FeatureByName = lambda name: (
-        SimpleNamespace(GetFaces=lambda: (face,)) if name == "BoreRearChamfer" else None
-    )
-    with pytest.raises(RuntimeError, match="cannot identify both actual rear bore-chamfer boundary edges"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_outer_mapping_exception_is_telemetry_but_never_substitutes_for_stock(monkeypatch):
-    adapter, profile, annotation, _outer, inner, _near = _chamfer_edge_case(monkeypatch)
-    def mapped(source):
-        if source is profile.source_edges[0]:
-            raise OSError("coincident outer rim suppressed")
-        return inner
-    profile.GetCorrespondingEntity = mapped
+@pytest.mark.parametrize("mapping", ((None, None), (object(), object())))
+def test_mapping_is_telemetry_only_but_never_replaces_actual_geometry(monkeypatch, mapping):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, mapping=mapping)
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    profile.GetPolylines7 = lambda _option: ((inner, profile.bevel), (*profile.record_data[1], *profile.record_data[2]))
-    with pytest.raises(RuntimeError, match="actual rendered stock-face contour"):
+    _packet(profile, profile.record_edges[:-1], profile.record_data[:-1])
+    with pytest.raises(RuntimeError, match="actual outer"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-@pytest.mark.parametrize("outer_mapped", (False, True))
-@pytest.mark.parametrize(
-    "changed",
-    (
-        {"stock_r": 9.95}, {"stock_z": 8.0},
-        {"stock_center": (0.001, 0.0, 0.0)}, {"stock_axis": (0.0, 1.0, 0.0)},
-        {"stock_degenerate": True}, {"stock_no_ink": True},
-        {"stock_points": ((4.0, 5.0, 6.0), (7.0, 8.0, 9.0))},
-        {"inner_points": ((0.296, 0.0948, 0.0), (0.296, 0.095, 0.0))},
-        {"stock_points": ((-0.0127, 0.0, 0.0001), (-0.00995, 0.0, 0.0001))},
-        {"stock_font": 8}, {"inner_font": 8}, {"bevel_font": 8},
-        {"bevel_points": ()},
-        {"bevel_points": ((-0.00995, 0.0001, 0.0), (-0.0097, 0.0001, 0.00025))},
-        {"stock_points": _circle_ink(0.0127, 0.0, (-0.0127, -0.0101))},
-        {"stock_points": _circle_ink(0.0127, 0.0, (-0.0098, 0.0))},
-        {"bevel_points": ((-0.0098875, 0.0, 0.0000625), (-0.0097625, 0.0, 0.0001875))},
-    ),
-)
-def test_stock_contour_fails_closed_despite_outer_mapping(monkeypatch, outer_mapped, changed):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, outer_mapped=outer_mapped, **changed,
+def test_mapping_exceptions_are_diagnostic_not_a_postbreakout_gate(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    def unmapped(_source):
+        raise OSError("derived edge has no corresponding entity")
+    profile.GetCorrespondingEntity = unmapped
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("endpoint", (0, 1))
+def test_bevel_requires_each_actual_mouth_endpoint_within_one_micron(monkeypatch, endpoint):
+    points = list(_NATIVE_SAMPLES["bevel"])
+    x, y, z = points[endpoint]
+    points[endpoint] = (x + 0.0000011, y, z)
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, bevel_points=tuple(points))
+    with pytest.raises(RuntimeError, match="chamfer section stroke"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("points", (
+    (), (_NATIVE_SAMPLES["bevel"][0],) * 2,
+    ((-0.00995, 0.0, 0.0), (-0.0097, 0.0, 0.00025)),  # wrong MODEL frame
+    ((_NATIVE_SAMPLES["bevel"][0]),
+     (-0.0038, -0.046, 0.0), (_NATIVE_SAMPLES["bevel"][1])),
+))
+def test_bevel_needs_nonzero_whole_view_local_record_not_just_fitting_ends(monkeypatch, points):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, bevel_points=points)
+    with pytest.raises(RuntimeError, match="chamfer section stroke"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("split", (False, True))
+def test_bevel_records_cannot_be_duplicated_or_joined_to_fabricate_coverage(monkeypatch, split):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    first, last = _NATIVE_SAMPLES["bevel"]
+    middle = tuple((a + b) / 2 for a, b in zip(first, last))
+    pair = ((_polyline_record((first, middle)), _polyline_record((middle, last))) if split
+            else (_polyline_record((first, last)),) * 2)
+    _packet(profile, (*profile.record_edges[:3], profile.bevel, profile.bevel, profile.record_edges[-1]),
+            (*profile.record_data[:3], *pair, profile.record_data[-1]))
+    with pytest.raises(RuntimeError, match="unique solid actual chamfer section stroke"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("name", ("stock", "stock_split", "inner", "outer", "bevel"))
+def test_native_descriptors_must_agree_with_the_proven_stock_outline(monkeypatch, name):
+    changed = {f"{name}_style": (0.0, 8.0, -1.0, 1.0, -1.0, 0.0)}
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, **changed)
+    with pytest.raises(RuntimeError, match="font|descriptor"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("changed", (
+    {"stock_points": ()}, {"stock_points": ((1.0, 2.0, 3.0), (4.0, 5.0, 6.0))},
+    {"stock_circle": _NATIVE_OUTER}, {"stock_split_circle": (0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0127)},
+    {"stock_style": (0.0, -2.0, -1.0, 1.0, -1.0, 0.0)},
+    {"inner_style": (0.0, 0.5, -1.0, 1.0, -1.0, 0.0)},
+))
+def test_missing_ambiguous_or_unreadable_outline_control_fails_closed(monkeypatch, changed):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, **changed)
+    with pytest.raises(RuntimeError, match="stock|font|descriptor"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("frame", ("sheet", "view-local"))
+def test_typed_style_uses_independent_stock_endpoint_calibration(monkeypatch, frame):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, placement=(0.421, 0.213))
+    _typed_lines(profile, frame=frame)
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+    expected_frame = "sheet" if frame == "sheet" else "view-local/GetXform"
+    assert any(f"chosen_frame='{expected_frame}'" in entry for entry in logged)
+    assert any("GetLineAtIndex3 native_raw_return=" in entry for entry in logged)
+
+
+@pytest.mark.parametrize("name", ("stock", "stock_split", "inner", "outer", "bevel"))
+@pytest.mark.parametrize("style", (1, 7, -1, 0.5))
+def test_legacy_style_zero_never_implies_typed_continuous_zero(monkeypatch, name, style):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    _typed_lines(profile, styles={name: style})
+    with pytest.raises(RuntimeError, match="documented typed style is not continuous"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("descriptor", (
+    (0.0, 23.0, -1.0, 1.0, -1.0, 0.0),
+    (0.0, -1.0, 7.0, 1.0, -1.0, 0.0),
+))
+def test_matching_legacy_descriptor_ids_are_not_typed_style_enum_values(monkeypatch, descriptor):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(
+        monkeypatch, **{f"{name}_style": descriptor for name in _NATIVE_SAMPLES},
     )
-    with pytest.raises(RuntimeError, match="MODEL-circle|stock-face contour|continuous native line font|chamfer section stroke"):
+    _typed_lines(profile)
+    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+@pytest.mark.parametrize("fault", ("duplicate", "missing", "malformed", "none", "wrong_frame", "stock_unmeasured", "mixed_frames"))
+def test_available_typed_line_channel_never_becomes_empty_success(monkeypatch, fault):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    lines = _typed_lines(profile)
+    if fault == "duplicate":
+        lines.append(lines[3])
+    elif fault == "missing":
+        lines.pop(3)
+    elif fault == "malformed":
+        lines[3] = (0.0, 0.0, 0.0)
+    elif fault == "none":
+        lines[3] = None
+    elif fault == "wrong_frame":
+        lines[:] = [(0.0, 0.0, 0.0, 1.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0)]
+    elif fault == "stock_unmeasured":
+        lines[:] = lines[2:]  # fitting chamfer alone cannot calibrate the frame
+    else:
+        line = lines[3]
+        lines[3] = (*line[:4], line[4] + 0.3, line[5] + 0.142, line[6],
+                    line[7] + 0.3, line[8] + 0.142, line[9])
+    with pytest.raises(RuntimeError, match="typed|GetLineAtIndex3"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
+@pytest.mark.parametrize("member", ("GetDisplayData4", "GetLineCount", "GetLineAtIndex3"))
+def test_typed_access_failure_is_not_documented_optional_absence(monkeypatch, member):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    _typed_lines(profile)
+    def unreadable(*_args):
+        raise OSError("typed channel unmeasured")
+    setattr(profile if member == "GetDisplayData4" else profile.line_data, member, unreadable)
+    with pytest.raises(RuntimeError, match="typed channel unmeasured"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-def test_unreadable_irrelevant_circle_is_diagnostic_with_positive_stock_proof(monkeypatch):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch)
-    class com_error(Exception):
-        """Offline reproduction of the observed native exception payload."""
+@pytest.mark.parametrize("count", (None, -1, 1.5, lambda: 0))
+def test_typed_native_count_must_be_measured_not_coerced_to_empty(monkeypatch, count):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    profile.line_data.GetLineCount = lambda: count
+    with pytest.raises(RuntimeError, match="typed line channel|GetLineCount"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_absent_display_object_is_unmeasured_not_optional_zero_lines(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    profile.line_data = None
+    with pytest.raises(RuntimeError, match="GetDisplayData4|GetLineCount"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_typed_coordinate_channel_ambiguity_on_stock_is_a_refusal(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    lines = _typed_lines(profile)
+    sheet_lines = [(*line[:4], line[4] + 0.3, line[5] + 0.142, line[6],
+                    line[7] + 0.3, line[8] + 0.142, line[9]) for line in lines]
+    lines.extend(sheet_lines)
+    with pytest.raises(RuntimeError, match="coordinate channel is unmeasured or ambiguous"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+
+
+def test_typed_raw_payload_is_logged_before_correspondence_refusal(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    lines = _typed_lines(profile)
+    lines[3] = (0.0, 0.0, float("nan"))
+    logged = []
+    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    with pytest.raises(RuntimeError, match="malformed native data"):
+        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
+    raw_index = next(index for index, entry in enumerate(logged) if "line 3 GetLineAtIndex3 native_raw_return=" in entry)
+    refusal_index = next(index for index, entry in enumerate(logged) if "line 3 has malformed native data" in entry)
+    assert raw_index < refusal_index
+
+
+def test_irrelevant_native_write_only_circle_stays_diagnostic(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
     class WriteOnlyCircle:
         def IsCircle(self):
             return True
         @property
         def CircleParams(self):
-            raise com_error(
-                -2147352567, "Exception occurred.",
-                (61836, "SOLIDWORKS Design", "Unable to read write-only property.", None, 0, None), None,
-            )
+            raise OSError("Unable to read write-only property.")
     irrelevant = SimpleNamespace(GetCurve=lambda: WriteOnlyCircle())
-    edges, raw = profile.GetPolylines7(1)
-    profile.GetPolylines7 = lambda _option: ((irrelevant, *edges), (*_polyline_record(((0.02, 0.0, 0.0), (0.021, 0.0, 0.0))), *raw))
-    logged = []
-    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
+    _packet(profile, (irrelevant, *profile.record_edges),
+            (_polyline_record(((0.02, 0.0, 0.0), (0.021, 0.0, 0.0))), *profile.record_data))
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert any("'UNMEASURED', 'com_error'" in entry
-               and "Unable to read write-only property." in entry for entry in logged)
-
-
-@pytest.mark.parametrize(
-    ("distance", "passes"),
-    ((0.0, True), (0.00005, True), (0.0000501, False)),
-)
-def test_outer_mouth_contour_distance_is_measured_with_005mm_limit(monkeypatch, distance, passes):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch)
-    projected_inputs = []
-    def project(adapter_arg, view, points, **kwargs):
-        projected_inputs.append(points)
-        result = _project_profile(adapter_arg, view, points, **kwargs)
-        if points == profile.stock_contour.raw_points:
-            return tuple((x + distance, y) for x, y in result)
-        return result
-    monkeypatch.setattr(drawing, "model_points_in_view", project)
-    if passes:
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    else:
-        with pytest.raises(RuntimeError, match="actual rendered stock-face contour"):
-            _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert profile.stock_contour.raw_points in projected_inputs
-    assert ((-0.00995, 0.0, 0.0), (-0.0097, 0.0, 0.00025)) in projected_inputs
-
-
-@pytest.mark.parametrize("projected", (None, (), ((float("nan"), 0.0),), ((0.296,),)))
-def test_selected_record_refuses_unmeasured_native_projection(monkeypatch, projected):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch)
-    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_kw: projected)
-    with pytest.raises(RuntimeError, match="projection|stock-face contour"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_clipped_records_on_same_stock_edge_never_bridge_gap_at_mouth(monkeypatch):
-    adapter, profile, annotation, _outer, inner, _near = _chamfer_edge_case(monkeypatch)
-    stock = profile.stock_contour
-    left = _polyline_record(_circle_ink(0.0127, 0.0, (-0.0127, -0.0101)))
-    right = _polyline_record(_circle_ink(0.0127, 0.0, (-0.0098, 0.0)))
-    profile.GetPolylines7 = lambda _option: (
-        (stock, stock, inner, profile.bevel),
-        (*left, *right, *profile.record_data[1], *profile.record_data[2]),
-    )
-    with pytest.raises(RuntimeError, match="actual rendered stock-face contour"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_separate_bevel_records_never_fabricate_full_endpoint_coverage(monkeypatch):
-    adapter, profile, annotation, _outer, inner, _near = _chamfer_edge_case(monkeypatch)
-    halfway = (-0.009825, 0.0, 0.000125)
-    first = _polyline_record(((-0.00995, 0.0, 0.0), halfway))
-    second = _polyline_record((halfway, (-0.0097, 0.0, 0.00025)))
-    profile.GetPolylines7 = lambda _option: (
-        (profile.stock_contour, inner, profile.bevel, profile.bevel),
-        (*profile.record_data[0], *profile.record_data[1], *first, *second),
-    )
-    with pytest.raises(RuntimeError, match="chamfer section stroke"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-@pytest.mark.parametrize(
-    "changed",
-    (
-        {"patterns": {7: None}}, {"patterns": {7: ()}}, {"patterns": {7: (0.0,)}},
-        {"patterns": {7: (1.5, 0.5)}}, {"patterns": {7: (2.0, 0.5)}},
-        {"patterns": {7: (1.0, 0.0)}}, {"patterns": {7: (1.0, -0.5)}},
-        {"patterns": {7: (1.0, float("nan"))}}, {"font_error": True},
-        {"stock_style": (0.0, -1.0, -2.0, 0.0, 0.0, 0.0)},
-        {"inner_style": (0.0, 1.5, 7.0, 0.0, 0.0, 0.0)},
-    ),
-)
-def test_native_font_decoder_refuses_missing_invalid_or_gapped_pattern(monkeypatch, changed):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, **changed)
-    with pytest.raises(RuntimeError, match="font|continuous native line"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-
-
-def test_documented_line_style_index_takes_precedence_over_line_font(monkeypatch):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, stock_style=(0.0, 23.0, 8.0, 0.0, 0.0, 0.0),
-        legacy_patterns={23: (1.0, 0.5)},
-        patterns={23: (2.0, 0.25, -0.25), 7: (1.0, 0.5), 8: (2.0, 0.25, -0.25)},
-    )
-    _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert sorted(adapter.currentModel.font_calls) == [7, 23]
-    assert sorted(adapter.currentModel.decoder_calls) == [("GetLineFontInfo", 23), ("GetLineFontInfo2", 7)]
-
-
-@pytest.mark.parametrize("decoder", ("GetLineFontInfo", "GetLineFontInfo2"))
-@pytest.mark.parametrize("solid", (False, True))
-def test_font_namespaces_use_their_own_different_pattern_at_the_same_index(monkeypatch, decoder, solid):
-    continuous = (1.0, 0.5)
-    dashed = (2.0, 0.25, -0.25)
-    selected = continuous if solid else dashed
-    opposite = dashed if solid else continuous
-    legacy = decoder == "GetLineFontInfo"
-    style = (0.0, 7.0, 8.0, 0.0, 0.0, 0.0) if legacy else (0.0, -1.0, 7.0, 0.0, 0.0, 0.0)
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, stock_style=style, inner_style=style, bevel_style=style,
-        legacy_patterns={7: selected if legacy else opposite},
-        patterns={7: opposite if legacy else selected},
-    )
-    if solid:
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    else:
-        with pytest.raises(RuntimeError, match="continuous native line font"):
-            _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert adapter.currentModel.decoder_calls == [(decoder, 7)]
-
-
-@pytest.mark.parametrize("legacy_solid", (False, True))
-def test_font_cache_keeps_same_integer_index_independent_across_decoders(monkeypatch, legacy_solid):
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, stock_style=(0.0, 7.0, 8.0, 0.0, 0.0, 0.0),
-        legacy_patterns={7: (2.0, 0.2, 0.3) if legacy_solid else (2.0, 0.25, -0.25)},
-        patterns={7: (1.0, 0.5)},
-    )
-    logged = []
-    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
-    if legacy_solid:
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    else:
-        with pytest.raises(RuntimeError, match="continuous native line font"):
-            _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert adapter.currentModel.decoder_calls == [("GetLineFontInfo2", 7), ("GetLineFontInfo", 7)]
-    assert any("decoder='GetLineFontInfo2'" in entry and "native_raw_return=(1.0, 0.5)" in entry for entry in logged)
-    assert any("decoder='GetLineFontInfo'" in entry and "native_raw_return=(2.0," in entry for entry in logged)
-
-
-@pytest.mark.parametrize("decoder", ("GetLineFontInfo", "GetLineFontInfo2"))
-def test_font_decoder_failure_cannot_try_the_other_api(monkeypatch, decoder):
-    legacy = decoder == "GetLineFontInfo"
-    style = (0.0, 7.0, 8.0, 0.0, 0.0, 0.0) if legacy else (0.0, -1.0, 7.0, 0.0, 0.0, 0.0)
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, stock_style=style, inner_style=style, bevel_style=style,
-        legacy_font_error=legacy, modern_font_error=not legacy,
-        legacy_patterns={7: (1.0, 0.5)}, patterns={7: (1.0, 0.5)},
-    )
-    with pytest.raises(RuntimeError, match="native font decoder unavailable"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    assert adapter.currentModel.decoder_calls == [(decoder, 7)]
-
-
-@pytest.mark.parametrize("raw", ((1.0, (0.5,)), {"segCount": 1, "lengths": (0.5,)}, "1,0.5"))
-def test_unexpected_legacy_font_payload_is_logged_before_parsing_and_never_reinterpreted(monkeypatch, raw):
-    style = (0.0, 7.0, 8.0, 0.0, 0.0, 0.0)
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(
-        monkeypatch, stock_style=style, inner_style=style, bevel_style=style,
-        legacy_patterns={7: raw}, patterns={7: (1.0, 0.5)},
-    )
-    logged = []
-    monkeypatch.setattr(drawing._telemetry, "info", logged.append)
-    with pytest.raises(RuntimeError, match="flat numeric pattern|continuous native line font"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    raw_index = next(index for index, entry in enumerate(logged)
-                     if "decoder='GetLineFontInfo'" in entry and f"native_raw_return={raw!r}" in entry)
-    parse_index = next(index for index, entry in enumerate(logged)
-                       if "UNMEASURED" in entry and "GetLineFontInfo flat numeric pattern" in entry)
-    assert raw_index < parse_index
-    assert adapter.currentModel.decoder_calls == [("GetLineFontInfo", 7)]
-
-
-@pytest.mark.parametrize("which", ("inner", "stock", "bevel"))
-def test_each_required_rendered_boundary_needs_its_own_actual_ink(monkeypatch, which):
-    adapter, profile, annotation, outer, inner, _near = _chamfer_edge_case(monkeypatch, outer_mapped=True)
-    edges = (profile.stock_contour, inner, profile.bevel)
-    missing = {"stock": 0, "inner": 1, "bevel": 2}[which]
-    remaining = tuple(edge for index, edge in enumerate(edges) if index != missing)
-    raw = tuple(value for index, item in enumerate(profile.record_data) if index != missing for value in item)
-    profile.GetPolylines7 = lambda _option: (remaining, raw)
-    with pytest.raises(RuntimeError, match="actual inner|actual rendered stock-face contour|chamfer section stroke"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
 @pytest.mark.parametrize(
@@ -1432,19 +1438,21 @@ def test_chamfer_unsupported_attachment_inventory_is_diagnostic_not_gating(monke
     assert any("profile chamfer native attachments:" in entry for entry in logged)
 
 
-def test_chamfer_rendered_edge_parser_keeps_native_arc_and_silhouette_alignment(monkeypatch) -> None:
-    adapter, profile, annotation, _outer, inner, _near = _chamfer_edge_case(monkeypatch)
-    stock, inner_record, bevel_record = profile.record_data
+def test_chamfer_rendered_edge_parser_keeps_arc_and_silhouette_alignment(monkeypatch):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    # Synthetic arc envelope tests only parser alignment; its geometry fields
+    # are not represented as observations from the native sample packet.
+    stock, *remaining = profile.record_data
     arc = (1.0, 12.0, *(0.0 for _ in range(12)), *stock[2:])
     line = _polyline_record(((0.02, 0.0, 0.0), (0.021, 0.0, 0.0)))
-    profile.GetPolylines7 = lambda _option: ((None, profile.stock_contour, inner, profile.bevel), (*line, *arc, *inner_record, *bevel_record))
+    _packet(profile, (None, *profile.record_edges), (line, arc, *remaining))
     _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-@pytest.mark.parametrize("corrupt", ("truncated", "fractional", "negative", "trailing"))
-def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch, corrupt) -> None:
-    adapter, profile, annotation, outer, inner, _near = _chamfer_edge_case(monkeypatch)
-    _edges, raw = profile.GetPolylines7(1)
+@pytest.mark.parametrize("corrupt", ("truncated", "fractional", "negative", "trailing", "unsupported"))
+def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch, corrupt):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch)
+    edges, raw = profile.GetPolylines7(1)
     raw = list(raw)
     if corrupt == "truncated":
         raw.pop()
@@ -1452,34 +1460,31 @@ def test_chamfer_rendered_edge_parser_refuses_bad_record_boundaries(monkeypatch,
         raw[8] = 1.5
     elif corrupt == "negative":
         raw[8] = -1.0
+    elif corrupt == "unsupported":
+        raw[0] = 3.0
     else:
         raw.append(0.0)
-    profile.GetPolylines7 = lambda _option: ((profile.stock_contour, inner, profile.bevel), tuple(raw))
+    profile.packet = (edges, tuple(raw))
     with pytest.raises(RuntimeError, match="buffer|render"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-@pytest.mark.parametrize(
-    "changed",
-    (
-        {"feature": None}, {"outer_z": 8.0}, {"inner_z": 0.10}, {"outer_r": 9.7},
-        {"feature_edges": ()}, {"rendered": ()}, {"rendered": (object(), object())},
-        {"degenerate": True}, {"inner_degenerate": True}, {"raw": ()}, {"raw": (float("nan"),)},
-        {"raw": (3.0, 0.0)}, {"result": None}, {"result": ((),)},
-    ),
-)
-def test_chamfer_edge_guard_rejects_missing_wrong_or_unrendered_receivers(monkeypatch, changed) -> None:
-    adapter, profile, annotation, _outer, _inner, _near = _chamfer_edge_case(monkeypatch, **changed)
+@pytest.mark.parametrize("changed", (
+    {"feature": None}, {"feature_edges": ()}, {"degenerate": True},
+    {"inner_degenerate": True}, {"raw": ()}, {"raw": (float("nan"),)},
+    {"raw": (3.0, 0.0)}, {"result": None}, {"result": ((),)}, {"result": ((), ())},
+))
+def test_chamfer_edge_guard_rejects_missing_wrong_or_unrendered_receivers(monkeypatch, changed):
+    adapter, profile, annotation, *_ = _chamfer_edge_case(monkeypatch, **changed)
     with pytest.raises(RuntimeError):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
 
-def test_chamfer_edge_guard_rejects_missing_inner_or_the_opposite_mouth(monkeypatch) -> None:
+def test_opposite_mouth_circle_never_proves_the_actual_source_inner(monkeypatch):
     adapter, profile, annotation, _outer, _inner, near = _chamfer_edge_case(monkeypatch)
-    profile.GetPolylines7 = lambda _option: ((profile.stock_contour, near, profile.bevel), tuple(value for item in profile.record_data for value in item))
-    with pytest.raises(RuntimeError, match="actual inner"):
-        _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
-    profile.GetPolylines7 = lambda _option: ((profile.stock_contour, profile.bevel), (*profile.record_data[0], *profile.record_data[2]))
+    edges = list(profile.record_edges)
+    edges[2] = near
+    _packet(profile, edges, profile.record_data)
     with pytest.raises(RuntimeError, match="actual inner"):
         _check_arm_guard(drawing._rendered_chamfer_edges, adapter, profile, annotation)
 
@@ -1576,8 +1581,9 @@ def _final_profile_case(monkeypatch, *, native_guards=False, **changed):
     if native_guards:
         adapter, profile, annotation, _outer, _inner, near = _chamfer_edge_case(monkeypatch, **changed)
         if changed.get("edge_hidden"):
-            _edges, raw = profile.GetPolylines7(1)
-            profile.GetPolylines7 = lambda _option: ((profile.stock_contour, near, profile.bevel), raw)
+            edges = list(profile.record_edges)
+            edges[2] = near
+            _packet(profile, edges, profile.record_data)
     else:
         adapter, profile, annotation, _display = _native_chamfer(monkeypatch, **changed)
     profile.initial_angle = changed.get("initial_angle", 0.0)
@@ -1954,10 +1960,11 @@ def test_build_collects_native_identity_limits_rendering_all_bad_runs_and_captio
 
 
 @pytest.mark.parametrize("newline", ("\n", "\r\n"))
-@pytest.mark.parametrize("direct_outer", (False, True))
-def test_build_complete_native_guard_positive_control_reaches_finalize_once(monkeypatch, newline, direct_outer):
+@pytest.mark.parametrize("mapped", (False, True))
+def test_build_complete_native_guard_positive_control_reaches_finalize_once(monkeypatch, forensic_calls, newline, mapped):
     native = _final_profile_case(
-        monkeypatch, native_guards=True, direct_outer=direct_outer,
+        monkeypatch, native_guards=True,
+        mapping=(object(), object()) if mapped else (None, None),
         attached=(), attached_count=0, attached_types=(),
         caption_text=notes.PROFILE_VIEW_CAPTION.replace("\n", newline),
         text=notes.BORE_REAR_CHAMFER_CALLOUT.replace("\n", newline),
@@ -1965,6 +1972,7 @@ def test_build_complete_native_guard_positive_control_reaches_finalize_once(monk
     case = _mock_arm_build(monkeypatch, native_case=native)
     assert asyncio.run(drawing.build(case.adapter)) == {"drawing": "complete"}
     assert case.finalized == [True]
+    assert forensic_calls == []
     doc = case.adapter.currentModel
     assert len(case.views) == 3 and case.views[1].mode == 2
     assert doc.created == [spec.HALF_WIDTH / 1000.0]
@@ -2024,7 +2032,7 @@ def test_breakout_preserves_database_mode_without_an_arbitrary_selection_count_g
 def test_breakout_and_ink_faults_collect_with_reference_text_runs_and_caption(monkeypatch):
     native = _final_profile_case(
         monkeypatch, native_guards=True, create_breakout=False,
-        stock_prefix="", stock_font=8, bevel_points=(), zero_width=True,
+        stock_prefix="", stock_style=(0.0, 8.0, -1.0, 1.0, -1.0, 0.0), bevel_points=(), zero_width=True,
         caption_text="WRONG\r\nCAPTION",
     )
     case = _mock_arm_build(monkeypatch, native_case=native)
@@ -2035,7 +2043,7 @@ def test_breakout_and_ink_faults_collect_with_reference_text_runs_and_caption(mo
         "native local breakout creation failed (no retry)",
         "profile breakout count did not change from zero to one",
         "profile did not retain exactly one local breakout",
-        "continuous native line font", "chamfer section stroke",
+        "native outline font descriptor", "chamfer section stroke",
         "native 8 mm reference (prefix)",
         "Width: native dimension text has no measurable whole bounds (run=0)",
         "Width: native dimension text has no measurable whole bounds (run=1)",
@@ -2127,4 +2135,78 @@ def test_failed_native_field_and_text_run_reads_do_not_hide_later_measurements(m
         assert violation in report
     assert any("WIDTH SECOND" in entry for entry in logged)
     assert any("anchor tap run 0" in entry for entry in logged)
+    assert case.finalized == []
+
+
+def test_collected_guard_failure_captures_labelled_sheet_before_same_exception(monkeypatch):
+    adapter = object()
+    errors = ["early placement refusal", "unmeasured native ink", "later caption refusal"]
+    events = []
+    originals = []
+    def capture(actual_adapter, label, message, **context):
+        assert actual_adapter is adapter
+        assert label == f"{drawing.PART_STEM}-native-guard"
+        assert context["api"] == "crank arm native drawing guards"
+        assert context["phase"] == "before-finalize"
+        assert context["violations"] == tuple(errors)
+        assert context["sheet_png"] is True
+        exc = context["exception"]
+        assert str(exc) == message
+        assert all(error in message for error in errors)
+        originals.append(exc)
+        events.append("forensic sheet PNG")
+        raise exc
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._raise_arm_errors(adapter, errors)
+    events.append("original exception")
+    assert events == ["forensic sheet PNG", "original exception"]
+    assert originals == [caught.value] and caught.value is originals[0]
+
+
+@pytest.mark.parametrize("capture_outcome", ("raises_original", "raises_secondary", "returns"))
+def test_forensic_secondary_failure_or_return_cannot_replace_original_guard(monkeypatch, capture_outcome):
+    originals = []
+    def capture(_adapter, _label, _message, **context):
+        originals.append(context["exception"])
+        if capture_outcome == "raises_original":
+            raise context["exception"]
+        if capture_outcome == "raises_secondary":
+            raise OSError("PNG capture failed")
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(RuntimeError, match="original collected violation") as caught:
+        drawing._raise_arm_errors(object(), ["original collected violation"])
+    assert caught.value is originals[0]
+
+
+def test_no_collected_errors_means_no_forensic_capture(forensic_calls):
+    drawing._raise_arm_errors(object(), [])
+    assert forensic_calls == []
+
+
+def test_build_forensic_capture_has_all_independent_errors_and_blocks_approved_export(monkeypatch):
+    native = _final_profile_case(
+        monkeypatch, native_guards=True, create_breakout=False,
+        source_dimension=object(), lower=-0.05, precision=1, edge_hidden=True,
+        stock_prefix="", zero_width=True, caption_text="WRONG CAPTION",
+    )
+    case = _mock_arm_build(monkeypatch, native_case=native)
+    captured = []
+    def capture(adapter, label, message, **context):
+        assert case.finalized == [] and len(case.checked) == 1
+        assert adapter is case.adapter and label == f"{drawing.PART_STEM}-native-guard"
+        assert context["sheet_png"] is True and context["phase"] == "before-finalize"
+        for violation in (
+            "creation failed", "source model dimension", "LIMIT band (lower)",
+            "tolerance precision", "actual inner", "native 8 mm reference (prefix)",
+            "run=0", "run=1", "caption did not persist",
+        ):
+            assert violation in message
+        assert message == "crank arm native guard violations:\n- " + "\n- ".join(context["violations"])
+        captured.append(context["exception"])
+        raise context["exception"]
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(drawing.build(case.adapter))
+    assert captured == [caught.value] and captured[0] is caught.value
     assert case.finalized == []
