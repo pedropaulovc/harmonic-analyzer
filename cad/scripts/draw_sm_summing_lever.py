@@ -505,27 +505,36 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
 
 
-def _assert_rib_root_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Read the native R1 MAX root/profile blend; never type its value."""
+def _assert_rib_blend_radius(adapter: Any, annotations: list[Any]) -> None:
+    """Read the visible upper-profile R1 MAX; never substitute another R1 arc."""
+    name, feature = "EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile"
+    label = f"{name}@{feature}"
     found = [
         raw for raw in annotations
-        if dimension_name(adapter, raw) == "RibRootRadius"
+        if dimension_name(adapter, raw) == name
     ]
     if len(found) != 1:
-        raise RuntimeError("expected one native RibRootRadius in VIEW G")
+        raise RuntimeError(f"expected one native {label} in VIEW G")
     annotation = _early_bound(found[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    raw_dimension = display.GetDimension2(0)
+    if raw_dimension is None:
+        raise RuntimeError(f"{label}: missing native model dimension")
+    dimension = _early_bound(raw_dimension, "IDimension")
+    full_name, value = dimension.FullName, dimension.SystemValue
+    raw_tolerance = dimension.Tolerance
+    if raw_tolerance is None:
+        raise RuntimeError(f"{label}: missing native tolerance")
+    tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
+    tolerance_type = tolerance.Type
     if (
-        display.Diametric is not False
-        or int(tolerance.Type) != RIB_BLEND_R_TOL_TYPE
-        or not math.isclose(
-            float(dimension.SystemValue), RIB_BLEND_R / 1000.0,
-            rel_tol=0.0, abs_tol=1e-9,
-        )
+        type(full_name) is not str or full_name.split("@")[:2] != [name, feature]
+        or display.Diametric is not False
+        or type(tolerance_type) is not int or tolerance_type != RIB_BLEND_R_TOL_TYPE
+        or type(value) not in (int, float) or not math.isfinite(value)
+        or not math.isclose(value, RIB_BLEND_R / 1000.0, rel_tol=0.0, abs_tol=1e-9)
     ):
-        raise RuntimeError("RibRootRadius lost its native radial value or MAX band")
+        raise RuntimeError(f"{label}: lost native owner, radial value or MAX band")
 
 
 # Datum A's box stands above the actual ridge round in Detail D.
@@ -1090,7 +1099,7 @@ FRONT_KEEP = {
     "WebThickness": (0.215, 0.247),
     "EdgeRibFrontArcR": (0.1948, 0.2120),
     "RibReach": (0.2443, 0.254),
-    "RibRootRadius": (0.283, 0.225),
+    "EdgeRibFrontUpperBlendR": (0.283, 0.225),
 }
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout
@@ -1338,13 +1347,14 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _attach_radial_leaders(
-        adapter, front_annotations, ("EdgeRibFrontArcR", "RibRootRadius"), label="front"
+        adapter, front_annotations, ("EdgeRibFrontArcR", "EdgeRibFrontUpperBlendR"),
+        label="front",
     )
     _attach_radial_leaders(
         adapter, top_annotations, ("SummationArcRadius",), label="top"
     )
     _shorten_radii(adapter, top_annotations, ("SummationArcRadius",), label="top")
-    _assert_rib_root_radius(adapter, front_annotations)
+    _assert_rib_blend_radius(adapter, front_annotations)
     _apply_callouts(
         adapter, [*front_annotations, *top_annotations], label="lever geometry",
     )

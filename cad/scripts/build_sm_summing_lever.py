@@ -1219,7 +1219,12 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 def _rib_radius_max_limits(adapter) -> None:
-    """The one printed R1 MAX governs all native profile and body-root radii."""
+    """Band every modeled rib blend; print the visible Front-profile R1 arc.
+
+    EdgeRibFrontUpperBlendR is a true XY arc in VIEW G. The perpendicular
+    rib-side root radii remain native controls, not projected radial marks.
+    This does not impose a modeled fillet on unchanged body junctions.
+    """
     owners = [
         (f"{stem}Profile", f"{stem}{side}BlendR")
         for stem in ("EdgeRibFront", "EdgeRibBack", "MiddleRib")

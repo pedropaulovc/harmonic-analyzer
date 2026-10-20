@@ -27,8 +27,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SummationAnchor": {"AnchorHeight"},
     "SummationPlateProfile": {"SummationArcRadius"},
     "SummationPlate": {"WebThickness"},
-    "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach"},
-    "RibRootFillets": {"RibRootRadius"},
+    "EdgeRibFrontProfile": {"EdgeRibFrontArcR", "RibReach", "EdgeRibFrontUpperBlendR"},
     "EdgeRibFront": {"EdgeRibThickness"},
     "MiddleRib": {"MiddleRibThickness"},
     "KnifeStubReference": {"KnifeStubLength"},
@@ -59,7 +58,7 @@ DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
     ("KnifeEnvelopeReference", "FlankToSide"): "4X ",
     # A linear dimension across the plan's cylinder band prints no Ø itself.
     ("CylinderReference", "CylinderDia"): "<MOD-DIAM>",
-    ("RibRootFillets", "RibRootRadius"): "R",
+    ("EdgeRibFrontProfile", "EdgeRibFrontUpperBlendR"): "R",
 }
 
 # The pivot cylinder's diameter is sized in the plan, across the band its
@@ -120,7 +119,7 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromRight": f"KNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER};\nBOTH STUBS",
     "FlankToSide": f"{KNIFE_MOUNT_NUMBER} SEAT",
     "HexHeight": f"VERTEX UP\nKNIFE-EDGE SEAT\nIN {KNIFE_MOUNT_NUMBER}",
-    "RibRootRadius": "RIB/BODY ROOTS\nAND PROFILE BLENDS",
+    "EdgeRibFrontUpperBlendR": "RIB SIDE ROOTS\nAND PROFILE BLENDS",
     "EdgeRibFrontArcR": "ALL RIBS\nMID RIB APEX\nAT BOSS AXIS",
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
