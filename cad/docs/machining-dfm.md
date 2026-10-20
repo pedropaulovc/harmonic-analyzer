@@ -98,7 +98,7 @@ geometry is casting-shaped, not milling-shaped.
   McMaster 92240A540 1/4-20 UNC-2A × 3/4 in hex-head screws install from the
   top into **through-tapped** UNC-2B seats in `fr-harmonic-base`. The exact
   vendor under-head washer transition still seats on the support, leaving
-  **12.422 mm stock insertion**. Insertion is not useful engagement: the
+  **12.422 mm nominal insertion**. Insertion is not useful engagement: the
   retained casting limits full-thread overlap, and any excess shank projects
   into the underside pocket. The seat contracts account separately for the
   printed material limits, edge breaks, full thread, protrusion and bench
@@ -185,22 +185,51 @@ remain authoritative. `THROUGH_SEAT_MATERIAL` records every individual seat.
 | Rocker support | 4 | 13.0 mm | 13.0 mm |
 | Cone pivot, cone lock, swing stop | 1 each | 13.0 mm | 13.0 mm |
 | Pinion blocks, `PINION_PIVOT_X − 8.5` | 2 | 13.0 mm | 13.0 mm |
-| Pinion blocks, `PINION_PIVOT_X + 8.5` (X ≈ −4.652) | 2 | 47.8 mm, through cross rib | 13.0 mm |
+| Pinion blocks, `PINION_PIVOT_X + 8.5` (X ≈ −4.652) | 2 | 13.0 mm | 13.0 mm |
 | Spring foot | 1 | 13.0 mm | 13.0 mm |
 | Arbor pedestals, including ±2 X / ±5 Z transfer envelopes | 2 | 13.0 mm | 13.0 mm |
 | Nameplate | 4 | 13.0 mm | 13.0 mm |
 
-The two block holes on the cross-rib edge break through to the rib's
-3.0 mm bottom relief, but their thread circles cross that edge: the extra
-axis depth is **not** a full circumference of useful thread. All eighteen
-receivers therefore use the conservative full-form interval **0.25–10.35 mm**
-below the deck at the printed limits. The current lock is 13.53 mm inside
-the pocket wall, and the stop is about 5.43 mm beyond the long rib's edge;
-neither is backed by those structures. No current hole footprint reaches an
-R6 patch, socket boss or cross-tap lug.
+The owner subsequently selected moving the **whole cross rib +11.0 mm in X**,
+not local notches. Its 10.0 mm width, full Z span, 3.0 mm bench relief and
+connection to the long rib/end walls remain unchanged. Its west/east faces
+are now X6.0/X16.0. This removes the two inner block bores' former 34.8 mm
+interrupted continuation down the rib; all eighteen axes and their thread
+footprints now exit the 13.0 mm skin into pocket air.
 
-Receiver capacity is distinct from unchanged stock-screw limitations. The
-nameplate's existing **RV-03** ruling (`parts/fr-nameplate.yaml`) retains the
+The nearest #8-32 axis is X≈−4.652206 with major radius 2.083 mm.
+The existing `.X` location band plus half the flange-length band bounds the
+rib face by ±(0.8+0.4), independently of the ±0.8 hole-position allowance:
+`6.0−(0.8+0.4)−(−4.652206+0.8+2.083) = 6.569206 mm` minimum
+bare-face clearance. Existing R6 MAX vertical root/end fillets are retained:
+cross/long-rib patches lie at |Z|5–11, and cross-rib/end-wall patches at
+|Z|119.25–125.25, far from these block stations at about Z−85.589/+87.311.
+The material/clearance contracts cover every seat and pedestal transfer
+envelope against the actual finite fillet patches, not an infinite rib line.
+No unrequested horizontal root fillet is introduced.
+
+All eighteen receivers use the conservative full-form interval
+**0.25–10.35 mm** below the deck at the printed limits. The current lock is
+13.53 mm inside the pocket wall, and the stop is about 5.43 mm beyond the long
+rib's edge; neither is backed by those structures. No current hole footprint
+reaches an R6 patch, socket boss or cross-tap lug.
+
+Receiver capacity is distinct from unchanged stock-screw limitations.
+The base and assemblies share one insertion window per support/pedestal
+joint rather than independently choosing stock or title-block limits.
+The support window charges the ASME B18.2.1 pointed hex-cap-screw
+[+0/−0.03 in length limit](https://www.portlandbolt.com/technical/faqs/bolt-length-tolerance/)
+exactly as 0.762 mm, the support foot's ±0.51 mm band, and the actual
+0.2778125 mm washer-bearing offset. With the harvested nominal 0.75-pitch
+tip, minimum complete overlap is
+`19.05−0.762−(6.35+0.51)−0.2778125−0.9525−0.25 = 9.9476875 mm`,
+above 1.5D=9.525 mm; it is not the entire 10.10 mm receiver capacity.
+Pedestal windows retain their existing 0.76 mm short-stock allowance and
+±0.8 mm flange band. Nominal vendor tip/runout geometry is not a published
+stock-tip tolerance; these calculations do not silently qualify unknown
+end-form limits or replace the existing installed inspections.
+
+The nameplate's existing **RV-03** ruling (`parts/fr-nameplate.yaml`) retains the
 1/4 in brass screw and the printed **3.73 MIN** external full-form projection:
 `6.35−0.508−(1.500+0.13)−0.75×0.635 = 3.73575 mm`.
 That inherited calculation omits the female entrance edge break. Charging
