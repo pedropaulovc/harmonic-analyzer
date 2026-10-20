@@ -1148,7 +1148,7 @@ CHECKS = _note_text(
         "   SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
         f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
         "   IT THERE AND TIGHTEN MHA-DT-VN-51. DO NOT LOOSEN MHA-DT-02 AFTER",
-        "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5 AND 7.",
+        "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5, 6 AND 7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
         "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
@@ -1173,7 +1173,9 @@ CHECKS = _note_text(
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
         f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}). IF A STATION IS OUT,",
         "   EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE FEELER AT BOTH STATIONS",
-        f"   AS STEP {steps.step_number('rig-located')}, TIGHTEN THEM AND RECHECK.",
+        f"   AS STEP {steps.step_number('rig-located')}, WITH THE STEP "
+        f"{steps.step_number('rig-set')} LEAVES REFITTED SNUG;",
+        "   TIGHTEN, RECHECK THOSE LEAVES AND REPEAT CHECKS 6 AND 7.",
     )
 )
 
@@ -1197,8 +1199,9 @@ INTERFACE_NOTES = _note_text(
         f"PAPER DRIVE MHA-PD-00: {CRANK_CHAIN_WHEEL} T12 CHAIN WHEEL ON MHA-DT-11.",
         "FRAME ASSEMBLY MHA-FR-00: ITS MHA-FR-05 RAIL TAKES THE NORTH MHA-CH-08 "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
-        "CHANNEL ASSEMBLY MHA-CH-00: CONNECTING RODS RUN ON THE MHA-DT-12 CAMS; "
-        f"ITS NORTH MHA-CH-08, ONE MHA-CH-VN-56 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
+        "CHANNEL ASSEMBLY MHA-CH-00:",
+        "   CONNECTING RODS RUN ON THE MHA-DT-12 CAMS.",
+        f"   ITS NORTH MHA-CH-08, ONE MHA-CH-VN-56 AND ONE {NORTH_BRACKET_SCREW} ARE SET "
         f"AT STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}.",
     )
 )

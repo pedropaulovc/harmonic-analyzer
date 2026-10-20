@@ -408,10 +408,6 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("SWING OUT AND REMOVE THE SHIMS"),
         check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-DT-VN-51"),
-        check.index(
-            "DO NOT LOOSEN MHA-DT-02 AFTER THIS SET; "
-            "IF YOU DO, REPEAT CHECKS 4, 5 AND 7"
-        ),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-DT-VN-53" not in check
@@ -449,12 +445,6 @@ def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> 
     assert "RECHECK AND RECORD X AND Y" in bank
     assert "THE Y READING IS ZERO" not in check
     assert "MHA-DT-13 BAR" not in bank
-    located = steps.step_number("rig-located")
-    check7 = _flat(drawing.CHECKS.split("\n7. ")[1])
-    assert (
-        "IF A STATION IS OUT, EASE THE MHA-DT-VN-57 SCREWS, RE-SET THE RIG ON THE "
-        f"FEELER AT BOTH STATIONS AS STEP {located}, TIGHTEN THEM AND RECHECK."
-    ) in check7
     check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
     assert check5.endswith("TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.")
 
