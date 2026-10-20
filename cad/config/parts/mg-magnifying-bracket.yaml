@@ -6,3 +6,14 @@ mg-magnifying-bracket:
   quantity: 1
   tolerance_class: machined_block
   process: "simple L machined from 1018 cold-drawn steel, then blued; parallel neck sides, no taper or collar boss; neck 12.50 ±0.10 thick on the thread axis, centred on the lever; axial nose R5.50 ±0.05 with the 1/4-20 UNC-2B through tap located 5.50 ±0.05 from the physical neck side and nose tip; internal thread-root envelope Ø6.45 MAX, both mouth chamfers 0.20 ±0.05 on both legs at 45 degrees; true radial location stack sqrt(0.10^2+0.10^2), plus drill wander 0.10 + 12.6 tan(0.3 degrees) = 0.165974, gives 1.667605 minimum thread-mouth wall, printed 1.667 MIN, above the 1.5 floor but below the 2.0 target; four foot corners and all inside neck/foot corners R0.25 MAX; mounting holes, seat and 3.175 ±0.13 screw grip unchanged; foot right edge extends flush to the neck right face without a ledge; mates the MHA-MG-03 lever thread without locknut, set screw or adhesive"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "thread-axis end view, THREAD-MOUTH WALL 1.667 MIN at the R5.50 nose"
+      finding: "the worst-case thread-mouth wall is 1.667605 mm, printed conservatively as 1.667 MIN: below the 2.0 mm target but above the 1.5 mm floor (rule 17, walls and webs at the worst case)"
+      reason: "user-approved R5.50 parallel-sided nose, 2026-10-20: retain this geometry and its ordinary location bands; the actual manufactured stack includes both location bands, root envelope, mouth chamfer and drill wander. This is a joint-specific sub-target wall approval, not permission to violate the 1.5 mm floor or tighten tolerances."
+    - id: "RV-02"
+      kind: "accept"
+      where: "the MHA-MG-03 external lever thread in this bracket's through tap, installed by MHA-MG-00 to tip projection"
+      finding: "the unseated lever thread has no mechanical anti-loosening means; projection is set without a shoulder or preload (rule 23, lock threaded joints exposed to operating loads)"
+      reason: "user, 2026-10-20: 'no further thread locking needed because mg-magnifying-lever does not experience rotational forces'. The accepted design has no added lock; it is not a static clamp or a demonstrated vibration-proof joint. Vibration can still change projection or back the lever out. Assembly RV-02 and joint_retention.py U-MHA-MG-03-no-lock record this same joint, with full engagement remaining a separate requirement."

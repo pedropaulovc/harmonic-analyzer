@@ -50,7 +50,7 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
 
 def test_every_marked_requirement_has_one_printed_home() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    maps = (drawing.FRONT_KEEP, drawing.BOTTOM_KEEP, drawing.SIDE_KEEP, drawing.MOUNTING_KEEP, drawing.TAP_KEEP)
+    maps = (drawing.FRONT_KEEP, drawing.BOTTOM_KEEP, drawing.SIDE_KEEP, drawing.MOUTH_KEEP, drawing.MOUNTING_KEEP, drawing.TAP_KEEP)
     kept = [name for keep in maps for name in keep]
     assert len(kept) == len(set(kept))
     assert set(kept) == marked
@@ -215,13 +215,19 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
         assert set(keep) <= set().union(*dimensions_by_feature.values())
         annotations = []
         for name in keep:
-            if name == missing:
+            # Native R5: the chamfer's axial leg collapses in the end view.
+            if name == missing or (name == "MouthChamfer" and view != "section A-A"):
                 continue
             assert name not in displays, "a dimension was imported into two homes"
             imported[view].add(name)
             display = displays[name] = _DrawingDisplay(name, view, imported)
             annotations.append(SimpleNamespace(GetSpecificAnnotation=lambda display=display: display))
         return annotations
+
+    def mouth_section(_adapter, parent):
+        assert parent == "*Right"
+        imported["section A-A"] = set()
+        return "section A-A"
 
     def complete(_view):
         raise _CalloutsComplete
@@ -230,6 +236,7 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (object(), object()))
     for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing, "_mouth_section", mouth_section)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "curate_hidden_dimensions", curate)
     monkeypatch.setattr(drawing, "_mounting_rims", complete)
@@ -246,7 +253,7 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
         "FlangeDepth": ("*Top", spec.FLANGE_DEPTH_CALLOUT),
         "RootR": ("*Top", spec.ROOT_CALLOUT),
         "FootCornerR": ("*Front", spec.FOOT_CORNER_CALLOUT),
-        "MouthChamfer": ("*Right", spec.MOUTH_CALLOUT),
+        "MouthChamfer": ("section A-A", spec.MOUTH_CALLOUT),
         "ThreadRootEnvelope": ("*Right", spec.THREAD_ENVELOPE_CALLOUT),
     }
     actual = {
@@ -255,3 +262,51 @@ def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypat
     }
     assert actual == expected
     assert set(displays) == set().union(*spec.DRAWING_DIMENSIONS.values())
+
+
+@pytest.mark.parametrize("fault", (None, "uncut_geometry", "end_on"))
+def test_mouth_section_shows_both_chamfer_legs_on_the_axis_plane(monkeypatch, fault) -> None:
+    """The real section recipe must cut Z=0 and preserve axial/radial lengths."""
+    parent = object()
+    state = SimpleNamespace(cut_only=False)
+
+    def set_cut_only(value):
+        if fault != "uncut_geometry":
+            state.cut_only = value
+        # Native SetDisplayOnlySurfaceCut returns void, not a success boolean.
+
+    definition = SimpleNamespace(
+        SetDisplayOnlySurfaceCut=set_cut_only,
+        GetDisplayOnlySurfaceCut=lambda: state.cut_only,
+    )
+    section = SimpleNamespace(GetSection=lambda: definition)
+
+    def project(_adapter, view, point, *, label):
+        x, y, z = point
+        if view is parent:
+            return -y, -z
+        assert view is section
+        scale = drawing.MOUTH_SECTION_SCALE[0] / drawing.MOUTH_SECTION_SCALE[1]
+        return (0.0 if fault == "end_on" else scale * x), scale * y
+
+    def create(_adapter, view, *, line_start, line_end, **kwargs):
+        assert view is parent
+        # The end view's projected horizontal cut is the model XY plane:
+        # both endpoints have Z=0, and it spans beyond both neck sides.
+        extent = (joint.NOSE_R + 3.0) / 1000.0
+        assert line_start == pytest.approx((-extent, 0.0))
+        assert line_end == pytest.approx((extent, 0.0))
+        assert kwargs["scale"] == drawing.MOUTH_SECTION_SCALE
+        return section
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "create_section_view", create)
+    for name in ("set_hidden_lines_removed", "rebuild_drawing", "position_section_caption"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    if fault is None:
+        assert drawing._mouth_section(object(), parent) is section
+        assert state.cut_only is True
+    else:
+        message = "geometry beyond the cutting plane" if fault == "uncut_geometry" else "both chamfer legs in true profile"
+        with pytest.raises(RuntimeError, match=message):
+            drawing._mouth_section(object(), parent)

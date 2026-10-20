@@ -23,8 +23,8 @@ Accuracy-driven limits on the **critical features** live in
 [`cad/config/error_budget.yaml`](../config/error_budget.yaml) and are derived — not asserted —
 by the sensitivity model [`cad/scripts/error_budget.py`](../scripts/error_budget.py)
 (`uv run python cad/scripts/error_budget.py`; gate `check:budget`,
-[`test_error_budget.py`](../scripts/test_error_budget.py)). Every number quoted below comes
-from that report; regenerate it rather than trusting the prose.
+[`test_error_budget.py`](../scripts/test_error_budget.py)). Current derived
+results and setup tables come from that report, not copied capacity snapshots.
 
 **What this buys, concretely:** every individual part tolerance on a critical feature can be
 traced to a number. Ask "why ±0.025 on the cam eccentricity, why ±1.25 % on the springs,
@@ -150,9 +150,9 @@ flowchart LR
     e4["station setting ±0.25 mm<br/><b>setup</b>; null lift 0.029"]:::setup -.-> bar
     e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
-    e7["hole position ±0.15 (2.667 %/mm)<br/>worst broad knife term 0.166 % FS"]:::part -.-> summing
-    e8["common-mode gain: calibrated out<br/>clamp 66–165 mm from knife,<br/>wire arm 56.1–166.9 mm:<br/><b>operating P ≤ 8.04 bars</b>"]:::free -.-> mag
-    e9["reading ±0.075 mm → 0.255 % FS<br/>crank index ±8° → 0.255 % FS"]:::setup -.-> op
+    e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
+    e8["common-mode gain: calibrated out<br/>component range 81.81 / 165 / 196.825 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
+    e9["reading ±0.075 mm<br/>crank index ±8°<br/>terms from current report"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
     classDef setup fill:#fff3cd,stroke:#b7791f
@@ -306,24 +306,23 @@ pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on)
 equal-share allocation. The D-flat play's per-land mean residual survives even
 with no clearance scatter, so no linear allowable half-width exists for it.
 
-| feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
-|---|---:|---:|---:|---:|---:|---|
-| cam eccentricity | 0.025 mm | 0.025 | 0.14 | 0.27 | 0.047 | offset-turn in a 4-jaw, indicate the throw |
-| rocker rod-pin radius | 0.10 mm | 0.009 | 0.04 | 0.08 | 0.57 | DRO/CNC hole position — a Ø0.20 position zone; both radial and tangential axes are drawn |
-| lever bar-pin arm | 0.10 mm | 0.007 | 0.04 | 0.07 | 0.71 | DRO/CNC hole position — a Ø0.20 position zone; both axes are drawn |
-| lever spring-hook arm | 0.10 mm | 0.005 | 0.03 | 0.05 | 0.95 | DRO/CNC hole position — a Ø0.20 position zone; the model draws both its axes (radial arm and tangential offset) |
-| summing hook position | 0.075 mm | 0.017 | 0.09 | 0.18 | 0.20 | ½ of the Ø0.15 pattern-position zone (tightened from 0.30 so neighbouring MHA-CH-14 jam nuts clear) |
-| **spring rate** | **1.25 %** | **0.109** | **0.57** | **1.15** | 0.54 | **matched by measurement** — 60/80 mm inside-hook lengths; Ø2 mm pin centres at 58/78 mm; bin the 20 springs around their measured common mean |
-| spring initial tension | 0.27 N | ≈0 | ≈0 | ≈0 | ≈2.02×10⁸ N (linearized) | rounded bound on the catalog's ±0.06 lbf; record each force-curve intercept, not a machining tolerance |
-| cam phase | 0.25° | 0.038 | 0.21 | 0.23 | 0.33 | native `NotchPhase` dimension; the nominal 1.50° offset remains #749 |
-| mesh lag spread | 0.14° | 0.021 | 0.12 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
-| cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.77° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
-| cone flat play | 0.01–0.03 mm AF clearance | 0.075 | 0.38 | 0.53 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-04 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
-| station setting (setup) | 0.25 mm | 0.045 | 0.27 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
-| **all combined** | | **0.155** | **0.78** | **1.53** | | targets 0.30 / 1.5 / 2.0 |
+The configured limits and their holding methods remain in
+`error_budget.yaml.critical_features`; the model derives their error shares at
+each input's **conservative operating-band setup**. Read the current report
+rather than carrying forward statistics or allowables from nominal model travel:
 
-The scatter calculation is below its broad-input and two-channel targets. This
-does not discharge the physical operating assumptions or the two waivers below.
+| current result | report source (`error_budget.py --json`) |
+|---|---|
+| feature's broad MAE and broad p99 maximum | `monte_carlo.per_feature.<key>.mae` and `.p99_max` |
+| feature's sparse-pair p99 maximum | `monte_carlo.per_feature.<key>.per_input.pair_1_20.p99_max` |
+| accuracy-only allowable tolerance | `monte_carlo.per_feature.<key>.allowable_tolerance` (`null` where a linear allowable is invalid) |
+| all-feature broad MAE and p99 maximum | `monte_carlo.combined.mae` and `.p99_max` |
+| all-feature sparse-pair p99 maximum | `monte_carlo.combined.per_input.pair_1_20.p99_max` |
+| broad and joint two-channel acceptance | `closure`, checked by `budget_closes` against config targets/allowances |
+
+Changing the capacity changes station scales, scatter and spring loads. A
+previous passing snapshot is not evidence for this range. Even a passing
+current report does not discharge the operating assumptions or waivers below.
 
 - **Spring-rate matching dominates the part budget.** Match all 20 rates within
   ±1.25% of their measured common mean and record each initial-tension intercept.
@@ -331,14 +330,14 @@ does not discharge the physical operating assumptions or the two waivers below.
   The MHA-CH-VN-50 channel-spring sheet's matched-set note orders 40 from one lot and
   keeps the 20 that match; if a lot cannot supply a matched set, select another
   lot rather than modifying the approved lever holes.
-- **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
-  ±0.047 mm; the drawing's ±0.025 (`dt_cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM`) is kept because an
-  indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
-  legitimate decision (it consumes 0.05 % MAE); `check:budget` pins
-  `ECCENTRICITY_TOLERANCE_MM` to the yaml so the two cannot silently diverge.
-- **The lever arms need no `precision` grade for accuracy**: at the general ±0.10 they use 1/7
-  to 1/10 of their allowable. Their bores still carry the `shaft_in_bushing` fit, which is
-  what the tighter size limit on the *bore* is for.
+- **The eccentricity limit is capability-driven, not accuracy-driven.** The
+  drawing's ±0.025 (`dt_cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM`) is held by an
+  indicated offset in a 4-jaw. Compare it with the current report's accuracy-only
+  `allowable_tolerance` before proposing a change; the budget pins that tolerance
+  to the yaml so they cannot silently diverge.
+- **Lever-arm accuracy and bore fit are different requirements.** Compare the
+  general ±0.10 arm limits with the current report's accuracy allowables; their
+  bores still carry `shaft_in_bushing` for the running fit.
 - **Summing-lever hole position is the relevant plate gain tolerance** (2.667 %/mm across the
   knife line). Drill the 20 holes from one fixture; the along-knife pitch can be loose.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
@@ -365,44 +364,44 @@ does not discharge the physical operating assumptions or the two waivers below.
 
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes | 0.007 % MAE (as-built 0.30) | 0.05 |
-| ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. The pen gain runs on the **wire moment arm** — the knife axis's perpendicular distance to wire 1 — not the clamp's distance from the knife: the output fixture hooks the wire 10.0 mm on the knife side of the clamp and the wire leans toward the wheel, so the arm is 56.11 mm with the clamp against the collar (66.4 mm) and 166.87 mm at the as-built 165 mm (`error_budget.wire_moment_arm`, solved from `sh_vn_music_wire_lever_geom`'s own run). Loaded spring stiffness and the CAD wheel ratio then give 1.865 mm per full-scale bar at the collar, or **≈8.04141 bars** of computed ordinate capacity; the conservative operating limit is **$P(f)\le8.04$**. The report's broad input scales are approximately 0.382 (all ones), 0.760 (half rectangle/lifted square) and 0.914 (Gaussian), all with the clamp at 66.4 mm; solve the table against the operating limit rather than using the rounded scales as settings. The sparse pair uses the built 165 mm station but reaches only 14.239 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.255 % MAE | 0.30 |
-| timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure, with the correction evaluated at the intended index; do not substitute the ideal Fourier-vector slope | 0.255 % FS | 0.30 |
-| knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The heaviest broad cases, half rectangle and lifted square, each conservatively load the knife to 138.683 N and require 47.622 N counter force at 351.973 mm inside length; they also give the worst broad term. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.166%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.166 % FS | 0.45 |
-| **total** | residual + RSS(scatter 0.155, readout, timebase, knife), under the stated assumptions | **0.434 % MAE** (as-built cam phase: **0.730 — over the benchmark**) | **0.7 benchmark** |
-| **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout. The gate compares the expected largest coefficient error, not an ensemble quantile, with the historical benchmark | **1.542 %** (p50 1.514, p90 1.993, **p99 2.383**; 9.675% of draws exceed 2%; conservative per-source envelope 2.110) | **2.0 benchmark** |
+| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749). The as-built common cam phase leaves a residual no step removes; both cases are reported | `closure.nominal_residual_mae` / `.nominal_residual_mae_as_built` | 0.05 |
+| ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. Gain uses `wire_moment_arm`, including the fixture's signed hook offset and installed wire lean, at the **conservative component operating minimum**, not a collar or nominal travel endpoint. Capacity and each reference input's scale come from `closed_form.mg-magnifier`; every coefficient carries its own reading error and the k=0 normalizer's through its actual stroke fill | `closure.readout` | 0.30 |
+| timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure at each input's actual setup, not the ideal Fourier-vector slope | `closure.timebase` | 0.30 |
+| knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's rest/preload force sum. `closed_form.knife` reports the worst case and each scaled station vector's spring loads/counter setting; the configured CAD case is not universal preload. The conservative numerator sums force magnitudes and reports the smaller resolved vertical load. The denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Confirm gravity, operating loads, contact material/finish and reversal trace width on hardware | `closure.knife` | 0.45 |
+| **total** | residual + RSS(scatter, readout, timebase, knife), with credited and as-built cam phases reported separately | `closure.total_mae` / `.total_mae_as_built` | **0.7 benchmark** |
+| **two-channel worst coefficient** | all sources drawn jointly through the sparse-pair readout; compare expected largest coefficient error, not an ensemble quantile, with the historical benchmark. `pair_joint` also reports quantiles and the fraction exceeding it | `closure.pair_worst` | **2.0 benchmark** |
 
-`check:budget` fails if a scored term or total overruns its allowance. Readout and
-timebase are now the largest broad-input terms. The wire moment arm at the 66.4 mm
-minimum clamp station (56.11 mm, the hook offset and wire lean) limits ordinate
-capacity, so all broad reference inputs, including the Gaussian, need reduced station scales.
-A longer pen stroke or a clamp that reaches nearer the knife would reduce these
-shares, but both are design proposals requiring native operating-pose validation,
-not tolerance changes. The current 66 mm pose remains waived under #748.
+`check:budget` fails if a scored term or total overruns its allowance. The wire
+moment arm at the conservative minimum clamp station limits ordinate capacity;
+the current report derives every reference input's reduced station scale and
+the resulting readout, scatter and knife terms. A longer pen stroke or a clamp
+reaching nearer the knife would be a design proposal requiring native
+operating-pose validation, not a tolerance adjustment. The current minimum
+component station remains waived under #748.
 
-How the 0.7 % benchmark is spent (all % of the greatest term, MAE; independent terms combine
-root-sum-square, the systematic residual adds):
+How the benchmark is allocated (all terms in % of the greatest term; current
+values are generated by the report):
 
 ```mermaid
 flowchart TB
-    subgraph rss["independent terms, RSS = 0.427"]
+    subgraph rss["independent terms, root sum square"]
         direction LR
-        s["part scatter<br/>(Monte Carlo)<br/><b>0.155</b> / 0.30"]
-        r["ordinate readout<br/><b>0.255</b> / 0.30"]
-        t["timebase<br/>(crank index)<br/><b>0.255</b> / 0.30"]
-        k["knife hysteresis<br/>(worst broad rest load)<br/><b>0.166</b> / 0.45"]
+        s["part scatter<br/>closure.scatter_mae / 0.30"]
+        r["ordinate readout<br/>closure.readout / 0.30"]
+        t["timebase<br/>closure.timebase / 0.30"]
+        k["knife hysteresis<br/>closure.knife / 0.45"]
     end
-    n["nominal residual<br/>after corrections<br/><b>0.007</b> / 0.05<br/>(as-built cam phase: 0.30)"]
-    rss --> total["<b>total 0.434</b><br/>(as-built: 0.730)"]
+    n["nominal residual<br/>closure.nominal_residual_mae / 0.05<br/>(as-built phase reported separately)"]
+    rss --> total["residual + RSS<br/>closure.total_mae"]
     n --> total
     total --> bench["benchmark 0.7<br/>Michelson & Stratton 1898"]
     style total fill:#e6f4ea,stroke:#2f855a
     style bench fill:#e2ecfd,stroke:#2b6cb0
 ```
 
-Each node shows **value** / allowance (`error_budget.yaml reserved:` and
-`targets:`). Within part scatter, spring-rate matching remains the dominant
-term; initial-tension variation contributes only about 0.001% broad-input MAE.
+Each node identifies its current report field and allowance
+(`error_budget.yaml reserved:` and `targets:`). Compare those generated values
+after any change to capacity, station setup or component inputs.
 
 ## Readout and calibration procedure (what the model assumes)
 
@@ -455,21 +454,27 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    greatest term, with no internal unit needed (`READOUT.md` step 3; the model's
    `read_coefficients` is the same arithmetic). This removes all common-mode
    gain, including the magnifier setting, so the magnifier is reset per trial to bring the
-   k = 0 term to the full stroke. Its range is finite, and it runs on the wire's moment arm
-   about the knife (56.11 mm with the clamp against the bracket collar, 66.4 mm from the knife;
-   166.87 mm at the as-built 165 mm — the output fixture hooks the wire 10.0 mm toward the
-   knife and the wire leans toward the wheel), so at the collar the computed capacity is
-   ≈8.04141 full-scale bars. Use the conservative operating limit **$P(f)\le8.04$**, with
-   $P(f) = \sum_i t_i(1+\kappa_i)$ and $t_i$ the table ordinate at $f\,x_i\cdot88$ mm
-   **before division by $f$**; record $x^\text{read}_i=t_i/f$ for the sums above. Set a broader
-   function at the largest $f$ satisfying the limit, solved from the station table.
-   Proportional scaling is wrong because the idle bars retain a fixed table ordinate
-   (all ones: table solve $f\approx0.382$, proportional estimate 0.396, ~3% overdrive).
-   Then set the clamp from `READOUT.md`'s clamp-station table (pen travel per bar against the
-   station), not by proportion to the distance from the knife, and never beyond the built
-   165 mm station. At that station the gain is 5.55 mm per full-scale bar: a small input
-   with $P<2.70$ cannot fill the stroke; use its actual reading, or scale it up within
-   the capacity and bar travel before setting the bars.
+   k = 0 term to the full stroke. Its finite range is the conservative component
+   band from `mg_magnifying_lever_geom.operating_clamp_radius_band()`: currently
+   **81.81 / 165.0 / 196.825 mm** minimum / built / maximum knife-to-clamp-axis
+   radii, with this procedure capped at the built **165 mm**. It runs on the
+   wire's moment arm, not station radius: the output fixture's hook is toward
+   the knife and the wire leans toward the wheel. Read capacity from the
+   generated `READOUT.md`, rounded **down** to two decimals, and require
+   $P(f)=\sum_i t_i(1+\kappa_i)$ no greater than that limit. Each $t_i$ is the
+   table ordinate at $f\,x_i\cdot88$ mm **before division by $f$**; record
+   $x^\text{read}_i=t_i/f$ for the sums above. Solve the largest permitted $f$
+   from the station table; proportional scaling ignores idle bars' fixed lift.
+   Set the clamp from the generated clamp-station table, never by proportional
+   scaling of its radius and never beyond the built station. A sparse input
+   that cannot fill the stroke there may be scaled up within capacity and bar
+   travel; otherwise use its actual reading and score its stroke shortfall.
+   Before clamping, verify as-made sliding bore clearance, the entire bore's
+   clearance from actual thread/runout and bracket, and cylindrical plain-body
+   support beyond the free hemisphere. Confirm the full directional envelope
+   lies inside finished stock, not an assumed centred half-depth. More travel
+   found by as-made inspection is not published capacity credit. These checks
+   and offline wire gaps do not replace native full-stroke proof (#748).
 3. **Lift signed inputs**: every bar stays on the lifting side of the pivot (the CAD realises
    no negative station), so add a constant $c$ to a signed function before setting the bars and
    subtract its lift vector ($20c$ at k = 0, $-c$ at odd k) from the readings, exactly as for
@@ -641,47 +646,61 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   (`gear_train.cylinder_lock_phase_deg`) — and the cam lobe is a tooth crest, so at crank home
   every lobe sits 1.5° off. Channel i turns i× faster than the crank, so no crank index zeroes
   all 20: it is a *common cam phase*, and its error h·Σ xᵢ sin(iθₖ) is the sine transform the
-  machine does not read — no procedure step touches it. On the reference inputs: 0.15–0.30 % MAE,
-  1.9 % max — 6× the residual allowance, and an **as-built total of 0.730% vs 0.7%**.
+  machine does not read — no procedure step touches it. The current report's
+  `cam_home_phase` and `closure` score the as-built residual and total beside the
+  credited lobe-up case; do not carry a total over from another capacity range.
   Cut the lobe half a pitch from the tooth crest without changing the gear mesh
   phase; reconcile the resulting rod/rocker rest closure before rebuilding.
   `verify:kinematics` uses a prescribed pen driver, not forces from the cams.
   `check:budget` scores the as-built residual beside the lobe-up one and fails
   unless `reserved.nominal_residual_mae.waive_cam_home_phase` is set; the waiver is set, and
   **the closure above is conditional on that cut**.
-- **Magnifier range / ordinate capacity** (#748): the clamp's knife radii 66.4–165 mm (collar
-  face to as-built; 208.6 at the rod tip) are where the clamp sits — reach and setup. What the
-  pen sees is the **wire moment arm**, the knife axis's perpendicular distance to wire 1's rest
-  run (`error_budget.wire_moment_arm`, built from `sh_vn_music_wire_lever_geom`'s own construction and
-  reproducing its as-built run): the output fixture hooks the wire its signed
-  `HOOK_OFFSET_X` (10.0 mm toward the knife) from the clamp station and the wire runs down
-  the plumb plane to the drum (option A1, #1559), so the arm is 56.11 mm at the collar,
-  166.87 mm as built and 208.42 mm at the rod
-  tip — not proportional to the station (using the clamp radius instead would
-  overstate the collar gain). With the loaded spring response and the CAD
-  wheel pitch ratio 4.99492 that is 1.865 mm pen travel per full-scale bar at the collar, or
-  ≈8.04141 bars within the 15 mm half-stroke; use **$P(f)\le8.04$** as the operating limit.
-  The setup solves the arm that fills the stroke and the station that realises it.
-  The sparse pair reaches only 14.239 mm at the built station (gain 5.547 mm per bar).
-  These are local linearized values, not a force-driven motion simulation. **Only the as-built pose is
-  CAD-gated**: `build_mg_magnifier_assembly` builds and `verify:soundness` exercises
-  only the as-built 165 mm placement; no clearance or articulation proof exists with the clamp
-  face against the collar face (the vertical rod hangs in the collar's plane), yet every
-  broad input is scored at it (all ones, half rectangle/lifted square and Gaussian at
-  66.4 mm from the knife, with report scales ≈0.382, 0.760 and 0.914 respectively).
-  `check:budget` names those inputs with their stations and
-  fails unless `reserved.readout.waive_minimum_pose` is set; the waiver is set, and **the
-  closure above is conditional on the collar pose being buildable** (#748). The report prints
-  an offline straight-wire estimate beside the waiver (hook at x 41.186 mm; rim-face
-  gap 6.61 mm, spoke-face gap 8.61 mm and boss-face gap 4.10 mm) —
-  it is not a proof and says nothing about the clamp, rod or collar. `READOUT.md` tabulates
-  the pen travel per bar against the clamp station and caps the
-  operating station at the built 165 mm. Validate the full required stroke in
-  both directions at minimum and built settings, including nonlinear spring
-  equilibrium and wire tangency. The wire's physical pitch radius must be
-  distinguished from the CAD display stand-off. The counter eye's mid-shank
-  axial station is a placement convention; check axial contact migration and
-  retaining-head clearance rather than assuming friction holds that station.
+- **Magnifier range / ordinate capacity** (#748): keep three distinct claims.
+  **Nominal model travel** is `clamp_radius_band(block_depth)`, for visualization
+  and export only. **Published component operating bounds** come from the
+  no-argument `operating_clamp_radius_band()`, currently
+  **81.81 / 165.0 / 196.825 mm** from knife to clamp/bottom-rod axis.
+  **As-made fit-up** may admit more travel after inspection, but that extra
+  travel is not advertised as capacity. No physical model pose or part
+  geometry changes with this conservative capacity policy.
+
+  The accepted earliest unthreaded root is
+  $(167.5-0.8)-(18+0.51)=148.19$ mm. Use the **full 15 mm one-sided clamp
+  envelope** from the actual tap axis inside finished stock, never ±7.5 mm
+  symmetry: $R_{\min}=215-148.19+15=81.81$ mm. The bracket near face is an
+  additional lower stop, but runout is stricter. At the free end keep the
+  complete bore on cylindrical plain body beyond the hemisphere:
+  $R_{\max}=215-(D_{\max}/2+15)=196.825$ mm. The nominal model's X149.50
+  thread-root boundary is not the earliest accepted root and earns no capacity
+  credit. These are conservative **component intervals**, not native
+  all-machine kinematic clearance.
+
+  What the pen sees is `error_budget.wire_moment_arm`, resolved from the same
+  signed hook offset and wire tangent as the built run, not the clamp radius.
+  With $g(R)=\texttt{pen_gain}(R)$ and $F$ the full-scale channel lift, the
+  computed ordinate capacity is
+  $C=H/[g(R_{\min})|F|]$, where $H$ is the pen half-stroke. The fitter uses
+  $P(f)\le\lfloor100C\rfloor/100$, solving the station table for $f$.
+  `closed_form.mg-magnifier` reports the actual arms, gains, capacity, scales
+  and stroke fills; `READOUT.md` generates the settings from those values.
+  This procedure remains capped at the unchanged built **165 mm**, not the
+  component-only upper bound. These are local linearized values, not a
+  force-driven motion simulation.
+
+  **Only the built pose is CAD-gated.** Native clearance and articulation at
+  the minimum component station remain unproven; `check:budget` names every
+  scored input below the built station and fails unless
+  `reserved.readout.waive_minimum_pose` is set. That waiver remains set and
+  closure remains conditional on #748. The report's offline straight-wire
+  surface gaps are not proof of clamp, rod, threaded bracket or frame
+  clearance. The fitter must verify as-made sliding bore clearance, thread/
+  runout and bracket clearance, and full-bore support beyond the free
+  hemisphere, then validate the full required stroke in both directions at
+  minimum and built settings, including nonlinear spring equilibrium and wire
+  tangency. Distinguish physical wire pitch radius from display stand-off.
+  The counter eye's mid-shank axial station is a placement convention; check
+  axial contact migration and retaining-head clearance rather than assuming
+  friction holds that station.
 - **Knife and pen performance still need physical evidence.** The 0.005 mm
   rolling-resistance assumption is not established by a material name or the
   current surface-finish callout. Measure a slow reversal with one channel
@@ -691,8 +710,8 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   marker/readout uncertainty. A prescribed pen-motion equation proves neither.
 - `amplitude.max_travel_mm` 88 vs. the ledger's ±146 mm foot travel: the budget uses 88; a
   larger full scale improves every readout term proportionally.
-- The eccentricity drawing limit (±0.025) vs. its accuracy allowable (±0.047): keep or relax
-  is a stated decision, pinned either way by `check:budget`.
+- A change to the eccentricity drawing limit (±0.025) requires comparison with
+  the current report's accuracy allowable; the budget pins the agreed limit.
 
 ## Scope of manufacturing outputs
 

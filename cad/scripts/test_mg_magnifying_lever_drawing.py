@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import itertools
+import json
 import math
 from types import SimpleNamespace
 
@@ -85,10 +86,50 @@ def test_clamp_entire_bore_stays_on_plain_body_at_nominal_travel_limits() -> Non
     centres = [geom.KNIFE_LOCAL_X - radius for radius in radii]
     half = clamp.BLOCK_DEPTH / 2.0
     assert max(centres) + half <= joint.THREAD_ROOT_X
-    assert min(centres) - half >= -1e-9
+    assert min(centres) - half >= joint.ROD_DIA / 2.0 - 1e-9
     assert centres[1] == geom.CLAMP_LOCAL_X
     assert assembly.LEVER_X0 - geom.BRACKET_LOCAL_X == assembly.BRACKET_X
     assert assembly.LEVER_X0 - geom.KNIFE_LOCAL_X == assembly.KNIFE[0]
+
+
+def test_operating_travel_covers_unbalanced_clamps_at_every_accepted_rod_corner() -> None:
+    operating = geom.operating_clamp_radius_band()
+    nominal = geom.clamp_radius_band(clamp.BLOCK_DEPTH)
+    assert nominal[0] < operating[0] < operating[1] < operating[2] < nominal[2]
+    assert operating[1] == nominal[1] == geom.KNIFE_LOCAL_X - geom.CLAMP_LOCAL_X
+    assert assembly.CLAMP_X == assembly.LEVER_X0 - geom.CLAMP_LOCAL_X
+    for length, threaded, thickness, diameter, width, fraction, radius in itertools.product(
+        (joint.ROD_LENGTH - joint.ROD_LENGTH_TOL, joint.ROD_LENGTH + joint.ROD_LENGTH_TOL),
+        (joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL, joint.THREAD_LENGTH + joint.THREAD_LENGTH_TOL),
+        (joint.NECK_THICKNESS - joint.NECK_THICKNESS_TOL, joint.NECK_THICKNESS + joint.NECK_THICKNESS_TOL),
+        (joint.ROD_DIA + joint.ROD_DIA_BAND[1], joint.ROD_DIA + joint.ROD_DIA_BAND[0]),
+        (clamp.BLOCK_DEPTH, clamp.STOCK_WIDTH_MAX),
+        (0.0, 0.25, 0.5, 0.75, 1.0),
+        (operating[0], operating[2]),
+    ):
+        station = geom.KNIFE_LOCAL_X - radius
+        # The point is inside the material envelope, but not necessarily at
+        # its centre. Either directed distance may consume the FULL width.
+        west = station - fraction * width
+        east = station + (1.0 - fraction) * width
+        assert west >= diameter / 2.0 - 1e-9
+        assert east <= length - threaded + 1e-9
+        assert east <= geom.BRACKET_LOCAL_X - thickness / 2.0 + 1e-9
+    # Mutation controls: neither symmetric half-width nor nominal thread
+    # root can replace the conservative one-sided accepted-part endpoint.
+    earliest = joint.ROD_LENGTH - joint.ROD_LENGTH_TOL - joint.THREAD_LENGTH - joint.THREAD_LENGTH_TOL
+    wrong_half_width = geom.KNIFE_LOCAL_X - earliest + clamp.STOCK_WIDTH_MAX / 2.0
+    wrong_nominal_root = geom.KNIFE_LOCAL_X - joint.THREAD_ROOT_X + clamp.STOCK_WIDTH_MAX
+    for wrong_radius in (wrong_half_width, wrong_nominal_root):
+        assert geom.KNIFE_LOCAL_X - wrong_radius + clamp.STOCK_WIDTH_MAX > earliest
+    assert geom.KNIFE_LOCAL_X - (geom.KNIFE_LOCAL_X - clamp.STOCK_WIDTH_MAX) - clamp.STOCK_WIDTH_MAX < joint.ROD_DIA / 2.0
+
+
+@pytest.mark.parametrize("field", ("STOCK_WIDTH_MAX", "WALL_TARGET"))
+def test_operating_travel_refuses_an_unbounded_or_noninterior_clamp(monkeypatch, field) -> None:
+    monkeypatch.setattr(clamp, field, 0.0)
+    with pytest.raises(AssertionError, match="inside"):
+        geom.operating_clamp_radius_band()
 
 
 def test_small_thread_requirements_have_a_legible_enlarged_native_home() -> None:
@@ -216,6 +257,8 @@ class _LeverFace:
             CylinderParams=(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, radius),
         )
         self.box = (*tuple(value - radius for value in center), *tuple(value + radius for value in center))
+        if identity == 4002:
+            self.box = (radius, -radius, -radius, joint.THREAD_ROOT_X / 1000.0, radius, radius)
         self.document = None
         self.selection_attempts = 0
 
@@ -236,9 +279,10 @@ class _LeverFace:
 
 
 class _LeverVisibleView:
-    def __init__(self, name, faces=()):
+    def __init__(self, name, faces=(), *, direct_faces=()):
         self.name = name
         self.faces = faces
+        self.direct_faces = direct_faces
         self.entity_kinds = []
         self.component = object()
 
@@ -251,32 +295,140 @@ class _LeverVisibleView:
     def GetVisibleEntities2(self, component, kind):
         assert component is self.component
         self.entity_kinds.append(kind)
-        assert kind == 3, "the free hemisphere must be resolved as a visible face"
-        return self.faces
+        if kind == 3:
+            return self.direct_faces
+        assert kind == 4
+        return tuple(SimpleNamespace(GetFace=lambda face=face: face) for face in self.faces)
 
 
-def test_free_end_matcher_identifies_the_actual_visible_sphere_not_a_cylinder_or_other_sphere() -> None:
+def _face_census_adapter():
+    def read_member(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+    return SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+        _attempt=lambda fn, default=None: fn(), _get_attr_or_call=read_member,
+    )
+
+
+@pytest.mark.parametrize("direct_enumeration", (False, True))
+def test_free_end_matcher_uses_actual_silhouette_faces_even_when_face_enumeration_is_empty(direct_enumeration) -> None:
     hemisphere = _LeverFace()
+    body = _LeverFace(identity=4002)
     view = _LeverVisibleView("front", (
-        _LeverFace(identity=4002),
+        body,
         _LeverFace(diameter_mm=joint.ROD_DIA + 1.0),
         _LeverFace(center_mm=(joint.ROD_LENGTH - joint.ROD_DIA / 2.0, 0.0, 0.0)),
-        hemisphere,
-    ))
-    assert drawing._free_end_face(view) is hemisphere
-    assert view.entity_kinds == [3]
+        hemisphere, hemisphere,  # Two silhouette flanks may share one face.
+    ), direct_faces=(body, hemisphere) if direct_enumeration else ())
+    assert drawing._free_end_face(_face_census_adapter(), view, []) is hemisphere
+    assert view.entity_kinds == [3, 4]
 
 
 @pytest.mark.parametrize("faces", (
     (),
-    (_LeverFace(identity=4002),),
     (_LeverFace(center_mm=(0.0, 0.0, 0.0)),),
     (_LeverFace(diameter_mm=joint.ROD_DIA + 1.0),),
     (_LeverFace(), _LeverFace()),
 ))
 def test_free_end_matcher_refuses_absent_wrong_or_ambiguous_visible_hemispheres(faces) -> None:
+    view = _LeverVisibleView("front", (_LeverFace(identity=4002), *faces))
     with pytest.raises(RuntimeError, match="expected one visible spherical face"):
-        drawing._free_end_face(_LeverVisibleView("front", faces))
+        drawing._free_end_face(_face_census_adapter(), view, [])
+
+
+def test_free_end_census_distinguishes_empty_enumeration_from_non_spherical_native_geometry(monkeypatch) -> None:
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    with pytest.raises(RuntimeError, match="plain-body positive control"):
+        drawing._free_end_face(_face_census_adapter(), _LeverVisibleView("front"), [])
+    empty = json.loads(messages[-1].split(": ", 1)[1])
+    assert empty["direct_faces"] == empty["silhouettes"] == empty["unique_faces"] == 0
+    assert empty["plain_body_matches"] == 0 and empty["faces"] == []
+
+    unknown = _LeverVisibleView("front", (_LeverFace(identity=4002), _LeverFace(identity=4006)))
+    with pytest.raises(RuntimeError, match="expected one visible spherical face"):
+        drawing._free_end_face(_face_census_adapter(), unknown, [])
+    census = json.loads(messages[-1].split(": ", 1)[1])
+    assert census["direct_faces"] == 0 and census["silhouettes"] == 2
+    assert census["plain_body_matches"] == 1 and census["hemisphere_matches"] == 0
+    assert {face["identity"] for face in census["faces"]} == {4002, 4006}
+    cylinder = next(face for face in census["faces"] if face["identity"] == 4002)
+    assert cylinder["parameters"][6] == pytest.approx(joint.ROD_DIA / 2000.0)
+    assert len(cylinder["box"]) == 6
+    unknown_face = next(face for face in census["faces"] if face["identity"] == 4006)
+    assert len(unknown_face["box"]) == 6
+    assert unknown_face["surface_type"] == "unhandled native surface identity"
+
+
+@pytest.mark.parametrize("source_fault", (None, "stale_dimension", "missing_dimension", "stale_path", "missing_reference", "missing_transform"))
+def test_free_end_census_compares_saved_geometry_source_transform_and_imported_dimension_owners(monkeypatch, source_fault) -> None:
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    hemisphere = _LeverFace()
+    view = _LeverVisibleView("front", (_LeverFace(identity=4002), hemisphere))
+    values = {
+        "RodDia@RodProfile": joint.ROD_DIA, "OverallLength@RodProfile": joint.ROD_LENGTH,
+        "TipChamfer@RodProfile": joint.TIP_CHAMFER, "ThreadLength@ThreadExtent": joint.THREAD_LENGTH,
+        "IncompleteLength@ThreadExtent": joint.INCOMPLETE_THREAD_MAX,
+    }
+    if source_fault == "stale_dimension":
+        values["RodDia@RodProfile"] += 0.1
+    if source_fault == "missing_dimension":
+        del values["RodDia@RodProfile"]
+
+    def parameter(name):
+        if name not in values:
+            return None
+        return SimpleNamespace(FullName=f"{name}@saved-lever", SystemValue=values[name] / 1000.0)
+
+    actual_path = "C:/unrelated/stale-lever.SLDPRT" if source_fault == "stale_path" else str(drawing.SOURCE)
+    view.ReferencedDocument = None if source_fault == "missing_reference" else SimpleNamespace(GetPathName=lambda: actual_path, Parameter=parameter)
+    # Deliberately non-default native transform: diagnostics must report what
+    # was actually read, not reconstruct an assumed *Front/1:1 transform.
+    matrix = (0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.08, 0.09, 0.0, 3.0, 0.0, 0.0, 0.0)
+    if source_fault != "missing_transform":
+        view.ModelToViewTransform = SimpleNamespace(ArrayData=matrix)
+    view.GetOrientationName = lambda: "actual saved orientation"
+    imported = []
+    for full_name in ("RodDia@RodProfile@saved-lever", "ThreadLength@ThreadExtent@saved-lever"):
+        native_dimension = SimpleNamespace(FullName=full_name)
+        display = SimpleNamespace(GetDimension=lambda dimension=native_dimension: dimension)
+        imported.append(SimpleNamespace(GetSpecificAnnotation=lambda display=display: display))
+
+    assert drawing._free_end_face(_face_census_adapter(), view, imported) is hemisphere
+    census = json.loads(messages[-1].split(": ", 1)[1])
+    assert census["coordinate_frame"] == "referenced part model" and census["length_units"] == "metres"
+    sphere = next(face for face in census["faces"] if face["identity"] == 4004)
+    assert sphere["sphere_center_m"] == pytest.approx((joint.ROD_DIA / 2000.0, 0.0, 0.0))
+    assert sphere["sphere_radius_m"] == pytest.approx(joint.ROD_DIA / 2000.0)
+    assert sphere["sphere_center_mm"] == pytest.approx((joint.ROD_DIA / 2.0, 0.0, 0.0))
+    assert sphere["sphere_diameter_mm"] == pytest.approx(joint.ROD_DIA)
+    assert census["imported_dimensions"] == [
+        {"full_name": "RodDia@RodProfile@saved-lever", "source_feature": "RodProfile"},
+        {"full_name": "ThreadLength@ThreadExtent@saved-lever", "source_feature": "ThreadExtent"},
+    ]
+    source = census["source"]
+    assert source["all_dimensions_match"] is (source_fault not in ("stale_dimension", "missing_dimension", "missing_reference"))
+    if source_fault == "missing_reference":
+        assert "read_error" in source
+    else:
+        assert source["actual_path"] == actual_path
+        assert source["path_matches"] is (source_fault != "stale_path")
+        diameter = next(row for row in source["dimensions"] if row["requested_name"] == "RodDia@RodProfile")
+        if source_fault == "missing_dimension":
+            assert diameter["read_error"] == "native source dimension unavailable"
+        else:
+            assert diameter["actual_mm"] == pytest.approx(values["RodDia@RodProfile"])
+            assert diameter["full_name"] == "RodDia@RodProfile@saved-lever"
+    if source_fault == "missing_transform":
+        assert "read_error" in census["view"]
+    else:
+        assert census["view"]["model_to_view"] == list(matrix)
+        assert census["view"]["translation_m"] == list(matrix[9:12])
+        assert census["view"]["scale"] == 3.0
+        assert census["view"]["orientation"] == "actual saved orientation"
 
 
 class _LeverNoteAnnotation:
@@ -401,4 +553,4 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert annotation.position == (0.030, 0.185, 0.0)
         assert annotation.GetLeaderCount() == 1 and not annotation.IsDangling()
     assert hemisphere.selection_attempts == 1
-    assert front.entity_kinds == [3]
+    assert front.entity_kinds == [3, 4]

@@ -2,7 +2,8 @@ r"""Native manufacturing sheet for the simple threaded L bracket.
 
 All sizes/locations import from the saved SLDPRT, including the ordinary
 side/tip hole-location chain and the independent internal-root MAX envelope.
-Each dimension's callout is applied only after its owning view imports it.
+Each dimension's callout is applied only after its owning view imports it;
+the bore's axial/radial mouth chamfer belongs in its true-profile section.
 No press-fit, collar, finish-land or GD&T-frame convention remains.
 """
 
@@ -29,11 +30,13 @@ from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _drawing_sections import create_section_view
 from _paths import CAD_ROOT
 from _session import run_build
+from _section_axis import position_section_caption
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_Z
-from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, TAP_DRILL_DIA
+from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA
 from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, FLANGE_DEPTH_CALLOUT, FOOT_CORNER_CALLOUT, MOUNTING_HOLE_PROCESS, MOUTH_CALLOUT, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
@@ -47,9 +50,12 @@ BOTTOM_CENTER = (0.079, 0.080)
 SIDE_CENTER = (0.228, 0.165)
 ISO_CENTER = (0.350, 0.130)
 ISO_SCALE = (1, 2)
+MOUTH_SECTION_CENTER = (0.228, 0.080)
+MOUTH_SECTION_SCALE = (3, 1)
 FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.140, 0.123), "RootR": (0.045, 0.145)}
 BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080), "FootCornerR": (0.040, 0.100)}
-SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165), "MouthChamfer": (0.280, 0.199)}
+SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
+MOUTH_KEEP = {"MouthChamfer": (0.290, 0.095)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240), "ThreadRootEnvelope": (0.292, 0.214)}
 
@@ -87,6 +93,36 @@ def _project_side_view(adapter: Any, front: Any, side: Any) -> None:
         raise RuntimeError("threaded bracket end view axis is not aligned")
 
 
+def _mouth_section(adapter: Any, side: Any) -> Any:
+    """Cut Z=0 through the X-axis tap; an end view collapses its chamfer leg."""
+    ends = [
+        model_point_in_view(adapter, side, (0.0, sign * (NOSE_R + 3.0) / 1000.0, 0.0), label="mouth section cutting line")
+        for sign in (1.0, -1.0)
+    ]
+    section = _early_bound(create_section_view(
+        adapter, side, line_start=ends[0], line_end=ends[1],
+        view_xy=MOUTH_SECTION_CENTER, section_label="A", scale=MOUTH_SECTION_SCALE,
+        label="thread-mouth true-profile section",
+    ), "IView")
+    cut = _early_bound(section.GetSection(), "IDrSection")
+    cut.SetDisplayOnlySurfaceCut(True)
+    set_hidden_lines_removed(adapter, section)
+    rebuild_drawing(adapter, label="thread-mouth section cut faces only")
+    if cut.GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError("thread-mouth section retained geometry beyond the cutting plane")
+    origin = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label="mouth section origin")
+    axes = [
+        model_point_in_view(adapter, section, point, label="mouth section profile axis")
+        for point in ((0.01, 0.0, 0.0), (0.0, 0.01, 0.0))
+    ]
+    vectors = [tuple(point[i] - origin[i] for i in range(2)) for point in axes]
+    expected = 0.01 * MOUTH_SECTION_SCALE[0] / MOUTH_SECTION_SCALE[1]
+    if any(abs(math.hypot(*vector) - expected) > 1e-7 for vector in vectors) or abs(sum(a * b for a, b in zip(*vectors))) > 1e-9:
+        raise RuntimeError("thread-mouth section does not show both chamfer legs in true profile")
+    position_section_caption(adapter, section, (0.209, 0.048), label="thread mouth A-A")
+    return section
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
@@ -101,10 +137,12 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, bottom, side, iso):
         set_hidden_lines_removed(adapter, view)
     _project_side_view(adapter, front, side)
+    mouth = _mouth_section(adapter, side)
     for view, keep, label, callouts in (
         (front, FRONT_KEEP, "front", {"NeckThickness": NECK_THICKNESS_CALLOUT, "FlangeDepth": FLANGE_DEPTH_CALLOUT, "RootR": ROOT_CALLOUT}),
         (bottom, BOTTOM_KEEP, "mounting face", {"FootCornerR": FOOT_CORNER_CALLOUT}),
-        (side, SIDE_KEEP, "thread-axis end", {"MouthChamfer": MOUTH_CALLOUT}),
+        (side, SIDE_KEEP, "thread-axis end", {}),
+        (mouth, MOUTH_KEEP, "thread-mouth section", {"MouthChamfer": MOUTH_CALLOUT}),
     ):
         annotations = curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=DRAWING_DIMENSIONS)
         set_dimension_callouts(adapter, annotations, callouts)

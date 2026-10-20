@@ -95,8 +95,14 @@ def _undeclared_bound_calls(tree):
                         if isinstance(target, ast.Name):
                             bindings[target.id] = node.value.args[1].value
         for node in ast.walk(function):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id in bindings:
-                interface = bindings[node.func.value.id]
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            receiver = node.func.value
+            interface = bindings.get(receiver.id) if isinstance(receiver, ast.Name) else None
+            if isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name) and receiver.func.id == "_early_bound":
+                if len(receiver.args) == 2 and isinstance(receiver.args[1], ast.Constant):
+                    interface = receiver.args[1].value
+            if interface is not None:
                 methods, _maps = _native_declaration(interface)
                 if node.func.attr not in methods:
                     failures.append(f"{interface}.{node.func.attr}")
@@ -167,3 +173,17 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
     rim = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
     rim.func.attr = "SetSelectionPoint"
     assert "ISelectionMgr.SetSelectionPoint arguments" in _undeclared_bound_calls(mutated)
+
+
+@pytest.mark.parametrize("recipe", ("draw_mg_magnifying_bracket.py", "draw_mg_magnifying_lever.py"))
+def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) -> None:
+    assert not _undeclared_bound_calls(_tree(SCRIPTS / recipe))
+    wrong = ast.parse('def inline_binding(): _early_bound(None, "ISilhouetteEdge").NotADeclaredFaceAccessor()')
+    assert _undeclared_bound_calls(wrong) == ["ISilhouetteEdge.NotADeclaredFaceAccessor"]
+    for interface, property_name in (
+        ("IView", "ReferencedDocument"),
+        ("IView", "ModelToViewTransform"),
+        ("IDimension", "FullName"),
+        ("IDimension", "SystemValue"),
+    ):
+        assert property_name in _native_declaration(interface)[1]["_prop_map_get_"]
