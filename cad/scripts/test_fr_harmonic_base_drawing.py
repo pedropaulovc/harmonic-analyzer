@@ -1042,6 +1042,20 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
 _FAKE_PIVOT_SEAT_BOX = (0.150, 0.020, 0.180, 0.040)
 
 
+def _pivot_note_display(items):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        GetTextCount=lambda: len(items),
+        GetTextAtIndex=lambda index: items[index]["text"],
+        GetTextPositionAtIndex=lambda index: items[index]["position"],
+        GetTextHeightAtIndex=lambda index: items[index]["height"],
+        GetTextRefPositionAtIndex=lambda index: items[index]["reference"],
+        GetTextAngleAtIndex=lambda index: items[index]["angle"],
+        GetTextInBoxWidthAtIndex=lambda index: items[index]["width"],
+    )
+
+
 def _drive_hole_sheet_callout_check(
     monkeypatch,
     note_box,
@@ -1049,6 +1063,7 @@ def _drive_hole_sheet_callout_check(
     *,
     pivot_native_state=None,
     pivot_copies=1,
+    pivot_extent=None,
 ) -> None:
     """Exercise the native-note guard without COM; boxes are unit controls."""
     from types import SimpleNamespace
@@ -1065,6 +1080,19 @@ def _drive_hole_sheet_callout_check(
         "points": (0.180, 0.020, 0.0, 0.190, 0.015, 0.0),
     }
     state.update(pivot_native_state or {})
+    text_box = pivot_seat_box or _FAKE_PIVOT_SEAT_BOX
+    pitch = (text_box[3] - text_box[1]) / 4.0
+    display = _pivot_note_display([
+        {
+            "text": text,
+            "position": (text_box[0], text_box[3] - (index + 1) * pitch, 0.0),
+            "height": pitch,
+            "reference": 1,
+            "angle": 0.0,
+            "width": text_box[2] - text_box[0],
+        }
+        for index, text in enumerate(sheet.PIVOT_SEAT_STEP.split("\n"))
+    ])
     pivot = SimpleNamespace(
         GetAttachedEntities3=lambda: state["attached"],
         GetAttachedEntityCount3=lambda: state["count"],
@@ -1072,6 +1100,7 @@ def _drive_hole_sheet_callout_check(
         GetLeaderCount=lambda: state["leaders"],
         IsDangling=lambda: state["dangling"],
         GetLeaderPointsAtIndex=lambda index: state["points"] if index == 0 else (),
+        GetDisplayData=lambda: state.get("display", display),
     )
 
     def annotations(_adapter, view):
@@ -1082,7 +1111,10 @@ def _drive_hole_sheet_callout_check(
             ))
         if pivot_seat_box is not None and view == "top view":
             return iter([
-                (SimpleNamespace(kind="note", label="PS", box=pivot_seat_box), pivot)
+                (SimpleNamespace(
+                    kind="note", label="PS",
+                    box=pivot_extent if pivot_extent is not None else pivot_seat_box,
+                ), pivot)
             ] * pivot_copies)
         return iter(())
 
@@ -1216,6 +1248,112 @@ def test_pivot_note_native_leader_cannot_return_through_its_own_ink(monkeypatch)
             (0.200, 0.200, 0.220, 0.210),
             pivot_native_state={"points": (0.180, 0.020, 0.0, 0.150, 0.040, 0.0)},
         )
+
+
+def test_pivot_note_ignores_extent_polluted_by_its_native_leader(monkeypatch) -> None:
+    # Ordinary native INote.GetExtent can include the leader, not just balloons.
+    # This envelope contains most of the default native leader; using it for
+    # own_rows would falsely refuse a leader that leaves the text at its corner.
+    _drive_hole_sheet_callout_check(
+        monkeypatch,
+        (0.200, 0.200, 0.220, 0.210),
+        pivot_extent=(0.150, 0.015, 0.190, 0.040),
+    )
+
+
+@pytest.mark.parametrize(
+    ("reference", "angle", "expected"),
+    (
+        (1, 0.0, (0.150, 0.020, 0.180, 0.0235)),
+        (2, 0.0, (0.135, 0.01825, 0.165, 0.02175)),
+        (3, math.pi / 2.0, (0.150, -0.010, 0.1535, 0.020)),
+    ),
+)
+def test_pivot_note_text_boxes_honor_native_width_reference_and_angle(
+    monkeypatch, reference, angle, expected,
+) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    display = _pivot_note_display([{
+        "text": "D1: LOCATES PIVOT",
+        "position": (0.150, 0.020, 0.0),
+        "height": 0.0035,
+        "reference": reference,
+        "angle": angle,
+        "width": 0.030,
+    }])
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    rows = sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+    assert list(rows) == ["0: D1: LOCATES PIVOT"]
+    assert next(iter(rows.values())) == pytest.approx(expected)
+
+
+def test_pivot_note_zero_native_width_uses_the_existing_text_estimator(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    display = _pivot_note_display([{
+        "text": "TEST",
+        "position": (0.150, 0.020, 0.0),
+        "height": 0.0035,
+        "reference": 1,
+        "angle": 0.0,
+        "width": 0.0,
+    }])
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    rows = sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+    assert next(iter(rows.values())) == pytest.approx(
+        (0.150, 0.020, 0.150 + 4 * 0.0035 * sheet.DEFAULT_ADVANCE_RATIO, 0.0235)
+    )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    (
+        {"text": ""},
+        {"position": ()},
+        {"position": (math.nan, 0.020, 0.0)},
+        {"height": 0.0},
+        {"height": math.inf},
+        {"reference": -1},
+        {"reference": 6},
+        {"angle": math.nan},
+        {"width": -0.001},
+        {"width": math.inf},
+    ),
+)
+def test_pivot_note_text_boxes_refuse_malformed_native_runs(monkeypatch, bad) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    item = {
+        "text": "D1: LOCATES PIVOT",
+        "position": (0.150, 0.020, 0.0),
+        "height": 0.0035,
+        "reference": 1,
+        "angle": 0.0,
+        "width": 0.030,
+    }
+    item.update(bad)
+    display = _pivot_note_display([item])
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    with pytest.raises(RuntimeError, match="malformed native text run"):
+        sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
+
+
+@pytest.mark.parametrize("display", (None, _pivot_note_display([])))
+def test_pivot_note_refuses_missing_native_text_display(monkeypatch, display) -> None:
+    from types import SimpleNamespace
+
+    import draw_fr_harmonic_base as sheet
+
+    monkeypatch.setattr(sheet, "_early_bound", lambda obj, interface: obj)
+    with pytest.raises(RuntimeError, match="no native text"):
+        sheet._pivot_seat_note_text_rows(SimpleNamespace(GetDisplayData=lambda: display))
 
 
 def test_section_line_boxes_cover_arrows_and_labels_in_sheet_space() -> None:
@@ -3189,7 +3327,8 @@ def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets() -> None:
     assert sheet.is_pivot_seat_note(sheet.PIVOT_SEAT_STEP.replace("\n", "\r\n") + "\r\n")
     assert not sheet.is_pivot_seat_note(sheet.TRANSFER_SPRING_CALLOUT)
     source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" in source
+    assert "note_rows = _pivot_seat_note_text_rows(annotation)" in source
+    assert "boxes[PIVOT_SEAT_NOTE_LABEL] = element.box" not in source
 
 
 def test_d1_note_is_created_once_on_the_exact_native_table_rim() -> None:

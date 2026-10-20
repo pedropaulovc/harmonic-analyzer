@@ -79,6 +79,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _layout_geometry import DEFAULT_ADVANCE_RATIO, estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -880,6 +881,51 @@ def is_pivot_seat_note(text: str) -> bool:
     """Whether a note read back off the sheet is the D1 pivot seat note (INote
     text reads back with CRLF line breaks)."""
     return text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP.strip()
+
+
+def _pivot_seat_note_text_rows(annotation: Any) -> dict[str, Box]:
+    """Box only D1's displayed text; INote.GetExtent also includes its leader."""
+    raw = annotation.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("pivot seat note has no native text display data")
+    data = _early_bound(raw, "IDisplayData")
+    rows = {}
+    for index in range(int(data.GetTextCount())):
+        text = str(data.GetTextAtIndex(index) or "").replace("\r\n", "\n").rstrip()
+        position = tuple(float(value) for value in data.GetTextPositionAtIndex(index) or ())
+        height = float(data.GetTextHeightAtIndex(index))
+        reference = int(data.GetTextRefPositionAtIndex(index))
+        angle = float(data.GetTextAngleAtIndex(index))
+        width = float(data.GetTextInBoxWidthAtIndex(index))
+        if (
+            not text
+            or len(position) < 2
+            or not all(math.isfinite(value) for value in (*position, height, angle, width))
+            or height <= 0.0
+            or reference not in range(6)
+            or width < 0.0
+        ):
+            raise RuntimeError(f"pivot seat note has malformed native text run {index}")
+        # Zero is documented for text without a text-in-box width. Retain
+        # the shared estimator then; a positive native width takes precedence.
+        advance = (
+            width / (max(map(len, text.split("\n"))) * height)
+            if width > 0.0 else DEFAULT_ADVANCE_RATIO
+        )
+        box = estimate_text_box(
+            text,
+            anchor=(position[0], position[1]),
+            height=height,
+            reference=reference,
+            angle=angle,
+            advance_ratio=advance,
+        )
+        if box is None:
+            raise RuntimeError(f"pivot seat note has no text box for native run {index}")
+        rows[f"{index}: {text}"] = (box.xmin, box.ymin, box.xmax, box.ymax)
+    if not rows:
+        raise RuntimeError("pivot seat note has no native text runs")
+    return rows
 
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
@@ -1861,10 +1907,14 @@ def _check_hole_sheet_callouts(
                     (points[index], points[index + 1], points[index + 3], points[index + 4])
                     for index in range(0, len(points) - 3, 3)
                 ]
-                boxes[PIVOT_SEAT_NOTE_LABEL] = element.box
-                # The longest row is last, so the leader must leave the full
-                # native ink envelope, not rise back through an earlier row.
-                own_rows[PIVOT_SEAT_NOTE_LABEL] = {PIVOT_SEAT_STEP: element.box}
+                note_rows = _pivot_seat_note_text_rows(annotation)
+                own_rows[PIVOT_SEAT_NOTE_LABEL] = note_rows
+                boxes[PIVOT_SEAT_NOTE_LABEL] = (
+                    min(box[0] for box in note_rows.values()),
+                    min(box[1] for box in note_rows.values()),
+                    max(box[2] for box in note_rows.values()),
+                    max(box[3] for box in note_rows.values()),
+                )
                 continue
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
