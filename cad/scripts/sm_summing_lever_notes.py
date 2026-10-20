@@ -167,15 +167,16 @@ REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 # thread prints as a minimum; the drill's one-sided +0.10/0 keeps the
 # bottoming tap's two pitches of lead inside the shallowest (nominal) drill
 # (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).  The drill runs
-# along the plate's mid-plane, so past the rib's inboard face is more plate,
-# not a floor: DRILL_POINT_RIB_MARGIN_MIN only keeps the point out of the
-# bare plate's thinner walls.  Machinist review r14 read the 7.30 rib as the
-# drill's floor (rule 17), so the callout says so (rule 20).  The thread is
-# shallower than the drill, so a drill ending in the rib puts the thread
-# there too.  Two lines here keep the callout to the audit's four rows (farm
-# r15: three made it five, tall-block).
+# along the plate's mid-plane: section H-H shows the rib stepping down to
+# the thinner plate beyond the drill point, not a bottom wall.  The receiver
+# stations are inboard of the spring-anchor pad, so the pad does not back
+# those walls.  DRILL_POINT_RIB_MARGIN_MIN keeps the point out of that thin
+# section.  Name that function at the callout: "solid plate beyond" alone
+# was read as making the upper limit unnecessary (review f3d4605b7cef).
+# The thread is shallower than the drill, so it stays in the rib too.
+# Two reason lines keep the audit's four rows (farm r15: three made five).
 BRACKET_TAP_CALLOUT_PROCESS = (
-    "DRILL ENDS IN RIB, SOLID PLATE BEYOND\n"
+    "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"
 )
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
