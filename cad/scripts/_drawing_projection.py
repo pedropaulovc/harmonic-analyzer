@@ -14,7 +14,9 @@ from _com import _com_invoke
 import _telemetry
 
 
-def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:
+def _projection_frame(
+    adapter: Any, view: Any, *, observed: dict[str, Any] | None = None
+) -> tuple[Any, Any]:
     """The math utility and the view's CURRENT model-to-sheet transform, raw.
 
     Raw dispatches (``_com._com_invoke``): the generated wrapper would read
@@ -25,6 +27,11 @@ def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:
     """
     utility = _com_invoke(adapter.swApp, "ISldWorks", "GetMathUtility")
     transform = _com_invoke(view, "IView", "ModelToViewTransform")
+    if observed is not None:
+        # Retain the object already fetched, without another native read.
+        # Its ArrayData is deliberately NOT sampled here; copy/live semantics
+        # of a deferred read are undocumented.
+        observed["model_to_view_transform_handle"] = transform
     return utility, transform
 
 
@@ -71,6 +78,7 @@ def model_points_in_view(
     *,
     label: str,
     names: Sequence[str] | None = None,
+    observed: dict[str, Any] | None = None,
 ) -> list[tuple[float, float]]:
     """:func:`model_point_in_view` for many points of one view at one moment.
 
@@ -82,7 +90,11 @@ def model_points_in_view(
     if names is not None and len(names) != len(points):
         raise ValueError(f"{label}: {len(names)} names for {len(points)} points")
     _telemetry.annotate(points=len(points))
-    utility, transform = _projection_frame(adapter, view)
+    utility, transform = (
+        _projection_frame(adapter, view)
+        if observed is None
+        else _projection_frame(adapter, view, observed=observed)
+    )
     projected: list[tuple[float, float]] = []
     for index, xyz in enumerate(points):
         try:
