@@ -1,6 +1,7 @@
 """Offline contract for the pen fitter package (MHA-PN-00)."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -148,6 +149,78 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
     )
     assert drawing.BOM_SKUS[spec.HANGER] == drawing.MADE_PART_SKU
     assert drawing.BOM_SKUS[spec.HANGER_JAM_NUT] != drawing.MADE_PART_SKU
+
+
+@pytest.mark.parametrize(
+    "heights",
+    (
+        (0.006,) * 14,
+        (0.006,) * 5 + (0.010168333333333333,) * 9,
+    ),
+)
+def test_exploded_caption_follows_actual_wrapped_bom_height(
+    monkeypatch: pytest.MonkeyPatch, heights: tuple[float, ...]
+) -> None:
+    # The naming cutover grew the native BOM to 121.515 mm; the old 96 mm
+    # estimate placed the caption through row 12. Read every final row instead.
+    position = (0.2481, 0.2627, 0.0)
+    annotation = SimpleNamespace(GetPosition=lambda: position)
+    table = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        RowCount=len(heights),
+        GetRowHeight=heights.__getitem__,
+    )
+    boxes = []
+
+    def add_note(adapter, sheet, text, xy, *, label):
+        # Native INote.GetExtent can extend slightly above its insertion point.
+        box = (xy[0], xy[1] - 0.009, xy[0] + 0.115, xy[1] + 0.0003)
+        boxes.append(box)
+        return box
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "_add_note_block", add_note)
+    drawing._place_exploded_caption(None, table, (1.0, 2.0))
+    assert position[1] - sum(heights) - boxes[0][3] >= drawing.VIEW_LABEL_GAP
+
+
+def test_exploded_caption_refuses_native_extent_that_still_touches_bom(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    table = SimpleNamespace(
+        GetAnnotation=lambda: SimpleNamespace(GetPosition=lambda: (0.2481, 0.2627, 0.0)),
+        RowCount=14,
+        GetRowHeight=lambda row: 0.006,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        drawing,
+        "_add_note_block",
+        lambda *args, **kwargs: (0.2481, 0.160, 0.3631, 0.1787),
+    )
+    with pytest.raises(RuntimeError, match="caption is only"):
+        drawing._place_exploded_caption(None, table, (1.0, 2.0))
+
+
+@pytest.mark.parametrize(
+    ("position", "height"),
+    (
+        ((0.2481, 0.2627), 0.006),
+        ((0.2481, 0.2627, 0.0), 0.0),
+        ((0.2481, 0.2627, 0.0), float("nan")),
+    ),
+)
+def test_exploded_caption_refuses_unreadable_bom_geometry(
+    monkeypatch: pytest.MonkeyPatch, position: tuple[float, ...], height: float
+) -> None:
+    table = SimpleNamespace(
+        GetAnnotation=lambda: SimpleNamespace(GetPosition=lambda: position),
+        RowCount=14,
+        GetRowHeight=lambda row: height,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    with pytest.raises(RuntimeError, match="unreadable geometry"):
+        drawing._place_exploded_caption(None, table, (1.0, 2.0))
 
 
 def test_explode_names_match_the_builder() -> None:
