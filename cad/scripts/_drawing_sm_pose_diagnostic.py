@@ -795,6 +795,12 @@ class _VisibilityTelemetry:
                     row["GetCurve"] = _metadata_field(
                         stage, lambda c=captured: True if c["GetCurve"] else None
                     )
+                    if captured["GetCurve"] is False:
+                        for dependent in ("IsLine", "GetCurveParams2"):
+                            row[dependent] = _metadata_field(
+                                stage,
+                                reason="same-handle GetCurve returned null; dependent getter not applicable",
+                            )
                 if "IsLine" in captured:
                     row["IsLine"] = _metadata_field(
                         stage, lambda c=captured: _metadata_scalar(c["IsLine"], bool)
@@ -805,16 +811,17 @@ class _VisibilityTelemetry:
                         row[member] = _metadata_field(
                             stage, reason=failure["error"], status=failure["status"]
                         )
+                if "GetCurveParams2" in captured:
+                    row["GetCurveParams2"] = _metadata_field(
+                        stage, lambda c=captured: _curve_packet(c["GetCurveParams2"])
+                    )
+                    continue
                 if (
                     budget is None
                     or time.perf_counter() - budget.start >= budget.seconds
                 ):
                     continue
-                if "GetCurveParams2" in captured:
-                    row["GetCurveParams2"] = _metadata_field(
-                        stage, lambda c=captured: _curve_packet(c["GetCurveParams2"])
-                    )
-                elif (
+                if (
                     allow_native
                     and captured.get("GetCurve") is True
                     and captured.get("IsLine") is False
