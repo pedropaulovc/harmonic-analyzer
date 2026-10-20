@@ -2380,7 +2380,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "pd_vn_guide_lock_screw_spec",
         "dt_vn_post_mount_screw_spec",
         "ch_vn_spring_hook_spec",
-        "dt_vn_swing_stop_screw_spec",
         "sm_vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",

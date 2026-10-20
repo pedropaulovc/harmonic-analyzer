@@ -4,6 +4,8 @@ Deck holes are native through taps. Depths below are material intervals measured
 DOWN from the finished deck, not drilling/thread-depth requirements. The native
 builder independently reads those intervals back before and after cutting.
 Horizontal frame cross taps retain their original blind manufacturing contract.
+Swing-stop receiver validation and its platform thickness allowance live here;
+the screw's pure stock limits and inspection data remain in its vendor spec.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import math
 from dataclasses import dataclass
 
 import _config
+import dt_vn_swing_stop_screw_spec as stop_stock
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
@@ -50,6 +53,7 @@ EDGE_BREAK_MAX_MM = max(
 # not a directly toleranced skin dimension. Do not book only one of these bands.
 DECK_HEIGHT_BAND_MM = 2.0 * title_block_band_mm("linear_1pl")
 POCKET_CEILING_BAND_MM = title_block_band_mm("linear_1pl")
+STOP_PLATE_THICKNESS_ALLOWANCE_MM = IN * float(_config.title_block("linear_2pl")["value_in"])
 
 BASE_CROSS_TAP_SPEC = HoleSpec(
     "tapped_bottoming", "#10-32", end="blind", depth_mm=CASTING_TAP_DRILL_DEPTH,
@@ -481,3 +485,42 @@ def require_through_seat_fit(
     if clearance <= 0:
         raise AssertionError(f"{label}: screw tip reaches clearance floor ({clearance:.4f} mm)")
     return ThroughSeatFit(engagement, max(0.0, insertion_max_mm - material.exit_depth_min_mm), clearance)
+
+
+def require_stop_seat_fit(
+    seat: HoleSpec,
+    plate_thickness: float,
+    *,
+    material: ThroughSeatMaterial,
+) -> None:
+    """Check the seated stock stop against the finite base receiver and platform.
+
+    Stock length and head-end runout use the screw spec's qualified B18.6.3
+    limits. Only the manufactured platform uses its title-block allowance.
+    The harvested tip chamfer remains nominal; the installed full-form
+    engagement and fully seated head still require the existing inspection.
+    """
+    if (
+        seat.kind != "tapped"
+        or seat.size != stop_stock.THREAD
+        or seat.thread_class != "2B"
+        or seat.end != "through_all"
+    ):
+        raise AssertionError("swing stop requires a through #4-40 UNC-2B seat")
+    fit = require_through_seat_fit(
+        "swing stop",
+        seat,
+        material,
+        insertion_min_mm=stop_stock.LENGTH_MIN_MM,
+        insertion_max_mm=stop_stock.LENGTH_MAX_MM,
+        tip_loss_mm=stop_stock.TIP_CHAMFER,
+        full_thread_start_mm=stop_stock.FULL_THREAD_START_MAX_MM,
+    )
+    if fit.full_thread_engagement_min_mm < stop_stock.MIN_USEFUL_ENGAGEMENT_MM - 1e-9:
+        raise AssertionError("swing stop has less than the minimum useful thread engagement")
+    # The whole head must bear on the edge of a tolerance-low platform.
+    if (
+        stop_stock.PROUD_LEN + stop_stock.HEAD_H
+        > plate_thickness - STOP_PLATE_THICKNESS_ALLOWANCE_MM + 1e-9
+    ):
+        raise AssertionError("swing-stop head stands above the tolerance-low platform")
