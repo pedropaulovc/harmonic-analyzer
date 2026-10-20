@@ -12,18 +12,47 @@ from types import SimpleNamespace
 
 import pytest
 from doit.loader import load_tasks
+from doit.task import dict_to_task
 
 from _buildgraph import RECIPE_SKIP_MODULES
-import machinist_review_config as review_config
 from _machinist_review_mode import MachinistReviewMode, mode_for_drawing
+from machinist_review_config import (
+    DEFAULT_EFFORTS,
+    DEFAULT_MODELS,
+    ENV_FIELDS,
+    ENV_PREFIX,
+    ReviewProfile,
+    registered_review_profile,
+    validate_review_profile,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PROFILE_FIELDS = ReviewProfile._fields
+PROFILE_CHANGES = [
+    ("backend", "codex"),
+    ("model", "claude-fable-5-1"),
+    ("effort", "high"),
+    ("judge_backend", "codex"),
+    ("judge_model", "claude-fable-5-1"),
+    ("judge_effort", "high"),
+]
+INVALID_PROFILE_VALUES = [
+    ("backend", "other"), ("judge_backend", "other"),
+    ("backend", ""), ("judge_backend", " codex"),
+    ("backend", "Claude"), ("backend", "codex "),
+    ("effort", "maximum"), ("judge_effort", "minimal"),
+    ("effort", ""), ("judge_effort", "high "),
+    ("model", ""), ("judge_model", " "),
+    ("model", "gpt-6-astra\n"), ("judge_model", "--model=other"),
+]
 
 
 @pytest.fixture(scope="module")
 def loaded_dodo():
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
+        for suffix in ENV_FIELDS.values():
+            patch.delenv(ENV_PREFIX + suffix, raising=False)
         spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -33,7 +62,9 @@ def loaded_dodo():
 @pytest.fixture
 def dodo(loaded_dodo, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
-    monkeypatch.delenv("HARMONIC_MACHINIST_REVIEWER", raising=False)
+    monkeypatch.setattr(
+        loaded_dodo, "_MACHINIST_REVIEW_PROFILE", registered_review_profile({})
+    )
     loaded_dodo._reviewed_drawings.cache_clear()
     yield loaded_dodo
     loaded_dodo._reviewed_drawings.cache_clear()
@@ -374,22 +405,324 @@ def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(
     monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
     inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.LEARN\n")
 
-    def tracker():
-        dodo._reviewed_drawings.cache_clear()
-        return next(dodo._machinist_review_tasks())["uptodate"][0]
-
-    first = tracker()
-    assert not first(None, {})
-    saved = {"_config_changed": first.config_digest}
-    assert tracker()(None, saved)
+    current, saved = _review_freshness(dodo, {})
+    assert not current
+    assert _review_freshness(dodo, saved)[0]
     key = _review_key(dodo)
     inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.ENFORCE\n")
-    assert not tracker()(None, saved)
+    current, enforced_saved = _review_freshness(dodo, saved)
+    assert not current
     assert _review_key(dodo) == key
-    enforced = tracker()
-    saved = {"_config_changed": enforced.config_digest}
     inputs.exception.unlink()
-    assert not tracker()(None, saved)
+    assert not _review_freshness(dodo, enforced_saved)[0]
+
+
+def _review_freshness(dodo, values):
+    """Exercise doit's configure/evaluate/success-save lifecycle without actions."""
+    dodo._reviewed_drawings.cache_clear()
+    task = dict_to_task(next(dodo._machinist_review_tasks()))
+    checker, args, kwargs = task.uptodate[0]
+    assert task.value_savers, "config_changed must register its successful-run saver"
+    current = checker(task, values, *args, **kwargs)
+    task.save_extra_values()
+    return current, dict(task.values)
+
+
+@pytest.fixture
+def review_freshness(inputs, monkeypatch):
+    monkeypatch.setattr(inputs.module, "_drawing_order", lambda: ["probe"])
+    inputs.draw.write_text(
+        "MACHINIST_REVIEW = MachinistReviewMode.LEARN\n", encoding="utf-8"
+    )
+    return lambda values: _review_freshness(inputs.module, values)
+
+
+@pytest.mark.parametrize(("field", "value"), PROFILE_CHANGES)
+def test_each_resolved_field_rekeys_review_and_invalidates_local_freshness(
+    inputs, monkeypatch, review_freshness, field, value
+):
+    dodo = inputs.module
+    label = "check:machinist_review:probe"
+    defaults = registered_review_profile({})
+    initial = _review_key(dodo, label=label)
+    current, saved = review_freshness({})
+    assert not current
+    assert review_freshness(saved)[0]
+    # Isolate exactly one field, including each backend independently. A model's
+    # availability is a provider concern, not a reason to normalize its key.
+    changed = defaults._replace(**{field: value})
+    assert {
+        name for name in PROFILE_FIELDS
+        if getattr(defaults, name) != getattr(changed, name)
+    } == {field}
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", changed)
+    assert _review_key(dodo, label=label) != initial
+    current, changed_saved = review_freshness(saved)
+    assert not current
+    assert review_freshness(changed_saved)[0]
+    command = dodo._machinist_review_command("probe", changed)
+    for name, selected in changed._asdict().items():
+        option = "--" + ENV_FIELDS[name].lower().replace("_", "-")
+        assert command[command.index(option) + 1] == selected
+    # Returning to the old profile must not reuse the newer profile's stamp.
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", defaults)
+    assert _review_key(dodo, label=label) == initial
+    assert not review_freshness(changed_saved)[0]
+
+
+def test_explicit_default_profile_has_the_same_key_and_local_freshness(
+    inputs, monkeypatch, review_freshness
+):
+    dodo = inputs.module
+    defaults = registered_review_profile({})
+    explicit = registered_review_profile({
+        ENV_PREFIX + ENV_FIELDS[field]: value
+        for field, value in defaults._asdict().items()
+    })
+    assert explicit == defaults
+    label = "check:machinist_review:probe"
+    initial = _review_key(dodo, label=label)
+    current, saved = review_freshness({})
+    assert not current
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", explicit)
+    assert _review_key(dodo, label=label) == initial
+    assert review_freshness(saved)[0]
+
+
+@pytest.mark.parametrize(("field", "value"), PROFILE_CHANGES)
+def test_reviewer_selection_does_not_rekey_real_native_leaves(
+    dodo, monkeypatch, field, value
+):
+    stem = "sm_summing_lever"
+    part = next(
+        path for path in dodo.part_scripts() if path.stem == f"build_{stem}"
+    )
+    rows = [
+        (f"part:{stem}", dodo._part_file_deps(part, stem)),
+        (f"drawing:{stem}", dodo._drawing_file_deps(stem)),
+    ]
+    config_path = str(dodo.SCRIPTS_DIR / "machinist_review_config.py")
+    # Even a native dependency on the canonical config source must get the
+    # plain content digest, never the review-only contextual selection.
+    rows.append(("part:config_probe", [config_path]))
+    initial = [dodo._cache_key(deps, label) for label, deps in rows]
+    plain = [
+        dodo._cache.cache_key(deps, dodo.ContentChecker._digest)
+        for _label, deps in rows
+    ]
+    assert initial == plain
+    monkeypatch.setattr(
+        dodo, "_MACHINIST_REVIEW_PROFILE",
+        registered_review_profile({})._replace(**{field: value}),
+    )
+    assert [dodo._cache_key(deps, label) for label, deps in rows] == initial
+
+
+@pytest.mark.parametrize(
+    ("environment", "expected"),
+    [
+        ({}, ReviewProfile(
+            "claude", "claude-opus-5-5", "medium",
+            "claude", "claude-opus-5-5", "medium",
+        )),
+        ({"HARMONIC_MACHINIST_REVIEWER": "codex"}, ReviewProfile(
+            "codex", "gpt-6-astra", "low", "codex", "gpt-6-astra", "low",
+        )),
+        ({"HARMONIC_MACHINIST_JUDGE_REVIEWER": "codex"}, ReviewProfile(
+            "claude", "claude-opus-5-5", "medium", "codex", "gpt-6-astra", "low",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_JUDGE_REVIEWER": "claude",
+        }, ReviewProfile(
+            "codex", "gpt-6-astra", "low", "claude", "claude-opus-5-5", "medium",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_MODEL": "provider/reviewer:v1",
+            "HARMONIC_MACHINIST_EFFORT": "high",
+            "HARMONIC_MACHINIST_JUDGE_REVIEWER": "claude",
+            "HARMONIC_MACHINIST_JUDGE_MODEL": "provider/judge:v2",
+            "HARMONIC_MACHINIST_JUDGE_EFFORT": "xhigh",
+        }, ReviewProfile(
+            "codex", "provider/reviewer:v1", "high",
+            "claude", "provider/judge:v2", "xhigh",
+        )),
+    ],
+)
+def test_registered_backend_fallback_and_explicit_stage_precedence(
+    environment, expected
+):
+    assert registered_review_profile(environment) == expected
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (field, value) for field, value in PROFILE_CHANGES
+        if field not in ("backend", "judge_backend")
+    ],
+)
+def test_explicit_model_and_effort_overrides_are_stage_local(field, value):
+    defaults = registered_review_profile({
+        "HARMONIC_MACHINIST_REVIEWER": "codex",
+    })
+    selected = registered_review_profile({
+        "HARMONIC_MACHINIST_REVIEWER": "codex",
+        ENV_PREFIX + ENV_FIELDS[field]: value,
+    })
+    assert selected == defaults._replace(**{field: value})
+
+
+@pytest.mark.parametrize("effort", ("high", "max"))
+def test_codex_configuration_is_explicit_for_both_stages(dodo, monkeypatch, effort):
+    profile = registered_review_profile({
+        "HARMONIC_MACHINIST_REVIEWER": "codex",
+        "HARMONIC_MACHINIST_EFFORT": effort,
+        "HARMONIC_MACHINIST_JUDGE_EFFORT": effort,
+    })
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", profile)
+    command = dodo._machinist_review_command(
+        "sm_summing_lever", dodo._machinist_review_profile()
+    )
+    assert command[-12:] == [
+        "--reviewer", "codex", "--model", "gpt-6-astra", "--effort", effort,
+        "--judge-reviewer", "codex", "--judge-model", "gpt-6-astra",
+        "--judge-effort", effort,
+    ]
+
+
+def test_environment_is_not_reread_between_freshness_key_and_command(
+    inputs, monkeypatch, review_freshness
+):
+    dodo = inputs.module
+    label = "check:machinist_review:probe"
+    profile = dodo._machinist_review_profile()
+    key = _review_key(dodo, label=label)
+    command = dodo._machinist_review_command("probe", profile)
+    current, saved = review_freshness({})
+    assert not current
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-after-import")
+    assert dodo._machinist_review_profile() is profile
+    assert _review_key(dodo, label=label) == key
+    assert dodo._machinist_review_command(
+        "probe", dodo._machinist_review_profile()
+    ) == command
+    assert review_freshness(saved)[0]
+
+
+def test_registered_profile_uses_environment_only_when_mapping_is_omitted(monkeypatch):
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.delenv(ENV_PREFIX + suffix, raising=False)
+    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "codex")
+    assert registered_review_profile() == registered_review_profile({
+        "HARMONIC_MACHINIST_REVIEWER": "codex",
+    })
+    assert registered_review_profile({}).backend == "claude"
+
+
+def test_validation_does_not_reresolve_environment_or_provider_defaults(monkeypatch):
+    profile = registered_review_profile({})
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-after-resolution")
+    for backend in ("claude", "codex"):
+        monkeypatch.setitem(DEFAULT_MODELS, backend, "changed-model")
+        monkeypatch.setitem(DEFAULT_EFFORTS, backend, "invalid-default")
+    assert validate_review_profile(profile) is None
+
+
+@pytest.mark.parametrize("stage", ("", "judge_"))
+@pytest.mark.parametrize("model", ("claude-opus-5-5", "claude-fable-5-1"))
+def test_claude_xhigh_effort_is_preserved(stage, model):
+    profile = registered_review_profile({
+        ENV_PREFIX + ENV_FIELDS[stage + "model"]: model,
+        ENV_PREFIX + ENV_FIELDS[stage + "effort"]: "xhigh",
+    })
+    assert getattr(profile, stage + "model") == model
+    assert getattr(profile, stage + "effort") == "xhigh"
+
+
+def test_graph_load_freezes_all_environment_overrides_before_prewarm(
+    dodo, monkeypatch
+):
+    expected = ReviewProfile(
+        "codex", "explicit-review", "max",
+        "claude", "explicit-judge", "xhigh",
+    )
+    for field, value in expected._asdict().items():
+        monkeypatch.setenv(ENV_PREFIX + ENV_FIELDS[field], value)
+    spec = importlib.util.spec_from_file_location(
+        "configured_review_dodo", REPO_ROOT / "dodo.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    prewarmed = []
+
+    def prewarm():
+        assert module._MACHINIST_REVIEW_PROFILE == expected
+        prewarmed.append(module._MACHINIST_REVIEW_PROFILE)
+
+    monkeypatch.setattr(dodo._cache, "prewarm", prewarm)
+    spec.loader.exec_module(module)
+    assert prewarmed == [expected]
+    frozen = module._machinist_review_profile()
+    assert frozen == expected
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-after-import")
+    assert module._machinist_review_profile() is frozen
+
+
+@pytest.mark.parametrize(("field", "value"), INVALID_PROFILE_VALUES)
+def test_invalid_profile_fails_graph_load_before_cache_or_native_work(
+    dodo, monkeypatch, field, value
+):
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.delenv(ENV_PREFIX + suffix, raising=False)
+    variable = ENV_PREFIX + ENV_FIELDS[field]
+    monkeypatch.setenv(variable, value)
+    monkeypatch.setattr(
+        dodo._cache, "prewarm",
+        lambda: pytest.fail("invalid review selection reached cache prewarming"),
+    )
+    spec = importlib.util.spec_from_file_location(
+        "invalid_review_dodo", REPO_ROOT / "dodo.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    with pytest.raises(ValueError, match=variable):
+        spec.loader.exec_module(module)
+
+
+@pytest.mark.parametrize(("field", "value"), PROFILE_CHANGES)
+def test_cache_status_probes_the_same_selected_review_key(
+    inputs, monkeypatch, field, value
+):
+    dodo = inputs.module
+    label = "check:machinist_review:probe"
+    defaults = dodo._machinist_review_profile()
+    default_key = _review_key(dodo, label=label)
+    profile = defaults._replace(**{field: value})
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", profile)
+    deps = dodo._machinist_review_file_deps("probe")
+    expected = _review_key(dodo, label=label)
+    assert expected != default_key
+    native_label = "part:config_probe"
+    native_deps = [str(inputs.scripts / "machinist_review_config.py")]
+    native_key = dodo._cache_key(native_deps, native_label)
+    assert native_key == dodo._cache.cache_key(
+        native_deps, dodo.ContentChecker._digest
+    )
+    probed = []
+    monkeypatch.setattr(
+        dodo, "_cache_rows",
+        lambda: [(label, deps), (native_label, native_deps)],
+    )
+    monkeypatch.setattr(dodo._cache, "probe", lambda key: probed.append(key))
+    monkeypatch.setattr(dodo._cache, "last_stored_key", lambda _label: None)
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-after-resolution")
+    dodo._cache_status([])
+    assert probed == [expected, native_key]
+
 
 
 def test_review_telemetry_has_a_stage_resource(dodo):
@@ -464,9 +797,9 @@ def action(inputs, monkeypatch):
         calls=calls,
         state=state,
         original_probe=original_probe,
-        original_key=original_key,
         profile=profile,
         original_store=original_store,
+        original_key=original_key,
     )
 
 
@@ -509,27 +842,71 @@ def review_sessions(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("selector", "expected"),
+    ("environment", "expected"),
     [
-        (None, ("claude", "claude-opus-5-5", "medium")),
-        ("claude", ("claude", "claude-opus-5-5", "medium")),
-        ("codex", ("codex", "gpt-6-astra", "low")),
+        ({}, ReviewProfile(
+            "claude", "claude-opus-5-5", "medium",
+            "claude", "claude-opus-5-5", "medium",
+        )),
+        ({"HARMONIC_MACHINIST_REVIEWER": "codex"}, ReviewProfile(
+            "codex", "gpt-6-astra", "low", "codex", "gpt-6-astra", "low",
+        )),
+        ({"HARMONIC_MACHINIST_JUDGE_REVIEWER": "codex"}, ReviewProfile(
+            "claude", "claude-opus-5-5", "medium", "codex", "gpt-6-astra", "low",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_JUDGE_REVIEWER": "claude",
+        }, ReviewProfile(
+            "codex", "gpt-6-astra", "low", "claude", "claude-opus-5-5", "medium",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_MODEL": "explicit-review",
+            "HARMONIC_MACHINIST_EFFORT": "high",
+            "HARMONIC_MACHINIST_JUDGE_REVIEWER": "claude",
+            "HARMONIC_MACHINIST_JUDGE_MODEL": "explicit-judge",
+            "HARMONIC_MACHINIST_JUDGE_EFFORT": "low",
+        }, ReviewProfile(
+            "codex", "explicit-review", "high", "claude", "explicit-judge", "low",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_EFFORT": "high",
+            "HARMONIC_MACHINIST_JUDGE_EFFORT": "high",
+        }, ReviewProfile(
+            "codex", "gpt-6-astra", "high", "codex", "gpt-6-astra", "high",
+        )),
+        ({
+            "HARMONIC_MACHINIST_REVIEWER": "codex",
+            "HARMONIC_MACHINIST_EFFORT": "max",
+            "HARMONIC_MACHINIST_JUDGE_EFFORT": "max",
+        }, ReviewProfile(
+            "codex", "gpt-6-astra", "max", "codex", "gpt-6-astra", "max",
+        )),
     ],
 )
 def test_registered_selection_reaches_real_cli_reviewers_and_judge(
-    action, review_sessions, monkeypatch, selector, expected
+    action, review_sessions, monkeypatch, environment, expected
 ):
     dodo = action.dodo
-    if selector is not None:
-        monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
+    # Replacing the process snapshot simulates a newly imported dodo, rather
+    # than depending on forbidden ambient environment rereads after import.
+    profile = registered_review_profile(environment)
+    assert profile == expected
+    monkeypatch.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", profile)
     monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
     monkeypatch.setattr(
         dodo, "mode_for_drawing", lambda _script: MachinistReviewMode.ENFORCE
     )
     task = next(dodo._machinist_review_tasks())
-    # The task's frozen profile must own command AND key even if the ambient
-    # selector changes after graph generation (including becoming invalid).
-    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-after-snapshot")
+    # Each task captures one profile for freshness, command and key, even if a
+    # later process configuration or the ambient environment changes.
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-after-snapshot")
+    monkeypatch.setattr(
+        dodo, "_MACHINIST_REVIEW_PROFILE", profile._replace(model="later-model")
+    )
     keyed_profiles = []
     monkeypatch.setattr(
         dodo, "_machinist_review_cache_key",
@@ -542,14 +919,18 @@ def test_registered_selection_reaches_real_cli_reviewers_and_judge(
     monkeypatch.setattr(dodo, "_run_subprocess", run)
     execute, arguments = task["actions"][0]
     execute(*arguments)
-    assert keyed_profiles == [review_config.ReviewProfile(*expected)]
+    assert keyed_profiles == [profile]
+    reviewer = expected[:3]
+    judge = expected[3:]
     assert sorted(review_sessions.seen) == sorted([
-        ("reviewer", *expected), ("reviewer", *expected), ("reviewer", *expected),
-        ("judge", *expected),
+        ("reviewer", *reviewer), ("reviewer", *reviewer), ("reviewer", *reviewer),
+        ("judge", *judge),
     ])
     aggregate = dodo._read_machinist_aggregate("probe")
-    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == expected
-    assert tuple(aggregate["judge"][name] for name in ("reviewer", "model", "effort")) == expected
+    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == reviewer
+    assert tuple(
+        aggregate["judge"][name] for name in ("reviewer", "model", "effort")
+    ) == judge
     assert aggregate["judge"]["skipped"] is False
     assert aggregate["verdict"] == "SHIP"
     assert dodo._machinist_review_stamp("probe").is_file()
@@ -568,10 +949,11 @@ def test_registered_selection_reaches_real_cli_reviewers_and_judge(
          ("codex", "explicit-review", "high"), ("claude", "explicit-judge", "low")),
     ],
 )
-def test_standalone_cli_ignores_registered_selector(
+def test_standalone_cli_ignores_all_registered_environment_overrides(
     inputs, review_sessions, monkeypatch, tmp_path, flags, reviewer, judge
 ):
-    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-for-registered-gate")
+    for suffix in ENV_FIELDS.values():
+        monkeypatch.setenv(ENV_PREFIX + suffix, "invalid-for-registered-gate")
     assert review_sessions.module.main([
         "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part", "--force",
         "--report-dir", str(tmp_path / "standalone"), *flags,
@@ -582,9 +964,31 @@ def test_standalone_cli_ignores_registered_selector(
     ])
 
 
-@pytest.mark.parametrize("selector", ["", "Claude", "codex ", "other"])
-def test_invalid_selector_fails_before_graph_inputs_cache_or_output_changes(
-    action, monkeypatch, selector
+@pytest.mark.parametrize(
+    ("profile", "error"),
+    [
+        (None, "ReviewProfile"),
+        ("codex", "ReviewProfile"),
+        (registered_review_profile({})._asdict(), "ReviewProfile"),
+        (tuple(registered_review_profile({})), "ReviewProfile"),
+        *[
+            (
+                registered_review_profile({})._replace(**{field: value}),
+                ENV_PREFIX + ENV_FIELDS[field],
+            )
+            for field, value in INVALID_PROFILE_VALUES
+        ],
+        *[
+            (
+                registered_review_profile({})._replace(**{field: None}),
+                ENV_PREFIX + ENV_FIELDS[field],
+            )
+            for field in PROFILE_FIELDS
+        ],
+    ],
+)
+def test_direct_action_rejects_unresolved_or_invalid_profile_before_work(
+    action, monkeypatch, profile, error
 ):
     dodo = action.dodo
     stamp = dodo._machinist_review_stamp("probe")
@@ -594,56 +998,28 @@ def test_invalid_selector_fails_before_graph_inputs_cache_or_output_changes(
     directory.mkdir(parents=True)
     evidence = directory / "prior-evidence.json"
     evidence.write_text("prior evidence")
-    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
-
-    def forbidden(*_args, **_kwargs):
-        pytest.fail("invalid selector performed review work")
-
-    monkeypatch.setattr(dodo, "_drawing_order", forbidden)
-    monkeypatch.setattr(dodo, "_machinist_review_file_deps", forbidden)
-    monkeypatch.setattr(dodo, "_probe_cache", forbidden)
-    monkeypatch.setattr(dodo, "_run_subprocess", forbidden)
-    monkeypatch.setattr(dodo._cache, "store", forbidden)
-    with pytest.raises(ValueError, match="HARMONIC_MACHINIST_REVIEWER must be"):
-        list(dodo._machinist_review_tasks())
-    assert stamp.read_text() == "prior success"
-    assert evidence.read_text() == "prior evidence"
-
-
-@pytest.mark.parametrize(
-    "profile",
-    [
-        {"backend": "codex", "model": "gpt-6-astra", "effort": "low"},
-        review_config.ReviewProfile("invalid", "ignored", "ignored"),
-    ],
-)
-def test_direct_action_rejects_unresolved_or_invalid_profile_before_work(
-    action, monkeypatch, profile
-):
-    dodo = action.dodo
-    stamp = dodo._machinist_review_stamp("probe")
-    stamp.parent.mkdir(parents=True, exist_ok=True)
-    stamp.write_text("prior success")
 
     def forbidden(*_args, **_kwargs):
         pytest.fail("invalid action profile performed review work")
 
     monkeypatch.setattr(dodo, "_machinist_review_dir", forbidden)
+    monkeypatch.setattr(dodo, "_machinist_review_file_deps", forbidden)
     monkeypatch.setattr(dodo, "_probe_cache", forbidden)
     monkeypatch.setattr(dodo, "_run_subprocess", forbidden)
     monkeypatch.setattr(dodo._cache, "store", forbidden)
-    with pytest.raises(ValueError, match="ReviewProfile|HARMONIC_MACHINIST_REVIEWER"):
+    with pytest.raises(ValueError, match=error):
         dodo._cached_machinist_review_action(
             "probe", MachinistReviewMode.ENFORCE, profile
         )
     assert stamp.read_text() == "prior success"
+    assert evidence.read_text() == "prior evidence"
 
 
-@pytest.mark.parametrize("changed", ["backend", "model", "effort"])
+@pytest.mark.parametrize(("field", "value"), PROFILE_CHANGES)
 def test_effective_profile_invalidates_real_freshness_and_cached_action(
-    action, review_sessions, monkeypatch, changed
+    action, review_sessions, monkeypatch, field, value
 ):
-    from doit.task import Stream, dict_to_task
+    from doit.task import Stream
 
     from test_artifact_cache import _BlockBlobService
 
@@ -658,13 +1034,24 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
     monkeypatch.setattr(cache, "_KEYDIR", dodo.REPORTS / "cache-keys")
     monkeypatch.setattr(cache, "_BACKEND", cache._BlobBackend(_BlockBlobService()))
     monkeypatch.setattr(dodo, "_machinist_review_cache_key", action.original_key)
-    monkeypatch.setattr(dodo, "_probe_cache", action.original_probe)
-    monkeypatch.setattr(cache, "store", action.original_store)
     monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
     monkeypatch.setattr(
         dodo, "mode_for_drawing", lambda _script: MachinistReviewMode.ENFORCE
     )
     commands = []
+    probed_keys = []
+    stored_keys = []
+
+    def probe(key, *args):
+        probed_keys.append(key)
+        return action.original_probe(key, *args)
+
+    def store(key, *args):
+        stored_keys.append(key)
+        return action.original_store(key, *args)
+
+    monkeypatch.setattr(dodo, "_probe_cache", probe)
+    monkeypatch.setattr(cache, "store", store)
 
     def run(command, *_args, **_kwargs):
         commands.append(command)
@@ -692,29 +1079,27 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
     saved, first_key, first_inputs = execute({})
     assert freshness(registered_task(), saved)
     assert len(commands) == 1 and len(review_sessions.seen) == 4
+    changed = action.profile._replace(**{field: value})
+    assert {
+        name for name in PROFILE_FIELDS
+        if getattr(action.profile, name) != getattr(changed, name)
+    } == {field}
     with monkeypatch.context() as change:
-        if changed == "backend":
-            change.setenv("HARMONIC_MACHINIST_REVIEWER", "codex")
-            # Isolate backend identity: different models/efforts must not hide
-            # a cache-key mutant that silently drops the backend field.
-            change.setitem(
-                review_config.DEFAULT_MODELS, "codex", action.profile.model
-            )
-            change.setitem(
-                review_config.DEFAULT_EFFORTS, "codex", action.profile.effort
-            )
-        elif changed == "model":
-            change.setitem(review_config.DEFAULT_MODELS, "claude", "other-model")
-        else:
-            change.setitem(review_config.DEFAULT_EFFORTS, "claude", "high")
+        change.setattr(dodo, "_MACHINIST_REVIEW_PROFILE", changed)
         assert not freshness(registered_task(), saved)
         second_saved, second_key, second_inputs = execute(saved)
         assert first_key != second_key
         assert len(commands) == 2 and len(review_sessions.seen) == 8
-        field = "reviewer" if changed == "backend" else changed
-        assert dodo._read_machinist_aggregate("probe")[field] != {
-            "backend": "claude", "model": "claude-opus-5-5", "effort": "medium",
-        }[changed]
+        aggregate = dodo._read_machinist_aggregate("probe")
+        assert tuple(
+            aggregate[name] for name in ("reviewer", "model", "effort")
+        ) == changed[:3]
+        assert tuple(
+            aggregate["judge"][name] for name in ("reviewer", "model", "effort")
+        ) == changed[3:]
+        for name, selected in changed._asdict().items():
+            option = "--" + ENV_FIELDS[name].lower().replace("_", "-")
+            assert commands[-1][commands[-1].index(option) + 1] == selected
 
     reverted = registered_task()
     assert freshness(reverted, saved)
@@ -723,9 +1108,14 @@ def test_effective_profile_invalidates_real_freshness_and_cached_action(
     assert restored_key == first_key
     assert len(commands) == 2 and len(review_sessions.seen) == 8
     aggregate = dodo._read_machinist_aggregate("probe")
-    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == (
-        "claude", "claude-opus-5-5", "medium",
-    )
+    assert tuple(
+        aggregate[name] for name in ("reviewer", "model", "effort")
+    ) == action.profile[:3]
+    assert tuple(
+        aggregate["judge"][name] for name in ("reviewer", "model", "effort")
+    ) == action.profile[3:]
+    assert probed_keys == [first_key, second_key, first_key]
+    assert stored_keys == [first_key, second_key]
     config_tag = "cad/scripts/machinist_review_config.py"
     assert {path for path in first_inputs if first_inputs[path] != second_inputs[path]} == {
         config_tag,
