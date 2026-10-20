@@ -99,6 +99,9 @@ hit test and final leader-landing checks; it is not an occlusion waiver.
 Native regeneration, the printed sheet-2 eye pass (including the other
 balloons), and the package's machinist gate remain required to establish
 acceptance of this replacement anchor.
+The drawing declares `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE`,
+opting into the existing `check:machinist_review:ms_measuring_stick_assembly`
+leaf; it previously had no declaration and therefore no review task.
 
 ## Where it runs
 
