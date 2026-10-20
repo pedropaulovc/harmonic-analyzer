@@ -194,7 +194,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.RELIEF_DIA_MAX == pytest.approx(spec.RELIEF_DIA + spec.RELIEF_DIA_BAND[0])
     assert spec.RELIEF_DIA_ROOT_CALLOUT == "BELOW #4-40 ROOT"
     assert "\n" not in spec.RELIEF_DIA_ROOT_CALLOUT
-    assert spec.RELIEF_DIA_CALLOUT == "NECK FOR SEATING\nON MHA-DT-006"
+    assert spec.RELIEF_DIA_CALLOUT == "NECK FOR SEATING\nON MHA-DT-06"
     assert drawing.RELIEF_DIA_ROOT_CALLOUT is spec.RELIEF_DIA_ROOT_CALLOUT
     assert max(
         len(line)
@@ -243,7 +243,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     # 0.0925) / 2 in = 0.0838: 0.226 radial.  Under the title block's 0.25 on
     # both edges there would be none.
     assert spec.SEAT_EDGE_BREAK_MAX == pytest.approx(0.1)
-    assert spec.SEAT_EDGE_BREAK_CALLOUT == "X 45 DEG\nPRESERVES SEAT ON MHA-DT-006"
+    assert spec.SEAT_EDGE_BREAK_CALLOUT == "X 45 DEG\nPRESERVES SEAT ON MHA-DT-06"
     assert drawing.SEAT_EDGE_BREAK_CALLOUT is spec.SEAT_EDGE_BREAK_CALLOUT
     assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(3.1)
     assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.1)
@@ -756,12 +756,12 @@ def test_native_callouts_own_the_relief_lead_corner_and_seat_break() -> None:
         "HeadLength": "HEAD_LENGTH_CALLOUT",
         "UnderHeadLocation": "UNDER_HEAD_CALLOUT",
     }
-    assert spec.HEAD_DIA_CALLOUT == "CLEARANCE IN MHA-DT-035 POCKET"
-    assert spec.HEAD_LENGTH_CALLOUT == "HEAD; KEEPS TOP BELOW MHA-DT-035 FACE"
+    assert spec.HEAD_DIA_CALLOUT == "CLEARANCE IN MHA-DT-35 POCKET"
+    assert spec.HEAD_LENGTH_CALLOUT == "HEAD; KEEPS TOP BELOW MHA-DT-35 FACE"
     assert drawing.HEAD_DIA_CALLOUT is spec.HEAD_DIA_CALLOUT
     assert drawing.HEAD_LENGTH_CALLOUT is spec.HEAD_LENGTH_CALLOUT
     assert spec.DRAWING_NOTES == (
-        f"TIP FILED FLUSH WITH MHA-DT-006 AND STAKED AT {spec.FITTED_STEP}."
+        f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {spec.FITTED_STEP}."
     )
 
 
@@ -1021,7 +1021,7 @@ def test_head_bands_name_their_reason_at_the_callout() -> None:
         "HeadLength": spec.HEAD_LENGTH_CALLOUT,
     }
     for name, text in callouts.items():
-        assert "\n" not in text and "MHA-DT-035" in text, name
+        assert "\n" not in text and "MHA-DT-35" in text, name
         half = len(text) * char / 2.0
         x = drawing.SIDE_KEEP[name][0]
         assert x - half - drawing.HEAD_FACE_X >= 0.005, name
@@ -1045,7 +1045,7 @@ def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
     # assembly finishing instruction.
     lines = spec.UNDER_HEAD_CALLOUT.splitlines()
     assert lines[0].startswith("UNDER-HEAD FACED TO SUIT")
-    assert "MHA-DT-008" in spec.UNDER_HEAD_CALLOUT
+    assert "MHA-DT-08" in spec.UNDER_HEAD_CALLOUT
     assert spec.UNDER_HEAD_CALLOUT.endswith("PLUS 0.25-1.00")
     # 2.5 mm a character (the r3 audit boxed the block 96.5 mm wide): the
     # widest line stays between the seat-face and under-head extension lines,
@@ -1056,11 +1056,11 @@ def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
     assert centre + half < drawing.FINISH_SYMBOL[0] - 0.003
     notes = spec.DRAWING_NOTES.splitlines()
     assert notes == [
-        f"TIP FILED FLUSH WITH MHA-DT-006 AND STAKED AT {spec.FITTED_STEP}."
+        f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {spec.FITTED_STEP}."
     ]
     # SOLIDWORKS prints no multi-line above-callout (the 04b95f481 sheet).
     assert "\n" not in spec.SHOULDER_CALLOUT
-    assert "MHA-DT-008" in spec.SHOULDER_CALLOUT
+    assert "MHA-DT-08" in spec.SHOULDER_CALLOUT
 
 
 def test_under_head_witness_lies_on_the_edge_and_prints_black() -> None:
@@ -2020,7 +2020,7 @@ def test_relief_diameter_ink_does_not_compare_foreign_groups_to_each_other():
 
 
 def test_relief_diameter_ink_refuses_empty_native_ink():
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter has no native ink;") as caught:
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter has no native ink;") as caught:
         drawing._assert_relief_diameter_ink([], _detail_ink())
     assert repr({"ReliefDia": [], **_detail_ink()}) in str(caught.value)
 
@@ -2034,14 +2034,14 @@ def test_relief_diameter_ink_refuses_each_empty_or_missing_detail_group(name, mi
     else:
         detail[name] = []
     prefix = "annotation missing" if missing else "native ink empty"
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief detail {prefix}: {name};") as caught:
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief detail {prefix}: {name};") as caught:
         drawing._assert_relief_diameter_ink(_diameter_ink(), detail)
     assert repr({"ReliefDia": _diameter_ink(), **detail}) in str(caught.value)
 
 
 @pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
 def test_relief_diameter_ink_refuses_nonfinite_native_coordinates(bad):
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter nonfinite native ink;"):
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter nonfinite native ink;"):
         drawing._assert_relief_diameter_ink([((bad, 0.0585), (0.115, 0.0775))], _detail_ink())
 
 
@@ -2049,7 +2049,7 @@ def test_relief_diameter_ink_refuses_nonfinite_native_coordinates(bad):
 def test_relief_diameter_ink_refuses_nonfinite_foreign_native_coordinates(name):
     detail = _detail_ink()
     detail[name] = [((math.nan, 0.030), (0.115, 0.030))]
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief detail nonfinite native ink: {name};"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief detail nonfinite native ink: {name};"):
         drawing._assert_relief_diameter_ink(_diameter_ink(), detail)
 
 
@@ -2085,7 +2085,7 @@ def test_relief_diameter_ink_refuses_one_arrow_diagonal_surrogate():
 def test_relief_diameter_ink_refuses_missing_surface_association_independently(surface, index):
     ink = _diameter_ink()
     del ink[index]
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter missing {surface} neck association;") as caught:
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter missing {surface} neck association;") as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
     assert "expected_surface_y=" in str(caught.value) and repr(ink) in str(caught.value)
 
@@ -2134,7 +2134,7 @@ def test_relief_diameter_ink_refuses_honestly_transformed_r10b_wrong_floor():
 
 def test_relief_diameter_ink_refuses_honestly_transformed_r11_seat_crossing():
     ink = _historical_side_ink_in_detail(R11_SEAT_CROSSING_INK)
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter ink crosses the seat face/witness;") as caught:
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter ink crosses the seat face/witness;") as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
     assert "crossing=" in str(caught.value) and repr(ink) in str(caught.value)
 
@@ -2149,7 +2149,7 @@ def test_relief_diameter_ink_refuses_each_corner_and_both_clearance_sides(corner
     y = {"lower": bottom - 0.0019, "upper": top + 0.0019, "middle": (bottom + top) / 2.0}[side]
     crossing = ((x, y - 0.0002), (x, y + 0.0002)) if vertical else ((x - 0.001, y), (x + 0.001, y))
     ink = [*_diameter_ink(), crossing]
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter ink crosses the {corner};") as caught:
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter ink crosses the {corner};") as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
     assert "crossing=" in str(caught.value) and "physical_y=" in str(caught.value)
     assert repr(crossing) in str(caught.value)
@@ -2177,7 +2177,7 @@ def test_relief_diameter_ink_refuses_each_detail_cross_tee_overlap(name, junctio
     detail = _detail_ink()
     foreign = _foreign_junction(junction)
     detail[name].append(foreign)
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter foreign detail ink: {name};") as caught:
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter foreign detail ink: {name};") as caught:
         drawing._assert_relief_diameter_ink(_diameter_ink(), detail)
     assert f"('ReliefDia', '{name}')" in str(caught.value)
     assert repr(foreign) in str(caught.value)
@@ -2350,7 +2350,7 @@ def test_relief_carrier_refuses_non_profile_native_type_before_style_or_ink(reli
     state = relief_styles
     display = state.annotations[0].display
     display._type = kind
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter wrong native type: Type2={kind},"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter wrong native type: Type2={kind},"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert display.native_reads == ["Type2"] and display.writes == []
     assert state.ink_reads == [] and state.native.model.rebuilds == 0
@@ -2361,7 +2361,7 @@ def test_relief_carrier_refuses_non_profile_native_type_before_style_or_ink(reli
 def test_relief_carrier_refuses_wrong_native_name_and_owner_independently(relief_styles, full_name):
     state = relief_styles
     state.annotations[0].display.dimension.FullName = full_name
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter wrong native owner:") as caught:
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter wrong native owner:") as caught:
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert repr(full_name) in str(caught.value)
     assert state.annotations[0].display.writes == [] and state.ink_reads == []
@@ -2372,7 +2372,7 @@ def test_relief_carrier_refuses_wrong_native_name_and_owner_independently(relief
 def test_relief_carrier_refuses_wrong_native_value_independently(relief_styles, value):
     state = relief_styles
     state.annotations[0].display.dimension.SystemValue = value
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter wrong native value:") as caught:
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter wrong native value:") as caught:
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert f"SystemValue={value!r}" in str(caught.value)
     assert state.annotations[0].display.writes == [] and state.ink_reads == []
@@ -2381,7 +2381,7 @@ def test_relief_carrier_refuses_wrong_native_value_independently(relief_styles, 
 def test_relief_carrier_refuses_missing_underlying_native_dimension(relief_styles):
     state = relief_styles
     state.annotations[0].display.dimension = None
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter missing native model dimension$"):
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter missing native model dimension$"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert state.annotations[0].display.writes == [] and state.ink_reads == []
 
@@ -2392,7 +2392,7 @@ def test_relief_carrier_refuses_missing_underlying_native_dimension(relief_style
 def test_relief_two_arrow_style_refuses_each_independent_native_readback(relief_styles, member):
     state = relief_styles
     state.annotations[0].display.ignore.add(member)
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter native two-arrow style did not persist:") as caught:
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter native two-arrow style did not persist:") as caught:
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert member in str(caught.value) and "actual=" in str(caught.value)
     assert state.ink_reads == [] and state.native.model.rebuilds == 0
@@ -2427,7 +2427,7 @@ def test_relief_native_readbacks_are_rechecked_after_rebuild(relief_styles, monk
         return result
 
     monkeypatch.setattr(model_type, "EditRebuild3", rebuild)
-    with pytest.raises(RuntimeError, match="^MHA-DT-032 relief diameter"):
+    with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert state.ink_reads == [] and state.native.model.rebuilds == 1
 
@@ -2436,7 +2436,7 @@ def test_relief_native_readbacks_are_rechecked_after_rebuild(relief_styles, monk
 def test_style_relief_dimensions_refuses_set_position(relief_styles, name):
     state = relief_styles
     next(item for item in state.annotations if item.name == name).position_ok = False
-    with pytest.raises(RuntimeError, match=f"^cannot position the MHA-DT-032 {name} text$"):
+    with pytest.raises(RuntimeError, match=f"^cannot position the MHA-DT-32 {name} text$"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
 
 
@@ -2460,7 +2460,7 @@ def test_style_relief_dimensions_refuses_missing_registered_style(relief_styles,
 @pytest.mark.parametrize("name", ["ReliefCornerRadius"])
 def test_style_relief_dimensions_refuses_missing_unstyled_detail_annotation(relief_styles, name):
     state = relief_styles
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief detail annotation missing: {name};"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief detail annotation missing: {name};"):
         drawing.style_relief_dimensions(state.native.adapter, [item for item in state.annotations if item.name != name])
     assert state.ink_reads == [] and state.native.model.rebuilds == 0
 
@@ -2470,7 +2470,7 @@ def test_style_relief_dimensions_refuses_each_empty_actual_native_group(relief_s
     state = relief_styles
     state.inks[name] = []
     message = "diameter has no native ink;" if name == "ReliefDia" else f"detail native ink empty: {name};"
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief {message}"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief {message}"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert [item.name for item in state.ink_reads] == ["ReliefDia", *drawing.DETAIL_DIMENSIONS]
 
@@ -2480,7 +2480,7 @@ def test_style_relief_dimensions_refuses_each_empty_actual_native_group(relief_s
 def test_style_relief_dimensions_refuses_each_actual_detail_cross_tee_overlap(relief_styles, name, junction):
     state = relief_styles
     state.inks[name].append(_foreign_junction(junction))
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter foreign detail ink: {name};"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter foreign detail ink: {name};"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
     assert [item.name for item in state.ink_reads] == ["ReliefDia", *drawing.DETAIL_DIMENSIONS]
 
@@ -2489,7 +2489,7 @@ def test_style_relief_dimensions_refuses_each_actual_detail_cross_tee_overlap(re
 def test_style_relief_dimensions_does_not_bypass_either_corner_guard(relief_styles, corner, x, y):
     state = relief_styles
     state.inks["ReliefDia"].append(((x - 0.001, y), (x + 0.001, y)))
-    with pytest.raises(RuntimeError, match=f"^MHA-DT-032 relief diameter ink crosses the {corner};"):
+    with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter ink crosses the {corner};"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
 
 

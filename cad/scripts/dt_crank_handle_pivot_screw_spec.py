@@ -74,7 +74,7 @@ HEAD_DIA_CALLOUT = "CLEARANCE IN MHA-DT-35 POCKET"
 # play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
-HEAD_LENGTH_CALLOUT = "HEAD; KEEPS TOP BELOW MHA-DT-035 FACE"
+HEAD_LENGTH_CALLOUT = "HEAD; KEEPS TOP BELOW MHA-DT-35 FACE"
 SLOT_WIDTH = 1.0
 # Routine (.X; the MHA-DT-32 machinist review of 04b95f481 called its
 # +/-0.20 band over-specification).  Codex P2 on #1694: a 1.0 depth at .X
@@ -95,7 +95,7 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # PIVOT_BORE_CALLOUT names this shoulder.  One line: SOLIDWORKS stores but
 # never prints a multi-line above-callout (draw_dt_cone_gear_shaft
 # _printable_above_callouts; the 04b95f481 sheet printed none).
-SHOULDER_CALLOUT = "RUNS IN MHA-DT-008 BORE"
+SHOULDER_CALLOUT = "RUNS IN MHA-DT-08 BORE"
 # The shoulder's thread-end face is the seat on the arm face.  Under the
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
@@ -219,8 +219,8 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # does not print); its seating reason and mate remain two BELOW lines.
 RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT} LEAD"
 RELIEF_DIA_ROOT_CALLOUT = f"BELOW {THREAD_SIZE} ROOT"
-RELIEF_DIA_CALLOUT = "NECK FOR SEATING\nON MHA-DT-006"
-SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-006"
+RELIEF_DIA_CALLOUT = "NECK FOR SEATING\nON MHA-DT-06"
+SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-06"
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 # ... and at its printed worst: the largest relief under the longest lead.
 SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
@@ -351,7 +351,7 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
 # User ruling 2026-09-29 (ch11 p.14 re-check): the photographs show no screw
 # end on the arm's inboard face, so the screw is cut long, seated shoulder
 # tight with no threadlocker, filed flush with that face and the tap mouth
-# staked onto it (MHA-DT-000 step crank-handle-fitted; rule 23, #1174).  The
+# staked onto it (MHA-DT-00 step crank-handle-fitted; rule 23, #1174).  The
 # drive train places that fitted state as the INSTALLED configuration (the
 # MHA-DT-30 precedent); the default stays the as-turned screw the sheet prints.
 # Filing removes at most FILE_ALLOWANCE_MAX, and even the shortest screw in
@@ -372,8 +372,8 @@ FITTED_STEP = step_ref("crank-handle-fitted")
 UNDER_HEAD_CALLOUT = "\n".join(
     (
         "UNDER-HEAD FACED TO SUIT: SEAT",
-        "TO UNDER-HEAD = MHA-DT-008 FERRULE",
-        f"FACE TO MHA-DT-035 FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}",
+        "TO UNDER-HEAD = MHA-DT-08 FERRULE",
+        f"FACE TO MHA-DT-35 FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}",
     )
 )
 DRAWING_NOTES = f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {FITTED_STEP}."

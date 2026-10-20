@@ -486,7 +486,7 @@ async def build(adapter) -> dict[str, str]:
     # from the tip, the under-head face this reference -- the shoulder is
     # turned to suit the bonded handle -- and the head face the overall.  The
     # dimension ends on a short vertical witness lying ON the under-head
-    # annulus's edge (the MHA-DT-032 machinist review of 04b95f481 read the
+    # annulus's edge (the MHA-DT-32 machinist review of 04b95f481 read the
     # earlier full-length line under the shank as a stray feature line); the
     # drawing blackens it into that edge.
     set_sketch_direct_db(adapter, True)
@@ -563,7 +563,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the running-fit shoulder and the
-    # two head sizes the MHA-DT-035 cup sets.
+    # two head sizes the MHA-DT-35 cup sets.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )

@@ -3,7 +3,7 @@ r"""Create the MHA-DT-32 crank handle pivot screw manufacturing drawing.
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the running-fit shoulder keeps its
 native size band and one bearing-surface finish, the head keeps the two bands
-the MHA-DT-035 cup sets, and the tip chamfer and seat edge break print as
+the MHA-DT-35 cup sets, and the tip chamfer and seat edge break print as
 single MAX limits.  The relief Ø retains its native size band, the relief
 lead its native limits and the thread-side floor radius its native MAX;
 every size keeps its part-authored places.
@@ -199,7 +199,7 @@ END_KEEP = {
     "SlotWidth": (END_CENTER[0] + 0.022, END_CENTER[1] + 0.010),
 }
 # A standalone cropped model view offers the tiny model-owned dimensions
-# that a true detail child did not offer in the VN post-mount-screw recipe.
+# that a true detail child did not offer in the dt-vn-post-mount-screw recipe.
 # The radius owns the upper row, with 3.2 mm nominal reason-to-witness air
 # at a conservative 1.3 mm tiny-leg overrun.  The width's long witnesses stay
 # on SIDE, separate from the enlarged diameter's text and vertical stroke.
@@ -306,7 +306,7 @@ def _blacken_under_head_witness(adapter: Any, view: Any) -> None:
     draw = adapter.currentModel
     drawing = _early_bound(draw, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError("failed to activate the MHA-DT-032 side view for its witness")
+        raise RuntimeError("failed to activate the MHA-DT-32 side view for its witness")
     expected = UNDER_HEAD_WITNESS_LEN
     line = _reference_line_in_view(view, REFERENCE_SKETCH, expected)
     draw.ClearSelection2(True)
@@ -342,7 +342,7 @@ def _sketch_circle(
 ) -> Any:
     """Sketch a view-owned circle from sheet coordinates, leaving it selected.
 
-    As in the VN post-mount-screw crop, transform through the view sketch and
+    As in the dt-vn-post-mount-screw crop, transform through the view sketch and
     use AddToDB so screen-space inference cannot snap the crop or parent mark.
     """
     sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
@@ -399,7 +399,7 @@ def _note_texts(view: Any) -> list[str]:
 def cropped_relief_view(adapter: Any) -> Any:
     """Centre and crop a standalone 10:1 *Right model view at the relief.
 
-    The VN crop pattern keeps the model dimensions available for native
+    The dt-vn-post-mount-screw crop keeps the model dimensions available for native
     import, unlike a true detail child.  Crop2 consumes the selected circle
     in the activated view's sketch; both placement and crop are read back.
     """
@@ -446,23 +446,23 @@ def _assert_relief_diameter_carrier(annotation: Any) -> None:
     kind = int(display.Type2)  # swDimensionType_e.swDiametricLinearDimension = 15
     if kind != 15:
         raise RuntimeError(
-            f"MHA-DT-032 relief diameter wrong native type: Type2={kind!r}, expected 15"
+            f"MHA-DT-32 relief diameter wrong native type: Type2={kind!r}, expected 15"
         )
     raw = display.GetDimension2(0)
     if raw is None:
-        raise RuntimeError("MHA-DT-032 relief diameter missing native model dimension")
+        raise RuntimeError("MHA-DT-32 relief diameter missing native model dimension")
     dimension = _early_bound(raw, "IDimension")
     full_name = str(dimension.FullName)
     if full_name.split("@")[:2] != ["ReliefDia", "ScrewProfile"]:
         raise RuntimeError(
-            "MHA-DT-032 relief diameter wrong native owner: "
+            "MHA-DT-32 relief diameter wrong native owner: "
             f"FullName={full_name!r}, expected ReliefDia@ScrewProfile"
         )
     value = float(dimension.SystemValue)
     expected = RELIEF_DIA / 1000.0
     if not math.isclose(value, expected, rel_tol=0.0, abs_tol=1e-9):
         raise RuntimeError(
-            "MHA-DT-032 relief diameter wrong native value: "
+            "MHA-DT-32 relief diameter wrong native value: "
             f"FullName={full_name!r}, SystemValue={value!r}, expected={expected!r}"
         )
 
@@ -491,7 +491,7 @@ def _assert_relief_diameter_style(display: Any) -> None:
     }
     if actual != expected:
         raise RuntimeError(
-            "MHA-DT-032 relief diameter native two-arrow style did not persist: "
+            "MHA-DT-32 relief diameter native two-arrow style did not persist: "
             f"actual={actual!r}; expected={expected!r}"
         )
 
@@ -509,27 +509,27 @@ def _assert_relief_diameter_ink(
     groups = {"ReliefDia": segments, **detail_segments}
     if not segments:
         raise RuntimeError(
-            f"MHA-DT-032 relief diameter has no native ink; segments={groups!r}"
+            f"MHA-DT-32 relief diameter has no native ink; segments={groups!r}"
         )
     for name in DETAIL_DIMENSIONS:
         if name not in detail_segments:
             raise RuntimeError(
-                f"MHA-DT-032 relief detail annotation missing: {name}; segments={groups!r}"
+                f"MHA-DT-32 relief detail annotation missing: {name}; segments={groups!r}"
             )
         if not detail_segments[name]:
             raise RuntimeError(
-                f"MHA-DT-032 relief detail native ink empty: {name}; segments={groups!r}"
+                f"MHA-DT-32 relief detail native ink empty: {name}; segments={groups!r}"
             )
         if not all(
             math.isfinite(value)
             for stroke in detail_segments[name] for point in stroke for value in point
         ):
             raise RuntimeError(
-                f"MHA-DT-032 relief detail nonfinite native ink: {name}; segments={groups!r}"
+                f"MHA-DT-32 relief detail nonfinite native ink: {name}; segments={groups!r}"
             )
     if not all(math.isfinite(value) for stroke in segments for point in stroke for value in point):
         raise RuntimeError(
-            f"MHA-DT-032 relief diameter nonfinite native ink; segments={groups!r}"
+            f"MHA-DT-32 relief diameter nonfinite native ink; segments={groups!r}"
         )
     scale = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
     cx, cy = DETAIL_CENTER
@@ -559,7 +559,7 @@ def _assert_relief_diameter_ink(
                 if crossing_y <= forbidden[0] or crossing_y >= forbidden[1]:
                     continue
             raise RuntimeError(
-                f"MHA-DT-032 relief diameter ink crosses the {label}; "
+                f"MHA-DT-32 relief diameter ink crosses the {label}; "
                 f"crossing=({x!r}, {crossing_y!r}), "
                 f"physical_y=({bottom!r}, {top!r}), clearance=0.002; segments={groups!r}"
             )
@@ -574,7 +574,7 @@ def _assert_relief_diameter_ink(
         for stroke in verticals for point in stroke
     ):
         raise RuntimeError(
-            "MHA-DT-032 relief diameter lacks a vertical stroke within the straight floor "
+            "MHA-DT-32 relief diameter lacks a vertical stroke within the straight floor "
             "spanning both neck surfaces; "
             f"floor_x=({floor_left!r}, {floor_right!r}), "
             f"neck_y=({neck_bottom!r}, {neck_top!r}), tolerance={tol!r}; segments={groups!r}"
@@ -603,7 +603,7 @@ def _assert_relief_diameter_ink(
                 reaches_line = min(start[0], end[0]) <= x <= max(start[0], end[0])
                 if not reaches_line or not (on_floor or gapped_endpoint):
                     raise RuntimeError(
-                        f"MHA-DT-032 relief diameter floating {surface} neck extension; "
+                        f"MHA-DT-32 relief diameter floating {surface} neck extension; "
                         f"extension={extension!r}, expected_surface_y={y!r}, "
                         f"floor_x=({floor_left!r}, {floor_right!r}), dimension_x={x!r}; "
                         f"segments={groups!r}"
@@ -612,7 +612,7 @@ def _assert_relief_diameter_ink(
             associated |= direct or connected
         if not associated:
             raise RuntimeError(
-                f"MHA-DT-032 relief diameter missing {surface} neck association; "
+                f"MHA-DT-32 relief diameter missing {surface} neck association; "
                 f"expected_surface_y={y!r}, floor_x=({floor_left!r}, {floor_right!r}), "
                 f"tolerance={tol!r}; segments={groups!r}"
             )
@@ -627,7 +627,7 @@ def _assert_relief_diameter_ink(
                 if _drawing_leaders.segments_cross(diameter, other)
             ]
             raise RuntimeError(
-                f"MHA-DT-032 relief diameter foreign detail ink: {name}; "
+                f"MHA-DT-32 relief diameter foreign detail ink: {name}; "
                 f"crossings={crossings!r}; crossing_segments={crossing_segments!r}; "
                 f"segments={groups!r}"
             )
@@ -657,7 +657,7 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
             status = int(display.SetBrokenLeader2(False, SOLID_LEADER_ALIGNED_TEXT))
             if status != 0:
                 raise RuntimeError(
-                    "MHA-DT-032 relief diameter solid aligned leader rejected: "
+                    "MHA-DT-32 relief diameter solid aligned leader rejected: "
                     f"SetBrokenLeader2 status={status!r}"
                 )
             _assert_relief_diameter_style(display)
@@ -666,7 +666,7 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
             display.CenterText = False
             display.ArrowSide = ARROWS_OUTSIDE
         if not annotation.SetPosition2(*xy, 0.0):
-            raise RuntimeError(f"cannot position the MHA-DT-032 {name} text")
+            raise RuntimeError(f"cannot position the MHA-DT-32 {name} text")
         if name != "ReliefDia" and (
             int(display.ArrowSide) != ARROWS_OUTSIDE or bool(display.CenterText)
         ):
@@ -679,7 +679,7 @@ def style_relief_dimensions(adapter: Any, annotations: list[Any]) -> None:
     for name in DETAIL_DIMENSIONS:
         if detail_annotations[name] is None:
             raise RuntimeError(
-                f"MHA-DT-032 relief detail annotation missing: {name}; annotations="
+                f"MHA-DT-32 relief detail annotation missing: {name}; annotations="
                 f"{sorted(key for key, value in detail_annotations.items() if value is not None)!r}"
             )
     adapter.currentModel.EditRebuild3()
