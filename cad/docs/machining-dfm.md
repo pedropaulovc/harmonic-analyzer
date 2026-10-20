@@ -379,6 +379,19 @@ the ordinary two-place band; a section solely to distinguish plate and
 pad thickness is no longer required. This is source intent, not evidence
 that the regenerated ink, witnesses or clearances have passed.
 
+Native nominal dimension readbacks use a fixed absolute allowance of
+**1e-9 m (1e-6 mm)** with no relative component, matching the builder's
+native dimensional checks. This applies to the imported plate thickness,
+visible R1 blend and knife-ridge radius, not their manufacturing bands.
+Length globals enter the inch document with explicit `mm` units; their
+equation-driven SI readbacks need not exactly equal the requested decimal
+(the 7 mm native readback can be **0.006999999969999999 m**).
+This numerical allowance does not enlarge a printed MAX limit or any
+tolerance deviation. After capture, the thickness check still requires the
+same native display/model objects and exactly unchanged full name, raw
+value and tolerance metadata, even for a change smaller than that allowance;
+the existing view-ownership and visible free-end witness proofs also remain.
+
 **Source-only material/gravity estimate (against #1761, b2c8d954).** The gross
 downward box is 10.080 cm³, but it overlaps the existing cylinder and ribs.
 Integrating the source prism unions gives **+5.808 cm³** for the plate

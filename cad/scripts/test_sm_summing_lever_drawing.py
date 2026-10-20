@@ -1469,14 +1469,23 @@ def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
 
 
 @pytest.mark.parametrize(
+    ("full_name", "value_m"),
+    [
+        ("PlateThickness@PlateProfile@sm-summing-lever.SLDPRT", 0.007),
+        # Native r4 readback: the explicit-mm global evaluated in an inch part.
+        ("PlateThickness@PlateProfile@sm-summing-lever.Part", 0.006999999969999999),
+    ],
+)
+@pytest.mark.parametrize(
     ("offset", "band"),
     [((0.0, 0.0), (0, 0.0, 0.0)), ((0.017, -0.009), (2, -0.0001, 0.0002))],
 )
 def test_plate_thickness_keeps_native_identity_band_gaps_and_free_end_ink(
-    monkeypatch, offset, band,
+    monkeypatch, offset, band, full_name, value_m,
 ) -> None:
     case = _native_plate_thickness(monkeypatch, offset, band)
     state = case.state
+    state.name, state.value = full_name, value_m
     original = (state.dimension, state.display, state.name, state.value, state.band)
     arrows = [tuple(row) for row in state.arrows]
     lines = list(state.lines)
@@ -1500,6 +1509,24 @@ def test_plate_thickness_keeps_native_identity_band_gaps_and_free_end_ink(
     }
 
 
+@pytest.mark.parametrize("direction", [-1.0, 1.0])
+@pytest.mark.parametrize("inside_budget", [True, False])
+def test_plate_thickness_nominal_readback_has_one_nanometre_budget(
+    monkeypatch, direction, inside_budget,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    # Adjacent representable values straddle each side of the absolute budget.
+    # Do not derive this test's budget from the production constant.
+    case.state.value = math.nextafter(
+        0.007 + direction * 1e-9, 0.007 if inside_budget else direction * math.inf,
+    )
+    if inside_budget:
+        case.capture()()
+    else:
+        with pytest.raises(RuntimeError, match="wrong model identity or thickness"):
+            case.capture()
+
+
 @pytest.mark.parametrize(
     "answer",
     [(1, False, 0.001), (True, 0, 0.001), (True, False, True),
@@ -1512,6 +1539,7 @@ def test_plate_thickness_requires_authoritative_native_witness_gap(monkeypatch, 
         case.capture()
 
 
+@pytest.mark.parametrize("readback", [0.007, 0.006999999969999999])
 @pytest.mark.parametrize(
     ("member", "value"),
     [
@@ -1525,8 +1553,11 @@ def test_plate_thickness_requires_authoritative_native_witness_gap(monkeypatch, 
         ("activate_result", False), ("activate_result", 1),
     ],
 )
-def test_plate_thickness_rejects_wrong_model_identity_or_view(monkeypatch, member, value) -> None:
+def test_plate_thickness_rejects_wrong_model_identity_or_view(
+    monkeypatch, member, value, readback,
+) -> None:
     case = _native_plate_thickness(monkeypatch)
+    case.state.value = readback
     setattr(case.state, member, value)
     with pytest.raises(RuntimeError, match="VIEW F PlateThickness"):
         case.capture()
@@ -1598,12 +1629,16 @@ def test_plate_thickness_rejects_unattached_or_wrong_native_ink(monkeypatch, dam
         case.capture()
 
 
+@pytest.mark.parametrize("readback", [0.007, 0.006999999969999999])
 @pytest.mark.parametrize(
     "damage", ["tail", "arrow", "origin", "detached", "replacement", "band", "value", "gap"],
 )
-def test_settled_thickness_check_reads_regenerated_native_state(monkeypatch, damage) -> None:
+def test_settled_thickness_check_reads_regenerated_native_state(
+    monkeypatch, damage, readback,
+) -> None:
     case = _native_plate_thickness(monkeypatch)
     state = case.state
+    state.value = readback
     settled_check = case.capture()
     if damage == "tail":
         first, second = state.lines[0]
@@ -1630,21 +1665,27 @@ def test_settled_thickness_check_reads_regenerated_native_state(monkeypatch, dam
 
 
 @pytest.mark.parametrize(
-    ("name", "feature", "check_radius", "nominal", "max_type"),
+    ("name", "feature", "check_radius", "value_m", "max_type"),
     [
         ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
-         drawing.KNIFE_RIDGE_R, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+         0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+        ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
+         0.000100000054, drawing.KNIFE_RIDGE_R_TOL_TYPE),
         ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
-         drawing.RIB_BLEND_R, drawing.RIB_BLEND_R_TOL_TYPE),
+         0.001, drawing.RIB_BLEND_R_TOL_TYPE),
+        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
+         0.001000000032, drawing.RIB_BLEND_R_TOL_TYPE),
     ],
 )
 @pytest.mark.parametrize("damage", [None, "value", "band", "diameter", "missing", "duplicate"])
 def test_imported_radii_keep_the_native_model_value_and_max_band(
-    monkeypatch, name, feature, check_radius, nominal, max_type, damage,
+    monkeypatch, name, feature, check_radius, value_m, max_type, damage,
 ) -> None:
+    # The nonexact values are the native trace's inch equation results converted
+    # to SI: 0.00393701 in for R0.1 and 0.03937008 in for R1.
     dimension = SimpleNamespace(
         FullName=f"{name}@{feature}@sm-summing-lever.SLDPRT",
-        SystemValue=(nominal + (0.01 if damage == "value" else 0.0)) / 1000.0,
+        SystemValue=value_m + (0.00001 if damage == "value" else 0.0),
         Tolerance=SimpleNamespace(Type=0 if damage == "band" else max_type),
     )
     display = SimpleNamespace(
@@ -1662,6 +1703,40 @@ def test_imported_radii_keep_the_native_model_value_and_max_band(
     else:
         with pytest.raises(RuntimeError):
             check_radius(object(), annotations)
+
+
+@pytest.mark.parametrize(
+    ("name", "feature", "check_radius", "nominal_m", "max_type"),
+    [
+        ("KnifeRidgeRadius", "KnifeRidgeFillet", drawing._assert_knife_ridge_radius,
+         0.0001, drawing.KNIFE_RIDGE_R_TOL_TYPE),
+        ("EdgeRibFrontUpperBlendR", "EdgeRibFrontProfile", drawing._assert_rib_blend_radius,
+         0.001, drawing.RIB_BLEND_R_TOL_TYPE),
+    ],
+)
+@pytest.mark.parametrize("direction", [-1.0, 1.0])
+@pytest.mark.parametrize("inside_budget", [True, False])
+def test_radius_nominal_readback_has_one_nanometre_budget(
+    monkeypatch, name, feature, check_radius, nominal_m, max_type, direction, inside_budget,
+) -> None:
+    value = math.nextafter(
+        nominal_m + direction * 1e-9, nominal_m if inside_budget else direction * math.inf,
+    )
+    dimension = SimpleNamespace(
+        FullName=f"{name}@{feature}@sm-summing-lever.Part", SystemValue=value,
+        Tolerance=SimpleNamespace(Type=max_type),
+    )
+    display = SimpleNamespace(
+        Diametric=False, GetDimension2=lambda _index: dimension, GetText=lambda _part: name,
+    )
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: name)
+    if inside_budget:
+        check_radius(object(), [annotation])
+    else:
+        with pytest.raises(RuntimeError):
+            check_radius(object(), [annotation])
 
 
 @pytest.mark.parametrize(

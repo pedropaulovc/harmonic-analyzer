@@ -173,6 +173,11 @@ DETAIL_LETTER_OFFSET = (0.0, 0.016)
 KNIFE_SKETCHES = ("KnifeEnvelopeReference",)
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 
+# Match the builder's native nominal checks (1e-6 mm), not manufacturing
+# deviations or settled-state equality. Equation-driven SI readbacks need not
+# equal the requested decimal after SolidWorks' document-unit round trip.
+_NATIVE_NOMINAL_TOL_M = 1e-9
+
 # The -Z end rib's ordinary depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
 # its hidden coordinate sketch, outside the marked-dimension contract.
@@ -499,7 +504,8 @@ def _assert_knife_ridge_radius(adapter: Any, annotations: list[Any]) -> None:
             f"KnifeRidgeRadius lost its native MAX type: {int(tolerance.Type)}"
         )
     if not math.isclose(
-        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0, abs_tol=1e-9
+        float(dimension.SystemValue), KNIFE_RIDGE_R / 1000.0,
+        rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
     ):
         raise RuntimeError("KnifeRidgeRadius does not measure the ridge round")
     _telemetry.info(f"knife ridge radius: text {display.GetText(1)!r}, MAX type")
@@ -532,7 +538,9 @@ def _assert_rib_blend_radius(adapter: Any, annotations: list[Any]) -> None:
         or display.Diametric is not False
         or type(tolerance_type) is not int or tolerance_type != RIB_BLEND_R_TOL_TYPE
         or type(value) not in (int, float) or not math.isfinite(value)
-        or not math.isclose(value, RIB_BLEND_R / 1000.0, rel_tol=0.0, abs_tol=1e-9)
+        or not math.isclose(
+            value, RIB_BLEND_R / 1000.0, rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
+        )
     ):
         raise RuntimeError(f"{label}: lost native owner, radial value or MAX band")
 
@@ -729,14 +737,18 @@ def _plate_thickness_check(
             type(name) is not str
             or name.split("@")[:2] != ["PlateThickness", "PlateProfile"]
             or not finite(value)
-            or abs(value - COEFFICIENT_T / 1000.0) > 1e-12
+            or not math.isclose(
+                value, COEFFICIENT_T / 1000.0,
+                rel_tol=0.0, abs_tol=_NATIVE_NOMINAL_TOL_M,
+            )
         ):
             raise RuntimeError(
                 f"{label}: wrong model identity or thickness; "
                 f"FullName={name!r} ({type(name).__name__}), "
                 "expected first two @ fields ['PlateThickness', 'PlateProfile']; "
                 f"SystemValue={value!r} ({type(value).__name__}) m, "
-                f"expected {COEFFICIENT_T / 1000.0!r} m (abs_tol=1e-12 m)"
+                f"expected {COEFFICIENT_T / 1000.0!r} m "
+                f"(abs_tol={_NATIVE_NOMINAL_TOL_M!r} m)"
             )
         raw_tolerance = dimension.Tolerance
         if raw_tolerance is None:
@@ -860,6 +872,9 @@ def _plate_thickness_check(
     def check_thickness() -> None:
         current, owner, current_name, current_value, current_band = model_state()
         same_display, same_dimension = same(current, display), same(owner, dimension)
+        # Nominal precision applies only when admitting the imported value.
+        # This snapshot must remain identical after layout/rebuild, including
+        # any sub-budget value or manufacturing-band change.
         if (
             not same_display or not same_dimension
             or (current_name, current_value, current_band) != (name, value, band)
