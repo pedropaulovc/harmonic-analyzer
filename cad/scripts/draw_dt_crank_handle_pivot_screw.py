@@ -441,12 +441,12 @@ def cropped_relief_view(adapter: Any) -> Any:
 
 
 def _assert_relief_diameter_carrier(annotation: Any) -> None:
-    """Require the associative doubled-distance profile control, not a note."""
+    """Require the associative native diameter imported directly into DETAIL."""
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    kind = int(display.Type2)  # swDimensionType_e.swDiametricLinearDimension = 15
-    if kind != 15:
+    kind = int(display.Type2)  # swDimensionType_e.swDiameterDimension = 6
+    if kind != 6:
         raise RuntimeError(
-            f"MHA-DT-32 relief diameter wrong native type: Type2={kind!r}, expected 15"
+            f"MHA-DT-32 relief diameter wrong native type: Type2={kind!r}, expected 6"
         )
     raw = display.GetDimension2(0)
     if raw is None:

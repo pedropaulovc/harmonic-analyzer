@@ -2210,7 +2210,7 @@ def relief_styles(monkeypatch, relief_native):
                            "SolidLeader": False, "GetUseDocBrokenLeader": True,
                            "GetBrokenLeader2": 2, "GetUseDocSecondArrow": True, "GetSecondArrow": False}
             self.ignore = set()
-            self._type = 15
+            self._type = 6
             self.dimension = Dimension()
             self.native_reads, self.writes = [], []
             self.broken_status = 0
@@ -2334,6 +2334,20 @@ def test_style_relief_dimensions_authors_two_arrows_and_reads_all_four_actual_de
     assert state.native.model.rebuilds == 1
 
 
+def test_r13_detail_diameter_type_6_keeps_ownership_style_and_ink_checks(relief_styles):
+    state = relief_styles
+    display = state.annotations[0].display
+    # R13 observed Type2=6 before the old type-15 guard stopped execution.
+    # The remaining fake values are contracts, not native render evidence.
+    display._type = 6
+    drawing.style_relief_dimensions(state.native.adapter, state.annotations)
+    assert display.native_reads.count("Type2") == 2
+    assert display.native_reads.count(("GetDimension2", 0)) == 2
+    assert display.native_reads.count("GetSecondArrow") == 2
+    assert state.native.model.rebuilds == 1
+    assert [item.name for item in state.ink_reads] == ["ReliefDia", "ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius"]
+
+
 def test_relief_style_fake_refuses_nonexistent_or_wrong_owner_members(relief_styles):
     display = relief_styles.annotations[0].display
     for member in ("DisplayAsLinear", "OffsetText", "GetType2"):
@@ -2345,8 +2359,8 @@ def test_relief_style_fake_refuses_nonexistent_or_wrong_owner_members(relief_sty
         drawing._early_bound(display, "IAnnotation")
 
 
-@pytest.mark.parametrize("kind", [0, 2, 5, 6, 14])
-def test_relief_carrier_refuses_non_profile_native_type_before_style_or_ink(relief_styles, kind):
+@pytest.mark.parametrize("kind", [0, 2, 5, 14, 15])
+def test_relief_carrier_refuses_non_diameter_native_type_before_style_or_ink(relief_styles, kind):
     state = relief_styles
     display = state.annotations[0].display
     display._type = kind
@@ -2419,7 +2433,7 @@ def test_relief_native_readbacks_are_rechecked_after_rebuild(relief_styles, monk
         if fault == "style":
             display.values["GetSecondArrow"] = False
         elif fault == "type":
-            display._type = 6
+            display._type = 15
         elif fault == "value":
             display.dimension.SystemValue = 0.00095
         else:
