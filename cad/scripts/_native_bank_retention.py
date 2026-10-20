@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from pathlib import PureWindowsPath
-from typing import Any
+from typing import Any, Literal
 
 import _config
 import _telemetry
@@ -53,8 +53,8 @@ def _vector(actual, expected, label):
         _near(read, want, f"{label}[{index}]")
 
 
-def _inventory(assembly, top_level):
-    raw = assembly.GetComponents(not top_level)
+def _inventory(assembly, assembly_kind: Literal["drive_train", "top_assembly"]):
+    raw = assembly.GetComponents(assembly_kind == "drive_train")
     if not isinstance(raw, (tuple, list)) or not raw:
         raise RuntimeError("bank retention: actual saved component inventory unavailable")
     found = {}
@@ -298,17 +298,19 @@ def _ring_witness(found, gears):
     }
 
 
-def measure(adapter: Any, *, top_level: bool = False) -> dict[str, Any]:
+def measure(
+    adapter: Any, *, assembly_kind: Literal["drive_train", "top_assembly"]
+) -> dict[str, Any]:
     """Certify active saved dt-drive-train, or its instances in the saved top.
 
     Called by the existing saved-assembly soundness battery after its one shared
     rebuild. Reads configured solids, not recipe dimensions pretending to be
     metrology. No save, selection, mate/configuration edit or production put.
     """
-    with _telemetry.span("verify.bank_retention", top_level=top_level) as sp:
+    with _telemetry.span("verify.bank_retention", assembly_kind=assembly_kind) as sp:
         assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
         model = _early_bound(adapter.currentModel, "IModelDoc2")
-        found = _inventory(assembly, top_level)
+        found = _inventory(assembly, assembly_kind)
         disc_component, = _family(found, "dt-cylinder-end-disc", 1)
         spring_component, = _family(found, "dt-vn-cylinder-bank-spring", spring.COUNT)
         arbor_component, = _family(found, "dt-cylinder-gear-shaft", 1)
@@ -448,11 +450,12 @@ def measure(adapter: Any, *, top_level: bool = False) -> dict[str, Any]:
                   "continuous_pinion_worst_mm": proof["engaged pinion worst"],
                   "continuous_retaining_land_mm": proof["retaining land"]}
         record.update({
+            "assembly_kind": assembly_kind,
             "coverage": "full-bank" if full_bank else "partial-bank",
             "missing_bank_stations": list(range(active_count, bank.COUNT)),
-            "north_bank_seat_native": full_bank,
+            "north_bank_seat": "measured" if full_bank else "absent-stations",
         })
-        if top_level:
+        if assembly_kind == "top_assembly":
             record.update(_ring_witness(found, gears))
         for name, value in record.items():
             sp.set_attribute(f"bank_retention.{name}", value)

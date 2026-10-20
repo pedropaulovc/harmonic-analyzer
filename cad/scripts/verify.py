@@ -925,7 +925,10 @@ def _run_soundness_battery(
     if name in ("dt-drive-train", "ha-harmonic-analyzer"):
         report.gate(
             f"{name}:bank-retention-native",
-            lambda: measure_bank_retention(adapter, top_level=name == "ha-harmonic-analyzer"),
+            lambda: measure_bank_retention(
+                adapter,
+                assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
+            ),
         )
     if name == CHANNEL_OWNER:
         report.gate(
@@ -1068,7 +1071,10 @@ async def _verify_static_one(
     if name in ("dt-drive-train", "ha-harmonic-analyzer"):
         report.gate(
             f"{name}:bank-retention-native",
-            lambda: measure_bank_retention(adapter, top_level=name == "ha-harmonic-analyzer"),
+            lambda: measure_bank_retention(
+                adapter,
+                assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
+            ),
         )
     # component-count REMOVED: every historical failure of that gate was a stale band
     # or a gate bug (never a real regression), so it cost more in false alarms than it
