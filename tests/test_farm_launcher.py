@@ -2623,10 +2623,62 @@ ORPHAN_WAITER = (
 )
 
 
+def _open_held_process(pid: int) -> int:
+    """A handle that pins `pid` to this process: Windows never reuses a PID
+    while any handle to its process is open."""
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE
+    handle = kernel32.OpenProcess(0x00100000 | 0x1000 | 0x0001, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    return handle
+
+
+def _held_process_exited(handle: int, timeout_s: float) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    waited = kernel32.WaitForSingleObject(handle, int(timeout_s * 1000))
+    if waited == 0:  # WAIT_OBJECT_0
+        return True
+    if waited == 0x102:  # WAIT_TIMEOUT
+        return False
+    raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _terminate_held_process(handle: int) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    if not kernel32.TerminateProcess(handle, 1) and not _held_process_exited(handle, 0):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _close_held_process(handle: int) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.CloseHandle(handle)
+
+
 @contextmanager
 def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
     """Keep a real orphan alive until the test releases its socket, not a timer."""
-    child = None
+    held = None
     gate = None
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -2653,8 +2705,12 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
             child = int(evidence["child_pid"])
             parent_pid = int(evidence["parent_pid"])
             gate, _ = listener.accept()
+            # The connected waiter blocks on the gate, so `child` is still the
+            # process the parent started: pin it before trusting its PID again.
+            # Without a gate there is no identity proof, so nothing is killed.
+            held = _open_held_process(child)
             assert not _process_alive(parent_pid), evidence
-            assert _process_alive(child), evidence
+            assert not _held_process_exited(held, 0), evidence
             yield parent_pid, child
         finally:
             if gate is not None:
@@ -2662,17 +2718,17 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
                 gate.close()
             # Closing the listener refuses any child that has not connected yet.
             listener.close()
-            if child is not None:
-                deadline = time.monotonic() + HANG_GUARD_S
-                while _process_alive(child) and time.monotonic() < deadline:
-                    time.sleep(0.05)
-                if _process_alive(child):
-                    subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(child)],
-                        capture_output=True,
-                        timeout=HANG_GUARD_S,
-                    )
-                    pytest.fail(f"orphan fixture {child} did not exit after socket release")
+            if held is not None:
+                try:
+                    if not _held_process_exited(held, HANG_GUARD_S):
+                        # Only the pinned process, never a PID another may now own.
+                        _terminate_held_process(held)
+                        _held_process_exited(held, HANG_GUARD_S)
+                        pytest.fail(
+                            f"orphan fixture {child} did not exit after socket release"
+                        )
+                finally:
+                    _close_held_process(held)
 
 
 def test_orphan_fixture_lifetime_is_controlled_by_release() -> None:

@@ -867,7 +867,9 @@ executes the parsed production wrapper against synthetic transient failures,
 then deterministic rows/empty success or persistent failure; a separate synthetic
 dead-launcher status test preserves the full exit-2 fail-closed contract. Orphan
 fixtures record their parent's own PID and wait for an explicit socket release;
-they do not need a CIM lookup or expire during slow test startup. Ownership and
+they do not need a CIM lookup or expire during slow test startup. Cleanup waits
+on a handle opened while the socket proves the child alive, and only that
+pinned handle is ever terminated, never a PID Windows may have reused. Ownership and
 cancellation integration (including some setup) still queries the real WMI
 provider. Persistent provider failures remain test failures, not skips or proof
 that ownership is empty (see
