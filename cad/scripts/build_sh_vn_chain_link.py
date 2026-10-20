@@ -125,11 +125,15 @@ async def build(adapter: Any) -> dict[str, str]:
             delta["body_half_len"],
         )
         await bbox_extent_check(
-            current_adapter, f"{configuration} pitch envelope", "x",
+            current_adapter,
+            f"{configuration} pitch envelope",
+            "x",
             LINK_PITCH + 2.0 * PLATE_HALF_H,
         )
         await bbox_extent_check(
-            current_adapter, f"{configuration} axial envelope", "z",
+            current_adapter,
+            f"{configuration} axial envelope",
+            "z",
             2.0 * max(delta["plate_z"] + PLATE_THICK / 2.0, delta["body_half_len"]),
         )
         assert_member_properties(

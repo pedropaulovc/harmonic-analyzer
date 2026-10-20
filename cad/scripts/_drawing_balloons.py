@@ -6,7 +6,7 @@ without re-keying ordinary part annotations.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from itertools import product
 import math
 from pathlib import PureWindowsPath
@@ -714,9 +714,7 @@ def _shown_instances(
     if anchor.instance is not None:
         selector = anchor.instance.replace("\\", "/")
         if semantic_reference_identity(selector) is not None:
-            bound = [
-                leaf for leaf in leaves if selector.casefold() in leaf.identities
-            ]
+            bound = [leaf for leaf in leaves if selector.casefold() in leaf.identities]
             if len(bound) != 1:
                 raise RuntimeError(
                     f"{label}: semantic balloon instance {selector!r} "

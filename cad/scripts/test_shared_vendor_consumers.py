@@ -64,28 +64,37 @@ def unwrapped_com(monkeypatch):
     for module in (references, balloons, assembly, _com):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
-        tables._sw_type_info, "early_bound_or_flag", lambda value, *_members: value,
+        tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_members: value,
     )
 
 
 @pytest.mark.parametrize("suffix", ["", " Simplified"])
 def test_reference_binds_arbitrary_native_index_and_exact_member(unwrapped_com, suffix):
     component = _component(
-        "unrelated-native-basename-207", stem=WIRE.upper(),
+        "unrelated-native-basename-207",
+        stem=WIRE.upper(),
         configuration="LeverWire" + suffix,
     )
     model = _model(component)
     assert references.component_reference_names(
-        model, {"@LeverWire:1": (WIRE, "LeverWire")},
+        model,
+        {"@LeverWire:1": (WIRE, "LeverWire")},
     ) == {"@LeverWire:1": "unrelated-native-basename-207"}
     assert model.queries == [False]
 
 
-@pytest.mark.parametrize("declared", [
-    ("sh-vn-chain-link", "OuterLink"),
-    ("other-native-file", "InnerLink"),
-])
-def test_reference_declaration_cannot_redefine_a_fixed_role_identity(unwrapped_com, declared):
+@pytest.mark.parametrize(
+    "declared",
+    [
+        ("sh-vn-chain-link", "OuterLink"),
+        ("other-native-file", "InnerLink"),
+    ],
+)
+def test_reference_declaration_cannot_redefine_a_fixed_role_identity(
+    unwrapped_com, declared
+):
     model = _model()
     with pytest.raises(ValueError, match="not declared identity"):
         references.component_reference_names(model, {"@InnerLink:1": declared})
@@ -97,18 +106,24 @@ def test_reference_binding_keeps_parent_scope_and_local_ordinals(unwrapped_com):
     other_scope = _component("parent-29/native-wire-1")
     second = _component("parent-17/native-wire-302", reference="LeverWire:2")
     model = _model(other_scope, second, wanted)
-    assert references.component_reference_names(model, {
-        "parent-17/@LeverWire:1": (WIRE, "LeverWire"),
-        "parent-17/@LeverWire:2": (WIRE, "LeverWire"),
-        "parent-29/@LeverWire:1": (WIRE, "LeverWire"),
-    }) == {
+    assert references.component_reference_names(
+        model,
+        {
+            "parent-17/@LeverWire:1": (WIRE, "LeverWire"),
+            "parent-17/@LeverWire:2": (WIRE, "LeverWire"),
+            "parent-29/@LeverWire:1": (WIRE, "LeverWire"),
+        },
+    ) == {
         "parent-17/@LeverWire:1": wanted.Name2,
         "parent-17/@LeverWire:2": second.Name2,
         "parent-29/@LeverWire:1": other_scope.Name2,
     }
-    assert references.component_reference_names(model, {
-        "parent-17\\@LeverWire:1": (WIRE, "LeverWire Simplified"),
-    }) == {"parent-17\\@LeverWire:1": wanted.Name2}
+    assert references.component_reference_names(
+        model,
+        {
+            "parent-17\\@LeverWire:1": (WIRE, "LeverWire Simplified"),
+        },
+    ) == {"parent-17\\@LeverWire:1": wanted.Name2}
 
 
 @pytest.mark.parametrize(
@@ -128,7 +143,8 @@ def test_reference_refuses_wrong_file_member_or_role(unwrapped_com, changes, mes
     component = _component("sh-vn-music-wire--LeverWire-1", **changes)
     with pytest.raises(RuntimeError, match=message):
         references.component_reference_names(
-            _model(component), {"@LeverWire:1": (WIRE, "LeverWire")},
+            _model(component),
+            {"@LeverWire:1": (WIRE, "LeverWire")},
         )
 
 
@@ -145,10 +161,18 @@ def test_reference_refuses_duplicate_reference_in_one_parent(unwrapped_com):
         )
 
 
-@pytest.mark.parametrize("selector", [
-    "@LeverWire:0", "@LeverWire:01", "@LeverWire:-1", "@LeverWire",
-    "@LeverWire:1extra", "@UnknownRole:1", "parent-1/@FootScrew:0",
-])
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "@LeverWire:0",
+        "@LeverWire:01",
+        "@LeverWire:-1",
+        "@LeverWire",
+        "@LeverWire:1extra",
+        "@UnknownRole:1",
+        "parent-1/@FootScrew:0",
+    ],
+)
 def test_malformed_reference_fails_before_native_enumeration(unwrapped_com, selector):
     model = _model()
     with pytest.raises(ValueError, match="invalid shared-component reference"):
@@ -159,11 +183,13 @@ def test_malformed_reference_fails_before_native_enumeration(unwrapped_com, sele
 def test_explicit_binding_leaves_ordinary_native_names_untouched(unwrapped_com):
     component = _component()
     assert references.bind_component_selectors(
-        _model(component), ["ordinary-part-11", "@LeverWire:1", "@LeverWire:1"],
+        _model(component),
+        ["ordinary-part-11", "@LeverWire:1", "@LeverWire:1"],
     ) == {"ordinary-part-11": "ordinary-part-11", "@LeverWire:1": component.Name2}
     with pytest.raises(ValueError, match="not an explicit"):
         references.component_reference_names(
-            _model(component), {component.Name2: (WIRE, "LeverWire")},
+            _model(component),
+            {component.Name2: (WIRE, "LeverWire")},
         )
 
 
@@ -177,24 +203,37 @@ def _leaf(component, *, visible=True, drawing_name=None):
 
 
 @pytest.mark.parametrize("suffix", ["", " Simplified"])
-def test_balloon_configured_key_is_case_normalized_from_physical_member(unwrapped_com, suffix):
+def test_balloon_configured_key_is_case_normalized_from_physical_member(
+    unwrapped_com, suffix
+):
     leaf = _leaf(_component(stem=WIRE.upper(), configuration="LeverWire" + suffix))
     requested = frozenset({WIRE, (WIRE + "--LeverWire").upper(), WIRE + "--PenWire"})
     assert balloons._stems_matching(leaf.identities, requested) == {
-        WIRE, (WIRE + "--LeverWire").upper(),
+        WIRE,
+        (WIRE + "--LeverWire").upper(),
     }
 
 
-def test_balloon_cannot_match_wrong_member_through_a_stale_occurrence_name(unwrapped_com):
-    leaf = _leaf(_component(
-        "sh-vn-music-wire--LeverWire-1", configuration="PenWire", reference="",
-    ))
+def test_balloon_cannot_match_wrong_member_through_a_stale_occurrence_name(
+    unwrapped_com,
+):
+    leaf = _leaf(
+        _component(
+            "sh-vn-music-wire--LeverWire-1",
+            configuration="PenWire",
+            reference="",
+        )
+    )
     assert balloons._stems_matching(
-        leaf.identities, frozenset({WIRE + "--LeverWire", WIRE + "--PenWire"}),
+        leaf.identities,
+        frozenset({WIRE + "--LeverWire", WIRE + "--PenWire"}),
     ) == {WIRE + "--PenWire"}
     with pytest.raises(RuntimeError, match="has no shown instance"):
         balloons._shown_instances(
-            [leaf], WIRE + "--LeverWire", balloons.BalloonAnchor(), label="wire",
+            [leaf],
+            WIRE + "--LeverWire",
+            balloons.BalloonAnchor(),
+            label="wire",
         )
 
 
@@ -208,10 +247,14 @@ def test_balloon_rejects_reference_attached_to_wrong_physical_member(unwrapped_c
 def test_semantic_balloon_anchor_selects_unique_native_name_in_its_scope(unwrapped_com):
     wanted = _leaf(_component("parent-17/native-wire-83"))
     other_scope = _leaf(_component("parent-29/native-wire-1"))
-    other_ordinal = _leaf(_component("parent-17/native-wire-1", reference="LeverWire:2"))
+    other_ordinal = _leaf(
+        _component("parent-17/native-wire-1", reference="LeverWire:2")
+    )
     shown = balloons._shown_instances(
-        [other_scope, other_ordinal, wanted], WIRE + "--LeverWire",
-        balloons.BalloonAnchor(instance="parent-17/@LeverWire:1"), label="wire",
+        [other_scope, other_ordinal, wanted],
+        WIRE + "--LeverWire",
+        balloons.BalloonAnchor(instance="parent-17/@LeverWire:1"),
+        label="wire",
     )
     assert len(shown) == 1 and shown[0] is wanted
     assert shown[0].path == "parent-17/native-wire-83"
@@ -219,7 +262,8 @@ def test_semantic_balloon_anchor_selects_unique_native_name_in_its_scope(unwrapp
 
 @pytest.mark.parametrize("fault", ["hidden", "duplicate", "missing"])
 def test_semantic_balloon_anchor_refuses_hidden_duplicate_or_missing_occurrence(
-    unwrapped_com, fault,
+    unwrapped_com,
+    fault,
 ):
     wanted = _leaf(_component("parent-17/native-wire-83"), visible=fault != "hidden")
     leaves = [] if fault == "missing" else [wanted]
@@ -229,8 +273,10 @@ def test_semantic_balloon_anchor_refuses_hidden_duplicate_or_missing_occurrence(
         leaves.append(_leaf(_component("parent-17/native-wire-92"), visible=False))
     with pytest.raises(RuntimeError, match="has no shown instance|native occurrences"):
         balloons._shown_instances(
-            leaves, WIRE + "--LeverWire",
-            balloons.BalloonAnchor(instance="parent-17/@LeverWire:1"), label="wire",
+            leaves,
+            WIRE + "--LeverWire",
+            balloons.BalloonAnchor(instance="parent-17/@LeverWire:1"),
+            label="wire",
         )
 
 
@@ -287,15 +333,23 @@ def number_binding(unwrapped_com, monkeypatch):
 
 
 @pytest.mark.parametrize("member", ["LeverWire", "LeverWire Simplified"])
-def test_number_column_binds_native_property_and_reads_actual_configuration(number_binding, member):
+def test_number_column_binds_native_property_and_reads_actual_configuration(
+    number_binding, member
+):
     adapter, rebuilds = number_binding
-    component = _component(properties={
-        (member, "Number"): NUMBER,
-        ("", "Number"): "WRONG-GLOBAL-NUMBER",
-    }, configuration=member)
+    component = _component(
+        properties={
+            (member, "Number"): NUMBER,
+            ("", "Number"): "WRONG-GLOBAL-NUMBER",
+        },
+        configuration=member,
+    )
     table = _NumberTable([component])
     tables._bind_bom_number_property(
-        adapter, table, configuration="Default Simplified", label="wire",
+        adapter,
+        table,
+        configuration="Default Simplified",
+        label="wire",
     )
     assert table.calls[:4] == [
         ("type", 1, 204, True, "Number"),
@@ -310,28 +364,42 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(numb
     assert rebuilds == ["bind_bom_number_property"]
 
 
-def test_number_column_uses_document_property_only_when_actual_member_has_none(number_binding):
+def test_number_column_uses_document_property_only_when_actual_member_has_none(
+    number_binding,
+):
     adapter, _rebuilds = number_binding
-    component = _component(configuration="LeverWire Simplified", properties={
-        ("LeverWire", "Number"): "UNSIMPLIFIED-PROPERTY-MUST-NOT-WIN",
-        ("", "Number"): NUMBER,
-    })
+    component = _component(
+        configuration="LeverWire Simplified",
+        properties={
+            ("LeverWire", "Number"): "UNSIMPLIFIED-PROPERTY-MUST-NOT-WIN",
+            ("", "Number"): NUMBER,
+        },
+    )
     tables._bind_bom_number_property(
-        adapter, _NumberTable([component]), configuration="Default Simplified", label="wire",
+        adapter,
+        _NumberTable([component]),
+        configuration="Default Simplified",
+        label="wire",
     )
     assert component.property_reads == [
-        ("LeverWire Simplified", "Number"), ("", "Number"),
+        ("LeverWire Simplified", "Number"),
+        ("", "Number"),
     ]
 
 
-@pytest.mark.parametrize("fault, message", [
-    ("column-type", "column type failed"),
-    ("property-write", "rejected the Number property"),
-    ("property-readback", "binding did not persist"),
-    ("title", "header could not be restored"),
-    ("header", "no PART NUMBER column"),
-])
-def test_number_column_binding_refuses_native_metadata_failures(number_binding, fault, message):
+@pytest.mark.parametrize(
+    "fault, message",
+    [
+        ("column-type", "column type failed"),
+        ("property-write", "rejected the Number property"),
+        ("property-readback", "binding did not persist"),
+        ("title", "header could not be restored"),
+        ("header", "no PART NUMBER column"),
+    ],
+)
+def test_number_column_binding_refuses_native_metadata_failures(
+    number_binding, fault, message
+):
     adapter, rebuilds = number_binding
     table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
     if fault == "column-type":
@@ -345,19 +413,26 @@ def test_number_column_binding_refuses_native_metadata_failures(number_binding, 
     else:
         table.cells[0][1] = "UNRELATED PROPERTY"
     with pytest.raises(RuntimeError, match=message):
-        tables._bind_bom_number_property(adapter, table, configuration="Default", label="wire")
+        tables._bind_bom_number_property(
+            adapter, table, configuration="Default", label="wire"
+        )
     assert rebuilds == []
 
 
-@pytest.mark.parametrize("fault, message", [
-    ("blank-property", "has no Number property"),
-    ("blank-display", "associative Number"),
-    ("wrong-display", "associative Number"),
-    ("merged-numbers", "associative Number"),
-    ("no-components", "no native components"),
-    ("unresolved-document", "document is not resolved"),
-])
-def test_number_column_refuses_blank_wrong_or_merged_native_numbers(number_binding, fault, message):
+@pytest.mark.parametrize(
+    "fault, message",
+    [
+        ("blank-property", "has no Number property"),
+        ("blank-display", "associative Number"),
+        ("wrong-display", "associative Number"),
+        ("merged-numbers", "associative Number"),
+        ("no-components", "no native components"),
+        ("unresolved-document", "document is not resolved"),
+    ],
+)
+def test_number_column_refuses_blank_wrong_or_merged_native_numbers(
+    number_binding, fault, message
+):
     adapter, _rebuilds = number_binding
     component = _component(properties={("LeverWire", "Number"): NUMBER})
     table = _NumberTable([component])
@@ -368,13 +443,17 @@ def test_number_column_refuses_blank_wrong_or_merged_native_numbers(number_bindi
     elif fault == "wrong-display":
         table.cells[1][1] = "MHA-SH-VN-57"
     elif fault == "merged-numbers":
-        table.components += (_component(properties={("LeverWire", "Number"): "MHA-SH-VN-57"}),)
+        table.components += (
+            _component(properties={("LeverWire", "Number"): "MHA-SH-VN-57"}),
+        )
     elif fault == "no-components":
         table.components = ()
     else:
         component.GetModelDoc2 = lambda: None
     with pytest.raises(RuntimeError, match=message):
-        tables._bind_bom_number_property(adapter, table, configuration="Default", label="wire")
+        tables._bind_bom_number_property(
+            adapter, table, configuration="Default", label="wire"
+        )
 
 
 @pytest.fixture
@@ -387,7 +466,9 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
     monkeypatch.setattr(assembly, "part_path", lambda stem: tmp_path / f"{stem}.SLDPRT")
     monkeypatch.setattr(assembly, "check", lambda _label, result: result)
     placements = []
-    monkeypatch.setattr(assembly, "assert_component_placed", lambda *args: placements.append(args))
+    monkeypatch.setattr(
+        assembly, "assert_component_placed", lambda *args: placements.append(args)
+    )
     monkeypatch.setattr(assembly, "_ledger_record", lambda *_args: None)
     monkeypatch.setattr(assembly, "_POSE_LEDGER", {})
     component = _component()
@@ -407,7 +488,8 @@ def placement_scene(unwrapped_com, monkeypatch, tmp_path):
         return {"name": component.Name2, "fixed": False}
 
     adapter = SimpleNamespace(
-        currentModel=model, insert_component=insert,
+        currentModel=model,
+        insert_component=insert,
         _attempt=lambda callback, default=None: callback(),
     )
     return adapter, component, rebuilds, placements
@@ -432,28 +514,59 @@ def insertion_api(placement_scene, monkeypatch, request):
     def place(part, *, configuration=None):
         options = {} if configuration is None else {"configuration": configuration}
         if request.param == "single":
-            return [asyncio.run(assembly.place_component(
-                adapter, part, position, [0.0, 0.0, 0.0], ROWS,
-                ground=False, **options,
-            ))]
-        return asyncio.run(assembly.place_components_batch(adapter, [{
-            "part": part, "position": position, "rows": ROWS,
-            "ground": False, **options,
-        }], label="shared configuration guard"))
+            return [
+                asyncio.run(
+                    assembly.place_component(
+                        adapter,
+                        part,
+                        position,
+                        [0.0, 0.0, 0.0],
+                        ROWS,
+                        ground=False,
+                        **options,
+                    )
+                )
+            ]
+        return asyncio.run(
+            assembly.place_components_batch(
+                adapter,
+                [
+                    {
+                        "part": part,
+                        "position": position,
+                        "rows": ROWS,
+                        "ground": False,
+                        **options,
+                    }
+                ],
+                label="shared configuration guard",
+            )
+        )
 
     return place, adapter, component, rebuilds, placements
 
 
-@pytest.mark.parametrize("active_member", [
-    "LeverWire", "PenWire", "LeverWire Simplified", "Default Simplified", "default", "",
-])
+@pytest.mark.parametrize(
+    "active_member",
+    [
+        "LeverWire",
+        "PenWire",
+        "LeverWire Simplified",
+        "Default Simplified",
+        "default",
+        "",
+    ],
+)
 def test_implicit_shared_insertion_rejects_accidentally_active_member(
-    insertion_api, active_member,
+    insertion_api,
+    active_member,
 ):
     place, _adapter, component, _rebuilds, placements = insertion_api
     component.ReferencedConfiguration = active_member
     component.ComponentReference = ""
-    with pytest.raises(RuntimeError, match="selected configuration .*expected 'Default'"):
+    with pytest.raises(
+        RuntimeError, match="selected configuration .*expected 'Default'"
+    ):
         place(WIRE)
     # Refusal must not silently choose another body or certify the bad member.
     assert component.ReferencedConfiguration == active_member
@@ -473,7 +586,9 @@ def test_implicit_ordinary_shared_insertion_accepts_exact_native_default(inserti
 
 
 @pytest.mark.parametrize("drift", [False, True])
-def test_explicit_member_without_reference_is_read_back_after_rebuild(insertion_api, drift):
+def test_explicit_member_without_reference_is_read_back_after_rebuild(
+    insertion_api, drift
+):
     place, adapter, component, rebuilds, placements = insertion_api
     component.ReferencedConfiguration = "LeverWire"
     component.ComponentReference = ""
@@ -501,33 +616,55 @@ def test_explicit_member_without_reference_is_read_back_after_rebuild(insertion_
 def test_individual_insertion_reads_member_and_persists_reference(placement_scene):
     adapter, component, rebuilds, placements = placement_scene
     component.ComponentReference = ""
-    actual = asyncio.run(assembly.place_component(
-        adapter, WIRE, [1.0, 2.0, 3.0], [0.0, 0.0, 0.0], ROWS,
-        ground=False, configuration="LeverWire", component_reference="LeverWire:1",
-        occurrence_basename=WIRE + "--LeverWire",
-    ))
+    actual = asyncio.run(
+        assembly.place_component(
+            adapter,
+            WIRE,
+            [1.0, 2.0, 3.0],
+            [0.0, 0.0, 0.0],
+            ROWS,
+            ground=False,
+            configuration="LeverWire",
+            component_reference="LeverWire:1",
+            occurrence_basename=WIRE + "--LeverWire",
+        )
+    )
     assert actual == component.Name2 == WIRE + "--LeverWire-73"
     assert component.ComponentReference == "LeverWire:1"
     assert rebuilds == [False]
     assert [call[1] for call in placements] == [actual]
 
 
-@pytest.mark.parametrize("actual_member", ["PenWire", "Default", "LeverWire Simplified"])
-def test_individual_insertion_refuses_configuration_substitution(placement_scene, actual_member):
+@pytest.mark.parametrize(
+    "actual_member", ["PenWire", "Default", "LeverWire Simplified"]
+)
+def test_individual_insertion_refuses_configuration_substitution(
+    placement_scene, actual_member
+):
     adapter, component, rebuilds, placements = placement_scene
     component.ReferencedConfiguration = actual_member
     component.ComponentReference = ""
     with pytest.raises(RuntimeError, match="selected configuration"):
-        asyncio.run(assembly.place_component(
-            adapter, WIRE, [1.0, 2.0, 3.0], [0.0, 0.0, 0.0], ROWS,
-            ground=False, configuration="LeverWire", component_reference="LeverWire:1",
-        ))
+        asyncio.run(
+            assembly.place_component(
+                adapter,
+                WIRE,
+                [1.0, 2.0, 3.0],
+                [0.0, 0.0, 0.0],
+                ROWS,
+                ground=False,
+                configuration="LeverWire",
+                component_reference="LeverWire:1",
+            )
+        )
     assert component.ComponentReference == ""
     assert rebuilds == [] and placements == []
 
 
 @pytest.mark.parametrize("fault", ["reference-loss", "configuration-drift"])
-def test_individual_insertion_refuses_metadata_lost_during_rebuild(placement_scene, fault):
+def test_individual_insertion_refuses_metadata_lost_during_rebuild(
+    placement_scene, fault
+):
     adapter, component, _rebuilds, placements = placement_scene
 
     def rebuild(_top_only):
@@ -538,17 +675,30 @@ def test_individual_insertion_refuses_metadata_lost_during_rebuild(placement_sce
         return True
 
     adapter.currentModel.ForceRebuild3 = rebuild
-    with pytest.raises(RuntimeError, match="rebuild lost component reference|rebuild changed component reference"):
-        asyncio.run(assembly.place_component(
-            adapter, WIRE, [1.0, 2.0, 3.0], [0.0, 0.0, 0.0], ROWS,
-            ground=False, configuration="LeverWire", component_reference="LeverWire:1",
-        ))
+    with pytest.raises(
+        RuntimeError,
+        match="rebuild lost component reference|rebuild changed component reference",
+    ):
+        asyncio.run(
+            assembly.place_component(
+                adapter,
+                WIRE,
+                [1.0, 2.0, 3.0],
+                [0.0, 0.0, 0.0],
+                ROWS,
+                ground=False,
+                configuration="LeverWire",
+                component_reference="LeverWire:1",
+            )
+        )
     assert placements == []
 
 
 @pytest.mark.parametrize("fault", ["none", "configuration-drift", "reference-loss"])
 def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
-    placement_scene, monkeypatch, fault,
+    placement_scene,
+    monkeypatch,
+    fault,
 ):
     adapter, first, rebuilds, placements = placement_scene
     second = _component(WIRE + "--PenWire-91", configuration="Default", reference="")
@@ -557,7 +707,9 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
     components = (first, second)
     positions = ([1.0, 2.0, 3.0], [41.0, 52.0, 63.0])
     for component, position in zip(components, positions, strict=True):
-        component.Transform2 = SimpleNamespace(ArrayData=assembly._placement_transform(ROWS, position))
+        component.Transform2 = SimpleNamespace(
+            ArrayData=assembly._placement_transform(ROWS, position)
+        )
 
     def add_components(_names, _transforms, _coordinate_systems):
         return second, first
@@ -573,7 +725,8 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
     adapter.currentModel.AddComponents3 = add_components
     adapter.currentModel.ForceRebuild3 = rebuild
     adapter.currentModel.GetComponentByName = lambda name: next(
-        (component for component in components if component.Name2 == name), None,
+        (component for component in components if component.Name2 == name),
+        None,
     )
     # The local import receives inert SAFEARRAY stand-ins, never pywin32 COM.
     pythoncom = ModuleType("pythoncom")
@@ -584,21 +737,30 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
     monkeypatch.setitem(sys.modules, "win32com.client", client)
     specs = [
         {
-            "part": WIRE, "position": position, "rows": ROWS, "ground": False,
-            "configuration": member, "component_reference": member + ":1",
+            "part": WIRE,
+            "position": position,
+            "rows": ROWS,
+            "ground": False,
+            "configuration": member,
+            "component_reference": member + ":1",
             "occurrence_basename": WIRE + "--" + member,
         }
         for position, member in zip(positions, ("LeverWire", "PenWire"), strict=True)
     ]
     if fault != "none":
         with pytest.raises(RuntimeError, match="rebuild changed|rebuild lost"):
-            asyncio.run(assembly.place_components_batch(adapter, specs, label="wire members"))
+            asyncio.run(
+                assembly.place_components_batch(adapter, specs, label="wire members")
+            )
         assert rebuilds == [False]
         return
-    actual = asyncio.run(assembly.place_components_batch(adapter, specs, label="wire members"))
+    actual = asyncio.run(
+        assembly.place_components_batch(adapter, specs, label="wire members")
+    )
     assert actual == [first.Name2, second.Name2]
     assert [(c.ReferencedConfiguration, c.ComponentReference) for c in components] == [
-        ("LeverWire", "LeverWire:1"), ("PenWire", "PenWire:1"),
+        ("LeverWire", "LeverWire:1"),
+        ("PenWire", "PenWire:1"),
     ]
     assert rebuilds == [False]
     assert [call[1] for call in placements] == actual
@@ -607,7 +769,10 @@ def test_batch_insertion_keeps_reordered_member_metadata_and_native_names(
 @pytest.mark.parametrize("initial_preference", [False, True])
 @pytest.mark.parametrize("fault", ["none", "rename-rejected", "selection-cleanup"])
 def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
-    unwrapped_com, monkeypatch, initial_preference, fault,
+    unwrapped_com,
+    monkeypatch,
+    initial_preference,
+    fault,
 ):
     import _preferences
 
@@ -674,11 +839,18 @@ def test_pattern_seed_rename_preserves_native_index_pose_and_name_preference(
 
     def rename():
         return assembly.set_component_reference(
-            adapter, old_name, "LeverWire:1", occurrence_basename=WIRE + "--LeverWire",
+            adapter,
+            old_name,
+            "LeverWire:1",
+            occurrence_basename=WIRE + "--LeverWire",
         )
 
     if fault != "none":
-        message = "native rename rejected" if fault == "rename-rejected" else "selection cleanup failed"
+        message = (
+            "native rename rejected"
+            if fault == "rename-rejected"
+            else "selection cleanup failed"
+        )
         with pytest.raises(RuntimeError, match=message):
             rename()
         assert component.Name2 == (old_name if fault == "rename-rejected" else new_name)

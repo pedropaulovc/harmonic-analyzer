@@ -24,9 +24,11 @@ def test_registry_row_is_the_purchased_pm_kit_stud() -> None:
 
 
 def test_quantity_is_c4s_hold_down_count() -> None:
-    assert int(ROW["configuration_quantities"][CONFIGURATION]) == (
-        spec.QUANTITY
-    ) == fasteners.HOLD_DOWN_STUD_COUNT
+    assert (
+        int(ROW["configuration_quantities"][CONFIGURATION])
+        == (spec.QUANTITY)
+        == fasteners.HOLD_DOWN_STUD_COUNT
+    )
     assert int(ROW["quantity"]) == sum(ROW["configuration_quantities"].values())
 
 

@@ -1338,15 +1338,64 @@ def _assert_canonical_source_passthrough(scan, operations):
 
     batch = functions["place_components_batch"]
     assert batch.args.args[1].arg == "specs"
-    assert not _assignment_expressions(batch, "specs")
     assert _assignment_expressions(batch, "part") == ["spec['part']"]
     assert _assignment_expressions(batch, "names") == ["[]"]
     assert _assignment_expressions(batch, "names_arg") == [
         "VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)"
     ]
+    name_calls = [
+        node
+        for node in ast.walk(batch)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "names"
+    ]
+    assert [ast.unparse(node) for node in name_calls] == [
+        "names.append(str(part_path(part)))"
+    ]
+    source_append = scan.parents[name_calls[0]]
+    assert isinstance(source_append, ast.Expr)
+    part_write = next(
+        node
+        for node in ast.walk(batch)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "part"
+            for target in node.targets
+        )
+    )
+    source_loops = [
+        node
+        for node in batch.body
+        if isinstance(node, ast.For)
+        and part_write in node.body
+        and source_append in node.body
+    ]
+    assert len(source_loops) == 1, "batch source and path must share one input-row loop"
+    source_loop = source_loops[0]
+    assert ast.unparse(source_loop.target) == "spec"
+    assert ast.unparse(source_loop.iter) == "specs"
+    assert source_loop.body.index(part_write) < source_loop.body.index(source_append)
+    assert sum(
+        isinstance(node, ast.Name)
+        and node.id == "spec"
+        and isinstance(node.ctx, ast.Store)
+        for node in ast.walk(source_loop)
+    ) == 1, "batch source row rebound inside path-construction loop"
+    # Later member-selection/readback loops do not participate in physical paths.
+    source_prefix = ast.Module(
+        body=batch.body[:batch.body.index(source_loop) + 1], type_ignores=[],
+    )
+    source_nodes = set(ast.walk(source_prefix))
+    assert not _assignment_expressions(source_prefix, "specs")
+    assert not any(
+        isinstance(node, ast.Name)
+        and node.id == "specs"
+        and isinstance(node.ctx, ast.Store)
+        for node in source_nodes
+    ), "batch input manifest rebound before path construction"
     for name, count in {
-        "specs": 0,
-        "spec": 1,
         "part": 1,
         "names": 1,
         "names_arg": 1,
@@ -1360,8 +1409,10 @@ def _assert_canonical_source_passthrough(scan, operations):
             )
             == count
         ), name
-    source_variables = {"specs", "spec", "names", "names_arg"}
     for node in ast.walk(batch):
+        source_variables = {"names", "names_arg"}
+        if node in source_nodes:
+            source_variables.update(("specs", "spec"))
         if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             assert not any(
@@ -1380,7 +1431,7 @@ def _assert_canonical_source_passthrough(scan, operations):
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
-            and node.func.value.id in {"spec", "specs"}
+            and node.func.value.id in ({"spec", "specs"} & source_variables)
         ):
             assert node.func.attr == "get", "batch source mutation method"
         if isinstance(node, ast.Call) and any(
@@ -1396,33 +1447,6 @@ def _assert_canonical_source_passthrough(scan, operations):
                     ast.unparse(node)
                     == "VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_BSTR, names)"
                 )
-    name_calls = [
-        ast.unparse(node)
-        for node in ast.walk(batch)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "names"
-    ]
-    assert name_calls == ["names.append(str(part_path(part)))"]
-    loops = [
-        node
-        for node in ast.walk(batch)
-        if isinstance(node, ast.For)
-        and isinstance(node.target, ast.Name)
-        and node.target.id == "spec"
-    ]
-    assert len(loops) == 1 and ast.unparse(loops[0].iter) == "specs"
-    part_write = next(
-        node
-        for node in ast.walk(batch)
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "part"
-            for target in node.targets
-        )
-    )
-    assert part_write in set(ast.walk(loops[0]))
     native = dict(operations["place_components_batch"])["AddComponents3"]
     assert ast.unparse(native.args[0]) == "names_arg"
 
@@ -1508,12 +1532,35 @@ def test_new_source_in_imported_helper_fails_even_when_old_manifest_still_matche
 
 
 @pytest.mark.parametrize(
+    "metadata",
+    [
+        "    for spec in specs:\n        spec.get('configuration')\n",
+        "    any(spec.get('component_reference') for spec in specs)\n",
+        (
+            "    for spec, name in zip(specs, out_names, strict=True):\n"
+            "        spec.get('configuration')\n"
+            "        spec.get('component_reference')\n"
+        ),
+    ],
+)
+def test_batch_source_proof_ignores_later_readonly_member_metadata_loops(metadata):
+    source = (SCRIPTS_DIR / "_assembly.py").read_text(encoding="utf-8")
+    marker = "    grounded_comps: list[Any] = []\n"
+    assert source.count(marker) == 1
+    source = source.replace(marker, marker + metadata, 1)
+    _assert_source_import_contract({"_assembly": source})
+
+
+@pytest.mark.parametrize(
     "change",
     [
         "new helper",
         "single source",
         "batch source",
         "batch row mutation",
+        "batch source row rebinding",
+        "batch source iterator",
+        "batch separate source loops",
         "single loop binding",
         "single path loop binding",
         "batch keyword consumer",
@@ -1534,6 +1581,28 @@ def test_canonical_assembly_is_not_a_blanket_source_exemption(change):
         source = source.replace(
             'part = spec["part"]',
             'spec["part"] = "fr-rocker-arm-support"\n        part = spec["part"]',
+        )
+    if change == "batch source row rebinding":
+        marker = '        part = spec["part"]'
+        assert source.count(marker) == 1
+        source = source.replace(
+            marker,
+            '        spec = {"part": "fr-rocker-arm-support"}\n' + marker,
+            1,
+        )
+    if change == "batch source iterator":
+        marker = '    for spec in specs:\n        part = spec["part"]'
+        assert source.count(marker) == 1
+        source = source.replace(
+            marker,
+            '    for spec in unrelated_specs:\n        part = spec["part"]',
+            1,
+        )
+    if change == "batch separate source loops":
+        marker = "        names.append(str(part_path(part)))"
+        assert source.count(marker) == 1
+        source = source.replace(
+            marker, "    for spec in specs:\n" + marker, 1,
         )
     if change == "single loop binding":
         source = source.replace(

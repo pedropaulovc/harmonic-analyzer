@@ -246,8 +246,7 @@ def component_family(native_stem: str, configuration: str) -> str:
     matches = [
         family
         for family, (stem, member) in COMPONENT_IDENTITIES.items()
-        if native_stem.casefold() == stem.casefold()
-        and member in (None, configuration)
+        if native_stem.casefold() == stem.casefold() and member in (None, configuration)
     ]
     if len(matches) != 1:
         raise ValueError(

@@ -78,7 +78,9 @@ def component_reference_names(
         canonical = selector.replace("\\", "/")
         required = semantic_reference_identity(canonical)
         if required is None:
-            raise ValueError(f"not an explicit component-reference selector: {selector!r}")
+            raise ValueError(
+                f"not an explicit component-reference selector: {selector!r}"
+            )
         if canonical in normalized:
             raise ValueError(f"duplicate component-reference selector {canonical!r}")
         identity = (stem.casefold(), member_configuration(configuration))
@@ -117,7 +119,9 @@ def component_reference_names(
     missing = sorted(set(normalized) - found.keys())
     if missing:
         raise RuntimeError(f"missing native component references: {missing!r}")
-    _telemetry.event("assembly.component_reference_binding", bindings=tuple(found.items()))
+    _telemetry.event(
+        "assembly.component_reference_binding", bindings=tuple(found.items())
+    )
     return {selector: found[selector.replace("\\", "/")] for selector in expected}
 
 

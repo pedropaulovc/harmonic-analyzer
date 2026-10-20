@@ -43,7 +43,10 @@ def mesh_key(stem: str, cfg: str) -> str:
 
 
 def member_export_paths(
-    stem: str, configuration: str, default_configuration: str, out: Path | None = None,
+    stem: str,
+    configuration: str,
+    default_configuration: str,
+    out: Path | None = None,
 ) -> dict[str, Path]:
     """Pure physical paths for one logical member (no registry or COM imports).
 
@@ -74,13 +77,23 @@ def member_configurations(stem: str) -> tuple[str, ...]:
     if quantities is None:
         return ()
     default = row.get("default_configuration")
-    if (not isinstance(quantities, dict) or not quantities
-            or not isinstance(default, str) or default not in quantities
-            or any(not isinstance(name, str)
-                   or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name) is None
-                   or not isinstance(quantity, int) or isinstance(quantity, bool)
-                   or quantity <= 0 for name, quantity in quantities.items())):
-        raise ValueError(f"{stem}: invalid configuration_quantities/default_configuration")
+    if (
+        not isinstance(quantities, dict)
+        or not quantities
+        or not isinstance(default, str)
+        or default not in quantities
+        or any(
+            not isinstance(name, str)
+            or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name) is None
+            or not isinstance(quantity, int)
+            or isinstance(quantity, bool)
+            or quantity <= 0
+            for name, quantity in quantities.items()
+        )
+    ):
+        raise ValueError(
+            f"{stem}: invalid configuration_quantities/default_configuration"
+        )
     names = (default, *(name for name in quantities if name != default))
     if len({mesh_key(stem, name) for name in names}) != len(names):
         raise ValueError(f"{stem}: colliding configuration export keys")
@@ -88,7 +101,8 @@ def member_configurations(stem: str) -> tuple[str, ...]:
 
 
 def configuration_export_paths(
-    stem: str, out: Path | None = None,
+    stem: str,
+    out: Path | None = None,
 ) -> dict[str, dict[str, Path]]:
     """Every declared member's paths, derived only from the parts registry."""
     names = member_configurations(stem)
@@ -105,8 +119,10 @@ def part_configuration_outputs(stem: str, out: Path | None = None) -> list[Path]
     members = configuration_export_paths(stem, out)
     if not members:
         return []
-    return [*(paths[kind] for paths in members.values() for kind in ("step", "png")),
-            configuration_manifest_path(stem, out)]
+    return [
+        *(paths[kind] for paths in members.values() for kind in ("step", "png")),
+        configuration_manifest_path(stem, out),
+    ]
 
 
 def _sha256(path: Path) -> str:
@@ -120,8 +136,11 @@ def _sha256(path: Path) -> str:
 def _file_record(path: Path, root: Path) -> dict[str, Any]:
     if not path.is_file() or path.stat().st_size == 0:
         raise RuntimeError(f"part member neutral output missing/empty: {path}")
-    return {"path": path.relative_to(root).as_posix(), "bytes": path.stat().st_size,
-            "sha256": _sha256(path)}
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
 
 
 def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
@@ -140,7 +159,11 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
     dashed = stem.replace("_", "-")
     try:
         certificate = json.loads(manifest.read_text(encoding="utf-8"))
-        identity = (root / "sldprt" / f".{dashed}.execution").read_text(encoding="utf-8").strip()
+        identity = (
+            (root / "sldprt" / f".{dashed}.execution")
+            .read_text(encoding="utf-8")
+            .strip()
+        )
     except (OSError, ValueError) as exc:
         raise RuntimeError(
             f"{dashed}: member export certificate/execution identity missing; "
@@ -148,14 +171,18 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
         ) from exc
     expected_source = f"sldprt/{dashed}.SLDPRT"
     native = root / expected_source
-    if (not isinstance(certificate, dict) or certificate.get("schema") != _SCHEMA
-            or certificate.get("source") != expected_source
-            or not re.fullmatch(r"[0-9a-f]{64}", identity)
-            or certificate.get("execution_identity") != identity
-            or not native.is_file() or native.stat().st_size == 0
-            or certificate.get("default_configuration") != next(iter(members))
-            or not isinstance(certificate.get("configurations"), dict)
-            or set(certificate["configurations"]) != set(members)):
+    if (
+        not isinstance(certificate, dict)
+        or certificate.get("schema") != _SCHEMA
+        or certificate.get("source") != expected_source
+        or not re.fullmatch(r"[0-9a-f]{64}", identity)
+        or certificate.get("execution_identity") != identity
+        or not native.is_file()
+        or native.stat().st_size == 0
+        or certificate.get("default_configuration") != next(iter(members))
+        or not isinstance(certificate.get("configurations"), dict)
+        or set(certificate["configurations"]) != set(members)
+    ):
         raise RuntimeError(
             f"{dashed}: stale member export identity/inventory; "
             f"request an explicit reasoned cache refresh of part:{stem}"
@@ -164,7 +191,9 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
     for configuration, paths in members.items():
         records = certificate["configurations"][configuration]
         if not isinstance(records, dict) or set(records) != {"step", "png"}:
-            raise RuntimeError(f"{dashed}/{configuration}: member export format inventory drifted")
+            raise RuntimeError(
+                f"{dashed}/{configuration}: member export format inventory drifted"
+            )
         for kind in ("step", "png"):
             path = paths[kind]
             if records[kind] != _file_record(path, root):
@@ -180,22 +209,33 @@ def _active_configuration(doc: Any) -> str:
     from _com import _read_member
 
     manager = _read_member(doc, "ConfigurationManager")
-    active = _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    active = (
+        _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    )
     return str(_read_member(active, "Name") or "") if active is not None else ""
 
 
 def _show_member(doc: Any, stem: str, configuration: str) -> None:
     if _active_configuration(doc) != configuration:
-        if not doc.ShowConfiguration2(configuration) or _active_configuration(doc) != configuration:
-            raise RuntimeError(f"{stem}: could not activate export member {configuration!r}")
+        if (
+            not doc.ShowConfiguration2(configuration)
+            or _active_configuration(doc) != configuration
+        ):
+            raise RuntimeError(
+                f"{stem}: could not activate export member {configuration!r}"
+            )
     if not doc.ForceRebuild3(False) or not doc.EditRebuild3():
         raise RuntimeError(f"{stem}/{configuration}: member export rebuild failed")
     if _active_configuration(doc) != configuration:
-        raise RuntimeError(f"{stem}: export member changed during rebuild: {configuration!r}")
+        raise RuntimeError(
+            f"{stem}: export member changed during rebuild: {configuration!r}"
+        )
 
 
 async def export_member_configurations(
-    adapter: Any, part_name: str, configurations: Iterable[str],
+    adapter: Any,
+    part_name: str,
+    configurations: Iterable[str],
 ) -> None:
     """Produce all member STEP/PNG outputs on the verified reopened native part.
 
@@ -212,8 +252,11 @@ async def export_member_configurations(
 
     part_name = part_name.replace("_", "-")
     members = configuration_export_paths(part_name)
-    root = (next(iter(members.values()))["step"].parent.parent if members
-            else Path(__file__).resolve().parents[1] / "out")
+    root = (
+        next(iter(members.values()))["step"].parent.parent
+        if members
+        else Path(__file__).resolve().parents[1] / "out"
+    )
     manifest = configuration_manifest_path(part_name, root)
     manifest.unlink(missing_ok=True)
     names = tuple(members)
@@ -222,7 +265,9 @@ async def export_member_configurations(
     doc = adapter.currentModel
     default = names[0]
     if _active_configuration(doc) != default:
-        raise RuntimeError(f"{part_name}: saved active export member must be {default!r}")
+        raise RuntimeError(
+            f"{part_name}: saved active export member must be {default!r}"
+        )
     native = root / "sldprt" / f"{part_name}.SLDPRT"
     if Path(doc.GetPathName()).resolve() != native.resolve():
         raise RuntimeError(f"{part_name}: export document is not the saved native part")
@@ -237,19 +282,32 @@ async def export_member_configurations(
             step.unlink(missing_ok=True)
             # Neutral SaveAs can otherwise export a reader's selected body subset.
             doc.ClearSelection2(True)
-            rc = doc.SaveAs3(str(step.resolve()), 0, 1 | 8)  # Silent | AvoidRebuildOnSave
+            rc = doc.SaveAs3(
+                str(step.resolve()), 0, 1 | 8
+            )  # Silent | AvoidRebuildOnSave
             if not step.is_file() or step.stat().st_size == 0:
                 step.unlink(missing_ok=True)
-                raise RuntimeError(f"{part_name}/{configuration}: STEP export failed (rc={rc!r})")
+                raise RuntimeError(
+                    f"{part_name}/{configuration}: STEP export failed (rc={rc!r})"
+                )
             set_isometric_view(adapter)
             png.parent.mkdir(parents=True, exist_ok=True)
             png.unlink(missing_ok=True)
-            check(f"export member PNG {configuration}", await adapter.export_image({
-                "file_path": str(png.resolve()), "format_type": "png",
-                "width": 1600, "height": 1000, "view_orientation": "isometric",
-            }))
-            records[configuration] = {kind: _file_record(paths[kind], root)
-                                      for kind in ("step", "png")}
+            check(
+                f"export member PNG {configuration}",
+                await adapter.export_image(
+                    {
+                        "file_path": str(png.resolve()),
+                        "format_type": "png",
+                        "width": 1600,
+                        "height": 1000,
+                        "view_orientation": "isometric",
+                    }
+                ),
+            )
+            records[configuration] = {
+                kind: _file_record(paths[kind], root) for kind in ("step", "png")
+            }
     finally:
         primary_error = sys.exception()
         restoration_error = None
@@ -264,9 +322,13 @@ async def export_member_configurations(
                 )
         try:
             if _sha256(native) != before:
-                raise RuntimeError(f"{part_name}: native bytes changed during member export")
+                raise RuntimeError(
+                    f"{part_name}: native bytes changed during member export"
+                )
         except Exception as cleanup_error:
-            pending_error = primary_error if primary_error is not None else restoration_error
+            pending_error = (
+                primary_error if primary_error is not None else restoration_error
+            )
             if pending_error is None:
                 raise
             pending_error.add_note(
@@ -277,13 +339,19 @@ async def export_member_configurations(
     for configuration, paths in members.items():
         for kind in ("step", "png"):
             if records[configuration][kind] != _file_record(paths[kind], root):
-                raise RuntimeError(f"{part_name}/{configuration}: member {kind} changed during export")
+                raise RuntimeError(
+                    f"{part_name}/{configuration}: member {kind} changed during export"
+                )
     certificate = {
-        "schema": _SCHEMA, "source": native.relative_to(root).as_posix(),
-        "execution_identity": before, "default_configuration": default,
+        "schema": _SCHEMA,
+        "source": native.relative_to(root).as_posix(),
+        "execution_identity": before,
+        "default_configuration": default,
         "configurations": records,
     }
     manifest.parent.mkdir(parents=True, exist_ok=True)
     temporary = manifest.with_suffix(".json.partial")
-    temporary.write_text(json.dumps(certificate, indent=1, sort_keys=True), encoding="utf-8")
+    temporary.write_text(
+        json.dumps(certificate, indent=1, sort_keys=True), encoding="utf-8"
+    )
     temporary.replace(manifest)

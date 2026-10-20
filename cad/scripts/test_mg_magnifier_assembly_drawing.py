@@ -967,18 +967,105 @@ def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:
         )
 
 
-def test_every_bom_family_is_ballooned_exactly_once_across_the_package() -> None:
-    items = {stem: str(index) for index, stem in enumerate(notes.BOM_ORDER, start=1)}
+@pytest.fixture
+def magnifier_bom(monkeypatch):
+    import _component_references as references
+    import _drawing_tables as tables
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        tables._sw_type_info, "early_bound_or_flag", lambda value, *_members: value
+    )
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+    native_members = []
+    expected_items = {}
+    # Native row order need not match the package's balloon order. Keep the
+    # configured wire expectation independent of the drawing's BOM_ROW_KEYS.
+    native_order = tuple(reversed(notes.BOM_ORDER))
+    for item, stem in enumerate(native_order, start=1):
+        is_wire = stem == "sh-vn-music-wire"
+        row_key = "sh-vn-music-wire--LeverWire" if is_wire else stem
+        expected_items[row_key] = str(item)
+        cells.append(
+            [
+                str(item),
+                drawing.BOM_PART_NUMBERS[row_key],
+                notes.BOM_DESCRIPTIONS[stem],
+                str(notes.QUANTITIES[stem]),
+            ]
+        )
+        native_members.append(
+            tuple(
+                SimpleNamespace(
+                    GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
+                    ReferencedConfiguration=(
+                        "LeverWire Simplified" if is_wire else "Default Simplified"
+                    ),
+                )
+                for _ in range(notes.QUANTITIES[stem])
+            )
+        )
+    table = SimpleNamespace(
+        RowCount=len(cells),
+        ColumnCount=len(cells[0]),
+        DisplayedText=lambda row, column: cells[row][column],
+        GetComponents2=lambda row, _configuration: native_members[row - 1],
+    )
+    return SimpleNamespace(
+        table=table,
+        expected_items=expected_items,
+        wire=native_members[native_order.index("sh-vn-music-wire")][0],
+    )
+
+
+@pytest.mark.parametrize("wire_member", ("LeverWire", "LeverWire Simplified"))
+def test_every_bom_family_is_ballooned_exactly_once_across_the_package(
+    magnifier_bom, wire_member
+) -> None:
+    magnifier_bom.wire.ReferencedConfiguration = wire_member
+    items = drawing._bom_items(magnifier_bom.table)
+    assert items == magnifier_bom.expected_items
     ballooned = [
-        stem
+        (row_key, item)
         for stems in (
             explode.WHEEL_GROUP_STEMS,
             explode.LEVER_GROUP_STEMS,
             frozenset({explode.WIRE_STEM}),
         )
-        for stem, _item in drawing.balloon_items(items, stems)
+        for row_key, item in drawing.balloon_items(items, stems)
     ]
-    assert sorted(ballooned) == sorted(notes.BOM_ORDER)
+    assert sorted(ballooned) == sorted(magnifier_bom.expected_items.items())
+    assert drawing.balloon_items(items, frozenset({explode.WIRE_STEM})) == (
+        (
+            "sh-vn-music-wire--LeverWire",
+            magnifier_bom.expected_items["sh-vn-music-wire--LeverWire"],
+        ),
+    )
+
+
+@pytest.mark.parametrize("wrong_member", ("PenWire", "PenWire Simplified", "Default"))
+def test_balloon_item_map_refuses_the_wrong_native_wire_member(
+    magnifier_bom, wrong_member
+) -> None:
+    assert drawing._bom_items(magnifier_bom.table) == magnifier_bom.expected_items
+    # The shared file and displayed Number are unchanged; only the installed
+    # native member changes, so neither can stand in for its configured row.
+    magnifier_bom.wire.ReferencedConfiguration = wrong_member
+    with pytest.raises(RuntimeError, match="expected one logical member"):
+        drawing._bom_items(magnifier_bom.table)
+
+
+@pytest.mark.parametrize(
+    "replacement_row", (None, "sh-vn-music-wire", "sh-vn-music-wire--PenWire")
+)
+def test_wire_balloon_requires_its_logical_bom_row(magnifier_bom, replacement_row) -> None:
+    items = drawing._bom_items(magnifier_bom.table)
+    item = items.pop("sh-vn-music-wire--LeverWire")
+    if replacement_row is not None:
+        items[replacement_row] = item
+    with pytest.raises(KeyError) as error:
+        drawing.balloon_items(items, frozenset({explode.WIRE_STEM}))
+    assert error.value.args == ("sh-vn-music-wire--LeverWire",)
 
 
 def test_the_joint_retention_rows_point_at_magnifier_steps() -> None:

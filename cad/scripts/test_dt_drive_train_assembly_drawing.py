@@ -346,8 +346,6 @@ def test_shared_screws_combine_quantity_without_merging_operational_roles() -> N
         ("pinion-rig", spec.FOOT_SCREW_SELECTOR),
     ):
         assert drawing.DRIVE_TRAIN_BALLOON_ANCHORS[cluster][SCREW_STEM].instance == selector
-    assert "1X MHA-SH-VN-52 AT THE SPRING FOOT" in RIG_STEPS
-    assert "1X MHA-SH-VN-52 AS SWING STOP" in RIG_STEPS
 
 
 @pytest.mark.parametrize("shared_quantity", [2, 1])

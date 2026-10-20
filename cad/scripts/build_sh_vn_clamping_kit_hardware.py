@@ -263,7 +263,10 @@ async def _readback(adapter, configuration: str) -> None:
     require_member_bodies(adapter, configuration, 1, ("ScrewAxis",))
     spec = MEMBER_SPECS[configuration]
     await volume_check(
-        adapter, f"{configuration} saved volume", spec.VOLUME_MM3, 0.005 * spec.VOLUME_MM3
+        adapter,
+        f"{configuration} saved volume",
+        spec.VOLUME_MM3,
+        0.005 * spec.VOLUME_MM3,
     )
     if configuration == HOLD_DOWN_STUD_CONFIGURATION:
         await bbox_extent_check(adapter, "stud length", "y", hold_down_stud.LENGTH)

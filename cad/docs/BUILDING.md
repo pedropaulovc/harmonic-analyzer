@@ -145,6 +145,9 @@ All suffixes use the existing lowercase configuration mesh-key convention.
 Scene-generated STLs remain qualified for every named member, including
 `sh-vn-chain-link--innerlink.STL`; the bare build STL remains a placement sidecar,
 not another released member identity.
+Configured purchased drawings read their registry metadata from the native source
+part identity, not the drawing's output label. Their cache dependencies therefore
+remain scoped to that source part's row.
 
 Each part task declares and caches all member STEP/PNG files together with its
 `reports/part-neutral/<stem>.json` certificate. The certificate records the

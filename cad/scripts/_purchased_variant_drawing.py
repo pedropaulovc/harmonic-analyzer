@@ -101,8 +101,10 @@ async def build_purchased_variant_drawing(
     }
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
-        raise FileNotFoundError(f"source configured purchased part is missing: {source}")
-    row = _config.parts(spec.artifact_stem)
+        raise FileNotFoundError(
+            f"source configured purchased part is missing: {source}"
+        )
+    row = _config.parts(source.stem)
     quantities = row["configuration_quantities"]
     if set(quantities) != set(configurations):
         raise ValueError("purchased sheet must depict every registered configuration")
@@ -130,8 +132,7 @@ async def build_purchased_variant_drawing(
     for name, value in expected.items():
         if properties[name] != value:
             raise RuntimeError(
-                f"{spec.artifact_stem}: stale {name} "
-                f"{properties[name]!r} != {value!r}"
+                f"{spec.artifact_stem}: stale {name} {properties[name]!r} != {value!r}"
             )
 
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
@@ -233,13 +234,9 @@ async def build_purchased_variant_drawing(
                 (0.015, note_y - 0.006, 0.415, note_y + 0.001),
             )
         )
-    purchase_note = (
-        f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
-    )
+    purchase_note = f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
     note = _literal_note(adapter, purchase_note, 0.018, 0.113)
-    placed.append(
-        (note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114))
-    )
+    placed.append((note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114)))
     placed.extend(
         add_purchased_footer(
             adapter,
@@ -328,8 +325,7 @@ async def build_purchased_variant_drawing(
             box = _box(note.GetExtent(), label=linked, kind="note")
             if not _inside(box, cell) or not _inside(box, border):
                 raise RuntimeError(
-                    "configured purchased note leaves its reserved space: "
-                    f"{linked!r}"
+                    f"configured purchased note leaves its reserved space: {linked!r}"
                 )
 
     return await finalize_drawing(

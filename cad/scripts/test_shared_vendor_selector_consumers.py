@@ -73,8 +73,12 @@ def _inventory(name):
 @pytest.mark.parametrize(
     "name",
     [
-        "pd-paper-drive", "ch-rocker-arm-tl-oblique-jig", "dt-drive-train",
-        "mg-magnifier", "pn-pen", "ha-harmonic-analyzer",
+        "pd-paper-drive",
+        "ch-rocker-arm-tl-oblique-jig",
+        "dt-drive-train",
+        "mg-magnifier",
+        "pn-pen",
+        "ha-harmonic-analyzer",
     ],
 )
 def test_reopened_reference_census_uses_native_readback_not_name_indices(
@@ -89,8 +93,15 @@ def test_reopened_reference_census_uses_native_readback_not_name_indices(
 @pytest.mark.parametrize(
     "corruption",
     [
-        "missing", "duplicate", "wrong-member", "missing-member", "decorated-member",
-        "wrong-file", "extra", "extra-no-reference", "wrong-scope",
+        "missing",
+        "duplicate",
+        "wrong-member",
+        "missing-member",
+        "decorated-member",
+        "wrong-file",
+        "extra",
+        "extra-no-reference",
+        "wrong-scope",
     ],
 )
 def test_reopened_member_census_rejects_identity_or_quantity_drift(
@@ -140,7 +151,8 @@ def test_configured_pattern_census_rejects_wrong_installed_quantity(
         components.append(_component(role, quantity + 1, index=9090))
     else:
         components = [
-            component for component in components
+            component
+            for component in components
             if component.ComponentReference != f"{role}:{quantity}"
         ]
     with pytest.raises(RuntimeError):
@@ -151,16 +163,21 @@ def test_both_same_file_default_roles_remain_required(native_bindings):
     components = _inventory("dt-drive-train")
     components[1].ComponentReference = "FootScrew:1"
     with pytest.raises(RuntimeError):
-        verify._assert_shared_component_references(_adapter(components), "dt-drive-train")
+        verify._assert_shared_component_references(
+            _adapter(components), "dt-drive-train"
+        )
 
 
 def test_unrelated_native_component_does_not_enter_member_census(native_bindings):
     components = _inventory("pn-pen")
-    components.append(SimpleNamespace(
-        Name2="ordinary-part-1", ComponentReference="",
-        ReferencedConfiguration="Default",
-        GetPathName=lambda: "C:/native/ordinary-part.SLDPRT",
-    ))
+    components.append(
+        SimpleNamespace(
+            Name2="ordinary-part-1",
+            ComponentReference="",
+            ReferencedConfiguration="Default",
+            GetPathName=lambda: "C:/native/ordinary-part.SLDPRT",
+        )
+    )
     verify._assert_shared_component_references(_adapter(components), "pn-pen")
 
 
@@ -195,7 +212,9 @@ def _gravity_adapter(events, *, failure=None):
                 raise RuntimeError("native member was not rebuilt")
             return SimpleNamespace(
                 Mass=0.001 if self.active == "LeverWire" else 0.002,
-                Density=7800.0, Volume=1e-6, SurfaceArea=1e-4,
+                Density=7800.0,
+                Volume=1e-6,
+                SurfaceArea=1e-4,
                 CenterOfMass=[0.0, 0.0, 0.0],
                 Recalculate=lambda: True,
                 GetOverrideOptions=lambda: SimpleNamespace(
@@ -206,7 +225,9 @@ def _gravity_adapter(events, *, failure=None):
     class Adapter:
         def __init__(self):
             self.currentModel = None
-            self.swApp = SimpleNamespace(CloseDoc=lambda title: events.append(("close", title)))
+            self.swApp = SimpleNamespace(
+                CloseDoc=lambda title: events.append(("close", title))
+            )
 
         async def open_model(self, path):
             events.append(("open", path))
@@ -215,28 +236,35 @@ def _gravity_adapter(events, *, failure=None):
 
         async def set_active_configuration(self, configuration):
             events.append(("activate", configuration))
-            self.currentModel.active = "PenWire" if failure == "misdirect" else configuration
+            self.currentModel.active = (
+                "PenWire" if failure == "misdirect" else configuration
+            )
             return SimpleNamespace(is_success=True, data=True)
 
     return Adapter()
 
 
 @pytest.mark.parametrize("failure", [None, "misdirect", "missing-member", "mass"])
-def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(monkeypatch, failure):
+def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(
+    monkeypatch, failure
+):
     from diagnostics import diag_stock_spring_gravity as gravity
     import _purchased_part_variants as variants
 
     # Limit this diagnostic to its real wire requests; do not replace their
     # production configurations with the expected answer.
     identities = {
-        key: value for key, value in gravity.PART_IDENTITIES.items()
+        key: value
+        for key, value in gravity.PART_IDENTITIES.items()
         if key.startswith("sh-vn-music-wire--")
     }
     monkeypatch.setattr(gravity, "PART_IDENTITIES", identities)
     monkeypatch.setattr(gravity, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(variants, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(
-        variants, "active_configuration_name", lambda adapter, model=None: adapter.currentModel.active
+        variants,
+        "active_configuration_name",
+        lambda adapter, model=None: adapter.currentModel.active,
     )
     events = []
     adapter = _gravity_adapter(events, failure=failure)
@@ -247,16 +275,24 @@ def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(mo
             assert not any(event[0] == "mass" for event in events)
     else:
         parts = asyncio.run(gravity._native_masses(adapter))
-        assert set(parts) == {"sh-vn-music-wire--LeverWire", "sh-vn-music-wire--PenWire"}
+        assert set(parts) == {
+            "sh-vn-music-wire--LeverWire",
+            "sh-vn-music-wire--PenWire",
+        }
         assert parts["sh-vn-music-wire--LeverWire"]["mass_kg"] == 0.001
         assert parts["sh-vn-music-wire--PenWire"]["mass_kg"] == 0.002
         assert parts["sh-vn-music-wire--LeverWire"]["identity"] == {
-            "stem": "sh-vn-music-wire", "configuration": "LeverWire"
+            "stem": "sh-vn-music-wire",
+            "configuration": "LeverWire",
         }
         assert parts["sh-vn-music-wire--PenWire"]["identity"] == {
-            "stem": "sh-vn-music-wire", "configuration": "PenWire"
+            "stem": "sh-vn-music-wire",
+            "configuration": "PenWire",
         }
-        assert parts["sh-vn-music-wire--LeverWire"]["path"] == parts["sh-vn-music-wire--PenWire"]["path"]
+        assert (
+            parts["sh-vn-music-wire--LeverWire"]["path"]
+            == parts["sh-vn-music-wire--PenWire"]["path"]
+        )
     assert adapter.currentModel is None
     assert sum(event[0] == "close" for event in events) == sum(
         event[0] == "open" for event in events
@@ -265,7 +301,11 @@ def test_gravity_reads_exact_wire_members_and_closes_after_success_or_failure(mo
 
 @pytest.mark.parametrize(
     ("first_role", "second_role"),
-    [("FootScrew", "SwingStopScrew"), ("HoldDownStud", "TNut"), ("HoldDownStud", "FlangeNut")],
+    [
+        ("FootScrew", "SwingStopScrew"),
+        ("HoldDownStud", "TNut"),
+        ("HoldDownStud", "FlangeNut"),
+    ],
 )
 @pytest.mark.parametrize("wrong_member", [False, True])
 def test_semantic_fit_binding_requires_both_native_file_and_exact_member(
@@ -287,7 +327,9 @@ def test_semantic_fit_binding_requires_both_native_file_and_exact_member(
         Done=lambda: None,
     )
     monkeypatch.setattr(_assembly, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(_assembly, "configured_interference_manager", lambda _adapter: manager)
+    monkeypatch.setattr(
+        _assembly, "configured_interference_manager", lambda _adapter: manager
+    )
     pairs = {frozenset((f"@{first_role}:1", f"@{second_role}:1")): 1.0}
     if wrong_member:
         with pytest.raises(RuntimeError, match="expected"):

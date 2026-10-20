@@ -114,9 +114,7 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    create_blank_drawing_sheets(
-        adapter, SHEET_NAMES, label="shared music-wire members"
-    )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="shared music-wire members")
     draw = _early_bound(drawing_model, "IDrawingDoc")
     configured_views = []
     linked_notes = []
@@ -184,9 +182,7 @@ async def build(adapter: Any) -> dict[str, str]:
             if not draw.ActivateSheet(configuration):
                 raise RuntimeError(f"cannot read back sheet {configuration!r}")
             if str(view.ReferencedConfiguration) != configuration:
-                raise RuntimeError(
-                    f"{configuration}: final view configuration changed"
-                )
+                raise RuntimeError(f"{configuration}: final view configuration changed")
             source = str(view.GetReferencedModelName()).replace("\\", "/").casefold()
             if source != str(SOURCE).replace("\\", "/").casefold():
                 raise RuntimeError(f"{configuration}: final view source changed")

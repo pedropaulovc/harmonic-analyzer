@@ -116,26 +116,64 @@ _PARTS = (
     ("ch-rocker-arm-tl-vn-oblique-bearing", "ch-rocker-arm-tl-vn-oblique-bearing"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    ("ch-rocker-arm-tl-vn-oblique-leadscrew-nut", "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"),
-    ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
+    (
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pillow-block",
+        "ch-rocker-arm-tl-vn-oblique-pillow-block",
+    ),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--TNut"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--FlangeNut"),
-    ("ch-rocker-arm-tl-vn-oblique-rail-screw", "ch-rocker-arm-tl-vn-oblique-rail-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-block-screw", "ch-rocker-arm-tl-vn-oblique-block-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
+    (
+        "ch-rocker-arm-tl-vn-oblique-rail-screw",
+        "ch-rocker-arm-tl-vn-oblique-rail-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw",
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-block-screw",
+        "ch-rocker-arm-tl-vn-oblique-block-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-carriage-screw",
+        "ch-rocker-arm-tl-vn-oblique-carriage-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-kp08-screw",
+        "ch-rocker-arm-tl-vn-oblique-kp08-screw",
+    ),
     ("ch-rocker-arm-tl-vn-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
-    ("ch-rocker-arm-tl-vn-oblique-block-washer", "ch-rocker-arm-tl-vn-oblique-block-washer"),
-    ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
+    (
+        "ch-rocker-arm-tl-vn-oblique-riser-screw",
+        "ch-rocker-arm-tl-vn-oblique-riser-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-clamp-screw",
+        "ch-rocker-arm-tl-vn-oblique-clamp-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-lever-screw",
+        "ch-rocker-arm-tl-vn-oblique-lever-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-block-washer",
+        "ch-rocker-arm-tl-vn-oblique-block-washer",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-lever-washer",
+        "ch-rocker-arm-tl-vn-oblique-lever-washer",
+    ),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
-assert all(spec.COMPONENT_IDENTITIES[family][0] == physical for physical, family in _PARTS)
+assert all(
+    spec.COMPONENT_IDENTITIES[family][0] == physical for physical, family in _PARTS
+)
 # A family of this many instances or more goes in one AddComponents3 (one
 # family per batch: the batch matches components by origin, and no two
 # instances of one family share an origin).
@@ -209,7 +247,9 @@ async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, s
             {selector: (physical, configuration) for selector in selectors},
         )
         if resolved != observed:
-            raise RuntimeError(f"{family}: inserted references {observed!r} != {resolved!r}")
+            raise RuntimeError(
+                f"{family}: inserted references {observed!r} != {resolved!r}"
+            )
     elif names != selectors:
         raise RuntimeError(f"{family}: inserted {names!r}, expected {selectors!r}")
     return observed
@@ -222,7 +262,9 @@ def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
     )
     expected = {selector: placed_names[selector] for selector in actual}
     if actual != expected:
-        raise RuntimeError(f"jig final kit references {actual!r} != inserted {expected!r}")
+        raise RuntimeError(
+            f"jig final kit references {actual!r} != inserted {expected!r}"
+        )
 
 
 async def _mate_carriages(adapter: Any) -> None:

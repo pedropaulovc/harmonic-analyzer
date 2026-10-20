@@ -62,7 +62,6 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     the hole, the shank or the taps' bands breaks one of these."""
     import _config
     from _hole_spec import HoleSpec, blind_cut_dia_mm
-    from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
     from sh_vn_clamp_screw_spec import SHANK_DIA

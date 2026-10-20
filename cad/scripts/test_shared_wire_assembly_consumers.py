@@ -14,7 +14,24 @@ from _assembly_contract import assembly_contract
 
 
 CONSUMERS = ((magnifier, "LeverWire", "mg-magnifier"), (pen, "PenWire", "pn-pen"))
-_IDENTITY = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
+_IDENTITY = (
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+)
 
 
 def _component(stem, configuration, reference="", native_index=73):
@@ -36,16 +53,25 @@ def _source(drawing, member, *, reference=None):
             component = _component(
                 stem,
                 member if is_wire else (configuration or "Default"),
-                (reference if reference is not None else f"{member.removesuffix(' Simplified')}:1")
-                if is_wire else "",
+                (
+                    reference
+                    if reference is not None
+                    else f"{member.removesuffix(' Simplified')}:1"
+                )
+                if is_wire
+                else "",
                 73 + len(components) + index,
             )
             components.append(component)
             if is_wire:
                 wire = component
     model = SimpleNamespace(
-        ConfigurationManager=SimpleNamespace(ActiveConfiguration=SimpleNamespace(Name="Default")),
-        GetExplodedViewNames2=lambda configuration: (drawing.EXPLODED_VIEW_NAMES[configuration],),
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Default")
+        ),
+        GetExplodedViewNames2=lambda configuration: (
+            drawing.EXPLODED_VIEW_NAMES[configuration],
+        ),
         GetComponents=lambda _top_level: tuple(components),
     )
     return model, components, wire
@@ -53,21 +79,30 @@ def _source(drawing, member, *, reference=None):
 
 def _unwrapped_com(monkeypatch, drawing):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_component_references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
-        _drawing_tables._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+        _component_references, "_early_bound", lambda value, _interface: value
+    )
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_args: value,
     )
 
 
 @pytest.mark.parametrize("drawing,member,assembly", CONSUMERS)
 @pytest.mark.parametrize("suffix", ("", " Simplified"))
-def test_source_census_accepts_only_its_named_wire_member(monkeypatch, drawing, member, assembly, suffix):
+def test_source_census_accepts_only_its_named_wire_member(
+    monkeypatch, drawing, member, assembly, suffix
+):
     _unwrapped_com(monkeypatch, drawing)
     model, _components, wire = _source(drawing, member + suffix)
     drawing._validate_source(model)
     # The semantic local ordinal is 1; SOLIDWORKS' allocator suffix is unrelated.
     assert not wire.Name2.endswith("-1")
-    assert drawing.BOM_COMPONENT_IDENTITIES[drawing.WIRE_ROW] == ("sh-vn-music-wire", member)
+    assert drawing.BOM_COMPONENT_IDENTITIES[drawing.WIRE_ROW] == (
+        "sh-vn-music-wire",
+        member,
+    )
     assert drawing.BOM_QUANTITIES[drawing.WIRE_ROW] == 1
     assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].instance == f"@{member}:1"
     contract = assembly_contract(assembly)
@@ -76,7 +111,9 @@ def test_source_census_accepts_only_its_named_wire_member(monkeypatch, drawing, 
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-@pytest.mark.parametrize("wrong_member", ("", "Default", "other-member", "LeverWire extra"))
+@pytest.mark.parametrize(
+    "wrong_member", ("", "Default", "other-member", "LeverWire extra")
+)
 def test_source_census_refuses_another_configuration_despite_the_shared_stem(
     monkeypatch, drawing, member, _assembly, wrong_member
 ):
@@ -87,7 +124,9 @@ def test_source_census_refuses_another_configuration_despite_the_shared_stem(
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_census_refuses_the_other_real_wire_member(monkeypatch, drawing, member, _assembly):
+def test_source_census_refuses_the_other_real_wire_member(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     other = "PenWire" if member == "LeverWire" else "LeverWire"
     model, _components, _wire = _source(drawing, other, reference=f"{member}:1")
@@ -96,7 +135,9 @@ def test_source_census_refuses_the_other_real_wire_member(monkeypatch, drawing, 
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_census_requires_the_persisted_reference(monkeypatch, drawing, member, _assembly):
+def test_source_census_requires_the_persisted_reference(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, _components, _wire = _source(drawing, member, reference="")
     with pytest.raises(RuntimeError, match="missing native component references"):
@@ -104,7 +145,9 @@ def test_source_census_requires_the_persisted_reference(monkeypatch, drawing, me
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_census_refuses_an_extra_unreferenced_wire_member(monkeypatch, drawing, member, _assembly):
+def test_source_census_refuses_an_extra_unreferenced_wire_member(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, components, _wire = _source(drawing, member)
     other = "PenWire" if member == "LeverWire" else "LeverWire"
@@ -114,7 +157,9 @@ def test_source_census_refuses_an_extra_unreferenced_wire_member(monkeypatch, dr
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_reference_changes_fail_closed_until_restored(monkeypatch, drawing, member, _assembly):
+def test_source_reference_changes_fail_closed_until_restored(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, components, wire = _source(drawing, member)
     drawing._validate_source(model)
@@ -134,7 +179,9 @@ def test_source_reference_changes_fail_closed_until_restored(monkeypatch, drawin
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_nested_wire_reference_cannot_satisfy_the_top_level_role(monkeypatch, drawing, member, _assembly):
+def test_nested_wire_reference_cannot_satisfy_the_top_level_role(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, _components, wire = _source(drawing, member)
     original_name = wire.Name2
@@ -146,7 +193,9 @@ def test_nested_wire_reference_cannot_satisfy_the_top_level_role(monkeypatch, dr
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_census_rejects_missing_and_extra_physical_occurrences(monkeypatch, drawing, member, _assembly):
+def test_source_census_rejects_missing_and_extra_physical_occurrences(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, components, _wire = _source(drawing, member)
     first = components.pop(0)
@@ -162,7 +211,9 @@ def test_source_census_rejects_missing_and_extra_physical_occurrences(monkeypatc
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_source_census_requires_the_wire_presentation_to_be_collapsed(monkeypatch, drawing, member, _assembly):
+def test_source_census_requires_the_wire_presentation_to_be_collapsed(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     model, _components, wire = _source(drawing, member)
     translated = list(_IDENTITY)
@@ -183,22 +234,28 @@ class _Bom:
         self.writes = []
         for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
             stem, configuration = drawing.BOM_COMPONENT_IDENTITIES[logical]
-            configuration = member if logical == drawing.WIRE_ROW else (configuration or "Default")
+            configuration = (
+                member if logical == drawing.WIRE_ROW else (configuration or "Default")
+            )
             self.components[item] = tuple(
                 _component(stem, configuration, native_index=101 + index)
                 for index in range(drawing.BOM_QUANTITIES[logical])
             )
-            self.cells.append([
-                str(item), drawing.BOM_PART_NUMBERS[logical],
-                (
-                    {
-                        "LeverWire": LEVER_WIRE_DESCRIPTION,
-                        "PenWire": PEN_WIRE_DESCRIPTION,
-                    }[member.removesuffix(" Simplified")]
-                    if logical == drawing.WIRE_ROW else drawing.BOM_DESCRIPTIONS[logical]
-                ),
-                str(drawing.BOM_QUANTITIES[logical]),
-            ])
+            self.cells.append(
+                [
+                    str(item),
+                    drawing.BOM_PART_NUMBERS[logical],
+                    (
+                        {
+                            "LeverWire": LEVER_WIRE_DESCRIPTION,
+                            "PenWire": PEN_WIRE_DESCRIPTION,
+                        }[member.removesuffix(" Simplified")]
+                        if logical == drawing.WIRE_ROW
+                        else drawing.BOM_DESCRIPTIONS[logical]
+                    ),
+                    str(drawing.BOM_QUANTITIES[logical]),
+                ]
+            )
 
     @property
     def RowCount(self):
@@ -246,13 +303,17 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
     table = _Bom(drawing, member + " Simplified")
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     items = dict(drawing._validate_bom(adapter, table))
-    assert items == {logical: str(item) for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)}
+    assert items == {
+        logical: str(item) for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)
+    }
     assert table.cells[int(items[drawing.WIRE_ROW])][1] == "MHA-SH-VN-56"
     assert all(column != 1 for _row, column, _text in table.writes)
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_bom_rejects_another_member_even_with_the_same_printed_number(monkeypatch, drawing, member, _assembly):
+def test_bom_rejects_another_member_even_with_the_same_printed_number(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     other = "PenWire" if member == "LeverWire" else "LeverWire"
     table = _Bom(drawing, other)
@@ -262,7 +323,9 @@ def test_bom_rejects_another_member_even_with_the_same_printed_number(monkeypatc
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_bom_refuses_a_blank_number_instead_of_repairing_the_cell(monkeypatch, drawing, member, _assembly):
+def test_bom_refuses_a_blank_number_instead_of_repairing_the_cell(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     table = _Bom(drawing, member)
     wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
@@ -274,7 +337,9 @@ def test_bom_refuses_a_blank_number_instead_of_repairing_the_cell(monkeypatch, d
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_bom_rejects_a_changed_physical_wire_quantity(monkeypatch, drawing, member, _assembly):
+def test_bom_rejects_a_changed_physical_wire_quantity(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     table = _Bom(drawing, member)
     wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
@@ -286,7 +351,9 @@ def test_bom_rejects_a_changed_physical_wire_quantity(monkeypatch, drawing, memb
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_bom_rejects_a_row_without_a_native_member_association(monkeypatch, drawing, member, _assembly):
+def test_bom_rejects_a_row_without_a_native_member_association(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     table = _Bom(drawing, member)
     wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
@@ -298,7 +365,9 @@ def test_bom_rejects_a_row_without_a_native_member_association(monkeypatch, draw
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-def test_bom_rejects_an_unexpected_native_wire_description(monkeypatch, drawing, member, _assembly):
+def test_bom_rejects_an_unexpected_native_wire_description(
+    monkeypatch, drawing, member, _assembly
+):
     _unwrapped_com(monkeypatch, drawing)
     table = _Bom(drawing, member)
     wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
@@ -312,7 +381,10 @@ def test_bom_rejects_an_unexpected_native_wire_description(monkeypatch, drawing,
 def test_wire_application_instructions_stay_with_the_assembly_consumers():
     magnifier_steps = " ".join(magnifier.notes.ASSEMBLY_STEPS)
     pen_steps = " ".join(pen.notes.ASSEMBLY_STEPS)
-    assert "HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE" in magnifier_steps
+    assert (
+        "HOOK THE MHA-SH-VN-56 LEVER WIRE IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE"
+        in magnifier_steps
+    )
     assert "WRAP IT CLOCKWISE DOWN THE MHA-MG-10 DRUM" in magnifier_steps
     assert "THROUGH THE MHA-PN-07 ADJUSTER STUD EYE" in pen_steps
     assert "SEAT THE PEN WIRE IN THE MHA-MG-05 WHEEL RIM GROOVE" in pen_steps

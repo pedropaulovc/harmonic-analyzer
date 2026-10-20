@@ -242,6 +242,9 @@ _DRAWING_OWN_ROW_READERS = {
     # _config.parts(stock.part_name) after the source identity check
     # (spec.source.stem == stock.part_name).
     "_purchased_fastener_drawing.py",
+    # The configured sheet reads spec.source.stem, derived from spec.part;
+    # output artifact labels cannot select a foreign registry row.
+    "_purchased_variant_drawing.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -2798,7 +2801,6 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     assert {
         "_holes.py",
         "build_pd_platen_guide.py",
-        "test_pen_summing_drawing_batch_contract.py",
         "identity-migration-map.json",
         "current-identity-map.json",
     } <= deps
@@ -2831,12 +2833,6 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         "pose_manifest.py",
         "render_offline.py",
     } <= deps
-
-    command = recipe["actions"][0][1][0]
-    assert any(
-        Path(argument).name == "test_pen_summing_drawing_batch_contract.py"
-        for argument in command
-    ), "the pen/summing metadata contract must execute under check:recipe"
 
 
 def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:

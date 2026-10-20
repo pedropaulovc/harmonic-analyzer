@@ -22,7 +22,9 @@ _MEMBERS = {
     "sh-vn-clamping-kit-hardware": ("HoldDownStud", "TNut", "FlangeNut"),
     "sh-vn-music-wire": ("LeverWire", "PenWire"),
 }
-_MEMBER_CASES = [(stem, member) for stem, members in _MEMBERS.items() for member in members]
+_MEMBER_CASES = [
+    (stem, member) for stem, members in _MEMBERS.items() for member in members
+]
 
 
 def _digest(path: Path) -> str:
@@ -55,8 +57,11 @@ class _NativePart:
         return str(self.path)
 
     def ShowConfiguration2(self, member):
-        if (self.refuse_default_restore and member == self.members[0]
-                and self.active != member):
+        if (
+            self.refuse_default_restore
+            and member == self.members[0]
+            and self.active != member
+        ):
             return False
         if member == self.refuse_member:
             return False
@@ -94,10 +99,16 @@ class _NativePart:
         if fault == "missing":
             return 1
         Path(filename).write_text(
-            "" if fault == "empty" else json.dumps({
-                "configuration": self.active, "geometry": self.geometry,
-                "bodies": self.selected_bodies or ["body-1", "body-2"],
-            }), encoding="utf-8",
+            ""
+            if fault == "empty"
+            else json.dumps(
+                {
+                    "configuration": self.active,
+                    "geometry": self.geometry,
+                    "bodies": self.selected_bodies or ["body-1", "body-2"],
+                }
+            ),
+            encoding="utf-8",
         )
         return 0
 
@@ -121,16 +132,25 @@ class _Adapter:
             raise RuntimeError("fake image writer failed")
         if fault != "missing":
             Path(request["file_path"]).write_text(
-                "" if fault == "empty" else json.dumps({
-                    "configuration": doc.active, "geometry": doc.geometry,
-                    "view": doc.view, "orientation": request["view_orientation"],
-                }), encoding="utf-8",
+                ""
+                if fault == "empty"
+                else json.dumps(
+                    {
+                        "configuration": doc.active,
+                        "geometry": doc.geometry,
+                        "view": doc.view,
+                        "orientation": request["view_orientation"],
+                    }
+                ),
+                encoding="utf-8",
             )
         if doc.active == doc.fault_member and self.mutate_output is not None:
             content = self.mutate_output.read_bytes()
             self.mutate_output.write_bytes(b"x" + content[1:])
         return SimpleNamespace(
-            is_success=fault != "status", error="fake image failure", data=None,
+            is_success=fault != "status",
+            error="fake image failure",
+            data=None,
         )
 
 
@@ -138,7 +158,8 @@ class _Adapter:
 def native_export(tmp_path, monkeypatch):
     real_paths = exports.configuration_export_paths
     monkeypatch.setattr(
-        exports, "configuration_export_paths",
+        exports,
+        "configuration_export_paths",
         lambda stem, out=None: real_paths(stem, tmp_path if out is None else out),
     )
     # Seat preference I/O is outside this member-export contract. Keep the real
@@ -152,8 +173,12 @@ def native_export(tmp_path, monkeypatch):
         native.write_bytes(b"freshly saved and reopened native part")
         doc = _NativePart(native, members)
         return SimpleNamespace(
-            stem=stem, members=members, native=native, doc=doc,
-            adapter=_Adapter(doc), root=tmp_path,
+            stem=stem,
+            members=members,
+            native=native,
+            doc=doc,
+            adapter=_Adapter(doc),
+            root=tmp_path,
             paths=real_paths(stem, tmp_path),
             certificate=exports.configuration_manifest_path(stem, tmp_path),
             execution=native.with_name(f".{stem}.execution"),
@@ -163,7 +188,9 @@ def native_export(tmp_path, monkeypatch):
 
 
 def _produce(case):
-    asyncio.run(exports.export_member_configurations(case.adapter, case.stem, case.members))
+    asyncio.run(
+        exports.export_member_configurations(case.adapter, case.stem, case.members)
+    )
 
 
 def _stamp_execution(case):
@@ -180,18 +207,27 @@ def test_real_registry_members_have_exact_physical_paths(tmp_path, stem, member,
     assert row["default_configuration"] == _MEMBERS[stem][0]
     assert exports.member_configurations(stem) == _MEMBERS[stem]
     qualified = f"{stem}--{member.lower()}"
-    basename = stem if member == row["default_configuration"] and kind != "stl" else qualified
+    basename = (
+        stem if member == row["default_configuration"] and kind != "stl" else qualified
+    )
     expected = {
         "step": tmp_path / "step" / f"{basename}.STEP",
         "stl": tmp_path / "stl" / f"{basename}.STL",
         "png": tmp_path / "png" / basename / f"{basename}_isometric.png",
     }[kind]
     assert exports.configuration_export_paths(stem, tmp_path)[member][kind] == expected
-    assert exports.configuration_export_paths(stem.replace("-", "_"), tmp_path)[member][kind] == expected
+    assert (
+        exports.configuration_export_paths(stem.replace("-", "_"), tmp_path)[member][
+            kind
+        ]
+        == expected
+    )
 
 
 @pytest.mark.parametrize("stem", _MEMBERS)
-def test_producer_exports_rebuilt_members_and_restores_saved_default(native_export, stem):
+def test_producer_exports_rebuilt_members_and_restores_saved_default(
+    native_export, stem
+):
     case = native_export(stem)
     before = case.native.read_bytes()
     case.execution.write_text("older execution token", encoding="utf-8")
@@ -212,12 +248,15 @@ def test_producer_exports_rebuilt_members_and_restores_saved_default(native_expo
     assert set(certificate["configurations"]) == set(case.members)
     for member, paths in case.paths.items():
         assert json.loads(paths["step"].read_text(encoding="utf-8")) == {
-            "configuration": member, "geometry": member,
+            "configuration": member,
+            "geometry": member,
             "bodies": ["body-1", "body-2"],
         }
         assert json.loads(paths["png"].read_text(encoding="utf-8")) == {
-            "configuration": member, "geometry": member,
-            "view": 7, "orientation": "isometric",
+            "configuration": member,
+            "geometry": member,
+            "view": 7,
+            "orientation": "isometric",
         }
         assert paths["stl"].read_bytes() == b"scene-owned STL"
         records = certificate["configurations"][member]
@@ -226,10 +265,13 @@ def test_producer_exports_rebuilt_members_and_restores_saved_default(native_expo
             path = paths[kind]
             assert records[kind] == {
                 "path": path.relative_to(case.root).as_posix(),
-                "bytes": path.stat().st_size, "sha256": _digest(path),
+                "bytes": path.stat().st_size,
+                "sha256": _digest(path),
             }
     owned = {p[k] for p in case.paths.values() for k in ("step", "png")}
-    assert set(exports.part_configuration_outputs(stem, case.root)) == owned | {case.certificate}
+    assert set(exports.part_configuration_outputs(stem, case.root)) == owned | {
+        case.certificate
+    }
     _stamp_execution(case)
     assert exports.validate_member_exports(stem, case.root) == owned
 
@@ -239,10 +281,14 @@ def test_certificate_tracks_execution_not_later_parent_save_bytes(native_export)
     _produce(case)
     _stamp_execution(case)
     identity = case.execution.read_text(encoding="utf-8")
-    case.native.write_bytes(b"legitimate raw native byte churn from a parent assembly save")
+    case.native.write_bytes(
+        b"legitimate raw native byte churn from a parent assembly save"
+    )
     assert _digest(case.native) != identity
     assert exports.validate_member_exports(case.stem, case.root)
-    case.execution.write_text("a" * 64 if identity != "a" * 64 else "b" * 64, encoding="utf-8")
+    case.execution.write_text(
+        "a" * 64 if identity != "a" * 64 else "b" * 64, encoding="utf-8"
+    )
     with pytest.raises(RuntimeError, match="identity"):
         exports.validate_member_exports(case.stem, case.root)
 
@@ -252,14 +298,18 @@ def test_certificate_requires_a_valid_execution_token(native_export, fault):
     case = native_export()
     _produce(case)
     if fault != "missing":
-        case.execution.write_text("" if fault == "empty" else "not-an-execution-digest", encoding="utf-8")
+        case.execution.write_text(
+            "" if fault == "empty" else "not-an-execution-digest", encoding="utf-8"
+        )
     with pytest.raises(RuntimeError, match="identity"):
         exports.validate_member_exports(case.stem, case.root)
 
 
 @pytest.mark.parametrize("kind", ["step", "png"])
 @pytest.mark.parametrize("fault", ["missing", "empty", "mutated"])
-def test_validator_rejects_missing_empty_or_changed_member_bytes(native_export, kind, fault):
+def test_validator_rejects_missing_empty_or_changed_member_bytes(
+    native_export, kind, fault
+):
     case = native_export()
     _produce(case)
     _stamp_execution(case)
@@ -277,7 +327,9 @@ def test_validator_rejects_missing_empty_or_changed_member_bytes(native_export, 
 
 @pytest.mark.parametrize("kind", ["step", "png"])
 @pytest.mark.parametrize("fault", ["missing", "empty", "raise"])
-def test_failed_output_removes_old_certificate_and_restores_default(native_export, kind, fault):
+def test_failed_output_removes_old_certificate_and_restores_default(
+    native_export, kind, fault
+):
     case = native_export()
     _produce(case)
     assert case.certificate.is_file()
@@ -313,7 +365,10 @@ def test_member_activation_or_rebuild_failure_cannot_certify(native_export, faul
         case.doc.ignore_member = case.members[-1]
     else:
         case.doc.rebuild_fault = fault
-    with pytest.raises(RuntimeError, match="activate export member|rebuild failed|changed during rebuild"):
+    with pytest.raises(
+        RuntimeError,
+        match="activate export member|rebuild failed|changed during rebuild",
+    ):
         _produce(case)
     assert not case.certificate.exists()
     assert case.doc.active == case.members[0]
@@ -342,7 +397,9 @@ def test_native_save_during_export_cannot_certify(native_export):
 @pytest.mark.parametrize("cleanup_fault", ["restore", "native", "both"])
 @pytest.mark.parametrize("export_fault", ["step", "png", "activation"])
 def test_export_failure_stays_primary_when_cleanup_also_fails(
-    native_export, export_fault, cleanup_fault,
+    native_export,
+    export_fault,
+    cleanup_fault,
 ):
     case = native_export()
     _produce(case)
@@ -377,7 +434,8 @@ def test_export_failure_stays_primary_when_cleanup_also_fails(
 
 @pytest.mark.parametrize("native_changes", [False, True])
 def test_cleanup_failure_without_export_failure_still_prevents_certificate(
-    native_export, native_changes,
+    native_export,
+    native_changes,
 ):
     case = native_export()
     _produce(case)
@@ -410,7 +468,8 @@ def test_later_export_cannot_certify_a_mutated_earlier_member(native_export):
 
 @pytest.mark.parametrize("stem", _MEMBERS)
 def test_restored_payload_requires_matching_adopted_execution_and_certificate(
-    native_export, stem,
+    native_export,
+    stem,
 ):
     case = native_export(stem)
     owned = {paths[kind] for paths in case.paths.values() for kind in ("step", "png")}
@@ -418,8 +477,7 @@ def test_restored_payload_requires_matching_adopted_execution_and_certificate(
 
     def snapshot():
         return {
-            path.relative_to(case.root): path.read_bytes()
-            for path in payload_paths
+            path.relative_to(case.root): path.read_bytes() for path in payload_paths
         }
 
     def restore(payload, root):
@@ -441,18 +499,19 @@ def test_restored_payload_requires_matching_adopted_execution_and_certificate(
 
     restored_root = case.root / "restored-cache"
     restore(loser, restored_root)
-    restored_outputs = {
-        restored_root / path.relative_to(case.root) for path in owned
-    }
+    restored_outputs = {restored_root / path.relative_to(case.root) for path in owned}
     # Validation has only restored files: no adapter, document or native seat.
     assert exports.validate_member_exports(stem, restored_root) == restored_outputs
 
     # Adopting the winning native identity is not permission to retain the
     # losing task's certificate/neutral payload, even for the same members.
-    restore({
-        native_relative: winner[native_relative],
-        execution_relative: winner[execution_relative],
-    }, restored_root)
+    restore(
+        {
+            native_relative: winner[native_relative],
+            execution_relative: winner[execution_relative],
+        },
+        restored_root,
+    )
     with pytest.raises(RuntimeError, match="identity"):
         exports.validate_member_exports(stem, restored_root)
 

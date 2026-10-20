@@ -14,7 +14,10 @@ import _config
 from _check import check
 from _com import _early_bound, _read_member
 from _configuration_material import require_material_in_every_configuration
-from _part_configuration_exports import export_member_configurations, member_configurations
+from _part_configuration_exports import (
+    export_member_configurations,
+    member_configurations,
+)
 from _part_save import save_part_and_images
 from _rebuild import active_configuration_name, assert_saved_configurations_regenerate
 from _simplified_part import _bom_identity, _close_part, persist_configurations_in_place
@@ -36,7 +39,9 @@ async def activate_member(adapter: Any, configuration: str) -> None:
 def require_active_member(adapter: Any, configuration: str) -> None:
     active = active_configuration_name(adapter)
     if active != configuration:
-        raise RuntimeError(f"native member {configuration!r} requested, active member is {active!r}")
+        raise RuntimeError(
+            f"native member {configuration!r} requested, active member is {active!r}"
+        )
 
 
 def require_member_configurations(
@@ -62,7 +67,9 @@ async def create_member_configurations(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     initial = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
     if len(initial) != 1:
-        raise RuntimeError(f"member authoring requires a fresh single-configuration part, got {initial!r}")
+        raise RuntimeError(
+            f"member authoring requires a fresh single-configuration part, got {initial!r}"
+        )
     original = _early_bound(model.GetConfigurationByName(initial[0]), "IConfiguration")
     original.Name = names[0]
     if model.GetConfigurationByName(names[0]) is None:
@@ -70,7 +77,9 @@ async def create_member_configurations(
     for name in names[1:]:
         check(
             f"create native member {name}",
-            await adapter.create_configuration(CreateConfigurationParameters(name=name, comment=name)),
+            await adapter.create_configuration(
+                CreateConfigurationParameters(name=name, comment=name)
+            ),
         )
     actual = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
     if set(actual) != set(names) or len(actual) != len(names):
@@ -95,11 +104,15 @@ def _suppressed(feature: Any) -> bool:
         or len(states) != 1
         or not isinstance(states[0], bool)
     ):
-        raise RuntimeError(f"{feature.Name}: invalid native suppression state {states!r}")
+        raise RuntimeError(
+            f"{feature.Name}: invalid native suppression state {states!r}"
+        )
     return states[0]
 
 
-def set_member_suppression(adapter: Any, names: Sequence[str], *, suppressed: bool) -> None:
+def set_member_suppression(
+    adapter: Any, names: Sequence[str], *, suppressed: bool
+) -> None:
     """Change only the active configuration, dependents before parents when hiding."""
     from solidworks_mcp.adapters.com_variant import null_variant
 
@@ -127,7 +140,9 @@ def assert_member_suppression(
         expected = member != configuration
         for name in names:
             if _suppressed(_feature(adapter, name)) != expected:
-                raise RuntimeError(f"{configuration}: feature {name!r} has wrong member suppression ({member})")
+                raise RuntimeError(
+                    f"{configuration}: feature {name!r} has wrong member suppression ({member})"
+                )
 
 
 async def select_member_features(
@@ -149,7 +164,9 @@ def _member_properties(
     row = _config.parts(part_name)
     quantities = row["configuration_quantities"]
     if configuration not in quantities:
-        raise ValueError(f"{part_name}: no quantity for native member {configuration!r}")
+        raise ValueError(
+            f"{part_name}: no quantity for native member {configuration!r}"
+        )
     return {
         **properties,
         "Number": str(row["number"]),
@@ -160,9 +177,15 @@ def _member_properties(
 
 def _property_manager(adapter: Any, configuration: str) -> Any:
     extension = _read_member(adapter.currentModel, "Extension")
-    raw = extension.CustomPropertyManager(configuration) if extension is not None else None
+    raw = (
+        extension.CustomPropertyManager(configuration)
+        if extension is not None
+        else None
+    )
     if raw is None:
-        raise RuntimeError(f"CustomPropertyManager unavailable for member {configuration!r}")
+        raise RuntimeError(
+            f"CustomPropertyManager unavailable for member {configuration!r}"
+        )
     return _early_bound(raw, "ICustomPropertyManager")
 
 
@@ -176,9 +199,13 @@ def apply_member_properties(
     """Give heterogeneous rows distinct grouping keys but one purchase Number."""
     require_active_member(adapter, configuration)
     manager = _property_manager(adapter, configuration)
-    for name, value in _member_properties(part_name, configuration, description, properties).items():
+    for name, value in _member_properties(
+        part_name, configuration, description, properties
+    ).items():
         manager.Add3(name, 30, str(value), 2)
-    native = _early_bound(adapter.currentModel.GetConfigurationByName(configuration), "IConfiguration")
+    native = _early_bound(
+        adapter.currentModel.GetConfigurationByName(configuration), "IConfiguration"
+    )
     native.BOMPartNoSource = 8  # swBOMPartNumber_UserSpecified
     native.AlternateName = f"{part_name}--{configuration}"
     native.UseAlternateNameInBOM = True
@@ -196,15 +223,23 @@ def assert_member_properties(
 ) -> None:
     require_active_member(adapter, configuration)
     model = adapter.currentModel
-    for name, value in _member_properties(part_name, configuration, description, properties).items():
-        observed = str(model.GetCustomInfoValue(configuration, name) or "").replace("\r\n", "\n")
+    for name, value in _member_properties(
+        part_name, configuration, description, properties
+    ).items():
+        observed = str(model.GetCustomInfoValue(configuration, name) or "").replace(
+            "\r\n", "\n"
+        )
         if observed != str(value).replace("\r\n", "\n"):
-            raise RuntimeError(f"{configuration}: property {name!r} reads {observed!r}, expected {value!r}")
+            raise RuntimeError(
+                f"{configuration}: property {name!r} reads {observed!r}, expected {value!r}"
+            )
     native = _early_bound(model.GetConfigurationByName(configuration), "IConfiguration")
     observed_bom = _bom_identity(native)
     expected_bom = (8, f"{part_name}--{configuration}", True, description, True)
     if observed_bom != expected_bom:
-        raise RuntimeError(f"{configuration}: native BOM identity {observed_bom!r} != {expected_bom!r}")
+        raise RuntimeError(
+            f"{configuration}: native BOM identity {observed_bom!r} != {expected_bom!r}"
+        )
 
 
 def require_member_bodies(
@@ -214,10 +249,14 @@ def require_member_bodies(
     part = _early_bound(adapter.currentModel, "IPartDoc")
     bodies = tuple(part.GetBodies2(0, False) or ())
     if len(bodies) != count:
-        raise RuntimeError(f"{configuration}: {len(bodies)} native solid bodies, expected {count}")
+        raise RuntimeError(
+            f"{configuration}: {len(bodies)} native solid bodies, expected {count}"
+        )
     for name in references:
         if _suppressed(_feature(adapter, name)):
-            raise RuntimeError(f"{configuration}: required reference {name!r} is suppressed")
+            raise RuntimeError(
+                f"{configuration}: required reference {name!r} is suppressed"
+            )
 
 
 def require_member_colour(
@@ -225,7 +264,10 @@ def require_member_colour(
 ) -> None:
     """Read the selected member's persisted native appearance, without repair."""
     require_active_member(adapter, configuration)
-    observed = tuple(float(value) for value in (adapter.currentModel.MaterialPropertyValues or ())[:3])
+    observed = tuple(
+        float(value)
+        for value in (adapter.currentModel.MaterialPropertyValues or ())[:3]
+    )
     if len(observed) != 3 or any(
         not abs(got - expected) <= 1.0 / 255.0
         for got, expected in zip(observed, rgb, strict=True)
@@ -252,11 +294,16 @@ async def save_member_part(
     await activate_member(adapter, names[0])
     artefacts = await save_part_and_images(adapter, part_name)
     _close_part(adapter)
-    check(f"reopen {part_name} to persist members", await adapter.open_model(artefacts["part"]))
+    check(
+        f"reopen {part_name} to persist members",
+        await adapter.open_model(artefacts["part"]),
+    )
     require_active_member(adapter, names[0])
     persist_configurations_in_place(adapter, part_name)
     _close_part(adapter)
-    check(f"reopen saved {part_name} members", await adapter.open_model(artefacts["part"]))
+    check(
+        f"reopen saved {part_name} members", await adapter.open_model(artefacts["part"])
+    )
     require_active_member(adapter, names[0])
     assert_saved_configurations_regenerate(adapter, part_name)
     for name in names:

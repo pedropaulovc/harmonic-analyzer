@@ -713,6 +713,7 @@ def test_release_notes_count_shared_member_files_not_part_documents() -> None:
         "stls": 7,
         "config_meshes": 7,
         "pngs": 7,
+        "comparisons": {"pairs": 0, "mean_score": None},
         "size_mb": 1.0,
     }
 

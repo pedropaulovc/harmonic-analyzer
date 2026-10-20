@@ -1498,7 +1498,6 @@ def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
     angle, and the budget draws that angle once per land: gears on one land
     turn together, and the Ø9.525 land (the 64T and T030..T120) is the
     reference its own clock cannot move."""
-    import dt_cone_gear_shaft_spec
     import cone_shaft_land_bands
 
     angle = float(_config.title_block("angular")["value_deg"])

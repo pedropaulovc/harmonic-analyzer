@@ -30,7 +30,11 @@ class MemberPart:
             for name, owner in (("InnerBody", "InnerLink"), ("OuterBody", "OuterLink"))
         }
         self.properties = {
-            name: {"Number": "MHA-SH-VN-50", "Description": f"Chain {name}", "Quantity": quantity}
+            name: {
+                "Number": "MHA-SH-VN-50",
+                "Description": f"Chain {name}",
+                "Quantity": quantity,
+            }
             for name, quantity in (("InnerLink", "34"), ("OuterLink", "33"))
         }
 
@@ -55,7 +59,10 @@ class MemberFeature:
         self.parents = parents
         self.refuse_change = False
         self.persist_change = True
-        self.states = {configuration: configuration != owner for configuration in part.configurations}
+        self.states = {
+            configuration: configuration != owner
+            for configuration in part.configurations
+        }
 
     def IsSuppressed2(self, _option, _names):
         return (self.states[self.part.active],)
@@ -83,7 +90,9 @@ def _adapter(part):
         part.active = configuration
         return SimpleNamespace(is_success=True, data=None)
 
-    return SimpleNamespace(currentModel=part, set_active_configuration=set_active_configuration)
+    return SimpleNamespace(
+        currentModel=part, set_active_configuration=set_active_configuration
+    )
 
 
 class FreshConfiguration:
@@ -190,17 +199,23 @@ def test_suppressing_the_selected_members_own_body_is_not_a_valid_variant():
     part.features["InnerBody"].states["InnerLink"] = True
     with pytest.raises(RuntimeError, match="InnerBody.*wrong member suppression"):
         variants.assert_member_suppression(
-            _adapter(part), "InnerLink", {"InnerLink": ("InnerBody",), "OuterLink": ("OuterBody",)},
+            _adapter(part),
+            "InnerLink",
+            {"InnerLink": ("InnerBody",), "OuterLink": ("OuterBody",)},
         )
 
 
 def test_missing_or_shared_feature_ownership_is_not_silently_accepted():
     part = MemberPart()
     with pytest.raises(RuntimeError, match="not found"):
-        variants.assert_member_suppression(_adapter(part), "InnerLink", {"InnerLink": ("AbsentBody",)})
+        variants.assert_member_suppression(
+            _adapter(part), "InnerLink", {"InnerLink": ("AbsentBody",)}
+        )
     with pytest.raises(ValueError, match="ownership overlaps"):
         variants.assert_member_suppression(
-            _adapter(part), "InnerLink", {"InnerLink": ("InnerBody",), "OuterLink": ("InnerBody",)},
+            _adapter(part),
+            "InnerLink",
+            {"InnerLink": ("InnerBody",), "OuterLink": ("InnerBody",)},
         )
 
 
@@ -221,31 +236,48 @@ def test_member_names_must_match_registry_order(member_registry, names):
 
 def test_registry_default_must_be_an_actual_member(member_registry):
     member_registry["default_configuration"] = "Default"
-    with pytest.raises(ValueError, match="invalid configuration_quantities/default_configuration"):
-        variants.require_member_configurations("sh-vn-chain-link", ("InnerLink", "OuterLink"))
+    with pytest.raises(
+        ValueError, match="invalid configuration_quantities/default_configuration"
+    ):
+        variants.require_member_configurations(
+            "sh-vn-chain-link", ("InnerLink", "OuterLink")
+        )
 
 
-def test_same_purchase_number_does_not_make_foreign_native_bom_member_valid(member_registry):
+def test_same_purchase_number_does_not_make_foreign_native_bom_member_valid(
+    member_registry,
+):
     part = MemberPart()
-    variants.assert_member_properties(_adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {})
+    variants.assert_member_properties(
+        _adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {}
+    )
     part.configurations["InnerLink"].AlternateName = "sh-vn-chain-link--OuterLink"
     with pytest.raises(RuntimeError, match="native BOM identity"):
-        variants.assert_member_properties(_adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {})
+        variants.assert_member_properties(
+            _adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {}
+        )
 
 
 def test_configuration_quantity_cannot_inherit_the_family_total(member_registry):
     part = MemberPart()
     part.properties["InnerLink"]["Quantity"] = "67"
     with pytest.raises(RuntimeError, match="Quantity.*expected '34'"):
-        variants.assert_member_properties(_adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {})
+        variants.assert_member_properties(
+            _adapter(part), "sh-vn-chain-link", "InnerLink", "Chain InnerLink", {}
+        )
 
 
 @pytest.mark.parametrize("suppressed", [False, True])
 @pytest.mark.parametrize(
     ("failure", "message"),
-    [("refused", "native suppression change refused"), ("not-persisted", "did not persist")],
+    [
+        ("refused", "native suppression change refused"),
+        ("not-persisted", "did not persist"),
+    ],
 )
-def test_native_suppression_refusal_or_nonpersistence_is_rejected(suppressed, failure, message):
+def test_native_suppression_refusal_or_nonpersistence_is_rejected(
+    suppressed, failure, message
+):
     part = MemberPart()
     feature = part.features["InnerBody"]
     feature.states["InnerLink"] = not suppressed
@@ -254,7 +286,9 @@ def test_native_suppression_refusal_or_nonpersistence_is_rejected(suppressed, fa
     before = dict(feature.states)
 
     with pytest.raises(RuntimeError, match=message):
-        variants.set_member_suppression(_adapter(part), ("InnerBody",), suppressed=suppressed)
+        variants.set_member_suppression(
+            _adapter(part), ("InnerBody",), suppressed=suppressed
+        )
 
     assert feature.states == before
 
@@ -263,19 +297,27 @@ def test_member_suppression_respects_native_dependencies_and_other_configuration
     part = MemberPart()
     part.features = {
         "PlateSketch": MemberFeature(part, "PlateSketch", "InnerLink"),
-        "PlateBody": MemberFeature(part, "PlateBody", "InnerLink", parents=("PlateSketch",)),
+        "PlateBody": MemberFeature(
+            part, "PlateBody", "InnerLink", parents=("PlateSketch",)
+        ),
         "Bore": MemberFeature(part, "Bore", "InnerLink", parents=("PlateBody",)),
     }
     names = ("PlateSketch", "PlateBody", "Bore")
-    foreign_states = {name: feature.states["OuterLink"] for name, feature in part.features.items()}
+    foreign_states = {
+        name: feature.states["OuterLink"] for name, feature in part.features.items()
+    }
 
     variants.set_member_suppression(_adapter(part), names, suppressed=True)
     assert all(feature.states["InnerLink"] for feature in part.features.values())
-    assert {name: feature.states["OuterLink"] for name, feature in part.features.items()} == foreign_states
+    assert {
+        name: feature.states["OuterLink"] for name, feature in part.features.items()
+    } == foreign_states
 
     variants.set_member_suppression(_adapter(part), names, suppressed=False)
     assert all(not feature.states["InnerLink"] for feature in part.features.values())
-    assert {name: feature.states["OuterLink"] for name, feature in part.features.items()} == foreign_states
+    assert {
+        name: feature.states["OuterLink"] for name, feature in part.features.items()
+    } == foreign_states
 
 
 def test_selecting_each_member_corrects_foreign_features_without_changing_the_other_member():
@@ -309,10 +351,21 @@ def test_malformed_native_suppression_readback_is_rejected(states):
 @pytest.mark.parametrize("default", ["InnerLink", "OuterLink"])
 def test_new_part_uses_registry_default_as_a_real_member(member_registry, default):
     member_registry["default_configuration"] = default
-    names = (default, *(name for name in member_registry["configuration_quantities"] if name != default))
+    names = (
+        default,
+        *(
+            name
+            for name in member_registry["configuration_quantities"]
+            if name != default
+        ),
+    )
     part = FreshPart()
 
-    asyncio.run(variants.create_member_configurations(_fresh_adapter(part), "sh-vn-chain-link", names))
+    asyncio.run(
+        variants.create_member_configurations(
+            _fresh_adapter(part), "sh-vn-chain-link", names
+        )
+    )
 
     assert part.GetConfigurationNames() == names
     assert part.active == default
@@ -325,7 +378,9 @@ def test_bad_member_order_is_rejected_before_initial_native_rename(member_regist
     with pytest.raises(ValueError, match="differ from registry order"):
         asyncio.run(
             variants.create_member_configurations(
-                _fresh_adapter(part), "sh-vn-chain-link", ("OuterLink", "InnerLink"),
+                _fresh_adapter(part),
+                "sh-vn-chain-link",
+                ("OuterLink", "InnerLink"),
             )
         )
     assert part.GetConfigurationNames() == ("Default",)
@@ -337,7 +392,9 @@ def test_initial_native_configuration_rename_must_persist(member_registry):
     with pytest.raises(RuntimeError, match="initial configuration did not rename"):
         asyncio.run(
             variants.create_member_configurations(
-                _fresh_adapter(part), "sh-vn-chain-link", ("InnerLink", "OuterLink"),
+                _fresh_adapter(part),
+                "sh-vn-chain-link",
+                ("InnerLink", "OuterLink"),
             )
         )
     assert part.GetConfigurationNames() == ("Default",)
@@ -352,28 +409,39 @@ def test_initial_native_configuration_rename_must_persist(member_registry):
     ],
 )
 def test_successful_configuration_creation_must_leave_exact_native_inventory(
-    member_registry, persist_creation, extra_configuration, remaining,
+    member_registry,
+    persist_creation,
+    extra_configuration,
+    remaining,
 ):
     part = FreshPart()
     adapter = _fresh_adapter(
-        part, persist_creation=persist_creation, extra_configuration=extra_configuration,
+        part,
+        persist_creation=persist_creation,
+        extra_configuration=extra_configuration,
     )
     with pytest.raises(RuntimeError, match="differ from requested"):
         asyncio.run(
             variants.create_member_configurations(
-                adapter, "sh-vn-chain-link", ("InnerLink", "OuterLink"),
+                adapter,
+                "sh-vn-chain-link",
+                ("InnerLink", "OuterLink"),
             )
         )
     assert part.GetConfigurationNames() == remaining
 
 
-def test_member_authoring_refuses_a_nonfresh_native_without_renaming_it(member_registry):
+def test_member_authoring_refuses_a_nonfresh_native_without_renaming_it(
+    member_registry,
+):
     part = FreshPart()
     part.add_configuration("ExistingMember")
     with pytest.raises(RuntimeError, match="fresh single-configuration part"):
         asyncio.run(
             variants.create_member_configurations(
-                _fresh_adapter(part), "sh-vn-chain-link", ("InnerLink", "OuterLink"),
+                _fresh_adapter(part),
+                "sh-vn-chain-link",
+                ("InnerLink", "OuterLink"),
             )
         )
     assert part.GetConfigurationNames() == ("Default", "ExistingMember")
