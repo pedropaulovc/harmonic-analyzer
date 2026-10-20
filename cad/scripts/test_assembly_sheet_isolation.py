@@ -182,6 +182,7 @@ def test_sheet_modules_exist_to_scan() -> None:
         "pd_paper_drive_assembly_steps.py",
         "ch_channel_assembly_steps.py",
         "dt_drive_train_steps.py",
+        "dt_drive_train_assembly_sheet.py",
         "mg_magnifier_assembly_sheet.py",
         "mg_magnifier_assembly_steps.py",
         "pn_pen_assembly_sheet.py",

@@ -98,7 +98,7 @@ from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
-from dt_drive_train_assembly_notes import (
+from dt_drive_train_assembly_sheet import (
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_ASSEMBLY_CHECK,
 )
