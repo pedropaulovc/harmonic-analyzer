@@ -75,6 +75,13 @@ class FakeView:
     def GetDisplayMode2(self) -> int:
         return self.mode
 
+    def SetDisplayMode4(
+        self, _use_parent: bool, mode: int, _faceted: bool, _edges: bool, _update: bool
+    ) -> bool:
+        changed = mode != self.mode
+        self.mode = mode
+        return changed
+
     @property
     def ReferencedConfiguration(self) -> str:
         return self.configuration
