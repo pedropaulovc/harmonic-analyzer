@@ -258,7 +258,7 @@ assert all(
         BRACKET_ORIGIN, (BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z), strict=True
     )
 ), "magnifying-bracket joint origin drifted from its live placement"
-# The clamp (#1559) is a vertical length of 7/16 hex: placed UNROTATED (hex
+# The clamp is a vertical length of 1/2 hex: placed UNROTATED (hex
 # axis = machine +Y, lever bore along X through the corners), its bottom-face
 # origin LEVER_BORE_Y under the lever axis. The vertical rod screws into the
 # clamp's bottom-face #4-40 tap on the same axis and seats on its shoulder; its

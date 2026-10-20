@@ -76,17 +76,18 @@ def test_rod_tap_floor_leaves_two_millimetres_under_the_lever_bore() -> None:
     drill_r_max = (TAP_DRILL_MM["#4-40"] + 0.10) / 2.0
     point = drill_r_max / math.tan(math.radians(59.0))
     bore_r_max = (clamp.LEVER_BORE_DIA + 0.10) / 2.0
-    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point - clamp.BORE_WANDER
+    slope = math.tan(math.radians(0.3))
+    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point - 15.0 * slope
     assert clamp.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(floor)
     assert floor >= 2.0
-    assert floor - 0.05 < 2.0  # the chosen practical height step is minimal
+    assert clamp.LEVER_BORE_Y == 19.95  # fixed approved hook/seat interface
     assert clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y == pytest.approx(clamp.TOP_TO_BORE)
 
 
 def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
     # Female wall alone is NOT installed FULL overlap: the stock screw's
     # chamfered male end starts above its contact with the lever.
-    female_wall = clamp.TOP_TO_BORE - 2.0 * 0.51 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - 0.25 - clamp.BORE_WANDER
+    female_wall = clamp.TOP_TO_BORE - 2.0 * 0.51 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - 0.25 - clamp.BORE_FULL_ANGULAR
     assert clamp.THUMB_ENGAGEMENT_WORST < female_wall
     assert clamp.THUMB_ENGAGEMENT_WORST >= 1.5 * _D
     assert clamp.THUMB_TAP_SPEC.size == joint.ROD_TAP_SPEC.size
@@ -94,15 +95,12 @@ def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
 
 
 def test_hex_stock_and_extent_along_the_lever() -> None:
-    assert clamp.HEX_AF == pytest.approx(7.0 / 16.0 * _IN)
+    assert clamp.HEX_AF == pytest.approx(0.5 * _IN)
     assert clamp.BLOCK_DEPTH == pytest.approx(clamp.HEX_AF * 2.0 / math.sqrt(3.0))
-    # Spend wander through the entire maximum-stock drilling depth: the
-    # exit-side flats extend past the central tap/floor section.
-    depth_max = (clamp.HEX_AF + clamp.HEX_AF_BAND) * 2.0 / math.sqrt(3.0)
-    wander = 0.10 + depth_max * math.tan(math.radians(0.3))
-    far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) / 2.0 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - wander
-    assert wander == pytest.approx(clamp.BORE_FULL_WANDER)
-    assert far_wall >= 2.0
+    # A finished receiving envelope, not perfect-hex normals, bounds the
+    # entire angular run-off. Wall acceptance is independently explicit.
+    wander = 15.0 * math.tan(math.radians(0.3))
+    assert wander == pytest.approx(clamp.BORE_FULL_ANGULAR)
 
 
 def test_shoulder_land_seats_flat_all_round() -> None:

@@ -122,8 +122,8 @@ REFERENCE_DIMENSIONS = frozenset({"HexAf", "OverallLength"})
 
 # --- Printed limits ----------------------------------------------------------------
 # An assumption, not a printed band: the flats as supplied stay within
-# +/-0.13 of 7/16 in (the band MG-002's same bar assumes,
-# mg_magnifying_clamp_geom.HEX_AF_BAND).  Every wall, the spigot's clean-up
+# +/-0.13 of its own 7/16 in stock; this is not the MG-02 clamp's stock size.
+# Every wall, the spigot's clean-up
 # and the tap's reach below hold at it.
 HEX_STOCK_AF_BAND = 0.13
 _ROD_STATION_LO, _ = printed_deviations(ROD_STATION, ROD_STATION_PLACES)

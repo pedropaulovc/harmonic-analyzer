@@ -39,7 +39,7 @@ import math
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 
-# --- Stock: 7/16 hex brass bar (MG-002's stock) -----------------------------------
+# --- Stock: 7/16 hex brass bar (independent of the larger MG-02 clamp) -------
 HEX_AF = 7.0 / 16.0 * 25.4  # 11.1125 across the flats
 # Centre to a corner: the hex's half-extent along local Y.
 HEX_CORNER_RADIUS = HEX_AF / math.sqrt(3.0)

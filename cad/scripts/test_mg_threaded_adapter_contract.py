@@ -74,7 +74,7 @@ def test_census_catches_missing_method_and_invalid_keyword_mutations(recipe) -> 
 def _native_declaration(interface):
     wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
     declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
-    methods = {node.name for node in declaration.body if isinstance(node, ast.FunctionDef)}
+    methods = {node.name: node for node in declaration.body if isinstance(node, ast.FunctionDef)}
     maps = {}
     for node in declaration.body:
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
@@ -100,6 +100,8 @@ def _undeclared_bound_calls(tree):
                 methods, _maps = _native_declaration(interface)
                 if node.func.attr not in methods:
                     failures.append(f"{interface}.{node.func.attr}")
+                elif not _can_bind(node, methods[node.func.attr]):
+                    failures.append(f"{interface}.{node.func.attr} arguments")
     return failures
 
 
@@ -120,3 +122,34 @@ def test_declared_native_interfaces_reject_the_wrong_document_binding() -> None:
     )
     binding.args[1] = ast.Constant("IModelDoc2")
     assert "IModelDoc2.FeatureByName" in _undeclared_bound_calls(mutated)
+
+
+def test_closed_sketch_status_and_dimension_ownership_use_native_call_shapes() -> None:
+    methods, maps = _native_declaration("ISketch")
+    assert "GetConstrainedStatus" in methods
+    assert all("GetConstrainedStatus" not in values for values in maps.values())
+    methods, maps = _native_declaration("IDimension")
+    assert "DrivenState" not in methods
+    assert "DrivenState" in maps["_prop_map_get_"] & maps["_prop_map_put_"]
+    # A property called as a method is a real binding error, not a valid
+    # adapter operation. Exercise that failure in the import-free census.
+    wrong = ast.parse('def bad_binding():\n    dimension = _early_bound(None, "IDimension")\n    dimension.DrivenState()')
+    assert _undeclared_bound_calls(wrong) == ["IDimension.DrivenState"]
+
+
+def test_clamp_location_native_calls_and_projection_properties_match_pinned_typelib() -> None:
+    tree = _tree(SCRIPTS / "build_mg_magnifying_clamp.py")
+    assert not _undeclared_bound_calls(tree)
+    assert not _undeclared_bound_calls(_tree(SCRIPTS / "draw_mg_magnifying_clamp.py"))
+    selection = next(node for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "Select4")
+    for interface in ("IEntity", "ISketchPoint", "ISketchSegment"):
+        methods, _maps = _native_declaration(interface)
+        assert _can_bind(selection, methods["Select4"])
+    _methods, maps = _native_declaration("ICurve")
+    assert "CircleParams" in maps["_prop_map_get_"]
+    _methods, maps = _native_declaration("IDisplayDimension")
+    assert "ShowParenthesis" in maps["_prop_map_get_"] & maps["_prop_map_put_"]
+    mutated = copy.deepcopy(tree)
+    conversion = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SketchUseEdge3")
+    conversion.args.append(ast.Constant(False))
+    assert "ISketchManager.SketchUseEdge3 arguments" in _undeclared_bound_calls(mutated)
