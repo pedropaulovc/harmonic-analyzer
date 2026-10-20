@@ -1270,6 +1270,10 @@ def _bad_blank_ink(problem: str):
     elif problem == "disconnected-witness":
         segments[1] = ((0.2112439, 0.31833), (0.215, 0.31833))
         segments.append(((0.244, 0.31833), (0.249, 0.31833)))
+    elif problem == "extra-left-witness":
+        segments.append(((0.200, 0.31833), (0.205, 0.31833)))
+    elif problem == "extra-detached-witness":
+        segments.append(((0.230, 0.31833), (0.235, 0.31833)))
     elif problem == "nan":
         segments[2] = ((math.nan, 0.22167), (0.248, 0.2571399))
     elif problem == "infinite":
@@ -1286,8 +1290,21 @@ _BAD_BLANK_INK_CASES = (
     "missing-upper-witness", "missing-lower-witness",
     "wrong-upper-origin", "wrong-lower-origin",
     "upper-witness-short", "lower-witness-short", "diagonal-witness",
-    "wrong-witness-span", "disconnected-witness", "nan", "infinite", "empty",
+    "wrong-witness-span", "disconnected-witness", "extra-left-witness",
+    "extra-detached-witness", "nan", "infinite", "empty",
 )
+
+
+@pytest.mark.parametrize("start_offset", (-0.000101, 0.003101))
+def test_native_witness_start_rejects_just_outside_gap_and_ink_slop(
+    start_offset: float,
+) -> None:
+    segments = list(_CYLINDER_NATIVE_BLANK_INK)
+    source_x = _CYLINDER_TEST_PROJECTED_ENDS[0][0]
+    segments[1] = ((source_x + start_offset, 0.31833), (0.249, 0.31833))
+    assert drawing._blank_diameter_ink_problem(
+        segments, _CYLINDER_TEST_PROJECTED_ENDS, 0.248,
+    )
 
 
 @pytest.mark.parametrize("problem", _BAD_BLANK_INK_CASES)
@@ -1416,7 +1433,7 @@ def native_blank_adapter(monkeypatch: pytest.MonkeyPatch):
         GraphicsRedraw2=lambda: events.append("redraw"),
     )
     adapter = SimpleNamespace(
-        currentModel=model, active=active, rebuilds=[], curations=[],
+        currentModel=model, active=active, curations=[],
         projections=[], ink_reads=[], events=events,
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
@@ -1425,15 +1442,10 @@ def native_blank_adapter(monkeypatch: pytest.MonkeyPatch):
         lambda _adapter, annotation: annotation.GetSpecificAnnotation().dimension.Name,
     )
 
-    def rebuild(_adapter, *, label):
-        events.append("rebuild")
-        adapter.rebuilds.append(label)
-
     def curate(_adapter, annotations, *, reposition):
         assert events and events[-1] == "redraw"
         events.append("curate")
         adapter.curations.append((annotations, reposition))
-        drawing.rebuild_drawing(_adapter, label="fake native curation")
 
     def project(_adapter, view, points, *, label):
         adapter.projections.append((view, points, label))
@@ -1447,7 +1459,6 @@ def native_blank_adapter(monkeypatch: pytest.MonkeyPatch):
         adapter.ink_reads.append(annotation)
         return annotation.display.segments
 
-    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
     monkeypatch.setattr(drawing, "curate_dimensions", curate)
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(drawing, "dimension_segments", ink)
@@ -1470,7 +1481,6 @@ def test_imported_blank_has_native_vertical_ink_without_changing_model_data(
     assert display.dimension.values == original
     assert display.dimension.queries
     assert set(display.dimension.queries) == {(3, configuration)}
-    assert native_blank_adapter.rebuilds
     assert native_blank_adapter.curations == [
         ([display.annotation], {"BlankDia": drawing.right_keep(teeth)["BlankDia"]})
     ]
@@ -1508,7 +1518,7 @@ def test_blank_flag_and_position_cannot_substitute_for_native_ink(
     assert "BlankDia" in str(failure.value)
 
 
-def test_blank_redraw_precedes_reposition_rebuild_and_native_ink(native_blank_adapter) -> None:
+def test_blank_redraw_precedes_reposition_and_native_ink(native_blank_adapter) -> None:
     display = _ImportedBlankDisplay(6)
     view, _segments = _blank_view_geometry(6)
 
@@ -1522,7 +1532,7 @@ def test_blank_redraw_precedes_reposition_rebuild_and_native_ink(native_blank_ad
     )
     events = native_blank_adapter.events
     assert events.index("redraw") < events.index("curate")
-    assert events.index("curate") < events.index("rebuild") < events.index("ink")
+    assert events.index("curate") < events.index("ink")
 
 
 @pytest.mark.parametrize("kind", (0, 2, 3, 5, 12, 15))
@@ -1565,22 +1575,25 @@ def test_blank_requires_one_imported_model_dimension(
         )
 
 
-@pytest.mark.parametrize("refusal", ("linear", "rebuild-revert", "value-drift", "type-drift"))
+@pytest.mark.parametrize("refusal", ("linear", "curation-revert", "value-drift", "type-drift"))
 def test_blank_refuses_failed_or_unsettled_native_presentation(
     native_blank_adapter, monkeypatch: pytest.MonkeyPatch, refusal: str,
 ) -> None:
     display = _ImportedBlankDisplay(6)
     display.accept_linear = refusal != "linear"
 
-    def rebuild(_adapter, *, label):
-        if refusal == "rebuild-revert":
+    original_curate = drawing.curate_dimensions
+
+    def curate(_adapter, annotations, *, reposition):
+        original_curate(_adapter, annotations, reposition=reposition)
+        if refusal == "curation-revert":
             display.linear = False
         if refusal == "value-drift":
             display.dimension.values["T006"] = (0.001,)
         if refusal == "type-drift":
             display.kind = 5
 
-    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(drawing, "curate_dimensions", curate)
     with pytest.raises(RuntimeError, match="BlankDia"):
         drawing._set_linear_blank_diameter(
             native_blank_adapter, [display.annotation], "T006", 6, _blank_view_geometry(6)[0],

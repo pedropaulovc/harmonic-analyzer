@@ -815,11 +815,12 @@ def _blank_diameter_ink_problem(
     for (source_x, limit_y), xs in zip((low, high), witnesses, strict=True):
         if not any(start - slop <= limit_y <= end + slop for start, end in axis):
             return f"no vertical dimension run reaches blank limit y={limit_y * 1000:.3f} mm"
-        # The captured cylinder diameter uses a 1.244 mm native start gap.
-        # Permit its standard extension gap, not a detached sheet-side leader.
-        if not any(
-            source_x - slop <= start <= source_x + 0.003 + slop
-            and end >= line_x - slop
+        # Allow a native extension-start gap, but every witness must run
+        # continuously from the projected source side through the axis.
+        if not xs or any(
+            start < source_x - slop
+            or start > source_x + 0.003 + slop
+            or end < line_x - slop
             for start, end in xs
         ):
             return f"no native witness joins blank limit y={limit_y * 1000:.3f} mm to its axis"
@@ -848,7 +849,8 @@ def _assert_blank_diameter_ink(
     _telemetry.info(
         f"{configuration}: BlankDia native ink: {len(segments)} strokes, "
         f"projected limits {[(round(x * 1000, 3), round(y * 1000, 3)) for x, y in ends]} mm, "
-        f"vertical axis x={line_x * 1000:.3f} mm"
+        f"vertical axis x={line_x * 1000:.3f} mm; "
+        f"native strokes {[[tuple(round(value * 1000, 3) for value in point) for point in segment] for segment in segments]} mm"
     )
 
 
