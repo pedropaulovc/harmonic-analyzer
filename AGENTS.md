@@ -950,10 +950,12 @@ a `cache.refresh` span event, and a `refresh` record with reason in `cache.jsonl
 executes entirely on the submitter under either executor. Its key includes the
 drawing PDF, the package's existing `cad/config/parts/<dashed>.yaml` (or assembly
 contract with the `-assembly` suffix removed), the review/exception/sheet-server
-code and its pinned local-import closure, the selected kind's reviewer prompt,
-shared judge prompts/schemas, and `cad/docs/drawing-guidelines.md`. Reviewer and
-judge defaults live in the hashed review code; there are no model/effort
-environment overrides. `_drawing_registry.py` is intentionally excluded because
+code and its pinned local-import closure, the selected kind's reviewer template
+and shared reviewer/judge severity contract, shared judge instructions/schemas,
+and `cad/docs/drawing-guidelines.md`. The other kind's template and severity
+contract are excluded. Reviewer and judge defaults live in the hashed review
+code; there are no model/effort environment overrides. `_drawing_registry.py` is
+intentionally excluded because
 the leaf supplies PDF, name and kind explicitly; selecting a different kind
 selects a different hashed prompt. Recipe-skipped modules, including telemetry,
 are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw

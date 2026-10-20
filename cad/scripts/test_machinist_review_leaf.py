@@ -143,6 +143,8 @@ def inputs(dodo, tmp_path, monkeypatch):
     for name in (
         "machinist_review_part.md",
         "machinist_review_assembly.md",
+        "machinist_review_part_severity.md",
+        "machinist_review_assembly_severity.md",
         "machinist_review_schema.json",
         "machinist_review_judge.md",
         "machinist_review_judge_schema.json",
@@ -214,6 +216,27 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+def test_key_tracks_only_selected_kind_severity_contract(inputs):
+    dodo = inputs.module
+
+    def key():
+        return dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+
+    for selected, opposite in (("part", "assembly"), ("assembly", "part")):
+        inputs.spec.source_kind = selected
+        initial = key()
+        for kind in (selected, opposite):
+            path = inputs.prompts / f"machinist_review_{kind}_severity.md"
+            before = path.read_bytes()
+            path.write_bytes(before + b"\nchanged: true\n")
+            if kind == selected:
+                assert key() != initial, path
+            else:
+                assert key() == initial, path
+            path.write_bytes(before)
+            assert key() == initial
 
 
 def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):

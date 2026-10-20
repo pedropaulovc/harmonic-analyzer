@@ -393,6 +393,44 @@ def prompt_repo(tmp_path: Path) -> Path:
         "modern",
     )
     _git(repo, "tag", "modern")
+    for kind in ("part", "assembly"):
+        (prompts / f"machinist_review_{kind}.md").write_text(
+            f"EXTRACTED {kind} instructions\n{evaluation.mr.SEVERITY_TOKEN}\n"
+            f"END {kind}\n",
+            encoding="utf-8",
+        )
+    _git(repo, "add", ".")
+    _git(
+        repo,
+        "-c",
+        "user.name=Offline test",
+        "-c",
+        "user.email=offline@example.invalid",
+        "commit",
+        "-m",
+        "missing-contract",
+    )
+    _git(repo, "tag", "missing-contract")
+    for kind in ("part", "assembly"):
+        (prompts / evaluation.mr.SEVERITY_FILES[kind].name).write_text(
+            f"HISTORICAL {kind} contract\n", encoding="utf-8"
+        )
+    _git(repo, "add", ".")
+    _git(
+        repo,
+        "-c",
+        "user.name=Offline test",
+        "-c",
+        "user.email=offline@example.invalid",
+        "commit",
+        "-m",
+        "extracted",
+    )
+    _git(repo, "tag", "extracted")
+    for kind in ("part", "assembly"):
+        (prompts / evaluation.mr.SEVERITY_FILES[kind].name).write_text(
+            f"UNCOMMITTED {kind} contract\n", encoding="utf-8"
+        )
     guidelines.write_text("UNCOMMITTED guidelines\n", encoding="utf-8")
     return repo
 
@@ -419,6 +457,48 @@ def test_legacy_ref_prompt_does_not_inherit_current_guidelines(
         evaluation.compose_prompt(kind, ref="legacy", repo=prompt_repo)
         == f"LEGACY {kind} instructions\n"
     )
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+def test_extracted_ref_prompt_uses_only_same_ref_contract(
+    prompt_repo: Path, kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompts = prompt_repo / "cad" / "scripts" / "prompts"
+    monkeypatch.setattr(
+        evaluation.mr,
+        "SEVERITY_FILES",
+        {
+            name: prompts / path.name
+            for name, path in evaluation.mr.SEVERITY_FILES.items()
+        },
+    )
+    assert evaluation.compose_prompt(kind, ref="extracted", repo=prompt_repo) == (
+        "MODERN shared guidelines\n\n"
+        f"EXTRACTED {kind} instructions\n"
+        f"HISTORICAL {kind} contract\n"
+        f"END {kind}\n"
+    )
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+def test_extracted_ref_prompt_rejects_missing_same_ref_contract(
+    prompt_repo: Path, kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompts = prompt_repo / "cad" / "scripts" / "prompts"
+    monkeypatch.setattr(
+        evaluation.mr,
+        "SEVERITY_FILES",
+        {
+            name: prompts / path.name
+            for name, path in evaluation.mr.SEVERITY_FILES.items()
+        },
+    )
+    with pytest.raises(ValueError) as error:
+        evaluation.compose_prompt(kind, ref="missing-contract", repo=prompt_repo)
+    message = str(error.value)
+    assert f"cannot load {kind} severity contract" in message
+    assert "missing-contract" in message
+    assert evaluation.mr.SEVERITY_FILES[kind].name in message
 
 
 def test_working_prompt_delegates_to_review_loader(

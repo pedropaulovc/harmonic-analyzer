@@ -1106,6 +1106,125 @@ def test_relink_codex_auth_never_overwrites_a_newer_user_login(
     assert linked.samefile(main_auth)
 
 
+@pytest.fixture
+def synthetic_prompt_sources(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    guidelines = tmp_path / "guidelines.md"
+    guidelines.write_text("Synthetic guidelines.\n", encoding="utf-8")
+    templates = {
+        kind: tmp_path / f"{kind}.md" for kind in ("part", "assembly")
+    }
+    contracts = {
+        kind: tmp_path / f"{kind}_severity.md" for kind in ("part", "assembly")
+    }
+    judge_template = tmp_path / "judge.md"
+    for path in (*templates.values(), judge_template):
+        path.write_text(
+            f"Synthetic introduction.\n{mr.SEVERITY_TOKEN}\nSynthetic conclusion.\n",
+            encoding="utf-8",
+        )
+    for path in contracts.values():
+        path.write_text("Synthetic contract.\n", encoding="utf-8")
+    monkeypatch.setattr(mr, "GUIDELINES_FILE", guidelines)
+    monkeypatch.setattr(mr, "PROMPT_FILES", templates)
+    monkeypatch.setattr(mr, "JUDGE_PROMPT_FILE", judge_template)
+    monkeypatch.setattr(mr, "SEVERITY_FILES", contracts)
+    return SimpleNamespace(
+        templates=templates, contracts=contracts, judge_template=judge_template
+    )
+
+
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+def test_load_prompt_rejects_unsupported_kind(synthetic_prompt_sources, judge) -> None:
+    with pytest.raises(ValueError):
+        mr.load_prompt("unsupported", judge=judge)
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+def test_load_prompt_rejects_missing_severity_contract(
+    synthetic_prompt_sources, kind, judge
+) -> None:
+    synthetic_prompt_sources.contracts[kind].unlink()
+    with pytest.raises(FileNotFoundError):
+        mr.load_prompt(kind, judge=judge)
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+@pytest.mark.parametrize("invalid", ["empty", "whitespace", "recursive"])
+def test_load_prompt_rejects_invalid_severity_contract(
+    synthetic_prompt_sources, kind, judge, invalid
+) -> None:
+    contents = {
+        "empty": "",
+        "whitespace": " \t\n\n",
+        "recursive": f"Synthetic contract quoting {mr.SEVERITY_TOKEN} inline.\n",
+    }
+    synthetic_prompt_sources.contracts[kind].write_text(
+        contents[invalid], encoding="utf-8"
+    )
+    with pytest.raises(ValueError):
+        mr.load_prompt(kind, judge=judge)
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("judge", [False, True], ids=["reviewer", "judge"])
+@pytest.mark.parametrize(
+    "invalid",
+    ["missing", "duplicate", "inline", "indented", "suffixed", "unterminated"],
+)
+def test_load_prompt_rejects_invalid_severity_template(
+    synthetic_prompt_sources, kind, judge, invalid
+) -> None:
+    token = mr.SEVERITY_TOKEN
+    contents = {
+        "missing": "Synthetic template without an insertion point.\n",
+        "duplicate": f"{token}\nSynthetic separator.\n{token}\n",
+        "inline": f"Synthetic prefix {token} synthetic suffix.\n",
+        "indented": f" {token}\n",
+        "suffixed": f"{token} \n",
+        "unterminated": token,
+    }
+    path = (
+        synthetic_prompt_sources.judge_template
+        if judge
+        else synthetic_prompt_sources.templates[kind]
+    )
+    path.write_text(contents[invalid], encoding="utf-8")
+    with pytest.raises(ValueError):
+        mr.load_prompt(kind, judge=judge)
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+@pytest.mark.parametrize("inline", [False, True], ids=["whole-line", "inline"])
+def test_review_prompt_rejects_reserved_token_before_reading_sheet_text(
+    monkeypatch: pytest.MonkeyPatch, kind, inline
+) -> None:
+    def forbidden_text_layers(_package):
+        pytest.fail("an unresolved prompt reached sheet-text extraction")
+
+    monkeypatch.setattr(mr, "_text_layers", forbidden_text_layers)
+    override = (
+        f"Synthetic override quoting {mr.SEVERITY_TOKEN} inline.\n"
+        if inline
+        else f"Synthetic override.\n{mr.SEVERITY_TOKEN}\n"
+    )
+    package = mr.ReviewPackage("synthetic", kind, ())
+    with pytest.raises(ValueError):
+        mr._review_prompt(package, 1, prompt_text=override)
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly"])
+def test_review_prompt_allows_reserved_token_in_sheet_text(
+    monkeypatch: pytest.MonkeyPatch, kind
+) -> None:
+    sheet_text = f'Synthetic sheet quotes "{mr.SEVERITY_TOKEN}" verbatim.'
+    monkeypatch.setattr(mr, "_text_layers", lambda _package: sheet_text)
+    package = mr.ReviewPackage("synthetic", kind, ())
+    prompt = mr._review_prompt(package, 1, prompt_text="Opaque synthetic override.\n")
+    assert sheet_text in prompt
+
+
 def test_prompts_share_the_static_load_prompt_prefix_for_every_package() -> None:
     packages = [
         (mr.ReviewPackage("crank_arm", "part", ()), 1),

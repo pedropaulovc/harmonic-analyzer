@@ -113,6 +113,11 @@ PROMPT_FILES = {
     "part": PROMPTS_DIR / "machinist_review_part.md",
     "assembly": PROMPTS_DIR / "machinist_review_assembly.md",
 }
+SEVERITY_FILES = {
+    "part": PROMPTS_DIR / "machinist_review_part_severity.md",
+    "assembly": PROMPTS_DIR / "machinist_review_assembly_severity.md",
+}
+SEVERITY_TOKEN = "<!-- MACHINIST_SEVERITY_CONTRACT -->"
 SCHEMA_FILE = PROMPTS_DIR / "machinist_review_schema.json"
 JUDGE_PROMPT_FILE = PROMPTS_DIR / "machinist_review_judge.md"
 JUDGE_SCHEMA_FILE = PROMPTS_DIR / "machinist_review_judge_schema.json"
@@ -219,11 +224,32 @@ def all_packages() -> list[ReviewPackage]:
     return [package_for(spec.name) for spec in DRAWINGS]
 
 
-def load_prompt(kind: str) -> str:
-    """The shared drawing guidelines followed by the kind's reviewer instructions."""
+def expand_severity_contract(template: str, contract: str) -> str:
+    """Expand one whole-line slot without changing the classification text."""
+    token_line = SEVERITY_TOKEN + "\n"
+    if (
+        template.count(SEVERITY_TOKEN) != 1
+        or token_line not in template.splitlines(keepends=True)
+    ):
+        raise ValueError("prompt template must contain one whole-line severity token")
+    if not contract.strip():
+        raise ValueError("severity contract must not be empty")
+    if SEVERITY_TOKEN in contract:
+        raise ValueError("severity contract must not contain its insertion token")
+    return template.replace(token_line, contract.rstrip("\n") + "\n")
+
+
+def load_prompt(kind: str, *, judge: bool = False) -> str:
+    """Compose either stage with the same kind-specific severity contract."""
+    if kind not in PROMPT_FILES:
+        raise ValueError(f"unknown review kind: {kind}")
     guidelines = GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
-    reviewer = PROMPT_FILES[kind].read_text(encoding="utf-8")
-    return f"{guidelines}\n\n{reviewer}"
+    template = JUDGE_PROMPT_FILE if judge else PROMPT_FILES[kind]
+    instructions = expand_severity_contract(
+        template.read_text(encoding="utf-8"),
+        SEVERITY_FILES[kind].read_text(encoding="utf-8"),
+    )
+    return f"{guidelines}\n\n{instructions}"
 
 
 def load_schema() -> dict[str, Any]:
@@ -311,6 +337,8 @@ def _review_prompt(
     response_instruction: str = "Return one verdict for the package as a whole.\n",
 ) -> str:
     prompt = load_prompt(package.kind) if prompt_text is None else prompt_text
+    if SEVERITY_TOKEN in prompt:
+        raise ValueError("prompt prefix contains an unexpanded severity token")
     prompt += (
         "\n\nPACKAGE INPUT\n"
         f"Sheet count: {sheet_count}.\n"
@@ -1786,11 +1814,7 @@ def _review_session(
         )
         validator = validate_verdict
     else:
-        judge_prefix = (
-            GUIDELINES_FILE.read_text(encoding="utf-8").rstrip()
-            + "\n\n"
-            + JUDGE_PROMPT_FILE.read_text(encoding="utf-8")
-        )
+        judge_prefix = load_prompt(snapshot.kind, judge=True)
         prompt = _review_prompt(
             snapshot, sheet_count, reviewer=reviewer, prompt_text=judge_prefix,
             response_instruction="",
