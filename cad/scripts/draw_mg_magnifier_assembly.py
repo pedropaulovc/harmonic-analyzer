@@ -1476,7 +1476,9 @@ def balloon_items(
 
 
 @contextmanager
-def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
+def _source_configuration_active(
+    view: Any, *, label: str
+) -> Iterator[Callable[[str], None] | None]:
     """Read an exploded view's steps with its source configuration active.
 
     Named model views preserve a camera, not an active-configuration contract.
@@ -1486,6 +1488,11 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
     shows/collapses its real explode and refuses missing steps. Restore the
     source configuration before any later view or final readback, and refuse a
     newly dirty source: drawing SaveAs3 would persist the released assembly.
+
+    Native artifact214 placed all 11 wheel-group balloons before this scope's
+    dirty guard failed. Probe activation, balloon work and restoration
+    separately, including the shared helper's explode/insertion/rebuild
+    boundaries: that log does not identify which transition dirtied the source.
     """
     bound = _early_bound(view, "IView")
     if not bool(bound.IsExploded()):
@@ -1500,28 +1507,49 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
 
     rest = active()
     was_dirty = bool(model.GetSaveFlag())
+
+    def probe(phase: str) -> None:
+        try:
+            dirty = bool(model.GetSaveFlag())
+            _telemetry.info(
+                f"{label}: source scope {phase}: dirty={dirty}, "
+                f"rest={rest!r}, wanted={wanted!r}",
+                source_scope_phase=phase,
+                source_dirty=dirty,
+                source_rest_configuration=rest,
+                source_wanted_configuration=wanted,
+            )
+        except Exception as error:
+            _telemetry.warn(f"{label}: source scope probe {phase!r} failed: {error}")
+
     try:
-        if rest != wanted and (
-            not bool(model.ShowConfiguration2(wanted)) or active() != wanted
-        ):
-            raise RuntimeError(f"{label}: the source did not activate {wanted!r}")
+        probe("entry")
+        if rest != wanted:
+            activated = bool(model.ShowConfiguration2(wanted))
+            probe("after source activation")
+            if not activated or active() != wanted:
+                raise RuntimeError(f"{label}: the source did not activate {wanted!r}")
         if not bool(bound.IsExploded()) or str(bound.ReferencedConfiguration) != wanted:
             raise RuntimeError(
                 f"{label}: activating {wanted!r} on the source changed the view"
             )
-        yield
+        probe("before balloon work")
+        yield probe
     finally:
         primary_error = sys.exception()
         try:
-            if active() != rest and (
-                not bool(model.ShowConfiguration2(rest)) or active() != rest
-            ):
-                raise RuntimeError(f"{label}: the source did not re-activate {rest!r}")
+            probe("before source restoration")
+            if active() != rest:
+                restored = bool(model.ShowConfiguration2(rest))
+                probe("after source restoration")
+                if not restored or active() != rest:
+                    raise RuntimeError(f"{label}: the source did not re-activate {rest!r}")
             if (
                 not bool(bound.IsExploded())
                 or str(bound.ReferencedConfiguration) != wanted
             ):
                 raise RuntimeError(f"{label}: restoring {rest!r} changed the view")
+            probe("after restoration readback")
             if bool(model.GetSaveFlag()) and not was_dirty:
                 raise RuntimeError(
                     f"{label}: scoped balloon/config readback dirtied the source"
