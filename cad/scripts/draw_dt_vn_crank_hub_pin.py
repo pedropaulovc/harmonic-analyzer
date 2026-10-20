@@ -78,8 +78,10 @@ RIGHT_KEEP = {
 # The extraction entry is the -Z-facing end at local Z=0; *Front looks from
 # +Z onto the opposite drill exit, whose native callout can omit the thread.
 # Select the actual entry rim by its model geometry, not a screen-space hit.
-# Text stays above the Ø40-sheet pin outline (top at y 0.200), left of PinDia.
-THREAD_NOTE_XY = (END_CENTER[0] + 0.027, END_CENTER[1] + HALF_DIA + 0.016)
+# sol12 measured a 72.8292 mm-wide native callout. Shift 15 mm right:
+# its left edge clears the x=95 mm centreline, and its right edge stays
+# 3.8139 mm left of PinDia text (greater than its 3.6328 mm text height).
+THREAD_NOTE_XY = (END_CENTER[0] + 0.042, END_CENTER[1] + HALF_DIA + 0.016)
 # Removal selector for the redundant automatic Hole Wizard label, not print text.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 

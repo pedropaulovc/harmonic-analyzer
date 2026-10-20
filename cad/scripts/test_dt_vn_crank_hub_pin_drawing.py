@@ -338,13 +338,19 @@ def test_pull_tap_outer_end_and_callout_layout() -> None:
     assert build.PULL_THREAD_ENTRY_POINT == (0.0, 0.0, 0.0)
     assert build.PULL_THREAD_ENTRY_NORMAL == (0.0, 0.0, -1.0)
 
-    # Callout above the pin outline and left of the right view's PinDia text.
+    # sol12's native wall row is widest; retain one text height on each side
+    # between the end-view centreline and the neighbouring PinDia text.
+    callout_half_width = 0.0728292 / 2.0
+    text_height = 0.0036328
+    pin_dia_text_left = drawing.RIGHT_KEEP["PinDia"][0] - 0.0177715
     assert drawing.THREAD_NOTE_XY[1] > drawing.END_CENTER[1] + drawing.HALF_DIA
-    assert drawing.THREAD_NOTE_XY[0] + 0.035 < drawing.RIGHT_KEEP["PinDia"][0] - 0.018
-    # The 26-glyph fact is slightly wider than the measured 25-glyph / 67 mm row.
-    assert drawing.THREAD_NOTE_XY == pytest.approx((0.122, 0.216))
-    assert drawing.THREAD_NOTE_XY[0] + (0.067 * 26.0 / 25.0) / 2.0 < (
-        drawing.RIGHT_KEEP["PinDia"][0] - 0.020
+    assert (
+        drawing.THREAD_NOTE_XY[0] - callout_half_width - drawing.END_CENTER[0]
+        >= text_height
+    )
+    assert (
+        pin_dia_text_left - drawing.THREAD_NOTE_XY[0] - callout_half_width
+        >= text_height
     )
 
 
