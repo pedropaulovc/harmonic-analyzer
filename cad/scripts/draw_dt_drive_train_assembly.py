@@ -343,7 +343,7 @@ CLUSTER_BALLOON_CLEARANCE = {
 NOTE_FIELD_LEFT = (0.018, 0.252, 0.212, 0.035)
 NOTE_FIELD_RIGHT = (0.222, 0.252, 0.415, 0.072)
 NOTE_FIELD_INSET = 0.0005
-NOTE_ANCHOR_PASSES = 3
+NOTE_ANCHOR_PASSES = 12
 NOTE_ANCHOR_SETTLE = 0.00005
 NOTE_BLOCK_GAP = 0.006
 # A note's anchor is its top edge: y=0.268 crossed the top zone border by
@@ -1840,9 +1840,10 @@ def _anchor_note(
         raise RuntimeError(f"{label}: note has no annotation to move")
     extent = _note_extent(adapter, note, label=label)
     moves = 0
-    for _pass in range(NOTE_ANCHOR_PASSES):
+    for _pass in range(NOTE_ANCHOR_PASSES + 1):
         shift = (target_x - extent[0], target_y - extent[3])
-        if max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE:
+        settled = max(abs(shift[0]), abs(shift[1])) <= NOTE_ANCHOR_SETTLE
+        if settled or moves == NOTE_ANCHOR_PASSES:
             break
         position = tuple(float(value) for value in (annotation.GetPosition() or ()))
         if len(position) != 3:
@@ -1851,13 +1852,32 @@ def _anchor_note(
             raise RuntimeError(f"{label}: note SetPosition failed")
         extent = _note_extent(adapter, note, label=label)
         moves += 1
+        _telemetry.event(
+            "drawing.note_anchor.move",
+            block=label,
+            move=moves,
+            target_mm=(target_x * 1000.0, target_y * 1000.0),
+            extent_mm=tuple(value * 1000.0 for value in extent),
+            shift_mm=tuple(value * 1000.0 for value in shift),
+            residual_mm=((target_x - extent[0]) * 1000.0, (target_y - extent[3]) * 1000.0),
+        )
     _telemetry.event(
         "drawing.note_anchor",
         block=label,
         moves=moves,
+        outcome="settled" if settled else "limit",
         target_mm=(target_x * 1000.0, target_y * 1000.0),
         extent_mm=tuple(value * 1000.0 for value in extent),
+        residual_mm=tuple(value * 1000.0 for value in shift),
     )
+    if not settled:
+        raise RuntimeError(
+            f"{label}: note anchor did not settle after {moves} moves: "
+            f"target_mm={(target_x * 1000.0, target_y * 1000.0)!r}, "
+            f"extent_mm={tuple(value * 1000.0 for value in extent)!r}, "
+            f"residual_mm={tuple(value * 1000.0 for value in shift)!r}, "
+            f"settle_mm={NOTE_ANCHOR_SETTLE * 1000.0!r}"
+        )
     return extent
 
 
