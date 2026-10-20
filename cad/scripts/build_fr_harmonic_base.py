@@ -1158,9 +1158,13 @@ def _through_holes_volume_mm3(seat: HoleSpec, stations) -> float:
 def _native_vertical_segments(adapter, points, label: str):
     """Read finite solid intervals from high-precision native vertical rays.
 
-    Both ENTER/EXIT flags and all coordinates are required. Missing bodies,
-    malformed/stale result arrays, grazing hits or unmatched exits fail closed;
-    zero hits alone is never accepted without the surrounding positive control.
+    ENTRY_EXIT | NORMALS (5) fixes GetRayIntersectionsPoints to nine doubles per
+    hit: BodyIndex, RayIndex, IntersectionType, x, y, z, nx, ny, nz. The integer
+    RayIntersections return counts intersections, not rays or array elements.
+    All nine fields must be finite; missing bodies, malformed/stale arrays,
+    grazing hits and unmatched exits fail closed. None is an empty readback
+    only for an integral zero count, and zero hits are accepted only with the
+    surrounding retained-material positive controls.
     """
     from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 
@@ -1172,43 +1176,101 @@ def _native_vertical_segments(adapter, points, label: str):
     extension = _early_bound(model.Extension, "IModelDocExtension")
     starts = [value for x, z in points for value in (x / 1000.0, (STACK_HEIGHT + 5.0) / 1000.0, z / 1000.0)]
     vectors = [value for _point in points for value in (0.0, -1.0, 0.0)]
+    options = 4 | 1  # swRayPtsOptsENTRY_EXIT | swRayPtsOptsNORMALS
+    record_width = 9
     reported_count = extension.RayIntersections(
         dispatch_array(list(bodies)), double_array(starts), double_array(vectors),
-        4, 1e-9, 1e-8, True,  # swRayPtsOptsENTRY_EXIT; SI tolerances
+        options, 1e-9, 1e-8, True,  # SI tolerances; high precision
     )
-    count = int(reported_count)
-    if reported_count != count:
-        raise RuntimeError(f"{label}: nonintegral native intersection count")
     raw = model.GetRayIntersectionsPoints()
-    if raw is None:
-        raw = ()
-    if not isinstance(raw, (tuple, list)) or count < 0 or len(raw) != 6 * count:
-        raise RuntimeError(f"{label}: malformed native ray-intersection readback")
+    try:
+        raw_length = len(raw) if raw is not None else None
+    except Exception:
+        raw_length = None
+
+    def readback_error(message, **details):
+        # Preserve native types without repr-ing an unbounded/unknown VARIANT.
+        count_type = type(reported_count)
+        if count_type in (float, bool, type(None)) or (
+            count_type is int and reported_count.bit_length() <= 64
+        ):
+            count_value = repr(reported_count)
+        elif count_type is str:
+            count_value = repr(reported_count[:80])
+        else:
+            count_value = f"<{count_type.__name__}>"
+        diagnostics = {
+            "raw_type": type(raw).__name__,
+            "reported_count": count_value,
+            "reported_count_type": count_type.__name__,
+            "raw_length": raw_length,
+            "expected_record_width": record_width,
+            "options": options,
+            "ray_count": len(points),
+            **details,
+        }
+        return RuntimeError(f"{label}: {message}; native_ray_readback={diagnostics!r}")
+
+    if type(reported_count) not in (int, float):
+        raise readback_error("nonintegral native intersection count")
+    try:
+        count = int(reported_count)
+    except (ValueError, OverflowError) as exc:
+        raise readback_error(
+            "nonintegral native intersection count",
+            conversion_error_type=type(exc).__name__,
+        ) from exc
+    if reported_count != count:
+        raise readback_error("nonintegral native intersection count")
+    if count < 0 or (
+        raw is not None and (
+            not isinstance(raw, (tuple, list)) or raw_length != record_width * count
+        )
+    ) or (raw is None and count != 0):
+        raise readback_error("malformed native ray-intersection readback")
+    # Keep raw unchanged for diagnostics, including a native None at zero hits.
+    records = () if raw is None else raw
     hits = [[] for _point in points]
-    for offset in range(0, len(raw), 6):
-        body_i, ray_i, flags, x, y, z = (float(v) for v in raw[offset:offset + 6])
-        if not all(math.isfinite(v) for v in (body_i, ray_i, flags, x, y, z)):
-            raise RuntimeError(f"{label}: non-finite native intersection")
+    for offset in range(0, len(records), record_width):
+        record_index = offset // record_width
+        values = []
+        for field_index, value in enumerate(records[offset:offset + record_width]):
+            try:
+                values.append(float(value))
+            except Exception as exc:
+                # Conversion errors can echo huge native values in their text.
+                raise readback_error(
+                    "malformed native ray-intersection record",
+                    record_index=record_index, field_index=field_index,
+                    field_type=type(value).__name__,
+                    conversion_error_type=type(exc).__name__,
+                ) from None
+        if not all(math.isfinite(v) for v in values):
+            raise readback_error(
+                "non-finite native intersection", record_index=record_index,
+                nonfinite_fields=tuple(i for i, value in enumerate(values) if not math.isfinite(value)),
+            )
+        body_i, ray_i, flags, x, y, z, _nx, _ny, _nz = values
         index = int(ray_i)
         if body_i != 0 or ray_i != index or not 0 <= index < len(points):
-            raise RuntimeError(f"{label}: native ray/body index out of bounds")
+            raise readback_error("native ray/body index out of bounds", record_index=record_index)
         if math.dist((x * 1000.0, z * 1000.0), points[index]) > 0.001:
-            raise RuntimeError(f"{label}: ray intersection is off its requested axis")
+            raise readback_error("ray intersection is off its requested axis", record_index=record_index)
         mode = int(flags) & (16 | 32)  # swRayPtsResultsENTER/EXIT
         if flags != int(flags) or mode not in (16, 32) or int(flags) & ~(1 | 16 | 32):
-            raise RuntimeError(f"{label}: ambiguous/grazing native material boundary")
+            raise readback_error("ambiguous/grazing native material boundary", record_index=record_index)
         hits[index].append((STACK_HEIGHT - y * 1000.0, mode))
     result = []
-    for ray_hits in hits:
+    for index, ray_hits in enumerate(hits):
         ray_hits.sort()
         if len(ray_hits) % 2 or any(
             flag != (16 if i % 2 == 0 else 32)
             for i, (_depth, flag) in enumerate(ray_hits)
         ):
-            raise RuntimeError(f"{label}: unpaired native material entry/exit")
+            raise readback_error("unpaired native material entry/exit", ray_index=index)
         segments = tuple((ray_hits[i][0], ray_hits[i + 1][0]) for i in range(0, len(ray_hits), 2))
         if any(end <= start for start, end in segments):
-            raise RuntimeError(f"{label}: native material interval is empty/reversed")
+            raise readback_error("native material interval is empty/reversed", ray_index=index)
         result.append(segments)
     return tuple(result)
 
