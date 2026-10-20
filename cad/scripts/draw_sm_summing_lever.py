@@ -20,7 +20,7 @@ cut in the front profile along the outer receiver tap through the -Z end
 rib, and a 1:4 isometric; sheet 2 shows VIEW F at 1:1, the -Z end with the
 two bracket receiver taps and the spring-anchor pad under the plate they sit
 in, so the end rib's slant over each tap reads, and the tap row's centreline
-through the hex centre with the plate top's (2.54) REF from it.  Sheet 1
+through the hex centre.  Sheet 1
 runs at 1:2.
 
 Run with SolidWorks open::
