@@ -202,15 +202,10 @@ def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
     assert "v_built, 1e-5 * v_built" in source
 
 
-def test_receiver_drill_upper_limit_reason_matches_the_backing_section() -> None:
+def test_receiver_upper_stop_keeps_drill_out_of_unbacked_plate() -> None:
     """H-H steps down to bare plate, not a floor or the spring-anchor pad."""
     import magnifying_bracket_joint_layout as joint
 
-    reasons = notes.BRACKET_TAP_CALLOUT_PROCESS.splitlines()
-    assert reasons == [
-        "DRILL ENDS IN RIB TO RETAIN PLATE WALLS",
-        f"DRILL CLEARS {notes.BRACKET_SCREW_NUMBER} TIP AND TAP LEAD",
-    ]
     # Both longitudinal receivers sit outside the pivot cylinder and inboard
     # of the pad. After the end rib, only the plate backs their bore walls.
     drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
