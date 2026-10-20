@@ -82,6 +82,24 @@ the zoomed-readback precedent, not proof of this longer note. Focused native
 post-fix and printed-sheet acceptance remain required; no fallback or
 relaxed containment is introduced.
 
+## Measuring-stick item-1 balloon visibility
+
+The measuring-stick assembly's exploded sheet pins the stop-block balloon to
+the midpoint of its +X/+Z vertical floor edge, in the part-local frame:
+`(BLOCK_LENGTH, FLOOR_THICKNESS / 2, BLOCK_DEPTH)` from `ms_stop_spec`.
+That edge is below the window and on the closed side facing the isometric
+camera; the stick withdraws toward -Z while the block stays stationary.
+The other families retain their automatic anchors and screw-instance pins.
+
+The retained 2026-10-20 comparison of `ecf642f7` and `cc36b453` exposed why
+landing readback alone is insufficient: the candidate's item-1 arrow was
+obscured by the graduated stick, while main's arrow was clearly exposed.
+An explicit `BalloonAnchor` still uses the existing native own-component
+hit test and final leader-landing checks; it is not an occlusion waiver.
+Native regeneration, the printed sheet-2 eye pass (including the other
+balloons), and the package's machinist gate remain required to establish
+acceptance of this replacement anchor.
+
 ## Where it runs
 
 `finalize_drawing` calls `run_layout_audit` after the PDF and PNG exports, with
