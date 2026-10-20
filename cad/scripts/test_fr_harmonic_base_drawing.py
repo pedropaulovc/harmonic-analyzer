@@ -1535,7 +1535,7 @@ def test_socket_tags_clear_the_native_section_cut_line(tag, old_anchor, old_box)
         value + (dx if index % 2 == 0 else dy)
         for index, value in enumerate(old_box)
     )
-    assert _segment_box_gap(cut_line, box) >= 0.0035
+    assert _segment_box_gap((cut_line[:2], cut_line[2:]), box) >= 0.0035
     neighbors = (
         (0.22285, 0.1591, 0.33715, 0.2309),
         (0.363437, 0.093512, 0.386563, 0.176488),
