@@ -6,6 +6,7 @@ without re-keying ordinary part annotations.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, replace
 from itertools import product
 import math
@@ -855,6 +856,7 @@ def _anchor_model_points(
     *,
     stem: str,
     label: str,
+    observed: dict[str, Any] | None = None,
 ) -> list[tuple[float, float, float]]:
     """Part-space points (metres) in the view's model space: transform, then explode."""
     transform = adapter._attempt(
@@ -872,7 +874,7 @@ def _anchor_model_points(
         raise RuntimeError(f"{label}: {stem} instance {leaf.path} has no transform")
     scale = values[12]
     dx, dy, dz = _explode_offset(offsets, leaf.path)
-    return [
+    model_points = [
         (
             scale * (x * values[0] + y * values[3] + z * values[6]) + values[9] + dx,
             scale * (x * values[1] + y * values[4] + z * values[7]) + values[10] + dy,
@@ -880,6 +882,14 @@ def _anchor_model_points(
         )
         for x, y, z in points_m
     ]
+    # Diagnostic-only: retain numbers already read, never fetch more geometry.
+    if observed is not None:
+        observed.update(
+            component_transform=values,
+            explode_offset_m=(dx, dy, dz),
+            model_points_m=model_points,
+        )
+    return model_points
 
 
 # A walk hit-tests at most this many of its instance's extreme points, each a
@@ -1014,20 +1024,11 @@ def _entity_owner(adapter: Any, entity: Any) -> str:
     return _component_path(adapter, component)
 
 
-# A frozen anchor's zoomed pick that finds no ink is repeated this many times,
-# each after forcing the graphics window to redraw under the zoom. Misses
-# returned in 45-172 ms against 300-1264 ms for every hit (21 days, n=20/472),
-# as if the pick read a window that had not drawn the zoom; the same key and
-# sheet point hit on another seat (#1667). The span's per-pick attributes
-# measure whether the redraw heals it.
-_FROZEN_REDRAW_RETRIES = 2
-
-
 def _hit_test_edge(
     adapter: Any,
     sheet_xy: Sequence[float],
     *,
-    redraw: bool = False,
+    diagnostic_label: str = "",
     observed: dict[str, Any] | None = None,
     on_miss: Callable[[], None] | None = None,
 ) -> tuple[Any, str]:
@@ -1036,35 +1037,93 @@ def _hit_test_edge(
     The pick runs zoomed onto the point (:data:`_HIT_ZOOM_HALF`), so which
     edge it returns does not depend on the seat's window size. In a drawing
     the view is selected alongside the edge; the edge is last. The selection
-    is left in place for the caller to use or clear. ``redraw`` forces the
-    window to draw the zoom before the pick; ``observed`` receives the
-    zoomed view's ``Scale2`` (``None`` when unreadable). ``on_miss`` runs
-    when the pick selects nothing, while the window is still zoomed on it.
+    is left in place for the caller to use or clear. ``observed`` receives
+    separate zoom, existing Scale2 read, raw pick, fit and owner-read timings.
+    No new COM read precedes the baseline pick. ``on_miss`` runs while still
+    zoomed, before any screenshot or fit; it cannot change the baseline result.
+    This is an instrumented baseline, not a claim of identical wall timing.
     """
     draw = adapter.currentModel
     draw.ClearSelection2(True)
-    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
-        if redraw:
-            draw.GraphicsRedraw2()
+    zoom_started = time.perf_counter()
+    fit_started = None
+    baseline_missed = False
+    try:
+        with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
+            try:
+                if observed is not None:
+                    observed["zoom_ms"] = (time.perf_counter() - zoom_started) * 1000.0
+                    started = time.perf_counter()
+                    observed["zoom_scale2"] = _view_scale2(draw, observed=observed)
+                    observed["scale2_read_ms"] = (time.perf_counter() - started) * 1000.0
+                # Same COM order as the rebased baseline: Extension, SelectByID2.
+                # Fetch Extension/callout outside the raw call's measured interval.
+                extension = draw.Extension
+                callout = null_callout()
+                started = time.perf_counter()
+                selected = extension.SelectByID2(
+                    "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, callout, 0
+                )
+                select_ms = (time.perf_counter() - started) * 1000.0
+                baseline_missed = not bool(selected)
+                if observed is not None:
+                    observed.update(select_result=bool(selected), select_ms=select_ms)
+                if not selected and on_miss is not None:
+                    # Persist the actual False and raw duration before importing
+                    # diagnostics, observer reads, captures, or any intervention.
+                    fields = {
+                        **(observed or {}),
+                        "label": diagnostic_label,
+                        "arm": "instrumented_baseline",
+                        "select_result": bool(selected),
+                        "select_ms": select_ms,
+                        "sheet_x_m": float(sheet_xy[0]),
+                        "sheet_y_m": float(sheet_xy[1]),
+                        "baseline_failure_preserved": True,
+                    }
+                    with contextlib.suppress(Exception):
+                        _telemetry.event("drawing.pick_diagnostic.raw", **fields)
+                    with contextlib.suppress(Exception):
+                        _telemetry.warn(
+                            f"[1667 diagnostic] instrumented_baseline result=False "
+                            f"SelectByID2_ms={select_ms:.3f}",
+                            **fields,
+                        )
+                    on_miss()
+            finally:
+                fit_started = time.perf_counter()
+    except Exception as exc:
+        if not baseline_missed or on_miss is None:
+            raise
+        # A diagnostic/capture/fit failure cannot replace the known initial miss.
         if observed is not None:
-            observed["zoom_scale2"] = _view_scale2(draw)
-        selected = draw.Extension.SelectByID2(
-            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
-        )
-        if not selected and on_miss is not None:
-            on_miss()
+            observed["post_miss_error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        if observed is not None and fit_started is not None:
+            observed["fit_ms"] = (time.perf_counter() - fit_started) * 1000.0
     if not selected:
         return None, ""
+    started = time.perf_counter()
     manager = draw.SelectionManager
     edge = manager.GetSelectedObject6(int(manager.GetSelectedObjectCount2(-1)), -1)
-    return edge, _entity_owner(adapter, edge)
+    if observed is not None:
+        observed["selected_object_read_ms"] = (time.perf_counter() - started) * 1000.0
+    started = time.perf_counter()
+    owner = _entity_owner(adapter, edge)
+    if observed is not None:
+        observed["owner_read_ms"] = (time.perf_counter() - started) * 1000.0
+    return edge, owner
 
 
-def _view_scale2(draw: Any) -> float | None:
+def _view_scale2(
+    draw: Any, *, observed: dict[str, Any] | None = None
+) -> float | None:
     """The active model view's ``Scale2``; ``None`` when it cannot be read."""
     try:
         return float(draw.ActiveView.Scale2)
-    except Exception:  # noqa: BLE001 - a telemetry read never fails the pick
+    except Exception as exc:  # noqa: BLE001 - a telemetry read never fails the pick
+        if observed is not None:
+            observed["zoom_scale2_error"] = f"{type(exc).__name__}: {exc}"
         return None
 
 
@@ -1174,6 +1233,8 @@ def _select_balloon_anchor(
     offsets: Mapping[str, tuple[float, float, float]],
     sheet_xy: tuple[float, float] | None,
     label: str,
+    projection_inputs: Mapping[str, Any] | None = None,
+    activation_view_name: str | None = None,
 ) -> _AnchorChoice:
     """Find the edge ``stem``'s balloon attaches to, and the sheet point on it.
 
@@ -1185,17 +1246,12 @@ def _select_balloon_anchor(
 
     ``frozen``: hit-test at the anchor's projected ``sheet_xy``. An edge of
     another instance in front of the point raises; the balloon never falls
-    back to some other edge. No edge at all is retried
-    :data:`_FROZEN_REDRAW_RETRIES` times after a forced redraw: a seat's
-    zoomed pick can miss ink another seat hits at the same point (#1667). Only
-    the instance's own ink passes. Each pick's outcome (``pickN``), time
-    (``pickN_ms``) and zoom (``pickN_scale2``) is on the span, and
-    ``picks`` lists the outcomes on the event. Every miss, healed or not, is
-    screenshotted while still zoomed on the point
-    (:func:`_seat_forensics.capture_pick_screens`); the files' paths under
-    ``failures/`` ride the span as ``pickN_<kind>``. When every pick misses,
-    :func:`_seat_forensics.capture_pick_miss` records them with the window
-    and the drawing's pick state, and raises.
+    back to some other edge. On this TEMPORARY issue1667 diagnostic branch,
+    the first natural empty pick runs bounded diagnostic arms before capture
+    or fit. Even if an intervention hits, the initial failure is terminal:
+    no healed diagnostic drawing may be published. First-hit COM behavior is
+    unchanged. Per-stage timings replace the misleading aggregate pick time;
+    each diagnostic arm emits its raw result before reading selection state.
 
     ``walk`` (``anchor.point_mm is None``): hit-test the family's first
     instance's body extreme points (:func:`_walk_points`), the instance
@@ -1234,59 +1290,158 @@ def _select_balloon_anchor(
         if sheet_xy is None:
             raise RuntimeError(f"{label}: {stem} frozen anchor was never projected")
         where = f"sheet ({sheet_xy[0] * 1000.0:.2f}, {sheet_xy[1] * 1000.0:.2f}) mm"
-        picks: list[str] = []
-        pick_attrs: dict[str, Any] = {}
-        edge, owner = None, ""
-        for attempt in range(1, _FROZEN_REDRAW_RETRIES + 2):
-            observed: dict[str, Any] = {}
-            captured: dict[str, Any] = {}
-            started = time.perf_counter()
-            edge, owner = _hit_test_edge(
-                adapter,
-                sheet_xy,
-                redraw=attempt > 1,
-                observed=observed,
-                on_miss=lambda pick=attempt, into=captured: into.update(
-                    _seat_forensics.capture_pick_screens(
-                        adapter, f"{stem}-frozen-anchor-pick{pick}"
+        observed: dict[str, Any] = {}
+        captured: dict[str, Any] = {}
+        diagnostic: dict[str, Any] = {}
+
+        def diagnose_miss() -> None:
+            callback_started = time.perf_counter()
+            draw = adapter.currentModel
+            # The FIRST repeat precedes helper import and ALL new COM state
+            # reads (including owner/type/view/geometry); no rezoom or Scale2.
+            repeat: dict[str, Any] = {"arm": "raw_repeat_before_observers"}
+            try:
+                draw.ClearSelection2(True)
+                extension = draw.Extension
+                callout = null_callout()
+                started = time.perf_counter()
+                try:
+                    repeat["select_result"] = bool(
+                        extension.SelectByID2(
+                            "",
+                            "EDGE",
+                            sheet_xy[0],
+                            sheet_xy[1],
+                            0.0,
+                            False,
+                            0,
+                            callout,
+                            0,
+                        )
                     )
-                ),
-            )
-            elapsed_ms = round((time.perf_counter() - started) * 1000.0)
-            outcome = (
-                "miss"
-                if edge is None
-                else "hit"
-                if owner.casefold() == instance.casefold()
-                else "other"
-            )
-            picks.append(outcome)
-            pick_attrs[f"pick{attempt}"] = outcome
-            # The pick's own time, without the screenshots taken at its miss.
-            pick_attrs[f"pick{attempt}_ms"] = elapsed_ms - int(
-                captured.get("capture_ms", 0)
-            )
-            if observed["zoom_scale2"] is not None:
-                pick_attrs[f"pick{attempt}_scale2"] = observed["zoom_scale2"]
-            pick_attrs.update(
-                {f"pick{attempt}_{kind}": value for kind, value in captured.items()}
-            )
-            if edge is not None:
-                break
+                finally:
+                    repeat["select_ms"] = (time.perf_counter() - started) * 1000.0
+            except Exception as exc:  # noqa: BLE001 - preserve initial miss
+                repeat["select_error"] = f"{type(exc).__name__}: {exc}"
+            with contextlib.suppress(Exception):
+                _telemetry.event("drawing.pick_diagnostic.raw", label=stem, **repeat)
+            with contextlib.suppress(Exception):
+                _telemetry.warn(
+                    f"[1667 diagnostic] {repeat['arm']}: {repeat}",
+                    label=stem,
+                    **repeat,
+                )
+            try:
+                # Deliberately deferred until AFTER the unchanged raw repeat.
+                from _drawing_pick_diagnostic import collect_after_raw_repeat
+
+                diagnostic.update(
+                    collect_after_raw_repeat(
+                        adapter,
+                        view,
+                        sheet_xy=sheet_xy,
+                        stem=stem,
+                        instance=instance,
+                        point_mm=anchor.point_mm,
+                        projection_inputs=projection_inputs,
+                        repeat=repeat,
+                        baseline_scale2=observed["zoom_scale2"],
+                        activation_view_name=activation_view_name,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001 - still capture and fail
+                diagnostic["collection_error"] = f"{type(exc).__name__}: {exc}"
+                with contextlib.suppress(Exception):
+                    _telemetry.event("drawing.pick_diagnostic.error", **diagnostic)
+                with contextlib.suppress(Exception):
+                    _telemetry.warn("[1667 diagnostic] collection failed", **diagnostic)
+            finally:
+                try:
+                    try:
+                        draw.ClearSelection2(True)
+                    except Exception as exc:  # noqa: BLE001 - retain original failure
+                        diagnostic["clear_error"] = f"{type(exc).__name__}: {exc}"
+                    # Screens/PDFs depict post-intervention state, NOT baseline.
+                    captured.update(
+                        _seat_forensics.capture_pick_screens(
+                            adapter, f"{stem}-frozen-anchor-pick1-post_arms"
+                        )
+                    )
+                finally:
+                    observed["diagnostic_callback_ms"] = (
+                        time.perf_counter() - callback_started
+                    ) * 1000.0
+
+        started = time.perf_counter()
+        edge, owner = _hit_test_edge(
+            adapter,
+            sheet_xy,
+            observed=observed,
+            on_miss=diagnose_miss,
+            diagnostic_label=stem,
+        )
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        outcome = (
+            "miss"
+            if edge is None
+            else "hit"
+            if owner.casefold() == instance.casefold()
+            else "other"
+        )
+        picks = [outcome]
+        pick_attrs: dict[str, Any] = {
+            "pick1": outcome,
+            # Historical aggregate metric; remove the entire diagnostic callback
+            # (including captures). Raw COM duration is pick1_select_ms below.
+            "pick1_ms": round(elapsed_ms - observed.get("diagnostic_callback_ms", 0.0)),
+            "pick1_total_with_diagnostics_ms": elapsed_ms,
+            **{
+                f"pick1_{key}": value
+                for key, value in observed.items()
+                if value is not None
+            },
+            **{f"pick1_{key}": value for key, value in captured.items()},
+        }
         tried.append(sheet_xy)
         pick_attrs.update(_seat_forensics.drawing_pick_state(adapter, view))
         _span_scan_attrs(**pick_attrs)
-        if edge is None:
-            _seat_forensics.capture_pick_miss(
-                adapter,
-                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
-                f"no edge at {where} on {instance} in {len(picks)} picks, "
-                f"{len(picks) - 1} after a forced redraw",
-                view=view_name(adapter, view),
-                entity_type="EDGE",
-                sheet_xy=sheet_xy,
-                state=pick_attrs,
+        with contextlib.suppress(Exception):
+            _telemetry.event(
+                "drawing.pick_diagnostic.baseline_complete", label=stem, **pick_attrs
             )
+        if not observed["select_result"]:
+            # Diagnostic hits NEVER flow into _AnchorChoice or balloon creation.
+            message = (
+                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
+                f"no edge at {where} on {instance} in the initial baseline pick; "
+                "issue1667 diagnostic arms cannot heal this leaf"
+            )
+            pick_attrs.update(
+                baseline_failure_preserved=True,
+                capture_phase="after_diagnostic_arms",
+                diagnostic=diagnostic,
+            )
+            try:
+                adapter.currentModel.ClearSelection2(True)
+            except Exception as exc:  # noqa: BLE001 - preserve initial failure
+                diagnostic["clear_before_raise_error"] = f"{type(exc).__name__}: {exc}"
+            try:
+                _seat_forensics.capture_pick_miss(
+                    adapter,
+                    message,
+                    view=str(
+                        diagnostic.get("observer_snapshot", {}).get(
+                            "intended_drawing_view", "<unavailable-after-miss>"
+                        )
+                    ),
+                    entity_type="EDGE",
+                    sheet_xy=sheet_xy,
+                    state=pick_attrs,
+                )
+            except Exception as exc:  # noqa: BLE001 - capture cannot heal the miss
+                diagnostic["terminal_capture_error"] = f"{type(exc).__name__}: {exc}"
+            # Preserve BaseException/cancellation; also fail if a mock returns.
+            raise RuntimeError(message)
         if owner.casefold() != instance.casefold():
             adapter.currentModel.ClearSelection2(True)
             raise RuntimeError(
@@ -1574,6 +1729,7 @@ def add_component_bom_balloons(
     }
     offsets = _view_explode_offsets(adapter, view, label=label)
     frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
+    projection_inputs: dict[str, dict[str, Any]] = {stem: {} for stem in frozen}
     projected = (
         model_points_in_view(
             adapter,
@@ -1586,6 +1742,7 @@ def add_component_bom_balloons(
                     offsets,
                     stem=stem,
                     label=label,
+                    observed=projection_inputs[stem],
                 )[0]
                 for stem in frozen
             ],
@@ -1597,7 +1754,9 @@ def add_component_bom_balloons(
     )
     sheet_points: dict[str, tuple[float, float]] = dict(zip(frozen, projected))
     draw = adapter.currentModel
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+    drawing = _early_bound(draw, "IDrawingDoc")
+    activation_view_name = view_name(adapter, view)
+    if not drawing.ActivateView(activation_view_name):
         raise RuntimeError(f"{label}: failed to activate the balloon view")
     # A coordinate hit test reads the view's display geometry: make it current once.
     _early_bound(view, "IView").UpdateViewDisplayGeometry()
@@ -1614,6 +1773,8 @@ def add_component_bom_balloons(
             offsets=offsets,
             sheet_xy=sheet_points.get(stem),
             label=label,
+            projection_inputs=projection_inputs.get(stem),
+            activation_view_name=activation_view_name,
         )
         for stem in stems
     ]
