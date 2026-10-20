@@ -164,7 +164,38 @@ def test_layout_constants_stay_on_the_sheet() -> None:
     assert drawing.FRONT_CENTER[0] < drawing.RIGHT_CENTER[0] < cx - radius
     bom_right = drawing.BOM_ANCHOR[0] + sum(drawing.BOM_COLUMN_WIDTHS.values())
     assert bom_right < right
-    assert drawing.EXPLODED_CAPTION_XY[1] > drawing.TITLE_BLOCK[3]
+
+
+def test_caption_tracks_native_bom_growth_without_entering_the_table() -> None:
+    # Captured native table bounds before/after #1709. Full parent-scoped
+    # vendor Numbers wrap without changing the 30 mm Number column or font.
+    old_bottom = 0.179495
+    current_bottom = 0.1586533
+    old_xy = drawing.exploded_caption_xy(old_bottom)
+    current_xy = drawing.exploded_caption_xy(current_bottom)
+    assert old_xy[0] == current_xy[0] == drawing.BOM_ANCHOR[0]
+    assert old_xy[1] - current_xy[1] == pytest.approx(old_bottom - current_bottom)
+    # The unchanged native caption extends 0.3958 mm above its anchor.
+    top_overhang = 0.0003958
+    height = 0.0047657
+    for bottom, xy in ((old_bottom, old_xy), (current_bottom, current_xy)):
+        top = xy[1] + top_overhang
+        assert bottom - top >= drawing.EXPLODED_CAPTION_MIN_GAP
+        drawing._assert_box_on_sheet(
+            (xy[0], top - height, xy[0] + 0.1148531, top),
+            label="captured exploded caption",
+        )
+
+
+def test_a_caption_pushed_into_the_title_block_is_refused() -> None:
+    # Retain complete rows and normal text size: insufficient paper must fail,
+    # not truncate the BOM or silently reduce the caption clearance.
+    xy = drawing.exploded_caption_xy(drawing.TITLE_BLOCK[3])
+    with pytest.raises(RuntimeError, match="title block"):
+        drawing._assert_box_on_sheet(
+            (xy[0], xy[1] - 0.0047657, xy[0] + 0.1148531, xy[1]),
+            label="captured exploded caption",
+        )
 
 
 def test_retention_rows_cite_the_package_steps() -> None:

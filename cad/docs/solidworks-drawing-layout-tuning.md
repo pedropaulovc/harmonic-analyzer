@@ -473,6 +473,18 @@ the value, precision and attachments; audit the new text box and leader, then
 check the native PDF for line strikes. This is not the radial/diametric
 `OffsetText` case below.
 
+Full parent-scoped Numbers can also grow a BOM without changing its column
+widths or font. On MHA-SM-00 sheet 2, the native table bottom moved from
+179.495 to 158.6533 mm after the identity cutover; its fixed caption at
+Y176 mm then overprinted rows 8–9. Measure the rebuilt top-left table's
+annotation position minus the sum of `ITableAnnotation.GetRowHeight` values,
+as the magnifier package does, rather than estimating from the nominal row
+pitch. The summing caption follows that measured bottom with a 6 mm anchor
+offset. Its `INote.GetExtent` must prove at least 4 mm below the table and
+remain clear of the border/title block both on placement and after the final
+rebuild. Keep every BOM row, complete Number, caption text and native font;
+log the measured table bounds, caption bounds and air for native acceptance.
+
 ## Refusal catalogue — do / don't
 
 **a. `IDisplayDimension::OffsetText` on a radial or diametric dimension.**

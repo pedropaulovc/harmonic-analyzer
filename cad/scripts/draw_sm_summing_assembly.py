@@ -172,9 +172,11 @@ BOM_SKU_TITLE = "VENDOR SKU"
 MADE_PART_SKU = "-"
 BOM_ROW_HEIGHT = 0.006
 BOM_ANCHOR = (0.226, 0.258)
-# The BOM's wrapped description rows grow it past its nominal row pitch
-# (r1: bottom at 0.1855), so the caption takes a fixed station well under it.
-EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.176)
+# Wrapped full vendor Numbers determine the native table height, not its
+# nominal row pitch. Target 6 mm below its rebuilt bottom; prove 4 mm of air
+# with the caption's actual extent, including after the final rebuild.
+EXPLODED_CAPTION_OFFSET = 0.006
+EXPLODED_CAPTION_MIN_GAP = 0.004
 
 # --- Sheet 3 ------------------------------------------------------------------
 # Reflow the full vendor Numbers into the unused space between the original
@@ -787,6 +789,49 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
+def _bom_vertical_limits(table: Any) -> tuple[float, float]:
+    """Read the top-left-anchored BOM after its rows have grown to fit."""
+    table = _early_bound(table, "ITableAnnotation")
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    top = float(annotation.GetPosition()[1])
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(int(table.RowCount)))
+    if not math.isfinite(top) or not heights or any(
+        not math.isfinite(height) or height <= 0.0 for height in heights
+    ):
+        raise RuntimeError("summing BOM has invalid native row heights or position")
+    return top - sum(heights), top
+
+
+def exploded_caption_xy(bom_bottom: float) -> tuple[float, float]:
+    """Follow the rebuilt BOM bottom without changing its full identities."""
+    return BOM_ANCHOR[0], bom_bottom - EXPLODED_CAPTION_OFFSET
+
+
+def _assert_exploded_caption(adapter: Any, table: Any, note: Any) -> None:
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    bottom, top = _bom_vertical_limits(table)
+    extent = tuple(float(value) for value in note.GetExtent())
+    if len(extent) != 6 or not all(math.isfinite(value) for value in extent):
+        raise RuntimeError(f"summing exploded caption has invalid extent {extent!r}")
+    box = (extent[0], extent[1], extent[3], extent[4])
+    if box[2] <= box[0] or box[3] <= box[1]:
+        raise RuntimeError(f"summing exploded caption has empty extent {extent!r}")
+    gap = bottom - box[3]
+    _telemetry.info(
+        "summing BOM and exploded caption native clearance",
+        bom_top_mm=top * 1000.0,
+        bom_bottom_mm=bottom * 1000.0,
+        caption_box_mm=tuple(value * 1000.0 for value in box),
+        caption_gap_mm=gap * 1000.0,
+    )
+    _assert_box_on_sheet(box, label="summing exploded caption")
+    if gap < EXPLODED_CAPTION_MIN_GAP:
+        raise RuntimeError(
+            f"summing exploded caption has {gap * 1000.0:.3f} mm below the BOM; "
+            f"requires {EXPLODED_CAPTION_MIN_GAP * 1000.0:.1f} mm"
+        )
+
+
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     """The exploded isometric, its BOM (with vendor SKU) and one balloon per
     BOM row; returns the check that proves every balloon again after the last
@@ -828,14 +873,23 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
             f"summing exploded view carries {len(landings)} balloons, "
             f"expected one per BOM row ({len(BOM_COMPONENTS)})"
         )
-    _add_note_block(
+    bottom, _top = _bom_vertical_limits(table)
+    caption = _add_note_block(
         adapter,
         SHEET_NAMES[1],
         notes.EXPLODED_CAPTION,
-        EXPLODED_CAPTION_XY,
+        exploded_caption_xy(bottom),
         label="exploded-view caption",
     )
-    return lambda: assert_balloon_landings(adapter, landings)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("summing exploded caption rebuild failed")
+    _assert_exploded_caption(adapter, table, caption)
+
+    def settled() -> None:
+        assert_balloon_landings(adapter, landings)
+        _assert_exploded_caption(adapter, table, caption)
+
+    return settled
 
 
 def _place_steps_sheet(adapter: Any) -> None:
