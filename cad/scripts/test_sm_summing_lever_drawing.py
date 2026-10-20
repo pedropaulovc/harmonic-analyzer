@@ -1133,3 +1133,352 @@ def test_finished_thread_capture_rejects_an_initially_nonnative_callout(monkeypa
     case.callouts[0][2].hole_callout = False
     with pytest.raises(RuntimeError, match="authored annotation is not a native hole callout"):
         drawing._finished_thread_annotation_check(case.adapter, case.callouts)
+
+
+def _native_plate_thickness(monkeypatch, offset=(0.0, 0.0), band=(0, 0.0, 0.0)):
+    """Measured native C-C contract; rebuild alone updates its visible gap ink."""
+    dx, dy = offset
+    state = SimpleNamespace(
+        name="PlateThickness@CoefficientsPlate@sm-summing-lever.SLDPRT",
+        value=0.00508, band=band, owner_type=0, dangling=False,
+        gaps=[0.001, 0.001], use_doc=[True, False], ink_gaps=[0.001, 0.001],
+        set_calls=[], gap_reads=[], setter_results=[True, True], persist=[True, True],
+        read_overrides={}, projection_offset=(0.0, 0.0), projection_scale=(1.0, 1.0),
+        projected_bad=None, projections=[], rebuilds=[],
+        active_sheet=drawing.SHEET_NAMES[1], activate_result=True,
+    )
+    free_x, tail_x, arrow_x = 0.085975 + dx, 0.048525 + dx, 0.049525 + dx
+    levels = (0.12746 + dy, 0.13254 + dy)
+    state.arrows = [
+        [arrow_x, y, 0.0, 0.0, direction, 0.0, 0.001, 0.001, 0.0, 0.0, 0.0, 1.0]
+        for y, direction in zip(levels, (-1.0, 1.0))
+    ]
+
+    def regenerate():
+        state.lines = [
+            ((free_x - gap, y), (tail_x, y))
+            for gap, y in zip(state.ink_gaps, levels)
+        ] + [((arrow_x, levels[0]), (arrow_x, levels[1]))]
+
+    regenerate()
+
+    class Tolerance:
+        Type = property(lambda self: state.band[0])
+
+        def GetMinValue(self):
+            return state.band[1]
+
+        def GetMaxValue(self):
+            return state.band[2]
+
+    tolerance = Tolerance()
+
+    class Dimension:
+        FullName = property(lambda self: state.name)
+        SystemValue = property(lambda self: state.value)
+        Tolerance = property(lambda self: tolerance)
+
+    class Data:
+        def GetArrowHeadCount(self):
+            assert state.active_sheet == drawing.SHEET_NAMES[0]
+            return len(state.arrows)
+
+        def GetArrowHeadAtIndex2(self, index):
+            return state.arrows[index]
+
+        def GetLineCount(self):
+            return len(state.lines)
+
+        def GetLineAtIndex2(self, index):
+            first, second = state.lines[index]
+            return (0.0, 0.0, 0.0, 0.0, *first, 0.0, *second, 0.0)
+
+    class Display:
+        def GetDimension2(self, index):
+            assert index == 0
+            return state.dimension
+
+        def GetDisplayData(self):
+            return state.data
+
+        def GetWitnessLineGap(self, index, use_doc, gap):
+            assert type(index) is int and index in (0, 1)
+            assert use_doc is False and gap == 0.0
+            stage = "after" if state.set_calls else "before"
+            state.gap_reads.append((stage, index))
+            return state.read_overrides.get(
+                (stage, index), (True, state.use_doc[index], state.gaps[index]),
+            )
+
+        def SetWitnessLineGap(self, index, use_doc, gap):
+            assert use_doc is False
+            state.set_calls.append((index, use_doc, gap))
+            result = state.setter_results[index]
+            if result is True and state.persist[index]:
+                state.gaps[index], state.use_doc[index] = gap, use_doc
+            return result
+
+    class Annotation:
+        OwnerType = property(lambda self: state.owner_type)
+
+        def GetType(self):
+            return 4
+
+        def IsDangling(self):
+            return state.dangling
+
+        def GetSpecificAnnotation(self):
+            return state.display
+
+    state.dimension, state.data, state.display = Dimension(), Data(), Display()
+    annotation = Annotation()
+    state.annotations = [annotation]
+    view = SimpleNamespace(GetAnnotations=lambda: tuple(state.annotations))
+
+    def activate_sheet(name):
+        if state.activate_result is True:
+            state.active_sheet = name
+        return state.activate_result
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(ActivateSheet=activate_sheet),
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+    )
+
+    def project(_adapter, _view, xyz, *, label):
+        x, y, z = xyz
+        assert z == drawing.PLATE_SECTION_Z / 1000.0
+        state.projections.append(xyz)
+        if state.projected_bad is not None:
+            return (state.projected_bad, 0.130 + dy + y)
+        return (
+            0.075 + dx + state.projection_offset[0]
+            + state.projection_scale[0] * (x - 0.033475),
+            0.130 + dy + state.projection_offset[1] + state.projection_scale[1] * y,
+        )
+
+    def rebuild(_adapter, *, label):
+        state.rebuilds.append(label)
+        state.ink_gaps = list(state.gaps)
+        regenerate()
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        solidworks_mcp.adapters.sw_type_info, "early_bound_or_flag", lambda value, *_args: value,
+    )
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    return SimpleNamespace(
+        adapter=adapter, view=view, annotation=annotation, state=state,
+        style=lambda: drawing._style_plate_thickness_witnesses(adapter, view, [annotation]),
+    )
+
+
+@pytest.mark.parametrize(
+    ("offset", "band"), [((0.0, 0.0), (0, 0.0, 0.0)), ((0.017, -0.009), (2, -0.0001, 0.0002))],
+)
+def test_plate_thickness_witnesses_shorten_native_ink_outside_the_bare_cut(
+    monkeypatch, offset, band,
+) -> None:
+    case = _native_plate_thickness(monkeypatch, offset, band)
+    state = case.state
+    original = (state.dimension, state.display, state.name, state.value, state.band)
+    arrows = [tuple(row) for row in state.arrows]
+    settled_check = case.style()
+    settled_check()
+    assert original == (state.dimension, state.display, state.name, state.value, state.band)
+    assert [tuple(row) for row in state.arrows] == arrows
+    assert state.set_calls == [(0, False, pytest.approx(0.03145)), (1, False, pytest.approx(0.03145))]
+    assert state.gaps == pytest.approx((0.03145, 0.03145))
+    assert state.use_doc == [False, False]
+    for line, y in zip(state.lines[:2], (0.12746 + offset[1], 0.13254 + offset[1])):
+        assert line[0] == pytest.approx((0.054525 + offset[0], y))
+        assert line[1] == pytest.approx((0.048525 + offset[0], y))
+        assert math.dist(*line) == pytest.approx(0.006)
+    assert set(state.projections) == {
+        (x / 1000.0, y / 1000.0, drawing.PLATE_SECTION_Z / 1000.0)
+        for x in (drawing.PLATE_SECTION_X[0], drawing.PLATE_W)
+        for y in (-drawing.PLATE_T / 2.0, drawing.PLATE_T / 2.0)
+    }
+    for index in (0, 1):
+        assert ("before", index) in state.gap_reads
+        assert state.gap_reads.count(("after", index)) >= 3
+    assert len(state.rebuilds) == 1
+
+
+@pytest.mark.parametrize(("index", "result"), [(0, False), (0, 1), (1, None)])
+def test_plate_thickness_witness_gap_setters_require_native_true(
+    monkeypatch, index, result,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    case.state.setter_results[index] = result
+    with pytest.raises(RuntimeError, match=f"native witness gap {index} was refused"):
+        case.style()
+    assert case.state.rebuilds == []
+
+
+@pytest.mark.parametrize(
+    ("stage", "answer"),
+    [
+        ("before", (1, False, 0.001)),
+        ("before", (True, 0, 0.001)),
+        ("before", (True, False, True)),
+        ("before", (True, False, math.nan)),
+        ("before", (True, False, 0.002)),
+        ("after", (False, False, 0.03145)),
+        ("after", (True, True, 0.03145)),
+        ("after", (True, False, math.inf)),
+        ("after", (True, False, True)),
+        ("after", (True, False, 0.001)),
+    ],
+)
+def test_plate_thickness_witness_gaps_require_checked_readback(
+    monkeypatch, stage, answer,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    case.state.read_overrides[(stage, 1)] = answer
+    with pytest.raises(RuntimeError, match="witness gap"):
+        case.style()
+    assert case.state.rebuilds == []
+    if stage == "before":
+        assert case.state.set_calls == []
+
+
+@pytest.mark.parametrize(
+    ("member", "value"),
+    [
+        ("name", "PlateThickness@SpringAnchorPad"),
+        ("value", True),
+        ("value", math.nan),
+        ("value", 0.005),
+        ("dimension", None),
+        ("band", (False, 0.0, 0.0)),
+        ("band", (2, math.nan, 0.0002)),
+        ("owner_type", 1),
+        ("owner_type", False),
+        ("dangling", True),
+        ("annotations", []),
+        ("activate_result", False),
+        ("activate_result", 1),
+    ],
+)
+def test_plate_thickness_witnesses_reject_unexpected_model_state(
+    monkeypatch, member, value,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    setattr(case.state, member, value)
+    with pytest.raises(RuntimeError, match="section C-C PlateThickness"):
+        case.style()
+    assert case.state.set_calls == []
+
+
+@pytest.mark.parametrize(
+    ("member", "value"),
+    [
+        ("projection_scale", (-1.0, 1.0)),
+        ("projection_scale", (1.0, -1.0)),
+        ("projection_scale", (2.0, 1.0)),
+        ("projection_offset", (0.001, 0.0)),
+        ("projected_bad", math.nan),
+        ("projected_bad", True),
+    ],
+)
+def test_plate_thickness_witnesses_reject_unexpected_projected_geometry(
+    monkeypatch, member, value,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    setattr(case.state, member, value)
+    with pytest.raises(RuntimeError, match="projected plate|witness endpoint"):
+        case.style()
+    assert case.state.set_calls == []
+
+
+@pytest.mark.parametrize(
+    "damage",
+    ["one_arrow", "nonfinite_arrow", "boolean_arrow", "arrow_level", "arrow_x",
+     "missing_witness", "extra_horizontal", "witness_level", "witness_origin", "nonfinite_witness"],
+)
+def test_plate_thickness_witnesses_reject_arrow_and_witness_mismatch(
+    monkeypatch, damage,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    if damage == "one_arrow":
+        state.arrows.pop()
+    elif damage in {"nonfinite_arrow", "boolean_arrow", "arrow_level", "arrow_x"}:
+        coordinate, value = {
+            "nonfinite_arrow": (0, math.inf), "boolean_arrow": (0, True),
+            "arrow_level": (1, 0.130), "arrow_x": (0, 0.050525),
+        }[damage]
+        state.arrows[0][coordinate] = value
+    elif damage == "missing_witness":
+        state.lines.pop(0)
+    elif damage == "extra_horizontal":
+        state.lines.append(((0.060, 0.125), (0.080, 0.125)))
+    else:
+        first, second = state.lines[0]
+        state.lines[0] = {
+            "witness_level": ((first[0], 0.130), (second[0], 0.130)),
+            "witness_origin": ((0.075, first[1]), second),
+            "nonfinite_witness": ((math.nan, first[1]), second),
+        }[damage]
+    with pytest.raises(RuntimeError, match="native|witness"):
+        case.style()
+    assert state.set_calls == []
+
+
+@pytest.mark.parametrize(
+    "damage", ["old_ink", "tail", "arrow", "origin", "detached", "replacement", "band", "value"],
+)
+def test_settled_plate_thickness_check_reads_regenerated_native_ink(
+    monkeypatch, damage,
+) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    state = case.state
+    settled_check = case.style()
+    state.active_sheet = drawing.SHEET_NAMES[1]  # The thread check visits this sheet last.
+    writes = list(state.set_calls)
+    if damage == "old_ink":
+        # Settings persist, but a later regeneration draws the old continuation.
+        state.lines[0] = ((0.084975, 0.12746), (0.048525, 0.12746))
+    elif damage == "tail":
+        state.lines[0] = (state.lines[0][0], (0.047525, 0.12746))
+    elif damage == "arrow":
+        state.arrows[0][1] = 0.130
+    elif damage == "origin":
+        state.projection_offset = (0.001, 0.0)
+    elif damage == "detached":
+        state.annotations = []
+    elif damage == "replacement":
+        old = state.dimension
+        state.dimension = SimpleNamespace(
+            FullName=old.FullName, SystemValue=old.SystemValue, Tolerance=old.Tolerance,
+        )
+    elif damage == "band":
+        state.band = (0, 0.0, 1e-13)  # Even a tiny native band drift is not ours to accept.
+    else:
+        state.value += 1e-13
+    with pytest.raises(RuntimeError, match="section C-C PlateThickness"):
+        settled_check()
+    assert state.set_calls == writes
+
+
+def test_plate_section_returns_its_settled_native_witness_check(monkeypatch) -> None:
+    case = _native_plate_thickness(monkeypatch)
+    cut_state = SimpleNamespace(surface_only=False)
+    cut = SimpleNamespace(
+        SetDisplayOnlySurfaceCut=lambda value: setattr(cut_state, "surface_only", value),
+        GetDisplayOnlySurfaceCut=lambda: cut_state.surface_only,
+    )
+    case.view.GetSection = lambda: cut
+    case.view.UpdateViewDisplayGeometry = lambda: None
+    monkeypatch.setattr(drawing, "create_section_view", lambda *args, **kwargs: case.view)
+    monkeypatch.setattr(drawing, "_hidden_lines_removed_without_greyed_pass", lambda view: None)
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *args, **kwargs: [(0.0, 0.0), (1.0, 0.0)])
+    monkeypatch.setattr(drawing, "position_section_caption", lambda *args, **kwargs: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *args, **kwargs: [case.annotation])
+    settled_check = drawing._plate_section(case.adapter, case.view)
+    settled_check()
+    case.state.lines[0] = ((0.084975, 0.12746), (0.048525, 0.12746))
+    with pytest.raises(RuntimeError, match="witness endpoint"):
+        settled_check()

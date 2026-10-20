@@ -68,7 +68,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_leader_note
-from _drawing_leaders import set_near_side_diameter
+from _drawing_leaders import dimension_segments, set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -765,7 +765,7 @@ def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
 
 
-def _plate_section(adapter: Any, top: Any) -> list[Any]:
+def _plate_section(adapter: Any, top: Any) -> Callable[[], None]:
     """Section C-C across the plate (PLATE_SECTION_* above): cut face only,
     looking up the sheet so the free edge and its pad print on the right as
     in the plan, turned +Y up and landed on PLATE_SECTION_CENTER
@@ -867,7 +867,210 @@ def _plate_section(adapter: Any, top: Any) -> list[Any]:
     position_section_caption(
         adapter, native, PLATE_SECTION_CAPTION_XY, label="plate section C-C"
     )
-    return annotations
+    return _style_plate_thickness_witnesses(adapter, native, annotations)
+
+
+def _style_plate_thickness_witnesses(
+    adapter: Any, view: Any, annotations: list[Any],
+) -> Callable[[], None]:
+    """Keep the imported thickness, but start both witnesses outside the bare cut.
+
+    The extrusion dimension originates at the free edge, beyond the merged pad.
+    Prove that origin before changing its native gaps; the final callback reads
+    fresh projected geometry and actual ink, not merely the persisted settings.
+    """
+    label = "section C-C PlateThickness"
+    gap_m, slop = 0.001, 1e-8
+    if len(annotations) != 1:
+        raise RuntimeError(f"{label}: expected one imported thickness annotation")
+    annotation = _early_bound(annotations[0], "IAnnotation")
+
+    def finite(value: Any) -> bool:
+        return type(value) in (int, float) and math.isfinite(value)
+
+    def same(first: Any, second: Any) -> bool:
+        result = adapter.swApp.IsSame(first, second)
+        return type(result) is int and result == 1
+
+    def model_state() -> tuple[Any, Any, str, float, tuple[int, float, float]]:
+        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+            raise RuntimeError(f"{label}: could not activate its geometry sheet")
+        kind, owner_type = annotation.GetType(), annotation.OwnerType
+        if (
+            type(kind) is not int or kind != 4
+            or type(owner_type) is not int or owner_type != 0
+            or annotation.IsDangling() is not False
+            or sum(same(raw, annotation) for raw in (view.GetAnnotations() or ())) != 1
+        ):
+            raise RuntimeError(f"{label}: imported thickness is detached from its view")
+        raw_display = annotation.GetSpecificAnnotation()
+        if raw_display is None:
+            raise RuntimeError(f"{label}: missing native display dimension")
+        display = _early_bound(raw_display, "IDisplayDimension")
+        raw_dimension = display.GetDimension2(0)
+        if raw_dimension is None:
+            raise RuntimeError(f"{label}: missing native model dimension")
+        dimension = _early_bound(raw_dimension, "IDimension")
+        name, value = dimension.FullName, dimension.SystemValue
+        if (
+            type(name) is not str
+            or name.split("@")[:2] != ["PlateThickness", "CoefficientsPlate"]
+            or not finite(value)
+            or abs(value - PLATE_T / 1000.0) > 1e-12
+        ):
+            raise RuntimeError(f"{label}: wrong model identity or thickness")
+        raw_tolerance = dimension.Tolerance
+        if raw_tolerance is None:
+            raise RuntimeError(f"{label}: missing native model band")
+        tolerance = _early_bound(raw_tolerance, "IDimensionTolerance")
+        band = (tolerance.Type, tolerance.GetMinValue(), tolerance.GetMaxValue())
+        if type(band[0]) is not int or not all(finite(v) for v in band[1:]):
+            raise RuntimeError(f"{label}: invalid native model band")
+        return display, dimension, name, value, band
+
+    def geometry() -> tuple[tuple[float, float], tuple[float, float], float]:
+        points = [
+            model_point_in_view(
+                adapter, view, _metres((x, y, PLATE_SECTION_Z)),
+                label=f"{label} {edge} {face}",
+            )
+            for edge, x in (("bare cut", PLATE_SECTION_X[0]), ("free edge", PLATE_W))
+            for face, y in (("bottom", -PLATE_T / 2.0), ("top", PLATE_T / 2.0))
+        ]
+        if any(len(point) != 2 or not all(finite(v) for v in point) for point in points):
+            raise RuntimeError(f"{label}: nonfinite projected plate geometry")
+        bottom, top, free_bottom, free_top = points
+        span = free_bottom[0] - bottom[0]
+        if (
+            span <= 0.0
+            or abs(span - (PLATE_W - PLATE_SECTION_X[0]) / 1000.0) > slop
+            or abs(top[0] - bottom[0]) > slop
+            or abs(top[1] - bottom[1] - PLATE_T / 1000.0) > slop
+            or any(
+                abs(free[0] - cut[0] - span) > slop
+                or abs(free[1] - cut[1]) > slop
+                for cut, free in ((bottom, free_bottom), (top, free_top))
+            )
+        ):
+            raise RuntimeError(f"{label}: unexpected projected plate direction or scale")
+        return bottom, top, span
+
+    def gaps(display: Any, *, local: bool) -> tuple[float, float]:
+        values = []
+        for index in (0, 1):
+            ok, use_doc, value = display.GetWitnessLineGap(index, False, 0.0)
+            if (
+                ok is not True or type(use_doc) is not bool
+                or (local and use_doc is not False)
+                or not finite(value) or value < 0.0
+            ):
+                raise RuntimeError(f"{label}: invalid native witness gap {index}")
+            values.append(value)
+        return tuple(values)
+
+    def ink(
+        display: Any, faces: tuple[tuple[float, float], tuple[float, float]],
+        starts: tuple[float, float],
+    ) -> tuple[tuple[tuple[float, float], ...], tuple[float, ...]]:
+        raw_data = display.GetDisplayData()
+        if raw_data is None:
+            raise RuntimeError(f"{label}: missing native display data")
+        data = _early_bound(raw_data, "IDisplayData")
+        count = data.GetArrowHeadCount()
+        if type(count) is not int or count != 2:
+            raise RuntimeError(f"{label}: expected two visible native arrows")
+        tips = []
+        for index in (0, 1):
+            row = tuple(data.GetArrowHeadAtIndex2(index))
+            if len(row) != 12 or not all(finite(value) for value in row):
+                raise RuntimeError(f"{label}: invalid native arrow coordinates")
+            tips.append((row[0], row[1]))
+        tips.sort(key=lambda point: point[1])
+        segments = dimension_segments(annotation)
+        if not segments or any(
+            not all(finite(value) for point in stroke for value in point)
+            for stroke in segments
+        ):
+            raise RuntimeError(f"{label}: invalid native witness coordinates")
+        horizontal = [
+            stroke for stroke in segments
+            if abs(stroke[1][1] - stroke[0][1]) <= slop
+            and abs(stroke[1][0] - stroke[0][0]) > slop
+        ]
+        if len(horizontal) != 2 or abs(tips[0][0] - tips[1][0]) > slop:
+            raise RuntimeError(f"{label}: expected two horizontal native witnesses")
+        tails = []
+        for face, tip, start in zip(faces, tips, starts):
+            matches = [
+                stroke for stroke in horizontal
+                if all(abs(point[1] - face[1]) <= slop for point in stroke)
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{label}: witness does not follow its plate face level")
+            left, right = sorted(point[0] for point in matches[0])
+            if (
+                abs(tip[1] - face[1]) > slop
+                or abs(right - start) > slop
+                or not left < tip[0] < face[0] - gap_m
+                or tip[0] > right + slop
+            ):
+                raise RuntimeError(f"{label}: unexpected native witness endpoint or arrow")
+            tails.append(left)
+        # Any extra horizontal continuation through the pad, or a skewed
+        # stroke, is unexpected ink, not a shortened visible witness pair.
+        if any(
+            stroke not in horizontal
+            and any(abs(point[0] - tips[0][0]) > slop for point in stroke)
+            for stroke in segments
+        ):
+            raise RuntimeError(f"{label}: unexpected native dimension-line ink")
+        return tuple(tips), tuple(tails)
+
+    display, dimension, name, value, band = model_state()
+    bottom, top, span = geometry()
+    original_gaps = gaps(display, local=False)
+    if any(abs(old - gap_m) > slop for old in original_gaps):
+        raise RuntimeError(f"{label}: unexpected original native witness gaps")
+    # Both actual witness starts must still derive from the model's free
+    # edge, not a seam or another origin that happens to have the same value.
+    tips, tails = ink(
+        display, (bottom, top),
+        tuple(face[0] + span - old for face, old in zip((bottom, top), original_gaps)),
+    )
+    expected_gaps = tuple(old + span for old in original_gaps)
+    for index, gap in enumerate(expected_gaps):
+        if display.SetWitnessLineGap(index, False, gap) is not True:
+            raise RuntimeError(f"{label}: native witness gap {index} was refused")
+
+    def check_witnesses() -> None:
+        current, owner, current_name, current_value, current_band = model_state()
+        if (
+            not same(current, display) or not same(owner, dimension)
+            or (current_name, current_value, current_band) != (name, value, band)
+        ):
+            raise RuntimeError(f"{label}: native model identity, value or band changed")
+        actual_gaps = gaps(current, local=True)
+        if any(abs(actual - expected) > slop for actual, expected in zip(actual_gaps, expected_gaps)):
+            raise RuntimeError(f"{label}: native witness gaps did not persist")
+        low, high, _span = geometry()
+        actual_tips, actual_tails = ink(
+            current, (low, high), (low[0] - gap_m, high[0] - gap_m),
+        )
+        if (
+            any(math.dist(actual, expected) > slop for actual, expected in zip(actual_tips, tips))
+            or any(abs(actual - expected) > slop for actual, expected in zip(actual_tails, tails))
+        ):
+            raise RuntimeError(f"{label}: native arrow tips or witness tails moved")
+
+    # Read both native settings back before rebuilding, then prove the rebuilt
+    # ink. The same proof runs after finalize_drawing's last regeneration.
+    actual_gaps = gaps(display, local=True)
+    if any(abs(actual - expected) > slop for actual, expected in zip(actual_gaps, expected_gaps)):
+        raise RuntimeError(f"{label}: native witness gaps did not persist")
+    rebuild_drawing(adapter, label="section C-C bare-cut witness gaps")
+    check_witnesses()
+    return check_witnesses
 
 
 def _sheet_to_view_sketch(
@@ -1957,7 +2160,7 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="20X",
         label="spring-hole pattern position",
     )
-    _plate_section(adapter, top)
+    check_plate_thickness = _plate_section(adapter, top)
     _tap_section(adapter, front)
     _add_view_arrow(adapter, top, BACK_VIEW_LETTER, VIEW_F_ARROW)
     _add_view_arrow(adapter, top, FRONT_VIEW_LETTER, VIEW_G_ARROW)
@@ -2076,7 +2279,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # This recipe deletes and proves its actual note inventory, as top-frame
         # does; the shared exact-count guard remains unchanged for other recipes.
         # Recheck after the final rebuild, before either drawing or PDF is saved.
-        settled_checks=(check_thread_annotations,),
+        settled_checks=(check_thread_annotations, check_plate_thickness),
     )
 
 
