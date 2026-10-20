@@ -10,12 +10,14 @@ import argparse
 import sys
 import math
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_variant_drawing import build_purchased_variant_drawing
+from _part_configuration_exports import _sha256
 from _com import _early_bound, _read_member
 from _drawing_attachment import _assert_leader_lands, _is_same_attachment
 from _drawing_common import set_high_quality_shaded_with_edges
@@ -668,7 +670,8 @@ def _member_thread_note(
             )
         return found
 
-    native_bore, native_diameter = bore_definition()
+    native_bore_identity: tuple[str, int, float] | None = None
+    correspondence_probed = False
     retire_non_iso_callouts()
     note, annotation, thread_annotation, geometry = notes(
         author_missing=True,
@@ -692,18 +695,16 @@ def _member_thread_note(
     if annotation.SetPosition2(*target) is not True:
         raise RuntimeError(f"{label}: native thread-note relocation refused")
 
-    def bore_landing(note_annotation: Any) -> tuple[Any, tuple[float, float]]:
-        iso.UpdateViewDisplayGeometry()
-        current_bore, diameter = bore_definition()
-        if (
-            int(adapter.swApp.IsSame(current_bore, native_bore)) != 1
-            or diameter != native_diameter
-        ):
-            raise RuntimeError(
-                f"{label}: native bore feature/diameter changed; "
-                f"expected_diameter_m={native_diameter!r}, actual_diameter_m={diameter!r}"
-            )
-        source = _early_bound(iso.ReferencedDocument, "IModelDoc2")
+    def rim_inventory(
+        source: Any,
+        current_bore: Any,
+        diameter: float,
+        record: dict,
+        *,
+        strict: bool,
+        candidates: list[Any] | None = None,
+        prior_candidates: list[Any] | None = None,
+    ) -> list[tuple]:
         extension = _early_bound(source.Extension, "IModelDocExtension")
         manager = _early_bound(source.ConfigurationManager, "IConfigurationManager")
         active = manager.ActiveConfiguration
@@ -718,15 +719,22 @@ def _member_thread_note(
                 if active is not None
                 else None
             ),
-            "source_bore": str(native_bore.Name)[:80],
-            "source_bore_type": str(native_bore.GetTypeName2())[:80],
+            "source_bore": str(current_bore.Name)[:80],
+            "source_bore_type": str(current_bore.GetTypeName2())[:80],
+            "source_bore_id": int(current_bore.GetID()),
             "source_bore_self_equality": int(
-                adapter.swApp.IsSame(native_bore, native_bore)
+                adapter.swApp.IsSame(current_bore, current_bore)
             ),
         }
-        _telemetry.info(f"{label}: native bore-rim source context; {context!r}")
+        record["context"] = context
         rims = []
         circles_seen, observed, matching_features = 0, [], []
+        record.update(
+            visible_circles=0,
+            geometry_candidates=0,
+            circle_params=observed,
+            matching_geometry_features=matching_features,
+        )
         for raw in visible_view_entities(iso, 1, label=f"{label} visible bore rim"):
             edge = _early_bound(raw, "IEdge")
             curve = _early_bound(edge.GetCurve(), "ICurve")
@@ -736,6 +744,7 @@ def _member_thread_note(
                 float(value) for value in (_read_member(curve, "CircleParams") or ())
             )
             circles_seen += 1
+            record["visible_circles"] = circles_seen
             if len(observed) < 6:
                 observed.append(circle[:7])
             if (
@@ -750,6 +759,18 @@ def _member_thread_note(
                 or not math.isclose(circle[6] * 2, diameter, rel_tol=0.0, abs_tol=1e-8)
             ):
                 continue
+            record["geometry_candidates"] += 1
+            if candidates is not None and len(candidates) < 4:
+                candidates.append(edge)
+            baseline_equalities = []
+            for before_edge in prior_candidates or ():
+                try:
+                    equality = int(adapter.swApp.IsSame(edge, before_edge))
+                except Exception as error:
+                    # Causal telemetry only: activation can invalidate old
+                    # wrappers. Never use this observation as an ownership gate.
+                    equality = f"{type(error).__name__}: {str(error)[:120]}"
+                baseline_equalities.append(equality)
             view_features = []
             for raw_face in edge.GetTwoAdjacentFaces2() or ():
                 if raw_face is not None:
@@ -783,7 +804,7 @@ def _member_thread_note(
                         feature = _early_bound(raw_face, "IFace2").GetFeature()
                         if feature is not None:
                             feature = _early_bound(feature, "IFeature")
-                            equality = int(adapter.swApp.IsSame(feature, native_bore))
+                            equality = int(adapter.swApp.IsSame(feature, current_bore))
                             bore_owned |= equality == 1
                             if len(source_features) < 4:
                                 source_features.append(
@@ -798,28 +819,33 @@ def _member_thread_note(
                 "view_features": tuple(view_features),
                 "mapped_source_edge": canonical is not None,
                 "view_roundtrip_equality": roundtrip_equality,
+                "geometry_candidate": record["geometry_candidates"],
+                "circle": circle,
+                "baseline_visible_equalities": tuple(baseline_equalities),
                 # (name, type, same source bore, self equality), all source-context.
                 "source_features": tuple(source_features),
             }
             if len(matching_features) < 4:
                 matching_features.append(correspondence)
-            _telemetry.info(
-                f"{label}: native bore-rim source correspondence; {correspondence!r}"
-            )
-            if canonical is None or roundtrip_equality != 1:
+            if strict and (canonical is None or roundtrip_equality != 1):
                 raise RuntimeError(
                     f"{label}: native bore-rim source/view correspondence failed; "
                     f"context={context!r}, correspondence={correspondence!r}"
                 )
-            if bore_owned:
+            if canonical is not None and roundtrip_equality == 1 and bore_owned:
                 rims.append((edge, circle))
-        if not rims:
+        if strict and not rims:
             raise RuntimeError(
                 f"{label}: expected one visible top bore rim owned by {bore_feature}; "
                 f"found={len(rims)}, visible_circles={circles_seen}, "
                 f"circle_params={observed!r}, matching_geometry_features={matching_features!r}, "
                 f"context={context!r}"
             )
+        return rims
+
+    def active_landing(
+        note_annotation: Any, rims: list[tuple]
+    ) -> tuple[Any, tuple[float, float]]:
         edge, circle = rims[0]
         x, y, z, _ax, _ay, _az, radius = circle
         center, along_x, along_z = model_points_in_view(
@@ -896,6 +922,261 @@ def _member_thread_note(
                 f"model_tip={model_tip!r}, trims={trim_observed!r}"
             )
         return eligible[0], tip
+
+    def bore_landing(note_annotation: Any) -> tuple[Any, tuple[float, float]]:
+        nonlocal native_bore_identity, correspondence_probed
+        source = _early_bound(iso.ReferencedDocument, "IModelDoc2")
+        drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+        source_path = str(source.GetPathName())
+
+        def active_configuration() -> str:
+            manager = _early_bound(source.ConfigurationManager, "IConfigurationManager")
+            active = manager.ActiveConfiguration
+            name = (
+                str(_early_bound(active, "IConfiguration").Name)
+                if active is not None
+                else ""
+            )
+            if not name:
+                raise RuntimeError(
+                    f"{label}: source active configuration is unreadable"
+                )
+            return name
+
+        def drawing_activation() -> tuple[str | None, str]:
+            raw = drawing.ActiveDrawingView
+            name = (
+                str(_early_bound(raw, "IView").GetName2()) if raw is not None else None
+            )
+            sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+            return name, str(sheet.GetName())
+
+        def drawing_configurations() -> tuple[tuple[str, str, str], ...]:
+            found = []
+            for raw_sheet in drawing.GetViews() or ():
+                sheet_views = tuple(raw_sheet or ())
+                if not sheet_views:
+                    raise RuntimeError(f"{label}: drawing view inventory is unreadable")
+                # GetViews documents the first entry as the sheet, not a model view.
+                sheet_name = str(_early_bound(sheet_views[0], "IView").GetName2())
+                for raw in sheet_views[1:]:
+                    view = _early_bound(raw, "IView")
+                    found.append(
+                        (
+                            sheet_name,
+                            str(view.GetName2()),
+                            str(view.ReferencedConfiguration),
+                        )
+                    )
+            if not found:
+                raise RuntimeError(f"{label}: drawing model-view inventory is empty")
+            return tuple(sorted(found))
+
+        previous = active_configuration()
+        target_configuration = str(iso.ReferencedConfiguration)
+        if not target_configuration:
+            raise RuntimeError(f"{label}: view referenced configuration is unreadable")
+        save_flag = bool(source.GetSaveFlag())
+        before_activation = drawing_activation()
+        before_views = drawing_configurations()
+        first_control = not correspondence_probed
+        before_sha = _sha256(Path(source_path)) if first_control else None
+        correspondence_probed = True
+        control = {
+            "source_model": source_path[:200],
+            "previous_configuration": previous[:80],
+            "view_configuration": target_configuration[:80],
+            "save_flag_before": save_flag,
+            "source_sha256_before": before_sha,
+        }
+        baseline_candidates = []
+        activation_attempted = False
+        primary_error = None
+        selected_rim, tip = None, None
+        try:
+            if first_control:
+                # A single diagnostic observation, never an alternate acceptance
+                # path: repeat this exact inventory/mapping shape after activation.
+                control["baseline"] = {}
+                before_bore = None
+                try:
+                    iso.UpdateViewDisplayGeometry()
+                    before_bore, before_diameter = bore_definition()
+                    rim_inventory(
+                        source,
+                        before_bore,
+                        before_diameter,
+                        control["baseline"],
+                        strict=False,
+                        candidates=baseline_candidates,
+                    )
+                except Exception as error:
+                    # The inactive-configuration observation is not acceptance.
+                    # Its failure must not replace the one strict target-config
+                    # attempt or be mistaken for proof of a configuration cause.
+                    control["baseline"]["error"] = (
+                        f"{type(error).__name__}: {str(error)[:240]}"
+                    )
+                finally:
+                    del before_bore
+            if previous != target_configuration:
+                activation_attempted = True  # Even a false/lying call can mutate state.
+                reported = source.ShowConfiguration2(target_configuration)
+                actual = active_configuration()
+                control["activation"] = {
+                    "reported": reported,
+                    "actual_configuration": actual[:80],
+                }
+                if reported is not True or actual != target_configuration:
+                    raise RuntimeError(
+                        f"{label}: source configuration activation failed; "
+                        f"requested={target_configuration!r}, reported={reported!r}, "
+                        f"actual={actual!r}"
+                    )
+            iso.UpdateViewDisplayGeometry()
+            current_bore, diameter = bore_definition()
+            identity = (source_path, int(current_bore.GetID()), diameter)
+            # GetID is unique within this document and persistent across sessions.
+            # Keep only that scalar identity across configuration scopes, not a
+            # source feature/edge wrapper that activation may invalidate.
+            if native_bore_identity is None:
+                native_bore_identity = identity
+            elif identity != native_bore_identity:
+                raise RuntimeError(
+                    f"{label}: native bore feature/diameter changed; "
+                    f"expected={native_bore_identity!r}, actual={identity!r}"
+                )
+            control["matched"] = {}
+            rims = rim_inventory(
+                source,
+                current_bore,
+                diameter,
+                control["matched"],
+                strict=True,
+                prior_candidates=baseline_candidates,
+            )
+            selected_rim, tip = active_landing(note_annotation, rims)
+        except BaseException as error:
+            primary_error = error
+            raise
+        finally:
+            cleanup_errors = []
+            restored_configuration = None
+            try:
+                restored_configuration = active_configuration()
+            except Exception as error:
+                cleanup_errors.append(("configuration readback", error))
+            # Restore even after a false/lying activation or failed readback.
+            if activation_attempted or restored_configuration != previous:
+                try:
+                    reported = source.ShowConfiguration2(previous)
+                    restored_configuration = active_configuration()
+                    if reported is not True or restored_configuration != previous:
+                        raise RuntimeError(
+                            f"expected={previous!r}, reported={reported!r}, "
+                            f"actual={restored_configuration!r}"
+                        )
+                except Exception as error:
+                    cleanup_errors.append(("configuration restoration", error))
+            control["restored_configuration"] = (
+                restored_configuration[:80]
+                if restored_configuration is not None
+                else None
+            )
+            try:
+                after_save_flag = bool(source.GetSaveFlag())
+                control["save_flag_after"] = after_save_flag
+                if after_save_flag != save_flag:
+                    raise RuntimeError(
+                        f"source save flag changed: {save_flag!r} -> {after_save_flag!r}"
+                    )
+            except Exception as error:
+                cleanup_errors.append(("source unsaved state", error))
+            try:
+                after_activation = drawing_activation()
+                control["drawing_activation_after"] = tuple(
+                    name[:80] if name is not None else None for name in after_activation
+                )
+                if after_activation != before_activation:
+                    raise RuntimeError(
+                        f"drawing activation changed: {before_activation!r} -> "
+                        f"{after_activation!r}"
+                    )
+            except Exception as error:
+                cleanup_errors.append(("drawing activation", error))
+            try:
+                after_views = drawing_configurations()
+                control["view_configurations_unchanged"] = after_views == before_views
+                if after_views != before_views:
+                    raise RuntimeError("drawing referenced configurations changed")
+            except Exception as error:
+                cleanup_errors.append(("drawing configurations", error))
+            if first_control:
+                try:
+                    after_sha = _sha256(Path(source_path))
+                    control["source_sha256_after"] = after_sha
+                    if after_sha != before_sha:
+                        raise RuntimeError("native source bytes changed")
+                except Exception as error:
+                    cleanup_errors.append(("native source SHA", error))
+            if selected_rim is not None and restored_configuration == previous:
+                try:
+                    # Configuration changes can invalidate wrappers. Re-enumerate
+                    # the VIEW after restoration; never return a canonical source
+                    # edge or treat a merely nearby edge as the original rim.
+                    iso.UpdateViewDisplayGeometry()
+                    fresh = [
+                        _early_bound(raw, "IEdge")
+                        for raw in visible_view_entities(
+                            iso, 1, label=f"{label} restored visible bore rim"
+                        )
+                        if int(adapter.swApp.IsSame(raw, selected_rim)) == 1
+                    ]
+                    control["restored_visible_rim_matches"] = len(fresh)
+                    if len(fresh) != 1:
+                        raise RuntimeError(
+                            f"visible bore rim lost native identity after configuration "
+                            f"restoration; matching_edges={len(fresh)}"
+                        )
+                    selected_rim = fresh[0]
+                except Exception as error:
+                    cleanup_errors.append(("restored visible rim", error))
+            control["cleanup_errors"] = tuple(
+                (stage, str(error)[:200]) for stage, error in cleanup_errors
+            )
+            diagnostic_error = None
+            try:
+                _telemetry.info(
+                    f"{label}: native bore configuration control; {control!r}"
+                )
+            except Exception as error:
+                # Observational logging must not mask a native failure or undo
+                # restoration. The native ownership/geometry gates above remain
+                # strict even when the telemetry sink itself is unavailable.
+                diagnostic_error = error
+                if primary_error is not None:
+                    primary_error.add_note(
+                        f"{label}: configuration-control logging failed: {error!r}"
+                    )
+            if cleanup_errors:
+                if primary_error is not None:
+                    for stage, error in cleanup_errors:
+                        primary_error.add_note(
+                            f"{label}: {stage} failed during restoration: {error!r}"
+                        )
+                else:
+                    error = RuntimeError(
+                        f"{label}: native bore configuration restoration failed; "
+                        f"errors={control['cleanup_errors']!r}"
+                    )
+                    if diagnostic_error is not None:
+                        error.add_note(
+                            f"configuration-control logging failed: {diagnostic_error!r}"
+                        )
+                    for stage, cleanup_error in cleanup_errors:
+                        error.add_note(f"{stage}: {cleanup_error!r}")
+                    raise error from cleanup_errors[0][1]
+        return selected_rim, tip
 
     native_rim, tip = bore_landing(annotation)
     # The SDK supports this setter on INote, not CThread. Whether this native

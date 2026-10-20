@@ -1121,7 +1121,33 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "create-replaced-thread",
         "none",
         "cross-context-feature",
-        "source-active-config-different",
+        "source-already-target",
+        "baseline-mapping-throws",
+        "baseline-bore-throws",
+        "baseline-equality-zero",
+        "baseline-equality-throws",
+        "mapping-failure-restore-throws-logger",
+        "logger-failure-restore",
+        "source-activation-false",
+        "source-activation-false-mutates",
+        "source-activation-true-wrong",
+        "source-restore-false",
+        "source-restore-lying",
+        "source-restore-throws",
+        "mapping-failure-restore-false",
+        "mapping-failure-restore-lying",
+        "mapping-failure-restore-throws",
+        "scope-cleanup-independent",
+        "scope-dirty-drift",
+        "scope-hash-drift",
+        "scope-view-config-drift",
+        "scope-other-view-config-drift",
+        "scope-drawing-view-drift",
+        "scope-drawing-sheet-drift",
+        "postrestore-rim-missing",
+        "postrestore-rim-replaced",
+        "postrestore-rim-duplicates",
+        "postrestore-rim-fresh-wrapper",
         "rim-source-mapping-missing",
         "rim-roundtrip-missing",
         "rim-roundtrip-wrong",
@@ -1227,6 +1253,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     monkeypatch, configuration, drift
 ):
     import math
+    import hashlib
     import draw_sh_vn_clamping_kit_hardware as kit
 
     spec = kit.tnut if configuration == "TNut" else kit.flange_nut
@@ -1240,6 +1267,9 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     # Native83's vendor STEP bore is 0.21095 in, not nominal TAP_DRILL_DIA / 2.
     native_bore_radius = 0.00535813
     bore_definition = SimpleNamespace(ThruTapDrillDiameter=0.01071626)
+    source_feature_ids = iter(range(1001, 1101))
+    drawing_feature_ids = iter(range(5001, 5101))
+    scope_events = []
 
     class SourceFeature:
         feature_context = "source"
@@ -1249,6 +1279,10 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             self.kind = kind
             self.definition = definition
             self.native_identity = object()
+            self.native_feature_id = next(source_feature_ids)
+
+        def GetID(self):
+            return self.native_feature_id
 
         def GetTypeName2(self):
             return self.kind
@@ -1263,6 +1297,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             self.Name = name
             self.kind = kind
             self.native_identity = object()
+            self.native_feature_id = next(drawing_feature_ids)
 
         def GetTypeName2(self):
             return self.kind
@@ -1300,6 +1335,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         is not source_bore.native_identity
     )
     assert native_equal(drawing_features[bore_feature], source_bore) == 0
+    assert drawing_features[bore_feature].native_feature_id != source_bore.GetID()
     source_mapping_calls, roundtrip_calls = [], []
     source_face_features, identity_comparisons, early_binding_calls = [], [], []
 
@@ -1475,6 +1511,22 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
 
         def SetLeaderAttachmentPointAtIndex(self, index, x, y, z):
             assert index == 0
+            # No canonical-source wrapper may escape the configuration scope
+            # into a drawing mutation, even when activation initially failed.
+            assert source_state.active == source_original_name
+            assert source_state.postrestore_inventories
+            assert source_state.postrestore_inventories[-1][0] == source_original_name
+            assert all(
+                not isinstance(item, SourceEdge)
+                for item in source_state.postrestore_inventories[-1][1]
+            )
+            if source_original_name != configuration:
+                assert source_state.activations
+                assert source_state.restorations == [source_original_name] * len(
+                    source_state.activations
+                )
+            events.append("set-leader")
+            scope_events.append(("leader-set", source_state.active))
             self.setter_calls.append((x, y, z))
             if drift == "setter-refused":
                 return False
@@ -1606,22 +1658,32 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     class MemberView(SimpleNamespace):
         @property
         def ReferencedConfiguration(self):
-            return configuration
+            scope_events.append(("view-configuration", self))
+            return self._referenced_configuration
+
+        @ReferencedConfiguration.setter
+        def ReferencedConfiguration(self, _value):
+            pytest.fail("drawing view configurations are immutable")
 
         def GetReferencedModelName(self):
             return source_model_path
 
     views = [
         MemberView(
+            _referenced_configuration=configuration,
             GetOutline=lambda box=box: (
                 box[0] + offset,
                 box[1],
                 box[2] + offset,
                 box[3],
-            )
+            ),
         )
         for box in outlines
     ]
+    unrelated_view = MemberView(
+        _referenced_configuration="Unrelated",
+        GetName2=lambda: "unrelated-view",
+    )
     note.Owner = views[3]
     native_threads = [ThreadAnnotation(note)]
     original_thread = native_threads[0]
@@ -1681,12 +1743,23 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
 
         @property
         def ActiveDrawingView(self):
+            scope_events.append(("drawing-view", drawing_state.active))
             if drawing_state.active is None:
                 return None
             return SimpleNamespace(GetName2=lambda: drawing_state.active)
 
         def GetCurrentSheet(self):
+            scope_events.append(("drawing-sheet", drawing_state.sheet))
             return SimpleNamespace(GetName=lambda: drawing_state.sheet)
+
+        def GetViews(self):
+            scope_events.append(("drawing-views",))
+            # SDK arrays include each sheet as their first entry; the active
+            # sheet need not be first and other-sheet views must be protected.
+            return (
+                (SimpleNamespace(GetName2=lambda: "OtherSheet"), unrelated_view),
+                (SimpleNamespace(GetName2=lambda: "Sheet1"), *views),
+            )
 
         def ActivateView(self, name):
             events.append(f"activate:{name}")
@@ -1762,6 +1835,9 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     def source_feature(name):
         if name == bore_feature:
             events.append("bore-definition")
+            if drift == "baseline-bore-throws" and source_state.active != configuration:
+                source_state.baseline_definition_failures += 1
+                raise baseline_error
             if drift == "bore-fresh-wrapper":
                 return EntityWrapper(feature_readback)
             return feature_readback
@@ -1779,11 +1855,80 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         )
 
     source_model_path = r"C:\fixture\clamping_kit.SLDPRT"
-    source_active_name = (
-        f"{configuration}-source-active"
-        if drift == "source-active-config-different"
-        else configuration
+    source_original_name = (
+        configuration if drift == "source-already-target" else "HoldDownStud"
     )
+    source_state = SimpleNamespace(
+        active=source_original_name,
+        dirty=False,
+        payload=b"unchanged canonical kit part",
+        phase="baseline",
+        activation_generation=0,
+        readback_generation=0,
+        refresh_count=0,
+        activations=[],
+        restorations=[],
+        hash_calls=[],
+        inventories=[],
+        postrestore_inventories=[],
+        baseline_definition_failures=0,
+        baseline_observations=[],
+    )
+
+    class NativeMappingError(RuntimeError):
+        pass
+
+    mapping_error = NativeMappingError("native reverse mapping failed")
+    baseline_error = NativeMappingError("baseline reverse mapping failed")
+    restore_error = RuntimeError("source configuration restore threw")
+    logger_error = RuntimeError("diagnostic logger failed")
+    baseline_equality_error = RuntimeError("stale baseline view wrapper")
+    control_logs = []
+    logger_failures = []
+    if drift in {
+        "baseline-bore-throws",
+        "baseline-mapping-throws",
+        "mapping-failure-restore-throws-logger",
+        "logger-failure-restore",
+    }:
+        original_info = kit._telemetry.info
+
+        def control_log(message, *args, **kwargs):
+            if "native bore configuration control" in message:
+                control_logs.append(message)
+                if "logger" in drift:
+                    logger_failures.append(logger_error)
+                    raise logger_error
+            return original_info(message, *args, **kwargs)
+
+        monkeypatch.setattr(kit._telemetry, "info", control_log)
+
+    def change_protected_state():
+        all_drift = drift in {
+            "scope-cleanup-independent",
+            "mapping-failure-restore-throws-logger",
+        }
+        if all_drift or drift == "scope-dirty-drift":
+            source_state.dirty = True
+        if all_drift or drift == "scope-hash-drift":
+            source_state.payload += b" changed"
+        if all_drift or drift == "scope-view-config-drift":
+            views[0]._referenced_configuration = "Unexpected"
+        if drift == "scope-other-view-config-drift":
+            unrelated_view._referenced_configuration = "Unexpected"
+        if all_drift or drift == "scope-drawing-view-drift":
+            drawing_state.active = "unexpected-view"
+        if all_drift or drift == "scope-drawing-sheet-drift":
+            drawing_state.sheet = "UnexpectedSheet"
+
+    def source_hash(path):
+        assert isinstance(path, Path) and path == Path(source_model_path)
+        digest = hashlib.sha256(source_state.payload).hexdigest()
+        source_state.hash_calls.append((path, digest, source_state.active))
+        scope_events.append(("hash", source_state.active))
+        return digest
+
+    monkeypatch.setattr(kit, "_sha256", source_hash)
     wrong_source_edge = SourceEdge(
         rim, SourceFeature(bore_feature, definition=bore_definition)
     )
@@ -1791,17 +1936,49 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
 
     class SourceExtension:
         def GetCorrespondingEntity2(self, drawing_edge):
-            assert isinstance(drawing_edge, BoreRim)
-            assert drawing_edge.curve_read
-            canonical = drawing_edge.source_edge
-            if drawing_edge is rim:
-                if drift == "rim-source-mapping-missing":
-                    canonical = None
-                elif drift == "rim-source-edge-wrong":
-                    canonical = wrong_source_edge
-                elif drift == "rim-source-fresh-wrapper":
-                    canonical = EntityWrapper(canonical)
+            unwrapped = (
+                drawing_edge.entity
+                if isinstance(drawing_edge, EntityWrapper)
+                else drawing_edge
+            )
+            assert isinstance(unwrapped, BoreRim)
+            assert unwrapped.curve_read
+            inventory = source_state.inventories[-1]
+            assert inventory["refresh"] == source_state.refresh_count
+            assert any(item is drawing_edge for item in inventory["edges"])
+            assert inventory["active"] == source_state.active
+            if (
+                drift == "baseline-mapping-throws"
+                and source_state.active != configuration
+            ):
+                inventory["maps"].append((drawing_edge, baseline_error))
+                raise baseline_error
+            canonical = None
+            if source_state.active == configuration:
+                # Active configuration alone is not activation acceptance:
+                # the production caller must first perform strict readback.
+                assert (
+                    source_state.readback_generation
+                    == source_state.activation_generation
+                )
+                change_protected_state()
+                if (
+                    drift.startswith("mapping-failure-")
+                    or drift == "scope-cleanup-independent"
+                ):
+                    inventory["maps"].append((drawing_edge, mapping_error))
+                    raise mapping_error
+                canonical = unwrapped.source_edge
+                if unwrapped is rim:
+                    if drift == "rim-source-mapping-missing":
+                        canonical = None
+                    elif drift == "rim-source-edge-wrong":
+                        canonical = wrong_source_edge
+                    elif drift == "rim-source-fresh-wrapper":
+                        canonical = EntityWrapper(canonical)
             source_mapping_calls.append((drawing_edge, canonical))
+            inventory["maps"].append((drawing_edge, canonical))
+            scope_events.append(("reverse-map", source_state.active, drawing_edge))
             return canonical
 
     class SourceConfiguration:
@@ -1809,7 +1986,9 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
 
         @property
         def Name(self):
-            return source_active_name
+            scope_events.append(("source-configuration", source_state.active))
+            source_state.readback_generation = source_state.activation_generation
+            return source_state.active
 
     class SourceConfigurationManager:
         __slots__ = ()
@@ -1840,6 +2019,45 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         def GetType(self):
             return 1
 
+        def GetSaveFlag(self):
+            scope_events.append(("save-flag", source_state.dirty))
+            return source_state.dirty
+
+        def ShowConfiguration2(self, name):
+            assert (self, "IModelDoc2") in early_binding_calls
+            assert name in {configuration, source_original_name}
+            scope_events.append(("show-configuration", name))
+            source_state.activation_generation += 1
+            if name == configuration:
+                source_state.activations.append(name)
+                source_state.phase = "matched"
+                if drift == "source-activation-false":
+                    return False
+                if drift == "source-activation-false-mutates":
+                    source_state.active = name
+                    return False
+                if drift == "source-activation-true-wrong":
+                    source_state.active = "WrongConfiguration"
+                    return True
+                source_state.active = name
+                return True
+            source_state.restorations.append(name)
+            source_state.phase = "restored"
+            if drift in {
+                "source-restore-throws",
+                "mapping-failure-restore-throws",
+                "mapping-failure-restore-throws-logger",
+                "logger-failure-restore",
+                "scope-cleanup-independent",
+            }:
+                raise restore_error
+            if drift in {"source-restore-false", "mapping-failure-restore-false"}:
+                return False
+            if drift in {"source-restore-lying", "mapping-failure-restore-lying"}:
+                return True
+            source_state.active = name
+            return True
+
     source_extension = SourceExtension()
     source_configuration = SourceConfiguration()
     source_configuration_manager = SourceConfigurationManager()
@@ -1850,6 +2068,8 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             canonical.entity if isinstance(canonical, EntityWrapper) else canonical
         )
         assert isinstance(unwrapped, SourceEdge)
+        assert source_state.active == configuration
+        assert source_state.readback_generation == source_state.activation_generation
         roundtrip = unwrapped.drawing_edge
         if roundtrip is rim:
             if drift == "rim-roundtrip-missing":
@@ -1871,7 +2091,18 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     decoy = _Note("literal", "1/2-13 Tapped Hole", offset + 0.32, 0.23)
     views[3].GetNotes = lambda: [decoy]
     views[3].GetAnnotations = read_annotations
-    views[3].UpdateViewDisplayGeometry = lambda: events.append("refresh")
+
+    def refresh_iso():
+        if source_state.phase == "matched":
+            assert source_state.active == configuration
+            assert (
+                source_state.readback_generation == source_state.activation_generation
+            )
+        source_state.refresh_count += 1
+        scope_events.append(("refresh", source_state.active))
+        events.append("refresh")
+
+    views[3].UpdateViewDisplayGeometry = refresh_iso
     views[3].GetName2 = lambda: iso_name
     views[3].ReferencedDocument = source_model
     views[3].GetCorrespondingEntity = view_corresponding_entity
@@ -1892,9 +2123,42 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         )
         view.GetAnnotations = right_annotations if index == 2 else lambda: ()
         view.GetNotes = read_right_notes if index == 2 else lambda: ()
-    monkeypatch.setattr(
-        kit, "visible_view_entities", lambda *_args, **_kwargs: visible_rims
-    )
+    postrestore_wrapper = EntityWrapper(rim)
+
+    def visible_entities(view, kind, **_kwargs):
+        assert view is views[3] and kind == 1
+        assert source_state.refresh_count
+        visible = list(visible_rims)
+        restored = source_state.phase == "restored" or (
+            drift == "source-already-target" and len(source_state.hash_calls) == 2
+        )
+        if restored:
+            if drift == "postrestore-rim-missing":
+                visible = [item for item in visible if item is not rim]
+            elif drift == "postrestore-rim-replaced":
+                visible = [BoreRim() if item is rim else item for item in visible]
+            elif drift == "postrestore-rim-duplicates":
+                visible.append(EntityWrapper(rim))
+            elif drift == "postrestore-rim-fresh-wrapper":
+                visible = [
+                    postrestore_wrapper if item is rim else item for item in visible
+                ]
+            source_state.postrestore_inventories.append(
+                (source_state.active, tuple(visible))
+            )
+        source_state.inventories.append(
+            {
+                "active": source_state.active,
+                "phase": source_state.phase,
+                "refresh": source_state.refresh_count,
+                "edges": tuple(visible),
+                "maps": [],
+            }
+        )
+        scope_events.append(("visible-edges", source_state.active))
+        return visible
+
+    monkeypatch.setattr(kit, "visible_view_entities", visible_entities)
     monkeypatch.setattr(kit, "model_points_in_view", project_points)
     monkeypatch.setattr(
         kit,
@@ -1907,6 +2171,13 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         return value
 
     def is_same(first, second):
+        assert not any(
+            isinstance(
+                item.entity if isinstance(item, EntityWrapper) else item,
+                SourceEdge,
+            )
+            for item in (first, second)
+        ), "canonical source edges must not escape into visible-edge identity"
         first_context = getattr(first, "feature_context", None)
         second_context = getattr(second, "feature_context", None)
         if first_context is not None or second_context is not None:
@@ -1914,6 +2185,19 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
                 "drawing-context feature identity must not prove source ownership"
             )
         identity_comparisons.append((first, second))
+        if (
+            drift in {"baseline-equality-zero", "baseline-equality-throws"}
+            and first is rim
+            and second is rim
+            and source_state.phase == "matched"
+            and not source_state.inventories[-1]["maps"]
+            and not source_state.baseline_observations
+        ):
+            if drift == "baseline-equality-throws":
+                source_state.baseline_observations.append(baseline_equality_error)
+                raise baseline_equality_error
+            source_state.baseline_observations.append(0)
+            return 0
         return native_equal(first, second)
 
     monkeypatch.setattr(kit, "_early_bound", early_bound)
@@ -2047,19 +2331,73 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         assert drawing_state.active == previous_active
         return
 
+    def assert_scope_cleanup():
+        assert source_state.active == source_original_name
+        assert source_state.dirty is False
+        assert [view._referenced_configuration for view in views] == [configuration] * 4
+        assert unrelated_view._referenced_configuration == "Unrelated"
+        assert drawing_state.active == previous_active
+        assert drawing_state.sheet == "Sheet1"
+        assert len(source_state.hash_calls) == 2
+        assert source_state.hash_calls[0] == source_state.hash_calls[1]
+        if drift == "source-already-target":
+            assert not source_state.activations and not source_state.restorations
+        else:
+            assert source_state.activations
+            assert source_state.activations == [configuration] * len(
+                source_state.activations
+            )
+            assert source_state.restorations == [source_original_name] * len(
+                source_state.activations
+            )
+
     def assert_source_correspondence():
-        expected_rims = [rim, other_arc] if drift == "rim-split" else [rim]
-        assert source_mapping_calls
-        assert len(source_mapping_calls) % len(expected_rims) == 0
-        assert len(roundtrip_calls) == len(source_mapping_calls)
-        for index, ((drawing_edge, canonical), (mapped, roundtrip)) in enumerate(
-            zip(source_mapping_calls, roundtrip_calls)
-        ):
-            assert drawing_edge is expected_rims[index % len(expected_rims)]
-            assert canonical is mapped
+        assert_scope_cleanup()
+        mapped_inventories = [
+            inventory for inventory in source_state.inventories if inventory["maps"]
+        ]
+        if drift == "baseline-bore-throws":
+            assert source_state.baseline_definition_failures == 1
+            assert mapped_inventories
+            matched = mapped_inventories[0]
+        else:
+            assert len(mapped_inventories) >= 2
+            baseline, matched = mapped_inventories[:2]
+            assert [item[0] for item in baseline["maps"]] == [
+                item[0] for item in matched["maps"]
+            ]
+            assert baseline["refresh"] < matched["refresh"]
+            assert baseline["active"] == source_original_name
+            if drift == "baseline-mapping-throws":
+                assert baseline["maps"] == [(rim, baseline_error)]
+            elif drift != "source-already-target":
+                assert all(canonical is None for _edge, canonical in baseline["maps"])
+        assert matched["active"] == configuration
+        if drift in {"baseline-bore-throws", "baseline-mapping-throws"}:
+            assert sum(str(baseline_error) in message for message in control_logs) == 1
+        if drift in {"baseline-equality-zero", "baseline-equality-throws"}:
+            assert source_state.baseline_observations == [
+                baseline_equality_error if drift == "baseline-equality-throws" else 0
+            ]
+        if drift != "source-already-target":
+            assert len(source_state.activations) == sum(
+                inventory["active"] == configuration
+                for inventory in source_state.inventories
+            )
+        assert all(canonical is not None for _edge, canonical in matched["maps"])
+        assert source_state.postrestore_inventories
+        for canonical, roundtrip in roundtrip_calls:
+            assert canonical is not roundtrip
+            assert native_equal(roundtrip, canonical.drawing_edge) == 1
+            assert any(
+                mapped is canonical and native_equal(drawing_edge, roundtrip) == 1
+                for drawing_edge, mapped in source_mapping_calls
+            )
+        assert roundtrip_calls
+        for drawing_edge, canonical in matched["maps"]:
             assert canonical is not drawing_edge
             assert native_equal(canonical, drawing_edge.source_edge) == 1
-            assert native_equal(roundtrip, drawing_edge) == 1
+            assert any(mapped is canonical for mapped, _edge in roundtrip_calls)
         assert any(
             first is feature and native_equal(second, source_bore) == 1
             for feature in source_face_features
@@ -2068,15 +2406,13 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         )
         assert (source_model, "IModelDoc2") in early_binding_calls
         assert (source_extension, "IModelDocExtension") in early_binding_calls
-        assert source_configuration.Name == source_active_name
+        assert source_configuration.Name == source_original_name
         assert views[3].ReferencedConfiguration == configuration
-        if drift == "source-active-config-different":
-            assert source_configuration.Name != views[3].ReferencedConfiguration
-        elif drift == "rim-source-fresh-wrapper":
+        if drift == "rim-source-fresh-wrapper":
             assert all(
                 isinstance(canonical, EntityWrapper)
                 and canonical is not drawing_edge.source_edge
-                for drawing_edge, canonical in source_mapping_calls
+                for drawing_edge, canonical in matched["maps"]
             )
         elif drift == "rim-roundtrip-fresh-wrapper":
             assert all(
@@ -2090,6 +2426,129 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
                 and native_equal(feature, source_bore) == 1
                 for feature in source_face_features
             )
+        if drift == "bore-fresh-wrapper":
+            assert EntityWrapper(source_bore).GetID() == source_bore.GetID()
+        if drift == "postrestore-rim-fresh-wrapper":
+            assert any(
+                first is postrestore_wrapper or second is postrestore_wrapper
+                for first, second in identity_comparisons
+            )
+
+    configuration_refusals = {
+        "source-activation-false",
+        "source-activation-false-mutates",
+        "source-activation-true-wrong",
+        "source-restore-false",
+        "source-restore-lying",
+        "source-restore-throws",
+        "mapping-failure-restore-false",
+        "mapping-failure-restore-lying",
+        "mapping-failure-restore-throws",
+        "mapping-failure-restore-throws-logger",
+        "logger-failure-restore",
+        "scope-cleanup-independent",
+        "scope-dirty-drift",
+        "scope-hash-drift",
+        "scope-view-config-drift",
+        "scope-other-view-config-drift",
+        "scope-drawing-view-drift",
+        "scope-drawing-sheet-drift",
+        "postrestore-rim-missing",
+        "postrestore-rim-replaced",
+        "postrestore-rim-duplicates",
+    }
+    if drift in configuration_refusals:
+        with pytest.raises(RuntimeError) as refused:
+            kit.annotate_member(adapter, configuration, cells, views)
+        assert not note.setter_calls
+        assert "set-leader" not in events and "insert" not in events
+        assert "delete-note" not in events
+        assert source_state.activations == [configuration]
+        assert source_state.restorations == [source_original_name]
+        assert len(source_state.hash_calls) == 2
+        assert source_state.hash_calls[0][2] == source_original_name
+        restore_failed = drift in {
+            "source-restore-false",
+            "source-restore-lying",
+            "source-restore-throws",
+            "mapping-failure-restore-false",
+            "mapping-failure-restore-lying",
+            "mapping-failure-restore-throws",
+            "mapping-failure-restore-throws-logger",
+            "logger-failure-restore",
+            "scope-cleanup-independent",
+        }
+        assert source_state.active == (
+            configuration if restore_failed else source_original_name
+        )
+        assert source_state.hash_calls[1][2] == source_state.active
+        changed_bytes = drift in {
+            "scope-hash-drift",
+            "scope-cleanup-independent",
+            "mapping-failure-restore-throws-logger",
+        }
+        assert (
+            source_state.hash_calls[0][1] != source_state.hash_calls[1][1]
+        ) is changed_bytes
+        restore_index = scope_events.index(("show-configuration", source_original_name))
+        cleanup = scope_events[restore_index + 1 :]
+        cleanup_kinds = {item[0] for item in cleanup}
+        assert {
+            "save-flag",
+            "drawing-views",
+            "drawing-view",
+            "drawing-sheet",
+            "hash",
+        } <= cleanup_kinds
+        assert all(("view-configuration", view) in cleanup for view in views)
+        if "logger" in drift:
+            assert logger_failures == [logger_error]
+            assert refused.value is not logger_error
+            assert repr(logger_error) in "\n".join(refused.value.__notes__)
+        assert ("view-configuration", unrelated_view) in cleanup
+        if drift.startswith("source-activation-"):
+            assert len(source_state.inventories) == 1
+            assert "source configuration activation failed" in str(refused.value)
+            assert all(
+                inventory["active"] == source_original_name
+                for inventory in source_state.inventories
+            )
+            assert not roundtrip_calls
+        elif (
+            drift.startswith("mapping-failure-") or drift == "scope-cleanup-independent"
+        ):
+            assert refused.value is mapping_error
+            assert refused.value.__notes__
+            notes = "\n".join(refused.value.__notes__)
+            assert "configuration restoration" in notes
+            if drift in {
+                "scope-cleanup-independent",
+                "mapping-failure-restore-throws-logger",
+            }:
+                assert source_state.dirty
+                assert views[0]._referenced_configuration == "Unexpected"
+                assert drawing_state.active == "unexpected-view"
+                assert drawing_state.sheet == "UnexpectedSheet"
+                assert len(refused.value.__notes__) >= 5
+                assert all(
+                    stage in notes
+                    for stage in (
+                        "source unsaved state",
+                        "drawing activation",
+                        "drawing configurations",
+                        "native source SHA",
+                    )
+                )
+        elif drift == "logger-failure-restore":
+            assert refused.value.__cause__ is restore_error
+            assert "native bore configuration restoration failed" in str(refused.value)
+            assert repr(restore_error) in "\n".join(refused.value.__notes__)
+        elif drift.startswith("postrestore-"):
+            assert source_state.postrestore_inventories
+            visible = source_state.postrestore_inventories[-1][1]
+            matches = [item for item in visible if native_equal(item, rim) == 1]
+            assert len(matches) == (2 if drift == "postrestore-rim-duplicates" else 0)
+        return
 
     initial_refusals = {
         "setter-refused": "placement refused",
@@ -2129,6 +2588,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         with pytest.raises(RuntimeError, match=initial_refusals[drift]) as refused:
             kit.annotate_member(adapter, configuration, cells, views)
         assert "insert" not in events and "delete-note" not in events
+        assert_scope_cleanup()
         if drift in {
             "rim-source-mapping-missing",
             "rim-roundtrip-missing",
@@ -2138,12 +2598,22 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             "rim-feature-identity",
         }:
             assert not note.setter_calls
-            assert len(source_mapping_calls) == 1
-            drawing_edge, canonical = source_mapping_calls[0]
+            matched_maps = [
+                mapping
+                for inventory in source_state.inventories
+                if inventory["active"] == configuration
+                for mapping in inventory["maps"]
+            ]
+            assert len(matched_maps) == 1
+            drawing_edge, canonical = matched_maps[0]
             assert drawing_edge is rim
             assert rim.feature == bore_feature
             if drift == "rim-source-mapping-missing":
                 assert canonical is None and not roundtrip_calls
+                assert any(
+                    first is rim and second is rim
+                    for first, second in identity_comparisons
+                ), "baseline view equality cannot qualify missing source ownership"
             else:
                 assert len(roundtrip_calls) == 1
                 assert roundtrip_calls[0][0] is canonical
@@ -2404,7 +2874,12 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         in {
             "none",
             "cross-context-feature",
-            "source-active-config-different",
+            "source-already-target",
+            "baseline-mapping-throws",
+            "baseline-bore-throws",
+            "baseline-equality-zero",
+            "baseline-equality-throws",
+            "postrestore-rim-fresh-wrapper",
             "rim-source-fresh-wrapper",
             "rim-roundtrip-fresh-wrapper",
             "rim-source-feature-fresh-wrapper",
@@ -2419,6 +2894,13 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     ):
         checks[0]()
         assert_source_correspondence()
+        if drift == "postrestore-rim-fresh-wrapper":
+            # Only the settled comparison sees two returned view wrappers;
+            # the post-restore inventory itself compares wrapper to old rim.
+            assert any(
+                first is postrestore_wrapper and second is postrestore_wrapper
+                for first, second in identity_comparisons
+            )
     else:
         expected_error = {
             "noniso-reappears": "survived/returned",
@@ -2434,6 +2916,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         }.get(drift)
         with pytest.raises(RuntimeError, match=expected_error):
             checks[0]()
+        assert_scope_cleanup()
     # Missing callouts during settled readback are failures, not repair requests.
     assert events.count("insert") == int(created)
     assert events.count("delete-note") == int(drift == "retire-right")
