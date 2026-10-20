@@ -15,10 +15,12 @@ fixed D-fit that does not run (drawing-guidelines.md rule 6).  Hidden lines
 communicate no additional manufacturing fact on these through-bored spur
 gears, so every view remains hidden-lines-removed.  The side view stays in
 projection with the front view's bore axis; its native blank diameter reads
-linearly across the profile, and its face width hangs below it, clear of the
-Gear Data block. The circular pitch thickness uses a construction inspection
-witness of the actual arc size, not an ideal chord oracle; root MIN/MAX use
-the actual radial-envelope witness.
+linearly across the profile. Only Right shows the existing consumed BlankProfile
+as a drawing-only cross-section, not a full blank envelope; its edge-on printed
+appearance and persistence still require native proof. Its face width hangs
+below it, clear of the Gear Data block. The circular pitch thickness uses a
+construction inspection witness of the actual arc size, not an ideal chord
+oracle; root MIN/MAX use the actual radial-envelope witness.
 The D-bore prints in an enlarged bore view, a cropped *Front model view at a
 scale that renders every bore at least ``BORE_VIEW_BORE_MIN`` across (its flat
 is 0.13 deep on T006 and T012); both views centre-mark the bore.  The part
@@ -54,7 +56,11 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
+from _drawing_dimension_import import (
+    _INSERT_DIMS_MARKED,
+    _drawing_component_name,
+    delete_unnamed_imports,
+)
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
@@ -1026,6 +1032,24 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
+def _show_blank_profile(adapter: Any, view: Any) -> None:
+    """Show the existing blank cross-section in Right only, never on the part.
+
+    Qualified selection and the drawing's void UnblankSketch call do not prove
+    that this consumed, edge-on sketch prints or survives final export.
+    """
+    orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
+    if orientation != "*Right":
+        raise RuntimeError(f"BlankProfile requires *Right, got {orientation!r}")
+    name = _activate_view(adapter, view, label="blank reference Right view")
+    hidden_sketches._show_view_sketches(
+        adapter.currentModel,
+        ("BlankProfile",),
+        paths=((_drawing_component_name(adapter, view), name),),
+        label=f"{name} blank reference",
+    )
+
+
 def _center_bore_view(adapter: Any, view: Any, configuration: str) -> None:
     """Move the configured bore view so the bore axis lands on BORE_VIEW_CENTER."""
     view = _early_bound(view, "IView")
@@ -1523,10 +1547,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
-        # The part saves both authoring sketches hidden; the front view shows
-        # them again for their dimensions (the side and iso views show the
-        # part as saved).  The targeted import still delivers the dimensions
-        # on every sheet after the first (probe 834-gapfloor-c301).
+        # The part saves both authoring sketches hidden; Front shows them
+        # for their dimensions. Right separately shows the consumed blank
+        # cross-section below; iso keeps the part as saved. The targeted import
+        # still delivers dimensions on every sheet (probe 834-gapfloor-c301).
         front_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
             front,
@@ -1534,6 +1558,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        _show_blank_profile(adapter, right)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,

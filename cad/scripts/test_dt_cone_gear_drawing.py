@@ -1654,6 +1654,180 @@ def test_settled_blank_refuses_native_regression_on_any_sheet(
     assert "BlankDia" in str(failure.value)
 
 
+class _BlankReferenceView:
+    def __init__(self, configuration, role, instance):
+        self.name = f"Drawing View{instance}"
+        self.component = f"cone-instance-{instance}"
+        self.ReferencedConfiguration = configuration
+        self.orientation = {
+            "right": "*Right", "front": "*Front",
+            "iso": "*Isometric", "bore": "*Front",
+        }[role]
+        self.shown = {"GapFloorReference"} if role == "front" else set()
+        self.base = None
+
+    def GetName2(self):
+        return self.name
+
+    def GetOrientationName(self):
+        return self.orientation
+
+    def RootDrawingComponent2(self, in_child_context):
+        assert in_child_context is False
+        from types import SimpleNamespace
+        return SimpleNamespace(Name=self.component)
+
+    def GetBaseView(self):
+        return self.base
+
+
+class _BlankReferenceDrawing:
+    """Selection/ownership state only; not a simulator of native printed ink."""
+
+    def __init__(self):
+        self.views = {}
+        for configuration, _teeth in spec.CONFIGS:
+            for role in ("front", "right", "iso", "bore"):
+                view = _BlankReferenceView(configuration, role, len(self.views) + 1)
+                self.views[configuration, role] = view
+        self.Extension = self
+        self.active = None
+        self.selected = None
+        self.refused_activation = set()
+        self.refused_selection = set()
+        self.attempts = []
+        self.unblanked = []
+        # The fake model has independent saved visibility, never changed by
+        # the drawing override. Other features must also retain their state.
+        self.part_visibility = {"BlankProfile": False, "BoreProfile": False}
+
+    def ActivateView(self, name):
+        if name in self.refused_activation:
+            return False
+        self.active = next(view for view in self.views.values() if view.name == name)
+        return True
+
+    def ClearSelection2(self, all_marks):
+        assert all_marks is True
+        self.selected = None
+
+    def SelectByID2(self, name, kind, x, y, z, append, mark, callout, option):
+        assert (kind, x, y, z, append, mark, option) == (
+            "SKETCH", 0.0, 0.0, 0.0, False, 0, 0,
+        )
+        self.attempts.append(name)
+        self.selected = None
+        if name in self.refused_selection:
+            return False
+        for view in self.views.values():
+            if name == f"BlankProfile@{view.component}@{view.name}":
+                if self.active is not view:
+                    return False
+                self.selected = (view, "BlankProfile")
+                return True
+        return False
+
+    def UnblankSketch(self):
+        assert self.selected is not None
+        view, sketch = self.selected
+        assert self.active is view
+        view.shown.add(sketch)
+        self.unblanked.append((view, sketch))
+        # SolidWorks returns void, not a success Boolean.
+        return None
+
+
+@pytest.fixture
+def blank_reference_adapter(monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace
+    import _drawing_dimension_import
+
+    # Keep the actual view-name/component qualifier and show primitive. Only
+    # COM binding/null marshalling is replaced at this offline boundary.
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing.hidden_sketches, "null_callout", lambda: None)
+
+    def member(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+    return SimpleNamespace(
+        currentModel=_BlankReferenceDrawing(), _get_attr_or_call=member,
+    )
+
+
+def test_blank_reference_persists_only_in_each_exact_right_view(blank_reference_adapter):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    original = {key: set(view.shown) for key, view in draw.views.items()}
+    part_visibility = dict(draw.part_visibility)
+    for index, (configuration, _teeth) in enumerate(spec.CONFIGS, start=1):
+        right = draw.views[configuration, "right"]
+        drawing._show_blank_profile(adapter, right)
+        assert draw.active is right
+        assert draw.selected is None
+        assert draw.attempts[-1] == f"BlankProfile@{right.component}@{right.name}"
+        assert len(draw.unblanked) == index
+        # Check all eighty persistent owners after EACH show, not just the
+        # last active view or twenty independent throwaway fake documents.
+        visited = set(drawing.GEAR_SHEET_NAMES[:index])
+        for (sheet, role), view in draw.views.items():
+            added = {"BlankProfile"} if role == "right" and sheet in visited else set()
+            assert view.shown == original[sheet, role] | added
+        assert draw.part_visibility == part_visibility
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+@pytest.mark.parametrize("failure", ("activation", "exact-selection", "base-fallback"))
+def test_blank_reference_refuses_without_showing_another_owner(
+    blank_reference_adapter, configuration, teeth, failure,
+):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    right = draw.views[configuration, "right"]
+    front = draw.views[configuration, "front"]
+    # An available base qualifier is tempting but must NEVER be tried.
+    right.base = front
+    exact = f"BlankProfile@{right.component}@{right.name}"
+    if failure == "activation":
+        draw.refused_activation.add(right.name)
+    else:
+        draw.refused_selection.add(exact)
+        if failure == "exact-selection":
+            right.base = None
+    draw.ActivateView(front.name)
+    before = {key: set(view.shown) for key, view in draw.views.items()}
+    part_visibility = dict(draw.part_visibility)
+    with pytest.raises(RuntimeError, match="activate|cannot select"):
+        drawing._show_blank_profile(adapter, right)
+    assert draw.attempts == ([] if failure == "activation" else [exact])
+    assert not draw.unblanked
+    assert draw.selected is None
+    assert {key: view.shown for key, view in draw.views.items()} == before
+    assert draw.part_visibility == part_visibility
+
+
+@pytest.mark.parametrize("role", ("front", "iso", "bore"))
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_blank_reference_rejects_nonright_targets_before_activation(
+    blank_reference_adapter, configuration, teeth, role,
+):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    right = draw.views[configuration, "right"]
+    draw.ActivateView(right.name)
+    before = {key: set(view.shown) for key, view in draw.views.items()}
+    part_visibility = dict(draw.part_visibility)
+    with pytest.raises(RuntimeError, match=r"requires \*Right"):
+        drawing._show_blank_profile(adapter, draw.views[configuration, role])
+    assert draw.active is right
+    assert not draw.attempts
+    assert not draw.unblanked
+    assert {key: view.shown for key, view in draw.views.items()} == before
+    assert draw.part_visibility == part_visibility
+
+
 def test_invalid_family_member_is_rejected() -> None:
     with pytest.raises(ValueError):
         spec.bore_dia_mm(7)
