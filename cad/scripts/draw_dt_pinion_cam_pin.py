@@ -5,9 +5,9 @@ MHA-DT-14 strap's follower seat.  The sheet runs at 8:1 so the 20.8-long pin
 reads at arm's length.  The side view lies as the pin is turned (drawing-guidelines.md rule 11 (turned parts read like the lathe)) and
 carries every dimension: the diameter, the length, the crown radius and a
 reference overall.  The end view projects to its left (third angle), and a
-4:1 isometric sits clear of the title block.  The shank the cam rides carries
-the one roughness symbol, and the sheet has no general notes
-(dt_pinion_cam_pin_spec).
+4:1 isometric sits clear of the title block.  The shank OD the cam rides carries
+the one roughness symbol, explicitly distinguished from the free crown, and
+the sheet has no general notes (dt_pinion_cam_pin_spec).
 
 Run with SolidWorks open::
 
@@ -128,11 +128,11 @@ DIMENSION_CALLOUTS = {
     "CapR": CAP_RADIUS_CALLOUT,
 }
 
-# The cam rides the shank about 15 from the seated end (the foot of the pin
-# line on the cam axis in build_dt_drive_train_assembly, parked 14.8 and
-# engaged 15.5).  The finish leader lands on the shank's upper silhouette at
-# that station, leaving the symbol's shelf end and falling to the right, so it
-# passes below the "Ra 1.6" text that sits above the shelf.
+# A representative station on the exposed shank identifies the whole
+# cylindrical finish face, not a restricted operating-contact band.  The
+# finish leader falls to the right below the target and Ra text.  Assembly
+# axis-distance geometry, not the unused free crown, establishes the contact
+# surface (test_the_cam_rides_the_shank_short_of_the_crown).
 CAM_CONTACT_FROM_SEATED_END_MM = 15.0
 SHANK_FINISH_SYMBOL_XY = (0.168, RIGHT_CENTER[1] + HALF_DIA + 0.006)
 
