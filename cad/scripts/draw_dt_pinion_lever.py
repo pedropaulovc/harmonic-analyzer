@@ -559,6 +559,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, detail, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the pin hole")
 
+    # machinist-exception: RV-01 (DRAWING_NOTES inside-corner ceiling)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
     # Top-left anchored under the relocated isometric (bottom y ~0.102).
     add_property_linked_note(adapter, "Isometric View Note", 0.1545, 0.097)

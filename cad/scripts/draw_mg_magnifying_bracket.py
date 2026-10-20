@@ -1272,6 +1272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_entity=bore_rim.edge,
         symbol_xy=COLLAR_FINISH_XY,
         leader_attach_xy=_collar_finish_landing(bore_axis),
+        # machinist-exception: RV-01 (SURFACE_FINISHES "collar_bore", COLLAR_BORE_CALLOUT)
         control=surface_finish_by_key(SURFACE_FINISHES, "collar_bore"),
         label="collar bore finish",
         char_height=COLLAR_FINISH_CHAR_HEIGHT,

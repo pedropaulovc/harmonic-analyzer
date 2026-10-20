@@ -1,0 +1,13 @@
+# Owner-accepted machinist-review exceptions for draw_dt_drive_train_assembly.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_dt_drive_train_assembly.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+# TODO(#1179): remove DT-01 when MHA-FR-001 carries a lock for MHA-VN-014.
+- id: "DT-01"
+  kind: "minor"
+  anchor:
+    - "note:draw_dt_drive_train_assembly.CONE_SET_ON_BASE_STEP"
+    - "note:draw_dt_drive_train_assembly.CONE_SWING_SET_CHECK"
+  finding: "threaded joint under operating load without a lock (rule 23)"
+  reason: "temporary, pending owner confirmation (#1179): the receiver is the MHA-FR-001 base (joint_retention.py ha-harmonic-analyzer/cone-pivot-screw-in-base), whose blind seat under a bottomed shoulder leaves nothing this assembly can stake, nut or pin; every lock #1179 lists (a through tap with a jam nut or staked mouth underneath, a cross pin through the base boss, a keyed washer pinned to the base) is a base change. MHA-VN-013 clamps the swing in the saved and running pose; it is loosened only for checks 4 and 5"

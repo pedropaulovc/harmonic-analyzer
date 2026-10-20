@@ -110,7 +110,7 @@ if PIN_SEAT_WEB_WORST < 1.5:
     )
 # The sheet states the far-face wall as a plain fact (rule 20), rounded down
 # so it never claims more than the worst case: the owner-ruled shortfall
-# declared as RV-01 in cad/config/parts/dt-pinion-bracket.yaml.
+# declared as RV-01 in draw_dt_pinion_bracket.exceptions.yaml.
 PIN_SEAT_WALL_CALLOUT = f"WALL {math.floor(PIN_SEAT_WEB_WORST * 10) / 10:.1f} MIN"
 
 # The seat floor is modelled sharp; the corner allowance lets the builder pick

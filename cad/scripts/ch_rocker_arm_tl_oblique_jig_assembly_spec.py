@@ -1205,7 +1205,7 @@ if not BLOCK_JOINT_SLIP_N >= 1.25 * FEED_THRUST_N:
 # carries it with margin, so the flange never slips and no operating torque
 # reaches the screws: a static clamp (rule 23's last bullet). A wedge-lock
 # pair cannot seat there: an M3 pair's OD 7.0 on the Ø16 circle reaches R4.5,
-# into the nut's Ø10.2 body. The jig's machinist_exceptions record the ruling.
+# into the nut's Ø10.2 body. The jig drawing's exception RV-01 records the ruling.
 # Engagement: the shortest screw (ISO 4762 length js15, ±0.29 at 10) past
 # the flange, in TL-29's 6061-T6 tap.
 _ISO4762_LENGTH_TOL_MM = 0.29  # STANDARD: ISO 4762 / ISO 4759-1 js15, l = 10
@@ -1352,6 +1352,34 @@ _CL_HOLE = (
     f"Ø{carrier.CL_DOWEL_DIA:.0f} X 20 M6 DOWEL "
     f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
 )
+# Steps 7A, 7C and 8 carry owner-accepted review exceptions (the nut-flange
+# static clamp, the nut bracket's set, the set screws' threadlocker); named so
+# draw_ch_rocker_arm_tl_oblique_jig_assembly.exceptions.yaml anchors them.
+NUT_FIT_STEP = (
+    f"7A. SCREW A KP08 BLOCK {_item(PILLOW_BLOCK)} ON EACH END BRACKET WITH 2 "
+    f"{_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)} AND THE FLANGED NUT "
+    f"{_item(LEADSCREW_NUT)} ON THE NUT BRACKET WITH 4 {_NUT_SCREW} "
+    f"{_item(NUT_SCREW)}, FLANGE TOWARD THE SPINDLE, SNUG."
+)
+NUT_BRACKET_SET_STEP = (
+    "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
+    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
+    "FROM "
+    "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); SPOT THE NUT BRACKET "
+    "THROUGH THE BLOCK'S 2 "
+    f"Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "
+    "TRANSFER PUNCH)."
+)
+FEED_TIGHTEN_STEP = (
+    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
+    f"{_BLOCK_TORQUE}, THEN THE KP08 "
+    "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
+    f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
+    # Owner ruling 2026-10-18 (rule 23, exception RV-03): the set screws are
+    # locked with a bought low-strength threadlocker, named, not prescribed.
+    "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH "
+    "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER."
+)
 ASSEMBLY_STEPS = (
     f"1. SCREW AN HGR15R RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, ENDS FLUSH: "
@@ -1392,19 +1420,10 @@ ASSEMBLY_STEPS = (
     "HOLD-DOWN NUTS AND READ EACH STATION AGAIN.",
     # Review bought-r15: one operation a line, so the taps plainly go in the
     # nut bracket's spots and the pivot block's side holes stay clearance.
-    f"7A. SCREW A KP08 BLOCK {_item(PILLOW_BLOCK)} ON EACH END BRACKET WITH 2 "
-    f"{_KP08_SCREW} {_item(PILLOW_BLOCK_SCREW)} AND THE FLANGED NUT "
-    f"{_item(LEADSCREW_NUT)} ON THE NUT BRACKET WITH 4 {_NUT_SCREW} "
-    f"{_item(NUT_SCREW)}, FLANGE TOWARD THE SPINDLE, SNUG.",
+    NUT_FIT_STEP,
     f"7B. THREAD THE LEADSCREW {_item(LEADSCREW)}, OILED WITH ISO VG 32 OIL, IN "
     "FROM THE BAR'S FAR END THROUGH BOTH BLOCKS AND THE NUT.",
-    "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
-    f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
-    "FROM "
-    "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); SPOT THE NUT BRACKET "
-    "THROUGH THE BLOCK'S 2 "
-    f"Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "
-    "TRANSFER PUNCH).",
+    NUT_BRACKET_SET_STEP,
     "7D. RUN THE SCREW OUT, UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 "
     f"SPOTS {nut_bracket.BLOCK_THREAD} PER {nut_bracket.NUMBER}; THE BLOCK'S "
     "HOLES STAY PLAIN.",
@@ -1416,14 +1435,7 @@ ASSEMBLY_STEPS = (
     # round it (7B threads it only to locate the nut for 7C's spotting).
     "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
     f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK.",
-    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
-    f"{_BLOCK_TORQUE}, THEN THE KP08 "
-    "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
-    f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
-    # Owner ruling 2026-10-18 (rule 23, exception RV-03): the set screws are
-    # locked with a bought low-strength threadlocker, named, not prescribed.
-    "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH "
-    "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER.",
+    FEED_TIGHTEN_STEP,
     "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
     "TAGGED ON SHEET 1) ON THE COLLARS.",
     "10. WITH THE CARRIER ON A1/B1, DRILL AND REAM ITS HUB AND CL HOLES OFF "

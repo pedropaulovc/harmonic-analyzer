@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_ch_channel_lever.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_channel_lever.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "dim:HubLength@Hub"
+    - "note:draw_ch_channel_lever.TOP_CALLOUTS[HubLength]"
+  finding: "20-hub face-to-face stack with no fit-up allowance or shim (rule 19)"
+  reason: "the hubs set the station pitch with no shim by design; the stack's end float is proven at the channel assembly, not on this part (owner-accepted)"

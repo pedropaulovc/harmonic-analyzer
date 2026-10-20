@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_pn_pen_assembly.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pn_pen_assembly.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "note:pn_pen_assembly_sheet.PEN_YAW_STEP"
+    - "note:pn_pen_assembly_sheet.YAW_HOLD_CHECK"
+  finding: "the #4-40 cup-point set screw holding the pen yaw is a threaded joint under reversing nib drag with no lock (rule 23)"
+  reason: "owner ruling U-MHA-VN-061-no-lock (user, 2026-10-14, PR #1436; joint_retention.py pn-pen/rod-set-screw-in-v-block): the set screw is the operator's yaw adjustment and a light clamp, re-set when it drifts; the block's 7.0 tap leaves no room for a second jam screw, and the 1898 machine ran the plain cup point bare (owner-accepted)"

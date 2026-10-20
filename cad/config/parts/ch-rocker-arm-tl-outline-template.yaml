@@ -8,9 +8,3 @@ ch-rocker-arm-tl-outline-template:
   quantity: 1
   tolerance_class: machined_block
   process: "lay out and scribe the arcs; drill and ream the pivot hole; saw outside the lines and file to them"
-  machinist_exceptions:
-    - id: "TL-01"
-      kind: "accept"
-      where: "the rod slot station, BASIC 133.067 and 8.456 from the pivot centreline"
-      finding: "basic dimensions with no feature-control frame (rule 5)"
-      reason: "the slot clocks the gauge: it is laid on the rocker with pin gauges in its pivot hole and this slot, and its shop acceptance (inventory arm-outline-template: DTI stations within 0.03) is taken with pins in both, so the station has no band of its own; a title-block +/-0.13 across the slot would rotate the outline by up to 2.08 x 0.13 at the tail end and break the 0.16 gauge share of the rocker zone (#1545 option 4)"

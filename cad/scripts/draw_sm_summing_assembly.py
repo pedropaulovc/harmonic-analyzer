@@ -36,6 +36,8 @@ import _telemetry
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
+import sm_summing_lever_spec as lever
+import vn_boss_hook_jam_nut_spec as jam_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloons import (
@@ -99,7 +101,7 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the summing package is landscape throughout")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 ASSEMBLED_SCALE = (1.0, 5.0)
-EXPLODED_SCALE = (1.0, 4.0)
+EXPLODED_SCALE = (1.0, explode.EXPLODED_SHEET_SCALE)
 SHEET_SCALES = dict(
     zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, ASSEMBLED_SCALE))
 )
@@ -210,8 +212,61 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # One balloon per BOM row, each on its own family's visible edge: every family
-# is separated from its neighbours in the explode.
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# is separated from its neighbours in the explode. Items 1-4, 6 and 9-10
+# walk their part's body; 5, 7 and 8 are pinned. The walk takes the first
+# body extreme point whose hit test returns the part's own edge, and the
+# extreme points (IBody2::GetExtremePoint on a tie) and the listed-edge order
+# changed between runs on byte-identical geometry (mass-props sha ed72951a,
+# farm runs 20261018T063722284Z and 20261018T082441219Z). Between those runs
+# the lever moved from its +Z trunnion to the far pad corner and the spring
+# from its top junction to an unproven listed-edge landing. The hook took its
+# cut end's chamfer, just above the nut, and the nut took its bottom corner,
+# drawn on the boss top face (machinist review r1-r3 FIX). Each pin is a
+# part-frame point (mm) on an edge of a face that turns towards the
+# *Isometric viewer (+X+Y+Z):
+#   5 lever (identity in the assembly): the midpoint (z = 0) of the spring
+#     pad's free bottom edge (x = PLATE_W, y = PLATE_T / 2 - SPRING_SEAT_T),
+#     the plate's longest silhouette: the +X side face above it faces the
+#     viewer and the pad underside below it faces away, and no other part's
+#     edge draws near it. Half the plate length runs on either side, 15.6
+#     sheet mm (33 px at 2.098 px/mm). It draws 21 mm right of the boss,
+#     hook and nut column. The earlier pin on the plate's top edge, a
+#     quarter length to -Z, missed all 3 picks on swmaker000009 and on
+#     swmaker00000f (run 20261019T205741588Z): its zoomed pick drew the edge
+#     4 px off the point, beside the spring-hole row;
+#   6 hook: left on the walk, which has resolved the hook on every run.
+#     Frozen hook points missed their hit test on 3 of 4 farm runs: the eye
+#     tip's dome-root circle (20261018T103421329Z), and the deburr circle's
+#     0 deg (20261018T133257069Z) and 18 deg (20261018T152147460Z) points;
+#   7 nut (ROT_X_NEG90: local x = X, y = -Z, z = +Y, corners on the local +-Y
+#     meridian): the middle of the top edge of the flat at local polar angle
+#     300 deg. Its normal is machine (0.5, 0, 0.866), the flat that faces the
+#     viewer most squarely. The nut now stands clear between the boss top face
+#     and the hook's cut end (explode.JAM_NUT_RISE); a part-frame pin rides that
+#     rise, being projected through the collapsed transform plus the summed
+#     explode steps (_drawing_balloons._anchor_model_points);
+#   8 spring (local x = +Y, y = -Z, z = -X): the +X coil-end junction circle,
+#     a wire radius off (-coil_start_x_mm, 0, -COIL_MEAN_RADIUS_MM). Its
+#     outward normal is machine (0.976, -0.216, 0.006). The point is the
+#     ICurve::Evaluate2 read-back the 063722284Z run hit-tested as the
+#     spring's own edge (method visible-edge, sheet 112.51, 200.52).
+LEVER_BALLOON_POINT_MM = (
+    lever.PLATE_W,
+    lever.PLATE_T / 2.0 - lever.SPRING_SEAT_T,
+    0.0,
+)
+_NUT_FLAT_ANGLE = math.radians(300.0)
+JAM_NUT_BALLOON_POINT_MM = (
+    jam_nut.ACROSS_FLATS / 2.0 * math.cos(_NUT_FLAT_ANGLE),
+    jam_nut.ACROSS_FLATS / 2.0 * math.sin(_NUT_FLAT_ANGLE),
+    jam_nut.THICKNESS,
+)
+COUNTER_SPRING_BALLOON_POINT_MM = (164.374, -0.005, -6.331)
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
+    spec.LEVER: BalloonAnchor(point_mm=LEVER_BALLOON_POINT_MM),
+    spec.BOSS_JAM_NUT: BalloonAnchor(point_mm=JAM_NUT_BALLOON_POINT_MM),
+    spec.COUNTER_SPRING: BalloonAnchor(point_mm=COUNTER_SPRING_BALLOON_POINT_MM),
+}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,
@@ -249,6 +304,7 @@ def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
 
 ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
 # Steps and checks share one note so the checks can never overlap the steps.
+# machinist-exception: SM-01 (notes.UPPER_EYE_CLAMP_STEP, notes.UPPER_EYE_CLAMP_CHECK)
 STEPS_AND_CHECKS = "\n".join(
     (
         "ASSEMBLY SEQUENCE",

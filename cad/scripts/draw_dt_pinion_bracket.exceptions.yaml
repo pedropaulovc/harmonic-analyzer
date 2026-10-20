@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_dt_pinion_bracket.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_dt_pinion_bracket.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "minor"
+  anchor:
+    - "dim:PinSeatCz@PinSeatProfile"
+    - "note:dt_pinion_bracket_spec.PIN_SEAT_WALL_CALLOUT"
+  finding: "follower-seat wall to the far broad face below the 2.0 mm target (rule 17)"
+  reason: "owner ruling (a), 2026-09-25 (dt_pinion_bracket_spec PIN_SEAT_STATION_TOL; #904 row 1): the Ø4 MHA-DT-025 stud and the 9.0 strap stay, and the station alone tightens to ±0.10 so the far-face wall holds the 1.5 floor (1.544 at the thinnest .X bar, the station's upper limit, the seat's upper-limit radius and 0.05 drill wander); the 2.0 target gives way. The geometry fixes (Ø3 stud, 9.5 strap) are tracked in #904. The sheet prints WALL 1.5 MIN"

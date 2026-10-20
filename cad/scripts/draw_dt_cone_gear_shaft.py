@@ -229,6 +229,7 @@ SIDE_DIAMETERS = {
     "Sec1Dia": (0.1600, 0.1800),
     "Sec2Dia": (BIG_END_X - (2.0 * SECTION_ENDS[2] + SECTION_ENDS[1]) / 3000.0, 0.1785),
     "Sec3Dia": (BIG_END_X - (2.0 * SECTION_ENDS[3] + SECTION_ENDS[2]) / 3000.0, 0.1905),
+    # machinist-exception: RV-01 (the tip land's Sec4Dia)
     "Sec4Dia": (TIP_END_X + 0.0030, 0.2025),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
@@ -404,6 +405,7 @@ D_SECTION_KEEP = {
 }
 SECTION_ABOVE_CALLOUTS = {
     f"Sec{min(FLAT_LANDS)}AF": FLATS_IN_LINE_CALLOUT,
+    # machinist-exception: RV-01 (the tip flat's Sec4AF and its corner limit)
     f"Sec{max(FLAT_LANDS)}AF": TORQUE_CORNER_CALLOUT,
 }
 # An above callout is centred on its dimension's text, set as one run: a
@@ -1676,6 +1678,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions={**collar_neighbours, "CollarDia": collar},
         sign=sign,
     )
+    # machinist-exception: RV-02 (DRAWING_NOTES tailstock row)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     setup_references = _add_setup_sheet(adapter)
 

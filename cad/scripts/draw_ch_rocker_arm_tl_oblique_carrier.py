@@ -946,6 +946,7 @@ async def build(adapter: Any) -> dict[str, str]:
             part_spec.LEVER_TAP_DRILL,
             part_spec.LEVER_HOLES[1],
             part_spec.LEVER_THREAD,
+            # machinist-exception: RV-01
             part_spec.LEVER_TAP_CALLOUT,
         ),
     ):

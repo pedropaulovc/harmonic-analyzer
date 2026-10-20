@@ -479,9 +479,11 @@ DIMENSION_CALLOUTS = {
     # #1128 full build). The mate hangs under the value in rows as narrow as
     # the value: on T006/T012 the flat's witness for the clock rises ~3 mm
     # right of it, and a wider block's shoulder crosses that witness.
+    # machinist-exception: RV-01, RV-02 (BoreCutDia)
     "BoreCutDia": f"THRU\nSLIDES ON\n{SHAFT_MATE}",
     # The value is the gear bore's own; naming the bore, not the shaft it
     # slides on, keeps it from reading as MHA-DT-004's across-flat.
+    # machinist-exception: RV-01 (BoreAF)
     "BoreAF": f"BORE ACROSS FLAT\nSLIDES ON {SHAFT_MATE}",
     # The flat's normal runs through the bore axis and the +X tooth's centre;
     # the bore view crops the teeth off, so the callout names the reference

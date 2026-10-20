@@ -1,0 +1,32 @@
+# Owner-accepted machinist-review exceptions for draw_ch_rocker_arm_tl_oblique_pivot_block.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_rocker_arm_tl_oblique_pivot_block.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "frame:ch_rocker_arm_tl_oblique_pivot_block_spec.GEOMETRIC_TOLERANCES_MM[top seat position to bottom seat]"
+  finding: "position frame outside the rule 5 short list"
+  reason: "the two 6200 seats carry one pivot pin; misaligned seats would preload the bearings and tilt the pin that sets the trammel radius (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "note:ch_rocker_arm_tl_oblique_pivot_block_spec.CALLOUTS_BELOW[TopBoreDepth]"
+    - "note:ch_rocker_arm_tl_oblique_pivot_block_spec.CALLOUTS_BELOW[BottomBoreDepth]"
+  finding: "three-place depths and a web 3.23 min stated on them"
+  reason: "the web behind each inner race must keep the 3.0 collet-puller space; at two places it could drop to 2.47 (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+- id: "RV-03"
+  kind: "accept"
+  anchor: "note:ch_rocker_arm_tl_oblique_pivot_block_spec.CALLOUTS_ABOVE[CboreFloor]"
+  finding: "three-place floor height"
+  reason: "the floor sets the M4 x 20 screws' engagement in the HGH15CA carriage's 5.0 deep thread (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+- id: "RV-04"
+  kind: "minor"
+  anchor: "note:ch_rocker_arm_tl_oblique_pivot_block_spec.CBORE_FLOOR_CALLOUT"
+  finding: "engagement 3.85-4.95 in the carriage's 5.0 deep thread, under 1.5D (rule 18)"
+  reason: "the bought carriage's M4 x 5 holes limit the engagement; the shortfall is stated on the sheet (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
+- id: "RV-05"
+  kind: "accept"
+  anchor: "note:ch_rocker_arm_tl_oblique_pivot_block_spec.SIDE_CALLOUT_BELOW"
+  finding: "three-place counterbore Ø7.940 and depth 4.400, holding side counterbore walls 1.67 min to each other and 1.83 min to the carriage-screw holes, under the 2.0 target (rule 17), over the 1.5 floor"
+  reason: "MHA-CH-006-TL-29's #8 screw positions on the 24 block set the spacing; at two places the counterbore-to-counterbore wall would fall to 1.29, under the 1.5 floor, so the three-place bands hold the walls the side callout states (owner ruling 2026-10-17, via coordinator, RockerV3 session)"

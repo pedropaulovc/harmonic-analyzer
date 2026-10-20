@@ -12,15 +12,23 @@ import _config
 import build_sm_summing_assembly as builder
 import draw_sm_summing_assembly as drawing
 import joint_retention
+import settled_spring_seats
 import sm_summing_assembly_sheet as notes
 import sm_summing_assembly_spec as spec
 import sm_summing_explode_spec as explode
+import sm_summing_lever_spec as lever
+import vn_boss_hook_jam_nut_spec as jam_nut
+import vn_boss_hook_spec as boss_hook
+import vn_counter_spring_stock_geom as counter_stock
 import vn_knife_hanger_stud_spec as hanger_bolt
 from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
+from _transforms import IDENTITY
 from dt_cone_pivot_post_installation import SUMMING_Z
+from stock_anchor_geom import ANCHOR_9490T1
+from vn_counter_spring_spec import INSTALLED_LENGTH_MM
 
 
 def _printed_text() -> str:
@@ -93,6 +101,83 @@ def test_bom_rows_come_from_the_part_registry() -> None:
     assert spec.QUANTITIES[spec.DOWEL] == builder.knife_dowel.PER_MOUNT * 2
 
 
+def _faces_viewer(normal: tuple[float, ...], rows: list[list[float]]) -> float:
+    """Cosine between a part-frame normal, placed by Transform2 ``rows``, and
+    the *Isometric view direction (+X+Y+Z)."""
+    machine = [sum(normal[i] * rows[i][j] for i in range(3)) for j in range(3)]
+    return sum(machine) / (math.sqrt(3.0) * math.hypot(*normal))
+
+
+# The fit-zoomed sheet as the farm seats draw it (pick-miss capture, run
+# 20261019T205741588Z: 2.098 px/mm, snap tolerance 8 px).
+_FIT_PX_PER_MM = 2.098
+_SNAP_TOLERANCE_PX = 8.0
+
+
+def _fit_sheet_px(point: tuple[float, ...]) -> tuple[float, float]:
+    """Where a point (mm, axes along the machine's) draws in the exploded
+    *Isometric (+X+Y+Z), in fit-sheet pixels relative to its frame's origin."""
+    x, y, z = point
+    k = _FIT_PX_PER_MM / drawing.EXPLODED_SCALE[1]
+    return k * (x - z) / math.sqrt(2.0), k * (2.0 * y - x - z) / math.sqrt(6.0)
+
+
+def test_balloons_5_7_and_8_are_pinned_on_viewer_facing_edges_of_their_parts() -> None:
+    # The body walk moved these between runs on identical geometry (machinist
+    # review r1-r3); each frozen point lies on an edge of its own part, and
+    # the edge's outward normal faces the viewer once the builder's placement
+    # turns it into the machine frame. The hook (6) stays on the walk: frozen
+    # hook points missed their hit test on 3 of 4 farm runs.
+    anchors = drawing.BALLOON_ANCHORS
+    pinned = {stem for stem, anchor in anchors.items() if anchor.point_mm is not None}
+    assert pinned == {spec.LEVER, spec.BOSS_JAM_NUT, spec.COUNTER_SPRING}
+    assert all(anchor.instance is None for anchor in anchors.values())
+
+    # Lever (identity): the midpoint of the spring pad's free bottom edge, a
+    # silhouette (the +X side face turns to the viewer, the pad underside
+    # away). Drawn at 1:EXPLODED_SCALE on the fit sheet, the point lies on the
+    # edge's drawn segment and has 8 px (the seat's snap tolerance) of it on
+    # either side: the old top-edge pin drew 4 px off it beside the hole row.
+    point = anchors[spec.LEVER].point_mm
+    bottom = lever.PLATE_T / 2.0 - lever.SPRING_SEAT_T
+    ends = [(lever.PLATE_W, bottom, sign * lever.PLATE_L / 2.0) for sign in (-1, 1)]
+    assert point == tuple((a + b) / 2.0 for a, b in zip(*ends))
+    assert _faces_viewer((1.0, 0.0, 0.0), IDENTITY) > 0.5
+    assert _faces_viewer((0.0, -1.0, 0.0), IDENTITY) < 0.0
+    p, a, b = (_fit_sheet_px(q) for q in (point, *ends))
+    along = [b[i] - a[i] for i in range(2)]
+    length = math.hypot(*along)
+    t = sum((p[i] - a[i]) * along[i] for i in range(2)) / length
+    off = abs((p[0] - a[0]) * along[1] - (p[1] - a[1]) * along[0]) / length
+    assert off <= 1.0
+    assert min(t, length - t) >= _SNAP_TOLERANCE_PX
+
+    # Jam nut: the middle of a flat's top edge, on the flat facing the
+    # viewer most squarely (flats at multiples of 60 deg, corners on +-Y).
+    x, y, z = anchors[spec.BOSS_JAM_NUT].point_mm
+    assert z == pytest.approx(jam_nut.THICKNESS)
+    assert math.hypot(x, y) == pytest.approx(jam_nut.ACROSS_FLATS / 2.0)
+    angle = math.degrees(math.atan2(y, x)) % 360.0
+    assert angle == pytest.approx(300.0)
+    rows = builder.JAM_NUT_ROWS
+    flats = [math.radians(60.0 * k) for k in range(6)]
+    best = max(
+        flats, key=lambda a: _faces_viewer((math.cos(a), math.sin(a), 0.0), rows)
+    )
+    assert math.degrees(best) == pytest.approx(angle)
+
+    # Counter spring: a wire radius off the +X coil-end junction centre.
+    centre = (
+        -counter_stock.coil_start_x_mm(INSTALLED_LENGTH_MM),
+        0.0,
+        -counter_stock.COIL_MEAN_RADIUS_MM,
+    )
+    offset = [p - c for p, c in zip(anchors[spec.COUNTER_SPRING].point_mm, centre)]
+    assert math.hypot(*offset) == pytest.approx(counter_stock.WIRE_RADIUS_MM, abs=1e-3)
+    seat, _gooseneck_y = settled_spring_seats.counter_seat()
+    assert _faces_viewer(tuple(offset), seat.pose.rotation_rows) > 0.4
+
+
 def test_every_bom_part_is_installed_by_a_numbered_step() -> None:
     steps = " ".join(notes.ASSEMBLY_STEPS)
     for stem in notes.BOM_ORDER:
@@ -126,6 +211,41 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
     mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
     for distance in slide.values():
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
+
+
+def _rise(stem: str) -> float:
+    return sum(
+        d for _, stems, _, axis, d in explode.EXPLODE_STEPS if axis == "y" and stem in stems
+    )
+
+
+def test_exploded_jam_nut_draws_clear_of_the_boss_and_the_hook_cut_end() -> None:
+    # Machinist review 20261018T153536833Z r2/r3: raised 6, the nut drew on
+    # the boss top face. Step 2 spins it on from the hook's cut end, so it
+    # stands on the hook's axis between the boss and the raised cut end. In
+    # the *Isometric (+X+Y+Z) a point draws (2Y - X - Z)/sqrt(6) up the sheet;
+    # boss, nut and cut end share one vertical axis, and a level circle of
+    # radius r draws r/sqrt(3) above and below its centre (the nut's hex
+    # inside its corner circle).
+    def drawn(y: float, r: float) -> tuple[float, float]:
+        centre = 2.0 * y / math.sqrt(6.0)
+        return centre - r / math.sqrt(3.0), centre + r / math.sqrt(3.0)
+
+    gap = explode.PAPER_GAP_MM * drawing.EXPLODED_SCALE[1]
+    corner = jam_nut.ACROSS_CORNERS / 2.0
+    assert builder.JAM_NUT_POS[1] == builder.spring_mounts.COUNTER_BOSS_TOP_Y
+    boss_top = drawn(builder.JAM_NUT_POS[1], lever.ANCHOR_R)[1]
+    nut_y = builder.JAM_NUT_POS[1] + _rise(spec.BOSS_JAM_NUT)
+    nut = drawn(nut_y, corner)[0], drawn(nut_y + jam_nut.THICKNESS, corner)[1]
+    cut_end_y = (
+        builder.BOSS_HOOK_POS[1] + boss_hook.TRIM.shank_end_y_mm + _rise(spec.BOSS_HOOK)
+    )
+    cut_end = drawn(cut_end_y, ANCHOR_9490T1.wire_dia_mm / 2.0)[0]
+    assert nut[0] - boss_top >= gap
+    assert cut_end - nut[1] >= gap
+    # The spring and the gooseneck keep their gaps above the raised hook.
+    assert _rise(spec.COUNTER_SPRING) - _rise(spec.BOSS_HOOK) == 20.0
+    assert _rise(spec.GOOSENECK) - _rise(spec.COUNTER_SPRING) == 25.0
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:

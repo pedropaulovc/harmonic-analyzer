@@ -367,9 +367,13 @@ def test_fitted_bores_name_their_mates_and_fits() -> None:
     # a numeric shortfall stays visible as a minor (simplicity policy).
     assert callouts["PinSeatCz"].splitlines()[-1] == "WALL 1.5 MIN"
     assert 1.5 <= dt_pinion_bracket_spec.PIN_SEAT_WEB_WORST < 2.0
-    (wall,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_bracket", "part")
-    assert (wall.id, wall.kind) == ("RV-01", "minor")
-    assert "WALL 1.5 MIN" in wall.where and "rule 17" in wall.finding
+    (wall,) = load_exceptions("dt_pinion_bracket")
+    assert (wall.id, wall.kind.value) == ("RV-01", "minor")
+    assert "rule 17" in wall.finding
+    assert {str(anchor) for anchor in wall.anchors} == {
+        "dim:PinSeatCz@PinSeatProfile",
+        "note:dt_pinion_bracket_spec.PIN_SEAT_WALL_CALLOUT",
+    }
     # The (43.0) stands left of the flank, so no leader to the follower seat
     # (callouts right of the view) crosses its dimension line.
     face_a = drawing.LEFT_CENTER[0] - (

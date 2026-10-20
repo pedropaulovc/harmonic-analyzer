@@ -187,6 +187,7 @@ AF_CALLOUT = (
 )
 DIMENSION_CALLOUTS = {
     "OutsideDia": TIP_DIA_CALLOUT,
+    # machinist-exception: RV-01 (BoreDia and its BoreAF partner)
     "BoreDia": BORE_CALLOUT,
     "BoreAF": AF_CALLOUT,
     "FaceWidth": FACE_WIDTH_CALLOUT,

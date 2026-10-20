@@ -438,7 +438,7 @@ SURFACE_FINISHES = (
 # begins at 216 mm.  The tailstock line is that one process word, by user
 # ruling (U40, 2026-09-23): the slender terminal land cannot be turned
 # unsupported, so the support IS the requirement, not a method preference
-# (exception RV-02 in cad/config/parts/dt-cone-gear-shaft.yaml).  The flats'
+# (exception RV-02 in draw_dt_cone_gear_shaft.exceptions.yaml).  The flats'
 # shared clock is FLATS_IN_LINE_CALLOUT on section A-A; its tolerance is the
 # title block's angle, which error_budget.yaml books per land as
 # cone_land_clock.  The across-flats name their gears in suffixes and have no

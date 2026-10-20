@@ -310,6 +310,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         symbol_xy=SEAT_FINISH_SYMBOL,
         leader_attach_xy=SEAT_FINISH_PICK,
+        # machinist-exception: RV-01 (SURFACE_FINISHES "clamp_screw_seat", SCREW_SEAT_CALLOUT)
         control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"),
         label="lever clamp screw seat finish",
         char_height=0.0025,
@@ -324,6 +325,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="FACE",
         symbol_xy=PRESS_LAND_FINISH_SYMBOL,
         leader_attach_xy=PRESS_LAND_FINISH_PICK,
+        # machinist-exception: RV-02 (SURFACE_FINISHES "press_land", PRESS_LAND_CALLOUT)
         control=surface_finish_by_key(SURFACE_FINISHES, "press_land"),
         label="lever press land finish",
         char_height=0.0025,

@@ -13,7 +13,6 @@ import pytest
 
 import _config
 from _drawing_contract import model_toleranced_dimensions
-from _paths import CAD_ROOT
 from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 import build_ch_rocker_arm_tl_oblique_nut_bracket as part
@@ -22,7 +21,7 @@ import ch_rocker_arm_tl_oblique_nut_bracket_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import draw_ch_rocker_arm_tl_oblique_nut_bracket as drawing
 import export_features
-from machinist_exceptions import load_exceptions
+from machinist_exceptions import load_exceptions, render_anchor
 
 STEM = "ch_rocker_arm_tl_oblique_nut_bracket"
 
@@ -245,8 +244,8 @@ def test_every_shortfall_is_stated_on_the_sheet() -> None:
 
 
 def test_owner_exceptions_match_the_stated_walls() -> None:
-    exceptions = load_exceptions(CAD_ROOT / "config", STEM, "part")
-    assert [(e.id, e.kind) for e in exceptions] == [
+    exceptions = load_exceptions(STEM)
+    assert [(e.id, e.kind.value) for e in exceptions] == [
         ("RV-01", "minor"),
         ("RV-02", "minor"),
     ]
@@ -256,14 +255,23 @@ def test_owner_exceptions_match_the_stated_walls() -> None:
     assert f"{spec.CBORE_DEPTH:.2f} counterbore depth" in exception.reason
     clearance = spec.WORST_WALLS["M3 tap to screw clearance"]
     assert f"{clearance:.2f} min" in exception.reason
-    assert f"Ø{spec.CBORE_DIA:.2f} x {spec.CBORE_DEPTH:.2f}" in exception.where
+    # Anchored on the seat callout's rows, which state the wall.
+    (seat_anchor,) = exception.anchors
+    assert render_anchor(seat_anchor, STEM) == (
+        f'note "{" / ".join(spec.NUT_SEAT_MATE_CALLOUT.splitlines())}"'
+    )
+    assert f"WALL TO M3 TAPS {spec.NUT_WALL_MIN:.2f} MIN" in spec.NUT_SEAT_MATE_CALLOUT
     # RV-02: the #8 taps' end walls, under the target at the stated X set.
     assert f"{spec.END_WALL_MIN:.2f} min" in end_walls.finding
     assert f"{spec.X_SET_MID:.{spec.X_SET_PLACES}f}" in end_walls.reason
     assert f"±{spec.X_SET_BAND:.2f}" in end_walls.reason
     assert "±0.10" not in end_walls.reason
     assert f"{spec.BRACKET_LENGTH:.2f} length" in end_walls.reason
-    assert spec.BLOCK_TAP_PROCESS.strip().rstrip(";") in end_walls.where
+    # Anchored on the #8 callout's spot row and its end-wall row.
+    assert [render_anchor(anchor, STEM) for anchor in end_walls.anchors] == [
+        f'note "{spec.BLOCK_TAP_PROCESS.strip()}"',
+        f'note "{spec.BLOCK_TAP_WALL_CALLOUT}"',
+    ]
 
 
 def test_rule_18_engagement_and_no_screw_bottoms() -> None:

@@ -340,7 +340,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=HOLE_CALLOUT_XY,
         label="ear taps",
     )
-    # sh-column-clamp-back RV-01 (BACK_WALL_NOTE).
+    # machinist-exception: RV-01 (BACK_WALL_NOTE)
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

@@ -19,8 +19,8 @@ tightened for a function, the neighbour named at the callout; owner ruling
 2026-10-17), and the pattern zone is held at Ø0.15 to leave the window open
 (owner ruling on code review C06).  The 2.0 wall target cannot be met inside
 the pitch; the floor is.  The 1.5 MIN wall and the 0.5D engagement are
-declared owner-ruled shortfalls (``machinist_exceptions`` in
-``ch-anchor-jam-nut.yaml``): a thin jam nut locks and carries no load.
+declared owner-ruled shortfalls (``draw_ch_anchor_jam_nut.exceptions.yaml``
+beside the draw script): a thin jam nut locks and carries no load.
 
 Drive: one saw cut across the lower face gives two diametrically opposite
 notches, the bore between them.  A forked driver (a screwdriver blade slotted

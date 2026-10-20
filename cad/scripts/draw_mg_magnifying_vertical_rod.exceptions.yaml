@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_mg_magnifying_vertical_rod.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_mg_magnifying_vertical_rod.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "note:mg_magnifying_vertical_rod_spec.SEAT_FINISH_REASON"
+  finding: "Ra 3.2 roughness symbol on a face a thumb screw clamps; a clamp face carries no symbol (rule 6, roughness symbols only where a surface runs, slides or locates)"
+  reason: "owner ruling 2026-10-17: the body is a functional set-screw seat. The MHA-MG-006 output fixture's axial #4-40 thumb screw (MHA-VN-011) locks the fixture wherever the operator sets it along the rod, so the Ø5 body is the static locating seat that screw bears on: rule 6's Ra 3.2 row, not over-specification."

@@ -13,14 +13,3 @@ pd-transgear-feed-pinion:
   # https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-8-diametral-pitch-32-cutter-diameter-2-1-4-hole-size-1/
   # Ground depth/form accuracy are unpublished; 2.25-module depth is Main's premise.
   process: "turned from bar; integral 12T 32DP PA20 teeth cut with stock #8 form cutter (12T master), with radial setting, tooth-span and all-space angular-index acceptance from the part specification; flat milled"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the step-face squareness frame to the bore (datum A)"
-      finding: "squareness frame over-specified (rule 5)"
-      reason: "owner-accepted disc-cluster control keeping the step square to its bore"
-    - id: "RV-02"
-      kind: "accept"
-      where: "the tooth-space radial runout callout to the actual running bore"
-      finding: "runout callout over-specified (rule 5)"
-      reason: "tooth-space radial runout to the actual running bore, measured with a calibrated pin in each space, is the owner gear-tooth critical class (owner-accepted)"

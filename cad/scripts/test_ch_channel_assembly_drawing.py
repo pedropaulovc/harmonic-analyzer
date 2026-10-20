@@ -927,18 +927,20 @@ def test_the_set_screws_go_in_after_the_shaft_is_set_and_print_the_engagement_fa
 def test_the_set_screw_step_states_a_fact_that_needs_no_declaration() -> None:
     """The owner's 2026-10-15 shortfall ruling (#1371) covered the R8 arch's
     1.08D; the lifted arch holds 1.5D, so the step's engagement fact is no
-    shortfall and the channel contract declares no exception for it. Its one
+    shortfall and the drawing declares no exception for it. Its one
     declaration (RV-01) is the keeper inner-face bands of owner ruling X-A."""
     import ch_pivot_bracket_spec as bracket_spec
-    from _paths import CAD_ROOT
     from machinist_exceptions import load_exceptions
 
     name = "ch_channel_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
-    (keeper_bands,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
-    assert (keeper_bands.id, keeper_bands.kind) == ("RV-01", "accept")
-    assert "KeeperFrontFaceZ, KeeperRearFaceZ" in keeper_bands.where
-    assert "ENGAGEMENT" not in keeper_bands.where.upper()
+    (keeper_bands,) = load_exceptions(name)
+    assert (keeper_bands.id, keeper_bands.kind.value) == ("RV-01", "accept")
+    assert [str(anchor) for anchor in keeper_bands.anchors] == [
+        "dim:KeeperFrontFaceZ@KeeperPlanSettingsReference",
+        "dim:KeeperRearFaceZ@KeeperPlanSettingsReference",
+        "step:fulcrum-keepers-set",
+    ]
     fact = (
         f"{bracket_spec.SET_SCREW_THREAD} ENGAGEMENT "
         f"{bracket_spec.SET_SCREW_FULL_THREAD_MIN:.2f} MIN "

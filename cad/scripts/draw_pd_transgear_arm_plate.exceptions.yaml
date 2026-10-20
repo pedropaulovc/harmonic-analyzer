@@ -1,0 +1,12 @@
+# Owner-accepted machinist-review exceptions for draw_pd_transgear_arm_plate.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_transgear_arm_plate.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "frame:pd_transgear_arm_plate_spec.GEOMETRIC_CONTROLS[plate_locator_1_position]"
+    - "frame:pd_transgear_arm_plate_spec.GEOMETRIC_CONTROLS[plate_locator_2_position]"
+  finding: "position controls over-specified (rule 5)"
+  reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"

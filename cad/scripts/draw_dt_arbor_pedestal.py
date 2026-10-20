@@ -699,6 +699,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _set_tap_callout_text(tap_callout)
     _prove_set_screw_callout_clear(adapter, tap_callout)
     # The one note (DRAWING_NOTES), lower left under the elevation's lanes.
+    # machinist-exception: RV-01
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_ANCHOR)
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set

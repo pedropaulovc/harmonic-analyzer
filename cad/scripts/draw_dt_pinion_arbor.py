@@ -1298,6 +1298,7 @@ async def build(adapter: Any) -> dict[str, str]:
             entity_type="FACE",
             char_height=0.0025,
         )
+    # machinist-exception: RV-01 (DRAWING_NOTES inside-corner ceiling)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.255)
     _label_detail(adapter, detail, principal, mark_center)

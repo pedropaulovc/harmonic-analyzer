@@ -712,6 +712,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
         symbol_xy=spt(*SEAT_FINISH_SYMBOL),
         leader_attach_xy=spt(*SEAT_FINISH_PICK),
+        # machinist-exception: RV-01 (SURFACE_FINISHES[screw_seat], SEAT_FINISH_REASON)
         control=surface_finish_by_key(SURFACE_FINISHES, "screw_seat"),
         label="vertical rod thumb-screw seat finish",
         char_height=FINISH_CHAR_HEIGHT,

@@ -179,22 +179,14 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
         assert valid.required_free_stems == ("rotor",)
         assert valid.free_dof == 1
 
-        # The drawing's machinist-review declarations share the file; the
-        # contract accepts the key and its parse is otherwise unchanged.
-        write_contract("declares", machinist_exceptions=[{"id": "RV-01"}])
-        declares = _assembly_contract.assembly_contract("declares")
-        assert replace(declares, stem="valid", path=valid.path) == valid
-
-        # Accepting that one key opens no others: an unknown key is still
-        # refused, alone or beside the declarations.
+        # An unknown key is refused. The drawing's machinist-review
+        # exceptions live beside its draw script, never in the contract.
         write_contract("bad-key", flip_seeds=[])
         with pytest.raises(ValueError, match="flip_seeds"):
             _assembly_contract.assembly_contract("bad-key")
-        write_contract(
-            "declares-bad-key", machinist_exceptions=[{"id": "RV-01"}], exceptions=[]
-        )
-        with pytest.raises(ValueError, match="unknown keys"):
-            _assembly_contract.assembly_contract("declares-bad-key")
+        write_contract("declares", machinist_exceptions=[{"id": "RV-01"}])
+        with pytest.raises(ValueError, match="machinist_exceptions"):
+            _assembly_contract.assembly_contract("declares")
         write_contract("dupe", flip_invert=["a", "a"])
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("dupe")

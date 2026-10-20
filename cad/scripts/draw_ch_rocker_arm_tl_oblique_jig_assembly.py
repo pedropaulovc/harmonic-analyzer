@@ -571,6 +571,7 @@ def steps_sheet_layout(steps: Sequence[str], checks: Sequence[str]) -> StepsLayo
     return StepsLayout(left, continued, checks_text, (x, top), region)
 
 
+# machinist-exception: RV-01, RV-02, RV-03 (spec steps 7A, 7C and 8)
 STEPS_LAYOUT = steps_sheet_layout(spec.ASSEMBLY_STEPS, spec.ASSEMBLY_CHECKS)
 ASSEMBLY_STEPS = STEPS_LAYOUT.steps
 ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued

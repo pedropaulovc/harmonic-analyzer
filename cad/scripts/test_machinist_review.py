@@ -1203,120 +1203,39 @@ def test_prompts_define_the_classification_contract() -> None:
 # --- owner-declared machinist exceptions -------------------------------------
 
 
-def _write_exceptions_config(root: Path, name: str, section: Any) -> Path:
-    dashed = name.replace("_", "-")
-    directory = root / "parts"
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{dashed}.yaml"
-    import yaml
-
-    path.write_text(
-        yaml.safe_dump({dashed: {"number": "MHA-XX-000", "machinist_exceptions": section}}),
-        encoding="utf-8",
-    )
-    return path
-
-
-def test_declared_exceptions_load_and_validate(tmp_path: Path) -> None:
-    import machinist_exceptions
-
-    section = [
-        {
-            "id": "RV-001",
-            "where": "sheet 1, front view, 25.20 overall length",
-            "finding": "tight clearance band with no named mate (rule 4)",
-            "reason": "CLEARS callout names the mate; owner accepts it",
-            "kind": "accept",
-        }
-    ]
-    _write_exceptions_config(tmp_path, "dt_crank_hub", section)
-    entries = machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
-    assert [entry.id for entry in entries] == ["RV-001"]
-    assert entries[0].kind == "accept"
-    # A package that declares nothing (or has no config file) gets nothing.
-    assert machinist_exceptions.load_exceptions(tmp_path, "ms_stick", "part") == ()
-    assert machinist_exceptions.load_exceptions(tmp_path, "pn_pen_assembly", "assembly") == ()
-    # Malformed declarations fail loud: a typo must never silently widen
-    # or narrow what the reviewer ignores.
-    for bad in (
-        [dict(section[0], kind="ignore")],
-        [dict(section[0], reason="")],
-        [dict(section[0], extra="x")],
-        [section[0], section[0]],
-    ):
-        _write_exceptions_config(tmp_path, "dt_crank_hub", bad)
-        with pytest.raises(ValueError):
-            machinist_exceptions.load_exceptions(tmp_path, "dt_crank_hub", "part")
-
-
-def test_assembly_declarations_load_from_the_assemblys_contract(tmp_path: Path) -> None:
-    """The review names an assembly package by its drawing, ``<stem>_assembly``
-    (BUILDING.md keeps the suffix); its declarations live at top level in the
-    assembly's contract, ``assemblies/<stem>.yaml``, beside the build keys."""
-    import yaml
-
-    import machinist_exceptions
-
-    entry = {
-        "id": "RV-01",
-        "where": "fit-up step 4, the set-screw engagement",
-        "finding": "short thread engagement (rule 18)",
-        "reason": "the arch is all the thread there is (owner-ruled shortfall)",
-        "kind": "minor",
-    }
-    directory = tmp_path / "assemblies"
-    directory.mkdir()
-    (directory / "xx-bank.yaml").write_text(
-        yaml.safe_dump(
-            {
-                "number": "MHA-XX-000",
-                "flip_invert": [],
-                "allowed_free_stems": [],
-                "required_free_stems": [],
-                "free_dof": 0,
-                "machinist_exceptions": [entry],
-            }
-        ),
-        encoding="utf-8",
-    )
-    load = machinist_exceptions.load_exceptions
-    (loaded,) = load(tmp_path, "xx_bank_assembly", "assembly")
-    assert (loaded.id, loaded.kind, loaded.where) == ("RV-01", "minor", entry["where"])
-    # Parts are unchanged: their own key in parts/<name>.yaml, the name never
-    # stripped, so an "-assembly" part name finds no file.
-    _write_exceptions_config(tmp_path, "xx_bank", [dict(entry, id="RV-09")])
-    assert [e.id for e in load(tmp_path, "xx_bank", "part")] == ["RV-09"]
-    assert load(tmp_path, "xx_bank_assembly", "part") == ()
-
-
 def test_review_prompt_injects_declared_exceptions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    import machinist_exceptions
+
     source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
-    config_root = tmp_path / "config"
-    _write_exceptions_config(
-        config_root,
-        "crank_arm",
-        [
-            {
-                "id": "RV-007",
-                "where": "sheet 1, bore",
-                "finding": "REAM callout with no named mate (rule 4)",
-                "reason": "mate named in the gear data block; accepted",
-                "kind": "minor",
-            }
-        ],
+    (tmp_path / "xx_crank_arm_notes.py").write_text(
+        'BORE_NOTE = "REAM\\nTHRU"\n', encoding="utf-8"
     )
-    monkeypatch.setattr(mr, "CAD_ROOT", tmp_path)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    (tmp_path / "draw_crank_arm.exceptions.yaml").write_text(
+        "- id: RV-007\n"
+        "  kind: minor\n"
+        "  anchor: note:xx_crank_arm_notes.BORE_NOTE\n"
+        "  finding: REAM callout with no named mate (rule 4)\n"
+        "  reason: mate named in the gear data block; accepted\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        mr,
+        "_load_exceptions",
+        lambda name: machinist_exceptions.load_exceptions(name, tmp_path),
+    )
     package = mr.ReviewPackage("crank_arm", "part", (source,))
     prompt = mr._review_prompt(package, 1)
     assert "OWNER-DECLARED MACHINIST EXCEPTIONS" in prompt
-    assert "RV-007 [minor] at sheet 1, bore" in prompt
+    # The anchor renders to the current source text, not a stored quote.
+    assert '- RV-007 [minor] at note "REAM / THRU": REAM callout' in prompt
     assert "the exception id in the summary" in prompt
     lines = prompt.splitlines()
     assert lines[-1] == "Return one verdict for the package as a whole."
-    # Packages without sources never see config-derived exceptions, so the
-    # static tail contract holds regardless of what configs declare.
+    # Packages without sources never see declared exceptions, so the static
+    # tail contract holds regardless of what drawings declare.
     bare = mr.ReviewPackage("crank_arm", "part", ())
     assert "OWNER-DECLARED MACHINIST EXCEPTIONS" not in mr._review_prompt(bare, 1)
 
@@ -4020,10 +3939,13 @@ def test_aggregate_error_is_retained_and_never_passes(
 def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import machinist_exceptions as me
+
     source = _text_pdf(tmp_path / "sheet.pdf", [(100, 400, "FRONT 5:1")])
-    exception = SimpleNamespace(
-        id="accepted-bore", kind="accept", where="front bore",
-        finding="known clearance", reason="owner accepted",
+    exception = me.MachinistException(
+        id="RV-01", kind=me.ExceptionKind.ACCEPT,
+        anchors=(me.parse_anchor("sheet:1/front bore"),),
+        finding="known clearance", reason="owner accepted; no code anchor",
     )
     monkeypatch.setattr(mr, "_load_exceptions", lambda *args: (exception,))
     prompts = []
@@ -4047,7 +3969,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     assert len(prompts) == 1
     assert "SHEET TEXT LAYER" in prompts[0] and "FRONT 5:1" in prompts[0]
     assert "OWNER-DECLARED MACHINIST EXCEPTIONS" in prompts[0]
-    assert "accepted-bore" in prompts[0]
+    assert '- RV-01 [accept] at sheet 1: front bore: known clearance' in prompts[0]
     assert "Return one verdict for the package as a whole." not in prompts[0]
 
 

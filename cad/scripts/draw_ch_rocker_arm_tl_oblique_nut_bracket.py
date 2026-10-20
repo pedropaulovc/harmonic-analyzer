@@ -475,6 +475,7 @@ def nut_seat_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         updated = f"{text[: count.end()]}{NUT_SEAT_PROCESS} {text[count.end() :]}"
     else:
         updated = compose_hole_callout_prefix(NUT_SEAT_PROCESS, text)
+    # machinist-exception: RV-01
     return {**definitions, part: updated, 8: NUT_SEAT_MATE_CALLOUT}
 
 
@@ -523,6 +524,7 @@ def block_tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]
         raise RuntimeError(f"unexpected #8 callout parts: {definitions!r}")
     if any(BLOCK_TAP_WALL_CALLOUT in text for text in definitions.values()):
         raise RuntimeError(f"#8 callout already states its end wall: {definitions!r}")
+    # machinist-exception: RV-02
     below = definitions[8].rstrip("\n")
     row = (
         f"{below}\n{BLOCK_TAP_WALL_CALLOUT}"

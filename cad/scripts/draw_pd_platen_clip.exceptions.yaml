@@ -1,0 +1,15 @@
+# Owner-accepted machinist-review exceptions for draw_pd_platen_clip.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_pd_platen_clip.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:LeftX@ScrewHoles"
+    - "dim:RightX@ScrewHoles"
+    - "dim:LeftZ@ScrewHoles"
+    - "note:draw_pd_platen_clip.DIMENSION_CALLOUTS[LeftZ]"
+    - "note:draw_pd_platen_clip.HOLE_CALLOUT_PROCESS"
+  finding: "three-place hole stations and hole row on a paper-holding sheet clip read as a tight band or over-specification (rules 3, 4)"
+  reason: "the screws are fixed in the platen's #2-56 taps, so the loose hole's float over the shank (0.76 min) must hold both patterns' position zones; two .XXX coordinates give each pattern a 0.37 zone (0.74 together), where .XX would need 2.88 and a hole the pan head pulls through; transfer-drilling the clip from its platen was rejected so any clip fits any platen (owner-accepted)"

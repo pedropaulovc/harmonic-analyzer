@@ -792,6 +792,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     # Each mating feature names its mate where it is dimensioned (rule 4).
+    # machinist-exception: RV-02, RV-03, RV-04
     set_dimension_callouts(
         adapter,
         annotations,

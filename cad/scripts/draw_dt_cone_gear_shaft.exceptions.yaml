@@ -1,0 +1,18 @@
+# Owner-accepted machinist-review exceptions for draw_dt_cone_gear_shaft.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_dt_cone_gear_shaft.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:Sec4Dia@Sec4Profile"
+    - "dim:Sec4AF@Sec4FlatProfile"
+    - "note:dt_cone_gear_shaft_spec.TORQUE_CORNER_CALLOUT"
+  finding: "slender tip land and its flat unbuildable or unreliable as one integral piece (rules 16, 21)"
+  reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat); 1/32 in is cutter-native for the 48DP T006/T012 webs (#1272); the 0.02 corner limit keeps the MHA-VN-016 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
+- id: "RV-02"
+  kind: "accept"
+  anchor: "note:dt_cone_gear_shaft_spec.DRAWING_NOTES"
+  finding: "process or method note (rule 7)"
+  reason: "owner ruling U40 2026-09-23: the slender terminal land cannot be turned unsupported, so the support is the requirement, not a method preference; goes away with the tip under #1649"

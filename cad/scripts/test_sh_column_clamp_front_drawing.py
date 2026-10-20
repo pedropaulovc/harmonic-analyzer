@@ -14,8 +14,7 @@ import _column_clamp_drawing
 import _drawing_hidden_sketches
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
-from _paths import CAD_ROOT
-from machinist_exceptions import load_exceptions
+from machinist_exceptions import load_exceptions, render_anchor
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -181,20 +180,16 @@ def test_walls_at_the_largest_column_and_drill_wander() -> None:
 
 def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
     # drawing-simplicity-policy.md "Named exceptions": each stated shortfall
-    # matches a kind-minor declaration under the package's own key, whose
-    # `where` names the printed note, at the value the spec computes.
-    entries = {
-        entry.id: entry
-        for entry in load_exceptions(
-            CAD_ROOT / "config", "sh_column_clamp_front", "part"
-        )
-    }
+    # matches a kind-minor declaration beside the draw script, anchored on
+    # the printed note, at the value the spec computes.
+    entries = {entry.id: entry for entry in load_exceptions("sh_column_clamp_front")}
     assert set(entries) == {"RV-01", "RV-02"}
     for entry in entries.values():
-        assert entry.kind == "minor"
+        assert entry.kind.value == "minor"
         assert entry.reason.endswith("(owner-ruled shortfall)")
-    assert entries["RV-01"].where.endswith(spec.EAR_WALL_NOTE)
-    assert entries["RV-02"].where.endswith(spec.SCREW_LINE_NOTE)
+    for id_, note in (("RV-01", spec.EAR_WALL_NOTE), ("RV-02", spec.SCREW_LINE_NOTE)):
+        (anchor,) = entries[id_].anchors
+        assert render_anchor(anchor, "sh_column_clamp_front") == f'note "{note}"'
     # The printed values, from the computed worst cases at the sheet's two
     # places, rounded never in the part's favour: the least wall down, the
     # screw line's excess up.

@@ -1,0 +1,13 @@
+# Owner-accepted machinist-review exceptions for draw_ch_channel_assembly.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_channel_assembly.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:KeeperFrontFaceZ@KeeperPlanSettingsReference"
+    - "dim:KeeperRearFaceZ@KeeperPlanSettingsReference"
+    - "step:fulcrum-keepers-set"
+  finding: "lug inner faces DRO-set to ±0.02 where a fit-up of the keepers to the MHA-CH-004 flats could absorb the stack (rules 4, 19)"
+  reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±0.10 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±0.02 because the shaft flats need them. As stated in step 10, the lug centre's ±0.10 band keeps each transferred foot hole over the MHA-FR-002 rail web with a full wall round its tap; the title-block band would put the drill wall below 1.5. Both bands are named on the sheet with their mates. The south band also holds the south foot 0.06 clear of the MHA-FR-002 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS): any band past ±0.08 lets the foot meet the boss, so the boss alone needs a sub-title-block band. The ±0.02 pair is what ch_fulcrum_shaft_spec's 0.057 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-004, MHA-FR-002), and that is left to the owner (PR #1665, decisions) (owner-accepted)"

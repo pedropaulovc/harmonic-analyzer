@@ -277,6 +277,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The tooth-space control reads datum A above, the 13.1 pilot, at the
     # cutting setup; the assembled control is MHA-PD-000's transfer step.
+    # machinist-exception: RV-02
     add_toothspace_callout(
         adapter,
         front,
@@ -303,6 +304,7 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=PARALLELISM_EDGE,
         frame_xy=PARALLELISM_FRAME,
         characteristic="parallelism",
+        # machinist-exception: RV-01
         tolerance=GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"],
         datums=(FRONT_FACE_DATUM,),
         label="disc rear face parallelism to front",

@@ -1,0 +1,19 @@
+# Owner-accepted machinist-review exceptions for draw_ch_fulcrum_keeper.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_ch_fulcrum_keeper.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:BoreFromSide@BoreSideReference"
+    - "note:ch_fulcrum_keeper_spec.BORE_CENTRE_CALLOUT"
+  finding: "bore lateral band tightened from \u00b10.8 to \u00b10.3 to rescue crown-tap thread engagement (rule 4)"
+  reason: "the crown is a full round that follows the 14.0 width, so the bore must sit on the width centre; \u00b10.3 holds the MHA-VN-055 set screw at 1.5D full thread and no more than 0.4 proud at the worst case; the geometry alternative is the parked lug/crown resize (owner ruling Q10-B)"
+- id: "RV-02"
+  kind: "accept"
+  anchor:
+    - "dim:ScrewFromSide@FootScrewSideReference"
+    - "note:ch_fulcrum_keeper_spec.FOOT_SCREW_SIDE_CALLOUT"
+  finding: "foot-hole lateral station held at .XXX instead of title-block .XX (rule 4)"
+  reason: "the MHA-FR-002 rail tap is transferred through this hole; at .XX the rail-web thread ligament drops from 1.62 to about 1.24, below the 1.5 floor (owner ruling 2026-10-16)"

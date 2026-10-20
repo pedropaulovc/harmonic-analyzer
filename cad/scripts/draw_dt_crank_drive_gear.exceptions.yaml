@@ -1,0 +1,14 @@
+# Owner-accepted machinist-review exceptions for draw_dt_crank_drive_gear.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_dt_crank_drive_gear.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor:
+    - "dim:BoreDia@BoreProfile"
+    - "note:draw_dt_crank_drive_gear.BORE_CALLOUT"
+    - "dim:BoreAF@BoreProfile"
+    - "note:draw_dt_crank_drive_gear.AF_CALLOUT"
+  finding: "the D-bore callout names no process word (REAM, DRILL or BORE) under rule 12"
+  reason: "owner ruling 2026-09-29 (commit 7b9ed6891, codex machinist review of the #1128 full build): the process word is ruled off both D-bores. A through reamer cuts away the material the retained flat needs, so REAM would be false, and the native limits on the round and across-flat dimensions define the D-profile; the route belongs in the book and logbook, not on the print (owner-accepted)"

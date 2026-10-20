@@ -1,0 +1,10 @@
+# Owner-accepted machinist-review exceptions for draw_mg_magnifying_bracket.py: the
+# drawing-simplicity-policy.md "Named exceptions" mechanism. Each anchor names
+# the symbol that prints the excused item; draw_mg_magnifying_bracket.py tags the site with
+# '# machinist-exception: <id>'. Read only by machinist_exceptions.py; no build
+# or draw closure reaches this file, so editing it re-keys nothing.
+- id: "RV-01"
+  kind: "accept"
+  anchor: "note:mg_magnifying_bracket_spec.COLLAR_BORE_CALLOUT"
+  finding: "roughness symbol on a pressed bore that neither runs, slides nor locates (rule 6)"
+  reason: "owner ruling #1570 option A: the bore is reamed or honed to Ra 0.8 because the matched fit's 0.007 minimum diametral interference rests on the DIN 7190 smoothing estimate 0.8 x 4 x (0.8 + 0.8) um = 0.00512 (effective minimum 0.00188), which holds only at Ra 0.8; a rougher bore would smooth the loosest press away (owner-accepted)"

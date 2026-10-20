@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -200,7 +201,9 @@ def test_callouts_and_no_notes() -> None:
     # The O.D.'s explicit band is bounded by the wall as well as the neighbour.
     assert drawing.DIMENSION_CALLOUTS_ABOVE == {"NutOd": "WALL 1.5 MIN"}
     assert spec.MIN_WALL <= spec.WALL_WORST
-    text = Path(drawing.__file__).read_text(encoding="utf-8").upper()
+    # The machinist-exception tags are code comments, never printed text.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    text = re.sub(r"#\s*machinist-exception:.*", "", source).upper()
     for banned in ("LOCTITE", "THREADLOCK", "NYLON", "EXCEPTION", "RULING"):
         assert banned not in text
 
@@ -276,13 +279,17 @@ def test_spec_imports_no_com_or_drawing_modules() -> None:
 
 def test_printed_shortfalls_are_owner_declared_minors() -> None:
     """Machinist gate 2026-10-17: a stated shortfall with no declaration gates."""
-    from machinist_exceptions import load_exceptions
+    from machinist_exceptions import load_exceptions, render_anchor
 
-    engagement, wall = load_exceptions(_config.CONFIG_DIR, "ch_anchor_jam_nut", "part")
-    assert (engagement.kind, wall.kind) == ("minor", "minor")
-    assert spec.THICKNESS_CALLOUT in engagement.where
+    engagement, wall = load_exceptions("ch_anchor_jam_nut")
+    assert (engagement.kind.value, wall.kind.value) == ("minor", "minor")
+    (anchor,) = engagement.anchors
+    rendered = render_anchor(anchor, "ch_anchor_jam_nut")
+    assert rendered == f'note "{spec.THICKNESS_CALLOUT}"'
     assert "rule 18" in engagement.finding
-    assert drawing.DIMENSION_CALLOUTS_ABOVE["NutOd"] in wall.where
+    (anchor,) = wall.anchors
+    rendered = render_anchor(anchor, "ch_anchor_jam_nut")
+    assert rendered == f'note "{drawing.DIMENSION_CALLOUTS_ABOVE["NutOd"]}"'
     assert "rule 17" in wall.finding
     for entry in (engagement, wall):
         assert entry.reason.startswith("owner ruling 2026-10-17")

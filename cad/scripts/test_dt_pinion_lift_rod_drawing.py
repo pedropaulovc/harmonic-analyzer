@@ -95,12 +95,13 @@ def test_the_body_length_exception_names_the_rig_stacks() -> None:
     import pinion_rig_layout
     from machinist_exceptions import load_exceptions
 
-    (entry,) = load_exceptions(_config.CONFIG_DIR, "dt_pinion_lift_rod", "part")
-    assert (entry.id, entry.kind) == ("RV-01", "accept")
-    spec = dt_pinion_lift_rod_spec
-    assert f"{spec.ROD_LEN:.1f} body length" in entry.where
-    assert f"({spec.ROD_LEN + spec.CAP_SAG:.1f})" in entry.where
-    assert f"SR{spec.CAP_R:.1f}" in entry.where
+    (entry,) = load_exceptions("dt_pinion_lift_rod")
+    assert (entry.id, entry.kind.value) == ("RV-01", "accept")
+    assert [str(anchor) for anchor in entry.anchors] == [
+        "dim:RodBody@RodProfile",
+        "dim:RodOverall@RodProfile",
+    ]
+    assert dt_pinion_lift_rod_spec.DRAWING_REFERENCE_DIMENSIONS == {"RodOverall"}
     for stack in ("lift_rod_seat_stack", "lever_north_travel_stack"):
         assert stack in entry.reason
         assert callable(getattr(pinion_rig_layout, stack))

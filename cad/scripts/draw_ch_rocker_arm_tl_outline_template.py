@@ -174,6 +174,7 @@ CALLOUTS_BELOW = {
     # value; its end-face direction rides above.
     "TailTipLen": PROFILE_CALLOUT,
     "RodTipLen": PROFILE_CALLOUT,
+    # machinist-exception: TL-01
     "RodSlotX": ROD_SLOT_STATION_CALLOUT,
     # drawing-guidelines.md rule 4: the slot's width is a matched fit, so the
     # print gives its reference nominal and the clearance on the named pin.
