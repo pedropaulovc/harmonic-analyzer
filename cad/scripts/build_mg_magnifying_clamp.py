@@ -36,7 +36,6 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -118,10 +117,38 @@ V_ROD_TAP = blind_hole_volume_mm3(ROD_TAP_DRILL_DIA, ROD_TAP_DRILL_DEPTH)
 V_TOTAL = V_HEX - V_BORE - V_THUMB - V_ROD_TAP
 
 
+def _segment_identity(entity: Any) -> tuple[str, int, int, int]:
+    """Native GetID identity: owning sketch name, segment type and ordered IDs.
+
+    ISketchSegment.GetID documents this combination as unique within a model;
+    a segment ID alone is not unique across sketch owners or segment types.
+    The SDK's Get Names of Sketch Segments example casts GetSketch to IFeature.
+    """
+    segment = _early_bound(entity, "ISketchSegment")
+    sketch = segment.GetSketch()
+    if sketch is None:
+        raise RuntimeError("native segment has no owning sketch")
+    owner = _early_bound(sketch, "IFeature")
+    name = owner.Name
+    kind = segment.GetType()
+    identifiers = tuple(segment.GetID() or ())
+    if not isinstance(name, str) or not name or type(kind) is not int or kind < 0:
+        raise RuntimeError(f"invalid native segment owner/type: {name!r}, {kind!r}")
+    if len(identifiers) != 2 or any(type(value) is not int for value in identifiers):
+        raise RuntimeError(f"invalid native segment ID pair: {identifiers!r}")
+    return name, kind, identifiers[0], identifiers[1]
+
+
 def _require_location_selection(
-    adapter: Any, expected: tuple[tuple[int, Any], ...], *, stage: str
+    adapter: Any, segment: Any, *, point: Any | None = None, stage: str
 ) -> None:
-    """Discriminate native selection loss from unsupported identity comparison."""
+    """Require the actual point/segment pair, using documented segment identity.
+
+    Direct IsSame of a raw selected dispatch and a bound ISketchSegment returned
+    different on the native working point/flat path. Keep that result visible,
+    but use the documented owner/type/GetID key for segment identity, not a
+    direct dispatch comparison or coincident coordinates.
+    """
     import _telemetry
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
@@ -130,10 +157,34 @@ def _require_location_selection(
     count = int(manager.GetSelectedObjectCount2(-1))
     selected = tuple(manager.GetSelectedObject6(index, -1) for index in range(1, count + 1))
     types = tuple(int(manager.GetSelectedObjectType3(index, -1)) for index in range(1, count + 1))
+    expected = ((1, point), (2, segment)) if point is not None else ((2, segment),)
     compared = tuple((index, entity) for index, entity in expected if index <= count and selected[index - 1] is not None)
     codes = tuple(int(application.IsSame(selected[index - 1], entity)) for index, entity in compared)
     self_codes = tuple(int(application.IsSame(entity, entity)) for _index, entity in expected)
-    detail = f"stage={stage}, count={count}, types={types}, compared={tuple(index for index, _entity in compared)}, IsSame={codes}, self={self_codes}"
+    actual_key = expected_key = None
+    readback_error = None
+    error = ""
+    if count != 2:
+        error = "expected two selected objects"
+    elif any(entity is None for entity in selected):
+        error = "selected object unavailable"
+    elif types != (11, 10):  # swSelSKETCHPOINTS, swSelSKETCHSEGS
+        error = "expected native sketch point and sketch segment selection types"
+    elif point is not None and self_codes[0] != 1:
+        error = "native point identity positive control failed"
+    elif point is not None and codes[0] != 1:
+        error = "actual selected point identity differs or is unavailable"
+    else:
+        try:
+            actual_key = _segment_identity(selected[1])
+            expected_key = _segment_identity(segment)
+        except Exception as exc:
+            readback_error = exc
+            error = "native segment identity unavailable"
+        else:
+            if actual_key != expected_key:
+                error = "actual selected segment owner/type/ID differs"
+    detail = f"stage={stage}, count={count}, types={types}, compared={tuple(index for index, _entity in compared)}, IsSame={codes}, self={self_codes}, segment={actual_key!r}, expected_segment={expected_key!r}, readback_error={readback_error!r}"
     _telemetry.info(
         f"clamp native selection: {detail}",
         operation_stage=stage,
@@ -143,15 +194,12 @@ def _require_location_selection(
         compared_selection_indices=tuple(index for index, _entity in compared),
         identity_codes=codes,
         self_identity_codes=self_codes,
+        selected_segment_identity=repr(actual_key),
+        expected_segment_identity=repr(expected_key),
+        segment_identity_readback_error=repr(readback_error),
     )
-    if count != 2:
-        raise RuntimeError(f"clamp location: expected two selected objects; {detail}")
-    if len(compared) != len(expected):
-        raise RuntimeError(f"clamp location: selected object unavailable; {detail}")
-    if any(code != 1 for code in self_codes):
-        raise RuntimeError(f"clamp location: native identity positive control failed; {detail}")
-    if any(code != 1 for code in codes):
-        raise RuntimeError(f"clamp location: actual selection identity differs or is unavailable; {detail}")
+    if error:
+        raise RuntimeError(f"clamp location: {error}; {detail}") from readback_error
 
 
 def _native_select(adapter: Any, entity: Any, interface: str, *, append: bool) -> None:
@@ -277,7 +325,7 @@ def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> None:
     model.ClearSelection2(True)
     _native_select(adapter, center, "ISketchPoint", append=False)
     _native_select(adapter, flat, "ISketchSegment", append=True)
-    _require_location_selection(adapter, ((1, center), (2, flat)), stage=f"{name}.point-flat.before-create")
+    _require_location_selection(adapter, flat, point=center, stage=f"{name}.point-flat.before-create")
     raw = model.AddDimension2(0.02, 0.02, 0.0)
     model.ClearSelection2(True)
     if raw is None:
@@ -327,6 +375,7 @@ def _select_bore_rim(adapter: Any, circle: Any) -> None:
     rim without replacing either attached entity or adding witness geometry.
     """
     from solidworks_mcp.adapters.com_variant import double_array
+    import _telemetry
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
@@ -346,12 +395,36 @@ def _select_bore_rim(adapter: Any, circle: Any) -> None:
     if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
         raise RuntimeError("clamp location: native bore-rim transform failed")
     manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    _require_location_selection(adapter, ((2, circle),), stage="bore-rim.before-set-selection-point")
+    _require_location_selection(adapter, circle, stage="bore-rim.before-set-selection-point")
     if manager.SetSelectionPoint2(2, -1, coordinates[0], coordinates[1], coordinates[2]) is not True:
         raise RuntimeError("clamp location: native bore-rim selection point failed")
     retained = tuple(float(value) for value in (manager.GetSelectionPointInSketchSpace2(2, -1) or ()))
     if len(retained) != 3 or any(not math.isfinite(actual) or abs(actual - expected) > 1e-10 for actual, expected in zip(retained, rim, strict=True)):
         raise RuntimeError("clamp location: native bore-rim selection point was not retained")
+    _telemetry.info(
+        f"clamp native rim selection: sketch={rim!r}, model={coordinates!r}, retained_sketch={retained!r}",
+        operation_stage="bore-rim.selection-point-readback",
+        rim_sketch_m=rim,
+        requested_model_m=coordinates,
+        retained_sketch_m=retained,
+    )
+
+
+def _assert_relative_attachment(adapter: Any, display: Any, point: Any, circle: Any, *, name: str) -> None:
+    """Verify actual part-sketch attachments before and after the final rebuild."""
+    display = _early_bound(display, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+    dangling = annotation.IsDangling()
+    if len(attached) != 2 or sorted(types) != [10, 11] or dangling is not False or any(entity is None for entity in attached):
+        raise RuntimeError(f"{name}: invalid native point/circle attachments: count={len(attached)}, types={types}, dangling={dangling}")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    point_code = int(application.IsSame(attached[types.index(11)], point))
+    actual_key = _segment_identity(attached[types.index(10)])
+    expected_key = _segment_identity(circle)
+    if point_code != 1 or actual_key != expected_key:
+        raise RuntimeError(f"{name}: native attachment identity differs: point_IsSame={point_code}, segment={actual_key!r}, expected_segment={expected_key!r}")
 
 
 def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> None:
@@ -360,7 +433,7 @@ def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> 
     model.ClearSelection2(True)
     _native_select(adapter, point, "ISketchPoint", append=False)
     _native_select(adapter, circle, "ISketchSegment", append=True)
-    _require_location_selection(adapter, ((1, point), (2, circle)), stage=f"{name}.point-circle.after-select")
+    _require_location_selection(adapter, circle, point=point, stage=f"{name}.point-circle.after-select")
     _select_bore_rim(adapter, circle)
     raw = model.AddHorizontalDimension2(0.0, 0.02, 0.02)
     model.ClearSelection2(True)
@@ -380,7 +453,10 @@ def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> 
     model.GraphicsRedraw2()
     if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or bool(display.ShowParenthesis):
         raise RuntimeError(f"{name}: measured relative-axis ownership/ink was not retained")
-    assert_dimension_measures(adapter, display, expected_mm=BORE_R, label=name, entities=(point, circle), entity_types=("SKETCHPOINT", "SKETCHSEGMENT"))
+    _assert_relative_attachment(adapter, display, point, circle, name=name)
+    if not math.isclose(float(dimension.SystemValue) * 1000.0, BORE_R, abs_tol=1e-5):
+        raise RuntimeError(f"{name}: native attached point/circle dimension does not measure the bore radius")
+
 
 async def _location_profiles(adapter: Any) -> None:
     sources = _location_sources(adapter)
@@ -431,7 +507,9 @@ def _assert_location_profiles(adapter: Any) -> None:
                 display, dimension = _named_dimension(adapter, feature, name)
                 if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
                     raise RuntimeError(f"{name}: native relative-axis measurement changed")
-                assert_dimension_measures(adapter, display, expected_mm=radius, label=name, entities=(point, circle), entity_types=("SKETCHPOINT", "SKETCHSEGMENT"))
+                _assert_relative_attachment(adapter, display, point, circle, name=name)
+                if not math.isclose(float(dimension.SystemValue) * 1000.0, radius, abs_tol=1e-5):
+                    raise RuntimeError(f"{name}: attached relative-axis measurement changed")
                 tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
                 if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
                     raise RuntimeError(f"{name}: native relative-axis acceptance band changed")

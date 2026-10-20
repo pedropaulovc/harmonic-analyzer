@@ -1086,14 +1086,27 @@ semantics, not geometry. The r4 null creation is observed, but the zero-span
 mechanism remains an inference until the corrected native path is exercised.
 
 The r5 attempt failed earlier, at the combined selected-count/circle-identity
-guard, before setting or reading a native pick. Do not attribute that failure
-to the zero-span hypothesis. Record count, every selected native type and
-availability, per-index `IsSame` codes and self-comparison positive controls
-with an operation stage. Apply the same readback before the existing successful
-point-to-flat dimension path, immediately after the relative pair selection,
-and before setting its rim pick. Count mismatch, missing objects, unsupported
-identity comparison and a genuinely different object are separate failures,
-not a generic “lost circle”. Unknown identity never passes.
+guard, before setting or reading a native pick. The r6 positive control then
+stopped on the previously working point/flat path: count2, native types
+`(11,10)`, selected-versus-expected `IsSame=(1,0)`, self controls `(1,1)`.
+Both objects were present; that direct segment comparison cannot distinguish
+a different sketch entity from an interface/dispatch identity difference.
+Do not attribute either failure to the zero-span hypothesis.
+
+For this part recipe's sketch segments, use the native identity documented by
+`ISketchSegment.GetID`: **owning sketch name + segment type + ordered ID pair**.
+`GetSketch` supplies the owner; cast it to `IFeature` for `Name`, as in the SDK
+Get Names of Sketch Segments example. IDs alone are not unique across owners
+or segment types. Require valid native identity fields and exact equality at
+selection readback and at the dimension's actual annotation attachments, both
+before and after final rebuild. Keep the Wizard point's `IsSame==1` guard,
+native point/segment types, exactly two non-null attachments, not dangling,
+near-arc condition, measured value, ownership and acceptance-band checks.
+Raw dispatch `IsSame` results remain diagnostic, not the segment-identity
+oracle; unavailable native keys never pass. Log count, types, availability,
+raw codes, actual/expected keys and retained native pick coordinates by stage.
+Do not substitute coordinate equality, a new witness copy, or a fixed number.
+The original null dimension creation still requires native proof.
 
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not

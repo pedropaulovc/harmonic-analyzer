@@ -4,6 +4,8 @@ All sizes/locations import from the saved SLDPRT, including the ordinary
 side/tip hole-location chain and the independent internal-root MAX envelope.
 Each dimension's callout is applied only after its owning view imports it;
 the bore's axial/radial mouth chamfer belongs in its true-profile section.
+The associative tap callout owns its thread description and extent; its class
+is owned by the title block. The duplicate Wizard name leaves the wall's lane.
 No press-fit, collar, finish-land or GD&T-frame convention remains.
 """
 
@@ -31,12 +33,13 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sections import create_section_view
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
 from _section_axis import position_section_caption
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_Z
-from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA
+from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
 from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, FLANGE_DEPTH_CALLOUT, FOOT_CORNER_CALLOUT, MOUNTING_HOLE_PROCESS, MOUTH_CALLOUT, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
@@ -58,6 +61,7 @@ SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUTH_KEEP = {"MouthChamfer": (0.290, 0.095)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240), "ThreadRootEnvelope": (0.292, 0.214)}
+WALL_TEXT_XY = (0.140, 0.250)
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:
@@ -123,6 +127,51 @@ def _mouth_section(adapter: Any, side: Any) -> Any:
     return section
 
 
+def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
+    """Keep the native tap/mate, omit its default printed class and duplicate name."""
+    display = _early_bound(callout, "IDisplayDimension")
+    definition = str(display.GetText(5) or "")
+    if not all(token in definition for token in ("<hw-threaddesc>", "<hw-threadclass>", "<hw-thru>")):
+        raise RuntimeError("through-tap callout lacks native thread description/class/extent")
+    resolved = str(display.GetText(1) or "")
+    if THREAD not in resolved:
+        raise RuntimeError("through-tap callout has no resolved native thread size")
+    classes = [
+        raw for raw in (display.GetHoleCalloutVariables() or ())
+        if str(_early_bound(raw, "ICalloutVariable").VariableName) == "hw-threadclass"
+    ]
+    if len(classes) != 1 or int(_early_bound(classes[0], "ICalloutVariable").Type) != 3:
+        raise RuntimeError("through-tap callout lacks one native string thread-class variable")
+    thread_class = _early_bound(classes[0], "ICalloutStringVariable")
+    original_class = str(thread_class.String or "")
+    if original_class.strip(" -") != "2B":
+        raise RuntimeError(f"through-tap class is not the title-block default 2B: {original_class!r}")
+    omit_title_block_thread_class(display, label="quarter-inch lever through tap")
+    if str(thread_class.String or "") != original_class:
+        raise RuntimeError("omitting printed thread class changed its native variable")
+    if THREAD not in str(display.GetText(1) or "") or any("2B" in str(display.GetText(part) or "") for part in (1, 2, 3, 4)):
+        raise RuntimeError("classless native tap lost its resolved thread size or still prints 2B")
+    native = _early_bound(view, "IView")
+    text = f"{THREAD} Tapped Hole"
+    notes = [
+        note for note in (_early_bound(raw, "INote") for raw in (native.GetNotes() or ()))
+        if str(note.GetText() or "").strip() == text
+    ]
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    for note in notes:
+        draw.ClearSelection2(True)
+        if not _early_bound(note.GetAnnotation(), "IAnnotation").Select2(False, 0):
+            raise RuntimeError("could not select the redundant tap feature-name note")
+        draw.EditDelete()  # Native void; the view's re-read proves deletion.
+    draw.ClearSelection2(True)
+    if notes:
+        rebuild_drawing(adapter, label="remove redundant tap feature-name note")
+    if any(str(_early_bound(raw, "INote").GetText() or "").strip() == text for raw in (native.GetNotes() or ())):
+        raise RuntimeError("redundant tap feature-name note survived deletion")
+    _telemetry.info(f"removed {len(notes)} redundant tap feature-name note(s); native thread/extent retained and native class unchanged")
+    return len(notes)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
@@ -153,9 +202,10 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(adapter, bottom, edge=rim.edge, callout_xy=(0.166, 0.054), label="two mounting clearance holes", process=MOUNTING_HOLE_PROCESS)
     edges = scan_view_edges(side, label="bracket through thread")
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")
-    add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap", process=TAP_PROCESS)
+    tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap", process=TAP_PROCESS)
+    _curate_tap_callout(adapter, side, tap)
     landing = model_point_in_view(adapter, side, (NECK_HALF_X / 1000.0, 0.0, -4.5e-3), label="minimum thread-mouth wall")
-    add_leader_note(adapter, WALL_CALLOUT, text_xy=(0.300, 0.181), attach_xy=landing, view=side, label="honest manufactured minimum wall")
+    add_leader_note(adapter, WALL_CALLOUT, text_xy=WALL_TEXT_XY, attach_xy=landing, view=side, label="honest manufactured minimum wall")
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.092)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
