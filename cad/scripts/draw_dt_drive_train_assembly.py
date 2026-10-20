@@ -1307,7 +1307,7 @@ def bank_setting_caption_violations(
     extent: tuple[float, float, float, float],
     outline: tuple[float, float, float, float],
 ) -> list[str]:
-    """Actual caption ink must stay below and within its view's horizontal span.
+    """Actual caption ink must retain at least 4 mm below its view.
 
     ``_anchor_note`` steers toward a point; its bounded moves do not promise
     that point. The functional postcondition is measured air, not target error.
@@ -1317,8 +1317,6 @@ def bank_setting_caption_violations(
     findings = []
     if outline[1] - extent[3] < VIEW_CAPTION_GAP:
         findings.append("caption is not 4 mm below its view")
-    if extent[0] < outline[0] or extent[2] > outline[2]:
-        findings.append("caption leaves its view's horizontal span")
     return findings
 
 

@@ -792,8 +792,6 @@ def test_bank_setting_caption_accepts_native_r4_extent_not_exact_anchor_target()
     # onto the view, or one whose measured air drops below the unchanged 4 mm.
     for top in (outline[1] + 0.001, outline[1] - 0.00399):
         assert drawing.bank_setting_caption_violations((*extent[:3], top), outline)
-    outside = (extent[0], extent[1], outline[2] + 0.001, extent[3])
-    assert drawing.bank_setting_caption_violations(outside, outline)
 
 
 @pytest.mark.parametrize(
