@@ -394,6 +394,7 @@ def action(inputs, monkeypatch):
         dodo=dodo,
         calls=calls,
         state=state,
+        report=report,
         original_probe=original_probe,
         original_store=original_store,
     )
@@ -587,11 +588,8 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
         lambda deps, label=None: cache.cache_key(deps, dodo.ContentChecker._digest, label),
     )
     key = dodo._cache_key(dodo._machinist_review_file_deps("probe"))
-    directory.mkdir(parents=True)
-    (directory / "probe.aggregate.json").write_text(json.dumps({
-        "name": "probe", "kind": "part", "verdict": winner,
-        "gating_count": 2 if winner == "FIX" else 0, "error": None,
-    }), encoding="utf-8")
+    action.state["verdict"] = winner
+    action.report()
     (directory / "winner-evidence.json").write_text('{"producer":"A"}', encoding="utf-8")
     winning_archive = cache._pack([directory])
     # The first probe misses. Another producer publishes only once our own
