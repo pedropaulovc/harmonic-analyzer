@@ -401,6 +401,8 @@ At the 2026-10-19 cutover, four category vendor families were in direct use by m
 
 The registry `quantity` is the sum of the installed member counts (67 links, 2 wire forms, 12 kit members), never the purchase units (one chain cut from 2 ft, one coil, one kit). Members share one purchase Number; where their bodies differ, their BOM rows differ by Description and are not summed into one row. The SKU suffix in `sh-vn-fillister-screw-90280a108` separates that steel fillister product from the brass 90114A511 one. No supplier dimension changed in the consolidation; the shared models carry the geometry the parent-scoped models had.
 
+Configured chain and clamping-kit reference sheets place each member caption from its measured native text extent and annotation position, centering the text box within its reserved panel-header band. After the final rebuild, strict containment checks require the actual note extent to remain inside both that band and the drawable sheet border. An insertion coordinate or a successful positioning call alone is not proof of fit. This placement contract does not change supplier dimensions, member geometry or installed quantities.
+
 #### Shared vendor transition table
 
 The two-digit parent-scoped identities below were current from 2026-10-19 to 2026-10-20 and appear in evidence dated in that window. They are lookup keys, not aliases: no registry row, builder, drawing, module or current map entry carries them, and their Numbers stay reserved in their parents and are never reissued. Read a historical reference through this table to the current shared identity and, where the shared part is configured, to the member configuration.

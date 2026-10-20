@@ -20,6 +20,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 import _config
+import _telemetry
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -91,6 +92,9 @@ async def build_purchased_variant_drawing(
     ``variants`` pairs exact native configuration names with short member labels.
     The source stamps ``<configuration> Manufacturing Notes`` at document scope,
     because every $PRPSHEET link on this single sheet follows its first view.
+
+    Member headers are centered by their measured native text extents inside
+    their reserved band; an insertion point alone is not proof of containment.
     """
     configurations = tuple(configuration for configuration, _ in variants)
     if len(set(configurations)) != len(configurations):
@@ -192,8 +196,30 @@ async def build_purchased_variant_drawing(
             sheet_scale = scales["*Front"]
         left, right = cells[0][2][0], cells[2][2][2]
         caption = f"{label}  QTY {int(quantities[configuration])} INSTALLED"
+        caption_cell = (left, 0.255, right, 0.264)
         note = _literal_note(adapter, caption, left, 0.262)
-        placed.append((note, caption, caption, (left, 0.255, right, 0.264)))
+        # The insertion point is not an extent edge. Seat the measured text box
+        # inside its existing band, as the view captions do horizontally below.
+        bounds = _box(note.GetExtent(), label=caption, kind="note")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        position = tuple(
+            float(value)
+            for value in adapter._get_attr_or_call(annotation, "GetPosition")
+        )
+        target = (
+            position[0] + (caption_cell[0] + caption_cell[2] - bounds[0] - bounds[2]) / 2,
+            position[1] + (caption_cell[1] + caption_cell[3] - bounds[1] - bounds[3]) / 2,
+            0.0,
+        )
+        if annotation.SetPosition(*target) is not True:
+            raise RuntimeError(f"{configuration}: failed to position member caption")
+        positioned = _box(note.GetExtent(), label=caption, kind="note")
+        _telemetry.info(
+            f"{configuration} member caption: position_m={position!r} -> {target!r}; "
+            f"extent_m={bounds!r} -> {positioned!r}; reserved_m={caption_cell!r}",
+            configuration=configuration,
+        )
+        placed.append((note, caption, caption, caption_cell))
         for view, (orientation, center, cell) in zip(views, cells, strict=True):
             scale = scales[orientation]
             caption = f"{orientation[1:].upper()}  {scale[0]}:{scale[1]}"
@@ -325,7 +351,8 @@ async def build_purchased_variant_drawing(
             box = _box(note.GetExtent(), label=linked, kind="note")
             if not _inside(box, cell) or not _inside(box, border):
                 raise RuntimeError(
-                    f"configured purchased note leaves its reserved space: {linked!r}"
+                    f"configured purchased note leaves its reserved space: {linked!r}; "
+                    f"extent_m={box!r}, reserved_m={cell!r}, border_m={border!r}"
                 )
 
     return await finalize_drawing(

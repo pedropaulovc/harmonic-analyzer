@@ -82,6 +82,7 @@ class _Note:
     ) -> None:
         self.PropertyLinkedText = linked_text
         self._resolved_text = resolved_text
+        self._position = (x, y, 0.0)
         self._extent = (x, y - 0.0005, 0.0, x + 0.001, y + 0.0005, 0.0)
 
     def GetText(self) -> str:
@@ -93,9 +94,14 @@ class _Note:
     def GetAnnotation(self):
         return self
 
-    def SetPosition(self, x, y, _z):
-        width = self._extent[3] - self._extent[0]
-        self._extent = (x, y - 0.0005, 0.0, x + width, y + 0.0005, 0.0)
+    def GetPosition(self):
+        return self._position
+
+    def SetPosition(self, x, y, z):
+        dx, dy = x - self._position[0], y - self._position[1]
+        x0, y0, z0, x1, y1, z1 = self._extent
+        self._extent = (x0 + dx, y0 + dy, z0, x1 + dx, y1 + dy, z1)
+        self._position = (x, y, z)
         return True
 
 
@@ -593,6 +599,75 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
         )
     )
     assert state.finalized
+
+
+@pytest.mark.parametrize(
+    ("count", "offset", "size", "moves", "fits"),
+    (
+        (2, (-0.003, -0.006), (0.070, 0.004), True, True),
+        (3, (-0.003, -0.006), (0.070, 0.004), True, True),
+        (2, (0.005, 0.002), (0.070, 0.004), True, True),
+        (3, (0.005, 0.002), (0.070, 0.004), True, True),
+        (3, (-0.003, -0.006), (0.200, 0.004), True, False),
+        (2, (-0.003, -0.006), (0.070, 0.020), True, False),
+        (2, (-0.200, -0.006), (0.070, 0.004), False, False),
+    ),
+    ids=(
+        "two-panels-left-overhang",
+        "three-panels-left-overhang",
+        "two-panels-upper-offset",
+        "three-panels-upper-offset",
+        "too-wide",
+        "too-tall",
+        "native-move-ignored",
+    ),
+)
+def test_member_caption_native_extents_are_centered_or_refused(
+    monkeypatch, tmp_path, count, offset, size, moves, fits
+):
+    """Synthetic extent/anchor offsets are not native after-fix evidence."""
+    variants = tuple((f"Member{index}", f"MEMBER {index}") for index in range(count))
+    quantities = {configuration: 1 for configuration, _ in variants}
+    state = _variant_sheet(monkeypatch, tmp_path, variants, quantities, count)
+    literal_note = configured._literal_note
+    headers = []
+
+    def native_note(adapter, text, x, y):
+        note = literal_note(adapter, text, x, y)
+        if y > 0.250:
+            x0, y0 = x + offset[0], y + offset[1]
+            note._extent = (x0, y0, 0.0, x0 + size[0], y0 + size[1], 0.0)
+            if not moves:
+                note.SetPosition = lambda *_args: True
+            headers.append(note)
+        return note
+
+    monkeypatch.setattr(configured, "_literal_note", native_note)
+
+    def build():
+        return asyncio.run(
+            configured.build_purchased_variant_drawing(
+                state.adapter, state.spec, variants=variants,
+                item="PURCHASED PRODUCT", purchase_unit="ONE PRODUCT",
+            )
+        )
+
+    if not fits:
+        with pytest.raises(RuntimeError):
+            build()
+        assert not state.finalized
+        return
+
+    build()
+    assert state.finalized
+    for index, note in zip(range(count), headers, strict=True):
+        cells = configured.configuration_view_cells(index, count)
+        left, right = cells[0][2][0], cells[2][2][2]
+        x0, y0, _, x1, y1, _ = note.GetExtent()
+        assert (x0 + x1) / 2 == pytest.approx((left + right) / 2)
+        assert (y0 + y1) / 2 == pytest.approx((0.255 + 0.264) / 2)
+        assert left <= x0 < x1 <= right
+        assert 0.255 <= y0 < y1 <= 0.264
 
 
 def test_configured_sheet_refuses_default_fallback_during_final_readback(monkeypatch, tmp_path):
