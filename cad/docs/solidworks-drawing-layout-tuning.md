@@ -689,35 +689,41 @@ configuration. `NameView`, `ShowNamedView2` and
 MG's native drawing at `d58d05d82` reached the wheel balloons with the view in
 `Default Simplified`, zero readable explode steps and the source in `Default`.
 That proves the configuration mismatch, not that the named camera itself
-reactivated a captured configuration. Follow the pen/oblique-jig pattern at
-the balloon boundary: activate the exploded view's referenced configuration,
-read it back, let the unchanged balloon reader show/collapse its real named
-explode, then restore the source's prior configuration in `finally` and check
-that the drawing view remains exploded in its intended configuration. Record
-the source's initial `GetSaveFlag` and refuse a newly dirty source after
-restoration, before drawing `SaveAs3` can persist the released assembly; never
-save the source or clear its dirty flag to conceal the transition. Preserve
-the primary balloon error if cleanup also fails. Follow the drive-train
-package's stronger ordering: place/configure every view, set its exploded or
-collapsed state, isolate the groups, set tangent edges and fit every view
-before inserting the BOM; only then link the views and place their balloons.
-The whole-assembly reference, not an isolated group, owns the complete BOM.
-Drawing-view configurations must remain final once the BOM binds: only the
-source's active configuration may switch for these guarded reads. The MG
-recipe does this for both exploded groups; collapsed views do not switch.
-MG's `48c8bd03f` native leaf opened clean and reached all 19 balloons before
-its final source-clean guard failed. That does not identify which operation
-dirtied the source: a scoped guard allows an already-dirty entry state. In
-that recipe, group isolation, tangent-edge setup and ring fitting still
-followed the BOM. Moving them before the BOM reuses the proven drive-train
-order, but is not proof of MG's dirty operation. The `eccfe91249e8` native
-leaf then first sampled the source dirty at 61.5 s, after the assembled views
-and settings and before either exploded view or the BOM. The last nearby
-message was WHEEL ENDSHAKE's Crop2 readback at 60.8 s, but the stage also
-includes later stack callouts, precision/name readbacks and captions; the log
-does not isolate Crop2 or establish changed geometry. This disproves post-BOM
-ordering as the primary cause of that transition, not the released-source
-safety rule.
+reactivated a captured configuration. The former recommendation to activate
+the source configuration around the balloon reader is superseded by r7 at
+`6bb872b2b` (artifact225): the source was clean at scope entry, 137.8 s, then
+dirty at 138.3 s immediately after
+`ShowConfiguration2("Default Simplified")`, before any balloon operation.
+Restoring the configuration cannot undo that source mutation.
+
+Documented `IConfiguration` explode-step reads are configuration scoped, but
+native reads still returned zero steps. `ShowExploded2` applies to the current
+configuration; there is no evidenced immutable native-API workaround for this
+MG path. Do not activate the model or show/collapse its explode during drawing
+generation. The builder instead verifies the native presentation and stores
+aggregate world translations in metres for **every** top-level instance,
+including zero offsets, separately for `Default` and `Default Simplified`.
+These are file-level custom properties, authored before the builder's normal
+save and bound to the configuration, named view, explode-step count and a
+required `contract_sha256`. This SHA-256 fingerprints canonical JSON of the
+ordered current `plan_explode(instances)`: each step's label, raw member
+selectors, axis, distance in millimetres and resolved component names.
+The assembly remains saved collapsed in `Default`.
+
+The drawing reads those properties through `GetCustomInfoValue("", name)`,
+validates their owner/view/step count, exact current instance membership and
+fingerprint against the current resolved explode contract, and passes the
+referenced drawing configuration's translations to associative edge balloons.
+Changes to axes, distances, member selectors or resolved instance membership
+therefore reject stale metadata even when the step count is unchanged.
+This proves recipe freshness, not detection of external native explode edits
+that leave the stored metadata and current recipe unchanged.
+Missing or invalid metadata fails with a request to rebuild
+`assembly:mg_magnifier`; no nominal-spec or direct-step fallback is allowed.
+Simplified drawing views, original camera geometry and final associative
+balloon landing proofs remain required. Place/configure views, isolate groups,
+set tangent edges and fit before binding the complete BOM to the whole-assembly
+reference; drawing-view configurations remain final once the BOM binds.
 
 The narrower native run at PR1764 head `e3d66daf9` (artifact198) first records
 `magnifier source went DIRTY after lever ClampStation above callout` at
@@ -756,13 +762,22 @@ drawing-only and must not enter the assembly builder's import closure.
 The temporary per-operation crop/settings checkpoints and synthetic
 checkpoint-attribution tests are superseded by this native evidence. Keep
 read-only `magnifier.source_save_flag` phase telemetry, the initial clean
-source guard, guarded balloon/configuration reads, and the final refusal
-before drawing SaveAs3. Never save a dirty released source, clear its flag,
-replace native dimensions with free-text notes, or assume identical text
-setters are harmless. Native acceptance still needs the rebuilt assembly's
-callout readbacks, printed dimension text, and unchanged source identity across
-drawing generation. Missing explode steps still fail; geometry, fitter
-cameras, standard views and the shared zero-step guard remain unchanged.
+source guard, and the final fail-closed refusal before drawing `SaveAs3`.
+MG also captures a streaming SHA-256 baseline before opening the source and
+always logs expected/actual source SHA-256 plus `GetSaveFlag` in native
+`task.log`: before finalization, in settled checks immediately before
+`SaveAs3`, and after finalization (including a failed finalization). Either
+different bytes or a dirty flag fails closed. The post-finalization proof
+also revalidates saved `Default`, collapsed presentation and metadata; if
+finalization already failed, a proof failure is warned without replacing the
+primary exception. These checks do not save, reset or repair the source.
+Never save a dirty released source, clear its flag, replace native dimensions
+with free-text notes, or assume identical text setters are harmless. The
+immutable metadata contract and offline fakes do not establish byte/source
+cleanliness or a native pass. Native acceptance still requires the rebuilt
+assembly's callout and metadata readbacks, saved `Default` collapsed state,
+simplified views, printed dimension text, associative edge balloon landings,
+and unchanged source identity throughout drawing generation.
 
 MS's working pose has the thumbscrew above the stick, both standalone and
 parked in HA. Its graduated face remains against the fixed clamp wall and is
