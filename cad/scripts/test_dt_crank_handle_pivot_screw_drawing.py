@@ -74,12 +74,12 @@ def test_model_owns_places_and_bands() -> None:
     running_fit = {"ShoulderDia", "HeadDia", "HeadLength"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
-    # User ruling 2026-09-29 (MHA-DT-32 review): the shoulder is turned to suit
-    # the bonded handle, so its length is a reference.
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "UnderHeadLocation"}
-    # Every axial location reads from the tip (re-reviews): the under-head
-    # face is located from it, not sized from the seat.
-    assert "ShoulderLength" not in spec.DRAWING_PRECISION_BY_NAME
+    # Main's r18 ruling adds the existing local 53 REF with its to-suit rule,
+    # without changing either tip-based location or the plain 63/67 REFs.
+    assert spec.REFERENCE_DIMENSIONS == {"ShoulderLength", "OverallLength", "UnderHeadLocation"}
+    assert "ShoulderLength" in spec.DRAWING_DIMENSIONS["ScrewProfile"]
+    assert spec.DRAWING_PRECISION["ScrewProfile"]["ShoulderLength"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["ShoulderLength"] == 1
     # Shared-setter bands come from named spec constants.  The native LIMIT
     # writer for the lead has its own readback/refusal contract below.
     assert model_toleranced_dimensions(part) == {
@@ -222,7 +222,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.RELIEF_LEAD_LIMITS == pytest.approx(
         (spec.RELIEF_LEAD - spec.RELIEF_LEAD_TOL, spec.RELIEF_LEAD + spec.RELIEF_LEAD_TOL)
     )
-    assert spec.RELIEF_LEAD_CALLOUT == "X 45 DEG LEAD"
+    assert spec.RELIEF_LEAD_CALLOUT == f"{spec.CHAMFER_CALLOUT}\nLEAD INTO MHA-DT-06"
     assert drawing.RELIEF_LEAD_CALLOUT is spec.RELIEF_LEAD_CALLOUT
     assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 2.4)
     # At or below the #4-40 external minor: the P/8-flat UN root
@@ -754,7 +754,7 @@ def test_native_callouts_own_the_relief_lead_corner_and_seat_break() -> None:
         "TipChamfer": "CHAMFER_CALLOUT",
         "HeadDia": "HEAD_DIA_CALLOUT",
         "HeadLength": "HEAD_LENGTH_CALLOUT",
-        "UnderHeadLocation": "UNDER_HEAD_CALLOUT",
+        "ShoulderLength": "UNDER_HEAD_CALLOUT",
     }
     assert spec.HEAD_DIA_CALLOUT == "CLEARANCE IN MHA-DT-35 POCKET"
     assert spec.HEAD_LENGTH_CALLOUT == "HEAD; KEEPS TOP BELOW MHA-DT-35 FACE"
@@ -1104,9 +1104,9 @@ def test_head_bands_name_their_reason_at_the_callout() -> None:
 
 
 def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
-    # The to-suit rule rides its reference dimension; the seat break now
-    # belongs to a model dimension in DETAIL A.  The only free note is the
-    # assembly finishing instruction.
+    # Historical name retained for the mutation harness. The local native
+    # seat-to-under-head 53 now owns the to-suit rule; tip-based 63/67 stay
+    # plain references. Only the assembly finishing instruction is a note.
     lines = spec.UNDER_HEAD_CALLOUT.splitlines()
     assert lines[0].startswith("UNDER-HEAD FACED TO SUIT")
     assert "MHA-DT-08" in spec.UNDER_HEAD_CALLOUT
@@ -1115,9 +1115,12 @@ def test_fitted_shoulder_rule_rides_the_under_head_reference() -> None:
     # widest line stays between the seat-face and under-head extension lines,
     # centred on the reference's text.
     half = max(len(line) for line in lines) * 0.0025 / 2.0
-    centre = drawing.SIDE_KEEP["UnderHeadLocation"][0]
+    centre = drawing.SIDE_KEEP["ShoulderLength"][0]
     assert centre - half > drawing.SEAT_X + 0.010
     assert centre + half < drawing.FINISH_SYMBOL[0] - 0.003
+    assert drawing.SIDE_KEEP["ShoulderLength"] == pytest.approx((0.154, 0.1575))
+    assert centre == drawing.SIDE_KEEP["UnderHeadLocation"][0]
+    assert centre <= 0.160
     notes = spec.DRAWING_NOTES.splitlines()
     assert notes == [
         f"TIP FILED FLUSH WITH MHA-DT-06 AND STAKED AT {spec.FITTED_STEP}."
@@ -1164,15 +1167,16 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     for x, y in points:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
         assert not (x >= title_block[0] and y <= title_block[1])
-    # Picks land on the features they annotate.  The thread callout's leader
-    # tip lands on the full-thread portion, never on the relief groove.
-    assert drawing.THREAD_PICK[0] == drawing.THREAD_START_X
+    # The combined thread/file-tip callout lands on the real tip-face EDGE,
+    # not the relief groove or the former upper full-thread junction.
+    assert drawing.THREAD_PICK == pytest.approx((drawing.TIP_X, 0.193))
     assert drawing.THREAD_START_X - drawing.TIP_X == pytest.approx(
         spec.TIP_CHAMFER * drawing.SHEET_SCALE[0] / 1000.0
     )
     assert not drawing.RELIEF_END_X <= drawing.THREAD_PICK[0] <= drawing.SEAT_X
     assert drawing.THREAD_PICK[0] < drawing.RELIEF_END_X
-    # All five native groove dimensions belong to the enlarged model view.
+    # The four local relief/detail dimensions stay in the enlarged model view;
+    # the width remains on SIDE, clear of the rotated neck text.
     assert set(drawing.DETAIL_KEEP).isdisjoint(drawing.SIDE_KEEP)
     assert "ReliefDia" in drawing.DETAIL_KEEP
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -1188,8 +1192,8 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.END_KEEP["SlotWidth"][1] - drawing.END_CENTER[1] > 0.005
     assert drawing.DETAIL_KEEP["ReliefDia"][1] < drawing.DETAIL_CENTER[1] - spec.SHOULDER_DIA * drawing.DETAIL_SCALE[0] / 2000.0
     assert drawing.SIDE_KEEP["ThreadLength"][1] > drawing.THREAD_TOP_Y + 0.010
-    thread_half = spec.THREAD_MODEL_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
+    tip_half = (spec.THREAD_MODEL_DIA / 2.0 - spec.TIP_CHAMFER) * drawing.SHEET_SCALE[0] / 1000.0
+    assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < tip_half
     assert drawing.SEAT_X < drawing.FINISH_PICK[0] < drawing.UNDERHEAD_X
     assert drawing.SEAT_X < drawing.CENTERLINE_PICK[0] < drawing.UNDERHEAD_X
     shoulder_dim_x = drawing.SIDE_KEEP["ShoulderDia"][0]
@@ -1202,13 +1206,16 @@ def test_relief_text_reserves_its_complete_right_block_below_both_shoulders() ->
     x, y = drawing.DETAIL_KEEP["ReliefDia"]
     # Historical test name retained for the mutation battery. The native
     # aligned block is ROTATED, not a horizontal block to the anchor's right.
-    # Translate r16 DisplayData metric-hull extrema, not PDF glyph pixels.
+    # Translate actual r17 DisplayData metric-hull extrema, not PDF pixels.
     left, right = x - 0.0236639, x
     bottom, top = y - 0.0220281, y + 0.0220282
-    assert (x, y) == pytest.approx((0.320, 0.094))
+    assert (x, y) == pytest.approx((0.320, 0.0905))
     assert bottom > 0.066
     neck_bottom = drawing.DETAIL_CENTER[1] - spec.RELIEF_DIA * 0.010 / 2.0
     assert neck_bottom - top >= 0.0044
+    thread_bottom = drawing.DETAIL_CENTER[1] - spec.THREAD_MODEL_DIA * 0.010 / 2.0
+    assert thread_bottom - top == pytest.approx(0.0032468)
+    assert thread_bottom - top >= 0.003
     assert right < drawing.DETAIL_LABEL_XY[0] - 0.005
     assert right < 0.4191
     assert left > drawing.DETAIL_CENTER[0] - drawing.DETAIL_RADIUS
@@ -1366,10 +1373,16 @@ def test_upper_thread_length_clears_parent_a_full_letter_reservation():
     observed_drop = 0.142 - 0.1392218750044704
     long_line_y = drawing.SIDE_KEEP["ThreadLength"][1] - observed_drop
     mark_x, mark_y = drawing.DETAIL_PARENT_LETTER_XY
-    # Reserve a whole 4.6 mm letter envelope, not half about its insertion.
-    mark_left, mark_right = mark_x, mark_x + 0.0046
-    mark_top = mark_y + 0.0046
-    assert mark_left - drawing.SEAT_X >= 0.005
+    # Actual r17 INote glyph/extent offsets translated to the adjacent ask.
+    circle_x = drawing._sheet_x(drawing.DETAIL_STATION)
+    circle_top = drawing.SIDE_CENTER[1] + drawing.DETAIL_PARENT_RADIUS
+    assert (mark_x, mark_y) == pytest.approx((0.0839, 0.2045))
+    mark_left, mark_right = mark_x - 0.0002827, mark_x + 0.0034514
+    mark_bottom, mark_top = mark_y - 0.0044867, mark_y + 0.000279
+    assert mark_left < circle_x < mark_right
+    assert mark_bottom - circle_top == pytest.approx(0.0010133)
+    assert mark_y - 0.0045257 - circle_top == pytest.approx(0.0009743)
+    assert drawing.SEAT_X - mark_right >= 0.002
     assert long_line_y - mark_top >= 0.003
     assert mark_right < drawing.SIDE_KEEP["ShoulderDia"][0] - 0.003
 
@@ -1453,8 +1466,8 @@ def test_relief_upper_leg_full_text_keeps_three_mm_from_cropped_physical_outline
     text = {"ReliefLead": spec.RELIEF_LEAD_CALLOUT, "SeatEdgeBreak": spec.SEAT_EDGE_BREAK_CALLOUT}[name]
     half = max(map(len, text.splitlines())) * 0.0028 / 2.0
     # r16 reports the seat's lowest reason/underline at askY - 8.3344 mm.
-    # The old synthetic -10 mm reservation was not a native observation.
-    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0065
+    # The r17 lead's 7.3038 mm drop grows one 5.5563 mm reason-row pitch.
+    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0128601
     box = (x - half, y - drop, x + half, y + 0.0073)
     upper_shoulder = cy + spec.SHOULDER_DIA * scale / 2.0
     # The shoulder's horizontal outline ends at the actual circular crop,
@@ -1489,7 +1502,7 @@ def test_relief_radius_text_has_real_2d_air_from_tiny_leg_text(name) -> None:
     }[name]
     x, y = drawing.DETAIL_KEEP[name]
     half = max(map(len, text.splitlines())) * 0.0028 / 2.0
-    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0065
+    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0128601
     box = (x - half, y - drop, x + half, y + 0.0073)
     horizontal_air = max(radius_box[0] - box[2], box[0] - radius_box[2], 0.0)
     vertical_air = max(radius_box[1] - box[3], box[1] - radius_box[3], 0.0)
@@ -2723,12 +2736,12 @@ def test_build_imports_profile_diameter_only_directly_into_detail_and_keeps_four
 
 
 def _approved_detail_ink():
-    """r16 native offsets relocated to approved anchors, not a new-seat proof."""
+    """r17 ink translated for r18 text/row changes, not new native-seat proof."""
     return {
         "ReliefDia": [
             ((0.311, 0.1205), (0.321, 0.1205)),
             ((0.311, 0.1395), (0.321, 0.1395)),
-            ((0.320, 0.1205), (0.320, 0.0719719)),
+            ((0.320, 0.1205), (0.320, 0.0684719)),
             ((0.320, 0.1205), (0.320, 0.1395)),
         ],
         "ReliefCornerRadius": [
@@ -2737,11 +2750,11 @@ def _approved_detail_ink():
             ((0.3050299, 0.1579438), (0.3333826, 0.1579438)),
         ],
         "ReliefLead": [
-            ((0.332, 0.1435), (0.332, 0.0976962)),
-            ((0.329, 0.1405), (0.329, 0.0976962)),
-            ((0.332, 0.0986962), (0.3947587, 0.0986962)),
-            ((0.332, 0.0986962), (0.329, 0.0986962)),
-            ((0.329, 0.0986962), (0.32265, 0.0986962)),
+            ((0.332, 0.1435), (0.332, 0.0921399)),
+            ((0.329, 0.1405), (0.329, 0.0921399)),
+            ((0.332, 0.0931399), (0.3947587, 0.0931399)),
+            ((0.332, 0.0931399), (0.329, 0.0931399)),
+            ((0.329, 0.0931399), (0.32265, 0.0931399)),
         ],
         "SeatEdgeBreak": [
             ((0.333, 0.149), (0.333, 0.1521656)),
@@ -3012,7 +3025,7 @@ def test_final_settled_guard_collects_every_view_and_sheet_without_another_rebui
         def take_errors(self):
             return {}
 
-    sheet_view, side, detail = View([sheet_note, template]), View([visible]), View([])
+    sheet_view, side, detail = View([sheet_note, template]), View([visible, *_settled_native_records()]), View([])
     model = SimpleNamespace(
         EditRebuild3=lambda: events.append("rebuild"),
         GetViews=lambda: [[sheet_view, side, detail]],
@@ -3108,7 +3121,7 @@ def test_approved_corridor_tune_keeps_exact_detail_frame_scale_crop_and_anchors(
     assert drawing.DETAIL_SCALE == (10.0, 1.0)
     assert drawing.DETAIL_RADIUS_MM == 3.0
     assert drawing.DETAIL_KEEP == {
-        "ReliefDia": (0.320, 0.094),
+        "ReliefDia": (0.320, 0.0905),
         "ReliefCornerRadius": (0.320, 0.1635),
         "ReliefLead": (0.378, 0.106),
         "SeatEdgeBreak": (0.378, 0.1615),
@@ -3116,3 +3129,306 @@ def test_approved_corridor_tune_keeps_exact_detail_frame_scale_crop_and_anchors(
     assert drawing.DETAIL_LABEL_XY == (0.370, 0.127)
     assert drawing.HEAD_LENGTH_TEXT_X == 0.360
     assert drawing.SIDE_KEEP["HeadLength"] == (0.360, 0.1765)
+
+
+def _r17_root_text(*, shift=0.0):
+    """Recorded r17 native metric run; shift is synthetic, never a seat result."""
+    return {"t": "BELOW #4-40 ROOT", "pos": [0.2998361, 0.0719719 + shift, -0.001],
+            "h": 0.0035, "w": 0.0440563, "ang": 1.5707963, "ref": 1,
+            "font": "Century Gothic", "ls": 0.001}
+
+
+def _settled_native_records(*, r17=False):
+    """Native-shaped required records; only r17=True uses the recorded bad route.
+
+    The default is a synthetic clear route in the approved gap and the r17
+    text shifted down 3.5 mm. It does not claim native r18 placement proof.
+    """
+    shift = 0.0 if r17 else -0.0035
+    root = _ink_annotation("ReliefDia", type=4, dim={"hole_callout": False}, texts=[
+        _r17_root_text(shift=shift),
+        {"t": "NECK FOR SEATING", "pos": [0.3144437, 0.0724604 + shift, -0.001],
+         "h": 0.0035, "w": 0.0430792, "ang": 1.5707963, "ref": 1},
+    ])
+    references = []
+    for name, right, bottom, row in (
+        ("UnderHeadLocation", 0.2485, 0.1228875, 0.1238875),
+        ("OverallLength", 0.2605, 0.1122219, 0.1132219),
+    ):
+        references.append(_ink_annotation(
+            name, type=4, dim={"hole_callout": False},
+            lines=[_actual_line((0.0595, 0.189), (0.0595, bottom)),
+                   _actual_line((right, 0.180 if name == "UnderHeadLocation" else 0.189), (right, bottom)),
+                   _actual_line((0.0595, row), (right, row))],
+        ))
+    if r17:
+        start, tip = (0.0559043, 0.1532104), (0.0604, 0.1942675)
+        registered = [0.0558983, 0.1530329, 0.0, *tip, 0.0]
+        direction = (-0.1088489, -0.9940583)
+    else:
+        start, tip = (0.0559043, 0.193), (0.0595, 0.193)
+        registered = [0.0558983, 0.193, 0.0, *tip, 0.0]
+        direction = (-1.0, 0.0)
+    widths = [0.0242618, 0.0185403, 0.024991, 0.0363271, 0.0232264, 0.0246604, 0.0147486]
+    rows = [0.1774743, 0.1729486, 0.1684229, 0.1638972, 0.1593715, 0.1548458, 0.1503201]
+    note = _ink_annotation(
+        "DetailItem348", type=6, pos=[0.0191, 0.182, 0.0],
+        lines=[_actual_line(start, start), _actual_line(start, tip)],
+        texts=[{"t": text, "pos": [0.0191, y, 0.0], "h": 0.0035, "w": width,
+                "ang": 0.0, "ref": 1, "font": "Century Gothic", "ls": 0.001}
+               for text, y, width in zip(drawing.THREAD_NOTE_TEXT.splitlines(), rows, widths, strict=True)],
+        leaders=[registered],
+        note={"text": drawing.THREAD_NOTE_TEXT.replace("\n", "\r\n"),
+              "extent": [0.0190772, 0.1506611, 0.0, 0.0600621, 0.1945054, 0.0]},
+    )
+    note["display"]["arrows"] = [[*tip, 0.0, *direction, 0.0, 0.003556, 0.000762, 1, 0, 0, 1]]
+    return [root, *references, note]
+
+
+def test_fitted_span_reuses_native_model_carrier_and_all_three_reference_guards():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    loop = next(node for node in build.body
+                if isinstance(node, ast.For) and ast.unparse(node.iter) == "sorted(REFERENCE_DIMENSIONS)")
+    code = compile(ast.Module(body=[loop], type_ignores=[]), drawing.__file__, "exec")
+    names = ["ShoulderLength", "UnderHeadLocation", "OverallLength"]
+    calls = []
+    context = {"REFERENCE_DIMENSIONS": spec.REFERENCE_DIMENSIONS, "annotations": names,
+               "adapter": object(), "dimension_name": lambda adapter, annotation: annotation,
+               "set_reference_dimension": lambda adapter, annotation, **kwargs: calls.append((annotation, kwargs))}
+    exec(code, context)
+    assert {name for name, _ in calls} == set(names)
+    assert len(calls) == 3
+    assert all(kwargs == {"label": f"MHA-DT-32 {name}"} for name, kwargs in calls)
+    for annotations in (names[1:], [*names, "ShoulderLength"]):
+        with pytest.raises(RuntimeError, match="expected one MHA-DT-32 ShoulderLength reference dimension"):
+            exec(code, {**context, "annotations": annotations})
+    assert spec.SHOULDER_LENGTH == 53.0
+    assert "ShoulderLength" not in drawing.DETAIL_KEEP
+    assert "ShoulderLength" not in drawing.END_KEEP
+    assert drawing.SIDE_KEEP["UnderHeadLocation"] == pytest.approx((0.154, 0.135))
+    assert drawing.SIDE_KEEP["OverallLength"] == pytest.approx((0.160, 0.116))
+
+
+def test_lower_thread_profile_is_spec_projected_and_circle_clipped(monkeypatch):
+    profile = drawing._relief_lower_thread_profile()
+    (left, lower), (right, same_y) = profile
+    cx, cy = drawing.DETAIL_CENTER
+    assert lower == same_y == pytest.approx(0.115775)
+    assert math.dist((left, lower), (cx, cy)) == pytest.approx(drawing.DETAIL_RADIUS)
+    assert left > cx - drawing.DETAIL_RADIUS
+    assert right == pytest.approx(0.308)
+    monkeypatch.setattr(drawing, "THREAD_MODEL_DIA", spec.THREAD_MODEL_DIA + 0.1)
+    changed = drawing._relief_lower_thread_profile()
+    assert changed[0][1] == pytest.approx(lower - 0.0005)
+    assert changed[0][0] > left
+
+
+@pytest.mark.parametrize("air,accepted", [(0.0, False), (0.002999, False), (0.003001, True)])
+def test_rotated_root_metric_hull_requires_three_mm_from_actual_thread_profile(air, accepted):
+    text = _r17_root_text()
+    profile = drawing._relief_lower_thread_profile()
+    box = drawing._layout_audit.display_box({"texts": [text]})
+    text["pos"][1] += profile[0][1] - box.ymax - air
+    errors = drawing._relief_text_profile_errors(_ink_annotation("ReliefDia", texts=[text]))
+    assert (errors == []) is accepted
+    if not accepted:
+        assert all("metric text/profile clearance below 0.003" in error for error in errors)
+        assert "model_spec_profile=" in errors[0]
+
+
+def test_r17_root_contact_and_both_tip_reference_crossings_collect_in_one_refusal():
+    records = _settled_native_records(r17=True)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    message = str(caught.value)
+    assert "BELOW #4-40 ROOT" in message and "metric text/profile clearance below 0.003" in message
+    assert "NECK FOR SEATING" in message
+    for inventory in ("lines", "leaders"):
+        for reference in ("UnderHeadLocation", "OverallLength"):
+            assert f"ThreadNote/{inventory} vs {reference}: tip-leader/reference-witness crossing" in message
+    assert "missing" not in message and "malformed" not in message
+    assert "outside inner border" not in message
+    actual = records[-1]["display"]["lines"][1]
+    crossing_y = actual[5] + (0.0595 - actual[4]) * (actual[8] - actual[5]) / (actual[7] - actual[4])
+    assert crossing_y == pytest.approx(0.186048, abs=0.000001)
+
+
+def test_synthetic_gap_route_and_shifted_native_metric_text_pass_required_settlement():
+    records = _settled_native_records()
+    drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    root = records[0]["display"]["texts"][0]
+    box = drawing._layout_audit.display_box({"texts": [root]})
+    assert box.ymin == pytest.approx(0.0684719)
+    assert drawing._relief_lower_thread_profile()[0][1] - box.ymax == pytest.approx(0.0032468)
+    assert drawing.THREAD_NOTE_XY == pytest.approx((0.0191, 0.182))
+    assert drawing.THREAD_PICK == pytest.approx((0.0595, 0.193))
+
+
+@pytest.mark.parametrize("name", ["ReliefDia", "UnderHeadLocation", "OverallLength", "ThreadNote"])
+@pytest.mark.parametrize("count", [0, 2])
+def test_required_settled_inventories_refuse_missing_or_duplicate_annotations(name, count):
+    records = _settled_native_records()
+    index = {"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]
+    annotation = records.pop(index)
+    records.extend([annotation] * count)
+    with pytest.raises(RuntimeError, match=f"{name}: expected one settled native annotation; count={count}"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+
+
+@pytest.mark.parametrize("text", [
+    drawing.THREAD_NOTE_TEXT + " ", " " + drawing.THREAD_NOTE_TEXT,
+    drawing.THREAD_NOTE_TEXT.replace("\n", "\r"), drawing.THREAD_NOTE_TEXT.lower(),
+])
+def test_settled_tip_note_only_normalizes_crlf_not_wrong_text(text):
+    records = _settled_native_records()
+    records[-1]["note"]["text"] = text
+    with pytest.raises(RuntimeError, match="ThreadNote: expected one settled native annotation; count=0"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+
+
+def test_settled_tip_note_rejects_mixed_lf_crlf_duplicate():
+    records = _settled_native_records()
+    records.append({**records[-1], "note": {**records[-1]["note"], "text": drawing.THREAD_NOTE_TEXT}})
+    with pytest.raises(RuntimeError, match="ThreadNote: expected one settled native annotation; count=2"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+
+
+@pytest.mark.parametrize("name,kind", [
+    ("ThreadNote", "lines"), ("ThreadNote", "leaders"), ("ThreadNote", "arrows"),
+    ("UnderHeadLocation", "lines"), ("OverallLength", "lines"), ("ReliefDia", "texts"),
+])
+@pytest.mark.parametrize("bad", [None, [], 42, [None], [[math.nan] * 10]])
+def test_required_native_ink_refuses_malformed_empty_or_missing_data_without_fallback(name, kind, bad):
+    records = _settled_native_records()
+    annotation = records[{"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]]
+    target = annotation if kind == "leaders" else annotation["display"]
+    if bad is None:
+        target.pop(kind)
+    else:
+        target[kind] = bad
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    message = str(caught.value)
+    assert name in message and ("missing" in message or "malformed" in message or "empty" in message)
+
+
+def test_tip_arrow_outline_is_checked_even_when_both_native_leader_routes_miss():
+    records = _settled_native_records()
+    records[-1]["display"]["arrows"] = [
+        [0.0596, 0.1885, 0, -1, 0, 0, 0.003556, 0.000762, 1, 0, 0, 1]
+    ]
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    message = str(caught.value)
+    for reference in ("UnderHeadLocation", "OverallLength"):
+        assert f"ThreadNote/arrows vs {reference}: tip-leader/reference-witness crossing" in message
+    assert "ThreadNote/lines vs" not in message and "ThreadNote/leaders vs" not in message
+
+
+def test_required_settlement_collects_malformed_text_routes_border_and_foreign_pairs_together():
+    records = _settled_native_records(r17=True)
+    records[0]["display"]["texts"].append({**_r17_root_text(), "w": math.nan})
+    records[-1]["leaders"].append([math.nan] * 6)
+    groups = _approved_detail_ink()
+    groups["ReliefLead"].append(groups["SeatEdgeBreak"][0])
+    records.append(_ink_annotation("off border", lines=[_actual_line((0.1, 0.1), (0.001, 0.1))]))
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], groups, settled=True)
+    message = str(caught.value)
+    for expected in ("metric text/profile clearance", "ThreadNote/lines vs UnderHeadLocation",
+                     "ThreadNote/lines vs OverallLength", "ThreadNote/leaders vs UnderHeadLocation",
+                     "malformed/nonfinite", "actual ink outside inner border", "foreign ink crossing"):
+        assert expected in message
+
+
+def test_production_settlement_always_enables_mandatory_dump_inventories():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    callback = next(node for node in tree.body
+                    if isinstance(node, ast.FunctionDef) and node.name == "assert_final_annotation_ink")
+    call = next(node for node in ast.walk(callback)
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "_assert_generated_annotation_ink")
+    assert [ast.unparse(arg) for arg in call.args] == ["dumps", "groups"]
+    assert next(ast.literal_eval(kw.value) for kw in call.keywords if kw.arg == "settled") is True
+
+
+@pytest.mark.parametrize("fault", [
+    "r17", "missing-ReliefDia", "duplicate-ReliefDia",
+    "missing-UnderHeadLocation", "duplicate-UnderHeadLocation",
+    "missing-OverallLength", "duplicate-OverallLength",
+    "missing-ThreadNote", "duplicate-ThreadNote",
+])
+def test_production_settled_callback_collects_required_native_records_without_new_reads(monkeypatch, fault):
+    from types import SimpleNamespace
+
+    records = _settled_native_records(r17=fault == "r17")
+    if fault != "r17":
+        action, name = fault.split("-", 1)
+        index = {"ReliefDia": 0, "UnderHeadLocation": 1, "OverallLength": 2, "ThreadNote": 3}[name]
+        annotation = records.pop(index)
+        records.extend([annotation] * (2 if action == "duplicate" else 0))
+
+    class View:
+        __slots__ = ("annotations",)
+
+        def __init__(self, annotations):
+            self.annotations = annotations
+
+        def GetAnnotations(self):
+            return self.annotations
+
+    class Reader:
+        __slots__ = ()
+
+        def __init__(self, adapter):
+            pass
+
+        def take_errors(self):
+            return {}
+
+    model = SimpleNamespace(GetViews=lambda: [[View([]), View(records)]],
+                            GetSheetNames=lambda: ["Sheet1"])
+    adapter = SimpleNamespace(currentModel=model)
+    groups = _approved_detail_ink()
+    monkeypatch.setattr(drawing, "_early_bound", lambda raw, interface: raw)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_Reader", Reader)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_dump_annotation", lambda reader, raw: raw)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_layer_states", lambda reader, dump: {})
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, name: name)
+    monkeypatch.setattr(drawing._drawing_leaders, "dimension_segments", lambda name: groups[name])
+    with pytest.raises(RuntimeError) as caught:
+        drawing.assert_final_annotation_ink(adapter, list(groups))
+    message = str(caught.value)
+    if fault == "r17":
+        assert "metric text/profile clearance" in message
+        assert "NECK FOR SEATING" in message
+        for reference in ("UnderHeadLocation", "OverallLength"):
+            assert f"ThreadNote/lines vs {reference}" in message
+            assert f"ThreadNote/leaders vs {reference}" in message
+        assert "missing" not in message and "malformed" not in message
+    else:
+        count = 2 if action == "duplicate" else 0
+        assert f"{name}: expected one settled native annotation; count={count}" in message
+
+
+@pytest.mark.parametrize("index", [1, 2], ids=["63", "67"])
+def test_required_reference_inventory_refuses_a_missing_witness_not_just_empty_lines(index):
+    records = _settled_native_records()
+    annotation = records[index]
+    del annotation["display"]["lines"][0]
+    with pytest.raises(RuntimeError, match=f"{annotation['name']}: expected two actual reference witnesses"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+
+
+def test_settled_unreadable_text_reference_keeps_all_other_native_offenders():
+    records = _settled_native_records(r17=True)
+    records[0]["display"]["texts"].append({**_r17_root_text(), "ref": "unreadable"})
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(*records)], _approved_detail_ink(), settled=True)
+    message = str(caught.value)
+    assert "unreadable actual metric text hull" in message
+    assert "metric text/profile clearance" in message
+    for reference in ("UnderHeadLocation", "OverallLength"):
+        assert f"ThreadNote/lines vs {reference}" in message
+        assert f"ThreadNote/leaders vs {reference}" in message

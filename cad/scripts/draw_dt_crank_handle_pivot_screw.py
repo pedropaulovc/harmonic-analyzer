@@ -21,10 +21,12 @@ DETAIL A and circled on the side view.  The ordinary associative two-arrow
 diameter crosses both neck surfaces within the straight floor; its full text
 block stays below the model.  The width stays on SIDE, avoiding witnesses
 through that text. Rebuilt native diameter ink must clear both groove corners
-and each of the other three detail dimensions. Every printable generated
-annotation's actual text, symbol and leader ink stays inside the unchanged
-ASME inner border, and every foreign DETAIL pair stays uncrossed. The tip's
-file-and-stake instruction shares the thread callout's feature leader.
+and each of the other three detail dimensions. Its validated native metric
+text hulls also keep 3 mm from the model/spec lower-thread profile (not
+pixel-exact PDF boxes). Every printable generated annotation's actual text,
+symbol and leader ink stays inside the unchanged ASME inner border, every
+foreign DETAIL pair stays uncrossed, and the tip's shared thread/file-and-stake
+leader misses both tip-reference witnesses in both native inventories.
 
 Run with SolidWorks open::
 
@@ -167,9 +169,10 @@ SHOULDER_TOP_Y = _sheet_y(SHOULDER_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(THREAD_MODEL_DIA / 2.0)
 
 # ThreadLength reads above the shorter TipChamfer dimension, so the tiny
-# inner witness cannot cross its long line.  The two tip-baseline references
-# stay below the profile, 19 mm apart.  Actual rebuilt ink, not a requested
-# text centre or assumed native offset, gates the relief leader below.
+# inner witness cannot cross its long line. The two plain tip-baseline
+# references stay below the profile, 19 mm apart; the local fitted-span REF
+# owns its own to-suit row. Actual rebuilt ink, not a requested text centre
+# or assumed native offset, gates the relief and tip leaders below.
 _ROW_Y = (SIDE_CENTER[1] + 0.035, SIDE_CENTER[1] - 0.055, SIDE_CENTER[1] - 0.074)
 # The 4-mm head prints 12 mm long, narrower than its ~21-mm value, so the head
 # length, the head Ø and the slot depth stand outside the head face rather
@@ -185,6 +188,9 @@ SIDE_KEEP = {
     "HeadLength": (HEAD_LENGTH_TEXT_X, 0.1765),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
+    # Existing model-owned fitted span, local REF only; its to-suit block
+    # shares the 63 column rather than centring over the physical span.
+    "ShoulderLength": ((TIP_X + UNDERHEAD_X) / 2.0, 0.1575),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)).  The shoulder's dimension line
     # crosses the shoulder near its thread end; the head's stands clear of the
@@ -221,7 +227,7 @@ DETAIL_KEEP = {
     "ReliefCornerRadius": (0.320, 0.1635),
     "ReliefLead": (0.378, 0.106),
     "SeatEdgeBreak": (0.378, 0.1615),
-    "ReliefDia": (0.320, 0.094),
+    "ReliefDia": (0.320, 0.0905),
 }
 DETAIL_LETTER = "A"
 DETAIL_VIEW_LABEL = (
@@ -229,8 +235,8 @@ DETAIL_VIEW_LABEL = (
 )
 DETAIL_LABEL_XY = (0.370, 0.127)
 DETAIL_PARENT_LETTER_XY = (
-    _sheet_x(DETAIL_STATION) + 0.014,
-    SIDE_CENTER[1] + 0.019,
+    _sheet_x(DETAIL_STATION) - 0.002,
+    SIDE_CENTER[1] + DETAIL_RADIUS_MM * _S / 1000.0 + 0.0055,
 )
 DETAIL_PARENT_RADIUS = DETAIL_RADIUS_MM * _S / 1000.0
 # Sheet-space readbacks reject inference-snapped circles and an ignored move.
@@ -240,12 +246,13 @@ ARROWS_OUTSIDE = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
 ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SOLID_LEADER_ALIGNED_TEXT = 1  # swDisplayDimensionLeaderText_e
 _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
-# The thread callout's leader lands on the edge where the full thread meets
-# the tip chamfer, the full-thread portion's own end edge in the side view (the
-# relief-flank edge at the other end would read as pointing at the groove).
-# The complete seven-line block stays 4 mm left of the tip witness.  Wrap
+# Only the leader changes: land on the real tip-face circular EDGE projection,
+# above the 63/67 witness tops and below the upper ThreadLength witness.
+# The complete seven-line block stays 4 mm left of the tip witness. Wrap
 # only the assembly instruction: the thread designation remains one line.
-THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
+# Final settlement checks actual display/registered leader ink and arrows;
+# this requested pick alone is not proof of the solved native route.
+THREAD_PICK = (TIP_X, SIDE_CENTER[1] + 0.003)
 THREAD_NOTE_TEXT = "\n".join(
     [THREAD_CALLOUT, *textwrap.wrap(
         DRAWING_NOTES, width=13, break_long_words=False, break_on_hyphens=False
@@ -837,14 +844,160 @@ def _actual_arc_extrema(raw: Sequence[float]) -> list[tuple[float, float]]:
     return points
 
 
+def _relief_lower_thread_profile() -> _drawing_leaders.Segment:
+    """Model/spec lower thread, clipped to DETAIL's unchanged circular crop."""
+    scale = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
+    cx, cy = DETAIL_CENTER
+    half = THREAD_MODEL_DIA * scale / 2.0
+    y = cy - half
+    return (
+        (cx - math.sqrt(DETAIL_RADIUS**2 - half**2), y),
+        (cx + (DETAIL_STATION - RELIEF_END_STATION) * scale, y),
+    )
+
+
+def _relief_text_profile_errors(annotation: Mapping[str, Any]) -> list[str]:
+    """Native metric text hulls versus model/spec profile, not PDF glyph pixels."""
+    label = "DETAIL/ReliefDia"
+    display = annotation.get("display")
+    texts = display.get("texts") if isinstance(display, Mapping) else None
+    if not isinstance(texts, Sequence) or isinstance(texts, (str, bytes)) or not texts:
+        return [f"{label}: missing/malformed actual text inventory; actual={texts!r}"]
+    errors = []
+    roots = sum(isinstance(text, Mapping) and text.get("t") == RELIEF_DIA_ROOT_CALLOUT
+                for text in texts)
+    if roots != 1:
+        errors.append(f"{label}: expected one actual ROOT text; count={roots}; actual={texts!r}")
+    profile = _relief_lower_thread_profile()
+    for index, text in enumerate(texts):
+        primitive = {"texts": [text]}
+        invalid = _annotation_ink_errors({"display": primitive}, f"{label}/text[{index}]")
+        errors.extend(invalid)
+        if invalid:
+            continue
+        try:
+            box = _layout_audit.display_box(primitive)
+        except (AttributeError, KeyError, TypeError, ValueError, OverflowError, IndexError) as exc:
+            errors.append(f"{label}/text[{index}]: unreadable actual metric text hull: {exc}; actual={text!r}")
+            continue
+        if box is None:  # Native blank tolerance separators carry no text ink.
+            continue
+        bounds = (box.xmin, box.ymin, box.xmax, box.ymax)
+        air = _drawing_leaders.distance_to_box(profile, bounds)
+        if air < 0.003:
+            errors.append(
+                f"{label}/text[{index}]: metric text/profile clearance below 0.003; "
+                f"text={text.get('t')!r}; air={air!r}; actual_box={bounds!r}; "
+                f"model_spec_profile={profile!r}"
+            )
+    return errors
+
+
+def _actual_stroke_inventory(
+    annotation: Mapping[str, Any], kind: str, label: str,
+) -> tuple[list[_drawing_leaders.Segment], list[str]]:
+    """Parse one required, collected native inventory without route substitutes."""
+    display = annotation.get("display")
+    records = (annotation.get("leaders") if kind == "leaders" else
+               display.get(kind) if isinstance(display, Mapping) else None)
+    if not isinstance(records, Sequence) or isinstance(records, (str, bytes)) or not records:
+        return [], [f"{label}: missing/malformed actual {kind} inventory; actual={records!r}"]
+    strokes, errors = [], []
+    for index, raw in enumerate(records):
+        if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+            errors.append(f"{label}/{kind}[{index}]: malformed actual primitive; actual={raw!r}")
+            continue
+        primitive = ({"display": {"texts": []}, "leaders": [raw]} if kind == "leaders"
+                     else {"display": {kind: [raw]}})
+        invalid = _annotation_ink_errors(primitive, f"{label}/{kind}[{index}]")
+        errors.extend(invalid)
+        if invalid:
+            continue
+        if kind == "leaders":
+            points = [(float(raw[i]), float(raw[i + 1])) for i in range(0, len(raw), 3)]
+            strokes.extend((a, b) for a, b in zip(points, points[1:]) if a != b)
+        else:
+            strokes.extend(
+                ((line.x0, line.y0), (line.x1, line.y1))
+                for line in _layout_audit._display_segments(primitive["display"])
+            )
+    if not strokes:
+        errors.append(f"{label}: empty actual {kind} ink; actual={records!r}")
+    return strokes, errors
+
+
+def _settled_profile_and_tip_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Mandatory ROOT and tip/63/67 reads from the already collected native dump.
+
+    DisplayData lines, registered leader points and the actual arrow outline
+    are independent inventories: none can replace a missing or malformed one.
+    CRLF becomes LF only; wrong text, duplicate notes and missing witnesses
+    fail closed. Every valid offending primitive still reaches the report.
+    """
+    errors = []
+    required = {name: [] for name in ("ReliefDia", "UnderHeadLocation", "OverallLength")}
+    tips = []
+    for sheet in dumps:
+        for annotation in _layout_audit.audited_annotations(_layout_audit.printed_dump(sheet)):
+            if annotation.get("owner_type") != 0:
+                continue
+            name = annotation.get("name")
+            if name in required:
+                required[name].append(annotation)
+            note = annotation.get("note")
+            if isinstance(note, Mapping) and isinstance(note.get("text"), str):
+                if note["text"].replace("\r\n", "\n") == THREAD_NOTE_TEXT:
+                    tips.append(annotation)
+    for name, records in {**required, "ThreadNote": tips}.items():
+        if len(records) != 1:
+            errors.append(f"{name}: expected one settled native annotation; count={len(records)}")
+        expected_type = 6 if name == "ThreadNote" else 4
+        for annotation in records:
+            if annotation.get("type") != expected_type or annotation.get("visible") != 1:
+                errors.append(f"{name}: wrong settled native type/visibility; actual={annotation!r}")
+    for annotation in required["ReliefDia"]:
+        errors.extend(_relief_text_profile_errors(annotation))
+    references = {}
+    for name in ("UnderHeadLocation", "OverallLength"):
+        references[name] = []
+        for annotation in required[name]:
+            lines, invalid = _actual_stroke_inventory(annotation, "lines", f"SIDE/{name}")
+            errors.extend(invalid)
+            witnesses = [line for line in lines
+                         if abs(line[0][0] - line[1][0]) <= 1e-9 and line[0][1] != line[1][1]]
+            if len(witnesses) != 2:
+                errors.append(f"SIDE/{name}: expected two actual reference witnesses; actual={lines!r}")
+            references[name].extend(witnesses)
+    for annotation in tips:
+        for kind in ("lines", "leaders", "arrows"):
+            strokes, invalid = _actual_stroke_inventory(annotation, kind, "SIDE/ThreadNote")
+            errors.extend(invalid)
+            for name, witnesses in references.items():
+                crossings = [(a, b) for a in strokes for b in witnesses
+                             if _drawing_leaders.segments_cross(a, b)]
+                if crossings:
+                    errors.append(
+                        f"SIDE/ThreadNote/{kind} vs {name}: tip-leader/reference-witness crossing; "
+                        f"actual={crossings!r}"
+                    )
+    return errors
+
+
 def _assert_generated_annotation_ink(
     dumps: Sequence[Mapping[str, Any]],
     detail_groups: Mapping[str, Sequence[_drawing_leaders.Segment]],
     *,
     collection_errors: Sequence[str] = (),
+    settled: bool = False,
 ) -> None:
-    """One collective refusal for all printable ink and every foreign DETAIL pair."""
+    """Collect every border/DETAIL violation; production also requires ROOT/tip reads.
+
+    Isolated border/foreign-DETAIL fixtures may omit the unrelated settled
+    inventories. The production finalizer always enables ``settled``.
+    """
     errors = list(collection_errors)
+    if settled:
+        errors.extend(_settled_profile_and_tip_errors(dumps))
     if not dumps:
         errors.append("no drawing sheets collected")
     inner = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -944,7 +1097,7 @@ def _assert_generated_annotation_ink(
 
 
 def assert_final_annotation_ink(adapter: Any, detail_annotations: Sequence[Any]) -> None:
-    """Finalizer's settled readback: all sheets, actual ink, no PDF or rebuild."""
+    """Collect all settled ink, including mandatory metric ROOT and native tip routes."""
     reader = _drawing_layout_audit._Reader(adapter)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     dumps, errors = [], []
@@ -1000,7 +1153,7 @@ def assert_final_annotation_ink(adapter: Any, detail_annotations: Sequence[Any])
                 groups[name] = _drawing_leaders.dimension_segments(annotation)
         except Exception as exc:
             errors.append(f"DETAIL: actual ink collection failed: {exc}")
-    _assert_generated_annotation_ink(dumps, groups, collection_errors=errors)
+    _assert_generated_annotation_ink(dumps, groups, collection_errors=errors, settled=True)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1086,13 +1239,13 @@ async def build(adapter: Any) -> dict[str, str]:
             "TipChamfer": CHAMFER_CALLOUT,
             "HeadDia": HEAD_DIA_CALLOUT,
             "HeadLength": HEAD_LENGTH_CALLOUT,
-            "UnderHeadLocation": UNDER_HEAD_CALLOUT,
+            "ShoulderLength": UNDER_HEAD_CALLOUT,
         },
         location="below",
     )
     # ABOVE is single-line only in the native display: keep the root reason
     # here, separate from the relief's two BELOW seating/mate lines.
-    # The running mate's to-suit rule stays above the shoulder value.
+    # The running mate stays above the shoulder-diameter value.
     set_dimension_callouts(
         adapter,
         annotations,

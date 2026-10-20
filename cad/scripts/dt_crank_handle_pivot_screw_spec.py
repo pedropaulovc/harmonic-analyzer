@@ -217,7 +217,7 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # Each chamfer leg is imported from its own native model dimension.  The
 # relief diameter's root reason is one ABOVE line (native multiline ABOVE
 # does not print); its seating reason and mate remain two BELOW lines.
-RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT} LEAD"
+RELIEF_LEAD_CALLOUT = f"{CHAMFER_CALLOUT}\nLEAD INTO MHA-DT-06"
 RELIEF_DIA_ROOT_CALLOUT = f"BELOW {THREAD_SIZE} ROOT"
 RELIEF_DIA_CALLOUT = "NECK FOR SEATING\nON MHA-DT-06"
 SEAT_EDGE_BREAK_CALLOUT = f"{CHAMFER_CALLOUT}\nPRESERVES SEAT ON MHA-DT-06"
@@ -364,10 +364,10 @@ INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
 ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
-# The fitted shoulder's to-suit rule rides the under-head reference as its
-# callout (user ruling 2026-09-29, after the MHA-DT-32 machinist review).
-# The seat break is now a native, feature-attached chamfer dimension; only
-# the tip's final assembly operation remains in the free note (r8).
+# The fitted shoulder's to-suit rule rides its local seat-to-under-head
+# reference (Main's r18 ruling); the tip-based 63/67 references stay plain.
+# The seat break and relief lead name their mates at their native chamfers;
+# only the tip's final assembly operation remains in the free note.
 FITTED_STEP = step_ref("crank-handle-fitted")
 UNDER_HEAD_CALLOUT = "\n".join(
     (
@@ -491,17 +491,19 @@ for _ok, _what in (
 
 # Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-32
 # re-reviews, 2026-09-29): the seat face (the thread length), the under-head
-# face (UnderHeadLocation, a
-# reference: the shoulder is turned to suit the bonded handle) and the head
-# face (the reference overall, for stock cut-off).  The head length, the slot
-# depth, the relief width and the 45-degree chamfer legs are local sizes of their
-# features.  A head-face origin cannot work: the seat is fitted, so the thread
-# length would ride on the handle stack.
+# face (UnderHeadLocation, a reference) and the head face (the reference
+# overall, for stock cut-off).  The fitted shoulder additionally prints its
+# existing local seat-to-under-head nominal as a reference with the to-suit
+# rule (Main's r18 ruling), not a second driving location.  The head length,
+# slot depth, relief width and 45-degree chamfer legs remain local sizes.
+# A head-face origin cannot work: the seat is fitted, so the thread length
+# would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
         "HeadLength",
         "ShoulderDia",
+        "ShoulderLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
@@ -524,6 +526,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadDia": 2,
         "HeadLength": 2,
         "ShoulderDia": 2,
+        "ShoulderLength": 1,
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 1,
@@ -552,6 +555,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-DT-32 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "UnderHeadLocation"})
+REFERENCE_DIMENSIONS = frozenset({"ShoulderLength", "OverallLength", "UnderHeadLocation"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"
