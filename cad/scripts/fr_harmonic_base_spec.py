@@ -251,13 +251,13 @@ UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
     )
     for name in names
 }
-# D1 is located from the nearer transferred MHA-DT-002 seat, not the table
+# D1 is located from the nearer transferred MHA-DT-02 seat, not the table
 # origin. The model's point-only PivotSeatReference sketch owns these offsets.
 PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
 PIVOT_SEAT_TAG = "D1"
 PIVOT_SEAT_STEP = (
     f"{PIVOT_SEAT_TAG} PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
-    "THE MHA-DT-002 SEATS, IN ONE SETUP WITH THEM;\n"
+    "THE MHA-DT-02 SEATS, IN ONE SETUP WITH THEM;\n"
     "OFFSETS SHOWN GOVERN; TABLE X/Y ARE REFERENCE."
 )
 
