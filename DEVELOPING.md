@@ -1317,9 +1317,17 @@ before unpacking (the SDK pins the initial ETag across ranged downloads).
 
 After any upload error, including an ambiguous timeout or `InvalidBlockList`,
 a present canonical entry means `lost`, not `stored`. The action must restore the
-entire winning archive before succeeding. Native adoption takes the COM seat and
-uses the existing release-once/reprobe recovery; unavailable, still-locked or
-hash-invalid canonical bytes are fatal. Part and assembly execution tokens are
+entire winning archive before succeeding. Restore validates all archive paths and
+inventoried replacement targets, then stages the complete payload before deleting
+anything. It replaces only inventoried files/directories (including optional
+outputs absent from the winner and loser-only directory members), never their
+shared parents or unrelated siblings. Winner-only dynamically discovered files
+are still installed without expanding recursive deletion to archive-supplied
+directories. Native adoption takes the COM seat and uses the existing
+release-once/reprobe recovery for deletion or installation locks; unavailable,
+still-locked or hash-invalid canonical bytes are fatal. Replacement is not a
+multi-output transaction: a later lock may leave partial outputs, but never a
+successful cache HIT. Part and assembly execution tokens are
 re-stamped; assembly input ledgers are rewritten. Drawing/generic COM bundles
 adopt all archived outputs, and machinist review re-reads the winning aggregate
 before enforcing/stamping it. LEARN softens machinist verdicts, not adoption

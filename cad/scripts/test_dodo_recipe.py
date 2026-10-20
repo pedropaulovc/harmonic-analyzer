@@ -4661,12 +4661,12 @@ def test_loser_adoption_holds_seat_and_releases_documents_once(
     released = []
     original_unpack = f.cache._unpack
 
-    def unpack(blob):
+    def unpack(blob, outputs):
         if f.dodo.REPO_ROOT.name == "B":
             assert f.seats[f.dodo.REPO_ROOT] == 1
             if persistent or not released:
                 raise PermissionError(13, "share-locked", "leaf.SLDPRT")
-        original_unpack(blob)
+        original_unpack(blob, outputs)
 
     def release(_label):
         assert f.seats[f.dodo.REPO_ROOT] == 1
@@ -4680,6 +4680,115 @@ def test_loser_adoption_holds_seat_and_releases_documents_once(
     else:
         _canonical_two_producer_race(f, monkeypatch, "part")
     assert released == ["B"]
+    assert not any(f.seats.values())
+
+
+@pytest.mark.parametrize("lock_at,persistent", [
+    (None, False),
+    ("optional-file", False), ("optional-file", True),
+    ("directory", False), ("directory", True),
+    ("install", False), ("install", True),
+])
+def test_sparse_winner_adoption_removes_loser_geometry_and_retries_replacement_locks(
+    canonical_publication, monkeypatch, lock_at, persistent
+):
+    """Different real archive members converge, including cleanup/install locks."""
+    import _transforms
+
+    f = canonical_publication
+    released, refused = [], []
+    winner_identity = None
+
+    def outputs():
+        return [
+            Path(f.dodo._sldprt("leaf")),
+            f.dodo.CAD_OUT / "stl" / "leaf.STL",
+            f.dodo.CAD_OUT / "png" / "leaf",
+        ]
+
+    monkeypatch.setattr(f.dodo, "_part_cache_outputs", lambda _stem: outputs())
+
+    def execute(*_args, **_kwargs):
+        nonlocal winner_identity
+        producer = f.dodo.REPO_ROOT.name
+        if producer == "B":
+            with f.at("A"):
+                f.run("part")
+                winner_identity = f.identity("part")
+        native, optional, views = outputs()
+        native.parent.mkdir(parents=True, exist_ok=True)
+        native.write_bytes(producer.encode() + b"-native")
+        views.mkdir(parents=True, exist_ok=True)
+        (views / "canonical.png").write_bytes(producer.encode() + b"-render")
+        if producer == "B":
+            optional.parent.mkdir(parents=True)
+            optional.write_bytes(
+                b"solid loser\nvertex 0 0 0\nvertex 9 8 0\nvertex 0 0 7\nendsolid\n"
+            )
+            stale = views / "loser-only"
+            stale.mkdir()
+            (stale / "geometry.STL").write_bytes(b"loser-only directory member")
+
+    def release(_label):
+        assert f.seats[f.dodo.REPO_ROOT] == 1
+        released.append("B")
+
+    def locked(phase, path):
+        if (
+            f.dodo.REPO_ROOT.name == "B" and phase == lock_at
+            and (persistent or not released)
+        ):
+            assert f.seats[f.dodo.REPO_ROOT] == 1
+            refused.append(phase)
+            raise PermissionError(13, "share-locked replacement", str(path))
+
+    unlink = Path.unlink
+    rmtree = f.cache.shutil.rmtree
+    replace = f.cache.os.replace
+
+    def unlink_output(path, *args, **kwargs):
+        if path == outputs()[1]:
+            locked("optional-file", path)
+        return unlink(path, *args, **kwargs)
+
+    def remove_directory(path, *args, **kwargs):
+        if Path(path) == outputs()[2]:
+            locked("directory", path)
+        return rmtree(path, *args, **kwargs)
+
+    def install(source, target, *args, **kwargs):
+        if Path(target) == outputs()[0]:
+            locked("install", target)
+        return replace(source, target, *args, **kwargs)
+
+    monkeypatch.setattr(f.dodo, "_exec_com", execute)
+    monkeypatch.setattr(f.dodo, "_release_seat_documents", release)
+    monkeypatch.setattr(Path, "unlink", unlink_output)
+    monkeypatch.setattr(f.cache.shutil, "rmtree", remove_directory)
+    monkeypatch.setattr(f.cache.os, "replace", install)
+    with f.at("B"):
+        sibling = f.dodo.CAD_OUT / "png" / "unrelated" / "keep.png"
+        sibling.parent.mkdir(parents=True)
+        sibling.write_bytes(b"unrelated")
+        if persistent:
+            with pytest.raises(RuntimeError, match="still share-locked"):
+                f.run("part")
+        else:
+            f.run("part")
+            native, optional, views = outputs()
+            assert f.identity("part") == winner_identity
+            assert native.read_bytes() == b"A-native"
+            assert (views / "canonical.png").read_bytes() == b"A-render"
+            assert not optional.exists()
+            assert not (views / "loser-only").exists()
+            monkeypatch.setattr(_transforms, "OUT_STL", optional.parent)
+            monkeypatch.setattr(_transforms, "_STL_BBOX_CACHE", {})
+            with pytest.raises(FileNotFoundError):
+                _transforms.stl_bbox_mm("leaf")
+        assert sibling.read_bytes() == b"unrelated"
+        assert not list(f.dodo.CAD_OUT.glob(".cache-restore-*"))
+    assert released == (["B"] if lock_at else [])
+    assert refused == ([lock_at] * (2 if persistent else 1) if lock_at else [])
     assert not any(f.seats.values())
 
 

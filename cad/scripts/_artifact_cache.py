@@ -59,6 +59,9 @@ Design notes / invariants:
   or fail. Absent-entry ordinary push failures remain soft. Explicit refresh alone
   may replace bytes, by CAS against its first pre-work ETag/absence snapshot.
   Downloads verify atomically committed archive hash/size metadata before unpack.
+  Restores replace only the declared output inventory, including absent optional
+  outputs and whole directory contents. Validate ownership and stage the complete
+  archive before removing anything; a failed replacement is never a cache HIT.
 
 * **Observable.** A cache miss must be explainable WITHOUT scrollback archaeology
   (issue #73). Three knobs, all best-effort and never able to fail a build:
@@ -110,8 +113,10 @@ import io
 import json
 import os
 import secrets
+import shutil
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import unicodedata
@@ -397,39 +402,90 @@ def _pack(outputs: list[Path]) -> bytes:
     return buf.getvalue()
 
 
-def _unpack(blob: bytes) -> None:
+def _restore_path(path: Path) -> Path:
+    """A replacement target must be a strict, unaliased child of cad/out/."""
+    target = Path(os.path.abspath(path))
+    if (
+        target == _CACHE_OUTPUT_ROOT
+        or not target.is_relative_to(_CACHE_OUTPUT_ROOT)
+        or target.resolve() != target
+    ):
+        raise RuntimeError(f"unsafe cache output path: {path}")
+    return target
+
+
+def _unpack(blob: bytes, outputs: list[Path]) -> None:
+    # Validate EVERY deletion target before touching any of them. Collapsing
+    # overlaps preserves directory ownership without deleting shared parents.
+    owned = sorted({_restore_path(Path(output)) for output in outputs})
+    roots = [
+        path for path in owned
+        if not any(parent in owned for parent in path.parents)
+    ]
     with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
         members = tar.getmembers()
+        if not members:
+            raise RuntimeError("empty cache archive has no canonical outputs")
         for member in members:
-            # A cache archive may ONLY write build outputs, all under cad/out/.
-            # Enforcing that here blocks path traversal AND -- since any principal
-            # with blob write access could poison a valid key -- stops a hostile
-            # archive from overwriting tracked SOURCE like cad/scripts/*.py that a
-            # later doit task would then execute (codex review). Reject links too.
-            if member.islnk() or member.issym():
-                raise RuntimeError(f"link member not allowed in cache archive: {member.name}")
-            dest = (REPO_ROOT / member.name).resolve()
-            try:
-                dest.relative_to(_CACHE_OUTPUT_ROOT)
-            except ValueError:
-                raise RuntimeError(f"cache archive member escapes cad/out/: {member.name}")
-        tar.extractall(REPO_ROOT)
-        # tar.add recorded the BUILDER's mtimes; refresh restored files to now so a
-        # pulled native part/assembly is never OLDER than a developer's pre-existing
-        # derived export -- the mtime-based downstream freshness guards (render_offline
-        # and cut_release's SCENE_JSON check) would otherwise see a stale-looking native
-        # and wrongly skip regeneration / ship old geometry (codex review). (export
-        # itself now keys staleness on the churn-immune recipe digest, not mtime, and
-        # re-stamps its outputs current after a successful run so those guards stay
-        # truthful.) Best-effort: a utime failure must not fail a restore.
-        now = time.time()
-        for member in members:
-            if not member.isreg():
-                continue
-            try:
-                os.utime((REPO_ROOT / member.name).resolve(), (now, now))
-            except OSError:
-                pass
+            # Reject links/special files, traversal and Windows path aliases
+            # (including alternate data streams), even on non-Windows readers.
+            if (
+                not (member.isreg() or member.isdir())
+                or "\\" in member.name
+                or ":" in member.name
+                or ".." in Path(member.name).parts
+            ):
+                raise RuntimeError(f"unsafe cache archive member: {member.name}")
+            _restore_path(REPO_ROOT / member.name)
+
+        # Parse/extract the complete payload BEFORE deleting local outputs. A bad
+        # member or truncated archive must leave the producer's tree untouched.
+        # Same-volume staging lets installation move bytes, not copy them again.
+        _CACHE_OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=".cache-restore-", dir=_CACHE_OUTPUT_ROOT
+        ) as temporary:
+            staged = Path(temporary)
+            tar.extractall(staged, members=members, filter="data")
+            # tar.add recorded the BUILDER's mtimes. Refresh them so downstream
+            # export/release freshness guards see the newly restored geometry.
+            now = time.time()
+            for member in members:
+                if member.isreg():
+                    try:
+                        os.utime(staged / member.name, (now, now))
+                    except OSError:
+                        pass
+            for output in roots:
+                # Recheck after staging, before replacement; do not follow a
+                # newly introduced alias into a sibling's output tree.
+                _restore_path(output)
+            for output in roots:
+                if output.is_dir():
+                    shutil.rmtree(output)
+                else:
+                    output.unlink(missing_ok=True)
+                source = staged / output.relative_to(REPO_ROOT)
+                if source.exists():
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(source, output)
+                # An absent optional output belongs to the winner too. A share
+                # lock during deletion/install propagates to RestoreLocked and
+                # the existing under-seat release/retry; never report a HIT.
+            # Some inventories discover optional files from the local tree
+            # (channel spring variants). A winner can contain new files the
+            # receiver did not enumerate. Install those too, but never expand
+            # recursive deletion to an archive-supplied shared directory.
+            for member in members:
+                source = staged / member.name
+                if not source.exists():
+                    continue  # already installed with an inventoried root
+                dest = _restore_path(REPO_ROOT / member.name)
+                if member.isdir():
+                    dest.mkdir(parents=True, exist_ok=True)
+                else:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(source, dest)
 
 
 # --------------------------------------------------------------------------- #
@@ -1079,7 +1135,7 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
             return False
         try:
             with _phase("cache.unpack", bytes=len(blob)):
-                _unpack(blob)
+                _unpack(blob, outputs)
         except PermissionError as exc:
             locked = RestoreLocked(label, key, exc)
             _warn(str(locked))

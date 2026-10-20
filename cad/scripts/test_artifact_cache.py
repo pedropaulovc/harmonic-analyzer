@@ -9,11 +9,13 @@ on-disk sinks (cache.jsonl, the per-label key sidecar) are redirected to a tmp d
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import logging
 import os
 import subprocess
 import sys
+import tarfile
 import types
 from pathlib import Path
 
@@ -71,7 +73,7 @@ def fake(tmp_path, monkeypatch, real_unpack):
     monkeypatch.setattr(cache, "_REPORTS", tmp_path)
     monkeypatch.setattr(cache, "_EVENTS_LOG", tmp_path / "cache.jsonl")
     monkeypatch.setattr(cache, "_KEYDIR", tmp_path / "cache-keys")
-    monkeypatch.setattr(cache, "_unpack", lambda blob: None)
+    monkeypatch.setattr(cache, "_unpack", lambda blob, outputs: None)
     monkeypatch.setattr(cache, "_KEY_INPUTS", {})
     monkeypatch.setattr(cache, "_KEY_CONTEXT", {})
     monkeypatch.setattr(cache, "_KEY_MANIFESTS", {})
@@ -274,7 +276,7 @@ def test_restore_hit_over_a_share_locked_output_raises_instead_of_falling_throug
     key = cache.cache_key([dep], _digest_one, label="part:x")
     fake.blobs[key] = b"payload"
 
-    def refuse(_blob):
+    def refuse(_blob, _outputs):
         raise PermissionError(13, "Permission denied", "cad/out/sldprt/x.SLDPRT")
 
     monkeypatch.setattr(cache, "_unpack", refuse)
@@ -291,11 +293,210 @@ def test_restore_other_unpack_errors_still_fall_through(tmp_path, fake, monkeypa
     key = cache.cache_key([dep], _digest_one, label="part:x")
     fake.blobs[key] = b"payload"
     monkeypatch.setattr(
-        cache, "_unpack", lambda _blob: (_ for _ in ()).throw(OSError("disk full"))
+        cache, "_unpack", lambda _blob, _outputs: (_ for _ in ()).throw(OSError("disk full"))
     )
 
     assert cache.restore(key, [], "part:x") is False
     assert [e["event"] for e in _events(tmp_path)] == ["restore_error"]
+
+
+@pytest.fixture
+def archive_tree(tmp_path, fake, real_unpack, monkeypatch):
+    """Real replacement with all source/output paths confined to a throwaway repo."""
+    monkeypatch.setattr(cache, "REPO_ROOT", tmp_path)
+    root = tmp_path / "cad" / "out"
+    root.mkdir(parents=True)
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", root)
+    monkeypatch.setattr(cache, "_unpack", real_unpack)
+    return root
+
+
+@pytest.mark.parametrize("optional_directory", [False, True])
+def test_restore_replaces_absent_outputs_and_whole_owned_directories(
+    archive_tree, fake, optional_directory
+):
+    root = archive_tree
+    native = root / "sldprt" / "leaf.SLDPRT"
+    optional = root / "stl" / "leaf.STL"
+    views = root / "png" / "leaf"
+    native.parent.mkdir()
+    native.write_bytes(b"winner-native")
+    views.mkdir(parents=True)
+    canonical = views / "canonical.png"
+    canonical.write_bytes(b"winner-render")
+    # Include duplicate/nested inventory entries: deleting the parent must not
+    # delete an already-installed child on a later pass.
+    outputs = [native, optional, views, canonical, views]
+    fake.blobs["winner"] = cache._pack(outputs)
+    native.write_bytes(b"loser-native")
+    canonical.write_bytes(b"loser-render")
+    optional.parent.mkdir()
+    if optional_directory:
+        optional.mkdir()
+        (optional / "loser.STL").write_bytes(b"loser-only geometry")
+    else:
+        optional.write_bytes(b"loser-only geometry")
+    stale = views / "loser-only"
+    stale.mkdir()
+    (stale / "geometry.STL").write_bytes(b"stale directory member")
+    sibling = views.parent / "unrelated"
+    sibling.mkdir()
+    (sibling / "keep.png").write_bytes(b"unrelated")
+
+    assert cache.restore("winner", outputs, "part:leaf") is True
+    assert native.read_bytes() == b"winner-native"
+    assert canonical.read_bytes() == b"winner-render"
+    assert not optional.exists()
+    assert not stale.exists()
+    assert (sibling / "keep.png").read_bytes() == b"unrelated"
+    assert not list(root.glob(".cache-restore-*"))
+
+
+def test_restore_keeps_winner_files_missing_from_local_discovery_inventory(
+    archive_tree, fake
+):
+    root = archive_tree
+    native = root / "sldprt" / "channel.SLDASM"
+    native.parent.mkdir()
+    native.write_bytes(b"winner-native")
+    winner_variant = native.parent / "spring-installed-stretch-10.SLDPRT"
+    winner_variant.write_bytes(b"winner-spring")
+    fake.blobs["winner"] = cache._pack([native, winner_variant])
+    winner_variant.unlink()
+    loser_variant = native.parent / "spring-installed-stretch-20.SLDPRT"
+    loser_variant.write_bytes(b"loser-spring")
+    sibling = native.parent / "unrelated.SLDPRT"
+    sibling.write_bytes(b"unrelated")
+
+    assert cache.restore("winner", [native, loser_variant], "assembly:channel")
+    assert not loser_variant.exists()
+    assert winner_variant.read_bytes() == b"winner-spring"
+    assert sibling.read_bytes() == b"unrelated"
+
+
+@pytest.mark.parametrize("invalid", ["output-root", "ancestor", "outside"])
+def test_restore_validates_every_deletion_target_before_removal(
+    archive_tree, fake, invalid
+):
+    root = archive_tree
+    native = root / "leaf.SLDPRT"
+    native.write_bytes(b"winner")
+    fake.blobs["winner"] = cache._pack([native])
+    native.write_bytes(b"loser")
+    outside = root.parent / "unrelated.txt"
+    outside.write_bytes(b"unrelated")
+    bad = {"output-root": root, "ancestor": root.parent, "outside": outside}[invalid]
+
+    assert cache.restore("winner", [native, bad], "part:leaf") is False
+    assert native.read_bytes() == b"loser"
+    assert outside.read_bytes() == b"unrelated"
+    assert not list(root.glob(".cache-restore-*"))
+
+
+def test_restore_rejects_aliased_deletion_target_without_deleting_its_sibling(
+    archive_tree, fake
+):
+    root = archive_tree
+    native = root / "leaf.SLDPRT"
+    native.write_bytes(b"winner")
+    fake.blobs["winner"] = cache._pack([native])
+    native.write_bytes(b"loser")
+    sibling = root / "unrelated"
+    sibling.mkdir()
+    (sibling / "keep.txt").write_bytes(b"unrelated")
+    alias = root / "alias"
+    try:
+        alias.symlink_to(sibling, target_is_directory=True)
+    except OSError:
+        if os.name != "nt":
+            raise
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(alias), str(sibling)],
+            check=True, capture_output=True, text=True,
+        )
+    try:
+        assert cache.restore("winner", [native, alias], "part:leaf") is False
+        assert native.read_bytes() == b"loser"
+        assert (sibling / "keep.txt").read_bytes() == b"unrelated"
+    finally:
+        if alias.is_symlink():
+            alias.unlink()
+        else:
+            alias.rmdir()
+
+
+@pytest.mark.parametrize("name,kind", [
+    ("cad/out/../../source.py", tarfile.REGTYPE),
+    ("cad/scripts/source.py", tarfile.REGTYPE),
+    ("cad/out/link", tarfile.SYMTYPE),
+    ("cad/out/link", tarfile.LNKTYPE),
+    ("cad/out/fifo", tarfile.FIFOTYPE),
+    ("cad\\out\\alias", tarfile.REGTYPE),
+    ("cad/out/leaf.SLDPRT:stream", tarfile.REGTYPE),
+    ("cad/out", tarfile.DIRTYPE),
+])
+def test_restore_validates_all_archive_members_before_removal(
+    archive_tree, fake, name, kind
+):
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"loser")
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w:gz") as archive:
+        good = tarfile.TarInfo("cad/out/leaf.SLDPRT")
+        good.size = len(b"winner")
+        archive.addfile(good, io.BytesIO(b"winner"))
+        bad = tarfile.TarInfo(name)
+        bad.type = kind
+        bad.linkname = "cad/out/leaf.SLDPRT" if bad.islnk() or bad.issym() else ""
+        archive.addfile(bad)
+    fake.blobs["winner"] = payload.getvalue()
+
+    assert cache.restore("winner", [native], "part:leaf") is False
+    assert native.read_bytes() == b"loser"
+    assert not list(archive_tree.glob(".cache-restore-*"))
+
+
+def test_restore_stages_complete_payload_before_removing_outputs(
+    archive_tree, fake, monkeypatch
+):
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"winner")
+    fake.blobs["winner"] = cache._pack([native])
+    native.write_bytes(b"loser")
+    original = tarfile.TarFile.makefile
+
+    def incomplete(archive, member, targetpath):
+        original(archive, member, targetpath)
+        raise tarfile.ReadError("truncated payload after a staged member")
+
+    monkeypatch.setattr(tarfile.TarFile, "makefile", incomplete)
+    assert cache.restore("winner", [native], "part:leaf") is False
+    assert native.read_bytes() == b"loser"
+    assert not list(archive_tree.glob(".cache-restore-*"))
+
+
+@pytest.mark.parametrize("damage", ["empty", "truncated", "conflicting-shape"])
+def test_restore_rejects_invalid_real_archives_without_removing_outputs(
+    archive_tree, fake, damage
+):
+    import gzip
+
+    native = archive_tree / "leaf.SLDPRT"
+    native.write_bytes(b"loser")
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w:", format=tarfile.USTAR_FORMAT) as archive:
+        if damage != "empty":
+            good = tarfile.TarInfo("cad/out/leaf.SLDPRT")
+            good.size = 4096
+            archive.addfile(good, io.BytesIO(b"W" * good.size))
+            if damage == "conflicting-shape":
+                archive.addfile(tarfile.TarInfo("cad/out/leaf.SLDPRT/child"))
+    raw = payload.getvalue()
+    fake.blobs["winner"] = gzip.compress(raw[:612] if damage == "truncated" else raw)
+
+    assert cache.restore("winner", [native], "part:leaf") is False
+    assert native.read_bytes() == b"loser"
+    assert not list(archive_tree.glob(".cache-restore-*"))
 
 
 def test_miss_retains_previous_and_current_inputs(tmp_path, fake):
@@ -1366,7 +1567,7 @@ def test_download_checks_response_metadata_before_unpack(monkeypatch, fake, fiel
     else:
         metadata[field] = value
     monkeypatch.setattr(cache, "_BACKEND", backend)
-    monkeypatch.setattr(cache, "_unpack", lambda _blob: pytest.fail("unpacked corrupt payload"))
+    monkeypatch.setattr(cache, "_unpack", lambda _blob, _outputs: pytest.fail("unpacked corrupt payload"))
     assert cache.restore(key, [], "part:x") is False
     assert not any(call[0] == "etag" for call in service.calls)
 
