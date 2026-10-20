@@ -485,6 +485,7 @@ def action(inputs, monkeypatch):
         dodo=dodo,
         calls=calls,
         state=state,
+        report=report,
         original_probe=original_probe,
         original_key=original_key,
         settings=settings,
@@ -1042,11 +1043,8 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     monkeypatch.setattr(cache, "_BACKEND", backend)
     monkeypatch.setattr(dodo, "_machinist_review_cache_key", action.original_key)
     key = _review_key(dodo)
-    directory.mkdir(parents=True)
-    (directory / "probe.aggregate.json").write_text(json.dumps({
-        "name": "probe", "kind": "part", "verdict": winner,
-        "gating_count": 2 if winner == "FIX" else 0, "error": None,
-    }), encoding="utf-8")
+    action.state["verdict"] = winner
+    action.report()
     (directory / "winner-evidence.json").write_text('{"producer":"A"}', encoding="utf-8")
     winning_archive = cache._pack([directory])
     # The first probe misses. Another producer publishes only once our own
