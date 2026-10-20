@@ -9,7 +9,7 @@ catches the same gap offline, across every registered part drawing.
 
 "Stamped" is static and deliberately generous: the keys ``part_properties``
 returns for the part, every string literal in the part's build script and in
-the repo-local modules it imports (``_drawing_marks`` aside, whose literals only
+the direct repo-local modules it imports (``_drawing_marks`` aside, whose literals only
 count through a call to ``apply_drawing_properties``), plus that helper's keys
 when the build calls it.  Configured document properties are stricter: only
 keys in the mapping actually passed to ``apply_drawing_properties`` count,
@@ -253,7 +253,20 @@ def _metadata_strings(
         return sequences[value.id]
     tree, value = _metadata(tree, value)
     if isinstance(value, (ast.Tuple, ast.List)):
-        return tuple(_metadata_string(tree, element) for element in value.elts)
+        strings = []
+        for element in value.elts:
+            if isinstance(element, ast.Starred):
+                expanded_tree, expanded = _metadata(tree, element.value)
+                assert isinstance(expanded, (ast.Tuple, ast.List)), (
+                    f"metadata expansion is not a literal sequence: "
+                    f"{ast.unparse(element.value)}"
+                )
+                strings.extend(
+                    _metadata_string(expanded_tree, item) for item in expanded.elts
+                )
+            else:
+                strings.append(_metadata_string(tree, element))
+        return tuple(strings)
     assert (
         isinstance(value, ast.Call)
         and isinstance(value.func, ast.Name)
@@ -391,15 +404,21 @@ def _required(draw: Path) -> set[str]:
 
 
 def _build_trees(build: Path) -> list[ast.Module]:
+    """Parse the producer's direct local imports, without executing or recursing."""
     trees = [_tree(build)]
     for node in ast.walk(trees[0]):
-        if not isinstance(node, ast.ImportFrom) or not node.module:
+        if isinstance(node, ast.ImportFrom):
+            modules = (node.module,) if node.module else ()
+        elif isinstance(node, ast.Import):
+            modules = tuple(alias.name for alias in node.names)
+        else:
             continue
-        if node.module == "_drawing_marks":
-            continue
-        module = SCRIPTS / f"{node.module.replace('.', '/')}.py"
-        if module.is_file():
-            trees.append(_tree(module))
+        for module_name in modules:
+            if module_name == "_drawing_marks":
+                continue
+            module = SCRIPTS / f"{module_name.replace('.', '/')}.py"
+            if module.is_file():
+                trees.append(_tree(module))
     return trees
 
 
@@ -546,3 +565,74 @@ def test_unsupported_configured_property_comprehension_fails_closed() -> None:
     )
     with pytest.raises(AssertionError):
         _property_keys(tree, ast.Name(id="notes", ctx=ast.Load()))
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        'PROPERTIES = ("Number", *MISSING_PROPERTIES)\n',
+        'PROPERTIES = ("Number", *make_properties())\n',
+        'PROPERTIES = ("Number", *PROPERTIES)\n',
+    ),
+    ids=("unresolved", "dynamic", "cyclic"),
+)
+def test_property_sequence_expansion_fails_closed(source: str) -> None:
+    tree = ast.parse(source)
+    with pytest.raises(AssertionError):
+        _metadata_strings(tree, ast.Name(id="PROPERTIES", ctx=ast.Load()), {})
+
+
+@pytest.mark.parametrize(
+    ("source", "included"),
+    (
+        ("from stock import PROPERTIES\n", True),
+        ("import stock\n", True),
+        ("import stock as supplier_metadata\n", True),
+        ("import absent_module, stock\n", True),
+        ("import metadata.stock as supplier_metadata\n", True),
+        ("pass\n", False),
+        ("import bridge\n", False),
+        ("import external_stock\n", False),
+        ("import _drawing_marks\n", False),
+        ("from _drawing_marks import PROPERTIES\n", False),
+    ),
+    ids=(
+        "from-import",
+        "plain-import",
+        "aliased-import",
+        "multiple-imports",
+        "dotted-import",
+        "unimported",
+        "transitive",
+        "outside-repo",
+        "drawing-marks-import",
+        "drawing-marks-from-import",
+    ),
+)
+def test_stock_metadata_uses_only_direct_repo_local_imports(
+    source: str, included: bool, tmp_path: Path, monkeypatch
+) -> None:
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "metadata").mkdir()
+    metadata = (
+        'raise RuntimeError("metadata must only be parsed")\n'
+        'PROPERTIES = {"Stock Name": "stock", "Supplier": "catalog", '
+        '"Supplier SKUs": "sku"}\n'
+    )
+    for path in (
+        scripts / "stock.py",
+        scripts / "metadata" / "stock.py",
+        scripts / "_drawing_marks.py",
+        tmp_path / "external_stock.py",
+    ):
+        path.write_text(metadata, encoding="utf-8")
+    (scripts / "bridge.py").write_text("import stock\n", encoding="utf-8")
+    build = scripts / "build_fixture.py"
+    build.write_text(source, encoding="utf-8")
+    monkeypatch.setitem(globals(), "SCRIPTS", scripts)
+    monkeypatch.setitem(globals(), "part_properties", lambda _stem: {})
+
+    stamped, _ = _stamped("fixture", build)
+    required = {"Stock Name", "Supplier", "Supplier SKUs"}
+    assert required & stamped == (required if included else set())
