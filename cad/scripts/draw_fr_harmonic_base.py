@@ -135,6 +135,7 @@ from fr_harmonic_base_spec import (
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     PIVOT_SEAT_STEP,
+    PIVOT_SEAT_TAG,
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
@@ -375,7 +376,21 @@ HOLE_TOP_KEEP = {
 }
 PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
 # ABOVE accepts one printable row; both native offsets cite numbered note 1.
-PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, "SEE NOTE 1")
+PIVOT_SEAT_FLAG = "SEE NOTE 1"
+PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
+# #1744: the D1 row carries the same flag where its reference X/Y print. The
+# hole table's generated cells are not editable (ITableAnnotation
+# IsCellTextEditable: only the header row and custom columns are), so the
+# flag sits in a custom NOTE column after SIZE and D1's X/Y stay the native
+# model-linked values. The column takes its width from the TAG and LOC
+# columns' slack, so the table keeps its native extent beside the notes lane.
+PIVOT_SEAT_TABLE_COLUMN = "NOTE"
+PIVOT_SEAT_TABLE_COLUMN_WIDTH = 0.029  # SEE NOTE 1 prints ~24.7 mm
+HOLE_TABLE_TAG_WIDTH = 0.013
+HOLE_TABLE_MIN_LOCATION_WIDTH = 0.018  # 425.60 / Y LOC print ~14 mm
+_INSERT_COLUMN_AFTER = 3  # swTableItemInsertPosition_After
+_INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
+_TABLE_SIZE_CAN_CHANGE = 0  # swTableRowColChange_TableSizeCanChange
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear
 # end it cuts.
@@ -765,6 +780,90 @@ def _flag_pivot_seat_dimensions(adapter: Any, annotations: list[Any]) -> None:
             raise RuntimeError(f"native {name} ABOVE flag did not persist: {actual!r}")
 
 
+def _table_cells(table: Any, columns: int) -> tuple[tuple[str, ...], ...]:
+    return tuple(
+        tuple(
+            str(table.DisplayedText2(row, column, False) or "").strip()
+            for column in range(columns)
+        )
+        for row in range(int(table.RowCount))
+    )
+
+
+def _flag_pivot_seat_table_row(table: Any) -> tuple[tuple[tuple[str, ...], ...], float]:
+    """Flag the generated D1 hole-table row in a custom NOTE column.
+
+    Returns the generated TAG/X LOC/Y LOC/SIZE cells and the native table
+    width, which the flag must leave unchanged through every rebuild.
+    """
+    if int(table.ColumnCount) != 4:
+        raise RuntimeError("D1 table flag expects the native four-column hole table")
+    generated = _table_cells(table, 4)
+    rows = [row for row in range(1, len(generated)) if generated[row][0] == PIVOT_SEAT_TAG]
+    if len(rows) != 1:
+        raise RuntimeError(f"hole table needs one {PIVOT_SEAT_TAG} row, got {rows!r}")
+    row = rows[0]
+    widths = tuple(float(table.GetColumnWidth(column)) for column in range(4))
+    location_width = (
+        sum(widths[:3]) - HOLE_TABLE_TAG_WIDTH - PIVOT_SEAT_TABLE_COLUMN_WIDTH
+    ) / 2.0
+    if location_width < HOLE_TABLE_MIN_LOCATION_WIDTH:
+        raise RuntimeError(
+            f"hole-table TAG/LOC slack cannot hold the D1 NOTE column: widths={widths!r}"
+        )
+    if table.InsertColumn2(
+        _INSERT_COLUMN_AFTER, 3, PIVOT_SEAT_TABLE_COLUMN, _INSERT_COLUMN_DEFAULT_WIDTH
+    ) is not True:
+        raise RuntimeError("native hole table refused the D1 NOTE column")
+    if table.SetColumnTitle2(4, PIVOT_SEAT_TABLE_COLUMN, False) is not True:
+        raise RuntimeError("native hole-table NOTE column title did not set")
+    if table.IsCellTextEditable(row, 4) is not True:
+        raise RuntimeError("native hole-table D1 NOTE cell is not editable")
+    table.SetText2(row, 4, False, PIVOT_SEAT_FLAG)
+    for column, width in (
+        (0, HOLE_TABLE_TAG_WIDTH),
+        (1, location_width),
+        (2, location_width),
+        (4, PIVOT_SEAT_TABLE_COLUMN_WIDTH),
+    ):
+        actual = float(table.SetColumnWidth(column, width, _TABLE_SIZE_CAN_CHANGE))
+        if abs(actual - width) > 1e-6:
+            raise RuntimeError(f"hole-table column {column} width did not persist: {actual!r}")
+    _check_pivot_seat_table_row(table, generated, sum(widths))
+    _telemetry.info(
+        f"D1 hole-table flag: row={row}, column_type={table.GetColumnType2(4, False)!r}, "
+        f"native_widths_mm={tuple(round(w * 1000.0, 3) for w in widths)!r}, "
+        f"location_width_mm={location_width * 1000.0:.3f}"
+    )
+    return generated, sum(widths)
+
+
+def _check_pivot_seat_table_row(
+    table: Any, generated: tuple[tuple[str, ...], ...], width: float
+) -> None:
+    """Only the custom column changed: D1 flagged, generated cells and extent kept."""
+    if int(table.ColumnCount) != 5:
+        raise RuntimeError("hole table lost or duplicated the D1 NOTE column")
+    cells = _table_cells(table, 5)
+    if tuple(row[:4] for row in cells) != generated:
+        raise RuntimeError(f"D1 NOTE column changed generated hole-table cells: {cells!r}")
+    expected = tuple(
+        PIVOT_SEAT_TABLE_COLUMN if index == 0
+        else PIVOT_SEAT_FLAG if row[0] == PIVOT_SEAT_TAG
+        else ""
+        for index, row in enumerate(cells)
+    )
+    actual = tuple(row[4].upper() if index == 0 else row[4] for index, row in enumerate(cells))
+    if actual != expected:
+        raise RuntimeError(f"hole-table NOTE column did not persist: {actual!r}")
+    actual_width = sum(float(table.GetColumnWidth(column)) for column in range(5))
+    if abs(actual_width - width) > 1e-5:
+        raise RuntimeError(
+            f"D1 NOTE column changed the hole-table width: {actual_width!r} != {width!r}"
+        )
+
+
+
 def _spread_hole_tags(view: Any, table: Any) -> None:
     table_locations = {}
     for row in range(1, int(table.RowCount)):
@@ -864,8 +963,9 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
 # The cone swing set is made against the arbor carried by MHA-DT-02.
-# Both native banded offsets cite spec-owned numbered note 1 in the B4 notes
-# lane; the free note states the assembly setup and table-reference status.
+# Both native banded offsets and the D1 hole-table row cite spec-owned
+# numbered note 1 in the B4 notes lane; the free note states the assembly
+# setup and table-reference status.
 PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
@@ -2271,6 +2371,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("base hole table did not retain individual coordinate tags")
     if int(hole_table.RowCount) != len(TABLE_HOLES) + 1:
         raise RuntimeError("combining base hole sizes changed individual table rows")
+    table_flag = _flag_pivot_seat_table_row(hole_table)
     for row in range(int(hole_table.RowCount)):
         hole_table.SetRowHeight(row, 0.007, 0)
     table_height = sum(
@@ -2282,6 +2383,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
+    _check_pivot_seat_table_row(hole_table, *table_flag)
     add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     _attached_note(
         adapter,

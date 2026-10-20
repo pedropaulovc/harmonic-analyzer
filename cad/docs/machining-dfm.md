@@ -126,7 +126,8 @@ geometry is casting-shaped, not milling-shaped.
   lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
   in one setup without repeating the numeric offsets, and states that D1
   table X/Y are reference. The generated native hole-table coordinates remain
-  unchanged.
+  unchanged; the D1 row carries the same `SEE NOTE 1` flag in a custom NOTE
+  column (#1744), because generated hole-table cells are not editable.
 
 ### Blind-thread DFM rule
 

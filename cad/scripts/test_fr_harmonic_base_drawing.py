@@ -1596,6 +1596,176 @@ def test_pivot_flags_refuse_missing_keys_or_nonprintable_caption_rows(monkeypatc
     assert events == []
 
 
+class _NativeHoleTable:
+    """ITableAnnotation surface for the D1 row flag; generated cells are locked."""
+
+    def __init__(self, *, refuse=None, widths=(0.0198, 0.0303, 0.0317, 0.0628), d1_rows=1):
+        self.refuse = refuse
+        self.cells = [
+            ["TAG", "X LOC", "Y LOC", "SIZE"],
+            ["A1", "31.60", "31.60", "Ø25.50"],
+            *[["D1", "142.05", "39.81", "Ø3.80 ↧ 13.45"]] * d1_rows,
+            ["E1", "284.04", "83.28", "Ø5.11"],
+        ]
+        self.cells = [list(row) for row in self.cells]
+        self.widths = list(widths)
+        self.events = []
+
+    @property
+    def RowCount(self):  # noqa: N802 - the COM member name
+        return len(self.cells)
+
+    @property
+    def ColumnCount(self):  # noqa: N802 - the COM member name
+        return len(self.cells[0])
+
+    def DisplayedText2(self, row, column, include_hidden):  # noqa: N802
+        assert include_hidden is False
+        return self.cells[row][column]
+
+    def GetColumnWidth(self, column):  # noqa: N802
+        return self.widths[column]
+
+    def GetColumnType2(self, column, include_hidden):  # noqa: N802
+        return 0
+
+    def InsertColumn2(self, where, index, name, width_style):  # noqa: N802
+        self.events.append(("insert", where, index, name, width_style))
+        if self.refuse == "insert":
+            return False
+        for row in self.cells:
+            row.insert(index + 1, "")
+        self.widths.insert(index + 1, 0.020)
+        return True
+
+    def SetColumnTitle2(self, index, title, include_hidden):  # noqa: N802
+        assert include_hidden is False
+        if self.refuse == "title":
+            return False
+        self.cells[0][index] = title
+        return True
+
+    def IsCellTextEditable(self, row, column):  # noqa: N802
+        # Hole tables: only the header row and custom columns are editable.
+        return self.refuse != "editable" and (row == 0 or column == 4)
+
+    def SetText2(self, row, column, include_hidden, text):  # noqa: N802
+        assert include_hidden is False
+        assert self.IsCellTextEditable(row, column), "wrote a generated hole-table cell"
+        self.events.append(("text", row, column, text))
+        if self.refuse != "text":
+            self.cells[row][column] = text
+
+    def SetColumnWidth(self, column, width, options):  # noqa: N802
+        assert options == 0  # swTableRowColChange_TableSizeCanChange
+        if self.refuse != "width":
+            self.widths[column] = width
+        return self.widths[column]
+
+
+def test_d1_table_row_carries_note_flag_in_custom_column_only() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    native = [list(row) for row in table.cells]
+    native_width = sum(table.widths)
+    generated, width = sheet._flag_pivot_seat_table_row(table)
+
+    assert generated == tuple(tuple(row) for row in native)
+    assert width == pytest.approx(native_width)
+    assert sheet.PIVOT_SEAT_FLAG == "SEE NOTE 1"
+    assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
+    assert table.events == [
+        ("insert", 3, 3, "NOTE", 0),
+        ("text", 2, 4, "SEE NOTE 1"),
+    ]
+    assert [row[:4] for row in table.cells] == native
+    assert [row[4] for row in table.cells] == ["NOTE", "", "SEE NOTE 1", ""]
+    assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
+    assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
+    assert table.widths[3] == 0.0628
+    assert table.widths[4] == sheet.PIVOT_SEAT_TABLE_COLUMN_WIDTH
+    assert sum(table.widths) == pytest.approx(native_width, abs=1e-9)
+    sheet._check_pivot_seat_table_row(table, generated, width)
+
+
+@pytest.mark.parametrize(
+    ("refuse", "message"),
+    (
+        ("insert", "refused the D1 NOTE column"),
+        ("title", "NOTE column title did not set"),
+        ("editable", "D1 NOTE cell is not editable"),
+        ("text", "NOTE column did not persist"),
+        ("width", "width did not persist"),
+    ),
+)
+def test_d1_table_flag_refuses_unconfirmed_native_state(refuse, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    with pytest.raises(RuntimeError, match=message):
+        sheet._flag_pivot_seat_table_row(_NativeHoleTable(refuse=refuse))
+
+
+@pytest.mark.parametrize(
+    ("table", "message"),
+    (
+        (_NativeHoleTable(d1_rows=0), "needs one D1 row"),
+        (_NativeHoleTable(d1_rows=2), "needs one D1 row"),
+        (_NativeHoleTable(widths=(0.012, 0.022, 0.022, 0.0628)), "slack cannot hold"),
+    ),
+)
+def test_d1_table_flag_refuses_before_inserting_a_column(table, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    with pytest.raises(RuntimeError, match=message):
+        sheet._flag_pivot_seat_table_row(table)
+    assert table.events == []
+    assert table.ColumnCount == 4
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    (
+        (lambda table: table.cells[2].__setitem__(1, "(142.05)"), "changed generated"),
+        (lambda table: table.cells[2].__setitem__(4, ""), "did not persist"),
+        (lambda table: table.cells[1].__setitem__(4, "SEE NOTE 1"), "did not persist"),
+        (lambda table: table.widths.__setitem__(3, 0.070), "changed the hole-table width"),
+        (lambda table: [row.pop() for row in table.cells], "lost or duplicated"),
+    ),
+)
+def test_d1_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    table = _NativeHoleTable()
+    generated, width = sheet._flag_pivot_seat_table_row(table)
+    mutate(table)
+    with pytest.raises(RuntimeError, match=message):
+        sheet._check_pivot_seat_table_row(table, generated, width)
+
+
+def test_d1_table_flag_precedes_row_sizing_and_is_reread_after_binding() -> None:
+    import ast
+    import inspect
+
+    import draw_fr_harmonic_base as sheet
+
+    tree = ast.parse(inspect.getsource(sheet.build))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+
+    def lines(name):
+        return [
+            node.lineno for node in calls
+            if getattr(node.func, "id", None) == name or getattr(node.func, "attr", None) == name
+        ]
+
+    (flag,) = lines("_flag_pivot_seat_table_row")
+    (check,) = lines("_check_pivot_seat_table_row")
+    (spread,) = lines("_spread_hole_tags")
+    assert flag < min(lines("SetRowHeight")) < spread < check
+    assert flag < min(line for line in lines("EditRebuild3") if line > flag) < spread
+    assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
+
+
 @pytest.mark.parametrize(
     ("tag", "old_anchor", "old_box"),
     [
