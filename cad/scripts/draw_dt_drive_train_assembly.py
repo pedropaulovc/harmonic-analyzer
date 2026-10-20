@@ -1303,6 +1303,37 @@ def note_field_violations(
     return violations
 
 
+def bank_setting_caption_violations(
+    extent: tuple[float, float, float, float],
+    outline: tuple[float, float, float, float],
+) -> list[str]:
+    """Actual caption ink must stay below and within its view's horizontal span.
+
+    ``_anchor_note`` steers toward a point; its bounded moves do not promise
+    that point. The functional postcondition is measured air, not target error.
+    """
+    if not all(map(math.isfinite, (*extent, *outline))):
+        return ["non-finite caption extent or view outline"]
+    findings = []
+    if outline[1] - extent[3] < VIEW_CAPTION_GAP:
+        findings.append("caption is not 4 mm below its view")
+    if extent[0] < outline[0] or extent[2] > outline[2]:
+        findings.append("caption leaves its view's horizontal span")
+    return findings
+
+
+def bank_setting_letter_violations(
+    extent: tuple[float, float, float, float],
+    centre: tuple[float, float],
+    radius: float,
+) -> list[str]:
+    """Keep the complete identifier at least 4 mm above-left of its circle."""
+    if not all(map(math.isfinite, (*extent, *centre, radius))):
+        return ["non-finite detail identifier extent or circle"]
+    air = (centre[0] - radius - extent[2], extent[1] - centre[1] - radius)
+    return ["detail identifier crowds its boundary circle"] if min(air) < VIEW_CAPTION_GAP else []
+
+
 def ring_fit_shift(
     outline: tuple[float, float, float, float],
     region: tuple[float, float, float, float],
@@ -3132,7 +3163,7 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         left = outline[2] - width if right_aligned else (outline[0] + outline[2] - width) / 2.0
         corner = (left, outline[1] - VIEW_CAPTION_GAP)
         _anchor_note(adapter, note, corner, label=label)
-        captions.append((note, corner, label))
+        captions.append((note, view, label))
 
     # This is the channel package's ordinary cropped-view/boundary pattern,
     # not an IDetailCircle. The parent view must own both its sketch circle and
@@ -3143,42 +3174,53 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         raise RuntimeError("cannot activate bank setting view for its detail identifier")
     letter = _add_note_block(adapter, "A", parent_centre, label="spring detail letter")
     letter_extent = _note_extent(adapter, letter, label="spring detail letter")
+    # Seed inside the clear region, not on its minimum-air boundary: the
+    # bounded anchor helper does not guarantee its requested text-box corner.
+    letter_gap = 2.0 * VIEW_CAPTION_GAP
     letter_corner = (
-        parent_centre[0] - radius - VIEW_CAPTION_GAP - (letter_extent[2] - letter_extent[0]),
-        parent_centre[1] + radius + VIEW_CAPTION_GAP + (letter_extent[3] - letter_extent[1]),
+        parent_centre[0] - radius - letter_gap - (letter_extent[2] - letter_extent[0]),
+        parent_centre[1] + radius + letter_gap + (letter_extent[3] - letter_extent[1]),
     )
     _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
+    placements = []
+    for note, label, owner_type in (
+        *((note, label, 1) for note, _view, label in captions),
+        (letter, "spring detail letter", 0),
+    ):
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"{label} position is unreadable: {position!r}")
+        placements.append((annotation, position, label, owner_type))
     letter_annotation = _early_bound(letter.GetAnnotation(), "IAnnotation")
-    letter_position = tuple(float(value) for value in (letter_annotation.GetPosition() or ()))
-    if len(letter_position) != 3 or not all(map(math.isfinite, letter_position)):
-        raise RuntimeError(f"spring detail letter position is unreadable: {letter_position!r}")
 
     def settled() -> None:
         _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
-        for note, corner, label in (*captions, (letter, letter_corner, "spring detail letter")):
-            extent = _note_extent(adapter, note, label=label)
-            if max(abs(extent[0] - corner[0]), abs(extent[3] - corner[1])) > NOTE_ANCHOR_SETTLE:
-                raise RuntimeError(f"{label} moved from its rendered target {corner!r}: {extent!r}")
-            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        # Preserve the actual native position and independently check current
+        # ink clearance, not the helper's requested point (R4's harmless
+        # rendered target error was +0.186/-0.185 mm).
+        for annotation, baseline, label, expected_owner in placements:
+            position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+            if len(position) != 3 or not all(map(math.isfinite, position)):
+                raise RuntimeError(f"{label} position is unreadable: {position!r}")
+            if math.dist(position, baseline) > NOTE_ANCHOR_SETTLE:
+                raise RuntimeError(f"{label} moved from {baseline!r} to {position!r}")
             # swAnnotationOwner_e: DrawingView=0, DrawingSheet=1.
-            expected_owner = 0 if note is letter else 1
             if int(annotation.OwnerType) != expected_owner:
                 raise RuntimeError(f"{label} has the wrong native owner: {annotation.OwnerType!r}")
+        for note, view, label in captions:
+            view.UpdateViewDisplayGeometry()
+            extent = _note_extent(adapter, note, label=label)
+            violations = bank_setting_caption_violations(extent, _view_outline(view))
+            if violations:
+                raise RuntimeError(f"{label}: {'; '.join(violations)}; actual extent {extent!r}")
         owner = _early_bound(letter_annotation.Owner, "IView")
         if view_name(adapter, owner) != overall_name:
             raise RuntimeError("spring detail letter is not owned by the bank setting view")
-        position = tuple(float(value) for value in (letter_annotation.GetPosition() or ()))
-        if len(position) != 3 or not all(map(math.isfinite, position)):
-            raise RuntimeError(f"spring detail letter position is unreadable: {position!r}")
-        if math.dist(position, letter_position) > NOTE_ANCHOR_SETTLE:
-            raise RuntimeError(f"spring detail letter moved from {letter_position!r} to {position!r}")
         extent = _note_extent(adapter, letter, label="spring detail letter")
-        circle_air = (
-            parent_centre[0] - radius - extent[2],
-            extent[1] - parent_centre[1] - radius,
-        )
-        if min(circle_air) < VIEW_CAPTION_GAP - NOTE_ANCHOR_SETTLE:
-            raise RuntimeError(f"spring detail letter crowds its boundary circle: {circle_air!r}")
+        violations = bank_setting_letter_violations(extent, parent_centre, radius)
+        if violations:
+            raise RuntimeError(f"{'; '.join(violations)}; actual extent {extent!r}")
         assert_imported_precision(
             adapter, annotations,
             {name: 2 for names in bank_settings.DRAWING_DIMENSIONS.values() for name in names},

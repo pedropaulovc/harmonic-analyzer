@@ -775,6 +775,51 @@ def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
     )
 
 
+def test_bank_setting_caption_accepts_native_r4_extent_not_exact_anchor_target() -> None:
+    # Native R4, source 957dc7b2fc79, 20261020T223233Z failure capture:
+    # Its rendered readback differed harmlessly from the requested corner.
+    # That point is not _anchor_note's postcondition; actual air is 4.1845 mm.
+    target = (0.25288663532950506, 0.1265405874866539)
+    extent = (
+        0.25307234782608695, 0.12206696321070235,
+        0.31073714381270906, 0.12635608026755854,
+    )
+    outline = (0.099, target[1] + 0.004, 0.311, 0.2336)
+    assert abs(extent[0] - target[0]) > drawing.NOTE_ANCHOR_SETTLE
+    assert abs(extent[3] - target[1]) > drawing.NOTE_ANCHOR_SETTLE
+    assert drawing.bank_setting_caption_violations(extent, outline) == []
+    # Position stability alone cannot accept a caption that actually moves
+    # onto the view, or one whose measured air drops below the unchanged 4 mm.
+    for top in (outline[1] + 0.001, outline[1] - 0.00399):
+        assert drawing.bank_setting_caption_violations((*extent[:3], top), outline)
+    outside = (extent[0], extent[1], outline[2] + 0.001, extent[3])
+    assert drawing.bank_setting_caption_violations(outside, outline)
+
+
+@pytest.mark.parametrize(
+    ("extent", "outline"),
+    (
+        # Actual R3 native caption/view boxes, the two original real overlaps.
+        ((0.1649, 0.1407, 0.2226, 0.1454), (0.099, 0.1305, 0.311, 0.2336)),
+        ((0.0596, 0.0306, 0.1325, 0.0353), (0.061, 0.0311, 0.149, 0.1189)),
+    ),
+)
+def test_bank_setting_caption_refuses_recorded_native_r3_collisions(extent, outline) -> None:
+    assert drawing.bank_setting_caption_violations(extent, outline)
+
+
+def test_bank_setting_letter_requires_whole_box_clear_of_circle() -> None:
+    centre, radius = (0.13275, 0.195), 0.008
+    clear = (0.113, 0.211, 0.117, 0.216)
+    assert drawing.bank_setting_letter_violations(clear, centre, radius) == []
+    # Each independent edge must retain 4 mm; readable/stable position alone
+    # does not prove the identifier is outside its view-owned sketch circle.
+    right_close = (*clear[:2], centre[0] - radius - 0.00399, clear[3])
+    below = (clear[0], centre[1] + radius + 0.00399, *clear[2:])
+    assert drawing.bank_setting_letter_violations(right_close, centre, radius)
+    assert drawing.bank_setting_letter_violations(below, centre, radius)
+
+
 def test_balloon_attachment_gate_names_every_mismatch() -> None:
     records = [("B1", "1", ("dt-crank-arm",)), ("B2", "3", ("dt-crank-pin",)), ("B3", "4", ())]
     findings = drawing.balloon_attachment_violations(
