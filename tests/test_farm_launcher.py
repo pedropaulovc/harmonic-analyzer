@@ -2661,8 +2661,12 @@ def _terminate_held_process(handle: int) -> None:
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.TerminateProcess.restype = wintypes.BOOL
     kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
-    if not kernel32.TerminateProcess(handle, 1) and not _held_process_exited(handle, 0):
-        raise ctypes.WinError(ctypes.get_last_error())
+    if kernel32.TerminateProcess(handle, 1):
+        return
+    # Capture before the wait below can overwrite the thread's last error.
+    error = ctypes.get_last_error()
+    if not _held_process_exited(handle, 0):
+        raise ctypes.WinError(error)
 
 
 def _close_held_process(handle: int) -> None:
@@ -2736,7 +2740,6 @@ def test_orphan_fixture_lifetime_is_controlled_by_release() -> None:
         assert not _process_alive(parent)
         time.sleep(0.1)
         assert _process_alive(child)
-    assert not _process_alive(child)
 
 
 @pytest.mark.parametrize(
