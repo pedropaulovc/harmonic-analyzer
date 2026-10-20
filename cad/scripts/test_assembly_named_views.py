@@ -9,9 +9,15 @@ import pytest
 from _assembly_named_views import name_standard_views
 
 _ISOMETRIC_ROWS = (
-    1 / math.sqrt(2), 0.0, -1 / math.sqrt(2),
-    -1 / math.sqrt(6), 2 / math.sqrt(6), -1 / math.sqrt(6),
-    1 / math.sqrt(3), 1 / math.sqrt(3), 1 / math.sqrt(3),
+    1 / math.sqrt(2),
+    0.0,
+    -1 / math.sqrt(2),
+    -1 / math.sqrt(6),
+    2 / math.sqrt(6),
+    -1 / math.sqrt(6),
+    1 / math.sqrt(3),
+    1 / math.sqrt(3),
+    1 / math.sqrt(3),
 )
 
 
@@ -62,7 +68,9 @@ class _Model:
 class _Adapter:
     def __init__(self, model):
         self.currentModel = model
-        self.swApp = type("App", (), {"GetMathUtility": staticmethod(lambda: _Utility())})()
+        self.swApp = type(
+            "App", (), {"GetMathUtility": staticmethod(lambda: _Utility())}
+        )()
 
 
 def _transpose(rotation):
@@ -79,7 +87,9 @@ class _StandardModel(_Model):
             7: tuple(value + 1e-5 for value in _ISOMETRIC_ROWS),
         }
         if transposed:
-            self.standard = {key: _transpose(value) for key, value in self.standard.items()}
+            self.standard = {
+                key: _transpose(value) for key, value in self.standard.items()
+            }
 
     def GetStandardViewRotation(self, view_id):
         return self.standard[view_id]
@@ -90,7 +100,9 @@ class _StandardModel(_Model):
 
 
 @pytest.mark.parametrize("transposed", [False, True])
-def test_named_standard_views_preserve_exact_native_projections(monkeypatch, transposed):
+def test_named_standard_views_preserve_exact_native_projections(
+    monkeypatch, transposed
+):
     import _assembly_named_views
 
     monkeypatch.setattr(_assembly_named_views, "_early_bound", lambda obj, _iface: obj)
@@ -112,9 +124,7 @@ def test_named_standard_views_follow_an_arbitrary_rigid_turn(monkeypatch, transp
     model = _StandardModel(transposed=transposed)
     turn = ((1.0, 0.0, 0.0), (0.0, -1.0, 0.0), (0.0, 0.0, -1.0))
     views = {"TURNED TOP": 5, "TURNED ISOMETRIC": 7}
-    name_standard_views(
-        _Adapter(model), views=views, label="test", model_rotation=turn
-    )
+    name_standard_views(_Adapter(model), views=views, label="test", model_rotation=turn)
     point = (31.0, 12.0, -7.0)
     turned = tuple(sum(point[i] * turn[i][j] for i in range(3)) for j in range(3))
     for name, view_id in views.items():
@@ -122,13 +132,16 @@ def test_named_standard_views_follow_an_arbitrary_rigid_turn(monkeypatch, transp
         named = model.named[name]
         if transposed:
             original, named = _transpose(original), _transpose(named)
-        before = tuple(sum(point[i] * original[3 * axis + i] for i in range(3)) for axis in range(3))
-        after = tuple(sum(turned[i] * named[3 * axis + i] for i in range(3)) for axis in range(3))
+        before = tuple(
+            sum(point[i] * original[3 * axis + i] for i in range(3))
+            for axis in range(3)
+        )
+        after = tuple(
+            sum(turned[i] * named[3 * axis + i] for i in range(3)) for axis in range(3)
+        )
         assert after == pytest.approx(before, abs=1e-12)
     # The physical working model still opens in its standard +Y-up frame.
-    assert model.standard[1] == (
-        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0
-    )
+    assert model.standard[1] == (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
 
 
 def test_named_standard_view_rejects_a_wrong_off_diagonal_readback(monkeypatch):
@@ -138,4 +151,6 @@ def test_named_standard_view_rejects_a_wrong_off_diagonal_readback(monkeypatch):
     model = _StandardModel()
     model.Extension.GetNamedViewRotation = lambda name: _transpose(model.named[name])
     with pytest.raises(RuntimeError, match="read back"):
-        name_standard_views(_Adapter(model), views={"MG BACK-TOP-LEFT": 7}, label="test")
+        name_standard_views(
+            _Adapter(model), views={"MG BACK-TOP-LEFT": 7}, label="test"
+        )
