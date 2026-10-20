@@ -157,9 +157,10 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
 MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
-cylindrical tap-drill depth, explicitly symmetric in the native dimension
-and hole callout at the ordinary title-block .XX band width, not an accepted
-tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
+cylindrical tap-drill depth, explicitly symmetric in the native dimension.
+The native hole callout prints **6.50** at two places, inheriting the same
+ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
+accepted tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
 to **8.20 mm**: its entry remains **−76.20 mm**, its inner boundary is
 **−68.00 mm**, and the opposite end rib remains **5.08 mm**. The axes and
 13.7 mm pitch, MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged.

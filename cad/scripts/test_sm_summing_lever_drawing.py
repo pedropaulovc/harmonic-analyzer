@@ -935,6 +935,146 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
     assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.00051, 0.00051))
 
 
+@pytest.fixture
+def bracket_depth_callout(monkeypatch):
+    """Keep late-bound metadata distinct from the native length interface."""
+    import sys
+
+    class Interface:
+        def __init__(self, **values):
+            object.__setattr__(self, "values", values)
+            object.__setattr__(self, "ignored", set())
+            object.__setattr__(self, "writes", [])
+
+        def __getattr__(self, name):
+            return self.values[name]
+
+        def __setattr__(self, name, value):
+            self.writes.append((name, value))
+            if name not in self.ignored:
+                self.values[name] = value
+
+    def native(name, depth):
+        metadata = Interface(
+            VariableName=name, ToleranceType=4, ToleranceMin=0.0, ToleranceMax=0.0,
+        )
+        length = Interface(Length=depth / 1000.0, Precision=1, TolerancePrecision=1)
+        return SimpleNamespace(raw=SimpleNamespace(_oleobj_=metadata), metadata=metadata, length=length)
+
+    thread = native("hw-threaddepth", 4.95)
+    drill = native("hw-tapdrldepth", 6.50)
+    unrelated = native("hw-threaddia", 2.1844)
+    variables = [unrelated.raw, thread.raw, drill.raw]
+    dispatched = []
+    bound = []
+
+    def dispatch(ole):
+        assert any(ole is item.metadata for item in (unrelated, thread, drill))
+        dispatched.append(ole)
+        return ole
+
+    def early_bound(raw, kind):
+        assert kind == "ICalloutLengthVariable"
+        for item in (thread, drill):
+            if raw is item.raw:
+                bound.append(raw)
+                return item.length
+        raise AssertionError("unrelated callout variable must not be dressed")
+
+    monkeypatch.setitem(sys.modules, "win32com.client.dynamic", SimpleNamespace(Dispatch=dispatch))
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    callout = SimpleNamespace(GetHoleCalloutVariables=lambda: variables)
+    return SimpleNamespace(
+        dress=lambda: drawing._dress_bracket_depth_callout(callout),
+        thread=thread, drill=drill, unrelated=unrelated, variables=variables,
+        dispatched=dispatched, bound=bound,
+    )
+
+
+def test_bracket_depth_callout_inherits_printed_two_place_band(bracket_depth_callout) -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    case = bracket_depth_callout
+    unrelated_before = (dict(case.unrelated.metadata.values), dict(case.unrelated.length.values))
+    case.dress()
+    assert case.drill.metadata.ToleranceType == 0  # swTolNONE: title-block presentation
+    assert case.drill.length.Precision == 2
+    assert case.drill.length.Length == pytest.approx(0.00650)
+    # NONE hides the native variable's unused tolerance fields; dressing must
+    # not write them or assume SOLIDWORKS retains hidden deviations.
+    assert case.drill.metadata.writes == [("ToleranceType", 0)]
+    assert case.drill.length.writes == [("Precision", 2)]
+    assert case.thread.metadata.ToleranceType == 5  # swTolMIN, not a bilateral thread depth
+    assert case.thread.length.Length == pytest.approx(0.00495)
+    assert case.thread.length.writes == []
+    assert (case.thread.metadata.ToleranceMin, case.thread.metadata.ToleranceMax) == (0.0, 0.0)
+    assert (case.unrelated.metadata.values, case.unrelated.length.values) == unrelated_before
+    assert case.unrelated.metadata.writes == case.unrelated.length.writes == []
+    assert case.bound == [case.thread.raw, case.drill.raw]
+    assert case.dispatched == [case.unrelated.metadata, case.thread.metadata, case.drill.metadata]
+
+    # Derive the effective band from the printed nominal and the actual sheet
+    # row, not value_in (whose metric conversion is intentionally rounded).
+    printed_nominal = f"{case.drill.length.Length * 1000.0:.{case.drill.length.Precision}f}"
+    assert printed_nominal == "6.50"
+    display = _config.title_block("linear_2pl")["display"]
+    assert display.startswith("±")
+    printed_band = float(display.removeprefix("±"))
+    effective_limits = (float(printed_nominal) - printed_band, float(printed_nominal) + printed_band)
+    assert effective_limits == pytest.approx((5.99, 7.01))
+    physical_limits = tuple(joint.DRILL_DEPTH + delta for delta in joint.DRILL_DEPTH_DEVIATIONS)
+    assert effective_limits == pytest.approx(physical_limits)
+
+
+@pytest.mark.parametrize(("member", "wrong_mm"), [("thread", 4.90), ("drill", 6.00)])
+def test_bracket_depth_callout_rejects_wrong_native_length(
+    bracket_depth_callout, member, wrong_mm,
+) -> None:
+    case = bracket_depth_callout
+    getattr(case, member).length.values["Length"] = wrong_mm / 1000.0
+    with pytest.raises(RuntimeError):
+        case.dress()
+
+
+@pytest.mark.parametrize("missing", ["thread", "drill", "both"])
+def test_bracket_depth_callout_requires_both_native_depth_variables(
+    bracket_depth_callout, missing,
+) -> None:
+    case = bracket_depth_callout
+    removed = (case.thread.raw, case.drill.raw) if missing == "both" else (getattr(case, missing).raw,)
+    case.variables[:] = [raw for raw in case.variables if all(raw is not item for item in removed)]
+    with pytest.raises(RuntimeError):
+        case.dress()
+
+
+@pytest.mark.parametrize(
+    ("member", "interface", "setter"),
+    [
+        ("thread", "metadata", "ToleranceType"),
+        ("drill", "metadata", "ToleranceType"),
+        ("drill", "length", "Precision"),
+    ],
+)
+def test_bracket_depth_callout_rejects_ignored_native_setters(
+    bracket_depth_callout, member, interface, setter,
+) -> None:
+    case = bracket_depth_callout
+    target = getattr(getattr(case, member), interface)
+    target.ignored.add(setter)
+    with pytest.raises(RuntimeError):
+        case.dress()
+    assert any(name == setter for name, _value in target.writes)
+
+
+@pytest.mark.parametrize("band", [(-0.51, 0.40), (-0.40, 0.40)])
+def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
+    monkeypatch, bracket_depth_callout, band,
+) -> None:
+    monkeypatch.setattr(drawing, "DRILL_DEPTH_DEVIATIONS", band)
+    with pytest.raises(RuntimeError):
+        bracket_depth_callout.dress()
+
+
 def test_rib_added_area_matches_independent_cross_section_integration() -> None:
     """Integrate profile minus the existing cylinder/plate/pad union by strips.
 
