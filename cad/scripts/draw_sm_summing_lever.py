@@ -1274,57 +1274,20 @@ def _mounting_rims(edges: ViewEdges) -> list[Any]:
     ]
 
 
-# VIEW F ties the plate top face, the origin of the bracket row's 2.54 +-0.05,
-# to the trunnion axis (machinist gate 2026-10-17 on #1607: the row's
-# centreline stopped at the holes, and only section C-C's 5.08 implied the
-# plate's symmetry).  The plate is extruded mid-plane on the pivot
-# (build_sm_summing_lever._coefficients_plate), so its top stands PLATE_T/2
-# over the hex centre and the row lies on that axis.  An owned centreline
-# runs from the free-edge side through both taps and the hex centre,
-# RECEIVER_AXIS_OVERRUN_MM past the station and past the hex's flats; a
-# (2.54) REF stands from it to the plate top at RECEIVER_AXIS_STATION_MM,
-# where the -Z end shows the plate's own top edge (the end rib steps up at
-# build_sm_summing_lever.RIB_PLATE_REACH, 35.75).  Its dimension line stands
-# 2.8 mm inside the free edge, its text RECEIVER_AXIS_TEXT_RISE_MM above the
-# plate top: between the free edge's and the outer tap's extension lines,
-# under the 14.75's dimension line and above the rib's slant.
+# VIEW F's controlled ReceiverY0 locates the bracket row from the plate top.
+# The plate is extruded mid-plane on the pivot, and both tap centres lie at
+# y=0. An owned centreline runs through the taps and hex centre, extending
+# past the free-edge station and hex flats. The separate (2.54) reference
+# repeated ReceiverY0's span and was struck by ReceiverX1's extension line.
 RECEIVER_AXIS_STATION_MM = 37.5
 RECEIVER_AXIS_OVERRUN_MM = 2.0
-RECEIVER_AXIS_TEXT_RISE_MM = 7.5
 
 
-def _receiver_plate_top_edge(edges: ViewEdges) -> ViewEdge:
-    """The -Z end's plate-top line under the axis reference's station.
-
-    VIEW F looks at the -Z end face (z = -PLATE_L/2): from the end rib's step
-    to the free edge, its only visible line at y = PLATE_T/2 is the plate's
-    own top edge. Anything else is a changed model and fails loud.
-    """
-    z_mm = -PLATE_L / 2.0
-    y_mm = PLATE_T / 2.0
-    x_mm = RECEIVER_AXIS_STATION_MM
-    matches = [
-        item
-        for item in edges.lines
-        if all(abs(point[2] - z_mm) < 1e-6 and abs(point[1] - y_mm) < 1e-6 for point in item.line)
-        and min(point[0] for point in item.line) - 1e-6 <= x_mm
-        and x_mm <= max(point[0] for point in item.line) + 1e-6
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"summing lever -Z plate top: expected one visible line at "
-            f"y={y_mm:g} z={z_mm:g} spanning x={x_mm:g} in the {edges.label!r} "
-            f"scan, found {[item.line for item in matches]}"
-        )
-    return matches[0]
-
-
-def _receiver_axis_reference(adapter: Any, back: Any, edges: ViewEdges) -> Any:
-    """VIEW F's row centreline through the hex centre and the (2.54) REF from
-    it to the plate top (see RECEIVER_AXIS_STATION_MM)."""
+def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
+    """Extend VIEW F's receiver-row centreline through the hex centre."""
     z_mm = -PLATE_L / 2.0
     station = RECEIVER_AXIS_STATION_MM
-    axis = _owned_centerline(
+    return _owned_centerline(
         adapter,
         back,
         (
@@ -1333,44 +1296,6 @@ def _receiver_axis_reference(adapter: Any, back: Any, edges: ViewEdges) -> Any:
         ),
         label="receiver row centreline",
     )
-    plate_top = _receiver_plate_top_edge(edges)
-    axis_pick, top_pick, text_xy = model_points_in_view(
-        adapter,
-        back,
-        [
-            _metres((station, 0.0, z_mm)),
-            _metres((station, PLATE_T / 2.0, z_mm)),
-            _metres((station, PLATE_T / 2.0 + RECEIVER_AXIS_TEXT_RISE_MM, z_mm)),
-        ],
-        label="receiver axis reference",
-        names=("axis", "plate top", "text"),
-    )
-    entity_types = ("SKETCHSEGMENT", "EDGE")
-    reference = add_edge_dimension(
-        adapter,
-        back,
-        p0=axis_pick,
-        p1=top_pick,
-        text_xy=text_xy,
-        label="plate top from the trunnion axis",
-        orientation="vertical",
-        entity_types=entity_types,
-        entities=(axis, plate_top.edge),
-    )
-    assert_dimension_measures(
-        adapter,
-        reference,
-        expected_mm=PLATE_T / 2.0,
-        label="plate top from the trunnion axis",
-        entities=(axis, plate_top.edge),
-        entity_types=entity_types,
-    )
-    set_reference_dimension(
-        adapter,
-        _early_bound(reference, "IDisplayDimension").GetAnnotation(),
-        label="plate top from the trunnion axis",
-    )
-    return reference
 
 
 # Front profile at 1:2 (2026-10-15 baseline render): the pivot axis prints at
@@ -1478,11 +1403,11 @@ TOP_KEEP = {
     # Foreshortened (_shorten_radii): the full line from the centre read as
     # a loose line (machinist review r8).
     "SummationArcRadius": (0.2096, 0.162),
-    # Left of the -Z stub, under the 20X frame, its text centred on its line:
-    # 2.8 mm left of the stub (at x 0.226 it touched datum A's old arrow, r6), its
-    # lower arrow 2.5 mm right of the R138.85.  Both stubs are one prism, so the
-    # stub's length is the hidden KnifeStubReference's, along its -X side.
-    "KnifeStubLength": (0.2235, 0.1735),
+    # Left of the -Z stub. Native text spanned x 213.0267..233.9732 mm
+    # against the stub's x 232.2987 mm outline; move its anchor 5 mm left
+    # to target 3.3 mm box clearance. Both stubs are one prism, so the length
+    # remains the hidden KnifeStubReference's, along its -X side.
+    "KnifeStubLength": (0.2185, 0.1735),
     # Left of the +Z end rib, above its span: below it the finish symbol and
     # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
     # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
@@ -2123,7 +2048,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
-    _receiver_axis_reference(adapter, back, back_edges)
+    _receiver_axis_centerline(adapter, back)
     # The view label below the pad's width, left of the view and the receiver
     # callout's leader: at (0.205, 0.172) that leader ran through it (farm r1
     # 2026-10-16, leader-through-text).

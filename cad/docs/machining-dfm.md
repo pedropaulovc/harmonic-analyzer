@@ -146,6 +146,10 @@ walls as the upper limit's function; "solid plate beyond" did not explain it.
 printed bands and drill wander. This clarification changes no geometry,
 depth limit or accepted wall threshold.
 
+View F retains the top-referenced **2.54 ±0.05 mm** receiver-row location
+and the centreline through both taps and the hex centre. The duplicate
+parenthesized 2.54 reference is omitted; it adds no independent requirement.
+
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
