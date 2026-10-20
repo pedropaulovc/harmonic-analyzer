@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import math
+from types import SimpleNamespace
 
 import pytest
 
 import build_mg_magnifier_assembly as assembly
+import build_mg_magnifying_lever as part
 import draw_mg_magnifying_lever as drawing
 import mg_lever_thread_joint as joint
 import mg_magnifier_assembly_spec as installed
@@ -95,3 +98,105 @@ def test_small_thread_requirements_have_a_legible_enlarged_native_home() -> None
     # Every actual rod corner at the threaded flat end lies inside its circle.
     tip_offset = joint.ROD_LENGTH - drawing.DETAIL_FOCUS[0] * 1000.0
     assert math.hypot(tip_offset, joint.ROD_DIA / 2.0) < drawing.DETAIL_RADIUS_MM
+
+
+_EXTENT_VALUES = {
+    "ThreadLengthTip": joint.ROD_LENGTH,
+    "ThreadLengthHeight": joint.ROD_DIA / 2.0,
+    "ThreadLength": joint.THREAD_LENGTH,
+    "IncompleteLengthTip": joint.ROD_LENGTH,
+    "IncompleteLengthHeight": joint.ROD_DIA / 2.0,
+    "IncompleteLength": joint.INCOMPLETE_THREAD_MAX,
+}
+
+
+def test_thread_witness_native_dimensions_are_driving_and_exact_before_equations(monkeypatch) -> None:
+    reads = []
+
+    def dimension(_adapter, feature, name):
+        assert feature == "ThreadExtent"
+        reads.append(name)
+        return None, SimpleNamespace(DrivenState=2, SystemValue=_EXTENT_VALUES[name] / 1000.0)
+
+    monkeypatch.setattr(part, "_named_dimension", dimension)
+    part._assert_thread_extent_driving(None)
+    assert set(reads) == set(_EXTENT_VALUES)
+
+
+@pytest.mark.parametrize("name", tuple(_EXTENT_VALUES))
+@pytest.mark.parametrize("state,offset", ((1, 0.0), (3, 0.0), (2, -0.2)))
+def test_thread_witness_rejects_reference_or_inference_shifted_native_dimensions(monkeypatch, name, state, offset) -> None:
+    def dimension(_adapter, feature, requested):
+        assert feature == "ThreadExtent"
+        changed = requested == name
+        return None, SimpleNamespace(DrivenState=state if changed else 2, SystemValue=(_EXTENT_VALUES[requested] + (offset if changed else 0.0)) / 1000.0)
+
+    monkeypatch.setattr(part, "_named_dimension", dimension)
+    with pytest.raises(RuntimeError, match=name):
+        part._assert_thread_extent_driving(None)
+
+
+@pytest.mark.parametrize("fail_creation", (False, True))
+def test_thread_witness_creation_suppresses_chamfer_snap_and_restores_add_to_db(monkeypatch, fail_creation) -> None:
+    manager = SimpleNamespace(AddToDB=False)
+    segments = {}
+    created = []
+
+    def result(data=None):
+        return SimpleNamespace(is_success=True, data=data)
+
+    async def create_sketch(plane):
+        assert plane == "Front"
+        return result()
+
+    async def add_line(x1, y1, x2, y2):
+        created.append((manager.AddToDB, (x1, y1), (x2, y2)))
+        if fail_creation:
+            raise RuntimeError("native line creation failed")
+        # Mutation control: the former bare add_line snaps the endpoint onto
+        # the existing 0.2 mm chamfer root when inference is allowed.
+        native_end = x2 if manager.AddToDB else x2 - joint.TIP_CHAMFER
+        key = f"line{len(segments)}"
+        segments[key] = SimpleNamespace(ConstructionGeometry=False, end_x=native_end)
+        return result(key)
+
+    async def constraint(*_args):
+        return result()
+
+    async def anchor(_adapter, endpoint, x, _y, _label):
+        assert segments[endpoint.split(".")[0]].end_x == pytest.approx(x)
+
+    async def dimension(*_args):
+        return None
+
+    async def fully_defined(*_args):
+        assert len(segments) == 2
+
+    class Dims:
+        def record(self, *_args):
+            pass
+
+        def apply(self, _adapter, feature):
+            assert feature == "ThreadExtent"
+            return []
+
+    adapter = SimpleNamespace(
+        currentSketchManager=manager, _sketch_entities=segments,
+        create_sketch=create_sketch, add_line=add_line,
+        add_sketch_constraint=constraint, exit_sketch=constraint,
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "SketchDims", Dims)
+    monkeypatch.setattr(part, "anchor_point_to_origin", anchor)
+    monkeypatch.setattr(part, "dimension_between", dimension)
+    monkeypatch.setattr(part, "ensure_fully_defined", fully_defined)
+    monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
+    if fail_creation:
+        with pytest.raises(RuntimeError, match="native line creation failed"):
+            asyncio.run(part._thread_extent(adapter))
+    else:
+        asyncio.run(part._thread_extent(adapter))
+        assert [row[2][0] for row in created] == [joint.ROD_LENGTH, joint.ROD_LENGTH]
+        assert all(segment.ConstructionGeometry for segment in segments.values())
+    assert created and all(row[0] for row in created)
+    assert manager.AddToDB is False
