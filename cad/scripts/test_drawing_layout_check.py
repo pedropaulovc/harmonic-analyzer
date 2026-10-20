@@ -3069,6 +3069,7 @@ class _IsolationComponent(_FakeDrawingComponent):
         self.write_error = None
         self.read_error = None
         self.ignore_writes = False
+        self.on_write = None
         self.events = events if events is not None else []
         super().__init__(
             name,
@@ -3095,6 +3096,8 @@ class _IsolationComponent(_FakeDrawingComponent):
             if self.ignore_writes:
                 return
         self._visible = value
+        if self._recording and self.on_write is not None:
+            self.on_write()
 
     def GetChildren(self):
         self.children_reads += 1
@@ -3134,9 +3137,61 @@ class _IsolationView:
             raise self.update_errors[value]
 
 
-def _isolation_scene(*children, disabled=False, events=None, on_rebuild=None):
+class _IsolationGraphicsView:
+    def __init__(self, *, enabled=False, events=None):
+        self._enabled = enabled
+        self.native_identity = object()
+        self.events = events if events is not None else []
+        self.reads = 0
+        self.writes = []
+        self.errors = {}
+        self.ignore_updates = set()
+        self.read_error = None
+        self.on_put = None
+
+    @property
+    def EnableGraphicsUpdate(self):
+        self.reads += 1
+        if self.read_error is not None:
+            raise self.read_error
+        return self._enabled
+
+    @EnableGraphicsUpdate.setter
+    def EnableGraphicsUpdate(self, value):
+        self.writes.append(value)
+        self.events.append(("graphics", value))
+        if value not in self.ignore_updates:
+            self._enabled = value
+        if value in self.errors:
+            raise self.errors[value]
+        if self.on_put is not None:
+            self.on_put(value)
+
+
+class _IsolationApp:
+    def __init__(self, draw):
+        self.ActiveDoc = draw
+
+    @staticmethod
+    def IsSame(left, right):
+        if left is None or right is None:
+            return 0
+        left_identity = getattr(left, "native_identity", left)
+        right_identity = getattr(right, "native_identity", right)
+        return 1 if left_identity is right_identity else 0
+
+
+def _isolation_scene(
+    *children,
+    disabled=False,
+    graphics_enabled=False,
+    events=None,
+    on_rebuild=None,
+    on_redraw=None,
+):
     events = events if events is not None else []
     view = _IsolationView(children, disabled=disabled, events=events)
+    graphics = _IsolationGraphicsView(enabled=graphics_enabled, events=events)
 
     def rebuild():
         events.append(("rebuild", view._disabled))
@@ -3144,7 +3199,20 @@ def _isolation_scene(*children, disabled=False, events=None, on_rebuild=None):
             on_rebuild()
         return True
 
-    return _FakeAdapter(SimpleNamespace(EditRebuild3=rebuild)), view
+    def redraw():
+        events.append(("redraw",))
+        if on_redraw is not None:
+            on_redraw()
+
+    draw = SimpleNamespace(
+        EditRebuild3=rebuild,
+        ActiveView=graphics,
+        GraphicsRedraw2=redraw,
+        native_identity=object(),
+    )
+    adapter = _FakeAdapter(draw)
+    adapter.swApp = _IsolationApp(draw)
+    return adapter, view
 
 
 def test_isolation_batches_only_changed_leaf_flags_and_preserves_other_views():
@@ -3199,6 +3267,8 @@ def test_isolation_unchanged_flags_never_touch_update_state_but_still_rebuild(di
     assert keep.visibility_writes == drop.visibility_writes == []
     assert view.update_reads == 0
     assert view.update_writes == []
+    assert adapter.currentModel.ActiveView.reads == 0
+    assert adapter.currentModel.ActiveView.writes == []
     assert events == [("rebuild", disabled)]
     assert view.DisableAutoUpdate is disabled
 
@@ -3447,6 +3517,465 @@ def test_isolation_rebuild_failure_happens_with_original_update_state_restored()
     assert view.DisableAutoUpdate is False
     assert events[-2:] == [("updates", False), ("rebuild", False)]
     assert keep.visibility_reads == 1
+
+
+@pytest.mark.parametrize("graphics_enabled", [False, True])
+@pytest.mark.parametrize("disabled", [False, True])
+def test_isolation_graphics_restore_precedes_rebuild_and_conditional_redraw(
+    graphics_enabled, disabled
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+
+    def assert_restored():
+        assert view.DisableAutoUpdate is disabled
+        assert graphics.EnableGraphicsUpdate is graphics_enabled
+
+    adapter, view = _isolation_scene(
+        keep,
+        disabled=disabled,
+        graphics_enabled=graphics_enabled,
+        events=events,
+        on_rebuild=assert_restored,
+        on_redraw=assert_restored,
+    )
+    graphics = adapter.currentModel.ActiveView
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    expected = []
+    if graphics_enabled:
+        expected.append(("graphics", False))
+    if not disabled:
+        expected.append(("updates", True))
+    expected.append(("visibility", "keep-1", True))
+    if not disabled:
+        expected.append(("updates", False))
+    if graphics_enabled:
+        expected.append(("graphics", True))
+    expected.append(("rebuild", disabled))
+    if graphics_enabled:
+        expected.append(("redraw",))
+    assert events == expected
+    assert graphics.writes == ([False, True] if graphics_enabled else [])
+    assert keep.Visible is True
+    assert keep.visibility_writes == [True]
+
+
+@pytest.mark.parametrize("view_restore_fails", [False, True])
+@pytest.mark.parametrize("graphics_restore_fails", [False, True])
+def test_isolation_graphics_cleanup_preserves_primary_and_attempts_both_restores(
+    view_restore_fails, graphics_restore_fails
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    primary = RuntimeError("visibility write failed")
+    keep.write_error = primary
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    if view_restore_fails:
+        view.update_errors[False] = RuntimeError("view restore failed")
+    if graphics_restore_fails:
+        graphics.errors[True] = RuntimeError("graphics restore failed")
+
+    with pytest.raises(RuntimeError, match="visibility write failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert view.DisableAutoUpdate is False
+    assert graphics.EnableGraphicsUpdate is True
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+    notes = getattr(primary, "__notes__", ())
+    assert any("view restore failed" in note for note in notes) is view_restore_fails
+    assert (
+        any("graphics restore failed" in note for note in notes)
+        is graphics_restore_fails
+    )
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_isolation_graphics_disable_failure_restores_a_partially_applied_put(ignored):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    if ignored:
+        graphics.ignore_updates.add(False)
+    else:
+        graphics.errors[False] = RuntimeError("disabling graphics failed after put")
+
+    with pytest.raises(RuntimeError, match="disabling"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert graphics.EnableGraphicsUpdate is True
+    assert graphics.writes == [False, True]
+    assert view.update_reads == 0
+    assert keep.visibility_writes == []
+    assert events == [("graphics", False), ("graphics", True)]
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_isolation_graphics_restore_failure_aborts_before_rebuild(ignored):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    if ignored:
+        graphics.ignore_updates.add(True)
+    else:
+        graphics.errors[True] = RuntimeError("restoring graphics failed")
+
+    with pytest.raises(RuntimeError, match="restor"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert view.DisableAutoUpdate is False
+    assert graphics.writes == [False, True]
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+    assert keep.visibility_reads == 1
+
+
+def test_isolation_graphics_cleanup_restores_original_viewport_not_later_active_view():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    original = adapter.currentModel.ActiveView
+    replacement = _IsolationGraphicsView(enabled=False)
+
+    def replace_active_view():
+        adapter.currentModel.ActiveView = replacement
+
+    keep.on_write = replace_active_view
+    with pytest.raises(RuntimeError, match="graphics viewport identity drifted"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert original.EnableGraphicsUpdate is True
+    assert original.writes == [False, True]
+    assert adapter.currentModel.ActiveView is replacement
+    assert replacement.EnableGraphicsUpdate is False
+    assert replacement.writes == []
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+
+
+def test_isolation_graphics_read_failure_propagates_before_mutation():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    primary = RuntimeError("graphics state read failed")
+    graphics.read_error = primary
+
+    with pytest.raises(RuntimeError, match="graphics state read failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert graphics.writes == []
+    assert view.update_reads == 0
+    assert keep.visibility_writes == []
+    assert events == []
+
+
+def test_isolation_graphics_missing_viewport_is_not_silently_ignored():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, events=events)
+    adapter.currentModel.ActiveView = None
+
+    with pytest.raises(RuntimeError, match="no active graphics viewport"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert view.update_reads == 0
+    assert keep.visibility_writes == []
+    assert events == []
+
+
+@pytest.mark.parametrize("failure_stage", ["rebuild", "redraw"])
+def test_isolation_graphics_post_restore_failures_propagate_without_false_readback(
+    failure_stage,
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    primary = RuntimeError(f"{failure_stage} failed")
+
+    def fail():
+        assert view.DisableAutoUpdate is False
+        assert graphics.EnableGraphicsUpdate is True
+        raise primary
+
+    adapter, view = _isolation_scene(
+        keep,
+        graphics_enabled=True,
+        events=events,
+        on_rebuild=fail if failure_stage == "rebuild" else None,
+        on_redraw=fail if failure_stage == "redraw" else None,
+    )
+    graphics = adapter.currentModel.ActiveView
+    with pytest.raises(RuntimeError, match=f"{failure_stage} failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert graphics.writes == [False, True]
+    assert keep.visibility_reads == 1
+    assert events[-1] == (
+        ("rebuild", False) if failure_stage == "rebuild" else ("redraw",)
+    )
+
+
+def test_isolation_graphics_redraw_precedes_strict_actual_visibility_proof():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+
+    def lose_visibility_during_redraw():
+        keep._visible = False
+
+    adapter, view = _isolation_scene(
+        keep,
+        graphics_enabled=True,
+        events=events,
+        on_redraw=lose_visibility_during_redraw,
+    )
+    with pytest.raises(RuntimeError, match="visibility readback failed.*keep-1"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert adapter.currentModel.ActiveView.EnableGraphicsUpdate is True
+    assert view.DisableAutoUpdate is False
+    assert events[-3:] == [("graphics", True), ("rebuild", False), ("redraw",)]
+    assert keep.visibility_reads == 2
+
+
+@pytest.mark.parametrize("failure_stage", ["disable", "restore"])
+def test_isolation_graphics_restores_after_view_update_put_mutates_then_throws(
+    failure_stage,
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    primary = RuntimeError(f"view {failure_stage} failed after put")
+    view.update_errors[failure_stage == "disable"] = primary
+
+    with pytest.raises(RuntimeError, match=f"view {failure_stage} failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert view.DisableAutoUpdate is False
+    assert graphics.EnableGraphicsUpdate is True
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+    assert keep.visibility_writes == ([] if failure_stage == "disable" else [True])
+
+
+def test_isolation_graphics_restores_caller_disabled_state_after_native_state_drift():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=False, events=events)
+    graphics = adapter.currentModel.ActiveView
+    primary = RuntimeError("visibility write failed after state changed")
+
+    def change_graphics_then_fail():
+        graphics._enabled = True
+        raise primary
+
+    keep.on_write = change_graphics_then_fail
+    with pytest.raises(RuntimeError, match="visibility write failed") as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is primary
+    assert view.DisableAutoUpdate is False
+    assert graphics.EnableGraphicsUpdate is False
+    assert graphics.writes == [False]
+    assert events[-2:] == [("updates", False), ("graphics", False)]
+
+
+@pytest.mark.parametrize("drift_target", ["active_document", "adapter_model"])
+def test_isolation_document_drift_restores_original_and_aborts_before_rebuild(
+    drift_target,
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    original_draw = adapter.currentModel
+    original_graphics = original_draw.ActiveView
+    replacement_events = []
+    replacement_adapter, _ = _isolation_scene(events=replacement_events)
+    replacement = replacement_adapter.currentModel
+
+    def drift():
+        if drift_target == "active_document":
+            adapter.swApp.ActiveDoc = replacement
+        else:
+            adapter.currentModel = replacement
+
+    keep.on_write = drift
+    with pytest.raises(RuntimeError, match="drawing document identity drifted"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert original_graphics.EnableGraphicsUpdate is True
+    assert view.DisableAutoUpdate is False
+    assert original_graphics.writes == [False, True]
+    assert replacement.ActiveView.EnableGraphicsUpdate is False
+    assert replacement.ActiveView.writes == []
+    assert replacement_events == []
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+
+
+def test_isolation_wrong_active_document_is_rejected_before_suspension():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    graphics = adapter.currentModel.ActiveView
+    replacement_adapter, _ = _isolation_scene()
+    adapter.swApp.ActiveDoc = replacement_adapter.currentModel
+
+    with pytest.raises(RuntimeError, match="drawing document identity drifted"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert graphics.writes == []
+    assert view.update_writes == []
+    assert keep.visibility_writes == []
+    assert events == []
+
+
+def test_isolation_drift_during_graphics_restore_aborts_before_rebuild():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    draw = adapter.currentModel
+    original = draw.ActiveView
+    replacement = _IsolationGraphicsView(enabled=False)
+
+    def drift_on_restore(enabled):
+        if enabled:
+            draw.ActiveView = replacement
+
+    original.on_put = drift_on_restore
+    with pytest.raises(RuntimeError, match="graphics viewport identity drifted"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert original.EnableGraphicsUpdate is True
+    assert view.DisableAutoUpdate is False
+    assert replacement.EnableGraphicsUpdate is False
+    assert replacement.writes == []
+    assert events[-2:] == [("updates", False), ("graphics", True)]
+
+
+@pytest.mark.parametrize("drift_target", ["viewport", "active_document"])
+def test_isolation_rebuild_drift_aborts_before_redraw(drift_target):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    replacement_adapter, _ = _isolation_scene()
+    replacement = replacement_adapter.currentModel
+
+    def drift():
+        if drift_target == "viewport":
+            draw.ActiveView = replacement.ActiveView
+        else:
+            adapter.swApp.ActiveDoc = replacement
+
+    adapter, view = _isolation_scene(
+        keep, graphics_enabled=True, events=events, on_rebuild=drift
+    )
+    draw = adapter.currentModel
+    original = draw.ActiveView
+    with pytest.raises(RuntimeError, match="identity drifted"):
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert original.EnableGraphicsUpdate is True
+    assert view.DisableAutoUpdate is False
+    assert replacement.ActiveView.EnableGraphicsUpdate is False
+    assert replacement.ActiveView.writes == []
+    assert events[-2:] == [("graphics", True), ("rebuild", False)]
+    assert keep.visibility_reads == 1
+
+
+def test_isolation_native_identity_aliases_are_not_mistaken_for_activation_drift():
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=True, events=events)
+    draw = adapter.currentModel
+    graphics = draw.ActiveView
+    adapter.swApp.ActiveDoc = SimpleNamespace(native_identity=draw.native_identity)
+    alias = SimpleNamespace(native_identity=graphics.native_identity)
+
+    def replace_wrapper_only():
+        draw.ActiveView = alias
+
+    keep.on_write = replace_wrapper_only
+    _drawing_balloons.isolate_drawing_view_components(
+        adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+    )
+
+    assert graphics.EnableGraphicsUpdate is True
+    assert graphics.writes == [False, True]
+    assert keep.Visible is True
+    assert events[-3:] == [("graphics", True), ("rebuild", False), ("redraw",)]
+
+
+@pytest.mark.parametrize("primary_fails", [False, True])
+@pytest.mark.parametrize("restore_put_fails", [False, True])
+def test_isolation_unreadable_graphics_cleanup_still_puts_known_prior_state(
+    primary_fails, restore_put_fails
+):
+    events = []
+    keep = _IsolationComponent("keep-1", visible=False, events=events)
+    adapter, view = _isolation_scene(keep, graphics_enabled=False, events=events)
+    graphics = adapter.currentModel.ActiveView
+    primary = RuntimeError("primary visibility failure")
+    read_error = RuntimeError("cleanup graphics read failed")
+    put_error = RuntimeError("cleanup graphics put failed")
+    if restore_put_fails:
+        graphics.errors[False] = put_error
+
+    def drift_and_make_cleanup_unreadable():
+        graphics._enabled = True
+        graphics.read_error = read_error
+        if primary_fails:
+            raise primary
+
+    keep.on_write = drift_and_make_cleanup_unreadable
+    expected = primary if primary_fails else read_error
+    with pytest.raises(RuntimeError) as caught:
+        _drawing_balloons.isolate_drawing_view_components(
+            adapter, view, visible_stems=frozenset({"keep"}), label="bank"
+        )
+
+    assert caught.value is expected
+    assert graphics._enabled is False  # The getter remains intentionally unreadable.
+    assert graphics.writes == [False]
+    assert view.DisableAutoUpdate is False
+    assert events[-2:] == [("updates", False), ("graphics", False)]
+    notes = getattr(expected, "__notes__", ())
+    if primary_fails:
+        assert any("cleanup graphics read failed" in note for note in notes)
+    if restore_put_fails:
+        assert any("cleanup graphics put failed" in note for note in notes)
 
 
 _ANCHOR = _drawing_balloons.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))

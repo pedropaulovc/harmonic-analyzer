@@ -642,19 +642,102 @@ def _suspend_drawing_view_updates(view: Any, *, label: str) -> Iterator[None]:
         raise
     finally:
         try:
-            if not previous or bool(view.DisableAutoUpdate) != previous:
-                view.DisableAutoUpdate = previous
-            if bool(view.DisableAutoUpdate) != previous:
-                raise RuntimeError(
-                    f"{label}: restoring drawing view DisableAutoUpdate={previous} "
-                    "did not persist"
-                )
+            with _telemetry.span(
+                "drawing.isolate_components.auto_update_restore", label=label
+            ):
+                if not previous or bool(view.DisableAutoUpdate) != previous:
+                    view.DisableAutoUpdate = previous
+                if bool(view.DisableAutoUpdate) != previous:
+                    raise RuntimeError(
+                        f"{label}: restoring drawing view DisableAutoUpdate={previous} "
+                        "did not persist"
+                    )
         except BaseException as restore:
             if primary is None:
                 raise
             primary.add_note(
                 f"restoring drawing view automatic updates also failed: {restore!r}"
             )
+
+
+def _assert_drawing_graphics_context(
+    adapter: Any, draw: Any, model_view: Any, *, label: str
+) -> None:
+    """Check native identities at batch boundaries, never per component."""
+    app = adapter.swApp
+    # ISldWorks.IsSame returns swObjectSame (1), not a Python wrapper identity.
+    if (
+        int(app.IsSame(adapter.currentModel, draw)) != 1
+        or int(app.IsSame(app.ActiveDoc, draw)) != 1
+    ):
+        raise RuntimeError(f"{label}: drawing document identity drifted")
+    if int(app.IsSame(draw.ActiveView, model_view)) != 1:
+        raise RuntimeError(f"{label}: drawing graphics viewport identity drifted")
+
+
+@contextlib.contextmanager
+def _suspend_drawing_graphics_updates(
+    model_view: Any, *, label: str
+) -> Iterator[Literal["enabled", "disabled"]]:
+    """Hold the original viewport and restore it after the view-update owner."""
+    previous = bool(model_view.EnableGraphicsUpdate)
+    state: Literal["enabled", "disabled"] = "enabled" if previous else "disabled"
+    _telemetry.trace.get_current_span().set_attribute("graphics_update_before", state)
+    primary: BaseException | None = None
+    try:
+        with _telemetry.span(
+            "drawing.isolate_components.graphics_disable", label=label
+        ):
+            if previous:
+                model_view.EnableGraphicsUpdate = False
+                if bool(model_view.EnableGraphicsUpdate):
+                    raise RuntimeError(
+                        f"{label}: disabling drawing graphics updates did not persist"
+                    )
+        yield state
+    except BaseException as exc:
+        primary = exc
+        raise
+    finally:
+        try:
+            with _telemetry.span(
+                "drawing.isolate_components.graphics_restore", label=label
+            ):
+                failures: list[BaseException] = []
+                current: bool | None = None
+                try:
+                    current = bool(model_view.EnableGraphicsUpdate)
+                except BaseException as read_error:
+                    failures.append(read_error)
+                if previous or failures or current != previous:
+                    try:
+                        model_view.EnableGraphicsUpdate = previous
+                    except BaseException as put_error:
+                        failures.append(put_error)
+                try:
+                    if bool(model_view.EnableGraphicsUpdate) != previous:
+                        raise RuntimeError(
+                            f"{label}: restoring drawing graphics updates to {state} "
+                            "did not persist"
+                        )
+                except BaseException as verify_error:
+                    failures.append(verify_error)
+                if failures:
+                    restore = failures[0]
+                    for failure in failures:
+                        if failure is not restore:
+                            restore.add_note(
+                                f"graphics cleanup also failed: {failure!r}"
+                            )
+                    raise restore
+        except BaseException as restore:
+            if primary is None:
+                raise
+            primary.add_note(
+                f"restoring drawing graphics updates also failed: {restore!r}"
+            )
+            for note in getattr(restore, "__notes__", ()):
+                primary.add_note(note)
 
 
 @_telemetry.traced("drawing.isolate_components", label_param="label")
@@ -670,6 +753,8 @@ def isolate_drawing_view_components(
     ``Visible`` is a per-view component flag, not proof that a leaf beneath a
     hidden sub-assembly is drawn. Preserve every ancestor flag and verify both
     the leaf flags and their effective visibility after the required rebuild.
+    Graphics refresh is suspended only for the unchanged visibility-write batch;
+    both native update states are restored before rebuilding, redrawing or proof.
     """
     if not visible_stems:
         raise ValueError(f"{label}: visible component set must not be empty")
@@ -743,15 +828,40 @@ def isolate_drawing_view_components(
             )
     _span_scan_attrs(**counts)
 
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    model_view = _early_bound(draw.ActiveView, "IModelView")
+    if model_view is None:
+        raise RuntimeError(f"{label}: drawing has no active graphics viewport")
+    _assert_drawing_graphics_context(adapter, draw, model_view, label=label)
+    graphics_before: Literal["enabled", "disabled"] | None = None
     with _telemetry.span(
         "drawing.isolate_components.visibility", label=label, **counts
     ):
         if changes:
-            with _suspend_drawing_view_updates(view, label=label):
-                for node in changes:
-                    node.drawing_component.Visible = node.expected == "shown"
+            with _suspend_drawing_graphics_updates(
+                model_view, label=label
+            ) as graphics_before:
+                with _suspend_drawing_view_updates(view, label=label):
+                    _assert_drawing_graphics_context(
+                        adapter, draw, model_view, label=label
+                    )
+                    with _telemetry.span(
+                        "drawing.isolate_components.setters",
+                        label=label,
+                        changed=len(changes),
+                    ):
+                        for node in changes:
+                            node.drawing_component.Visible = node.expected == "shown"
+                    _assert_drawing_graphics_context(
+                        adapter, draw, model_view, label=label
+                    )
 
+    _assert_drawing_graphics_context(adapter, draw, model_view, label=label)
     rebuild_drawing(adapter, label="isolate_drawing_view_components")
+    _assert_drawing_graphics_context(adapter, draw, model_view, label=label)
+    if graphics_before == "enabled":
+        with _telemetry.span("drawing.isolate_components.graphics_redraw", label=label):
+            draw.GraphicsRedraw2()
     with _telemetry.span("drawing.isolate_components.readback", label=label):
         effective: list[bool] = []
         actually_shown: set[str] = set()
@@ -784,6 +894,7 @@ def isolate_drawing_view_components(
                 f"{label}: component visibility readback failed: {mismatches}; "
                 f"component families not shown: {not_shown}"
             )
+    _assert_drawing_graphics_context(adapter, draw, model_view, label=label)
     _span_scan_attrs(
         effectively_shown=effective_shown, families_shown=len(actually_shown)
     )
