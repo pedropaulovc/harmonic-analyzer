@@ -48,7 +48,7 @@ import sys
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from _dimensions import _feature_display_dimensions, drive_dimension, name_dimensions, set_global
 from _feature_tree import _feature_by_name, name_last_feature
 from _part_checks import report_mass_properties, volume_check
@@ -411,7 +411,7 @@ def _log_root_relief_dimension_census(adapter) -> None:
     def dimension(raw):
         if raw is None:
             return None
-        item = _early_bound(raw, "IDimension")
+        item = _bind(raw, "IDimension")
         return {
             "full_name": scalar(lambda: str(item.FullName)),
             "name": scalar(lambda: str(item.Name)),
@@ -432,7 +432,10 @@ def _log_root_relief_dimension_census(adapter) -> None:
         except Exception as exc:
             census["definition"] = failure(exc)
         for index, raw_display in enumerate(_feature_display_dimensions(feature)):
-            display = _early_bound(raw_display, "IDisplayDimension")
+            # This iterator yields RAW PyIDispatch, not a wrapped display or
+            # a tuple. Match _named_dimensions: _bind converts raw dispatch;
+            # _early_bound's no-_oleobj_ test-double passthrough cannot.
+            display = _bind(raw_display, "IDisplayDimension")
             row = {"index": index, "type2": scalar(lambda: int(display.Type2))}
             components = []
             for component in (0, 1):
@@ -456,33 +459,50 @@ def _log_root_relief_dimension_census(adapter) -> None:
     )
 
 
-def _root_relief_dimensions(adapter) -> tuple[object, object, object]:
-    display, size = _named_dimension(adapter, "CamRootRelief", "RootReliefSize")
-    display = _early_bound(display, "IDisplayDimension")
-    # A compound display is part of the current print contract, not a
-    # documented consequence of InsertFeatureChamfer. Census before refusing
-    # an unrecognized native shape; do not infer an angular D2 or a wrapper.
+def _root_relief_dimensions(adapter) -> tuple[object, object, object, object]:
+    """Resolve scalar model drivers by native type/owner, never D2/order.
+
+    InsertFeatureChamfer's farm-observed width display is linear (Type2=2),
+    not a drawing compound chamfer. The second feature display is usable as
+    the angular driver ONLY if its own native type, owner and value prove it.
+    """
     try:
-        kind = int(display.Type2)
-        second = display.GetDimension2(1)
+        feature = _feature_by_name(adapter, "CamRootRelief")
+        owned = []
+        for raw_display in _feature_display_dimensions(feature):
+            raw_dimension = _com_invoke(
+                raw_display, "IDisplayDimension", "GetDimension2", 0,
+            )
+            full_name = str(_com_invoke(raw_dimension, "IDimension", "FullName"))
+            if full_name.split("@")[1:2] != ["CamRootRelief"]:
+                continue
+            owned.append((
+                _bind(raw_display, "IDisplayDimension"),
+                _bind(raw_dimension, "IDimension"),
+            ))
+        widths = [(display, dimension) for display, dimension in owned if int(display.Type2) == 2]
+        angles = [(display, dimension) for display, dimension in owned if int(display.Type2) == 3]
+        if len(owned) != 2 or len(widths) != 1 or len(angles) != 1:
+            raise RuntimeError(
+                "cam-root relief: expected exactly one owned linear width and one angular driver; "
+                f"owned display types={[int(display.Type2) for display, _dimension in owned]}"
+            )
+        width_display, size = widths[0]
+        angle_display, angle = angles[0]
+        if (
+            str(size.FullName).split("@")[:2] != ["RootReliefSize", "CamRootRelief"]
+            or not math.isclose(
+                float(size.SystemValue) * 1000.0, ROOT_RELIEF_SIZE, abs_tol=1e-6,
+            )
+            or not math.isclose(
+                float(angle.SystemValue), math.radians(ROOT_RELIEF_ANGLE_DEG), abs_tol=1e-10,
+            )
+        ):
+            raise RuntimeError("cam-root relief: native scalar width/angle drivers changed")
+        return width_display, size, angle_display, angle
     except Exception:
         _log_root_relief_dimension_census(adapter)
         raise
-    if second is None or kind != 10:  # swChamferDimension
-        _log_root_relief_dimension_census(adapter)
-        raise RuntimeError(
-            "cam-root relief: native compound chamfer dimension missing: "
-            f"Type2={kind}, GetDimension2(1) is None={second is None}"
-        )
-    angle = _early_bound(second, "IDimension")
-    if (
-        not math.isclose(float(size.SystemValue) * 1000.0, ROOT_RELIEF_SIZE, abs_tol=1e-6)
-        or not math.isclose(
-            float(angle.SystemValue), math.radians(ROOT_RELIEF_ANGLE_DEG), abs_tol=1e-10
-        )
-    ):
-        raise RuntimeError("cam-root relief: native size/angle dimensions changed")
-    return display, size, angle
 
 
 async def _cam_root_relief(adapter) -> list[tuple[str, str]]:
@@ -498,10 +518,16 @@ async def _cam_root_relief(adapter) -> list[tuple[str, str]]:
     )
     name_last_feature(adapter, "CamRootRelief")
     name_dimensions(adapter, "CamRootRelief", ["RootReliefSize"])
-    _display, _size, angle = _root_relief_dimensions(adapter)
+    _display, _size, _angle_display, angle = _root_relief_dimensions(adapter)
     angle.Name = "RootReliefAngle"
     if str(angle.Name) != "RootReliefAngle":
         raise RuntimeError("cam-root relief: native angle name did not persist")
+    _telemetry.success(
+        f"cam-root relief native model drivers: {_size.FullName}, "
+        f"Type2={int(_display.Type2)}, width_m={float(_size.SystemValue)!r}; "
+        f"{angle.FullName}, Type2={int(_angle_display.Type2)}, "
+        f"angle_rad={float(angle.SystemValue)!r}"
+    )
     return [
         ("RootReliefSize@CamRootRelief", '"RootReliefSize"'),
         ("RootReliefAngle@CamRootRelief", f"{ROOT_RELIEF_ANGLE_DEG}deg"),
@@ -542,16 +568,15 @@ def _assert_cam_root_relief(adapter, *, marked: bool = False) -> None:
             )
     finally:
         definition.ReleaseSelectionAccess()
-    display, size, angle = _root_relief_dimensions(adapter)
+    display, size, angle_display, angle = _root_relief_dimensions(adapter)
     if (
-        int(display.ChamferTextStyle) != 2  # swDetailChamferDimDistAng
-        or int(display.GetPrimaryPrecision2()) != 1
+        int(display.GetPrimaryPrecision2()) != 1
         or int(display.GetPrimaryTolPrecision2()) != 1
-        or int(display.ChamferPrecision(0)) != 1
-        or int(display.ChamferPrecision(1)) != 0
-        or (marked and not bool(display.MarkedForDrawing))
+        or int(angle_display.GetPrimaryPrecision2()) != 0
+        or (marked and not all(bool(item.MarkedForDrawing) for item in (display, angle_display)))
+        or str(angle.FullName).split("@")[:2] != ["RootReliefAngle", "CamRootRelief"]
     ):
-        raise RuntimeError("cam-root relief: native display/precision/drawing mark changed")
+        raise RuntimeError("cam-root relief: native scalar display/precision/drawing mark changed")
     if int(angle.Tolerance.Type) != 0:
         raise RuntimeError("cam-root relief: angle must retain title-block tolerance")
     tolerance = _early_bound(size.Tolerance, "IDimensionTolerance")
@@ -1098,8 +1123,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "CamRootRelief", "RootReliefSize", relief_upper
     )
-    relief_display, _relief_size, _relief_angle = _root_relief_dimensions(adapter)
-    relief_display.ChamferTextStyle = 2  # swDetailChamferDimDistAng
     _inside_corner_max_limit(adapter)
     # The reamed press hole's band rides natively on its diameter, which the
     # front view imports at three places (DRAWING_PRECISION); its band prints
@@ -1108,12 +1131,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # ChamferPrecision is indexed in the native SDK: 0 distance, 1 angle.
-    # Author on the MODEL, never rewrite precision on the drawing import.
-    relief_display.SetChamferPrecision(
-        0, DRAWING_PRECISION["CamRootRelief"]["RootReliefSize"]
-    )
-    relief_display.SetChamferPrecision(1, 0)
     tolerance_at_dimension_places(adapter, "PinHoleProfile", "PinHoleDia")
     _assert_cam_root_relief(adapter)
     _assert_pin_hole_lands(adapter)
