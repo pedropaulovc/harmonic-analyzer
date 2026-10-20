@@ -126,13 +126,27 @@ geometry is casting-shaped, not milling-shaped.
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
   one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
   lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
-  in one setup without repeating the numeric offsets, and states that the
-  pivot's table X/Y are reference. Its actual native tag is resolved from the
+  without prescribing a setup or repeating the numeric offsets, and states
+  that the pivot's table X/Y are reference. Its actual native tag is resolved from the
   physical pivot station, not a fixed family letter. The generated native
   hole-table coordinates remain unchanged; that same physical row carries
   `SEE NOTE 1` in a custom NOTE column (#1744), because generated hole-table
   cells are not editable. Both the numbered note and curated view-tag layout
   follow station identity if native size families re-letter or merge.
+
+The flange perimeter remains the hole table's coordinate origin, not a
+specified mating seat. A layout reference alone does not justify Ra 3.2 under
+drawing-guidelines rule 6, so the four flange-side roughness controls are
+removed from both the native part and drawing. The deck, underside and matched
+column-socket finish controls remain; neither the flange shape nor the native
+hole-table origin changes.
+
+The modeled stamped ID must read **2** in the native top projection. Its
+3.5 mm artwork stays centered at machine X161.0/Z124.25 and cuts 0.3 mm deep.
+The DXF generator accounts for both the Top-sketch Y/part-Z mapping and the
+plan's downward-positive Z projection; the artwork is reflected in sketch Y
+to avoid a reflected numeral on the actual part. This changes orientation,
+not the glyph area, cut volume, location or drawing-view orientation.
 
 The base's **18 deck seats** are through-tapped at their existing stations
 and thread designations: four rocker-support, one cone-pivot, one cone-lock,

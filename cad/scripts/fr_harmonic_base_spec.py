@@ -109,42 +109,9 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # of the foot is the user's reconstruction choice, not photo evidence.
 # The registry Finish field owns the paint and its masking, so each roughness
 # symbol carries the grade alone; there are no locally masked feet.
-#
-# The flange perimeter carries the same seat grade because it is the drawing's
-# hole-table origin: every mounting coordinate is measured from the virtual
-# sharp corner of two of these faces, so they LOCATE the part (simplicity
-# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) and cannot be left as-cast under the title block's
-# CAST/MACHINED surface row. All four sides are required equally -- the corner
-# arcs between them are skimmed with the sides -- and the flange keeps the
-# RAL6000 body colour (only the deck and underside are blacked by the Finish
-# field). The part authors one native symbol per qualified face; the sheet
-# states the requirement once, as this target on the plan profile. The target
-# NAMES the surface, so the one sheet symbol cannot be misread as the pad side
-# face or the deck (2026-09 review clarity item: three nested plan outlines
-# share the plan view). "(TABLE ORIGIN)" states the
-# function: the 2026-09-25 Codex machinist review read the edges as neither
-# running nor locating and asked for the symbol's removal (Main: rebutted,
-# and made legible on the sheet).
-FLANGE_PERIMETER_TARGET = "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
 SURFACE_FINISHES = (
     SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
     SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
-    SurfaceFinishControl(
-        "flange_west", SEAT_UM, PlanarFace((-1, 0, 0), BOTTOM_LENGTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_east", SEAT_UM, PlanarFace((1, 0, 0), BOTTOM_LENGTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_rear", SEAT_UM, PlanarFace((0, 0, 1), BOTTOM_WIDTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_front", SEAT_UM, PlanarFace((0, 0, -1), BOTTOM_WIDTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
 )
 
 # --- Column sockets: the frame interface this casting owns -----------------
@@ -214,7 +181,7 @@ def pivot_seat_step(tag: str) -> str:
     """Identify the physical pivot using its current native hole-table tag."""
     return (
         f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
-        "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
+        "DRILL AND TAP AT ASSEMBLY.\n"
         f"{tag} TABLE X/Y ARE REFERENCE."
     )
 

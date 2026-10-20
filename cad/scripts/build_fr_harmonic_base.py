@@ -300,7 +300,7 @@ PAD_ROOT_R = 0.5  # pad-to-flange root fillet; modelled, never called out
 # casting green). DECK_* live in fr_harmonic_base_spec.
 
 # Stamped serial number (2026-09-02, ch26 p.70 page001_img02/03): a hand-stamped
-# "2" on the bright machined deck. Cut from the vendored closed-region DXF
+# "2" on the deck. Cut from the vendored closed-region DXF
 # (gen_base_serial_dxf.py regenerates it from these constants) on a plane at
 # the deck top, SERIAL_DEPTH deep. Since the 2026-10-09 ruling it sits in the
 # deck's north-west (+X, +Z) corner, SERIAL_INSET in from both deck edges --
@@ -310,9 +310,10 @@ SERIAL_HEIGHT_MM = 3.5  # p.70 macro: a small hand stamp
 SERIAL_DEPTH = 0.3  # a stamp, not an engraving
 SERIAL_INSET = 6.0
 SERIAL_XZ = (DECK_HALF_X - SERIAL_INSET, DECK_HALF_Z - SERIAL_INSET)  # (161.0, 124.25)
-SERIAL_MIRROR_Y = (
-    False  # flip if the seat's deck-top sketch frame reads the glyph mirrored
-)
+# Top-sketch (sx, sy) maps to model (sx, STACK_HEIGHT, -sy), and native *Top
+# projects model (X, Z) to paper (X, -Z). Keep glyph +Y along sketch +Y:
+# the native R7 PDF confirmed the former setting vertically reflected the "2".
+SERIAL_MIRROR_Y = True
 SERIAL_DXF = REFERENCES_DIR / "base-serial.dxf"
 SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph area)
 
@@ -1445,18 +1446,16 @@ def _com_get(obj, name: str):
     return value() if callable(value) else value
 
 
-# Only these two qualified planes are blacked by the registry Finish field; the
-# flange perimeter faces carry the same seat grade but keep the body colour.
+# Only these two qualified planes are blacked by the registry Finish field;
+# the qualified socket bores keep the body colour.
 BLACK_FINISH_KEYS = ("deck", "underside")
 
 
 async def _paint_machined_faces_black(adapter) -> None:
     """Qualify every spec-owned finish face, then black the two painted planes.
 
-    Every control's face is area-checked, so the native part proves the face
-    selection for the four flange perimeter sides as well -- a plane picked at
-    the wrong offset (the top plate's side instead of the flange's) fails here
-    rather than shipping a roughness symbol on the wrong surface.
+    Every remaining control's face is area-checked, so a wrong deck, underside
+    or socket-wall selection fails before its finish control can be authored.
     """
     from solidworks_mcp.adapters.com_variant import double_array
 
@@ -1464,11 +1463,6 @@ async def _paint_machined_faces_black(adapter) -> None:
         adapter.currentModel,
         {control.key: control.face for control in PART_SURFACE_FINISHES},
     )
-    # The flange sides are bounded by the four corner arcs and the two 1/16 in
-    # rim breaks, so neither dimension is the raw plate envelope.
-    flange_side_height = BOTTOM_THICKNESS - 2.0 * RIM_CHAMFER
-    flange_end_width = BOTTOM_WIDTH - 2.0 * FLANGE_CORNER_R
-    flange_face_width = BOTTOM_LENGTH - 2.0 * FLANGE_CORNER_R
     # The deck's flat ends where its break starts; the underside is the
     # perimeter foot inside the underside break: the flange outline less the
     # pocket opening, plus the socket bosses and pocket fillets that come
@@ -1496,10 +1490,6 @@ async def _paint_machined_faces_black(adapter) -> None:
     expected_areas = {
         "deck": deck_flat * 1e-6,
         "underside": foot * 1e-6,
-        "flange_west": flange_end_width * flange_side_height * 1e-6,
-        "flange_east": flange_end_width * flange_side_height * 1e-6,
-        "flange_rear": flange_face_width * flange_side_height * 1e-6,
-        "flange_front": flange_face_width * flange_side_height * 1e-6,
     }
     # Each socket bore wall loses two small windows where the cross tap passes
     # through it (~1.3% of the cylinder), well inside the 5% band below.

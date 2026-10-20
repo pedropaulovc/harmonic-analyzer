@@ -78,6 +78,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -195,29 +196,9 @@ ISO_CENTER = (0.3425, 0.175)
 # top row.
 SERIAL_NOTE_XY = (0.098, 0.132)
 SERIAL_LEADER_START_OFFSET_M = (0.0440, -0.0118)
-# The deck Ra symbol, left of the plan between the flange symbol's text row
-# (top ~0.1805) and the R22.2 FLANGE callout (bottom ~0.2104). Below the plan
-# at (0.040, 0.138) its leader climbed through the X0 Y0 corner where the
-# PlanReference dimensions now stand; from here it runs nearly horizontally
-# to the deck's west edge, without a diagonal trip across the machined face.
+# The deck Ra symbol remains left of the plan and below the R22.2 callout.
 DECK_FINISH_XY = (0.040, 0.1855)
 DECK_FINISH_FACE_INSET_M = 0.004
-# The flange-perimeter finish symbol, in sheet 1's open field left of the
-# plan. Its target, "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)", runs ~63 mm at
-# 2.5 mm text, too long for sheet 2's strip between the hole table and the
-# plan (~50 mm), so the symbol moved here with its leader on the same west
-# flange face (Main, 2026-09-25, option A). The anchor is the symbol's leader
-# line; the leader lands on the straight west edge 100 mm in front of the
-# plan centre, below the text row, so it runs down and clear of it.
-FLANGE_FINISH_XY = (0.0168, 0.170)
-FLANGE_FINISH_ATTACH_Z_MM = 100.0
-# hb-render-5's sheet-2 flange symbol, measured at its 2.5 mm text: the vee
-# starts 2.1 mm left of the anchor, the target text 5.3 mm right of it at
-# 1.76 mm per character, and the text top sits 10.5 mm above the anchor.
-FINISH_SYMBOL_VEE_LEFT_M = 0.0021
-FINISH_TARGET_OFFSET_M = 0.0053
-FINISH_TARGET_CHAR_M = 0.00176
-FINISH_SYMBOL_TOP_M = 0.0105
 HOLE_TOP_CENTER = (0.280, 0.195)
 HOLE_SIDE_CENTER = (0.280, 0.095)
 SECTION_CENTER = (0.375, 0.135)
@@ -369,11 +350,15 @@ HOLE_TOP_KEEP = {
     # reference sketch supplies real centre-to-centre extension origins;
     # place X below the plan, left of both witnesses and the datum X letter.
     "PivotSeatX": (0.2427, 0.1320),
-    # Keep the short native line between the holes; offset only its text
-    # onto the blank pocket floor, clear of the nearby marks and leaders.
+    # Preserve the R7 point-to-point line and its short native witnesses;
+    # offset the complete two-row block into the exterior west notes lane.
     "PivotSeatY": (0.2616, 0.1705),
 }
-PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
+PIVOT_SEAT_Y_TEXT_XY = (0.2080, 0.1895)
+# Lower the free origin note 8.5 mm for the exterior block/leader, retaining
+# a full native row-pitch gap to both this note and the socket-fit note.
+# The theoretical origin, native axes and table stay fixed.
+HOLE_ORIGIN_NOTE_XY = (0.165, 0.1775)
 # ABOVE accepts one printable row; both native offsets cite numbered note 1.
 PIVOT_SEAT_FLAG = "SEE NOTE 1"
 PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
@@ -456,6 +441,14 @@ HOLE_SIDE_CALLOUTS = {
 # Layout belongs to physical model X/Z stations, never generated tag letters.
 # Keep the proven anchors when native size families merge or re-letter.
 HOLE_TAG_STATION_POSITIONS = {
+    # Native R7 A1/A2 crossed the deck's west edge at x238.25 mm. Move
+    # the lower tag below the flange and the upper tag into the clear west
+    # green-land lane. Native leaders retain the physical socket attachments.
+    **dict(zip(
+        sorted((xz for xz in COLUMN_SOCKET_XZ if xz[0] < 0.0), key=lambda xz: -xz[1]),
+        ((0.229, 0.1555), (0.229, 0.212)),
+        strict=True,
+    )),
     # Larger Z is lower on the top view. Both east socket labels stay in the
     # clear gutter beyond the A-A cut line at x329.2 mm.
     **dict(zip(
@@ -583,6 +576,10 @@ def _check_cross_tap_callout(display: Any) -> None:
             )
         found.add(name)
     required = set(expected) | set(expected_strings)
+    # Formatting can remove the unused class variable from the returned list.
+    # If SolidWorks retains it, its model-owned value still has to agree.
+    required.discard("hw-threadclass")
+    found.discard("hw-threadclass")
     if found != required:
         raise RuntimeError(
             f"base tap callout is missing native variables: {required - found}"
@@ -629,6 +626,23 @@ def _set_cross_tap_callout_text(display: Any) -> None:
         )
     ):
         raise RuntimeError("aggregate cross-tap quantity or untouched native definitions did not persist")
+
+
+def _omit_base_callout_thread_class(display: Any, *, label: str) -> None:
+    """Omit only the title-block default, never a nondefault native class."""
+    classes = []
+    for raw in display.GetHoleCalloutVariables() or ():
+        variable = dynamic_dispatch(raw._oleobj_)
+        if str(variable.VariableName) == "hw-threadclass":
+            if int(variable.Type) != 3:
+                raise RuntimeError(f"{label}: native thread class is not a string")
+            classes.append(str(_early_bound(raw, "ICalloutStringVariable").String or "").strip(" -"))
+    if classes != ["2B"]:
+        raise RuntimeError(f"{label}: expected one title-block-default native class, got {classes!r}")
+    omit_title_block_thread_class(display, label=label)
+    resolved = [str(display.GetText(part) or "") for part in (1, 2, 3, 4)]
+    if any("2B" in text for text in resolved):
+        raise RuntimeError(f"{label}: callout still prints its class: {resolved!r}")
 
 
 def _horizontal_base_edge(view: Any, height_mm: float) -> Any:
@@ -1135,6 +1149,11 @@ UNDERSIDE_SECTION_SCALE = (1, 2)
 # 50.8 mm height 25.4 mm across. Its caption hangs 31.2 mm under the cut's
 # lowest edge (bp3 render: at y 0.160 the caption ran into the title block).
 UNDERSIDE_SECTION_CENTER = (0.300, 0.176)
+# R7's lower B ink is y143.7122..149.8844 mm, across the y149.1 flange
+# stroke. Extend the actual cutting sketch 10 mm south: arrows and native B
+# follow; the full cut's X station, upper end and direction do not.
+UNDERSIDE_CUT_START_Y = BOTTOM_CENTER[1] - 0.050
+UNDERSIDE_CUT_END_Y = BOTTOM_CENTER[1] + 0.040
 
 
 def _bottom_xy(x_mm: float, z_mm: float) -> tuple[float, float]:
@@ -2144,25 +2163,9 @@ async def build(adapter: Any) -> dict[str, str]:
             label="underside finish edge",
         ),
     )
-    # drawing-guidelines.md rule 10 (dimension from a real feature): the flange perimeter is the hole table's datum -- every sheet-2
-    # coordinate is measured from the virtual corner of its west and rear
-    # faces -- so the plan carries the seat grade once, read off the west
-    # flange edge, and its target names the surface AND its function. The
-    # part owns one control per perimeter face; this callout states all four.
-    flange_west_edge = _visible_hole_table_entities(adapter, top, ())[2]
-    flange_finish = add_surface_finish(
-        adapter, top,
-        symbol_xy=FLANGE_FINISH_XY,
-        control=surface_finish_by_key(PART_SURFACE_FINISHES, "flange_west"),
-        label="flange perimeter seat finish",
-        char_height=0.0025,
-        edge_entity=flange_west_edge,
-        leader_attach_xy=_plan_xy(-BOTTOM_LENGTH / 2.0, FLANGE_FINISH_ATTACH_Z_MM),
-    )
     for label, symbol in (
         ("deck", deck_finish),
         ("underside", underside_finish),
-        ("flange perimeter", flange_finish),
     ):
         annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
         annotation.BentLeaderLength = 0.035
@@ -2362,6 +2365,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hole_callout_precision(
         tap_callout, {"hw-tapdrldepth": 0}, label="base cross-tap drill depth"
     )
+    for label, display in (
+        ("pinion-block transfer seats", block_callout),
+        ("arbor-pedestal transfer seats", pedestal_callout),
+        ("pinion-spring transfer seat", spring_callout),
+        ("nameplate transfer seats", nameplate_callout),
+        ("base column-retention taps", tap_callout),
+    ):
+        _omit_base_callout_thread_class(display, label=label)
     _check_cross_tap_callout(tap_callout)
     # The point-only HeightReference dimensions this actual cross-screw centre
     # from the same faced underside as GreenTopHeight. The spec-owned caption
@@ -2434,7 +2445,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # lines and sits BESIDE the arrows it explains, clear of the table border
     # and of the spotface callout below it.
     add_note(
-        adapter, "ORIGIN: FLANGE\nOUTER SHARP\nCORNER (X0 Y0)", 0.165, 0.186,
+        adapter, "ORIGIN: FLANGE\nOUTER SHARP\nCORNER (X0 Y0)", *HOLE_ORIGIN_NOTE_XY,
     )
     section_threads = import_cosmetic_threads(adapter, section)
     if section_threads[1] == 0:
@@ -2455,8 +2466,8 @@ async def build(adapter: Any) -> dict[str, str]:
     underside_section = create_section_view(
         adapter,
         bottom,
-        line_start=(cut_line_x, BOTTOM_CENTER[1] - 0.040),
-        line_end=(cut_line_x, BOTTOM_CENTER[1] + 0.040),
+        line_start=(cut_line_x, UNDERSIDE_CUT_START_Y),
+        line_end=(cut_line_x, UNDERSIDE_CUT_END_Y),
         view_xy=UNDERSIDE_SECTION_CENTER,
         section_label="B",
         scale=UNDERSIDE_SECTION_SCALE,

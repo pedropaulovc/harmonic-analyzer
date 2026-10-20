@@ -1819,42 +1819,6 @@ def test_pivot_y_line_replays_the_narrow_native_between_hole_window() -> None:
     assert _R2B_PIVOT_X_WITNESS_STARTS[1][0] - x >= 0.003
 
 
-@pytest.mark.parametrize("anchor_is_top", (False, True), ids=("centred", "top-centre"))
-def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
-    anchor_is_top,
-) -> None:
-    import draw_fr_harmonic_base as sheet
-
-    # r2b's actual Y text was left of its line, not centred on its keep.
-    old_text = (0.166826, 0.1621558, 0.1905016, 0.1657212)
-    width, height = old_text[2] - old_text[0], old_text[3] - old_text[1]
-    x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
-    top = y if anchor_is_top else y + height / 2.0
-    box = (x - width / 2.0, top - height, x + width / 2.0, top)
-    assert box[0] >= sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
-    # Deliberately inboard on blank printed pocket floor: reject nearby ink,
-    # not the whole plan outline, which is not an occupied rectangular box.
-    assert _R2B_HOLE_PLAN[0] < box[0] < box[2] < _R2B_HOLE_PLAN[2]
-    assert _R2B_HOLE_PLAN[1] < box[1] < box[3] < _R2B_HOLE_PLAN[3]
-    neighbors = {
-        "spring centre mark": (0.2708043, 0.1749896, 0.2726196, 0.1768049),
-        "pedestal centre mark": (0.2638448, 0.170928, 0.2659583, 0.1730415),
-        "centre mark 391": (0.2925969, 0.1786569, 0.2951231, 0.1811831),
-        "E1 leader": (0.2943345, 0.1794933, 0.2964761, 0.1879897),
-        "B1 tag": (0.2471988, 0.1904933, 0.2509839, 0.1938953),
-        "former D1 tag": _R2B_D1_TEXT,
-        "X pedestal witness": (
-            0.2649016,
-            _R2B_PIVOT_X_LINE_Y
-            + sheet.HOLE_TOP_KEEP["PivotSeatX"][1]
-            - _R2B_PIVOT_X_KEEP[1]
-            - 0.001,
-            0.2649016,
-            0.1740415,
-        ),
-    }
-    for label, neighbor in neighbors.items():
-        assert sheet.box_gap(box, neighbor) >= 0.0035, label
 
 
 def _pivot_y_placement_fakes(monkeypatch, failure=None):
@@ -2419,7 +2383,7 @@ def test_native_tag_layout_follows_physical_stations_with_shuffled_families(
     sheet._spread_hole_tags(view, table)
     assert table.cells == before
     assert len(by_station) == len(sheet.TABLE_HOLES) == 11
-    assert len(sheet.HOLE_TAG_STATION_POSITIONS) == 9
+    assert len(sheet.HOLE_TAG_STATION_POSITIONS) == len(sheet.TABLE_HOLES) == 11
     assert by_station[sheet.LOCK_KNOB_XZ].position == (0.2425, 0.2230, 0.0)
     assert by_station[sheet.STOP_SCREW_XZ].position == (0.247, 0.212, 0.0)
     for station, annotation in by_station.items():
@@ -2985,49 +2949,25 @@ def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
 # hb-render-5's sheet frame: the drawable region starts 12.7 mm in from the
 # sheet's left edge (the frame obstacle the callout check logs).
 SHEET_FRAME_INNER_X_M = 0.0127
-FLANGE_FINISH_MIN_MARGIN_M = 0.0015
 
 
-def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> None:
-    # Main's option A (2026-09-25): "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)" is
-    # too long for sheet 2's 50 mm strip, so the symbol sits in sheet 1's open
-    # field left of the plan, leader on the west flange edge.
+def test_only_actual_mating_faces_keep_their_native_finish_controls() -> None:
+    from _gtol_planar import PlanarFace
+
+    spec = fr_harmonic_base_spec
+    controls = {control.key: control for control in spec.PART_SURFACE_FINISHES}
+    assert set(controls) == {"deck", "underside"} | {
+        spec.socket_bore_finish_key(x, z) for x, z in spec.COLUMN_SOCKET_XZ
+    }
+    assert controls["deck"].face == PlanarFace((0, 1, 0), spec.STACK_HEIGHT)
+    assert controls["underside"].face == PlanarFace((0, -1, 0), 0.0)
+    assert all(control.roughness_um == spec.SEAT_UM for control in controls.values())
+    # Coordinate references are still real flange edges, not finish controls.
     import draw_fr_harmonic_base as sheet
 
-    assert fr_harmonic_base_spec.FLANGE_PERIMETER_TARGET == "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
-    x, y = sheet.FLANGE_FINISH_XY
-
-    def symbol_box(anchor, text):
-        return (
-            anchor[0] - sheet.FINISH_SYMBOL_VEE_LEFT_M,
-            anchor[1],
-            anchor[0] + sheet.FINISH_TARGET_OFFSET_M + len(text) * sheet.FINISH_TARGET_CHAR_M,
-            anchor[1] + sheet.FINISH_SYMBOL_TOP_M,
-        )
-
-    box = symbol_box(sheet.FLANGE_FINISH_XY, fr_harmonic_base_spec.FLANGE_PERIMETER_TARGET)
-    west_edge_x = sheet._plan_xy(-fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0)[0]
-    margins = {
-        "sheet frame": box[0] - SHEET_FRAME_INNER_X_M,
-        "plan west flange edge": west_edge_x - box[2],
-        # The deck Ra symbol above it carries no target text; its own
-        # symbol box stands between this row and the R22.2 callout.
-        "deck Ra symbol": sheet.DECK_FINISH_XY[1] - box[3],
-        "deck Ra symbol to flange corner radius callout": 0.2104
-        - (sheet.DECK_FINISH_XY[1] + sheet.FINISH_SYMBOL_TOP_M),
-        # R22.2 FLANGE corner callout above it: its two-row block hangs from
-        # (0.040, 0.215) down to ~0.2104 (hb-render-5 sheet 1).
-        "flange corner radius callout": 0.2104 - box[3],
-        # The stamped-ID note below the plan now starts right of this row.
-        "stamped-ID note": sheet.SERIAL_NOTE_XY[0] - box[2],
-    }
-    assert {name: gap for name, gap in margins.items() if gap < FLANGE_FINISH_MIN_MARGIN_M} == {}
-    # The leader lands on the straight west edge (inside its R22.2 corners),
-    # below the text row, so its run to the edge descends clear of the text.
-    attach = sheet._plan_xy(-fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0, sheet.FLANGE_FINISH_ATTACH_Z_MM)
-    straight = fr_harmonic_base_spec.BOTTOM_WIDTH / 2.0 - part.FLANGE_CORNER_R
-    assert abs(sheet.FLANGE_FINISH_ATTACH_Z_MM) < straight
-    assert attach[1] < y
+    assert sheet._TABLE_ORIGIN_XY == pytest.approx(
+        sheet._plan_xy(-spec.BOTTOM_LENGTH / 2.0, spec.BOTTOM_REAR_Z, center=sheet.HOLE_TOP_CENTER),
+    )
 
 
 def _pocket_shape_covers(shape: tuple, x: float, z: float) -> bool:
@@ -3541,7 +3481,7 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert sheet.PIVOT_SEAT_NOTE_XY == (0.020, 0.100)
     assert sheet.HOLE_TOP_KEEP["PivotSeatX"] == (0.2427, 0.1320)
     assert sheet.HOLE_TOP_KEEP["PivotSeatY"] == (0.2616, 0.1705)
-    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2735, 0.1850)
+    assert sheet.PIVOT_SEAT_Y_TEXT_XY == (0.2080, 0.1895)
     assert sheet.HOLE_TAG_STATION_POSITIONS[sheet.PIVOT_SCREW_XZ] == (0.2456, 0.1550)
     assert sheet.HOLE_SIDE_KEEP["SpotFaceDia"] == (0.193, 0.135)
 
@@ -3563,12 +3503,10 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
     assert note[0] - _BORDER_INNER_M[0] >= 0.0035
     assert note[1] - _BORDER_INNER_M[1] >= 0.0035
 
-    # Values retain their native r4 size. SEE NOTE 1 is conservatively 24.7 mm
-    # wide, not the smaller SEE D1 or the initial 22 mm estimate.
-    x_value = (0.2291351, 0.1292219, 0.2562650, 0.1327219)
-    y_value = (0.2599351, 0.1822219, 0.2870650, 0.1857219)
+    # The native R7 coupled replay below owns the Y value/flag and its route.
+    # Keep this older X control as a separate precision/layout regression.
     x_flag = (0.2427 - 0.01235, 0.1347819, 0.2427 + 0.01235, 0.1382819)
-    y_flag = (0.2735 - 0.01235, 0.18778, 0.2735 + 0.01235, 0.19128)
+    x_value = (0.2291351, 0.1292219, 0.2562650, 0.1327219)
     letters = {
         "X": (0.242401, 0.142429, 0.245245, 0.148808),
         "X zero": (0.218557, 0.142407, 0.221143, 0.148787),
@@ -3579,7 +3517,7 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
         ((wx, x_value[1] - 0.001), (wx, end_y))
         for wx, end_y in _R2B_PIVOT_X_WITNESS_STARTS
     ]
-    for label, box in {"X value": x_value, "Y value": y_value, "X flag": x_flag, "Y flag": y_flag}.items():
+    for label, box in {"X value": x_value, "X flag": x_flag}.items():
         for name, letter in letters.items():
             assert _box_gap(box, letter) >= 0.0035, (label, name)
         for witness in witnesses:
@@ -3590,12 +3528,9 @@ def test_numbered_note_and_wider_flags_predict_clearance_in_the_proven_lanes() -
         "E2": (0.289, 0.2014743, 0.29409, 0.2049743),
         "B1": (0.2467835, 0.1894801, 0.2520481, 0.1929801),
     }
-    for box in (x_flag, y_value, y_flag):
+    for box in (x_flag,):
         for label, tag in tags.items():
             assert _box_gap(box, tag) >= 0.0035, label
-    y_offset_leader = ((0.2616, 0.1705186), (0.2599351, 0.1822219))
-    assert _segment_box_gap(y_offset_leader, y_flag) >= 0.0035
-    assert _segment_box_gap(y_offset_leader, tags["B1"]) >= 0.0035
 
 
 @pytest.mark.parametrize("tag", ("D1", "Q7", "B12"))
@@ -3612,7 +3547,7 @@ def test_pivot_seat_setup_identifies_its_mate_without_numeric_offsets(tag) -> No
     text = sheet.pivot_seat_step(tag)
     assert text.split("\n") == [
         f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;",
-        "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.",
+        "DRILL AND TAP AT ASSEMBLY.",
         f"{tag} TABLE X/Y ARE REFERENCE.",
     ]
     # Only the note number and part/table identities may contain digits;
@@ -4752,3 +4687,502 @@ def test_native_rib_controls_require_full_height_crossing_end_joins_and_open_old
         "CrossRibHeight@CrossRib": 34.8,
         "CrossRibRelief@CrossRib": 3.0,
     })
+
+
+def _native_r7_sheet(index=0):
+    """Unmodified native audit/PDF ink, not an invented after-fix drawing."""
+    import json
+    from pathlib import Path
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures" / "fr_harmonic_base_r7.json").read_text(encoding="utf-8"),
+    )
+    assert fixture["source_head"] == "17c7cf25ff5201c53f1a2a7d8bc12924d1b0f208"
+    assert fixture["coordinate_quantum_m"] == 1e-7
+    return fixture["sheets"][index]
+
+
+def _native_r7_annotation(dump, name, view_index=0):
+    matches = [item for item in dump["views"][view_index]["annotations"] if item["name"] == name]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def _native_r7_geometry():
+    from _layout_audit import sheet_model
+
+    return sheet_model(_native_r7_sheet()).geometry
+
+
+def _native_r7_named(geometry, prefix):
+    matches = [item for item in geometry.annotations if item.label.startswith(prefix)]
+    assert len(matches) == 1, prefix
+    return matches[0]
+
+
+def _native_r7_callouts():
+    """All five complete native display arrays; no R5 coordinates substituted."""
+    import draw_fr_harmonic_base as sheet
+
+    dump = _native_r7_sheet()
+    identities = (
+        ("MHA-DT-18 block transfer", 0, "RD1"),
+        ("MHA-DT-02 pedestal transfer", 0, "RD2"),
+        ("MHA-DT-24 spring transfer", 0, "RD3"),
+        ("MHA-FR-04 nameplate transfer", 0, "RD4"),
+        ("MHA-FR-VN-53 cross-tap", 1, "RD1"),
+    )
+    boxes, lines, rows = {}, {}, {}
+    for label, view_index, name in identities:
+        item = _native_r7_annotation(dump, name, view_index)
+        data = item["display"]
+        lines[label] = [tuple(row[4:6] + row[7:9]) for row in data["lines"]]
+        texts = [(row["t"], row["pos"], row["h"]) for row in data["texts"]]
+        boxes[label] = sheet.callout_text_box(item["pos"], lines[label], texts, label)
+        rows[label] = sheet.callout_text_rows(lines[label], texts, label)
+    assert len(boxes) == 5
+    return boxes, lines, rows
+
+
+def test_native_r7_records_both_west_tag_strikes_and_the_interior_y_block() -> None:
+    from _layout_geometry import Box
+    import draw_fr_harmonic_base as sheet
+
+    geometry = _native_r7_geometry()
+    # This is the projected DECK west straight edge, not GetOutline padding.
+    deck_x = sheet.HOLE_TOP_CENTER[0] - fr_harmonic_base_spec.DECK_HALF_X * sheet.VIEW_SCALE / 1000.0
+    assert deck_x == pytest.approx(0.23825)
+    deck_edge = (deck_x, 0.164, deck_x, 0.226)
+    for prefix in ("note DetailItem446 ", "note DetailItem447 "):
+        tag = _native_r7_named(geometry, prefix)
+        assert len(tag.text_boxes) == 1
+        box = tag.text_boxes[0]
+        assert sheet.segment_crosses_box(deck_edge, (box.xmin, box.ymin, box.xmax, box.ymax))
+    y = _native_r7_named(geometry, "dim PivotSeatY ")
+    assert len(y.text_boxes) == 2  # value AND the native ABOVE flag
+    part_box = Box(0.22285, 0.1591, 0.33715, 0.2309)
+    for box in y.text_boxes:
+        assert part_box.xmin < box.xmin < box.xmax < part_box.xmax
+        assert part_box.ymin < box.ymin < box.ymax < part_box.ymax
+    assert sheet.find_callout_clashes(
+        {"native R7 PivotSeatY row " + str(i): (box.xmin, box.ymin, box.xmax, box.ymax)
+         for i, box in enumerate(y.text_boxes)},
+        {"actual part": (part_box.xmin, part_box.ymin, part_box.xmax, part_box.ymax)},
+    )
+
+
+def _conditional_r7_exterior_layout():
+    """Conditional envelopes only: the next native audit must prove the routes.
+
+    Text envelopes union R7 PDF ink with its native unleadered extent and add
+    0.1 mm on each edge (larger than the dump's 0.1 um coordinate quantum).
+    A socket route is bounded by the hull of the ENTIRE unchanged bore rim and
+    that text envelope: never translate a leader's physical hole end.
+    """
+    from dataclasses import replace
+    from _layout_geometry import Box, Segment
+    import draw_fr_harmonic_base as sheet
+
+    dump = _native_r7_sheet()
+    geometry = _native_r7_geometry()
+    replacements, tag_envelopes = {}, {}
+    west = sorted(
+        (xz for xz in sheet.COLUMN_SOCKET_XZ if xz[0] < 0.0),
+        key=lambda xz: -xz[1],
+    )
+    for station, name in zip(west, ("DetailItem446", "DetailItem447"), strict=True):
+        raw = _native_r7_annotation(dump, name)
+        annotation = _native_r7_named(geometry, f"note {name} ")
+        x, y = sheet.HOLE_TAG_STATION_POSITIONS[station]
+        dx, dy = x - raw["pos"][0], y - raw["pos"][1]
+        moved = tuple(
+            Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+            for box in annotation.text_boxes
+        )
+        extent = raw["note"]["extent"]
+        assert not raw.get("leaders")  # only these R7 extents may be translated
+        text = Box(extent[0] + dx, extent[1] + dy, extent[3] + dx, extent[4] + dy)
+        for box in moved:
+            text = text.union(box)
+        text = Box(text.xmin - 0.0001, text.ymin - 0.0001, text.xmax + 0.0001, text.ymax + 0.0001)
+        cx, cy = sheet._plan_xy(*station, center=sheet.HOLE_TOP_CENTER)
+        radius = sheet.COLUMN_SOCKET_DIAMETER * sheet.VIEW_SCALE / 2000.0
+        rim = Box(cx - radius, cy - radius, cx + radius, cy + radius)
+        route = text.union(rim)
+        tag_envelopes[annotation.label] = (text, route)
+        # This candidate is only a control inside that envelope. The envelope
+        # checks below also cover either shoulder side and every rim endpoint.
+        leader = Segment(
+            text.xmax, text.ymax if y < cy else text.ymin,
+            cx, cy + (radius if y > cy else -radius), "leader",
+        )
+        replacements[annotation.label] = replace(
+            annotation, text_boxes=moved, segments=(leader,), position=(x, y),
+        )
+
+    origin = _native_r7_named(geometry, "note DetailItem467 ")
+    dx, dy = sheet.HOLE_ORIGIN_NOTE_XY[0] - 0.165, sheet.HOLE_ORIGIN_NOTE_XY[1] - 0.186
+    replacements[origin.label] = replace(
+        origin,
+        text_boxes=tuple(Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy) for b in origin.text_boxes),
+        position=sheet.HOLE_ORIGIN_NOTE_XY,
+    )
+    original_y = _native_r7_named(geometry, "dim PivotSeatY ")
+    raw_y = _native_r7_annotation(dump, "PivotSeatY")
+    x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
+    dx, dy = x - raw_y["pos"][0], y - raw_y["pos"][1]
+    texts = tuple(Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy) for b in original_y.text_boxes)
+    # R7 establishes the two-row text/shoulder alignment: width 24.5438 mm,
+    # lower shoulder 5.5562 mm below the top-centre annotation anchor.
+    assert raw_y["display"]["lines"][-1][4:9] == [
+        0.2612281, 0.1794438, 0.0, 0.2857719, 0.1794438,
+    ]
+    native_lines = raw_y["display"]["lines"]
+    fixed = tuple(Segment(*row[4:6], *row[7:9]) for row in native_lines[:4])
+    shoulder_y = native_lines[-1][5] + dy
+    # Text is now WEST of the line. The nearest native shoulder end must be
+    # its RIGHT end, not the LEFT end used by the observed east-side text.
+    shoulder_right = native_lines[-1][7] + dx
+    leader = Segment(0.2616, 0.1705186, shoulder_right, shoulder_y, "leader")
+    shoulder = Segment(native_lines[-1][4] + dx, shoulder_y, shoulder_right, shoulder_y, "shoulder")
+    replacements[original_y.label] = replace(
+        original_y, text_boxes=texts, segments=(*fixed, leader, shoulder), position=(x, y),
+    )
+    proposed = replace(
+        geometry,
+        annotations=tuple(replacements.get(a.label, a) for a in geometry.annotations),
+    )
+    assert len(proposed.annotations) == len(geometry.annotations)
+    return geometry, proposed, replacements, tag_envelopes, leader
+
+
+def test_conditional_r7_layout_couples_all_five_callouts_every_obstacle_and_new_routes() -> None:
+    from _layout_audit import (
+        find_text_clearance, find_text_separation, find_merged_blocks,
+        find_leader_through_text, find_leader_across_lines, find_lines_through_own_text,
+    )
+    from _layout_geometry import find_leader_crossings, find_text_on_line
+    import draw_fr_harmonic_base as sheet
+
+    observed, proposed, changed, envelopes, y_leader = _conditional_r7_exterior_layout()
+    callouts, callout_lines, rows = _native_r7_callouts()
+    # Keep all native annotations: dimensions/centre marks, all eleven tags,
+    # both axes and labels, section arrows/letters, free notes and every table.
+    assert len(observed.annotations) == len(proposed.annotations)
+    texts = {
+        f"{annotation.label} row {index}": (box.xmin, box.ymin, box.xmax, box.ymax)
+        for annotation in proposed.annotations
+        for index, box in enumerate(annotation.text_boxes)
+    }
+    obstacles = {
+        **sheet.frame_obstacles((proposed.width, proposed.height), proposed.region, (0.216, 0.066)),
+        **texts,
+        "view holes top": (0.22285, 0.1591, 0.33715, 0.2309),
+        "view holes front": (0.22285, 0.08865, 0.33715, 0.10135),
+        "view section A-A": (0.369025, 0.0991, 0.381725, 0.1709),
+    }
+    dump = _native_r7_sheet()
+    native_origin = _native_r7_annotation(dump, "DetailItem445")
+    obstacles.update(sheet.datum_origin_boxes(native_origin["datum_origin"]["axis"]))
+    for view in dump["views"]:
+        for section in view.get("sections") or ():
+            obstacles.update(sheet.section_line_boxes(
+                section["label"], section["arrows"], section["texts"], section["text_height"],
+                section["label"], (dump["width"], dump["height"]),
+            ))
+    # The R7 callout boxes are conservative after dropping only the class
+    # token: retain their full original widths/rows/shoulders and all segments.
+    callout_prefixes = ("hole-callout RD1 ", "hole-callout RD2 ", "hole-callout RD3 ", "hole-callout RD4 ")
+    foreign = {
+        name: box for name, box in obstacles.items()
+        if not name.startswith(callout_prefixes)
+    }
+    assert sheet.find_callout_clashes(callouts, foreign) == []
+    assert sheet.find_tall_callouts(rows) == []
+    assert sheet.find_merged_blocks(callouts) == []
+    # Every callout leader and shoulder is checked against the moved rows.
+    changed_texts = {
+        name: box for name, box in texts.items()
+        if any(name.startswith(label + " row ") for label in changed)
+    }
+    assert sheet.find_leader_crossings(callout_lines, changed_texts) == []
+    for label, (text, route) in envelopes.items():
+        # Whole-rim/whole-text route envelope against ALL foreign text, table,
+        # frame and title-block obstacles. Its own part/landing is not text.
+        neighbors = {
+            name: box for name, box in obstacles.items()
+            if not name.startswith(label + " row ") and not name.startswith("view ")
+        }
+        assert sheet.find_callout_clashes(
+            {label: (route.xmin, route.ymin, route.xmax, route.ymax)}, neighbors,
+        ) == []
+        if text.ymax < obstacles["view holes top"][1]:
+            assert obstacles["view holes top"][1] - text.ymax >= sheet.CALLOUT_CLEARANCE_M
+        else:
+            # Tags may identify a bore inside the silhouette, but neither
+            # nested west outline may strike their complete text.
+            pad_west = sheet.HOLE_TOP_CENTER[0] - fr_harmonic_base_spec.TOP_LENGTH * sheet.VIEW_SCALE / 2000.0
+            deck_west = sheet.HOLE_TOP_CENTER[0] - fr_harmonic_base_spec.DECK_HALF_X * sheet.VIEW_SCALE / 1000.0
+            assert text.xmin - pad_west >= 0.0035
+            assert deck_west - text.xmax >= 0.003
+    y = next(a for a in proposed.annotations if a.label.startswith("dim PivotSeatY "))
+    for box in y.text_boxes:
+        assert sheet.box_gap((box.xmin, box.ymin, box.xmax, box.ymax), obstacles["view holes top"]) > 0.002
+    foreign_texts = {name: box for name, box in texts.items() if not name.startswith(y.label + " row ")}
+    assert sheet.find_leader_crossings(
+        {"exterior PivotSeatY": [(y_leader.x0, y_leader.y0, y_leader.x1, y_leader.y1)]}, foreign_texts,
+    ) == []
+    # All native leaders remain in the shared, unchanged coupled predicates.
+    # Do not demand unrelated pre-existing R7 findings disappear.
+    for predicate in (
+        find_text_clearance, find_text_separation, find_merged_blocks,
+        find_leader_through_text, find_leader_across_lines, find_lines_through_own_text,
+        find_leader_crossings, find_text_on_line,
+    ):
+        affected = [
+            finding for finding in predicate(proposed)
+            if finding.a in changed or finding.b in changed
+        ]
+        assert affected == []
+
+
+def test_native_r7_lower_b_failure_and_conditional_real_cut_endpoint_clearance() -> None:
+    from dataclasses import replace
+    from _layout_audit import sheet_model, find_text_clearance
+    from _layout_geometry import Box, Segment, find_text_on_line
+    import draw_fr_harmonic_base as sheet
+
+    dump = _native_r7_sheet(1)
+    model = sheet_model(dump).geometry
+    marker = _native_r7_named(model, "section-line B")
+    assert len(marker.text_boxes) == 2
+    lower = min(marker.text_boxes, key=lambda box: box.ymin)
+    flange_edge = (0.09, 0.1491, 0.20, 0.1491)
+    assert sheet.segment_crosses_box(flange_edge, (lower.xmin, lower.ymin, lower.xmax, lower.ymax))
+    assert sheet.UNDERSIDE_CUT_X == pytest.approx(205.875)
+    dy = sheet.UNDERSIDE_CUT_START_Y - 0.145
+    assert dy == pytest.approx(-0.010)
+    assert sheet.UNDERSIDE_CUT_END_Y == pytest.approx(0.225)
+    moved_lower = Box(lower.xmin, lower.ymin + dy, lower.xmax, lower.ymax + dy)
+    assert 0.1491 - moved_lower.ymax > 0.009
+    # Every other native sheet-3 row is retained, including PocketLen's value
+    # and POCKET caption immediately below the new marker.
+    # Move the real lower arrow AND the lower end of the native cutting
+    # stroke, keeping the upper arrow/text fixed. This remains conditional
+    # on the next native CreateLine/CreateSectionViewAt5 readback.
+    lower_y = dump["views"][0]["sections"][0]["arrows"][1]
+    segments = tuple(
+        Segment(s.x0, s.y0 + (dy if abs(s.y0 - lower_y) < 1e-7 else 0.0),
+                s.x1, s.y1 + (dy if abs(s.y1 - lower_y) < 1e-7 else 0.0), s.role)
+        for s in marker.segments
+    )
+    moved = replace(
+        marker, text_boxes=tuple(moved_lower if box is lower else box for box in marker.text_boxes),
+        segments=segments,
+    )
+    conditional = replace(model, annotations=tuple(moved if a is marker else a for a in model.annotations))
+    for predicate in (find_text_clearance, find_text_on_line):
+        assert not [f for f in predicate(conditional) if marker.label in (f.a, f.b)]
+    # The actual lower B ink clears PocketLen's value by 2.2268 mm in X
+    # despite their overlapping Y intervals. Keep the stricter 2 mm control,
+    # not only the shared small-text half-height rule.
+    pocket = _native_r7_named(model, "dim PocketLen ")
+    value = max(pocket.text_boxes, key=lambda box: box.ymin)
+    assert moved_lower.xmin - value.xmax == pytest.approx(0.0022268)
+    foreign_text = {
+        f"{annotation.label} row {i}": (box.xmin, box.ymin, box.xmax, box.ymax)
+        for annotation in model.annotations if annotation is not marker
+        for i, box in enumerate(annotation.text_boxes)
+    }
+    complete_marker = {
+        f"B whole ink {i}": (box.xmin, box.ymin, box.xmax, box.ymax)
+        for i, box in enumerate(moved.text_boxes)
+    }
+    complete_marker.update({
+        f"B native {segment.role} {i}": (
+            min(segment.x0, segment.x1), min(segment.y0, segment.y1),
+            max(segment.x0, segment.x1), max(segment.y0, segment.y1),
+        )
+        for i, segment in enumerate(moved.segments)
+    })
+    assert sheet.find_callout_clashes(complete_marker, foreign_text, clearance=0.002) == []
+    # All witnesses, socket, fillet, rib, tables, border and title-block ink
+    # remain in the full sheet model above; native annotation strokes are not
+    # translated with the section marker.
+    for name in ("PocketLen", "PocketFilletRadius", "SocketBossDia", "CrossRibThickness"):
+        native = _native_r7_named(model, f"dim {name} ")
+        assert any(a is native for a in conditional.annotations)
+    # Retain the real helper/API path: move the CUTTING SKETCH endpoint, not
+    # a note masquerading as the lower B. Existing orientation proof remains.
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(sheet.build))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    section = next(
+        node for node in calls
+        if getattr(node.func, "id", None) == "create_section_view"
+        and any(k.arg == "section_label" and isinstance(k.value, ast.Constant) and k.value.value == "B" for k in node.keywords)
+    )
+    keywords = {k.arg: ast.unparse(k.value) for k in section.keywords}
+    assert keywords["line_start"] == "(cut_line_x, UNDERSIDE_CUT_START_Y)"
+    assert keywords["line_end"] == "(cut_line_x, UNDERSIDE_CUT_END_Y)"
+    assert keywords["scale"] == "UNDERSIDE_SECTION_SCALE"
+    assert any(getattr(node.func, "id", None) == "_turn_underside_section_clockwise" for node in calls)
+
+
+def _native_base_tap_class_display(monkeypatch, *, drop_unused_class=False):
+    """Exercise the existing native-definition helper without invoking COM."""
+    from types import SimpleNamespace
+    import _hole_callout_thread_class
+    import draw_fr_harmonic_base as sheet
+
+    variables = []
+    for name, value in (
+        ("hw-threaddesc", "10-32 UNF"),
+        ("hw-threadclass", "2B"),
+        ("hw-tapdrldia", sheet.BASE_CROSS_TAP_DRILL_DIA),
+        ("hw-tapdrldepth", sheet.BASE_CROSS_TAP_SPEC.depth_mm),
+        ("hw-threaddepth", sheet.BASE_CROSS_TAP_SPEC.overrides_mm["ThreadDepth"]),
+    ):
+        variable = SimpleNamespace(VariableName=name, Type=3 if isinstance(value, str) else 1)
+        if variable.Type == 3:
+            variable.String = value
+        else:
+            variable.Length = value / 1000.0
+            variable.Precision = 0 if name == "hw-tapdrldepth" else 2
+        variable._oleobj_ = variable
+        variables.append(variable)
+
+    class NativeDisplay:
+        def __init__(self):
+            self.definitions = {
+                5: "<hw-threaddesc> - <hw-threadclass>",
+                6: " <HOLE-DEPTH><hw-threaddepth>",
+                7: "<NUM_INST>X <MOD-DIAM><hw-tapdrldia> <HOLE-DEPTH><hw-tapdrldepth>",
+                8: "",
+            }
+            self.variables = variables
+
+        def IsHoleCallout(self):
+            return True
+
+        def GetText(self, part):
+            if part in self.definitions:
+                return self.definitions[part]
+            text = self.definitions[part + 4].replace("<NUM_INST>", "2")
+            for variable in self.variables:
+                value = (
+                    variable.String if variable.Type == 3
+                    else f"{variable.Length * 1000.0:.{variable.Precision}f}"
+                )
+                text = text.replace(f"<{variable.VariableName}>", value)
+            return text
+
+        def SetText(self, part, text):
+            self.definitions[part + 4] = text
+
+        def GetHoleCalloutVariables(self):
+            return tuple(
+                variable for variable in self.variables
+                if not (
+                    drop_unused_class
+                    and variable.VariableName == "hw-threadclass"
+                    and "<hw-threadclass>" not in self.definitions[5]
+                )
+            )
+
+    monkeypatch.setattr(sheet, "dynamic_dispatch", lambda raw: raw)
+    monkeypatch.setattr(sheet, "_early_bound", lambda raw, interface: raw)
+    monkeypatch.setattr(_hole_callout_thread_class, "_early_bound", lambda raw, interface: raw)
+    return NativeDisplay()
+
+
+@pytest.mark.parametrize("drop_unused_class", (False, True))
+def test_default_class_omission_preserves_quantity_min_depth_native_tokens_and_precision(
+    monkeypatch, drop_unused_class,
+) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    display = _native_base_tap_class_display(monkeypatch, drop_unused_class=drop_unused_class)
+    native_values = [
+        (v.VariableName, getattr(v, "String", None), getattr(v, "Length", None), getattr(v, "Precision", None))
+        for v in display.variables
+    ]
+    original = dict(display.definitions)
+    sheet._set_cross_tap_callout_text(display)
+    assert display.GetText(3).startswith("4X ")
+    assert display.GetText(7).count("<hw-tapdrldepth> MIN") == 1
+    assert all(display.GetText(part) == original[part] for part in (5, 6, 8))
+    aggregated = dict(display.definitions)
+    sheet._omit_base_callout_thread_class(display, label="actual native tap")
+    assert display.GetText(5) == "<hw-threaddesc>"
+    assert all(display.GetText(part) == aggregated[part] for part in (6, 7, 8))
+    assert not any("2B" in display.GetText(part) for part in (1, 2, 3, 4))
+    assert native_values == [
+        (v.VariableName, getattr(v, "String", None), getattr(v, "Length", None), getattr(v, "Precision", None))
+        for v in display.variables
+    ]
+    assert all(
+        display.GetText(7).count(token) == 1
+        for token in ("<hw-tapdrldia>", "<hw-tapdrldepth>", "<MOD-DIAM>", "<HOLE-DEPTH>")
+    )
+    assert "<hw-threaddepth>" in display.GetText(6)
+    sheet._check_cross_tap_callout(display)
+    depth = next(v for v in display.variables if v.VariableName == "hw-tapdrldepth")
+    depth.Precision = 2
+    with pytest.raises(RuntimeError, match="whole-mm MIN"):
+        sheet._check_cross_tap_callout(display)
+
+
+@pytest.mark.parametrize("native_class", ("2A", "3B", ""))
+def test_nondefault_native_class_is_not_silently_erased(monkeypatch, native_class) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    display = _native_base_tap_class_display(monkeypatch)
+    next(v for v in display.variables if v.VariableName == "hw-threadclass").String = native_class
+    before = dict(display.definitions)
+    with pytest.raises(RuntimeError, match="title-block-default native class"):
+        sheet._omit_base_callout_thread_class(display, label="nondefault tap")
+    assert display.definitions == before
+
+
+def test_class_omission_rejects_a_ghost_literal_and_retained_wrong_model_class(monkeypatch) -> None:
+    import draw_fr_harmonic_base as sheet
+
+    display = _native_base_tap_class_display(monkeypatch)
+    display.definitions[6] += " 2B"
+    with pytest.raises(RuntimeError, match="still prints its class"):
+        sheet._omit_base_callout_thread_class(display, label="ghost class")
+    display.definitions[6] = display.definitions[6].removesuffix(" 2B")
+    next(v for v in display.variables if v.VariableName == "hw-threadclass").String = "2A"
+    with pytest.raises(RuntimeError, match="hw-threadclass"):
+        sheet._check_cross_tap_callout(display)
+
+
+def test_all_five_native_callouts_omit_only_after_quantity_and_precision_edits() -> None:
+    import ast
+    import inspect
+    import draw_fr_harmonic_base as sheet
+
+    tree = ast.parse(inspect.getsource(sheet.build))
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    omission = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.For)
+        and any(
+            isinstance(call, ast.Call)
+            and getattr(call.func, "id", None) == "_omit_base_callout_thread_class"
+            for statement in node.body for call in ast.walk(statement)
+        )
+    )
+    assert [element.elts[1].id for element in omission.iter.elts] == [
+        "block_callout", "pedestal_callout", "spring_callout", "nameplate_callout", "tap_callout",
+    ]
+    aggregate = next(c for c in calls if getattr(c.func, "id", None) == "_set_cross_tap_callout_text")
+    precision = next(
+        c for c in calls if getattr(c.func, "id", None) == "set_hole_callout_precision"
+        and c.args and isinstance(c.args[0], ast.Name) and c.args[0].id == "tap_callout"
+    )
+    readback = next(c for c in calls if getattr(c.func, "id", None) == "_check_cross_tap_callout")
+    assert aggregate.lineno < precision.lineno < omission.lineno < readback.lineno
