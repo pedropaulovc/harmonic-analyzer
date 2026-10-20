@@ -31,7 +31,6 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     _SW_LENGTH_MM,
     _SW_PREF_UNITS_LINEAR,
-    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
@@ -404,9 +403,45 @@ PINION_PIN_HOLE_WINDOW = (
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)
-# One row under the general note (drawing-guidelines.md rule 11: say CENTRES
-# OK where centre holes do no harm; machinist review of 9d262bff5).
-CENTRES_NOTE_XY = (NOTES_XY[0], NOTES_XY[1] - 0.0055)
+# The *Isometric shows model +Y up the sheet foreshortened by sqrt(2/3) and,
+# like the profile, is centred on the part's bounding box, which is round
+# about the axis, so the axis runs up the view's centre line (run
+# 20261020T103553803Z: the outline (0.3778, 0.1095)..(0.4182, 0.2505) is that
+# projected box plus 5.6 mm a side).  The plain far end's flat face is the
+# view's top; its Ø9.000 rim is an ellipse 4.5 mm half-wide and 4.5/sqrt(3)
+# mm half-tall about FAR_END_ISO_XY, and the window adds 0.5 mm of pick slack.
+_ISO_S = ISO_SCALE[0] / ISO_SCALE[1]
+FAR_END_ISO_XY = (
+    ISO_CENTER[0],
+    ISO_CENTER[1] + (SHAFT_LENGTH - _BBOX_MID_Y) * math.sqrt(2.0 / 3.0) * _ISO_S / 1000.0,
+)
+_FAR_RIM_HALF_WIDTH = (PINION_SEAT_DIA / 2.0 * _ISO_S + 0.5) / 1000.0
+_FAR_RIM_HALF_HEIGHT = (PINION_SEAT_DIA / 2.0 * _ISO_S / math.sqrt(3.0) + 0.5) / 1000.0
+FAR_END_ISO_RIM_WINDOW = (
+    FAR_END_ISO_XY[0] - _FAR_RIM_HALF_WIDTH,
+    FAR_END_ISO_XY[1] - _FAR_RIM_HALF_HEIGHT,
+    FAR_END_ISO_XY[0] + _FAR_RIM_HALF_WIDTH,
+    FAR_END_ISO_XY[1] + _FAR_RIM_HALF_HEIGHT,
+)
+# The lathe centre hole's note (dt_crankshaft_notes.CENTRES_NOTE) stands over
+# the isometric, anchored upper-left, its leader dropping to that rim: the
+# isometric is the one view that shows the plain end's face
+# (drawing-guidelines.md rule 7: flag it where it applies; the unleadered
+# general-note row named an end the sheet never identified, machinist review
+# of run 20261020T103553803Z).  Its measured text keeps one text height of
+# air from the retention-pin note's measured text on its left, from the rim
+# below, and stays 1 mm inside the inner border (_centres_note_field).
+CENTRES_NOTE_XY = (0.380, 0.263)
+# The leader lands on the rim's rightmost point, where the ellipse's
+# horizontal major axis meets it: a sheet pick there fixes the landing under
+# the note's text, right of the axis, so SolidWorks cannot route the leader
+# from the text's left end across its own rows; the pick must resolve to
+# _far_end_rim's edge (add_attached_note's attached_to).
+FAR_END_ISO_RIM_PICK = (
+    FAR_END_ISO_XY[0] + PINION_SEAT_DIA / 2.0 * _ISO_S / 1000.0,
+    FAR_END_ISO_XY[1],
+)
+NOTE_TEXT_GAP = 0.0035  # one 3.5 mm note-text height
 ISO_NOTE_XY = (0.376, 0.108)
 
 
@@ -619,10 +654,11 @@ def _note_text_box(drawing_model: Any, annotation: Any, note: Any, label: str) -
 
 def _place_note_text_in_field(
     drawing_model: Any, note: Any, field: Box, *, hole: Box, label: str
-) -> None:
+) -> Box:
     """Move a leadered note's text inside ``field`` from its measured box.
 
     Its leader must still end inside ``hole``.  Everything read is logged.
+    Returns the placed text box.
     """
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -643,6 +679,7 @@ def _place_note_text_in_field(
         raise RuntimeError(f"{label}: text box {text} left its field {field}")
     if not _inside(tip, hole):
         raise RuntimeError(f"{label}: leader tip {tip} is off the hole window {hole}")
+    return text
 
 
 def _visible_cross_hole_edge(
@@ -768,6 +805,88 @@ def _collar_rear_rim(adapter: Any, view: Any) -> Any:
         f"crankshaft side view has no visible Ø{COLLAR_DIA} rim at the collar "
         f"rear station {COLLAR_REAR}"
     )
+
+
+def _far_end_rim(adapter: Any, view: Any) -> Any:
+    """Return the plain far end's Ø9.000 rim, the end a lathe centre may enter.
+
+    The model circle centred on the shaft axis at SHAFT_LENGTH with the
+    seat's radius is that end face's only boundary; the seat step's Ø9.000
+    circle sits at SEAT_STEP.  None or several fail rather than land the
+    note's leader on another edge.
+    """
+    radius_mm = PINION_SEAT_DIA / 2.0
+    matches: list[Any] = []
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = (
+            adapter._attempt(
+                lambda c=component: visible_component_entities(
+                    view, c, 1
+                ),  # swViewEntityType_Edge
+                default=(),
+            )
+            or ()
+        )
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(curve.CircleParams)
+            cx, cy, cz = (float(v) * 1000.0 for v in params[:3])
+            if (
+                abs(cx) < 1e-3
+                and abs(cz) < 1e-3
+                and abs(cy - SHAFT_LENGTH) < 1e-3
+                and abs(float(params[6]) * 1000.0 - radius_mm) < 1e-3
+            ):
+                matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"crankshaft isometric shows {len(matches)} visible Ø{PINION_SEAT_DIA} "
+            f"rims at the far end station {SHAFT_LENGTH}; expected exactly one"
+        )
+    return matches[0]
+
+
+def _centres_note_field(clear_of_x: float) -> Box:
+    """The centres note's text field over the isometric, right of ``clear_of_x``.
+
+    ``clear_of_x`` is the retention-pin note's measured right edge.  The field
+    keeps one note-text height of air from it and from the far end's rim
+    below, and stops 1 mm inside the ASME B inner border at right and top.
+    """
+    return (
+        clear_of_x + NOTE_TEXT_GAP,
+        FAR_END_ISO_RIM_WINDOW[3] + NOTE_TEXT_GAP,
+        0.4181,
+        PINION_PIN_NOTE_FIELD[3],
+    )
+
+
+def _add_centres_note(
+    adapter: Any, drawing_model: Any, iso: Any, *, clear_of_x: float
+) -> Any:
+    """Flag where a lathe centre hole may go: a leader to the far end's rim."""
+    label = "lathe centre hole end"
+    note = add_attached_note(
+        adapter,
+        iso,
+        text=CENTRES_NOTE,
+        entity_xy=FAR_END_ISO_RIM_PICK,
+        attached_to=_far_end_rim(adapter, iso),
+        note_xy=CENTRES_NOTE_XY,
+        label=label,
+    )
+    _place_note_text_in_field(
+        drawing_model,
+        note,
+        _centres_note_field(clear_of_x),
+        hole=FAR_END_ISO_RIM_WINDOW,
+        label=label,
+    )
+    return note
 
 
 def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
@@ -1063,13 +1182,14 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=PINION_PIN_NOTE_XY,
         label="16T retention-pin transfer",
     )
-    _place_note_text_in_field(
+    pinion_text = _place_note_text_in_field(
         drawing_model,
         pinion_note,
         PINION_PIN_NOTE_FIELD,
         hole=PINION_PIN_HOLE_WINDOW,
         label="16T retention-pin transfer",
     )
+    _add_centres_note(adapter, drawing_model, iso, clear_of_x=pinion_text[2])
     add_surface_finish(
         adapter,
         side,
@@ -1101,9 +1221,6 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    centres = add_note(adapter, CENTRES_NOTE, *CENTRES_NOTE_XY)
-    if centres is None or str(centres.GetText() or "").replace("\r", "") != CENTRES_NOTE:
-        raise RuntimeError("failed to add the crankshaft centres note")
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view prints hidden lines removed with the rest (drawing-guidelines.md
     # rule 9 (show internal shape in solid lines)): the punch mark is flagged by
