@@ -697,10 +697,23 @@ that the drawing view remains exploded in its intended configuration. Record
 the source's initial `GetSaveFlag` and refuse a newly dirty source after
 restoration, before drawing `SaveAs3` can persist the released assembly; never
 save the source or clear its dirty flag to conceal the transition. Preserve
-the primary balloon error if cleanup also fails. Drawing-view configurations
-must remain final once the BOM binds: only the source's active configuration
-may switch for these guarded reads. The MG recipe does this for both exploded
-groups; collapsed views do not switch.
+the primary balloon error if cleanup also fails. Follow the drive-train
+package's stronger ordering: place/configure every view, set its exploded or
+collapsed state, isolate the groups, set tangent edges and fit every view
+before inserting the BOM; only then link the views and place their balloons.
+The whole-assembly reference, not an isolated group, owns the complete BOM.
+Drawing-view configurations must remain final once the BOM binds: only the
+source's active configuration may switch for these guarded reads. The MG
+recipe does this for both exploded groups; collapsed views do not switch.
+MG's `48c8bd03f` native leaf opened clean and reached all 19 balloons before
+its final source-clean guard failed. That does not identify which operation
+dirtied the source: a scoped guard allows an already-dirty entry state. In
+that recipe, group isolation, tangent-edge setup and ring fitting still
+followed the BOM. Moving them before the BOM reuses the proven drive-train
+order, but is not proof of MG's dirty operation. Its local
+`magnifier.source_save_flag` trace reads `GetSaveFlag` after each preparation,
+BOM, balloon and final annotation phase and names the first dirty transition;
+the existing final refusal still prevents a dirty-source drawing save.
 Missing explode steps still fail. Do not change geometry, fitter cameras,
 standard views or the shared zero-step guard to conceal this mismatch.
 

@@ -1237,3 +1237,32 @@ def test_mg_source_cleanup_failure_preserves_balloon_error(
         if cleanup_failure == "restore"
         else "scoped balloon/config readback dirtied"
     ) in warnings[0]
+
+
+def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
+    monkeypatch,
+) -> None:
+    events = []
+    warnings = []
+    monkeypatch.setattr(
+        drawing._telemetry,
+        "event",
+        lambda name, **fields: events.append((name, fields)),
+    )
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    step = drawing._source_dirty_tracer(source)
+    step("prepared views")
+    source.dirty = True  # Outside the guarded balloon/configuration read.
+    step("BOM insertion")
+    step("wheel balloons")
+    assert events == [
+        ("magnifier.source_save_flag", {"step": "prepared views", "dirty": False}),
+        ("magnifier.source_save_flag", {"step": "BOM insertion", "dirty": True}),
+        ("magnifier.source_save_flag", {"step": "wheel balloons", "dirty": True}),
+    ]
+    assert warnings == ["magnifier source went DIRTY after BOM insertion"]
+    assert source.dirty
+    assert source.configuration_switches == []
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert not source.exploded
