@@ -21,8 +21,9 @@ Hole locations come from the carrier at assembly: the riser is cut in place
 on the carrier, so its seven holes are spotted through the carrier's finished
 holes and taps (the TL-00 assembly sequence). The sheet prints every station
 as a REFERENCE value in parentheses at 2 places, with one note naming the
-mate; the model holds the stations rounded to 0.01 (under 0.005 from the
-calculator). Only the hole sizes carry bands.
+mate; the model retains the unrounded carrier stations so the clearance holes
+and countersinks remain coaxial with the taps and screws. Only hole sizes
+carry bands.
 
 Holes, all THRU from the top face:
 
@@ -87,10 +88,10 @@ BLANK_ORIGIN = trammel.RISER_BLANK_ORIGIN  # (-170, 16) ⚙, carrier frame
 
 
 def to_riser(point: tuple[float, float]) -> tuple[float, float]:
-    """Carrier-frame point -> riser model frame, at the printed places."""
+    """Carrier-frame point -> riser model frame, without presentation rounding."""
     return (
-        round(point[0] - BLANK_ORIGIN[0], STATION_PLACES),
-        round(point[1] - BLANK_ORIGIN[1], STATION_PLACES),
+        point[0] - BLANK_ORIGIN[0],
+        point[1] - BLANK_ORIGIN[1],
     )
 
 
@@ -256,6 +257,9 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 for _name, _places in DRAWING_PRECISION_BY_NAME.items():
+    # Reference stations display at 2 places without moving the model axes.
+    if _name in _STATIONS:
+        continue
     _value = GLOBALS[_name]
     if abs(_value - round(_value, _places)) > 1e-9:
         raise AssertionError(f"riser {_name} {_value} does not print as modelled")

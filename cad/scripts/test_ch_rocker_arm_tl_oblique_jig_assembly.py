@@ -188,7 +188,7 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
     assert spec.HUB_PIN_ORIGIN[:2] == pytest.approx(hub)
     assert spec.HUB_HEAD_BOTTOM_Z + hub_pin.HEAD_LENGTH == trammel.CARRIER_UNDERSIDE_Z
     riser_hub = _image(spec.RISER_ROWS, spec.RISER_ORIGIN, (*riser.HUB_HOLE, 0.0))
-    assert riser_hub[:2] == pytest.approx(hub, abs=5e-3)  # printed to 0.01
+    assert riser_hub[:2] == pytest.approx(hub, rel=0.0, abs=1e-9)
     for model_x, hole in zip(feed_lever.HOLE_X, carrier.LEVER_HOLES):
         lever = _image(
             spec.FEED_LEVER_ROWS,
@@ -199,6 +199,26 @@ def test_carrier_riser_hub_pin_and_lever_close_on_the_carrier_frame() -> None:
     # The lever's grip end points at the operator (machine -Y), its top up.
     assert spec.FEED_LEVER_ROWS[0] == pytest.approx((0.0, -1.0, 0.0))
     assert spec.FEED_LEVER_ROWS[1] == pytest.approx((0.0, 0.0, 1.0))
+
+
+@pytest.mark.parametrize("station", range(4))
+def test_riser_holes_and_screws_are_coaxial_with_carrier_taps(station: int) -> None:
+    x, y = riser.SCREW_HOLES[station]
+    tap_x, tap_y = carrier.RISER_SCREWS[station]
+    tap = _image(spec.CARRIER_ROWS, spec.CARRIER_ORIGIN, (tap_x, 0.0, -tap_y))
+    screw_origin, screw_rows = spec.RISER_SCREW_PLACEMENTS[station]
+    # Compare the physical axis lines, not just their different-height origins:
+    # the riser is Z-up; the screw and carrier tap axes are local +Y.
+    for z in (0.0, riser.THICKNESS):
+        hole = _image(spec.RISER_ROWS, spec.RISER_ORIGIN, (x, y, z))
+        for origin, axis in (
+            (tap, spec.CARRIER_ROWS[1]),
+            (screw_origin, screw_rows[1]),
+        ):
+            offset = tuple(hole[i] - origin[i] for i in range(3))
+            along = math.fsum(offset[i] * axis[i] for i in range(3))
+            radial = tuple(offset[i] - along * axis[i] for i in range(3))
+            assert math.hypot(*radial) < 1e-9
 
 
 def test_end_brackets_stand_on_bar_1_under_the_screw() -> None:

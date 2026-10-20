@@ -32,8 +32,8 @@ def _close(a: tuple[float, float], b: tuple[float, float], tol: float) -> bool:
 
 
 def test_hole_positions_map_back_to_the_calculator() -> None:
-    # Reference stations at 2 places: within half a unit of the second place.
-    tol = 0.005 * math.sqrt(2.0)
+    # Presentation precision must not move the carrier-located model axes.
+    tol = 1e-9
     assert len(spec.SCREW_HOLES) == len(trammel.RISER_SCREWS) == 4
     for riser, carrier in zip(spec.SCREW_HOLES, trammel.RISER_SCREWS, strict=True):
         assert _close(_carrier(riser), carrier, tol)
