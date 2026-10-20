@@ -86,6 +86,7 @@ from ch_connecting_rod_spec import (
     RING_BORE_DIA,
     RING_BOTTOM_Y,
     RING_OUTER_RADIUS,
+    RING_THICKNESS,
     ROOT_RELIEF_ANGLE_DEG,
     ROOT_RELIEF_BAND,
     ROOT_RELIEF_SIZE,
@@ -527,8 +528,11 @@ def _root_section_band(adapter: Any, sheet: Any) -> Box:
 
 
 def _root_section_boxes(view: Any) -> tuple[Box, ...]:
-    """Native view outline plus exact native caption boxes, in sheet metres."""
+    """Refreshed native view outline and native caption extent, in sheet metres."""
     view = _early_bound(view, "IView")
+    # A rebuild does not return control to the window's repaint loop.
+    # UpdateViewDisplayGeometry is VT_VOID and exposes the changed geometry now.
+    view.UpdateViewDisplayGeometry()
     outline = tuple(float(value) for value in view.GetOutline())
     if (
         len(outline) != 4 or not all(math.isfinite(value) for value in outline)
@@ -547,6 +551,43 @@ def _root_section_boxes(view: Any) -> tuple[Box, ...]:
         raise RuntimeError(f"strap section has invalid native caption extent {extent}")
     boxes.append(Box(extent[0], extent[1], extent[3], extent[4]))
     return tuple(boxes)
+
+
+def _log_root_section_placement(
+    adapter: Any, view: Any, boxes: tuple[Box, ...], *, stage: str,
+) -> None:
+    """Keep the native outline, caption and physical projection distinguishable."""
+    view = _early_bound(view, "IView")
+    caption = _early_bound(tuple(view.GetNotes())[0], "INote")
+    annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
+    half = RING_THICKNESS / 2000.0
+    projected = model_points_in_view(
+        adapter, view,
+        [
+            (0.0, y / 1000.0, z)
+            for y in (RING_BOTTOM_Y, -RING_BORE_DIA / 2.0)
+            for z in (-half, half)
+        ] + [
+            (0.0, (RING_BOTTOM_Y - 3.0) / 1000.0, 0.0),
+            (0.0, (-RING_BORE_DIA / 2.0 + 3.0) / 1000.0, 0.0),
+        ],
+        label="strap section nominal wall and cut-span projection",
+    )
+    text_angles = tuple(
+        float(caption.GetTextAngleAtIndex(index))
+        for index in range(1, int(caption.GetTextCount()) + 1)
+    )
+    _telemetry.info(
+        f"strap section placement ({stage}): native outline={boxes[0]}; "
+        f"native caption extent={boxes[1]}; "
+        f"view angle={float(view.Angle)!r}; view position={tuple(view.Position)!r}; "
+        f"caption angle={float(caption.Angle)!r}; "
+        f"caption position={tuple(annotation.GetPosition())!r}; "
+        f"caption text angles={text_angles!r}; "
+        f"caption linked text={str(caption.PropertyLinkedText)!r}; "
+        f"projected nominal wall corners={projected[:4]!r}; "
+        f"projected cut-span endpoints={projected[4:]!r}"
+    )
 
 
 def _root_layout_geometry(
@@ -719,6 +760,9 @@ def _root_section(adapter: Any, front: Any, band: Box) -> Any:
     # Put the native caption BESIDE the small section, not below it. This
     # saves the narrow band's height without changing any character height.
     outline, caption_box = _root_section_boxes(view)
+    _log_root_section_placement(
+        adapter, view, (outline, caption_box), stage="oriented, before caption placement",
+    )
     caption = _early_bound(tuple(view.GetNotes())[0], "INote")
     annotation = _early_bound(caption.GetAnnotation(), "IAnnotation")
     at = tuple(float(value) for value in annotation.GetPosition())
@@ -729,9 +773,16 @@ def _root_section(adapter: Any, front: Any, band: Box) -> Any:
     ):
         raise RuntimeError("strap section native caption could not be placed beside its view")
     rebuild_drawing(adapter, label="strap section native caption beside view")
-    whole = union_boxes(list(_root_section_boxes(view)))
+    boxes = _root_section_boxes(view)
+    _log_root_section_placement(
+        adapter, view, boxes, stage="caption placed, before band containment",
+    )
+    whole = union_boxes(list(boxes))
     if whole.width > band.width or whole.height > band.height:
-        raise RuntimeError(f"strap section and native caption do not fit their open band: {whole}; {band}")
+        raise RuntimeError(
+            f"strap section and native caption do not fit their open band: "
+            f"outline={boxes[0]}; caption={boxes[1]}; union={whole}; band={band}"
+        )
     position = tuple(float(value) for value in view.Position)
     target = [
         position[0] + band.xmax - whole.xmax,
@@ -741,6 +792,9 @@ def _root_section(adapter: Any, front: Any, band: Box) -> Any:
         raise RuntimeError("strap section could not be seated in its open band")
     set_hidden_lines_removed(adapter, view)
     rebuild_drawing(adapter, label="strap section below Detail C fence")
+    _log_root_section_placement(
+        adapter, view, _root_section_boxes(view), stage="view positioned and regenerated",
+    )
     return view
 
 
