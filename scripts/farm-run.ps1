@@ -1112,9 +1112,11 @@ function Invoke-FarmCli {
         [Parameter(Mandatory)][string[]]$Arguments
     )
 
-    # The pool is its own uv project; a caller's VIRTUAL_ENV must not leak in.
+    # The pool is its own uv project; caller environment selectors must not leak in.
     $previous = $env:VIRTUAL_ENV
+    $previousProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
     $env:VIRTUAL_ENV = $null
+    $env:UV_PROJECT_ENVIRONMENT = $null
     try {
         $output = @(& uv run --frozen --project $PoolHome (Join-Path $PoolHome 'farm.py') @Arguments 2>&1 |
                 ForEach-Object { [string]$_ })
@@ -1122,6 +1124,7 @@ function Invoke-FarmCli {
     }
     finally {
         $env:VIRTUAL_ENV = $previous
+        $env:UV_PROJECT_ENVIRONMENT = $previousProjectEnvironment
     }
 }
 
