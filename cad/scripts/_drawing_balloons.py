@@ -1248,7 +1248,7 @@ def _select_balloon_anchor(
                 observed=observed,
                 on_miss=lambda pick=attempt, into=captured: into.update(
                     _seat_forensics.capture_pick_screens(
-                        adapter, f"{stem}-frozen-anchor-pick{pick}"
+                        adapter, f"{stem}-frozen-anchor-pick{pick}", sheet_xy=sheet_xy
                     )
                 ),
             )
