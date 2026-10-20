@@ -4991,7 +4991,7 @@ def test_native_r7_lower_b_failure_and_conditional_real_cut_endpoint_clearance()
     assert moved_lower.xmin - value.xmax == pytest.approx(0.0022268)
     foreign_text = {
         f"{annotation.label} row {i}": (box.xmin, box.ymin, box.xmax, box.ymax)
-        for annotation in model.annotations if annotation is not marker
+        for annotation in model.annotations if annotation.label != moved.label
         for i, box in enumerate(annotation.text_boxes)
     }
     complete_marker = {
@@ -5005,7 +5005,16 @@ def test_native_r7_lower_b_failure_and_conditional_real_cut_endpoint_clearance()
         )
         for i, segment in enumerate(moved.segments)
     })
-    assert sheet.find_callout_clashes(complete_marker, foreign_text, clearance=0.002) == []
+    # All these pieces belong to the SAME native section annotation. Its
+    # arrows necessarily meet its cutting stroke; they are not independent
+    # callouts. Check every constituent against every foreign annotation,
+    # excluded by that native owner identity, without testing intentional
+    # connections within the marker assembly as callout-to-callout clashes.
+    assert moved.label == marker.label
+    for part_name, part_box in complete_marker.items():
+        assert sheet.find_callout_clashes(
+            {f"{moved.label}: {part_name}": part_box}, foreign_text, clearance=0.002,
+        ) == []
     # All witnesses, socket, fillet, rib, tables, border and title-block ink
     # remain in the full sheet model above; native annotation strokes are not
     # translated with the section marker.
