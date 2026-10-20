@@ -98,6 +98,10 @@ sheet 2 imports those native fillet dimensions into VIEW K and DETAIL J.
 The part build checks each intended edge pick within 1 µm and reads back each
 fillet's stored edge count and radius. Those checks do not replace inspection
 of the resulting geometry and the drawing leaders.
+After the final drawing rebuild, each imported corner-radius arrow is checked
+against its finite material arc using native display-data readback. A tip on
+the continuation of the supporting circle is rejected even when the radius
+value and MAX tolerance are correct.
 
 The cone-pivot-post drawing also checks the linked Finish note's native extent
 against the landscape template's cell rules. In the exported sheet, those rules

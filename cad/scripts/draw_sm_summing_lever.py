@@ -22,7 +22,9 @@ two bracket receiver taps and the spring-anchor pad under the plate they sit
 in, so the end rib's slant over each tap reads, and the tap row's centreline
 through the hex centre.  Removed VIEW K at 5:1 shows the stub-root rounds
 in plan; Detail J at 10:1 shows the end-rib step's round onto the plate.
-Sheet 1 runs at 1:2.
+Their native arrow tips must land on the finite material arcs after the
+final rebuild, before export; correct radius/MAX metadata alone is
+insufficient.  Sheet 1 runs at 1:2.
 
 Run with SolidWorks open::
 
@@ -220,8 +222,17 @@ STUB_ROOT_CENTER = (0.080, 0.225)
 STUB_ROOT_SCALE = (5.0, 1.0)
 STUB_ROOT_CROP_RADIUS_MM = 6.5
 STUB_ROOT_ANCHOR_MM = (0.0, 0.0, -PLATE_L / 2.0)
-STUB_ROOT_KEEP = {"StubRootRadius": (0.130, 0.208)}
+# Aim the shelf through the upper-left material quarter of the right-hand
+# root round, not the lower-right extension of its complete circle.
+STUB_ROOT_KEEP = {"StubRootRadius": (0.112, 0.248)}
 STUB_ROOT_NOTE_XY = (0.0605, 0.189)
+# Centre and tangent points of that -X root quarter, in model mm.  K looks
+# along Y, so the cross-section's Y station does not affect its projection.
+STUB_ROOT_ARC_MM = (
+    (-HEX_W / 2.0 - STUB_ROOT_R, 0.0, -PLATE_L / 2.0 - STUB_ROOT_R),
+    (-HEX_W / 2.0, 0.0, -PLATE_L / 2.0 - STUB_ROOT_R),
+    (-HEX_W / 2.0 - STUB_ROOT_R, 0.0, -PLATE_L / 2.0),
+)
 
 # J enlarges only the -Z end rib's step-foot onto the plate top; its
 # 1.2-model-mm fence in F keeps the receiver taps outside the detail.
@@ -231,7 +242,14 @@ RIB_END_DETAIL_SCALE = (10.0, 1.0)
 RIB_END_DETAIL_RADIUS_MM = 1.2
 RIB_END_DETAIL_LABEL_XY = (0.060, 0.045)
 RIB_END_DETAIL_LETTER_OFFSET = (-0.0055, 0.0085)
-RIB_END_KEEP = {"RibEndRadius": (0.030, 0.090)}
+# J's material quarter is down-right of its centre in the back projection.
+# Put its native text to that side, clear of the detail and its caption.
+RIB_END_KEEP = {"RibEndRadius": (0.114, 0.065)}
+RIB_END_ARC_MM = (
+    (RIB_PLATE_REACH + RIB_END_R, PLATE_T / 2.0 + RIB_END_R, -PLATE_L / 2.0),
+    (RIB_PLATE_REACH, PLATE_T / 2.0 + RIB_END_R, -PLATE_L / 2.0),
+    (RIB_PLATE_REACH + RIB_END_R, PLATE_T / 2.0, -PLATE_L / 2.0),
+)
 
 # Section C-C: the plate's own thickness.  Every end view shows the end ribs
 # over the plate and the spring-anchor pad below its free edge, so no view
@@ -533,7 +551,7 @@ def _detail_view(
 def _attach_radial_leaders(
     adapter: Any, annotations: Iterable[Any], names: Iterable[str], *, label: str
 ) -> None:
-    """Stop each radial leader at its own arc.
+    """Remove radial arc-extension and centre tails.
 
     ``ArcExtensionLineOrOppositeSide`` defaults to True, which sweeps the
     R138.8 summation arc through the top view and trails the R15.24 rib leader
@@ -541,6 +559,8 @@ def _attach_radial_leaders(
     and rules the leader on to the arc centre, off the view for R138.8 (both
     seen on the 2026-10 summing-lever renders).  Both are bool properties, so
     each assignment is proven only by reading it back.
+    They do not force a text ray outside a finite arc's sector onto material:
+    K/J also read back their actual arrow tips against their fillet quarters.
     """
     wanted = set(names)
     seen = set()
@@ -679,6 +699,75 @@ def _assert_native_max_radius(
     ):
         raise RuntimeError(f"{name} does not measure its modelled radius")
     _telemetry.info(f"{name}: native R{radius_mm:g} MAX, text {display.GetText(1)!r}")
+
+
+def _assert_radius_arrow_lands(
+    adapter: Any,
+    view: Any,
+    annotations: list[Any],
+    *,
+    name: str,
+    arc_mm: tuple[tuple[float, float, float], ...],
+) -> None:
+    """Require the rebuilt native arrow on the material quarter, not its circle
+    extension.  Uses the output fixture's native arrow-head readback pattern."""
+    found = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == name
+    ]
+    if len(found) != 1:
+        raise RuntimeError(f"expected one {name} for its arrow landing, found {len(found)}")
+    annotation = _early_bound(found[0], "IAnnotation")
+    if annotation.IsDangling():
+        raise RuntimeError(f"{name}: native radius is dangling")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError(f"{name}: native radius has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"{name}: expected exactly one native radial arrow")
+    arrow = tuple(float(value) for value in data.GetArrowHeadAtIndex2(0) or ())
+    if len(arrow) != 12 or not all(math.isfinite(value) for value in arrow):
+        raise RuntimeError(f"{name}: native arrow-head coordinates are incomplete")
+    tip = arrow[:2]
+    centre, start, end = model_points_in_view(
+        adapter,
+        view,
+        [_metres(point) for point in arc_mm],
+        label=f"{name} material quarter",
+        names=("centre", "first tangent", "second tangent"),
+    )
+    axes = [
+        tuple(point[i] - centre[i] for i in (0, 1))
+        for point in (start, end)
+    ]
+    radius = math.dist(centre, start)
+    if (
+        not all(math.isfinite(value) for point in (centre, start, end) for value in point)
+        or radius <= 0.0
+        or not math.isclose(math.dist(centre, end), radius, rel_tol=1e-6, abs_tol=1e-9)
+        or abs(sum(a * b for a, b in zip(*axes))) > 1e-6 * radius**2
+    ):
+        raise RuntimeError(f"{name}: projected fillet quarter is invalid")
+    # Native display ink has the same 0.4-sheet-mm allowance as the output
+    # fixture's material-arc proof.  Checking the quadrant as well as radius
+    # rejects an arrow on the invisible continuation of the same circle.
+    tolerance = 0.0004
+    delta = tuple(tip[i] - centre[i] for i in (0, 1))
+    if (
+        abs(math.dist(tip, centre) - radius) > tolerance
+        or any(
+            sum(a * b for a, b in zip(delta, axis)) / radius < -tolerance
+            for axis in axes
+        )
+    ):
+        raise RuntimeError(
+            f"{name}: native arrow does not land on its visible fillet arc: "
+            f"tip={tip}, centre={centre}, tangents={(start, end)}, radius={radius:g}"
+        )
+    _telemetry.info(f"{name}: native arrow lands on its material quarter at {tip}")
 
 
 # Datum A's box over the vertex in Detail E, inside E's 15 mm fence: the
@@ -2492,6 +2581,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _remove_redundant_thread_notes(adapter)
     check_thread_annotations()
+
+    def check_corner_radius_landings() -> None:
+        if not drawing.ActivateSheet(SHEET_NAMES[1]):
+            raise RuntimeError("failed to activate receiver sheet for radius arrow proof")
+        for view, radius_annotations, name, arc_mm in (
+            (stub_root, stub_annotations, "StubRootRadius", STUB_ROOT_ARC_MM),
+            (rib_end, rib_annotations, "RibEndRadius", RIB_END_ARC_MM),
+        ):
+            _assert_radius_arrow_lands(
+                adapter, view, radius_annotations, name=name, arc_mm=arc_mm
+            )
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -2502,7 +2603,9 @@ async def build(adapter: Any) -> dict[str, str]:
         # This recipe deletes and proves its actual note inventory, as top-frame
         # does; the shared exact-count guard remains unchanged for other recipes.
         # Recheck after the final rebuild, before either drawing or PDF is saved.
-        settled_checks=(check_thread_annotations, check_plate_thickness),
+        settled_checks=(
+            check_thread_annotations, check_plate_thickness, check_corner_radius_landings,
+        ),
     )
 
 

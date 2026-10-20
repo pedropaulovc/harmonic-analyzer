@@ -1839,3 +1839,69 @@ def test_tangent_display_requires_native_mode_readback(monkeypatch, visible) -> 
     view.SetDisplayTangentEdges2 = lambda _mode: None
     with pytest.raises(RuntimeError, match="tangent edges did not become"):
         drawing._set_tangent_edges(view, visible=visible)
+
+
+@pytest.mark.parametrize(
+    ("name", "arc_mm", "centre", "radius", "signs"),
+    [
+        (
+            "StubRootRadius",
+            drawing.STUB_ROOT_ARC_MM,
+            (0.1027, 0.2225),
+            0.0025,
+            (-1.0, 1.0),
+        ),
+        (
+            "RibEndRadius",
+            drawing.RIB_END_ARC_MM,
+            (0.056, 0.069),
+            0.004,
+            (1.0, -1.0),
+        ),
+    ],
+)
+def test_radius_arrow_landing_rejects_invisible_extension_and_air(
+    monkeypatch, name, arc_mm, centre, radius, signs
+) -> None:
+    arc_xy = [
+        centre,
+        (centre[0] + signs[0] * radius, centre[1]),
+        (centre[0], centre[1] + signs[1] * radius),
+    ]
+    offset = tuple(sign * radius / math.sqrt(2.0) for sign in signs)
+    state = SimpleNamespace(
+        tip=tuple(c + d for c, d in zip(centre, offset)),
+        count=1,
+        dangling=False,
+    )
+    data = SimpleNamespace(
+        GetArrowHeadCount=lambda: state.count,
+        GetArrowHeadAtIndex2=lambda _index: (*state.tip, 0.0, *([0.0] * 9)),
+    )
+    display = SimpleNamespace(GetDisplayData=lambda: data)
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display,
+        IsDangling=lambda: state.dangling,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda *_args: name)
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_args, **_kwargs: arc_xy)
+    kwargs = {"name": name, "arc_mm": arc_mm}
+    drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
+    # Same complete circle, opposite non-material quarter: the original K/J
+    # metadata and flag checks accepted this visibly floating native arrow.
+    state.tip = tuple(c - d for c, d in zip(centre, offset))
+    with pytest.raises(RuntimeError, match="does not land on its visible fillet arc"):
+        drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
+    # Right sector but floating away from the material still must fail.
+    state.tip = tuple(c + 1.5 * d for c, d in zip(centre, offset))
+    with pytest.raises(RuntimeError, match="does not land on its visible fillet arc"):
+        drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
+    state.tip = tuple(c + d for c, d in zip(centre, offset))
+    state.count = 0
+    with pytest.raises(RuntimeError, match="exactly one native radial arrow"):
+        drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
+    state.count = 1
+    state.dangling = True
+    with pytest.raises(RuntimeError, match="native radius is dangling"):
+        drawing._assert_radius_arrow_lands(None, None, [annotation], **kwargs)
