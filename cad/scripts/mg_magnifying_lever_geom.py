@@ -36,8 +36,9 @@ if TIP_PROJECTION_MIN < 0.0:
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:
     """Nominal permitted plain-body travel, working pose and free-tip limit.
 
-    There is no invented positive stop: the fitter keeps the complete clamp
-    bore on the plain body, outside the incomplete root runout/thread.
+    This is not a tolerance-safe endpoint or a positive stop. The fitter keeps
+    the complete bore clear of the AS-MADE runout/thread; the shortest accepted
+    rod and longest thread move the nominal X149.50 boundary to X148.19.
     """
     from mg_lever_thread_joint import THREAD_ROOT_X
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 from pathlib import Path
 
@@ -50,7 +51,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert geom.HEX_AF == pytest.approx(7.0 / 16.0 * 25.4)
     assert geom.BLOCK_DEPTH == pytest.approx(geom.HEX_AC)
-    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, 28.95)
+    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, 29.50)
     for gone in ("BLOCK_WIDTH", "ROD_BORE_DIA", "ROD_BORE_X"):
         assert not hasattr(geom, gone)
     assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
@@ -67,18 +68,20 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    # The bore centred between the flats by symmetry: its largest drilled Ø
-    # on the thinnest stock, off centre by the drill's run-off to mid-block.
+    # An exit-side flat lies beyond mid-block. Bound its complete drilling
+    # depth on maximum stock while taking minimum stock for the wall.
     bore_nominal, bore_worst = spec.WALLS["lever bore to a flat"]
     assert bore_nominal == pytest.approx((spec.HEX_AF - spec.LEVER_BORE_DIA) / 2.0)
-    wander = 0.10 + spec.HEX_AC / 2.0 * math.tan(math.radians(0.3))
+    maximum_depth = (spec.HEX_AF + spec.HEX_AF_BAND) / math.cos(math.radians(30.0))
+    wander = 0.10 + maximum_depth * math.tan(math.radians(0.3))
     assert bore_worst == pytest.approx(
         (spec.HEX_AF - spec.HEX_AF_BAND) / 2.0 - (spec.LEVER_BORE_DIA + 0.10) / 2.0 - wander
     )
-    assert bore_worst == pytest.approx(2.0577, abs=1e-4)
+    assert bore_worst > 2.02
     assert bore_worst >= spec.WALL_TARGET
     # No printed location from a flat: the bore's only offset is its wander.
-    assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER == pytest.approx(wander)
+    assert spec.BORE_FULL_WANDER == pytest.approx(wander)
+    assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER == pytest.approx(0.10 + maximum_depth / 2.0 * math.tan(math.radians(0.3)))
     for gone in (
         "LEVER_BORE_FROM_FLAT",
         "LEVER_BORE_FROM_FLAT_PLACES",
@@ -105,12 +108,50 @@ def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
     band = printed_band_mm(geom.HEIGHT_PLACES)
     radius_max = (geom.LEVER_BORE_DIA + 0.10) / 2.0
     floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - geom.BORE_WANDER
-    full_thumb = (geom.BLOCK_HEIGHT - band) - (geom.LEVER_BORE_Y + band) - radius_max - geom.BORE_WANDER - geom.EDGE_BREAK
+    female_wall_only = (geom.BLOCK_HEIGHT - band) - (geom.LEVER_BORE_Y + band) - radius_max - geom.BORE_WANDER - geom.EDGE_BREAK
     assert floor == pytest.approx(geom.ROD_TAP_FLOOR_WALL_WORST)
-    assert full_thumb == pytest.approx(geom.THUMB_ENGAGEMENT_WORST)
+    assert geom.THUMB_ENGAGEMENT_WORST < female_wall_only
     assert floor >= geom.WALL_TARGET
     assert floor - 0.05 < geom.WALL_TARGET  # smallest practical 0.05 height step
-    assert full_thumb >= joint.ENGAGEMENT_MIN
+    assert geom.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
+
+
+def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> None:
+    import mg_magnifying_clamp_geom as geom
+    from _mcmaster_91882a221 import SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
+    from _printed_tolerance import printed_band_mm
+    from mg_lever_thread_joint import ROD_DIA, ROD_DIA_BAND
+
+    band = printed_band_mm(geom.HEIGHT_PLACES)
+    overlaps, collar_gaps = [], []
+    # Actual parallel-cylinder sections at all height/diameter/angle corners.
+    # Include every extreme seating, even the conservative upper bore cap:
+    # this must not rely on a centreline or perfectly bottom-seated rod.
+    for height, bore_y, bore_dia, rod_dia, drift, angle, seat in itertools.product(
+        (geom.BLOCK_HEIGHT - band, geom.BLOCK_HEIGHT + band),
+        (geom.LEVER_BORE_Y - band, geom.LEVER_BORE_Y + band),
+        (geom.LEVER_BORE_DIA, geom.LEVER_BORE_DIA + 0.10),
+        (ROD_DIA + ROD_DIA_BAND[1], ROD_DIA),
+        (-geom.BORE_FULL_WANDER, geom.BORE_FULL_WANDER),
+        (-geom.THUMB_CONTACT_ANGLE_MAX, 0.0, geom.THUMB_CONTACT_ANGLE_MAX),
+        (-1.0, 0.0, 1.0),
+    ):
+        sec, slope = 1.0 / math.cos(angle), abs(math.tan(angle))
+        cy, rb, rr = bore_y + drift, bore_dia / 2.0, rod_dia / 2.0
+        contact = cy + seat * (rb - rr) * sec + rr * sec + TIP_FLAT_R * slope
+        female = (cy + rb * sec + (joint.THREAD_MAJOR / 2.0 + 0.025) * slope, height - geom.EDGE_BREAK)
+        male = (contact + TIP_CHAMFER, contact + SHANK_LEN)
+        overlaps.append(min(female[1], male[1]) - max(female[0], male[0]))
+        collar_gaps.append(male[1] - height)
+    assert min(overlaps) == pytest.approx(geom.THUMB_ENGAGEMENT_WORST)
+    assert min(overlaps) >= joint.ENGAGEMENT_MIN
+    assert min(collar_gaps) >= geom.THUMB_COLLAR_CLEARANCE_MIN - 1e-9
+    assert geom.THUMB_COLLAR_CLEARANCE_MIN > 0.0
+    # Pre-fix mutation: an accepted bottom-seated part at the old height loses
+    # 1.5D once the REAL male tip chamfer is removed from the full interval.
+    contact = geom.LEVER_BORE_Y + band + geom.BORE_WANDER + ROD_DIA - geom.LEVER_BORE_DIA / 2.0
+    old_overlap = (28.95 - band - geom.EDGE_BREAK) - (contact + TIP_CHAMFER)
+    assert old_overlap < joint.ENGAGEMENT_MIN
 
 
 def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:

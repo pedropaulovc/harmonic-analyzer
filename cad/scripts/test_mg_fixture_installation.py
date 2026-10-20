@@ -116,7 +116,24 @@ def test_clamp_compensation_keeps_rod_seating_hook_and_thumb_tip() -> None:
     assert math.isclose(assembly.FIXTURE_POSITION[1], 919.7, abs_tol=1e-9)
     assert math.isclose(assembly.THUMB_SCREW_TIP_Y - assembly.LEVER_ROD_Y, lever_dia / 2.0, abs_tol=1e-9)
     assert assembly.THUMB_SCREW_RAIL_CLEARANCE >= 0.25
+    assert assembly.THUMB_SCREW_RAIL_CLEARANCE_WORST >= 0.25
+    assert clamp.THUMB_COLLAR_CLEARANCE_MIN > 0.0
     assert clamp.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
+
+
+def test_thumb_head_envelope_clears_rail_at_the_contact_angle_bound() -> None:
+    from _mcmaster_91882a221 import TIP_FLAT_R
+    from mg_magnifying_clamp_geom import THUMB_CONTACT_ANGLE_MAX
+    from mg_lever_thread_joint import ROD_DIA as lever_dia
+
+    # Support of the actual tilted head's enclosing cylinder. Keep the lever
+    # horizontal at its functional machine axis, as in the installed CAD pose.
+    for angle in (0.0, THUMB_CONTACT_ANGLE_MAX / 2.0, THUMB_CONTACT_ANGLE_MAX):
+        tip = assembly.LEVER_ROD_Y + lever_dia / 2.0 + TIP_FLAT_R * math.sin(angle)
+        head_top = tip + (SHANK_LEN + HEAD_STACK_LEN) * math.cos(angle) + THUMB_SPEC["head_r"] * math.sin(angle)
+        gap = assembly.TOP_FRAME_RAIL_UNDERSIDE_Y - head_top
+        assert gap >= assembly.THUMB_SCREW_RAIL_CLEARANCE_WORST - 1e-9
+        assert gap >= 0.25
 
 
 def test_new_overlap_pairs_are_exact_and_shared_with_top_assembly() -> None:
