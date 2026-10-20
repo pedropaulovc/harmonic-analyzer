@@ -12,8 +12,10 @@ checks. Every text, pose and reference value comes from
 lays the sheets out. It never edits the source assembly or its explodes.
 
 PRIVATE HISTORICAL-INPUT DIAGNOSTIC, NOT A MERGE CANDIDATE: the normal farm leaf
-observes the original first frozen stop-block pick, then fails before its
-balloon/finalization. No successful drawing or manufacturing approval is possible.
+observes the ORIGINAL FIRST frozen stop-block pick before extra diagnostic
+observation, then fails before its balloon/finalization WITHOUT original retries.
+Only an original miss permits one post-observer same-point diagnostic pick.
+No successful drawing or manufacturing approval is possible.
 """
 
 from __future__ import annotations

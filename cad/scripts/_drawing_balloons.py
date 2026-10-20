@@ -1174,6 +1174,7 @@ def _hit_test_edge(
     redraw: bool = False,
     observed: dict[str, Any] | None = None,
     on_miss: Callable[[], None] | None = None,
+    after_pick: Callable[[bool, int, int], None] | None = None,
 ) -> tuple[Any, str]:
     """Select the edge drawn at ``sheet_xy`` of the active view; return it and its owner.
 
@@ -1184,6 +1185,9 @@ def _hit_test_edge(
     window to draw the zoom before the pick; ``observed`` receives the
     zoomed view's ``Scale2`` (``None`` when unreadable). ``on_miss`` runs
     when the pick selects nothing, while the window is still zoomed on it.
+    ``after_pick`` is a diagnostic-only observer, called immediately after the
+    native result at the original zoom, BEFORE miss capture or fit restoration.
+    Its default leaves existing callers unchanged; it may deliberately raise.
     """
     draw = adapter.currentModel
     draw.ClearSelection2(True)
@@ -1192,9 +1196,12 @@ def _hit_test_edge(
             draw.GraphicsRedraw2()
         if observed is not None:
             observed["zoom_scale2"] = _view_scale2(draw)
+        pick_started_ns = time.perf_counter_ns() if after_pick is not None else 0
         selected = draw.Extension.SelectByID2(
             "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
         )
+        if after_pick is not None:
+            after_pick(selected, pick_started_ns, time.perf_counter_ns())
         if not selected and on_miss is not None:
             on_miss()
     if not selected:

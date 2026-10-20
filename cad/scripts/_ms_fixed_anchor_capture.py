@@ -1,16 +1,11 @@
-"""Offline-prepared diagnostic; native calls have NOT been exercised.
+"""MS first-pick/late-observer diagnostic; no native pre-pick observer.
 
-The parent owns source/input authorization, hooks, timing and the original failure.
-Pass the ALREADY IMPORTED frozen _drawing_balloons module as ``balloons`` and the
-actual _ComponentLeaf as ``leaf``. This module imports only the standard library;
-importing it does not load a DLL, import the repository, open files, or call COM.
-Neither public function writes files. No coordinate pick is made here.
-
-collect_pre_pick: call once from the original _view_scale2 hook, after the original
-zoom/redraw and immediately before its unchanged SelectByID2.
-compare_exact_edge: call only after pick 3 missed and its original screenshot
-callback returned, still inside the same original _hit_test_edge zoom context.
-An entity-only diagnostic selection is always cleared; it cannot heal the pick.
+The recipe owns packet authorization and the original first-pick result.
+Collect only from the optional _hit_test_edge post-result callback while its
+original zoom and first-attempt caller frames remain live. Observations are
+AFTER the native result, never pre-pick or a historic-state reproduction.
+The exact-edge comparison is allowed only after original-first-miss plus one
+explicitly diagnostic same-point coordinate miss. It never heals either result.
 """
 
 import math
@@ -280,19 +275,44 @@ class _Capture:
         loaded = (loaded_type == 1 and isinstance(configuration, str) and bool(configuration)
                   and configuration == loaded_configuration and isinstance(model_path, str) and isinstance(loaded_path, str)
                   and ntpath.normcase(ntpath.normpath(model_path)) == ntpath.normcase(ntpath.normpath(loaded_path)))
+        first = (context is not _MISSING
+                 and context[1]["original_attempt"] == 1
+                 and context[1]["prior_original_pick_outcomes"] == []
+                 and context[1]["original_hit_frame"].get("sheet_xy_matches") is True
+                 and context[1]["original_hit_frame"].get("redraw") is False
+                 and isinstance(context[1]["original_hit_frame"].get("coordinate_return"), bool))
         self.out["guards"] = {"exact_frozen_target_and_active_view": target,
                               "loaded_part_path_and_configuration_match": loaded,
                               "original_projection_bound": self.out["projection_derivation"]["status"] == "ok",
                               "native_viewport_projection_bound": self.out["viewport_projection"]["status"] == "ok",
-                              "original_third_miss_context": context is not _MISSING
-                                  and context[1]["original_attempt"] == 3
-                                  and context[1]["prior_original_pick_outcomes"] == ["miss", "miss"]
-                                  and context[1]["original_hit_frame"].get("sheet_xy_matches") is True
-                                  and context[1]["original_hit_frame"].get("coordinate_return") is False,
+                              "original_first_pick_context": first,
+                              "original_first_miss_context": first and context[1]["original_hit_frame"]["coordinate_return"] is False,
                               "drawing_document_path": _safe(draw_path)}
         self.ready = (target and loaded and self.out["guards"]["original_projection_bound"]
                       and self.out["guards"]["native_viewport_projection_bound"]
-                      and (self.out["phase"] == "pre_pick" or self.out["guards"]["original_third_miss_context"]))
+                      and self.out["phase"] == "after_first_original_pick" and first)
+        if first and context[1]["original_hit_frame"]["coordinate_return"]:
+            self.selected_identity()
+
+    def selected_identity(self):
+        """Read the native coordinate hit's actual identity; never select here."""
+        count = self.q("coordinate.selection.count", lambda: self.manager.GetSelectedObjectCount2(-1))
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            self.out["coordinate_hit_identity"] = {"status": "unsupported", "reason": "no selected entity"}
+            return
+        selected = self.q("coordinate.selection.entity", lambda:
+            self.bound(self.manager.GetSelectedObject6(count, -1), "IEntity"), obj=True)
+        selected_type = self.q("coordinate.selection.type", lambda: self.manager.GetSelectedObjectType3(count, -1))
+        owner_ok = self.owner("coordinate.selection", selected)
+        selected_view = self.q("coordinate.selection.view", lambda:
+            self.manager.GetSelectedObjectsDrawingView2(count, -1), obj=True)
+        same_view = self.q("coordinate.selection.IsSameTargetView", lambda: self.sw.IsSame(selected_view, self.v))
+        self.persist("coordinate.selection.drawing_persistent_reference", self.draw, selected)
+        self.out["coordinate_hit_identity"] = {
+            "status": "bound" if selected_type == 1 and owner_ok and same_view == 1 else "unsupported",
+            "selection_index": count, "edge_type": selected_type,
+            "owner_is_exact_leaf": owner_ok, "drawing_view_is_exact_target": same_view == 1,
+            "persistent_reference_scope": "current drawing only; not a file digest or local visibility proof"}
 
     def explode(self):
         if self.offsets is _MISSING:
@@ -433,31 +453,49 @@ class _Capture:
         self.q("selection.GetSelectionPoint2.raw_model_space_not_anchor_proof", lambda: self.manager.GetSelectionPoint2(1, -1))
         self.persist("selection.drawing.GetPersistReference3", self.draw, readback)
         result["status"] = "diagnostic_entity_selected_and_read_back" if selected_type == 1 and same == 1 and owner_ok and same_view == 1 else "unsupported"
-        result["original_coordinate_pick_outcome"] = "unchanged: third original coordinate miss"
+        result["original_coordinate_pick_outcome"] = "unchanged: first original coordinate miss; no original redraw retries executed"
 
 
-def collect_pre_pick(adapter, view, leaf, point_mm, sheet_xy, balloons):
-    """Read-only native observations; never pick, clear, redraw, activate or save."""
+def collect_after_first_pick(adapter, view, leaf, point_mm, sheet_xy, balloons):
+    """Post-result native readbacks at original first-pick zoom, hit or miss."""
     capture = None
     try:
-        capture = _Capture(adapter, view, leaf, point_mm, sheet_xy, balloons, "pre_pick")
+        capture = _Capture(adapter, view, leaf, point_mm, sheet_xy, balloons, "after_first_original_pick")
         capture.snapshot()
         capture.out["status"] = "observed" if capture.ready else "unsupported"
         return _safe(capture.out)
     except Exception as error:
-        result = capture.out if capture is not None else {"schema": "fixed-anchor-capture/1", "phase": "pre_pick", "native_calls_tested": False}
+        result = capture.out if capture is not None else {"schema": "fixed-anchor-capture/1", "phase": "after_first_original_pick", "native_calls_tested": False}
         result.update(status="unsupported", collector_error={"type": type(error).__name__, "message": str(error)[:4096]})
         return _safe(result)
 
 
-def compare_exact_edge(adapter, view, leaf, point_mm, sheet_xy, balloons):
-    """Bounded one-pass native exact-edge comparison; diagnostic selection only."""
+def collect_coordinate_identity(adapter, view, leaf, point_mm, sheet_xy, balloons):
+    """Read back the diagnostic coordinate hit; no new selection or snapshot."""
     capture = None
-    result = {"schema": "fixed-anchor-capture/1", "phase": "after_original_third_miss", "native_calls_tested": False}
     try:
-        capture = _Capture(adapter, view, leaf, point_mm, sheet_xy, balloons, "after_original_third_miss")
+        capture = _Capture(adapter, view, leaf, point_mm, sheet_xy, balloons, "after_first_original_pick")
+        capture.selected_identity()
+        return _safe(capture.out)
+    except Exception as error:
+        result = capture.out if capture is not None else {"phase": "after_first_original_pick"}
+        result.update(status="unsupported", collector_error={"type": type(error).__name__, "message": str(error)[:4096]})
+        return _safe(result)
+
+
+def compare_exact_edge(adapter, view, leaf, point_mm, sheet_xy, balloons, diagnostic_selected):
+    """Only after BOTH coordinate misses; bounded entity-only diagnostic."""
+    capture = None
+    result = {"schema": "fixed-anchor-capture/1", "phase": "after_first_original_pick", "native_calls_tested": False}
+    try:
+        if diagnostic_selected is not False:
+            raise ValueError("exact-edge comparison requires diagnostic coordinate miss")
+        capture = _Capture(adapter, view, leaf, point_mm, sheet_xy, balloons, "after_first_original_pick")
         result = capture.out
         capture.snapshot()
+        capture.ready = capture.ready and capture.out["guards"]["original_first_miss_context"]
+        if not capture.ready:
+            raise ValueError("unbound original first-miss caller/target/projection; no edge census")
         capture.edges()
         result["status"] = result["exact_edge_comparison"]["status"]
     except Exception as error:
