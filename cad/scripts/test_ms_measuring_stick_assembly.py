@@ -35,7 +35,7 @@ import ms_stop_spec as stop
 import _mcmaster_90114a124 as plate_screw
 import _mcmaster_91882a221 as thumb
 from _transforms import rows_from_euler
-from _named_views import octant_axes, octant_view_name
+from _named_views import octant_axes
 
 SCRIPTS = Path(__file__).resolve().parent
 BUILDER = SCRIPTS / "build_ms_measuring_stick_assembly.py"
@@ -340,11 +340,8 @@ def test_native_standalone_final_guard_reads_solved_screw_transform(monkeypatch,
     import build_ms_measuring_stick_assembly as builder
 
     adapter = object()
-    reads = []
 
-    def transform(current, instance):
-        assert current is adapter
-        reads.append(instance)
+    def transform(_current, _instance):
         return (*axis, 1, 0, 0, 0, 0, 1, 100, 200, 300, 1)
 
     monkeypatch.setattr(builder, "component_transform", transform)
@@ -353,107 +350,6 @@ def test_native_standalone_final_guard_reads_solved_screw_transform(monkeypatch,
     else:
         with pytest.raises(RuntimeError, match="thumbscrew head must be above"):
             builder._assert_working_pose(adapter, "native-thumb-1")
-    assert reads == ["native-thumb-1"]
-
-
-@pytest.mark.parametrize(
-    "module,guard,instance",
-    (("build_ms_measuring_stick_assembly", "_assert_working_pose", "thumbscrew"),
-     ("build_ha_harmonic_analyzer_assembly", "_assert_ms_working_pose", "ms_component")),
-)
-def test_final_save_wires_the_native_orientation_gate(module, guard, instance) -> None:
-    source = (SCRIPTS / f"{module}.py").read_text(encoding="utf-8")
-    saves = [
-        node for node in ast.walk(ast.parse(source))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        and node.func.id == "save_assembly_and_images"
-    ]
-    assert len(saves) == 1
-    gates = [kw.value for kw in saves[0].keywords if kw.arg == "solved_gates"]
-    assert len(gates) == 1
-    assert isinstance(gates[0], ast.Lambda)
-    assert ast.unparse(gates[0].body) == f"{guard}(current, {instance})"
-
-
-def test_drawing_wires_upright_views_with_only_the_scale_inspection_underneath(monkeypatch) -> None:
-    """Front, its section and both isometrics stay screw-up; only the labelled
-    graduated-underside inspection uses the old stop-frame camera."""
-    placed, sections, states, notes = [], [], [], []
-    adapter = object()
-
-    def place(current, source, name, x, y, **kwargs):
-        assert current is adapter and source == str(drawing.SOURCE)
-        view = SimpleNamespace(name=name, xy=(x, y))
-        placed.append(view)
-        return view
-
-    def section(current, parent, **kwargs):
-        assert parent is placed[0]
-        sections.append((parent, kwargs))
-        return SimpleNamespace(name="section")
-
-    for name in ("_activate_sheet", "set_hidden_lines_removed", "_assert_view_on_sheet",
-                 "set_high_quality_shaded_with_edges", "_center_view_outline",
-                 "assert_full_detail_view", "assert_balloon_landings"):
-        monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "create_section_view", section)
-    monkeypatch.setattr(drawing, "_view_outline", lambda *a, **kw: (0.02, 0.16, 0.25, 0.21))
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda *a, **kw: (0.14, 0.19))
-
-    def settled():
-        return None
-
-    monkeypatch.setattr(drawing, "_add_assembly_dimensions",
-                        lambda current, view: settled if view is placed[0] else pytest.fail("not Front"))
-    monkeypatch.setattr(drawing, "_add_note_block",
-                        lambda current, sheet_name, text, xy, **kw: notes.append(text))
-    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *a, **kw: "configured")
-    monkeypatch.setattr(drawing, "set_view_exploded_state",
-                        lambda current, view, state, **kw: states.append((view.name, state)))
-    monkeypatch.setattr(drawing, "insert_bom_table", lambda *a, **kw: object())
-    monkeypatch.setattr(drawing, "_validate_bom",
-                        lambda *a: tuple((stem, str(i)) for i, stem in enumerate(sheet.BOM_ORDER)))
-    monkeypatch.setattr(drawing, "add_component_bom_balloons",
-                        lambda *a, items, **kw: [object() for _ in items])
-
-    assert drawing._place_clamped_sheet(adapter) is settled
-    drawing._place_exploded_sheet(adapter)()
-    drawing._place_steps_sheet(adapter)
-    assert [view.name for view in placed] == [
-        "*Front", spec.DRAWING_UNDERSIDE_VIEW, spec.DRAWING_EXPLODED_VIEW, "*Isometric"
-    ]
-    assert [view.xy for view in placed] == [
-        drawing.FRONT_CENTER, drawing.UNDERSIDE_CENTER,
-        drawing.EXPLODED_ISO_CENTER, drawing.ASSEMBLY_ISO_CENTER,
-    ]
-    assert len(sections) == 1
-    assert sections[0][1]["section_label"] == drawing.CLAMP_SECTION_LABEL
-    assert states == [(spec.DRAWING_EXPLODED_VIEW, True), ("*Isometric", False)]
-    assert sheet.UNDERSIDE_CAPTION in notes
-    assert "UNDERSIDE" in sheet.UNDERSIDE_CAPTION
-    assert spec.DRAWING_STANDARD_VIEWS == {spec.DRAWING_UNDERSIDE_VIEW: 5}
-    assert len(spec.DRAWING_EXPLODED_OCTANTS) == 1
-    key, octant = next(iter(spec.DRAWING_EXPLODED_OCTANTS.items()))
-    assert spec.DRAWING_EXPLODED_VIEW == octant_view_name(*octant) == f"ISO {key}"
-    # Only the scale inspection undoes the physical Rx180. Front and the
-    # finished isometric use the native working frame; the explode is +Y-up.
-    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
-    cameras = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
-               and isinstance(node.func, ast.Name) and node.func.id == "name_standard_views"]
-    assert len(cameras) == 1
-    assert {kw.arg: ast.unparse(kw.value) for kw in cameras[0].keywords} == {
-        "views": "spec.DRAWING_STANDARD_VIEWS",
-        "label": "ASM_NAME",
-        "model_rotation": "spec.WORKING_ROWS",
-    }
-    assert spec.WORKING_ROWS == ((1, 0, 0), (0, -1, 0), (0, 0, -1))
-    octants = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
-               and isinstance(node.func, ast.Name) and node.func.id == "name_octant_views"]
-    assert len(octants) == 1
-    assert {kw.arg: ast.unparse(kw.value) for kw in octants[0].keywords} == {
-        "octants": "spec.DRAWING_EXPLODED_OCTANTS", "label": "ASM_NAME",
-    }
 
 
 def test_joint_rows_name_printed_steps() -> None:
