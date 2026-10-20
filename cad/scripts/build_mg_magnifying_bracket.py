@@ -169,9 +169,12 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
     wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "unchanged mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
     wizard_holes(adapter, TAP_SPEC, [(NECK_HALF_X, 0.0, 0.0)], (1.0, 0.0, 0.0), "lever through tap", name="LeverTap", expect_dia_mm=TAP_DRILL_DIA, placement_dims=[((None, None), (None, None))])
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model = _early_bound(adapter.currentModel, "IPartDoc")
     for feature_name in ("MountingHoles", "LeverTap"):
-        sub = _early_bound(model.FeatureByName(feature_name), "IFeature").GetFirstSubFeature()
+        feature = model.FeatureByName(feature_name)
+        if feature is None:
+            raise RuntimeError(f"{feature_name}: native part feature not found")
+        sub = _early_bound(feature, "IFeature").GetFirstSubFeature()
         while sub is not None:
             sub = _early_bound(sub, "IFeature")
             if str(sub.GetTypeName2()) in ("ProfileFeature", "3DProfileFeature"):

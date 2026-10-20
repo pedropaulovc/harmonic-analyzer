@@ -31,7 +31,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA
+from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, TAP_DRILL_DIA
 from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, FLANGE_DEPTH_CALLOUT, FOOT_CORNER_CALLOUT, MOUNTING_HOLE_PROCESS, MOUTH_CALLOUT, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
 
@@ -51,6 +51,15 @@ BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080), "FootCornerR": (0.040, 0.100)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165), "MouthChamfer": (0.280, 0.199)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240), "ThreadRootEnvelope": (0.292, 0.214)}
+
+
+def _mounting_rims(view: Any) -> tuple[Any, ...]:
+    """The *Front HLR view sees the +Z mounting-face exits, not drill entries."""
+    edges = scan_view_edges(view, label="unchanged bracket mounting holes")
+    return tuple(
+        edges.circle_at((point[0], point[1], SIDE_PLATE_Z[1]), CLEARANCE_DIA / 2.0, axis=(0.0, 0.0, 1.0), label=f"mounting-hole {index} exit rim")
+        for index, point in enumerate(BRACKET_HOLE_POINTS)
+    )
 
 
 def _project_side_view(adapter: Any, front: Any, side: Any) -> None:
@@ -97,9 +106,7 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations and root limit", dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature] for feature in ("TapCoordinates", "ThreadEnvelope")})
     set_dimension_callouts(adapter, annotations, {"ThreadRootEnvelope": THREAD_ENVELOPE_CALLOUT})
-    rims = scan_view_edges(bottom, label="unchanged bracket mounting holes")
-    point = BRACKET_HOLE_POINTS[1]
-    rim = rims.circle_at(point, CLEARANCE_DIA / 2.0, axis=(0.0, 0.0, 1.0), label="east mounting-hole rim")
+    rim = _mounting_rims(bottom)[1]
     add_native_hole_callout(adapter, bottom, edge=rim.edge, callout_xy=(0.166, 0.054), label="two mounting clearance holes", process=MOUNTING_HOLE_PROCESS)
     edges = scan_view_edges(side, label="bracket through thread")
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")

@@ -13,6 +13,7 @@ import draw_mg_magnifying_bracket as drawing
 import magnifying_bracket_joint_layout as mounting
 import mg_lever_thread_joint as joint
 import mg_magnifying_bracket_spec as spec
+from _drawing_edges import ViewEdge, ViewEdges
 from _printed_tolerance import printed_band_mm
 
 
@@ -54,6 +55,22 @@ def test_every_marked_requirement_has_one_printed_home() -> None:
     assert set(kept) == marked
     assert marked == set().union(*(set(names) for names in spec.DRAWING_PRECISION.values()))
     assert spec.SINGLE_LIMITS["ThreadEnvelope", "ThreadRootEnvelope"][0] > joint.THREAD_MAJOR
+
+
+def test_mounting_callout_selects_the_visible_exit_not_the_hidden_entry(monkeypatch) -> None:
+    visible = ViewEdges(
+        label="front HLR mounting face",
+        edges=tuple(
+            ViewEdge(edge=object(), line=None, circle=(point[0], point[1], mounting.SIDE_PLATE_Z[1], 0.0, 0.0, 1.0, mounting.CLEARANCE_DIA / 2.0), vertices=None)
+            for point in mounting.BRACKET_HOLE_POINTS
+        ),
+    )
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, *, label: visible)
+    assert drawing._mounting_rims(object()) == visible.edges
+    # Mutation/pre-fix control: the real visible-edge matcher rejects an entry
+    # rim even though its XY position, radius and normal all match.
+    with pytest.raises(RuntimeError):
+        visible.circle_at(mounting.BRACKET_HOLE_POINTS[1], mounting.CLEARANCE_DIA / 2.0, axis=(0.0, 0.0, 1.0), label="hidden entry")
 
 
 class _Tolerance:

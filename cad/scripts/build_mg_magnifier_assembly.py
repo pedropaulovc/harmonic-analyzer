@@ -189,7 +189,7 @@ LEVER_ROD_Y = 979.7
 # literal: web/scripts/native_identity_source.py reads LEVER_ROD_Y,
 # LEVER_ROD_Z and VROD_TOP_Y from this file by AST. The one-piece top-frame
 # casting's front rail imposes no depth bound (the exact-stock thumb-screw
-# reach, asserted below, keeps its head under the rail), and the Ø6 lever's
+# reach, asserted below, keeps its head under the rail), and the quarter-inch lever's
 # clearance to the front column surface (-124.7) is now ~45.8 -- trivially
 # large. The drum route's rim/spoke/boss clearance is proved in XY by
 # sh_vn_music_wire_lever_geom.RUN_GAPS; the bracket arm reaches back to the unchanged
@@ -200,7 +200,7 @@ from sh_vn_music_wire_lever_geom import DRUM_END_Z as LEVER_WIRE_DRUM_Z  # noqa:
 assert math.isclose(LEVER_ROD_Z, LEVER_WIRE_DRUM_Z, abs_tol=1e-9), (
     f"magnifying group plane {LEVER_ROD_Z} left the drum wire lane {LEVER_WIRE_DRUM_Z}"
 )
-LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
+LEVER_X0 = 200.0  # lever part origin (free dome tip; rod spans +32.5..+200,
 # placed Ry(180) so the part's local +x runs east toward the summing knife)
 
 # Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
@@ -226,18 +226,25 @@ assert math.isclose(LEVER_ROD_Y + KNIFE_LOCAL_Y, KNIFE_CONTACT_Y, abs_tol=1e-9),
     "magnifying-lever KnifeAxis y drifted from the knife-edge contact ridge"
 )
 from sh_vn_thumb_screw_spec import (  # noqa: E402
+    HEAD_DIA as THUMB_HEAD_DIA,
     HEAD_STACK_LEN as THUMB_HEAD_STACK_LEN,
     SHANK_LEN as THUMB_SHANK_LEN,
+    TIP_FLAT_R as THUMB_TIP_FLAT_R,
 )
+from mg_magnifying_clamp_geom import THUMB_CONTACT_ANGLE_MAX  # noqa: E402
 
 TOP_FRAME_RAIL_UNDERSIDE_Y = 999.7
 _MIN_THUMB_RAIL_CLEARANCE = 0.25
 THUMB_SCREW_TIP_Y = LEVER_ROD_Y + LEVER_ROD_DIA / 2.0
 THUMB_SCREW_OUTER_FACE_Y = THUMB_SCREW_TIP_Y + THUMB_SHANK_LEN + THUMB_HEAD_STACK_LEN
 THUMB_SCREW_RAIL_CLEARANCE = TOP_FRAME_RAIL_UNDERSIDE_Y - THUMB_SCREW_OUTER_FACE_Y
-assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
+# In this horizontal-lever pose, allow the finite tip and head-radius vertical
+# excursions at the conservative manufactured clamp/screw angle. Dropping the
+# axial cos(angle) shortening makes this a lower bound, not just nominal CAD.
+THUMB_SCREW_RAIL_CLEARANCE_WORST = THUMB_SCREW_RAIL_CLEARANCE - (THUMB_TIP_FLAT_R + THUMB_HEAD_DIA / 2.0) * math.sin(THUMB_CONTACT_ANGLE_MAX)
+assert THUMB_SCREW_RAIL_CLEARANCE_WORST >= _MIN_THUMB_RAIL_CLEARANCE, (
     f"thumb-screw head clears the top-frame rail by only "
-    f"{THUMB_SCREW_RAIL_CLEARANCE:.4f} mm"
+    f"{THUMB_SCREW_RAIL_CLEARANCE_WORST:.4f} mm at the contact/head angle bound"
 )
 # Sliding clamp default position (p.46/48 insets) and the threaded bracket, both
 # derived from the lever-local stations error_budget.py reads for the
@@ -880,9 +887,9 @@ async def build(adapter) -> dict[str, str]:
     # Exact 91882A221 reach comes from the wrapper's stock shank and head-stack
     # constants. The wrapper preserves its outer-head-face local origin, so the
     # target below is that face after placing the tip at THUMB_SCREW_TIP_Y.
-    # THUMB_SCREW_RAIL_CLEARANCE proves the head clears the full-depth front
-    # rail while the clamp's #4-40 tap band (block top +9.0 down to the bore
-    # top +3.175: 5.825 nominal) stays fully engaged at its printed/wander limits.
+    # THUMB_SCREW_RAIL_CLEARANCE_WORST bounds this horizontal-lever pose.
+    # The clamp's independent interval stack includes the real male tip chamfer,
+    # finite-tip contact and bore wander; female wall alone is not FULL overlap.
     # It enters the top face on the hex axis, coaxial with the vertical rod below.
     # Rz(-90) points the shank down the hex axis; the extra Ry(180) turns its head features to
     # the machine hand ([180, 0, -90] is the same rotation's Euler form).
