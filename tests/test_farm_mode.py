@@ -327,7 +327,8 @@ def test_absent_key_after_success_on_a_drifted_checkout_names_the_drift(
         dodo._cached_part_action("pen_rod", script)
 
     assert str(failure.value) == (
-        f"part:pen_rod: farm reported success but cache key {'k' * 12} is absent: "
+        f"part:pen_rod: farm reported success but cache key {'k' * 12} is "
+        "absent or failed integrity/restore: "
         f"{DRIFT}"
     )
     assert calls["stamp"] == []
@@ -2564,6 +2565,10 @@ def test_refresh_farm_submitter_only_restores_after_the_worker_publishes(
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
         "labels": ["part:pen_rod"], "reason": "Re-evaluate",
     }))
+    snapshots = []
+    monkeypatch.setattr(
+        dodo._cache, "capture_refresh", lambda *args: snapshots.append(args)
+    )
     restore((True,))
     dispatched = []
     monkeypatch.setattr(
@@ -2575,6 +2580,7 @@ def test_refresh_farm_submitter_only_restores_after_the_worker_publishes(
     assert len(calls["restore"]) == 1
     assert calls["store"] == []
     assert calls["stamp"] == ["pen_rod"]
+    assert snapshots == [("part:pen_rod", "k" * 64)]
 
 
 def test_leaf_refresh_wire_and_durable_record_are_scoped_to_the_listed_task(

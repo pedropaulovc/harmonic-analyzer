@@ -416,8 +416,9 @@ def test_forced_review_uses_shared_refresh_probe_store_and_freshness(
     monkeypatch.setattr(
         dodo._cache, "note_refresh", lambda *args: refreshes.append(args)
     )
+    monkeypatch.setattr(dodo._cache, "_REFRESH_ETAGS", {(label, "a" * 64): None})
 
-    def publish(_key, outputs, published_label):
+    def publish(_key, outputs, published_label, *, replace_etag=None):
         action.calls["store"] += 1
         assert outputs == [dodo._machinist_review_dir("probe")]
         assert published_label == label
@@ -529,6 +530,93 @@ def test_invalid_refresh_carrier_is_not_demoted_to_a_learning_warning(
     monkeypatch.setattr(action.dodo, "_probe_cache", malformed)
     with pytest.raises(ValueError, match="HARMONIC_CACHE_REFRESH"):
         action.dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+    assert not action.calls["warnings"]
+
+
+@pytest.mark.parametrize("winner,loser", [("FIX", "SHIP"), ("SHIP", "FIX")])
+@pytest.mark.parametrize("mode", REVIEWED_MODES)
+def test_losing_review_restores_full_winner_and_rereads_verdict(
+    action, monkeypatch, winner, loser, mode
+):
+    from test_artifact_cache import _BlockBlobService
+
+    dodo = action.dodo
+    cache = dodo._cache
+    root = dodo.REPO_ROOT
+    directory = dodo._machinist_review_dir("probe")
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", root / "cad" / "out")
+    monkeypatch.setattr(cache, "_REPORTS", dodo.REPORTS)
+    monkeypatch.setattr(cache, "_EVENTS_LOG", dodo.REPORTS / "cache.jsonl")
+    monkeypatch.setattr(cache, "_KEYDIR", dodo.REPORTS / "cache-keys")
+    backend = cache._BlobBackend(_BlockBlobService())
+    monkeypatch.setattr(cache, "_BACKEND", backend)
+    monkeypatch.setattr(
+        dodo, "_cache_key",
+        lambda deps, label=None: cache.cache_key(deps, dodo.ContentChecker._digest, label),
+    )
+    key = dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+    directory.mkdir(parents=True)
+    (directory / "probe.aggregate.json").write_text(json.dumps({
+        "name": "probe", "kind": "part", "verdict": winner,
+        "gating_count": 2 if winner == "FIX" else 0, "error": None,
+    }), encoding="utf-8")
+    (directory / "winner-evidence.json").write_text('{"producer":"A"}', encoding="utf-8")
+    winning_archive = cache._pack([directory])
+    # The first probe misses. Another producer publishes only once our own
+    # expensive review has completed, before its conditional publication.
+    run = dodo._run_subprocess
+    action.state.update(verdict=loser, code=int(loser == "FIX"))
+
+    def competing_review(*args, **kwargs):
+        code = run(*args, **kwargs)
+        (directory / "loser-only-attempt.json").write_text("{}", encoding="utf-8")
+        backend.put(key, winning_archive)
+        return code
+
+    monkeypatch.setattr(dodo, "_run_subprocess", competing_review)
+    monkeypatch.setattr(dodo, "_probe_cache", action.original_probe)
+    monkeypatch.setattr(cache, "store", action.original_store)
+    if mode is MachinistReviewMode.ENFORCE and winner == "FIX":
+        with pytest.raises(RuntimeError, match="FIX, gating_count=2"):
+            dodo._cached_machinist_review_action("probe", mode)
+    else:
+        dodo._cached_machinist_review_action("probe", mode)
+    assert dodo._read_machinist_aggregate("probe")["verdict"] == winner
+    assert (directory / "winner-evidence.json").is_file()
+    assert not (directory / "loser-only-attempt.json").exists()
+    assert dodo._machinist_review_stamp("probe").exists() == (
+        winner == "SHIP" or mode is MachinistReviewMode.LEARN
+    )
+    assert action.calls["run"] == 1
+    assert cache.last_stored_key("check:machinist_review:probe") is None
+
+
+@pytest.mark.parametrize("failure", ["missing", "locked", "cleanup", "invalid-aggregate"])
+def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, failure):
+    dodo = action.dodo
+    directory = dodo._machinist_review_dir("probe")
+    monkeypatch.setattr(dodo._cache, "store", lambda *_args: "lost")
+
+    def restore(key, outputs, label):
+        assert outputs == [directory]
+        if failure == "locked":
+            raise dodo._cache.RestoreLocked(label, key, PermissionError("locked"))
+        if failure == "invalid-aggregate":
+            directory.mkdir()
+            (directory / "probe.aggregate.json").write_text("{}", encoding="utf-8")
+            return True
+        return False
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    if failure == "cleanup":
+        def locked_cleanup(_path):
+            raise PermissionError("report directory locked")
+
+        monkeypatch.setattr(dodo.shutil, "rmtree", locked_cleanup)
+    with pytest.raises(RuntimeError, match="canonical|share-locked"):
+        dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+    assert not dodo._machinist_review_stamp("probe").exists()
     assert not action.calls["warnings"]
 
 

@@ -3376,7 +3376,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     monkeypatch.setattr(dodo, "POST_ASSEMBLY", {stem: ("hook_probe.py",)})
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: False)
-    monkeypatch.setattr(dodo._cache, "store", lambda *_a: "stored")
+    monkeypatch.setattr(dodo._cache, "store", lambda *_a, **_kw: "stored")
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
     monkeypatch.setattr(dodo, "_com_seat", free_seat)
     monkeypatch.setattr(dodo, "_reprobe_under_seat", lambda *_a: False)
@@ -3465,7 +3465,7 @@ def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs, refresh_rc=0):
     monkeypatch.setattr(
         dodo._cache,
         "store",
-        lambda key, _o, label: stores.append((key, label)) or "stored",
+        lambda key, _o, label, **_kw: stores.append((key, label)) or "stored",
     )
     monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
     monkeypatch.setattr(dodo, "_com_seat", free_seat)
@@ -4282,7 +4282,7 @@ def test_prechips_empty_enrollment_has_no_tasks(monkeypatch, synthetic_prechips_
 
 
 @pytest.mark.parametrize("kind", ["part", "assembly", "explode_assembly", "gate"])
-@pytest.mark.parametrize("outcome", ["stored", "skip", "empty", "error", "off"])
+@pytest.mark.parametrize("outcome", ["stored", "lost", "skip", "empty", "error", "off"])
 def test_forced_refresh_never_restores_and_requires_a_stored_result(
     monkeypatch, tmp_path, kind, outcome
 ):
@@ -4318,8 +4318,9 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
         dodo._cache, "restore", lambda *_a: pytest.fail("refreshed leaf restored")
     )
     monkeypatch.setattr(dodo._cache, "note_refresh", lambda *args: refreshes.append(args))
+    monkeypatch.setattr(dodo._cache, "capture_refresh", lambda *_args: None)
     monkeypatch.setattr(
-        dodo._cache, "store", lambda *args: stores.append(args) or outcome
+        dodo._cache, "store", lambda *args, **_kw: stores.append(args) or outcome
     )
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
@@ -4369,6 +4370,618 @@ def test_forced_refresh_never_restores_and_requires_a_stored_result(
     assert refreshes == [(label, "a" * 64, "Owner - Re-evaluate unchanged inputs")] * 2
 
 
+@pytest.fixture
+def canonical_publication(tmp_path, monkeypatch):
+    """Real pack/unpack, keys and native tokens; only COM/Azure transport are fake."""
+    import hashlib
+    from types import SimpleNamespace
+    import _artifact_cache
+    from test_artifact_cache import _BlockBlobService
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
+    dodo = _load_dodo()
+    cache_module = dodo._cache
+    service = _BlockBlobService()
+    seats, probes, publications = {}, [], []
+    references = {}
+
+    class Backend(cache_module._BlobBackend):
+        def put(self, key, blob, *, replace_etag=None):
+            assert not seats.get(dodo.REPO_ROOT, 0), "publication held the COM seat"
+            publications.append((dodo.REPO_ROOT.name, key, replace_etag))
+            return super().put(key, blob, replace_etag=replace_etag)
+
+    backend = Backend(service)
+    monkeypatch.setattr(cache_module, "_BACKEND", backend)
+    monkeypatch.setattr(cache_module, "_REFRESH_ETAGS", {})
+    monkeypatch.setattr(cache_module, "_KEY_INPUTS", {})
+    monkeypatch.setattr(cache_module, "_KEY_CONTEXT", {})
+    monkeypatch.setattr(cache_module, "_KEY_MANIFESTS", {})
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: False)
+    monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
+    monkeypatch.setattr(
+        dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("unconfigured fake COM work")
+    )
+    monkeypatch.setattr(
+        dodo, "_farm_build", lambda *_a: pytest.fail("unexpected farm dispatch")
+    )
+    monkeypatch.setattr(
+        dodo, "_release_seat_documents",
+        lambda _label: pytest.fail("unexpected document-release subprocess"),
+    )
+
+    @contextlib.contextmanager
+    def seat(_label):
+        root = dodo.REPO_ROOT
+        assert not seats.get(root, 0)
+        seats[root] = 1
+        try:
+            yield 0.0
+        finally:
+            seats[root] = 0
+
+    monkeypatch.setattr(dodo, "_com_seat", seat)
+    monkeypatch.setattr(
+        dodo, "_sldprt",
+        lambda stem: str(dodo.CAD_OUT / "sldprt" / f"{stem}.SLDPRT"),
+    )
+    monkeypatch.setattr(
+        dodo, "_sldasm",
+        lambda stem: str(dodo.CAD_OUT / "sldasm" / f"{stem}.SLDASM"),
+    )
+
+    def script(stem, assembly=False):
+        suffix = "_assembly" if assembly else ""
+        return dodo.REPO_ROOT / "cad" / "scripts" / f"build_{stem}{suffix}.py"
+
+    def deps(stem):
+        result = [str(script(stem, assembly=True))]
+        for kind, child in references.get(stem, ()):
+            result.append(
+                dodo._part_execution_token(child) if kind == "part"
+                else dodo._assembly_execution_token(child)
+            )
+        return result
+
+    def outputs(kind, stem="leaf"):
+        out = dodo.CAD_OUT
+        if kind == "part":
+            return [
+                Path(dodo._sldprt(stem)), out / "stl" / f"{stem}.STL",
+                out / "png" / f"{stem}.png",
+            ]
+        if kind == "assembly":
+            return [
+                Path(dodo._sldasm(stem)), dodo._input_ledger(stem),
+                out / "sldasm" / f".{stem}.massprops.sha",
+                out / "png" / f"{stem}.png",
+            ]
+        if kind == "drawing":
+            return [
+                out / "drawings" / "leaf.SLDDRW", out / "sldprt" / "leaf.SLDPRT",
+                out / "pdf" / "leaf.pdf",
+            ]
+        return [out / "reports" / "gate.ok", out / "reports" / "gate.json"]
+
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda path, _stem: [str(path)])
+    monkeypatch.setattr(dodo, "_part_cache_outputs", lambda stem: outputs("part", stem))
+    monkeypatch.setattr(dodo, "_assembly_file_deps", deps)
+    monkeypatch.setattr(dodo, "_assembly_cache_outputs", lambda stem: outputs("assembly", stem))
+    monkeypatch.setattr(dodo, "_input_ledger", lambda stem: dodo.CAD_OUT / "sldasm" / f".{stem}.inputs.json")
+    monkeypatch.setattr(dodo, "_recipe_files", lambda stem: [str(script(stem, True))])
+    monkeypatch.setattr(dodo, "POST_ASSEMBLY", {})
+    monkeypatch.setattr(dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=frozenset()))
+    monkeypatch.setattr(dodo, "_assembly_tier", lambda *_a: (dodo.RefreshTier.FULL, "test missing"))
+    monkeypatch.setattr(dodo, "_drawing_file_deps", lambda _stem: [str(script("leaf"))])
+    monkeypatch.setattr(dodo, "_drawing_cache_outputs", lambda _stem: outputs("drawing"))
+    original_restore = cache_module.restore
+
+    def restore(key, paths, label):
+        hit = original_restore(key, paths, label)
+        probes.append((dodo.REPO_ROOT.name, label, hit))
+        return hit
+
+    monkeypatch.setattr(cache_module, "restore", restore)
+
+    @contextlib.contextmanager
+    def at(name):
+        root = (tmp_path / name).resolve()
+        scripts = root / "cad" / "scripts"
+        scripts.mkdir(parents=True, exist_ok=True)
+        for stem in ("leaf", "mid", "top"):
+            for suffix in ("", "_assembly"):
+                path = scripts / f"build_{stem}{suffix}.py"
+                if not path.exists():
+                    path.write_text(f"# same {stem}{suffix} recipe\n", encoding="utf-8")
+        out = root / "cad" / "out"
+        with monkeypatch.context() as patch:
+            patch.setattr(dodo, "REPO_ROOT", root)
+            patch.setattr(dodo, "CAD_OUT", out)
+            patch.setattr(dodo, "REPORTS", out / "reports")
+            patch.setattr(cache_module, "REPO_ROOT", root)
+            patch.setattr(cache_module, "_CACHE_OUTPUT_ROOT", out)
+            patch.setattr(cache_module, "_REPORTS", out / "reports")
+            patch.setattr(cache_module, "_EVENTS_LOG", out / "reports" / "cache.jsonl")
+            patch.setattr(cache_module, "_KEYDIR", out / "reports" / "cache-keys")
+            yield root
+
+    def emit(kind, payload, stem="leaf"):
+        for path in outputs(kind, stem):
+            if path == dodo._input_ledger(stem):
+                continue  # the real action writes the ledger
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(payload + b":" + path.name.encode())
+
+    def run(kind, stem="leaf"):
+        if kind == "part":
+            dodo._cached_part_action(stem, script(stem))
+        elif kind == "assembly":
+            dodo.build_or_refresh(stem, [], [], [dodo._sldasm(stem)])
+        elif kind == "drawing":
+            dodo._cached_drawing_action("pd_platen_guide")
+        else:
+            paths = outputs(kind)
+            dodo._cached_com_action(
+                "verify:test", ["fake-gate"], [str(script("leaf"))],
+                paths, "test-gate", stamp=str(paths[0]),
+            )
+
+    def identity(kind, stem="leaf"):
+        if kind in ("part", "assembly"):
+            token = (
+                dodo._part_execution_token(stem) if kind == "part"
+                else dodo._assembly_execution_token(stem)
+            )
+            native = Path(dodo._sldprt(stem) if kind == "part" else dodo._sldasm(stem))
+            value = Path(token).read_text(encoding="utf-8").strip()
+            assert value == hashlib.sha256(native.read_bytes()).hexdigest()
+            return value
+        return hashlib.sha256(outputs(kind)[-1].read_bytes()).hexdigest()
+
+    return SimpleNamespace(
+        dodo=dodo, cache=cache_module, backend=backend, service=service,
+        at=at, run=run, emit=emit, identity=identity, outputs=outputs,
+        references=references, probes=probes, publications=publications, seats=seats,
+    )
+
+
+def _canonical_two_producer_race(fixture, monkeypatch, kind, after_consumer=None):
+    """Schedule barrier: both miss; A publishes; consumer hits; B finishes late."""
+    f = fixture
+    seen, arrived = {}, False
+
+    def execute(_cmd, label, **kwargs):
+        nonlocal arrived
+        if f.dodo.REPO_ROOT.name == "B" and not arrived:
+            arrived = True
+            with f.at("A"):
+                f.run(kind)
+                seen["A"] = f.identity(kind)
+            with f.at("consumer"):
+                f.run(kind)
+                seen["consumer"] = f.identity(kind)
+                if after_consumer is not None:
+                    after_consumer()
+        f.emit(kind, f.dodo.REPO_ROOT.name.encode())
+
+    monkeypatch.setattr(f.dodo, "_exec_com", execute)
+    with f.at("B"):
+        f.run(kind)
+        seen["B"] = f.identity(kind)
+        if kind == "assembly":
+            assert f.dodo._read_input_ledger(f.dodo._input_ledger("leaf")) == f.dodo._ledger_inputs(
+                f.dodo._assembly_file_deps("leaf")
+            )
+    assert seen["B"] == seen["consumer"] == seen["A"], "canonical identity fork"
+    assert [hit for name, _label, hit in f.probes if name == "B"] == [False, False, True]
+    with f.at("late-consumer"):
+        f.run(kind)
+        assert f.identity(kind) == seen["consumer"], "canonical identity changed after publication"
+    return seen
+
+
+@pytest.mark.parametrize("kind", ["part", "assembly", "drawing", "generic"])
+def test_two_producers_and_consumer_adopt_one_complete_canonical_bundle(
+    canonical_publication, monkeypatch, kind
+):
+    f = canonical_publication
+    ledger_writes = []
+    write_ledger = f.dodo._write_input_ledger
+
+    def record_ledger(path, inputs):
+        ledger_writes.append((f.dodo.REPO_ROOT.name, Path(f.dodo._sldasm("leaf")).read_bytes()))
+        write_ledger(path, inputs)
+
+    if kind == "assembly":
+        monkeypatch.setattr(f.dodo, "_write_input_ledger", record_ledger)
+    _canonical_two_producer_race(f, monkeypatch, kind)
+    if kind == "assembly":
+        assert [body[:2] for name, body in ledger_writes if name == "B"] == [b"B:", b"A:"]
+    with f.at("B"):
+        for path in f.outputs(kind):
+            if path.name.endswith(".inputs.json") or path.name == "gate.ok":
+                continue
+            assert path.read_bytes().startswith(b"A:"), path
+
+
+def test_same_race_rejects_an_overwrite_backend_mutation(canonical_publication, monkeypatch):
+    f = canonical_publication
+    original = f.backend.put
+
+    def overwrite(key, blob, *, replace_etag=None):
+        return original(key, blob, replace_etag=f.backend.etag(key))
+
+    monkeypatch.setattr(f.backend, "put", overwrite)
+    # The exact same oracle must reject the old last-writer behavior.
+    with pytest.raises(AssertionError, match="canonical identity fork"):
+        _canonical_two_producer_race(f, monkeypatch, "part")
+
+
+def test_inline_prerequisite_adoption_converges_nested_assembly_keys(
+    canonical_publication, monkeypatch
+):
+    f = canonical_publication
+    f.references.update(mid=[("part", "leaf")], top=[("assembly", "mid")])
+    expected = {}
+
+    def downstream():
+        def emit_assembly(_cmd, label, **kwargs):
+            stem = kwargs["task"].split(":")[1]
+            f.emit("assembly", b"consumer-native", stem)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(f.dodo, "_exec_com", emit_assembly)
+            for stem in ("mid", "top"):
+                f.run("assembly", stem)
+                expected[stem] = (
+                    f.dodo._cache_key(f.dodo._assembly_file_deps(stem)),
+                    f.identity("assembly", stem),
+                )
+
+    _canonical_two_producer_race(f, monkeypatch, "part", after_consumer=downstream)
+    # A worker leaf can build a missing prerequisite inline, then keep walking
+    # its native closure; no private losing identity may leak into either level.
+    monkeypatch.setattr(
+        f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("nested key diverged")
+    )
+    with f.at("B"):
+        for stem in ("mid", "top"):
+            assert f.dodo._cache_key(f.dodo._assembly_file_deps(stem)) == expected[stem][0]
+            f.run("assembly", stem)
+            assert f.identity("assembly", stem) == expected[stem][1]
+
+
+@pytest.mark.parametrize("persistent", [False, True], ids=["release-recovers", "still-locked"])
+def test_loser_adoption_holds_seat_and_releases_documents_once(
+    canonical_publication, monkeypatch, persistent
+):
+    f = canonical_publication
+    released = []
+    original_unpack = f.cache._unpack
+
+    def unpack(blob, outputs):
+        if f.dodo.REPO_ROOT.name == "B":
+            assert f.seats[f.dodo.REPO_ROOT] == 1
+            if persistent or not released:
+                raise PermissionError(13, "share-locked", "leaf.SLDPRT")
+        original_unpack(blob, outputs)
+
+    def release(_label):
+        assert f.seats[f.dodo.REPO_ROOT] == 1
+        released.append(f.dodo.REPO_ROOT.name)
+
+    monkeypatch.setattr(f.cache, "_unpack", unpack)
+    monkeypatch.setattr(f.dodo, "_release_seat_documents", release)
+    if persistent:
+        with pytest.raises(RuntimeError, match="still share-locked"):
+            _canonical_two_producer_race(f, monkeypatch, "part")
+    else:
+        _canonical_two_producer_race(f, monkeypatch, "part")
+    assert released == ["B"]
+    assert not any(f.seats.values())
+
+
+@pytest.mark.parametrize("lock_at,persistent", [
+    (None, False),
+    ("optional-file", False), ("optional-file", True),
+    ("directory", False), ("directory", True),
+    ("install", False), ("install", True),
+])
+def test_sparse_winner_adoption_removes_loser_geometry_and_retries_replacement_locks(
+    canonical_publication, monkeypatch, lock_at, persistent
+):
+    """Different real archive members converge, including cleanup/install locks."""
+    import _transforms
+
+    f = canonical_publication
+    released, refused = [], []
+    winner_identity = None
+
+    def outputs():
+        return [
+            Path(f.dodo._sldprt("leaf")),
+            f.dodo.CAD_OUT / "stl" / "leaf.STL",
+            f.dodo.CAD_OUT / "png" / "leaf",
+        ]
+
+    monkeypatch.setattr(f.dodo, "_part_cache_outputs", lambda _stem: outputs())
+
+    def execute(*_args, **_kwargs):
+        nonlocal winner_identity
+        producer = f.dodo.REPO_ROOT.name
+        if producer == "B":
+            with f.at("A"):
+                f.run("part")
+                winner_identity = f.identity("part")
+        native, optional, views = outputs()
+        native.parent.mkdir(parents=True, exist_ok=True)
+        native.write_bytes(producer.encode() + b"-native")
+        views.mkdir(parents=True, exist_ok=True)
+        (views / "canonical.png").write_bytes(producer.encode() + b"-render")
+        if producer == "B":
+            optional.parent.mkdir(parents=True)
+            optional.write_bytes(
+                b"solid loser\nvertex 0 0 0\nvertex 9 8 0\nvertex 0 0 7\nendsolid\n"
+            )
+            stale = views / "loser-only"
+            stale.mkdir()
+            (stale / "geometry.STL").write_bytes(b"loser-only directory member")
+
+    def release(_label):
+        assert f.seats[f.dodo.REPO_ROOT] == 1
+        released.append("B")
+
+    def locked(phase, path):
+        if (
+            f.dodo.REPO_ROOT.name == "B" and phase == lock_at
+            and (persistent or not released)
+        ):
+            assert f.seats[f.dodo.REPO_ROOT] == 1
+            refused.append(phase)
+            raise PermissionError(13, "share-locked replacement", str(path))
+
+    unlink = Path.unlink
+    rmtree = f.cache.shutil.rmtree
+    replace = f.cache.os.replace
+
+    def unlink_output(path, *args, **kwargs):
+        if path == outputs()[1]:
+            locked("optional-file", path)
+        return unlink(path, *args, **kwargs)
+
+    def remove_directory(path, *args, **kwargs):
+        if Path(path) == outputs()[2]:
+            locked("directory", path)
+        return rmtree(path, *args, **kwargs)
+
+    def install(source, target, *args, **kwargs):
+        if Path(target) == outputs()[0]:
+            locked("install", target)
+        return replace(source, target, *args, **kwargs)
+
+    monkeypatch.setattr(f.dodo, "_exec_com", execute)
+    monkeypatch.setattr(f.dodo, "_release_seat_documents", release)
+    monkeypatch.setattr(Path, "unlink", unlink_output)
+    monkeypatch.setattr(f.cache.shutil, "rmtree", remove_directory)
+    monkeypatch.setattr(f.cache.os, "replace", install)
+    with f.at("B"):
+        sibling = f.dodo.CAD_OUT / "png" / "unrelated" / "keep.png"
+        sibling.parent.mkdir(parents=True)
+        sibling.write_bytes(b"unrelated")
+        if persistent:
+            with pytest.raises(RuntimeError, match="still share-locked"):
+                f.run("part")
+        else:
+            f.run("part")
+            native, optional, views = outputs()
+            assert f.identity("part") == winner_identity
+            assert native.read_bytes() == b"A-native"
+            assert (views / "canonical.png").read_bytes() == b"A-render"
+            assert not optional.exists()
+            assert not (views / "loser-only").exists()
+            monkeypatch.setattr(_transforms, "OUT_STL", optional.parent)
+            monkeypatch.setattr(_transforms, "_STL_BBOX_CACHE", {})
+            with pytest.raises(FileNotFoundError):
+                _transforms.stl_bbox_mm("leaf")
+        assert sibling.read_bytes() == b"unrelated"
+        assert not list(f.dodo.CAD_OUT.glob(".cache-restore-*"))
+    assert released == (["B"] if lock_at else [])
+    assert refused == ([lock_at] * (2 if persistent else 1) if lock_at else [])
+    assert not any(f.seats.values())
+
+
+def test_hash_invalid_canonical_adoption_is_fatal(canonical_publication, monkeypatch):
+    f = canonical_publication
+
+    def corrupt_after_consumer():
+        _producer, key, _etag = f.publications[-1]
+        f.service.metadata[f.backend._name(key)]["archive_sha256"] = "0" * 64
+
+    with pytest.raises(RuntimeError, match="canonical outputs could not be restored"):
+        _canonical_two_producer_race(
+            f, monkeypatch, "part", after_consumer=corrupt_after_consumer
+        )
+
+
+def _enable_test_explode_alias(f, monkeypatch):
+    from types import SimpleNamespace
+
+    base_key = f.cache.key_inputs([], f.dodo.ContentChecker._digest)[0]
+    monkeypatch.setattr(
+        f.dodo, "explode_plan", lambda _stem: SimpleNamespace(closure=frozenset({"explode.py"}))
+    )
+    monkeypatch.setattr(f.dodo, "_explode_base_key", lambda *_args: base_key)
+    return base_key
+
+
+def test_ordinary_alias_conflict_never_adopts_over_full_key(
+    canonical_publication, monkeypatch
+):
+    import json
+
+    f = canonical_publication
+    base_key = _enable_test_explode_alias(f, monkeypatch)
+    with f.at("A"):
+        f.emit("assembly", b"alias-A")
+        f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+        assert f.cache.store(base_key, f.outputs("assembly"), "assembly:leaf explode-base") == "stored"
+    old_alias = f.backend.get(base_key)
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"full-B"))
+    with f.at("B"):
+        f.run("assembly")
+        assert Path(f.dodo._sldasm("leaf")).read_bytes().startswith(b"full-B:")
+        full_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        assert f.backend.get(full_key) != old_alias
+        assert f.backend.get(base_key) == old_alias
+        events = [
+            json.loads(line)["event"]
+            for line in f.cache._EVENTS_LOG.read_text(encoding="utf-8").splitlines()
+        ]
+        assert events[-1] == "store_lost"
+
+
+@pytest.mark.parametrize("initially_present", [False, True])
+@pytest.mark.parametrize("conflict", [None, "root", "alias"])
+def test_forced_root_and_alias_cas_snapshot_before_seat_and_work(
+    canonical_publication, monkeypatch, initially_present, conflict
+):
+    import json
+
+    f = canonical_publication
+    base_key = _enable_test_explode_alias(f, monkeypatch)
+    with f.at("A"):
+        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        if initially_present:
+            f.emit("assembly", b"old-A")
+            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+            archive = f.cache._pack(f.outputs("assembly"))
+            f.backend.put(root_key, archive)
+            f.backend.put(base_key, archive)
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Refresh root and alias",
+    }))
+    initial_etags = dict(f.service.etags)
+    seat = f.dodo._com_seat
+    snapshots = []
+
+    @contextlib.contextmanager
+    def before_seat(label):
+        heads = [call[1] for call in f.service.calls if call[0] == "etag"]
+        assert sorted(heads) == sorted([f.backend._name(root_key), f.backend._name(base_key)])
+        snapshots.extend(heads)
+        if conflict is not None:
+            key = root_key if conflict == "root" else base_key
+            f.backend.put(
+                key, b"concurrent canonical",
+                replace_etag=initial_etags.get(f.backend._name(key)),
+            )
+        with seat(label) as waited:
+            yield waited
+
+    def execute(*_args, **_kwargs):
+        assert len(snapshots) == 2
+        f.emit("assembly", b"refresh-B")
+
+    monkeypatch.setattr(f.dodo, "_com_seat", before_seat)
+    monkeypatch.setattr(f.dodo, "_exec_com", execute)
+    with f.at("B"):
+        if conflict is None:
+            f.run("assembly")
+        else:
+            with pytest.raises(RuntimeError, match="did not store outputs \\(lost\\)"):
+                f.run("assembly")
+    heads = [call[1] for call in f.service.calls if call[0] == "etag"]
+    assert heads == snapshots  # no under-seat or pre-upload recapture
+    if conflict == "root":
+        assert f.backend.get(root_key) == b"concurrent canonical"
+        if not initially_present:
+            assert f.backend.get(base_key) is None
+    elif conflict == "alias":
+        assert f.backend.get(base_key) == b"concurrent canonical"
+        # The pair is deliberately non-atomic: the root has already advanced.
+        assert f.service.etags[f.backend._name(root_key)] != initial_etags.get(f.backend._name(root_key))
+    else:
+        import io
+        import tarfile
+
+        def members(key):
+            with tarfile.open(fileobj=io.BytesIO(f.backend.get(key)), mode="r:gz") as tar:
+                return {
+                    member.name: tar.extractfile(member).read()
+                    for member in tar.getmembers() if member.isreg()
+                }
+
+        assert members(root_key) == members(base_key)
+
+
+@pytest.mark.parametrize("which", ["root", "alias"])
+def test_refresh_snapshot_head_error_is_fatal_before_work(
+    canonical_publication, monkeypatch, which
+):
+    import json
+
+    f = canonical_publication
+    base_key = _enable_test_explode_alias(f, monkeypatch)
+    etag = f.backend.etag
+
+    def fail(key):
+        if (key == base_key) == (which == "alias"):
+            raise OSError("HEAD unavailable, not absence")
+        return etag(key)
+
+    monkeypatch.setattr(f.backend, "etag", fail)
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Snapshot failure",
+    }))
+    monkeypatch.setattr(f.dodo, "_com_seat", lambda *_a: pytest.fail("waited for seat after failed HEAD"))
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("built after failed HEAD"))
+    with f.at("B"), pytest.raises(OSError, match="HEAD unavailable"):
+        f.run("assembly")
+    assert not f.publications
+
+
+@pytest.mark.parametrize("which", ["root", "alias"])
+@pytest.mark.parametrize("initially_present", [False, True])
+def test_root_or_alias_refresh_upload_failure_is_fatal(
+    canonical_publication, monkeypatch, which, initially_present
+):
+    import json
+
+    f = canonical_publication
+    base_key = _enable_test_explode_alias(f, monkeypatch)
+    with f.at("A"):
+        root_key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        if initially_present:
+            f.emit("assembly", b"old-A")
+            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+            archive = f.cache._pack(f.outputs("assembly"))
+            f.backend.put(root_key, archive)
+            f.backend.put(base_key, archive)
+    initial_etags = dict(f.service.etags)
+    put = f.backend.put
+
+    def upload(key, blob, *, replace_etag=None):
+        if (key == base_key) == (which == "alias"):
+            raise OSError("upload unavailable")
+        return put(key, blob, replace_etag=replace_etag)
+
+    monkeypatch.setattr(f.backend, "put", upload)
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: f.emit("assembly", b"refresh-B"))
+    monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
+        "labels": ["assembly:leaf"], "reason": "Owner - Publish failure",
+    }))
+    outcome = "lost" if initially_present else "error"
+    with f.at("B"), pytest.raises(RuntimeError, match=f"did not store outputs \\({outcome}\\)"):
+        f.run("assembly")
+    if which == "alias":
+        assert f.service.etags[f.backend._name(root_key)] != initial_etags.get(f.backend._name(root_key))
+        assert f.service.etags.get(f.backend._name(base_key)) == initial_etags.get(f.backend._name(base_key))
+    else:
+        assert f.service.etags == initial_etags
+
+
 def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
     import json
     import _artifact_cache
@@ -4402,3 +5015,29 @@ def test_refresh_bypasses_each_cached_task_family_freshness(monkeypatch):
     for task in tasks:
         assert False in task["uptodate"]
         assert all(getattr(action[0], "_remote_cache_action", False) for action in task["actions"])
+
+
+@pytest.mark.parametrize("shortcut", ["hit", "farm"])
+def test_ordinary_assembly_shortcut_does_not_walk_explode_closure(
+    canonical_publication, monkeypatch, shortcut
+):
+    f = canonical_publication
+    with f.at("A"):
+        key = f.dodo._cache_key(f.dodo._assembly_file_deps("leaf"))
+        if shortcut == "hit":
+            f.emit("assembly", b"canonical-A")
+            f.dodo._write_input_ledger(f.dodo._input_ledger("leaf"), {})
+            f.backend.put(key, f.cache._pack(f.outputs("assembly")))
+
+    def remote(label, requested, outputs):
+        assert (label, requested) == ("assembly:leaf", key)
+        f.emit("assembly", b"remote-canonical")
+
+    monkeypatch.setattr(f.dodo._farm, "enabled", lambda: shortcut == "farm")
+    monkeypatch.setattr(f.dodo, "_farm_build", remote)
+    monkeypatch.setattr(f.dodo, "explode_plan", lambda *_a: pytest.fail("eager explode walk"))
+    monkeypatch.setattr(f.dodo, "_explode_base_key", lambda *_a: pytest.fail("eager base key"))
+    monkeypatch.setattr(f.dodo, "_exec_com", lambda *_a, **_kw: pytest.fail("shortcut built locally"))
+    with f.at("B"):
+        f.run("assembly")
+        f.identity("assembly")
