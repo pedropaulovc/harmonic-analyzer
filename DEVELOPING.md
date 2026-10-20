@@ -130,6 +130,12 @@ cache invalidation or replace the applicable native gate.
 `--collect-in-virtualenv` is safe here only because the gate supplies an explicit
 file list: it avoids repeated parent-directory virtualenv-marker probes without
 expanding that inventory. Do not apply it to normal recursive pytest discovery.
+
+Enroll new SolidWorks-free test files in `dodo.task_check`;
+`test_check_gate_enrollment.py` rejects uncollected files. Release packaging's
+fake-seat cleanup and error-preservation contracts
+(`test_package_native_cleanup.py`) run in `check:recipe` beside failure forensics.
+
 In one ordered, unchanged 291-file, serial (`-n 0`) collect-only pair, baseline
 collection took **75.1735279 s** versus **38.6164179 s** with the flag; the
 **11,513 node-ID multisets were identical**. This is collection-only evidence,
