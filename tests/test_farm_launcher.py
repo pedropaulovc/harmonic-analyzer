@@ -2623,10 +2623,100 @@ ORPHAN_WAITER = (
 )
 
 
+# FILETIME creation time of the process behind a handle; the spawning parent
+# reads the same value from its own original child handle.
+PROCESS_CREATED = (
+    "k=ctypes.WinDLL('kernel32'); "
+    "k.GetProcessTimes.argtypes=[ctypes.c_void_p]+[ctypes.POINTER(ctypes.c_ulonglong)]*4; "
+    "t=[ctypes.c_ulonglong() for _ in range(4)]; "
+    "assert k.GetProcessTimes(int(child._handle),*map(ctypes.byref,t)); "
+)
+
+
+def _process_created(handle: int) -> int:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE, *[ctypes.POINTER(ctypes.c_ulonglong)] * 4,
+    )
+    times = [ctypes.c_ulonglong() for _ in range(4)]
+    if not kernel32.GetProcessTimes(handle, *map(ctypes.byref, times)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return times[0].value
+
+
+def _open_held_process(pid: int, created: int) -> int:
+    """A handle that pins `pid` to this process (Windows never reuses a PID
+    while any handle to its process is open), proven to be the process created
+    at `created` rather than a later one that reused its PID."""
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE
+    handle = kernel32.OpenProcess(0x00100000 | 0x1000 | 0x0001, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        opened = _process_created(handle)
+    except BaseException:
+        _close_held_process(handle)
+        raise
+    if opened != created:
+        _close_held_process(handle)
+        raise AssertionError(f"PID {pid} now names a process created at {opened}, not {created}")
+    return handle
+
+
+def _held_process_exited(handle: int, timeout_s: float) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+    waited = kernel32.WaitForSingleObject(handle, int(timeout_s * 1000))
+    if waited == 0:  # WAIT_OBJECT_0
+        return True
+    if waited == 0x102:  # WAIT_TIMEOUT
+        return False
+    raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _terminate_held_process(handle: int) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    if kernel32.TerminateProcess(handle, 1):
+        return
+    # Capture before the wait below can overwrite the thread's last error.
+    error = ctypes.get_last_error()
+    if not _held_process_exited(handle, 0):
+        raise ctypes.WinError(error)
+
+
+def _close_held_process(handle: int) -> None:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.CloseHandle(handle)
+
+
 @contextmanager
 def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
     """Keep a real orphan alive until the test releases its socket, not a timer."""
-    child = None
+    held = None
     gate = None
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -2637,12 +2727,14 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
                 [
                     sys.executable,
                     "-c",
-                    "import json, os, subprocess, sys; "
+                    "import ctypes, json, os, subprocess, sys; "
                     f"child=subprocess.Popen([sys.executable, '-c', {ORPHAN_WAITER!r}, "
                     f"'{listener.getsockname()[1]}', *{extra!r}], "
                     "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
                     "stderr=subprocess.DEVNULL); "
-                    "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid}))",
+                    + PROCESS_CREATED
+                    + "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid, "
+                    "'child_created':t[0].value}))",
                 ],
                 check=True,
                 capture_output=True,
@@ -2653,8 +2745,11 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
             child = int(evidence["child_pid"])
             parent_pid = int(evidence["parent_pid"])
             gate, _ = listener.accept()
+            # Pin the PID, then prove it still names the process the parent
+            # started; a mismatch is closed unused, so nothing else is killed.
+            held = _open_held_process(child, int(evidence["child_created"]))
             assert not _process_alive(parent_pid), evidence
-            assert _process_alive(child), evidence
+            assert not _held_process_exited(held, 0), evidence
             yield parent_pid, child
         finally:
             if gate is not None:
@@ -2662,17 +2757,17 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
                 gate.close()
             # Closing the listener refuses any child that has not connected yet.
             listener.close()
-            if child is not None:
-                deadline = time.monotonic() + HANG_GUARD_S
-                while _process_alive(child) and time.monotonic() < deadline:
-                    time.sleep(0.05)
-                if _process_alive(child):
-                    subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(child)],
-                        capture_output=True,
-                        timeout=HANG_GUARD_S,
-                    )
-                    pytest.fail(f"orphan fixture {child} did not exit after socket release")
+            if held is not None:
+                try:
+                    if not _held_process_exited(held, HANG_GUARD_S):
+                        # Only the pinned process, never a PID another may now own.
+                        _terminate_held_process(held)
+                        _held_process_exited(held, HANG_GUARD_S)
+                        pytest.fail(
+                            f"orphan fixture {child} did not exit after socket release"
+                        )
+                finally:
+                    _close_held_process(held)
 
 
 def test_orphan_fixture_lifetime_is_controlled_by_release() -> None:
@@ -2680,7 +2775,6 @@ def test_orphan_fixture_lifetime_is_controlled_by_release() -> None:
         assert not _process_alive(parent)
         time.sleep(0.1)
         assert _process_alive(child)
-    assert not _process_alive(child)
 
 
 @pytest.mark.parametrize(
