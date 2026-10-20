@@ -22,6 +22,7 @@ import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from dt_pinion_pivot_block_geometry import BORE_UP
 from dt_pinion_spring_section import (
     PAD_WIDTH,
@@ -63,8 +64,8 @@ FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 CONTACT_T = 23.0
 PARKED_AIR = 0.15
 
-# Screw-down pad: #4 clearance, webs >= 2.0 at the printed .XX worst case
-# (test_dt_pinion_spring_drawing), which takes the 9.5 square.  O5 (Main,
+# Screw-down pad: #4 clearance, its end and side webs >= 2.0 at the printed .XX
+# worst case (test_dt_pinion_spring_drawing), which takes the 9.5 square.  O5 (Main,
 # 2026-09-24, option c): the screw stands 20.0 east of the pivot axis -- 12.5
 # east of the flank.  FOOT_FLAT is the straight between the pad and the bend:
 # ruling 4 sets it to zero (the bend starts at the pad's edge). With the raised
@@ -72,10 +73,21 @@ PARKED_AIR = 0.15
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
-PAD_LEN_PLACES = 2  # PadLen prints .XX (dt_pinion_spring_spec)
+PAD_LEN_PLACES = 2  # PadLen prints .XX (dt_pinion_spring_spec), from the hole axis
 HOLE_FROM_END = 4.5
 FOOT_FLAT = 0.0
 FOOT_LEN = PAD_LEN + FOOT_FLAT  # free end to the bend tangent
+# Bend relief (machinist review and Codex, PR #1675): the pad's wing beside the
+# strip stops short of the bend, and its inside corner takes an R PAD_RELIEF_R
+# MAX round, so even with the wing at its longest and the bend tangent at its
+# nearest (FootLen's low limit) neither the wing nor the round's tangent end
+# reaches the bend.  That clearance, against the hole's web to the wing's
+# corner, sets the wing.  Both are measured from the hole's axis (the screw,
+# which fixes the foot), so the hole's own location band never enters the
+# chain: at .XX the web clears rule 17's 1.5 floor without a tight band, and
+# being under the 2.0 target it is printed (PAD_HOLE_WEB_MIN, rule 20).
+PAD_RELIEF_R = 0.25
+PAD_RELIEF_PLACES = 2
 # #859 option (iv): the pad is flush with the strip's aft edge and widens
 # forward only (pinion_rig_layout).  Placed Ry(180), the part's local +z
 # runs machine -z (forward), so the pad's centre, and the hole's, stand
@@ -95,6 +107,61 @@ MODULUS_MPA = 200_000.0
 # as dt_pinion_spring_spec.FORMED_TOLERANCE_MM.  The drive train gates preload at
 # the band's low end and stress at its high end, each at the stock corner.
 FORMED_BAND_MM = 0.5
+# The pad's hole location prints .XX (sheet dimensions on the blank's edges).
+HOLE_PLACES = 2
+# The print baselines the bend, the free kink and the wing from the hole's
+# axis -- the screw, which fixes the foot -- so the .XX location of the hole
+# itself (from the free end) moves none of them.
+FOOT_FROM_HOLE = FOOT_LEN - HOLE_FROM_END  # the hole axis to the bend tangent
+_WING_CLEAR_OF_BEND = (
+    FOOT_FROM_HOLE - FORMED_BAND_MM - printed_band_mm(PAD_LEN_PLACES) - PAD_RELIEF_R
+)
+# Hole axis to the wing's straight edge (PadLen): the longest at PadLen's
+# places whose round still ends at or before the nearest bend tangent.
+PAD_WING_FROM_HOLE = math.floor(_WING_CLEAR_OF_BEND * 100.0 + 1e-9) / 100.0
+PAD_WING_LEN = HOLE_FROM_END + PAD_WING_FROM_HOLE  # the free end to that edge
+
+
+def pad_hole_webs() -> dict[str, float]:
+    """The hole's webs at the printed worst case: to the pad's sides and free
+    end, and to the wing's inside corner at the relief's limits (sharp, or the
+    MAX round) with the wing short of the hole's axis and the hole nearest the
+    strip's forward edge -- the strip narrow, the pad wide and the hole short
+    of its lower (forward) edge, all measured from the aft edge."""
+    xx = printed_band_mm(HOLE_PLACES)
+    radius = (HOLE_DIA + drilled_oversize_mm()) / 2.0
+    across = PAD_WIDTH / 2.0  # hole from the pad's lower edge
+    webs = {
+        "near side": across - xx - radius,
+        "far side": PAD_WIDTH
+        - printed_band_mm(PAD_WIDTH_PLACES)
+        - (across + xx)
+        - radius,
+        "end": HOLE_FROM_END - xx - radius,
+    }
+    hole_along = 0.0  # PadLen runs from the hole's axis
+    hole_from_aft = (PAD_WIDTH + printed_band_mm(PAD_WIDTH_PLACES)) - (across - xx)
+    hole_aft_of_strip_edge = (WIDTH - printed_band_mm(WIDTH_PLACES)) - hole_from_aft
+    for relief in (0.0, PAD_RELIEF_R):
+        corner_along = PAD_WING_FROM_HOLE - printed_band_mm(PAD_LEN_PLACES) + relief
+        corner_out = relief  # the round's centre, forward of the strip edge
+        webs[f"toward the strip, R{relief:g}"] = (
+            math.hypot(corner_along - hole_along, corner_out + hole_aft_of_strip_edge)
+            - relief
+            - radius
+        )
+    return webs
+
+
+# The web the bend's clearance leaves between the hole and the wing's corner,
+# printed on PadLen as a plain fact (rule 20), rounded down.
+PAD_HOLE_WEB_MIN = (
+    math.floor(
+        min(web for name, web in pad_hole_webs().items() if name.startswith("toward"))
+        * 100.0
+    )
+    / 100.0
+)
 # Design yield: ASTM A693-02 Table 5, Type 631 (S17700) "cold rolled at mill"
 # (Condition C), 0.0015-0.050 in: 0.2 % yield 175 ksi (1205 MPa) MINIMUM,
 # tensile 200 ksi min.  The standard guarantees the yield itself, so no
@@ -166,7 +233,9 @@ PATH_LEN = (
 # Both arcs carry the wall on their convex side: each adds theta * T^2 / 2.
 _ARC_SIDE = (math.radians(KINK_DEG) + _BEND_SWEEP) * (THICK / 2.0) * THICK
 VOLUME = (PATH_LEN * THICK + _ARC_SIDE) * WIDTH
-PAD_VOLUME = (PAD_WIDTH - WIDTH) * PAD_LEN * THICK  # the wings beside the strip
+PAD_VOLUME = (PAD_WIDTH - WIDTH) * PAD_WING_LEN * THICK  # the wing beside the strip
+# The relief round's spandrel in the wing's inside corner.
+PAD_RELIEF_VOLUME = (1.0 - math.pi / 4.0) * PAD_RELIEF_R**2 * THICK
 
 # Free (as-formed) profile: everything past the bend exit turned PRESET_DEG
 # counter-clockwise (toward the strap) about the bend centre.
@@ -183,6 +252,27 @@ FREE_KINK_START = _free(KINK_START)
 FREE_KINK_C = _free(KINK_C)
 FREE_KINK_EXIT = _free(KINK_EXIT)
 FREE_FLAT_TIP = _free(FLAT_TIP)
+# The kink prints as its included angle, blade to flat (machinist review, PR
+# #1675): 180 - KINK_DEG, the angle SOLIDWORKS measures between the two
+# segments (spring r3/r7/r8 leaves read 155 deg, and SupplementaryAngle left
+# that reading).  The two lines cross outside the crest, on its convex side,
+# R_KINK / cos(KINK_DEG / 2) out along the crest's mid-normal.  The sketch
+# places the dimension's text down the bisector of the acute wedge below
+# that crossing (KINK_ANGLE_BISECTOR, where those leaves read 155); the
+# print shows the arc in the included wedge on the convex side, west of the
+# crest -- the blade's line carried up, the flat's carried down -- about
+# KINK_INCLUDED_BISECTOR, the crest's mid-normal.  Shape-invariant, so the
+# free form's is the installed one turned PRESET_DEG about the bend centre.
+KINK_INCLUDED_DEG = 180.0 - KINK_DEG
+KINK_VERTEX = _add(
+    KINK_C, _cw(_W, KINK_DEG / 2.0), R_KINK / math.cos(math.radians(KINK_DEG / 2.0))
+)
+KINK_ANGLE_BISECTOR = _cw((-_B[0], -_B[1]), KINK_DEG / 2.0)
+KINK_INCLUDED_BISECTOR = _cw(_W, KINK_DEG / 2.0)
+FREE_KINK_VERTEX = _free(KINK_VERTEX)
+FREE_KINK_ANGLE_BISECTOR = _cw(KINK_ANGLE_BISECTOR, -PRESET_DEG)
+FREE_KINK_INCLUDED_BISECTOR = _cw(KINK_INCLUDED_BISECTOR, -PRESET_DEG)
+KINK_ANGLE_PLACES = 0
 # How far the free crest's outer face stands into the parked flank, along the
 # flank normal: the free crest circle's centre shift less the parked air. The
 # parked contact point turned PRESET_DEG is no longer the face's nearest point
@@ -219,11 +309,12 @@ def root_stress(
 
 
 # The formed profile as the print holds it (Codex #859, PRRT_kwDOPHDy386mTao2):
-# FootLen, BendR, the free kink start's FreeKinkH / FreeKinkV from the foot's
-# free end, and KinkR each carry FORMED_BAND_MM on their own.  FlatLen and
-# FreeTipH shape the flick past the crest's contact point, so they move
-# neither the contact nor the arm.  A corner is one sign per band.
-FREE_KINK_H = FOOT_END[0] - FREE_KINK_START[0]
+# FootLen and the free kink start's FreeKinkH from the hole's axis (the screw),
+# FreeKinkV from the foot's surface, BendR and KinkR each carry FORMED_BAND_MM
+# on their own.  FlatLen and the kink angle shape the flick past the crest's
+# contact point, so they move neither the contact nor the arm.  A corner is
+# one sign per band.
+FREE_KINK_H = HOLE_X - FREE_KINK_START[0]
 FREE_KINK_V = FREE_KINK_START[1] - FOOT_END[1]
 FORMED_CONTACT_BANDS = ("FootLen", "BendR", "FreeKinkH", "FreeKinkV", "KinkR")
 
@@ -234,7 +325,7 @@ def formed_contact(
     """(penetration, arm, station) of a formed FREE profile, mm.
 
     ``deviations`` moves each named FORMED_CONTACT_BANDS dimension off its
-    nominal.  The foot's free end is fixed (the pad screw); the bend starts
+    nominal.  The hole's axis is fixed (the pad screw); the bend starts
     FootLen west of it; the blade is the tangent from the free kink start to
     the bend circle; the crest's outer face is KinkR + ``thick`` round its
     centre.  Penetration is how far that face stands into the parked flank,
@@ -245,9 +336,9 @@ def formed_contact(
     dev.update(deviations or {})
     r_bend = R_BEND + dev["BendR"]
     r_kink = R_KINK + dev["KinkR"]
-    bend_c = (FOOT_END[0] - (FOOT_LEN + dev["FootLen"]), FOOT_Y + r_bend)
+    bend_c = (HOLE_X - (FOOT_FROM_HOLE + dev["FootLen"]), FOOT_Y + r_bend)
     kink_start = (
-        FOOT_END[0] - (FREE_KINK_H + dev["FreeKinkH"]),
+        HOLE_X - (FREE_KINK_H + dev["FreeKinkH"]),
         FOOT_END[1] + FREE_KINK_V + dev["FreeKinkV"],
     )
     dx, dy = bend_c[0] - kink_start[0], bend_c[1] - kink_start[1]

@@ -132,8 +132,8 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
     # Codex #859 (PRRT_kwDOPHDy386mTao2): every formed band the print holds
     # independently is a corner of its own, recomputing the arm and station.
-    # The flick's two (FlatLen, FreeTipH) lie past the contact.
-    assert set(leaf.FORMED_CONTACT_BANDS) | {"FlatLen", "FreeTipH"} == set().union(
+    # The flick's two (FlatLen, FreeKinkAngle) lie past the contact.
+    assert set(leaf.FORMED_CONTACT_BANDS) | {"FlatLen", "FreeKinkAngle"} == set().union(
         *spring_spec.FORMED_DIMENSIONS.values()
     )
     assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -14,11 +15,103 @@ import dt_pinion_spring_section as section
 import dt_pinion_spring_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import printed_band_mm, printed_deviations
+from machinist_exceptions import load_exceptions
 
-_XX_BAND = float(_config.title_block("linear_2pl")["value_in"]) * 25.4
+_XX_BAND = printed_band_mm(2)
 _HOLE_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _WEB_TARGET = 2.0  # U27: machined webs >= 2.0 at the printed worst case
+
+
+class _MarkDisplay:
+    def __init__(self, lines):
+        self.lines = lines
+
+    def GetLineCount(self):
+        return len(self.lines)
+
+    def GetLineAtIndex2(self, index):
+        return self.lines[index]
+
+
+class _CentreMark:
+    def __init__(self, data):
+        self.data = data
+
+    def GetDisplayData(self):
+        return self.data
+
+
+class _MarkedTop:
+    def __init__(self, marks):
+        self.marks = marks
+
+    def GetAnnotationsByType(self, kind):
+        assert kind == 13  # swCenterMark
+        return self.marks
+
+
+def _pad_mark(x=0.1147081, y=0.228):
+    return _CentreMark(
+        _MarkDisplay(
+            [
+                [0, 0, 0, 0, x - 0.003, y, 0, x + 0.003, y, 0],
+                [0, 0, 0, 0, x, y - 0.003, 0, x, y + 0.003, 0],
+            ]
+        )
+    )
+
+
+@pytest.fixture
+def pad_mark_projection(monkeypatch):
+    adapter = object()
+    calls = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+
+    def project(actual_adapter, view, point, *, label):
+        assert actual_adapter is adapter
+        assert point == pytest.approx(
+            tuple(value / 1000.0 for value in drawing.HOLE_CENTER)
+        )
+        assert label == "pad hole axis"
+        calls.append(view)
+        return (0.1147081, 0.228, 0.0)
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing._telemetry, "success", lambda message: None)
+    return adapter, calls
+
+
+@pytest.mark.parametrize("offset", [0.0, 0.00049])
+def test_template_pad_mark_is_proved_from_printed_lines(pad_mark_projection, offset):
+    adapter, calls = pad_mark_projection
+    top = _MarkedTop([_pad_mark(x=0.1147081 + offset)])
+    drawing._prove_pad_hole_centre_mark(adapter, top)
+    assert calls == [top]
+
+
+@pytest.mark.parametrize("marks", [None, [], [_pad_mark(), _pad_mark()]])
+def test_template_pad_mark_census_fails_closed(pad_mark_projection, marks):
+    adapter, calls = pad_mark_projection
+    with pytest.raises(RuntimeError, match="centre marks"):
+        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop(marks))
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("mark", "message"),
+    [
+        (_pad_mark(x=0.1157081), "off the hole axis"),
+        (_CentreMark(None), "no display data"),
+        (_CentreMark(_MarkDisplay([])), "draws no lines"),
+        (_CentreMark(_MarkDisplay([[0] * 9])), "invalid display lines"),
+        (_pad_mark(x=float("nan")), "invalid display lines"),
+    ],
+)
+def test_invalid_template_pad_mark_is_rejected(pad_mark_projection, mark, message):
+    adapter, _calls = pad_mark_projection
+    with pytest.raises(RuntimeError, match=message):
+        drawing._prove_pad_hole_centre_mark(adapter, _MarkedTop([mark]))
 
 
 def test_spring_contact_rises_with_pivot_while_foot_stays_on_base() -> None:
@@ -58,44 +151,135 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     )
 
 
-def test_every_formed_feature_carries_the_one_formed_band() -> None:
-    # Main's r6 ruling (c): the hand-formed profile prints one place with a
-    # +/-0.5 band; the blank's cut features ride the title-block .XX row.
+def test_preload_setting_formed_features_carry_the_formed_band() -> None:
+    # Main's r6 ruling (c): the hand-formed profile prints one place.  The
+    # dimensions that set the crest's preload carry the +/-0.5 band the drive
+    # train's corner walk books; the flick's two ride the .X row (PR #1675).
     assert dt_pinion_spring_spec.FORMED_TOLERANCE_MM == 0.5
     assert model_toleranced_dimensions(spring) == {
         ("feature_name", "name"): "FORMED_TOLERANCE_MM"
     }
-    formed = dt_pinion_spring_spec.FORMED_DIMENSIONS["SpringProfile"]
+    banded = set().union(*dt_pinion_spring_spec.FORMED_BANDED_DIMENSIONS.values())
+    assert banded == set(geometry.FORMED_CONTACT_BANDS)
+    assert not banded & {"FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE}
+    for name in banded:
+        assert "MHA-DT-014" in drawing.DIMENSION_CALLOUTS[name]
+    formed = set().union(*dt_pinion_spring_spec.FORMED_DIMENSIONS.values())
     precision = dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME
-    assert {name: precision[name] for name in formed} == dict.fromkeys(formed, 1)
-    for name in ("StripWidth", "PadWidth", "PadLen"):
+    linear = formed - {dt_pinion_spring_spec.FREE_KINK_ANGLE}
+    assert {name: precision[name] for name in linear} == dict.fromkeys(linear, 1)
+    assert precision[dt_pinion_spring_spec.FREE_KINK_ANGLE] == 0
+    for name in ("PadWidth", "PadReliefR", "PadLen"):
         assert precision[name] == 2
+    source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "_pad_relief_max_limit(adapter)" in source
 
 
-def test_profile_is_baselined_from_the_foots_free_end() -> None:
-    # drawing-guidelines.md rule 10 (dimension from a real feature): the kink start and the tip locate from the free end, the one
-    # feature the maker can put a rule on, never from the model origin.
+def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
+    # drawing-guidelines.md rule 10 (dimension from a real feature): the bend
+    # tangent, the kink start and the wing locate from the pad hole's axis --
+    # the screw that fixes the foot -- never from the model origin, so the
+    # hole's own .XX location from the free end moves none of them (Codex P1
+    # and machinist review r13, PR #1675).
     source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "KinkStartX" not in source and "FlatTipX" not in source
+    for needle in (
+        'dims.record(f"{prefix}HoleAxisX", \'"HoleFromEnd"\')',
+        'dims.record(f"{prefix}FootLen", \'"BendFromHole"\')',
+        'pad.record("PadHoleAxisX", \'"HoleFromEnd"\')',
+        'pad.record("PadLen", \'"WingFromHole"\')',
+        '"kink start from the hole axis"',
+    ):
+        assert source.count(needle) == 1, needle
+    assert geometry.FOOT_FROM_HOLE == geometry.FOOT_LEN - geometry.HOLE_FROM_END
+    assert geometry.FREE_KINK_H == pytest.approx(
+        geometry.HOLE_X - geometry.FREE_KINK_START[0]
+    )
+    # Re-baselining moves no formed edge: the nominal contact is the one the
+    # free-end baseline gave.
+    assert geometry.HOLE_X - geometry.FOOT_FROM_HOLE == pytest.approx(
+        geometry.FOOT_TAN[0]
+    )
     free = dt_pinion_spring_spec.FORMED_DIMENSIONS[dt_pinion_spring_spec.FREE_FORM_SKETCH]
-    assert free == {"FreeKinkH", "FreeKinkV", "FreeTipH"}
+    assert free == {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
     assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
     assert drawing.DETAIL_SCALE == (5, 1)
+    # Both views print the datum as a centreline on the hole's axis.
+    for ends in (drawing.FRONT_HOLE_AXIS_ENDS, drawing.TOP_HOLE_AXIS_ENDS):
+        assert {end[0] for end in ends} == {geometry.HOLE_X}
+    # The 4.50's arrows inside: its outside tail ran west past the hole
+    # axis, under the hole callout's leader (spring r15).
+    assert drawing._DIM_ARROWS_INSIDE == 0
 
 
 def test_pad_webs_clear_two_millimetres_at_the_printed_worst_case() -> None:
     radius = (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
-    width_min = geometry.PAD_WIDTH - _XX_BAND
     across = geometry.PAD_WIDTH / 2.0  # hole from the pad's lower edge
-    side_near = across - _XX_BAND - radius
-    side_far = width_min - (across + _XX_BAND) - radius
-    end_web = geometry.HOLE_FROM_END - _XX_BAND - radius
-    pad_web = (geometry.PAD_LEN - _XX_BAND) - (
-        geometry.HOLE_FROM_END + _XX_BAND
-    ) - radius
-    webs = {"near side": side_near, "far side": side_far, "end": end_web}
-    webs["toward the strip"] = pad_web
-    assert min(webs.values()) >= _WEB_TARGET, webs
+    webs = geometry.pad_hole_webs()
+    assert webs["near side"] == pytest.approx(across - _XX_BAND - radius, abs=0.01)
+    assert webs["end"] == pytest.approx(
+        geometry.HOLE_FROM_END - _XX_BAND - radius, abs=0.01
+    )
+    toward = {name: web for name, web in webs.items() if name.startswith("toward")}
+    assert min(set(webs.values()) - set(toward.values())) >= _WEB_TARGET, webs
+    # The bend's clearance leaves the web to the wing's corner under target
+    # but over rule 17's 1.5 floor at .XX: printed on PadLen (rule 20),
+    # rounded down.
+    assert geometry.PAD_HOLE_WEB_MIN == math.floor(min(toward.values()) * 100) / 100
+    assert geometry.PAD_HOLE_WEB_MIN == pytest.approx(1.54)
+    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
+    assert drawing.DIMENSION_CALLOUTS["PadLen"] == (
+        f"HOLE WEB {geometry.PAD_HOLE_WEB_MIN:.2f} MIN"
+    )
+
+
+def test_owner_exception_matches_only_the_stated_hole_web() -> None:
+    (exception,) = load_exceptions(
+        Path(geometry.__file__).parents[1] / "config", "dt_pinion_spring", "part"
+    )
+    assert (exception.id, exception.kind) == ("RV-01", "minor")
+    assert dt_pinion_spring_spec.PAD_LEN_CALLOUT in exception.where
+    assert f"{geometry.PAD_HOLE_WEB_MIN:.2f} mm minimum" in exception.finding
+    assert "PAD_HOLE_WEB_MIN" in exception.reason
+    assert 1.5 <= geometry.PAD_HOLE_WEB_MIN < _WEB_TARGET
+
+
+def test_pad_wing_and_its_round_clear_the_bend_at_the_printed_worst_case() -> None:
+    # Codex P1 (PR #1675): the wing at its longest, the round at its MAX and the
+    # bend tangent at FootLen's low limit still leave the round's end short of
+    # the bend -- both from the hole's axis, at the title-block .XX row (r13:
+    # a tight .XXX band rescuing the web is not allowed, rules 4 and 17).
+    assert geometry.PAD_LEN_PLACES == 2
+    longest = geometry.PAD_WING_FROM_HOLE + printed_band_mm(geometry.PAD_LEN_PLACES)
+    nearest_bend = geometry.FOOT_FROM_HOLE - geometry.FORMED_BAND_MM
+    assert longest + geometry.PAD_RELIEF_R <= nearest_bend + 1e-9
+    assert geometry.PAD_WING_FROM_HOLE == pytest.approx(3.74)
+    assert geometry.PAD_WING_LEN == pytest.approx(8.24)
+    # Positive control: from the free end, the hole's band would join the chain
+    # and leave the web under the floor.
+    from_end = (
+        geometry.FOOT_LEN
+        - geometry.FORMED_BAND_MM
+        - 2 * printed_band_mm(2)
+        - geometry.PAD_RELIEF_R
+        - (geometry.HOLE_FROM_END + printed_band_mm(2))
+        - (geometry.HOLE_DIA + _HOLE_OVERSIZE) / 2.0
+    )
+    assert from_end < 1.5
+
+
+def test_screw_head_still_bears_on_the_shortened_wing() -> None:
+    from vn_foot_screw_spec import HEAD_DIA
+
+    # The pad's working contact is the MHA-VN foot screw's head clamping it;
+    # past the strip's forward edge the head lands on the wing.  At the worst
+    # case (wing short, the hole nearest the strip edge) the head's rim stays
+    # well inside the wing's edge.
+    head_r = HEAD_DIA / 2.0
+    wing_short = geometry.PAD_WING_FROM_HOLE - printed_band_mm(geometry.PAD_LEN_PLACES)
+    margin = wing_short - head_r
+    assert margin == pytest.approx(0.906, abs=0.01)
+    assert margin >= 0.5
 
 
 def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
@@ -106,9 +290,10 @@ def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
     centre = (geometry.HOLE_X, geometry.FOOT_Y, geometry.PAD_Z)
     assert drawing.HOLE_CENTER == pytest.approx(centre)
     x, y, z = drawing.HOLE_EDGE_PICK
-    assert (x, y) == pytest.approx(centre[:2])
-    assert abs(z - centre[2]) == pytest.approx(geometry.HOLE_DIA / 2.0)
-    assert abs(z - geometry.PAD_Z) < geometry.PAD_WIDTH / 2.0
+    assert y == pytest.approx(centre[1])
+    assert math.hypot(x - centre[0], z - centre[2]) == pytest.approx(
+        geometry.HOLE_DIA / 2.0
+    )
     # Positive control: the pc-r11 pick is nowhere near the rim.
     stale = abs(geometry.HOLE_DIA / 2.0 - centre[2])
     assert geometry.HOLE_DIA / 2.0 - stale > 1.0
@@ -145,7 +330,7 @@ def test_free_form_presets_the_crest_into_the_flank() -> None:
 
 def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
-    # tip print from the hidden sketch, which the part blanks and the front
+    # kink angle print from the hidden sketch, which the part blanks and the front
     # view shows through the opt-in hidden-sketch curation.
     assert dt_pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
@@ -153,7 +338,8 @@ def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
     assert 'prefix="Free", construction=True' in build_source
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "hidden_sketches.curate_view_dimensions(" in draw_source
-    assert {"FreeKinkH", "FreeKinkV", "FreeTipH"} <= set(drawing.FRONT_KEEP)
+    free = {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
+    assert free <= set(drawing.FRONT_KEEP)
     assert "FREE FORM" in dt_pinion_spring_spec.DRAWING_NOTES
 
 
@@ -162,12 +348,12 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
     # view's vertical extension lines: each qualified text now sits wholly
     # between or wholly outside the lines at its row.
     for name, lines in drawing.FRONT_ROW_EXTENSION_X.items():
-        text = drawing.DIMENSION_CALLOUTS[name]
-        half = drawing.QUALIFIER_HALF_WIDTH[text]
+        half = drawing.callout_half_width(name)
         x = drawing.FRONT_KEEP[name][0]
         crossed = [line for line in lines if x - half < line < x + half]
-        assert not crossed, (name, text, crossed)
-    assert set(drawing.FRONT_ROW_EXTENSION_X) == set(drawing.DIMENSION_CALLOUTS)
+        assert not crossed, (name, crossed)
+    rows = {"FootLen", "FreeKinkH", "FreeKinkV"}
+    assert set(drawing.FRONT_ROW_EXTENSION_X) == rows
     # Positive control: pc-r12's centred kink-row text crossed both lines.
     old_x = drawing._front_x(drawing._FOOT_MID_X)
     half = drawing.QUALIFIER_HALF_WIDTH["FREE, TO KINK TANGENT"]
@@ -175,6 +361,133 @@ def test_front_qualifier_text_clears_its_rows_extension_lines() -> None:
         old_x - half < line < old_x + half
         for line in drawing.FRONT_ROW_EXTENSION_X["FreeKinkH"]
     )
+
+
+def _unit(v: tuple[float, float]) -> tuple[float, float]:
+    length = math.hypot(*v)
+    return (v[0] / length, v[1] / length)
+
+
+def test_kink_angle_drives_the_flick_as_its_included_angle() -> None:
+    # PR #1675 review r2: the tip's location from the free end less the kink
+    # start's (two .X dimensions) let the flick read flat, reversed or sharply
+    # kinked.  The kink's included angle, blade to flat, now drives both
+    # profiles and prints on the free one, on the crest's convex side.
+    build_source = Path(spring.__file__).read_text(encoding="utf-8")
+    assert "TipH" not in build_source
+    assert (
+        build_source.count('dims.record(f"{prefix}KinkAngle", \'"KinkIncludedAngle"\')')
+        == 1
+    )
+    assert (
+        'set_global(adapter, "KinkIncludedAngle", f"{KINK_INCLUDED_DEG}deg")'
+        in build_source
+    )
+    assert geometry.KINK_INCLUDED_DEG == pytest.approx(180.0 - geometry.KINK_DEG)
+    for start, bend_exit, kink_exit, tip, vertex, bisector, included in (
+        (
+            geometry.KINK_START,
+            geometry.BEND_EXIT,
+            geometry.KINK_EXIT,
+            geometry.FLAT_TIP,
+            geometry.KINK_VERTEX,
+            geometry.KINK_ANGLE_BISECTOR,
+            geometry.KINK_INCLUDED_BISECTOR,
+        ),
+        (
+            geometry.FREE_KINK_START,
+            geometry.FREE_BEND_EXIT,
+            geometry.FREE_KINK_EXIT,
+            geometry.FREE_FLAT_TIP,
+            geometry.FREE_KINK_VERTEX,
+            geometry.FREE_KINK_ANGLE_BISECTOR,
+            geometry.FREE_KINK_INCLUDED_BISECTOR,
+        ),
+    ):
+        blade_down = _unit((bend_exit[0] - start[0], bend_exit[1] - start[1]))
+        flat_down = _unit((kink_exit[0] - tip[0], kink_exit[1] - tip[1]))
+        for point, direction in ((start, blade_down), (kink_exit, flat_down)):
+            offset = (vertex[0] - point[0], vertex[1] - point[1])
+            assert offset[0] * direction[1] - offset[1] * direction[0] == pytest.approx(
+                0.0, abs=1e-9
+            )
+        dot = blade_down[0] * flat_down[0] + blade_down[1] * flat_down[1]
+        assert math.degrees(math.acos(dot)) == pytest.approx(geometry.KINK_DEG)
+        # The sketch's text point (where SOLIDWORKS read the included angle).
+        assert bisector == pytest.approx(
+            _unit((blade_down[0] + flat_down[0], blade_down[1] + flat_down[1]))
+        )
+        # The printed wedge: between the blade's line carried up and the
+        # flat's carried down, away from the crest.
+        assert included == pytest.approx(
+            _unit((flat_down[0] - blade_down[0], flat_down[1] - blade_down[1]))
+        )
+        towards_crest = (start[0] - vertex[0], start[1] - vertex[1])
+        assert included[0] * towards_crest[0] + included[1] * towards_crest[1] < 0.0
+    # The keep sits on the free included wedge's bisector, west of the crest.
+    vertex = (
+        drawing._front_x(geometry.FREE_KINK_VERTEX[0]),
+        drawing._front_y(geometry.FREE_KINK_VERTEX[1]),
+    )
+    keep = drawing.FRONT_KEEP[dt_pinion_spring_spec.FREE_KINK_ANGLE]
+    assert math.dist(keep, vertex) == pytest.approx(drawing.KINK_ANGLE_TEXT_RADIUS)
+    assert keep[0] < vertex[0] - 0.010
+    assert dt_pinion_spring_spec.FREE_KINK_ANGLE not in drawing.DIMENSION_CALLOUTS
+
+
+def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.012):
+    bisector_x, bisector_y = geometry.FREE_KINK_INCLUDED_BISECTOR
+    bisector = math.degrees(math.atan2(bisector_y, bisector_x))
+    points = []
+    for step in range(11):
+        angle = math.radians(bisector + about_deg - half_deg + step * half_deg / 5.0)
+        x, y = math.cos(angle), math.sin(angle)
+        points.append((vertex[0] + radius * x, vertex[1] + radius * y))
+    return [(vertex, points)]
+
+
+def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
+    vertex = (0.087, 0.152)
+    half = geometry.KINK_INCLUDED_DEG / 2
+    acute = geometry.KINK_DEG / 2
+    assert drawing.kink_arc_faults(_arc(vertex, 0.0, half), vertex) == []
+    # Positive controls: either acute wedge, the opposite included wedge, an
+    # arc about another centre, and no arc.
+    assert drawing.kink_arc_faults(_arc(vertex, 90.0, acute), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, -90.0, acute), vertex)
+    assert drawing.kink_arc_faults(_arc(vertex, 180.0, half), vertex)
+    shifted = (vertex[0] + 0.002, vertex[1])
+    assert drawing.kink_arc_faults(_arc(shifted, 0.0, half), vertex)
+    assert drawing.kink_arc_faults([], vertex) == ["no arc"]
+    # The r10 leaf's arcs as imported: the segments' own wedge across the
+    # crest (blade down to flat up) plus an extension arc out to the text.
+    centre = (0.08715684620887239, 0.15211975644463)
+    blade_down = (0.0890486683798352, 0.14028129645639575)
+    flat_up = (0.09044542242555458, 0.16364856351590332)
+    text_side = (0.0753884200079658, 0.1498323407033654)
+    r10 = [
+        (centre, drawing.minor_arc_points(centre, blade_down, flat_up)),
+        (centre, drawing.minor_arc_points(centre, text_side, blade_down)),
+    ]
+    assert drawing.kink_arc_faults(r10, centre)
+
+
+def test_minor_arc_points_sweep_the_short_way_either_sense() -> None:
+    # The convex wedge's 155 deg arc, given end-first or start-first, reads
+    # inside the wedge: the arc's sense flag is not consulted.
+    vertex = (0.087, 0.152)
+    half = geometry.KINK_INCLUDED_DEG / 2
+    ((_, points),) = _arc(vertex, 0.0, half)
+    for start, end in ((points[0], points[-1]), (points[-1], points[0])):
+        arc = [(vertex, drawing.minor_arc_points(vertex, start, end))]
+        assert drawing.kink_arc_faults(arc, vertex) == []
+        swept = arc[0][1]
+        assert swept[0] == pytest.approx(start)
+        assert swept[-1] == pytest.approx(end)
+    # The opposite included wedge stays opposite.
+    ((_, across),) = _arc(vertex, 180.0, half)
+    arc = [(vertex, drawing.minor_arc_points(vertex, across[0], across[-1]))]
+    assert drawing.kink_arc_faults(arc, vertex)
 
 
 class _KinkView:
@@ -390,9 +703,12 @@ def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
     # reaches down to the label.
     for name in ("KinkR", "FlatLen"):
         assert drawing.DETAIL_KEEP[name][1] > drawing.DETAIL_LABEL_XY[1]
-    # The fence letter goes west of the front view's fence.
-    assert drawing.PARENT_LETTER_OFFSET[0] < -drawing.DETAIL_RADIUS_MM * drawing._S
-    assert drawing.PARENT_LETTER_OFFSET[1] == 0.0
+    # The fence letter goes east of the front view's fence, off the phantom.
+    assert drawing.PARENT_LETTER_OFFSET[0] > drawing.DETAIL_RADIUS_MM * drawing._S
+    # ...and 2 mm west of the hole axis's extension line up to FreeKinkH's row.
+    focus = drawing._front_x(drawing.DETAIL_FOCUS[0])
+    letter_east = focus + drawing.PARENT_LETTER_OFFSET[0] + 0.0015  # half an "A"
+    assert drawing._HOLE_AXIS_X - letter_east >= 0.002
 
 
 def test_views_are_projected_and_hidden_lines_removed() -> None:
@@ -405,7 +721,7 @@ def test_views_are_projected_and_hidden_lines_removed() -> None:
     assert "process=HOLE_PROCESS" in source
     assert drawing.HOLE_PROCESS == "#30 DRILL"
     assert geometry.HOLE_DIA == pytest.approx(0.1285 * 25.4, abs=1e-3)  # No. 30 drill
-    assert source.count("add_edge_dimension(") == 1  # the two hole locations
+    assert source.count("add_edge_dimension(") == 1  # the blank's driven dimensions
 
 
 def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
@@ -427,7 +743,7 @@ def test_bend_coupon_qualifies_the_tightest_accepted_radius() -> None:
 def test_notes_carry_no_dimension_and_stay_short() -> None:
     notes = dt_pinion_spring_spec.DRAWING_NOTES
     assert len(notes.splitlines()) <= 4
-    assert "TEMPLATE" in notes and "FORM" in notes
+    assert "FORM" in notes
     assert "COIL" not in notes
     # The blank's orientation is the coupon's (Codex #859, PRRT_kwDOPHDy386mTtoA).
     assert "ALONG ROLL LENGTH (BENDS ACROSS ROLLING DIRECTION)" in notes
@@ -468,7 +784,6 @@ def test_registry_names_the_stock_the_section_models() -> None:
     assert printed_deviations(section.WIDTH, section.WIDTH_PLACES) == pytest.approx(
         (-_XX_BAND, _XX_BAND), abs=0.005
     )
-    assert dt_pinion_spring_spec.DRAWING_PRECISION_BY_NAME["StripWidth"] == 2
     assert spring.MATERIAL == "AISI 304"  # the library's stainless stand-in
 
 
