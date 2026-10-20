@@ -5,8 +5,8 @@ motion and the magnifying wheel multiplies it again (via the wire to the pen),
 in machine coordinates (assembly origin = base origin; the output side is -Z).
 
 * magnifying-bracket -- the fitting that AFFIXES the lever rod to the pivoted
-  summing bar, so it RIDES the lever (locked, like the clamp chain), its collar
-  carrying the rod with a press fit alone (#1570) at every rock angle. The
+  summing bar, so it RIDES the lever (locked, like the clamp chain), its
+  1/4-20 thread carrying the rod at every rock angle without an added lock.
   lever EXTENDS FROM the pivoted summing bar and pivots WITH it about the
   knife-edge ridge line (engineerguy video 2/4 + 4/4; tip arc ~6 mm), so its
   one DOF is the rock about that Z line; the clamp + thumb screw + vertical rod
@@ -203,13 +203,13 @@ LEVER_X0 = 200.0  # lever part origin (rod west dome tip; rod spans +35..+200,
 
 # Knife-edge pivot (engineerguy video 2/4 + 4/4): the lever rod EXTENDS FROM
 # the pivoted summing bar and pivots WITH it about the knife-edge ridge line
-# (along Z) -- it does NOT spin in the press-fitted, bonded bracket collar.
+# (along Z) -- it does NOT spin about its 1/4-20 bracket thread axis.
 # The ridge is the summing sub's knife line; assert the lever part's local
 # KnifeAxis lands exactly on it, so a knife move fails loud here.
-from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA  # noqa: E402
+from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA  # noqa: E402
 from mg_magnifying_lever_geom import (  # noqa: E402
     CLAMP_LOCAL_X,
-    COLLAR_LOCAL_X,
+    BRACKET_LOCAL_X,
     KNIFE_LOCAL_X,
     KNIFE_LOCAL_Y,
 )
@@ -237,11 +237,11 @@ assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
     f"thumb-screw head clears the top-frame rail by only "
     f"{THUMB_SCREW_RAIL_CLEARANCE:.4f} mm"
 )
-# Sliding clamp default position (p.46/48 insets) and the bracket collar, both
+# Sliding clamp default position (p.46/48 insets) and the threaded bracket, both
 # derived from the lever-local stations error_budget.py reads for the
 # magnification range (Ry(180): machine x = LEVER_X0 - local x).
 CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
-BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X  # 40
+BRACKET_X = LEVER_X0 - BRACKET_LOCAL_X  # 40
 assert math.isclose(SEAT_PLANE_Z, SUMMING_Z - PLATE_L / 2.0, abs_tol=1e-9), (
     "magnifying-bracket seat drifted from the summing-lever front face"
 )
@@ -251,9 +251,6 @@ assert all(
         BRACKET_ORIGIN, (BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z), strict=True
     )
 ), "magnifying-bracket joint origin drifted from its live placement"
-# The bracket part imports COLLAR_HALF_LEN from mg_magnifying_lever_geom (which
-# reads output.magnifier_collar_half_len_mm), so the collar length has ONE read
-# point and there is no copy left here to assert equal.
 # The clamp (#1559) is a vertical length of 7/16 hex: placed UNROTATED (hex
 # axis = machine +Y, lever bore along X through the corners), its bottom-face
 # origin LEVER_BORE_Y under the lever axis. The vertical rod screws into the
@@ -268,7 +265,7 @@ CLAMP_POS = (CLAMP_X, LEVER_ROD_Y - CLAMP_BORE_Y, LEVER_ROD_Z)
 VROD_Z = LEVER_ROD_Z  # coaxial with the clamp and its thumb screw
 # Thread tip: the shoulder seats on the clamp's bottom face. A literal for the
 # same AST reader as LEVER_ROD_Z, asserted against its derivation.
-VROD_TOP_Y = 967.55
+VROD_TOP_Y = 967.25
 assert math.isclose(
     VROD_TOP_Y, LEVER_ROD_Y - CLAMP_BORE_Y + VROD_SHOULDER_X, abs_tol=1e-9
 ), "vertical-rod thread tip drifted from the clamp's bottom face + SHOULDER_X"
@@ -633,6 +630,30 @@ async def _author_lever_setting_reference(adapter) -> None:
     if int(feature.Visible) != 1:  # swVisibilityStateHide
         raise RuntimeError(f"{spec.LEVER_FEATURE} still visible after BlankSketch")
 
+    # Independent nonzero witness from the far neck face to the flat tip.
+    # Installation is by depth, never an invented shoulder.
+    dims = SketchDims()
+    check("create threaded lever setting", await adapter.create_sketch("Front"))
+    leg = check("thread projection witness", await adapter.add_line(spec.THREADED_TIP_X, spec.LEVER_AXIS_Y, spec.THREAD_FAR_FACE_X, spec.LEVER_AXIS_Y))
+    segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    await anchor_point_to_origin(adapter, f"{leg}.start", spec.THREADED_TIP_X, spec.LEVER_AXIS_Y, "flat threaded tip")
+    dims.record("ThreadedTipX")
+    dims.record("ThreadAxisY")
+    check("thread projection along lever", await adapter.add_sketch_constraint(leg, None, "horizontal"))
+    await dimension_between(adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", spec.THREAD_PROJECTION, spec.THREAD_PROJECTION_DIMENSION)
+    dims.record(spec.THREAD_PROJECTION_DIMENSION)
+    await ensure_fully_defined(adapter, "threaded lever setting")
+    check("exit threaded lever setting", await adapter.exit_sketch())
+    name_last_feature(adapter, spec.THREAD_FEATURE)
+    dims.apply(adapter, spec.THREAD_FEATURE)
+    apply_drawing_precision(adapter, spec.THREAD_DRAWING_PRECISION)
+    mark_dimensions_for_drawing(adapter, spec.THREAD_FEATURE, spec.THREAD_DRAWING_DIMENSIONS[spec.THREAD_FEATURE])
+    blank_sketch(adapter, spec.THREAD_FEATURE)
+    feature = _early_bound(_early_bound(adapter.currentModel, "IAssemblyDoc").FeatureByName(spec.THREAD_FEATURE), "IFeature")
+    if int(feature.Visible) != 1:
+        raise RuntimeError(f"{spec.THREAD_FEATURE} still visible after BlankSketch")
+
 
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
@@ -730,8 +751,8 @@ async def build(adapter) -> dict[str, str]:
     # operational DOF: its drive spec is recorded into the DOF manifest, never
     # authored -- the lever and everything clamped to it swings about the
     # knife line, and the WIRE-1 yoke below turns the wheel with it. Same
-    # mechanism as drive-train's crank spin. The bracket collar stays a loose
-    # visual guide.
+    # mechanism as drive-train's crank spin. The threaded bracket follows
+    # the same knife rock; it is not a loose guide or a second pivot.
     await distance_driver(
         adapter,
         named_ref(f"Axis2@{ml}", "AXIS"),
@@ -766,8 +787,8 @@ async def build(adapter) -> dict[str, str]:
         free_dof_key="lever_rock",
     )
     # The bracket affixes the lever to the rocking summing bar, not the frame.
-    # Its collar is press-fitted and bonded to MHA-MG-03 (mg_lever_press_fit_geom),
-    # so it is locked to the lever and stays concentric through the rock.
+    # Its 1/4-20 thread is installed to the dimensioned depth, not a shoulder;
+    # it is locked kinematically to the lever through the common rocking pose.
     # Grounding this moving fitting would constrain the mechanism incorrectly.
     bracket = await place_component(
         adapter,
@@ -832,9 +853,9 @@ async def build(adapter) -> dict[str, str]:
     # target below is that face after placing the tip at THUMB_SCREW_TIP_Y.
     # THUMB_SCREW_RAIL_CLEARANCE proves the head clears the full-depth front
     # rail while the clamp's #4-40 tap band (block top +9.0 down to the bore
-    # top +3.1: 5.9 of thread) stays fully engaged. It enters the top face on
-    # the hex axis, coaxial with the vertical rod below. Rz(-90) points the
-    # shank down the hex axis; the extra Ry(180) turns its head features to
+    # top +3.175: 5.825 nominal) stays fully engaged at its printed/wander limits.
+    # It enters the top face on the hex axis, coaxial with the vertical rod below.
+    # Rz(-90) points the shank down the hex axis; the extra Ry(180) turns its head features to
     # the machine hand ([180, 0, -90] is the same rotation's Euler form).
     _rz90_ry180 = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
     tscrew = await place_component(

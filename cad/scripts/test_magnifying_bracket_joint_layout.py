@@ -48,14 +48,14 @@ def test_part_recipe_seat_literals_match_the_live_installation() -> None:
 
 
 def test_side_plate_is_flush_and_taller_without_moving_the_arm() -> None:
-    assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-43.0, 5.0)
+    assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-43.0, bracket.NECK_HALF_X)
     assert bracket.FLANGE_Y == joint.SIDE_PLATE_Y == (-6.35, 6.35)
     assert bracket.FLANGE_Z == joint.SIDE_PLATE_Z
     back = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[1]
     front = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[0]
     assert back == pytest.approx(joint.SEAT_PLANE_Z)
     assert back - front == pytest.approx(joint.SIDE_PLATE_THICKNESS)
-    assert joint.SIDE_PLATE_MACHINE_X == (-3.0, 45.0)
+    assert joint.SIDE_PLATE_MACHINE_X == tuple(joint.BRACKET_ORIGIN[0] + x for x in bracket.FLANGE_X)
     mount_back = (
         installation.SUMMING_Z - summing.HEX_Z_MID + knife_mount.SUPPORT_Z_THICK / 2.0
     )
@@ -94,7 +94,7 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     assert joint.HEAD_POSITION_MISMATCH_MAX == pytest.approx(0.10)
     assert joint.HEAD_FLOAT_MIN >= joint.HEAD_POSITION_MISMATCH_MAX
     assert joint.GRIP_MIN == pytest.approx(3.045)
-    assert joint.COUNTERBORE_END_WALL_MIN == pytest.approx(2.000)
+    assert joint.COUNTERBORE_END_WALL_MIN >= 2.0
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.840)
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.

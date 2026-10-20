@@ -982,98 +982,60 @@ in their authored views, non-dangling, with unchanged native definitions.
 The shared finalizer's exact-count contract is unchanged for other recipes.
 
 **q. A standard view placed as-is is not necessarily in projection.**
-Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
-`*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
-(source `8d6d2088a`, launcher `20261012T124257186Z`): `*Top` was the principal
-view with model +Z running DOWN it, but `*Right` arrived with +Y up and +Z to
-the sheet's LEFT, so the collar's circle stood beside an arm running left and
-the blind machinist read a different part (mreview09 blocker 1); the `*Back`
-view under it, mirrored about the flange, carried the counterbore callout and
-the hole coordinates and read as a duplicate "not a projection of anything
-above it". The same sheet located the bore axis twice from two origins — the
-arm's 54.30 from its buried start in the top view and the actual seat's
-55.19 from the axis in the side view (blocker 3).
-Do: turn the view by a MEASURED angle, not an assumed one: project a model
-axis before and after `IView::Angle` (`model_point_in_view` on the origin and
-a point along +Z, the cradle's `_turn`), require +Z down and +Y left within
-1e-6 rad, then pin the view's ORIGIN (not its centre) to the principal view's
-measured origin height through `IView::Position` / `SetViewPosition`, read
-back within 1e-4 m (the latch hook's `_pin_origin`), all BEFORE any import so
-every placed text is in the final frame
-(`draw_mg_magnifying_bracket._project_side_view`). Dimension the mounting
-face on the ALIGNED view that shows it (`*Front` under `*Top`): the
-counterbores open on the face that view cannot see, so the hole callout
-attaches to the THROUGH rims on the visible face (`ViewEdge.circle_at` at
-`SIDE_PLATE_Z[1]`, radius `CLEARANCE_DIA / 2`) and names the entry side in its
-process prefix (`DRILL / COUNTERBORE FROM` / `FACE OPPOSITE MOUNTING FACE`);
-whether `AddHoleCallout2` on
-the through rim resolves the Hole Wizard feature is native evidence, not an
-assumption. Give one axis ONE controlling chain from the actual flange seat,
-not an inner step merely labelled "mounting face". Other face-to-axis values
-are REF, with sufficient precision that their printed step sums consistently,
-and the dimension from the buried start is unmarked. The collar's OD, with no
-band of its own, inherits the title block's `.XX` ±0.51. The named OD print
-corners in `mg_lever_press_fit_geom` are conservative independently: strength
-uses Ø11.49 (330.8 MPa von Mises, below the 333 MPa limit), while maximum
-pressure and press force use Ø12.51. The press force is the friction term over the
-whole conservative contact envelope, not the nominal 7 mm straight cylinder, plus
-the normal reaction on the partial dome. The longest straight cylinder is
-10.00 − 2.997 = 7.003 mm; the part of the R3 hemisphere still outside the smallest
-(5.986) bore adds sqrt(3.000² − 2.993²) = 0.204819 mm, so the explicit maximum is
-7.207819 mm. Friction (μ 0.10–0.15, p 143.66 MPa, d 6.000, L 7.207819 mm) gives
-1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds
-18.933819 N, so the total press force is 1970.804504–2946.739847 N
-(1.970805–2.946740 kN). The two corners are chosen independently on purpose
-(the smallest dome sets the longest cylinder, the largest dome the deepest
-penetration), so this is an envelope, not one physical part; its coupled tight
-corner is 7.204819 mm. The shared note rounds the high total upward to
-**3.0 kN MAX**. The 2.9 kN prints from native 16 are source-specific evidence for
-the old 7.003 mm, friction-only note; they do not prove this 3.0 kN note.
-`test_mg_fixture_installation` checks both corners and the
-ceiling independently. A safe low-OD stress corner does not justify using
-the nominal OD to cap force, nor an unnecessary second OD band.
-For the bracket the actual seat is local Z55.1875877804, not the arm's
-Z58.3 end: the flange's 3.175 stock thickness is a different distance.
-The controlling chain is 55.19 seat-to-axis plus 3.11 arm-past-seat;
-58.30 is the sum, printed as a genuine drawing-native linear REF picked
-on the collar rim's arc centre and the arm end. Identify the mounting plane
-from the installed joint, rather than guessing it from a step's outline.
-The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
-Label that short extension `ARM PAST MOUNTING FACE`, not merely 3.11.
-Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
-and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
-1.85, not a contradictory 12.70 chain. The existing 3.35 edge-to-arm and
-3.00 arm-to-bore controls locate the bore axis 6.35 from the flange edge;
-do not duplicate that sum with an optional reference dimension. The required
-short overhang remains labelled `ARM PAST MOUNTING FACE`. A SIDE-view rim
-combined with a BOTTOM edge made an angle, and a subsequent mapped sketch
-centre could not prove its source identity: neither justifies relaxed
-dimension-type or identity guards. The optional REF and its exclusive
-selection code are removed; the complete mounting-coordinate ink guard stays.
+Do not assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
+`*Back` view merely to carry hole dimensions. Turn by a **measured** angle:
+project the model origin and a point along +Z before and after `IView::Angle`,
+require +Z down and +Y left, then pin the view's origin (not its bounding-box
+centre) to the principal view's measured origin height with `SetViewPosition`.
+Read the result back before importing dimensions
+(`draw_mg_magnifying_bracket._project_side_view`).
 
-The arm's controlling 3.00 locates its Y=-3 face, not the opposite Y=+4.5
-face: label it `NEAR ARM FACE TO BORE AXIS`. Put `VIEW ON MOUNTING FACE`
-below the lower view it describes, rather than in the gap above it where
-it reads as the upper view's title. Read the rebuilt caption, controls and
-manufacturing-note extents to prove the lower placement remains clear.
-The added drill/counterbore process had two standalone rows; it was not
-an inherited five-row Hole Wizard limitation. Combine those into one
-truthful `C'BORE OPP. MOUNTING FACE` row, retaining the native
-hole association, size and tolerance stack.
+The current MHA-MG-01 is the 2026-10-20 approved simple L bracket: its true
+semicircular nose and parallel sides replace the old collar and tapered arm.
+Use current-main axis-to-seat **100.3975878**, not the superseded 55.1876
+sketch; preserve the 3.175 stock mounting grip at its native `.XXX` ±0.13.
+The foot's right face merges flush with the centred 12.50 ±0.10 neck.
+Native mounting dimensions stay attached to their witness sketch, imported
+on the visible mounting face; the Hole Wizard callout attaches to its real rim.
 
-Put the junction's 7.50 width and 3.35 edge location on the bottom view,
-where its footprint is visible, without a second controlling copy in the
-side view. Short inside-arrow spans can overlap their arrowheads even after
-the witness crossings disappear. Instead distribute the controls between
-views and stack outside-arrow dimensions by their rebuilt ink: here the
-3.35 hangs below at x150, the 12.70 above at x166, and the 7.50 is outermost
-at x175. A full diametric chord always passes the bore-axis witness at the
-centre; use the genuine near-side single-arrow style
-(`set_near_side_diameter`) and prove the rebuilt leaders clear of each
-station witness separately. The view-direction caption belongs above the
-bottom outline where neither mounting witnesses nor the hole leader crosses
-it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
-view's printed dimension ink.
+The through tap's ordinary locations are 5.50 ±0.05 from the physical nose tip
+and neck side. These are not zero datum dimensions and not a GD&T frame.
+Combine the R5.50 ±0.05 radius with each locating band: the relative radial
+axis error is `hypot(0.10, 0.10)`, not the conditional sketch's 0.05. A
+separate native **Ø6.45 MAX internal thread-root envelope** bounds the
+thread mouth; a nominal 2B tap and its tap drill do not establish that maximum.
+Include start wander 0.10 plus 0.3° run-off over the maximum 12.6 hole depth,
+an additional 0.165974. With both native 0.20 ±0.05 ×45° mouth breaks, each
+leg bounded, the actual wall bound is **1.667605**: above the 1.5 floor, below
+the 2.0 target. Round a printed MIN
+down, never to a value above the computed bound. No FCF or tighter radius
+band was authorized to recover the superseded sketch's 1.925 figure.
+
+MHA-MG-03 now has one free hemisphere and a flat threaded end. Import the
+small thread/lead dimensions before circularly cropping its enlarged
+independent Front model view, then prove every kept native dimension survives
+the crop (the MHA-MG-04 pattern). The assembly's native ThreadProjection
+specifies installation depth: the flat tip reaches through the far face,
+with no shoulder or added relief groove. Full engaged overlap excludes
+mouth chamfers, incomplete male thread at both ends, and root runout.
+There is no press-fit force/finish/elastic-yield contract or added lock.
+
+The retention and wall checks are not a brass strength certification. Wire
+force below the lever produces bending even though there is no torque about
+its thread axis. The conservative 10.7 N wire / 1.08 N hanging-weight audit
+puts nominal stress near the basic 1/4-20 root at approximately 120 MPa,
+before any thread-notch factor. The specified generic brass has no guaranteed
+alloy/temper yield minimum; do not claim a yield margin from its CAD material
+or transfer the steel bracket's allowable stress to it. For context, even
+[Wieland C36000 under 1/2 in](https://wieland-chase.com/36000-standard-alloys/)
+has a 25 ksi minimum yield, not the frequently quoted 45 ksi typical value.
+No alloy or temper substitution is authorized by this geometry change.
+
+Keep a mounting-face caption beside the view it describes, clear of its
+native hole leader and coordinate witnesses. Distribute short controls
+between views rather than forcing overlapping inside arrowheads. For each
+new source state, the final native layout audit and rendered sheet—not old
+sheet coordinates or source-only tests—decide whether that placement ships.
 
 The MG-06 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.

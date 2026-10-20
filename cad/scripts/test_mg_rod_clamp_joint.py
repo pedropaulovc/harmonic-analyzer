@@ -75,21 +75,21 @@ def test_tap_depths_follow_the_blind_seat_law_at_the_xx_band() -> None:
 def test_rod_tap_floor_leaves_two_millimetres_under_the_lever_bore() -> None:
     drill_r_max = (TAP_DRILL_MM["#4-40"] + 0.10) / 2.0
     point = drill_r_max / math.tan(math.radians(59.0))
-    bore_r_max = (6.2 + 0.10) / 2.0
-    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point
+    bore_r_max = (clamp.LEVER_BORE_DIA + 0.10) / 2.0
+    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point - clamp.BORE_WANDER
     assert clamp.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(floor)
     assert floor >= 2.0
-    assert clamp.LEVER_BORE_Y == 19.65
-    assert clamp.BLOCK_HEIGHT == 28.65
+    assert floor - 0.05 < 2.0  # the chosen practical height step is minimal
+    assert clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y == pytest.approx(clamp.TOP_TO_BORE)
 
 
 def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
     top_to_bore_min = clamp.TOP_TO_BORE - 2.0 * 0.51
-    thread = top_to_bore_min - (6.2 + 0.10) / 2.0 - 0.25
+    thread = top_to_bore_min - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - 0.25 - clamp.BORE_WANDER
     assert clamp.THUMB_ENGAGEMENT_WORST == pytest.approx(thread)
     assert thread >= 1.5 * _D
     assert clamp.THUMB_TAP_SPEC.size == joint.ROD_TAP_SPEC.size
-    assert clamp.THUMB_TAP_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(5.9)
+    assert clamp.THUMB_TAP_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(clamp.TOP_TO_BORE - clamp.LEVER_BORE_DIA / 2.0)
 
 
 def test_hex_stock_and_extent_along_the_lever() -> None:
@@ -99,8 +99,8 @@ def test_hex_stock_and_extent_along_the_lever() -> None:
     # thinnest stock at the largest drilled Ø, off centre by the drill's
     # wander to mid-block, holds the 2.0 target.
     wander = 0.10 + clamp.HEX_AC / 2.0 * math.tan(math.radians(0.3))
-    far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) / 2.0 - (6.2 + 0.10) / 2.0 - wander
-    assert far_wall == pytest.approx(2.2077, abs=1e-4)
+    far_wall = (clamp.HEX_AF - clamp.HEX_AF_BAND) / 2.0 - (clamp.LEVER_BORE_DIA + 0.10) / 2.0 - wander
+    assert far_wall == pytest.approx(2.0577, abs=1e-4)
     assert far_wall >= 2.0
 
 

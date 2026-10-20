@@ -75,33 +75,31 @@ reserved:
     reading_uncertainty_mm: 0.075  # half a 0.15 mm technical-pen line, read against the grid
     # The magnifier is NOT an assumption: error_budget.py fits every reference
     # input to the pen from the CAD's own output chain (spring coupling, the
-    # clamp's reachable station band on the magnifying lever -- collar face to
-    # rod tip, output.yaml magnifier_* -- and the wheel's rim/hub wire ratio).
+    # clamp's permitted station band on the magnifying lever -- complete bore
+    # before thread runout to rod tip, output.yaml magnifier_* -- and wire ratio).
     # The clamp stations are where the BLOCK sits (reach and setup); what the
     # pen sees is the WIRE MOMENT ARM -- the knife axis's perpendicular
     # distance to wire 1's rest run (error_budget.wire_moment_arm): the output
     # fixture's groove hook sits its signed HOOK_OFFSET_X (~10.0 mm toward the
     # knife) from the clamp station and below the knife, and the wire leans
-    # toward the wheel, so the arm is ~56.11 mm with the clamp against the
-    # collar (66.4 mm from the knife) and ~166.87 mm at the as-built 165 mm
-    # station (~208.42 at the 208.6 mm rod tip) -- not proportional to the
-    # station. The k=0 (greatest) term is made to span the stroke,
-    # Michelson's normalisation, book p. 99: where the arm that does it is
-    # below the collar station's the operator scales the ordinates down
+    # toward the wheel. The current report computes each station's actual arm,
+    # not a proportional scale of its radius. The k=0 (greatest) term is made
+    # to span the stroke, Michelson's normalisation, book p. 99: when the
+    # required arm is below the permitted minimum the operator scales down
     # instead (the machine's ORDINATE CAPACITY, computed in the report), and
     # where it is above the as-built station's the reading falls short and
     # the term grows by the shortfall.
     # Only the as-built pose is CAD-gated (build_mg_magnifier_assembly): no
     # clearance or articulation gate exercises the clamp, vertical rod and
     # wire anywhere else, yet every broad input is scored with the clamp at or
-    # just above the MINIMUM pose -- clamp face against the bracket collar
-    # face, 66 mm from the knife -- which bounds them. That is an OPEN DESIGN
+    # just above the MINIMUM pose -- the entire bore before thread runout,
+    # not a shoulder or positive stop -- which bounds them. That is an OPEN DESIGN
     # ITEM (#748), not a budget assumption: check:budget fails on it unless
     # waived here, and the waiver is the record that the closure is
     # conditional on that pose being buildable. The report prints an offline
     # straight-wire estimate beside the waiver (including the signed hook
     # offset and the current rim, spoke and boss surface gaps). Those
-    # computed estimates are not a proof of the clamp, rod or collar.
+    # computed estimates are not a proof of the clamp, rod or threaded bracket.
     # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this waiver.
     waive_minimum_pose: true
     allowance_pct: 0.30            # scored as the MAE the benchmark uses: every coefficient

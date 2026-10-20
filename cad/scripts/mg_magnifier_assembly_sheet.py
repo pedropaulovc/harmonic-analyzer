@@ -22,6 +22,7 @@ from mg_magnifier_assembly_spec import (
     FEATURE,
     FIXTURE_DROP_DIMENSION,
     PRESS_GAUGE_DIMENSION,
+    THREAD_PROJECTION_DIMENSION,
 )
 from mg_vn_lever_wire_geom import WIRE_DIA as _WIRE_DIA
 
@@ -55,6 +56,7 @@ DIMENSION_CALLOUTS = {
 LEVER_CALLOUTS = {
     CLAMP_STATION_DIMENSION: "CLAMP STATION: SETS MAGNIFICATION",
     FIXTURE_DROP_DIMENSION: "FIXTURE DROP:\nSETS TRACE HEIGHT",
+    THREAD_PROJECTION_DIMENSION: "FLAT LEVER TIP PROUD OF FAR BRACKET FACE",
 }
 
 # --- Fitter package -----------------------------------------------------------
@@ -149,9 +151,7 @@ EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
 
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
-# Ends and sides are named by features the fitter can see (the lever's PRESS
-# ZONE on MHA-MG-03, the bracket), not compass words no view defines
-# (machinist review r1).
+# Ends and sides name physical features rather than ambiguous compass words.
 STEP_TEXT = {
     _steps.AXLE_PRESSED_KEY: (
         "PRESS THE MHA-MG-07 WHEEL AXLE INTO THE MHA-MG-08 WHEEL BAR FROM ITS "
@@ -180,16 +180,18 @@ STEP_TEXT = {
         "HOLD THE FIRST NUT; JAM THE SECOND MHA-MG-VN-52 NUT AGAINST IT. RECHECK "
         "THE ENDSHAKE."
     ),
-    "collar-pressed": (
-        "HOLDING THE MHA-MG-03 LEVER NEAR ITS PRESS-ZONE END, PRESS THE "
-        "MHA-MG-01 BRACKET'S COLLAR ONTO THAT END, LEVER END FLUSH WITH THE "
-        "COLLAR'S OUTER FACE. THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
+    _steps.LEVER_THREADED_KEY: (
+        "SCREW THE MHA-MG-03 LEVER INTO THE MHA-MG-01 BRACKET TO THE THREAD "
+        "PROJECTION (SHEET 1). THE FLAT THREADED TIP MUST REACH THROUGH THE "
+        "FAR FACE; THE PLAIN ROD HAS NO SHOULDER. NO LOCKNUT, SET "
+        "SCREW OR ADHESIVE. THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
         "MHA-HA-00 DRIVES THEM INTO THE SUMMING LEVER."
     ),
     _steps.CLAMP_SET_KEY: (
-        "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS FREE END, THE END "
-        "NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); TIGHTEN ITS "
-        "MHA-MG-VN-50 THUMB SCREW BY HAND."
+        "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS DOMED FREE END, "
+        "THE END NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); KEEP ITS "
+        "ENTIRE BORE ON THE PLAIN BODY, CLEAR OF THE RUNOUT AND THREAD; "
+        "TIGHTEN ITS MHA-MG-VN-50 THUMB SCREW BY HAND."
     ),
     # #1559: the rod is retained by its own thread, seated on its shoulder.
     _steps.FIXTURE_SET_KEY: (

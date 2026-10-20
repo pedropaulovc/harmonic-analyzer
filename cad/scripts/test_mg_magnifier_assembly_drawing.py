@@ -548,14 +548,18 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
     tip = (stack.LEVER_TIP_X, stack.LEVER_AXIS_Y)
     clamp = (stack.CLAMP_CENTRE_X, stack.LEVER_AXIS_Y)
     fixture = (stack.CLAMP_CENTRE_X, stack.FIXTURE_AXIS_Y)
-    assert lines == [(*tip, *clamp), (*clamp, *fixture)]
+    threaded_tip = (stack.THREADED_TIP_X, stack.LEVER_AXIS_Y)
+    far_face = (stack.THREAD_FAR_FACE_X, stack.LEVER_AXIS_Y)
+    assert lines == [(*tip, *clamp), (*clamp, *fixture), (*threaded_tip, *far_face)]
     assert ("leg0", None, "horizontal") in relations
     assert ("leg1", None, "vertical") in relations
     assert ("leg0.end", "leg1.start", "coincident") in relations
-    assert anchors == [("leg0.start", *tip)]
+    assert ("leg2", None, "horizontal") in relations
+    assert anchors == [("leg0.start", *tip), ("leg2.start", *threaded_tip)]
     assert lengths == {
         stack.CLAMP_STATION_DIMENSION: ("horizontal_distance", stack.CLAMP_STATION),
         stack.FIXTURE_DROP_DIMENSION: ("vertical_distance", stack.FIXTURE_DROP),
+        stack.THREAD_PROJECTION_DIMENSION: ("horizontal_distance", stack.THREAD_PROJECTION),
     }
     feature = stack.LEVER_FEATURE
     assert equations == {
@@ -571,7 +575,7 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
         "LeverFixtureDrop": f"{stack.FIXTURE_DROP}mm",
     }
     assert all(entity.ConstructionGeometry for entity in Adapter._sketch_entities.values())
-    assert blanked == [feature]
+    assert blanked == [feature, stack.THREAD_FEATURE]
 
 
 def test_the_explode_moves_every_shown_family_but_the_wire_in_one_group() -> None:

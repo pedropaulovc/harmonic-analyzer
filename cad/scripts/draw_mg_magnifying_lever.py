@@ -1,354 +1,164 @@
-r"""Create the curated machinist drawing for the magnifying lever rod.
+r"""Native quarter-inch lever sheet with an enlarged flat-thread-end detail.
 
-The rod is a revolved Ø6 x 165 brass capsule with hemispherical ends -- a
-smooth, tangent-continuous body with NO flat face and no end-face circle, so
-the print rests on the auto-imported profile marks (the overall length tip to
-tip and the dome radius, a radial reference "(R3.0)": each end is a tangent
-full hemisphere on the selected bar) plus two blanked reference sketches the
-FRONT view shows and dimensions: ``RodStock`` (the Ø6 as plain bar stock at
-mid-length, at the title block's .X) and ``PressZone`` (the cylinder the
-bracket collar grips -- its start back from the east tip a single MIN limit
-covering the MHA-MG-01 collar, its length to the dome tangent as a
-reference, and its banded diameter, tied to the MHA-MG-01 bore it enters).
-The zone's start is a solid line across the bar, so the zone reads between it
-and the dome's tangent edge; every other reference entity lies on the
-silhouette.  The Ø6 body's general finish, the part-owned Ra 3.2 seat of the
-MHA-MG-02 clamp's screw, and the press land's stricter Ra 0.8 are native
-symbols, each with its reason standing at it.
-The sheet carries no note block: pressing the collar on is the MHA-MG-00
-assembly's step.  The rod axis is local +X, so the FRONT view is the long
-side elevation; an end view of a plain round would show nothing the Ø does
-not, so there is none.
-
-Run with SolidWorks open::
-
-    uv run python cad\scripts\draw_mg_magnifying_lever.py mg-magnifying-lever
+The independent model detail imports its dimensions before its circular crop,
+as on MHA-MG-04. Native diameters/lengths/limits remain associative; the part's
+cosmetic thread and the sheet share one UNC-2A callout. Only the free end domes.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
-    dimension_name,
-    place_view,
-)
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
-from _drawing_common import (
-    DrawingOutputs,
-    finalize_drawing,
-    new_project_drawing,
-    read_required_properties,
-    stamp_drawing_summary,
-    view_name,
-)
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary, view_name
+from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_reference_dimension
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-import _telemetry
 from _surface_finish import surface_finish_by_key
-from mg_lever_press_fit_geom import ROD_DIA
-from mg_magnifying_lever_spec import (
-    DRAWING_DIMENSIONS,
-    PRESS_LAND_CALLOUT,
-    PRESS_ZONE_DIA_CALLOUT,
-    PRESS_ZONE_LENGTH,
-    PRESS_ZONE_START_CALLOUT,
-    RADIAL_REFERENCE_DIMENSIONS,
-    REFERENCE_DIMENSIONS,
-    ROD_LENGTH,
-    SCREW_SEAT_CALLOUT,
-    SURFACE_FINISHES,
-)
-
+import _telemetry
+from mg_lever_thread_joint import ROD_DIA
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT, TIP_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
-OUTPUTS = DrawingOutputs(
-    slddrw=SPEC.outputs["slddrw"],
-    pdf=SPEC.outputs["pdf"],
-    png=SPEC.outputs["png"],
-)
-SLDDRW = OUTPUTS.slddrw
-PDF = OUTPUTS.pdf
-PNG = OUTPUTS.png
-
-SHEET_SCALE = (1.0, 1.0)
-FRONT_CENTER = (0.115, 0.150)
-ISO_CENTER = (0.350, 0.185)
+OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"], png=SPEC.outputs["png"])
+SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
+SHEET_SCALE = (1, 1)
+FRONT_CENTER = (0.115, 0.120)
+ISO_CENTER = (0.350, 0.105)
 ISO_SCALE = (1, 2)
-
-# Sheet stations of the rod's ends, from the model's own constants: the west
-# tip (the part origin), the east tip, the press zone's start
-# (PRESS_ZONE_LENGTH back from the tip), the dome tangent (one radius back)
-# and the zone cylinder's mid-length; the rod's top outline.
-_ROD_WEST_TIP_X = FRONT_CENTER[0] - ROD_LENGTH * SHEET_SCALE[0] / 2000.0
-_ROD_TIP_X = FRONT_CENTER[0] + ROD_LENGTH * SHEET_SCALE[0] / 2000.0
-_PRESS_ZONE_START_X = _ROD_TIP_X - PRESS_ZONE_LENGTH * SHEET_SCALE[0] / 1000.0
-_DOME_TANGENT_X = _ROD_TIP_X - ROD_DIA / 2.0 * SHEET_SCALE[0] / 1000.0
-_PRESS_ZONE_MID_X = (_PRESS_ZONE_START_X + _DOME_TANGENT_X) / 2.0
-_ROD_TOP_Y = FRONT_CENTER[1] + ROD_DIA / 2.0 * SHEET_SCALE[1] / 1000.0
-
-# The two native profile dims the print keeps: the tip-to-tip length below the
-# rod, outermost on a line of its own (its extension lines drop from both
-# tips), and the dome radius reference right of the east tip, its three rows
-# between the zone diameter's dimension line (left) and block (above).
-# Machinist review r2: r4 printed the 165.0 line (y 113.5 mm) level with the
-# zone start's (113.1 mm), so the two read as one chain ending at the zone
-# start; it now runs ~13 mm under the zone start's line, the title block's
-# top (y ~65 mm) far below.
-FRONT_KEEP = {
-    "OverallLength": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.042),
-    "DomeRadius": (_ROD_TIP_X + 0.040, FRONT_CENTER[1] + 0.008),
-}
-# The reference sketches' dims.  The stock diameter above the rod at
-# mid-length, its dimension line just right of its points on the outlines; a
-# plain Ø, no callout.
-# The press zone's lengths hang below the rod off the witness on its bottom
-# outline and the tip (layout doc: a horizontal dim's rows centre on the
-# requested x and y, its line at the lowest row's baseline): the cylinder's
-# reference length innermost, its row left of the 7 mm span; the start from
-# the tip outside it, its three rows wholly right of the tip's extension line
-# (machinist review r2: r4's 52 mm block, centred 24 mm right of the tip, ran
-# that line through its 'M') and under the reference length's line.
-# The banded diameter's dimension line stands inside the zone, between the
-# zone-start line and the dome's tangent edge, and its rows hang ABOVE the
-# rod, right of that line: the line rises to the shoulder under the block,
-# never alongside a row of text, and the two-row mate callout stays short of
-# the isometric.
-REFERENCE_KEEP = {
-    "RodDia": (FRONT_CENTER[0], FRONT_CENTER[1] + 0.020),
-    "PressZoneLen": (_PRESS_ZONE_START_X - 0.010, FRONT_CENTER[1] - 0.012),
-    "PressZoneStart": (_ROD_TIP_X + 0.030, FRONT_CENTER[1] - 0.024),
-    "PressZoneDia": (_PRESS_ZONE_MID_X, FRONT_CENTER[1] + 0.030),
-}
-DIMENSION_CALLOUTS = {
-    "DomeRadius": "BOTH ENDS\nTANGENT HEMISPHERE",
-}
-REFERENCE_CALLOUTS = {
-    "PressZoneStart": PRESS_ZONE_START_CALLOUT,
-    "PressZoneDia": PRESS_ZONE_DIA_CALLOUT,
-}
-# The seat's Ra 3.2 (SURFACE_FINISHES "clamp_screw_seat"): a native symbol
-# whose leader lands on the Ø6 face 40 mm in from the west tip, inside the
-# clamp screw's reach and clear of the stock diameter's station (82.5 mm);
-# the symbol stands above-left of the landing, west of the stock diameter's
-# row.
-# The symbol is attached to the OD's FACE: the front view lies in the
-# revolve's profile plane, so its top outline is the cylinder's seam, and a
-# silhouette pick there re-solved onto the other half-face on rebuild (r12
-# leaf 20261017T061433Z-1-6db3cfe0: types=(46,), same_entity=False). A face
-# picked by coordinate keeps its leader at the pick, not at a separate
-# landing (r13 leaf 20261017T065000Z-1-a58d0439), and a pick 0.4 mm inside
-# the outline selected nothing (r14 leaf 20261017T070332Z-1-45a1d3b0), so the
-# pick and the landing are one point midway between the axis and the top
-# outline, where r13 selected and attached the face.
-# add_surface_finish proves the symbol attached to that face (the part's
-# control) and the leader landed where requested.
-SEAT_FINISH_PICK = (_ROD_WEST_TIP_X + 0.040, (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0)
-SEAT_FINISH_SYMBOL = (_ROD_WEST_TIP_X + 0.030, _ROD_TOP_Y + 0.014)
-# The seat's reason, a free note at the symbol (machinist review r4 read the
-# old reason, a callout on a seat-length dimension 15 mm above, as detached
-# from it): one row whose top-left corner (a note's position) sits 13 mm over
-# the symbol's root, left-aligned with the symbol's bar 2.5 mm west of it, so
-# it stands just over the symbol (r15: its ink reached 7.2 mm over the root)
-# and ~4 mm over the stock diameter's row (its top ~172 mm), well west of the
-# zone diameter's block (x >= ~191 mm).
-SEAT_REASON_XY = (SEAT_FINISH_SYMBOL[0] - 0.0025, SEAT_FINISH_SYMBOL[1] + 0.013)
-# The press land's Ra 0.8 (SURFACE_FINISHES "press_land", #1570): the same Ø6
-# face, picked inside the 7 mm land between the zone-start line and the zone
-# diameter's dimension line (x ~190.8 mm on r15), midway between the axis and
-# the top outline as the seat's pick.  The symbol stands above-left, its
-# "Ra 0.8" ending ~3 mm short of that dimension line and under the zone
-# diameter's block, high enough that the leader crosses the top outline east
-# of the zone-start line.  Its two-row reason stands left of the symbol, the
-# rows straddling the symbol's ink, well east of the stock diameter's row.
-PRESS_LAND_FINISH_PICK = (
-    _PRESS_ZONE_START_X + 0.002,
-    (FRONT_CENTER[1] + _ROD_TOP_Y) / 2.0,
-)
-PRESS_LAND_FINISH_SYMBOL = (_PRESS_ZONE_START_X - 0.015, _ROD_TOP_Y + 0.012)
-PRESS_LAND_REASON_XY = (
-    PRESS_LAND_FINISH_SYMBOL[0] - 0.035,
-    PRESS_LAND_FINISH_SYMBOL[1] + 0.008,
-)
+DETAIL_CENTER = (0.310, 0.190)
+DETAIL_SCALE = (3, 1)
+DETAIL_FOCUS = (0.156, 0.0, 0.0)
+DETAIL_RADIUS_MM = 12.5
+DETAIL_KEEP = {"ThreadLength": (0.323, 0.220), "TipChamfer": (0.377, 0.198), "IncompleteLength": (0.368, 0.165)}
+FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.118, 0.150)}
+CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "TipChamfer": TIP_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
 
 
-def _add_finish_reason(
-    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, what: str
-) -> None:
-    """A finish's reason as a free note owned by ``view`` at ``xy``; a note
-    that did not land in that view raises (the reason-note recipe of
-    draw_mg_magnifying_vertical_rod)."""
-    name = view_name(adapter, view)
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate the lever front view {name!r}")
+def _activate(adapter: Any, view: Any) -> None:
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError("could not activate lever drawing view")
     adapter.currentModel.ClearSelection2(True)
+
+
+def _note(adapter: Any, view: Any, text: str, xy: tuple[float, float]) -> None:
+    _activate(adapter, view)
     if add_note(adapter, text, *xy) is None:
-        raise RuntimeError(f"failed to add the lever {what} reason note")
-    texts = [
-        " ".join(str(_early_bound(found, "INote").GetText() or "").split())
-        for found in (_early_bound(view, "IView").GetNotes() or ())
-    ]
+        raise RuntimeError(f"could not add lever note {text!r}")
+    texts = [" ".join(str(_early_bound(found, "INote").GetText() or "").split()) for found in (_early_bound(view, "IView").GetNotes() or ())]
     if texts.count(" ".join(text.split())) != 1:
-        raise RuntimeError(f"lever {what} reason missed its view: {texts!r}")
+        raise RuntimeError(f"lever note is not owned by its view: {text!r}")
 
 
-def _set_radial_reference(adapter: Any, annotation: Any, *, label: str) -> None:
-    """Print a model radius as the ASME radial reference ``(R3.0)``.
+def _circle(adapter: Any, view: Any, center: tuple[float, float], radius: float, *, mark: bool = False) -> None:
+    _activate(adapter, view)
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (center, (center[0] + radius, center[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = mark
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError("could not create lever detail circle")
+    if mark:
+        segment = _early_bound(circle, "ISketchSegment")
+        segment.Color = 0
+        if int(segment.Color) != 0:
+            raise RuntimeError("lever detail mark is not black")
+        adapter.currentModel.ClearSelection2(True)
 
-    The radius is read-only: each dome is a full hemisphere tangent to the
-    bar, so the selected press-zone diameter fixes it.  The singular
-    ``set_reference_dimension`` writes a bare ``(`` prefix, which replaces the
-    display's own radius glyph, so whatever prefix it carries is kept behind
-    the ``(``; the readback proves it stuck (draw_ch_pivot_shaft's ``(SR4.1)``
-    idiom, without the spherical S).
-    """
-    annotation = _early_bound(annotation, "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
-    prefix = "(" + existing
-    display.SetText(1, prefix)
-    display.SetText(2, ")")  # swDimensionTextSuffix
-    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
-    _telemetry.info(
-        f"{label}: radial reference prefix {existing!r} -> {applied[0]!r}, "
-        f"suffix {applied[1]!r}"
-    )
-    if applied != (prefix, ")"):
-        raise RuntimeError(f"failed to mark {label} as a radial reference: {applied}")
+
+def _detail(adapter: Any) -> tuple[Any, list[Any]]:
+    view = _early_bound(place_view(adapter, str(SOURCE), "*Front", *DETAIL_CENTER, scale=DETAIL_SCALE), "IView")
+    if tuple(float(value) for value in view.ScaleRatio) != DETAIL_SCALE:
+        raise RuntimeError("lever thread detail lost its native scale")
+    focus = model_point_in_view(adapter, view, DETAIL_FOCUS, label="lever thread focus")
+    position = tuple(float(value) for value in view.Position)
+    if not view.SetViewPosition(double_array([position[i] + DETAIL_CENTER[i] - focus[i] for i in range(2)]), False):
+        raise RuntimeError("could not position lever thread detail")
+    rebuild_drawing(adapter, label="position lever thread detail")
+    if math.dist(model_point_in_view(adapter, view, DETAIL_FOCUS, label="positioned lever focus"), DETAIL_CENTER) > 0.00005:
+        raise RuntimeError("lever thread detail focus shifted")
+    set_hidden_lines_removed(adapter, view)
+    annotations = curate_hidden_dimensions(adapter, view, keep=DETAIL_KEEP, view_label="lever thread-end detail", dimensions_by_feature=DRAWING_DIMENSIONS)
+    _circle(adapter, view, DETAIL_CENTER, DETAIL_RADIUS_MM * DETAIL_SCALE[0] / 1000.0)
+    status = int(view.Crop2(False, False, 1))
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="crop lever thread detail")
+    view.UpdateViewDisplayGeometry()
+    if status != 1 or not bool(view.IsCropped()) or bool(view.CropViewJaggedOutline) or bool(view.CropViewNoOutline):
+        raise RuntimeError(f"lever thread detail crop failed: {status}")
+    names = {dimension_name(adapter, _early_bound(annotation, "IAnnotation")) for annotation in (view.GetAnnotations() or ())}
+    if not set(DETAIL_KEEP) <= names:
+        raise RuntimeError(f"lever thread detail crop lost dimensions: {set(DETAIL_KEEP) - names}")
+    return view, annotations
 
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
-        raise FileNotFoundError(f"source part is missing: {SOURCE}")
-
-    check("open magnifying-lever source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
-        adapter.currentModel,
-        (
-            "Number",
-            "Revision",
-            "Title",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Iso View Note",
-        ),
-        required=(
-            "Number",
-            "Material Specification",
-            "Finish",
-            "Quantity",
-            "Iso View Note",
-        ),
-    )
-    drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
-    )
-    stamp_drawing_summary(
-        adapter,
-        drawing_model,
-        {
-            0: "Magnifying Lever Rod Manufacturing Drawing",
-            1: "Harmonic Analyzer hobby-machinist book drawing",
-            2: "Harmonic Analyzer Project",
-            3: "magnifying lever; turned brass rod; domed ends",
-            4: "Generated from the project-owned ASME B drawing standard",
-        },
-    )
-
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
+        raise FileNotFoundError(SOURCE)
+    check("open quarter-inch lever source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Iso View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Iso View Note"))
+    drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout)
+    stamp_drawing_summary(adapter, drawing, {0: "Magnifying Lever Rod Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "quarter-inch brass lever; flat UNC-2A end; external die runout", 4: "Generated from the project-owned ASME B drawing standard"})
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
-
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    for name in sorted(RADIAL_REFERENCE_DIMENSIONS):
-        matches = [a for a in front_annotations if dimension_name(adapter, a) == name]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one lever {name} radial reference")
-        _set_radial_reference(adapter, matches[0], label=f"lever {name}")
-    # The part saves PressZone and RodStock blanked (they would print in every
-    # assembly render); shown here per view, their dimensions import and stay.
-    reference_annotations = curate_hidden_dimensions(
-        adapter,
-        front,
-        keep=REFERENCE_KEEP,
-        view_label="front reference sketches",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    set_dimension_callouts(adapter, reference_annotations, REFERENCE_CALLOUTS)
-    # The zone cylinder's length is the start less the dome radius: a LINEAR
-    # reference. The plural set_reference_dimensions forces a diameter glyph.
-    for name in sorted(REFERENCE_DIMENSIONS):
-        matches = [
-            a for a in reference_annotations if dimension_name(adapter, a) == name
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one lever {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"lever {name}")
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=SEAT_FINISH_PICK,
-        entity_type="FACE",
-        symbol_xy=SEAT_FINISH_SYMBOL,
-        leader_attach_xy=SEAT_FINISH_PICK,
-        control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"),
-        label="lever clamp screw seat finish",
-        char_height=0.0025,
-    )
-    _add_finish_reason(
-        adapter, front, SCREW_SEAT_CALLOUT, SEAT_REASON_XY, what="screw-seat"
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_xy=PRESS_LAND_FINISH_PICK,
-        entity_type="FACE",
-        symbol_xy=PRESS_LAND_FINISH_SYMBOL,
-        leader_attach_xy=PRESS_LAND_FINISH_PICK,
-        control=surface_finish_by_key(SURFACE_FINISHES, "press_land"),
-        label="lever press land finish",
-        char_height=0.0025,
-    )
-    _add_finish_reason(
-        adapter, front, PRESS_LAND_CALLOUT, PRESS_LAND_REASON_XY, what="press-land"
-    )
-    add_property_linked_note(adapter, "Iso View Note", 0.320, 0.140)
-
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        pdf_title="Magnifying Lever Rod Manufacturing Drawing",
-        scale=SHEET_SCALE,
-        layout=SPEC.layout,
-    )
-
-
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("part", choices=[PART_STEM])
-    return parser.parse_args()
+    # Import the small details first: the same RodProfile owns the full view.
+    detail, detailed = _detail(adapter)
+    full = curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="lever full length", dimensions_by_feature=DRAWING_DIMENSIONS)
+    annotations = [*detailed, *full]
+    assert_imported_precision(adapter, annotations, {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()})
+    set_dimension_callouts(adapter, annotations, CALLOUTS)
+    thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
+    add_attached_note(adapter, detail, text=THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.350, 0.244), label="native quarter-inch external thread", entity_type="SILHOUETTE")
+    free_tip = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="free hemispherical tip")
+    add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity_xy=free_tip, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="EDGE")
+    seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
+    symbol = (seat_pick[0] - 0.010, FRONT_CENTER[1] + 0.020)
+    add_surface_finish(adapter, front, edge_xy=seat_pick, entity_type="FACE", symbol_xy=symbol, leader_attach_xy=seat_pick, control=surface_finish_by_key(SURFACE_FINISHES, "clamp_screw_seat"), label="lever clamp screw seat finish", char_height=0.0025)
+    _note(adapter, front, SCREW_SEAT_CALLOUT, (symbol[0] - 0.0025, symbol[1] + 0.013))
+    focus = model_point_in_view(adapter, front, DETAIL_FOCUS, label="parent thread-detail mark")
+    _circle(adapter, front, focus, DETAIL_RADIUS_MM / 1000.0, mark=True)
+    _note(adapter, front, "A", (focus[0] + 0.016, focus[1] + 0.016))
+    _note(adapter, detail, "DETAIL A  SCALE 3:1", (0.277, 0.142))
+    add_property_linked_note(adapter, "Iso View Note", 0.320, 0.071)
+    seeds, instances = import_cosmetic_threads(adapter, iso)
+    if (seeds, instances) != (1, 1):
+        raise RuntimeError(f"lever isometric external thread missing: {(seeds, instances)}")
+    return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Lever Rod Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 
 if __name__ == "__main__":
-    _parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    parser.parse_args()
     _telemetry.set_service("drawing-export")
     sys.exit(run_build(build))

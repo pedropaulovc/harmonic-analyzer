@@ -93,15 +93,27 @@ def test_magnifying_bracket_joint_is_a_two_screw_static_clamp() -> None:
     assert row.receiver == "sm_summing_lever"
     assert row.quantity == 2
     assert row.thread == "#2-56 UNC"
-    assert "counterbore floors" in row.axial_capture
+    assert "flange front face" in row.axial_capture
     assert row.exposure is Exposure.STATIC_CLAMP
     assert row.lock is Lock.NONE
     assert not row.lock_part and not row.exception
     assert "without relative motion" in row.exposure_reason
     assert row.member in jr.THREADED_PARTS
-    assert "mg_magnifying_bracket" in jr.UNTHREADED_PARTS
+    assert "mg_magnifying_bracket" in jr.THREADED_PARTS
     assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
     assert row.member in jr.build_inventory().parts["mg_magnifier"]
+
+
+def test_lever_thread_is_depth_installed_without_invented_shoulder_or_lock() -> None:
+    import mg_magnifier_assembly_steps as steps
+    row = next(joint for joint in jr.JOINTS if joint.id == "mg-magnifier/lever-in-bracket")
+    assert row.member == "mg_magnifying_lever" and row.receiver == "mg_magnifying_bracket"
+    assert row.member in jr.THREADED_PARTS and row.receiver in jr.THREADED_PARTS
+    assert row.installed_at == steps.LEVER_THREADED_KEY
+    assert row.exposure is Exposure.STATIC_CLAMP and row.lock is Lock.NONE
+    assert not row.lock_part
+    assert "ThreadProjection" in row.axial_capture and "no shoulder" in row.axial_capture
+    assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
 
 
 def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:

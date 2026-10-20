@@ -283,19 +283,13 @@ _FRAME_ALLOWED_PAIRS = {
 # Independent runtime oracles: importing the magnifier's fit/pose modules here
 # would re-key every assembly for an unrelated fixture station or groove edit.
 # test_mg_fixture_installation pins these triples to their geometry owners.
-# Keep the ruled light-press triple in one place; tests pin it to the band owner.
-# Its third value is the conservative WHOLE-CONTACT envelope, not the nominal
-# 7 mm straight cylinder (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT): the longest
-# straight cylinder, 10.00 - 2.997 = 7.003, plus the part of the R3 hemisphere
-# still outside the smallest bore, sqrt(3.000**2 - 2.993**2) = 0.2048.
-# The two corners are chosen independently on purpose (the smallest dome sets
-# the longest cylinder; the largest dome sets the deepest penetration). This is
-# an envelope, not one physical part: its coupled tight corner is 7.204819 mm.
-_MG_LEVER_PRESS_TRIPLE_MM = (6.0, 5.986, 7.2078194326718075)
+# The nominal smooth major/tap-drill annulus through the entire neck is the
+# cosmetic-thread overlap. The incomplete root runout is wholly outside it.
+_MG_LEVER_THREAD_TRIPLE_MM = (6.35, 5.105, 12.5)
 _MG_FIXTURE_THREAD_TRIPLE_MM = (2.8448, 2.261, 10.1)
 # #1559 clamp (MHA-MG-02): the 91882A221 #4-40 shank in the thumb tap's
-# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 5.9).
-_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.9)
+# Ø2.261 drill from the top face to the lever-bore top (THUMB_TAP_LENGTH 5.75).
+_MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.75)
 # The vertical rod's #4-40 end (modelled at the 2.845 major) in the clamp's
 # bottom-face Ø2.261 tap drill. Envelope 6.0 = ROD_THREAD_LEN - RELIEF_WIDTH:
 # the full-major section from the tip to the relief, which also covers the tip
@@ -303,12 +297,7 @@ _MG_CLAMP_THUMB_TRIPLE_MM = (2.8448, 2.261, 5.9)
 # than the drill and overlaps nothing.
 _MG_ROD_THREAD_TRIPLE_MM = (2.845, 2.261, 6.0)
 
-# Bound the press annulus over that whole conservative contact envelope (the
-# straight cylinder plus the partial dome: the triple's third value).
-# Both diameter maxima/minima are nominal for these bands.
-_MG_LEVER_PRESS_LIMIT = _smooth_annulus_limit_mm3(
-    *_MG_LEVER_PRESS_TRIPLE_MM
-)
+_MG_LEVER_THREAD_LIMIT = _smooth_annulus_limit_mm3(*_MG_LEVER_THREAD_TRIPLE_MM)
 # Only the major/thread-drill annulus from the spigot face to the rod-bore
 # breakout (10.1 mm), not the tangent screw tip or screw/rod overlap, is allowed.
 _MG_FIXTURE_THREAD_LIMIT = _smooth_annulus_limit_mm3(
@@ -341,7 +330,7 @@ _MAGNIFIER_ALLOWED_PAIRS = {
     frozenset(("mg-vn-thumb-screw-2", "mg-output-fixture-1")): _MG_FIXTURE_THREAD_LIMIT,
     frozenset(
         ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
-    ): _MG_LEVER_PRESS_LIMIT,
+    ): _MG_LEVER_THREAD_LIMIT,
 }
 
 _COUNTER_ANCHOR_THREAD_LIMIT = _smooth_annulus_limit_mm3(
@@ -702,8 +691,8 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
             "mg-magnifier-1/mg-magnifying-lever-1",
             "mg-magnifier-1/mg-magnifying-bracket-1",
         )
-    ): _MG_LEVER_PRESS_LIMIT,
-    # Two #2-56 x 1/4 screws seat on the shallow counterbore floors.
+    ): _MG_LEVER_THREAD_LIMIT,
+    # Two #2-56 x 1/4 screws seat on the flange's front face.
     # Only thread/lever overlap is allowed; the bracket must remain clear.
     **_numbered_pairs(
         "mg-magnifier-1/mg-vn-magnifying-bracket-screw",

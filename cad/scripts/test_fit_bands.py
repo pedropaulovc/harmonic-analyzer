@@ -267,10 +267,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the title block's drilled-hole row, indexed for the slide-clearance, "
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
-    ("mg_lever_press_fit_geom", "COLLAR_OD_BAND"): (
-        "inherited title-block .XX band, indexed into the collar's independent "
-        "Lamé strength and press-force corners; not a new native fit band"
-    ),
     ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
     ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"

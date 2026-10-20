@@ -19,6 +19,7 @@ AXLE_PRESSED_KEY = "axle-pressed"
 COLUMN_CLAMP_STARTED_KEY = "column-clamp-started"
 ENDSHAKE_SET_KEY = "endshake-set"
 LOCKNUT_JAMMED_KEY = "locknut-jammed"
+LEVER_THREADED_KEY = "lever-threaded"
 CLAMP_SET_KEY = "clamp-set"
 FIXTURE_SET_KEY = "fixture-set"
 WIRE_HOOKED_KEY = "lever-wire-hooked"
@@ -31,7 +32,7 @@ SEQUENCE: tuple[str, ...] = (
     "wheel-stacked",
     ENDSHAKE_SET_KEY,
     LOCKNUT_JAMMED_KEY,
-    "collar-pressed",
+    LEVER_THREADED_KEY,
     CLAMP_SET_KEY,
     FIXTURE_SET_KEY,
     WIRE_HOOKED_KEY,

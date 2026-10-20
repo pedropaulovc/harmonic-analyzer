@@ -10,7 +10,7 @@ so the drawing contract must NOT live here.  ``_spec`` re-exports these and adds
 the drawing data.
 
 #1559 owner ruling: the clamp is a VERTICAL length of stock 7/16 in hex brass.
-The Ø6 lever (MHA-MG-03) passes through it across the corners; the knurled
+The quarter-inch lever (MHA-MG-03) passes through it across the corners; the knurled
 thumb screw (MHA-MG-VN-50) enters the top face on the hex axis and pinches the
 lever; the vertical rod (MHA-MG-04) screws into a blind tap in the bottom face
 on the same axis and seats on its shoulder (``mg_rod_clamp_joint``), so the
@@ -47,9 +47,14 @@ HEX_AC = HEX_AF / math.cos(math.radians(30.0))  # 12.8316 across corners
 # mechanics export read it under this name.
 BLOCK_DEPTH = HEX_AC
 
-# --- lever bore: Ø6.2 drilled through the corners, slip on the Ø6 lever -------
-LEVER_BORE_DIA = 6.2
-_LEVER_BORE_R_MAX = (LEVER_BORE_DIA + drilled_oversize_mm()) / 2.0  # 3.15
+# --- lever bore: ordinary drilled slip clearance on selected 1/4-inch stock --
+LEVER_BORE_DIA = 6.5
+_LEVER_BORE_R_MAX = (LEVER_BORE_DIA + drilled_oversize_mm()) / 2.0
+# Apply the same allowed bore wander in every radial direction, including the
+# vertical floor and thumb-thread stacks (not only the flat-wall check).
+DRILL_WANDER_MAX = 0.10
+DRILL_WANDER_DEG = 0.3
+BORE_WANDER = DRILL_WANDER_MAX + HEX_AC / 2.0 * math.tan(math.radians(DRILL_WANDER_DEG))
 
 # --- heights from the bottom face (two-place prints, the .XX band) -----------
 HEIGHT_PLACES = 2
@@ -68,13 +73,15 @@ _LEVER_BORE_Y_NEED = (
     + ROD_TAP_DRILL_DEPTH_MAX
     + ROD_TAP_DRILL_POINT
     + _HEIGHT_BAND
+    + BORE_WANDER
 )
-LEVER_BORE_Y = round(math.ceil(_LEVER_BORE_Y_NEED / 0.05 - 1e-9) * 0.05, 2)  # 19.65
+LEVER_BORE_Y = round(math.ceil(_LEVER_BORE_Y_NEED / 0.05 - 1e-9) * 0.05, 2)
 ROD_TAP_FLOOR_WALL_WORST = (
     (LEVER_BORE_Y - _HEIGHT_BAND)
     - _LEVER_BORE_R_MAX
     - ROD_TAP_DRILL_DEPTH_MAX
     - ROD_TAP_DRILL_POINT
+    - BORE_WANDER
 )
 
 # --- thumb-screw tap: #4-40 from the top face, on the hex axis, into the bore
@@ -83,16 +90,16 @@ ROD_TAP_FLOOR_WALL_WORST = (
 # printed worst case (both heights at their .XX limits, the largest bore) that
 # is still 1.5D (drawing-guidelines.md rule 18 (thread engagement)).
 TOP_TO_BORE = 9.0
-BLOCK_HEIGHT = round(LEVER_BORE_Y + TOP_TO_BORE, 2)  # 28.65
+BLOCK_HEIGHT = round(LEVER_BORE_Y + TOP_TO_BORE, 2)
 EDGE_BREAK = 0.25  # title block edge break at the tap mouth
 THUMB_ENGAGEMENT_WORST = (
-    TOP_TO_BORE - 2.0 * _HEIGHT_BAND - _LEVER_BORE_R_MAX - EDGE_BREAK
+    TOP_TO_BORE - 2.0 * _HEIGHT_BAND - _LEVER_BORE_R_MAX - EDGE_BREAK - BORE_WANDER
 )
 # The fixture's precedent: the drill runs on to the bore axis (its point stops
 # in the bore, short of the far wall), the thread ends at the bore -- its
 # depth a REF on the sheet.
 THUMB_TAP_DRILL_DEPTH = TOP_TO_BORE
-THUMB_TAP_LENGTH = TOP_TO_BORE - LEVER_BORE_DIA / 2.0  # 5.9
+THUMB_TAP_LENGTH = TOP_TO_BORE - LEVER_BORE_DIA / 2.0
 THUMB_TAP_SPEC = HoleSpec(
     "tapped",
     THREAD,

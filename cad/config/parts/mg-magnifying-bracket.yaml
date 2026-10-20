@@ -1,24 +1,8 @@
 mg-magnifying-bracket:
   number: MHA-MG-01
-  # The light-press strength budget uses 1018 cold-drawn yield, not brittle
-  # class-30 gray iron. Keep the condition on the print, not just in code,
-  # on one title-block line (machinist review r2: the 35-character
-  # "LOW-CARBON STEEL (1018, COLD-DRAWN)" wrapped).
   material: AISI 1018 COLD-DRAWN STEEL
   material_specification: AISI 1018 COLD-DRAWN STEEL
-  finish: machined
+  finish: blued
   quantity: 1
   tolerance_class: machined_block
-  # No fit_class: the collar is a light PRESS seat for the MHA-MG-03 lever rod
-  # (user ruling; limits and Lamé strength in mg_lever_press_fit_geom), not a
-  # running fit; the screwed seat on the summing lever remains static.
-  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or honed to Ra 0.8 as the matched press seat for the MHA-MG-03 lever rod (0.007-0.014 diametral interference); press the collar onto the rod held near its end; the press alone retains it"
-  # The pressed bore's Ra 0.8 is an owner ruling (#1570 option A), not a
-  # running surface: the matched fit's 0.007 minimum interference holds only
-  # after DIN 7190 smoothing at that finish (mg_lever_press_fit_geom).
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "the Ra 0.8 roughness symbol on the collar bore, (Ø5.986) REAM OR HONE THRU: 0.007-0.014 DIAMETRAL INTERFERENCE ON MHA-MG-03 LEVER, in the collar's end view beside Ø12.00 COLLAR OD"
-      finding: "roughness symbol on a pressed bore that neither runs, slides nor locates (rule 6)"
-      reason: "owner ruling #1570 option A: the bore is reamed or honed to Ra 0.8 because the matched fit's 0.007 minimum diametral interference rests on the DIN 7190 smoothing estimate 0.8 x 4 x (0.8 + 0.8) um = 0.00512 (effective minimum 0.00188), which holds only at Ra 0.8; a rougher bore would smooth the loosest press away (owner-accepted)"
+  process: "simple L machined from 1018 cold-drawn steel, then blued; parallel neck sides, no taper or collar boss; neck 12.50 ±0.10 thick on the thread axis, centred on the lever; axial nose R5.50 ±0.05 with the 1/4-20 UNC-2B through tap located 5.50 ±0.05 from the physical neck side and nose tip; internal thread-root envelope Ø6.45 MAX, both mouth chamfers 0.20 ±0.05 on both legs at 45 degrees; true radial location stack sqrt(0.10^2+0.10^2), plus drill wander 0.10 + 12.6 tan(0.3 degrees) = 0.165974, gives 1.667605 minimum thread-mouth wall, printed 1.667 MIN, above the 1.5 floor but below the 2.0 target; four foot corners and all inside neck/foot corners R0.25 MAX; mounting holes, seat and 3.175 ±0.13 screw grip unchanged; foot right edge extends flush to the neck right face without a ledge; mates the MHA-MG-03 lever thread without locknut, set screw or adhesive"
