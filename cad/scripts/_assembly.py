@@ -9,7 +9,6 @@ import hashlib
 import json
 import math
 import re
-import sys
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from enum import StrEnum
@@ -2359,7 +2358,9 @@ async def _export_assembly_images(
 
 
 @_telemetry.traced("simplified.assembly_config", label_param="asm_name")
-def sync_simplified_configuration(adapter: Any, asm_name: str) -> int:
+def sync_simplified_configuration(
+    adapter: Any, asm_name: str, *, verify: bool = True
+) -> int:
     """Ensure ``Default Simplified`` (derived from ``Default``) points every
     top-level component at its ``<referenced> Simplified`` configuration.
 
@@ -2377,194 +2378,168 @@ def sync_simplified_configuration(adapter: Any, asm_name: str) -> int:
     configuration and THAT configuration's comment (a part's suppressed
     features, a subassembly's own fingerprint), so a child whose simplified
     geometry changed while Default did not still forces the save -- the
-    geometry digest reads Default only. Refresh callers own the subsequent
-    rebuilds: the parts tier rebuilds every configuration, while the explode
-    tier preserves its existing authoring/final-Default-solve sequence.
-    Default is re-activated before returning, not rebuilt. Both tiers retain
-    reconciliation of every saved configuration and the fresh-open proof.
+    geometry digest reads Default only. With ``verify`` the simplified
+    configuration is force-rebuilt and must read What's Wrong clean; a caller
+    that rebuilds every configuration next passes False. The rest
+    configuration is re-activated on return or failure, not rebuilt: both callers
+    run ``final_rebuild_before_save`` next (ForceRebuild3, NeedsRebuild2 must
+    read 0), and ``reconcile_saved_rebuild_state`` rebuilds and persists every
+    configuration of the saved file.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    try:
-        configuration, created = _ensure_simplified_configuration(model, asm_name, options=0)
-        child = simplified_name("Default")
-        _activate_drawing_configuration(adapter, model, asm_name, child)
-        _swapped, changes = _sync_simplified_references(adapter, asm_name, configuration)
-        changes += created
-        _telemetry.annotate(changes=changes)
-        return changes
-    finally:
-        _restore_default_configuration(adapter, model, asm_name)
-
-
-def _ensure_simplified_configuration(
-    model: Any, asm_name: str, *, options: int
-) -> tuple[Any, int]:
-    """Create/validate the derived child, using the caller's native creation options."""
     rest = "Default"
-    child = simplified_name(rest)
-    with _telemetry.span("simplified.config_create", asm=asm_name) as sp:
-        names = [str(name) for name in (model.GetConfigurationNames() or ())]
-        if rest not in names:
-            raise RuntimeError(f"{asm_name}: no {rest!r} configuration among {names}")
-        created = 0
-        if child not in names:
-            manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
-            configuration = manager.AddConfiguration2(
-                child, SIMPLIFIED_COMMENT, "", options, rest, "", False
-            )
-            if configuration is None:
-                raise RuntimeError(f"{asm_name}: AddConfiguration2({child!r}) returned None")
-            created = 1
-        raw = model.GetConfigurationByName(child)
-        configuration = _early_bound(raw, "IConfiguration") if raw is not None else None
-        parent = configuration.GetParent() if configuration is not None else None
-        if parent is None or str(_early_bound(parent, "IConfiguration").Name) != rest:
-            raise RuntimeError(f"{asm_name}: {child!r} is not derived from {rest!r}")
-        sp.set_attribute("created", created)
-    return configuration, created
-
-
-def _activate_drawing_configuration(
-    adapter: Any, model: Any, asm_name: str, configuration: str
-) -> None:
-    with _telemetry.span(
-        "simplified.config_activate", asm=asm_name, configuration=configuration
-    ):
-        if active_configuration_name(adapter, model) != configuration and not bool(
-            model.ShowConfiguration2(configuration)
-        ):
-            raise RuntimeError(f"{asm_name}: ShowConfiguration2({configuration!r}) refused")
-        if active_configuration_name(adapter, model) != configuration:
-            raise RuntimeError(f"{asm_name}: {configuration!r} did not become active")
-
-
-def _restore_default_configuration(adapter: Any, model: Any, asm_name: str) -> None:
-    primary_error = sys.exception()
+    primary_error: BaseException | None = None
     try:
-        with _telemetry.span("simplified.restore", asm=asm_name):
-            _activate_drawing_configuration(adapter, model, asm_name, "Default")
-    except Exception as cleanup_error:
-        if primary_error is None:
-            raise
-        _telemetry.warn(f"{asm_name}: cleanup of drawing configurations: {cleanup_error}")
-
-
-def _sync_simplified_references(
-    adapter: Any, asm_name: str, configuration: Any
-) -> tuple[int, int]:
-    """Synchronize the active child's references/fingerprint; return swaps and changes."""
-    child = simplified_name("Default")
-    known: dict[str, set[str]] = {}
-    planned: list[tuple[Any, str, str, str]] = []
-    with _telemetry.span("simplified.reference_scan", asm=asm_name) as sp:
-        assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
-        for raw_component in assembly.GetComponents(True) or ():
-            component = _early_bound(raw_component, "IComponent2")
-            path = str(component.GetPathName())
-            if path not in known:
-                known[path] = {
-                    str(name) for name in (adapter.swApp.GetConfigurationNames(path) or ())
-                }
-            current = str(component.ReferencedConfiguration)
-            base = current.removesuffix(SIMPLIFIED_SUFFIX)
-            want = simplified_name(base) if simplified_name(base) in known[path] else base
-            planned.append((component, path, current, want))
-        sp.set_attribute("components", len(planned))
-        sp.set_attribute("models", len(known))
-    comments: dict[tuple[str, str], str] = {}
-    rows: list[tuple[str, str, str]] = []
-    swapped = kept = 0
-    refused: list[str] = []
-    with _telemetry.span("simplified.reference_update", asm=asm_name) as sp:
-        for component, path, current, want in planned:
-            if want == current:
-                kept += 1
-            else:
-                component.ReferencedConfiguration = want
-                if str(component.ReferencedConfiguration) != want:
-                    refused.append(f"{component.Name2}: {current!r} -> {want!r}")
-                    continue
-                swapped += 1
-            rows.append(
-                (
-                    str(component.Name2),
-                    want,
-                    _referenced_comment(asm_name, component, path, want, comments),
+        with _telemetry.span("simplified.config_create", asm=asm_name):
+            names = [str(name) for name in (model.GetConfigurationNames() or ())]
+            if rest not in names:
+                raise RuntimeError(f"{asm_name}: no {rest!r} configuration among {names}")
+            child = simplified_name(rest)
+            changes = 0
+            if child not in names:
+                manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+                created = manager.AddConfiguration2(
+                    child, SIMPLIFIED_COMMENT, "", 0, rest, "", False
                 )
-            )
-        if refused:
-            raise RuntimeError(
-                f"{asm_name}: {child} refused component configurations: " + "; ".join(refused)
-            )
-        comment = simplified_comment(components_identity(rows))
-        comment_changed = str(configuration.Comment or "") != comment
-        if comment_changed:
-            configuration.Comment = comment
+                if created is None:
+                    raise RuntimeError(f"{asm_name}: AddConfiguration2({child!r}) returned None")
+                changes += 1
+            raw = model.GetConfigurationByName(child)
+            configuration = _early_bound(raw, "IConfiguration") if raw is not None else None
+            parent = configuration.GetParent() if configuration is not None else None
+            if parent is None or str(_early_bound(parent, "IConfiguration").Name) != rest:
+                raise RuntimeError(f"{asm_name}: {child!r} is not derived from {rest!r}")
+        with _telemetry.span(
+            "simplified.config_activate", asm=asm_name, configuration=child
+        ):
+            if active_configuration_name(adapter, model) != child and not bool(
+                model.ShowConfiguration2(child)
+            ):
+                raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+
+        with _telemetry.span("simplified.reference_sync", asm=asm_name) as sp:
+            assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+            known: dict[str, set[str]] = {}
+            comments: dict[tuple[str, str], str] = {}
+            rows: list[tuple[str, str, str]] = []
+            swapped = kept = 0
+            refused: list[str] = []
+            for raw_component in assembly.GetComponents(True) or ():
+                component = _early_bound(raw_component, "IComponent2")
+                path = str(component.GetPathName())
+                if path not in known:
+                    known[path] = {
+                        str(name) for name in (adapter.swApp.GetConfigurationNames(path) or ())
+                    }
+                current = str(component.ReferencedConfiguration)
+                base = current.removesuffix(SIMPLIFIED_SUFFIX)
+                want = simplified_name(base) if simplified_name(base) in known[path] else base
+                if want == current:
+                    kept += 1
+                else:
+                    component.ReferencedConfiguration = want
+                    if str(component.ReferencedConfiguration) != want:
+                        refused.append(f"{component.Name2}: {current!r} -> {want!r}")
+                        continue
+                    swapped += 1
+                rows.append(
+                    (
+                        str(component.Name2),
+                        want,
+                        _referenced_comment(asm_name, component, path, want, comments),
+                    )
+                )
+            changes += swapped
+            if refused:
+                raise RuntimeError(
+                    f"{asm_name}: {child} refused component configurations: " + "; ".join(refused)
+                )
+            comment = simplified_comment(components_identity(rows))
             if str(configuration.Comment or "") != comment:
-                raise RuntimeError(f"{asm_name}: {child} comment did not persist")
-        sp.set_attribute("components", len(planned))
-        sp.set_attribute("swapped", swapped)
-        sp.set_attribute("kept", kept)
-        sp.set_attribute("comment_changed", comment_changed)
-    changes = swapped + int(comment_changed)
-    _telemetry.annotate(swapped=swapped, kept=kept, changes=changes)
+                configuration.Comment = comment
+                if str(configuration.Comment or "") != comment:
+                    raise RuntimeError(f"{asm_name}: {child} comment did not persist")
+                changes += 1
+            sp.set_attribute("components", len(rows))
+            sp.set_attribute("models", len(known))
+            sp.set_attribute("swapped", swapped)
+            sp.set_attribute("kept", kept)
+        if verify:
+            with _telemetry.span("simplified.verify", asm=asm_name):
+                rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+                faults = _rebuild_faults(adapter)
+                if rebuilt is False or rebuilt is None or faults:
+                    raise RuntimeError(
+                        f"{asm_name}: {child} rebuild returned {rebuilt!r} with faults {faults}"
+                    )
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            with _telemetry.span("simplified.restore", asm=asm_name):
+                if not bool(model.ShowConfiguration2(rest)):
+                    raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{asm_name}: cleanup of drawing configurations: {cleanup_error}")
+    _telemetry.annotate(swapped=swapped, kept=kept, changes=changes, verified=verify)
     _telemetry.success(
         f"{asm_name}: {child} re-points {swapped} component(s), {kept} unchanged "
         f"({comment})"
     )
-    return swapped, changes
+    return changes
 
 
-def _verify_simplified_configuration(adapter: Any, model: Any, asm_name: str) -> None:
-    with _telemetry.span("simplified.verify", asm=asm_name):
-        rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
-        faults = _rebuild_faults(adapter)
-        if rebuilt is False or rebuilt is None or faults:
-            raise RuntimeError(
-                f"{asm_name}: {simplified_name('Default')} rebuild returned "
-                f"{rebuilt!r} with faults {faults}"
-            )
-
-
-@_telemetry.traced("simplified.drawing_configurations", label_param="asm_name")
-def _author_and_verify_drawing_configurations(
+@_telemetry.traced("simplified.author_in_drawing_configurations", label_param="asm_name")
+def author_in_drawing_configurations(
     adapter: Any, asm_name: str, author: Callable[[str], None]
 ) -> None:
-    """Save owns the complete author/sync/verify traversal, with one child visit.
+    """Run a configuration-owned authoring step in ``Default`` and in ``Default
+    Simplified``, each while it is the active configuration.
 
-    Create the child BEFORE Default's explode so it cannot inherit that
-    configuration-owned feature. Both explodes are authored while their owning
-    configuration is active. The child is synchronized and deeply verified
-    during its single visit; Default's independent final solve follows in save.
+    An exploded view belongs to one configuration, and a drawing view shows
+    the explode of the configuration it references (``IView.ShowExploded``),
+    so the small exploded drawing views -- which reference ``Default
+    Simplified`` -- need the same steps authored there. The simplified
+    configuration is created first, before anything configuration-owned
+    exists to be copied into it; ``author`` receives the active
+    configuration's name. ``Default`` is restored on return or failure.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     rest = "Default"
     if active_configuration_name(adapter, model) != rest:
         raise RuntimeError(f"{asm_name}: drawing configurations are authored from {rest!r}")
+    sync_simplified_configuration(adapter, asm_name, verify=False)
+    child = simplified_name(rest)
+    primary_error: BaseException | None = None
     try:
-        # swConfigurationOptions2_e.swConfigOption_DontActivate: deriving the
-        # child must not pay a switch or move Default's author into the child.
-        configuration, created = _ensure_simplified_configuration(model, asm_name, options=128)
-        if active_configuration_name(adapter, model) != rest:
-            raise RuntimeError(f"{asm_name}: creating the simplified child activated it")
         with _telemetry.span("simplified.author", asm=asm_name, configuration=rest):
             author(rest)
-        child = simplified_name(rest)
-        _activate_drawing_configuration(adapter, model, asm_name, child)
-        swapped, changes = _sync_simplified_references(adapter, asm_name, configuration)
-        if swapped:
-            # ReferencedConfiguration requires EditRebuild3 to display its
-            # changes. Previously the later re-activation supplied this refresh;
-            # now the child's explode is authored without leaving it first.
-            with _telemetry.span("simplified.reference_rebuild", asm=asm_name):
-                if not bool(model.EditRebuild3()):
-                    raise RuntimeError(f"{asm_name}: {child} reference rebuild refused")
+        with _telemetry.span(
+            "simplified.config_activate", asm=asm_name, configuration=child
+        ):
+            if not bool(model.ShowConfiguration2(child)):
+                raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+        if active_configuration_name(adapter, model) != child:
+            raise RuntimeError(f"{asm_name}: {child!r} did not become active")
         with _telemetry.span("simplified.author", asm=asm_name, configuration=child):
             author(child)
-        _verify_simplified_configuration(adapter, model, asm_name)
-        _telemetry.annotate(changes=created + changes, verified=True)
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
-        _restore_default_configuration(adapter, model, asm_name)
+        try:
+            with _telemetry.span("simplified.restore", asm=asm_name):
+                if not bool(model.ShowConfiguration2(rest)) or (
+                    active_configuration_name(adapter, model) != rest
+                ):
+                    raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{asm_name}: cleanup after {child} authoring: {cleanup_error}")
 
 
 def _referenced_comment(
@@ -2603,17 +2578,11 @@ async def save_assembly_and_images(
     asm_name: str,
     views: Iterable[str] = DEFAULT_VIEWS,
     *,
-    author: Callable[[str], None],
     native_contact_check: Callable[[Any, str], None] | None = None,
     solved_gates: Callable[[Any], None] | None = None,
     dof_manifest: bool = False,
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``.
-
-    ``author`` receives the active configuration name and authors its explode.
-    Save creates the derived child before authoring Default, then synchronizes,
-    authors and deeply verifies the child in one visit. No earlier caller may
-    certify that mutable state on save's behalf.
 
     ``solved_gates`` runs right after the final deep rebuild, before any other
     gate reads the model: a builder whose own gates need a fully solved model
@@ -2630,7 +2599,7 @@ async def save_assembly_and_images(
     # The drawings' views at 1:2 and smaller print this derived configuration
     # (gear teeth and screw threads suppressed); Default stays the solved,
     # gated, rendered and saved-active pose.
-    _author_and_verify_drawing_configurations(adapter, asm_name, author)
+    sync_simplified_configuration(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     if solved_gates is not None:
@@ -3509,7 +3478,7 @@ async def refresh_assembly(
     # A refreshed part may have gained, lost or changed its "<cfg> Simplified",
     # so the drawing configuration is re-pointed and re-fingerprinted before
     # the per-config rebuild below proves it clean; any change forces the save.
-    simplified_changes = sync_simplified_configuration(adapter, asm_name)
+    simplified_changes = sync_simplified_configuration(adapter, asm_name, verify=False)
     configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the

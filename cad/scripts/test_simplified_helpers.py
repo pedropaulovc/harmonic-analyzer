@@ -295,7 +295,7 @@ def _assembly_model(*components: FakeComponent) -> FakeModel:
 def _sync(model: FakeModel, paths: dict[str, FakeModel]) -> int:
     app = SimpleNamespace(GetConfigurationNames=lambda path: paths[path].GetConfigurationNames())
     adapter = SimpleNamespace(currentModel=model, swApp=app)
-    return _assembly.sync_simplified_configuration(adapter, "fixture")
+    return _assembly.sync_simplified_configuration(adapter, "fixture", verify=False)
 
 
 def test_a_childs_changed_simplified_geometry_forces_the_assembly_save() -> None:
@@ -914,22 +914,113 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         assert view.exploded_in in (None, wanted)
 
 
-class FakeConfiguredAssembly(FakeModel):
-    """Per-configuration references/explodes, including native creation activation."""
+class FakeConfiguredAssembly:
+    """An assembly whose active configuration changes only through
+    ``ShowConfiguration2`` of a configuration that exists."""
 
     def __init__(self) -> None:
+        self.names = [ASSEMBLY_VIEW_CONFIGURATION]
+        self.active = ASSEMBLY_VIEW_CONFIGURATION
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        if name not in self.names:
+            return False
+        self.active = name
+        return True
+
+
+def _author_in_both(monkeypatch, model: FakeConfiguredAssembly, author) -> None:
+    def sync(_adapter, _asm_name, *, verify: bool = True) -> int:
+        model.names.append(SIMPLIFIED_VIEW_CONFIGURATION)
+        return 1
+
+    monkeypatch.setattr(_assembly, "sync_simplified_configuration", sync)
+    monkeypatch.setattr(_assembly, "active_configuration_name", lambda _a, m: m.active)
+    _assembly.author_in_drawing_configurations(
+        SimpleNamespace(currentModel=model), "fixture", author
+    )
+
+
+def test_the_explode_is_authored_in_both_drawing_configurations(monkeypatch) -> None:
+    """Default Simplified exists before anything configuration-owned is
+    authored; each run sees its own configuration active; the saved-active
+    Default is active again afterwards."""
+    model = FakeConfiguredAssembly()
+    authored: list[tuple[str, str]] = []
+    _author_in_both(
+        monkeypatch, model, lambda configuration: authored.append((configuration, model.active))
+    )
+    assert authored == [
+        (ASSEMBLY_VIEW_CONFIGURATION, ASSEMBLY_VIEW_CONFIGURATION),
+        (SIMPLIFIED_VIEW_CONFIGURATION, SIMPLIFIED_VIEW_CONFIGURATION),
+    ]
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+
+
+def test_a_failed_simplified_explode_still_leaves_default_active(monkeypatch) -> None:
+    model = FakeConfiguredAssembly()
+
+    def author(configuration: str) -> None:
+        if configuration == SIMPLIFIED_VIEW_CONFIGURATION:
+            raise RuntimeError("AddExplodeStep2 error 3")
+
+    with pytest.raises(RuntimeError, match="AddExplodeStep2"):
+        _author_in_both(monkeypatch, model, author)
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+
+
+class FakeLifecycleConfiguration(FakeConfiguration):
+    def __init__(self, *args, **kwargs):
+        self.refuse_comment = False
+        super().__init__(*args, **kwargs)
+
+    @property
+    def Comment(self):
+        return self.comment
+
+    @Comment.setter
+    def Comment(self, value):
+        if not self.refuse_comment:
+            self.comment = value
+
+
+class FakeLifecycleComponent(FakeComponent):
+    def __init__(self, assembly, part):
+        self.assembly = assembly
+        self.references = {ASSEMBLY_VIEW_CONFIGURATION: "T24"}
+        self.refuse_reference = False
+        self.reference_error = None
+        super().__init__("gear-1", "gear.SLDPRT", part, "T24")
+
+    @property
+    def ReferencedConfiguration(self):
+        return self.references[self.assembly.active]
+
+    @ReferencedConfiguration.setter
+    def ReferencedConfiguration(self, value):
+        if self.reference_error is not None:
+            raise self.reference_error
+        if not self.refuse_reference:
+            self.references[self.assembly.active] = value
+
+
+class FakeLifecycleAssembly(FakeModel):
+    """Native creation activates the child, including before a failed return."""
+
+    def __init__(self):
         super().__init__(FakeConfiguration(ASSEMBLY_VIEW_CONFIGURATION))
         self.events = []
         self.explodes = {ASSEMBLY_VIEW_CONFIGURATION: []}
-        self.reference_dirty = False
+        self.creation_failure = None
+        self.child_activation_failure = None
+        self.restore_failure = None
+        self.refuse_comment = False
         self.rebuild_result = True
-        self.reference_rebuild_result = True
+        self.rebuild_error = None
         self.faults = None
-        self.refuse_switch = None
-        self.ignore_switch = None
         self.Extension.GetWhatsWrong = self._faults
         gear = FakeConfiguration("T24")
-        self.component = FakeConfiguredComponent(
+        self.component = FakeLifecycleComponent(
             self,
             FakeModel(
                 gear,
@@ -942,32 +1033,49 @@ class FakeConfiguredAssembly(FakeModel):
     def active(self):
         return self.ConfigurationManager.ActiveConfiguration.Name
 
-    def _add(self, name, comment, alternate, options, parent, description, rebuild):
-        created = super()._add(name, comment, alternate, options, parent, description, rebuild)
-        self.events.append(("create", name))
+    def _add(self, name, comment, _alternate, options, parent, _description, _rebuild):
+        assert options == 0
+        created = FakeLifecycleConfiguration(
+            name, self.configurations[parent], comment=comment
+        )
+        created.refuse_comment = self.refuse_comment
+        self.configurations[name] = created
         self.explodes[name] = list(self.explodes[parent])
         self.component.references[name] = self.component.references[parent]
-        if not options & 128:  # swConfigOption_DontActivate
-            self.ConfigurationManager.ActiveConfiguration = created
+        self.ConfigurationManager.ActiveConfiguration = created
+        self.events.append(("create", name))
+        if self.creation_failure == "none":
+            return None
+        if self.creation_failure == "raise":
+            raise ValueError("native creation failed")
+        if self.creation_failure == "parent":
+            created.parent = FakeConfiguration("Other")
         return created
 
     def ShowConfiguration2(self, name):
         self.events.append(("switch", name))
-        if self.ignore_switch != name:
-            super().ShowConfiguration2(name)
-        return self.refuse_switch != name
+        if name == ASSEMBLY_VIEW_CONFIGURATION and self.restore_failure is not None:
+            if self.restore_failure == "raise":
+                raise RuntimeError("native Default restoration failed")
+            return False
+        if name == SIMPLIFIED_VIEW_CONFIGURATION and self.child_activation_failure == "ignore":
+            return True
+        super().ShowConfiguration2(name)
+        if name == SIMPLIFIED_VIEW_CONFIGURATION:
+            if self.child_activation_failure == "raise":
+                raise ValueError("native activation failed after switching")
+            if self.child_activation_failure == "refuse":
+                return False
+        return True
 
     def GetComponents(self, top_level):
         self.events.append(("references", self.active))
         return super().GetComponents(top_level)
 
-    def EditRebuild3(self):
-        self.events.append(("reference_rebuild", self.active))
-        self.reference_dirty = False
-        return self.reference_rebuild_result
-
     def ForceRebuild3(self, top_only):
         self.events.append(("verify", self.active, top_only))
+        if self.rebuild_error is not None:
+            raise self.rebuild_error
         return self.rebuild_result
 
     def _faults(self):
@@ -977,33 +1085,12 @@ class FakeConfiguredAssembly(FakeModel):
     def author(self, configuration):
         assert self.active == configuration
         assert SIMPLIFIED_VIEW_CONFIGURATION in self.configurations
-        assert not self.explodes[configuration]  # no inherited Default explode
-        assert not self.reference_dirty  # child references displayed before authoring
+        assert not self.explodes[configuration]
         self.events.append(("author", configuration))
-        self.explodes[configuration].append(f"EXPLODED {configuration}")
+        self.explodes[configuration].append(configuration)
 
 
-class FakeConfiguredComponent(FakeComponent):
-    def __init__(self, assembly, part):
-        self.assembly = assembly
-        self.references = {ASSEMBLY_VIEW_CONFIGURATION: "T24"}
-        self.refuse_reference = False
-        super().__init__("gear-1", "gear.SLDPRT", part, "T24")
-
-    @property
-    def ReferencedConfiguration(self):
-        return self.references[self.assembly.active]
-
-    @ReferencedConfiguration.setter
-    def ReferencedConfiguration(self, value):
-        if not self.refuse_reference:
-            self.references[self.assembly.active] = value
-            self.assembly.reference_dirty = True
-
-
-def _configured_adapter(model):
-    # Construction seeds the initial reference, without a native mutation.
-    model.reference_dirty = False
+def _lifecycle_adapter(model):
     return SimpleNamespace(
         currentModel=model,
         swApp=SimpleNamespace(
@@ -1014,204 +1101,205 @@ def _configured_adapter(model):
 
 
 @pytest.mark.parametrize("existing_child", [False, True])
-def test_the_explode_is_authored_in_both_drawing_configurations(existing_child) -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
+def test_failure_cleanup_preserves_the_successful_configuration_traversal(existing_child):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
     if existing_child:
-        _assembly._ensure_simplified_configuration(model, "fixture", options=128)
+        model._add(
+            SIMPLIFIED_VIEW_CONFIGURATION, "", "", 0,
+            ASSEMBLY_VIEW_CONFIGURATION, "", False,
+        )
+        model.ShowConfiguration2(ASSEMBLY_VIEW_CONFIGURATION)
         model.events.clear()
-    _assembly._author_and_verify_drawing_configurations(adapter, "fixture", model.author)
-    assert model.explodes == {
-        ASSEMBLY_VIEW_CONFIGURATION: [f"EXPLODED {ASSEMBLY_VIEW_CONFIGURATION}"],
-        SIMPLIFIED_VIEW_CONFIGURATION: [f"EXPLODED {SIMPLIFIED_VIEW_CONFIGURATION}"],
-    }
-    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
-    assert [event for event in model.events if event[0] == "switch"] == [
-        ("switch", SIMPLIFIED_VIEW_CONFIGURATION),
+    _assembly.author_in_drawing_configurations(adapter, "fixture", model.author)
+    _assembly.sync_simplified_configuration(adapter, "fixture")
+    assert model.events == [
+        ("switch" if existing_child else "create", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("references", SIMPLIFIED_VIEW_CONFIGURATION),
         ("switch", ASSEMBLY_VIEW_CONFIGURATION),
-    ]
-    assert [event for event in model.events if event[0] == "references"] == [
-        ("references", SIMPLIFIED_VIEW_CONFIGURATION)
-    ]
-    assert [event for event in model.events if event[0] == "verify"] == [
-        ("verify", SIMPLIFIED_VIEW_CONFIGURATION, False)
+        ("author", ASSEMBLY_VIEW_CONFIGURATION),
+        ("switch", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("author", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("switch", ASSEMBLY_VIEW_CONFIGURATION),
+        ("switch", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("references", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("verify", SIMPLIFIED_VIEW_CONFIGURATION, False),
+        ("faults", SIMPLIFIED_VIEW_CONFIGURATION),
+        ("switch", ASSEMBLY_VIEW_CONFIGURATION),
     ]
     assert model.component.references == {
         ASSEMBLY_VIEW_CONFIGURATION: "T24",
         SIMPLIFIED_VIEW_CONFIGURATION: "T24 Simplified",
     }
-    assert model.configurations[SIMPLIFIED_VIEW_CONFIGURATION].Comment == simplified_comment(
-        _assembly.components_identity(
-            [("gear-1", "T24 Simplified", simplified_comment("Teeth"))]
-        )
-    )
-    assert model.configurations[ASSEMBLY_VIEW_CONFIGURATION].Comment == ""
+    assert model.explodes == {
+        ASSEMBLY_VIEW_CONFIGURATION: [ASSEMBLY_VIEW_CONFIGURATION],
+        SIMPLIFIED_VIEW_CONFIGURATION: [SIMPLIFIED_VIEW_CONFIGURATION],
+    }
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
 
 
 @pytest.mark.parametrize(
     "phase",
     [
-        "default_author",
-        "child_author",
+        "creation_none",
+        "creation_raise",
+        "parent",
+        "activation_refuse",
+        "activation_raise",
         "reference",
-        "reference_rebuild",
-        "verify",
-        "verify_none",
+        "comment",
+        "rebuild_false",
+        "rebuild_none",
+        "rebuild_raise",
         "faults",
-        "activate",
     ],
 )
-def test_a_failed_drawing_configuration_lifecycle_still_leaves_default_active(phase) -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    if phase == "reference":
+def test_a_failed_simplified_sync_restores_default(phase):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
+    if phase.startswith("creation_"):
+        model.creation_failure = phase.removeprefix("creation_")
+    elif phase == "parent":
+        model.creation_failure = "parent"
+    elif phase.startswith("activation_"):
+        model._add(
+            SIMPLIFIED_VIEW_CONFIGURATION, "", "", 0,
+            ASSEMBLY_VIEW_CONFIGURATION, "", False,
+        )
+        model.ShowConfiguration2(ASSEMBLY_VIEW_CONFIGURATION)
+        model.events.clear()
+        model.child_activation_failure = phase.removeprefix("activation_")
+    elif phase == "reference":
         model.component.refuse_reference = True
-    elif phase == "reference_rebuild":
-        model.reference_rebuild_result = False
-    elif phase == "verify":
+    elif phase == "comment":
+        model.refuse_comment = True
+    elif phase == "rebuild_false":
         model.rebuild_result = False
-    elif phase == "verify_none":
+    elif phase == "rebuild_none":
         model.rebuild_result = None
-    elif phase == "faults":
+    elif phase == "rebuild_raise":
+        model.rebuild_error = ValueError("native rebuild failed")
+    else:
         model.faults = (True, [SimpleNamespace(Name="Broken mate")], [1], [False])
-    elif phase == "activate":
-        # Even a refused native switch can have changed the active configuration.
-        model.refuse_switch = SIMPLIFIED_VIEW_CONFIGURATION
-
-    def author(configuration):
-        model.author(configuration)
-        if (phase, configuration) in (
-            ("default_author", ASSEMBLY_VIEW_CONFIGURATION),
-            ("child_author", SIMPLIFIED_VIEW_CONFIGURATION),
-        ):
-            raise RuntimeError("AddExplodeStep2 error 3")
-
-    with pytest.raises(RuntimeError):
-        _assembly._author_and_verify_drawing_configurations(adapter, "fixture", author)
+    with pytest.raises((RuntimeError, ValueError)):
+        _assembly.sync_simplified_configuration(adapter, "fixture")
     assert model.active == ASSEMBLY_VIEW_CONFIGURATION
-    if phase in ("reference", "reference_rebuild", "activate"):
-        assert model.explodes[SIMPLIFIED_VIEW_CONFIGURATION] == []
-    if phase == "default_author":
-        assert ("references", SIMPLIFIED_VIEW_CONFIGURATION) not in model.events
+    assert model.events[-1] == ("switch", ASSEMBLY_VIEW_CONFIGURATION)
+    assert not any(event[0] == "author" for event in model.events)
 
 
-def test_a_claimed_switch_must_really_activate_the_child() -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    model.ignore_switch = SIMPLIFIED_VIEW_CONFIGURATION
-    with pytest.raises(RuntimeError):
-        _assembly._author_and_verify_drawing_configurations(adapter, "fixture", model.author)
-    assert model.explodes[SIMPLIFIED_VIEW_CONFIGURATION] == []
+@pytest.mark.parametrize("verify", [False, True])
+def test_a_failed_initial_sync_prevents_either_authoring_pass(verify):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
+    primary = ValueError("native reference update failed")
+    model.component.reference_error = primary
+    with pytest.raises(ValueError) as failure:
+        if verify:
+            _assembly.sync_simplified_configuration(adapter, "fixture")
+        else:
+            _assembly.author_in_drawing_configurations(adapter, "fixture", model.author)
+    assert failure.value is primary
     assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+    assert not any(event[0] in ("author", "verify") for event in model.events)
 
 
 @pytest.mark.parametrize("primary_failure", [False, True])
-def test_restore_failure_is_fatal_without_masking_an_authoring_failure(
-    monkeypatch, primary_failure
-) -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    model.refuse_switch = ASSEMBLY_VIEW_CONFIGURATION
-    model.ignore_switch = ASSEMBLY_VIEW_CONFIGURATION
+@pytest.mark.parametrize("cleanup_failure", ["refuse", "raise"])
+def test_sync_restore_failure_preserves_the_primary_error(
+    monkeypatch, primary_failure, cleanup_failure
+):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
+    model.restore_failure = cleanup_failure
+    primary = ValueError("native reference update failed")
+    if primary_failure:
+        model.component.reference_error = primary
+    warnings = []
+    monkeypatch.setattr(_assembly._telemetry, "warn", warnings.append)
+    with pytest.raises(ValueError if primary_failure else RuntimeError) as failure:
+        _assembly.sync_simplified_configuration(adapter, "fixture")
+    if primary_failure:
+        assert failure.value is primary
+    assert len(warnings) == int(primary_failure)
+    assert model.active == SIMPLIFIED_VIEW_CONFIGURATION
+
+
+@pytest.mark.parametrize(
+    "phase",
+    ["default_author", "child_author", "activation_refuse", "activation_raise", "activation_ignore"],
+)
+def test_a_failed_authoring_pass_or_activation_restores_default(phase):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
+    primary = ValueError("native explode authoring failed")
+
+    def author(configuration):
+        model.author(configuration)
+        if configuration == ASSEMBLY_VIEW_CONFIGURATION:
+            if phase.startswith("activation_"):
+                model.child_activation_failure = phase.removeprefix("activation_")
+            if phase == "default_author":
+                model.ShowConfiguration2(SIMPLIFIED_VIEW_CONFIGURATION)
+                raise primary
+        elif phase == "child_author":
+            raise primary
+
+    with pytest.raises((RuntimeError, ValueError)) as failure:
+        _assembly.author_in_drawing_configurations(adapter, "fixture", author)
+    if phase.endswith("_author"):
+        assert failure.value is primary
+    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+    assert model.events[-1] == ("switch", ASSEMBLY_VIEW_CONFIGURATION)
+    if phase.startswith("activation_"):
+        assert ("author", SIMPLIFIED_VIEW_CONFIGURATION) not in model.events
+
+
+@pytest.mark.parametrize("primary_failure", [False, True])
+@pytest.mark.parametrize("cleanup_failure", ["refuse", "raise"])
+def test_author_restore_failure_preserves_the_primary_error(
+    monkeypatch, primary_failure, cleanup_failure
+):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
+    primary = ValueError("native explode authoring failed")
     warnings = []
     monkeypatch.setattr(_assembly._telemetry, "warn", warnings.append)
 
     def author(configuration):
         model.author(configuration)
-        if primary_failure and configuration == SIMPLIFIED_VIEW_CONFIGURATION:
-            raise ValueError("original author failure")
+        if configuration == SIMPLIFIED_VIEW_CONFIGURATION:
+            model.restore_failure = cleanup_failure
+            if primary_failure:
+                raise primary
 
     with pytest.raises(ValueError if primary_failure else RuntimeError) as failure:
-        _assembly._author_and_verify_drawing_configurations(adapter, "fixture", author)
+        _assembly.author_in_drawing_configurations(adapter, "fixture", author)
     if primary_failure:
-        assert str(failure.value) == "original author failure"
-        assert len(warnings) == 1
-    else:
-        assert warnings == []
+        assert failure.value is primary
+    assert len(warnings) == int(primary_failure)
+    assert model.active == SIMPLIFIED_VIEW_CONFIGURATION
 
 
-def test_a_settled_child_still_gets_authored_and_deeply_verified() -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    _assembly.sync_simplified_configuration(adapter, "fixture")
-    model.reference_dirty = False  # refresh leaves its closing rebuild to its caller
-    model.events.clear()
-    _assembly._author_and_verify_drawing_configurations(adapter, "fixture", model.author)
-    assert [event for event in model.events if event[0] == "verify"] == [
-        ("verify", SIMPLIFIED_VIEW_CONFIGURATION, False)
-    ]
-    assert [event[1] for event in model.events if event[0] == "author"] == [
-        ASSEMBLY_VIEW_CONFIGURATION,
-        SIMPLIFIED_VIEW_CONFIGURATION,
-    ]
-    assert not any(event[0] == "reference_rebuild" for event in model.events)
-
-
-def test_refresh_keeps_its_sync_then_author_traversal_without_a_new_deep_rebuild() -> None:
-    import _explode_refresh
-
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    _assembly.sync_simplified_configuration(adapter, "fixture")
-    model.reference_dirty = False
-    model.events.clear()
-    _explode_refresh._reauthor_drawing_configurations(adapter, "fixture", model.author)
-    assert [event for event in model.events if event[0] == "switch"] == [
-        ("switch", SIMPLIFIED_VIEW_CONFIGURATION),
-        ("switch", ASSEMBLY_VIEW_CONFIGURATION),
-        ("switch", SIMPLIFIED_VIEW_CONFIGURATION),
-        ("switch", ASSEMBLY_VIEW_CONFIGURATION),
-    ]
-    assert [event[1] for event in model.events if event[0] == "author"] == [
-        ASSEMBLY_VIEW_CONFIGURATION,
-        SIMPLIFIED_VIEW_CONFIGURATION,
-    ]
-    assert not any(event[0] == "verify" for event in model.events)
-    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
-
-
-@pytest.mark.parametrize("defect", ["missing_child", "wrong_parent"])
-def test_an_invalid_derived_child_refuses_authoring(defect) -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    if defect == "missing_child":
-        model.ConfigurationManager.AddConfiguration2 = lambda *_args: None
-    else:
-        _assembly._ensure_simplified_configuration(model, "fixture", options=128)
-        model.configurations[SIMPLIFIED_VIEW_CONFIGURATION].parent = FakeConfiguration("Other")
-    model.events.clear()
-    with pytest.raises(RuntimeError):
-        _assembly._author_and_verify_drawing_configurations(adapter, "fixture", model.author)
-    assert not any(event[0] == "author" for event in model.events)
-    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
-
-
-def test_a_failed_refresh_reference_sync_still_leaves_default_active() -> None:
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    model.component.refuse_reference = True
-    with pytest.raises(RuntimeError):
-        _assembly.sync_simplified_configuration(adapter, "fixture")
-    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
-    assert not any(event[0] == "verify" for event in model.events)
-
-
-def test_a_failed_explode_refresh_author_still_leaves_default_active() -> None:
-    import _explode_refresh
-
-    model = FakeConfiguredAssembly()
-    adapter = _configured_adapter(model)
-    _assembly.sync_simplified_configuration(adapter, "fixture")
-    model.reference_dirty = False
+@pytest.mark.parametrize("operation", ["sync", "author"])
+def test_cleanup_failure_is_fatal_inside_an_unrelated_exception_handler(operation):
+    model = FakeLifecycleAssembly()
+    adapter = _lifecycle_adapter(model)
 
     def author(configuration):
         model.author(configuration)
         if configuration == SIMPLIFIED_VIEW_CONFIGURATION:
-            raise ValueError("explode author failed")
+            model.restore_failure = "refuse"
 
-    with pytest.raises(ValueError):
-        _explode_refresh._reauthor_drawing_configurations(adapter, "fixture", author)
-    assert model.active == ASSEMBLY_VIEW_CONFIGURATION
+    try:
+        raise ValueError("unrelated caller error")
+    except ValueError:
+        with pytest.raises(RuntimeError):
+            if operation == "sync":
+                model.restore_failure = "refuse"
+                _assembly.sync_simplified_configuration(adapter, "fixture")
+            else:
+                _assembly.author_in_drawing_configurations(adapter, "fixture", author)
 
 
 TEETH = ("ToothGapCut", "ToothGapPattern")

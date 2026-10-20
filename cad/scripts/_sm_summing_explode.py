@@ -123,7 +123,7 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
     leave the operational model collapsed.
 
     Run in Default and in Default Simplified
-    (``_assembly.save_assembly_and_images``): a drawing view shows the
+    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
     explode of the configuration it references."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
@@ -206,92 +206,170 @@ def create_summing_explode(adapter: Any, configuration_name: str) -> None:
                 )
             distance = distance_mm / 1000.0
             with _telemetry.span(
-                "assembly.sm_explode.step", label=label, moved=len(moved)
+                "assembly.sm_explode.step",
+                label=label,
+                moved=len(moved),
+                configuration=configuration_name,
+                step_index=step_index,
             ):
-                model.ClearSelection2(True)
-                selection = _early_bound(model.SelectionManager, "ISelectionMgr")
-                data = _early_bound(selection.CreateSelectData(), "ISelectData")
-                if data is None:
-                    raise RuntimeError(
-                        f"{label}: cannot create component selection data"
-                    )
-                data.Mark = 1
-                for component in moved:
-                    if not component.Select4(True, data, False):
-                        raise RuntimeError(f"{label}: cannot select {component.Name2}")
-                axis_name, positive = axes[key]
-                if not model.Extension.SelectByID2(
-                    axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
+                with _telemetry.span(
+                    "assembly.sm_explode.step.selection", selected_expected=len(moved)
                 ):
-                    raise RuntimeError(
-                        f"{label}: cannot select global direction {axis_name} with mark 2"
-                    )
-                # Explicit entity only; -1 omits the component-local manipulator.
-                # Early-bound wrapper returns (IExplodeStep, error); omit [out].
-                result = configuration.AddExplodeStep2(
-                    abs(distance),
-                    -1,
-                    (distance > 0.0) != positive,
-                    0.0,
-                    -1,
-                    False,
-                    True,
-                    False,
-                )
-                model.ClearSelection2(True)
-                if not isinstance(result, tuple) or len(result) != 2:
-                    raise RuntimeError(
-                        f"{label}: incomplete AddExplodeStep2 result {result!r}"
-                    )
-                raw_step, error = result
-                if int(error) != 0 or raw_step is None:
-                    raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
-                step = _early_bound(raw_step, "IExplodeStep")
-                # Distinct per explode: Default Simplified's copy carries the suffix.
-                step_name = f"SM {label.upper()}"
-                if configuration_name != explode.SOURCE_CONFIGURATION:
-                    step_name = simplified_name(step_name)
-                step.Name = step_name
-                if str(step.Name) != step_name or not model.EditRebuild3():
-                    raise RuntimeError(f"{label}: step name/rebuild failed")
-                if int(configuration.GetNumberOfExplodeSteps()) != step_index:
-                    raise RuntimeError(
-                        f"{label}: authored step count is not {step_index}"
-                    )
-                actual = {
-                    str(_early_bound(component, "IComponent2").Name2)
-                    for component in (step.GetComponents() or ())
-                }
-                intended = {str(component.Name2) for component in moved}
-                if (
-                    actual != intended
-                    or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9
-                ):
-                    raise RuntimeError(
-                        f"{label}: step component/distance readback mismatch: {actual!r}"
-                    )
-                for name in intended:
-                    expected[name]["xyz".index(key)] += distance
-                # Read every instance, the unmoved ones too.
-                for component in components:
-                    name = str(component.Name2)
-                    current = _presentation_transform(component)
-                    delta = tuple(
-                        current[i + 9] - baseline[name][i + 9] for i in range(3)
-                    )
-                    if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
-                        raise RuntimeError(
-                            f"{label}: {name} world translation mm "
-                            f"{tuple(value * 1000.0 for value in delta)!r} != "
-                            f"{tuple(value * 1000.0 for value in expected[name])!r}; "
-                            f"direction={axis_name}, signed distance={distance_mm:g} mm"
+                    selected_attempted = selected_completed = 0
+                    axis_attempted = axis_selected = False
+                    try:
+                        model.ClearSelection2(True)
+                        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+                        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+                        if data is None:
+                            raise RuntimeError(
+                                f"{label}: cannot create component selection data"
+                            )
+                        data.Mark = 1
+                        for component in moved:
+                            selected_attempted += 1
+                            if not component.Select4(True, data, False):
+                                raise RuntimeError(f"{label}: cannot select {component.Name2}")
+                            selected_completed += 1
+                        axis_name, positive = axes[key]
+                        axis_attempted = True
+                        if not model.Extension.SelectByID2(
+                            axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
+                        ):
+                            raise RuntimeError(
+                                f"{label}: cannot select global direction {axis_name} with mark 2"
+                            )
+                        axis_selected = True
+                    finally:
+                        _telemetry.annotate(
+                            selected_attempted=selected_attempted,
+                            selected_completed=selected_completed,
+                            axis_attempted=int(axis_attempted),
+                            axis_completed=int(axis_selected),
                         )
-                    if any(
-                        abs(current[i] - baseline[name][i]) > 1e-9
-                        for i in (*range(9), 12)
+                with _telemetry.span(
+                    "assembly.sm_explode.step.create",
+                    create_calls=1,
+                    step_name_state="unverified",
+                ):
+                    # Explicit entity only; -1 omits the component-local manipulator.
+                    # Early-bound wrapper returns (IExplodeStep, error); omit [out].
+                    result = configuration.AddExplodeStep2(
+                        abs(distance),
+                        -1,
+                        (distance > 0.0) != positive,
+                        0.0,
+                        -1,
+                        False,
+                        True,
+                        False,
+                    )
+                    model.ClearSelection2(True)
+                    if not isinstance(result, tuple) or len(result) != 2:
+                        raise RuntimeError(
+                            f"{label}: incomplete AddExplodeStep2 result {result!r}"
+                        )
+                    raw_step, error = result
+                    _telemetry.annotate(add_explode_error=error)
+                    if int(error) != 0 or raw_step is None:
+                        raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
+                    step = _early_bound(raw_step, "IExplodeStep")
+                    # Distinct per explode: Default Simplified's copy carries the suffix.
+                    step_name = f"SM {label.upper()}"
+                    if configuration_name != explode.SOURCE_CONFIGURATION:
+                        step_name = simplified_name(step_name)
+                    step.Name = step_name
+                    if str(step.Name) != step_name:
+                        raise RuntimeError(f"{label}: step name/rebuild failed")
+                    _telemetry.annotate(step_name_state="verified")
+                # This phase includes the status observation and required rebuild.
+                # An unreadable observation is not clean and must not prevent rebuilding.
+                with _telemetry.span(
+                    "assembly.sm_explode.step.rebuild",
+                    rebuild_calls=0,
+                    rebuild_state="not_completed",
+                ):
+                    try:
+                        needs_rebuild_before = int(model.Extension.NeedsRebuild2)
+                    except Exception as observation_error:
+                        rebuild_attributes = {
+                            "needs_rebuild_before_state": "unreadable",
+                            "needs_rebuild_before_error_type": type(observation_error).__name__,
+                            "needs_rebuild_before_error_message": str(observation_error),
+                        }
+                    else:
+                        rebuild_attributes = {
+                            "needs_rebuild_before_state": "measured",
+                            "needs_rebuild_before": needs_rebuild_before,
+                        }
+                    _telemetry.annotate(rebuild_calls=1, **rebuild_attributes)
+                    rebuilt = model.EditRebuild3()
+                    _telemetry.annotate(
+                        rebuild_state="succeeded" if rebuilt else "failed"
+                    )
+                    if not rebuilt:
+                        raise RuntimeError(f"{label}: step name/rebuild failed")
+                with _telemetry.span(
+                    "assembly.sm_explode.step.metadata", membership_expected=len(moved)
+                ):
+                    actual_step_count = int(configuration.GetNumberOfExplodeSteps())
+                    _telemetry.annotate(step_count_actual=actual_step_count)
+                    if actual_step_count != step_index:
+                        raise RuntimeError(
+                            f"{label}: authored step count is not {step_index}"
+                        )
+                    actual = {
+                        str(_early_bound(component, "IComponent2").Name2)
+                        for component in (step.GetComponents() or ())
+                    }
+                    _telemetry.annotate(membership_count=len(actual))
+                    intended = {str(component.Name2) for component in moved}
+                    if (
+                        actual != intended
+                        or abs(float(step.ExplodeDistance) - abs(distance)) > 1e-9
                     ):
                         raise RuntimeError(
-                            f"{label}: {name} presentation rotated or scaled"
+                            f"{label}: step component/distance readback mismatch: {actual!r}"
+                        )
+                with _telemetry.span(
+                    "assembly.sm_explode.step.readback", instances_expected=len(components)
+                ):
+                    transform_reads_attempted = transform_reads_completed = 0
+                    readback_completed = False
+                    try:
+                        for name in intended:
+                            expected[name]["xyz".index(key)] += distance
+                        # Read every instance, the unmoved ones too.
+                        for component in components:
+                            name = str(component.Name2)
+                            transform_reads_attempted += 1
+                            current = _presentation_transform(component)
+                            transform_reads_completed += 1
+                            delta = tuple(
+                                current[i + 9] - baseline[name][i + 9] for i in range(3)
+                            )
+                            if any(abs(delta[i] - expected[name][i]) > 1e-7 for i in range(3)):
+                                raise RuntimeError(
+                                    f"{label}: {name} world translation mm "
+                                    f"{tuple(value * 1000.0 for value in delta)!r} != "
+                                    f"{tuple(value * 1000.0 for value in expected[name])!r}; "
+                                    f"direction={axis_name}, signed distance={distance_mm:g} mm"
+                                )
+                            if any(
+                                abs(current[i] - baseline[name][i]) > 1e-9
+                                for i in (*range(9), 12)
+                            ):
+                                raise RuntimeError(
+                                    f"{label}: {name} presentation rotated or scaled"
+                                )
+                        readback_completed = True
+                    finally:
+                        _telemetry.annotate(
+                            transform_reads_attempted=transform_reads_attempted,
+                            transform_reads_completed=transform_reads_completed,
+                            proof_state=(
+                                "completed" if readback_completed else "incomplete"
+                            ),
                         )
     finally:
         primary_error = sys.exception()
