@@ -1331,6 +1331,7 @@ def _select_balloon_anchor(
                     label=stem,
                     **repeat,
                 )
+            cancelled = False
             try:
                 # Deliberately deferred until AFTER the unchanged raw repeat.
                 from _drawing_pick_diagnostic import collect_after_raw_repeat
@@ -1355,18 +1356,22 @@ def _select_balloon_anchor(
                     _telemetry.event("drawing.pick_diagnostic.error", **diagnostic)
                 with contextlib.suppress(Exception):
                     _telemetry.warn("[1667 diagnostic] collection failed", **diagnostic)
+            except BaseException:
+                cancelled = True
+                raise
             finally:
                 try:
                     try:
                         draw.ClearSelection2(True)
                     except Exception as exc:  # noqa: BLE001 - retain original failure
                         diagnostic["clear_error"] = f"{type(exc).__name__}: {exc}"
-                    # Screens/PDFs depict post-intervention state, NOT baseline.
-                    captured.update(
-                        _seat_forensics.capture_pick_screens(
-                            adapter, f"{stem}-frozen-anchor-pick1-post_arms"
+                    if not cancelled:
+                        # Screens/PDFs depict post-intervention state, NOT baseline.
+                        captured.update(
+                            _seat_forensics.capture_pick_screens(
+                                adapter, f"{stem}-frozen-anchor-pick1-post_arms"
+                            )
                         )
-                    )
                 finally:
                     observed["diagnostic_callback_ms"] = (
                         time.perf_counter() - callback_started
