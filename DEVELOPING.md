@@ -32,10 +32,11 @@ $env:HARMONIC_MACHINIST_REVIEWER = "codex"
 uv run --frozen python build.py --verbosity warning
 ```
 
-Other values, including an empty value, fail at review-task generation before
-cache probing or report/stamp changes. The graph freezes the effective backend,
-model and effort for task freshness, cache identity and explicit CLI arguments
-for both roles. Changing that profile invalidates freshness and selects a separate
+Other values, including an empty value, fail during selection before review
+inputs, cache probes or output changes unless both roles are explicitly selected
+by CLI flags. The graph freezes the six effective
+reviewer/judge backend, model and effort fields for task freshness, cache identity
+and explicit CLI arguments. Changing that profile selects a separate
 cache entry; reverting can reuse only that profile's verdict. Cache provenance
 retains the real `machinist_review_config.py` source path: its contextual digest
 combines the file's content digest with canonical effective-profile JSON.
@@ -49,15 +50,58 @@ Draw scripts default to `MachinistReviewMode.OFF`: no review task exists, so
 `MACHINIST_REVIEW = MachinistReviewMode.LEARN` (`FIX`/`ERROR` warn) or
 `MachinistReviewMode.ENFORCE` (they fail the build) at module level. The graph reads
 only the AST, rejects other value forms, and reruns verdict consumption when the
-mode changes without re-keying the review. `FIX` is stored before enforcement;
-provider/runner errors are never cached or freshness-stamped. An explicitly forced
-refresh that produces no cacheable verdict fails even in LEARN mode, without
-caching the error. Review keys hash the PDF, package exceptions, review code/import
-closure, the selected kind's reviewer/severity prompts, shared reviewer/judge
-prompts/schemas and shared drawing guidelines, not the registry, enforcement
-declaration, or recipe-skipped infrastructure such as telemetry. Build leaves
-always pass `--force`, so bypassed PDF-diff implementation, identity-pairing inputs,
-and the precheck prompt/schema do not invalidate their review cache.
+mode changes without re-keying the review. `FIX` is stored before enforcement.
+Ensemble `ERROR` or an aggregate error is never cached or freshness-stamped;
+individual failed runs remain evidence and do not invalidate a successful
+partial-run aggregate. An explicitly forced refresh that produces no cacheable
+verdict fails even in LEARN mode. Review keys hash the PDF, package exceptions,
+review code/import closure, selected kind's reviewer/severity contract, shared
+judge prompts/schemas, drawing guidelines and the effective review settings,
+not the registry, enforcement declaration or recipe-skipped infrastructure.
+Build leaves always pass `--force`, so bypassed PDF-diff implementation,
+identity-pairing inputs and the precheck prompt/schema do not invalidate their
+review cache or permit a minimal-change skip of the registered gate.
+
+Without the registered environment selector, reviewer and judge defaults remain
+independently Claude / `claude-opus-5-5` / `medium`. Normal builds support explicit
+selection for each role, overriding the environment selector for that role:
+
+```text
+uv run --frozen python build.py --executor farm --display-name "Owner - Codex review" --machinist-reviewer codex --machinist-model gpt-6-astra --machinist-effort high --machinist-judge-reviewer codex --machinist-judge-model gpt-6-astra --machinist-judge-effort high build
+```
+
+Omitted model/effort use the selected provider's defaults (Codex:
+`gpt-6-astra` / `low`); selecting the reviewer does not change the judge.
+Builds always attempt three blind runs. Direct `machinist_review.py` uses the
+same resolver through its existing `--reviewer/--model/--effort` and
+`--judge-reviewer/--judge-model/--judge-effort` flags, and retains `--runs`.
+Its precheck and resumed adjudication use the selected judge role; they do not
+introduce another provider setting. Direct CLI reviews require paired baseline
+PDFs unless `--force` requests an unconditional after-only review.
+Empty or malformed tokens are errors, never defaults. Unsupported opaque
+model/effort requests remain provider errors, without automatic substitution.
+
+The wrapper freezes the six effective strings in the internal
+`HARMONIC_MACHINIST_REVIEW_SETTINGS` carrier for graph loading and all submitter
+workers, then restores the caller's environment. It is not a public environment
+override; standalone review CLI ignores it. The single `machinist_review_config.py`
+module supplies both standalone defaults and the registered selector. Its real
+source digest is combined with canonical effective settings for review-only
+cache identity; no settings sidecar is created. Equivalent explicit/omitted
+defaults share a key. Changing any effective field splits local freshness and
+remote cache identity, not native recipes.
+Hits and misses require matching aggregate/run/judge selection provenance and
+three attempted run summaries. All present run reports are checked; a missing
+report is permitted only for an explicitly failed attempt, never a successful
+run. A skipped judge needs no report; partial-run
+policy and the adaptive confirmation threshold are unchanged.
+
+For supervised runs, pass all desired `-Machinist*` options to `farm-run.ps1`
+(see parameters below). The recorded build argv proves requested values; task
+argv and retained reports record effective values. Python validates selection
+inside the private snapshot before graph inspection, model calls or dispatch,
+so the launcher may already have created its checkout/shared environment and
+launch record when an invalid value is rejected.
 
 ## Process traveler prerequisites
 
@@ -489,6 +533,8 @@ explicit way to stop a run, `-Cancel` (see
 | `-DisplayName` | yes, Launch only | short owner/session plus reason; nonblank, single-line, no control characters, at most 160 characters; tracking commands such as `-Watch` do not require it |
 | `-ForceCacheRefresh` | no, Launch only | string array of exact remote-cache leaf task names; each string may also be comma-separated |
 | `-ForceCacheRefreshReason` | with refresh labels only | why these cached outputs must be overwritten; same text/Unicode rules as `-DisplayName` |
+| `-MachinistReviewer`, `-MachinistModel`, `-MachinistEffort` | no, Launch only | blind reviewer provider/model/effort, forwarded explicitly to the corresponding `--machinist-*` build options |
+| `-MachinistJudgeReviewer`, `-MachinistJudgeModel`, `-MachinistJudgeEffort` | no, Launch only | independent judge selection; same Python defaults/validation as a direct build invocation |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 An explicit `HARMONIC_AGENT_SCRATCHPAD` always wins. Otherwise, an OMP
