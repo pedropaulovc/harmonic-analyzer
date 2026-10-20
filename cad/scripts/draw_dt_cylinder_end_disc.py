@@ -6,8 +6,10 @@ import argparse
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -20,7 +22,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
@@ -72,6 +74,42 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "DiscThick": THICKNESS_CALLOUT,
 }
+
+# swDimensionTextParts_e.swDimensionTextCalloutBelow. These are ordinary
+# model display dimensions, not Hole Wizard callouts (GetText excludes those).
+_CALLOUT_BELOW = 4
+
+
+def _set_required_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Refuse export unless the process and datum requirements persist."""
+    remaining = dict(DIMENSION_CALLOUTS)
+    for annotation in annotations:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetSpecificAnnotation"
+        )
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        text = remaining[name]
+        display = annotation.GetSpecificAnnotation()
+        if display is None:
+            raise RuntimeError(f"disc dimension {name!r} has no display annotation")
+        display = _sw_type_info.early_bound_or_flag(
+            display, "IDisplayDimension", "SetText", "GetText"
+        )
+        # SetText returns void: do not route either call through _attempt,
+        # which swallows COM exceptions. DRILL THRU selects the bore limits
+        # used by the clearance proof, so an ineffective write must fail too.
+        display.SetText(_CALLOUT_BELOW, text)
+        actual = display.GetText(_CALLOUT_BELOW)
+        if actual != text:
+            raise RuntimeError(
+                f"disc dimension {name!r} below callout did not persist: "
+                f"{actual!r} != {text!r}"
+            )
+        del remaining[name]
+    if remaining:
+        raise RuntimeError(f"disc required callouts missing: {sorted(remaining)}")
 
 
 def _require_horizontal_axis(adapter: Any, section: Any) -> None:
@@ -145,7 +183,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
+    _set_required_callouts(adapter, annotations)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the disc face view")
 

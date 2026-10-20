@@ -542,6 +542,10 @@ sections:
       (T120), increasing northward for every smaller cone. This axial gap is
       not claimed at free-bore disc tilt; the radial separating plane is the
       controlling clearance proof.
+      Before exporting the disc drawing, its native below-callout text is
+      read back exactly: DRILL THRU selects the bore limits used above, and
+      the thickness callout identifies the south bank datum. A failed write
+      or mismatched readback refuses export rather than losing those facts.
       cylinder_bank_layout calls the pure owning-spec guard with its actual
       datum budget. Native assembly checks remain required, including an
       engaged-pinion sweep; a parked-pose interference result alone cannot

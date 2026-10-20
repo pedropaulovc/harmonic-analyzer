@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from types import SimpleNamespace
+
 import pytest
 
 import dt_cylinder_end_disc_spec as spec
@@ -76,3 +79,109 @@ def test_axial_section_rejects_a_nonhorizontal_or_degenerate_axis(
     )
     with pytest.raises(RuntimeError, match="horizontal turning axis"):
         drawing._require_horizontal_axis(object(), object())
+
+
+@pytest.mark.parametrize("target", ["BoreDia", "DiscThick"])
+@pytest.mark.parametrize("failure", ["write", "ineffective", "partial", "read"])
+def test_required_callout_failure_prevents_export(
+    monkeypatch, tmp_path, target, failure
+) -> None:
+    source = tmp_path / "disc.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    exported = False
+
+    class Display:
+        def __init__(self, name):
+            self.name = name
+            self.text = ""
+
+        def GetDimension(self):
+            return SimpleNamespace(Name=self.name)
+
+        def SetText(self, _part, text):
+            if self.name == target:
+                if failure == "write":
+                    raise RuntimeError("native callout write failed")
+                if failure == "ineffective":
+                    return
+                if failure == "partial":
+                    self.text = text.splitlines()[0]
+                    return
+            self.text = text
+
+        def GetText(self, _part):
+            if self.name == target and failure == "read":
+                raise RuntimeError("native callout read failed")
+            return self.text
+
+    class Annotation:
+        def __init__(self, name):
+            self.display = Display(name)
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+    def attempt(operation):
+        # Model the real adapter's swallowing behavior: production must not
+        # use this boundary for the required callout write or readback.
+        try:
+            return operation()
+        except RuntimeError:
+            return None
+
+    async def open_model(_path):
+        return None
+
+    async def finalize(*_args, **_kwargs):
+        nonlocal exported
+        exported = True
+        return {}
+
+    adapter = SimpleNamespace(
+        currentModel=object(),
+        open_model=open_model,
+        _attempt=attempt,
+        _get_attr_or_call=lambda obj, name: getattr(obj, name),
+    )
+    monkeypatch.setattr(
+        drawing._sw_type_info,
+        "early_bound_or_flag",
+        lambda obj, *_args: obj,
+    )
+    monkeypatch.setattr(drawing, "check", lambda *_args: None)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "new_project_drawing", lambda *_args, **_kwargs: (object(), object())
+    )
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(drawing, "create_section_view", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(
+        drawing,
+        "model_points_in_view",
+        lambda *_args, **_kwargs: ((0.0, 0.0), (0.01, 0.0)),
+    )
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(
+        drawing,
+        "curate_view_dimensions",
+        lambda *_args, **_kwargs: [
+            Annotation("DiscDia"),
+            Annotation("BoreDia"),
+            Annotation("DiscThick"),
+        ],
+    )
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *_args: None)
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+
+    expected = {
+        "write": "native callout write failed",
+        "ineffective": "below callout did not persist",
+        "partial": "below callout did not persist",
+        "read": "native callout read failed",
+    }[failure]
+    with pytest.raises(RuntimeError, match=expected):
+        asyncio.run(drawing.build(adapter))
+    assert not exported
