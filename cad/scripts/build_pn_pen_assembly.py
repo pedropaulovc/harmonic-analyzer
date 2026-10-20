@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: pen subassembly (book ch. 24; engineerguy 4/4, 9:15-10:34).
 
 The machine's output transducer: the pen carriage that writes the Fourier sum

@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: paper-drive subassembly (book ch. 22-23, 25).
 
 The orthogonal time-base of the plotter: the platen carries the recording paper

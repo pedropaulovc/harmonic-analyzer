@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: magnifier subassembly (book ch. 20-21).
 
 The amplification stage: the magnifying lever takes the summing lever's tiny

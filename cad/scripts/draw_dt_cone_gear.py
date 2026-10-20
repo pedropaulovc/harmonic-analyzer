@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Create the complete cone-gear batch drawing package (MHA-DT-003).
 
 Every configured family member T006..T120 by six receives a standalone sheet.

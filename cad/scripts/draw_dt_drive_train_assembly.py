@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Create the native eleven-sheet drive-train assembly drawing package (MHA-DT-000).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte

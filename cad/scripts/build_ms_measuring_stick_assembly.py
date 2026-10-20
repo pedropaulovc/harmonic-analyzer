@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: ms-measuring-stick.SLDASM (MHA-MS-000).
 
 The ch16 measuring stick with its stop clamped at the 2.0 mark (user-approved

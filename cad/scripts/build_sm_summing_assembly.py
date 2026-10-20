@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: summing subassembly (book ch. 18-19).
 
 The head of the analyzer's output, where the 20 channel springs converge on

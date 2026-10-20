@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: ch-rocker-arm-tl-oblique-jig.SLDASM (MHA-CH-006-TL-000).
 
 The rocker arm's oblique-trammel mill jig, a shop fixture (never in the

@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Create the native multi-sheet frame assembly drawing package.
 
 The released ``fr-frame.SLDASM`` stays authoritative and byte-for-byte unchanged.

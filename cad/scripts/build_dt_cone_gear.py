@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Author the cutter-native configured cone family, T006 through T120.
 
 ``dt_cone_gear_spec.stock_form_profile`` is the geometry authority. Each

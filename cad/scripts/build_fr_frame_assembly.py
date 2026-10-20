@@ -1,3 +1,4 @@
+# Benchmark-only recipe isolation: matched COM workload; executable source unchanged.
 r"""Reproduction script: frame subassembly (book ch. 6 / eight-views).
 
 Static structure of the machine: the stepped cast base, four polished tube
