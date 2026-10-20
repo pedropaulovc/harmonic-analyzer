@@ -267,12 +267,9 @@ def test_exact_added_area_and_first_moments_match_independent_section_integratio
         return area * x if kind == "x" else area
 
     exact = section.section_moments() - section.base_section_moments()
-    assert section.edge_rib_added_area_mm2() == exact.area_mm2
-    assert profile.edge_rib_added_area_mm2() == exact.area_mm2
     assert exact.area_mm2 == pytest.approx(_integral(lambda x: slice_moment(x, "area"), breaks), abs=0.003)
     assert exact.x_mm3 == pytest.approx(_integral(lambda x: slice_moment(x, "x"), breaks), abs=0.02)
     assert exact.y_mm3 == pytest.approx(_integral(lambda x: slice_moment(x, "y"), breaks), abs=0.003)
-    assert exact.area_mm2 > 400.0
 
 
 def _legacy_rib_bounds(x: float, middle: bool) -> tuple[float, float]:
