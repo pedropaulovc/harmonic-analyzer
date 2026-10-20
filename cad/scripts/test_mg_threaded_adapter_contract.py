@@ -153,3 +153,17 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
     conversion = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SketchUseEdge3")
     conversion.args.append(ast.Constant(False))
     assert "ISketchManager.SketchUseEdge3 arguments" in _undeclared_bound_calls(mutated)
+    for interface, property_name in (
+        ("ISketch", "ModelToSketchTransform"),
+        ("ISketchPoint", "X"),
+        ("ISketchPoint", "Y"),
+        ("IMathPoint", "ArrayData"),
+    ):
+        _methods, maps = _native_declaration(interface)
+        assert property_name in maps["_prop_map_get_"]
+    rim = next(node for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
+    assert _can_bind(rim, _native_declaration("ISelectionMgr")[0]["SetSelectionPoint2"])
+    mutated = copy.deepcopy(tree)
+    rim = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
+    rim.func.attr = "SetSelectionPoint"
+    assert "ISelectionMgr.SetSelectionPoint arguments" in _undeclared_bound_calls(mutated)

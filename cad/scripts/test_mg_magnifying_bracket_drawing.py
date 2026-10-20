@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import math
 from types import SimpleNamespace
@@ -166,3 +167,91 @@ def test_native_wizard_placement_refuses_a_missing_feature(monkeypatch) -> None:
     adapter, _reads, _bindings = _placement_adapter(monkeypatch, {"MountingHoles": 3})
     with pytest.raises(RuntimeError, match="LeverTap: native part feature not found"):
         part._assert_placement_sketches_fully_defined(adapter)
+
+
+class _CalloutsComplete(Exception):
+    """Stop the real recipe after all dimension imports, before hole picking."""
+
+
+class _DrawingDisplay:
+    def __init__(self, name, view, imported):
+        self.dimension = SimpleNamespace(Name=name)
+        self.view = view
+        self.imported = imported
+        self.text = {}
+
+    def GetDimension(self):
+        return self.dimension
+
+    def SetText(self, location, text):
+        assert self.dimension.Name in self.imported[self.view]
+        assert location not in self.text, "a required callout was applied twice"
+        self.text[location] = text
+
+
+@pytest.mark.parametrize("missing", (None, "NeckThickness", "FlangeDepth", "RootR", "FootCornerR", "MouthChamfer", "ThreadRootEnvelope"))
+def test_recipe_applies_every_callout_only_to_its_imported_owning_view(monkeypatch, tmp_path, missing) -> None:
+    """Exercise the actual build loop and strict callout writer, not copied maps."""
+    source = tmp_path / "bracket.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    imported = {}
+    displays = {}
+
+    async def open_model(_path):
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter = SimpleNamespace(
+        currentModel=object(), open_model=open_model,
+        _attempt=lambda fn, default=None: fn(),
+        _get_attr_or_call=lambda obj, name: getattr(obj, name)() if callable(getattr(obj, name)) else getattr(obj, name),
+    )
+
+    def place(_adapter, _source, orientation, *_xy, scale):
+        imported[orientation] = set()
+        return orientation
+
+    def curate(_adapter, view, *, keep, view_label, dimensions_by_feature):
+        assert set(keep) <= set().union(*dimensions_by_feature.values())
+        annotations = []
+        for name in keep:
+            if name == missing:
+                continue
+            assert name not in displays, "a dimension was imported into two homes"
+            imported[view].add(name)
+            display = displays[name] = _DrawingDisplay(name, view, imported)
+            annotations.append(SimpleNamespace(GetSpecificAnnotation=lambda display=display: display))
+        return annotations
+
+    def complete(_view):
+        raise _CalloutsComplete
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (object(), object()))
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "curate_hidden_dimensions", curate)
+    monkeypatch.setattr(drawing, "_mounting_rims", complete)
+    if missing is not None:
+        # The strict writer still fails when an owning import lacks its callout
+        # carrier; filtering against what happened to arrive must not hide it.
+        with pytest.raises(RuntimeError, match=f"dimension callouts not applied:.*{missing}"):
+            asyncio.run(drawing.build(adapter))
+        return
+    with pytest.raises(_CalloutsComplete):
+        asyncio.run(drawing.build(adapter))
+    expected = {
+        "NeckThickness": ("*Top", spec.NECK_THICKNESS_CALLOUT),
+        "FlangeDepth": ("*Top", spec.FLANGE_DEPTH_CALLOUT),
+        "RootR": ("*Top", spec.ROOT_CALLOUT),
+        "FootCornerR": ("*Front", spec.FOOT_CORNER_CALLOUT),
+        "MouthChamfer": ("*Right", spec.MOUTH_CALLOUT),
+        "ThreadRootEnvelope": ("*Right", spec.THREAD_ENVELOPE_CALLOUT),
+    }
+    actual = {
+        name: (display.view, display.text[4])
+        for name, display in displays.items() if display.text
+    }
+    assert actual == expected
+    assert set(displays) == set().union(*spec.DRAWING_DIMENSIONS.values())

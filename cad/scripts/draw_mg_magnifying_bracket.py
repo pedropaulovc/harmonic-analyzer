@@ -2,6 +2,7 @@ r"""Native manufacturing sheet for the simple threaded L bracket.
 
 All sizes/locations import from the saved SLDPRT, including the ordinary
 side/tip hole-location chain and the independent internal-root MAX envelope.
+Each dimension's callout is applied only after its owning view imports it.
 No press-fit, collar, finish-land or GD&T-frame convention remains.
 """
 
@@ -100,9 +101,13 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, bottom, side, iso):
         set_hidden_lines_removed(adapter, view)
     _project_side_view(adapter, front, side)
-    for view, keep, label in ((front, FRONT_KEEP, "front"), (bottom, BOTTOM_KEEP, "mounting face"), (side, SIDE_KEEP, "thread-axis end")):
+    for view, keep, label, callouts in (
+        (front, FRONT_KEEP, "front", {"NeckThickness": NECK_THICKNESS_CALLOUT, "FlangeDepth": FLANGE_DEPTH_CALLOUT, "RootR": ROOT_CALLOUT}),
+        (bottom, BOTTOM_KEEP, "mounting face", {"FootCornerR": FOOT_CORNER_CALLOUT}),
+        (side, SIDE_KEEP, "thread-axis end", {"MouthChamfer": MOUTH_CALLOUT}),
+    ):
         annotations = curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=DRAWING_DIMENSIONS)
-        set_dimension_callouts(adapter, annotations, {"NeckThickness": NECK_THICKNESS_CALLOUT, "FlangeDepth": FLANGE_DEPTH_CALLOUT, "RootR": ROOT_CALLOUT, "FootCornerR": FOOT_CORNER_CALLOUT, "MouthChamfer": MOUTH_CALLOUT})
+        set_dimension_callouts(adapter, annotations, callouts)
     curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations and root limit", dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature] for feature in ("TapCoordinates", "ThreadEnvelope")})
     set_dimension_callouts(adapter, annotations, {"ThreadRootEnvelope": THREAD_ENVELOPE_CALLOUT})
