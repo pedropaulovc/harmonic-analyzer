@@ -1066,11 +1066,11 @@ def _settled_under_head_errors(dumps: Sequence[Mapping[str, Any]]) -> list[str]:
             if annotation.get("owner_type") == 0 and annotation.get("name") in records:
                 records[annotation["name"]].append(annotation)
     errors, strokes, boxes = [], {}, {}
-    for name, annotations in records.items():
+    for name, matching in records.items():
         strokes[name], boxes[name] = [], []
-        if len(annotations) != 1:
-            errors.append(f"SIDE/{name}: expected one settled under-head corridor annotation; count={len(annotations)}")
-        for annotation in annotations:
+        if len(matching) != 1:
+            errors.append(f"SIDE/{name}: expected one settled under-head corridor annotation; count={len(matching)}")
+        for annotation in matching:
             if annotation.get("type") != 4 or annotation.get("visible") != 1:
                 errors.append(f"SIDE/{name}: wrong native corridor type/visibility; actual={annotation!r}")
             display = annotation.get("display")
