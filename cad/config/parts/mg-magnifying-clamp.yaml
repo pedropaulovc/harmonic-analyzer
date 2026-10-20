@@ -6,4 +6,4 @@ mg-magnifying-clamp:
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "cut from 7/16 hex bar (brass), flats as supplied: face both ends square to the hex axis (the bottom face is the MHA-MG-04 shoulder seat); hold on flats and centre-drill the corner ridge before drilling the Ø6.2 lever bore through the corners; tap #4-40 from the top face on the hex axis into the bore and #4-40 blind from the bottom face on the hex axis; chemically blacken"
+  process: "cut 28.95 long from 7/16 hex bar (brass), flats as supplied: face both ends square to the hex axis (the bottom face is the MHA-MG-04 shoulder seat); hold on flats and centre-drill the corner ridge before drilling the Ø6.50 +0.10/0 lever bore through the corners at 19.95 from the bottom, sliding on the MHA-MG-03 quarter-inch body; tap #4-40 from the top face on the hex axis into the bore and #4-40 blind from the bottom face on the hex axis; retain the rod tap 8.55 full thread and 12.75 drill at the .XX band; bore wander 0.10 + HEX_AC/2 tan(0.3 degrees) included in the 2.037 minimum rod-tap floor and 4.296 minimum thumb full thread; chemically blacken"

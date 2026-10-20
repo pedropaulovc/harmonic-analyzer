@@ -13,7 +13,7 @@ centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
   (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
   (``Height``).  Equal flats either side of the origin centre the hex axis,
   so neither the bore nor the taps need a location from a flat.
-* ``LeverBoreProfile``: the Ø6.2 drilled lever bore, a Right-plane circle on
+* ``LeverBoreProfile``: the Ø6.50 drilled lever bore, a Right-plane circle on
   the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
 * ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
   thread ending at the bore, drill to the bore axis.
@@ -42,10 +42,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
+from _printed_tolerance import drilled_oversize_mm
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -227,6 +229,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Places are the tolerance statement (drawing-guidelines.md rule 3): the
     # part carries them, the drawing reads them back.
+    set_dimension_bilateral_tolerance(adapter, "LeverBoreProfile", "LeverBoreDiaDim", 0.0, drilled_oversize_mm())
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

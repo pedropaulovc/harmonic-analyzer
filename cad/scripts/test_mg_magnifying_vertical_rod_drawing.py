@@ -152,10 +152,10 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
     assert reach[0] - spec.SHOULDER_X == pytest.approx(4.993, abs=1e-3)
     assert spec.ROD_LENGTH - reach[1] == pytest.approx(7.493, abs=1e-3)
     assert (reach[1] - reach[0]) / (body[1] - body[0]) > 0.9
-    # The modelled installation lies inside the reach: the screw axis 47.85
+    # The compensated installation keeps the hook fixed, 47.55 under the tip.
     # under the thread tip, its tip tangent to the rod.
     station = assembly.VROD_TOP_Y - fixture.FIXTURE_AXIS_Y
-    assert station == pytest.approx(47.85, abs=1e-9)
+    assert station == pytest.approx(47.55, abs=1e-9)
     half = fixture.HEX_CORNER_RADIUS
     assert body[0] + half <= station <= body[1] - half
     assert assembly.FIXTURE_SCREW_TIP_X == spec.ROD_DIA / 2.0

@@ -30,6 +30,8 @@ import mg_wheel_axle_spec as _pin
 import mg_wheel_bar_geom as _bar
 import mg_wheel_group as _group
 from sh_vn_music_wire_lever_geom import WHEEL_X
+from _printed_tolerance import printed_band_mm
+from mg_lever_thread_joint import REQUIRED_FULL_ENGAGEMENT, installation_full_overlap
 from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.
@@ -80,10 +82,10 @@ DIMENSION_TOLERANCES = {
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
-# The lever rod lies along machine x at the bracket's height; its west dome
-# tip is the collar station east of the bracket (Ry(180) placement).
+# The free hemisphere tip stays fixed; the flat threaded tip extends beyond
+# the bracket's far face instead of moving the useful lever/knife position.
 LEVER_AXIS_Y = _bracket.BRACKET_ORIGIN[1]
-LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.COLLAR_LOCAL_X
+LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.BRACKET_LOCAL_X
 CLAMP_STATION = _lever.CLAMP_LOCAL_X
 CLAMP_CENTRE_X = LEVER_TIP_X - CLAMP_STATION
 FIXTURE_AXIS_Y = _fixture.FIXTURE_AXIS_Y
@@ -124,3 +126,17 @@ SETTING_CALLOUTS = {
         FIXTURE_DROP_DIMENSION: (4, "FIXTURE DROP:\nSETS TRACE HEIGHT"),
     },
 }
+
+# A separate native installation witness: flat tip proud of the far neck face.
+# .XX general tolerance is an assembly setting, not a manufactured shoulder.
+THREAD_FEATURE = "LeverThreadSetting"
+THREAD_PROJECTION_DIMENSION = "ThreadProjection"
+THREADED_TIP_X = LEVER_TIP_X - _lever.ROD_LENGTH
+THREAD_FAR_FACE_X = _bracket.BRACKET_ORIGIN[0] - _lever.NECK_HALF_X
+THREAD_PROJECTION = THREAD_FAR_FACE_X - THREADED_TIP_X
+THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
+THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
+THREAD_PROJECTION_TOL = printed_band_mm(2)
+INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
+if THREAD_PROJECTION - THREAD_PROJECTION_TOL < 0.0 or INSTALLED_FULL_ENGAGEMENT_MIN < REQUIRED_FULL_ENGAGEMENT:
+    raise AssertionError("MG native installation depth loses far-face reach or 1.5D full thread")

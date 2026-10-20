@@ -3056,7 +3056,6 @@ def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None
     closure = _helper_names("_interference_contracts.py")
     assert "_hole_spec" in closure
     assert "mg_output_fixture_geom" not in closure
-    assert "mg_lever_press_fit_geom" not in closure
 
 
 @pytest.mark.parametrize(
