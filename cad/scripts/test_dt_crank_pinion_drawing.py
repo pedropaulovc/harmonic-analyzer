@@ -1213,27 +1213,22 @@ def _crank_step() -> str:
     return step.split(f"\n{number + 1}. ")[0]
 
 
-def test_assembly_step_states_current_t120_clearance_and_absent_sections() -> None:
-    # Each finite fact belongs to its own feature. A missing shoulder section
-    # is stated as absence, never as an infinite size or an obsolete shortfall.
-    # The clearances are a design-check result: the part sheet does not print
-    # them (Main's MHA-DT-010 eye pass), only the assembly's crank step does.
-    import build_dt_drive_train_assembly as bdt
+def test_no_print_states_the_t120_design_clearances() -> None:
+    # The clearances are a design-check result (build_dt_drive_train_assembly
+    # asserts them). Neither print narrates them: the part sheet dropped them in
+    # Main's MHA-DT-010 eye pass, and #1695 moved the assembly crank step to the
+    # bench check and its cuts only (dt_drive_train_assembly_notes). The step
+    # still reads the fit-up feeler and both cut limits.
+    import dt_drive_train_assembly_notes as notes
 
-    band = round(math.floor(bdt.T120_TURNED_BAND_RADIAL * 100.0) / 100.0, 2)
-    shoulder = (
-        {round(math.floor(bdt.T120_SHOULDER_AIR * 100.0) / 100.0, 2)}
-        if math.isfinite(bdt.T120_SHOULDER_AIR)
-        else set()
-    )
     text = _crank_step()
-    assert _t120_clearance_facts(text) == {"BAND": {band}, "SHOULDER": shoulder}
-    if not shoulder:
-        assert "SHOULDER NO AXIAL OVERLAP" in text
+    flat = " ".join(text.split())
+    assert " ".join(notes.T120_FITUP_ASSEMBLY_CHECK.split()) in flat
+    assert f"{spec.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND" in flat
     assert not re.search(r"\b(?:INF|NAN)\b|∞", text)
-    for part_text in (spec.DRAWING_NOTES, spec.TURNED_DIA_FITUP_CALLOUT):
-        assert "CLEARANCE" not in part_text
-        assert _t120_clearance_facts(part_text) == {"BAND": set(), "SHOULDER": set()}
+    for printed in (text, spec.DRAWING_NOTES, spec.TURNED_DIA_FITUP_CALLOUT):
+        assert "CLEARANCE" not in printed
+        assert _t120_clearance_facts(printed) == {"BAND": set(), "SHOULDER": set()}
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
