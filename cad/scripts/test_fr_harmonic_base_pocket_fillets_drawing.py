@@ -970,14 +970,18 @@ def test_nominal_face_gaps_and_a_clear_axis_cannot_hide_a_max_r6_interruption() 
     assert _skin_exit_clearances(seat, centre)[f"R6 {corner.name}"] < 0.0
 
 
-def test_skin_exit_scan_refuses_nominal_only_and_transfer_envelope_counterexamples() -> None:
+def test_skin_exit_scan_refuses_nominal_only_and_transfer_envelope_counterexamples() -> (
+    None
+):
     seat = base.BLOCK_SEAT_SPEC
     radius = _seat_radius(seat.size, TAP_DRILL_MM[seat.size])
     left = spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0
     right = spec.CROSS_RIB_CENTER_X + spec.RIB_THICKNESS / 2.0
     nominal_only = (left - radius - 1.0, 50.0)
     assert left - nominal_only[0] - radius == pytest.approx(1.0)
-    assert base.retained_material_segments_mm(*nominal_only) == ((0.0, spec.POCKET_SKIN),)
+    assert base.retained_material_segments_mm(*nominal_only) == (
+        (0.0, spec.POCKET_SKIN),
+    )
     assert _skin_exit_clearances(seat, nominal_only)["cross rib"] < 0.0
     transferred = (right + radius + 5.0, 50.0)
     assert _skin_exit_clearances(seat, transferred)["cross rib"] > 0.0
