@@ -189,11 +189,15 @@ left only **0.21 mm** between the underline and border strokes at the old
 anchor. The regenerated native PDF measured **4.21 mm** of border air;
 subsequent native inspection must retain that gap and check the neighbouring
 boss-height callouts. The **1.0 X 45 DEG CAP / GOOSENECK TOP** chamfer keeps
-its original exact-vertex measurement and dimension-line placement, while
-its native text-only jog moves the three rows to **(315, 174) mm**. This
-separates the text shelf from the dimension line and witness overrun rather
-than moving the coupled self-collision. Native inspection must confirm the
-actual jog/arrow connection and clearance to the 4.5 boss-height leader.
+its original creation point and exact-vertex measurement, while its native
+text-only jog moves the three rows to **(315, 174) mm**. Native inspection
+found that enabling `OffsetText` re-dressed the dimension line from
+**y = 153.6656 mm** to **y = 162.000 mm**, the unchanged creation-point y.
+The measuring vertices and 1.0 control are unchanged; the native dimension
+line's paper placement is not invariant. The text shelf is now separate
+from the dimension line and witness overrun. Inspection must distinguish
+the offset leader joining its own native arrow/witness widget from a
+text/witness strike, and confirm clearance to the 4.5 boss-height leader.
 
 The top-frame's live view identifiers are **H-H** (front/rear rail section),
 **DETAIL J** (underside hub enlargement), **K-K** (set-screw boss section)
