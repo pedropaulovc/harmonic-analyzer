@@ -20,8 +20,11 @@ break read in a standalone cropped 10:1 ``*Right`` model view, labelled
 DETAIL A and circled on the side view.  The ordinary associative two-arrow
 diameter crosses both neck surfaces within the straight floor; its full text
 block stays below the model.  The width stays on SIDE, avoiding witnesses
-through that text.  Rebuilt native diameter ink must clear both groove corners
-and each of the other three detail dimensions.
+through that text. Rebuilt native diameter ink must clear both groove corners
+and each of the other three detail dimensions. Every printable generated
+annotation's actual text, symbol and leader ink stays inside the unchanged
+ASME inner border, and every foreign DETAIL pair stays uncrossed. The tip's
+file-and-stake instruction shares the thread callout's feature leader.
 
 Run with SolidWorks open::
 
@@ -34,6 +37,7 @@ import argparse
 from collections.abc import Mapping
 import math
 import sys
+import textwrap
 from typing import Any, Sequence
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -60,6 +64,7 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+import _drawing_layout_audit
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
@@ -69,6 +74,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
+import _layout_audit
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -77,6 +83,7 @@ import _telemetry
 from dt_crank_handle_pivot_screw_spec import (
     CHAMFER_CALLOUT,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
     HEAD_DIA_CALLOUT,
@@ -168,14 +175,14 @@ _ROW_Y = (SIDE_CENTER[1] + 0.035, SIDE_CENTER[1] - 0.055, SIDE_CENTER[1] - 0.074
 # length, the head Ø and the slot depth stand outside the head face rather
 # than between extension lines that would strike their text (v43 render).
 # Each head band's one-line reason callout is centred under its value.
-# Its half-width at 2.8 mm a character leaves 6 mm clear of the head-face
-# extension line and the centreline's overshoot, even with the longer reasons.
-HEAD_LENGTH_TEXT_X = HEAD_FACE_X + 0.006 + len(HEAD_LENGTH_CALLOUT) * 0.0028 / 2.0
+# The head-length reason's measured left edge clears the head Ø arrow stub
+# at 307.1 mm by 5.6 mm; its right edge stays inside the 419.1 mm border.
+HEAD_LENGTH_TEXT_X = 0.360
 HEAD_DIA_TEXT_X = HEAD_FACE_X + 0.006 + len(HEAD_DIA_CALLOUT) * 0.0028 / 2.0
 SLOT_DEPTH_TEXT_X = HEAD_FACE_X + 0.012
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "HeadLength": (HEAD_LENGTH_TEXT_X, SIDE_CENTER[1] - 0.034),
+    "HeadLength": (HEAD_LENGTH_TEXT_X, 0.1765),
     # The under-head face located from the tip, like every axial location.
     "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
@@ -201,26 +208,26 @@ END_KEEP = {
 }
 # A standalone cropped model view offers the tiny model-owned dimensions
 # that a true detail child did not offer in the dt-vn-post-mount-screw recipe.
-# The radius owns the upper row, with 3.2 mm nominal reason-to-witness air
-# at a conservative 1.3 mm tiny-leg overrun.  The width's long witnesses stay
-# on SIDE, separate from the enlarged diameter's text and vertical stroke.
+# The radius stays above the upper thread fillet; the lead reads below-right
+# and the seat break above-right so their native leaders cannot interleave.
+# The width's long witnesses remain on SIDE.
 DETAIL_SCALE = (10.0, 1.0)
-DETAIL_CENTER = (0.115, 0.068)
+DETAIL_CENTER = (0.320, 0.130)
 DETAIL_RADIUS_MM = 3.0
 DETAIL_RADIUS = DETAIL_RADIUS_MM * DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_STATION = SEAT_STATION + RELIEF_WIDTH / 2.0
 DETAIL_REFERENCE_MM = (0.0, 0.0, DETAIL_STATION)
 DETAIL_KEEP = {
-    "ReliefCornerRadius": (DETAIL_CENTER[0], 0.1015),
-    "ReliefLead": (0.075, 0.0955),
-    "SeatEdgeBreak": (0.180, 0.0955),
-    "ReliefDia": (DETAIL_CENTER[0], 0.032),
+    "ReliefCornerRadius": (0.320, 0.1635),
+    "ReliefLead": (0.378, 0.106),
+    "SeatEdgeBreak": (0.378, 0.1615),
+    "ReliefDia": (0.320, 0.094),
 }
 DETAIL_LETTER = "A"
 DETAIL_VIEW_LABEL = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]:g}:{DETAIL_SCALE[1]:g}"
 )
-DETAIL_LABEL_XY = (0.165, 0.065)
+DETAIL_LABEL_XY = (0.370, 0.127)
 DETAIL_PARENT_LETTER_XY = (
     _sheet_x(DETAIL_STATION) + 0.014,
     SIDE_CENTER[1] + 0.019,
@@ -236,11 +243,16 @@ _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, the full-thread portion's own end edge in the side view (the
 # relief-flank edge at the other end would read as pointing at the groove).
-# The complete one-line note stays 4 mm left of the tip witness; its leader
-# runs out left from the unchanged full-thread/tip edge.
+# The complete seven-line block stays 4 mm left of the tip witness.  Wrap
+# only the assembly instruction: the thread designation remains one line.
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
+THREAD_NOTE_TEXT = "\n".join(
+    [THREAD_CALLOUT, *textwrap.wrap(
+        DRAWING_NOTES, width=13, break_long_words=False, break_on_hyphens=False
+    )]
+)
 THREAD_NOTE_XY = (
-    TIP_X - 0.004 - len(THREAD_CALLOUT) * 0.0028,
+    TIP_X - 0.004 - max(map(len, THREAD_NOTE_TEXT.splitlines())) * 0.0028,
     SIDE_CENTER[1] - 0.008,
 )
 # The running shoulder's lower flank, right of the Ø dimension line: above the
@@ -261,8 +273,6 @@ REFERENCE_WITNESS_LEN_TOL = 0.01  # mm; the line is a fully defined sketch lengt
 # A point on the shoulder face, clear of the Ø6.00 dimension line.
 CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.218)
-# The single assembly-only note sits above the profile, clear of DETAIL A.
-NOTES_XY = (0.016, 0.250)
 DETAIL_DIMENSIONS = ("ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius")
 
 
@@ -747,6 +757,252 @@ def _add_shoulder_finish(adapter: Any, view: Any) -> None:
     )
 
 
+def _annotation_ink_errors(annotation: Mapping[str, Any], label: str) -> list[str]:
+    """Check actual native primitives, never substitute an anchor or font guess.
+
+    Text bounds use reported DisplayData origin/width/height/angle, not exact
+    exported-PDF glyph pixels. Native renders and the exported audit remain
+    the final authority for visual clearance.
+    """
+    errors: list[str] = []
+    display = annotation.get("display")
+    if not isinstance(display, Mapping) or not display:
+        return [f"{label}: missing actual display ink; actual={display!r}"]
+    minimum = {"lines": 8, "arcs": 17, "polylines": 7,
+               "polygons": 5, "triangles": 9, "arrows": 8}
+    for kind, records in display.items():
+        if kind not in minimum and kind != "texts" and records:
+            errors.append(f"{label}: unsupported actual {kind} ink; actual={records!r}")
+    for kind, size in minimum.items():
+        for index, raw in enumerate(display.get(kind, ())):
+            try:
+                values = tuple(float(value) for value in raw)
+                valid = len(values) >= size and all(map(math.isfinite, values))
+                if kind == "polylines" and valid:
+                    count = int(values[6])
+                    valid = count >= 2 and (
+                        len(values) >= 7 + 3 * count
+                        or len(values) >= 7 + int(values[1]) + 3 * count
+                    )
+                if kind == "polygons" and valid:
+                    valid = int(values[4]) >= 2 and len(values) >= 5 + 3 * int(values[4])
+                if kind == "arrows" and valid:
+                    valid = math.hypot(values[3], values[4]) > 0 and values[6] > 0 and values[7] > 0
+            except (TypeError, ValueError, OverflowError):
+                valid = False
+            if not valid:
+                errors.append(f"{label}: malformed/nonfinite {kind}[{index}]; actual={raw!r}")
+    for index, text in enumerate(display.get("texts", ())):
+        try:
+            pos = tuple(float(value) for value in text["pos"])
+            h, w, angle = (float(text[key]) for key in ("h", "w", "ang"))
+            valid = len(pos) >= 2 and all(map(math.isfinite, (*pos, h, w, angle))) and h > 0 and w > 0
+        except (KeyError, TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            errors.append(f"{label}: missing/malformed/nonfinite actual text[{index}]; actual={text!r}")
+    for index, raw in enumerate(annotation.get("leaders", ())):
+        try:
+            valid = len(raw) >= 6 and len(raw) % 3 == 0 and all(math.isfinite(float(v)) for v in raw)
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            errors.append(f"{label}: malformed/nonfinite leader[{index}]; actual={raw!r}")
+    note = annotation.get("note")
+    if note is not None:
+        raw = note.get("extent", ())
+        try:
+            valid = len(raw) == 6 and all(math.isfinite(float(v)) for v in raw)
+            valid = valid and raw[0] <= raw[3] and raw[1] <= raw[4]
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            errors.append(f"{label}: missing/malformed/nonfinite note extent; actual={raw!r}")
+    return errors
+
+
+def _actual_arc_extrema(raw: Sequence[float]) -> list[tuple[float, float]]:
+    """Exact cardinal extrema supplement the audit's sampled arc hull."""
+    sx, sy, ex, ey, cx, cy = (float(raw[i]) for i in (4, 5, 7, 8, 10, 11))
+    radius = math.hypot(sx - cx, sy - cy)
+    start, end = math.atan2(sy - cy, sx - cx), math.atan2(ey - cy, ex - cx)
+    ccw = (raw[16] != 0) == (raw[15] >= 0)
+    full = math.hypot(ex - sx, ey - sy) < 1e-9
+    sweep = ((end - start) if ccw else (start - end)) % math.tau
+    points = [(sx, sy), (ex, ey)]
+    for angle in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2):
+        along = ((angle - start) if ccw else (start - angle)) % math.tau
+        if full or along <= sweep:
+            points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    return points
+
+
+def _assert_generated_annotation_ink(
+    dumps: Sequence[Mapping[str, Any]],
+    detail_groups: Mapping[str, Sequence[_drawing_leaders.Segment]],
+    *,
+    collection_errors: Sequence[str] = (),
+) -> None:
+    """One collective refusal for all printable ink and every foreign DETAIL pair."""
+    errors = list(collection_errors)
+    if not dumps:
+        errors.append("no drawing sheets collected")
+    inner = (0.0127, 0.0127, 0.4191, 0.2667)
+    for sheet in dumps:
+        if sheet.get("read_errors"):
+            errors.append(f"{sheet.get('sheet')}: native collection errors={sheet['read_errors']!r}")
+        printable = _layout_audit.printed_dump(sheet)
+        for index, annotation in enumerate(_layout_audit.audited_annotations(printable)):
+            label = f"{sheet.get('sheet')}/{annotation.get('name') or index}"
+            if annotation.get("owner_type") == 2:
+                continue  # template ink, never generated drawing annotation ink
+            try:
+                if annotation.get("owner_type") not in (0, 1):
+                    errors.append(f"{label}: unknown annotation owner; actual={annotation!r}")
+                if annotation.get("visible") != 1:
+                    errors.append(f"{label}: unknown annotation visibility; actual={annotation!r}")
+                try:
+                    errors.extend(_annotation_ink_errors(annotation, label))
+                except (AttributeError, TypeError, ValueError, IndexError) as exc:
+                    errors.append(f"{label}: malformed actual ink: {exc}; actual={annotation!r}")
+                points = []
+                # A malformed record does not hide valid offending primitives
+                # in the SAME annotation, nor errors in later annotations.
+                display = annotation.get("display") or {}
+                for kind in ("lines", "arcs", "polylines", "polygons", "triangles", "arrows", "texts"):
+                    records = display.get(kind) or ()
+                    if not isinstance(records, Sequence) or isinstance(records, (str, bytes)):
+                        errors.append(f"{label}: malformed actual {kind} inventory; actual={records!r}")
+                        continue
+                    for raw in records:
+                        primitive = {"display": {kind: [raw]}}
+                        try:
+                            if _annotation_ink_errors(primitive, label):
+                                continue
+                            box = _layout_audit.display_box(primitive["display"])
+                            if box is not None:
+                                points.extend(((box.xmin, box.ymin), (box.xmax, box.ymax)))
+                            if kind == "arcs":
+                                points.extend(_actual_arc_extrema(raw))
+                        except (AttributeError, KeyError, TypeError, ValueError, OverflowError, IndexError) as exc:
+                            errors.append(f"{label}: malformed actual {kind}: {exc}; actual={raw!r}")
+                leaders = annotation.get("leaders") or ()
+                if not isinstance(leaders, Sequence) or isinstance(leaders, (str, bytes)):
+                    errors.append(f"{label}: malformed actual leader inventory; actual={leaders!r}")
+                    leaders = ()
+                for raw in leaders:
+                    try:
+                        if len(raw) >= 6 and len(raw) % 3 == 0 and all(math.isfinite(float(v)) for v in raw):
+                            points.extend((float(raw[i]), float(raw[i + 1])) for i in range(0, len(raw), 3))
+                    except (TypeError, ValueError, OverflowError) as exc:
+                        errors.append(f"{label}: malformed actual leader: {exc}; actual={raw!r}")
+                note = annotation.get("note") or {}
+                extent = note.get("extent") if isinstance(note, Mapping) else ()
+                try:
+                    if extent and len(extent) == 6 and all(math.isfinite(float(v)) for v in extent):
+                        points.extend(((extent[0], extent[1]), (extent[3], extent[4])))
+                except (TypeError, ValueError, OverflowError) as exc:
+                    errors.append(f"{label}: malformed actual note extent: {exc}; actual={extent!r}")
+                if not points or not all(math.isfinite(v) for point in points for v in point):
+                    errors.append(f"{label}: missing/nonfinite actual ink bounds; actual={annotation!r}")
+                    continue
+                bounds = (min(p[0] for p in points), min(p[1] for p in points),
+                          max(p[0] for p in points), max(p[1] for p in points))
+                if bounds[0] < inner[0] or bounds[1] < inner[1] or bounds[2] > inner[2] or bounds[3] > inner[3]:
+                    errors.append(f"{label}: actual ink outside inner border; actual={bounds!r}; inner={inner!r}")
+            except (AttributeError, KeyError, TypeError, ValueError, OverflowError, IndexError) as exc:
+                errors.append(f"{label}: unreadable actual ink bounds: {exc}; actual={annotation!r}")
+    valid_groups = {}
+    for name in DETAIL_KEEP:
+        strokes = detail_groups.get(name)
+        valid_strokes = []
+        if not isinstance(strokes, Sequence) or not strokes:
+            errors.append(f"DETAIL/{name}: missing/malformed/nonfinite actual ink; actual={strokes!r}")
+        for stroke in strokes if isinstance(strokes, Sequence) else ():
+            try:
+                valid = len(stroke) == 2 and all(
+                    len(point) == 2 and all(math.isfinite(v) for v in point)
+                    for point in stroke
+                )
+            except (TypeError, ValueError, OverflowError):
+                valid = False
+            if not valid:
+                errors.append(f"DETAIL/{name}: missing/malformed/nonfinite actual ink; actual={stroke!r}")
+            else:
+                valid_strokes.append(stroke)
+        if valid_strokes:
+            valid_groups[name] = valid_strokes
+    names = list(valid_groups)
+    for index, name in enumerate(names):
+        for other in names[index + 1:]:
+            crossings = [(a, b) for a in valid_groups[name] for b in valid_groups[other]
+                         if _drawing_leaders.segments_cross(a, b)]
+            if crossings:
+                errors.append(f"DETAIL/{name} vs {other}: foreign ink crossing; actual={crossings!r}")
+    if errors:
+        raise RuntimeError("MHA-DT-32 generated annotation ink violations:\n" + "\n".join(errors))
+
+
+def assert_final_annotation_ink(adapter: Any, detail_annotations: Sequence[Any]) -> None:
+    """Finalizer's settled readback: all sheets, actual ink, no PDF or rebuild."""
+    reader = _drawing_layout_audit._Reader(adapter)
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    dumps, errors = [], []
+    try:
+        rows = ddoc.GetViews() or ()
+    except Exception as exc:
+        rows = ()
+        errors.append(f"drawing sheet inventory failed: {exc}")
+    try:
+        names = tuple(ddoc.GetSheetNames() or ())
+        if not names or len(names) != len(rows):
+            errors.append(f"drawing sheet inventory mismatch; sheets={names!r}; view_rows={len(rows)}")
+    except Exception as exc:
+        errors.append(f"drawing sheet-name inventory failed: {exc}")
+    for index, row in enumerate(rows):
+        dump: dict[str, Any] = {"sheet": f"sheet[{index}]", "views": [], "sheet_annotations": []}
+        if not row:
+            errors.append(f"sheet[{index}]: empty view inventory")
+        for view_index, raw_view in enumerate(row or ()):
+            try:
+                view = _early_bound(raw_view, "IView")
+                records = []
+                # Strict enumeration: an unreadable inventory cannot become
+                # a clean border gate through the audit's tolerant call.
+                for raw in view.GetAnnotations() or ():
+                    try:
+                        record = _drawing_layout_audit._dump_annotation(reader, raw)
+                        if record is None:
+                            errors.append(f"sheet[{index}]/view[{view_index}]: unreadable annotation")
+                        else:
+                            records.append(record)
+                    except Exception as exc:
+                        errors.append(f"sheet[{index}]/view[{view_index}]: annotation collection failed: {exc}")
+                if view_index == 0:
+                    dump["sheet_annotations"] = records
+                else:
+                    dump["views"].append({"annotations": records})
+            except Exception as exc:
+                errors.append(f"sheet[{index}]/view[{view_index}]: inventory failed: {exc}")
+        try:
+            dump["layers"] = _drawing_layout_audit._layer_states(reader, dump)
+        except Exception as exc:
+            errors.append(f"sheet[{index}]: native layer collection failed: {exc}")
+        dump["read_errors"] = reader.take_errors()
+        dumps.append(dump)
+    groups = {}
+    for annotation in detail_annotations:
+        try:
+            name = dimension_name(adapter, annotation)
+            if name in DETAIL_KEEP:
+                if name in groups:
+                    errors.append(f"DETAIL/{name}: duplicate native annotation")
+                groups[name] = _drawing_leaders.dimension_segments(annotation)
+        except Exception as exc:
+            errors.append(f"DETAIL: actual ink collection failed: {exc}")
+    _assert_generated_annotation_ink(dumps, groups, collection_errors=errors)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -870,7 +1126,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_attached_note(
         adapter,
         side,
-        text=THREAD_CALLOUT,
+        text=THREAD_NOTE_TEXT,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-DT-32 thread callout",
@@ -879,7 +1135,6 @@ async def build(adapter: Any) -> dict[str, str]:
     label_relief_view(adapter, detail)
     mark_relief_on_side(adapter, side)
     _activate(adapter, side, label="side view notes")
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
@@ -888,6 +1143,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Crank Handle Pivot Screw Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: assert_final_annotation_ink(adapter, detail_annotations),),
     )
 
 

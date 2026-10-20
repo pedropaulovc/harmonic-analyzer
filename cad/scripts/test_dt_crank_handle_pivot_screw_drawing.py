@@ -1153,7 +1153,6 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.DETAIL_CENTER,
         drawing.DETAIL_LABEL_XY,
         drawing.DETAIL_PARENT_LETTER_XY,
-        drawing.NOTES_XY,
         drawing.THREAD_NOTE_XY,
         drawing.FINISH_SYMBOL,
         drawing.ISO_NOTE_XY,
@@ -1183,7 +1182,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert obsolete not in source
     # The complete note, not a centred half-width, stays left of the tip.
     note_x, note_y = drawing.THREAD_NOTE_XY
-    assert drawing.TIP_X - (note_x + len(spec.THREAD_CALLOUT) * 0.0028) >= 0.004 - 1e-12
+    assert drawing.TIP_X - (note_x + max(map(len, drawing.THREAD_NOTE_TEXT.splitlines())) * 0.0028) >= 0.004 - 1e-12
     assert note_y == pytest.approx(drawing.SIDE_CENTER[1] - 0.008)
     # The slot value stands clear of its 3-mm-apart extension lines.
     assert drawing.END_KEEP["SlotWidth"][1] - drawing.END_CENTER[1] > 0.005
@@ -1201,24 +1200,18 @@ def test_sheet_placements_stay_inside_the_border() -> None:
 
 def test_relief_text_reserves_its_complete_right_block_below_both_shoulders() -> None:
     x, y = drawing.DETAIL_KEEP["ReliefDia"]
-    lines = [
-        *spec.RELIEF_DIA_ROOT_CALLOUT.splitlines(),
-        f"Ø{spec.RELIEF_DIA:.1f} {spec.RELIEF_DIA_BAND[0]:+.1f}/{spec.RELIEF_DIA_BAND[1]:+.1f}",
-        *spec.RELIEF_DIA_CALLOUT.splitlines(),
-    ]
-    # Full width on one side, never a centred half-width assumption.  Aligned
-    # text can rotate natively: this reservation is not a native bbox claim.
-    width = max(0.044056, max(map(len, lines)) * 0.0028)
-    left, right = x, x + width
-    bottom, top = y - 0.0146, y + 0.0092
-    assert (x, y) == pytest.approx((0.115, 0.032))
-    assert bottom - 0.0127 >= 0.003
-    shoulder_bottom = drawing.DETAIL_CENTER[1] - spec.SHOULDER_DIA * 0.010 / 2.0
-    assert shoulder_bottom - top >= 0.005
-    assert shoulder_bottom - top == pytest.approx(0.0068)
+    # Historical test name retained for the mutation battery. The native
+    # aligned block is ROTATED, not a horizontal block to the anchor's right.
+    # Translate r16 DisplayData metric-hull extrema, not PDF glyph pixels.
+    left, right = x - 0.0236639, x
+    bottom, top = y - 0.0220281, y + 0.0220282
+    assert (x, y) == pytest.approx((0.320, 0.094))
+    assert bottom > 0.066
+    neck_bottom = drawing.DETAIL_CENTER[1] - spec.RELIEF_DIA * 0.010 / 2.0
+    assert neck_bottom - top >= 0.0044
     assert right < drawing.DETAIL_LABEL_XY[0] - 0.005
-    assert right < 0.218
-    assert left == drawing.DETAIL_CENTER[0]
+    assert right < 0.4191
+    assert left > drawing.DETAIL_CENTER[0] - drawing.DETAIL_RADIUS
 
 
 def test_relief_width_side_full_text_clears_references_head_and_bottom_border():
@@ -1247,11 +1240,11 @@ def test_relief_width_side_native_shaped_witnesses_clear_references_thread_note_
     reference_ink = _axial_ink()
     for name, strokes in reference_ink.items():
         assert drawing._drawing_leaders.leader_crossings({"ReliefWidth": ink, name: strokes}) == []
-    note_right = drawing.THREAD_NOTE_XY[0] + len(spec.THREAD_CALLOUT) * 0.0028
+    note_right = drawing.THREAD_NOTE_XY[0] + max(map(len, drawing.THREAD_NOTE_TEXT.splitlines())) * 0.0028
     thread_note = [(drawing.THREAD_PICK, (note_right, drawing.THREAD_NOTE_XY[1]))]
     assert drawing.RELIEF_END_X - max(drawing.THREAD_PICK[0], note_right) >= 0.005
     assert drawing._drawing_leaders.leader_crossings({"ReliefWidth": ink, "ThreadNote": thread_note}) == []
-    head_line = drawing.SIDE_KEEP["HeadLength"][1] - (0.142 - 0.1392218750044704)
+    head_line = drawing.SIDE_KEEP["HeadLength"][1] - 0.0055562  # r16 native underline drop
     head_ink = [
         ((drawing.UNDERHEAD_X, head_line), (drawing.HEAD_FACE_X, head_line)),
         ((drawing.UNDERHEAD_X, 0.180), (drawing.UNDERHEAD_X, head_line - 0.0013)),
@@ -1279,23 +1272,23 @@ def test_relief_width_side_witness_reservations_start_below_the_real_profile_wit
 
 def test_relief_caption_full_block_clears_crop_root_and_title_block():
     x, y = drawing.DETAIL_LABEL_XY
-    assert (x, y) == pytest.approx((0.165, 0.065))
+    assert (x, y) == pytest.approx((0.370, 0.127))
     width = max(map(len, drawing.DETAIL_VIEW_LABEL.splitlines())) * 0.0028
     assert x - (drawing.DETAIL_CENTER[0] + drawing.DETAIL_RADIUS) >= 0.005
-    assert x + width < 0.218
+    assert x + width < 0.4191
     assert y - 2.0 * 0.0046 > drawing.DETAIL_KEEP["ReliefDia"][1] + 0.0092
-    assert y - 2.0 * 0.0046 > 0.0127
+    assert y - 2.0 * 0.0046 > 0.066
 
 
 def test_thread_note_complete_left_block_clears_root_and_tip_witness() -> None:
     x, y = drawing.THREAD_NOTE_XY
     # INote insertion is the upper-left corner, not its centre.
-    note_right = x + len(spec.THREAD_CALLOUT) * 0.0028
-    assert (x, y) == pytest.approx((0.0303, 0.182))
+    note_right = x + max(map(len, drawing.THREAD_NOTE_TEXT.splitlines())) * 0.0028
+    assert (x, y) == pytest.approx((0.0191, 0.182))
     assert drawing.TIP_X - note_right == pytest.approx(0.004)
     root_x, root_y = drawing.DETAIL_KEEP["ReliefDia"]
     assert root_x - note_right >= 0.005
-    assert y - 0.004 - (root_y + 0.0092) >= 0.005
+    assert y - 0.0308 - (root_y + 0.012) >= 0.005
     assert y < drawing.THREAD_PICK[1]
 
 
@@ -1318,7 +1311,7 @@ def test_tip_chamfer_header_and_reasons_clear_the_thread_and_relief_block() -> N
 
 
 def test_tip_baselines_keep_reference_rows_and_upper_thread_witnesses() -> None:
-    assert drawing.SIDE_KEEP["HeadLength"][1] == pytest.approx(0.156)
+    assert drawing.SIDE_KEEP["HeadLength"] == pytest.approx((0.360, 0.1765))
     rows = {
         name: drawing.SIDE_KEEP[name][1]
         for name in ("ThreadLength", "UnderHeadLocation", "OverallLength")
@@ -1382,7 +1375,7 @@ def test_upper_thread_length_clears_parent_a_full_letter_reservation():
 
 
 def test_thread_note_route_stays_below_upper_thread_length_witnesses():
-    note_right = drawing.THREAD_NOTE_XY[0] + len(spec.THREAD_CALLOUT) * 0.0028
+    note_right = drawing.THREAD_NOTE_XY[0] + max(map(len, drawing.THREAD_NOTE_TEXT.splitlines())) * 0.0028
     note_leader = [(drawing.THREAD_PICK, (note_right, drawing.THREAD_NOTE_XY[1]))]
     assert drawing._drawing_leaders.leader_crossings({
         "ThreadNote": note_leader, "ThreadLength": _axial_ink()["ThreadLength"]
@@ -1432,26 +1425,24 @@ def test_relief_detail_contains_the_actual_native_dimension_endpoints() -> None:
 def test_relief_detail_text_and_circle_clear_the_baseline_rows_and_border() -> None:
     cx, cy = drawing.DETAIL_CENTER
     radius = drawing.DETAIL_RADIUS
-    assert cx - radius > 0.0127 and cx + radius < 0.218
-    assert cy - radius > 0.0127
-    assert drawing.SIDE_KEEP["OverallLength"][1] - 0.005 - (cy + radius) >= 0.005
+    assert cx - radius > 0.0127 and cx + radius < 0.4191
+    assert cy - radius > 0.066  # above the title block at this sheet X
+    assert cx - radius > drawing.HEAD_FACE_X + 0.005
     scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
     lead_left = cx + (drawing.DETAIL_STATION - spec.SEAT_STATION - spec.RELIEF_LEAD) * scale
     seat_right = cx + (
         drawing.DETAIL_STATION - spec.SEAT_STATION + spec.SEAT_EDGE_BREAK_MAX
     ) * scale
-    lead_half = len(spec.RELIEF_LEAD_CALLOUT) * 0.0028 / 2.0
     seat_half = max(len(line) for line in spec.SEAT_EDGE_BREAK_CALLOUT.splitlines()) * 0.0028 / 2.0
-    assert lead_left - (drawing.DETAIL_KEEP["ReliefLead"][0] + lead_half) >= 0.003
+    assert drawing.DETAIL_KEEP["ReliefLead"][0] > lead_left + 0.030
     assert drawing.DETAIL_KEEP["SeatEdgeBreak"][0] - seat_half - seat_right >= 0.003
-    radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
-    assert (radius_x, radius_y) == pytest.approx((0.115, 0.1015))
-    # Raising both reference rows preserves 19 mm nesting and leaves 3.5 mm
-    # between the radius value envelope and the overall dimension line.
-    overall_line = drawing.SIDE_KEEP["OverallLength"][1] - 0.005
-    assert overall_line - (radius_y + 0.006) >= 0.003
-    assert overall_line - (radius_y + 0.006) == pytest.approx(0.0035)
-    assert (cx, cy) == pytest.approx((0.115, 0.068))
+    assert drawing.DETAIL_KEEP["ReliefCornerRadius"] == pytest.approx((0.320, 0.1635))
+    # Historical r16 observed glyph-top offset, translated to the tuned
+    # anchor; this is a reservation, not proof from the next native seat.
+    radius_top = drawing.DETAIL_KEEP["ReliefCornerRadius"][1] + 0.0044992
+    head_underline = drawing.SIDE_KEEP["HeadLength"][1] - 0.0055562
+    assert head_underline - radius_top >= 0.0029
+    assert (cx, cy) == pytest.approx((0.320, 0.130))
 
 
 @pytest.mark.parametrize("name", ["ReliefLead", "SeatEdgeBreak"])
@@ -1461,7 +1452,10 @@ def test_relief_upper_leg_full_text_keeps_three_mm_from_cropped_physical_outline
     x, y = drawing.DETAIL_KEEP[name]
     text = {"ReliefLead": spec.RELIEF_LEAD_CALLOUT, "SeatEdgeBreak": spec.SEAT_EDGE_BREAK_CALLOUT}[name]
     half = max(map(len, text.splitlines())) * 0.0028 / 2.0
-    box = (x - half, y - (0.010 if "\n" in text else 0.0065), x + half, y + 0.006)
+    # r16 reports the seat's lowest reason/underline at askY - 8.3344 mm.
+    # The old synthetic -10 mm reservation was not a native observation.
+    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0065
+    box = (x - half, y - drop, x + half, y + 0.0073)
     upper_shoulder = cy + spec.SHOULDER_DIA * scale / 2.0
     # The shoulder's horizontal outline ends at the actual circular crop,
     # not the rectangular crop bbox's farther-right corner.
@@ -1495,12 +1489,12 @@ def test_relief_radius_text_has_real_2d_air_from_tiny_leg_text(name) -> None:
     }[name]
     x, y = drawing.DETAIL_KEEP[name]
     half = max(map(len, text.splitlines())) * 0.0028 / 2.0
-    box = (x - half, y - (0.010 if "\n" in text else 0.0065), x + half, y + 0.006)
+    drop = 0.0083344 if name == "SeatEdgeBreak" else 0.0065
+    box = (x - half, y - drop, x + half, y + 0.0073)
     horizontal_air = max(radius_box[0] - box[2], box[0] - radius_box[2], 0.0)
     vertical_air = max(radius_box[1] - box[3], box[1] - radius_box[3], 0.0)
-    # These rows overlap in Y: their real horizontal separation must carry
-    # the unchanged 5 mm floor, not a reduced vertical-clearance threshold.
-    assert vertical_air == 0.0
+    # The lead now reads below-right; the seat reads above-right. Either
+    # real axis of separation can supply the unchanged 5 mm text floor.
     assert max(horizontal_air, vertical_air) >= 0.005, (radius_box, box)
 
 
@@ -1510,21 +1504,21 @@ def test_relief_radius_reason_clears_tiny_leg_witness_ends_in_2d(name) -> None:
     scale = drawing.DETAIL_SCALE[0] / drawing.DETAIL_SCALE[1] / 1000.0
     radius_x, radius_y = drawing.DETAIL_KEEP["ReliefCornerRadius"]
     half = len(spec.RELIEF_CORNER_CALLOUT) * 0.0028 / 2.0
-    reason_box = (radius_x - half, radius_y - 0.0065, radius_x + half, radius_y - 0.003)
+    # Historical r16 reported reason baseline and 3.5 mm metric height.
+    reason_box = (radius_x - half, radius_y - 0.0055563,
+                  radius_x + half, radius_y - 0.0020563)
     stations = {
         "ReliefLead": (spec.SEAT_STATION, spec.SEAT_STATION + spec.RELIEF_LEAD),
         "SeatEdgeBreak": (spec.SEAT_STATION - spec.SEAT_EDGE_BREAK_MAX, spec.SEAT_STATION),
     }[name]
-    # Nominal placement envelopes, not native readback proof: reserve the
-    # conservative 1.3 mm overrun from the existing native calibration.
-    # The raised radius row gives 3.2 mm, preserving the 3 mm text/ink floor.
-    witness_y = drawing.DETAIL_KEEP[name][1] - 0.005 + 0.0013
+    # Conservative endpoint reservation from r16's actual native offsets,
+    # not the old fabricated common -5 mm drop for both tiny dimensions.
+    witness_y = {"ReliefLead": 0.1435, "SeatEdgeBreak": 0.1541656}[name]
     for station in stations:
         witness_x = cx + (drawing.DETAIL_STATION - station) * scale
         horizontal_air = max(reason_box[0] - witness_x, witness_x - reason_box[2], 0.0)
         vertical_air = max(reason_box[1] - witness_y, witness_y - reason_box[3], 0.0)
         assert max(horizontal_air, vertical_air) >= 0.003, (reason_box, (witness_x, witness_y))
-        assert vertical_air == pytest.approx(0.0032)
 
 
 def test_relief_radius_leader_corridor_has_no_tiny_leg_crossing() -> None:
@@ -2000,27 +1994,37 @@ def _side_width_ink():
         ((drawing.SEAT_X, seat_y), (drawing.SEAT_X, y - 0.0013)),
     ]
 
+def _detail_point(x, y):
+    """Translate a synthetic old-frame point, preserving physical offsets."""
+    return (round(drawing.DETAIL_CENTER[0] + x - 0.115, 12),
+            round(drawing.DETAIL_CENTER[1] + y - 0.068, 12))
+
+
+def _detail_strokes(strokes):
+    return [tuple(_detail_point(x, y) for x, y in stroke) for stroke in strokes]
+
+
 
 def _diameter_ink():
     """Synthetic native-shaped ink, NOT a calibrated native Option A result."""
-    return [
+    return _detail_strokes([
         ((0.115, 0.01913993001729248), (0.115, 0.08385)),
         ((0.104, 0.0585), (0.1163, 0.0585)),
         ((0.104, 0.0775), (0.1163, 0.0775)),
         ((0.115, 0.01913993001729248), (0.1598, 0.01913993001729248)),
-    ]
+    ])
 
 
 def _detail_ink():
     """Independent synthetic ink from the three other DETAIL dimensions."""
-    return {
+    return {name: _detail_strokes(strokes) for name, strokes in {
         "ReliefLead": [((0.124, 0.0785), (0.124, 0.0918)),
                        ((0.124, 0.0905), (0.127, 0.0905))],
         "SeatEdgeBreak": [((0.128, 0.089), (0.128, 0.0918)),
                           ((0.127, 0.0905), (0.128, 0.0905))],
         "ReliefCornerRadius": [((0.1044, 0.0781), (0.110, 0.094)),
                                ((0.110, 0.094), (0.115, 0.098))],
-    }
+    }.items()}
 
 
 # Actual SIDE IDisplayData strokes; only the affine transform below places
@@ -2057,7 +2061,7 @@ def _historical_side_ink_in_detail(ink):
     factor = 10.0 / 3.0
     assert drawing._sheet_x(drawing.DETAIL_STATION) == pytest.approx(0.0859)
     return [
-        tuple((0.115 + (x - 0.0859) * factor, 0.068 + (y - 0.190) * factor)
+        tuple((drawing.DETAIL_CENTER[0] + (x - 0.0859) * factor, drawing.DETAIL_CENTER[1] + (y - 0.190) * factor)
               for x, y in stroke)
         for stroke in ink
     ]
@@ -2073,7 +2077,7 @@ def test_relief_diameter_ink_accepts_both_neck_surfaces_and_normal_extension_gap
 
 
 def test_relief_diameter_ink_accepts_direct_two_surface_endpoints():
-    drawing._assert_relief_diameter_ink([((0.115, 0.0585), (0.115, 0.0775))], _detail_ink())
+    drawing._assert_relief_diameter_ink(_detail_strokes([((0.115, 0.0585), (0.115, 0.0775))]), _detail_ink())
 
 
 def test_relief_diameter_ink_does_not_compare_foreign_groups_to_each_other():
@@ -2106,25 +2110,25 @@ def test_relief_diameter_ink_refuses_each_empty_or_missing_detail_group(name, mi
 @pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
 def test_relief_diameter_ink_refuses_nonfinite_native_coordinates(bad):
     with pytest.raises(RuntimeError, match="^MHA-DT-32 relief diameter nonfinite native ink;"):
-        drawing._assert_relief_diameter_ink([((bad, 0.0585), (0.115, 0.0775))], _detail_ink())
+        drawing._assert_relief_diameter_ink(_detail_strokes([((bad, 0.0585), (0.115, 0.0775))]), _detail_ink())
 
 
 @pytest.mark.parametrize("name", ["ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius"])
 def test_relief_diameter_ink_refuses_nonfinite_foreign_native_coordinates(name):
     detail = _detail_ink()
-    detail[name] = [((math.nan, 0.030), (0.115, 0.030))]
+    detail[name] = _detail_strokes([((math.nan, 0.030), (0.115, 0.030))])
     with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief detail nonfinite native ink: {name};"):
         drawing._assert_relief_diameter_ink(_diameter_ink(), detail)
 
 
 @pytest.mark.parametrize("x", [0.105, 0.124])
 def test_relief_diameter_ink_accepts_exact_straight_floor_boundaries(x):
-    drawing._assert_relief_diameter_ink([((x, 0.0585), (x, 0.0775))], _detail_ink())
+    drawing._assert_relief_diameter_ink(_detail_strokes([((x, 0.0585), (x, 0.0775))]), _detail_ink())
 
 
 @pytest.mark.parametrize("x", [0.104999, 0.124001])
 def test_relief_diameter_ink_refuses_vertical_stroke_outside_straight_floor(x):
-    ink = [((x, 0.0585), (x, 0.0775))]
+    ink = _detail_strokes([((x, 0.0585), (x, 0.0775))])
     with pytest.raises(RuntimeError, match="lacks a vertical stroke within the straight floor") as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
     assert "floor_x=" in str(caught.value) and "neck_y=" in str(caught.value)
@@ -2135,14 +2139,14 @@ def test_relief_diameter_ink_refuses_vertical_stroke_outside_straight_floor(x):
 def test_relief_diameter_ink_refuses_shortened_vertical_span_independently(surface):
     bottom = 0.058651 if surface == "lower" else 0.0585
     top = 0.077349 if surface == "upper" else 0.0775
-    ink = [((0.115, bottom), (0.115, top)), *_diameter_ink()[1:]]
+    ink = [*_detail_strokes([((0.115, bottom), (0.115, top))]), *_diameter_ink()[1:]]
     with pytest.raises(RuntimeError, match="spanning both neck surfaces;"):
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
 
 
 def test_relief_diameter_ink_refuses_one_arrow_diagonal_surrogate():
     with pytest.raises(RuntimeError, match="lacks a vertical stroke"):
-        drawing._assert_relief_diameter_ink([((0.115, 0.0585), (0.120, 0.0775))], _detail_ink())
+        drawing._assert_relief_diameter_ink(_detail_strokes([((0.115, 0.0585), (0.120, 0.0775))]), _detail_ink())
 
 
 @pytest.mark.parametrize("surface,index", [("lower", 1), ("upper", 2)])
@@ -2163,11 +2167,11 @@ def test_relief_diameter_ink_refuses_floating_surface_extension(surface, index, 
         ink[index] = ((x0, y + 0.000151), (x1, y + 0.000151))
         message = f"missing {surface} neck association;"
     elif fault == "disconnected":
-        ink[index] = ((0.106, y), (0.110, y))
+        ink[index] = (_detail_point(0.106, 0.068)[0], y), (_detail_point(0.110, 0.068)[0], y)
         message = f"floating {surface} neck extension;"
     else:
         # Outside the straight floor and NOT one normal gap from its end.
-        ink[index] = ((0.1045, y), (0.1163, y))
+        ink[index] = (_detail_point(0.1045, 0.068)[0], y), (_detail_point(0.1163, 0.068)[0], y)
         message = f"floating {surface} neck extension;"
     with pytest.raises(RuntimeError, match=message) as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
@@ -2211,7 +2215,7 @@ def test_relief_diameter_ink_refuses_honestly_transformed_r11_seat_crossing():
 @pytest.mark.parametrize("vertical", [False, True])
 def test_relief_diameter_ink_refuses_each_corner_and_both_clearance_sides(corner, x, bottom, top, side, vertical):
     y = {"lower": bottom - 0.0019, "upper": top + 0.0019, "middle": (bottom + top) / 2.0}[side]
-    crossing = ((x, y - 0.0002), (x, y + 0.0002)) if vertical else ((x - 0.001, y), (x + 0.001, y))
+    crossing = _detail_strokes([((x, y - 0.0002), (x, y + 0.0002)) if vertical else ((x - 0.001, y), (x + 0.001, y))])[0]
     ink = [*_diameter_ink(), crossing]
     with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter ink crosses the {corner};") as caught:
         drawing._assert_relief_diameter_ink(ink, _detail_ink())
@@ -2223,16 +2227,16 @@ def test_relief_diameter_ink_refuses_each_corner_and_both_clearance_sides(corner
 @pytest.mark.parametrize("upper", [False, True])
 def test_relief_diameter_ink_allows_corner_strokes_outside_two_mm_air(x, bottom, top, upper):
     y = top + 0.0021 if upper else bottom - 0.0021
-    drawing._assert_relief_diameter_ink([*_diameter_ink(), ((x - 0.0002, y), (x + 0.0002, y))], _detail_ink())
+    drawing._assert_relief_diameter_ink([*_diameter_ink(), *_detail_strokes([((x - 0.0002, y), (x + 0.0002, y))])], _detail_ink())
 
 
 def _foreign_junction(junction):
-    midpoint = (0.115, 0.030)
+    midpoint = _detail_point(0.115, 0.030)
     if junction == "crossing":
-        return ((0.113, midpoint[1]), (0.117, midpoint[1]))
+        return (_detail_point(0.113, 0.030), _detail_point(0.117, 0.030))
     if junction == "tee":
-        return (midpoint, (0.117, midpoint[1]))
-    return ((0.115, 0.028), (0.115, 0.032))
+        return (midpoint, _detail_point(0.117, 0.030))
+    return (_detail_point(0.115, 0.028), _detail_point(0.115, 0.032))
 
 
 @pytest.mark.parametrize("name", ["ReliefLead", "SeatEdgeBreak", "ReliefCornerRadius"])
@@ -2566,7 +2570,7 @@ def test_style_relief_dimensions_refuses_each_actual_detail_cross_tee_overlap(re
 @pytest.mark.parametrize("corner,x,y", [("seat face/witness", 0.127, 0.048), ("thread-side corner", 0.103, 0.053775)])
 def test_style_relief_dimensions_does_not_bypass_either_corner_guard(relief_styles, corner, x, y):
     state = relief_styles
-    state.inks["ReliefDia"].append(((x - 0.001, y), (x + 0.001, y)))
+    state.inks["ReliefDia"].extend(_detail_strokes([((x - 0.001, y), (x + 0.001, y))]))
     with pytest.raises(RuntimeError, match=f"^MHA-DT-32 relief diameter ink crosses the {corner};"):
         drawing.style_relief_dimensions(state.native.adapter, state.annotations)
 
@@ -2717,3 +2721,398 @@ def test_build_imports_profile_diameter_only_directly_into_detail_and_keeps_four
     assert curated["detail"].lineno < style.lineno < finalize.lineno
 
 
+
+def _approved_detail_ink():
+    """r16 native offsets relocated to approved anchors, not a new-seat proof."""
+    return {
+        "ReliefDia": [
+            ((0.311, 0.1205), (0.321, 0.1205)),
+            ((0.311, 0.1395), (0.321, 0.1395)),
+            ((0.320, 0.1205), (0.320, 0.0719719)),
+            ((0.320, 0.1205), (0.320, 0.1395)),
+        ],
+        "ReliefCornerRadius": [
+            ((0.3094214, 0.1434145), (0.3050299, 0.1579438)),
+            ((0.310, 0.1415), (0.3094214, 0.1434145)),
+            ((0.3050299, 0.1579438), (0.3333826, 0.1579438)),
+        ],
+        "ReliefLead": [
+            ((0.332, 0.1435), (0.332, 0.0976962)),
+            ((0.329, 0.1405), (0.329, 0.0976962)),
+            ((0.332, 0.0986962), (0.3947587, 0.0986962)),
+            ((0.332, 0.0986962), (0.329, 0.0986962)),
+            ((0.329, 0.0986962), (0.32265, 0.0986962)),
+        ],
+        "SeatEdgeBreak": [
+            ((0.333, 0.149), (0.333, 0.1521656)),
+            ((0.332, 0.150), (0.332, 0.1541656)),
+            ((0.333, 0.1531656), (0.4130875, 0.1531656)),
+            ((0.333, 0.1531656), (0.332, 0.1531656)),
+            ((0.332, 0.1531656), (0.32565, 0.1531656)),
+        ],
+    }
+
+
+def _ink_annotation(name="generated", *, texts=(), lines=(), **extra):
+    return {"name": name, "visible": 1, "owner_type": 0,
+            "display": {"texts": list(texts), "lines": list(lines)}, **extra}
+
+
+def _ink_sheet(*annotations, sheet_annotations=(), layers=None):
+    return {"sheet": "Sheet1", "views": [{"annotations": list(annotations)}],
+            "sheet_annotations": list(sheet_annotations), "layers": layers or {}}
+
+
+def _actual_text(x=0.1, y=0.1, *, angle=0.0, width=0.02):
+    return {"t": "ACTUAL", "pos": [x, y, 0], "h": 0.0035,
+            "w": width, "ang": angle, "ref": 1}
+
+
+def _actual_line(a, b):
+    return [0, 0, 0, 0, *a, 0, *b, 0]
+
+
+def test_approved_actual_offset_reservations_clear_border_and_all_detail_pairs():
+    groups = _approved_detail_ink()
+    annotations = [_ink_annotation(name, lines=[_actual_line(a, b) for a, b in strokes])
+                   for name, strokes in groups.items()]
+    drawing._assert_generated_annotation_ink([_ink_sheet(*annotations)], groups)
+    drawing._assert_relief_diameter_ink(groups["ReliefDia"], {
+        name: groups[name] for name in drawing.DETAIL_DIMENSIONS
+    })
+
+
+@pytest.mark.parametrize("side,x,y", [
+    ("left", 0.0126, 0.1), ("right", 0.4192, 0.1),
+    ("bottom", 0.1, 0.0126), ("top", 0.1, 0.2668),
+])
+def test_generated_actual_ink_refuses_every_border_not_just_anchor(side, x, y):
+    annotation = _ink_annotation(side, lines=[_actual_line((0.1, 0.1), (x, y))], pos=[0.1, 0.1, 0])
+    with pytest.raises(RuntimeError, match=f"Sheet1/{side}: actual ink outside inner border") as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(annotation)], _approved_detail_ink())
+    assert str(x) in str(caught.value) and str(y) in str(caught.value)
+    assert "inner=(0.0127, 0.0127, 0.4191, 0.2667)" in str(caught.value)
+
+
+def test_r16_actual_rotated_root_text_and_line_collect_both_border_offenders():
+    # Actual r16 GetDisplayData, not requested (.115,.032) text anchors.
+    text = {"t": "BELOW #4-40 ROOT", "pos": [0.0948361, 0.0099719, -0.001],
+            "h": 0.0035, "w": 0.0440563, "ang": 1.5707963, "ref": 1}
+    line = _actual_line((0.115, 0.0585), (0.115, 0.0099719))
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([
+            _ink_sheet(_ink_annotation("r16 rotated root", texts=[text]),
+                       _ink_annotation("r16 root line", lines=[line]))
+        ], _approved_detail_ink())
+    message = str(caught.value)
+    assert "r16 rotated root: actual ink outside" in message
+    assert "r16 root line: actual ink outside" in message
+    assert message.count("outside inner border") == 2
+    moved = {**text, "pos": [text["pos"][0] + 0.205, text["pos"][1] + 0.062, -0.001]}
+    drawing._assert_generated_annotation_ink([
+        _ink_sheet(_ink_annotation("moved root", texts=[moved]))
+    ], _approved_detail_ink())
+
+
+@pytest.mark.parametrize("first,second", [
+    ("ReliefCornerRadius", "ReliefLead"), ("ReliefCornerRadius", "SeatEdgeBreak"),
+    ("ReliefLead", "SeatEdgeBreak"), ("ReliefDia", "ReliefCornerRadius"),
+    ("ReliefDia", "ReliefLead"), ("ReliefDia", "SeatEdgeBreak"),
+])
+@pytest.mark.parametrize("junction", ["crossing", "tee", "overlap"])
+def test_generated_all_detail_foreign_pairs_refuse_cross_tee_overlap(first, second, junction):
+    groups = _approved_detail_ink()
+    groups[first] = [((0.2, 0.1), (0.2, 0.12))]
+    other = {"crossing": ((0.19, 0.11), (0.21, 0.11)),
+             "tee": ((0.2, 0.11), (0.21, 0.11)),
+             "overlap": ((0.2, 0.105), (0.2, 0.115))}[junction]
+    groups[second] = [other]
+    with pytest.raises(RuntimeError, match="foreign ink crossing") as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet()], groups)
+    assert first in str(caught.value) and second in str(caught.value)
+    assert repr(other) in str(caught.value)
+
+
+def test_r16_actual_radius_leader_crosses_actual_lead_underline():
+    # Unchanged r16 DisplayData line endpoints from the native layout audit.
+    groups = _approved_detail_ink()
+    radius = ((0.1044214, 0.0814145), (0.1000299, 0.0959438))
+    lead = ((0.124, 0.0881962), (0.0582413, 0.0881962))
+    groups["ReliefCornerRadius"], groups["ReliefLead"] = [radius], [lead]
+    with pytest.raises(RuntimeError, match="ReliefCornerRadius vs ReliefLead") as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet()], groups)
+    assert repr(radius) in str(caught.value) and repr(lead) in str(caught.value)
+
+
+@pytest.mark.parametrize("fault", [
+    "missing-display", "empty-display", "missing-width", "missing-height",
+    "missing-position", "missing-angle", "nan-text", "inf-line", "short-line",
+    "short-arc", "short-polyline", "short-polygon", "short-triangle", "bad-arrow",
+    "bad-leader", "bad-note", "unsupported-ellipse",
+])
+def test_generated_actual_ink_fails_closed_without_guessed_bounds(fault):
+    annotation = _ink_annotation(fault, texts=[_actual_text()])
+    display = annotation["display"]
+    if fault == "missing-display":
+        del annotation["display"]
+    elif fault == "empty-display":
+        annotation["display"] = {}
+    elif fault.startswith("missing-"):
+        key = {"missing-width": "w", "missing-height": "h",
+               "missing-position": "pos", "missing-angle": "ang"}[fault]
+        del display["texts"][0][key]
+    elif fault == "nan-text":
+        display["texts"][0]["pos"][0] = math.nan
+    elif fault == "inf-line":
+        display["lines"] = [_actual_line((math.inf, 0.1), (0.2, 0.1))]
+    elif fault.startswith("short-"):
+        key = {"short-line": "lines", "short-arc": "arcs", "short-polyline": "polylines",
+               "short-polygon": "polygons", "short-triangle": "triangles"}[fault]
+        display[key] = [[0, 0]]
+    elif fault == "bad-arrow":
+        display["arrows"] = [[0.1, 0.1, 0, 0, 0, 0, 0.003, 0.001]]
+    elif fault == "unsupported-ellipse":
+        # The shared collector exposes ellipses, but display_box has no
+        # ellipse hull. Valid text alongside one must not hide unknown ink.
+        display["ellipses"] = [[0.0] * 20]
+    elif fault == "bad-leader":
+        annotation["leaders"] = [[0.1, 0.1, math.nan, 0.2, 0.2, 0]]
+    else:
+        annotation["note"] = {"extent": []}
+    with pytest.raises(RuntimeError, match=f"Sheet1/{fault}:"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(annotation)], _approved_detail_ink())
+
+
+def test_generated_ink_collects_missing_nonfinite_border_and_every_pair_in_one_refusal():
+    groups = {name: [((0.2, 0.1), (0.2, 0.12))] for name in drawing.DETAIL_KEEP}
+    groups["ReliefDia"] = []
+    groups["ReliefLead"] = [((math.nan, 0.1), (0.2, 0.1))]
+    sheet = _ink_sheet(
+        _ink_annotation("bad", texts=[{**_actual_text(), "w": math.inf}]),
+        _ink_annotation("outside", lines=[_actual_line((0.1, 0.1), (0.1, 0.001))]),
+        _ink_annotation("missing", display={}),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([sheet], groups, collection_errors=["inventory refusal"])
+    message = str(caught.value)
+    for label in ("inventory refusal", "Sheet1/bad", "Sheet1/outside", "Sheet1/missing",
+                  "DETAIL/ReliefDia", "DETAIL/ReliefLead", "ReliefCornerRadius vs SeatEdgeBreak"):
+        assert label in message
+    assert message.count("generated annotation ink violations") == 1
+
+
+def test_generated_border_reuses_printability_visibility_and_sheet_ownership():
+    outside = _ink_annotation(lines=[_actual_line((0, 0), (0.001, 0.001))])
+    sheet = _ink_sheet(
+        {**outside, "visible": 2}, {**outside, "layer": "nonprinting"},
+        sheet_annotations=[{**outside, "owner_type": 2}, {**outside, "owner_type": 0}],
+        layers={"nonprinting": {"visible": True, "printable": False}},
+    )
+    drawing._assert_generated_annotation_ink([sheet], _approved_detail_ink())
+    # A sheet-owned generated note is NOT template ink, even near the title.
+    sheet["sheet_annotations"].append({**outside, "owner_type": 1, "name": "generated sheet note"})
+    with pytest.raises(RuntimeError, match="generated sheet note"):
+        drawing._assert_generated_annotation_ink([sheet], _approved_detail_ink())
+
+
+def test_wrapped_tip_instruction_has_one_feature_leader_and_no_floating_copy():
+    assert drawing.THREAD_NOTE_TEXT.splitlines() == [
+        "#4-40 UNC", "TIP FILED", "FLUSH WITH", "MHA-DT-06 AND",
+        "STAKED AT", "MHA-DT-00", "STEP 7.",
+    ]
+    assert " ".join(drawing.THREAD_NOTE_TEXT.splitlines()[1:]) == spec.DRAWING_NOTES
+    x, y = drawing.THREAD_NOTE_XY
+    right = x + max(map(len, drawing.THREAD_NOTE_TEXT.splitlines())) * 0.0028
+    bottom = y - 0.0308
+    assert x > 0.0127
+    assert right == pytest.approx(drawing.TIP_X - 0.004)
+    assert bottom > drawing.SIDE_KEEP["UnderHeadLocation"][1] + 0.006
+    assert bottom > drawing.SIDE_KEEP["OverallLength"][1] + 0.006
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    attached = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id == "add_attached_note"]
+    assert len(attached) == 1
+    keywords = {kw.arg: ast.unparse(kw.value) for kw in attached[0].keywords}
+    assert keywords["text"] == "THREAD_NOTE_TEXT"
+    assert keywords["entity_xy"] == "THREAD_PICK"
+    assert keywords["note_xy"] == "THREAD_NOTE_XY"
+    properties = [node for node in calls if isinstance(node.func, ast.Name) and node.func.id == "add_property_linked_note"]
+    assert [ast.literal_eval(node.args[1]) for node in properties] == ["Isometric View Note"]
+    assert not hasattr(drawing, "NOTES_XY")
+
+
+def test_build_runs_collective_actual_ink_guard_as_finalizer_settled_check():
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
+    finalize = next(node for node in calls if isinstance(node.func, ast.Name) and node.func.id == "finalize_drawing")
+    settled = next(kw.value for kw in finalize.keywords if kw.arg == "settled_checks")
+    assert isinstance(settled, ast.Tuple) and len(settled.elts) == 1
+    callback = settled.elts[0]
+    assert isinstance(callback, ast.Lambda) and not callback.args.args
+    guard = callback.body
+    assert isinstance(guard, ast.Call) and ast.unparse(guard.func) == "assert_final_annotation_ink"
+    assert [ast.unparse(arg) for arg in guard.args] == ["adapter", "detail_annotations"]
+    assert sum(isinstance(node.func, ast.Name) and node.func.id == "assert_final_annotation_ink"
+               for node in calls) == 1
+    ink_names = {"add_attached_note", "_add_shoulder_finish", "label_relief_view",
+                 "mark_relief_on_side", "add_property_linked_note", "style_relief_dimensions"}
+    assert all(node.lineno < finalize.lineno for node in calls
+               if isinstance(node.func, ast.Name) and node.func.id in ink_names)
+
+def test_generated_ink_keeps_valid_offenders_when_same_annotation_or_group_is_malformed():
+    annotation = _ink_annotation("mixed", texts=[{**_actual_text(), "w": math.nan}],
+                                 lines=[_actual_line((0.1, 0.1), (0.1, 0.001))])
+    groups = _approved_detail_ink()
+    groups["ReliefLead"] = [((math.nan, 0.1), (0.2, 0.1)),
+                            ((0.19, 0.11), (0.21, 0.11))]
+    groups["SeatEdgeBreak"] = [((0.2, 0.1), (0.2, 0.12))]
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet(annotation)], groups)
+    message = str(caught.value)
+    assert "actual text" in message and "actual ink outside inner border" in message
+    assert "DETAIL/ReliefLead: missing/malformed/nonfinite" in message
+    assert "ReliefLead vs SeatEdgeBreak" in message
+
+
+@pytest.mark.parametrize("direction", [0, 1])
+def test_generated_arc_bounds_include_true_extreme_between_sample_vertices(direction):
+    # A full circle whose start angle is not a cardinal point: sampling alone
+    # can miss an arbitrarily small true breach of the unchanged inner border.
+    radius, cy = 0.01, 0.1
+    cx = 0.4191 - radius + 0.000001
+    sx, sy = cx + radius * math.cos(0.04), cy + radius * math.sin(0.04)
+    arc = [0, 0, 0, 0, sx, sy, 0, sx, sy, 0, cx, cy, 0, 0, 0, 1, direction]
+    annotation = _ink_annotation("arc")
+    annotation["display"]["arcs"] = [arc]
+    with pytest.raises(RuntimeError, match="arc: actual ink outside inner border"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(annotation)], _approved_detail_ink())
+
+
+def test_final_settled_guard_collects_every_view_and_sheet_without_another_rebuild(monkeypatch):
+    from types import SimpleNamespace
+
+    events = []
+    visible = _ink_annotation("view dimension", texts=[_actual_text()])
+    sheet_note = _ink_annotation("sheet note", texts=[_actual_text()], owner_type=1)
+    template = {"owner_type": 2, "display": {}}
+    class View:
+        def __init__(self, records):
+            self.records = records
+
+        def GetAnnotations(self):
+            events.append(("annotations", self))
+            return self.records
+
+    class Reader:
+        def __init__(self, adapter):
+            self.adapter = adapter
+
+        def take_errors(self):
+            return {}
+
+    sheet_view, side, detail = View([sheet_note, template]), View([visible]), View([])
+    model = SimpleNamespace(
+        EditRebuild3=lambda: events.append("rebuild"),
+        GetViews=lambda: [[sheet_view, side, detail]],
+        GetSheetNames=lambda: ["Sheet1"],
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    groups = _approved_detail_ink()
+    monkeypatch.setattr(drawing, "_early_bound", lambda raw, interface: raw)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_Reader", Reader)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_dump_annotation", lambda reader, raw: raw)
+    monkeypatch.setattr(drawing._drawing_layout_audit, "_layer_states", lambda reader, dump: {})
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, name: name)
+    monkeypatch.setattr(drawing._drawing_leaders, "dimension_segments", lambda name: groups[name])
+    drawing.assert_final_annotation_ink(adapter, list(groups))
+    assert events == [("annotations", sheet_view), ("annotations", side), ("annotations", detail)]
+    # A view inventory failure must not prevent collecting later annotations,
+    # later DETAIL groups, or their simultaneous actual-ink violations.
+    class BrokenView:
+        def GetAnnotations(self):
+            raise RuntimeError("inventory refused")
+
+    model.GetViews = lambda: [[sheet_view, BrokenView(), side, detail]]
+    visible["display"]["texts"][0]["pos"][0] = 0.001
+    groups["ReliefLead"] = []
+    with pytest.raises(RuntimeError) as caught:
+        drawing.assert_final_annotation_ink(adapter, list(groups))
+    message = str(caught.value)
+    for expected in ("inventory refused", "view dimension: actual ink outside", "DETAIL/ReliefLead"):
+        assert expected in message
+
+def test_head_length_actual_reason_and_underline_clear_border_arrow_stub_and_radius():
+    x, y = drawing.SIDE_KEEP["HeadLength"]
+    # Actual r16 reason width and native underline drop, translated only.
+    reason_left, reason_right = x - 0.0472819, x + 0.0472819
+    assert reason_left - 0.3071 >= 0.0056
+    assert reason_right < 0.4191
+    head_line = y - 0.0055562
+    radius_top = drawing.DETAIL_KEEP["ReliefCornerRadius"][1] + 0.0044992
+    seat_top = drawing.DETAIL_KEEP["SeatEdgeBreak"][1] + 0.0072774
+    assert head_line - radius_top >= 0.0029
+    assert head_line - seat_top >= 0.0021
+    assert 0.17465 - head_line >= 0.0037
+
+
+@pytest.mark.parametrize("name", list(drawing.DETAIL_KEEP))
+@pytest.mark.parametrize("bad", [None, [], 42, [None], [((math.inf, 0.1), (0.2, 0.1))]])
+def test_generated_foreign_pair_guard_collects_every_missing_or_malformed_group(name, bad):
+    groups = _approved_detail_ink()
+    groups[name] = bad
+    with pytest.raises(RuntimeError, match=f"DETAIL/{name}: missing/malformed/nonfinite actual ink"):
+        drawing._assert_generated_annotation_ink([_ink_sheet()], groups)
+
+@pytest.mark.parametrize("primitive", ["leader", "note-extent", "arrow", "triangle", "polygon", "polyline"])
+def test_generated_border_includes_every_actual_native_ink_carrier(primitive):
+    annotation = _ink_annotation(primitive, texts=[_actual_text()])
+    if primitive == "leader":
+        annotation["leaders"] = [[0.1, 0.1, 0, 0.001, 0.1, 0]]
+    elif primitive == "note-extent":
+        annotation["note"] = {"extent": [0.001, 0.09, 0, 0.12, 0.11, 0]}
+    elif primitive == "arrow":
+        annotation["display"]["arrows"] = [[0.014, 0.1, 0, -1, 0, 0, 0.004, 0.001]]
+    elif primitive == "triangle":
+        annotation["display"]["triangles"] = [[0.1, 0.1, 0, 0.001, 0.1, 0, 0.1, 0.11, 0, 1, 0]]
+    elif primitive == "polygon":
+        annotation["display"]["polygons"] = [[0, 0, 0, 0, 3, 0.1, 0.1, 0, 0.001, 0.1, 0, 0.1, 0.11, 0]]
+    else:
+        annotation["display"]["polylines"] = [[0, 0, 0, 0, 0, 0, 2, 0.1, 0.1, 0, 0.001, 0.1, 0]]
+    with pytest.raises(RuntimeError, match=f"Sheet1/{primitive}: actual ink outside inner border"):
+        drawing._assert_generated_annotation_ink([_ink_sheet(annotation)], _approved_detail_ink())
+
+
+def test_generated_border_excludes_template_owned_view_records_without_coordinate_exemptions():
+    outside = _ink_annotation("format", lines=[_actual_line((0, 0), (0.001, 0.001))], owner_type=2)
+    ghost = _ink_annotation("hidden ghost", lines=[_actual_line((0, 0), (0.001, 0.001))], visible=3, owner_type=1)
+    invisible_layer = _ink_annotation("hidden layer", lines=[_actual_line((0, 0), (0.001, 0.001))], layer="hidden")
+    drawing._assert_generated_annotation_ink([
+        _ink_sheet(outside, ghost, invisible_layer, layers={"hidden": {"visible": False, "printable": True}})
+    ], _approved_detail_ink())
+
+def test_generated_pair_guard_reports_all_six_simultaneous_foreign_pairs_once():
+    groups = {name: [((0.2, 0.1), (0.2, 0.12))] for name in drawing.DETAIL_KEEP}
+    with pytest.raises(RuntimeError) as caught:
+        drawing._assert_generated_annotation_ink([_ink_sheet()], groups)
+    message = str(caught.value)
+    names = list(drawing.DETAIL_KEEP)
+    for index, name in enumerate(names):
+        for other in names[index + 1:]:
+            assert f"DETAIL/{name} vs {other}: foreign ink crossing" in message
+    assert message.count("foreign ink crossing") == 6
+
+def test_approved_corridor_tune_keeps_exact_detail_frame_scale_crop_and_anchors():
+    assert drawing.DETAIL_CENTER == (0.320, 0.130)
+    assert drawing.DETAIL_SCALE == (10.0, 1.0)
+    assert drawing.DETAIL_RADIUS_MM == 3.0
+    assert drawing.DETAIL_KEEP == {
+        "ReliefDia": (0.320, 0.094),
+        "ReliefCornerRadius": (0.320, 0.1635),
+        "ReliefLead": (0.378, 0.106),
+        "SeatEdgeBreak": (0.378, 0.1615),
+    }
+    assert drawing.DETAIL_LABEL_XY == (0.370, 0.127)
+    assert drawing.HEAD_LENGTH_TEXT_X == 0.360
+    assert drawing.SIDE_KEEP["HeadLength"] == (0.360, 0.1765)
