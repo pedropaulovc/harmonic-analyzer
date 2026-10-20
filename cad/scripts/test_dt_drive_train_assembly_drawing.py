@@ -6,6 +6,7 @@ import ast
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import _config
 import cone_line
@@ -840,6 +841,99 @@ def test_note_fields_and_ring_fit() -> None:
     assert len(drawing.note_field_violations((0.010, 0.020, 0.300, 0.300), field)) == 4
     shift, overflows = drawing.ring_fit_shift((0.1, 0.1, 0.2, 0.2), (0.0, 0.0, 0.5, 0.5), grow=0.01)
     assert shift == pytest.approx((0.1, 0.1)) and overflows == []
+
+
+class _AnchoringNote:
+    def __init__(self, left: float, top: float, *, response: float) -> None:
+        self.left = left
+        self.top = top
+        self.response = response
+        self.position = (0.0, 0.0, 0.0)
+        self.moves = 0
+        self.reads = 0
+
+    def GetAnnotation(self):
+        return self
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition(self, x, y, z):
+        self.left += (x - self.position[0]) * self.response
+        self.top += (y - self.position[1]) * self.response
+        self.position = (x, y, z)
+        self.moves += 1
+        return True
+
+    def GetExtent(self):
+        self.reads += 1
+        return (self.left, self.top - 0.01, 0.0, self.left + 0.1, self.top, 0.0)
+
+
+def _anchor_test_adapter(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    events = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attributes: events.append((name, attributes))
+    )
+    return SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None)), events
+
+
+def test_note_anchor_converges_after_more_than_three_native_moves(monkeypatch) -> None:
+    adapter, events = _anchor_test_adapter(monkeypatch)
+    note = _AnchoringNote(0.001, -0.001, response=0.5)
+    extent = drawing._anchor_note(adapter, note, (0.0, 0.0), label="external interfaces")
+    assert note.moves == 5
+    assert note.reads == note.moves + 1
+    assert max(abs(extent[0]), abs(extent[3])) <= drawing.NOTE_ANCHOR_SETTLE
+    move_events = [attributes for name, attributes in events if name == "drawing.note_anchor.move"]
+    assert len(move_events) == note.moves
+    assert move_events[0]["residual_mm"] == pytest.approx((-0.5, 0.5))
+    assert events[-1][1]["outcome"] == "settled"
+    assert events[-1][1]["residual_mm"] == pytest.approx((-0.03125, 0.03125))
+
+
+def test_note_anchor_initially_settled_does_not_write(monkeypatch) -> None:
+    adapter, events = _anchor_test_adapter(monkeypatch)
+    note = _AnchoringNote(0.0, 0.0, response=0.0)
+    extent = drawing._anchor_note(adapter, note, (0.0, 0.0), label="settled note")
+    assert extent == pytest.approx((0.0, -0.01, 0.1, 0.0))
+    assert note.moves == 0
+    assert note.reads == 1
+    assert len(events) == 1
+    assert events[0][1]["outcome"] == "settled"
+
+
+def test_note_anchor_refuses_unconverged_native_extent_at_move_limit(monkeypatch) -> None:
+    adapter, events = _anchor_test_adapter(monkeypatch)
+    note = _AnchoringNote(0.001, -0.002, response=0.0)
+    with pytest.raises(RuntimeError, match="stuck note: note anchor did not settle") as error:
+        drawing._anchor_note(adapter, note, (0.0, 0.0), label="stuck note")
+    assert note.moves == 12
+    assert note.reads == note.moves + 1
+    assert "after 12 moves" in str(error.value)
+    assert "target_mm=(0.0, 0.0)" in str(error.value)
+    assert "residual_mm=(-1.0, 2.0)" in str(error.value)
+    assert "settle_mm=0.05" in str(error.value)
+    assert events[-1][1]["outcome"] == "limit"
+    assert events[-1][1]["residual_mm"] == pytest.approx((-1.0, 2.0))
+
+
+@pytest.mark.parametrize("axis", ["left", "top"])
+@pytest.mark.parametrize("outside", [False, True])
+def test_note_anchor_uses_existing_inclusive_settle_threshold(monkeypatch, axis, outside) -> None:
+    adapter, events = _anchor_test_adapter(monkeypatch)
+    offset = drawing.NOTE_ANCHOR_SETTLE
+    if outside:
+        offset = math.nextafter(offset, math.inf)
+    note = _AnchoringNote(
+        offset if axis == "left" else 0.0,
+        offset if axis == "top" else 0.0,
+        response=1.0,
+    )
+    drawing._anchor_note(adapter, note, (0.0, 0.0), label="threshold note")
+    assert note.moves == int(outside)
+    assert events[-1][1]["outcome"] == "settled"
 
 
 def _title_block_keep_out() -> tuple[float, float, float, float]:

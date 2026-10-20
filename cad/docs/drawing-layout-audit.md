@@ -40,6 +40,30 @@ the callouts with all collision guards retained. Native regeneration remains
 the acceptance gate. [#1231](https://github.com/pedropaulovc/harmonic-analyzer/issues/1231)
 tracks measured lane allocation for the longer-term fix.
 
+## Drive-train note anchoring before finalization
+
+The 2026-10-20 bridge at `ee228d2f4259` failed before this post-export
+audit: sheet 12's external-interfaces note ended at 415.042449 mm against
+its unchanged 415 mm field. Its native `INote.GetExtent` left edge was
+222.7818125 mm after three moves toward 222.5 mm; the 192.260637 mm text
+width fits at the requested anchor. The retained exact-e2 execution also
+exhausted three moves without meeting the existing 0.05 mm anchor threshold,
+but happened to stay within the field. These are distinct from its twelve
+post-export findings and strict cache-identity failure.
+
+`draw_dt_drive_train_assembly._anchor_note` now rereads native extent after
+each correction, permits at most twelve moves, and returns only when both
+rendered top-left residuals meet the unchanged 0.05 mm threshold. Otherwise
+it refuses with target, measured extent and residual. Move telemetry records
+each correction/readback; the terminal event distinguishes `settled` from
+`limit`. All DT note fields and view captions using this local helper keep
+their text, fonts, target coordinates and independent containment guards.
+The offline regression
+`test_note_anchor_converges_after_more_than_three_native_moves` exercises
+the real placement function; companion cases cover initially settled notes,
+the inclusive threshold and bounded nonconvergence. Native post-fix proof
+and printed-sheet acceptance remain required; offline fakes do not supply them.
+
 ## Where it runs
 
 `finalize_drawing` calls `run_layout_audit` after the PDF and PNG exports, with
