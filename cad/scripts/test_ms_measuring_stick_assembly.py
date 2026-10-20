@@ -723,7 +723,6 @@ def test_reference_dimensions_follow_the_spec() -> None:
     assert isinstance(sheet.DRAWING_REFERENCE_PRECISION, int)
     assert sheet.DRAWING_REFERENCE_PRECISION >= 1
     # The underside projects below Front; both dimension rows stay above Front.
-    assert drawing.UNDERSIDE_CENTER[0] == drawing.FRONT_CENTER[0]
     assert (
         drawing.UNDERSIDE_CENTER[1]
         < drawing.FRONT_CENTER[1]
@@ -731,6 +730,74 @@ def test_reference_dimensions_follow_the_spec() -> None:
         < drawing.OVERALL_LENGTH_TEXT_Y
         < drawing.SHEET_INNER_BORDER[3]
     )
+
+
+@pytest.mark.parametrize("defect", (None, "style-set", "style-readback", "alignment"))
+def test_clamped_sheet_places_section_clear_of_setting(monkeypatch, defect) -> None:
+    front, underside, section = object(), object(), object()
+    views = iter((front, underside))
+    projected = []
+    cut = {}
+    style = []
+
+    def settled():
+        pass
+
+    class Extension:
+        def SetUserPreferenceInteger(self, preference, option, value):
+            style.append((preference, option, value))
+            return defect != "style-set"
+
+        def GetUserPreferenceInteger(self, preference, option):
+            assert (preference, option) == (542, 0)
+            return 0 if defect == "style-readback" else 1
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(Extension=Extension()))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *a: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *a, **kw: next(views))
+    for name in ("set_hidden_lines_removed", "apply_view_configuration",
+                 "_assert_view_on_sheet", "_add_note_block"):
+        monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
+    monkeypatch.setattr(
+        drawing, "_view_outline",
+        lambda *a, **kw: (0.029412, 0.1739245, 0.240588, 0.2060755),
+    )
+
+    def project(adapter, view, point, **kwargs):
+        projected.append((view, point))
+        x = 0.1199
+        if defect == "alignment" and view is underside:
+            x += 0.001
+        return (x, 0.190)
+
+    def create(adapter, parent, **kwargs):
+        assert parent is front
+        cut.update(kwargs)
+        return section
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "create_section_view", create)
+    monkeypatch.setattr(drawing, "_add_assembly_dimensions", lambda *a: settled)
+    if defect is not None:
+        message = {
+            "style-set": "failed to set end-only",
+            "style-readback": "style did not persist",
+            "alignment": "thumbscrew axes are not aligned",
+        }[defect]
+        with pytest.raises(RuntimeError, match=message):
+            drawing._place_clamped_sheet(adapter)
+        assert not cut
+        return
+    assert drawing._place_clamped_sheet(adapter) is settled
+    assert style == [(542, 0, 1)]
+    axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
+    assert projected == [(front, axis_point), (underside, axis_point)]
+    assert cut["line_start"] == pytest.approx((0.1199, 0.2240755))
+    assert cut["line_end"] == pytest.approx((0.1199, 0.1699245))
+    assert cut["view_xy"] == drawing.CLAMP_SECTION_CENTER
+    assert cut["scale"] == drawing.CLAMP_SECTION_SCALE
+
 
 
 @pytest.mark.parametrize(
@@ -841,10 +908,15 @@ def _assert_fitter_text_spacing(fitter) -> None:
     centre = drawing.STOP_POSITION_TEXT_FRACTION * span
     assert centre - half_width > 0.0
     assert centre + half_width < span - section_label_clearance
-    # The exact d58d05d82 PDF places the upper A/arrow within 35 mm of Front's
-    # centre; its setting line sits about 9 mm below the requested text point.
-    # Keep the entire line above that cutting-plane envelope, not just its text.
-    assert drawing.STOP_POSITION_TEXT_Y - 0.010 > drawing.FRONT_CENTER[1] + 0.035
+    # Initial native outline top: 206.0755 mm. The old 4 mm cut overhang
+    # put the upper arrow at Y210.0755, across the setting's right witness.
+    # At text Y220 the native setting line is Y211.6656; its witness ends
+    # 1 mm beyond it. The 18 mm overhang places the complete upper arrow
+    # above that witness, with the overall reference still above the arrow.
+    upper_arrow_y = 0.2060755 + drawing.CLAMP_SECTION_TOP_CLEARANCE
+    setting_line_y = drawing.STOP_POSITION_TEXT_Y - 0.0083344
+    assert upper_arrow_y > setting_line_y + 0.001 + 0.002
+    assert upper_arrow_y + 0.00635 < drawing.OVERALL_LENGTH_TEXT_Y - 0.010
     # The stacked callout stays above Front; the overall reference above it
     # retains text-height clearance to the inner border.
     assert (

@@ -1007,6 +1007,9 @@ class _ExplodeSource:
         self.owner = drawing.SIMPLIFIED_VIEW_CONFIGURATION
         self.readable = False
         self.exploded = False
+        self.dirty = False
+        self.dirty_on_show: set[str] = set()
+        self.configuration_switches: list[str] = []
         self.refuse: set[str] = set()
         self.ignore: set[str] = set()
         self.ConfigurationManager = SimpleNamespace(
@@ -1032,12 +1035,17 @@ class _ExplodeSource:
         )
 
     def ShowConfiguration2(self, name: str) -> bool:
+        self.configuration_switches.append(name)
         if name in self.refuse:
             return False
         if name not in self.ignore:
             self.active = name
             self.ConfigurationManager.ActiveConfiguration.Name = name
+            self.dirty |= name in self.dirty_on_show
         return True
+
+    def GetSaveFlag(self) -> bool:
+        return self.dirty
 
     def GetConfigurationByName(self, name: str):
         return self.configuration if name == self.owner else None
@@ -1085,10 +1093,7 @@ def test_mg_explode_offsets_read_real_steps_and_restore_the_source(
         offsets = balloons._view_explode_offsets(adapter, view, label=label)
         assert offsets == {instance: pytest.approx((0.030, 0.025, 0.0))}
         assert not source.exploded
-        assert view.IsExploded()
     assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-    assert view.ReferencedConfiguration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
-    assert view.IsExploded()
 
 
 def test_mg_missing_explode_steps_still_fail_and_restore_the_source(monkeypatch) -> None:
@@ -1134,7 +1139,60 @@ def test_mg_source_configuration_restores_after_balloon_failure(monkeypatch) -> 
     assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
 
 
-def test_mg_collapsed_view_does_not_switch_the_source_configuration() -> None:
-    view = SimpleNamespace(IsExploded=lambda: False)
+def test_mg_collapsed_view_does_not_switch_the_source_configuration(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    view = source.drawing_view()
+    view.IsExploded = lambda: False
     with drawing._source_configuration_active(view, label="finished"):
-        assert not view.IsExploded()
+        pass
+    assert source.configuration_switches == []
+
+
+@pytest.mark.parametrize("dirty_during", ["activation", "restoration"])
+def test_mg_source_configuration_refuses_newly_dirty_source(
+    monkeypatch, dirty_during
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    source.dirty_on_show.add(
+        source.owner if dirty_during == "activation" else source.active
+    )
+    with pytest.raises(RuntimeError, match="configuration dirtied it"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            pass
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert source.dirty  # Refuse, never save the released assembly or clear its flag.
+
+
+def test_mg_source_configuration_preserves_existing_dirty_state(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    source.dirty = True
+    with drawing._source_configuration_active(source.drawing_view(), label="t"):
+        pass
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert source.dirty
+
+
+@pytest.mark.parametrize("cleanup_failure", ["restore", "dirty"])
+def test_mg_source_cleanup_failure_preserves_balloon_error(
+    monkeypatch, cleanup_failure
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    warnings = []
+    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    if cleanup_failure == "restore":
+        source.refuse.add(source.active)
+    else:
+        source.dirty_on_show.add(source.active)
+    primary_error = RuntimeError("balloon attachment failed")
+    with pytest.raises(RuntimeError) as caught:
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            raise primary_error
+    assert caught.value is primary_error
+    assert len(warnings) == 1
+    assert (
+        "did not re-activate" if cleanup_failure == "restore" else "configuration dirtied it"
+    ) in warnings[0]

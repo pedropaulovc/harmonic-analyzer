@@ -1536,7 +1536,8 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
     remained in Default. As on the pen and oblique-jig drawings, activate the
     referenced configuration for the balloon walk; the shared reader still
     shows/collapses its real explode and refuses missing steps. Restore the
-    source configuration before any later view or final readback.
+    source configuration before any later view or final readback, and refuse a
+    newly dirty source: drawing SaveAs3 would persist the released assembly.
     """
     bound = _early_bound(view, "IView")
     if not bool(bound.IsExploded()):
@@ -1550,6 +1551,7 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
         return str(_early_bound(manager.ActiveConfiguration, "IConfiguration").Name)
 
     rest = active()
+    was_dirty = bool(model.GetSaveFlag())
     try:
         if rest != wanted and (
             not bool(model.ShowConfiguration2(wanted)) or active() != wanted
@@ -1572,6 +1574,10 @@ def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
                 or str(bound.ReferencedConfiguration) != wanted
             ):
                 raise RuntimeError(f"{label}: restoring {rest!r} changed the view")
+            if bool(model.GetSaveFlag()) and not was_dirty:
+                raise RuntimeError(
+                    f"{label}: switching the source's configuration dirtied it"
+                )
         except Exception as cleanup_error:
             if primary_error is None:
                 raise
@@ -1706,7 +1712,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _create_sheets(adapter)
     settled_checks = _place_assembled_sheet(adapter)
     # Every drawing view's configuration and exploded state is final before
-    # the BOM binds; only the source's active configuration changes for reads.
+    # the BOM binds. Never switch a drawing view's configuration after the BOM:
+    # only the source's active configuration may change for guarded reads.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
     reference = _place_collapsed_view(
         adapter,
