@@ -1,6 +1,7 @@
 """Offline contract for the complete-machine fitter package (MHA-HA-00)."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ import ha_harmonic_analyzer_assembly_spec as spec
 import ha_harmonic_analyzer_assembly_steps as steps
 import joint_retention
 import ch_vn_spring_hook_spec
+import ms_measuring_stick_assembly_spec as ms
 from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 
@@ -207,3 +209,75 @@ def test_steps_sheet_text_clears_the_title_block() -> None:
     assert drawing.STEPS_COLUMN_BOTTOM_Y > landscape.title_block_top_m
     for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
+
+
+def test_parked_stick_instruction_requires_the_approved_working_pose() -> None:
+    number = steps.step_number("stick-parked")
+    instruction = notes.ASSEMBLY_STEPS[number - 1]
+    assert instruction.startswith(f"{number}. ")
+    assert "THUMBSCREW ABOVE THE STICK" in instruction
+    assert "STICK FRONT TO REAR" in instruction
+    assert "CENTRED FRONT TO REAR" in instruction
+    assert "MHA-FR-01 AS-CAST TOP" in instruction
+    assert "RAISED DECK'S EAST EDGE AND THE EAST COLUMNS" in instruction
+    printed = " ".join((*notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS, drawing.ASSEMBLED_NOTE))
+    assert "GRADUATIONS UP" not in printed
+    assert "GRADUATIONS-UP" not in printed
+
+
+@pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),
+                                (0.6, -0.8, 0.0), (0.0, -0.8, 0.6)))
+def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axis) -> None:
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    transform_reads = []
+
+    class Screw:
+        def GetPathName(self):
+            return f"C:/models/{ms.THUMB_SCREW}.SLDPRT"
+
+        @property
+        def Transform2(self):
+            transform_reads.append(True)
+            return SimpleNamespace(ArrayData=(*axis, 1, 0, 0, 0, 0, 1, 10, 20, 30, 1))
+
+    # Other children are ignored; applying the parent's rotation a second time
+    # would corrupt the correct root-frame axis supplied by Transform2.
+    other = SimpleNamespace(GetPathName=lambda: f"C:/models/{ms.STICK}.SLDPRT")
+    component = SimpleNamespace(GetChildren=lambda: (other, Screw()))
+
+    def get_component(instance):
+        assert instance == "ms-measuring-stick-1"
+        return component
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(GetComponentByName=get_component))
+    if axis == (0.0, -1.0, 0.0):
+        builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")
+    else:
+        with pytest.raises(RuntimeError, match="thumbscrew head must be above"):
+            builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")
+    assert transform_reads == [True]
+
+
+@pytest.mark.parametrize("defect", ("missing instance", "missing screw", "duplicate screw",
+                                  "missing transform"))
+def test_native_ha_final_guard_rejects_unresolved_nested_screw(monkeypatch, defect) -> None:
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    screw = SimpleNamespace(
+        GetPathName=lambda: f"C:/models/{ms.THUMB_SCREW}.SLDPRT",
+        Transform2=None,
+    )
+    children = () if defect == "missing screw" else (screw,)
+    if defect == "duplicate screw":
+        children = (screw, screw)
+    component = None if defect == "missing instance" else SimpleNamespace(GetChildren=lambda: children)
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetComponentByName=lambda instance: component)
+    )
+    message = {
+        "missing instance": "missing measuring-stick instance",
+        "missing screw": "expected one measuring-stick thumbscrew, got 0",
+        "duplicate screw": "expected one measuring-stick thumbscrew, got 2",
+        "missing transform": "missing measuring-stick thumbscrew transform",
+    }[defect]
+    with pytest.raises(RuntimeError, match=message):
+        builder._assert_ms_working_pose(adapter, "ms-measuring-stick-1")

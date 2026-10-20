@@ -677,6 +677,16 @@ the two as conflicting locations; resolve it with one key note on the priming
 sheet saying which is which (top-frame `ORIENTATION_KEY_TEXT`), never by
 flipping the model names.
 
+Assembly opening views and fitter projections have separate contracts. MG's
+standard Front faces machine −Z, matching HA; its named fitter views preserve
+the back/left inspection and exploded projections independently of that remap.
+MS's working pose has the thumbscrew above the stick, both standalone and
+parked in HA. Its graduated face remains against the fixed clamp wall and is
+therefore underneath; the named underside inspection view shows that scale.
+The HA parking height comes from the rotated assembly envelope, not the
+thumbscrew head. Native orientation checks must inspect component axes, not
+infer physical placement from a camera.
+
 **g. Picking one of four identical bores.**
 Don't: `SelectByID2("CylinderFace", "FACE", 0, 0, 0, ...)` and hope. A generated
 face name is not stable across rebuilds, and four identical bores make the name

@@ -8,14 +8,14 @@ distances are presentation offsets, not dimensions. The bar, the pressed wheel
 axle, the lever and the clamp on it never move, and neither does the lever
 wire (the finished sheet balloons it).
 
-Machine frame: +X west, +Y up, -Z front (the pen side). The assembly keeps
-SolidWorks' own standard views, so the drawing's *Isometric looks from
-+X+Y+Z: from the machine's back, above and west. A part moved -Z draws up and
-right and passes BEHIND what it left; a part moved +Z draws down and left, in
-front. Each part pushed off the front of the axle therefore clears the
-wheel's outline by more than the wheel's projected radius (about 0.58 R along
-the axle's sheet direction, 0.82 mm of sheet travel per mm of Z), or the
-wheel hides it from its balloon.
+Machine frame: +X west, +Y up, -Z front (the pen side). Standard Front is
+rebased to the machine front, while the fitter package uses the preserved
+``MG BACK-TOP-LEFT`` view from +X+Y+Z: the machine's back, above and west.
+A part moved -Z draws up and right and passes BEHIND what it left; a part
+moved +Z draws down and left, in front. Each part pushed off the front of the
+axle therefore clears the wheel's outline by more than the wheel's projected
+radius (about 0.58 R along the axle's sheet direction, 0.82 mm of sheet travel
+per mm of Z), or the wheel hides it from its balloon.
 """
 
 from __future__ import annotations
