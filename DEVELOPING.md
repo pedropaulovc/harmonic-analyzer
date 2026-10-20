@@ -1586,6 +1586,47 @@ yields a unique key, so an experiment is stored under its own key and never
 collides with the canonical artefacts. Two seats share a blob only when their
 inputs are byte-identical.
 
+### Branch-only bulk visibility contract experiment
+
+The isolated `perf/com-bulk-visibility-probe-20261020` branch runs a bounded
+contract probe after pure spring-preset validation and before normal native
+`drawing:ch_channel_assembly` work. Implementation
+approval is **not native-launch or production-cutover approval**; the parent must
+authorize any farm run separately. Do not run this probe locally. It uses two
+declared read-only channel parts, disposable nested assemblies and two diagnostic
+drawing views; it never replaces production outputs or production isolation.
+
+Evidence is written under
+`cad/out/reports/failures/com-perf-bulk-visibility/<run-id>/`: a checkpointed JSON
+report, six all-page PDFs, full-page renders/overlays and owned native fixtures.
+The terminal task-log receipt carries the finalized report digest (the report
+does not hash itself). Exact head/tree metadata is read only during an authorized
+farm-native execution. Any failed/unsupported control blocks the normal drawing;
+all owned fixture models are discarded before a successful handoff. A cache hit
+does not execute the probe and is not new native evidence. No forced cache miss,
+new task prefix, pool deployment or alternative selector is provided.
+
+`CloseDoc` is documented to also close non-active hidden documents. Before every
+probe-owned close, the probe therefore requires positive ownership of **every live
+document**, including owned acquisitions still awaiting admission. A foreign or
+unresolved live identity forbids probe-owned closes: owned models may remain
+resident **at probe exit**, the report records held-model diagnostics, and
+normal-drawing handoff stays blocked. There is no alternate probe close API or
+blanket-close recovery. These are probe-local guarantees, not final seat-residency
+claims: the surrounding `run_build` owns the entire farm seat and its mandatory
+outer session teardown remains enabled, including discard of remaining documents.
+The probe cannot observe that later cleanup; receipts state
+`held_model_scope=probe_exit` and `outer_session_teardown=not_observed_by_probe`.
+Offline fakes model the documented collateral behavior; they are not native proof.
+
+The 29-case experiment includes seven separately timed checked setup rebuilds;
+its eight-minute envelope is unvalidated. Probe-control success, the subsequent
+normal drawing result, artifact retrieval and parent all-page visual acceptance
+are separate claims. This small fixture establishes contracts, not a build-speed
+percentage. Offline behavior tests:
+`uv run --frozen pytest -q cad/scripts/test_bulk_visibility_contract_probe.py`
+(no COM imports or native work).
+
 ### Debugging a miss (provenance & diagnostics)
 
 A key is `sha256(epoch + salt + Σ(relpath, digest))`, so an unexpected key shift
