@@ -1603,7 +1603,9 @@ class _NativeHoleTable:
         self.refuse = refuse
         self.cells = [
             ["TAG", "X LOC", "Y LOC", "SIZE"],
+            # CombineSameSize: merged SIZE cells read back on every row.
             ["A1", "31.60", "31.60", "Ø25.50"],
+            ["A2", "31.60", "255.60", "Ø25.50"],
             *[["D1", "142.05", "39.81", "Ø3.80 ↧ 13.45"]] * d1_rows,
             ["E1", "284.04", "83.28", "Ø5.11"],
         ]
@@ -1677,10 +1679,10 @@ def test_d1_table_row_carries_note_flag_in_custom_column_only() -> None:
     assert set(sheet.PIVOT_SEAT_CALLOUTS.values()) == {sheet.PIVOT_SEAT_FLAG}
     assert table.events == [
         ("insert", 3, 3, "NOTE", 0),
-        ("text", 2, 4, "SEE NOTE 1"),
+        ("text", 3, 4, "SEE NOTE 1"),
     ]
     assert [row[:4] for row in table.cells] == native
-    assert [row[4] for row in table.cells] == ["NOTE", "", "SEE NOTE 1", ""]
+    assert [row[4] for row in table.cells] == ["NOTE", "", "", "SEE NOTE 1", ""]
     assert table.widths[0] == sheet.HOLE_TABLE_TAG_WIDTH
     assert table.widths[1] == table.widths[2] >= sheet.HOLE_TABLE_MIN_LOCATION_WIDTH
     assert table.widths[3] == 0.0628
@@ -1726,8 +1728,9 @@ def test_d1_table_flag_refuses_before_inserting_a_column(table, message) -> None
 @pytest.mark.parametrize(
     ("mutate", "message"),
     (
-        (lambda table: table.cells[2].__setitem__(1, "(142.05)"), "changed generated"),
-        (lambda table: table.cells[2].__setitem__(4, ""), "did not persist"),
+        (lambda table: table.cells[3].__setitem__(1, "(142.05)"), "changed generated"),
+        (lambda table: table.cells[2].__setitem__(3, ""), "changed generated"),
+        (lambda table: table.cells[3].__setitem__(4, ""), "did not persist"),
         (lambda table: table.cells[1].__setitem__(4, "SEE NOTE 1"), "did not persist"),
         (lambda table: table.widths.__setitem__(3, 0.070), "changed the hole-table width"),
         (lambda table: [row.pop() for row in table.cells], "lost or duplicated"),
@@ -1743,7 +1746,7 @@ def test_d1_table_flag_rebuild_readback_refuses_drift(mutate, message) -> None:
         sheet._check_pivot_seat_table_row(table, generated, width)
 
 
-def test_d1_table_flag_precedes_row_sizing_and_is_reread_after_binding() -> None:
+def test_d1_table_flag_precedes_row_sizing_and_is_reread_after_every_rebuild() -> None:
     import ast
     import inspect
 
@@ -1759,11 +1762,16 @@ def test_d1_table_flag_precedes_row_sizing_and_is_reread_after_binding() -> None
         ]
 
     (flag,) = lines("_flag_pivot_seat_table_row")
-    (check,) = lines("_check_pivot_seat_table_row")
+    bound, settled = lines("_check_pivot_seat_table_row")
     (spread,) = lines("_spread_hole_tags")
-    assert flag < min(lines("SetRowHeight")) < spread < check
+    assert flag < min(lines("SetRowHeight")) < spread < bound
     assert flag < min(line for line in lines("EditRebuild3") if line > flag) < spread
     assert not any(getattr(node.func, "attr", None) == "SetText2" for node in calls)
+    finalize = next(node for node in calls if getattr(node.func, "id", None) == "finalize_drawing")
+    keywords = {keyword.arg: keyword.value for keyword in finalize.keywords}
+    (check,) = keywords["settled_checks"].elts
+    assert ast.unparse(check) == "lambda: _check_pivot_seat_table_row(hole_table, *table_flag)"
+    assert check.lineno == settled
 
 
 @pytest.mark.parametrize(

@@ -2668,6 +2668,8 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        # The export prints the table the last rebuild leaves.
+        settled_checks=(lambda: _check_pivot_seat_table_row(hole_table, *table_flag),),
     )
 
 
