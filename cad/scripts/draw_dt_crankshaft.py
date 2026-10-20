@@ -432,6 +432,15 @@ FAR_END_ISO_RIM_WINDOW = (
 # air from the retention-pin note's measured text on its left, from the rim
 # below, and stays 1 mm inside the inner border (_centres_note_field).
 CENTRES_NOTE_XY = (0.380, 0.263)
+# The leader lands on the rim's rightmost point, where the ellipse's
+# horizontal major axis meets it: a sheet pick there fixes the landing under
+# the note's text, right of the axis, so SolidWorks cannot route the leader
+# from the text's left end across its own rows; the pick must resolve to
+# _far_end_rim's edge (add_attached_note's attached_to).
+FAR_END_ISO_RIM_PICK = (
+    FAR_END_ISO_XY[0] + PINION_SEAT_DIA / 2.0 * _ISO_S / 1000.0,
+    FAR_END_ISO_XY[1],
+)
 NOTE_TEXT_GAP = 0.0035  # one 3.5 mm note-text height
 ISO_NOTE_XY = (0.376, 0.108)
 
@@ -865,7 +874,8 @@ def _add_centres_note(
         adapter,
         iso,
         text=CENTRES_NOTE,
-        entity=_far_end_rim(adapter, iso),
+        entity_xy=FAR_END_ISO_RIM_PICK,
+        attached_to=_far_end_rim(adapter, iso),
         note_xy=CENTRES_NOTE_XY,
         label=label,
     )

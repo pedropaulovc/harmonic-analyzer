@@ -102,4 +102,4 @@ FIDUCIAL_NOTE = "PUNCH\nMARK\nBY EYE"
 # witness (FIDUCIAL_NOTE) is a separate, required mark made by eye on the
 # finished sphere, which a centre hole would destroy.  Three rows fit the
 # field over the isometric.  Pending owner confirmation (#991).
-CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNONE IN DOME"
+CENTRES_NOTE = "LATHE CENTRE\nHOLE OK HERE;\nNOT IN DOME"

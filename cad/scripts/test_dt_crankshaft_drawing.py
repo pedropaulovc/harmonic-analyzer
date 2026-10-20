@@ -645,6 +645,18 @@ def test_far_end_rim_window_follows_the_native_isometric_projection() -> None:
     window = drawing.FAR_END_ISO_RIM_WINDOW
     assert window[0] < drawing.FAR_END_ISO_XY[0] < window[2]
     assert window[1] < drawing.FAR_END_ISO_XY[1] < window[3] < y1 - margin
+    # The leader's pick is the rim's rightmost point (the ellipse's horizontal
+    # semi-axis is the rim's true radius), inside the window and under the
+    # note's text, which starts left of it.
+    pick = drawing.FAR_END_ISO_RIM_PICK
+    assert pick == pytest.approx(
+        (
+            drawing.FAR_END_ISO_XY[0] + spec.PINION_SEAT_DIA / 2000.0,
+            drawing.FAR_END_ISO_XY[1],
+        )
+    )
+    assert drawing._inside(pick, window)
+    assert drawing.CENTRES_NOTE_XY[0] < pick[0]
 
 
 def test_centres_note_text_fits_its_field_over_the_isometric() -> None:
@@ -756,7 +768,9 @@ def test_centres_note_is_attached_to_the_far_end_rim_on_the_isometric(
     assert drawing._add_centres_note(adapter, model, iso, clear_of_x=0.37) is note
     adapter_, view, kwargs = calls["attach"]
     assert adapter_ is adapter and view is iso
-    assert kwargs["entity"] is rim
+    assert kwargs["entity_xy"] == drawing.FAR_END_ISO_RIM_PICK
+    assert kwargs["attached_to"] is rim
+    assert "entity" not in kwargs
     assert kwargs["text"] is notes.CENTRES_NOTE
     assert kwargs["note_xy"] == drawing.CENTRES_NOTE_XY
     assert calls["place"] == (
@@ -793,5 +807,4 @@ def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
         if isinstance(node, ast.Call) and ast.unparse(node.func) == "_add_centres_note"
     ]
     assert len(placements) == 1
-    (clear_of,) = [kw.value for kw in placements[0].keywords if kw.arg == "clear_of_x"]
-    assert ast.unparse(clear_of) == "pinion_text[2]"
+    assert [kw.arg for kw in placements[0].keywords] == ["clear_of_x"]
