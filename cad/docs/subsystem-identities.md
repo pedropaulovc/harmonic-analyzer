@@ -409,6 +409,10 @@ The clamping-kit sheet identifies its installed stud with an associative overall
 
 Shared occurrence renaming resolves `swExtRefUpdateCompNames` through the SDK's installed `swconst.tlb` reader, not makepy globals or the adapter's sparse legacy constants. The rename path verifies the preference change and restoration through native getters; it preserves the component's instance index, configuration, role reference and placement.
 
+Rename an unreferenced occurrence before assigning its `Role:N` reference. Restore the name preference and clear the selection before writing that reference; an already-matching reference is read back without rewriting it. A required rename of an already-referenced occurrence is refused rather than clearing its identity. Name and reference writes have separate trace spans, and final readback must preserve the native instance index, configuration and placement.
+
+A configured part that loses a create-only cache publication adopts the winner's complete native/member archive, stamps the adopted execution identity, then validates its STEP/PNG certificate before succeeding. Pre-publication validation of the losing outputs is not evidence for the adopted winner. Missing or mismatched winner members fail closed; never regenerate them or rewrite their certificate from the losing build.
+
 Longer shared identities are checked against native drawing geometry. Support-bar slot counterbores retain their proven screw-head clearance minimum with native asymmetric model limits; Detail C's text and leader must clear Section B-B. The measuring-stick section-A marker must clear the setting dimension without changing its value or section plane. Frame sheet 2 places the set-screw balloon below the measured BOM extent and verifies its ring and leader remain clear of the cap balloon after rebuilding.
 
 #### Shared vendor transition table
