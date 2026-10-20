@@ -2308,6 +2308,21 @@ def _reprobe_under_seat(
         released = True
 
 
+def _refuse_raw_matrix_producer(label: str, disposition: str) -> None:
+    """This experiment may restore prerequisites, never author or publish them.
+
+    This is an unconditional source policy, not an environment/cache-mode switch.
+    Keep ordinary producer recipes and cache keys so exact historical hits work.
+    """
+    if label.startswith(("part:", "assembly:")):
+        raise RuntimeError(
+            f"{label}: raw-matrix experiment is source-explicit restore-only; "
+            f"cache disposition {disposition!r} is not an ordinary exact hit. "
+            "Native producer dispatch, COM seat/reprobe/build and cache "
+            "publication are forbidden on this branch."
+        )
+
+
 @_farm.leaf_action
 @_cache.keyed_action
 def _cached_com_action(
@@ -2321,6 +2336,10 @@ def _cached_com_action(
     """THE one way a COM subprocess runs: remote-cache probe, farm dispatch, or the
     local seat -- for every SolidWorks-touching task (parts, assemblies, drawings,
     the verify gates, preflight, the neutral export and the release Pack-and-Go).
+
+    On this raw-matrix branch, ``part:``/``assembly:`` labels are restore-only:
+    every non-hit is refused before farm dispatch, a seat, re-probe or publication.
+    Other labels (including verify/probe reports) retain the normal miss path.
 
     A HIT always skips the COM work. A MISS under ``--executor farm`` dispatches ONE
     leaf: the worker runs this same doit task with the cache in ``rw`` mode and
@@ -2343,6 +2362,8 @@ def _cached_com_action(
         probed = _probe_cache(key, outputs, label, probe)
         if probed == "hit":
             return
+
+    _refuse_raw_matrix_producer(label, probed)
 
     if _farm.enabled():
         _farm_build(label, key, outputs)
@@ -2446,6 +2467,8 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     leaf that exits 0 without the key is re-checked against every tracked
     difference before blaming the cache (#1114).
     """
+    # Also seal direct callers, not only the cached-action entry points.
+    _refuse_raw_matrix_producer(label, "producer dispatch")
     # Inputs this process never recorded mean every tracked change counts.
     drift = _farm.checkout_drift(task_inputs=_cache.key_input_paths(label, key))
     if drift is not None:
@@ -2488,9 +2511,10 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
 @_farm.leaf_action
 @_cache.keyed_action
 def _cached_part_action(stem: str, script: Path) -> None:
-    """Part action with a remote-cache shortcut: on a HIT the .SLDPRT (+ renders)
-    are downloaded and the SolidWorks build is skipped; otherwise build, then push.
-    Falls through to a normal build whenever the cache is off or errors.
+    """Restore an exact cached .SLDPRT (+ renders), then stamp its identity.
+
+    This raw-matrix branch refuses every non-hit before dispatch or the COM seat;
+    the ordinary producer path below is intentionally unreachable on this branch.
 
     Opens its OWN spans HERE (rather than in _run) so every phase of the task is
     timed for what it is, and each carries the ``cache`` disposition + ``label``:
@@ -2510,6 +2534,8 @@ def _cached_part_action(stem: str, script: Path) -> None:
         if probed == "hit":
             _stamp_part_execution(stem)
             return
+
+    _refuse_raw_matrix_producer(label, probed)
 
     if _farm.enabled():
         _farm_build(label, key, outputs)
@@ -2812,6 +2838,10 @@ class _RecipeTracker:
 def build_or_refresh(stem, dependencies, changed, targets):
     """Bring one assembly stem up to date through the cheapest provable tier.
 
+    On this raw-matrix branch, only an ordinary exact cache hit is permitted.
+    Every non-hit refuses before the farm, explode-base planning or COM seat;
+    the dormant build/refresh path below is retained without changing its keys.
+
     The tier (``_assembly_tier`` -> ``_refresh_tier.classify_refresh``) compares
     the per-input digests the saved .SLDASM was keyed from (``_input_ledger``)
     with the current ones; a forced cache refresh (``_cache.forced_refresh``)
@@ -2864,6 +2894,8 @@ def build_or_refresh(stem, dependencies, changed, targets):
             _stamp_assembly_execution(stem)
             _write_input_ledger(ledger, _ledger_inputs(file_deps))
             return
+
+    _refuse_raw_matrix_producer(label, probed)
 
     if _farm.enabled():
         _farm_build(label, cache_key, cache_outputs)
@@ -3437,6 +3469,8 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # Branch-only producer misses must refuse before dispatch/seat/publication.
+        SCRIPTS_DIR / "test_dodo_raw_matrix_restore_only.py",
         SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",

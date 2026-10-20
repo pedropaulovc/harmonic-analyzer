@@ -7,7 +7,10 @@ attach to a seat, or manufacture an exploded presentation control.
 
 from __future__ import annotations
 
+import ast
+import asyncio
 from copy import deepcopy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -1706,3 +1709,440 @@ def test_full_runner_raises_unreadable_poststate_after_successful_real_controls_
             is None
         )
     fake.assert_cohort_released()
+
+
+@pytest.fixture
+def preserved_session(probe, monkeypatch, tmp_path):
+    """Authenticate real temporary bytes without importing any native module."""
+    worker = tmp_path / "worker"
+    scripts = worker / "cad/scripts"
+    scripts.mkdir(parents=True)
+    monkeypatch.setattr(probe, "__file__", str(scripts / "_verify_pd_digest_probe.py"))
+    assembly_dir = worker / "cad/out/sldasm"
+    part_dir = worker / "cad/out/sldprt"
+    assembly_dir.mkdir(parents=True)
+    part_dir.mkdir(parents=True)
+    source = assembly_dir / "pd-paper-drive.SLDASM"
+    source.write_bytes(b"historical assembly fixture")
+    root_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    monkeypatch.setattr(probe, "_ROOT_SHA256", root_hash)
+    inputs = {}
+    parts = []
+    for index in range(43):
+        part = part_dir / f"part-{index}.SLDPRT"
+        part.write_bytes(f"historical part {index}".encode("ascii"))
+        token = part.with_name(f".{part.stem}.execution")
+        token.write_bytes(
+            hashlib.sha256(part.read_bytes()).hexdigest().encode("ascii") + b"\r\n"
+        )
+        inputs[part.relative_to(worker).as_posix()] = "unused-native-recipe-digest"
+        inputs[token.relative_to(worker).as_posix()] = hashlib.md5(
+            token.read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
+        parts.append(part)
+    inputs.update({f"source-{index}": "source-digest" for index in range(207)})
+    fixed = {
+        ".pd-paper-drive.execution": (root_hash + "\r\n").encode("ascii"),
+        ".pd-paper-drive.massprops.sha": (probe._MASS_TEXT + "\r\n").encode("ascii"),
+        ".pd-paper-drive.inputs.json": json.dumps({"inputs": inputs}).encode("utf-8"),
+        ".pd-paper-drive.dof.json": b'{"fixture": true}',
+    }
+    for name, data in fixed.items():
+        (assembly_dir / name).write_bytes(data)
+    for constant, name in (
+        ("_MASS_BYTE_SHA256", ".pd-paper-drive.massprops.sha"),
+        ("_LEDGER_SHA256", ".pd-paper-drive.inputs.json"),
+        ("_DOF_SHA256", ".pd-paper-drive.dof.json"),
+    ):
+        monkeypatch.setattr(probe, constant, hashlib.sha256(fixed[name]).hexdigest())
+    report_path = worker / "cad/out/reports/pd-paper-drive-digest-probe.json"
+    events = []
+    emitted = []
+    hash_after = probe._hash_after
+
+    def posthash(report):
+        events.append("posthash")
+        hash_after(report)
+
+    def emit(data):
+        events.append("emit")
+        emitted.append(json.loads(data))
+
+    monkeypatch.setattr(probe, "_hash_after", posthash)
+    monkeypatch.setattr(probe, "_emit_report", emit)
+
+    def checkpoint():
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["probe_status"] == "not_started"
+        assert report["outer_session"]["authentication"]["complete"] is True
+        assert len(report["outer_session"]["files_before"]) == 91
+        assert probe._OUTER_SESSION_ID == report["outer_session_id"]
+        report["probe_status"] = "pending_outer_session"
+        report.pop("outer_session")
+        probe._write_report(report_path, report)
+        events.append("probe_checkpoint")
+
+    return SimpleNamespace(
+        source=source,
+        part=parts[0],
+        report_path=report_path,
+        checkpoint=checkpoint,
+        events=events,
+        emitted=emitted,
+    )
+
+
+def test_outer_session_authenticates_before_entry_and_emits_once_after_teardown(
+    probe, preserved_session
+):
+    fake = preserved_session
+
+    def session(build):
+        assert build is _unexpected_native_boundary
+        fake.events.append("connect")
+        fake.checkpoint()
+        fake.events.append("teardown")
+        assert fake.emitted == []
+        return 0
+
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == 0
+    assert fake.events == ["connect", "probe_checkpoint", "teardown", "posthash", "emit"]
+    assert len(fake.emitted) == 1
+    report = fake.emitted[0]
+    assert report == json.loads(fake.report_path.read_text(encoding="utf-8"))
+    assert report["probe_status"] == report["outer_session"]["status"] == "complete"
+    assert report["outer_session"]["preservation_complete"] is True
+    assert len(report["outer_session"]["files_after"]) == 91
+    assert probe._OUTER_SESSION_ID is None
+    _assert_primitives(report)
+
+
+@pytest.mark.parametrize("mutation", ["connect", "verification", "teardown"])
+@pytest.mark.parametrize("return_code", [0, 7])
+def test_outer_session_refuses_mutation_outside_the_inner_probe(
+    probe, preserved_session, mutation, return_code
+):
+    fake = preserved_session
+
+    def session(_build):
+        # All phases occur after the real outer authentication checkpoint.
+        if mutation == "connect":
+            fake.part.write_bytes(b"changed by connection cleanup")
+        fake.checkpoint()
+        if mutation == "verification":
+            fake.part.write_bytes(b"changed after helper's preservation boundary")
+        fake.events.append("teardown")
+        if mutation == "teardown":
+            fake.part.write_bytes(b"changed by session teardown")
+        return return_code
+
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == (return_code or 1)
+    report = fake.emitted[0]
+    assert len(fake.emitted) == 1
+    assert report["probe_status"] == report["outer_session"]["status"] == "failed"
+    outer = report["outer_session"]
+    assert outer["session_return_code"] == return_code
+    assert outer["preservation_complete"] is False
+    assert outer["files_after"][str(fake.part)]["unchanged"] is False
+    assert any(error["location"].startswith("preservation.") for error in outer["errors"])
+    assert fake.events[-3:] == ["teardown", "posthash", "emit"]
+
+
+@pytest.mark.parametrize("primary", [RuntimeError("session failed"), SystemExit(9)])
+def test_outer_session_preserves_primary_exception_with_secondary_hash_failure(
+    probe, preserved_session, primary
+):
+    fake = preserved_session
+
+    def session(_build):
+        fake.checkpoint()
+        try:
+            raise primary
+        finally:
+            fake.events.append("teardown")
+            fake.part.write_bytes(b"teardown changed protected part")
+
+    with pytest.raises(type(primary)) as caught:
+        probe.run_preserved_session(
+            session, _unexpected_native_boundary, fake.source, fake.report_path
+        )
+    assert caught.value is primary
+    assert fake.emitted[0]["outer_session"]["preservation_complete"] is False
+    assert fake.emitted[0]["probe_status"] == "failed"
+    assert fake.events[-3:] == ["teardown", "posthash", "emit"]
+    assert "preservation." in primary.__notes__[-1]
+    assert probe._OUTER_SESSION_ID is None
+
+
+def test_outer_authentication_failure_never_enters_session(probe, preserved_session):
+    fake = preserved_session
+    fake.part.write_bytes(b"not historical bytes")
+    with pytest.raises(RuntimeError, match="native child authentication"):
+        probe.run_preserved_session(
+            _unexpected_native_boundary,
+            _unexpected_native_boundary,
+            fake.source,
+            fake.report_path,
+        )
+    assert fake.emitted[0]["outer_session"]["session_entered"] is False
+    assert fake.emitted[0]["probe_status"] == "failed"
+
+
+@pytest.mark.parametrize("status", ["not_started", "complete"])
+def test_outer_session_cannot_accept_stale_or_uncompleted_helper_report(
+    probe, preserved_session, status
+):
+    fake = preserved_session
+
+    def session(_build):
+        report = json.loads(fake.report_path.read_text(encoding="utf-8"))
+        report["probe_status"] = status
+        if status == "complete":
+            report["outer_session_id"] -= 1
+        probe._write_report(fake.report_path, report)
+        return 0
+
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == 1
+    assert fake.emitted[0]["outer_session"]["status"] == "failed"
+    assert any(
+        error["location"] == "outer_session.required_probe_report"
+        for error in fake.emitted[0]["outer_session"]["errors"]
+    )
+
+
+def test_inner_failure_does_not_emit_before_outer_posthash(probe, preserved_session):
+    fake = preserved_session
+
+    def session(_build):
+        with pytest.raises(RuntimeError, match="ISldWorks dispatch was null"):
+            asyncio.run(
+                probe.inspect_saved_paper_drive(
+                    SimpleNamespace(swApp=None), fake.source, fake.report_path
+                )
+            )
+        assert fake.emitted == []
+        fake.events.append("teardown")
+        return 1
+
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == 1
+    assert len(fake.emitted) == 1
+    assert fake.emitted[0]["probe_status"] == "failed"
+    assert fake.events == ["posthash", "teardown", "posthash", "emit"]
+
+
+@pytest.mark.parametrize("channel", ["json", "log"])
+@pytest.mark.parametrize("return_code", [0, 7])
+def test_outer_publication_failure_cannot_turn_a_session_green(
+    probe, preserved_session, monkeypatch, channel, return_code
+):
+    fake = preserved_session
+    write_report = probe._write_report
+
+    def session(_build):
+        fake.checkpoint()
+        fake.events.append("teardown")
+        return return_code
+
+    def write(path, report):
+        if report.get("outer_session", {}).get("status") in ("complete", "failed"):
+            raise OSError("final JSON publication failed")
+        return write_report(path, report)
+
+    def emit(_data):
+        raise OSError("final task-log publication failed")
+
+    if channel == "json":
+        monkeypatch.setattr(probe, "_write_report", write)
+    else:
+        monkeypatch.setattr(probe, "_emit_report", emit)
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == (return_code or 1)
+    if channel == "json":
+        report = fake.emitted[0]
+        assert report["probe_status"] == report["outer_session"]["status"] == "failed"
+    else:
+        report = json.loads(fake.report_path.read_text(encoding="utf-8"))
+        assert report["probe_status"] == report["outer_session"]["status"] == "failed"
+
+
+@pytest.mark.parametrize(
+    ("suite", "names", "guarded"),
+    [
+        ("soundness", ["pd-paper-drive"], True),
+        ("soundness", ["pd-paper-drive", "dt-drive-train"], True),
+        ("soundness", ["dt-drive-train"], False),
+        ("kinematics", ["pd-paper-drive"], False),
+    ],
+)
+def test_verify_entrypoint_guards_only_sessions_containing_pd_soundness(
+    monkeypatch, tmp_path, suite, names, guarded
+):
+    source = Path(__file__).with_name("verify.py").read_text(encoding="utf-8")
+    module = ast.parse(source)
+    entrypoint = module.body[-1]
+    assert isinstance(entrypoint, ast.If)
+    args = SimpleNamespace(suite=suite, names=names, auto_repair=False)
+    calls = []
+    build = object()
+
+    def run_build(actual_build):
+        assert actual_build is build
+        calls.append("ordinary")
+        return 7
+
+    def preserved(runner, actual_build, native_source, report_path):
+        assert runner is run_build and actual_build is build
+        assert native_source == tmp_path / "sldasm/pd-paper-drive.SLDASM"
+        assert report_path == tmp_path / "reports/pd-paper-drive-digest-probe.json"
+        calls.append("guarded")
+        return 7
+
+    helper = ModuleType("_verify_pd_digest_probe")
+    helper.run_preserved_session = preserved
+    monkeypatch.setitem(sys.modules, helper.__name__, helper)
+    namespace = {
+        "__name__": "__main__",
+        "_parse_args": lambda: args,
+        "_telemetry": SimpleNamespace(set_service=lambda _service: None),
+        "sys": sys,
+        "build": build,
+        "run_build": run_build,
+        "OUT_SLDASM": tmp_path / "sldasm",
+        "REPORTS_DIR": tmp_path / "reports",
+    }
+    with pytest.raises(SystemExit) as caught:
+        exec(
+            compile(ast.Module(body=[entrypoint], type_ignores=[]), "verify.py", "exec"),
+            namespace,
+        )
+    assert caught.value.code == 7
+    assert calls == (["guarded"] if guarded else ["ordinary"])
+
+
+@pytest.mark.parametrize("channel", ["json", "log"])
+def test_outer_session_keeps_primary_system_exit_when_final_publication_fails(
+    probe, preserved_session, monkeypatch, channel
+):
+    fake = preserved_session
+    primary = SystemExit(11)
+    write_report = probe._write_report
+
+    def session(_build):
+        fake.checkpoint()
+        raise primary
+
+    def write(path, report):
+        if report.get("outer_session", {}).get("status") == "failed":
+            raise OSError("secondary final JSON failure")
+        return write_report(path, report)
+
+    def emit(_data):
+        raise OSError("secondary final task-log failure")
+
+    if channel == "json":
+        monkeypatch.setattr(probe, "_write_report", write)
+    else:
+        monkeypatch.setattr(probe, "_emit_report", emit)
+    with pytest.raises(SystemExit) as caught:
+        probe.run_preserved_session(
+            session, _unexpected_native_boundary, fake.source, fake.report_path
+        )
+    assert caught.value is primary and caught.value.code == 11
+    assert "publication" in primary.__notes__[-1]
+    assert probe._OUTER_SESSION_ID is None
+
+
+@pytest.mark.parametrize("code", [0, None, False, _IntSubclass(0)])
+@pytest.mark.parametrize("secondary_failure", [None, "hash", "json", "log"])
+def test_success_coded_system_exit_cannot_bypass_outer_failure(
+    probe, preserved_session, monkeypatch, code, secondary_failure
+):
+    fake = preserved_session
+    primary = SystemExit(code)
+    write_report = probe._write_report
+
+    def session(_build):
+        fake.checkpoint()
+        fake.events.append("teardown")
+        if secondary_failure == "hash":
+            fake.part.write_bytes(b"teardown changed a protected file")
+        raise primary
+
+    def write(path, report):
+        if report.get("outer_session", {}).get("status") == "failed":
+            raise OSError("secondary final JSON failure")
+        return write_report(path, report)
+
+    def emit(_data):
+        raise OSError("secondary final task-log failure")
+
+    if secondary_failure == "json":
+        monkeypatch.setattr(probe, "_write_report", write)
+    elif secondary_failure == "log":
+        monkeypatch.setattr(probe, "_emit_report", emit)
+    assert probe.run_preserved_session(
+        session, _unexpected_native_boundary, fake.source, fake.report_path
+    ) == 1
+    assert primary.code is code
+    assert "outer_session.execution" in primary.__notes__[-1]
+    report = (
+        json.loads(fake.report_path.read_text(encoding="utf-8"))
+        if secondary_failure == "log"
+        else fake.emitted[0]
+    )
+    outer = report["outer_session"]
+    assert report["probe_status"] == outer["status"] == "failed"
+    assert outer["success_coded_system_exit_refused"] is True
+    assert outer["preservation_complete"] is (secondary_failure != "hash")
+    execution = next(
+        error for error in outer["errors"]
+        if error["location"] == "outer_session.execution"
+    )
+    assert execution["type"] == "SystemExit" and execution["message"] == str(code)
+    if secondary_failure == "hash":
+        assert any(
+            error["location"].startswith("preservation.")
+            for error in outer["errors"]
+        )
+    elif secondary_failure in ("json", "log"):
+        assert any("publication" in error["location"] for error in outer["errors"])
+    assert probe._OUTER_SESSION_ID is None
+
+
+class _ExitStatusEqualToZero:
+    def __eq__(self, other):
+        return other == 0
+
+    def __str__(self):
+        return "non-integer exit status"
+
+
+@pytest.mark.parametrize(
+    "code", [_ExitStatusEqualToZero(), 0.0, "0", True, _IntSubclass(9)]
+)
+def test_non_success_system_exit_status_is_preserved_without_equal_zero_coercion(
+    probe, preserved_session, code
+):
+    fake = preserved_session
+    primary = SystemExit(code)
+
+    def session(_build):
+        fake.checkpoint()
+        raise primary
+
+    with pytest.raises(SystemExit) as caught:
+        probe.run_preserved_session(
+            session, _unexpected_native_boundary, fake.source, fake.report_path
+        )
+    assert caught.value is primary and caught.value.code is code
+    assert fake.emitted[0]["outer_session"]["success_coded_system_exit_refused"] is False
+    assert fake.emitted[0]["probe_status"] == "failed"

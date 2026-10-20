@@ -872,8 +872,11 @@ def _fresh_dodo():
 def test_dodo_part_build_with_a_real_runner_is_refused(
     solidworks_launch_refusals, monkeypatch, tmp_path
 ):
-    """dodo's part path: a cache miss with no farm reaches ``_exec_com``."""
+    """The dormant ordinary part path still reaches the runner's safety tripwire."""
     with _fresh_dodo() as dodo:
+        # Test the host safety tripwire beneath the branch's earlier source-only
+        # refusal. Unpatched restore-only behavior has its own offline tests.
+        monkeypatch.setattr(dodo, "_refuse_raw_matrix_producer", lambda *_args: None)
         monkeypatch.setattr(dodo, "LOGS", tmp_path / "logs")
         monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [])
         monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [])

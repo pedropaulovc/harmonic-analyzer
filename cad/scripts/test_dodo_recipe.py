@@ -45,6 +45,10 @@ def _load_dodo():
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    # Preserve coverage of the dormant original producer paths on this branch.
+    # The unpatched source policy is exercised behaviorally, without importing
+    # dodo, in test_dodo_raw_matrix_restore_only.py. This is test-local only.
+    mod._refuse_raw_matrix_producer = lambda _label, _disposition: None
     return mod
 
 
@@ -122,8 +126,9 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
         member.write_text("v0\n")  # restore for next iteration
 
 
-def test_drawing_depends_on_actual_part_execution():
+def test_drawing_depends_on_actual_part_execution(tmp_path, monkeypatch):
     dodo = _load_dodo()
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     token = dodo._part_execution_token("pd_platen_guide")
     part = next(task for task in dodo.task_part() if task["name"] == "pd_platen_guide")
     drawing = next(
@@ -133,8 +138,9 @@ def test_drawing_depends_on_actual_part_execution():
     assert token in drawing["file_dep"]
 
 
-def test_assembly_drawing_depends_on_actual_assembly_execution():
+def test_assembly_drawing_depends_on_actual_assembly_execution(tmp_path, monkeypatch):
     dodo = _load_dodo()
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     token = dodo._assembly_execution_token("pn_pen")
     assembly = next(task for task in dodo.task_assembly() if task["name"] == "pn_pen")
     drawing = next(
@@ -2481,6 +2487,15 @@ def _reset_submodule_memo(dodo):
     dodo._SUBMODULE_PART_DEP_PATH = None
 
 
+def _redirect_recipe_sidecars(dodo, monkeypatch, root: Path):
+    """Keep real submodule, drawing-registry and fastener digests in the sandbox."""
+    import _buildgraph
+
+    _redirect_submodule(dodo, root / "submodule")
+    monkeypatch.setattr(dodo, "CAD_OUT", root / "cad" / "out")
+    monkeypatch.setattr(_buildgraph, "CAD_OUT", dodo.CAD_OUT)
+
+
 def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
     """The synthetic submodule dep is present in EVERY COM task's dep set and absent
     from EVERY check:* file_dep. THREE tiers: PARTS fold the part-relevant slice
@@ -3331,6 +3346,7 @@ def _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, stem, *, mode):
     """Drive a local ``build_or_refresh(stem)`` miss through ``mode`` ("full" with
     one injected post-assembly hook, or "refresh") and return ``(label, env)`` for
     every subprocess it launched."""
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     launched = []
 
     class FakePopen:
@@ -3385,6 +3401,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     # Exercise a narrowed assembly's guard plumbing on an assembly with no
     # explode-tier plan (the pen's explode qualifies since #1603, so its FULL
     # path first probes an explode base); the row is a stand-in.
@@ -3415,6 +3432,7 @@ def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs, refresh_rc=0):
     or None when the cache holds no base; ``refresh_rc`` is the exit code of
     ``refresh_assembly.py``. Returns ``(commands, restores, stores)`` as
     ``(script, args)`` and ``(key, label)`` rows."""
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     launched, restores, stores = [], [], []
 
     class FakePopen:
@@ -3469,6 +3487,7 @@ def _pd_clean_leaf(dodo, monkeypatch, tmp_path, *, base_inputs, refresh_rc=0):
 
 def test_clean_leaf_with_an_explode_base_takes_the_explode_tier(monkeypatch, tmp_path):
     dodo = _load_dodo()
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
     assert PD_EXPLODE_SPEC in current
     base = {**current, PD_EXPLODE_SPEC: "0" * 32}
@@ -3491,6 +3510,7 @@ def test_failed_explode_tier_falls_back_to_full_in_the_same_task(monkeypatch, tm
     they were, so the next leaf restoring that base would pick EXPLODE and fail
     the same way again (coderabbit on #1575). The task builds FULL instead."""
     dodo = _load_dodo()
+    _redirect_recipe_sidecars(dodo, monkeypatch, tmp_path)
     current = dodo._ledger_inputs(dodo._recipe_files("pd_paper_drive"))
     base = {**current, PD_EXPLODE_SPEC: "0" * 32}
 

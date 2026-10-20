@@ -2420,4 +2420,17 @@ if __name__ == "__main__":
             verify_amplitude_preset(_report)
         _print_summary(_report)
         sys.exit(1 if _report.failed else 0)
+    if _ARGS.suite == "soundness" and "pd-paper-drive" in _ARGS.names:
+        if _ARGS.auto_repair:
+            raise RuntimeError("paper-drive session preservation forbids auto-repair")
+        from _verify_pd_digest_probe import run_preserved_session
+
+        sys.exit(
+            run_preserved_session(
+                run_build,
+                build,
+                OUT_SLDASM / "pd-paper-drive.SLDASM",
+                REPORTS_DIR / "pd-paper-drive-digest-probe.json",
+            )
+        )
     sys.exit(run_build(build))

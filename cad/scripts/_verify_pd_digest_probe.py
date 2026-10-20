@@ -43,6 +43,9 @@ _MATRIX_BENCHMARK_PROTOCOL = "paper-drive-collapsed-raw-matrix-pairs/1"
 _HISTORICAL_PROBE_PARENT = "645f955cd60a6d7580fe3f63c06a6485d28427a1"
 _MATRIX_PAIR_ORDERS = ("AB", "BA", "AB", "BA", "AB", "BA")
 
+# Set only by the branch-only synchronous entrypoint, never by environment.
+_OUTER_SESSION_ID = None
+
 
 def _require(condition, message):
     if not condition:
@@ -1596,6 +1599,144 @@ def _emit_report(data):
     print(f"{prefix} END", file=sys.stderr, flush=True)
 
 
+def run_preserved_session(session_runner, build, source, report_path):
+    """Authenticate before session entry and finalize only after its teardown."""
+    global _OUTER_SESSION_ID
+    _require(_OUTER_SESSION_ID is None, "paper-drive session guard is not reentrant")
+    worker_root = Path(__file__).resolve().parents[2]
+    source = Path(source).resolve()
+    report_path = Path(report_path)
+    session_id = time.time_ns()
+    outer = {
+        "boundary": "before run_build entry through return/raise after session teardown",
+        "status": "not_started",
+        "authentication": {"complete": False},
+        "files_before": {},
+        "files_after": {},
+        "errors": [],
+        "session_entered": False,
+        "session_return_code": None,
+    }
+    report = {
+        "schema": "paper-drive-historical-digest-probe/1",
+        "role": _ROLE,
+        "source_revision": _SOURCE_REVISION,
+        "process_id": os.getpid(),
+        "outer_session_id": session_id,
+        "probe_status": "not_started",
+        "errors": [],
+    }
+    primary = None
+    return_code = None
+    safe_path = None
+    try:
+        safe_path = _safe_report_destination(report_path, report)
+        _require(
+            source == worker_root / "cad/out/sldasm/pd-paper-drive.SLDASM",
+            "outer source is not its own worker checkout root",
+        )
+        _authenticate(worker_root, source, outer)
+        _require(
+            outer["authentication"]["complete"] is True
+            and len(outer["files_before"]) == 91,
+            "outer session requires all 91 authenticated files before session entry",
+        )
+        outer["status"] = "observing"
+        # Replace any prior result before a session can fail without reaching
+        # the helper. The nonce also binds the helper report to this invocation.
+        report["outer_session"] = outer
+        _write_report(safe_path, report)
+        _OUTER_SESSION_ID = session_id
+        outer["session_entered"] = True
+        return_code = session_runner(build)
+        outer["session_return_code"] = return_code
+        _require(type(return_code) is int, "run_build returned a non-integer exit code")
+    except BaseException as error:
+        primary = error
+        # Python treats None and integer zero (including False/int subclasses)
+        # as successful SystemExit codes. Do not trust arbitrary == 0 objects.
+        outer["success_coded_system_exit_refused"] = isinstance(error, SystemExit) and (
+            error.code is None
+            or (isinstance(error.code, int) and int.__eq__(error.code, 0) is True)
+        )
+        _error(outer, "outer_session.execution", error)
+        _clear_exception_frames(error)
+    finally:
+        _OUTER_SESSION_ID = None
+        try:
+            _hash_after(outer)
+        except BaseException as error:
+            _error(outer, "outer_session.preservation", error)
+            _clear_exception_frames(error)
+
+    if outer["session_entered"] and safe_path is not None:
+        try:
+            _safe_report_destination(safe_path, report)
+            observed = json.loads(
+                safe_path.read_text(encoding="utf-8"),
+                object_pairs_hook=_unique_object,
+            )
+            _require(
+                type(observed) is dict
+                and observed.get("schema") == report["schema"]
+                and observed.get("process_id") == os.getpid()
+                and observed.get("outer_session_id") == session_id,
+                "missing or foreign same-session probe report",
+            )
+            if return_code == 0:
+                _require(
+                    observed.get("probe_status") == "pending_outer_session"
+                    and not _required_errors(observed),
+                    "session returned success without a complete required probe report",
+                )
+            report = observed
+        except BaseException as error:
+            _error(outer, "outer_session.required_probe_report", error)
+            _clear_exception_frames(error)
+    complete = (
+        primary is None
+        and return_code == 0
+        and outer["authentication"]["complete"] is True
+        and len(outer["files_before"]) == len(outer["files_after"]) == 91
+        and outer.get("preservation_complete") is True
+        and not _required_errors(outer)
+    )
+    outer["status"] = "complete" if complete else "failed"
+    report["outer_session"] = outer
+    report["probe_status"] = "complete" if complete else "failed"
+    try:
+        serialized = _write_report(report_path, report)
+    except BaseException as error:
+        _error(outer, "outer_session.required_json_publication", error)
+        outer["status"] = report["probe_status"] = "failed"
+        complete = False
+        serialized = _report_bytes(report)
+    try:
+        _emit_report(serialized)
+    except BaseException as error:
+        _error(outer, "outer_session.required_log_publication", error)
+        outer["status"] = report["probe_status"] = "failed"
+        complete = False
+        try:
+            _write_report(report_path, report)
+        except BaseException as write_error:
+            _error(outer, "outer_session.failed_json_publication", write_error)
+    if primary is not None:
+        primary.add_note(
+            "Outer session preservation/publication evidence is in the probe report; "
+            "recorded failures: "
+            + ", ".join(error["location"] for error in _required_errors(outer))
+        )
+        if outer.get("success_coded_system_exit_refused") and not complete:
+            return 1
+        raise primary
+    # Preserve an existing failure code; preservation/report errors cannot turn
+    # it green or cause a second session attempt.
+    if type(return_code) is int and return_code != 0:
+        return return_code
+    return 0 if complete else 1
+
+
 @_telemetry.traced("verify.paper_drive_saved_digest_probe")
 async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) -> None:
     """Observe authenticated saved Default and the unreconciled in-memory child.
@@ -1607,6 +1748,7 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
         "schema": "paper-drive-historical-digest-probe/1",
         "role": _ROLE,
         "source_revision": _SOURCE_REVISION,
+        "outer_session_id": _OUTER_SESSION_ID,
         "raw_matrix_benchmark": _benchmark_report(),
         "original_assembly_cache_key": _ORIGINAL_ASSEMBLY_KEY,
         "original_cache_epoch": "3",
@@ -1821,7 +1963,13 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
         primary = RuntimeError(
             "paper-drive probe required observation/authentication/cleanup/preservation evidence failed"
         )
-    report["probe_status"] = "failed" if primary is not None else "complete"
+    report["probe_status"] = (
+        "failed"
+        if primary is not None
+        else "pending_outer_session"
+        if _OUTER_SESSION_ID is not None
+        else "complete"
+    )
     if (
         safe_report_path is None
         or report["report_destination"]["status"] != "safe_expected_output"
@@ -1838,7 +1986,8 @@ async def inspect_saved_paper_drive(adapter, source: Path, report_path: Path) ->
                 primary = error
             serialized = _report_bytes(report)
     try:
-        _emit_report(serialized)
+        if _OUTER_SESSION_ID is None:
+            _emit_report(serialized)
     except BaseException as error:
         _error(report, "publication.task_log_chunks", error)
         report["probe_status"] = "failed"

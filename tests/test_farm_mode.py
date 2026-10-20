@@ -52,6 +52,10 @@ def _load_dodo():
         assert spec is not None and spec.loader is not None
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
+        # Exercise the dormant ordinary producer/farm contract with safe fakes.
+        # Unpatched branch refusal is covered by the AST-extracted offline
+        # test_dodo_raw_matrix_restore_only.py; this creates no runtime opt-out.
+        mod._refuse_raw_matrix_producer = lambda _label, _disposition: None
         return mod
     finally:
         Dependency.save_success = save_success
@@ -2557,9 +2561,12 @@ def test_refresh_runs_fresh_targets_with_scoped_deduplicated_carrier(
 
 
 def test_refresh_farm_submitter_only_restores_after_the_worker_publishes(
-    farm_part, monkeypatch
+    farm_part, monkeypatch, tmp_path
 ):
     dodo, script, calls, restore = farm_part
+    reports = tmp_path / "reports"
+    monkeypatch.setattr(dodo._cache, "_REPORTS", reports)
+    monkeypatch.setattr(dodo._cache, "_EVENTS_LOG", reports / "cache.jsonl")
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
     monkeypatch.setenv("HARMONIC_CACHE_REFRESH", json.dumps({
         "labels": ["part:pen_rod"], "reason": "Re-evaluate",
