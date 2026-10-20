@@ -385,6 +385,26 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 | **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.44×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.575 through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed (see [Cutter plan](#cutter-plan); wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
 | **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring and shank 2.175, both faces at 1.950 / 4.125 ±0.05 from the fork's datum face, fork 6.075 REF, all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin, 18 long from the crown; tine 1.700 ±0.05 from the datum face, slot 2.675 ±0.05, 14.75 deep from the crown (#982); Ø1.968 +0.010/0 pin hole reamed through both tines (pin MHA-CH-10 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **1.700** (1.65 MIN) beside a 2.675 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.175 shank ~150 long faced from 6.35 — chatter/curl); the ream must hold +0.010/0 for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
 
+**Selected cam-root relief B.** The source authority is
+[`ch_connecting_rod_spec.py`](../scripts/ch_connecting_rod_spec.py): chamfer
+exactly **one** strap-bore mouth, on the rod's local −Z side, **1.2 ±0.1 mm
+at 45°**; the title-block general angular tolerance is **±1°**. Keep the
+opposite mouth to the general **0.25 mm maximum edge break**. The cylinder
+gear is unchanged. At bench preassembly, orient the relieved mouth **north,
+toward its cylinder-gear web**; the authored rod rotation maps local −Z to
+assembly +Z. Preserve the bore's running fit and the plate's thickness and
+face-location bands.
+
+The clearance envelope assumes **zero axial gap and local radial contact**,
+without crediting the running clearance. With the R1 maximum cam root,
+both possible chamfer legs remain greater than 1 mm over the size and
+44–46° limits. Conservatively allowing the largest possible axial leg
+(1.34619 mm), the minimum plate thickness (2.125 mm), and the opposite
+0.25 mm edge break leaves **0.52881 mm (about 0.529 mm) minimum straight
+bearing land**. This is a geometric clearance result for the selected
+topology, **not a load-capacity or wear qualification**; the reduced bearing
+land does not establish an allowable operating load.
+
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 
 | part | stock / form | key features | machinability hazards | setups | route |
