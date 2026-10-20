@@ -97,18 +97,18 @@ HUB_WALL_MIN = (
     math.floor(_HUB_WALL_WORST * 10**DEFAULT_DRAWING_PRECISION + 1e-9)
     / 10**DEFAULT_DRAWING_PRECISION
 )
-# Named exception: MHA-CH-006 hub wall
+# Named exception: MHA-CH-06 hub wall
 HUB_WALL_NOTE = f"HUB WALL {HUB_WALL_MIN:.{DEFAULT_DRAWING_PRECISION}f} MIN"
 
 # BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
 # text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
 # Route v3 (user ruling, 2026-10-16): the part may be the turned hub
-# MHA-CH-012 joined to the flat strap MHA-CH-013. Permission only; the joint
+# MHA-CH-12 joined to the flat strap MHA-CH-13. Permission only; the joint
 # (its fit) is on those two details (ch_rocker_hub_fit), never a method here
 # -- the note points at them so the joint is defined, not left open (r1
 # machinist review of "MAY BE BUILT UP FROM ...").
 BUILT_UP_PERMISSION_NOTE = (
-    "3. MAY BE HUB MHA-CH-012 JOINED TO STRAP MHA-CH-013 PER THEIR DWGS."
+    "3. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
 )
 
 # Three lines (drawing-guidelines rule 7; Opus #1020 r3 C3).
@@ -122,7 +122,7 @@ DRAWING_NOTES = "\n".join(
         # The OD ceiling is the amplitude bar's foot cheeks at d = 0
         # (ch_rocker_arm_spec); the hub OD's position frame to A in detail D
         # (HUB_COAXIALITY_DIA) holds the named-exception wall.
-        f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS.",
+        f"2. {HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS.",
         BUILT_UP_PERMISSION_NOTE,
     )
 )
@@ -145,7 +145,7 @@ def _limits(low: float, high: float) -> str:
 
 
 # Named mates for the two tight bands (drawing-guidelines rule 4): the reamed
-# bore runs on the MHA-CH-005 pivot shaft; the strap runs in the MHA-CH-003
+# bore runs on the MHA-CH-05 pivot shaft; the strap runs in the MHA-CH-03
 # rod's fork slot (ch_rod_pivot_pin_spec.joint_budget side clearance).
 PIVOT_SHAFT_CLEARANCE = (
     PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1] - (SHAFT_DIA + SHAFT_DIA_BAND[0]),
@@ -154,23 +154,23 @@ PIVOT_SHAFT_CLEARANCE = (
 PIVOT_FIT_CALLOUT = (
     f"({_limits(*PIVOT_SHAFT_CLEARANCE)} DIAMETRAL\n"
     "CLEARANCE ON PIVOT\n"
-    "SHAFT MHA-CH-005)"
+    "SHAFT MHA-CH-05)"
 )
 STRAP_FIT_CALLOUT = (
     f"({_limits(ROD_JOINT_BUDGET['side_clearance_min'], ROD_JOINT_BUDGET['side_clearance_max'])} TOTAL\n"
     "SIDE CLEARANCE IN\n"
-    "MHA-CH-003 FORK)"
+    "MHA-CH-03 FORK)"
 )
 # Integral hub length, not spacers, sets channel pitch: the hubs stack face to
 # face on the pivot shaft (rocker_bank_layout). Below-text rows (above-text
 # line breaks print as one run).
-HUB_LENGTH_CALLOUT = "SETS ARM PITCH:\n20X STACK ON\nMHA-CH-005"
+HUB_LENGTH_CALLOUT = "SETS ARM PITCH:\n20X STACK ON\nMHA-CH-05"
 # The amplitude bar's foot rides the top edge (ch_rocker_arm_spec
 # TOP_EDGE_BAND): the one profile frame names it below the frame.
-TOP_EDGE_MATE_CALLOUT = "MHA-CH-001 FOOT TRACK"
-# The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-010 pin runs
+TOP_EDGE_MATE_CALLOUT = "MHA-CH-01 FOOT TRACK"
+# The rod-pin hole's mate (rule 4; Opus #1020 r3 C5): the MHA-CH-10 pin runs
 # in it (ch_rod_pivot_pin_spec), a prefix row over the native #47 DRILL.
-ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-010"
+ROD_PIN_MATE_CALLOUT = "FOR PIN MHA-CH-10"
 # The lower arc shares the top edge's centre (Opus #1020 r2 B1): below-text
 # rows under R816 (above-text line breaks print as one run).
 BOTTOM_RADIUS_CALLOUT = f"CONCENTRIC\nWITH R{R_TOP:.0f}"

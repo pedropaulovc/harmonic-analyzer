@@ -7,7 +7,7 @@
 # and the mated assembly and ~2.3e-6 mm between rebuilds of the same swept spring,
 # so 6e-6 mm clears the measured scatter ~2.6x over.
 # 2026-10-16 (#1189): both counter records moved +3.836 mm in Y with the
-# MHA-VN-001 anchor, which now stands its jam-nut thread above the boss. The
+# MHA-SM-VN-50 anchor, which now stands its jam-nut thread above the boss. The
 # whole counter stack (anchor, spring, gooseneck, screw) translates rigidly,
 # so every measured contact is unchanged; the summing assembly's native
 # contact gates re-certify both seats.
@@ -272,7 +272,7 @@ springs:
         gooseneck_origin_y_mm: 1190.2303698792273
         upper_support:
           component: sm-gooseneck-spring-screw
-          number: MHA-SM-004
+          number: MHA-SM-04
           thread: '#6-32 UNC'
           pitch_mm: 0.79375
           underhead_length_mm: 16.0
@@ -334,7 +334,7 @@ springs:
         gooseneck_origin_y_mm: 1190.801264915858
         upper_support:
           component: sm-gooseneck-spring-screw
-          number: MHA-SM-004
+          number: MHA-SM-04
           thread: '#6-32 UNC'
           pitch_mm: 0.79375
           underhead_length_mm: 16.0

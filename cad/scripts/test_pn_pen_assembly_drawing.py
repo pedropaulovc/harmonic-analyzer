@@ -1,4 +1,4 @@
-"""Offline contract for the pen fitter package (MHA-PN-000)."""
+"""Offline contract for the pen fitter package (MHA-PN-00)."""
 
 from pathlib import Path
 
@@ -13,7 +13,7 @@ import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
-import vn_pen_rod_set_screw_spec as rod_set_screw
+import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM

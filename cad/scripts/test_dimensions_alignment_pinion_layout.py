@@ -31,11 +31,11 @@ import dt_pinion_bracket_geometry as strap
 from dt_pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
 import dt_pinion_spring_geometry as spring
 import gen_dimensions
-import vn_post_mount_screw_spec as post_screw
-import vn_cone_tip_collar_spec as tip_collar
+import dt_vn_post_mount_screw_spec as post_screw
+import dt_vn_cone_tip_collar_spec as tip_collar
 import _mcmaster_94025a164 as tip_adjuster
-import vn_cone_pivot_screw_spec as pivot_screw
-import vn_swing_stop_screw_spec as stop_screw
+import dt_vn_cone_pivot_screw_spec as pivot_screw
+import dt_vn_swing_stop_screw_spec as stop_screw
 
 DIMENSIONS = Path(__file__).resolve().parents[1] / "config" / "dimensions.yaml"
 
@@ -82,7 +82,7 @@ def test_real_configured_dimensions_tables_render_and_keep_dt_suffixes() -> None
     arbor = gen_dimensions.find_row(record, "Chapter 13", "Arbor ends and set screws")
     assert arbor is not None
     assert "#4-40" in arbor[1]
-    adjuster = gen_dimensions.find_row(record, "Chapter 13", "`vn-cone-tip-adjuster`")
+    adjuster = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-adjuster`")
     assert adjuster is not None
     assert "#10-32" in adjuster[1]
     assert "t00147:" in adjuster[3]
@@ -286,7 +286,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"running bore at {post.CRANK_BORE_HEIGHT:.12f} above platform",
     ):
         assert fragment in post_row[1], fragment
-    screw_row = gen_dimensions.find_row(record, "Chapter 13", "`vn-post-mount-screw`")
+    screw_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-post-mount-screw`")
     assert screw_row is not None
     for fragment in (
         f"MSC {post_screw.SKU}",
@@ -306,7 +306,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     ):
         assert fragment in tip_block_row[2], fragment
 
-    collar_row = gen_dimensions.find_row(record, "Chapter 13", "`vn-cone-tip-collar`")
+    collar_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-collar`")
     assert collar_row is not None
     body_places = tip_collar.DRAWING_PRECISION_BY_NAME["CollarDia"]
     for fragment in (
@@ -327,7 +327,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         in collar_row[2]
     )
     assert "no physical-air or native realization qualification asserted" in collar_row[4]
-    pivot_row = gen_dimensions.find_row(record, "Chapter 13", "`vn-cone-pivot-screw`")
+    pivot_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-pivot-screw`")
     assert pivot_row is not None
     for fragment in (
         f"supplied shoulder diameter {pivot_screw.SHOULDER_DIA:g} "
@@ -343,7 +343,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         f"current nominal ({_mm(cone_line.PIVOT_XZ[0], 9)}, "
         f"+{cone_line.PIVOT_XZ[1]:.9f})" in pivot_row[2]
     )
-    adjuster_row = gen_dimensions.find_row(record, "Chapter 13", "`vn-cone-tip-adjuster`")
+    adjuster_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-cone-tip-adjuster`")
     assert adjuster_row is not None
     for fragment in (
         f"#10-32 UNF-{tip_adjuster.THREAD_CLASS}",
@@ -354,7 +354,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     ):
         assert fragment in adjuster_row[1], fragment
     assert f"model apex/tip station is {cone_shaft.T006_TIP_STATION:.12f}" in adjuster_row[2]
-    stop_row = gen_dimensions.find_row(record, "Chapter 13", "`vn-swing-stop-screw`")
+    stop_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-vn-swing-stop-screw`")
     assert stop_row is not None
     for fragment in (
         f"{stop_screw.STOCK_STANDARD} #4-40 UNC-{stop_screw.THREAD_CLASS}",

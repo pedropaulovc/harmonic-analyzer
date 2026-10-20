@@ -27,6 +27,13 @@ from functools import lru_cache
 import hashlib
 from pathlib import Path
 
+_IDENTITY_SPEC = importlib.util.spec_from_file_location(
+    "current_native_identity", Path(__file__).with_name("current_native_identity.py"))
+_IDENTITY = importlib.util.module_from_spec(_IDENTITY_SPEC)
+_IDENTITY_SPEC.loader.exec_module(_IDENTITY)
+project_current_anchor = _IDENTITY.project_current_anchor
+project_current_native_path = _IDENTITY.project_current_native_path
+
 WEB = Path(__file__).resolve().parents[1]
 SETUP_FIELDS = (
     "counterHeightM", "meanLineAngleRad", "platenOffsetM", "wireFixtureOffsetM",
@@ -113,6 +120,8 @@ def validate_current_generation_seals(producer_path, *, executed_inputs=()):
         "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
         "web/scripts/approved-model.mjs", "web/model-representation.mjs",
         "web/content/model-representation.json",
+        "web/current-native-identity.mjs", "web/content/current-native-identities.json",
+        "web/src/current-mechanics-data.ts", "web/scripts/current_native_identity.py",
     }
     paths.update(relative_path(path) for path in executed_inputs)
     paths.update(relative_path(path) for path in fresh.EXECUTED_INPUTS)
@@ -722,9 +731,12 @@ def anchor_motion(anchor):
     path = anchor.get("partPath")
     if not anchor.get("correspondenceEvidence"):
         return None
-    if path in FIXED_ANCHOR_PARTS or (path, anchor["id"]) in FIXED_AXIS_ANCHORS:
+    current_path = project_current_native_path(path)
+    if (current_path in {project_current_native_path(value) for value in FIXED_ANCHOR_PARTS}
+            or (current_path, anchor["id"]) in {
+                (project_current_native_path(value), identity) for value, identity in FIXED_AXIS_ANCHORS}):
         return "fixed"
-    motion = next((motion for pattern, motion in native_motion_bindings() if path and pattern.fullmatch(path)), None)
+    motion = next((motion for pattern, motion in native_motion_bindings() if current_path and pattern.fullmatch(current_path)), None)
     # A spin/swing binding alone does not prove that this point is off its axis.
     # Crank/cone also have compound platform motion: their unidentified centres
     # remain unknown, rather than being certified fixed or moving by prose.
@@ -807,9 +819,9 @@ def executed_anchor_motion(data, anchors, frames):
     candidates = {
         anchor["id"]: anchor for anchor in anchors if anchor["motion"] is None
         and anchor.get("correspondenceEvidence")
-        and any((motion in ("crank", "wheel") and pattern.fullmatch(anchor.get("partPath", "")))
+        and any((motion in ("crank", "wheel") and pattern.fullmatch(project_current_native_path(anchor.get("partPath", ""))))
                 or (motion == "paper-sprocket" and "partLocalMetres" in anchor
-                    and pattern.fullmatch(anchor.get("runtimeTemplatePartPath") or anchor.get("partPath", "")))
+                    and pattern.fullmatch(project_current_native_path(anchor.get("runtimeTemplatePartPath") or anchor.get("partPath", ""))))
                 for pattern, motion in bindings)
     }
     if not candidates:
@@ -825,7 +837,7 @@ def executed_anchor_motion(data, anchors, frames):
             if not view or not view.get("input"):
                 unavailable.add(anchor_id)
                 continue
-            cases.append({"anchor": candidates[anchor_id], "input": view["input"],
+            cases.append({"anchor": project_current_anchor(candidates[anchor_id]), "input": view["input"],
                           "sourceAssembly": view.get("sourceAssembly", {"kind": "operating"})})
     cases = [case for case in cases if case["anchor"]["id"] not in unavailable]
     if not cases:

@@ -1,4 +1,4 @@
-"""Offline contract checks for the platen-clip manufacturing drawing (MHA-PD-003)."""
+"""Offline contract checks for the platen-clip manufacturing drawing (MHA-PD-03)."""
 
 from __future__ import annotations
 
@@ -190,8 +190,8 @@ def test_length_line_clears_the_bridge_end_texts():
 def test_hole_row_names_the_tap_pattern_and_clears_the_rail_line():
     # The .XXX hole row holds the pattern float with the platen's taps; it
     # says so, and its widest line stays right of the screw rail's line.
-    assert "MHA-PD-002" in draw.DIMENSION_CALLOUTS["LeftZ"]
-    assert "MHA-PD-002" in draw.HOLE_CALLOUT_PROCESS
+    assert "MHA-PD-02" in draw.DIMENSION_CALLOUTS["LeftZ"]
+    assert "MHA-PD-02" in draw.HOLE_CALLOUT_PROCESS
     _top, _bottom, width = _block("LeftZ")
     hole_row_left = draw.FRONT_KEEP["LeftZ"][0] - 0.0014 - width
     assert hole_row_left > draw.FRONT_KEEP["RailWidth"][0] + 0.003

@@ -1,4 +1,4 @@
-"""Pure fitting contract for pn-pen.SLDASM (MHA-PN-000): inventory, the
+"""Pure fitting contract for pn-pen.SLDASM (MHA-PN-00): inventory, the
 exploded view's octant and the three carriage settings.
 
 Builder data only: the builder (``build_pn_pen_assembly``) authors the
@@ -25,7 +25,7 @@ setup and adjustment):
   ``PenYaw@CarriageSetting`` on the Top plane.
 * NIB PRESET -- the nib tip beyond the v-block/stirrup paper-end face along
   the marker axis, ``NibProtrusion@CarriageSetting``. The nib-to-paper
-  clearance is set at MHA-HA-000, where the paper exists.
+  clearance is set at MHA-HA-00, where the paper exists.
 """
 
 from __future__ import annotations
@@ -44,16 +44,16 @@ ASM_NAME = "pn-pen"
 HANGER = "pn-pen-hanger"
 ROD = "pn-pen-rod"
 STUD = "pn-pen-adjust-screw"
-STUD_NUT = "vn-pen-adjust-nut"
+STUD_NUT = "pn-vn-pen-adjust-nut"
 V_BLOCK = "pn-pen-v-block"
-ROD_SET_SCREW = "vn-pen-rod-set-screw"
+ROD_SET_SCREW = "pn-vn-pen-rod-set-screw"
 FRAME = "pn-pen-frame"
-THUMB_SCREW = "vn-pen-set-screw"
-MARKER = "vn-pen-marker"
-WIRE = "vn-pen-wire"
-HANGER_SCREW = "vn-hanger-screw"
-HANGER_NUT = "vn-pen-hanger-nut"
-HANGER_JAM_NUT = "vn-pen-hanger-jam-nut"
+THUMB_SCREW = "pn-vn-pen-set-screw"
+MARKER = "pn-vn-pen-marker"
+WIRE = "pn-vn-pen-wire"
+HANGER_SCREW = "pn-vn-hanger-screw"
+HANGER_NUT = "pn-vn-pen-hanger-nut"
+HANGER_JAM_NUT = "pn-vn-pen-hanger-jam-nut"
 
 # Every component family and its count: the builder places, the explode
 # moves and the drawing's BOM proves exactly this inventory. BOM_ORDER is

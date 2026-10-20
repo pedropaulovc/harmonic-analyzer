@@ -1,4 +1,4 @@
-r"""Reproduction script: MHA-PD-009 removable ANSI #25 sprocket (book ch. 23, p. 56-61).
+r"""Reproduction script: MHA-PD-09 removable ANSI #25 sprocket (book ch. 23, p. 56-61).
 
 Three purchased steel sprockets -- McMaster 6793K4 / 6793K11 / 6793K17,
 12 / 18 / 24 teeth -- with the supplied hub turned off flush with the plate.
@@ -695,7 +695,7 @@ async def build(adapter) -> dict[str, str]:
     check("create_sketch blank", await adapter.create_sketch("Top"))
     # The axis centerline spans the on-axis edge exactly, so its endpoints merge
     # into the (0, 0) / (0, -PLATE) corners and the chain's own relations define
-    # it (the build_vn_crank_hub_pin pattern); the diameter is measured from it.
+    # it (the build_dt_vn_crank_hub_pin pattern); the diameter is measured from it.
     set_sketch_direct_db(adapter, True)
     axis = check(
         "add_centerline axis",

@@ -3,7 +3,7 @@ r"""Reproduction script: amplitude bar (book ch. 15, pp. 30-33).
 One of the 20 chrome-finished bars (~81 cm long, 1/4" square) that set each
 channel's Fourier coefficient. The bottom-end notch rides the rocker arm;
 the deeper top-end notch straddles the channel lever and hangs from the
-MHA-CH-011 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
+MHA-CH-11 bar pivot pin pressed through the top pin hole (M6.3 layout: bars
 run UP the spine from the rocker bank to the top-lever bank).
 
 Dimensions: cad/DIMENSIONS.md "Chapter 15" — width 6.35 mm is book-annotated,
@@ -93,7 +93,7 @@ BOTTOM_NOTCH_HEIGHT = 0.09375 * IN  # 2.381  DIMENSIONS.md ch15: legacy 3/32" (m
 # TOP_NOTCH_HEIGHT (14.0, was the legacy 1/2") is the spec's: it clears the
 # lever's lower edge (ch_amplitude_bar_spec).
 # top pin hole: was Ø2.0 drill, then #47 (Ø1.994) Hole Wizard; now the
-# Ø1.968 +0.010/0 reamed press hole for the MHA-CH-011 pin (a sketch cut: the
+# Ø1.968 +0.010/0 reamed press hole for the MHA-CH-11 pin (a sketch cut: the
 # Hole Wizard has no reamed-size table)
 TOP_PIN_DROP = 0.25 * IN  # 6.35  DIMENSIONS.md ch15: hole centre below bar top (derived)
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > the bar width

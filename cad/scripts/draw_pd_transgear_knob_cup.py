@@ -1,8 +1,8 @@
-r"""Create the manufacturing drawing for the transgear knob cup (MHA-PD-016).
+r"""Create the manufacturing drawing for the transgear knob cup (MHA-PD-16).
 
 The face view is the ``*Top`` orientation, looking into the ring from the
 rear: it carries the source six-millimetre H7 bore and the note that the
-MHA-VN-048 pin hole is drilled at assembly (through cup and journal together,
+MHA-PD-VN-62 pin hole is drilled at assembly (through cup and journal together,
 so it is not dimensioned here).  Section A-A cuts it on the cup axis through
 the Front plane, the plane of the turned profile, so the O.D. and the length
 print on solid cut edges.  The front face is the running face on the plate's

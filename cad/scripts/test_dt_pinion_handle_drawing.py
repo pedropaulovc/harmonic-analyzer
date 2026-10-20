@@ -1,4 +1,4 @@
-"""Behavioral release contracts for the separate MHA-DT-015 grip crossrod."""
+"""Behavioral release contracts for the separate MHA-DT-15 grip crossrod."""
 
 from __future__ import annotations
 
@@ -32,12 +32,12 @@ def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:
 
 
 def test_crossrod_preserves_released_geometry_and_local_origin() -> None:
-    # R1: as-received Ø6 bar, bonded into MHA-DT-022 (no longer a 6.0175 press rod).
+    # R1: as-received Ø6 bar, bonded into MHA-DT-22 (no longer a 6.0175 press rod).
     assert spec.ROD_DIA == pytest.approx(6.0)
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond and its acceptance are the fit-up step, not notes.
     assert spec.DRAWING_NOTES == "USE COLD-FINISHED BAR AS RECEIVED."
     assert spec.ASSEMBLY_STEP == (
-        "BOND MHA-DT-015 INTO MHA-DT-022 HEAD WITH LOCTITE 638; "
+        "BOND MHA-DT-15 INTO MHA-DT-22 HEAD WITH LOCTITE 638; "
         "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND."
     )
     assert "MATCH-REAM" not in spec.DRAWING_NOTES
@@ -72,7 +72,7 @@ def _world_vector(
 def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> None:
     # Released construction: MHA-DT-015's component origin was the head/crossrod
     # axis, with the old Ø15x9 head followed by a 2 mm wall.  New construction:
-    # that head centre is MHA-DT-022 local z=-6.5; MHA-DT-015 keeps its own origin.
+    # that head centre is MHA-DT-22 local z=-6.5; MHA-DT-15 keeps its own origin.
     # Codex #854/#858 P1 (Main): the assembly shows the fit-up stack, where the
     # back stop puts the drum -- and the arbor it is bonded on -- 0.25 aft of
     # the released arbor station, plus RIG_AFT_SHIFT set from the configured
@@ -132,7 +132,7 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     # both faces and the crown move 1.25 out; machinist review r5 of #1685
     # grew it forward only, to 12.2, so the rear face stays.  The neck
     # shoulder (the released head rear + 2 wall + 10) moves 0.25 forward, so
-    # every turned length on the MHA-DT-022 print lands on .X.
+    # every turned length on the MHA-DT-22 print lands on .X.
     released_head_stations = (
         released_origin[2] + 11.5 / 2.0 - 12.2,
         released_origin[2] + 11.5 / 2.0,
@@ -236,7 +236,7 @@ def test_no_note_line_carries_a_dimension() -> None:
     """drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Codex P1 on #814): the Ø6 bar size lives in the registry's
     material specification and the imported RodDia, never in a note."""
     for line in spec.DRAWING_NOTES.splitlines():
-        text = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", line).replace(arbor.RETAINING_COMPOUND, "")
+        text = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", line).replace(arbor.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
     assert "USE COLD-FINISHED BAR AS RECEIVED." in spec.DRAWING_NOTES
     assert "6 mm" in _config.parts("dt-pinion-handle")["material_specification"]

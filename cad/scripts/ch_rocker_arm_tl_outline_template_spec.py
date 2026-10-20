@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker arm's outline template (MHA-CH-006-TL-13).
+r"""Pure-data contract for the rocker arm's outline template (MHA-CH-06-TL-13).
 
 Shop gauge, not a machine part (cad/docs/subsystem-identities.md). An annealed
 O1 plate carrying the rocker arm's finished outline: the R800 top and R816
@@ -96,7 +96,7 @@ for _low, _high, _nominal in (
 # put each tip land 0.0453 OUTSIDE that zone (#1544). So the straight edges are
 # offset along their own normals instead, through the three printed stations:
 # the top-arc end, the tip-land length and the bottom-arc end. The arcs stay
-# on the trammel's R800/R816 about CENTER_Y (MHA-CH-006-TL-14..19 scribe them).
+# on the trammel's R800/R816 about CENTER_Y (MHA-CH-06-TL-14..19 scribe them).
 _MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 END_PLACES = 3
 _ROCKER_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
@@ -288,7 +288,7 @@ if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e
     )
 
 # Rod-pin slot: the template's clocking. The rocker's datum C is its #47
-# rod-pin hole (MHA-CH-006, Ø0.20 position to A|B). The pivot pin alone
+# rod-pin hole (MHA-CH-06, Ø0.20 position to A|B). The pivot pin alone
 # leaves the template free to turn about the pivot; a fixed pin gauge in the
 # arm's rod-pin hole, through a slot here at that hole's BASIC station,
 # clocks it. The slot runs radially from the pivot, so the hole's radial
@@ -591,7 +591,7 @@ SHARP_EDGE_CALLOUT = "SHARP EDGE"
 # sheet border and the station extension lines, with room for the short flag
 # only.
 PROFILE_CALLOUT = "ROCKER PROFILE"
-ROCKER_NUMBER = "MHA-CH-006"
+ROCKER_NUMBER = "MHA-CH-06"
 STATION_CALLOUT = f"{PROFILE_CALLOUT}, {ROCKER_NUMBER}"
 # The run's function (its three-place minimum is what must reach), no method.
 ROD_SLOT_FLAT_CALLOUT = f"PIN REACH TO ROD-PIN\nHOLE, {ROCKER_NUMBER}"

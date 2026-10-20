@@ -1,4 +1,4 @@
-r"""MHA-FR-005's central web and the rocker pivot brackets' hold-down seats (#743 PR2).
+r"""MHA-FR-05's central web and the rocker pivot brackets' hold-down seats (#743 PR2).
 
 PURE DATA, no SolidWorks/COM imports: ``build_fr_rocker_arm_support`` cuts the
 web and its seats from it, and the channel assembly places the screws from
@@ -6,7 +6,7 @@ it. Kept out of ``fr_rocker_arm_support_section_spec`` on purpose: the base,
 frame and drive train import that module, and a web or seat edit must not
 re-key them.
 
-Each MHA-CH-008 bracket is held by one MHA-VN-071 (McMaster 90280A196, #8-32 x
+Each MHA-CH-08 bracket is held by one MHA-CH-VN-57 (McMaster 90280A196, #8-32 x
 5/8 slotted fillister; owner Q13c, 2026-10-16) through its #8 close-clearance
 foot hole into a bottoming-tapped seat in the support's top face, transferred
 from the set bracket at assembly (the south bracket is blade-set off the
@@ -14,7 +14,7 @@ preload spring's washer, so its seat cannot be cast or pre-drilled). The 5/8
 length keeps 1.5D in the cast iron at worst case with the shallowest seat.
 
 The brackets' feet run outboard toward the support's end faces (user-approved
-sketch, 2026-10-09; the one MHA-CH-008 ends flush with the south end face and
+sketch, 2026-10-09; the one MHA-CH-08 ends flush with the south end face and
 short of the north one, #1341), so each seat lies over the window's side edge:
 the post outboard, the central web and its R6.35 pocket-corner fillet inboard. Under
 the top rail (the source casting's 6.35, no longer deepened as #743 had it)
@@ -42,7 +42,7 @@ station move the thread toward the end wall. The station is given from the
 ear's inboard face, the face fit-up sets, so the foot length's band is not in
 this chain (user, 2026-10-10, option ii).
 
-The stack is checked at the printed worst case: MHA-CH-008's foot height at
+The stack is checked at the printed worst case: MHA-CH-08's foot height at
 .XX and its station at +/-0.10, the seat depths and the
 support's 177.8 length at .X, the web at .XX, the screw at its +0/-0.76
 commercial length band, and the 0.25 edge break at the seat mouth. Every check
@@ -73,7 +73,7 @@ LINEAR_3PL = 0.127  # title-block .XXX band
 EDGE_BREAK = 0.25  # title-block edge break, also the novice spare
 RULE12_WEB_TARGET = 2.0
 
-# MHA-VN-071: the channel assembly pins these to the stock part it places.
+# MHA-CH-VN-57: the channel assembly pins these to the stock part it places.
 SCREW_THREAD = "#8-32"
 SCREW_LENGTH = 15.875  # under-head length, 5/8 in
 SCREW_LENGTH_BAND = (0.0, 0.76)  # (+, -): commercial screw length tolerance

@@ -32,9 +32,9 @@ import _telemetry  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
     "ch-amplitude-bar",
-    "vn-channel-spring-installed",
+    "ch-vn-channel-spring-installed",
     "channel-spring",
-    "vn-counter-spring",
+    "sm-vn-counter-spring",
     "sm-gooseneck",
 ]
 # Solid features legitimately report Visible == 2 (their bodies are shown);

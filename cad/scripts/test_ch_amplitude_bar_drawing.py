@@ -55,7 +55,7 @@ def test_part_geometry_matches_the_spec() -> None:
 
 
 def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
-    """User ruling 2026-10: the MHA-CH-011 pin is pressed into both top-notch
+    """User ruling 2026-10: the MHA-CH-11 pin is pressed into both top-notch
     cheeks (ch_bar_pivot_pin_spec holds the fit), so the hole is reamed to a
     band of its own, native on TopPinDia. Machinist round 1 (#1293): the hole
     was only words in a note; it now prints in the top end's right side view,
@@ -76,7 +76,7 @@ def test_top_pin_hole_is_the_reamed_press_hole_for_the_bar_pivot_pin() -> None:
         "TopPinDia",
     }
     assert set(drawing.TOP_SIDE_KEEP) == notes.DRAWING_DIMENSIONS["TopPinProfile"]
-    assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-011"
+    assert notes.DIMENSION_CALLOUTS["TopPinDia"] == "THRU, REAM\nPRESS FIT MHA-CH-11"
     precision = notes.DRAWING_PRECISION["TopPinProfile"]
     assert precision == {"BarSection": 2, "TopPinX": 3, "TopPinDrop": 2, "TopPinDia": 3}
     # Machinist round 1: the three-place location states its function, the
@@ -157,13 +157,13 @@ def test_callouts_name_each_mate_at_its_dimension() -> None:
     assert notes.LEVER_NUMBER == parts("ch-channel-lever")["number"]
     assert notes.ROCKER_ARM_NUMBER == parts("ch-rocker-arm")["number"]
     callouts = notes.DIMENSION_CALLOUTS
-    assert callouts["TopNotchWidth"].startswith("STRADDLES MHA-CH-002\n")
-    assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-006\n")
+    assert callouts["TopNotchWidth"].startswith("STRADDLES MHA-CH-02\n")
+    assert callouts["BottomNotchWidth"].startswith("RIDES MHA-CH-06\n")
     assert callouts["TopRightLedge"] == "CENTRES ON LEVER"
     assert callouts["BottomLeftLedge"] == "CENTRES ON ROCKER"
     assert callouts["TopNotchHeight"] == "ROOTS R0.40 MAX"
     # Machinist r5: the foot depth's shallow-only band names its mate.
-    assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-006"
+    assert callouts["BottomNotchHeight"] == "SITS ON MHA-CH-06"
     assert callouts["BottomNotchWidth"].endswith("\nROOTS R0.40 MAX")
     assert drawing.CALLOUTS_ABOVE <= set(callouts)
     for text in callouts.values():

@@ -1,4 +1,4 @@
-"""The step registry matches the numbers MHA-DT-000 prints (SolidWorks-free)."""
+"""The step registry matches the numbers MHA-DT-00 prints (SolidWorks-free)."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
     """The fitter accepts the touching gear stack before setting the tip."""
     low, high = dt_cone_gear_stack.STACK_L20_ACCEPT
     stack = _step_body("cone-gears-stacked")
-    assert "MHA-DT-007" in stack and "MHA-DT-003" in stack
+    assert "MHA-DT-07" in stack and "MHA-DT-03" in stack
     assert "T120 FIRST THROUGH T006" in stack
     assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
     assert f"{low:.3f}-{high:.3f}" in stack
@@ -74,21 +74,21 @@ def test_the_cone_stack_step_prints_measured_limits() -> None:
 def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     """User ruling 2026-09-29: the collar is set to T006 over the feeler and
     locked first, so the stack's float is fixed on the shaft before the cup
-    screw sets MHA-DT-004's end play and the pinch screw locks it."""
+    screw sets MHA-DT-04's end play and the pinch screw locks it."""
     fitup = _step_body("tip-adjuster-set")
-    # The tip's lateral error is taken up by turning MHA-DT-005 on its screws
+    # The tip's lateral error is taken up by turning MHA-DT-05 on its screws
     # (build_drive_train_assembly.TIP_LATERAL_CAPACITY_MM), so the post stays
     # turnable until the tip is centred in the cup, and is locked before the
     # end play is set (Codex P1 on #1136).
     order = (
-        f"PUSH {_config.parts('vn-cone-tip-collar')['number']} ONTO A "
+        f"PUSH {_config.parts('dt-vn-cone-tip-collar')['number']} ONTO A "
         f"{cone_stack_end_play.COLLAR_FEELER:.2f} FEELER ON T006",
         "LOCK ITS SET SCREW",
-        "THREAD MHA-VN-017 INTO MHA-DT-021",
-        "TURN MHA-DT-005 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",
-        "TIGHTEN BOTH MHA-VN-031",
+        "THREAD MHA-DT-VN-55 INTO MHA-DT-21",
+        "TURN MHA-DT-05 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",
+        "TIGHTEN BOTH MHA-DT-VN-61",
         "JUST STOPS SHUTTLING",
-        "TIGHTEN MHA-VN-018",
+        "TIGHTEN MHA-DT-VN-56",
     )
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
@@ -96,9 +96,9 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     # The block is placed by its hold-down alone: nothing is set against it,
     # and the post is left free to turn.
     placed = _step_body("post-and-tip-block")
-    assert "MHA-VN-030 UP FROM UNDER THE PLATE" in placed
+    assert "MHA-DT-VN-60 UP FROM UNDER THE PLATE" in placed
     assert "FEELER" not in placed
-    assert "LEAVE MHA-VN-031 LOOSE ENOUGH TO TURN MHA-DT-005" in placed
+    assert "LEAVE MHA-DT-VN-61 LOOSE ENOUGH TO TURN MHA-DT-05" in placed
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
@@ -112,13 +112,13 @@ def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
 
 
 def test_post_screws_keep_spec_owned_stock_and_cut_to_fit_acceptance() -> None:
-    import vn_post_mount_screw_spec as screw
+    import dt_vn_post_mount_screw_spec as screw
 
-    row = _config.parts("vn-post-mount-screw")
+    row = _config.parts("dt-vn-post-mount-screw")
     fitup = _step_body("post-and-tip-block")
-    assert row["number"] == drawing.BOM_PART_NUMBERS["vn-post-mount-screw"]
+    assert row["number"] == drawing.BOM_PART_NUMBERS["dt-vn-post-mount-screw"]
     assert row["supplier_skus"][0] == screw.SKU
-    assert f"MSC {screw.SKU}" in drawing.BOM_DESCRIPTIONS["vn-post-mount-screw"]
+    assert f"MSC {screw.SKU}" in drawing.BOM_DESCRIPTIONS["dt-vn-post-mount-screw"]
     assert (
         f"MSC {screw.SKU}, {screw.THREAD} X {screw.STOCK_LENGTH_MM / 25.4:g} IN STOCK"
         in fitup
@@ -143,19 +143,19 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
 
     fitup = _step_body("crank-mesh-checked")
     order = (
-        "SLIDE MHA-DT-010 ON UNPINNED",
-        f"SET MHA-DT-010 {pinion.SEAT_FEELER_MM:.2f} OFF",
-        "PUSH MHA-DT-010 AND T120 TOWARD EACH OTHER",
+        "SLIDE MHA-DT-10 ON UNPINNED",
+        f"SET MHA-DT-10 {pinion.SEAT_FEELER_MM:.2f} OFF",
+        "PUSH MHA-DT-10 AND T120 TOWARD EACH OTHER",
         f"READING A {pinion.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND",
-        "MHA-DT-010 BAND TO T120 TIPS: IF THE FEELER STOPS",
-        "TURN THE MHA-DT-010 BAND DOWN",
+        "MHA-DT-10 BAND TO T120 TIPS: IF THE FEELER STOPS",
+        "TURN THE MHA-DT-10 BAND DOWN",
         f"Ø{pinion.TURNED_DIA_FITUP_MIN:.{pinion.TURNED_DIA_PLACES}f} MIN",
-        "MHA-DT-010 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS",
-        "FACE THE MHA-DT-010 SHOULDER BACK",
+        "MHA-DT-10 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS",
+        "FACE THE MHA-DT-10 SHOULDER BACK",
         f"{pinion.SHOULDER_LENGTH_FITUP_MIN:.{pinion.SHOULDER_LENGTH_PLACES}f} MIN",
         "RESET, RECHECK",
-        "TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND",
-        "THEN MATCH-DRILL THROUGH THE MHA-DT-010",
+        "TURN MHA-DT-07 ONE FULL REVOLUTION; IT MUST NEVER BIND",
+        "THEN MATCH-DRILL THROUGH THE MHA-DT-10",
         "RE-CHECK NO BINDING",
     )
     positions = [fitup.index(phrase) for phrase in order]
@@ -172,11 +172,11 @@ def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform()
     checks = " ".join(drawing.CHECKS.split())
     ratio = Fraction(pinion.TEETH, gear64.TEETH)
     assert f"CONE SET {ratio} TURN ({pinion.TEETH}T:{gear64.TEETH}T)" in checks
-    assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-007 TURN" in checks
-    assert "MHA-DT-007 CLEAR OF THE UNRELIEVED MHA-DT-020 TOP THROUGHOUT" in checks
+    assert "WITHOUT BINDING THROUGH ONE FULL MHA-DT-07 TURN" in checks
+    assert "MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT" in checks
     assert "RELIEF THROUGHOUT" not in checks
     assert "FINISHING IN THE CYLINDERS' RUNNING DIRECTION TO TAKE UP PLAY" in checks
-    assert "BINDING THROUGH ONE FULL MHA-DT-007 TURN" in " ".join(
+    assert "BINDING THROUGH ONE FULL MHA-DT-07 TURN" in " ".join(
         drawing.FIT_PLACEHOLDER.split()
     )
 
@@ -191,25 +191,25 @@ def test_crank_end_fit_holds_the_collar_on_the_boss_and_leaves_the_end_proud() -
     least, most = crankshaft.SHAFT_END_PROUD_RANGE
     assert least >= 0.0
     order = (
-        "MHA-DT-011 COLLAR REAR FACE HARD ON THE MHA-DT-005 BOSS SOUTH FACE",
-        f"MHA-DT-010 ON THE {pinion.SEAT_FEELER_MM:.2f} FEELER OFF THE BOSS NORTH FACE",
-        "MATCH-DRILL AND REAM FOR MHA-DT-029",
+        "MHA-DT-11 COLLAR REAR FACE HARD ON THE MHA-DT-05 BOSS SOUTH FACE",
+        f"MHA-DT-10 ON THE {pinion.SEAT_FEELER_MM:.2f} FEELER OFF THE BOSS NORTH FACE",
+        "MATCH-DRILL AND REAM FOR MHA-DT-29",
         "END PLAY = THE FEELER",
-        f"END STANDS {least:.2f}-{most:.2f} PROUD OF MHA-DT-010 NORTH FACE",
+        f"END STANDS {least:.2f}-{most:.2f} PROUD OF MHA-DT-10 NORTH FACE",
         "DO NOT FACE",
     )
     positions = [fitup.index(phrase) for phrase in order]
     assert positions == sorted(positions)
     assert f"(STEP {steps.step_number('crank-mesh-checked')})" in fitup
-    assert "SHIM" not in fitup and "MHA-VN-071" not in fitup
+    assert "SHIM" not in fitup and "MHA-CH-VN-57" not in fitup
 
 
 def test_step_four_holds_the_collar_before_the_feeler_and_the_pin() -> None:
     body = _step_body("crank-mesh-checked")
     positions = [
-        body.index("HOLD THE MHA-DT-011 COLLAR HARD ON THE BOSS SOUTH FACE"),
-        body.index("OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER"),
-        body.index("MATCH-DRILL THROUGH THE MHA-DT-010"),
+        body.index("HOLD THE MHA-DT-11 COLLAR HARD ON THE BOSS SOUTH FACE"),
+        body.index("OFF THE MHA-DT-05 BOSS NORTH FACE WITH A FEELER"),
+        body.index("MATCH-DRILL THROUGH THE MHA-DT-10"),
     ]
     assert positions == sorted(positions)
 

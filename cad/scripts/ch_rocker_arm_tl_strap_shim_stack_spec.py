@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker arm's strap shim stack (MHA-CH-006-TL-11).
+r"""Pure-data contract for the rocker arm's strap shim stack (MHA-CH-06-TL-11).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). Four
 stacks stand on the rocker riser blocks and carry the blank: in S1 under the

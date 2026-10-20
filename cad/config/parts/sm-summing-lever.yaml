@@ -1,5 +1,5 @@
 sm-summing-lever:
-  number: MHA-SM-003
+  number: MHA-SM-03
   material_family: ferrous_noncritical
   finish: green enamel; mask knife edges and tapped holes; oil bare machined surfaces
   quantity: 1
@@ -10,7 +10,7 @@ sm-summing-lever:
       kind: "accept"
       where: "the knife-seat and 20-hole spring-pattern position frame (Ø0.15 RFS)"
       finding: "pattern position frame over-specified (rule 5)"
-      reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-014 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
+      reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
     # TODO(#1625): remove RV-02 when the title block gains its inside-corner
     # default and this lever models R0.5 MAX stub roots / R0.4 MAX rib ends.
     - id: "RV-02"

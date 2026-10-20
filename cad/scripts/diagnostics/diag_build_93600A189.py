@@ -3,7 +3,7 @@ r"""McMaster 93600A189: catalogue-only nominal 316SS 2 x 6 dowel reference.
 The supplier gives chamfered ends but no dimensions. The common recipe's
 plain-cylinder branch is deliberate; it is not a vendor end-form replica.
 Incoming measured end/length acceptance lives in the production pin spec.
-Used as transgear-arm-plate-locating-pin (MHA-VN-056).
+Used as transgear-arm-plate-locating-pin (MHA-PD-VN-64).
 
 Run standalone (SolidWorks open)::
 

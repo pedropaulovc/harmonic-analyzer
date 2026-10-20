@@ -1,4 +1,4 @@
-r"""McMaster 91375A942 -- alloy steel cup-tip set screw, #1-72 x 5/32 (MHA-VN-055).
+r"""McMaster 91375A942 -- alloy steel cup-tip set screw, #1-72 x 5/32 (MHA-CH-VN-55).
 
 Catalogue-only: no vendor model has been harvested, so there is no pinned
 VENDOR_* truth and no replica gate. Read live on 2026-10-09 (the public
@@ -22,7 +22,7 @@ detail table is login-only):
   top 15P/16 at major + H/16); and the 91375A106 vendor-frame COM mapping.
 
 Frame: axis +Y, origin mid-length, socket face at y = +L/2 and cup end at
-y = -L/2; build_vn_fulcrum_set_screw lifts the cup end onto y = 0.
+y = -L/2; build_ch_vn_fulcrum_set_screw lifts the cup end onto y = 0.
 
 Run standalone (SolidWorks open); without a vendor file this is catalogue-only::
 

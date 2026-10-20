@@ -1,5 +1,5 @@
 r"""Pure-data dimensional contract shared by the pinion strap torque shaft
-(MHA-DT-019) and its manufacturing drawing.
+(MHA-DT-19) and its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A plain Ø6.35 steel shaft with a
 shallow spherical crown at each end -- the pivot the two swing straps rock on.
@@ -20,7 +20,7 @@ from __future__ import annotations
 from _fit_shaft_h import SHAFT_H
 from _gtol_cylinder import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-import vn_pinion_strap_pin_spec as _strap_pin
+import dt_vn_pinion_strap_pin_spec as _strap_pin
 from pinion_rig_layout import (
     TORQUE_SHAFT_LEN,
     TORQUE_SHAFT_PIN_HOLE_Z,
@@ -45,7 +45,7 @@ SHAFT_DIA_BAND = SHAFT_H
 # shallowest one past its flush setting
 # (pinion_rig_layout.torque_shaft_back_bearing_stack).
 # Nothing stands on the shaft's axis past either block: the nearest body, the
-# MHA-DT-016 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
+# MHA-DT-16 lever, rides the lift rod 18.63 off it -- hub 8.95 radial clear,
 # arm >= 12.42 clear over the -82 degree throw (test_dt_drive_train_support_layout::
 # test_torque_shaft_length_band_clears_both_ends).
 # Decimal places are the tolerance (drawing-guidelines.md rule 3).  The body
@@ -59,8 +59,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinHoleProfile": {"PinHoleDia": 2, "OverallLength": 1},
 }
 
-# Option E-a set pins (vn_pinion_strap_pin_spec): one cross hole under each
-# MHA-DT-014 strap, match-drilled through the strap's own cross hole with the
+# Option E-a set pins (dt_vn_pinion_strap_pin_spec): one cross hole under each
+# MHA-DT-14 strap, match-drilled through the strap's own cross hole with the
 # shaft back-flush and the cluster at the back stop -- the fit-up stack the
 # assembly shows (pinion_rig_layout) -- so they sit at its strap mid-planes,
 # from the front end (local z 0).  The print
@@ -71,7 +71,7 @@ PIN_HOLE_BAND = _strap_pin.HOLE_BAND  # the spring pin's functional band
 PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
 # The hole specification only.  The drilling set-up the pin-hole stations
 # and both bearing stacks assume is an assembly step: Main's re-ruling
-# (2026-09-26) moved it from this callout to MHA-DT-000's SHAFT DRILL SET
+# (2026-09-26) moved it from this callout to MHA-DT-00's SHAFT DRILL SET
 # (pinion_rig_fitup.SHAFT_DRILL_STEP), where the fitter drills, superseding
 # the #858 restricted review's rulings 2 and 3.  The drawing adds the
 # pointer to that step (draw_dt_pinion_pivot_shaft): it is sheet text, so the
@@ -79,7 +79,7 @@ PIN_HOLE_Z = TORQUE_SHAFT_PIN_HOLE_Z  # (front, back), pinion_rig_layout
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "MATCH-DRILL THRU AT ASSEMBLY",
-        "IN MHA-DT-014 CROSS HOLES, 2 PL",
+        "IN MHA-DT-14 CROSS HOLES, 2 PL",
     )
 )
 

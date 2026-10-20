@@ -1,4 +1,4 @@
-r"""MHA-MG-006 output fixture: the drawing contract shared by part and sheet.
+r"""MHA-MG-06 output fixture: the drawing contract shared by part and sheet.
 
 PURE DATA, no SolidWorks/COM imports.  The shape is
 ``mg_output_fixture_geom``'s (the assembly and the wire read that module, not
@@ -157,7 +157,7 @@ BORE_WANDER = _wander(HEX_CORNER_RADIUS)
 # the Ø the shop turns to.  A part that kept a flat would not carry the
 # printed Ø at all (a Ø is round), so this is the route's check, not a band's.
 if not SPIGOT_DIA < HEX_AF - HEX_STOCK_AF_BAND:
-    raise AssertionError("MHA-MG-006 spigot Ø leaves flats on the thinnest stock")
+    raise AssertionError("MHA-MG-06 spigot Ø leaves flats on the thinnest stock")
 
 
 def groove_half_opening(radius: float, root_dia: float, spigot_dia: float) -> float:
@@ -174,13 +174,13 @@ GROOVE_HALF_OPENING_MAX = GROOVE_RADIUS_MAX
 if groove_half_opening(GROOVE_RADIUS, GROOVE_ROOT_DIA, SPIGOT_DIA) > (
     GROOVE_HALF_OPENING_MAX
 ):
-    raise AssertionError("MHA-MG-006 groove mouth exceeds its MAX radius")
+    raise AssertionError("MHA-MG-06 groove mouth exceeds its MAX radius")
 # The wire stays in the groove: at the smallest OD over the largest root the
 # groove is still deeper than the wire's radius (the root sets the depth,
 # whatever the radius).
 GROOVE_DEPTH_MIN = ((SPIGOT_DIA + _SPIGOT_LO) - (GROOVE_ROOT_DIA + _ROOT_HI)) / 2.0
 if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
-    raise AssertionError("MHA-MG-006 groove shallower than the wire's radius")
+    raise AssertionError("MHA-MG-06 groove shallower than the wire's radius")
 # At the LIMIT's lower end the wire still seats on the floor: the floor's
 # radius exceeds the wire's, so the wire touches the root at one line, its
 # centre stays the root plus its radius (the hook's station, geom), and the
@@ -191,15 +191,15 @@ if not GROOVE_DEPTH_MIN > _geom.WIRE_DIA / 2.0:
 # long at the shallowest groove (0.7 at nominal, 1.21 at the deepest), and
 # the mouth is 2 x R0.5 = 1.0 at any printed root and OD.
 if not GROOVE_RADIUS_MIN > _geom.WIRE_DIA / 2.0:
-    raise AssertionError("MHA-MG-006 groove floor tighter than the wire: it bridges")
+    raise AssertionError("MHA-MG-06 groove floor tighter than the wire: it bridges")
 GROOVE_WALL_AT_RADIUS_MIN = GROOVE_DEPTH_MIN - GROOVE_RADIUS_MIN
 if not GROOVE_WALL_AT_RADIUS_MIN > 0.0:
-    raise AssertionError("MHA-MG-006 R MIN groove has no straight walls under FULL R")
+    raise AssertionError("MHA-MG-06 R MIN groove has no straight walls under FULL R")
 GROOVE_HALF_OPENING_MIN = groove_half_opening(
     GROOVE_RADIUS_MIN, GROOVE_ROOT_DIA + _ROOT_HI, SPIGOT_DIA + _SPIGOT_LO
 )
 if not 2.0 * GROOVE_HALF_OPENING_MIN > _geom.WIRE_DIA:
-    raise AssertionError("MHA-MG-006 groove mouth narrower than the wire at R MIN")
+    raise AssertionError("MHA-MG-06 groove mouth narrower than the wire at R MIN")
 # The groove stays on the spigot at the worst case: its shoulder-side mouth
 # clears the shoulder (the spigot's length and the groove's station both run
 # from the spigot face: one band each), and the shoulder's corner radius.
@@ -209,14 +209,14 @@ GROOVE_SHOULDER_CLEARANCE = (SPIGOT_LENGTH + _SPIGOT_LENGTH_LO) - (
 GROOVE_FILLET_CLEARANCE = GROOVE_SHOULDER_CLEARANCE - SHOULDER_FILLET_R_MAX
 if not GROOVE_FILLET_CLEARANCE > 0.0:
     raise AssertionError(
-        "MHA-MG-006 groove runs into the shoulder's corner at the worst case"
+        "MHA-MG-06 groove runs into the shoulder's corner at the worst case"
     )
 # The shoulder's corner radius stays on the shoulder face, inside the flats'
 # annulus round the spigot, even on the thinnest bar.
 SHOULDER_ANNULUS = (HEX_AF - SPIGOT_DIA) / 2.0
 SHOULDER_ANNULUS_MIN = (HEX_AF - HEX_STOCK_AF_BAND - SPIGOT_DIA) / 2.0
 if not SHOULDER_FILLET_R_MAX < SHOULDER_ANNULUS_MIN:
-    raise AssertionError("MHA-MG-006 shoulder radius runs off the shoulder face")
+    raise AssertionError("MHA-MG-06 shoulder radius runs off the shoulder face")
 
 # --- Walls at the printed worst case (drawing-guidelines.md rule 17 (walls and webs)) ----------------------------
 # (nominal, worst).  Drilled walls take the drill's wander over its depth;
@@ -258,7 +258,7 @@ WALLS: dict[str, tuple[float, float]] = {
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
-            f"MHA-MG-006 {_name} wall {_worst:.3f} under the {WALL_TARGET} target "
+            f"MHA-MG-06 {_name} wall {_worst:.3f} under the {WALL_TARGET} target "
             "at the printed worst case"
         )
 
@@ -271,13 +271,13 @@ ROD_DIA_MIN = VROD_DIA - ROD_STOCK_DIA_LOW
 SCREW_REACH_NEEDED = FACE_TO_BORE_AXIS_MAX + ROD_BORE_R_MAX - ROD_DIA_MIN
 SCREW_REACH_MARGIN = SCREW_SHANK_LEN - SCREW_REACH_NEEDED
 if not SCREW_REACH_MARGIN > 0.0:
-    raise AssertionError("MHA-MG-006 thumb screw bottoms before it clamps the rod")
+    raise AssertionError("MHA-MG-06 thumb screw bottoms before it clamps the rod")
 # Full thread from the face to the shallowest bore wall on the tap's axis,
 # less the first pitch at the face: at least 1.5 D of engagement.
 ENGAGEMENT_MIN = 1.5 * SCREW_DIA
 ENGAGEMENT_WORST = FACE_TO_BORE_AXIS_MIN - ROD_BORE_R_MAX - SCREW_PITCH
 if ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
-    raise AssertionError("MHA-MG-006 thumb-screw thread under 1.5D")
+    raise AssertionError("MHA-MG-06 thumb-screw thread under 1.5D")
 
 # --- The tap's reach (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) -----------------------------------------------
 # FULL THREAD TO ROD BORE asks for a bottoming tap: the #4-40 hand tap's
@@ -294,7 +294,7 @@ BOTTOMING_TAP_CHAMFER_THREADS = (1, 2)
 THREAD_PITCH = 25.4 / 40.0
 BOTTOMING_TAP_LEAD = BOTTOMING_TAP_CHAMFER_THREADS[1] * THREAD_PITCH
 if not TAP_SHANK_DIA > THREAD_MAJOR:
-    raise AssertionError("MHA-MG-006 tap shank enters its own thread")
+    raise AssertionError("MHA-MG-06 tap shank enters its own thread")
 # The bore's half-chord at the thread's widest reach off the bore axis: the
 # major envelope, with the bore off centre by the drill's run-off.
 THREAD_HALF_CHORD = math.sqrt(
@@ -307,17 +307,17 @@ TAP_REACH_NEEDED = TAP_WALL_DEEPEST + BOTTOMING_TAP_LEAD
 FAR_WALL_NEAREST = FACE_TO_BORE_AXIS_MIN + THREAD_HALF_CHORD
 if TAP_REACH_NEEDED > TAP_USABLE_LENGTH + 1e-9:
     raise AssertionError(
-        "MHA-MG-006 bottoming tap cannot cut full thread through the wall"
+        "MHA-MG-06 bottoming tap cannot cut full thread through the wall"
     )
 # On ONE part the near and far walls move together: the tap stops once its
 # lead has passed into the bore, inside the bore's chord less the lead.
 TAP_STOP_WINDOW = 2.0 * THREAD_HALF_CHORD - BOTTOMING_TAP_LEAD
 if not TAP_STOP_WINDOW > 0.0:
-    raise AssertionError("MHA-MG-006 tap meets the far wall before full thread")
+    raise AssertionError("MHA-MG-06 tap meets the far wall before full thread")
 # The callout's (REF) thread depth is the nominal wall on the tap's axis: where
 # the rod bore ends the thread.
 if abs(TAP_LENGTH - (BORE_STATION - ROD_BORE_DIA / 2.0)) > 1e-9:
-    raise AssertionError("MHA-MG-006 thread depth is not the wall on the tap's axis")
+    raise AssertionError("MHA-MG-06 thread depth is not the wall on the tap's axis")
 
 # The tap drill, at its printed .X depth and drilled-hole Ø: its full Ø clears
 # the near wall at the shallowest depth, and its 118 deg point stops short of
@@ -333,9 +333,9 @@ TAP_DRILL_FAR_CLEAR = (FACE_TO_BORE_AXIS_MIN + _DRILL_HALF_CHORD) - (
     TAP_DRILL_DEPTH + _DRILL_DEPTH_HI + _DRILL_POINT
 )
 if not TAP_DRILL_NEAR_CLEAR > 0.0:
-    raise AssertionError("MHA-MG-006 tap drill stops in the near wall")
+    raise AssertionError("MHA-MG-06 tap drill stops in the near wall")
 if not TAP_DRILL_FAR_CLEAR > 0.0:
-    raise AssertionError("MHA-MG-006 tap drill point reaches the far wall")
+    raise AssertionError("MHA-MG-06 tap drill point reaches the far wall")
 
 # The turned profile (Top plane) carries the bore's stations from the free end
 # and to the spigot face, the shoulder from the spigot face (the spigot's
@@ -383,15 +383,15 @@ LIMIT_BANDS: dict[str, tuple[str, tuple[float, float]]] = {
 if not REFERENCE_DIMENSIONS <= (
     set(DRAWING_PRECISION_BY_NAME) - set(SINGLE_LIMITS) - set(LIMIT_BANDS)
 ):
-    raise AssertionError("MHA-MG-006 reference dimension is unprinted or limited")
+    raise AssertionError("MHA-MG-06 reference dimension is unprinted or limited")
 if abs(OVERALL_LENGTH - (ROD_STATION + BORE_STATION)) > 1e-9:
-    raise AssertionError("MHA-MG-006 overall REF is not the bore's two stations")
+    raise AssertionError("MHA-MG-06 overall REF is not the bore's two stations")
 # The hex is extruded to the shoulder the spigot's length sets: its depth is
 # the bore's two stations less the spigot (the part's equation).
 if abs(HEX_LENGTH - (ROD_STATION + BORE_STATION - SPIGOT_LENGTH)) > 1e-9:
-    raise AssertionError("MHA-MG-006 hex length is not the stations less the spigot")
+    raise AssertionError("MHA-MG-06 hex length is not the stations less the spigot")
 if abs(FREE_END_X + ROD_STATION) > 1e-9:
-    raise AssertionError("MHA-MG-006 rod station does not run free end to bore axis")
+    raise AssertionError("MHA-MG-06 rod station does not run free end to bore axis")
 
 # --- Sheet text -------------------------------------------------------------------
 # Under the bore's Ø: how it is made (drilled; the DRILLED HOLES row is its

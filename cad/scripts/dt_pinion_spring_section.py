@@ -1,4 +1,4 @@
-r"""Strip section of the MHA-DT-024 pinion return leaf spring.
+r"""Strip section of the MHA-DT-24 pinion return leaf spring.
 
 Split out of ``pinion_spring_geometry`` (Main, 2026-09-24): the swing-rig
 layout (``SPRING_Z`` follows the pad and strip widths: the pad is set a

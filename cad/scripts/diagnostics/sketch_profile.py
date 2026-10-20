@@ -33,7 +33,7 @@ relation merges two DISTINCT points, and applied to a pair the DB has already
 coalesced, ``ISketchRelationManager.AddRelation`` returns ``None`` without
 raising -- indistinguishable from a refusal, which is how it surfaced as
 "SolidWorks rejected 'merge' relation" on three workers (2026-09-18,
-``part:vn_pen_set_screw`` / ``part:vn_knife_hanger_stud``).
+``part:pn_vn_pen_set_screw`` / ``part:sm_vn_knife_hanger_stud``).
 
 Nothing in this module touches COM, so it is importable -- and testable --
 without a SolidWorks seat.  :func:`endpoint_merges` is the offline invariant

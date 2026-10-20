@@ -68,7 +68,7 @@ GEAR_DATA = gear_data_note(
         ),
         ("NORMAL TOOL PLUNGE (mm, REF)", f"{spec.TOOL_PLUNGE_MM:.3f}"),
         (
-            "TRANSVERSE BACKLASH WITH MHA-DT-010, ACCEPT AT ASSEMBLY (mm)",
+            "TRANSVERSE BACKLASH WITH MHA-DT-10, ACCEPT AT ASSEMBLY (mm)",
             f"{GEAR_MESH_BACKLASH_MM[0]:.2f} TO {GEAR_MESH_BACKLASH_MM[1]:.2f}",
         ),
         (
@@ -80,7 +80,7 @@ GEAR_DATA = gear_data_note(
         # fine teeth; the requirement is a tooth fact, so it reads with them
         # (machinist review r1 of #1641: a free-floating note).
         ("TOOTH EDGES", "DO NOT BREAK OR CHAMFER FLANKS, TIPS OR ROOTS"),
-        ("MATES WITH", "CRANK PINION MHA-DT-010, 16T SPUR"),
+        ("MATES WITH", "CRANK PINION MHA-DT-10, 16T SPUR"),
     ]
 )
 
@@ -91,4 +91,4 @@ GEAR_DATA = gear_data_note(
 # rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
 # a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
-SHAFT_MATE_NUMBER = "MHA-DT-004"
+SHAFT_MATE_NUMBER = "MHA-DT-04"

@@ -1,7 +1,7 @@
 """Import-time contracts for the cone tip block's hold-down stack in the drive train.
 
-The block (MHA-DT-021) stands straight on the swing platform, held by one socket
-head cap screw (MHA-VN-030) rising through the plate's counterbored hold-down
+The block (MHA-DT-21) stands straight on the swing platform, held by one socket
+head cap screw (MHA-DT-VN-60) rising through the plate's counterbored hold-down
 hole into a blind tap in its foot (user ruling 2026-09-29).  The drive-train
 builder asserts, when it is imported, that the block, the platform, the post
 and the shaft agree and that every stack the hold-down fixes still closes at
@@ -15,12 +15,12 @@ import pytest
 
 
 def test_post_fillisters_engage_the_plate_tap_at_least_090d() -> None:
-    """I22: each MHA-VN-031 seats on the post's counterbore floor and runs into
-    the MHA-DT-020 tap by its cut length past the post's grip -- never proud of
+    """I22: each MHA-DT-VN-61 seats on the post's counterbore floor and runs into
+    the MHA-DT-20 tap by its cut length past the post's grip -- never proud of
     the plate underside, and 0.90D of thread after the tap's edge break."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_swing_platform_spec as platform
-    import vn_post_mount_screw_spec as screw
+    import dt_vn_post_mount_screw_spec as screw
 
     assert bdt.POST_SCREW_SEAT == pytest.approx(screw.GRIP_MM)
     assert bdt.POST_SCREW_INTO_PLATE == pytest.approx(
@@ -153,7 +153,7 @@ def test_adjuster_embed_stays_in_its_working_window() -> None:
 
 
 def test_stack_collar_never_touches_the_block() -> None:
-    """MHA-VN-016 is locked on the shaft one feeler off T006 and must keep air to
+    """MHA-DT-VN-54 is locked on the shaft one feeler off T006 and must keep air to
     the block's south face at the printed limits (user ruling 2026-09-29)."""
     import build_dt_drive_train_assembly as bdt
 

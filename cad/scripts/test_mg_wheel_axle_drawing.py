@@ -16,7 +16,7 @@ import mg_wheel_axle_spec as spec
 import mg_wheel_bar_geom
 import mg_wheel_group as group
 import paper_drive_geom
-import vn_wheel_axle_back_washer_spec
+import mg_vn_wheel_axle_back_washer_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import MACHINED_UM
@@ -134,7 +134,7 @@ def test_thread_callout_and_notes() -> None:
     notes = spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
     flat = " ".join(notes.splitlines())
-    assert "TO THE GAUGE ON MHA-MG-000 (AXLE AS PRESSED)" in flat
+    assert "TO THE GAUGE ON MHA-MG-00 (AXLE AS PRESSED)" in flat
     assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN", notes)
     assert all(len(line) <= 80 for line in notes.splitlines())
     assert "REAMED BORE" not in notes
@@ -185,7 +185,7 @@ def test_wheel_group_stack_fits_the_pin() -> None:
     # The spacer lands the spokes' mid-plane on the pen-rod line.
     assert group.SPOKE_MID_D == pytest.approx(
         mg_wheel_axle_spacer_spec.LENGTH
-        + vn_wheel_axle_back_washer_spec.MODEL_THICKNESS
+        + mg_vn_wheel_axle_back_washer_spec.MODEL_THICKNESS
         + mg_magnifying_wheel_geom.HUB_BACK_Z
     )
     assert group.WHEEL_MID_Z == paper_drive_geom.PEN_Z_MID

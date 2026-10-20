@@ -1,7 +1,7 @@
 r"""Pure pinion-arbor collar geometry consumed by the part and assembly recipes.
 
 User ruling 2026-09-24 (R1a, dt-pinion-arbor-retention-20260924.md): a turned
-steel collar slides on the MHA-DT-022 arbor outboard of the front MHA-DT-014 strap
+steel collar slides on the MHA-DT-22 arbor outboard of the front MHA-DT-14 strap
 and is cross-pinned to it with the rig's 1/16 in slotted spring pin.  It is a
 northward walk-out backstop behind the drum's Loctite 638 bond, and it gives
 the model the sleeve and the flush pin end the ch25 photos show there

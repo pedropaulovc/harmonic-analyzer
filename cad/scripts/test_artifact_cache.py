@@ -1085,7 +1085,7 @@ def test_remote_baseline_identifies_changed_dependency_across_disposable_seats(
 ):
     recipe_dep = _make_dep(tmp_path, "_stock_fastener.py", "old recipe digest")
     config_dep = _make_dep(tmp_path, "spring.yaml", "unchanged config digest")
-    label = "part:vn_counter_spring"
+    label = "part:sm_vn_counter_spring"
     old_key = cache.cache_key([recipe_dep, config_dep], _digest_one, label=label)
     out = tmp_path / "out.bin"
     out.write_bytes(b"payload")

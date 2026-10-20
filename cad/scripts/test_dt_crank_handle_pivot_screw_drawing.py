@@ -1,4 +1,4 @@
-"""Offline release contracts for MHA-DT-032, the crank handle pivot screw (U33)."""
+"""Offline release contracts for MHA-DT-32, the crank handle pivot screw (U33)."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_registry_paths_and_part_name() -> None:
 
 def test_part_registry_row_is_the_made_screw() -> None:
     row = _config.parts("dt-crank-handle-pivot-screw")
-    assert row["number"] == "MHA-DT-032"
+    assert row["number"] == "MHA-DT-32"
     # The title block prints the registry title, not the slug.
     assert row["title"] == "Crank Handle Pivot Screw"
     for grade in ("1018", "12L14", "1/4 in"):
@@ -76,7 +76,7 @@ def test_model_owns_places_and_bands() -> None:
     }
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
-    # User ruling 2026-09-29 (MHA-DT-032 review): the shoulder is turned to suit
+    # User ruling 2026-09-29 (MHA-DT-32 review): the shoulder is turned to suit
     # the bonded handle, so its length is a reference.
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "UnderHeadLocation"}
     # Every axial location reads from the tip (re-reviews): the under-head
@@ -119,7 +119,7 @@ def test_geometry_matches_the_u33_ruling() -> None:
     # Ø6 head; #4-40 (user ruling 2026-09-30, local review of fbf82ad96).
     assert spec.HEAD_DIA == 6.0
     assert spec.HEAD_DIA_TOL == 0.10
-    # User ruling 2026-09-29 (MHA-DT-032 review): a 4.0 head and a banded
+    # User ruling 2026-09-29 (MHA-DT-32 review): a 4.0 head and a banded
     # 1.00 +/-0.20 slot leave 2.0 of head under the slot at the worst case,
     # and the slot can never print as nothing (re-review).
     assert spec.HEAD_LENGTH == 4.0
@@ -197,7 +197,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.7)
     assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
     # The seat on the arm face, from printed limits (local reviews of
-    # 1f3067ef2, fbf82ad96, 21bb244c5 and aed772158): MHA-DT-006's tapped mouth
+    # 1f3067ef2, fbf82ad96, 21bb244c5 and aed772158): MHA-DT-06's tapped mouth
     # Ø3.1 max, out to the smallest shoulder broken 0.1 max, 3.92 - 0.2 =
     # Ø3.72, less the screw's float off axis in the 2A/2B fit, (0.0991 -
     # 0.0925) / 2 in = 0.0838: 0.226 radial.  Under the title block's 0.25 on
@@ -226,7 +226,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.690, abs=0.001)
     # The lead's band is model-owned and prints as limits in its callout, and
-    # the tip chamfer carries its own band (MHA-DT-032 re-review: at .X either
+    # the tip chamfer carries its own band (MHA-DT-32 re-review: at .X either
     # could print as nothing).  The relief width is routine at 2.2: at .X its
     # straight floor past the longest lead keeps 1.5 #4-40 pitches (machinist
     # review of crank-v4-16; local review of 20dac9d3f).
@@ -269,7 +269,7 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
     assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.55)
     assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(5.55 / 2.845, abs=1e-3)
-    # The MHA-DT-032 review's own count: the shortest section less the widest
+    # The MHA-DT-32 review's own count: the shortest section less the widest
     # relief and 1.5 pitches of die run-in still spans the stock arm's
     # full-thread need.
     assert spec.THREAD_LENGTH_MIN - spec.RELIEF_WIDTH_MAX - 1.5 * spec.THREAD_PITCH >= (
@@ -295,7 +295,7 @@ def test_head_bearing_acceptance_accounts_for_running_offset() -> None:
 
 
 def test_cup_wall_follows_ruling_b_without_changing_the_head_or_fit() -> None:
-    # Owner ruling B on #1375 grows the cup, not any MHA-DT-032 geometry.
+    # Owner ruling B on #1375 grows the cup, not any MHA-DT-32 geometry.
     assert (spec.HEAD_DIA, spec.HEAD_DIA_TOL) == (6.0, 0.10)
     assert spec.CUP_BODY_DIA == cup.BODY_DIA == 9.6
     assert spec.CUP_BODY_DIA_TOL == cup.BODY_DIA_TOL == 0.10
@@ -474,10 +474,10 @@ def test_printed_material_fits_one_title_block_line() -> None:
 
 
 def test_assembly_seats_the_shoulder_on_the_arm_and_files_the_tip_flush() -> None:
-    """#831 P1 (Codex PRRT_kwDOPHDy386lqC_R): MHA-DT-032 is inserted in the drive
+    """#831 P1 (Codex PRRT_kwDOPHDy386lqC_R): MHA-DT-32 is inserted in the drive
     train with ArmSeat on the arm's outboard face.  User ruling 2026-09-29
     (ch11 p.14): its tip is filed flush with the arm's inboard face, so the
-    drive train places the INSTALLED configuration (the MHA-DT-030 precedent)."""
+    drive train places the INSTALLED configuration (the MHA-DT-30 precedent)."""
     import build_dt_drive_train_assembly as assembly
 
     assert assembly.HANDLE_SCREW_Z0 + spec.SEAT_STATION == pytest.approx(

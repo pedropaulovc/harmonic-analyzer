@@ -1,4 +1,4 @@
-r"""Create the MHA-SM-004 gooseneck spring screw manufacturing drawing.
+r"""Create the MHA-SM-04 gooseneck spring screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter, relief lead and
@@ -244,12 +244,12 @@ def _check_dimension_state(
     value_mm = float(dimension.SystemValue) * 1000.0
     if not math.isclose(value_mm, nominal, abs_tol=1e-6):
         raise RuntimeError(
-            f"MHA-SM-004 {label}: persisted nominal {value_mm!r} mm, spec "
+            f"MHA-SM-04 {label}: persisted nominal {value_mm!r} mm, spec "
             f"{nominal!r} mm; rebuild the source part"
         )
     if int(tolerance.Type) != tolerance_type:
         raise RuntimeError(
-            f"MHA-SM-004 {label}: tolerance type {int(tolerance.Type)}, "
+            f"MHA-SM-04 {label}: tolerance type {int(tolerance.Type)}, "
             f"spec {tolerance_type}; rebuild the source part"
         )
     if tolerance_type == _TOL_NONE:
@@ -263,7 +263,7 @@ def _check_dimension_state(
         for actual, wanted in zip(band_mm, (lower, upper), strict=True)
     ):
         raise RuntimeError(
-            f"MHA-SM-004 {label}: persisted deviations {band_mm!r} mm, spec "
+            f"MHA-SM-04 {label}: persisted deviations {band_mm!r} mm, spec "
             f"{(lower, upper)!r} mm; rebuild the source part"
         )
 
@@ -273,7 +273,7 @@ def _verify_source_dimensions(model: Any) -> None:
     for full_name, expected in SOURCE_ONLY_DIMENSIONS.items():
         dimension = model.Parameter(full_name)
         if dimension is None:
-            raise RuntimeError(f"MHA-SM-004 source part lacks {full_name}")
+            raise RuntimeError(f"MHA-SM-04 source part lacks {full_name}")
         _check_dimension_state(full_name, dimension, expected)
 
 
@@ -289,7 +289,7 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
     for name, expected in PRINTED_DIMENSIONS.items():
         if len(found[name]) != 1:
             raise RuntimeError(
-                f"MHA-SM-004 sheet prints {name} {len(found[name])} times, not once"
+                f"MHA-SM-04 sheet prints {name} {len(found[name])} times, not once"
             )
         display = _early_bound(
             found[name][0].GetSpecificAnnotation(), "IDisplayDimension"
@@ -299,9 +299,9 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             display.GetText(2) or ""
         ).endswith(")")
         if parenthesized != (name in REFERENCE_DIMENSIONS):
-            raise RuntimeError(f"MHA-SM-004 {name}: reference state did not persist")
+            raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
-            raise RuntimeError(f"MHA-SM-004 {name}: display places did not persist")
+            raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -382,16 +382,16 @@ async def build(adapter: Any) -> dict[str, str]:
             if dimension_name(adapter, annotation) == name
         ]
         if len(matches) != 1:
-            raise RuntimeError(f"expected one MHA-SM-004 {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"MHA-SM-004 {name}")
+            raise RuntimeError(f"expected one MHA-SM-04 {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"MHA-SM-04 {name}")
 
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to MHA-SM-004 head-end view")
+        raise RuntimeError("failed to add ASME center mark to MHA-SM-04 head-end view")
     add_view_centerline(
         adapter,
         side,
         face_xy=CENTERLINE_PICK,
-        label="MHA-SM-004 turning axis",
+        label="MHA-SM-04 turning axis",
     )
     add_attached_note(
         adapter,
@@ -399,7 +399,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=THREAD_CALLOUT,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
-        label="MHA-SM-004 thread callout",
+        label="MHA-SM-04 thread callout",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

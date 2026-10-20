@@ -1,4 +1,4 @@
-r"""MHA-MG-004 rod to MHA-MG-002 clamp threaded joint (#1559) -- PURE DATA.
+r"""MHA-MG-04 rod to MHA-MG-02 clamp threaded joint (#1559) -- PURE DATA.
 
 The vertical rod's top end is a #4-40 UNC-2A thread turned down from the Ø5
 bar; it screws into a blind #4-40 UNC-2B tap in the clamp's bottom face, on
@@ -142,31 +142,31 @@ ROD_TAP_MINOR_DIA = blind_cut_dia_mm(ROD_TAP_SPEC)  # 2.261, #43
 # --- import-time worst-case guards -------------------------------------------
 if ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
     raise AssertionError(
-        f"MHA-MG-004 rod thread engages {ENGAGEMENT_WORST:.3f} of full thread at "
+        f"MHA-MG-04 rod thread engages {ENGAGEMENT_WORST:.3f} of full thread at "
         f"worst, under 1.5D = {ENGAGEMENT_MIN:.3f}"
     )
 if ROD_TAP_THREAD_DEPTH_MIN - ROD_THREAD_LEN_MAX < SEAT_TIP_RESERVE - 1e-9:
     raise AssertionError(
-        "MHA-MG-002 rod tap's full thread does not clear the rod tip: the tip "
+        "MHA-MG-02 rod tap's full thread does not clear the rod tip: the tip "
         "would bottom on incomplete thread before the shoulder seats"
     )
 if ROD_TAP_DRILL_DEPTH_MIN - ROD_TAP_THREAD_DEPTH_MAX < PLUG_TAP_LEAD - 1e-9:
-    raise AssertionError("MHA-MG-002 rod tap drill loses the plug tap's lead")
+    raise AssertionError("MHA-MG-02 rod tap drill loses the plug tap's lead")
 if RELIEF_WIDTH_MIN < DIE_RUNOUT - 1e-9:
-    raise AssertionError("MHA-MG-004 relief is narrower than the die's run-out")
+    raise AssertionError("MHA-MG-04 relief is narrower than the die's run-out")
 if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
     raise AssertionError(
-        f"MHA-MG-004 relief Ø{RELIEF_DIA_MAX:.3f} max leaves thread at the 2A root "
+        f"MHA-MG-04 relief Ø{RELIEF_DIA_MAX:.3f} max leaves thread at the 2A root "
         f"Ø{THREAD_ROOT_2A_MIN:.3f}"
     )
 if not THREAD_BASIC_MINOR > RELIEF_DIA_MAX:
-    raise AssertionError("MHA-MG-004 tip chamfer runs below the relief")
+    raise AssertionError("MHA-MG-04 tip chamfer runs below the relief")
 if round(RELIEF_ROOT_R, RELIEF_ROOT_R_PLACES) != RELIEF_ROOT_R:
-    raise AssertionError("MHA-MG-004 relief root MAX does not print as its model")
+    raise AssertionError("MHA-MG-04 relief root MAX does not print as its model")
 if 2.0 * RELIEF_ROOT_R > RELIEF_WIDTH_MIN + 1e-9:
-    raise AssertionError("MHA-MG-004 relief roots meet at the narrowest relief")
+    raise AssertionError("MHA-MG-04 relief roots meet at the narrowest relief")
 if not RELIEF_ROOT_OUTER_DIA < ROD_TAP_MINOR_DIA:
     raise AssertionError(
-        f"MHA-MG-004 shoulder-side relief root Ø{RELIEF_ROOT_OUTER_DIA:.3f} reaches "
-        f"the seat annulus outside the MHA-MG-002 tap mouth Ø{ROD_TAP_MINOR_DIA:.3f}"
+        f"MHA-MG-04 shoulder-side relief root Ø{RELIEF_ROOT_OUTER_DIA:.3f} reaches "
+        f"the seat annulus outside the MHA-MG-02 tap mouth Ø{ROD_TAP_MINOR_DIA:.3f}"
     )

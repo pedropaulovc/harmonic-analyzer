@@ -1,8 +1,8 @@
-r"""Create the manufacturing drawing for the transgear arm (MHA-PD-018).
+r"""Create the manufacturing drawing for the transgear arm (MHA-PD-18).
 
 The principal view is ``*Front``, looking at the REAR face: the outline (the
 pivot radius, the tip station and the end-face width), the pivot bore, the
-MHA-PD-023 pin's reamed press bore, the plate-tap callout with its qualifier
+MHA-PD-23 pin's reamed press bore, the plate-tap callout with its qualifier
 lines, and the hole stations from the pivot (the blanked
 ``StationReference`` sketch, shown in this view only). The plate-tap stations
 follow the reducer's knob bore through ``pd_transgear_arm_geometry``; neither

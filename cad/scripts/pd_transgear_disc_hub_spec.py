@@ -1,18 +1,18 @@
-r"""MHA-PD-017 transgear-disc-hub: the brass hub and flange in front of the 120T disc.
+r"""MHA-PD-17 transgear-disc-hub: the brass hub and flange in front of the 120T disc.
 
 The retained Ø13.2 turned hub has an H7 bore matching the pinion sleeve's
-(MHA-PD-010) h6 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
-and a Ø13.1 h6 rear spigot.  The spigot passes the 120T disc's (MHA-PD-006)
+(MHA-PD-10) h6 boss and drives through its D-flat, with a Ø25.1 × 2.4 flange
+and a Ø13.1 h6 rear spigot.  The spigot passes the 120T disc's (MHA-PD-06)
 bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
-spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-VN-039)
+spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-PD-VN-55)
 pass the flange's Ø1.7 holes on the Ø19 circle into the disc's taps
 (``pd_transgear_disc_hub_geometry``; the taps are spotted through these holes at
 assembly, R9-9). The bore's round diameter is H7 over its whole length; the flat
 only drives, from the flange's rear face forward, and starts clear ahead of
 the sleeve flat's end wall.  Nothing fastens the hub axially: the spigot
-bears rearward on the step, and the MHA-PD-025 front bushing, held by the
-MHA-VN-047 ring, traps hub and disc forward.  The hub's front face is faced at
+bears rearward on the step, and the MHA-PD-25 front bushing, held by the
+MHA-PD-VN-61 ring, traps hub and disc forward.  The hub's front face is faced at
 assembly to stand ``transgear_cluster_fit.HUB_NOSE_WINDOW`` behind the
 sleeve's nose, so the bushing, whose rear face covers the hub's front face,
 bears on the steel nose and never thrusts on the brass (R9-5).  The bore is
@@ -77,18 +77,18 @@ from pd_transgear_disc_hub_geometry import (
 # The mating parts the sheet names, by name and number (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the
 # feed pinion whose h6 boss and flat the hub's bore slides on, the disc that
 # pilots on the spigot, and the disc screws.
-SLEEVE_NUMBER = "MHA-PD-010"
+SLEEVE_NUMBER = "MHA-PD-10"
 SLEEVE_NAME = "FEED PINION"
-DISC_NUMBER = "MHA-PD-006"
+DISC_NUMBER = "MHA-PD-06"
 DISC_NAME = "DISC"
-SCREW_NUMBER = "MHA-VN-039"
+SCREW_NUMBER = "MHA-PD-VN-55"
 SCREW_NAME = "DISC SCREW"
 if SLEEVE.SLEEVE_NUMBER != SLEEVE_NUMBER:
     raise AssertionError("the hub's fit notes name another part than the sleeve")
 if SLEEVE.DISC_NUMBER != DISC_NUMBER:
     raise AssertionError("the hub's fit notes name another part than the disc")
 
-# --- screw (MHA-VN-039, McMaster 91794A055) ------------------------------------
+# --- screw (MHA-PD-VN-55, McMaster 91794A055) ------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, SCREW_HEAD_H, SCREW_HEAD_DIA, _SCREW_PITCH = (
     FILLISTER_SIZE
 )
@@ -111,7 +111,7 @@ SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_LENGTH_MIN = SPIGOT_LENGTH - SPIGOT_LENGTH_BAND
 SPIGOT_LENGTH_MAX = SPIGOT_LENGTH + SPIGOT_LENGTH_BAND
 if FIT.HUB_CHAIN_NOMINAL <= SPIGOT_LENGTH + FLANGE_THICK:
-    raise AssertionError("MHA-PD-017 has no body between its flange and the nose")
+    raise AssertionError("MHA-PD-17 has no body between its flange and the nose")
 
 # --- length: faced to the sleeve's nose at assembly --------------------------
 # Spigot end (on the step) to hub front face.  The model is the fitted
@@ -127,7 +127,7 @@ FACING_ALLOWANCE = 0.10
 BLANK_LENGTH_MIN = 14.05
 if BLANK_LENGTH_MIN < HUB_LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
-        f"MHA-PD-017 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
+        f"MHA-PD-17 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "
         f"facing allowance over the {HUB_LENGTH_FITTED_MAX:.3f} longest fit"
     )
 # The hub body (flange front face to hub front face) is the remainder of the
@@ -136,7 +136,7 @@ HUB_BODY_LENGTH = HUB_LENGTH - SPIGOT_LENGTH - FLANGE_THICK  # 7.65
 # Local z of the hub's front face (the spigot's end is z = +SPIGOT_LENGTH).
 HUB_FRONT_Z = SPIGOT_LENGTH - HUB_LENGTH  # -10.05
 
-# --- bore on the sleeve's boss and flat (MHA-PD-010) ---------------------------
+# --- bore on the sleeve's boss and flat (MHA-PD-10) ---------------------------
 # Round over the whole length: it locates on the boss's h6 band, ISO H7 at
 # 6-10 mm.  The flat at local -Y only drives the disc's torque; its plane sits
 # FLAT_TO_AXIS from the axis, printed with a band above the sleeve flat's
@@ -150,7 +150,7 @@ FLAT_TO_AXIS_PLACES = 3
 FLAT_TO_AXIS_BAND = (0.035, 0.020)  # (upper, lower) deviations
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 if not 0.0 < FLAT_TO_AXIS < BORE_DIA / 2.0:
-    raise AssertionError("MHA-PD-017 bore flat must cut the round bore")
+    raise AssertionError("MHA-PD-17 bore flat must cut the round bore")
 # Both corners at the flange stay sharp: the #0-80 heads sit beside the
 # hub's, and the disc's bore chamfer clears the spigot's.
 CORNER_RADIUS_MAX = 0.1
@@ -175,9 +175,9 @@ FLAT_CLEARANCE = (
     round(FLAT_TO_AXIS_BAND[0] - SLEEVE.FLAT_TO_AXIS_BAND[1], 3),
 )  # 0.020 .. 0.050
 if BOSS_CLEARANCE_LIMITS[0] < 0.0:
-    raise AssertionError(f"MHA-PD-017 binds on the sleeve's boss: {BOSS_CLEARANCE_LIMITS}")
+    raise AssertionError(f"MHA-PD-17 binds on the sleeve's boss: {BOSS_CLEARANCE_LIMITS}")
 if FLAT_CLEARANCE[0] <= 0.0:
-    raise AssertionError(f"MHA-PD-017 flat binds on the sleeve's: {FLAT_CLEARANCE}")
+    raise AssertionError(f"MHA-PD-17 flat binds on the sleeve's: {FLAT_CLEARANCE}")
 
 # The hub's flat starts at the flange's rear face, the spigot's length ahead
 # of the step; the sleeve flat's end wall stands behind it, so the wall never
@@ -414,7 +414,7 @@ for _label, _wall, _floor in (
     ("screw head air to the hub body", HEAD_TO_HUB_WORST, HEAD_AIR_MIN),
 ):
     if _wall < _floor - 1e-9:
-        raise AssertionError(f"MHA-PD-017 {_label}: {_wall:.3f} worst < floor {_floor}")
+        raise AssertionError(f"MHA-PD-17 {_label}: {_wall:.3f} worst < floor {_floor}")
 
 # --- sheet --------------------------------------------------------------------
 CORNER_NOTE = f"SPIGOT AND HUB CORNERS AT FLANGE SHARP, R{CORNER_RADIUS_MAX:.1f} MAX."
@@ -495,5 +495,5 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in names.items()
 }
 if {f: set(n) for f, n in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
-    raise AssertionError("every marked MHA-PD-017 dimension needs its printed places")
+    raise AssertionError("every marked MHA-PD-17 dimension needs its printed places")
 REFERENCE_DIMENSIONS = frozenset({"HubLength"})

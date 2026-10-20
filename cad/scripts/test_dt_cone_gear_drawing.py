@@ -131,6 +131,13 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
+@pytest.mark.parametrize("teeth, suffix", ((6, "T006"), (12, "T012"), (120, "T120")))
+def test_two_digit_family_number_keeps_three_digit_tooth_configuration(
+    teeth: int, suffix: str,
+) -> None:
+    assert spec.configuration_number(" mha-dt-03 ", teeth) == f"MHA-DT-03-{suffix}"
+
+
 def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
     assert spec.BORE_DIA_BAND == pytest.approx(
         (spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_LOWER)
@@ -258,16 +265,16 @@ def test_tight_bands_name_their_mates_at_the_callout() -> None:
     each tight band names its mate and fit at the callout (rule 4). ENFORCE
     round 2: a multi-line callout above a value never prints, so every
     above-callout is one line."""
-    assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["BoreAF"]
-    assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["BoreCutDia"]
-    assert "MHA-DT-004" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
+    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["BoreAF"]
+    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["BoreCutDia"]
+    assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
     assert notes.CYLINDER_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["FloorDia"]
     above = drawing.CALLOUTS_ABOVE
     assert set(above) == {"ToothThickness", "BlankDia", "BoreFlatClock"}
     assert all("\n" not in text for text in above.values())
     for key in ("ToothThickness", "BlankDia"):
         assert notes.CYLINDER_MATE_NUMBER in above[key], key
-    assert "MHA-DT-004" in above["BoreFlatClock"]
+    assert "MHA-DT-04" in above["BoreFlatClock"]
     label = "CIRCULAR TOOTH THICKNESS"
     assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == label
     # The bore diameter's rows stay as narrow as its value, clear of the

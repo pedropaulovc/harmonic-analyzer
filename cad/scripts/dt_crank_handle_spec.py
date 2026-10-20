@@ -3,8 +3,8 @@ manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A turned, ebonized oak pear grip on the
 crank-arm pivot.  User ruling 2026-09-29 (ch11 p.14 and p.15 photographs): the
-bright ring at the crank end is a separate brass ferrule MHA-DT-034 on a turned
-tenon, and the bright disc at the butt a steel cup MHA-DT-035 in a counterbore,
+bright ring at the crank end is a separate brass ferrule MHA-DT-34 on a turned
+tenon, and the bright disc at the butt a steel cup MHA-DT-35 in a counterbore,
 the pivot screw's slotted head recessed inside it.
 
 User rulings 2026-09-30 (ch30 eight-views-4, the true side view, and the
@@ -22,7 +22,7 @@ the bonded cup.  Five tangent arcs, in turn:
 The sheet prints what the turner sets out and calipers: the stations from the
 tenon end face, the waist, swell and crest diameters and the end round, at the
 title block's .X band; the tangencies fix the other radii, which print as
-references (MHA-DT-008 machinist review of 2026-10-18: the contour had lived in
+references (MHA-DT-08 machinist review of 2026-10-18: the contour had lived in
 a note).
 
 Owner ruling B on #1375 enlarges the cup body to retain its pocket wall and
@@ -64,10 +64,10 @@ from dt_crank_handle_ferrule_spec import (
 # cup take its two ends.
 HANDLE_LENGTH = 58.0  # basic: ferrule arm face to cup face
 HANDLE_MAX_DIA = 21.0  # max diameter at the swell
-# The title block's .X band governs every grip size (MHA-DT-008 machinist
+# The title block's .X band governs every grip size (MHA-DT-08 machinist
 # review of 2026-10-18: a tighter contour allowance had no mate to justify it).
 _GENERAL_1PL = GENERAL_1PL_TOL_MM
-# Reamed running bore on the MHA-DT-032 Ø4.00 shoulder: limits 4.10-4.15,
+# Reamed running bore on the MHA-DT-32 Ø4.00 shoulder: limits 4.10-4.15,
 # printed as 4.10 +0.05/0 so the two-place nominal is the limit itself (local
 # review of fbf82ad96: 4.125 at two places printed 4.13 +/-0.025).
 PIVOT_BORE_DIA = 4.10
@@ -77,7 +77,7 @@ PIVOT_BORE_BAND = (0.05, 0.0)
 # face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
 SHOULDER_X = FERRULE_LENGTH
 SHOULDER_R = FERRULE_OUTER_DIA / 2.0
-# The tenon is turned to suit the actual MHA-DT-034 bore for an epoxy line; the
+# The tenon is turned to suit the actual MHA-DT-34 bore for an epoxy line; the
 # model carries the size that line gives on a nominal bore.
 TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
@@ -102,21 +102,21 @@ INFLECTION_X = 20.0
 PEAK_X = 42.0
 PEAK_R = HANDLE_MAX_DIA / 2.0
 
-# The counterbore is bored to suit the actual MHA-DT-035 body for an epoxy line.
+# The counterbore is bored to suit the actual MHA-DT-35 body for an epoxy line.
 COUNTERBORE_GLUE_LINE = (0.05, 0.15)
 COUNTERBORE_DIA = CUP_BODY_DIA + sum(COUNTERBORE_GLUE_LINE) / 2.0
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 # Unprinted design margin: the walls budget 0.10 of wander between the reamed
 # bore and the turned outside (local reviews of 1f3067ef2 and 4b46c8b53).  No
-# run-out prints (MHA-DT-008 machinist review of 2026-10-18: a TIR on a
+# run-out prints (MHA-DT-08 machinist review of 2026-10-18: a TIR on a
 # hand-cranked wooden grip is over-specification); the cup's position is
 # absorbed at fit-up instead.
 BORE_ECCENTRICITY = 0.10
-# The MHA-DT-035 cup can sit off the bore axis by this eccentricity plus half its
+# The MHA-DT-35 cup can sit off the bore axis by this eccentricity plus half its
 # widest glue line, 0.175 -- more than the screw's head and floor-hole
 # clearances plus its float in the bore take up (0.165, local review of
-# 4b46c8b53).  So the cup is epoxied in centred on the waxed MHA-DT-032 screw
-# through it and the bore (user ruling 2026-09-30, MHA-DT-000 step 7): it
+# 4b46c8b53).  So the cup is epoxied in centred on the waxed MHA-DT-32 screw
+# through it and the bore (user ruling 2026-09-30, MHA-DT-00 step 7): it
 # cures where the screw fits, and the screw only turns about its own axis after.
 CUP_OFFSET_MAX = BORE_ECCENTRICITY + COUNTERBORE_GLUE_LINE[1] / 2.0
 # The printed limit on the counterbore (bored to suit the cup).
@@ -309,7 +309,7 @@ for _ok, _what in (
     (COUNTERBORE_R > PIVOT_BORE_DIA / 2.0, "counterbore is inside the pivot bore"),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-DT-008: {_what}")
+        raise AssertionError(f"MHA-DT-08: {_what}")
 
 # Marked dimensions, all on the one revolve profile: the tenon, the reamed bore,
 # the stations from the tenon end face, the grip diameters and the end round,
@@ -356,7 +356,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-DT-008 dimension needs authored places")
+    raise AssertionError("every marked MHA-DT-08 dimension needs authored places")
 # Fitted to the ferrule and the cup (user ruling 2026-09-29): references.
 REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
 # Driven by the tangencies: references.
@@ -365,9 +365,9 @@ REFERENCE_RADII = frozenset({"FlareR", "SConcaveR", "SConvexR", "DomeR"})
 # the oak's overall (for stock cut-off) is a marked dimension of its own.
 OVERALL_LENGTH = OAK_END_X - TENON_X0
 
-FERRULE_NUMBER = "MHA-DT-034"
-CUP_NUMBER = "MHA-DT-035"
-SCREW_NUMBER = "MHA-DT-032"
+FERRULE_NUMBER = "MHA-DT-34"
+CUP_NUMBER = "MHA-DT-35"
+SCREW_NUMBER = "MHA-DT-32"
 FERRULE_NAME = "FERRULE"
 CUP_NAME = "BUTT CUP"
 SCREW_NAME = "PIVOT SCREW"

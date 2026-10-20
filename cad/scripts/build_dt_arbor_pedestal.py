@@ -105,11 +105,11 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # values the print annotates (foot envelope, strap, dome, journal bore).
 #
 # STRAP_T: band local z STRAP_ROOT_Z..STRAP_INNER_Z = -2..+8, unchanged by
-# U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-VN-032
+# U34c. The -Z ledge carries a #8 close-clearance hole for the MHA-DT-VN-62
 # #8-32 x 3/4 fillister (McMaster 90280A197); the base seat under it is
 # transfer-punched through this hole at assembly.
 # SCREW_Z (spec): hole centre on the ledge, local z -11.
-# SET_SCREW_Z (spec): the #4-40 apex tap for the MHA-VN-034 set screw (#743),
+# SET_SCREW_Z (spec): the #4-40 apex tap for the MHA-DT-VN-64 set screw (#743),
 # radial through the crown at the strap's mid-depth, local z +3.
 
 BORE_RADIUS = BORE_DIA / 2.0
@@ -391,7 +391,7 @@ async def build(adapter) -> dict[str, str]:
     # only the circular cap above that chord.
     # The crown prints as the radius it is, so the model dimensions it as one:
     # a diameter the sheet flips radial keeps its value and re-reads it as a
-    # radius (v37 MHA-DT-002 printed R22 on this R11 part).
+    # radius (v37 MHA-DT-02 printed R22 on this R11 part).
     dome = SketchDims()
     check("create_sketch dome", await adapter.create_sketch("Front"))
     await define_circle(
@@ -451,7 +451,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Flange hold-down screw hole (U34c): ONE native Hole Wizard #8 close
     # clearance feature (through-all along Y) through the exposed -Z ledge at
-    # (x 0, z SCREW_Z), drilled from the foot bottom (y=0) -- the MHA-VN-032
+    # (x 0, z SCREW_Z), drilled from the foot bottom (y=0) -- the MHA-DT-VN-62
     # fillister bolts the casting to the base. The foot bottom is a clean rectangle (the
     # strap/dome/bore are all above it), so find_planar_face resolves cleanly.
     screw_cut = wizard_holes(

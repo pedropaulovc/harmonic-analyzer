@@ -1,6 +1,6 @@
 """Pure catalogue inputs for McMaster-Carr 9666K56 music wire; no diagnostic imports.
 
-Both amplification wires (MHA-VN-066 lever wire, MHA-VN-067 pen wire) are cut
+Both amplification wires (MHA-MG-VN-56 lever wire, MHA-PN-VN-57 pen wire) are cut
 from this one coil.
 """
 

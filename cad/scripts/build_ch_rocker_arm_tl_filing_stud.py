@@ -1,4 +1,4 @@
-r"""Build the rocker arm hub filing stud (MHA-CH-006-TL-05; shop fixture).
+r"""Build the rocker arm hub filing stud (MHA-CH-06-TL-05; shop fixture).
 
 A headed 4140 stud turned in one chucking: the lapped body locates in the
 rocker arm's reamed pivot bore and carries the two filing buttons, the

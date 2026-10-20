@@ -1,4 +1,4 @@
-r"""Build the oblique trammel's pivot pin (MHA-CH-006-TL-23; shop tooling).
+r"""Build the oblique trammel's pivot pin (MHA-CH-06-TL-23; shop tooling).
 
 A stepped turned pin (``ch_rocker_arm_tl_oblique_pivot_pin_spec``). Layout:
 

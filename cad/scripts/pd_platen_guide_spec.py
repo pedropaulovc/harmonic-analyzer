@@ -14,7 +14,7 @@ TAPPED_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 
 # The guide-lock screws' rear receivers (R9-48): #4-40 tapped THROUGH the
 # rail, so the full depth carries thread and no depth band can starve
-# the 3/8 in MHA-VN-046 screws (vn_guide_lock_screw_spec.ENGAGEMENT_WORST). The
+# the 3/8 in MHA-PD-VN-60 screws (pd_vn_guide_lock_screw_spec.ENGAGEMENT_WORST). The
 # tips stop inside the rail (build_pd_platen_guide asserts the reach).
 LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 

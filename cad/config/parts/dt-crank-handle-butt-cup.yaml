@@ -1,6 +1,6 @@
 dt-crank-handle-butt-cup:
   title: Crank Handle Butt Cup
-  number: MHA-DT-035
+  number: MHA-DT-35
   description: "CRANK HANDLE BUTT CUP"
   # Owner ruling B on #1375: stock for the enlarged body and restored wall floor.
   material: AISI 12L14 or 1018 CF rod, 1/2 in
@@ -8,4 +8,4 @@ dt-crank-handle-butt-cup:
   finish: bright turned, oiled
   quantity: 1
   tolerance_class: machined_block
-  process: "turned (steel); epoxied flush in the MHA-DT-008 butt counterbore; face left flat, the oak's end round turned clear of it"
+  process: "turned (steel); epoxied flush in the MHA-DT-08 butt counterbore; face left flat, the oak's end round turned clear of it"

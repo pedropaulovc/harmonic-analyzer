@@ -161,6 +161,6 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert "material_family" not in part
     assert lever.MATERIAL == "Gray Cast Iron"
     # A conversion coat, not paint: the hub faces, plate faces and bores
-    # keep their bands with nothing masked (as the rocker arms, MHA-CH-006).
+    # keep their bands with nothing masked (as the rocker arms, MHA-CH-06).
     assert part["finish"] == "matte black oxide per MIL-DTL-13924 Class 1, oil sealed"
     assert int(part["quantity"]) == 20

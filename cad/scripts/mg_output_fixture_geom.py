@@ -1,4 +1,4 @@
-r"""MHA-MG-006 output fixture: drawing-free geometry and installed pose.
+r"""MHA-MG-06 output fixture: drawing-free geometry and installed pose.
 
 PURE DATA, no SolidWorks/COM imports and no drawing spec, title block or
 registry in its import closure. The assembly and lever wire share the
@@ -26,7 +26,7 @@ the groove root with its running clearance.
 
 Installed pose: ``Ry(180 deg + FIXTURE_YAW_DEG)`` about the vertical rod, so
 local +X runs back through the spigot toward the bracket and the hook lands
-on the lever wire's start (``vn_lever_wire_geom.WIRE_START``). Option A1
+on the lever wire's start (``mg_vn_lever_wire_geom.WIRE_START``). Option A1
 (#1559, the true plumb plane of ch30 p.4): the rod axis sits in the drum's
 wire lane and the hook lies in the rod's own plane (dz = 0), so the lever
 wire runs coplanar with the drum lane.
@@ -114,7 +114,7 @@ HOOK_LOCAL = (GROOVE_X, 0.0, HOOK_RADIAL_OFFSET)
 
 # --- Installed pose (magnifier frame) -------------------------------------------
 FIXTURE_AXIS_Y = 919.7  # the hex axis's height on the vertical rod
-# The vertical rod's axis: the drum's wire lane (vn_lever_wire_geom.DRUM_END_Z,
+# The vertical rod's axis: the drum's wire lane (mg_vn_lever_wire_geom.DRUM_END_Z,
 # asserted equal there). A literal, so this part's recipe closure stays free of
 # the wheel and paper modules.
 VROD_Z = -173.51
@@ -146,28 +146,28 @@ HOOK_OFFSET_Z = HOOK_LOCAL[0] * math.sin(FIXTURE_YAW_RAD) - HOOK_LOCAL[2] * math
 
 # --- Import-time geometry guards -------------------------------------------------
 if abs(HOOK_OFFSET_Z - (HOOK_TARGET_Z - VROD_Z)) > 1e-9:
-    raise AssertionError("MHA-MG-006 yaw does not put the hook in the rod's plane")
+    raise AssertionError("MHA-MG-06 yaw does not put the hook in the rod's plane")
 if HOOK_OFFSET_X >= 0.0:
-    raise AssertionError("MHA-MG-006 hook must sit on the bracket side of the rod")
+    raise AssertionError("MHA-MG-06 hook must sit on the bracket side of the rod")
 if abs(GROOVE_CENTRE_R - SPIGOT_DIA / 2.0) > 1e-9:
     raise AssertionError(
-        "MHA-MG-006 groove centre is not on the spigot OD (semicircle)"
+        "MHA-MG-06 groove centre is not on the spigot OD (semicircle)"
     )
 if not SHOULDER_X < GROOVE_MOUTHS[0] < GROOVE_MOUTHS[1] < SPIGOT_FACE_X:
-    raise AssertionError("MHA-MG-006 groove runs off the spigot")
+    raise AssertionError("MHA-MG-06 groove runs off the spigot")
 if not SPIGOT_DIA < HEX_AF:
-    raise AssertionError("MHA-MG-006 spigot leaves no shoulder inside the flats")
+    raise AssertionError("MHA-MG-06 spigot leaves no shoulder inside the flats")
 if not SHOULDER_FILLET_R < (HEX_AF - SPIGOT_DIA) / 2.0:
-    raise AssertionError("MHA-MG-006 shoulder fillet runs off the shoulder onto a flat")
+    raise AssertionError("MHA-MG-06 shoulder fillet runs off the shoulder onto a flat")
 if not SHOULDER_X + SHOULDER_FILLET_R < GROOVE_MOUTHS[0]:
-    raise AssertionError("MHA-MG-006 shoulder fillet runs into the groove")
+    raise AssertionError("MHA-MG-06 shoulder fillet runs into the groove")
 if not ROD_BORE_DIA < HEX_AF:
-    raise AssertionError("MHA-MG-006 rod bore breaks through a flat")
+    raise AssertionError("MHA-MG-06 rod bore breaks through a flat")
 if not TAP_DRILL_DIA < ROD_BORE_DIA:
-    raise AssertionError("MHA-MG-006 tap drill does not end inside the rod bore")
+    raise AssertionError("MHA-MG-06 tap drill does not end inside the rod bore")
 if not 0.0 < TAP_LENGTH < TAP_DRILL_DEPTH:
-    raise AssertionError("MHA-MG-006 tap drill stops short of the thread it carries")
+    raise AssertionError("MHA-MG-06 tap drill stops short of the thread it carries")
 if not THREAD_MAJOR < GROOVE_ROOT_DIA:
-    raise AssertionError("MHA-MG-006 thread breaks into the groove")
+    raise AssertionError("MHA-MG-06 thread breaks into the groove")
 if not VROD_DIA < ROD_BORE_DIA:
-    raise AssertionError("MHA-MG-006 rod bore does not clear the vertical rod")
+    raise AssertionError("MHA-MG-06 rod bore does not clear the vertical rod")

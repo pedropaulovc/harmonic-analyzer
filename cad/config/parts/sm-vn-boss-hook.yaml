@@ -1,0 +1,18 @@
+sm-vn-boss-hook:
+  title: Counter Spring Anchor
+  number: MHA-SM-VN-50
+  stock_name: 'Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)'
+  supplier: McMaster-Carr
+  supplier_skus: [9490T1]
+  material: Plain Carbon Steel
+  material_specification: Zinc-plated steel, McMaster-Carr 9490T1
+  finish: SUPPLIED ZINC PLATING; OIL BARE CUT END
+  installation_notes: |-
+    INSTALLATION - COUNTER LOWER ANCHOR
+    THREAD INTO SUMMING LEVER MHA-SM-03 TAPPED BOSS,
+    CUT END FLUSH WITH THE BOSS UNDERSIDE. CLOCK EYE TO
+    PULL PLANE; LOCK WITH MHA-SM-VN-55 JAM NUT ON THE BOSS
+    TOP FACE.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

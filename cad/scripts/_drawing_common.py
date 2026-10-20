@@ -306,7 +306,7 @@ def _pin_annotation_ink(adapter: Any) -> None:
 # 96 (registry ``Export Settings\PDF Dots Per Inch`` on all five workers,
 # 2026-10-16), which embeds the shaded isos at 120.5 dpi: the 0.21 mm pixel
 # staircase shows as white specks between the vector silhouette and the fill
-# (machinist review MHA-MG-001 r2: "draft quality, speckled broken edges").
+# (machinist review MHA-MG-01 r2: "draft quality, speckled broken edges").
 _PREF_PDF_SHADED_DRAFT_DPI = 534
 
 

@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique trammel's HUB locator pin (MHA-CH-006-TL-25)."""
+"""Offline contracts for the oblique trammel's HUB locator pin (MHA-CH-06-TL-25)."""
 
 from __future__ import annotations
 
@@ -69,9 +69,9 @@ def test_sections_are_modelled_at_their_low_limits() -> None:
 
 def test_matched_fit_callouts_name_their_mates() -> None:
     assert spec.SEAT_CALLOUT.splitlines()[0] == "0.000-0.029 DIAMETRAL"
-    assert spec.SEAT_CALLOUT.endswith("MHA-CH-006-TL-21 HUB HOLE")
+    assert spec.SEAT_CALLOUT.endswith("MHA-CH-06-TL-21 HUB HOLE")
     assert spec.LOCATOR_CALLOUT.splitlines()[0] == "0.006-0.035 DIAMETRAL"
-    assert spec.LOCATOR_CALLOUT.endswith("MHA-CH-013 STRAP HOLE")
+    assert spec.LOCATOR_CALLOUT.endswith("MHA-CH-13 STRAP HOLE")
     for text in spec.DIMENSION_CALLOUTS.values():
         for line in text.splitlines():
             assert len(line) <= 30, line
@@ -93,7 +93,7 @@ def test_number_and_quantity() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts(DASHED)["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-25"
+    assert number == "MHA-CH-06-TL-25"
     assert _config.parts(DASHED)["quantity"] == 1
     finish = _config.parts(DASHED)["finish"]
     assert "\n" not in finish and len(finish) <= 40
@@ -154,7 +154,7 @@ def test_top_is_faced_to_fit_over_the_stack() -> None:
     assert spec.PIN_LENGTH_CALLOUT.splitlines() == [
         "SUPPLY 26.8 MIN;",
         "FACE LOCATOR END AT ASSEMBLY",
-        "1.80-2.20 ABOVE MHA-CH-006-TL-24;",
+        "1.80-2.20 ABOVE MHA-CH-06-TL-24;",
         "RECUT LEAD CHAMFER",
     ]
     assert spec.REFERENCE_CALLOUTS == {"PinLength": spec.PIN_LENGTH_CALLOUT}

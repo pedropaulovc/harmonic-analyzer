@@ -1,4 +1,4 @@
-"""Offline contracts for the cylinder-bank thrust washer (MHA-DT-026) drawing."""
+"""Offline contracts for the cylinder-bank thrust washer (MHA-DT-26) drawing."""
 
 from __future__ import annotations
 

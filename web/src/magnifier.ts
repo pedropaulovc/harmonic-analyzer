@@ -1,4 +1,4 @@
-import { MECHANISM_DATA } from './mechanics-data'
+import { MECHANISM_DATA } from './current-mechanics-data'
 
 /**
  * Taut, inextensible, non-slipping output wires, on the installed branch.

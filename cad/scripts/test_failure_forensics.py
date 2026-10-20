@@ -1394,7 +1394,7 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 21.8)
     _seat_forensics.record_seat_provenance(_Adapter(sw=_StartingSeat([True], pid=15124)))
-    part = _SourcePart({"Number": "MHA-DT-023"}, loading_reads=0)
+    part = _SourcePart({"Number": "MHA-DT-23"}, loading_reads=0)
 
     with pytest.raises(
         RuntimeError,
@@ -1417,7 +1417,7 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     assert capture["file_properties"]["names"] == ["Number"]
     assert capture["file_properties"]["get6"]["Finish"]["result"] == "NotPresent"
     assert capture["file_properties"]["get6"]["Number"] == {
-        "result": "CachedValue", "value": "MHA-DT-023", "resolved": "MHA-DT-023",
+        "result": "CachedValue", "value": "MHA-DT-23", "resolved": "MHA-DT-23",
     }
 
 
@@ -2315,15 +2315,15 @@ def test_a_failure_that_captured_nothing_says_so(dodo_failures, capture_telemetr
     leaves ``failures/`` empty. Emitting no line at all made that
     indistinguishable from a capture path that never ran, and the submitter's
     message still advertised a ``failures/*`` download -- which fetched zero
-    blobs on ``part:vn_pen_set_screw`` in the 2026-09-18 gate build. The absence
+    blobs on ``part:pn_vn_pen_set_screw`` in the 2026-09-18 gate build. The absence
     has to be STATED, because it is the thing the download instruction is
     conditional on.
     """
     dodo = dodo_failures
     _spans, logs = capture_telemetry
 
-    with pytest.raises(RuntimeError, match=r"^part:vn_pen_set_screw failed \(exit 1\)$"):
-        dodo._fail_task("part:vn_pen_set_screw", 1, started=0.0)
+    with pytest.raises(RuntimeError, match=r"^part:pn_vn_pen_set_screw failed \(exit 1\)$"):
+        dodo._fail_task("part:pn_vn_pen_set_screw", 1, started=0.0)
 
     (record,) = [
         r.log_record

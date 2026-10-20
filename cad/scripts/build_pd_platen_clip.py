@@ -67,7 +67,7 @@ from _sketch_circle import define_circle
 from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, SharedCoordinate, wizard_holes
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from vn_platen_clip_screw_spec import (
+from pd_vn_platen_clip_screw_spec import (
     HEAD_DIA,
     HEAD_DIA_MIN,
     PITCH,
@@ -141,7 +141,7 @@ SCREW_RAIL_END_RADIUS = 2.5
 SCREW_RAIL_SLIT_RADIUS = 0.75
 ARCH_RISE = 1.5  # shallow outward bow; editable as ArchRise in Tools > Equations
 
-# The brass #2-56 slotted pan-head screws (vn-platen-clip-screw; img03's heads
+# The brass #2-56 slotted pan-head screws (pd-vn-platen-clip-screw; img03's heads
 # read ~2.6-3.0 mm, user ruling 2026-10-15 for the pan head's bearing land)
 # retain their lengthwise stations in the flat rail, 3.3 in from its outer
 # edge (above); each head lies wholly on the rail.

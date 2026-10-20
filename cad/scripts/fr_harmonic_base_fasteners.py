@@ -17,11 +17,11 @@ import _config
 import fr_nameplate_spec
 from _hole_spec import TAP_DRILL_MM, HoleSpec, blind_cut_dia_mm
 from dt_arbor_pedestal_spec import FOOT_HEIGHT as PEDESTAL_FLANGE_THICKNESS
-from vn_lag_screw_spec import (
+from fr_vn_lag_screw_spec import (
     BEARING_OFFSET as HOLD_DOWN_BEARING_OFFSET,
     SHANK_LEN as HOLD_DOWN_SCREW_LEN,
 )
-from vn_pedestal_hold_down_screw_spec import SHANK_LEN as PEDESTAL_SCREW_LEN
+from dt_vn_pedestal_hold_down_screw_spec import SHANK_LEN as PEDESTAL_SCREW_LEN
 from fr_rocker_arm_support_section_spec import FOOT_THICKNESS as SUPPORT_FOOT_THICKNESS
 from fr_frame_attachment_spec import CASTING_FULL_THREAD_DEPTH, CASTING_TAP_DRILL_DEPTH
 

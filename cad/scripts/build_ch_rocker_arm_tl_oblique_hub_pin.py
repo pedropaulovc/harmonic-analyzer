@@ -1,4 +1,4 @@
-r"""Build the oblique trammel's HUB locator pin (MHA-CH-006-TL-25; shop tooling).
+r"""Build the oblique trammel's HUB locator pin (MHA-CH-06-TL-25; shop tooling).
 
 A headed turned pin (``ch_rocker_arm_tl_oblique_hub_pin_spec``). One
 Right-plane half-profile (sketch u -> model -Z, v -> radius; the cam-pin

@@ -1,4 +1,4 @@
-"""Offline contracts for the keeper-chain anchor eye (MHA-DT-028) part and drawing.
+"""Offline contracts for the keeper-chain anchor eye (MHA-DT-28) part and drawing.
 
 A ``visual_noncritical`` formed-wire eye under ``cad/docs/drawing-guidelines.md``
 (#1076): three native model dimensions whose places the PART owns -- the
@@ -19,7 +19,7 @@ import build_dt_crank_pin_eye as part
 import dt_crank_pin_eye_notes as notes
 import dt_crank_pin_eye_spec as spec
 import draw_dt_crank_pin_eye as drawing
-import vn_keeper_chain_spec as chain
+import dt_vn_keeper_chain_spec as chain
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -143,16 +143,16 @@ def test_notes_are_few_and_carry_no_values() -> None:
     text = notes.DRAWING_NOTES
     for value in ("\u00b1", "+/-", "\u00d8", "MM", "1.0", "3.0", "4.0"):
         assert value not in text, value
-    assert "MHA-DT-006" in text and "MHA-VN-006" in text
-    assert "MHA-VN-035" in notes.DIMENSION_CALLOUTS["LoopID"]
+    assert "MHA-DT-06" in text and "MHA-DT-VN-50" in text
+    assert "MHA-DT-VN-65" in notes.DIMENSION_CALLOUTS["LoopID"]
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in _source()
 
 
 def test_mating_part_numbers_are_live() -> None:
-    assert _config.parts("dt-crank-arm")["number"] == "MHA-DT-006"
-    assert _config.parts("vn-fillister-screw")["number"] == "MHA-VN-006"
-    assert _config.parts("vn-keeper-chain")["number"] == "MHA-VN-035"
+    assert _config.parts("dt-crank-arm")["number"] == "MHA-DT-06"
+    assert _config.parts("dt-vn-fillister-screw")["number"] == "MHA-DT-VN-50"
+    assert _config.parts("dt-vn-keeper-chain")["number"] == "MHA-DT-VN-65"
 
 
 def test_views_are_in_projection_and_clear_of_the_title_block() -> None:
@@ -250,7 +250,7 @@ def test_top_view_turn_rejects_a_refused_rotation(turn_top_view) -> None:
 
 def test_part_registry_row() -> None:
     config = _config.parts("dt-crank-pin-eye")
-    assert config["number"] == "MHA-DT-028"
+    assert config["number"] == "MHA-DT-28"
     assert config["tolerance_class"] == "visual_noncritical"
     assert int(config["quantity"]) == 1
     assert "brass wire" in str(config["material_specification"]).lower()

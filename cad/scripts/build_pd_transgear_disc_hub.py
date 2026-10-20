@@ -1,11 +1,11 @@
-r"""Reproduction script: transgear disc hub (MHA-PD-017; ch. 23; 1 used).
+r"""Reproduction script: transgear disc hub (MHA-PD-17; ch. 23; 1 used).
 
 The turned brass hub and flange whose bore slides on the pinion sleeve's
-(MHA-PD-010) h6 boss and drives through its D-flat. Its rear spigot passes the
-120T disc's (MHA-PD-006) bore, which pilots on it, and seats on the sleeve's
+(MHA-PD-10) h6 boss and drives through its D-flat. Its rear spigot passes the
+120T disc's (MHA-PD-06) bore, which pilots on it, and seats on the sleeve's
 step; the flange's rear face clamps the disc's front face and three #0-80
-fillister screws (MHA-VN-039) hold them.  Nothing fastens the hub to the
-sleeve: the spigot bears on the step and the MHA-PD-025 front bushing traps hub
+fillister screws (MHA-PD-VN-55) hold them.  Nothing fastens the hub to the
+sleeve: the spigot bears on the step and the MHA-PD-25 front bushing traps hub
 and disc forward; the D-flat drives (``pd_transgear_disc_hub_spec``,
 ``pd_transgear_disc_hub_geometry``).
 

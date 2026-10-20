@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel jig's nut bracket (MHA-CH-006-TL-29)."""
+"""Offline contracts for the oblique-trammel jig's nut bracket (MHA-CH-06-TL-29)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from _paths import CAD_ROOT
 from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 import build_ch_rocker_arm_tl_oblique_nut_bracket as part
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import draw_ch_rocker_arm_tl_oblique_nut_bracket as drawing
@@ -320,7 +320,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-oblique-nut-bracket")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-29" == spec.NUMBER
+    assert number == "MHA-CH-06-TL-29" == spec.NUMBER
 
 
 def test_sheet_carries_no_notes_and_cites_inventory_ids_only() -> None:
@@ -355,7 +355,7 @@ def test_nut_seat_callout_puts_drill_in_the_thru_row_and_the_mate_below() -> Non
 
 def test_block_tap_callout_ends_with_the_end_wall_row() -> None:
     definitions = {
-        5: "SPOT FROM MHA-CH-006-TL-22 AT ASSEMBLY;\n8-32 UNC",
+        5: "SPOT FROM MHA-CH-06-TL-22 AT ASSEMBLY;\n8-32 UNC",
         6: "",
         7: "2X",
         8: "",

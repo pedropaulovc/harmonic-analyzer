@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear disc hub (MHA-PD-017) and its drawing."""
+"""Offline contracts for the transgear disc hub (MHA-PD-17) and its drawing."""
 
 from __future__ import annotations
 
@@ -562,12 +562,12 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
     name_by_number: dict[str, str] = {}
     for stem, name in (
         ("pd-transgear-feed-pinion", spec.SLEEVE_NAME),
-        ("vn-transgear-disc-screw", spec.SCREW_NAME),
+        ("pd-vn-transgear-disc-screw", spec.SCREW_NAME),
         ("pd-rack-pinion", spec.DISC_NAME),
     ):
         name_by_number[_config.parts(stem)["number"]] = name
     printed = " ".join(_sheet_text().split())
-    cited = re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", printed)
+    cited = re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", printed)
     assert set(cited) == set(name_by_number) | {
         assembly_contract("pd-paper-drive").number
     }
@@ -1082,7 +1082,7 @@ async def _async(value):
 
 def test_registry_row_is_the_turned_brass_mha_159() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-017"
+    assert row["number"] == "MHA-PD-17"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

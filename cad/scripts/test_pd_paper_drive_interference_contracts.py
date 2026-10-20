@@ -3,7 +3,7 @@
 ``_interference_contracts`` writes every transgear size as a literal so no
 assembly re-keys on a transgear spec edit; these tests re-derive each row from
 the owners, so a spec change that moves a fit fails here instead of passing
-a stale bound (the MHA-DT-032 precedent in test_crank_handle_pivot_screw_drawing).
+a stale bound (the MHA-DT-32 precedent in test_dt_crank_handle_pivot_screw_drawing).
 """
 
 from __future__ import annotations
@@ -16,27 +16,27 @@ import pytest
 import _chain
 import _holes
 import _interference_contracts
-import vn_latch_hook_bracket_screw_spec as bracket_screw
+import pd_vn_latch_hook_bracket_screw_spec as bracket_screw
 import pd_latch_hook_geometry as hook
 import pd_rack_pinion_spec as disc
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
-import vn_transgear_arm_plate_screw_spec as plate_screw
+import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_transgear_disc_hub_spec as hub
-import vn_transgear_disc_screw_spec as disc_screw
+import pd_vn_transgear_disc_screw_spec as disc_screw
 import transgear_hanger_joints as joints
-import vn_transgear_knob_cup_pin_spec as cup_pin
+import pd_vn_transgear_knob_cup_pin_spec as cup_pin
 import pd_transgear_knob_cup_spec as cup
-import vn_transgear_knob_drive_pin_spec as drive_pin
+import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_knob_shaft_spec as shaft
-import vn_transgear_latch_pin_spec as latch_pin
-import vn_transgear_pivot_screw_spec as pivot_screw
+import pd_vn_transgear_latch_pin_spec as latch_pin
+import pd_vn_transgear_pivot_screw_spec as pivot_screw
 from _mcmaster_90325a174 import NECK_FLAT_END
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_transgear_removable_spec as removable
 import pd_transgear_pin_spec as pin
-import vn_transgear_retaining_ring_spec as ring
+import pd_vn_transgear_retaining_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut
 from _hole_spec import TAP_DRILL_MM
 
@@ -54,7 +54,7 @@ def _pair(first: str, second: str) -> frozenset[str]:
 
 
 def _collar():
-    # MHA-PD-022's spec (KnobShaftRound10); imported here so a missing or
+    # MHA-PD-22's spec (KnobShaftRound10); imported here so a missing or
     # renamed collar fails this test rather than the whole module.
     return importlib.import_module("pd_transgear_drive_collar_spec")
 
@@ -67,12 +67,12 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
         plate_screw.THREAD_MAJOR, TAP_DRILL_MM[arm.PLATE_TAP_SPEC.size], engaged
     )
     for n in (1, 2):
-        pair = _pair(f"vn-transgear-arm-plate-screw-{n}", "pd-transgear-arm-1")
+        pair = _pair(f"pd-vn-transgear-arm-plate-screw-{n}", "pd-transgear-arm-1")
         assert allowed[pair] == pytest.approx(plate_limit)
 
     # The shoulder screw's fitted thread past its neck flat, in the bar's
     # through tap.
-    assert allowed[_pair("vn-transgear-pivot-screw-1", "pd-support-bar-1")] == pytest.approx(
+    assert allowed[_pair("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")] == pytest.approx(
         _annulus(
             pivot_screw.THREAD_MAJOR,
             bar.PIVOT_TAP_DRILL_DIA,
@@ -81,7 +81,7 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
     )
     # R9-71: the spacer's reamed bore pressed on the shoulder, whole length.
     assert allowed[
-        _pair("pd-transgear-pivot-spacer-1", "vn-transgear-pivot-screw-1")
+        _pair("pd-transgear-pivot-spacer-1", "pd-vn-transgear-pivot-screw-1")
     ] == pytest.approx(
         _annulus(pivot_screw.SHOULDER_DIA, spacer.BORE_DIA, spacer.LENGTH)
     )
@@ -95,7 +95,7 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
         bracket_screw.ENGAGEMENT_NOMINAL,
     )
     for n in (1, 2):
-        pair = _pair(f"vn-latch-hook-bracket-screw-{n}", "pd-support-bar-1")
+        pair = _pair(f"pd-vn-latch-hook-bracket-screw-{n}", "pd-support-bar-1")
         assert allowed[pair] == pytest.approx(limit)
 
 
@@ -112,13 +112,13 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     assert 0.0 < disc.FACE_WIDTH - engaged <= disc_screw.TIP_BELOW_REAR_FACE[1]
     limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, engaged)
     for n in (1, 2, 3):
-        pair = _pair(f"vn-transgear-disc-screw-{n}", "pd-rack-pinion-1")
+        pair = _pair(f"pd-vn-transgear-disc-screw-{n}", "pd-rack-pinion-1")
         assert allowed[pair] == pytest.approx(limit)
 
 
 def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
-    """MHA-VN-047 is the replica-gated vendor body at its free diameter, so its
-    prongs grip inside the MHA-PD-023 groove floor; the overlap is the prong
+    """MHA-PD-VN-61 is the replica-gated vendor body at its free diameter, so its
+    prongs grip inside the MHA-PD-23 groove floor; the overlap is the prong
     arcs' share of the groove-to-free annulus over the ring's thickness."""
     from diagnostics import diag_build_97431A260 as recipe
 
@@ -137,7 +137,7 @@ def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
         sweeps.append((end - start) % (2.0 * math.pi))
     assert len(sweeps) == 3
     share = sum(sweeps) / (2.0 * math.pi)
-    pair = _pair("vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
+    pair = _pair("pd-vn-transgear-retaining-ring-1", "pd-transgear-pin-1")
     assert _allowed()[pair] == pytest.approx(
         share * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
     )
@@ -145,7 +145,7 @@ def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
 
 def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     allowed = _allowed()
-    # R9-70 (K-1): MHA-VN-048 across the journal and both walls of the cup ring,
+    # R9-70 (K-1): MHA-PD-VN-62 across the journal and both walls of the cup ring,
     # its ends inside the cup's O.D.: the journal takes the diametral chord,
     # the cup the rest of the tube.
     tube_d, tube_id = cup_pin.PIN_DIA, cup_pin.PIN_DIA - 2.0 * cup_pin.WALL_T
@@ -155,9 +155,9 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     tube = math.pi * (tube_d**2 - tube_id**2) / 4.0 * cup_pin.PIN_LEN
     assert shaft.JOURNAL_DIA < cup_pin.PIN_LEN < cup.OD
     assert cup.BORE_DIA == shaft.JOURNAL_DIA
-    pair = _pair("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")
+    pair = _pair("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-shaft-1")
     assert allowed[pair] == pytest.approx(1.10 * in_journal, rel=1e-4)
-    pair = _pair("vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")
+    pair = _pair("pd-vn-transgear-knob-cup-pin-1", "pd-transgear-knob-cup-1")
     assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
     assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
@@ -188,12 +188,12 @@ def test_head_seat_rows_admit_less_than_a_micron_of_sink() -> None:
     r0, r1 = plate.SCREW_HOLE_DIA / 2.0, plate.CSK_DIA / 2.0
     cone_area = math.pi * (r0 + r1) * (r1 - r0) / math.sin(half)
     for n in (1, 2):
-        pair = _pair(f"vn-transgear-arm-plate-screw-{n}", "pd-transgear-arm-plate-1")
+        pair = _pair(f"pd-vn-transgear-arm-plate-screw-{n}", "pd-transgear-arm-plate-1")
         assert 0.0 < allowed[pair] < cone_area * sink
 
 
 def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
-    """MHA-VN-038's reams moved from the shaft's integral collar to MHA-PD-022; the
+    """MHA-PD-VN-54's reams moved from the shaft's integral collar to MHA-PD-22; the
     pins press over their length behind the seat face, inside the collar."""
     collar = _collar()
     allowed = _allowed()
@@ -201,13 +201,13 @@ def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
     assert drive_pin.PRESS_DEPTH <= collar.LENGTH
     limit = _annulus(drive_pin.DIA, collar.PIN_HOLE_DIA, drive_pin.PRESS_DEPTH)
     for n in (1, 2):
-        pin = f"vn-transgear-knob-drive-pin-{n}"
+        pin = f"pd-vn-transgear-knob-drive-pin-{n}"
         assert allowed[_pair(pin, "pd-transgear-drive-collar-1")] == pytest.approx(limit)
         assert _pair(pin, "pd-transgear-knob-shaft-1") not in allowed
 
 
 def test_connecting_link_row_is_the_closing_link_mesh_on_the_t24() -> None:
-    """MHA-VN-068 closes the loop at the last station, whose forward pin is
+    """MHA-PD-VN-66 closes the loop at the last station, whose forward pin is
     pin 0 on the knob T24's pitch circle: one bounded mesh row with the
     removable, and no row with any chain link (link joints are clear)."""
     x, y, _ = _chain.loop_point_tangent(_chain.LINK_COUNT * _chain.LINK_PITCH)
@@ -215,15 +215,15 @@ def test_connecting_link_row_is_the_closing_link_mesh_on_the_t24() -> None:
     rows = {
         pair: v for pair, v in _allowed().items() if any("vn-chain" in n for n in pair)
     }
-    pair = _pair("pd-transgear-removable-1", "vn-chain-connecting-link-1")
+    pair = _pair("pd-transgear-removable-1", "pd-vn-chain-connecting-link-1")
     assert set(rows) == {pair}
     assert rows[pair] == pytest.approx(1.10 * (3.51208627 + 2.10455082))
 
 
 def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
-    """MHA-VN-056 presses into the arm's blind reams over its insertion
+    """MHA-PD-VN-64 presses into the arm's blind reams over its insertion
     (length less proud), short of the floor, and slips in the plate."""
-    import vn_transgear_arm_plate_locating_pin_spec as dowel
+    import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
 
     allowed = _allowed()
     insertion = dowel.LENGTH - dowel.PROUD_MM
@@ -232,7 +232,7 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
     assert dowel.DIA <= plate.LOCATOR_HOLE_DIA_MM
     limit = _annulus(dowel.DIA, arm.LOCATOR_HOLE_DIA_MM, insertion)
     for n in (1, 2):
-        pin = f"vn-transgear-arm-plate-locating-pin-{n}"
+        pin = f"pd-vn-transgear-arm-plate-locating-pin-{n}"
         assert allowed[_pair(pin, "pd-transgear-arm-1")] == pytest.approx(limit)
         assert _pair(pin, "pd-transgear-arm-plate-1") not in allowed
 

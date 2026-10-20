@@ -1,4 +1,4 @@
-r"""Create the rework drawing for the pivot bracket's angle plate (MHA-CH-008-TL-02).
+r"""Create the rework drawing for the pivot bracket's angle plate (MHA-CH-08-TL-02).
 
 The plate is bought; the sheet controls only the four holes the shop adds to
 its upright and prints the bought envelope as reference. The front view (the
@@ -306,7 +306,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Pivot Bracket Angle Plate Rework Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "pivot bracket angle plate; bought cast iron, reworked; MHA-CH-008-TL-02",
+            3: "pivot bracket angle plate; bought cast iron, reworked; MHA-CH-08-TL-02",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

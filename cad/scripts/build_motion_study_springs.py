@@ -82,7 +82,7 @@ SUM_LEVER_EYE = (
     _SL.HOLE_Z_FIRST + ANCHOR_9489T111.eye_centre_mm[2],
 )
 # The stock double-loop spring is clamped along the exposed full-thread band
-# of made MHA-SM-004, as in spring_mount_geom.COUNTER_UPPER_EYE_X (assembly frame).
+# of made MHA-SM-04, as in spring_mount_geom.COUNTER_UPPER_EYE_X (assembly frame).
 GOOSENECK_EYE = (
     _GN.SPRING_EYE_X,
     _GN.ARM_Y,
@@ -223,7 +223,7 @@ async def add_springs(adapter):
         adapter, "sm-gooseneck-1", GOOSENECK_EYE, "gooseneck counter-top", comps=comps
     )
     hook_pt = await _eye_point(
-        adapter, "vn-boss-hook-1", COUNTER_ANCHOR_EYE, "9490T1 counter-bottom", comps=comps
+        adapter, "sm-vn-boss-hook-1", COUNTER_ANCHOR_EYE, "9490T1 counter-bottom", comps=comps
     )
 
     sum_name = _find_one(adapter, "sm-summing-lever-1", comps=comps)[1]
@@ -259,7 +259,7 @@ async def add_springs(adapter):
 
     # 4) counter spring: gooseneck (structural) <-> boss-hook (on summing-lever).
     goose_n = _find_one(adapter, "sm-gooseneck-1", comps=comps)[1]
-    hook_n = _find_one(adapter, "vn-boss-hook-1", comps=comps)[1]
+    hook_n = _find_one(adapter, "sm-vn-boss-hook-1", comps=comps)[1]
     k_ct = SPRING_KCT if SPRING_KCT > 0 else STOCK_KCT
     log(
         f"  counter spring k = {k_ct:.1f} N/m (catalogue {STOCK_KCT:.3f} N/m, "

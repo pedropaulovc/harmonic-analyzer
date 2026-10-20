@@ -1,4 +1,4 @@
-"""Offline contract checks for the platen manufacturing drawing (MHA-PD-002)."""
+"""Offline contract checks for the platen manufacturing drawing (MHA-PD-02)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import SharedCoordinate
 from _printed_tolerance import printed_band_mm
 from machinist_exceptions import load_exceptions
-from vn_fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
+from _mcmaster_90114a511 import HEAD_H as FILLISTER_HEAD_H
 
 # ASME B landscape field and title block (sheet metres).
 BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -225,12 +225,12 @@ def test_one_centre_mark_per_hole_per_plan_view():
 
 
 def test_hole_callouts_name_their_mating_patterns():
-    assert "MHA-PD-011" in draw.GUIDE_CALLOUT_PROCESS
+    assert "MHA-PD-11" in draw.GUIDE_CALLOUT_PROCESS
     # Four callout rows at most: the Ø line, two process rows, the C'BORE row.
     assert draw.GUIDE_CALLOUT_PROCESS.count("\n") == 2
-    assert "MHA-PD-003" in draw.SOCKET_CALLOUT_PROCESS
+    assert "MHA-PD-03" in draw.SOCKET_CALLOUT_PROCESS
     # The counterbore depth's .XXX sinks a named screw's head.
-    assert _config.parts("vn-fillister-screw")["number"] in draw.GUIDE_CALLOUT_PROCESS
+    assert _config.parts("pd-vn-fillister-screw")["number"] in draw.GUIDE_CALLOUT_PROCESS
     # The through hole is DRILLED at .XX; the depth keeps .XXX to sink the head.
     assert spec.GUIDE_CALLOUT_PRECISION["hw-thruholedia"] == 2
     assert spec.HEAD_RECESS_MIN > 0.0

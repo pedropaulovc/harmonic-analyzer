@@ -179,8 +179,8 @@ NOTE_CENTRING_PASSES = 2
 # notch prints in a 4:1 detail (Main ruling 2026-09-27). Each is a cropped
 # *Front model view, dimensioned while uncropped and cropped after: r743-6
 # (d92938949, leaf 20260927T020523Z-1-e3f9f1f7) showed a native detail of the
-# front view refusing the targeted import (available=[]), the MHA-VN-031 /
-# MHA-DT-022 / MHA-DT-024 pattern (the pc-r15 kink detail, d6b8ed93f). A crop
+# front view refusing the targeted import (available=[]). The same pattern serves
+# current MHA-DT-VN-61 / MHA-DT-22 / MHA-DT-24 (pc-r15 detail, d6b8ed93f). A crop
 # drops any dimension whose reference lies outside it, so every printed
 # edge's ends stay inside the circle (test_cropped_views_frame_their_ends...).
 # The foot's views run along the bottom of the sheet, the top end's along the

@@ -178,7 +178,7 @@ def test_no_part_imports_main_assembly_helper():
 
 
 def test_no_part_reads_the_assembly_step_registry():
-    """No part's recipe depends on MHA-DT-000's step numbering.
+    """No part's recipe depends on MHA-DT-00's step numbering.
 
     A step pointer is sheet text, so renumbering the sequence re-keys the
     drawings that print it, never a part (Main's TbPB ruling 2, 2026-09-27:
@@ -191,7 +191,7 @@ def test_no_part_reads_the_assembly_step_registry():
         if any(Path(p).stem == "dt_drive_train_steps" for p in module_deps_of(script))
     )
     assert not offenders, (
-        "part scripts transitively import the MHA-DT-000 step registry "
+        "part scripts transitively import the MHA-DT-00 step registry "
         f"(drive_train_steps): {offenders}. Print the pointer from the drawing.")
 
 

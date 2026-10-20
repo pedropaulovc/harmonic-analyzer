@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker template trammel's pivot plate (MHA-CH-006-TL-19)."""
+r"""Create the drawing for the rocker template trammel's pivot plate (MHA-CH-06-TL-19)."""
 
 from __future__ import annotations
 
@@ -327,7 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Template Trammel Pivot Plate Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker template trammel pivot plate; 1018 offcut; MHA-CH-006-TL-19",
+            3: "rocker template trammel pivot plate; 1018 offcut; MHA-CH-06-TL-19",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

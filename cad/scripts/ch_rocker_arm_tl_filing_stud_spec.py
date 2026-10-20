@@ -1,10 +1,10 @@
-r"""Pure-data contract for the rocker arm hub filing stud (MHA-CH-006-TL-05).
+r"""Pure-data contract for the rocker arm hub filing stud (MHA-CH-06-TL-05).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 rocker arm's hub filing hold (traveler setup S6, inventory fixture
 ``hub-filing-buttons``) the bench vise grips the stud's tail; the lapped
 body locates in the arm's reamed pivot bore (datum A) and carries both
-filing buttons (MHA-CH-006-TL-04). The lower button seats on the integral
+filing buttons (MHA-CH-06-TL-04). The lower button seats on the integral
 head, the arm's hub sits between the buttons, the upper button rides the
 body, and a bought #10-24 coupling nut (McMaster 90264A425) on the thread
 clamps the stack. Turned in one chucking from 4140 at HRC 32 and left
@@ -300,8 +300,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate) and drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit sits on the locating diameter's
 # callout, naming each mate by Number with its acceptance (above, below).
 BODY_FIT_CALLOUT = (
-    "SLIDES IN MHA-CH-006 ROCKER ARM PIVOT BORE AND",
-    "MHA-CH-006-TL-04 BUTTONS BY HAND WITHOUT SHAKE",
+    "SLIDES IN MHA-CH-06 ROCKER ARM PIVOT BORE AND",
+    "MHA-CH-06-TL-04 BUTTONS BY HAND WITHOUT SHAKE",
 )
 BODY_FIT_NOTE = " ".join(part for part in BODY_FIT_CALLOUT if part)
 REFERENCE_DIMENSIONS = frozenset({"BodyDia"})

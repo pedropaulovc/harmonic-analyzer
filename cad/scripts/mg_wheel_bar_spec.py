@@ -83,7 +83,7 @@ DRAWING_NOTES = "\n".join(
     (
         "ALL BORES THRU, SQUARE TO THE BACK FACE.",
         f"2X {CLAMP_HOLE_SPEC.size} {CLAMP_HOLE_SPEC.fit.upper()} CLEARANCE "
-        "FOR COLUMN-CLAMP SCREWS (MHA-SH-002).",
+        "FOR COLUMN-CLAMP SCREWS (MHA-SH-02).",
         f"1X {PEN_HANGER_HOLE_SPEC.size} {PEN_HANGER_HOLE_SPEC.fit.upper()} "
         "CLEARANCE FOR THE PEN-HANGER SCREW.",
     )

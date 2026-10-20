@@ -356,10 +356,11 @@ def _world(origin, rows, local):
 
 
 def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
-    # MHA-DT-030 is match-drilled through the lever hub and the lift rod at
+    # MHA-DT-30 is match-drilled through the lever hub and the lift rod at
     # assembly, so the model's two holes must be one line.  Each part cuts its
-    # hole along its own local X (build_pinion_lift_rod / build_pinion_lever
-    # "lever pin" axes); the rod is phased to the lever to make them coincide.
+    # hole along its own local X (build_dt_pinion_lift_rod /
+    # build_dt_pinion_lever "lever pin" axes); the rod is phased to the lever
+    # to make them coincide.
     from dt_pinion_lever_geometry import PIN_HOLE_Z, ROD_PIN_HOLE_FROM_END
 
     rod_origin = [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0]
@@ -381,7 +382,7 @@ def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
 
 
 def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
-    # MHA-DT-030 is a component, not only a mated joint: BDT inserts it with
+    # MHA-DT-30 is a component, not only a mated joint: BDT inserts it with
     # the rod's phase at the rod's pin station (both holes' common point),
     # and locks it to the rod, so it joins the freed lift-rod spin family.
     from _assembly import allowed_free_stems
@@ -399,7 +400,7 @@ def test_mha135_is_placed_on_the_shared_pin_axis_and_rides_the_rod() -> None:
 
 
 def test_mha135_is_shown_trimmed_flush_in_its_installed_configuration() -> None:
-    # Codex #858 P2: the assembly shows MHA-DT-030 as assembly leaves it, trimmed
+    # Codex #858 P2: the assembly shows MHA-DT-30 as assembly leaves it, trimmed
     # and peened flush with the hub, not the 16.0 overlength cut the part's
     # drawing prints.  The part carries both as configurations with one BOM
     # identity, and BDT places the installed one.
@@ -562,8 +563,8 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     # term of either stack, and RIG_AFT_SHIFT is what the set-up leaves.
     for stack in (RIG.DRUM_BACK_ADVANCE_STACK, RIG.DRUM_FRONT_RETREAT_STACK):
         for name in stack:
-            assert "MHA-DT-014" not in name and "strap" not in name.lower(), name
-            assert "MHA-DT-012" not in name and "g19" not in name, name
+            assert "MHA-DT-14" not in name and "strap" not in name.lower(), name
+            assert "MHA-DT-12" not in name and "g19" not in name, name
     assert math.isclose(
         sum(RIG.DRUM_BACK_ADVANCE_STACK.values()) + RIG.RIG_MARGIN_SPARE,
         RIG.RIG_SET_LEAF_D,
@@ -596,12 +597,12 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     # the bank adds nothing to the advance.
     assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
     assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
-    assert "NORTH MHA-DT-012 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
+    assert "NORTH MHA-DT-12 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
     # The bank's terms at the front are booked by name in their own stack,
     # never mixed into the rig's (Codex #858, PRRT_kwDOPHDy386mUjhU), and the
     # preloaded bank carries no end play among them.
     assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == ()
-    assert all(name.startswith("MHA-DT-012 ") for name in RIG.G0_FRONT_SOUTH_STACK)
+    assert all(name.startswith("MHA-DT-12 ") for name in RIG.G0_FRONT_SOUTH_STACK)
     assert not any(
         "E_b" in name or "end play" in name for name in RIG.G0_FRONT_SOUTH_STACK
     )
@@ -776,7 +777,7 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     import pd_transgear_removable_spec as removable
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
-    # The knob side's seat is the MHA-PD-022 drive collar's front face, set
+    # The knob side's seat is the MHA-PD-22 drive collar's front face, set
     # SET_NOMINAL in front of the knob shaft's 12T front face.
     knob_seat = paper.KNOB_COLLAR_Z0
     assert crank_seat == pytest.approx(-154.3)
@@ -866,7 +867,7 @@ def test_follower_pins_stay_on_their_collars_at_the_worst_stack() -> None:
     )
 
 
-# MHA-DT-017's and MHA-DT-019's body lengths carry the title-block .X band (Main
+# MHA-DT-17's and MHA-DT-19's body lengths carry the title-block .X band (Main
 # 2026-09-24: keep it loose).  Both are set back-flush at fit-up, so the band
 # lands at their front ends; the back-end envelope below still takes the whole
 # band at the back as well, so either reference is covered.
@@ -925,7 +926,7 @@ def test_worst_stack_sizes_the_torque_shaft_and_the_lift_rod() -> None:
     # The sweep's longest stack is the named-term budget's growth, term for
     # term: everything in it but the nominal and the shaft's own length and
     # flush setting.
-    shaft_own = ("nominal", "MHA-DT-019 shaft length", "MHA-DT-019 rear end flush")
+    shaft_own = ("nominal", "MHA-DT-19 shaft length", "MHA-DT-19 rear end flush")
     growth = -sum(
         value
         for name, value in RIG.TORQUE_SHAFT_BEARING_STACK.items()
@@ -972,10 +973,10 @@ def test_lever_station_clears_at_both_rod_extremes() -> None:
     # rod's length band and float (north to the back collar's largest gap,
     # south to the front collar's widest feeler) and its own printed bands.
     # The torque shaft's front end moves south with its own band, the pinned
-    # cluster's end play and its flush set (P2-3).  The rig sizes MHA-DT-017 so
+    # cluster's end play and its flush set (P2-3).  The rig sizes MHA-DT-17 so
     # the plane clears that front end, and the assembly logs the same row.
     north = RIG.LEVER_NORTH_TRAVEL_STACK
-    assert north["MHA-DT-017 floated north to the back collar"] == RIG.BACK_COLLAR_GAP_MAX
+    assert north["MHA-DT-17 floated north to the back collar"] == RIG.BACK_COLLAR_GAP_MAX
     shaft = RIG.SHAFT_FRONT_SOUTH_TRAVEL_STACK
     assert math.isclose(
         sum(shaft.values()), _ROD_LEN_BAND + _P_MAX + RIG.FLUSH_SET_ERROR
@@ -1043,7 +1044,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
     # the 1.5 D floor the front block keeps (drawing-guidelines.md rule 18 (thread engagement)).  The retired check read
     # the nominal depth only (10.25 - 0.35 = 9.90); at the printed worst case
     # the U28 block bore 9.39.  Main (#858, ruling 2): the flush setting it is
-    # drilled at carries its own error, printed on MHA-DT-000's SHAFT DRILL SET.
+    # drilled at carries its own error, printed on MHA-DT-00's SHAFT DRILL SET.
     from _printed_tolerance import printed_band_mm
     from dt_pinion_pivot_block_geometry import BLOCK_DEPTH_PLACES
 
@@ -1068,7 +1069,7 @@ def test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack() -> None:
 
 
 def test_torque_shaft_length_band_clears_both_ends() -> None:
-    # MHA-DT-019 at the title-block .X band (U27), set back-flush: at the
+    # MHA-DT-19 at the title-block .X band (U27), set back-flush: at the
     # shortest stack (both blocks thin, Codex #854 P1) the longest shaft's
     # body end stands 7.52 proud of the front block, and its SR crown 1.2
     # beyond that (Codex #837 P1).
@@ -1086,7 +1087,7 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     shrink = -sum(
         value
         for name, value in rig.LIFT_ROD_SEAT_STACK.items()
-        if not name.startswith(("nominal", "MHA-DT-017"))
+        if not name.startswith(("nominal", "MHA-DT-17"))
     )
     shortest_outer = rig.FRONT_BLOCK_Z0 + shrink
     proud = shortest_outer - front_end
@@ -1102,7 +1103,7 @@ def test_torque_shaft_length_band_clears_both_ends() -> None:
     # Its back end then sits P_MAX inside the back block, bearing
     # test_pinned_torque_shaft_bears_the_back_block_at_the_worst_stack.
     # South of the front block nothing stands on the shaft's axis at any z.
-    # The nearest body is the MHA-DT-016 lever on the lift rod: its hub keeps
+    # The nearest body is the MHA-DT-16 lever on the lift rod: its hub keeps
     # 8.95 radial clearance, and its arm points away from the shaft over the
     # whole throw.  (BDT's lever-plane gate compares z only, as a proxy.)
     shaft_r = SHAFT_DIA / 2.0
@@ -1201,7 +1202,7 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
 
 
 def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
-    # Option E-a: MHA-DT-019's holes are match-drilled through the MHA-DT-014 cross
+    # Option E-a: MHA-DT-19's holes are match-drilled through the MHA-DT-14 cross
     # holes with the shaft back-flush and the cluster at the back stop.  Codex
     # #858 P1: the released part is the manufactured shaft, so its holes sit
     # under the HARDWARE strap mid-planes (back strap hard on the back block,
@@ -1239,12 +1240,12 @@ def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
 
 
 def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
-    # Option E-a: the pin's west end faces the MHA-DT-023 cam collar, whose air
+    # Option E-a: the pin's west end faces the MHA-DT-23 cam collar, whose air
     # to the strap foot is 0.38 at the printed worst case.  The longest pin
     # (B18.8.2 length +/-0.010 in) fits inside the narrowest strap foot (the
     # .X end-cap radius at its minimum), so driven flush-or-below on the west
     # edge it is buried on the east edge too: it can never eat that air.
-    import vn_pinion_strap_pin_spec as pin
+    import dt_vn_pinion_strap_pin_spec as pin
 
     assert pin.PIN_STANDARD == "ASME B18.8.2"
     assert (pin.PIN_DIA, pin.PIN_LEN) == (25.4 / 16.0, 25.4 / 2.0)
@@ -1275,7 +1276,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert (
         pin.PIN_LEN - pin.PIN_LEN_BAND - deeper - pin.PIVOT_BORE_MAX
     ) / 2.0 < pin.PIN_DIA
-    # The bore allowance is MHA-DT-014's own printed band.
+    # The bore allowance is MHA-DT-14's own printed band.
     import dt_pinion_bracket_spec
 
     assert pin.PIVOT_BORE_MAX == pytest.approx(
@@ -1295,7 +1296,7 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     assert math.isclose(pin.SHAFT_LIGAMENT_QUARTER, 2.091, abs_tol=5e-4)
     # Where the 1.541 comes from (Codex #858, PRRT_kwDOPHDy386mTvki).  The
     # centred wall is (min shaft 6.33 - max hole 1.6475) / 2 = 2.341.  The
-    # hole's centre sits on the pivot-axis line MHA-DT-014's flank view draws
+    # hole's centre sits on the pivot-axis line MHA-DT-14's flank view draws
     # (an implied zero, #1007 r1; Codex P1 on #1663), so it can run off the
     # shaft axis by the coarsest general grade (.X, 0.8).  2.0 is a target
     # met with geometry where a lever exists; none does here (the 1/4 shaft
@@ -1315,11 +1316,11 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
 
 def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
     # Codex #858 P2: the two E-a set pins are components, not only a mated
-    # tie.  BDT inserts MHA-VN-033 once per strap (front first), each centred in
+    # tie.  BDT inserts MHA-DT-VN-63 once per strap (front first), each centred in
     # its strap's cross hole -- the strap's local X line at CrossHoleCz =
     # StrapThickness / 2 through the pivot-bore axis -- with the strap's rows,
     # and locks it to that strap, so it joins the freed pinion swing family.
-    # Codex #858 P1: each pin is also coaxial with its MHA-DT-019 hole, because
+    # Codex #858 P1: each pin is also coaxial with its MHA-DT-19 hole, because
     # the saved pose is the fit-up stack the holes are match-drilled in.
     from _assembly import allowed_free_stems
     from dt_pinion_bracket_geometry import THICKNESS
@@ -1346,11 +1347,11 @@ def test_mha145_strap_pins_sit_in_both_strap_cross_holes() -> None:
     ]
     for z_hole, z_pin in zip(shaft_holes, drive.STRAP_PIN_Z, strict=True):
         assert math.isclose(z_hole, z_pin, abs_tol=1e-9)
-    assert "vn-pinion-strap-pin" in allowed_free_stems("dt-drive-train")
+    assert "dt-vn-pinion-strap-pin" in allowed_free_stems("dt-drive-train")
 
 
 def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
-    # Main: MHA-VN-033 carries a real SKU like its purchased siblings.  The part
+    # Main: MHA-DT-VN-63 carries a real SKU like its purchased siblings.  The part
     # is the stock 98296A027 recipe (1/16 x 1/2, 0.012 in wall, as installed)
     # at the nominal length; the spec proves the longest pin the band allows
     # is still buried (PIN_BURIED_MARGIN).  The registry row is the
@@ -1358,15 +1359,15 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     import inspect
 
     import _config
-    import build_vn_pinion_strap_pin as part
-    import vn_pinion_strap_pin_spec as pin
+    import build_dt_vn_pinion_strap_pin as part
+    import dt_vn_pinion_strap_pin_spec as pin
     from _buildgraph import part_stems, references_of
     from _drawing_registry import DRAWINGS_BY_NAME
     from _fastener_catalog import FASTENERS
     from _test_stock_recipes import discovered_recipes
     from diagnostics import diag_build_98296A027 as recipe
 
-    assert part.SPEC is FASTENERS["vn-pinion-strap-pin"]
+    assert part.SPEC is FASTENERS["dt-vn-pinion-strap-pin"]
     assert part.SPEC.skus == ("98296A027",)
     source = inspect.getsource(part)
     assert 'sku="98296A027"' in source and "author=build_98296A027" in source
@@ -1375,8 +1376,8 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     assert math.isclose(pin.WALL_T, 0.012 * 25.4)
     assert math.isclose(recipe.PIN_ID, pin.PIN_DIA - 2.0 * pin.WALL_T)
     assert pin.PIN_LEN + pin.PIN_LEN_BAND <= pin.STRAP_FOOT_MIN_WIDTH
-    row = _config.parts("vn-pinion-strap-pin")
-    assert row["number"] == "MHA-VN-033"
+    row = _config.parts("dt-vn-pinion-strap-pin")
+    assert row["number"] == "MHA-DT-VN-63"
     # The BOM line counts the pins the drive train places (Codex #858): one
     # per strap cross hole, plus the R1a arbor-collar pin at COLLAR_PIN_Z.
     assert isinstance(drive.COLLAR_PIN_Z, float)
@@ -1384,17 +1385,17 @@ def test_mha145_is_mcmaster_98296a027_and_a_purchased_bom_line() -> None:
     assert row["process"] == "purchased"
     assert tuple(row["supplier_skus"]) == ("98296A027",)
     assert row["stock_name"] == part.SPEC.stock_name
-    assert DRAWINGS_BY_NAME["vn_pinion_strap_pin"].script_name == (
-        "draw_vn_pinion_strap_pin.py"
+    assert DRAWINGS_BY_NAME["dt_vn_pinion_strap_pin"].script_name == (
+        "draw_dt_vn_pinion_strap_pin.py"
     )
-    assert "vn_pinion_strap_pin" in part_stems()
-    assert "vn_pinion_strap_pin" in references_of("dt_drive_train")
+    assert "dt_vn_pinion_strap_pin" in part_stems()
+    assert "dt_vn_pinion_strap_pin" in references_of("dt_drive_train")
 
 
 def test_drive_train_reads_no_shaft_or_pin_drawing_contract() -> None:
     # Restricted review (Main): BDT imported pinion_pivot_shaft_spec for the
     # pin-hole stations, and through it pinion_strap_pin_spec, so rewording a
-    # note on MHA-DT-019 re-keyed and fully rebuilt the drive train.  The stations
+    # note on MHA-DT-19 re-keyed and fully rebuilt the drive train.  The stations
     # live in pinion_rig_layout; the specs re-export them.
     from pathlib import Path
 
@@ -1402,7 +1403,7 @@ def test_drive_train_reads_no_shaft_or_pin_drawing_contract() -> None:
     from dt_pinion_pivot_shaft_spec import PIN_HOLE_Z
 
     deps = {Path(p).stem for p in module_deps_of(Path(drive.__file__))}
-    assert not deps & {"dt_pinion_pivot_shaft_spec", "vn_pinion_strap_pin_spec"}, deps
+    assert not deps & {"dt_pinion_pivot_shaft_spec", "dt_vn_pinion_strap_pin_spec"}, deps
     assert PIN_HOLE_Z == RIG.TORQUE_SHAFT_PIN_HOLE_Z
 
 
@@ -1417,10 +1418,10 @@ def test_mha145_pins_carry_no_interference_exemption() -> None:
     import _interference_contracts as ic
 
     pairs = ic.allowed_interference_pairs("dt-drive-train")
-    assert not [p for p in pairs if any(n.startswith("vn-pinion-strap-pin") for n in p)]
+    assert not [p for p in pairs if any(n.startswith("dt-vn-pinion-strap-pin") for n in p)]
     assert not [p for p in pairs if any(n.startswith("dt-pinion-bracket") for n in p)]
     source = inspect.getsource(ic)
-    for module in ("pinion_rig_layout", "vn_pinion_strap_pin_spec"):
+    for module in ("pinion_rig_layout", "dt_vn_pinion_strap_pin_spec"):
         assert module not in source, module
 
 
@@ -1443,7 +1444,7 @@ def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
 
 def test_drive_train_reads_no_arbor_drawing_contract() -> None:
     # Main (restricted review of #858): the drive train sizes the drum air and
-    # the land margins from MHA-DT-022, so it must read the arbor GEOMETRY module,
+    # the land margins from MHA-DT-22, so it must read the arbor GEOMETRY module,
     # never pinion_arbor_spec -- a print-wording or precision edit there would
     # otherwise re-key the whole drive train.
     from pathlib import Path
@@ -1481,7 +1482,7 @@ def test_rig_anchors_are_named_not_literal() -> None:
     strict=True,
     raises=AssertionError,
     reason=(
-        "#1037: MHA-DT-024's pad has no east-west locate that fits the preload "
+        "#1037: MHA-DT-24's pad has no east-west locate that fits the preload "
         "and stress window (user ruling 2026-09-27: ships in v37 as a known "
         "issue, redesigned after the release)"
     ),
@@ -1522,7 +1523,7 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
     # back block's east end, the pad screwed through its clearance hole.
     placement = {
         "gage leaf set error": RIG.FEELER_SET_ERROR,
-        "MHA-DT-018 east end from its pivot bore, .X": printed_deviations(
+        "MHA-DT-18 east end from its pivot bore, .X": printed_deviations(
             BLOCK_EAST, 1
         )[1],
         "#4 screw float in the pad's clearance hole": (
@@ -1551,7 +1552,7 @@ def test_spring_pad_books_its_printed_bands() -> None:
 
 
 def test_spring_is_stationed_from_the_block_on_its_pad_leaf() -> None:
-    # Main (restricted review of #858): MHA-DT-024's pad is set SPRING_PAD_LEAF
+    # Main (restricted review of #858): MHA-DT-24's pad is set SPRING_PAD_LEAF
     # off the back block's inner face before its seat is transferred.  #859
     # option (iv) (Main, 2026-09-26): the pad is flush with the strip's aft
     # edge, so the leaf sets the strip's own edge.
@@ -1586,14 +1587,14 @@ def test_spring_blade_on_flank_books_every_primitive_term() -> None:
     from dt_pinion_spring_section import WIDTH, WIDTH_PLACES
 
     terms = {
-        "MHA-DT-014 strap thickness": THICKNESS,
-        "MHA-DT-014 strap thickness .X, thinnest": printed_deviations(
+        "MHA-DT-14 strap thickness": THICKNESS,
+        "MHA-DT-14 strap thickness .X, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES
         )[0],
         "spring pad leaf": -RIG.SPRING_PAD_LEAF,
         "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-024 strip width": -WIDTH,
-        "MHA-DT-024 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+        "MHA-DT-24 strip width": -WIDTH,
+        "MHA-DT-24 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
     }
     assert RIG.SPRING_BLADE_ON_FLANK_WORST == pytest.approx(
         sum(terms.values()), abs=1e-12
@@ -1639,11 +1640,11 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     terms = {
         "strip front edge, nominal": RIG.SPRING_Z - WIDTH / 2.0 - j19_back,
         "rig-set leaf D set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-014 strap thickness .X, thinnest": printed_deviations(
+        "MHA-DT-14 strap thickness .X, thinnest": printed_deviations(
             THICKNESS, THICKNESS_PLACES
         )[0],
         "spring pad leaf set error": -RIG.FEELER_SET_ERROR,
-        "MHA-DT-024 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
+        "MHA-DT-24 strip width .XX, widest": -printed_deviations(WIDTH, WIDTH_PLACES)[1],
     }
     worst, floor = drive.RIG_MARGINS["spring strip to gear j = 19"]
     assert worst == pytest.approx(sum(terms.values()), abs=1e-9)
@@ -1711,30 +1712,30 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
     assert FITUP.RIG_SET_STEP == (
         "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
-        "FRONT MHA-DT-018 0.25 LEAF OFF FRONT MHA-DT-014;\n"
-        "MHA-DT-001 BACK END 1.00 + 0.25 LEAVES OFF\n"
-        "NORTH MHA-DT-012 BACK FACE, BANK PUSHED NORTH;\n"
-        "MHA-DT-024 PAD 0.65 LEAF OFF MHA-DT-018."
+        "FRONT MHA-DT-18 0.25 LEAF OFF FRONT MHA-DT-14;\n"
+        "MHA-DT-01 BACK END 1.00 + 0.25 LEAVES OFF\n"
+        "NORTH MHA-DT-12 BACK FACE, BANK PUSHED NORTH;\n"
+        "MHA-DT-24 PAD 0.65 LEAF OFF MHA-DT-18."
     )
-    # The base's rig callouts cite this step on MHA-DT-000 by key (plate-r1
+    # The base's rig callouts cite this step on MHA-DT-00 by key (plate-r1
     # review: the procedure is the assembly's, not the base's).
     rig_set_ref = dt_drive_train_steps.step_ref("rig-set")
     for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_CALLOUT):
         assert f"AFTER {rig_set_ref};" in callout
-    # The collars' set is an assembly step: nothing is cut, so MHA-DT-023's own
-    # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-018 keeps its feeler).
+    # The collars' set is an assembly step: nothing is cut, so MHA-DT-23's own
+    # print stays free of it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method), as MHA-DT-18 keeps its feeler).
     assert "LEAF" not in dt_pinion_cam_spec.DRAWING_NOTES
-    assert "0.90 OFF BACK MHA-DT-018" in FITUP.COLLAR_SET_STEP
-    assert "0.25 OFF FRONT MHA-DT-018" in FITUP.COLLAR_SET_STEP
-    # The fit-up module no longer claims MHA-DT-000 prints the feeler band.
-    assert "MHA-DT-000 prints" not in (FITUP.__doc__ or "")
+    assert "0.90 OFF BACK MHA-DT-18" in FITUP.COLLAR_SET_STEP
+    assert "0.25 OFF FRONT MHA-DT-18" in FITUP.COLLAR_SET_STEP
+    # The fit-up module no longer claims MHA-DT-00 prints the feeler band.
+    assert "MHA-DT-00 prints" not in (FITUP.__doc__ or "")
 
 
 def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
-    # #814 moved the drawing-guidelines.md rule 7 (notes: few, flagged, never a method) assembly notes off MHA-DT-025, MHA-DT-015, MHA-DT-022,
-    # MHA-DT-001 and MHA-DT-030 into ASSEMBLY_STEP constants. The sequence imports
+    # #814 moved the drawing-guidelines.md rule 7 (notes: few, flagged, never a method) assembly notes off MHA-DT-25, MHA-DT-15, MHA-DT-22,
+    # MHA-DT-01 and MHA-DT-30 into ASSEMBLY_STEP constants. The sequence imports
     # them (identity, not a retyped copy), bonds before RIG SET, pin last.
-    # MHA-DT-033 and the front strap go on first: neither passes the Ø15 head
+    # MHA-DT-33 and the front strap go on first: neither passes the Ø15 head
     # or a bonded drum (Codex #860, PRRT_kwDOPHDy386mTbe7).
     import dt_pinion_arbor_collar_spec
     import dt_pinion_arbor_spec
@@ -1755,7 +1756,7 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     collar = FITUP.ASSEMBLY_SEQUENCE[0]
     assert collar is dt_pinion_arbor_collar_spec.ASSEMBLY_STEP
     words = collar.replace(";", " ").replace(",", " ").split()
-    assert {"MHA-DT-033", "MHA-DT-022", "MHA-VN-033", "MHA-DT-014"} <= set(words)
+    assert {"MHA-DT-33", "MHA-DT-22", "MHA-DT-VN-63", "MHA-DT-14"} <= set(words)
     assert collar.startswith("BEFORE THE DRUM BOND:")
     assert FITUP.ASSEMBLY_SEQUENCE.index(collar) < FITUP.ASSEMBLY_SEQUENCE.index(
         dt_pinion_arbor_spec.ASSEMBLY_STEP
@@ -1763,7 +1764,7 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
     assert FITUP.ASSEMBLY_SEQUENCE[-1] is dt_pinion_lever_pin_spec.ASSEMBLY_STEP
     bonds = FITUP.ASSEMBLY_SEQUENCE[1:4]
     assert all("LOCTITE 638" in step for step in bonds)
-    assert {"MHA-DT-022", "MHA-DT-001", "MHA-DT-015", "MHA-DT-025"} <= {
+    assert {"MHA-DT-22", "MHA-DT-01", "MHA-DT-15", "MHA-DT-25"} <= {
         word
         for step in bonds
         for word in step.replace(";", " ").replace(",", " ").split()
@@ -1777,9 +1778,9 @@ def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:
 
 def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     # Main's re-ruling (2026-09-26): a drilling pose, drive or peen is
-    # performed at assembly, so it prints on MHA-DT-000 where the fitter works,
-    # and nowhere else; MHA-DT-019's, MHA-DT-016's and MHA-DT-017's pin-hole callouts
-    # carry the hole specification.  MHA-DT-000 prints them from
+    # performed at assembly, so it prints on MHA-DT-00 where the fitter works,
+    # and nowhere else; MHA-DT-19's, MHA-DT-16's and MHA-DT-17's pin-hole callouts
+    # carry the hole specification.  MHA-DT-00 prints them from
     # pinion_rig_fitup (#1045), so no source but the owner spells them out.
     import importlib
     from pathlib import Path
@@ -1791,14 +1792,14 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
         "pinion_rig_fitup.SHAFT_DRILL_STEP": (
             FITUP.SHAFT_DRILL_STEP,
             (
-                "REAR END FLUSH WITH MHA-DT-018 REAR FACE",
-                "STRAPS ON BACK STOP, MHA-DT-001 ON BACK STRAP",
-                "FEELER AT MHA-DT-001 FRONT END",
+                "REAR END FLUSH WITH MHA-DT-18 REAR FACE",
+                "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP",
+                "FEELER AT MHA-DT-01 FRONT END",
             ),
         ),
         "dt_pinion_lever_pin_spec.ASSEMBLY_STEP": (
             dt_pinion_lever_pin_spec.ASSEMBLY_STEP,
-            ("GRIP PARKED", "INSERT MHA-DT-030", "PEEN FLUSH"),
+            ("GRIP PARKED", "INSERT MHA-DT-30", "PEEN FLUSH"),
         ),
     }
     scripts = Path(FITUP.__file__).resolve().parent
@@ -1806,8 +1807,8 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
     for pattern in (
         "dt_pinion_*_spec.py",
         "draw_dt_pinion_*.py",
-        "vn_pinion_strap_pin_spec.py",
-        "draw_vn_pinion_strap_pin.py",
+        "dt_vn_pinion_strap_pin_spec.py",
+        "draw_dt_vn_pinion_strap_pin.py",
     ):
         matches = sorted(scripts.glob(pattern))
         assert matches, f"no pinion family modules match {pattern}"
@@ -1845,7 +1846,7 @@ def test_assembly_poses_print_once_on_their_rig_steps() -> None:
         assert callout.startswith("MATCH-DRILL THRU AT ASSEMBLY"), drawing
     assert FITUP.SHAFT_DRILL_STEP.startswith(f"{FITUP.SHAFT_DRILL_NAME}: MATCH-DRILL")
     # The steps' pin numbers are the registry's.
-    assert FITUP.STRAP_PIN_NUMBER == _config.parts("vn-pinion-strap-pin")["number"]
+    assert FITUP.STRAP_PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert (
         dt_pinion_lever_pin_spec.PIN_NUMBER == _config.parts("dt-pinion-lever-pin")["number"]
     )

@@ -20,7 +20,7 @@ import dt_cone_pivot_post_spec
 import cone_shaft_land_bands
 import cone_stack_end_play
 import dt_cone_tip_block_spec
-import vn_cone_tip_collar_spec
+import dt_vn_cone_tip_collar_spec
 import draw_dt_cone_gear_shaft as drawing
 import pytest
 from _drawing_annotation_extent import CLEAR_GAP_M
@@ -69,7 +69,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     assert not _lands_ride_named_bands(tuple(forked))
     # The custom collar preserves the terminal land's retained slip class.
     tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
-    collar_min = vn_cone_tip_collar_spec.BORE_DIA + vn_cone_tip_collar_spec.BORE_DIA_BAND[1]
+    collar_min = dt_vn_cone_tip_collar_spec.BORE_DIA + dt_vn_cone_tip_collar_spec.BORE_DIA_BAND[1]
     assert collar_min - tip_max >= 0.025 - 1e-9
     # Every flat rides the one named across-flat band.
     assert spec.FLAT_AF_BAND is cone_shaft_land_bands.FLAT_AF_BAND
@@ -84,7 +84,7 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
 def test_terminal_torque_corners_are_a_drawing_break_limit_not_geometry():
     lands = cone_shaft_land_bands
     assert dt_cone_gear_shaft_spec.TERMINAL_FLAT_EDGE_BREAK_MAX is lands.TERMINAL_FLAT_EDGE_BREAK_MAX
-    collar = vn_cone_tip_collar_spec
+    collar = dt_vn_cone_tip_collar_spec
     # The stock point's landing books the stoned corners at their MAX ...
     assert collar.FLAT_FACE_HALF_WIDTH_MIN_MM == pytest.approx(
         lands.TERMINAL_HALF_CHORD_MIN_MM - lands.TERMINAL_FLAT_EDGE_BREAK_MAX
@@ -235,12 +235,12 @@ def test_every_tight_band_names_its_mate_at_its_callout():
     """Machinist review r1 (20261018T054926125Z): each seat, flat, step and
     the collar web says what it fits or locates at its own dimension."""
     spec = dt_cone_gear_shaft_spec
-    assert drawing.DIMENSION_CALLOUTS["Sec0Dia"] == "RUNNING FIT IN\nMHA-DT-005 BORE"
+    assert drawing.DIMENSION_CALLOUTS["Sec0Dia"] == "RUNNING FIT IN\nMHA-DT-05 BORE"
     assert drawing.DIMENSION_CALLOUTS["Sec1Dia"] == "SLIDES IN 64T AND\nT030-T120"
     assert drawing.DIMENSION_SUFFIXES == {
         "Sec2Dia": " SLIDES IN T024",
         "Sec3Dia": " SLIDES IN T018",
-        "Sec4Dia": " SLIDES IN T006, T012, MHA-VN-016",
+        "Sec4Dia": " SLIDES IN T006, T012, MHA-DT-VN-54",
         "Sec1End": " INSIDE T030 BORE",
         "Sec2End": " INSIDE T024 BORE",
         "Sec3End": " INSIDE T018 BORE",
@@ -291,7 +291,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec3AF": 3,
         "Sec4AF": 3,
         "ShoulderR": 2,
-        # #914: the collar web is the 64T's station toward MHA-DT-005, so it
+        # #914: the collar web is the 64T's station toward MHA-DT-05, so it
         # prints .XXX (crank_boss_rim).  The collar diameter is the bar's as
         # supplied, a two-place reference (15.88).
         "CollarDia": 2,
@@ -1137,14 +1137,14 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     ) == pytest.approx(
         cone_line.POST_STATION + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
     )
-    # The tip chain (user ruling 2026-09-29): the MHA-VN-016 collar stands one
+    # The tip chain (user ruling 2026-09-29): the MHA-DT-VN-54 collar stands one
     # feeler off T006's north face; the block's north face stands the
     # pivot-screw head's air south of the pivot and the block grows south.
     # Every length is its owner's, not a copy.
     assert dt_cone_gear_shaft_spec.T006_NORTH_FACE_STATION == pytest.approx(
         cone_line.T006_NORTH_FACE
     )
-    assert dt_cone_gear_shaft_spec.TIP_COLLAR_WIDTH == vn_cone_tip_collar_spec.WIDTH
+    assert dt_cone_gear_shaft_spec.TIP_COLLAR_WIDTH == dt_vn_cone_tip_collar_spec.WIDTH
     assert dt_cone_gear_shaft_spec.TIP_COLLAR_START_STATION == pytest.approx(
         dt_cone_gear_shaft_spec.T006_NORTH_FACE_STATION + cone_stack_end_play.COLLAR_FEELER
     )
@@ -1215,7 +1215,7 @@ def test_custom_tip_collar_stays_wholly_on_the_terminal_land_at_printed_limits()
     import dt_cone_gear_stack as stack
 
     shaft = dt_cone_gear_shaft_spec
-    collar = vn_cone_tip_collar_spec
+    collar = dt_vn_cone_tip_collar_spec
     face_upper, face_lower = stack.face_band(stack.COUNT - 1, "north")
     collar_south_min = (
         shaft.TIP_COLLAR_START_STATION - shaft.printed_band("CollarWidth")
@@ -1673,7 +1673,7 @@ def test_the_sheet_states_the_collar_as_stock_with_its_break() -> None:
     assert f"{spec.THRUST_EDGE_BREAK_MAX:.1f} MAX" in callout
     # Machinist review r1: the sharp roots get a limit and both their reason.
     assert f"ROOTS R{spec.COLLAR_ROOT_RADIUS_MAX:.2f} MAX" in callout
-    assert "SEATS MHA-DT-005 AND 64T" in callout
+    assert "SEATS MHA-DT-05 AND 64T" in callout
     assert spec.COLLAR_ROOT_RADIUS_MAX < spec.THRUST_EDGE_BREAK_MAX
     assert spec.DRAWING_PRECISION["CollarProfile"]["CollarDia"] == 2
     assert f"{spec.COLLAR_DIA:.2f}" == "15.88"

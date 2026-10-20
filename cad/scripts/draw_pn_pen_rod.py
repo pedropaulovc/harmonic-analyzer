@@ -143,7 +143,7 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 # A vertical dimension whose text stands off its span runs its line to a
 # shoulder under the text's bottom row, the block hanging to ONE side of
 # that line with its edge ON it (farm audit 20261014T045316872Z, PivotDia
-# keep (0.084, 0.142): line x 0.0840, "MHA-PN-005 PIVOT BORE" 0.02821 +
+# keep (0.084, 0.142): line x 0.0840, "MHA-PN-05 PIVOT BORE" 0.02821 +
 # 0.05579 = 0.0840, shoulder y 0.13192 = keep y - 0.0101, top row's top
 # ~0.152 = keep y + 0.010).  Text BELOW its span therefore has the line run
 # up the block's whole edge (the review's "E struck by the line"); text
@@ -172,7 +172,7 @@ _END_HALF_M = _HALF * END_SCALE[0] / END_SCALE[1] / 1000.0
 #   tail (6.35 mm) runs to y ~0.1597 at x 0.0768, where nothing else is.
 # Below the rod, where the ShoulderRadius's arc is (model +X, the root the
 # vertical layout's leader found):
-#   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-005 down-right of the root:
+#   R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05 down-right of the root:
 #     farm audit 20261014T053239477Z drew that block x keep-0.0281..
 #     keep+0.0265 with its shoulder 8.35 mm under the anchor, so at
 #     (0.16925, 0.1475) it spans x 0.1412..0.1958, y 0.1392..0.1559 (9.1 mm

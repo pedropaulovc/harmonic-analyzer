@@ -145,14 +145,14 @@ def test_bore_prints_the_grip_budget_on_the_column() -> None:
     # #970: the bore is matched to the purchased column at the clearance the
     # pair's grip budget allows (sh_column_clamp_fit), not "bored as a pair".
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "DIAMETRAL" in bore and "MHA-FR-003" in bore
+    assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
     assert f"{spec.BORE_DIAMETRAL_CLEARANCE[1]:.2f}" in bore
     assert spec.BORE_DIAMETRAL_CLEARANCE[1] <= 0.30
-    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
-    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
+    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
     # The two-place depth says what it sets; the bore says where its axis is.
     assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 2
-    assert "MHA-SH-002" in drawing.DIMENSION_CALLOUTS["Depth"]
+    assert "MHA-SH-02" in drawing.DIMENSION_CALLOUTS["Depth"]
     assert "AXIS ON SPLIT FACE" in bore
 
 
@@ -201,7 +201,7 @@ def test_owner_ruled_shortfalls_are_declared_and_stated() -> None:
     assert spec.EAR_WALL_NOTE == "MIN EAR WALL 1.85"
     assert 1.85 <= spec.WALLS_WORST["ear to bore"] < 1.86
     assert spec.SCREW_LINE_NOTE == (
-        "EAR TO MHA-SH-002 TAP OFFSET UP TO 0.06 OVER #8 SCREW CLEARANCE"
+        "EAR TO MHA-SH-02 TAP OFFSET UP TO 0.06 OVER #8 SCREW CLEARANCE"
     )
     assert 0.05 < fit.SCREW_LINE_SHORTFALL <= 0.06
     assert spec.DRAWING_NOTES.split("\n") == [

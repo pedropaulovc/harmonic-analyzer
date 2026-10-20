@@ -33,7 +33,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -1162,15 +1162,16 @@ def _hidden_lines_removed_without_greyed_pass(view: Any) -> None:
     _telemetry.info(f"{bound.GetName2()} placed in display mode {placed}, now HLR")
 
 
-def _log_thread_labels(adapter: Any) -> None:
-    """Log every view's cosmetic threads and "Tapped Hole" label notes, the
-    notes finalize_drawing's sweep removes, so a drift in its count names
-    the view that grew one (#1591).
+def _remove_redundant_thread_notes(adapter: Any) -> None:
+    """Inventory, delete and read back the actual automatic thread labels.
 
-    Read only: each sheet's views come off ``ISheet::GetViews`` (as
-    finalize_drawing's display flush), so no sheet is activated.
+    Like draw_fr_top_frame, do not make their incidental count specification:
+    #1591 already recorded view-dependent labels.  PR1709's failed leaf had
+    four H-H cosmetic threads on TAP_THREAD_LAYER but no H-H label (7 total,
+    not 8).  The three authored native callouts, not these notes, define holes.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    draw = adapter.currentModel
     labels = 0
     for sheet_name in SHEET_NAMES:
         sheet = _early_bound(ddoc.Sheet(sheet_name), "ISheet")
@@ -1178,6 +1179,7 @@ def _log_thread_labels(adapter: Any) -> None:
             view = _early_bound(raw_view, "IView")
             threads = 0
             found: list[str] = []
+            hits: list[Any] = []
             for raw in view.GetAnnotations() or ():
                 annotation = _early_bound(raw, "IAnnotation")
                 kind = int(annotation.GetType())
@@ -1186,14 +1188,79 @@ def _log_thread_labels(adapter: Any) -> None:
                 elif kind == 6:  # swNote
                     note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
                     text = str(note.GetText() or "")
-                    if "Tapped Hole" in text:
+                    if "tapped hole" in text.lower():
                         found.append(f"{annotation.GetName()}={text!r}")
+                        hits.append(annotation)
             labels += len(found)
             _telemetry.info(
                 f"thread labels: {sheet_name}/{view_name(adapter, view)} "
                 f"{threads} cosmetic threads, {len(found)} labels {found!r}"
             )
+            for annotation in hits:
+                draw.ClearSelection2(True)
+                if not annotation.Select2(False, 0):
+                    raise RuntimeError("failed to select an automatic tapped-hole note")
+                draw.EditDelete()  # VT_VOID: the re-read below proves deletion.
+            draw.ClearSelection2(True)
+            survivors = [
+                str(_early_bound(raw, "INote").GetText() or "")
+                for raw in (view.GetNotes() or ())
+                if "tapped hole" in str(_early_bound(raw, "INote").GetText() or "").lower()
+            ]
+            if survivors:
+                raise RuntimeError(
+                    f"{sheet_name}/{view_name(adapter, view)}: automatic tapped-hole "
+                    f"notes survived deletion: {survivors!r}"
+                )
     _telemetry.info(f"thread labels: {labels} in all")
+
+
+def _finished_thread_annotation_check(
+    adapter: Any, callouts: Iterable[tuple[str, Any, Any]]
+) -> Callable[[], None]:
+    """Keep the authored callouts' identity and native definitions through cleanup
+    and the final settling rebuild, with no redundant note left on either sheet."""
+    expected = []
+    for label, view, raw_display in callouts:
+        display = _early_bound(raw_display, "IDisplayDimension")
+        if not display.IsHoleCallout():
+            raise RuntimeError(f"{label}: authored annotation is not a native hole callout")
+        expected.append((
+            label, view, _early_bound(display.GetAnnotation(), "IAnnotation"),
+            tuple(str(display.GetText(part) or "") for part in (5, 6, 7, 8)),
+        ))
+
+    def check_annotations() -> None:
+        ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+        for sheet_name in SHEET_NAMES:
+            sheet = _early_bound(ddoc.Sheet(sheet_name), "ISheet")
+            for raw_view in sheet.GetViews() or ():
+                view = _early_bound(raw_view, "IView")
+                for raw_note in view.GetNotes() or ():
+                    text = str(_early_bound(raw_note, "INote").GetText() or "")
+                    if "tapped hole" in text.lower():
+                        raise RuntimeError(
+                            f"{sheet_name}/{view_name(adapter, view)}: redundant "
+                            f"tapped-hole note remains: {text!r}"
+                        )
+        for label, view, original, definitions in expected:
+            matches = [
+                _early_bound(raw, "IAnnotation")
+                for raw in (_early_bound(view, "IView").GetAnnotations() or ())
+                if int(adapter.swApp.IsSame(raw, original)) == 1
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{label}: authored native hole callout is missing")
+            annotation = matches[0]
+            if annotation.IsDangling():
+                raise RuntimeError(f"{label}: authored native hole callout is dangling")
+            display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            if not display.IsHoleCallout() or definitions != tuple(
+                str(display.GetText(part) or "") for part in (5, 6, 7, 8)
+            ):
+                raise RuntimeError(f"{label}: authored native hole callout changed")
+
+    return check_annotations
 
 
 def _mounting_rims(edges: ViewEdges) -> list[Any]:
@@ -1651,7 +1718,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # leader-through-text), and down-left its text took the room the boss's
     # Z location needs (machinist review r4 B3).
     anchor_tap_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
-    add_native_hole_callout(
+    anchor_callout = add_native_hole_callout(
         adapter,
         top,
         edge_xy=anchor_tap_edge,
@@ -1929,7 +1996,7 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=(0.0, 1.0, 0.0),
         label="spring-hole callout rim",
     )
-    add_native_hole_callout(
+    spring_callout = add_native_hole_callout(
         adapter,
         top,
         edge=callout_rim.edge,
@@ -2064,7 +2131,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # The repeated isometric's label, where sheet 1 puts its own (machinist
     # review r12: unlabelled on this sheet).
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
-    _log_thread_labels(adapter)
+    check_thread_annotations = _finished_thread_annotation_check(
+        adapter,
+        (
+            ("anchor tap", top, anchor_callout),
+            ("spring-hole pattern", top, spring_callout),
+            ("two blind bracket mounting taps", back, mounting_callout),
+        ),
+    )
+    _remove_redundant_thread_notes(adapter)
+    check_thread_annotations()
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -2072,13 +2148,10 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
-        redundant_note_substrings=("Tapped Hole",),
-        # main's 3 on the plan's lever taps, the bracket taps' one on the back
-        # view and the receiver iso's 3 (7, farm 2026-10-09), plus section
-        # H-H's cosmetic-thread import (farm r18 2026-10-17).  No sheet-1 view
-        # passes through hidden-lines-visible, where the bracket taps' label
-        # grew on some builds only (#1591).
-        expected_redundant_notes=8,
+        # This recipe deletes and proves its actual note inventory, as top-frame
+        # does; the shared exact-count guard remains unchanged for other recipes.
+        # Recheck after the final rebuild, before either drawing or PDF is saved.
+        settled_checks=(check_thread_annotations,),
     )
 
 

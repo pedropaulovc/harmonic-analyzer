@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the pinion strap torque shaft
-(MHA-DT-019).
+(MHA-DT-19).
 
 A plain Ø6.35 steel shaft with a shallow spherical crown at each end, drawn
-like the MHA-CH-005 pivot shaft: one 1:1 side view carries the diameter, the
+like the MHA-CH-05 pivot shaft: one 1:1 side view carries the diameter, the
 body length, the overall length (reference) and the match-drilled pin holes,
 a 5:1 detail carries the crown, and a 1:2 isometric stays clear of the title
 block.
@@ -112,12 +112,12 @@ ISO_NOTE_XY = (0.115, 0.082)
 SHAFT_FIT_CALLOUT = (
     f"RUNNING FIT IN\n{_config.parts('dt-pinion-pivot-block')['number']} BORES"
 )
-# The holes are drilled at MHA-DT-000's SHAFT DRILL SET, so the callout points
+# The holes are drilled at MHA-DT-00's SHAFT DRILL SET, so the callout points
 # at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB). The
 # +0.06/0 band is the spring pin's hole, so the callout names the pin and its
 # fit (rule 4; r3 review), with the fleet's "FOR <pin> SPRING PIN" wording.
 SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
-STRAP_PIN_NUMBER = _config.parts("vn-pinion-strap-pin")["number"]
+STRAP_PIN_NUMBER = _config.parts("dt-vn-pinion-strap-pin")["number"]
 PIN_HOLE_FIT = f"PRESS FIT FOR {STRAP_PIN_NUMBER} SPRING PIN"
 DIMENSION_CALLOUTS = {
     "ShaftDia": SHAFT_FIT_CALLOUT,
@@ -165,13 +165,13 @@ if DETAIL_RADIUS_MM <= abs(
 # The label anchors at its top centre, under the crown's callout.
 DETAIL_LABEL_XY = (DETAIL_CENTER[0], DETAIL_CENTER[1] - _DETAIL_FENCE_R - 0.032)
 # The circle's letter on the profile: up-left of the front end, left of its
-# two length witness lines, as on MHA-CH-005. Up-right (r4) the diameter's
+# two length witness lines, as on MHA-CH-05. Up-right (r4) the diameter's
 # upper dimension line ran onto its foot.
 DETAIL_LETTER_XY = (FRONT_END_X - 0.010, PROFILE_CENTER[1] + 0.012)
 
 # A short dimension's callout is far wider than the span it measures, so its
 # text stands OUTSIDE the witness pair. Callout text runs ~2.75 mm a character
-# at the template's dimension height (MHA-CH-005 r743-3 render).
+# at the template's dimension height (MHA-CH-05 r743-3 render).
 CALLOUT_CHAR_WIDTH = 0.00275
 CALLOUT_WITNESS_GAP = 0.003
 
@@ -203,7 +203,7 @@ DETAIL_KEEP = {
 # Ra on the running face, the body both pivot-block bores run on. A revolved
 # flank is a drawing SILHOUETTE, not a model edge, so the pick names that
 # entity type; the straight leader keeps off the geometry. The UPPER flank,
-# as on MHA-CH-005: on the lower one (r2, swmaker000005) the symbol re-solved
+# as on MHA-CH-05: on the lower one (r2, swmaker000005) the symbol re-solved
 # onto a silhouette of another face and the attachment check failed. Left of
 # the body length's callout and right of the back pin hole. Note text height,
 # as on the other part sheets: at the template default the symbol printed
@@ -302,7 +302,7 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
     The radius is read-only: a spherical cap of the printed crown height on
     the toleranced diameter already fixes it. Whatever radius prefix the
     display carries is kept behind the ``(S``; the readback proves it stuck
-    (the MHA-CH-005 pivot shaft's dome prints the same way).
+    (the MHA-CH-05 pivot shaft's dome prints the same way).
     """
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")

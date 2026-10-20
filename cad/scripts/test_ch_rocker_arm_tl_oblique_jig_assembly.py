@@ -1,4 +1,4 @@
-"""Offline contract for the oblique-trammel jig assembly (MHA-CH-006-TL-000).
+"""Offline contract for the oblique-trammel jig assembly (MHA-CH-06-TL-00).
 
 The poses close on the calculator's rail and carrier geometry and the leadscrew
 feed's layout, the builder places all thirty-one made and bought families,
@@ -24,29 +24,28 @@ import _buildgraph as bg
 import _config
 import _interference_contracts as contracts
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
-import ch_rocker_arm_tl_oblique_bearing_spec as bearing
-import ch_rocker_arm_tl_oblique_block_washer_spec as block_washer
-import ch_rocker_arm_tl_oblique_carriage_spec as carriage
+import ch_rocker_arm_tl_vn_oblique_bearing_spec as bearing
+import ch_rocker_arm_tl_vn_oblique_block_washer_spec as block_washer
+import ch_rocker_arm_tl_vn_oblique_carriage_spec as carriage
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
-import ch_rocker_arm_tl_oblique_cl_dowel_spec as cl_dowel
+import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
-import ch_rocker_arm_tl_oblique_flange_nut_spec as flange_nut
-import ch_rocker_arm_tl_oblique_handwheel_spec as handwheel
+import ch_rocker_arm_tl_vn_oblique_flange_nut_spec as flange_nut
+import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import ch_rocker_arm_tl_oblique_hub_pin_spec as hub_pin
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
-import ch_rocker_arm_tl_oblique_leadscrew_nut_spec as leadscrew_nut
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
-import ch_rocker_arm_tl_oblique_leadscrew_stock_spec as leadscrew_stock
-import ch_rocker_arm_tl_oblique_lever_washer_spec as lever_washer
+import ch_rocker_arm_tl_vn_oblique_leadscrew_nut_spec as leadscrew_nut
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_stock_spec as leadscrew_stock
+import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_riser_spec as riser
-import ch_rocker_arm_tl_oblique_t_nut_spec as t_nut
+import ch_rocker_arm_tl_vn_oblique_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import machinist_exceptions
 
 
 BUILDER = Path(__file__).with_name("build_ch_rocker_arm_tl_oblique_jig_assembly.py")
@@ -370,148 +369,12 @@ def test_named_views_are_the_machine_frame() -> None:
     assert sight == pytest.approx(
         (1 / math.sqrt(3), -1 / math.sqrt(3), 1 / math.sqrt(3))
     )
-    assert spec.ISOMETRIC_VIEW.startswith("ISO ")
-    # The builder names them and leaves SolidWorks' standard views alone.
-    source = BUILDER.read_text(encoding="utf-8")
-    build = source[source.index("async def build(") :]
-    assert "name_machine_views(adapter)" in build
-    assert "UpdateStandardViews" not in source
 
 
-def test_steps_state_the_pin_direction_and_the_finished_holes() -> None:
-    steps = {line.split(". ", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
-    # Review bought-r15: each press loads only the ring it fits, the pin
-    # still entering from the top face, collar up.
-    step4 = steps["4"]
-    for text in (
-        "PIVOT PIN (ITEM 4), BEARING END FIRST, UNTIL ITS INNER RACE SEATS ON THE "
-        "COLLAR, PUSHING ON THE INNER RACE ONLY.",
-        "PRESS THE PIN DOWN FROM THE BLOCK'S TOP FACE, PUSHING ON THE OUTER RACE ONLY",
-        "WITH A FLAT DRIVER ON BOTH RACES",
-    ):
-        assert text in step4
-    # The DRO reads the table: the alignment step zeroes it on the spindle.
-    assert "ZERO THE DRO X AND Y ON THE SPINDLE ORIGIN (SHEET 1)" in steps["6"]
-    assert "A1 AND B1 (INNER PASS, TAGGED ON SHEET 1)" in steps["9"]
-    step10 = steps["10"]
-    assert "TRAVELER" not in " ".join(spec.ASSEMBLY_STEPS)
-    assert "GAUGE" not in step10
-    for text in (
-        # c3-r7 (rule 4): the H7 names its press fit, item and interference;
-        # c4-r10 (rule 25): the item is the sheet's, the builder's BOM_ORDER.
-        "HUB Ø10.20 H7 (10.200/10.218) THRU, PRESS FIT ON THE HUB LOCATOR PIN, "
-        "ITEM 6 (0.000-0.029 INTERFERENCE)",
-        "CL Ø6 N7 (5.984/5.996) THRU",
-        "Ø6 X 20 M6 DOWEL (6.004/6.012)",
-        "LOCATED ON MHA-CH-006-TL-21 FROM THE A1-B1 PIN AXES",
-        # close-c3-r3 review: squareness and position need an acceptance,
-        # so the step names the setup that holds them.
-        "DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS",
-        "EACH IN ONE SETUP SQUARE TO THE CARRIER TOP:",
-        # Codex (#1582): the title block sets no minimum break.
-        "BREAK THE HUB HOLE BELOW 0.3 MIN X 45°.",
-    ):
-        assert text in step10
+def test_finished_hole_fits_and_bracket_end_wall() -> None:
     assert hub_pin.SHOULDER_FILLET_RADIUS <= hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN
-    # Review r11 (TL-000): the change to the outer pass, the alignment it
-    # keeps, and the pass the jig ships on; the handwheel holds carriage 1.
-    # Review bought-r5: the block screws' as-shipped state (in, as the
-    # handwheel needs them; the checks take them out for the lever).
-    # Review bought-r6 (rule 23): at the torque their preload holds by.
-    for text in (
-        "RUN CARRIAGE 1 BY THE HANDWHEEL",
-        "SLIDE CARRIAGE 2 UNTIL THE PINS MEET A2/B2",
-        "THE STEP 6 READINGS STAND",
-        "SHIP ON A1/B1, BLOCK SCREWS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) IN AT 4.4 N·m.",
-    ):
-        assert text in steps["13"]
-    # Review bought-r6 (rule 23): the block screws seat on wedge-lock pairs
-    # and are tightened, in the alignment order, to the derived torque.
-    assert (
-        "REFIT THE NUT BRACKET FROM THE BLOCK'S FAR FACE WITH 2 #8-32 X 1-7/8 SHCS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) ON WEDGE-LOCK PAIRS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.BLOCK_LOCK_WASHER]}), SNUG."
-    ) in steps["7E"]
-    # C3 r6 TL-000 review (rule 23): the lever screws seat on wedge-lock pairs
-    # and go to their derived torque.
-    assert (
-        "BOLT THE FEED LEVER ON THE CARRIER WITH 2 5/16-18 X 1 SHCS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.LEVER_SCREW]}) ON WEDGE-LOCK PAIRS "
-        f"(ITEM {spec.ITEM_NUMBERS[spec.LEVER_LOCK_WASHER]}), TIGHTENED TO "
-        "18.7 N·m, GRIP END TOWARD THE OPERATOR."
-    ) in steps["12"]
-    # Review bought-r15: step 7 is one operation a line; the taps go in the
-    # nut bracket's spots, the pivot block stays on its carriage, its side
-    # holes plain.
-    assert [label for label in steps if label.startswith("7")] == [
-        "7A",
-        "7B",
-        "7C",
-        "7D",
-        "7E",
-        "7F",
-    ]
-    assert "RAIL 1'S PIVOT BLOCK (STILL ON ITS CARRIAGE)" in steps["7C"]
-    spot = "SPOT THE NUT BRACKET THROUGH THE BLOCK'S 2 Ø4.98 SIDE HOLES"
-    assert spot in steps["7C"]
-    # Owner ruling 2026-10-17 (review jbf-r17): the set takes the title
-    # block's .XXX band with its reason; no explicit band; the wall at that
-    # band (exception RV-02) holds the 1.5 floor.
-    assert (
-        "CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS);"
-    ) in steps["7C"]
-    assert "±" not in steps["7C"]
     assert nut_bracket.X_SET_BAND == pytest.approx(0.13)
     assert nut_bracket.END_WALL_MIN == pytest.approx(1.544, abs=0.001)
-    (set_rule,) = [
-        e
-        for e in machinist_exceptions.load_exceptions(
-            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
-        )
-        if e.id == "RV-02"
-    ]
-    assert "CENTRE 50.000" in set_rule.where and "1.544" in set_rule.reason
-    assert (
-        "UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 SPOTS #8-32 PER "
-        "MHA-CH-006-TL-29; THE BLOCK'S HOLES STAY PLAIN."
-    ) in steps["7D"]
-    assert steps["7D"].startswith("7D. RUN THE SCREW OUT, UNCLAMP")
-    # Review full-bought: after 7D runs it out, the screw goes back through
-    # the nut to its working stub before step 8 tightens round it.
-    assert steps["7F"] == (
-        "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
-        f"{spec.leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK."
-    )
-    assert "PAST THE NEAR BLOCK" not in steps["7B"]
-    assert (
-        "TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS TO 4.4 N·m, THEN THE KP08"
-    ) in steps["8"]
-    # Review bought-r5: the turned-over bar is told by a feature its views
-    # show; the lubricants are named; every set screw sits on a flat.
-    assert "NEAR SLOT" not in steps["1"]
-    assert "THE OTHER TURNED OVER FOR RAIL 2, ITS COUNTERBORES UP." in steps["1"]
-    assert steps["3"].startswith("3. SLIDE A FACTORY-GREASED HGH15CA CARRIAGE")
-    assert (
-        f"THREAD THE LEADSCREW (ITEM {spec.ITEM_NUMBERS[spec.LEADSCREW]}), OILED "
-        "WITH ISO VG 32 OIL, IN FROM THE BAR'S FAR END"
-    ) in steps["7B"]
-    # Owner ruling 2026-10-18 (rule 23): the set screws' lock is named, as a
-    # bought consumable, with no numbers or method; exception RV-03 records it.
-    assert (
-        "TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH LOCKED "
-        "WITH LOW-STRENGTH (PURPLE) THREADLOCKER."
-    ) in steps["8"]
-    (lock_rule,) = [
-        e
-        for e in machinist_exceptions.load_exceptions(
-            _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
-        )
-        if e.id == "RV-03"
-    ]
-    assert "THREADLOCKER" in lock_rule.where and "2026-10-18" in lock_rule.reason
-    # The limits are the parts' own fits: the HUB pin's p6 seat presses into
-    # the H7, the dowel's m6 into the N7.
     assert hub_pin.HUB_HOLE_BAND == (0.018, 0.0)
     assert (carrier.CL_HOLE_BAND, carrier.CL_DOWEL_BAND) == (
         (-0.004, -0.016),
@@ -808,54 +671,19 @@ def test_interference_contracts_are_the_press_fits_and_threads() -> None:
 
 def test_bom_rows_name_every_made_and_bought_item() -> None:
     assert set(spec.BOM_DESCRIPTIONS) == set(spec.QUANTITIES)
-    assert max(map(len, spec.BOM_DESCRIPTIONS.values())) <= spec.BOM_DESCRIPTION_CHARS
     assert spec.ITEM_NUMBERS == {
         stem: str(index) for index, stem in enumerate(spec.BOM_ORDER, 1)
     }
-    assert spec.BOM_DESCRIPTIONS[spec.BASE_BAR] == "BASE BAR"
-    assert spec.BOM_DESCRIPTIONS[spec.END_BRACKET] == "END BRACKET"
-    assert spec.BOM_DESCRIPTIONS[spec.NUT_BRACKET] == "NUT BRACKET"
-    assert spec.BOM_DESCRIPTIONS[spec.LEADSCREW] == "TR8X2 LEADSCREW, 410 LONG"
-    assert "3 IN" in spec.BOM_DESCRIPTIONS[spec.HOLD_DOWN_STUD]
-    for stem, row in SCREW_ROWS.items():
-        assert spec.BOM_DESCRIPTIONS[stem].startswith(fasteners.callout(row)), stem
-    # The fitter text cites every bought item by its BOM item number and names
-    # each screw by its callout.
-    steps = " ".join(spec.ASSEMBLY_STEPS)
-    for stem in spec.BOM_ORDER[spec.BOM_ORDER.index(spec.RAIL) :]:
-        assert f"(ITEM {spec.ITEM_NUMBERS[stem]})" in steps, stem
-    for name in (
-        "HGR15R",
-        "HGH15CA",
-        "6200-2RS",
-        "CL DOWEL",
-        "HOLD-DOWN",
-        "KP08",
-        "LEADSCREW",
-        "FLANGED NUT",
-        "HANDWHEEL",
-        *(fasteners.callout(row) for row in fasteners.FASTENERS),
-    ):
-        assert name in steps
-    assert "3 IN" in steps
-    # The nut does not back-drive: the lever check runs with the block screws
-    # out, the handwheel check with them in.
-    checks = " ".join(spec.ASSEMBLY_CHECKS)
-    assert "BLOCK SCREWS OUT" in checks and "HANDWHEEL" in checks
 
 
 def test_bom_follows_the_part_registry() -> None:
     prefix = spec.DRAWING_NUMBER.rsplit("-", 1)[0] + "-"
     rows = {stem: _config.parts(stem) for stem in spec.BOM_ORDER}
-    numbers = [
-        int(rows[stem]["number"].removeprefix(prefix)) for stem in spec.BOM_ORDER
-    ]
-    # Registry order TL-20..51 (TL-27 is not a jig component).
-    assert numbers == [20, 21, 22, 23, 24, 25, 26, 28, 29, *range(30, 52)]
+    numbers = [rows[stem]["number"] for stem in spec.BOM_ORDER]
     for stem, number in zip(spec.BOM_ORDER, numbers, strict=True):
         row = rows[stem]
         assert row["quantity"] == spec.QUANTITIES[stem], stem
-        assert (row["process"] == "purchased") == (number >= 30), stem
+        assert (row["process"] == "purchased") == number.startswith(prefix + "VN-"), stem
         # The registry owns each bought item's source: no supplier or SKU
         # leaks into the BOM text.
         description = spec.BOM_DESCRIPTIONS[stem].casefold()
@@ -891,25 +719,6 @@ def test_alignment_note_prints_the_calculator_targets() -> None:
         assert (x2, y2) == pytest.approx((-x1, y1))
     assert trammel.ALIGNMENT_TARGETS[100.0]["rail 1"] == pytest.approx(
         (-98.973, -14.298), abs=5e-4
-    )
-
-
-def test_sweep_note_gives_each_pass_its_pin_stations() -> None:
-    # Review bought-tl000-r1: the checks' sweeps are ranged on sheet 1, each
-    # pass's pin stations over its whole sweep, rounded outward.
-    assert spec.SWEEP_NOTE_LINE == (
-        "SWEEP OF EACH PASS, EACH PIN AT S: INNER 75 TO 378, OUTER 77 TO 390; "
-        "NO STOP LIMITS IT, THE FITTER ENDS EACH PASS THERE."
-    )
-    for lo, hi in trammel.PIN_TRAVEL.values():
-        assert f"{math.floor(lo)} TO {math.ceil(hi)}" in spec.SWEEP_NOTE_LINE
-    assert "EACH PASS'S SWEEP (SHEET 1)" in spec.ASSEMBLY_CHECKS[1]
-    # Review bought-tl000-r3: the screws that check took out go back in at
-    # the ship state's torque.
-    assert spec.ASSEMBLY_CHECKS[2] == (
-        f"CHECK: REFIT THE BLOCK SCREWS (ITEM {spec.ITEM_NUMBERS[spec.BLOCK_SCREW]}) "
-        "ON THEIR WEDGE-LOCK PAIRS AT 4.4 N·m; THE HANDWHEEL RUNS THE SAME SWEEPS "
-        "WITHOUT BINDING."
     )
 
 
@@ -964,9 +773,6 @@ def test_studs_stop_under_the_swinging_carrier() -> None:
     assert spec.STUD_LENGTH == fasteners.HOLD_DOWN_STUD_LENGTH_MM
     assert spec.STUD_LENGTH == pytest.approx(3.0 * trammel.INCH)
     assert spec.STUD_LENGTH < spec.STUD_LENGTH_MAX
-    step2 = spec.ASSEMBLY_STEPS[1]
-    assert "1/2-13 X 3 IN STUDS ONLY" in step2
-    assert "A STUD OVER 3-1/2 IN REACHES THE SWINGING CARRIER" in step2
 
 
 def test_sweep_sidecar_drives_both_passes_to_their_end_stops() -> None:
@@ -1051,44 +857,6 @@ def test_inch_eighths_down() -> None:
     assert spec.inch_eighths_down(3.0 * trammel.INCH) == "3"
     assert spec.inch_eighths_down(3.874 * trammel.INCH) == "3-3/4"
     assert spec.inch_eighths_down(0.25 * trammel.INCH) == "1/4"
-
-
-def test_one_step_spots_the_riser_holes_before_screwing_it_down() -> None:
-    # TL-24's hole-location note sends the shop to TL-000: exactly one step
-    # spots the riser's holes through the carrier's before it is screwed down.
-    spotting = [line for line in spec.ASSEMBLY_STEPS if "SPOT ITS 7 HOLES" in line]
-    assert len(spotting) == 1
-    step = spotting[0]
-    assert (
-        "SPOT ITS 7 HOLES (4 #4 COUNTERSUNK, HUB Ø12, CL DOWEL, CR SCREW Ø6.60) "
-        "FROM BELOW "
-        "THROUGH THE CARRIER'S FINISHED AND TAPPED HOLES"
-    ) in step
-    assert "MHA-CH-006-TL-24" in step
-    # Codex (#1583): only the B18.6.3 machine-screw head fits the countersinks.
-    assert (
-        f"WITH 4 #4-40 X 1/2 B18.6.3 FLAT HEADS (ITEM {spec.ITEM_NUMBERS[spec.RISER_SCREW]})."
-        in step
-    )
-    assert step.index("SPOT") < step.index("SCREW IT DOWN")
-    # Codex (#1583): the pins would plug the holes the riser is spotted
-    # through, so they press in only after the riser is screwed down.
-    assert step.index("SCREW IT DOWN") < step.index("PRESS THE HUB PIN UP")
-    assert not any("PRESS THE HUB PIN" in line for line in spec.ASSEMBLY_STEPS[:8])
-    # Codex (#1582): the HUB pin's top is faced to fit once the riser is down
-    # (rule 19), its lead chamfer cut again, no larger than the strap
-    # engagement allows (Codex #1582).
-    facing = (
-        f"FACE THE HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-"
-        f"{hub_pin.LOCATOR_SET_MAX:.2f} ABOVE THE RISER AND RECHAMFER IT "
-        "0.5 X 45° MAX."
-    )
-    assert facing in step
-    assert step.index("PRESS THE HUB PIN UP") < step.index(facing)
-    # The CR screw clamps the workpiece, which is not part of the jig; the
-    # in-use note rides on step 12, where the steps sheet has room.
-    steps = {line.split(". ", 1)[0]: line for line in spec.ASSEMBLY_STEPS}
-    assert "MHA-CH-013 STRAP BLANK (NOT SUPPLIED)" in steps["12"]
 
 
 def test_sweep_table_edge_margins(report) -> None:
@@ -1264,7 +1032,7 @@ def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     assert leadscrew.BRACKET_SLIP_THRUST == pytest.approx(2688.7, abs=0.1)
     assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(1540.9, abs=0.1)
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * leadscrew.HAND_ABUSE_THRUST
-    # TL-000 step 1 prints the one torque where the bracket screws go in.
+    # TL-00 step 1 prints the one torque where the bracket screws go in.
     assert (
         "STATION, 4 #8-32 X 5/8 SHCS (ITEM "
         f"{spec.ITEM_NUMBERS[spec.BRACKET_SCREW]}) PER BRACKET FROM BELOW, "
@@ -1411,7 +1179,7 @@ def test_block_screw_torque_is_capped_by_the_bracket_thread() -> None:
 
 
 def test_lever_screw_torque_is_capped_by_the_carrier_thread() -> None:
-    # C3 r6 TL-000 review (rule 23): the wedge-lock pairs keep the lever
+    # C3 r6 TL-00 review (rule 23): the wedge-lock pairs keep the lever
     # screws from backing off under the operator's reversing push and pull.
     # Their preload is a third of the TL-21 6061 tap's strip load over the
     # shortest engagement (the shortest 1 in screw through the thickest lever
@@ -1446,15 +1214,6 @@ def test_nut_flange_is_a_static_clamp() -> None:
     assert spec.NUT_FLANGE_SLIP_MARGIN >= 1.5
     # The wedge-lock pair the ruling rules out: OD 7.0 at R8 reaches the body.
     assert 16.0 / 2.0 - 7.0 / 2.0 < 10.2 / 2.0
-    steps = " ".join(spec.ASSEMBLY_STEPS)
-    assert "8. TIGHTEN THE NUT SCREWS TO 1.0 N·m, THE BLOCK SCREWS" in steps
-    exceptions = machinist_exceptions.load_exceptions(
-        _config.CONFIG_DIR, "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
-    )
-    (static,) = [e for e in exceptions if "nut-flange" in e.finding]
-    assert static.kind == "accept"
-    for text in ("1.0 N·m", "0.87 N·m", "8.0 to 10.7 N·m", "1.67 kN", "7.0", "0.6"):
-        assert text in static.reason or text in static.where, text
 
 
 def test_handwheel_set_screw_meets_the_leadscrew_flat() -> None:

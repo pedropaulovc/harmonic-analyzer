@@ -8,10 +8,10 @@ import _config
 import _interference_contracts
 import build_ch_channel_assembly as channel
 import build_ch_pivot_bracket as bracket_build
-import build_vn_bracket_hold_down_screw as hold_down_build
-import vn_bracket_hold_down_screw_spec as hold_down
+import build_ch_vn_bracket_hold_down_screw as hold_down_build
+import ch_vn_bracket_hold_down_screw_spec as hold_down
 import dt_arbor_pedestal_spec as pedestal
-import vn_pedestal_hold_down_screw_spec as pedestal_screw
+import dt_vn_pedestal_hold_down_screw_spec as pedestal_screw
 import build_fr_rocker_arm_support as support
 import ch_pivot_bracket_sides as sides
 import ch_pivot_bracket_spec as bracket
@@ -41,17 +41,17 @@ def test_top_level_contract_literals_match_the_layout() -> None:
         limit
         for pair, limit in pairs.items()
         if "fr-frame-1/fr-rocker-arm-support-1" in pair
-        and any(name.startswith("ch-channel-1/vn-bracket-hold-down-screw-") for name in pair)
+        and any(name.startswith("ch-channel-1/ch-vn-bracket-hold-down-screw-") for name in pair)
     }
     screws = {
         name
         for pair in pairs
         if "fr-frame-1/fr-rocker-arm-support-1" in pair
         for name in pair
-        if name.startswith("ch-channel-1/vn-bracket-hold-down-screw-")
+        if name.startswith("ch-channel-1/ch-vn-bracket-hold-down-screw-")
     }
     assert screws == {
-        f"ch-channel-1/vn-bracket-hold-down-screw-{n}"
+        f"ch-channel-1/ch-vn-bracket-hold-down-screw-{n}"
         for n in range(1, len(seats.SEAT_MACHINE_XZ) + 1)
     }
     (limit,) = limits
@@ -146,7 +146,7 @@ def test_seat_thread_keeps_the_end_wall_at_the_worst_transferred_position() -> N
 
 
 def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
-    """r743-3C: MHA-CH-008's #19 hole (0.025 radial over the #8-32 major) cut the
+    """r743-3C: MHA-CH-08's #19 hole (0.025 radial over the #8-32 major) cut the
     fillister's under-head junction fillet, P/10 in diag_mcmaster_fillister's
     recipe, at the hole mouth: 0.0048 mm^3 per screw in assembly:ch_channel."""
     fillet = hold_down._PITCH / 10.0
@@ -188,7 +188,7 @@ def test_bracket_hole_ligaments_keep_the_floor_at_worst_case() -> None:
 
 
 def test_bracket_lengths_along_the_foot_carry_their_bands_on_the_model() -> None:
-    """The S4 fixture plan and the MHA-CH-008 sheet take the +/-0.10 lengths
+    """The S4 fixture plan and the MHA-CH-08 sheet take the +/-0.10 lengths
     from the saved model's dimensions; the tap station and the reamed bore
     carry the drawing contract's bands beside them. The foot length and the
     hold-down station ride the title block's .XX (user ruling 2026-10-14: the

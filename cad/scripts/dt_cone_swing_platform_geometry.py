@@ -1,4 +1,4 @@
-r"""Plan geometry of the MHA-DT-020 cone swing platform.
+r"""Plan geometry of the MHA-DT-20 cone swing platform.
 
 PURE, SolidWorks-free: the plate outline, the v2 post footprint, the lock-notch
 seat and chord and the base-fixed swing hardware stations.
@@ -14,9 +14,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import vn_cone_pivot_screw_spec as pivot_stock
-import vn_swing_stop_screw_spec as stop_stock
-from vn_cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
+import dt_vn_cone_pivot_screw_spec as pivot_stock
+import dt_vn_swing_stop_screw_spec as stop_stock
+from dt_vn_cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
 import _config
 from cone_line import (
     COS_I as _COS_I,

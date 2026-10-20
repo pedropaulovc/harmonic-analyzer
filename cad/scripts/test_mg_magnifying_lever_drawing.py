@@ -62,7 +62,7 @@ def test_stock_diameter_is_plain_stock_on_the_side_view() -> None:
     over-defines the capsule), between two construction lines ON the top and
     bottom outlines, with the Ø prefix a linear dim needs (v41 sheet).  r1
     review blocker: it is plain bar stock at the title block's .X, no band,
-    like MHA-MG-004's rod.  Owner ruling: the Ø prints bare -- no "STOCK OK"
+    like MHA-MG-04's rod.  Owner ruling: the Ø prints bare -- no "STOCK OK"
     callout and no replacement note.  The bar's h9 band stays in the spec as
     the procurement contract the press zone is selected from."""
     import mg_lever_press_fit_geom as press
@@ -261,7 +261,7 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
         "PressZoneLen": 1,
         "PressZoneDia": 3,
     }
-    # The MIN recipe (build_vn_knife_hanger_stud's ThreadLengthMin) with the
+    # The MIN recipe (build_sm_vn_knife_hanger_stud's ThreadLengthMin) with the
     # bracket's readback: the model value is the limit, no deviations.
     assert "_press_zone_start_min_limit(adapter)" in source
     assert '_named_dimension(adapter, "PressZone", "PressZoneStart")' in source
@@ -287,7 +287,7 @@ def test_press_zone_is_a_native_band_from_the_config_free_press_contract() -> No
     assert (
         drawing.REFERENCE_CALLOUTS["PressZoneStart"]
         is mg_magnifying_lever_spec.PRESS_ZONE_START_CALLOUT
-        == "PRESS ZONE COVERS\nMHA-MG-001 COLLAR"
+        == "PRESS ZONE COVERS\nMHA-MG-01 COLLAR"
     )
     assert "MATCHES" not in mg_magnifying_lever_spec.PRESS_ZONE_START_CALLOUT
     # The sheet's stations come from the same constants as the model's.
@@ -363,7 +363,7 @@ def test_dome_radius_is_a_radial_reference_of_the_tangent_hemisphere() -> None:
 # apart, 3.5 mm caps, the dimension line at the lowest row's baseline (r4's
 # five-row zone start, requested at y 126 mm, spanned 113.1..138.6 mm); a lone
 # row's baseline sits 2.78 mm under the requested y (r4's (7.0) line at 135.2
-# mm); the widest r4 row, "MATCHES MHA-MG-001", printed 52.3 mm over its 18
+# mm); the widest r4 row, "MATCHES MHA-MG-01", printed 52.3 mm over its 18
 # characters.
 _ROW_PITCH = 0.00556
 _TEXT_HEIGHT = 0.0035
@@ -440,7 +440,7 @@ def test_press_zone_text_clears_its_lines_and_the_isometric() -> None:
 
 def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     """Review item 5 / code-review nit: the banded zone's callout names the
-    mating MHA-MG-001 bore as the REFERENCE nominal that sheet prints and the
+    mating MHA-MG-01 bore as the REFERENCE nominal that sheet prints and the
     matched-fit interference its callout states (rule 25: the sheets agree;
     the bore carries no absolute band), every number derived from
     mg_lever_press_fit_geom in the spec -- the sheet carries no
@@ -452,7 +452,7 @@ def test_press_zone_callout_ties_the_zone_to_the_bracket_bore() -> None:
     callout = mg_magnifying_lever_spec.PRESS_ZONE_DIA_CALLOUT
     assert drawing.REFERENCE_CALLOUTS["PressZoneDia"] is callout
     assert callout == (
-        "IN MHA-MG-001 (<MOD-DIAM>5.986) BORE:\n0.007-0.014 DIAMETRAL INTERFERENCE"
+        "IN MHA-MG-01 (<MOD-DIAM>5.986) BORE:\n0.007-0.014 DIAMETRAL INTERFERENCE"
     )
     assert f"(<MOD-DIAM>{press.COLLAR_BORE_DIA:.3f})" in callout
     assert "/" not in callout and "+0.006" not in callout
@@ -532,7 +532,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 def test_sheet_carries_no_note_block() -> None:
     """r1 review over-specification: the zone's selection, how to hold the
-    rod and the press force are the MHA-MG-000 assembly's step, the stock is a
+    rod and the press force are the MHA-MG-00 assembly's step, the stock is a
     plain Ø, the zone carries callouts at its features and the screw seat's
     reason stands at its Ra symbol -- so the sheet carries no note block
     (drawing-guidelines.md rule 7)."""
@@ -558,10 +558,10 @@ def test_view_scales_are_explicit() -> None:
 
 
 def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
-    """Owner rulings 2026-10-17 (supersede r1's "no finish"): the MHA-MG-002
+    """Owner rulings 2026-10-17 (supersede r1's "no finish"): the MHA-MG-02
     clamp's thumb screw pinches the Ø6 body where the clamp is set, a static
     locating seat -- Ra 3.2 (drawing-guidelines.md rule 6), on the WHOLE Ø6
-    face as on the MHA-MG-004 vertical rod, no seat-zone lengths.  The screw's
+    face as on the MHA-MG-04 vertical rod, no seat-zone lengths.  The screw's
     reach over the block's travel, from the live output.yaml stations and the
     clamp geometry, lies on that one face; the part owns the one control, the
     sheet consumes it."""
@@ -598,7 +598,7 @@ def test_rod_od_carries_one_clamp_screw_seat_finish() -> None:
     # The whole face: no station narrows it to a zone.
     assert control.face.contains_x_mm is None
     assert control.face.contains_y_mm is None and control.face.contains_z_mm is None
-    assert spec.SCREW_SEAT_CALLOUT == "MHA-MG-002 SCREW SEAT"
+    assert spec.SCREW_SEAT_CALLOUT == "MHA-MG-02 SCREW SEAT"
     # Clean cutover from the r15 seat zone: no sketch, dims or plumbing left.
     for name in (
         "SCREW_SEAT_X",
@@ -734,15 +734,15 @@ def test_part_stamps_make_critical_properties() -> None:
     assert int(config["quantity"]) == 1
     # The clamp block still slides along the rod; the tip end is pressed.
     assert config["fit_class"] == "shaft_in_bushing"
-    assert "MHA-MG-001" in config["process"]
+    assert "MHA-MG-01" in config["process"]
 
 
 def test_machinist_exceptions_accept_the_owner_ruled_finishes() -> None:
-    """Owner ruling 2026-10-17: the Ra 3.2 on the Ø6 body is the MHA-MG-002
+    """Owner ruling 2026-10-17: the Ra 3.2 on the Ø6 body is the MHA-MG-02
     clamp screw's functional seat (rule 6), declared so the reviewer does not
     re-file it as a symbol on a clamp face.  #1570 (press only): the press
     land's Ra 0.8 is the retention proof's smoothing input, declared as the
-    MHA-MG-001 bore's is, with the proof's own numbers."""
+    MHA-MG-01 bore's is, with the proof's own numbers."""
     import mg_lever_press_fit_geom as press
     from machinist_exceptions import load_exceptions
     from _surface_finish import SEAT_UM
@@ -753,7 +753,7 @@ def test_machinist_exceptions_accept_the_owner_ruled_finishes() -> None:
     assert "Ra 3.2" in entry.where and "Ø6 body" in entry.where
     assert "rule 6" in entry.finding and "rule 6" in entry.reason
     assert "owner ruling 2026-10-17" in entry.reason
-    assert "MHA-MG-002" in entry.reason
+    assert "MHA-MG-02" in entry.reason
     assert (land.id, land.kind) == ("RV-02", "accept")
     assert "Ra 0.8" in land.where and "press land" in land.where
     assert " ".join(mg_magnifying_lever_spec.PRESS_LAND_CALLOUT.split()) in land.where
@@ -838,7 +838,7 @@ def test_press_land_symbol_lands_inside_the_land_with_its_reason() -> None:
     assert sheet_source.index("PRESS_LAND_CALLOUT, PRESS_LAND_REASON_XY") > (
         sheet_source.index("edge_xy=PRESS_LAND_FINISH_PICK")
     )
-    assert mg_magnifying_lever_spec.PRESS_LAND_CALLOUT == "MHA-MG-001\nPRESS LAND"
+    assert mg_magnifying_lever_spec.PRESS_LAND_CALLOUT == "MHA-MG-01\nPRESS LAND"
 
     start_x = drawing._PRESS_ZONE_START_X
     dim_line_x = drawing.REFERENCE_KEEP["PressZoneDia"][0]
@@ -864,7 +864,7 @@ def test_press_land_symbol_lands_inside_the_land_with_its_reason() -> None:
     # the symbol's ink, ending >= 2 mm short of its bar.
     left, top = drawing.PRESS_LAND_REASON_XY
     rows = mg_magnifying_lever_spec.PRESS_LAND_CALLOUT.split("\n")
-    right = left + 0.0301 / 10 * max(len(row) for row in rows)  # r15 "MHA-MG-002"
+    right = left + 0.0301 / 10 * max(len(row) for row in rows)  # r15 "MHA-MG-02"
     bottom = top - (_TEXT_HEIGHT + (len(rows) - 1) * _ROW_PITCH)
     assert right + 0.002 <= sym_x - 0.0015
     assert bottom <= sym_y + 0.0071 / 2 <= top

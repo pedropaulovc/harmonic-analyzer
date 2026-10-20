@@ -1,7 +1,7 @@
 """SolidWorks-free contract for ``_rebuild.rebuild_stale_configurations`` and
 ``_rebuild.assert_saved_configurations_regenerate``.
 
-pc-p1r: dt-drive-train.SLDASM opened with NeedsRebuild2=1 because MHA-DT-030's
+pc-p1r: dt-drive-train.SLDASM opened with NeedsRebuild2=1 because MHA-DT-30's
 INSTALLED configuration, the one the assembly places, was saved stale (amet
 probe, dt-logs/pc-p1r/probe-saved-rebuild.jsonl).  The shared part-save
 chokepoint reads every configuration first and leaves a clean part alone, and
@@ -416,7 +416,7 @@ def test_the_builders_that_create_configurations_are_the_known_five() -> None:
         "build_dt_crank_handle_pivot_screw",
         "build_dt_pinion_lever_pin",
         "build_pd_transgear_removable",
-        "build_vn_cone_tip_collar",
+        "build_dt_vn_cone_tip_collar",
     }
 
 

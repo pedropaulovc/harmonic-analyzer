@@ -1,13 +1,13 @@
-r"""Create the manufacturing drawing for the rocker strap (MHA-CH-013).
+r"""Create the manufacturing drawing for the rocker strap (MHA-CH-13).
 
 Under ``cad/docs/drawing-guidelines.md``: the flat strap of the built-up rocker
-arm MHA-CH-006 (``ch_rocker_strap_spec``), every size a native model dimension
+arm MHA-CH-06 (``ch_rocker_strap_spec``), every size a native model dimension
 of its one profile sketch, located from the Ø10.200 H7 hub hole's centre
-(rule 10): the top edge's height over the hole with the MHA-CH-006 band and
+(rule 10): the top edge's height over the hole with the MHA-CH-06 band and
 mate, the R800 top edge (its centre, ~808 mm off the sheet, stated on it as
 above the hole), the bottom edge's depth under the hole, both tip corners'
 and both taper feet's offsets, and the 2X radial tip land. The hole's H7 band
-names the MHA-CH-012 hub and the fit (rule 4) and keeps both its edges sharp
+names the MHA-CH-12 hub and the fit (rule 4) and keeps both its edges sharp
 (the title block's break would groove the pressed root); the 2.500 thickness,
 on the end view, names the rod fork it runs in. One property-linked note names
 the joint the finish field's "after joining" refers to. No datums, no frames,

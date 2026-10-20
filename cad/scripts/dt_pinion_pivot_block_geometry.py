@@ -40,7 +40,7 @@ BLOCK_DEPTH = 11.0  # U28: 12 -> 10.25; ruling (c) then put the back strap hard
 # so the depth grew to 11.0 (10.04 worst), outward from both block faces the
 # cluster sits against, so the cluster and its drilled stations stay put
 # (pinion_rig_layout).
-# Depth prints at the drawing document's two places: MHA-DT-018's sheet is not
+# Depth prints at the drawing document's two places: MHA-DT-18's sheet is not
 # precision-migrated (_drawing_contract), so the title block's .XX row governs
 # it, and the rig's worst fitted stack reads that printed row (Main, Codex #854
 # P1).  Migrating the sheet means stating these places natively; the band

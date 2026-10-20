@@ -187,11 +187,34 @@ run without SolidWorks, a GPU, source footage or the private GLB.
 
 ## Canonical identity evidence audit
 
-`content/canonical-native/manifest.json` seals 29 identity-only derivatives.
-The sole mapping authority is `../cad/config/identity-migration-map.json`.
+`content/canonical-native/manifest.json` seals 29 historical identity-only derivatives.
+Their mapping authority remains the exact archived `../cad/config/identity-migration-map.json`;
+it is not the current CAD registry.
 Original evidence files and `canonical-native/historical-code/` snapshots are
 immutable inputs; the offline audit never executes archived producers, fetches
 network data or recovers files from Git.
+
+Current consumers use `current-native-identity.mjs` and the independently pinned
+`content/current-native-identities.json` at archive ingestion. Current Numbers
+have two identity digits (`MHA-DT-28`, assembly `MHA-DT-00`), while configuration
+qualifiers such as `T006` retain all three digits. Purchased parts use their
+immediate assembly parent (`dt-vn-fillister-screw`, `MHA-DT-VN-50`); the same
+archived vendor may resolve differently under FR, DT or PD. Tooling nests that
+scope (`dt-cone-pivot-post-tl-vn-*`, `MHA-DT-05-TL-VN-50`).
+The projection table pins the exact current `../cad/config/current-identity-map.json`
+bytes; Node source authority also compares every active mapping row against it.
+Both CAD maps use Git `-text` attributes because their raw-byte hashes must
+survive Windows `core.autocrlf` checkouts. Fixture copies preserve those bytes;
+raw-map checks never normalize newlines or accept a platform-specific pin.
+The current-source executed-input closure also requires independent live-consumer
+seals for the current map and its Node authority helper at build and publication;
+these supplement rather than replace raw-map authentication.
+The table's three historical-only occurrences remain separate, with no current Number,
+registry or builder path. They identify archived geometry, not invented CAD parts.
+Browser loading verifies the current table's semantic digest before projecting
+the already byte-verified model's names and declared identity extras. Archived
+GLB bytes, source names, hashes, URLs, inventory matrices and measured geometry
+remain unchanged; current projection provenance is separate from model provenance.
 
 ```sh
 npm --prefix web run verify:identity-evidence
@@ -199,8 +222,11 @@ npm --prefix web run verify:identity-evidence
 uv run --isolated --no-project python scripts/canonical-native-evidence.py validate
 uv run --isolated --no-project python scripts/canonical-native-evidence.py check
 # Explicit authoring only, after an intentional mapping/input change:
-uv run --isolated --no-project python scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13 python scripts/canonical-native-evidence.py generate
 ```
+
+Use stock-zlib Python 3.13 for authoring: a different gzip implementation can
+change stored compressed evidence bytes even when decoded measurements agree.
 
 `verify:sync` runs the identity evidence check first. Both read-only commands
 check exact original, derivative and historical-snapshot SHA-256 seals,

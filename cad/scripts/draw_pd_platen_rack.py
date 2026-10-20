@@ -1,4 +1,4 @@
-r"""Manufacturing print for the composite platen rack, MHA-PD-005.
+r"""Manufacturing print for the composite platen rack, MHA-PD-05.
 
 The long front/top/end group is aligned at 1:1. A separately labelled 4:1
 end view defines the stepped brass section and soft-solder seam in solid

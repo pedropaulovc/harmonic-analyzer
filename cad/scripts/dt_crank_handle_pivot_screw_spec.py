@@ -1,8 +1,8 @@
-r"""Pure-data contract for MHA-DT-032, the crank handle pivot screw (user ruling U33).
+r"""Pure-data contract for MHA-DT-32, the crank handle pivot screw (user ruling U33).
 
 A made slotted shoulder screw turned from 1/4-in cold-finished rod.  The oak
-handle MHA-DT-008 spins on the shoulder; the thread screws into the crank arm
-MHA-DT-006's #4-40 tapped through hole and the shoulder seats tight on the arm
+handle MHA-DT-08 spins on the shoulder; the thread screws into the crank arm
+MHA-DT-06's #4-40 tapped through hole and the shoulder seats tight on the arm
 face, so the shoulder length alone sets the handle's end play.  The tip is
 filed flush with the arm's inboard face at assembly (``INSTALLED_CONFIG``).
 
@@ -52,7 +52,7 @@ from dt_crank_hub_geometry import (
 
 STOCK_DIA = 0.25 * MM_PER_IN
 
-# User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-035
+# User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-DT-35
 # butt cup's pocket, which is bored to suit it, and bears on the cup floor.
 # Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
 # the worst case, after an edge break on each.  Ø6 (user ruling 2026-09-30,
@@ -60,14 +60,14 @@ STOCK_DIA = 0.25 * MM_PER_IN
 # shrink to the photographed size.
 HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
-# A 4.0 head (user ruling 2026-09-29, MHA-DT-032 machinist review): with the
+# A 4.0 head (user ruling 2026-09-29, MHA-DT-32 machinist review): with the
 # slot's own band below, the worst case leaves 2.0 of head under the slot,
 # not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
 # longest head, at the widest fitted end play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
 HEAD_LENGTH_TOL = 0.10
 SLOT_WIDTH = 1.0
-# Banded (MHA-DT-032 re-review): at .X the slot could print as nothing.
+# Banded (MHA-DT-32 re-review): at .X the slot could print as nothing.
 SLOT_DEPTH = 1.0
 SLOT_DEPTH_TOL = 0.20
 
@@ -80,10 +80,10 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
 # seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
 # (local review of fbf82ad96).  So the thread is #4-40 (user ruling
-# 2026-09-30) and the sheet breaks the seat edge 0.1 max, as MHA-DT-006 does its
+# 2026-09-30) and the sheet breaks the seat edge 0.1 max, as MHA-DT-06 does its
 # tapped mouth: a 0.34 radial seat at the worst case.
 SEAT_EDGE_BREAK_MAX = 0.1
-# Arm face to the head's underside, which bears on the MHA-DT-035 cup floor.
+# Arm face to the head's underside, which bears on the MHA-DT-35 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
 # turned to suit the bonded handle -- its measured length from the ferrule's
 # arm face to the cup floor, plus the end play -- so no part in the handle
@@ -107,14 +107,14 @@ THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
 # pitches of die run-in still carries full thread across the arm's 7.94
 # (5/16-in) stock thickness, so the ARM governs the worst-case engagement,
-# not the screw (the 9.0 of U33b left the MHA-DT-032 machinist review short).
+# not the screw (the 9.0 of U33b left the MHA-DT-32 machinist review short).
 # The tip is cut proud of the arm's inboard face and filed flush at assembly
 # (below).
 THREAD_LENGTH = 10.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.39 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
-# print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-DT-032
+# print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-DT-32
 # re-review): at .X the 0.4 could print as nothing; +0.05/-0.10 keeps a real
 # chamfer that never cuts past the thread depth.
 TIP_CHAMFER = 0.3
@@ -144,7 +144,7 @@ THREAD_PD_2A_MIN_IN = 0.0925
 THREAD_MINOR_2A_MIN_EST = (
     THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN
 ) * MM_PER_IN
-# The arm's tapped mouth is printed on MHA-DT-006 as an inspectable maximum
+# The arm's tapped mouth is printed on MHA-DT-06 as an inspectable maximum
 # (local review of aed772158: an assumed tap major was load-bearing and
 # printed nowhere), and the screw floats off the hole's axis by the 2A/2B
 # pitch-diameter fit.  #4-40 UNC class 2B pitch diameter 0.0958-0.0991 in
@@ -166,7 +166,7 @@ THREAD_FIT_OFFSET_MAX = round(
 RELIEF_DIA = 1.85
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
-# Routine at 2.2 (the MHA-DT-032 machinist review of crank-v4-16 called a
+# Routine at 2.2 (the MHA-DT-32 machinist review of crank-v4-16 called a
 # +/-0.10 band over-specification): at .X the straight floor past the
 # longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
 # (local review of 20dac9d3f: the lead is not floor), and the widest 3.0
@@ -177,7 +177,7 @@ RELIEF_WIDTH = 2.2
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
 # an equation, and printed as a callout on the lead's axial size, as limits
-# (MHA-DT-032 re-review: at .X the lead could print as nothing).
+# (MHA-DT-32 re-review: at .X the lead could print as nothing).
 RELIEF_LEAD = 0.3
 # The model owns the band (drawing-simplicity-policy.md `How the repository implements the guidelines`; Codex P2 on #1139): the ReliefLead
 # dimension carries +/-0.10 and the callout prints the limits it gives, so a
@@ -266,7 +266,7 @@ HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNIN
 # Wood-on-steel running clearance, on diameter.
 DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
-# Engagement in the MHA-DT-006 tapped through hole.  The relief sits in the arm's
+# Engagement in the MHA-DT-06 tapped through hole.  The relief sits in the arm's
 # first RELIEF_WIDTH below the seat face, so only the full thread beyond it
 # engages, and never deeper than the arm is thick.  The drawing-simplicity
 # policy's 1.5D rule holds at the worst case, with no exception.
@@ -326,7 +326,7 @@ FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
 # end on the arm's inboard face, so the screw is cut long, seated with its
 # threadlocker, then filed flush with that face and its edge broken.  The
 # drive train places that fitted state as the INSTALLED configuration (the
-# MHA-DT-030 precedent); the default stays the as-turned screw the sheet prints.
+# MHA-DT-30 precedent); the default stays the as-turned screw the sheet prints.
 # Filing removes at most FILE_ALLOWANCE_MAX, and even the shortest screw in
 # the thickest stock arm carries full thread past the face before filing, so
 # nothing of the tip chamfer survives and the arm still governs engagement.
@@ -338,14 +338,14 @@ ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The fitted shoulder and both head bands' reasons, stated once (user ruling
-# 2026-09-29, after the MHA-DT-032 machinist review; the length band's reason
+# 2026-09-29, after the MHA-DT-32 machinist review; the length band's reason
 # after the 1d2be3aaf re-review called it over-specification unstated).
 DRAWING_NOTES = "\n".join(
     (
-        "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-008: UNDER-HEAD TO SEAT",
-        f"  FACE (SHOULDER END, EDGE BROKEN {SEAT_EDGE_BREAK_MAX:.1f} MAX, ON MHA-DT-006) = FERRULE",
+        "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-08: UNDER-HEAD TO SEAT",
+        f"  FACE (SHOULDER END, EDGE BROKEN {SEAT_EDGE_BREAK_MAX:.1f} MAX, ON MHA-DT-06) = FERRULE",
         f"  FACE TO CUP FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
-        f"HEAD BEARS ON MHA-DT-035 FLOOR;",
+        f"HEAD BEARS ON MHA-DT-35 FLOOR;",
         f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
     )
 )
@@ -428,19 +428,19 @@ for _ok, _what in (
     ),
     (
         all(len(line) <= 72 for line in DRAWING_NOTES.splitlines()),
-        "an MHA-DT-032 note line is over 72 characters",
+        "an MHA-DT-32 note line is over 72 characters",
     ),
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
     (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
     (
         # Owner ruling B on #1375: the cup body grows; the head and fit stay unchanged.
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
-        "the MHA-DT-035 pocket bored to suit the largest head leaves under its 1.5 wall",
+        "the MHA-DT-35 pocket bored to suit the largest head leaves under its 1.5 wall",
     ),
     (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 of under-head bearing on the cup floor"),
     (
         CUP_FLOOR_HOLE_DIA > SHOULDER_DIA_MAX,
-        "the MHA-DT-035 floor hole does not pass the shoulder",
+        "the MHA-DT-35 floor hole does not pass the shoulder",
     ),
     (HEAD_RECESS_NOMINAL >= 0.0, "the head stands proud of the cup at nominal"),
     (
@@ -452,9 +452,9 @@ for _ok, _what in (
     (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at its limits"),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-DT-032: {_what}")
+        raise AssertionError(f"MHA-DT-32: {_what}")
 
-# Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-032
+# Every axial LOCATION reads from the TIP, the one faced end (MHA-DT-32
 # re-reviews, 2026-09-29): the seat face (the thread length, with its own band
 # for the engagement check), the under-head face (UnderHeadLocation, a
 # reference: the shoulder is turned to suit the bonded handle) and the head
@@ -502,7 +502,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-DT-032 dimension needs authored places")
+    raise AssertionError("every marked MHA-DT-32 dimension needs authored places")
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "UnderHeadLocation"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

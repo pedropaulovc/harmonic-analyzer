@@ -1,7 +1,7 @@
-r"""Reproduction script: transgear pivot spacer (MHA-PD-020; ch. 23; 1 used).
+r"""Reproduction script: transgear pivot spacer (MHA-PD-20; ch. 23; 1 used).
 
-The turned brass ring on the MHA-VN-041 pivot screw's shoulder between the
-MHA-PD-007 support bar's back face and the MHA-PD-018 arm's front face
+The turned brass ring on the MHA-PD-VN-57 pivot screw's shoulder between the
+MHA-PD-07 support bar's back face and the MHA-PD-18 arm's front face
 (``pd_transgear_pivot_spacer_spec``; contract §3.4).  Its length sets the pivot
 head play, so it carries an explicit band; it is fitted as made, never faced
 (R9-6).  Its reamed bore is a light press on the shoulder, under its own

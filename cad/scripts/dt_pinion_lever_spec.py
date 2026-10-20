@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the pinion engage lever and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A hub slipped over the lift rod's front
-end, with a straight Ø6 grip rod rising out of it -- turned steel.  The MHA-DT-030 pin
+end, with a straight Ø6 grip rod rising out of it -- turned steel.  The MHA-DT-30 pin
 (U36) match-drilled through hub and rod at assembly carries the drive torque, so
 the bore is a plain slip fit.  The nominals drive the part's named equation
 globals AND the drawing's coordinate math; the marked-dimension map keeps the
@@ -34,12 +34,12 @@ from dt_pinion_lever_geometry import (
     WALL_T as WALL_T,
 )
 
-LIFT_ROD_NUMBER = "MHA-DT-017"
+LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # U36: the pin carries the torque, so the hub only has to slide onto the h-band
 # 6.35 lift rod.  Codex P2 (#844): the former 6.35-6.40 band's minimum met the
-# rod's maximum line-to-line; REAM_SLIDE (+0.025/+0.010, the fit MHA-DT-014 and
-# MHA-DT-018 hold on the same shafts) guarantees 0.010 of clearance.
+# rod's maximum line-to-line; REAM_SLIDE (+0.025/+0.010, the fit MHA-DT-14 and
+# MHA-DT-18 hold on the same shafts) guarantees 0.010 of clearance.
 BORE_BAND = REAM_SLIDE
 # drawing-guidelines.md rule 17 (walls 2.0 target / 1.5 floor at the worst
 # printed bands): the end wall behind the blind bore is what the two .X

@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker template trammel's scriber block (MHA-CH-006-TL-15).
+r"""Pure-data contract for the rocker template trammel's scriber block (MHA-CH-06-TL-15).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). The
 second clamp-on block of the rocker outline-template trammel kit
@@ -6,9 +6,9 @@ second clamp-on block of the rocker outline-template trammel kit
 section 2.1): the pivot block's body, bar slot, set screws and pinch screw
 (``ch_rocker_arm_tl_trammel_pivot_block_spec``, the shared section) with two
 point holes 16.000 +/-0.025 apart for the two scriber points
-(MHA-CH-006-TL-16): the inner one scribes R800, the outer one R816. Both holes
+(MHA-CH-06-TL-16): the inner one scribes R800, the outer one R816. Both holes
 are reamed in one setting; the setting bar's H800/H816 cones
-(MHA-CH-006-TL-17) prove the spacing.
+(MHA-CH-06-TL-17) prove the spacing.
 
 The slit runs from the block's near end face through both point holes into
 the pivot block's 3.0 drilled relief, 9 past the outer one (an 8 hinge less
@@ -33,11 +33,11 @@ BLOCK_X0 = -HOLE_FROM_END
 BLOCK_X1 = BLOCK_X0 + block.BLOCK_LENGTH
 SCRIBER_SPACING = kit.SCRIBER_SPACING
 HOLE_X = (0.0, SCRIBER_SPACING)
-POINT_MATE_NUMBER = "MHA-CH-006-TL-16"
+POINT_MATE_NUMBER = "MHA-CH-06-TL-16"
 POINT_HOLE_CALLOUT = block.point_hole_callout(len(HOLE_X), POINT_MATE_NUMBER)
 # drawing-guidelines.md rule 4: the tight spacing names what checks it, in
 # one line (round 5).
-SCRIBER_SPACING_CALLOUT = "CHECKED ON MHA-CH-006-TL-17"
+SCRIBER_SPACING_CALLOUT = "CHECKED ON MHA-CH-06-TL-17"
 
 SLIT_END_X = 42.0 - HOLE_FROM_END  # L42: the relief, 9 past the outer hole
 SLIT_START_X = BLOCK_X0 - 1.0  # the slit sketch starts beyond the end face

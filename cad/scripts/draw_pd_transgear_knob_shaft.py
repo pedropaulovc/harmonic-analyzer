@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-008).
+r"""Create the manufacturing drawing for the transgear knob shaft (MHA-PD-08).
 
 A turned side view, aligned rear and front end views, a 10:1 detail of the
 front neck, and an isometric.
@@ -220,7 +220,7 @@ CORE_RUNOUT_FRAME = (THREAD_END_X + 0.0066, SIDE_CENTER[1] + 0.0155)
 # runout frame crossed one another and the core's annotations (mr-stack6).
 # Detail B is a cropped 10:1 *Right MODEL view, draw_dt_pinion_spring's
 # detail-A recipe: native detail views imported no dimensions on the
-# amplitude bar (r743-6), vn_post_mount_screw and the pinion spring
+# amplitude bar (r743-6), dt_vn_post_mount_screw and the pinion spring
 # (pc-r13/14).
 DETAIL_SCALE = (10, 1)
 _DS = DETAIL_SCALE[0] / DETAIL_SCALE[1]
@@ -621,7 +621,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     add_view_centerline(
-        adapter, side, face_xy=CENTERLINE_PICK, label="MHA-PD-008 turning axis"
+        adapter, side, face_xy=CENTERLINE_PICK, label="MHA-PD-08 turning axis"
     )
     add_attached_note(
         adapter,
@@ -629,7 +629,7 @@ async def build(adapter: Any) -> dict[str, str]:
         text=THREAD_CALLOUT,
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
-        label="MHA-PD-008 stud thread callout",
+        label="MHA-PD-08 stud thread callout",
     )
 
     # The two running surfaces, authored on the part and read back (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).

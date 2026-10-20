@@ -524,12 +524,12 @@ DIMENSION_CALLOUTS = {
     "CrankBossDia": "CRANK BOSS",
     "CrankBossLen": "CRANK BOSS\nLENGTH",
     "CrankBossStartZ": "CRANK BOSS\nFACE",
-    "CrankBoreDia": "RUNS ON MHA-DT-011",
-    "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-004\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
+    "CrankBoreDia": "RUNS ON MHA-DT-11",
+    "JournalBoreDia": f"CONE BORE THRU\nRUNS ON MHA-DT-04\n{POST_JOURNAL_RIM_BREAK}\nFOR COLLAR SEAT",
     "ConeBossLen": "CONE BOSS FACE-TO-FACE",
-    "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-004 COLLAR,\nFROM POST AXIS",
+    "ConeBossNorthZ": "THRUST FACE FOR\nMHA-DT-04 COLLAR,\nFROM POST AXIS",
     "CrankAboveCone": "16T:64T\nMESH",
-    "JournalAxisY": "AXIS MATCHES\nMHA-DT-021",
+    "JournalAxisY": "AXIS MATCHES\nMHA-DT-21",
 }
 # Text after the size and its band, on the same line: one row keeps the
 # head's Ø in the narrow band between View C's head and the A-A station,

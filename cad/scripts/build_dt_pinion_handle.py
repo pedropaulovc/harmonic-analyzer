@@ -1,7 +1,7 @@
-r"""Build the separate MHA-DT-015 pinion grip crossrod.
+r"""Build the separate MHA-DT-15 pinion grip crossrod.
 
 The registry slug remains ``dt-pinion-handle`` for the operator-grip component.
-The part is now exactly one cold-finished rod body; MHA-DT-022 owns the integral
+The part is now exactly one cold-finished rod body; MHA-DT-22 owns the integral
 turned head, neck, arbor shaft, and reamed cross-hole.
 """
 

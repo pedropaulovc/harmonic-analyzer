@@ -1,8 +1,8 @@
 r"""The rocker arm's surface-profile check (plan ch_rocker_arm S7 op 97).
 
-Both printed profile zones (MHA-CH-006: the top edge's 0.5 Ⓤ0.5 and the lower
+Both printed profile zones (MHA-CH-06: the top edge's 0.5 Ⓤ0.5 and the lower
 outline's 0.5 Ⓤ0 between J and K, each to A|B|C) are read against the arm
-outline template (MHA-CH-006-TL-13, inventory gauges.arm-outline-template),
+outline template (MHA-CH-06-TL-13, inventory gauges.arm-outline-template),
 pinned on the arm in datums A and C. A DTI (gauges.dti) on the height gauge's
 scriber (gauges.height-gauge) is zeroed on the template's edge and read on
 the arm's edge directly above it, so each reading o is how far the arm's edge

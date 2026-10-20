@@ -164,7 +164,7 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     assert spec.JOURNAL_START == pytest.approx(42.5)
     # Bottomed dowels stand proud by the drive-train's pin length budget.
     assert (
-        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.vn_crank_seat_drive_pin_spec.LENGTH
+        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.dt_vn_crank_seat_drive_pin_spec.LENGTH
         == (pytest.approx(removable.DRIVE_PIN_TIP_Z))
     )
 
@@ -282,9 +282,9 @@ def test_mha024_station_and_notes_belong_to_hub_and_shaft() -> None:
     callout = notes.CROSS_HOLE_CALLOUT
     assert "TAPER-REAM" in callout
     assert "LIGHT DRIVE FIT" in callout
-    assert "MHA-DT-031" in callout
-    assert "MHA-DT-009" in callout
-    assert "MHA-DT-006" not in callout
+    assert "MHA-DT-31" in callout
+    assert "MHA-DT-09" in callout
+    assert "MHA-DT-06" not in callout
 
 
 def test_shaft_end_fiducial_is_a_simple_punch_not_a_dimensioned_dimple() -> None:
@@ -327,7 +327,7 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
 
 # Measured on the 19e33c6c2 stack-top render (3.5 mm text, 2:1 sheet): the
 # "7.000 ±0.025" value is 27.5 mm wide, and the uppercase callout rows run
-# 2.75 mm a character ("SPROCKET MHA-PD-009", 44 mm).
+# 2.75 mm a character ("SPROCKET MHA-PD-09", 44 mm).
 _PIN_VALUE_TEXT_WIDTH = 0.0275
 _CALLOUT_CHAR_WIDTH = 0.00275
 
@@ -339,7 +339,7 @@ def test_pin_location_texts_end_before_the_dome_extension_lines() -> None:
     # extension lines.  Every row must end, with air, before the dome tip;
     # both pin locations name the mate (machinist review of 902433a8d).
     rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
-    assert "MHA-PD-009" in rows and "SPROCKET" in " ".join(rows)
+    assert "MHA-PD-09" in rows and "SPROCKET" in " ".join(rows)
     block = max(
         _PIN_VALUE_TEXT_WIDTH,
         max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,

@@ -1,4 +1,4 @@
-"""Axial air between the MHA-VN-016 stack collar and the drum bank's G19.
+"""Axial air between the MHA-DT-VN-54 stack collar and the drum bank's G19.
 
 The collar rides the cone shaft just north of T006; G19's tooth face is the
 bank's north end. Over the whole P1 swing the collar must never reach the
@@ -70,8 +70,8 @@ import dt_cone_pivot_post_spec as post
 import dt_cone_swing_platform_spec as plate
 import dt_cone_tip_block_spec as tip
 import dt_cylinder_gear_spec as drum
-import vn_cone_tip_block_screw_spec as holddown_screw
-import vn_cone_tip_collar_spec as collar
+import dt_vn_cone_tip_block_screw_spec as holddown_screw
+import dt_vn_cone_tip_collar_spec as collar
 import _mcmaster_94025a164 as adjuster
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
@@ -238,7 +238,7 @@ _TIP_RELEASE = (
     2.0 * (2.0 * _JOURNAL_FLOAT) * _SUPPORT_SPAN / shaft.JOURNAL_SUPPORT_SPAN_MIN_MM
 )
 
-# MHA-DT-000 step 3 (user decision 2026-10-12) holds the post pushed toward
+# MHA-DT-00 step 3 (user decision 2026-10-12) holds the post pushed toward
 # the tip block while it is turned and its screws are tightened.  The screws
 # sit at +/-ATTACHMENT_X: turning the post by theta moves them +/-theta*X
 # in their holes, and the post's remaining translation is the lens where
@@ -444,7 +444,7 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     # collar turns with it about the pivot.
     set_angle = cone_set_stack.T120_SET_MM / cone_set_stack.pivot_distance_mm(120)
     terms["T120 set of the swing"] = _pivot_reach_mm(tier, angle_deg) * set_angle
-    # The collar on its journal: float and cock (vn_cone_tip_collar), then
+    # The collar on its journal: float and cock (dt_vn_cone_tip_collar), then
     # the tier's own limits, each into its physical source.
     cock = TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
     bore_upper_r = collar.BORE_FINISHED_DIA_LIMITS_MM[1] / 2.0
@@ -550,7 +550,7 @@ def full_sweep_proof(*, intervals: int = 400) -> list[dict]:
         air = s.arithmetic_mm if method == "arithmetic" else s.statistical_mm
         if not math.isfinite(air) or air <= 0.0:
             raise ValueError(
-                f"MHA-VN-016 collar can reach G19 at P1 {s.angle_deg:.3f} deg: {s.tier}/"
+                f"MHA-DT-VN-54 collar can reach G19 at P1 {s.angle_deg:.3f} deg: {s.tier}/"
                 f"{s.drum_tier} nominal {s.nominal_mm:.3f}, arithmetic "
                 f"{s.arithmetic_mm:.3f}, statistical {s.statistical_mm:.3f}: {s.terms}"
             )

@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion lever retention pin.
 
-A plain 1/16 in drill-rod pin (MHA-DT-030), cut overlength, then trimmed and
+A plain 1/16 in drill-rod pin (MHA-DT-30), cut overlength, then trimmed and
 peened flush with the lever hub at assembly.  The side view carries the cut length, the projected
 end view the stock diameter, and a 4:1 isometric sits clear of the title block.
 
@@ -63,7 +63,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The overlength cut is trimmed at MHA-DT-000's LEVER PIN SET; the pointer
+# The overlength cut is trimmed at MHA-DT-00's LEVER PIN SET; the pointer
 # comes from the registry.
 DIMENSION_CALLOUTS = {
     "PinDia": PIN_DIA_CALLOUT,

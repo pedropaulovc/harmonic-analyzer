@@ -1,4 +1,4 @@
-r"""Build the rocker arm filing stand (MHA-CH-006-TL-12; shop fixture).
+r"""Build the rocker arm filing stand (MHA-CH-06-TL-12; shop fixture).
 
 Two steel end blocks and a steel pedestal standing loose on the fitting bench:
 the blocks carry the raw blank ends and the pedestal the lower hub face while

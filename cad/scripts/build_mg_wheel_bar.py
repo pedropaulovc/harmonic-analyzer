@@ -61,7 +61,7 @@ from _sketch import (
 from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
-from vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
+from pn_vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,

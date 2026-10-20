@@ -31,7 +31,7 @@ MM_PER_IN = 25.4
 
 # Main casting: the upper 26.6 mm is a very slightly larger head around the
 # main body; both cylinders share the vertical body/swing axis.  HEAD_DIA is
-# v36's harvested 42.7506 (user ruling 2026-09-28: MHA-DT-005's v36 post geometry
+# v36's harvested 42.7506 (user ruling 2026-09-28: MHA-DT-05's v36 post geometry
 # is restored, and with it the Ø44 as-cast collar reading is withdrawn).  The
 # head is a one-place reference size -- nothing mates on it; the body below it
 # is the locating/bore cylinder and keeps its turned size.
@@ -47,7 +47,7 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
 # initial derivation.
 #
-# v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-011 runs directly
+# v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-11 runs directly
 # in the Ø11.438 crank bore, whose height follows the crossed-crank config
 # above the unchanged foot -- no eccentric bushing, no drop, fixed centres.
 # The boss starts at the head's tangent plane, so its north face stands
@@ -89,7 +89,7 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
 # local east/west axes to the opposite platform names.
 #
-# MHA-VN-031 must provide a shank long enough to reach the platform from the
+# MHA-DT-VN-61 must provide a shank long enough to reach the platform from the
 # counterbore floor, BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH.  The unchanged
 # dia 11.509 x 6.02 counterbore takes its ASME B18.6.3 fillister head; the
 # purchased-stock spec owns the actual head envelope, stock-length,
@@ -124,7 +124,7 @@ if MOUNT_HEAD_WEB_WORST + 1e-9 < WEB_FLOOR_MM:
 if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
     raise AssertionError("mounting holes are farther inward than the printable floor requires")
 
-# The cone shaft MHA-DT-004's collar bears on the NORTH cone-boss end face, so
+# The cone shaft MHA-DT-04's collar bears on the NORTH cone-boss end face, so
 # the print locates that face from the post axis (rule 10) instead of calling
 # the boss symmetric in a note.  The drive-train stacks book that face half the
 # face-to-face .XX band off the post axis (dt_cone_gear_shaft_spec,
@@ -173,8 +173,8 @@ HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 # band, so a bore held +0.005/-0.025 delivers exactly the class's 0.025..0.075
 # mm diametral clearance:
 #
-#   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-DT-011)
-#   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-DT-004)
+#   crank:   shaft 11.368..11.388  bore 11.413..11.443  (crankshaft MHA-DT-11)
+#   journal: shaft 12.2108..12.2308 bore 12.2558..12.2858 (cone shaft MHA-DT-04)
 #
 # Apart from these two, the spacing between them and the cone-axis height (both
 # below), nothing else on this casting is an accuracy feature, so nothing else
@@ -196,7 +196,7 @@ CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
 # Cone-axis height above the foot.  The post's journal sets the cone shaft's
-# height; at the shaft's tip MHA-DT-021 stands directly on the same platform top
+# height; at the shaft's tip MHA-DT-21 stands directly on the same platform top
 # (user ruling 2026-09-29, no shim), so the tip's stub must enter the
 # adjuster's cup on this band plus the block's explicit AxisHeight band (the
 # plate top is common to both and cancels).  The .XX grade (+/-0.51)
@@ -295,7 +295,7 @@ SURFACE_FINISHES = (
     # faces that MUST be cut say so on the face (the title block's surface row
     # is the process statement "CAST/MACHINED", not a grade).
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
-    # The crankshaft MHA-DT-011 runs in the crank bore, so it is a running
+    # The crankshaft MHA-DT-11 runs in the crank bore, so it is a running
     # journal (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)), like the cone bore.
     SurfaceFinishControl(
         "crank_bore",
@@ -401,7 +401,7 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
 # TODO(#1625): drop the corner line when the title block carries the default.
 DRAWING_NOTES = "\n".join(
     (
-        "FOOT SEATS ON MHA-DT-020.",
+        "FOOT SEATS ON MHA-DT-20.",
         "INSIDE CORNERS R1.0 MAX.",
         f"WALL {MOUNT_HEAD_WEB_WORST:.2f} MIN, COUNTERBORE TO HEAD OD.",
     )

@@ -9,7 +9,7 @@ Layout: shaft axis Z, z 0..SHAFT_LEN (PR7: ends FLUSH with the pivot blocks'
 outer faces -- pinion_rig_layout -- instead of 2 proud), each end crowned by
 a shallow spherical cap (sagitta 1.2 -- the p.69 close-up's domed end
 visible inside the strap bore).  Every sketch is on the Right plane (sketch
-u = -z), the MHA-CH-005 idiom, so the diameter, the body length, the crown
+u = -z), the MHA-CH-05 idiom, so the diameter, the body length, the crown
 and the overall length all import into the drawing's side view.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
@@ -88,7 +88,7 @@ V_SHAFT = math.pi * SHAFT_R**2 * SHAFT_LEN
 def _pin_hole_removed() -> float:
     """Volume one diametral X hole of PIN_HOLE_DIA takes out of the solid
     shaft: the hole's chord width times the shaft's full chord at each height
-    (Simpson over the hole's y extent) -- the MHA-DT-017 pin-hole integral."""
+    (Simpson over the hole's y extent) -- the MHA-DT-17 pin-hole integral."""
     r = PIN_HOLE_DIA / 2.0
     n = 2000
     h = 2.0 * r / n
@@ -284,7 +284,7 @@ async def build(adapter) -> dict[str, str]:
     # strap's mid-plane in the physical back-stop stack, where the match-drill
     # puts it (dt_pinion_pivot_shaft_spec.PIN_HOLE_Z), sketched on the
     # Right Plane (normal X; sketch u = -z) and cut mid-plane twice the shaft
-    # diameter deep -- the MHA-DT-017 pin-hole idiom.  The origin sits on the
+    # diameter deep -- the MHA-DT-17 pin-hole idiom.  The origin sits on the
     # front end face, so each circle's axial anchor is its station from that
     # end.  A mirror station (z < 0) lies outside the shaft and cuts nothing,
     # and the removed volume is gated at 5% of the two holes, so a missing or

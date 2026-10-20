@@ -164,7 +164,7 @@ FOOT_HOLE_PROCESS = "DRILL\n"
 # bench instructions of the pair-ream step, so each rides its own dimension.
 # The bore's (7.0) reference station off the side face states its place on
 # the width's centre plane and the part it holds there for (owner ruling
-# Q10-B: the MHA-VN-055 set screw's full thread under the full round).
+# Q10-B: the MHA-CH-VN-55 set screw's full thread under the full round).
 _PAIR_REAM_STEP = steps.step_ref(steps.KEEPERS_PAIR_REAMED_KEY)
 DIMENSION_CALLOUTS = {
     "BoreDia": f"{BORE_PAIR_CALLOUT},\nPER {_PAIR_REAM_STEP}",

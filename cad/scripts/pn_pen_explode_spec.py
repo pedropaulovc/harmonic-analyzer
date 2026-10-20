@@ -1,4 +1,4 @@
-"""Pure explode contract of pn-pen.SLDASM (MHA-PN-000): the builder's named
+"""Pure explode contract of pn-pen.SLDASM (MHA-PN-00): the builder's named
 ``PN_EXPLODED`` presentation and the ordered native steps that open it.
 
 Only ``_pn_pen_explode`` (through the builder's canonical

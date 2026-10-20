@@ -1,11 +1,11 @@
 r"""Pure-data contract for the oblique trammel's HUB locator pin
-(MHA-CH-006-TL-25; shop tooling, one off).
+(MHA-CH-06-TL-25; shop tooling, one off).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). Once
-the running jig has reamed the carrier's (MHA-CH-006-TL-21) HUB hole to
+the running jig has reamed the carrier's (MHA-CH-06-TL-21) HUB hole to
 Ø10.20 H7 in place, this headed pin is pressed up into it from under the
 carrier. Its head is the press stop; its upper section passes the riser's
-(MHA-CH-006-TL-24) Ø12 clearance and locates the strap (MHA-CH-013) by the
+(MHA-CH-06-TL-24) Ø12 clearance and locates the strap (MHA-CH-13) by the
 strap's hole, so the strap's hub sits on the circle the jig cuts
 (``ch_rocker_arm_tl_oblique_trammel_spec``).
 
@@ -28,7 +28,7 @@ Sections, bottom to top:
 3. Strap locator Ø10.20 g6 (10.183/10.194), 8 long (⚙ ``RISER_THICK`` 6 plus
    the strap's 2.5 ``ARM_THICKNESS``, less 0.5 so its top sits under the
    strap top), in the strap's Ø10.20 H7 hole (user ruling: names
-   ``MHA-CH-013 STRAP HOLE``): 0.006-0.035 diametral clearance.
+   ``MHA-CH-13 STRAP HOLE``): 0.006-0.035 diametral clearance.
    Sensitivity: the clearance is hub-position error 1:1.
 
 A 0.5 x 45 degree lead chamfer finishes the top, cut again after the facing
@@ -84,7 +84,7 @@ if not HEAD_DIA < STOCK_DIA:
 FIT_DIA = 10.20
 FIT_PLACES = 3
 HUB_HOLE_BAND = (0.018, 0.0)  # (upper, lower): Ø10.20 H7, reamed in place
-STRAP_HOLE_BAND = (0.018, 0.0)  # Ø10.20 H7 in MHA-CH-013
+STRAP_HOLE_BAND = (0.018, 0.0)  # Ø10.20 H7 in MHA-CH-13
 SEAT_BAND = (0.029, 0.018)  # p6
 LOCATOR_BAND = (-0.006, -0.017)  # g6
 
@@ -224,11 +224,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # does not wrap callout text).
 SEAT_CALLOUT = (
     f"{SEAT_INTERFERENCE_MIN:.3f}-{SEAT_INTERFERENCE_MAX:.3f} DIAMETRAL\n"
-    "INTERFERENCE ON\nMHA-CH-006-TL-21 HUB HOLE"
+    "INTERFERENCE ON\nMHA-CH-06-TL-21 HUB HOLE"
 )
 LOCATOR_CALLOUT = (
     f"{LOCATOR_CLEARANCE_MIN:.3f}-{LOCATOR_CLEARANCE_MAX:.3f} DIAMETRAL\n"
-    "CLEARANCE ON\nMHA-CH-013 STRAP HOLE"
+    "CLEARANCE ON\nMHA-CH-13 STRAP HOLE"
 )
 SEAT_NOTE = " ".join(SEAT_CALLOUT.splitlines())
 LOCATOR_NOTE = " ".join(LOCATOR_CALLOUT.splitlines())
@@ -247,7 +247,7 @@ DIMENSION_CALLOUTS = {
 PIN_LENGTH_CALLOUT = (
     f"SUPPLY {SUPPLY_LENGTH_MIN:.1f} MIN;\n"
     "FACE LOCATOR END AT ASSEMBLY\n"
-    f"{LOCATOR_SET_MIN:.2f}-{LOCATOR_SET_MAX:.2f} ABOVE MHA-CH-006-TL-24;\n"
+    f"{LOCATOR_SET_MIN:.2f}-{LOCATOR_SET_MAX:.2f} ABOVE MHA-CH-06-TL-24;\n"
     "RECUT LEAD CHAMFER"
 )
 PIN_LENGTH_NOTE = " ".join(PIN_LENGTH_CALLOUT.splitlines())

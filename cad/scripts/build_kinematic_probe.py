@@ -428,7 +428,7 @@ async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
     from solidworks_mcp.adapters.base import MoveComponentParameters
     try:
         links = sorted(n for n in component_names(adapter)
-                       if n.startswith(("vn-chain-inner-link", "vn-chain-outer-link")))
+                       if n.startswith(("pd-vn-chain-inner-link", "pd-vn-chain-outer-link")))
         if len(links) < 3:
             return False
         seed = links[0]                       # the pattern's seed link

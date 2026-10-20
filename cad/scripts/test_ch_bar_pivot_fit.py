@@ -1,5 +1,5 @@
 """Offline contract: the amplitude bar's top notch straddles its channel lever,
-and the MHA-CH-011 pin is pressed into both notch cheeks and runs in the
+and the MHA-CH-11 pin is pressed into both notch cheeks and runs in the
 lever, with every fit held at the worst case of its printed bands (policy
 drawing-guidelines.md rule 17 (walls and webs)).
 

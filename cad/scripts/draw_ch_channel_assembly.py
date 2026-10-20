@@ -1,4 +1,4 @@
-r"""Create the MHA-CH-000 channel assembly fitter package (four sheets).
+r"""Create the MHA-CH-00 channel assembly fitter package (four sheets).
 
 1. ASSEMBLED VIEWS: Front and Right at 1:5 and the full-detail isometric at
    1:7.
@@ -248,23 +248,23 @@ def spring_stems(amplitudes: list[float], channels: int) -> tuple[str, ...]:
     }
     return tuple(
         dict.fromkeys(
-            f"vn-channel-spring-installed-stretch{variants[amplitude]:02d}"
+            f"ch-vn-channel-spring-installed-stretch{variants[amplitude]:02d}"
             for amplitude in amplitudes[:channels]
         )
     )
 
 
 def require_single_spring_variant(stems: tuple[str, ...], preset: str) -> None:
-    """Refuse a BOM the drawing cannot print: one MHA-VN-004 row of qty 20.
+    """Refuse a BOM the drawing cannot print: one MHA-CH-VN-50 row of qty 20.
 
     Each spring variant is its own SLDPRT, so a preset with several installed
     lengths would print several rows under one part number.
     """
     if len(stems) != 1:
         raise RuntimeError(
-            f"MHA-CH-000 is drawn for one installed-spring length, but the "
+            f"MHA-CH-00 is drawn for one installed-spring length, but the "
             f"{preset!r} amplitude preset builds {len(stems)} spring variants "
-            f"that share MHA-VN-004; see {SPRING_VARIANT_ISSUE}"
+            f"that share MHA-CH-VN-50; see {SPRING_VARIANT_ISSUE}"
         )
 
 
@@ -298,21 +298,21 @@ PART_ROWS = {
     "ch-pivot-shaft": _config.parts("ch-pivot-shaft"),
     "ch-fulcrum-shaft": _config.parts("ch-fulcrum-shaft"),
     "ch-pivot-bracket": _config.parts("ch-pivot-bracket"),
-    "vn-arbor-set-screw": _config.parts("vn-arbor-set-screw"),
-    "vn-rocker-thrust-washer": _config.parts("vn-rocker-thrust-washer"),
-    "vn-rocker-bank-spring": _config.parts("vn-rocker-bank-spring"),
-    "vn-bracket-hold-down-screw": _config.parts("vn-bracket-hold-down-screw"),
+    "ch-vn-arbor-set-screw": _config.parts("ch-vn-arbor-set-screw"),
+    "ch-vn-rocker-thrust-washer": _config.parts("ch-vn-rocker-thrust-washer"),
+    "ch-vn-rocker-bank-spring": _config.parts("ch-vn-rocker-bank-spring"),
+    "ch-vn-bracket-hold-down-screw": _config.parts("ch-vn-bracket-hold-down-screw"),
     "ch-fulcrum-keeper": _config.parts("ch-fulcrum-keeper"),
-    "vn-frame-side-screw": _config.parts("vn-frame-side-screw"),
-    "vn-fulcrum-set-screw": _config.parts("vn-fulcrum-set-screw"),
+    "ch-vn-frame-side-screw": _config.parts("ch-vn-frame-side-screw"),
+    "ch-vn-fulcrum-set-screw": _config.parts("ch-vn-fulcrum-set-screw"),
     "ch-rocker-arm": _config.parts("ch-rocker-arm"),
     "ch-connecting-rod": _config.parts("ch-connecting-rod"),
     "ch-amplitude-bar": _config.parts("ch-amplitude-bar"),
     "ch-channel-lever": _config.parts("ch-channel-lever"),
     "ch-rod-pivot-pin": _config.parts("ch-rod-pivot-pin"),
     "ch-bar-pivot-pin": _config.parts("ch-bar-pivot-pin"),
-    SPRING_STEM: _config.parts("vn-channel-spring-installed"),
-    "vn-spring-hook": _config.parts("vn-spring-hook"),
+    SPRING_STEM: _config.parts("ch-vn-channel-spring-installed"),
+    "ch-vn-spring-hook": _config.parts("ch-vn-spring-hook"),
     "ch-anchor-jam-nut": _config.parts("ch-anchor-jam-nut"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
@@ -325,7 +325,7 @@ BOM_SKUS = {
 }
 BOM_DESCRIPTIONS = {
     stem: notes.BOM_DESCRIPTIONS[
-        "vn-channel-spring-installed" if stem == SPRING_STEM else stem
+        "ch-vn-channel-spring-installed" if stem == SPRING_STEM else stem
     ]
     for stem in BOM_COMPONENTS
 }
@@ -504,7 +504,7 @@ LEVER_BANK = BankView(
         }
     ),
 )
-# The keepers on MHA-FR-002 in plan at 1:2, machine front up as the frame's
+# The keepers on MHA-FR-02 in plan at 1:2, machine front up as the frame's
 # own plan prints it (b9ae machinist review: step 10's settings had no view,
 # and its X datum, the web centre, is no face to touch). The frame is not in
 # this assembly, so the hidden KEEPER_PLAN_FEATURE sketch draws the frame
@@ -664,10 +664,10 @@ NORTH_KEEPER_DETAIL = BankView(
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
-# rocker arms (ch_channel_assembly_spec), so off its shaft it read as part of
+# rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
 # explode trail, a black phantom line along the path its steps moved it,
-# ties it back to the MHA-CH-005 north end (draw_pn_pen_assembly's trails).
+# ties it back to the MHA-CH-05 north end (draw_pn_pen_assembly's trails).
 TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM
 TRAIL_COLOR = 0  # COLORREF black, the views' outline colour
 _STACK_MID = (asm.PIVOT_CHAIN_Z[2] + asm.PIVOT_CHAIN_Z[3]) / 2.0
@@ -814,21 +814,21 @@ def _fitup_notes() -> tuple[str, str]:
     pin = _config.parts("ch-rod-pivot-pin")["number"]
     shaft = _config.parts("ch-pivot-shaft")["number"]
     bracket = _config.parts("ch-pivot-bracket")["number"]
-    washer = _config.parts("vn-rocker-thrust-washer")["number"]
-    spring = _config.parts("vn-rocker-bank-spring")["number"]
-    pivot_set_screw = _config.parts("vn-arbor-set-screw")["number"]
+    washer = _config.parts("ch-vn-rocker-thrust-washer")["number"]
+    spring = _config.parts("ch-vn-rocker-bank-spring")["number"]
+    pivot_set_screw = _config.parts("ch-vn-arbor-set-screw")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
-    hold_down = _config.parts("vn-bracket-hold-down-screw")["number"]
+    hold_down = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
     keeper = _config.parts("ch-fulcrum-keeper")["number"]
     fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
-    fulcrum_set_screw = _config.parts("vn-fulcrum-set-screw")["number"]
-    foot_screw = _config.parts("vn-frame-side-screw")["number"]
+    fulcrum_set_screw = _config.parts("ch-vn-fulcrum-set-screw")["number"]
+    foot_screw = _config.parts("ch-vn-frame-side-screw")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
     bar = _config.parts("ch-amplitude-bar")["number"]
     lever = _config.parts("ch-channel-lever")["number"]
     bar_pin = _config.parts("ch-bar-pivot-pin")["number"]
-    channel_spring = _config.parts("vn-channel-spring-installed")["number"]
-    anchor = _config.parts("vn-spring-hook")["number"]
+    channel_spring = _config.parts("ch-vn-channel-spring-installed")["number"]
+    anchor = _config.parts("ch-vn-spring-hook")["number"]
     anchor_nut = _config.parts("ch-anchor-jam-nut")["number"]
     last = COUNT - 1
     # Step 1 prints that the stack is never short (machinist review, PR
@@ -861,7 +861,7 @@ def _fitup_notes() -> tuple[str, str]:
     if abs(rear_face - front_face - KEEPER_INNER_FACE_SPAN_MM) > 1e-9:
         raise AssertionError("the pair-ream span is not the fit-up span")
     # The crown and its tap centre on the bore this step makes, so each
-    # keeper is finished here, but to its own print: MHA-CH-007 sizes the
+    # keeper is finished here, but to its own print: MHA-CH-07 sizes the
     # crown (CrownRadius, "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE
     # HEIGHT, PER" this step) and sizes and places the crown tap ("ON BORE
     # AXIS AFTER REAM", its station in the plan). The step carries none of
@@ -979,7 +979,7 @@ def _fitup_notes() -> tuple[str, str]:
             "SCREW ONTO EACH FLAT AND STAKE EACH TAP MOUTH AT 2 POINTS."
         ),
         # The anchors thread into the summing plate and are jammed by their
-        # nuts at MHA-HA-000, which owns that joint, its lock and its
+        # nuts at MHA-HA-00, which owns that joint, its lock and its
         # setting. This sheet only hooks the spring; the pointer is
         # steps.HA_ANCHORS_SET_REF.
         steps.SPRINGS_HOOKED_KEY: (
@@ -1473,7 +1473,7 @@ def _sketch_view_circle(
 
 def north_end_trail_mm() -> tuple[tuple[float, float, float], ...]:
     """The north bracket's explode path (model mm): its seat on the
-    MHA-CH-005 axis, north along that axis, then up to its exploded bore."""
+    MHA-CH-05 axis, north along that axis, then up to its exploded bore."""
     seat = (_PIVOT_X, _PIVOT_Y, PIVOT_BRACKET_Z[1])
     dx, dy, dz = exploded_offset(explode.BRACKET, "north")
     if dx != 0.0 or dy <= 0.0 or dz <= 0.0:

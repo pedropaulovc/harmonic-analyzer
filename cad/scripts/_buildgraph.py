@@ -54,7 +54,7 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # ``output`` is split by function into summing -> magnifier -> pen (the value
 # chain) + paper-drive; the measuring stick + its clamped stop form their own
 # sub (MS, 2026-10-09). Shop-fixture assemblies (``is_shop_fixture``: the
-# rocker's oblique-trammel jig, TL-000) build here too but never enter the
+# rocker's oblique-trammel jig, TL-00) build here too but never enter the
 # machine tree: ``MACHINE_ASSEMBLIES`` excludes them.
 ASSEMBLY_ORDER = (
     "fr_frame",
@@ -2342,7 +2342,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_limits",
         "_printed_tolerance",
-        "vn_boss_hook_spec",
+        "sm_vn_boss_hook_spec",
         "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
         "dt_cone_pivot_post_spec",
@@ -2352,7 +2352,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Drilled-hole and angular rows size the collar-to-bank air stack.
         "dt_tip_collar_air",
         # Angular row sets the through tap's angle in the screw landing gate.
-        "vn_cone_tip_collar_spec",
+        "dt_vn_cone_tip_collar_spec",
         "crank_boss_rim",
         "dt_crank_hub_geometry",
         "dt_crank_pinion_spec",
@@ -2373,11 +2373,11 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         # Angular row sets the lever-level acceptance the summing sheet prints,
         # held inside the knife edge's free-rock floor.
         "sm_summing_assembly_sheet",
-        "vn_guide_lock_screw_spec",
-        "vn_post_mount_screw_spec",
-        "vn_spring_hook_spec",
-        "vn_swing_stop_screw_spec",
-        "vn_knife_mount_dowel_spec",
+        "pd_vn_guide_lock_screw_spec",
+        "dt_vn_post_mount_screw_spec",
+        "ch_vn_spring_hook_spec",
+        "dt_vn_swing_stop_screw_spec",
+        "sm_vn_knife_mount_dowel_spec",
         "pd_transgear_disc_hub_spec",
         "pd_transgear_removable_notes",
         # Edge-break row sizes the knob tip and the rack window/lateral stacks.

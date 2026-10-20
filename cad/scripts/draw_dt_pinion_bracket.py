@@ -226,9 +226,9 @@ ARBOR_FINISH_XY = (0.155, 0.205)
 # (option E-a); the arbor runs in its bore; the follower stud slips into its
 # seat and is bonded (LOCTITE 638, dt_pinion_cam_pin_spec's bond gap).
 DIMENSION_CALLOUTS = {
-    "PivotBoreDia": "REAM THRU\nSLIDE FIT ON SHAFT\nMHA-DT-019, PINNED",
-    "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-022",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-025\nBONDED SLIP FIT\nBLIND FLAT-BOTTOM REAM",
+    "PivotBoreDia": "REAM THRU\nSLIDE FIT ON SHAFT\nMHA-DT-19, PINNED",
+    "ArborBoreDia": "REAM THRU\nRUNNING FIT ON\nARBOR MHA-DT-22",
+    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-25\nBONDED SLIP FIT\nBLIND FLAT-BOTTOM REAM",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
     # The two held locations name what they serve (rules 3 and 4): the
     # follower's height sets the drum's swing for a given cam lift
@@ -236,10 +236,10 @@ DIMENSION_CALLOUTS = {
     # (PIN_SEAT_WEB_WORST, user ruling (a)).  SOLIDWORKS starts the 7.000's
     # text at its bent dimension line, so that leg touched the leading S of
     # SETS (r3 review, rule 14); the leading spaces stand the rows off it.
-    "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-023 CAM",
+    "PinSeatCy": "   SETS FOLLOWER HEIGHT\n   ON MHA-DT-23 CAM",
     # The station's band leaves the far-face wall under rule 17's 2.0 target.
     # Emits the fact declared by RV-01 (owner ruling (a)), from the spec.
-    "PinSeatCz": "CENTRES MHA-DT-025\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
+    "PinSeatCz": "CENTRES MHA-DT-25\nFOLLOWER IN BAR\n" + PIN_SEAT_WALL_CALLOUT,
 }
 
 

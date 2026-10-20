@@ -180,7 +180,7 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
     """
     return {
         "component": "sm-gooseneck-spring-screw",
-        "number": "MHA-SM-004",
+        "number": "MHA-SM-04",
         "thread": spring_screw.THREAD,
         "pitch_mm": spring_screw.PITCH,
         "underhead_length_mm": spring_screw.LENGTH,
@@ -207,7 +207,7 @@ def counter_seat() -> tuple[SettledSpring, float]:
     if record.get("upper_support") != counter_upper_support_geometry():
         raise ValueError(
             "Stale counter native calibration: upper support must be the "
-            "made MHA-SM-004 screw in its clamped gap. Rebuild "
+            "made MHA-SM-04 screw in its clamped gap. Rebuild "
             "sm-gooseneck-spring-screw and sm-gooseneck, then run "
             "diagnostics/calibrate_spring_seats.py --presets neutral square --write "
             "on a licensed farm/native seat; older support measurements cannot "

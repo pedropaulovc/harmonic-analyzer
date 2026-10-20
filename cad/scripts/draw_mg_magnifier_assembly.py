@@ -1,4 +1,4 @@
-r"""Create the four-sheet magnifier fitter package (MHA-MG-000).
+r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
 Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
 and every assembly setting printed as the assembly's own model dimension
@@ -23,9 +23,10 @@ BOM (part number, description, vendor SKU, quantity) and one balloon per
 family. Sheet 3, LEVER GROUP: the same explode with only the lever group
 shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
-(mg_magnifier_assembly_steps) and the checks. Step text names the settings
-and never values them. This recipe never edits the source assembly or its
-explodes.
+(mg_magnifier_assembly_steps) and the checks. The instruction column uses
+the left 190 mm; the finished view is centred in the remaining right field.
+Step text names the settings and never values them. This recipe never edits
+the source assembly or its explodes.
 """
 
 from __future__ import annotations
@@ -51,10 +52,10 @@ import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
-import vn_lever_wire_geom
-import vn_lever_wire_spec
-import vn_wheel_axle_front_washer_spec as front_washer
-import vn_wheel_axle_nut_spec as axle_nut
+import mg_vn_lever_wire_geom
+import mg_vn_lever_wire_spec
+import mg_vn_wheel_axle_front_washer_spec as front_washer
+import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
@@ -196,7 +197,7 @@ LEVER_VIEW_LABEL = "lever settings (Front)"
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
 # its caption under it (as the lever sheet's), the BOM in the top-right
 # corner, and under the BOM the collapsed whole-assembly view the BOM is
-# inserted on (the MHA-PD-000 BOM reference): the exploded views are isolated
+# inserted on (the MHA-PD-00 BOM reference): the exploded views are isolated
 # afterwards, and view-only isolation must never touch the view that owns the
 # parts list. The reference is HIDDEN once the package is laid out: machinist
 # review r2 (run 20261016T105658863Z-132a077b63f840489c527e3ef02d296d) found
@@ -208,9 +209,12 @@ BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 # 20261016T072448223Z-614c0a10f732427c87668fb67f9db447) wrapped the 0.072
 # column's "#4-40 X 7/16 KNURLED THUMB SCREW" to two lines, pushing the BOM's
 # last row onto the reference caption.
+# Reserve a separate 48 mm column for full parent-scoped MHA-MG-VN-xx
+# Numbers. The old 32 mm allocation predates those longer IDs; widening it
+# uses the spare gap to the wheel field, not smaller text or description space.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.032,
+    "part": 0.048,
     "description": 0.082,
     "sku": 0.032,
     "quantity": 0.012,
@@ -269,19 +273,21 @@ if any(
     raise AssertionError("a rescale on the lever ladder would switch configuration")
 LEVER_GROUP = "LEVER GROUP"
 LEVER_LABEL = "lever group exploded"
-# Sheet 4: the sequence and checks down the left, the finished assembly right
-# of them above the title block, its caption centred over it. The lever wire's
-# balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
+# Sheet 4: the sequence and checks down a 190 mm left column, the finished
+# assembly centred in the remaining field above the title block, its caption
+# centred over it. The wider column keeps full parent-scoped vendor Numbers
+# intact without reducing the default text size or its line pitch.
+# The lever wire's balloon stands right of the view (FINISHED_WIRE_BALLOON_*).
 STEPS_XY = (0.018, 0.258)
-STEPS_LINE_WIDTH = 58  # characters; default-format note text (as MHA-MS-000)
-STEPS_RIGHT = 0.156  # 58 default-format characters from STEPS_XY
-# Default-format note line pitch (the MHA-PD-000 stake note measured 0.0045).
+STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
+# Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
 # Machinist review r2: the caption at the field's left corner sat ~40 mm left
 # of the view it names, so it is centred over the view's outline once the view
 # has settled. Its width is the character count at the r6 PDF's measured
 # pitch ("FINISHED ASSEMBLY (SCALE 1:4)": 29 characters, 68.8 mm).
 CAPTION_CHAR_WIDTH = 0.00237
+STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * CAPTION_CHAR_WIDTH
 CAPTION_GAP = 0.004
 FINISHED_FIELD = (
     STEPS_RIGHT + _PAD,
@@ -299,9 +305,9 @@ FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
 # the wire's only model edges were its two end circles, so balloon 19 landed
-# on the drum end inside the wheel and read as pointing at a spoke. MHA-VN-066
+# on the drum end inside the wheel and read as pointing at a spoke. MHA-MG-VN-56
 # now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
-# (build_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
+# (build_mg_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
 # ring's point facing the *Isometric viewer (wire_facing_point). The balloon
 # then stands right of the view, its leader dropping this little from the
 # ring so it passes under the vertical rod's lower end, the one part right of
@@ -341,10 +347,10 @@ def wire_facing_point(
 
 
 WIRE_BALLOON_POINT_MM = wire_facing_point(
-    vn_lever_wire_geom.WIRE_START,
-    vn_lever_wire_geom.WIRE_END,
-    radius=vn_lever_wire_geom.WIRE_DIA / 2.0,
-    station=vn_lever_wire_spec.BALLOON_RING_FRACTION * vn_lever_wire_geom.WIRE_LEN,
+    mg_vn_lever_wire_geom.WIRE_START,
+    mg_vn_lever_wire_geom.WIRE_END,
+    radius=mg_vn_lever_wire_geom.WIRE_DIA / 2.0,
+    station=mg_vn_lever_wire_spec.BALLOON_RING_FRACTION * mg_vn_lever_wire_geom.WIRE_LEN,
 )
 
 BOM_QUANTITIES = {stem: notes.QUANTITIES[stem] for stem in notes.BOM_ORDER}
@@ -355,21 +361,21 @@ PART_ROWS = {
     "mg-wheel-bar": _config.parts("mg-wheel-bar"),
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front"),
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back"),
-    "vn-clamp-screw": _config.parts("vn-clamp-screw"),
+    "mg-vn-clamp-screw": _config.parts("mg-vn-clamp-screw"),
     "mg-wheel-drum": _config.parts("mg-wheel-drum"),
     "mg-magnifying-wheel": _config.parts("mg-magnifying-wheel"),
     "mg-wheel-axle-spacer": _config.parts("mg-wheel-axle-spacer"),
-    "vn-wheel-axle-back-washer": _config.parts("vn-wheel-axle-back-washer"),
-    "vn-wheel-axle-front-washer": _config.parts("vn-wheel-axle-front-washer"),
-    "vn-wheel-axle-nut": _config.parts("vn-wheel-axle-nut"),
+    "mg-vn-wheel-axle-back-washer": _config.parts("mg-vn-wheel-axle-back-washer"),
+    "mg-vn-wheel-axle-front-washer": _config.parts("mg-vn-wheel-axle-front-washer"),
+    "mg-vn-wheel-axle-nut": _config.parts("mg-vn-wheel-axle-nut"),
     "mg-magnifying-lever": _config.parts("mg-magnifying-lever"),
     "mg-magnifying-bracket": _config.parts("mg-magnifying-bracket"),
-    "vn-magnifying-bracket-screw": _config.parts("vn-magnifying-bracket-screw"),
+    "mg-vn-magnifying-bracket-screw": _config.parts("mg-vn-magnifying-bracket-screw"),
     "mg-magnifying-clamp": _config.parts("mg-magnifying-clamp"),
-    "vn-thumb-screw": _config.parts("vn-thumb-screw"),
+    "mg-vn-thumb-screw": _config.parts("mg-vn-thumb-screw"),
     "mg-magnifying-vertical-rod": _config.parts("mg-magnifying-vertical-rod"),
     "mg-output-fixture": _config.parts("mg-output-fixture"),
-    "vn-lever-wire": _config.parts("vn-lever-wire"),
+    "mg-vn-lever-wire": _config.parts("mg-vn-lever-wire"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the assembly families")
@@ -389,14 +395,14 @@ BOM_NORMALIZED_ALIASES = {
 # One balloon per family (row); each walks its family's lowest-named shown
 # instance for a visible edge, except the two rods.
 #
-# MHA-MG-003 is a revolved capsule (a hemispherical dome at each end): no
+# MHA-MG-03 is a revolved capsule (a hemispherical dome at each end): no
 # flat face, no end circle. Its only model edges are the two dome-to-cylinder
 # tangent circles at x = R from each tip, which IView's visible-entity list
 # does not report (0 listed, tangent edges shown), and every body extreme
 # point sits on a dome silhouette, which no EDGE hit test picks (r1/r2, runs
 # 20261016T062016526Z-f9642112ccea4d2ab63c137a71a668ea and
 # 20261016T065610791Z-790156178d0b4378a1fd0680e77ece6b: the lever walked 12
-# extremes, no ink). MHA-MG-004's top is a #4-40 thread turned down to a
+# extremes, no ink). MHA-MG-04's top is a #4-40 thread turned down to a
 # shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
 # circle, 45 below the clamp's bottom face once the explode drops the rod
 # (the bottom dome is tangent, like the lever's). Each is
@@ -444,7 +450,7 @@ LOCKNUT_BALLOON_POINT_MM = (
     _NUT_FLAT_R * math.sin(math.radians(225.0)),
     0.0,
 )
-LOCKNUT_INSTANCE = "vn-wheel-axle-nut-2"
+LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-lever": BalloonAnchor(
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
@@ -452,8 +458,8 @@ BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
     "mg-magnifying-vertical-rod": BalloonAnchor(
         point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
     ),
-    "vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
-    "vn-wheel-axle-nut": BalloonAnchor(
+    "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
+    "mg-vn-wheel-axle-nut": BalloonAnchor(
         point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
     explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
@@ -480,9 +486,17 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
                 width=width,
                 initial_indent=f"{number}. ",
                 subsequent_indent=" " * (len(number) + 2),
+                break_long_words=False,
+                break_on_hyphens=False,
             )
         else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
+            out += textwrap.wrap(
+                line,
+                width=width,
+                subsequent_indent="   ",
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
     return "\n".join(out)
 
 
@@ -599,11 +613,11 @@ ENDSHAKE = StackDetail(
         {
             "mg-wheel-bar",
             "mg-wheel-axle",
-            "vn-wheel-axle-back-washer",
+            "mg-vn-wheel-axle-back-washer",
             "mg-magnifying-wheel",
             "mg-wheel-drum",
-            "vn-wheel-axle-front-washer",
-            "vn-wheel-axle-nut",
+            "mg-vn-wheel-axle-front-washer",
+            "mg-vn-wheel-axle-nut",
         }
     ),
     math.sqrt(_ENDSHAKE_RADIUS**2 - (_ENDSHAKE_CENTRE_D - stack.HUB_FRONT_D) ** 2),
@@ -1315,19 +1329,65 @@ def _assert_bom_clears_reference_field(table: Any) -> None:
     bound = _early_bound(table, "ITableAnnotation")
     annotation = _early_bound(bound.GetAnnotation(), "IAnnotation")
     top = float(annotation.GetPosition()[1])
-    height = sum(float(bound.GetRowHeight(row)) for row in range(int(bound.RowCount)))
-    bottom = top - height
+    row_heights = tuple(
+        float(bound.GetRowHeight(row)) for row in range(int(bound.RowCount))
+    )
+    bottom = top - sum(row_heights)
     _telemetry.info(
         f"magnifier BOM spans y {bottom * 1000.0:.1f}..{top * 1000.0:.1f} mm",
         bom_top_mm=round(top * 1000.0, 2),
         bom_bottom_mm=round(bottom * 1000.0, 2),
     )
     if bottom < BOM_REFERENCE_FIELD[3] + 0.0025:
-        raise RuntimeError(
+        failure = RuntimeError(
             f"magnifier BOM bottom {bottom * 1000.0:.1f} mm runs into the reference "
             f"field at {BOM_REFERENCE_FIELD[3] * 1000.0:.1f} mm "
             f"(planned {BOM_BOTTOM * 1000.0:.1f} mm)"
         )
+        # Keep native width/height and full grown-row contents in the task log:
+        # failed farm leaves do not necessarily retain a drawing for inspection.
+        try:
+            contents = _bom_cells(bound)
+            column_widths_mm = tuple(
+                round(float(bound.GetColumnWidth(column)) * 1000.0, 3)
+                for column in range(int(bound.ColumnCount))
+            )
+            row_heights_mm = tuple(round(height * 1000.0, 3) for height in row_heights)
+            _telemetry.info(
+                f"magnifier BOM columns mm {column_widths_mm!r}; "
+                f"rows mm {row_heights_mm!r}",
+                bom_column_widths_mm=column_widths_mm,
+                bom_row_heights_mm=row_heights_mm,
+            )
+            for row, height in enumerate(row_heights):
+                if height <= BOM_ROW_HEIGHT + 1e-6:
+                    continue
+                text_heights_mm = tuple(
+                    round(
+                        float(
+                            _early_bound(
+                                bound.GetCellTextFormat(row, column), "ITextFormat"
+                            ).CharHeight
+                        )
+                        * 1000.0,
+                        3,
+                    )
+                    for column in range(int(bound.ColumnCount))
+                )
+                _telemetry.info(
+                    f"magnifier BOM row {row}: {height * 1000.0:.3f} mm, "
+                    f"text heights mm {text_heights_mm!r}, cells {contents[row]!r}",
+                    bom_row=row,
+                    bom_row_height_mm=height * 1000.0,
+                    bom_cell_text_heights_mm=text_heights_mm,
+                    bom_cells=contents[row],
+                )
+        except Exception as exc:
+            try:
+                _telemetry.warn(f"magnifier BOM failure diagnostics unavailable: {exc}")
+            except Exception:
+                pass  # Diagnostic logging must not replace the measured overrun.
+        raise failure
 
 
 def _hide_bom_reference(adapter: Any, view: Any, table: Any, items: dict[str, str]) -> None:

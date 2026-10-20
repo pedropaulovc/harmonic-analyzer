@@ -1,9 +1,9 @@
-r"""Build crank arm MHA-DT-006 for the separate through-hub construction.
+r"""Build crank arm MHA-DT-06 for the separate through-hub construction.
 
-The arm is a plain 8-mm plate with an O19.4 match-fitted MHA-DT-031 seat.  It no
-longer mounts directly on the crankshaft and no longer carries the MHA-DT-009
+The arm is a plain 8-mm plate with an O19.4 match-fitted MHA-DT-31 seat.  It no
+longer mounts directly on the crankshaft and no longer carries the MHA-DT-09
 cross-hole.  A blind axial seam groove enters the outboard face at six o'clock,
-parallel to the shaft, and accepts MHA-VN-029 for half the arm thickness.  The
+parallel to the shaft, and accepts MHA-DT-VN-59 for half the arm thickness.  The
 outboard witness is a small punched representation, not a machined dimple.
 
 Layout: arm length +X, width +/-Y, thickness +Z (0..8).  In the drive train
@@ -202,7 +202,7 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after extrude: {vol:.1f} mm^3")
 
-    # Match-fitted through-hub seat.  The assigned actual MHA-DT-031 is lightly
+    # Match-fitted through-hub seat.  The assigned actual MHA-DT-31 is lightly
     # arbor-pressed into this nominal bore until its shoulder meets the arm's
     # inboard face; no independent numeric fit band competes with that process.
     hub_seat = SketchDims()
@@ -305,8 +305,8 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume(adapter)
     _telemetry.info(f"volume after anchor tap: {vol:.1f} mm^3")
 
-    # MHA-VN-029 axial seam groove: a blind cylinder from the outboard face,
-    # centred exactly on the nominal MHA-DT-031 seat at six o'clock (toward the
+    # MHA-DT-VN-59 axial seam groove: a blind cylinder from the outboard face,
+    # centred exactly on the nominal MHA-DT-31 seat at six o'clock (toward the
     # hanging handle).  The cut leaves only its arm-side segment here; the
     # complementary segment is match-drilled in the assembled hub.
     before_axial_groove = await _volume(adapter)
@@ -469,7 +469,7 @@ async def build(adapter) -> dict[str, str]:
 
 
     # Named axes for semantic assembly mates.  Axis1 is the through-hub seat,
-    # Axis2 the handle pivot, Axis3 the six-o'clock axial MHA-VN-029 seam.
+    # Axis2 the handle pivot, Axis3 the six-o'clock axial MHA-DT-VN-59 seam.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "hub seat axis")
     pivot_axis = await name_bore_axis(
         adapter,
@@ -506,7 +506,7 @@ async def build(adapter) -> dict[str, str]:
     assert_signed_circle_center(
         adapter,
         "AxialPinGrooveProfile",
-        label="MHA-DT-006 six-o'clock seam",
+        label="MHA-DT-06 six-o'clock seam",
         expected_sketch_xy_mm=(AXIAL_PIN_X, AXIAL_PIN_Y),
         expected_model_xyz_mm=(AXIAL_PIN_X, AXIAL_PIN_Y, ARM_THICKNESS),
         axis_name=seam_axis,
@@ -515,12 +515,12 @@ async def build(adapter) -> dict[str, str]:
     assert_signed_circle_center(
         adapter,
         "FiducialProfile",
-        label="MHA-DT-006 punched fiducial",
+        label="MHA-DT-06 punched fiducial",
         expected_sketch_xy_mm=(FIDUCIAL_X, FIDUCIAL_Y),
         expected_model_xyz_mm=(FIDUCIAL_X, FIDUCIAL_Y, ARM_THICKNESS),
     )
     # The assigned actual hub governs the final match-fit bore; no independent
-    # local band is authored on MHA-DT-006.
+    # local band is authored on MHA-DT-06.
     await volume_check(adapter, "driven crank arm (equations neutral)", vol, 0.001 * vol)
 
     # HandleSeat datum: the plate face OPPOSITE the origin plane (z =

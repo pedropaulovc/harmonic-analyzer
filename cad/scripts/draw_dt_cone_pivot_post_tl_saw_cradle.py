@@ -1,4 +1,4 @@
-r"""Create the drawing for the cone pivot post's saw cradle (MHA-DT-005-TL-02).
+r"""Create the drawing for the cone pivot post's saw cradle (MHA-DT-05-TL-02).
 
 Three ASME third-angle views at 1:2 plus the isometric. Every dimension runs
 from the origin corner the build anchors each sketch to: the base's kerf-side
@@ -446,7 +446,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Cone Post Saw Cradle Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "cone pivot post saw cradle; milled 1018 block; MHA-DT-005-TL-02",
+            3: "cone pivot post saw cradle; milled 1018 block; MHA-DT-05-TL-02",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

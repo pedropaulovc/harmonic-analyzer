@@ -22,7 +22,7 @@ pitfall's safe case).
 Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
 + rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
 
-U36 (MHA-DT-030): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
+U36 (MHA-DT-30): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
 to the grip -- at mid-engagement (4.0 in from the mouth face B).  It is
 match-drilled at assembly through the hub and the lift rod; the part carries
 it so the print can call it out and the assembly can seat the pin.
@@ -532,7 +532,7 @@ async def build(adapter) -> dict[str, str]:
     # Named hub-bore axis (Axis1): the assembly clamps the lever coaxial on
     # the lift rod (PR8 -- it spins with the rod to drive the cams).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "hub bore")
-    # Named pin-hole axis (along X at the pin station): the MHA-DT-030 pin's
+    # Named pin-hole axis (along X at the pin station): the MHA-DT-30 pin's
     # reference in the assembly.
     await name_bore_axis(
         adapter, "Top Plane", 0.0, "Front Plane", PIN_HOLE_Z, "lever pin"

@@ -1,5 +1,5 @@
 mg-magnifying-bracket:
-  number: MHA-MG-001
+  number: MHA-MG-01
   # The light-press strength budget uses 1018 cold-drawn yield, not brittle
   # class-30 gray iron. Keep the condition on the print, not just in code,
   # on one title-block line (machinist review r2: the 35-character
@@ -9,16 +9,16 @@ mg-magnifying-bracket:
   finish: machined
   quantity: 1
   tolerance_class: machined_block
-  # No fit_class: the collar is a light PRESS seat for the MHA-MG-003 lever rod
+  # No fit_class: the collar is a light PRESS seat for the MHA-MG-03 lever rod
   # (user ruling; limits and Lamé strength in mg_lever_press_fit_geom), not a
   # running fit; the screwed seat on the summing lever remains static.
-  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or honed to Ra 0.8 as the matched press seat for the MHA-MG-003 lever rod (0.007-0.014 diametral interference); press the collar onto the rod held near its end; the press alone retains it"
+  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or honed to Ra 0.8 as the matched press seat for the MHA-MG-03 lever rod (0.007-0.014 diametral interference); press the collar onto the rod held near its end; the press alone retains it"
   # The pressed bore's Ra 0.8 is an owner ruling (#1570 option A), not a
   # running surface: the matched fit's 0.007 minimum interference holds only
   # after DIN 7190 smoothing at that finish (mg_lever_press_fit_geom).
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the Ra 0.8 roughness symbol on the collar bore, (Ø5.986) REAM OR HONE THRU: 0.007-0.014 DIAMETRAL INTERFERENCE ON MHA-MG-003 LEVER, in the collar's end view beside Ø12.00 COLLAR OD"
+      where: "the Ra 0.8 roughness symbol on the collar bore, (Ø5.986) REAM OR HONE THRU: 0.007-0.014 DIAMETRAL INTERFERENCE ON MHA-MG-03 LEVER, in the collar's end view beside Ø12.00 COLLAR OD"
       finding: "roughness symbol on a pressed bore that neither runs, slides nor locates (rule 6)"
       reason: "owner ruling #1570 option A: the bore is reamed or honed to Ra 0.8 because the matched fit's 0.007 minimum diametral interference rests on the DIN 7190 smoothing estimate 0.8 x 4 x (0.8 + 0.8) um = 0.00512 (effective minimum 0.00188), which holds only at Ra 0.8; a rougher bore would smooth the loosest press away (owner-accepted)"

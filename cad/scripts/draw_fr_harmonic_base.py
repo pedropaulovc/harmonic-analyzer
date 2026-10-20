@@ -222,7 +222,7 @@ HOLE_TABLE_ANCHOR = (0.018, 0.260)
 # not text-editable, so the note marks their diameter as reference.
 SOCKET_FIT_NOTE = (
     "4X: FIT TO ASSIGNED\n"
-    "MHA-FR-003 TUBE:\n"
+    "MHA-FR-03 TUBE:\n"
     "CLOSE HAND-SLIP, NO\n"
     "PERCEPTIBLE ROCK.\n"
     "TABLE <MOD-DIAM> REF.\n"
@@ -267,7 +267,7 @@ CROSS_TAP_CALLOUT_XY = (0.285, 0.117)
 # of E4's tag and west of section arrow A's shank.
 NAMEPLATE_CALLOUT_XY = (0.362, 0.255)
 # The holes-sheet plan's view label, top-left corner. Centred over the plan it
-# sat under the transfer callouts, and the MHA-DT-002 leader, which has to reach
+# sat under the transfer callouts, and the MHA-DT-02 leader, which has to reach
 # the pedestal seats beneath it, ran through "TOP" (hb-render-2 eye pass).
 # It now reads beside the plan's top-left corner, left of every leader.
 HOLES_TOP_LABEL_XY = (0.170, 0.237)
@@ -410,7 +410,7 @@ GEOMETRY_CALLOUTS = {
 SECTION_CALLOUTS = {
     "TopRimChamfer": "X 45 DEG\nTOP RIMS",
     "BottomEdgeChamfer": "X 45 DEG\nUNDERSIDE",
-    "SpotFaceDepth": "4X SPOTFACE\nDEPTH, SEATS\nMHA-VN-027",
+    "SpotFaceDepth": "4X SPOTFACE\nDEPTH, SEATS\nMHA-FR-VN-53",
 }
 HOLE_SIDE_CALLOUTS = {
     "SpotFaceDia": "4X SPOTFACE\nCROSS-SCREW HOLES\nFRONT/REAR",
@@ -733,7 +733,7 @@ def _spread_hole_tags(view: Any, table: Any) -> None:
 # ledge hole. The sheet therefore prints no position for any of them: they
 # leave the hole table and carry their native size on a callout naming their
 # source. Along the bank nothing in the frame fixes the rig until the fitter
-# sets it (user ruling P1-2), so the two rig callouts cite the MHA-DT-000 step
+# sets it (user ruling P1-2), so the two rig callouts cite the MHA-DT-00 step
 # that sets it (dt_drive_train_steps "rig-set"): the settings live on the
 # drive-train assembly print, which the fitter has open for that step, and a
 # copy here (the old RIG SET note) was a second source to drift (plate-r1
@@ -752,24 +752,24 @@ TRANSFER_PEDESTAL_HOLES = tuple(
 # trailing line break reaches the sheet through
 # _drawing_hole_callout.compose_hole_callout_prefix.
 _TRANSFER_AFTER_RIG_SET = f"AFTER {step_ref('rig-set')};\n"
-TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-018\n{_TRANSFER_AFTER_RIG_SET}"
-TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-024\n{_TRANSFER_AFTER_RIG_SET}"
-TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
+TRANSFER_BLOCK_CALLOUT = f"TRANSFER FROM MHA-DT-18\n{_TRANSFER_AFTER_RIG_SET}"
+TRANSFER_SPRING_CALLOUT = f"TRANSFER FROM MHA-DT-24\n{_TRANSFER_AFTER_RIG_SET}"
+TRANSFER_PEDESTAL_CALLOUT = "TRANSFER FROM MHA-DT-02\nAT ASSEMBLY;\n"
 # #628 (owner-ratified 2026-10-15, fr-harmonic-base machinist exception
 # RV-01, a rule-19 fit-up): the base's #4-40 nameplate taps are spotted
-# through the finished MHA-FR-004 plate's corner holes, its frame-assembly
+# through the finished MHA-FR-04 plate's corner holes, its frame-assembly
 # step setting the plate first. Like the spring callout, the instruction joins
 # the thread line, so the callout stays three rows in the band above the plan.
 TRANSFER_NAMEPLATE_HOLES = tuple(
     (x, z, NAMEPLATE_SCREW_HOLE_DIA) for x, z in NAMEPLATE_SCREW_XZ
 )
-TRANSFER_NAMEPLATE_CALLOUT = "TRANSFER FROM MHA-FR-004\nAT ASSEMBLY;"
+TRANSFER_NAMEPLATE_CALLOUT = "TRANSFER FROM MHA-FR-04\nAT ASSEMBLY;"
 # Its leader lands on the rear-east tap (right and upper on the plan).
 TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
 # The cone swing set (cone_set_stack) is made at T120 against the arbor, which
-# the MHA-DT-002 pedestals carry; a pivot-seat error reaches the near cones
+# the MHA-DT-02 pedestals carry; a pivot-seat error reaches the near cones
 # x (1 - r) after it. The pivot seat is therefore located from the pedestal
 # seats, +-0.05, in one setup with them (Main ruling 2026-10-10, critical
 # interface), not from the table's corner datum: its table row stays the
@@ -790,7 +790,7 @@ _PIVOT_NEAR_PEDESTAL_XZ = min(
 PIVOT_SEAT_TAG = "D1"
 PIVOT_SEAT_STEP = (
     f"{PIVOT_SEAT_TAG} PIVOT SEAT: DRILL AND TAP AT ASSEMBLY, AFTER\n"
-    "THE MHA-DT-002 SEATS, IN ONE SETUP WITH THEM;\n"
+    "THE MHA-DT-02 SEATS, IN ONE SETUP WITH THEM;\n"
     f"X {PIVOT_SCREW_XZ[0] - _PIVOT_NEAR_PEDESTAL_XZ[0]:.2f}, "
     f"Y {_PIVOT_NEAR_PEDESTAL_XZ[1] - PIVOT_SCREW_XZ[1]:.2f} "
     f"<MOD-PM>{PIVOT_SEAT_POSITION_BAND_MM:.2f} "
@@ -953,7 +953,7 @@ _SHALLOW_ROUND_BOSSES = sum(shape[0] == "disc" for shape in SHALLOW_BOSS_SHAPES)
 if _DEEP_ROUND_BOSSES != len(HOLE_XZ) + len(FOOT_SCREW_XZ):
     raise AssertionError("the deep round bosses are not E1-E4 and the foot boss")
 if _SHALLOW_ROUND_BOSSES != len(SHALLOW_BOSS_CENTRES):
-    raise AssertionError("the shallow round bosses are not B1, D1 and MHA-FR-004's")
+    raise AssertionError("the shallow round bosses are not B1, D1 and MHA-FR-04's")
 # Each level is named, not typed: section B-B prints its height (DEEP LEVEL /
 # SHALLOW LEVEL under the model's DeepBossBottom and ShallowBossBottom).
 UNDERSIDE_BOTTOM_CALLOUTS = {
@@ -963,10 +963,10 @@ UNDERSIDE_BOTTOM_CALLOUTS = {
     "LongRibThickness": "RIB",
     "CrossRibThickness": "RIB",
     "HangingBossDia": (
-        f"{_DEEP_ROUND_BOSSES}X BOSSES UNDER\nE1-E4, MHA-DT-024\nTO DEEP LEVEL"
+        f"{_DEEP_ROUND_BOSSES}X BOSSES UNDER\nE1-E4, MHA-DT-24\nTO DEEP LEVEL"
     ),
     "ShallowBoss4Dia": (
-        f"{_SHALLOW_ROUND_BOSSES}X BOSSES UNDER\nB1, D1, MHA-FR-004\nTO SHALLOW LEVEL"
+        f"{_SHALLOW_ROUND_BOSSES}X BOSSES UNDER\nB1, D1, MHA-FR-04\nTO SHALLOW LEVEL"
     ),
 }
 # Section B-B texts as MACHINE (Y, Z) points in the cut plane, projected
@@ -996,7 +996,7 @@ UNDERSIDE_SECTION_CALLOUTS = {
 }
 
 # Sheet 4, the underside pads (Codex P2 on #1310). The rect pads, the
-# cross-tap lugs, the ribs, the MHA-DT-024 foot boss and the four MHA-FR-004
+# cross-tap lugs, the ribs, the MHA-DT-24 foot boss and the four MHA-FR-04
 # nameplate bosses stand under seats the hole table does not locate, or under
 # none, so their sizes and their places are model dims, placed from the
 # table's own X0 Y0 -- the flange's rear-west theoretical corner, top left in
@@ -1231,8 +1231,8 @@ def _log_tapped_hole_notes(adapter: Any, ddoc: Any) -> None:
 
 # Sheet 2's native hole callouts are display dimensions, which the shared
 # layout audit boxes only as a nominal square around their text anchor
-# (_drawing_common._dim_element, NONE scope). So the MHA-DT-002/MHA-DT-018 transfer
-# callouts running into each other, and the MHA-DT-024 callout struck through by
+# (_drawing_common._dim_element, NONE scope). So the MHA-DT-02/MHA-DT-18 transfer
+# callouts running into each other, and the MHA-DT-24 callout struck through by
 # the plan outline, both passed it (hb-notes-2 eye pass, 2026-09-25). This
 # drawing-local check boxes each callout from its own display data and fails
 # on any clash; it stays out of _drawing_common so no other drawing re-keys.
@@ -2484,11 +2484,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     hole_sheet_callouts = {
-        "MHA-DT-018 block transfer": block_callout,
-        "MHA-DT-002 pedestal transfer": pedestal_callout,
-        "MHA-DT-024 spring transfer": spring_callout,
-        "MHA-FR-004 nameplate transfer": nameplate_callout,
-        "MHA-VN-027 cross-tap": tap_callout,
+        "MHA-DT-18 block transfer": block_callout,
+        "MHA-DT-02 pedestal transfer": pedestal_callout,
+        "MHA-DT-24 spring transfer": spring_callout,
+        "MHA-FR-04 nameplate transfer": nameplate_callout,
+        "MHA-FR-VN-53 cross-tap": tap_callout,
     }
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to activate the holes sheet for the leader sides")

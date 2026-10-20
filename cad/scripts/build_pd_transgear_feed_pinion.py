@@ -3,7 +3,7 @@ r"""Reproduction script: translational-gearing feed-pinion sleeve (book ch. 23).
 The independent feed stage has 12 teeth and a finite standard 32DP PA20
 stock #8 master translated rigidly, not a generated profile shift. The
 teeth mesh the matching platen rack and are integral with the rear end of
-one turned steel sleeve (MHA-PD-010), running on the MHA-PD-023 pin's Ø3.9
+one turned steel sleeve (MHA-PD-10), running on the MHA-PD-23 pin's Ø3.9
 shank. Ahead of the teeth, the Ø8.2 h6 boss carries the brass hub and drives
 it through its unchanged D-flat; the hub's spigot seats on the step.
 

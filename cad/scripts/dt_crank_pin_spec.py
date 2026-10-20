@@ -57,7 +57,7 @@ CROSS_HOLE_WEB_MIN = (
 )
 # The shortfall is stated under the hole's own Ø callout (rule 20), flagged
 # where it applies (rule 7); the review files it as a non-gating shortfall.
-# Pending exception ruling: MHA-DT-009 cross-hole web (#989; the 2026-09-30
+# Pending exception ruling: MHA-DT-09 cross-hole web (#989; the 2026-09-30
 # acceptance from #1140 was reset to pending on 2026-10-11).
 CROSS_HOLE_WEB_CALLOUT = f"WEB {CROSS_HOLE_WEB_MIN:.2f} MIN"
 DIMENSION_CALLOUTS: dict[str, str] = {
@@ -72,7 +72,7 @@ DRAWING_NOTES = "\n".join(
     (
         "1:48 TAPER ON DIAMETER, LIGHT DRIVE",
         "FIT IN THE CROSS-HOLE OF CRANK HUB",
-        "MHA-DT-031 AND CRANKSHAFT MHA-DT-011,",
+        "MHA-DT-31 AND CRANKSHAFT MHA-DT-11,",
         "TAPER-REAMED TOGETHER AT ASSEMBLY",
     )
 )

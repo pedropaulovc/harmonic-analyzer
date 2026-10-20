@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker trammel setting bar (MHA-CH-006-TL-17)."""
+r"""Create the drawing for the rocker trammel setting bar (MHA-CH-06-TL-17)."""
 
 from __future__ import annotations
 
@@ -120,13 +120,13 @@ THICKNESS_TEXT_GAP = 0.010
 
 # Functional acceptance sits on the dimension it governs, not in the notes;
 # each scriber seat names the trammel part it holds. The pivot seat's mate
-# (MHA-CH-006-TL-18) stays off its callout: above, it ran past the border in
+# (MHA-CH-06-TL-18) stays off its callout: above, it ran past the border in
 # round 4; below, it would land on the bar and the 3X 12.7 extension line.
 CALLOUTS_ABOVE = {
     "H0FromEnd": "PIVOT SEAT",
     "H0FromSide": "3X",
-    "H800X": "INNER SCRIBER SEAT FOR MHA-CH-006-TL-16",
-    "H816X": "OUTER SCRIBER SEAT FOR MHA-CH-006-TL-16",
+    "H800X": "INNER SCRIBER SEAT FOR MHA-CH-06-TL-16",
+    "H816X": "OUTER SCRIBER SEAT FOR MHA-CH-06-TL-16",
     "SeatDia": "3X",
     "PilotDia": "3X",
 }
@@ -399,7 +399,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Trammel Setting Bar Drawing",
             1: "Harmonic Analyzer shop gauge drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker trammel setting bar; 1018 CF flat; MHA-CH-006-TL-17",
+            3: "rocker trammel setting bar; 1018 CF flat; MHA-CH-06-TL-17",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

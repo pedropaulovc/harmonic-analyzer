@@ -2,13 +2,13 @@ r"""McMaster 91790A199 -- 18-8 stainless steel slotted 82 deg oval head screw,
 8-32 x 1 in from the top of the bevel, fully threaded.
 
 The chosen SKU was read live at https://www.mcmaster.com/91790A199/ on
-2026-10-09; ``vn_transgear_arm_plate_screw_spec`` owns catalogue dimensions
+2026-10-09; ``pd_vn_transgear_arm_plate_screw_spec`` owns catalogue dimensions
 and published standard bounds, not a commodity receiving procedure.
 
 Built by the shared 91790A oval recipe in ``diag_mcmaster_oval.py`` (see its
 docstring for the live-page facts and the [INFERENCE] head, slot and thread
 laws).  Without arguments it builds the supplied screw; ``cut_length`` with
-``cut_end_break`` draws it cut to fit, as the MHA-VN-040 part installs it.  No
+``cut_end_break`` draws it cut to fit, as the MHA-PD-VN-56 part installs it.  No
 vendor SLDPRT is downloaded or committed, so the standalone run is
 catalog-only (the supplied screw).
 

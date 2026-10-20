@@ -1,9 +1,9 @@
 mg-magnifying-clamp:
-  number: MHA-MG-002
+  number: MHA-MG-02
   material: Brass
   material_specification: Brass
   finish: machined; chemically blackened (brass black)
   quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "cut from 7/16 hex bar (brass), flats as supplied: face both ends square to the hex axis (the bottom face is the MHA-MG-004 shoulder seat); hold on flats and centre-drill the corner ridge before drilling the Ø6.2 lever bore through the corners; tap #4-40 from the top face on the hex axis into the bore and #4-40 blind from the bottom face on the hex axis; chemically blacken"
+  process: "cut from 7/16 hex bar (brass), flats as supplied: face both ends square to the hex axis (the bottom face is the MHA-MG-04 shoulder seat); hold on flats and centre-drill the corner ridge before drilling the Ø6.2 lever bore through the corners; tap #4-40 from the top face on the hex axis into the bore and #4-40 blind from the bottom face on the hex axis; chemically blacken"

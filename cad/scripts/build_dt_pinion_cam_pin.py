@@ -140,7 +140,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Pin")
     volume = await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
 
-    # Domed outer end on the same Right plane (the MHA-DT-017 back-cap idiom;
+    # Domed outer end on the same Right plane (the MHA-DT-17 back-cap idiom;
     # rim -> apex is the minor CCW lobe at a +Z end, u = -z).
     u_base, u_apex = -PIN_LEN, -(PIN_LEN + CAP_SAG)
     u_centre = -(PIN_LEN + CAP_SAG - CAP_R)

@@ -15,7 +15,7 @@ import _drawing_detail_projection
 import cone_line
 import dt_crank_drive_gear_spec as gear64
 import dt_cone_swing_platform_crank_axis as crank_axis
-import vn_cone_pivot_screw_spec
+import dt_vn_cone_pivot_screw_spec
 import build_dt_cone_swing_platform as part
 import dt_cone_pivot_post_spec
 import dt_cone_swing_platform_drawing_spec as drawing_spec
@@ -63,7 +63,7 @@ def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
     assert pivot_spec.PIVOT_HOLE_BAND == tuple(
         _config.fit("cone_drum_oblique_mesh", "pivot_bore_band_mm")
     ) == (0.015, 0.0)
-    shoulder_max = vn_cone_pivot_screw_spec.SHOULDER_DIA + vn_cone_pivot_screw_spec.SHOULDER_DIA_BAND[0]
+    shoulder_max = dt_vn_cone_pivot_screw_spec.SHOULDER_DIA + dt_vn_cone_pivot_screw_spec.SHOULDER_DIA_BAND[0]
     assert pivot_spec.PIVOT_HOLE_DIA + pivot_spec.PIVOT_HOLE_BAND[1] >= shoulder_max
 
 
@@ -181,7 +181,7 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     closed_web = part.NORTH_OVERHANG - half
     assert closed_web < 2.0  # positive control: the closed spotface failed
     assert part.PIVOT_RELIEF_RUNOUT > 0.0
-    head_dia = vn_cone_pivot_screw_spec.HEAD_DIA
+    head_dia = dt_vn_cone_pivot_screw_spec.HEAD_DIA
     assert (spec.PIVOT_BEARING_RELIEF_DIAMETER - head_dia) / 2.0 >= (
         spec.PIVOT_HEAD_RADIAL_CLEARANCE - 1e-9
     )
@@ -190,7 +190,7 @@ def test_pivot_relief_runs_out_through_the_north_edge() -> None:
     lines = spec.PIVOT_RELIEF_FIT_REQUIREMENT.split("\n")
     flat = " ".join(lines)
     assert "TOP RELIEF" in flat and "FIT DEPTH" in flat
-    assert "MHA-VN-014" in flat and "SHOULDER" in flat
+    assert "MHA-DT-VN-52" in flat and "SHOULDER" in flat
     assert "SWINGS FREE" in flat and "NO AXIAL SHAKE" in flat
     assert "UNLOCKED" not in flat and "SCREW:" not in flat
     # Retain the saved layout envelope, without pinning the spec's line breaks.
@@ -548,7 +548,7 @@ def test_material_fits_one_title_block_line() -> None:
 
 
 def test_post_screw_engagement_note_states_the_computed_exception() -> None:
-    """Codex review of 68565ace (B1): the sheet must state MHA-VN-031's exception.
+    """Codex review of 68565ace (B1): the sheet must state MHA-DT-VN-61's exception.
 
     U37 accepts short engagement for the 1/4-20 post screws. The printed worst
     case is the thinnest stock plate (U41 band), less the 0.3 cut-to-fit
@@ -612,7 +612,7 @@ def _holddown_x_text_box() -> tuple[float, float, float, float]:
 
 
 # The hold-down callout's widest row: DRILL Ø3.05 THRU ALL at 50.0 mm (r8),
-# or the mate row LOCATES MHA-DT-021, not yet printed (~47..52 mm).  The
+# or the mate row LOCATES MHA-DT-21, not yet printed (~47..52 mm).  The
 # underline's left end, where the leader leaves, stands 1.6 mm before it.
 _CALLOUT_HALF_WIDTHS = (0.0250, 0.0262)
 _CALLOUT_SHOULDER = 0.0016
@@ -1535,7 +1535,7 @@ def test_holddown_callout_drills_in_its_thru_row_and_names_face_and_mate() -> No
     updated = drawing.holddown_callout_definitions(dict(_CBORE_PARTS))
     assert updated[5] == _CBORE_PARTS[5]
     assert updated[7] == "DRILL <MOD-DIAM><hw-diam> THRU ALL"
-    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-021"
+    assert updated[8] == "FROM UNDERSIDE\nLOCATES MHA-DT-21"
     counted = drawing.holddown_callout_definitions(
         {**_CBORE_PARTS, 7: "<NUM_INST>X <MOD-DIAM><hw-diam> THRU ALL"}
     )
@@ -1624,9 +1624,9 @@ def test_post_mount_class_override_refuses_a_nondefault_class_before_native_edit
 def test_tight_bands_name_their_mates_on_their_callouts() -> None:
     """Rule 4: the reamed bore and both +-0.1 hole groups name the part that
     makes the tolerance necessary, each at its own callout (r1 blocker)."""
-    assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-VN-014 SHOULDER",)
-    assert "MHA-DT-005" in drawing.POST_MOUNT_CALLOUT_BELOW[1]
-    assert "MHA-DT-021" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
+    assert drawing.PIVOT_BORE_CALLOUT_BELOW == ("RUNNING FIT ON MHA-DT-VN-52 SHOULDER",)
+    assert "MHA-DT-05" in drawing.POST_MOUNT_CALLOUT_BELOW[1]
+    assert "MHA-DT-21" in drawing.HOLDDOWN_CALLOUT_BELOW[1]
     pivot = drawing.callout_below_definitions(
         {5: "REAM <MOD-DIAM><hw-diam>", 6: "", 7: "", 8: ""},
         drawing.PIVOT_BORE_CALLOUT_BELOW,
@@ -1635,7 +1635,7 @@ def test_tight_bands_name_their_mates_on_their_callouts() -> None:
         5: "REAM <MOD-DIAM><hw-diam>",
         6: "",
         7: "",
-        8: "RUNNING FIT ON MHA-VN-014 SHOULDER",
+        8: "RUNNING FIT ON MHA-DT-VN-52 SHOULDER",
     }
     # SolidWorks drops multi-line text above a dimension; every added row is
     # below, and the tallest callout's rows stay in their free fields.

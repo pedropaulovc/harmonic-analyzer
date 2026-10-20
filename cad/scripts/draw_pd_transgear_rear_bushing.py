@@ -1,8 +1,8 @@
-r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-024).
+r"""Create the manufacturing drawing for the transgear rear bushing (MHA-PD-24).
 
 A turned brass ring: Ø9.0 O.D. over a reamed Ø3.900 bore, faced to fit at
 assembly, so its modelled 6.0 length prints as a REFERENCE under the
-fit-at-assembly callout and the MHA-PD-000 step that sets it.  The profile lies
+fit-at-assembly callout and the MHA-PD-00 step that sets it.  The profile lies
 as it sits in the lathe (axis horizontal): the ``*Top`` view turned a quarter
 turn, so model +Z runs LEFT and the arm face (z 0) is the profile's right
 end, the sleeve face its left end.  Each end face carries its running
@@ -101,7 +101,7 @@ _PROFILE_SLEEVE_X = PROFILE_CENTER[0] - LENGTH * _S / 2.0  # z LENGTH, left end
 _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
-# Faced to fit at MHA-PD-000's rear-bushing step (the float); the pointer comes
+# Faced to fit at MHA-PD-00's rear-bushing step (the float); the pointer comes
 # from the step registry.
 FIT_STEP_KEY = "rear-bushing-faced-to-fit"
 

@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the output fixture (MHA-MG-006).
+r"""Create the manufacturing drawing for the output fixture (MHA-MG-06).
 
 The SLDPRT is authoritative: every printed dimension, its places and its
 band are model dimensions marked for the drawing
@@ -1521,7 +1521,7 @@ async def build(adapter: Any) -> dict[str, str]:
     by_name = {**side_by_name, **end_by_name}
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, by_name[name], label=f"MHA-MG-006 {name} reference"
+            adapter, by_name[name], label=f"MHA-MG-06 {name} reference"
         )
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add the rod bore's center mark to the side view")

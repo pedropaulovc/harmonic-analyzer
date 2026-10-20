@@ -1,6 +1,6 @@
-"""The MHA-PD-000 paper-drive (transgear) assembly sequence, numbered in one place.
+"""The MHA-PD-00 paper-drive (transgear) assembly sequence, numbered in one place.
 
-The drive_train_steps pattern (MHA-DT-000): a step's number is its position in
+The drive_train_steps pattern (MHA-DT-00): a step's number is its position in
 SEQUENCE, so inserting a step renumbers every later one and every pointer that
 cites a step by key follows. The sheet prints the step text
 (draw_pd_paper_drive_assembly); this module holds the order and the few fit-up
@@ -8,7 +8,7 @@ values no part spec owns, because they belong to the assembly procedure, not
 to a part. The current feed reference comes from ``paper_drive_geom``'s
 selected sprocket and gear ratios, not a historical pitch or tip-based
 rolling diameter. The collar rear-face fit, wheel/pilot float and stud cut
-come from MHA-PD-022 (its sheet shares the fit phrases, R9-30). Its actual
+come from MHA-PD-22 (its sheet shares the fit phrases, R9-30). Its actual
 loaded overlap inspection precedes final platen installation and does not
 turn the static F-to-disc setting into a clearance certificate.
 The feed rack's datum setup and its closed-form gates live in
@@ -29,13 +29,13 @@ import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
 import paper_drive_geom as paper_geometry
 
-DRAWING_NUMBER = "MHA-PD-000"
+DRAWING_NUMBER = "MHA-PD-00"
 
 # The chain fit-up starts from the crank side complete per its own fit-up
 # (CONTRACT-paper-drive.md §13.2 procedure (1)): the 16T set on its feeler and
-# the seat washer faced (MHA-DT-000 "crank-mesh-checked"), then the selected chain
-# wheel on the crankshaft (MHA-DT-000 "paper-drive-wheel"). Cited by key so the
-# pointer follows any renumbering of MHA-DT-000; both print on its cone-and-crank
+# the seat washer faced (MHA-DT-00 "crank-mesh-checked"), then the selected chain
+# wheel on the crankshaft (MHA-DT-00 "paper-drive-wheel"). Cited by key so the
+# pointer follows any renumbering of MHA-DT-00; both print on its cone-and-crank
 # sequence sheet (draw_dt_drive_train_assembly.SEQUENCE_SHEET).
 CRANK_SIDE_KEYS = ("crank-mesh-checked", "paper-drive-wheel")
 CRANK_SIDE_SHEET = 7
@@ -79,7 +79,7 @@ SEQUENCE: tuple[str, ...] = (
     "hub-faced-to-nose",
     "disc-taps-transferred",
     # R9-47: tips flush to 0.20 below the disc's rear face, cut ends broken
-    # (vn_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
+    # (pd_vn_transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
     "disc-screws-cut",
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushing blanks, the ring last.
@@ -103,8 +103,8 @@ SEQUENCE: tuple[str, ...] = (
     "loaded-rack-geometry-checked",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
-    # R9-68: in that pose, the MHA-PD-025 front bushing faced to m (the F-to-disc
-    # window, cluster forward), then the MHA-PD-024 rear bushing faced to the
+    # R9-68: in that pose, the MHA-PD-25 front bushing faced to m (the F-to-disc
+    # window, cluster forward), then the MHA-PD-24 rear bushing faced to the
     # cluster's float (transgear_cluster_fit).
     "front-bushing-faced-to-fit",
     "rear-bushing-faced-to-fit",
@@ -133,7 +133,7 @@ def step_number(key: str) -> int:
 
 
 def step_ref(key: str) -> str:
-    """A pointer another sheet prints, e.g. ``MHA-PD-000 STEP 4``."""
+    """A pointer another sheet prints, e.g. ``MHA-PD-00 STEP 4``."""
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 
@@ -211,10 +211,10 @@ RACK_ROOT_CLEARANCE_FLOOR = mesh_check.RACK_ROOT_CLEARANCE_FLOOR_MM
 OFFSET_ACCEPT_TOL = 0.10
 # What the acceptance passes, in service: the seated front faces within the
 # accepted band, the mid-planes a half plate band either way (both chain
-# wheels are MHA-PD-009 plates); then the crank's end play, the knob's end
+# wheels are MHA-PD-09 plates); then the crank's end play, the knob's end
 # float and the knob wheel's own float under the nut forward. Nothing moves the
-# crank wheel rearward: MHA-VN-049 holds the arm on a spacer pressed on the
-# MHA-VN-041 shoulder, so its tilt is fixed in the bar and read here as made
+# crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer pressed on the
+# MHA-PD-VN-57 shoulder, so its tilt is fixed in the bar and read here as made
 # (pd_transgear_drive_collar_spec's in-service terms):
 _HALF_PLATE_SPREAD = (max(removable.PLATE_BAND) - min(removable.PLATE_BAND)) / 2.0
 ACCEPTED_CHAIN_OFFSET_IN_SERVICE = (

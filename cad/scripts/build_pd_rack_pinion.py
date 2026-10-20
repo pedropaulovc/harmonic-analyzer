@@ -1,10 +1,10 @@
-r"""Reproduction script: translational-gearing reducer disc MHA-PD-006 (book ch. 23).
+r"""Reproduction script: translational-gearing reducer disc MHA-PD-06 (book ch. 23).
 
 The large thin brass reducer disc retains the narrated 120 physical teeth,
 cut by the finite PA20 48DP stock #2/reference-55 master. It does not
 touch the rack: the finite stock #8/reference-12 knob pinion drives it 12:120.
 Its bore pilots on the brass hub's Ø13.1 spigot, and three #0-80 fillister
-screws (MHA-VN-039) clamp it to that hub's flange (MHA-PD-017).
+screws (MHA-PD-VN-55) clamp it to that hub's flange (MHA-PD-17).
 
 Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
 ``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
@@ -90,16 +90,16 @@ from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_X_FACTOR,
     BOLT_CIRCLE_Y_FACTOR,
 )
-from vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
+from pd_vn_transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 
-# The MHA-VN-039 screw's worst full-thread engagement in the through taps (the
+# The MHA-PD-VN-55 screw's worst full-thread engagement in the through taps (the
 # tap's lead runs out of the rear face; the losses are the mouths' burr
 # breaks and the cut tip), floored so the MIN never rounds up.
 ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
 MANUFACTURING_NOTES = "\n".join(
     (
         DRAWING_NOTES,
-        "#0-80 TAPS FULL THREAD THRU; MHA-VN-039 SCREW ENGAGEMENT "
+        "#0-80 TAPS FULL THREAD THRU; MHA-PD-VN-55 SCREW ENGAGEMENT "
         f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN.",
     )
 )
@@ -205,7 +205,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- #0-80 taps through, placed from the rear face on the flange's bolt
     # circle.  The sheet prints no position:
-    # the shop transfers each tap from its MHA-PD-017 flange hole at assembly.
+    # the shop transfers each tap from its MHA-PD-17 flange hole at assembly.
     taps = wizard_holes(
         adapter,
         TAP_SPEC,

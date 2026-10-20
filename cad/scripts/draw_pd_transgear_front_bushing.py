@@ -1,9 +1,9 @@
-r"""Create the manufacturing drawing for the transgear front bushing (MHA-PD-025).
+r"""Create the manufacturing drawing for the transgear front bushing (MHA-PD-25).
 
 A turned brass ring: Ø12 O.D. over a reamed Ø3.900 bore, a 0.5 x 45 deg
 chamfer on the ring face's O.D. edge, faced to fit at assembly, so its
 modelled length prints as a REFERENCE under the fit-at-assembly callout and
-the MHA-PD-000 step that sets it.  The profile lies as it sits in the lathe
+the MHA-PD-00 step that sets it.  The profile lies as it sits in the lathe
 (axis horizontal): the ``*Top`` view turned a quarter turn, so model +Z runs
 LEFT and the nose face (z 0) is the profile's right end, the chamfered ring
 face its left end.  Each end face carries its running finish, the length
@@ -105,7 +105,7 @@ _PROFILE_RING_X = PROFILE_CENTER[0] - LENGTH * _S / 2.0  # z LENGTH, left end
 _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
-# Faced to fit at MHA-PD-000's front-bushing step (m); the pointer comes from
+# Faced to fit at MHA-PD-00's front-bushing step (m); the pointer comes from
 # the step registry.
 FIT_STEP_KEY = "front-bushing-faced-to-fit"
 

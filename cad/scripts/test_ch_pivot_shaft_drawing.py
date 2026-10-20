@@ -1,4 +1,4 @@
-"""Offline contracts for the pivot-shaft (MHA-CH-005) drawing."""
+"""Offline contracts for the pivot-shaft (MHA-CH-05) drawing."""
 
 from __future__ import annotations
 
@@ -144,7 +144,7 @@ def test_the_isometric_note_states_the_only_off_sheet_scale() -> None:
 
 def test_part_stamps_make_critical_properties() -> None:
     config = _config.parts("ch-pivot-shaft")
-    assert config["number"] == "MHA-CH-005"
+    assert config["number"] == "MHA-CH-05"
     assert "1018" in str(config["material_specification"])
     assert config["finish"]
     assert int(config["quantity"]) == 1

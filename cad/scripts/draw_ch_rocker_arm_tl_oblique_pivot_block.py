@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's pivot block (MHA-CH-006-TL-22)."""
+r"""Create the drawing for the oblique-trammel jig's pivot block (MHA-CH-06-TL-22)."""
 
 from __future__ import annotations
 
@@ -1020,7 +1020,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Pivot Block Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel pivot block; 6061-T6; MHA-CH-006-TL-22",
+            3: "rocker oblique trammel pivot block; 6061-T6; MHA-CH-06-TL-22",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

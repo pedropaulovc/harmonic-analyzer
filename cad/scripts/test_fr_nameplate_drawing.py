@@ -21,7 +21,7 @@ from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dime
 from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _release_artwork import bundle_path
-from vn_fillister_screw_spec import HEAD_DIA
+from _mcmaster_90114a511 import HEAD_DIA
 
 # Sheet B landscape inner border and the title block's top-left corner (m).
 _BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
@@ -750,7 +750,7 @@ def test_part_registry_row_carries_the_title_block_facts() -> None:
     import _config
 
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-FR-004"
+    assert row["number"] == "MHA-FR-04"
     assert "brass" in str(row["material_specification"]).lower()
     assert row["finish"]
     assert int(row["quantity"]) == 1

@@ -1,4 +1,4 @@
-"""Offline contracts for the output fixture (MHA-MG-006): part, sheet, pose."""
+"""Offline contracts for the output fixture (MHA-MG-06): part, sheet, pose."""
 
 from __future__ import annotations
 
@@ -140,7 +140,7 @@ def test_installed_hook_sits_on_the_wire_start() -> None:
     # Option A1: the hook lies in the rod's own plane (dz = 0), on the bracket
     # side, and the run heads further from the rod, so the wire clears it.
     from mg_magnifying_vertical_rod_geom import ROD_DIA
-    import vn_lever_wire_geom as wire
+    import mg_vn_lever_wire_geom as wire
 
     assert geom.HOOK_TARGET_Z == geom.VROD_Z
     assert -geom.HOOK_OFFSET_X - ROD_DIA / 2.0 - geom.WIRE_DIA / 2.0 >= geom.WIRE_CLEARANCE

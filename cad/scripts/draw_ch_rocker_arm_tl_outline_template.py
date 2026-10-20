@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker arm's outline template (MHA-CH-006-TL-13).
+r"""Create the drawing for the rocker arm's outline template (MHA-CH-06-TL-13).
 
 The face view (``*Front``, 1:1) carries the whole outline from the pivot
 hole: both apex heights on the mirror line, both radii, the arc-end stations
@@ -439,7 +439,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Arm Outline Template Drawing",
             1: "Harmonic Analyzer shop gauge drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm layout and profile template; annealed O1; MHA-CH-006-TL-13",
+            3: "rocker arm layout and profile template; annealed O1; MHA-CH-06-TL-13",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

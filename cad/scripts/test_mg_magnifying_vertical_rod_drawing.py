@@ -162,7 +162,7 @@ def test_tolerances_are_native_on_the_model() -> None:
     assert drawing.ORIGIN_DIMENSIONS == ("BodyLength", "ThreadLength")
     assert drawing.DIMENSION_CALLOUTS == {
         "BodyLength": "FROM SHOULDER",
-        "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
+        "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-02;\nTIP CLEARS ITS TAP",
         "DomeR": "TANGENT HEMISPHERE",
     }
     # Owner ruling 2026-10-17: the Ø prints plain at the title block's band.
@@ -176,7 +176,7 @@ def test_tolerances_are_native_on_the_model() -> None:
     for callout in drawing.DIMENSION_CALLOUTS.values():
         lines = callout.splitlines()
         assert len(lines) <= 4 and all(len(line) <= 20 for line in lines), callout
-        assert not any(ch.isdigit() for ch in callout.replace("MHA-MG-002", ""))
+        assert not any(ch.isdigit() for ch in callout.replace("MHA-MG-02", ""))
 
 
 def test_relief_root_radius_reads_clear_in_detail_a() -> None:
@@ -244,9 +244,9 @@ def test_no_general_notes() -> None:
 
 
 def _fixture_screw_reach() -> tuple[float, float]:
-    """Rod stations (from the thread tip) the MHA-MG-006 thumb screw can bear
+    """Rod stations (from the thread tip) the MHA-MG-06 thumb screw can bear
     on: its axis rides the fixture's hex axis, the hex reaches a corner radius
-    along the rod each way (its top corner stops on MHA-MG-002's bottom face,
+    along the rod each way (its top corner stops on MHA-MG-02's bottom face,
     at the shoulder; its bore stays on the body down to the dome tangent), and
     the tip widens the band by its radius."""
     import mg_output_fixture_geom as fixture
@@ -261,11 +261,11 @@ def _fixture_screw_reach() -> tuple[float, float]:
 
 
 def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
-    """Owner ruling 2026-10-17 (rule 6, a static seat, Ra 3.2): MHA-MG-006's
-    axial thumb screw (MHA-VN-011) locks the fixture wherever the operator
+    """Owner ruling 2026-10-17 (rule 6, a static seat, Ra 3.2): MHA-MG-06's
+    axial thumb screw (MHA-MG-VN-50) locks the fixture wherever the operator
     sets it along the rod (ch. 20 p. 46). Its reach lies on the body's one Ø5
     cylinder and covers nearly all of it, so the control qualifies that whole
-    face, with no zone lengths. No MHA-MG-002 screw bears on the rod."""
+    face, with no zone lengths. No MHA-MG-02 screw bears on the rod."""
     import build_mg_magnifier_assembly as assembly
     import mg_magnifying_clamp_geom as clamp
     import mg_output_fixture_geom as fixture
@@ -295,7 +295,7 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
     half = fixture.HEX_CORNER_RADIUS
     assert body[0] + half <= station <= body[1] - half
     assert assembly.FIXTURE_SCREW_TIP_X == spec.ROD_DIA / 2.0
-    # MHA-MG-002: its thumb screw enters the top face and stops on the lever
+    # MHA-MG-02: its thumb screw enters the top face and stops on the lever
     # (the drill to the lever bore's axis); the rod's threaded end, screwed
     # into the bottom face, stops under that bore, so no clamp screw meets it.
     assert clamp.THUMB_TAP_DRILL_DEPTH == pytest.approx(

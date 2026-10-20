@@ -1,4 +1,4 @@
-r"""Keeper-chain anchor eye (MHA-DT-028) drawing-only data: the marked-dimension
+r"""Keeper-chain anchor eye (MHA-DT-28) drawing-only data: the marked-dimension
 and precision contract and the manufacturing notes the part build stamps into
 the SLDPRT.
 
@@ -50,7 +50,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 REFERENCE_DIMENSIONS = frozenset({"WireDia"})
 DIMENSION_CALLOUTS: dict[str, str] = {
     "WireDia": "WIRE",
-    "LoopID": "MHA-VN-035 BEAD CHAIN PASSES FREELY",
+    "LoopID": "MHA-DT-VN-65 BEAD CHAIN PASSES FREELY",
 }
 if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
     DRAWING_PRECISION_BY_NAME
@@ -62,7 +62,7 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 DRAWING_NOTES = "\n".join(
     (
         "1. LOOP CLOSED ON THE TAIL; LOOP AND TAIL IN ONE PLANE.",
-        "2. TAIL CLAMPED FLAT ON THE MHA-DT-006 ARM FACE"
-        " UNDER THE MHA-VN-006 SCREW HEAD.",
+        "2. TAIL CLAMPED FLAT ON THE MHA-DT-06 ARM FACE"
+        " UNDER THE MHA-DT-VN-50 SCREW HEAD.",
     )
 )

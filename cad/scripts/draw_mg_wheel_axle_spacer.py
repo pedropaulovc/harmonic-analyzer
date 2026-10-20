@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the wheel-axle spacer (MHA-MG-011).
+r"""Create the manufacturing drawing for the wheel-axle spacer (MHA-MG-11).
 
 Run with SolidWorks open::
 

@@ -1,4 +1,4 @@
-number: MHA-CH-006-TL-000
+number: MHA-CH-06-TL-00
 # ch-rocker-arm-tl-oblique-jig assembly contract (shop fixture; never in the
 # machine tree) -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the jig's
@@ -31,18 +31,18 @@ allowed_free_stems:
   - ch-rocker-arm-tl-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-oblique-nut-bracket
-  - ch-rocker-arm-tl-oblique-carriage
-  - ch-rocker-arm-tl-oblique-bearing
-  - ch-rocker-arm-tl-oblique-cl-dowel
-  - ch-rocker-arm-tl-oblique-leadscrew-nut
-  - ch-rocker-arm-tl-oblique-block-screw
-  - ch-rocker-arm-tl-oblique-carriage-screw
-  - ch-rocker-arm-tl-oblique-nut-screw
-  - ch-rocker-arm-tl-oblique-riser-screw
-  - ch-rocker-arm-tl-oblique-clamp-screw
-  - ch-rocker-arm-tl-oblique-lever-screw
-  - ch-rocker-arm-tl-oblique-block-washer
-  - ch-rocker-arm-tl-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-carriage
+  - ch-rocker-arm-tl-vn-oblique-bearing
+  - ch-rocker-arm-tl-vn-oblique-cl-dowel
+  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-vn-oblique-block-screw
+  - ch-rocker-arm-tl-vn-oblique-carriage-screw
+  - ch-rocker-arm-tl-vn-oblique-nut-screw
+  - ch-rocker-arm-tl-vn-oblique-riser-screw
+  - ch-rocker-arm-tl-vn-oblique-clamp-screw
+  - ch-rocker-arm-tl-vn-oblique-lever-screw
+  - ch-rocker-arm-tl-vn-oblique-block-washer
+  - ch-rocker-arm-tl-vn-oblique-lever-washer
 # One freed DOF (carriage 1's slide, DOF manifest key carriage_slide); every
 # moving family rides it, so each must read under-constrained: a rider whose
 # lock mate silently fixed it to the ground would otherwise pass.
@@ -54,18 +54,18 @@ required_free_stems:
   - ch-rocker-arm-tl-oblique-hub-pin
   - ch-rocker-arm-tl-oblique-feed-lever
   - ch-rocker-arm-tl-oblique-nut-bracket
-  - ch-rocker-arm-tl-oblique-carriage
-  - ch-rocker-arm-tl-oblique-bearing
-  - ch-rocker-arm-tl-oblique-cl-dowel
-  - ch-rocker-arm-tl-oblique-leadscrew-nut
-  - ch-rocker-arm-tl-oblique-block-screw
-  - ch-rocker-arm-tl-oblique-carriage-screw
-  - ch-rocker-arm-tl-oblique-nut-screw
-  - ch-rocker-arm-tl-oblique-riser-screw
-  - ch-rocker-arm-tl-oblique-clamp-screw
-  - ch-rocker-arm-tl-oblique-lever-screw
-  - ch-rocker-arm-tl-oblique-block-washer
-  - ch-rocker-arm-tl-oblique-lever-washer
+  - ch-rocker-arm-tl-vn-oblique-carriage
+  - ch-rocker-arm-tl-vn-oblique-bearing
+  - ch-rocker-arm-tl-vn-oblique-cl-dowel
+  - ch-rocker-arm-tl-vn-oblique-leadscrew-nut
+  - ch-rocker-arm-tl-vn-oblique-block-screw
+  - ch-rocker-arm-tl-vn-oblique-carriage-screw
+  - ch-rocker-arm-tl-vn-oblique-nut-screw
+  - ch-rocker-arm-tl-vn-oblique-riser-screw
+  - ch-rocker-arm-tl-vn-oblique-clamp-screw
+  - ch-rocker-arm-tl-vn-oblique-lever-screw
+  - ch-rocker-arm-tl-vn-oblique-block-washer
+  - ch-rocker-arm-tl-vn-oblique-lever-washer
 # The sweep; verify's pass-sweep-interference-free gate replays the recorded
 # slide drive through both passes (the .<asm>.sweep.json sidecar).
 free_dof: 1
@@ -83,7 +83,7 @@ machinist_exceptions:
     kind: "accept"
     where: "step 7C (sheet 6): CENTRE 50.000 FROM THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS), the nut bracket's set on pivot block 1 before its taps are spotted"
     finding: "a three-place set given to hold the #8 taps' end walls (rules 4 and 17: walls fixed with geometry, not a tighter band)"
-    reason: "TL-29 cannot grow: a longer bracket puts the leadscrew feed gap under 2.5 and its 3/4 stock caps the length, so the set takes the title block's .XXX band (+/-0.13) with its reason, and each #8 tap's end wall is 1.544 min at the worst case of every band, over the 1.5 floor; MHA-CH-006-TL-29 states it on its #8 callout (nut bracket spec END_WALL_MIN, self-checked) (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
+    reason: "TL-29 cannot grow: a longer bracket puts the leadscrew feed gap under 2.5 and its 3/4 stock caps the length, so the set takes the title block's .XXX band (+/-0.13) with its reason, and each #8 tap's end wall is 1.544 min at the worst case of every band, over the 1.5 floor; MHA-CH-06-TL-29 states it on its #8 callout (nut bracket spec END_WALL_MIN, self-checked) (owner ruling 2026-10-17, via coordinator) (owner-accepted)"
   - id: "RV-03"
     kind: "accept"
     where: "step 8 (sheet 6): the handwheel's and the two KP08 pillow blocks' set screws on the leadscrew's flats, EACH LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER"

@@ -1,6 +1,6 @@
 """Pure contract shared by the paper-drive builder's explode and its drawing.
 
-The MHA-PD-000 platen-and-support sheet balloons the bar, its column clamps,
+The MHA-PD-00 platen-and-support sheet balloons the bar, its column clamps,
 the platen and everything that rides it on one exploded isometric. This
 module names that presentation and the ordered native steps that open it.
 Positions come from the opened model; distances are presentation offsets,
@@ -34,31 +34,31 @@ class ExplodeStep:
 
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("rack below the platen", ("pd-platen-rack",), "y", -35.0),
-    ExplodeStep("guide screws forward", ("vn-fillister-screw",), "z", -45.0),
+    ExplodeStep("guide screws forward", ("pd-vn-fillister-screw",), "z", -45.0),
     ExplodeStep(
         "clips and paper forward",
-        ("pd-platen-clip", "pd-platen-paper", "vn-platen-clip-screw"),
+        ("pd-platen-clip", "pd-platen-paper", "pd-vn-platen-clip-screw"),
         "z",
         -40.0,
     ),
-    ExplodeStep("clip screws forward", ("vn-platen-clip-screw",), "z", -30.0),
+    ExplodeStep("clip screws forward", ("pd-vn-platen-clip-screw",), "z", -30.0),
     ExplodeStep(
         "guides above the platen",
-        ("pd-platen-guide", "pd-guide-lock", "vn-guide-lock-screw"),
+        ("pd-platen-guide", "pd-guide-lock", "pd-vn-guide-lock-screw"),
         "y",
         110.0,
     ),
     ExplodeStep(
-        "locks above the guides", ("pd-guide-lock", "vn-guide-lock-screw"), "y", 45.0
+        "locks above the guides", ("pd-guide-lock", "pd-vn-guide-lock-screw"), "y", 45.0
     ),
-    ExplodeStep("lock screws rearward", ("vn-guide-lock-screw",), "z", 35.0),
+    ExplodeStep("lock screws rearward", ("pd-vn-guide-lock-screw",), "z", 35.0),
     ExplodeStep(
         "bar above the locks",
         (
             "pd-support-bar",
             "sh-column-clamp-front",
             "sh-column-clamp-back",
-            "vn-clamp-screw",
+            "pd-vn-clamp-screw",
         ),
         "y",
         200.0,
@@ -70,7 +70,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         30.0,
     ),
     ExplodeStep("back arcs rearward", ("sh-column-clamp-back",), "z", 30.0),
-    ExplodeStep("clamp screws forward", ("vn-clamp-screw",), "z", -45.0),
+    ExplodeStep("clamp screws forward", ("pd-vn-clamp-screw",), "z", -45.0),
 )
 # The platen carries the balloons in place.
 STATIONARY_STEMS = frozenset({"pd-platen"})

@@ -142,7 +142,7 @@ CHANNELS = _config.active_count()
 # the pen tip traces truth_model.pen_y -- the computed-not-simulated summation,
 # with no force solver (cad/docs/motion-policy.md).
 MOTION_OWNER = "pn-pen"
-PEN_MARKER_STEM = "vn-pen-marker"  # the carriage tip whose Y traces the curve
+PEN_MARKER_STEM = "pn-vn-pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
 # stroke extremes (the square-wave preset peaks at 0 and 180) are exercised.
 _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 360.0]
@@ -182,10 +182,10 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # The channel + drive-train bands scale with the built channel count N (the
 # active_count build-speed knob): channel = 8N + 17 (N×{rocker,rod,rod-pivot-pin,
 # bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + 2 thrust washers
-# (MHA-VN-070, south and north) + fulcrum shaft + 2 pivot brackets
-# + 2 bracket hold-down screws (MHA-VN-032) + 2 pivot-arbor apex set screws
-# (MHA-VN-034) + 2 fulcrum keepers + 2 keeper foot screws (MHA-VN-022)
-# + 2 keeper crown set screws (MHA-VN-055) + the MHA-VN-053 rocker-bank
+# (MHA-CH-VN-56, south and north) + fulcrum shaft + 2 pivot brackets
+# + 2 bracket hold-down screws (MHA-CH-VN-57) + 2 pivot-arbor apex set screws
+# (MHA-CH-VN-53) + 2 fulcrum keepers + 2 keeper foot screws (MHA-CH-VN-52)
+# + 2 keeper crown set screws (MHA-CH-VN-55) + the MHA-CH-VN-54 rocker-bank
 # wave spring; the 2 spacer bushings per gap are gone -- integral hubs),
 # drive-train = 62 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
@@ -197,7 +197,7 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # + 2 foot screws (PR7), 2 eccentric cam collars (PR8), + the PR2 cone-swing
 # hardware 6: lock knob, pivot screw, swing-stop screw, tip
 # bushing/adjuster/pinch screw, MINUS the crank-pedestal the merged column
-# absorbed, + the MHA-VN-052 cylinder-bank spring (#948 ruling R), plus N
+# absorbed, + the MHA-DT-VN-68 cylinder-bank spring (#948 ruling R), plus N
 # cylinder gears). At N=20 they give 177 and 82 (measured 164 and 77 pre-PR8 ->
 # 81 before the pins and springs) and stay correct at N=3.
 _N_CH = _config.active_count()
@@ -205,16 +205,16 @@ _COMPONENT_BAND = {
     "fr-frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
     # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
     # rederive; plain capped column stubs, NO column nuts)
-    # #948 ruling R (PR #1292): + the MHA-VN-052 bank spring.
+    # #948 ruling R (PR #1292): + the MHA-DT-VN-68 bank spring.
     "dt-drive-train": (62 + _N_CH - 4, 62 + _N_CH + 4),  # N=20 -> (78,86), expected 82
     "ch-channel": (
         8 * _N_CH + 17 - 6,
         8 * _N_CH + 17 + 6,
-    ),  # N=20 -> (171,183), expected 177 (#948 ruling R: + MHA-VN-053)
+    ),  # N=20 -> (171,183), expected 177 (#948 ruling R: + MHA-CH-VN-54)
     # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
     # keepers +2 keeper foot screws nets +2; 2026-10-10: #1307 one hold-down
     # per pivot bracket -2; #1317 +2 pivot-arbor apex set screws, both thrust
-    # washers and the wave spring; +2 MHA-VN-055 fulcrum crown set screws)
+    # washers and the wave spring; +2 MHA-CH-VN-55 fulcrum crown set screws)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
     "sm-summing": (14, 16),  # ch 18-19, source-recipe expected 15: two mounts,
@@ -229,7 +229,7 @@ _COMPONENT_BAND = {
     # ch16 (2026-10-09 re-derivation): stick, block, cover, 2 plate screws and
     # the thumbscrew.
     "ms-measuring-stick": (5, 7),  # expected 6
-    # The rocker's oblique-trammel jig (shop fixture, TL-000; never under the
+    # The rocker's oblique-trammel jig (shop fixture, TL-00; never under the
     # top): its 9 made parts (13 instances) and its 20 bought families, every
     # screw, stud, nut and bearing inserted (jig spec QUANTITIES).
     "ch-rocker-arm-tl-oblique-jig": (81, 83),  # expected 82
@@ -1002,7 +1002,7 @@ async def _verify_static_one(
         # EXACT SET: no component outside the allowed coupled families may
         # read under-constrained (an unintended freedom fails here, the
         # replacement for the retired release park-closure proof).
-        # pd-paper-drive alone has a SHARED stem (three vn-transgear-removable siblings),
+        # pd-paper-drive alone has a SHARED stem (three pd-transgear-removable siblings),
         # so target the EXACT T12 crank instance from the recorded DOF manifest
         # (codex #189 :679); every other assembly keeps its unique stem families
         # (unchanged -- their DOF map to distinct part names).
@@ -1546,7 +1546,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """
     import build_mg_magnifier_assembly as _mag
     from mg_output_fixture_geom import HOOK_LOCAL
-    import vn_lever_wire_geom as _wire
+    import mg_vn_lever_wire_geom as _wire
 
     name = "mg-magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
@@ -1589,7 +1589,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("vn-lever-wire-1")
+        rows, pos = _xform("mg-vn-lever-wire-1")
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat
@@ -1804,8 +1804,8 @@ def verify_spring_base(report: Report) -> None:
 
     def _channel_mounts() -> None:
         import build_ch_channel_assembly as channel
-        import vn_channel_spring_installed_spec as spec
-        import vn_channel_spring_stock_geom as stock
+        import ch_vn_channel_spring_installed_spec as spec
+        import ch_vn_channel_spring_stock_geom as stock
         import spring_mount_geom as mounts
 
         stations = sorted(
@@ -1862,11 +1862,11 @@ def verify_base_footprint(report: Report) -> None:
 
     def _mounts_on_plate() -> None:
         import build_dt_arbor_pedestal as arbor_post
-        import vn_cone_pivot_screw_spec as pscrew
+        import dt_vn_cone_pivot_screw_spec as pscrew
         import dt_cone_swing_platform_geometry as platform
         import build_dt_drive_train_assembly as train
         import fr_harmonic_base_spec as base
-        import vn_swing_stop_screw_spec as sscrew
+        import dt_vn_swing_stop_screw_spec as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1894,21 +1894,21 @@ def verify_base_footprint(report: Report) -> None:
             ),
             # base-bolted statics; head/washer is each one's widest plan extent
             (
-                "vn-cone-lock-knob",
+                "dt-vn-cone-lock-knob",
                 train.KNOB_X,
                 train.KNOB_Z,
                 train.KNOB_HEAD_DIA / 2.0,
                 train.KNOB_HEAD_DIA / 2.0,
             ),
             (
-                "vn-cone-pivot-screw",
+                "dt-vn-cone-pivot-screw",
                 pv[0],
                 pv[2],
                 pscrew.HEAD_DIA / 2.0,
                 pscrew.HEAD_DIA / 2.0,
             ),
             (
-                "vn-swing-stop-screw",
+                "dt-vn-swing-stop-screw",
                 train.STOP_X,
                 train.STOP_Z,
                 sscrew.HEAD_DIA / 2.0,

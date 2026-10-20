@@ -1,4 +1,4 @@
-r"""MHA-MG-002 magnifying clamp: the drawing contract shared by part and sheet.
+r"""MHA-MG-02 magnifying clamp: the drawing contract shared by part and sheet.
 
 PURE DATA, no SolidWorks/COM imports.  The shape is
 ``mg_magnifying_clamp_geom``'s (the assembly, the error budget and the web
@@ -7,9 +7,9 @@ about it: the marked model dimensions and their places, the walls at the worst
 case of the printed bands and the stock, the plug taps' reach and the sheet
 text.
 
-Sheet datums: the heights run from the bottom face (the MHA-MG-004 shoulder
+Sheet datums: the heights run from the bottom face (the MHA-MG-04 shoulder
 seat).  The lever bore and both #4-40 taps sit on the hex axis, centred
-between the flats by symmetry (the MHA-MG-006 rod bore's precedent), with no
+between the flats by symmetry (the MHA-MG-06 rod bore's precedent), with no
 location from a flat: the thumb-screw tap from the top face into the lever
 bore, the rod tap blind from the bottom face (``mg_rod_clamp_joint``).
 """
@@ -121,7 +121,7 @@ WALLS: dict[str, tuple[float, float]] = {
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
-            f"MHA-MG-002 {_name} wall {_worst:.3f} at the printed worst case is "
+            f"MHA-MG-02 {_name} wall {_worst:.3f} at the printed worst case is "
             f"under {WALL_TARGET}"
         )
 
@@ -133,7 +133,7 @@ for _name, (_nominal, _worst) in WALLS.items():
 PLUG_TAP_USABLE_LENGTH = 9.0 / 16.0 * 25.4
 PLUG_TAP_CHAMFER_THREADS = (3, 5)
 if abs(PLUG_TAP_CHAMFER_THREADS[1] * THREAD_PITCH - PLUG_TAP_LEAD) > 1e-9:
-    raise AssertionError("MHA-MG-002 plug-tap lead disagrees with the rod joint's")
+    raise AssertionError("MHA-MG-02 plug-tap lead disagrees with the rod joint's")
 # Top face to the bore axis: both heights at their .XX limits.
 _TOP_TO_AXIS_MAX = TOP_TO_BORE + 2.0 * _HEIGHT_BAND
 _TOP_TO_AXIS_MIN = TOP_TO_BORE - 2.0 * _HEIGHT_BAND
@@ -154,15 +154,15 @@ FAR_WALL_NEAREST = _TOP_TO_AXIS_MIN + _THREAD_HALF_CHORD
 # tap's usable length.
 TAP_STOP_WINDOW = 2.0 * _THREAD_HALF_CHORD - PLUG_TAP_LEAD
 if TAP_STOP_WINDOW <= 0.0:
-    raise AssertionError("MHA-MG-002 plug tap meets the far wall before full thread")
+    raise AssertionError("MHA-MG-02 plug tap meets the far wall before full thread")
 if TAP_REACH_NEEDED > PLUG_TAP_USABLE_LENGTH + 1e-9:
-    raise AssertionError("MHA-MG-002 plug tap cannot cut full thread through the wall")
+    raise AssertionError("MHA-MG-02 plug tap cannot cut full thread through the wall")
 # The callout's (REF) thread depth is the nominal wall on the tap's axis.
 if abs(THUMB_TAP_LENGTH - (TOP_TO_BORE - LEVER_BORE_DIA / 2.0)) > 1e-9:
-    raise AssertionError("MHA-MG-002 thread depth is not the wall on the tap's axis")
+    raise AssertionError("MHA-MG-02 thread depth is not the wall on the tap's axis")
 # The thumb screw's full thread at the printed worst case (geom computes it).
 if THUMB_ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
-    raise AssertionError("MHA-MG-002 thumb-screw thread under 1.5D")
+    raise AssertionError("MHA-MG-02 thumb-screw thread under 1.5D")
 
 # The tap drill, at its printed .XX depth: its full Ø clears the near wall at
 # the shallowest depth, and its 118 deg point stops short of the far wall at
@@ -177,17 +177,17 @@ THUMB_DRILL_FAR_CLEAR = (_TOP_TO_AXIS_MIN + _DRILL_HALF_CHORD) - (
     THUMB_TAP_DRILL_DEPTH + _DEPTH_BAND + ROD_TAP_DRILL_POINT
 )
 if not THUMB_DRILL_NEAR_CLEAR > 0.0:
-    raise AssertionError("MHA-MG-002 thumb tap drill stops in the near wall")
+    raise AssertionError("MHA-MG-02 thumb tap drill stops in the near wall")
 if not THUMB_DRILL_FAR_CLEAR > 0.0:
-    raise AssertionError("MHA-MG-002 thumb tap drill point reaches the far wall")
+    raise AssertionError("MHA-MG-02 thumb tap drill point reaches the far wall")
 # The rod tap's drill and thread both fit the plug tap's reach from the face.
 if not ROD_TAP_THREAD_DEPTH_MAX + PLUG_TAP_LEAD <= PLUG_TAP_USABLE_LENGTH + 1e-9:
-    raise AssertionError("MHA-MG-002 rod tap is deeper than the plug tap reaches")
+    raise AssertionError("MHA-MG-02 rod tap is deeper than the plug tap reaches")
 if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX:
-    raise AssertionError("MHA-MG-002 rod tap drill reaches the lever bore")
+    raise AssertionError("MHA-MG-02 rod tap drill reaches the lever bore")
 
 # --- Squareness ----------------------------------------------------------------
-# The MHA-MG-004 rod seats on the bottom face, so it hangs at the lever bore's
+# The MHA-MG-04 rod seats on the bottom face, so it hangs at the lever bore's
 # angle to that seat: the title block's +/-1 deg on the drawn 90 deg.  1 deg
 # along the lever swings the wire hook (60.00 under the bore axis, 10.02 toward
 # the knife) 1.05 along the lever and 0.17 vertically, moving the wire moment
@@ -221,12 +221,12 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in names.items()
 }
 if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
-    raise AssertionError("MHA-MG-002 reference dimension is unprinted")
+    raise AssertionError("MHA-MG-02 reference dimension is unprinted")
 
 # --- Sheet text ----------------------------------------------------------------
 # The lever bore's Ø: drilled and the mate it slides on (rule 4), one row each
 # under the Ø.  Its wall to a flat holds the target, so the sheet states none.
-LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON Ø6 LEVER MHA-MG-003"))
+LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON Ø6 LEVER MHA-MG-03"))
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE"
 ROD_TAP_PROCESS = "TAP"
@@ -239,8 +239,8 @@ TAP_CALLOUT_PRECISION = {
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
 STOCK_NOTE = "7/16 HEX BAR, FLATS AS SUPPLIED."
-# The MHA-MG-004 shoulder's face, flagged on Section A-A's bottom line.
-SEAT_NOTE = "MHA-MG-004 SHOULDER SEAT:\nNO CHAMFER OR SPOTFACE AT TAP"
+# The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
+SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT:\nNO CHAMFER OR SPOTFACE AT TAP"
 # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the stock.
 DRAWING_NOTES = STOCK_NOTE
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

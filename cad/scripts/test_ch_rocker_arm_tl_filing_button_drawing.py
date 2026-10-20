@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker arm hub filing kit (MHA-CH-006-TL-04/-05)."""
+"""Offline contracts for the rocker arm hub filing kit (MHA-CH-06-TL-04/-05)."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def test_every_exported_nominal_lies_inside_its_band(stem: str) -> None:
 # Each printed toleranced dimension -> the exported feature and requirement
 # that owns its band. Reference sizes governed by a matched-fit callout, the
 # thread designation and the corner radii (tool-form sizes read with a radius
-# gauge, as vn_cone_tip_collar's shoulder root) own no band.
+# gauge, as dt_vn_cone_tip_collar's shoulder root) own no band.
 PRINTED_OWNERS = {
     BUTTON: (
         button,

@@ -1,0 +1,15 @@
+mg-vn-lever-wire:
+  title: Lever Wire
+  number: MHA-MG-VN-56
+  stock_name: Music Wire, 0.031 in, 1/4 lb Coil (Cut to Length)
+  supplier: McMaster-Carr
+  supplier_skus: [9666K56]
+  material: ASTM A228 music wire
+  material_specification: "ASTM A228 music wire, 0.031 in; McMaster-Carr 9666K56"
+  finish: phosphate coated, as supplied
+  installation_notes: |-
+    INSTALLATION - HOOK IN THE MHA-MG-06 OUTPUT FIXTURE SPIGOT GROOVE;
+    WRAP THE MHA-MG-10 DRUM.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

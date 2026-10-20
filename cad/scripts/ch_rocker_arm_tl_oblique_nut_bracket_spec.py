@@ -1,11 +1,11 @@
-r"""Pure-data contract for the oblique-trammel jig's nut bracket (MHA-CH-006-TL-29).
+r"""Pure-data contract for the oblique-trammel jig's nut bracket (MHA-CH-06-TL-29).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). One
 bracket hangs the leadscrew feed's flanged nut (bought, shop inventory
-``fixtures.trammel-tr8-flange-nut``) off pivot block 1 (MHA-CH-006-TL-22),
+``fixtures.trammel-tr8-flange-nut``) off pivot block 1 (MHA-CH-06-TL-22),
 so turning the handwheel drives the carriage along rail 1. The layout (the
 screw axis, the bracket's envelope and every bought dimension) belongs to
-``ch_rocker_arm_tl_oblique_leadscrew_spec``, imported as ``leadscrew``; this
+``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers, so a vendor swap of the nut only
 changes numbers there.
 
@@ -29,7 +29,7 @@ Features:
 - Two #8-32 UNC taps, blind from the Y = 0 face, spotted at assembly through
   TL-22's two side holes (``leadscrew.PIVOT_BLOCK_HOLE_SPEC``) with the
   bracket clamped on rail 1's pivot block at the X set (owner ruling 3B,
-  2026-10-17; TL-000's match-drill step), then drilled and tapped. The model
+  2026-10-17; TL-00's match-drill step), then drilled and tapped. The model
   holds them at TL-22's nominal stations (``leadscrew.BLOCK_SCREW_X``, row
   ``NUT_BRACKET_BLOCK_HOLES_Z``); the sheet prints no station. Two #8-32
   SHCS come through TL-22 into them, ``BLOCK_SCREW_ENGAGEMENT`` deep. The
@@ -93,7 +93,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 from _hole_spec import (
     CLEARANCE_MM,
@@ -112,7 +112,7 @@ DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 NUMBER = leadscrew.NUT_BRACKET_NUMBER
 QUANTITY = leadscrew.NUT_BRACKET_QUANTITY
 NUT_ID = leadscrew.NUT_ID
-PIVOT_BLOCK_NUMBER = "MHA-CH-006-TL-22"
+PIVOT_BLOCK_NUMBER = "MHA-CH-06-TL-22"
 
 # --- Bracket: 6061-T6 3/4 x 2 in flat --------------------------------------
 FACE_X = round(leadscrew.NUT_BRACKET_X[0], 9)  # the -X (nut) face, -9.25
@@ -142,7 +142,7 @@ BLOCK_THREAD = leadscrew.BLOCK_SCREW  # "#8-32"
 SCREW_X = tuple(round(x - FACE_X, 9) for x in leadscrew.BLOCK_SCREW_X)  # 4.25, 14.25
 SCREW_Z = round(leadscrew.NUT_BRACKET_BLOCK_HOLES_Z, 9)  # 22.3
 BLOCK_SCREW_POINTS = tuple((x, 0.0, SCREW_Z) for x in leadscrew.BLOCK_SCREW_X)
-# The X set (TL-000's match-drill step): clamped on TL-22's -Y face, the
+# The X set (TL-00's match-drill step): clamped on TL-22's -Y face, the
 # bracket's centre stands X_SET_MID from TL-22's -X end, within X_SET_BAND.
 # X_SET_MID is the mid-station of TL-22's
 # two side holes, so the bracket centres on them and each tap's end wall

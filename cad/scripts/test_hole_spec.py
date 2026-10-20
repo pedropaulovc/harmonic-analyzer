@@ -13,7 +13,7 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm, drill_process
 def test_crank_drill_process_is_derived_from_part_owned_specs() -> None:
     assert blind_cut_dia_mm(dt_crank_hub_spec.SERVICE_PIN_HOLE_SPEC) == 4.623
     assert drill_process(dt_crank_hub_spec.SERVICE_PIN_HOLE_SPEC) == "#14 DRILL"
-    # The arm pivot is tapped #4-40 (tap drill #43) for MHA-DT-032.
+    # The arm pivot is tapped #4-40 (tap drill #43) for MHA-DT-32.
     assert blind_cut_dia_mm(dt_crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC) == 2.261
     with pytest.raises(ValueError, match="not a drill-size hole"):
         drill_process(dt_crank_arm_spec.HANDLE_PIVOT_HOLE_SPEC)

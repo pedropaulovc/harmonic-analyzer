@@ -1,4 +1,4 @@
-r"""Build the rocker template trammel's pivot plate (MHA-CH-006-TL-19; shop fixture).
+r"""Build the rocker template trammel's pivot plate (MHA-CH-06-TL-19; shop fixture).
 
 A 1018 bar offcut screwed to the MDF scribing board; the trammel's 60 degree
 pivot point runs in its centre-drilled seat while R800/R816 are scribed

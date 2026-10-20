@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel pivot block (MHA-CH-006-TL-22)."""
+"""Offline contracts for the oblique-trammel pivot block (MHA-CH-06-TL-22)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 
 import _config
 import build_ch_rocker_arm_tl_oblique_pivot_block as part
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
@@ -328,7 +328,7 @@ def test_side_screw_walls_at_worst_case() -> None:
     assert math.isclose(worst["side counterbore to top face"], 10.325, abs_tol=1e-9)
     assert spec.SIDE_WALL_CALLOUT == "SETS C'BORE WALL 1.67 MIN"
     assert spec.SIDE_CALLOUT_BELOW == (
-        "MATCHES MHA-CH-006-TL-29\nSETS C'BORE WALL 1.67 MIN"
+        "MATCHES MHA-CH-06-TL-29\nSETS C'BORE WALL 1.67 MIN"
     )
     # c4 review: the row's 9.000 says which face it reads from; close-c4-r5:
     # and the mate its three places serve (rule 4), by its short number.
@@ -410,7 +410,7 @@ def test_side_screw_head_sinks_and_spacing_fits_the_float() -> None:
         )
         for i in (1, 2)
     ) == [(45.0, 9.0), (55.0, 9.0)]
-    assert "MHA-CH-006-TL-29" in features["side_screw_hole_1"]["note"]
+    assert "MHA-CH-06-TL-29" in features["side_screw_hole_1"]["note"]
 
 
 def test_carriage_screws_seat_and_reach_the_carriage_thread() -> None:
@@ -560,7 +560,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     config = _config.parts("ch-rocker-arm-tl-oblique-pivot-block")
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", config["number"])
-    assert config["number"] == "MHA-CH-006-TL-22"
+    assert config["number"] == "MHA-CH-06-TL-22"
     assert config["quantity"] == 2
 
 

@@ -10,9 +10,9 @@ so the drawing contract must NOT live here.  ``_spec`` re-exports these and adds
 the drawing data.
 
 #1559 owner ruling: the clamp is a VERTICAL length of stock 7/16 in hex brass.
-The Ø6 lever (MHA-MG-003) passes through it across the corners; the knurled
-thumb screw (MHA-VN-011) enters the top face on the hex axis and pinches the
-lever; the vertical rod (MHA-MG-004) screws into a blind tap in the bottom face
+The Ø6 lever (MHA-MG-03) passes through it across the corners; the knurled
+thumb screw (MHA-MG-VN-50) enters the top face on the hex axis and pinches the
+lever; the vertical rod (MHA-MG-04) screws into a blind tap in the bottom face
 on the same axis and seats on its shoulder (``mg_rod_clamp_joint``), so the
 thumb screw, the rod and the wire hook below all lie in one plane with the
 lever.
@@ -39,7 +39,7 @@ MM_PER_IN = 25.4
 
 # --- stock: 7/16 in hex brass bar, flats as supplied -------------------------
 HEX_AF = 7.0 / 16.0 * MM_PER_IN  # 11.1125 across flats
-# Commercial hex-bar across-flats band (the MHA-MG-006 HEX_STOCK_AF_BAND).
+# Commercial hex-bar across-flats band (the MHA-MG-06 HEX_STOCK_AF_BAND).
 HEX_AF_BAND = 0.13
 HEX_AC = HEX_AF / math.cos(math.radians(30.0))  # 12.8316 across corners
 # The block's extent ALONG THE LEVER: the bore runs corner to corner, so this
@@ -104,15 +104,15 @@ THUMB_TAP_SPEC = HoleSpec(
 # --- import-time geometry guards ---------------------------------------------
 if ROD_TAP_FLOOR_WALL_WORST < WALL_TARGET - 1e-9:
     raise AssertionError(
-        f"MHA-MG-002 rod-tap floor under the lever bore {ROD_TAP_FLOOR_WALL_WORST:.3f} "
+        f"MHA-MG-02 rod-tap floor under the lever bore {ROD_TAP_FLOOR_WALL_WORST:.3f} "
         f"at worst, under {WALL_TARGET}"
     )
 if THUMB_ENGAGEMENT_WORST < ENGAGEMENT_MIN - 1e-9:
     raise AssertionError(
-        f"MHA-MG-002 thumb-screw thread {THUMB_ENGAGEMENT_WORST:.3f} at worst, "
+        f"MHA-MG-02 thumb-screw thread {THUMB_ENGAGEMENT_WORST:.3f} at worst, "
         f"under 1.5D = {ENGAGEMENT_MIN:.3f}"
     )
 if not LEVER_BORE_DIA / 2.0 < HEX_AF / 2.0:
-    raise AssertionError("MHA-MG-002 lever bore breaks through a flat")
+    raise AssertionError("MHA-MG-02 lever bore breaks through a flat")
 if not 0.0 < THUMB_TAP_LENGTH < THUMB_TAP_DRILL_DEPTH:
-    raise AssertionError("MHA-MG-002 thumb tap drill stops short of its thread")
+    raise AssertionError("MHA-MG-02 thumb tap drill stops short of its thread")

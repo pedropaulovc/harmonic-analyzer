@@ -1,7 +1,7 @@
 r"""McMaster 9714K24 -- high-carbon steel wave disc spring, ID 0.265 x OD 0.367 in.
 
-Used as vn-rocker-bank-spring (MHA-VN-053).  The catalogue facts and the
-part frame are ``vn_rocker_bank_spring_spec``'s.  The model is the
+Used as ch-vn-rocker-bank-spring (MHA-CH-VN-54).  The catalogue facts and the
+part frame are ``ch_vn_rocker_bank_spring_spec``'s.  The model is the
 spring's installed envelope: one Top-plane ID x OD annulus extruded blind
 MODEL_HEIGHT along +Y from the south bearing face (y = 0).  [INFERENCE: the
 waves are not modelled; the envelope is what the bank layout and the
@@ -35,7 +35,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_rocker_bank_spring_spec import (  # noqa: E402
+from ch_vn_rocker_bank_spring_spec import (  # noqa: E402
     ID,
     MODEL_HEIGHT,
     OD,

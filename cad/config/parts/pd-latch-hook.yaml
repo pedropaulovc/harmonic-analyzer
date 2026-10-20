@@ -1,6 +1,6 @@
 pd-latch-hook:
   title: Latch Hook
-  number: MHA-PD-014
+  number: MHA-PD-14
   # pd_latch_hook_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
   material: "0.8 (0.032) 1095 spring steel"
   material_specification: "1095 spring steel sheet 0.032 in (0.8 mm) +/-0.03 mm, annealed"

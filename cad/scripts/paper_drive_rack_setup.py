@@ -1,7 +1,7 @@
 """The paper-drive feed-rack datum setup and its closed-form gates.
 
 The builder refuses a model whose rack pitch line, mesh or engaged-feed window
-leaves these bands, and MHA-PD-000 prints the same bands
+leaves these bands, and MHA-PD-00 prints the same bands
 (``pd_paper_drive_assembly_steps``). Owned here, not by the steps module, so
 the assembly's recipe carries the setup it gates on and never the sheet text.
 The frozen finite-rack reader requires the exact source-derived measured-datum
@@ -32,7 +32,7 @@ RACK_DATUM_MODEL_AXIS_DISTANCE_RANGE = tuple(
 )
 
 # Codex P1 on b2eb9a0e1: the hook's Ø3.3 pin hole is match-drilled from the
-# MHA-VN-042 pin with the largest pin on its lower edge
+# MHA-PD-VN-58 pin with the largest pin on its lower edge
 # ("hook-pin-hole-match-drilled"), so the unclamped arm cannot fall through
 # the hole. With no slack the latch adds no opening to the rack mesh's loose
 # datum end.

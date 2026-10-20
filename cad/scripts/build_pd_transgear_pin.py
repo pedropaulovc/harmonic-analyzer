@@ -1,12 +1,12 @@
-r"""Build MHA-PD-023, the transgear pin (R9-68).
+r"""Build MHA-PD-23, the transgear pin (R9-68).
 
-The plain steel pin the disc cluster runs on, pressed into the MHA-PD-018 arm
+The plain steel pin the disc cluster runs on, pressed into the MHA-PD-18 arm
 from the rear.  Dimensions and the derived fit facts live in
 ``pd_transgear_pin_spec``.
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø5.0 head land, the Ø3.900 ground shank, the MHA-VN-047 ring
+the rear: the Ø5.0 head land, the Ø3.900 ground shank, the MHA-PD-VN-61 ring
 groove (its FRONT wall, the load wall, at ``GROOVE_STATION`` from the seat)
 and the plain land in front of it.  The two spherical ends are separate
 revolves on the same plane.  The named plane ``GrooveLoadWall`` and
@@ -110,7 +110,7 @@ async def _dome(
     rim_drive: str,
     station_drive: str,
 ) -> SketchDims:
-    """A spherical end on the Right plane (the MHA-DT-017 cap idiom): base on
+    """A spherical end on the Right plane (the MHA-DT-17 cap idiom): base on
     the end face at ``u_base``, apex on the axis at ``u_apex``, closed down
     the axis.  The arc runs CCW over its minor lobe, so it starts at the rim
     for a +Z end (apex at smaller u) and at the apex for a -Z end.  Its

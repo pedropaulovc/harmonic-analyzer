@@ -1,4 +1,4 @@
-r"""MHA-PD-019 transgear-arm-plate: the drawing contract of the made steel plate.
+r"""MHA-PD-19 transgear-arm-plate: the drawing contract of the made steel plate.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Every number is ``pd_transgear_arm_plate_geometry``'s (the numbers
@@ -8,7 +8,7 @@ places of each marked dimension, the explicit model bands, the bore's and
 the thrust faces' finish and the printed callout text.
 
 Part frame (``pd_transgear_arm_plate_geometry``): origin on the knob-shaft bore
-axis K on the MOUNTING face (the Front Plane, which seats on the MHA-PD-018
+axis K on the MOUNTING face (the Front Plane, which seats on the MHA-PD-18
 arm's rear face); +X and +Y are the arm's axes, the long axis runs along -Y
 from the screws to the end round about K; +Z to the rear.  The over-arm
 section spans z 0..5, the section below the arm z -7.9375..5 (the arm's
@@ -91,7 +91,7 @@ for _label, _places, _band in (
 ):
     if abs(BAND_BY_PLACES[_places] - _band) > 1e-9:
         raise AssertionError(
-            f"MHA-PD-019 {_label} prints {_places} places (±{BAND_BY_PLACES[_places]}),"
+            f"MHA-PD-19 {_label} prints {_places} places (±{BAND_BY_PLACES[_places]}),"
             f" not the ±{_band} its walls assume"
         )
 
@@ -153,7 +153,7 @@ GEOMETRIC_CONTROLS += (
     ),
 )
 # The dowel engagement pays the arm's mouth break, which is tighter than the
-# title block's edge break; MHA-PD-000 says the dowels locate and the screws
+# title block's edge break; MHA-PD-00 says the dowels locate and the screws
 # only clamp, so the callout does not repeat it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 # Three short lines: at two, the break line's width put its left end over
 # the sheet border (run 20261010T001620278Z).
@@ -164,8 +164,8 @@ LOCATOR_CALLOUT = (
 
 # The bore is the knob shaft's running surface (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MACHINED, on
 # the exact native bore face the part build resolves. The hub face and the
-# boss face are the knob stack's running thrust faces (the MHA-PD-015 thrust
-# ring and the MHA-PD-016 cup), MACHINED as the crankshaft journals are (R9-13).
+# boss face are the knob stack's running thrust faces (the MHA-PD-15 thrust
+# ring and the MHA-PD-16 cup), MACHINED as the crankshaft journals are (R9-13).
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "transgear_arm_plate_bore", MACHINED_UM, CylinderFace(BORE_DIA)
@@ -274,6 +274,6 @@ if {
 } != {
     (feature, name) for feature, names in DRAWING_DIMENSIONS.items() for name in names
 }:
-    raise AssertionError("MHA-PD-019 marked dimensions and authored places disagree")
+    raise AssertionError("MHA-PD-19 marked dimensions and authored places disagree")
 if len(DRAWING_PRECISION_BY_NAME) != sum(map(len, DRAWING_DIMENSIONS.values())):
-    raise AssertionError("MHA-PD-019 marked dimension names must be unique on the sheet")
+    raise AssertionError("MHA-PD-19 marked dimension names must be unique on the sheet")

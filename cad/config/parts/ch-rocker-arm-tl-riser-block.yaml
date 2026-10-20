@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-riser-block:
   title: Rocker Riser Block
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-10
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-10
   description: "RISER BLOCK, L036 AND L045; 4 X L036, 2 X L045"
   material: Plain Carbon Steel
   material_specification: AISI 1018 cold-finished steel flat bar, 3/4 x 1-1/2 in

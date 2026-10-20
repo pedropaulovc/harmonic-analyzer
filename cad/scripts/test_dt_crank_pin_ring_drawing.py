@@ -1,4 +1,4 @@
-"""Offline contracts for the crank-pin keeper ring (MHA-DT-027) part and drawing.
+"""Offline contracts for the crank-pin keeper ring (MHA-DT-27) part and drawing.
 
 A ``visual_noncritical`` formed-wire ring under ``cad/docs/drawing-guidelines.md``
 (#1076): three native model dimensions whose places the PART owns -- the
@@ -156,7 +156,7 @@ def test_notes_are_few_and_carry_no_values() -> None:
     ):
         assert value not in text, value
     assert "SILVER-SOLDERED" in text
-    assert "MHA-DT-009" in text and "CROSS-HOLE" in text
+    assert "MHA-DT-09" in text and "CROSS-HOLE" in text
     for callout in notes.DIMENSION_CALLOUTS.values():
         assert not any(ch.isdigit() for ch in callout), callout
     assert '"Manufacturing Notes": DRAWING_NOTES' in _build_source()
@@ -164,7 +164,7 @@ def test_notes_are_few_and_carry_no_values() -> None:
 
 
 def test_mating_part_number_in_the_notes_is_live() -> None:
-    assert _config.parts("dt-crank-pin")["number"] == "MHA-DT-009"
+    assert _config.parts("dt-crank-pin")["number"] == "MHA-DT-09"
 
 
 def test_views_are_in_projection_and_clear_of_the_title_block() -> None:
@@ -191,7 +191,7 @@ def test_views_are_in_projection_and_clear_of_the_title_block() -> None:
 
 def test_part_registry_row() -> None:
     config = _config.parts("dt-crank-pin-ring")
-    assert config["number"] == "MHA-DT-027"
+    assert config["number"] == "MHA-DT-27"
     assert config["tolerance_class"] == "visual_noncritical"
     assert int(config["quantity"]) == 1
     assert "brass wire" in str(config["material_specification"]).lower()

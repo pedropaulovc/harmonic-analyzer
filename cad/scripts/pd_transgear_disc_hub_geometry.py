@@ -3,13 +3,13 @@ and the hub's spigot the disc pilots on.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The one
 authority for what two parts cut and must agree on: the brass hub's flange
-(MHA-PD-017, ``transgear_disc_hub_spec``) carries the Ø1.7 clearance holes and
-the 120T disc (MHA-PD-006, ``rack_pinion_spec``) the #0-80 taps; the three
-91794A055 fillister screws (MHA-VN-039) join them on a Ø19 circle, the
+(MHA-PD-17, ``transgear_disc_hub_spec``) carries the Ø1.7 clearance holes and
+the 120T disc (MHA-PD-06, ``rack_pinion_spec``) the #0-80 taps; the three
+91794A055 fillister screws (MHA-PD-VN-55) join them on a Ø19 circle, the
 smallest that keeps the disc's taps 2.0 clear of its Ø13.1 bore at the worst
 case (``rack_pinion_spec`` checks it; the heads stand 1.5 clear of the
 Ø13.2 hub body).  The hub's rear spigot passes the disc's bore and seats on
-the MHA-PD-010 sleeve's step face (R9-68): its diameter is the disc's locating
+the MHA-PD-10 sleeve's step face (R9-68): its diameter is the disc's locating
 fit and its length the disc front face's station ahead of the step, so the
 disc's, the sleeve's and the hub's specs and the cluster fit read it here.
 Nothing here imports either part's spec, so the disc's spec reads the joint
@@ -28,7 +28,7 @@ import math
 from _printed_tolerance import printed_band_mm
 
 SCREW_THREAD = "#0-80"
-# MHA-VN-039, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
+# MHA-PD-VN-55, McMaster 91794A055 (_mcmaster_91794a055 sizes it).
 SCREW_COUNT = 3
 SCREW_ANGLES_DEG = (0.0, 120.0, 240.0)
 # The flange's drilled clearance hole the disc's taps are spotted through.

@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker template trammel's scriber point (MHA-CH-006-TL-16)."""
+"""Offline contracts for the rocker template trammel's scriber point (MHA-CH-06-TL-16)."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
     assert "dia" not in shank
     assert shank["dia_nominal"] == kit.POINT_ROD_DIA
     assert shank["note"] == spec.ROD_NOTE
-    assert "MHA-CH-006-TL-15" in spec.ROD_CALLOUT
+    assert "MHA-CH-06-TL-15" in spec.ROD_CALLOUT
 
 
 def test_tip_flat_truncates_the_point_on_the_cone() -> None:
@@ -104,7 +104,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts(DASHED)["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-16"
+    assert number == "MHA-CH-06-TL-16"
     assert _config.parts(DASHED)["quantity"] == 2
 
 
@@ -137,7 +137,7 @@ def test_tightened_cone_names_its_seat_on_its_callout() -> None:
     """Rule 4: the half-angle band names the setting bar's seats by Number on
     the angle callout itself."""
     callout = spec.DIMENSION_CALLOUTS["TipHalfAngle"]
-    assert "SEATS IN MHA-CH-006-TL-17" in callout.splitlines()
+    assert "SEATS IN MHA-CH-06-TL-17" in callout.splitlines()
     assert spec.TIP_ANGLE_TOL_DEG == spec.TIP_HALF_ANGLE_TOL_DEG * 2.0
 
 

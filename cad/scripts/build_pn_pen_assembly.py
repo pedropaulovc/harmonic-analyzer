@@ -16,22 +16,22 @@ the curve. Everything below the guides rides the rod:
   CrankDeg global, no force solver).
 * pn-pen-v-block -- the brass block HANGING on the rod: the rod's turned pivot
   end drops into the block's pivot bore and its square shoulder rests on the
-  block top; vn-pen-rod-set-screw (front face) locks the pen's yaw, which is
+  block top; pn-vn-pen-rod-set-screw (front face) locks the pen's yaw, which is
   PEN_BLOCK_YAW_DEG to the paper.
-* vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
+* pn-vn-pen-marker -- the purchased Sharpie Fine Point, its grip in the block's V-groove,
   nib on the paper, body running out forward and east.
-* pn-pen-frame -- the stirrup flush on the block's PAPER end; vn-pen-set-screw
+* pn-pen-frame -- the stirrup flush on the block's PAPER end; pn-vn-pen-set-screw
   (the thumb screw) threads up through its bottom rail and presses the grip
   into the V.
-* pn-pen-adjust-screw + vn-pen-adjust-nut -- the height adjuster on the rod
+* pn-pen-adjust-screw + pn-vn-pen-adjust-nut -- the height adjuster on the rod
   top: the stud threads into the rod's #0-80 tap, the jam nut locks it, and
   the pen wire ties through its eye.
-* vn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
+* pn-vn-pen-wire -- WIRE 2's straight rest-pose run hanging PLUMB from the wheel
   rim's 3 o'clock tangent onto the stud's eye head (the rod line is the rim's
   mid-plane), locked to the rod so it rides the pen travel. The rim wrap and
   tie-off are not modeled; the kinematic coupling stays a Motion-study mate
   (cad/docs/motion-policy.md).
-* vn-hanger-screw + vn-pen-hanger-nut + vn-pen-hanger-jam-nut -- fasten the
+* pn-vn-hanger-screw + pn-vn-pen-hanger-nut + pn-vn-pen-hanger-jam-nut -- fasten the
   pen-hanger: the screw from behind the wheel bar through the strap's
   clearance hole, the nut on the strap front and the thin jam nut jammed
   against it, locking it.
@@ -52,7 +52,7 @@ the DOF manifest, never authored); the carriage parts placed on-solution and
 lock-mated to the rod; transforms asserted by read-back; zero interference
 beyond the thread-envelope allowances in ``_interference_contracts``.
 
-Fitter package (draw_pn_pen_assembly.py, MHA-PN-000): the three carriage
+Fitter package (draw_pn_pen_assembly.py, MHA-PN-00): the three carriage
 settings -- stud height, pen yaw and nib preset -- are blanked construction
 sketches (``StudSetting`` on the Right plane, ``CarriageSetting`` on the Top
 plane) whose driving, toleranced dimensions the drawing imports, and the
@@ -116,15 +116,15 @@ from _assembly import (
 )
 from _transforms import IDENTITY, euler_from_rows
 from _interference_contracts import allowed_interference_pairs
-from vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
-from vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
-from vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
-from vn_pen_hanger_jam_nut_spec import (
+from pn_vn_hanger_screw_spec import SHANK_LEN as HANGER_SHANK_LEN
+from pn_vn_hanger_screw_spec import THREAD_PITCH as HANGER_THREAD_PITCH
+from pn_vn_hanger_screw_spec import TIP_CHAMFER as HANGER_TIP_CHAMFER
+from pn_vn_pen_hanger_jam_nut_spec import (
     THREAD_PAST_MIN_PITCHES as HANGER_THREAD_PAST_PITCHES,
 )
-from vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
-from vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
-from vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
+from pn_vn_pen_hanger_jam_nut_spec import THICKNESS as HANGER_JAM_NUT_T
+from pn_vn_pen_hanger_nut_spec import ACROSS_CORNERS as HANGER_NUT_ACROSS_CORNERS
+from pn_vn_pen_hanger_nut_spec import THICKNESS as HANGER_NUT_T
 from mg_magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 from mg_magnifying_wheel_geom import RIM_OUTER_DIA as WHEEL_RIM_OUTER_DIA
 from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
@@ -137,7 +137,7 @@ from pn_pen_hanger_spec import (
     SCREW_HOLE_XY as HANGER_HOLE_XY,
     STRAP_Z as HANGER_STRAP_Z,
 )
-from vn_pen_wire_geom import (
+from pn_vn_pen_wire_geom import (
     WHEEL_BAR_Y,
     WHEEL_MID_Z,
     WIRE_BOTTOM as PEN_WIRE_BOTTOM,
@@ -204,8 +204,8 @@ assert math.isclose(HANGER_SCREW_POS[0], HANGER_SCREW_MACHINE_X, abs_tol=1e-9)
 assert math.isclose(HANGER_SCREW_POS[1], WHEEL_BAR_Y, abs_tol=1e-9)
 HANGER_SCREW_TIP_Z = HANGER_SCREW_POS[2] - HANGER_SHANK_LEN
 HANGER_STRAP_FRONT_Z = HANGER_POS[2] + min(HANGER_STRAP_Z)
-# Both nuts' frames span local z 0..T (vn_pen_hanger_nut_spec,
-# vn_pen_hanger_jam_nut_spec): the nut placed un-rotated at the strap front
+# Both nuts' frames span local z 0..T (pn_vn_pen_hanger_nut_spec,
+# pn_vn_pen_hanger_jam_nut_spec): the nut placed un-rotated at the strap front
 # less its T bears on the strap with its z = T face; the jam nut, placed at
 # the nut's z = 0 face less its own T, bears on the nut the same way.
 HANGER_NUT_POS = (
@@ -245,13 +245,13 @@ if HANGER_NUT_RIM_RADIAL <= 0.0:
 # on top of the Lock would only over-constrain the solve.
 RIDERS = (
     ("pn-pen-v-block", VBLOCK_POS, BLOCK_ROWS),
-    ("vn-pen-marker", MARKER_POS, MARKER_ROWS),
+    ("pn-vn-pen-marker", MARKER_POS, MARKER_ROWS),
     ("pn-pen-frame", FRAME_POS, FRAME_ROWS),
-    ("vn-pen-set-screw", THUMB_SCREW_POS, THUMB_SCREW_ROWS),
-    ("vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
+    ("pn-vn-pen-set-screw", THUMB_SCREW_POS, THUMB_SCREW_ROWS),
+    ("pn-vn-pen-rod-set-screw", ROD_SET_SCREW_POS, ROD_SET_SCREW_ROWS),
     ("pn-pen-adjust-screw", STUD_POS, IDENTITY),
-    ("vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
-    ("vn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
+    ("pn-vn-pen-adjust-nut", NUT_POS, NUT_ROWS),
+    ("pn-vn-pen-wire", PEN_WIRE_BOTTOM, IDENTITY),
 )
 
 
@@ -477,7 +477,7 @@ async def build(adapter) -> dict[str, str]:
 
     hanger_screw = await place_component(
         adapter,
-        "vn-hanger-screw",
+        "pn-vn-hanger-screw",
         list(HANGER_SCREW_POS),
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -512,9 +512,9 @@ async def build(adapter) -> dict[str, str]:
     # Lock mate, like the riders; a coaxial mate on top would only
     # over-constrain the solve.
     for stem, pos, label in (
-        ("vn-pen-hanger-nut", HANGER_NUT_POS, "hanger nut locked to hanger"),
+        ("pn-vn-pen-hanger-nut", HANGER_NUT_POS, "hanger nut locked to hanger"),
         (
-            "vn-pen-hanger-jam-nut",
+            "pn-vn-pen-hanger-jam-nut",
             HANGER_JAM_NUT_POS,
             "hanger jam nut locked to hanger",
         ),

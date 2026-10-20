@@ -85,13 +85,13 @@ expect(
     IDENTITY,
     "sm-summing-lever",
 )
-expect("sm-summing", "vn-boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "vn-boss-hook")
+expect("sm-summing", "sm-vn-boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "sm-vn-boss-hook")
 expect(
     "sm-summing",
-    "vn-boss-hook-jam-nut-1",
+    "sm-vn-boss-hook-jam-nut-1",
     list(s.JAM_NUT_POS),
     s.JAM_NUT_ROWS,
-    "vn-boss-hook-jam-nut",
+    "sm-vn-boss-hook-jam-nut",
 )
 # The counter and gooseneck now seat on unchanged native supplier surfaces.
 # Their analytical insertion seeds are not their final placements and cannot
@@ -106,14 +106,14 @@ expect("pn-pen", "pn-pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pn-pen-hanger
 expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 for _stem, _pos, _rows in p.RIDERS:
     expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
-expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
-expect("pn-pen", "vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "vn-pen-hanger-nut")
+expect("pn-pen", "pn-vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "pn-vn-hanger-screw")
+expect("pn-pen", "pn-vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "pn-vn-pen-hanger-nut")
 expect(
     "pn-pen",
-    "vn-pen-hanger-jam-nut-1",
+    "pn-vn-pen-hanger-jam-nut-1",
     list(p.HANGER_JAM_NUT_POS),
     IDENTITY,
-    "vn-pen-hanger-jam-nut",
+    "pn-vn-pen-hanger-jam-nut",
 )
 
 # Each rider's placement euler (derived in the assembly) must reproduce its rows.
@@ -152,17 +152,17 @@ expect(
 )
 expect(
     "mg-magnifier",
-    "vn-clamp-screw-1",
+    "mg-vn-clamp-screw-1",
     [m.CLAMP_SCREW_X[0], m.WHEEL_BAR_Y, m.BAR_FRONT_Z],
     IDENTITY,
-    "vn-clamp-screw-1",
+    "mg-vn-clamp-screw-1",
 )
 expect(
     "mg-magnifier",
-    "vn-clamp-screw-2",
+    "mg-vn-clamp-screw-2",
     [m.CLAMP_SCREW_X[1], m.WHEEL_BAR_Y, m.BAR_FRONT_Z],
     IDENTITY,
-    "vn-clamp-screw-2",
+    "mg-vn-clamp-screw-2",
 )
 expect(
     "mg-magnifier",
@@ -181,10 +181,10 @@ expect(
 for index, position in enumerate(m.BRACKET_SCREW_POSITIONS, start=1):
     expect(
         "mg-magnifier",
-        f"vn-magnifying-bracket-screw-{index}",
+        f"mg-vn-magnifying-bracket-screw-{index}",
         list(position),
         m.BRACKET_SCREW_ROWS,
-        "vn-magnifying-bracket-screw",
+        "mg-vn-magnifying-bracket-screw",
     )
 expect(
     "mg-magnifier",
@@ -196,10 +196,10 @@ expect(
 _rz = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
 expect(
     "mg-magnifier",
-    "vn-thumb-screw-1",
+    "mg-vn-thumb-screw-1",
     [m.CLAMP_X, m.THUMB_SCREW_OUTER_FACE_Y, m.LEVER_ROD_Z],
     _rz,
-    "vn-thumb-screw",
+    "mg-vn-thumb-screw",
 )
 expect(
     "mg-magnifier",
@@ -235,7 +235,7 @@ expect(
 # the post-rebuild pose diff.
 expect(
     "mg-magnifier",
-    "vn-lever-wire-1",
+    "mg-vn-lever-wire-1",
     list(m.HUB_WIRE_END),
     m._HW_ROWS,
     "lever-wire (accepted 2c delta)",
@@ -355,64 +355,64 @@ expect(
 )
 expect(
     DT,
-    "vn-cone-tip-collar-1",
+    "dt-vn-cone-tip-collar-1",
     [_pcl[0], d.Y_DRIVE, _pcl[2]],
     d.ROT_SHAFT_NORTH,
-    "vn-cone-tip-collar",
+    "dt-vn-cone-tip-collar",
 )
 expect(
     DT,
-    "vn-cone-tip-adjuster-1",
+    "dt-vn-cone-tip-adjuster-1",
     [_pad[0], d.Y_DRIVE, _pad[2]],
     d.ROT_SHAFT_SOUTH,
-    "vn-cone-tip-adjuster",
+    "dt-vn-cone-tip-adjuster",
 )
 expect(
     DT,
-    "vn-cone-tip-block-screw-1",
+    "dt-vn-cone-tip-block-screw-1",
     [
         _ptp[0] + d.PLAT_HOLDDOWN_LOCAL_X * d.COS_I,
         d.Y_BASE_TOP + d.PLAT_HOLDDOWN_CBORE_DEPTH,
         _ptp[2] - d.PLAT_HOLDDOWN_LOCAL_X * d.SIN_I,
     ],
     d.ROT_X_180,
-    "vn-cone-tip-block-screw",
+    "dt-vn-cone-tip-block-screw",
 )
 expect(
     DT,
-    "vn-cone-tip-pinch-screw-1",
+    "dt-vn-cone-tip-pinch-screw-1",
     [
         _ptp[0] + (d.TIP_BLOCK_X / 2.0) * d.COS_I,
         d.Y_BASE_TOP + d.PLAT_T + d.TIP_PINCH_Y,
         _ptp[2] - (d.TIP_BLOCK_X / 2.0) * d.SIN_I,
     ],
     d.ROT_PINCH_WEST,
-    "vn-cone-tip-pinch-screw",
+    "dt-vn-cone-tip-pinch-screw",
 )
 expect(
     DT,
-    "vn-cone-lock-knob-1",
+    "dt-vn-cone-lock-knob-1",
     [d.KNOB_X, d.Y_BASE_TOP + d.PLAT_T, d.KNOB_Z],
     IDENTITY,
-    "vn-cone-lock-knob",
+    "dt-vn-cone-lock-knob",
 )
 expect(
     DT,
-    "vn-cone-pivot-screw-1",
+    "dt-vn-cone-pivot-screw-1",
     [
         base.PIVOT_SCREW_XZ[0],
         d.Y_BASE_TOP + d.PSCREW_SHOULDER_LEN,
         base.PIVOT_SCREW_XZ[1],
     ],
     IDENTITY,
-    "vn-cone-pivot-screw",
+    "dt-vn-cone-pivot-screw",
 )
 expect(
     DT,
-    "vn-swing-stop-screw-1",
+    "dt-vn-swing-stop-screw-1",
     [base.STOP_SCREW_XZ[0], d.Y_BASE_TOP, base.STOP_SCREW_XZ[1]],
     IDENTITY,
-    "vn-swing-stop-screw",
+    "dt-vn-swing-stop-screw",
 )
 expect(
     DT,
@@ -517,7 +517,7 @@ expect(
 for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
     expect(
         DT,
-        f"vn-slotted-screw-{k + 1}",
+        f"dt-vn-slotted-screw-{k + 1}",
         [sx, d.BLOCK_TOP_Y, sz],
         IDENTITY,
         f"slotted-screw {k}",
@@ -525,7 +525,7 @@ for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
 for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
     expect(
         DT,
-        f"vn-foot-screw-{k + 1}",
+        f"dt-vn-foot-screw-{k + 1}",
         [sx, d.Y_BASE_TOP + d.SPRING_T, sz],
         IDENTITY,
         f"foot-screw {k}",
@@ -533,7 +533,7 @@ for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
 for k, (sx, sz) in enumerate(d._PEDESTAL_SCREW_XZ):
     expect(
         DT,
-        f"vn-pedestal-hold-down-screw-{k + 1}",
+        f"dt-vn-pedestal-hold-down-screw-{k + 1}",
         [sx, d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T, sz],
         IDENTITY,
         f"pedestal-hold-down-screw {k}",
@@ -606,10 +606,10 @@ expect(
 )
 expect(
     DT,
-    "vn-crank-hub-pin-1",
+    "dt-vn-crank-hub-pin-1",
     d.CRANK_HUB_PIN_ORIGIN,
     d.CRANK_HUB_PIN_ROWS,
-    "vn-crank-hub-pin",
+    "dt-vn-crank-hub-pin",
     **_SOLVED,
 )
 expect(
@@ -702,7 +702,7 @@ expect(
 )
 expect(
     CH,
-    "vn-frame-side-screw-1",
+    "ch-vn-frame-side-screw-1",
     [
         c.FULCRUM[0],
         c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H,
@@ -713,7 +713,7 @@ expect(
 )
 expect(
     CH,
-    "vn-frame-side-screw-2",
+    "ch-vn-frame-side-screw-2",
     [
         c.FULCRUM[0],
         c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H,
@@ -724,14 +724,14 @@ expect(
 )
 expect(
     CH,
-    "vn-fulcrum-set-screw-1",
+    "ch-vn-fulcrum-set-screw-1",
     [c.FULCRUM[0], c.SET_SCREW_SEAT_Y, c.FULCRUM_SHAFT_Z + c.KEEPER_Z_OFF],
     IDENTITY,
     "keeper set screw +z",
 )
 expect(
     CH,
-    "vn-fulcrum-set-screw-2",
+    "ch-vn-fulcrum-set-screw-2",
     [c.FULCRUM[0], c.SET_SCREW_SEAT_Y, c.FULCRUM_SHAFT_Z - c.KEEPER_Z_OFF],
     IDENTITY,
     "keeper set screw -z",
@@ -796,7 +796,7 @@ for j in range(20):
     )
     expect(
         CH,
-        f"vn-spring-hook-{j + 1}",
+        f"ch-vn-spring-hook-{j + 1}",
         [*spring_mount_geom.CHANNEL_ANCHOR_XY, z_mid],
         IDENTITY,
         f"spring-hook ch{j:02d}",
@@ -840,7 +840,7 @@ for i, sx in enumerate((1.0, -1.0)):
 for i, x in enumerate(p.CLAMP_HOLE_X):
     expect(
         PD,
-        f"vn-clamp-screw-{i + 1}",
+        f"mg-vn-clamp-screw-{i + 1}",
         [-x, p.BAR_CY, p.BAR_FRONT_Z],
         IDENTITY,
         f"clamp-screw x{-x:+.1f}",
@@ -907,12 +907,12 @@ expect(
     "pd-platen-paper",
     **_SOLV,
 )
-# The MHA-VN-059 #2-56 clip screws are their own stem; the MHA-VN-006 guide
+# The MHA-PD-VN-65 #2-56 clip screws are their own stem; the MHA-DT-VN-50 guide
 # screws number from 1 on their own.
 for i, (x, y) in enumerate(p.CLIP_SCREW_XY):
     expect(
         PD,
-        f"vn-platen-clip-screw-{i + 1}",
+        f"pd-vn-platen-clip-screw-{i + 1}",
         [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
         IDENTITY,
         f"clip screw {i + 1}",
@@ -921,17 +921,17 @@ for i, (x, y) in enumerate(p.CLIP_SCREW_XY):
 for i, (x, y) in enumerate(p.GUIDE_SCREW_XY):
     expect(
         PD,
-        f"vn-fillister-screw-{i + 1}",
+        f"dt-vn-fillister-screw-{i + 1}",
         [x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
         IDENTITY,
         f"guide screw {i + 1}",
         **_SOLV,
     )
-# R9-31: the guide-lock screws are their own slotted pan-head stem (MHA-VN-046).
+# R9-31: the guide-lock screws are their own slotted pan-head stem (MHA-PD-VN-60).
 for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
     expect(
         PD,
-        f"vn-guide-lock-screw-{i + 1}",
+        f"pd-vn-guide-lock-screw-{i + 1}",
         [x, y, p.LOCK_Z0 + p.LOCK_THICK],
         p.ROT_Y_180,
         f"lock screw {i + 1}",
@@ -944,30 +944,30 @@ expect(PD, "pd-transgear-pivot-spacer-1", [*_P, p.SPACER_Z0], IDENTITY, "pivot s
 expect(PD, "pd-transgear-arm-1", [*_P, p.ARM_Z0], _arm_rows, "pd-transgear-arm")
 expect(
     PD,
-    "vn-transgear-pivot-screw-1",
+    "pd-vn-transgear-pivot-screw-1",
     [*_P, p.PIVOT_SCREW_Z0],
     p.ROT_X_POS90,
     "pivot screw",
 )
 expect(
-    PD, "vn-transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
+    PD, "pd-vn-transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
 )
 expect(
-    PD, "vn-transgear-pivot-shim-1", [*_P, p.PIVOT_SHIM_Z0], p.ROT_X_POS90, "pivot shim"
+    PD, "pd-vn-transgear-pivot-shim-1", [*_P, p.PIVOT_SHIM_Z0], p.ROT_X_POS90, "pivot shim"
 )
 _K = [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1]]
 expect(PD, "pd-transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")
 for i, (x, y) in enumerate(p.PLATE_SCREW_XY):
     expect(
         PD,
-        f"vn-transgear-arm-plate-screw-{i + 1}",
+        f"pd-vn-transgear-arm-plate-screw-{i + 1}",
         [x, y, p.PLATE_SCREW_Z0],
         p.ROT_X_POS90,
         f"arm plate screw {i + 1}",
     )
 expect(
     PD,
-    "vn-transgear-latch-pin-1",
+    "pd-vn-transgear-latch-pin-1",
     list(p.LATCH_PIN_POS),
     p.rot_z_rows(p.ARM_ANGLE_DEG - 90.0),
     "latch pin",
@@ -977,13 +977,13 @@ expect(PD, "pd-latch-hook-1", list(p.LATCH_HOOK_POS), IDENTITY, "latch hook")
 for i, pos in enumerate(p.HOOK_BRACKET_SCREW_POS):
     expect(
         PD,
-        f"vn-latch-hook-bracket-screw-{i + 1}",
+        f"pd-vn-latch-hook-bracket-screw-{i + 1}",
         list(pos),
         p.ROT_X_POS90,
         f"latch-hook screw {i + 1}",
     )
-# Disc cluster on the MHA-PD-023 pin at S: pin and both bushings Ry(180), the
-# MHA-VN-047 ring in the pin's groove.
+# Disc cluster on the MHA-PD-23 pin at S: pin and both bushings Ry(180), the
+# MHA-PD-VN-61 ring in the pin's groove.
 _S = [p.STUD_XY[0], p.STUD_XY[1]]
 expect(PD, "pd-transgear-pin-1", [*_S, p.PIN_Z0], p.ROT_Y_180, "pd-transgear-pin")
 expect(
@@ -1006,7 +1006,7 @@ expect(PD, "pd-transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **
 for i, (x, y) in enumerate(p.DISC_SCREW_XY):
     expect(
         PD,
-        f"vn-transgear-disc-screw-{i + 1}",
+        f"pd-vn-transgear-disc-screw-{i + 1}",
         [x, y, p.DISC_SCREW_Z0],
         p.ROT_X_NEG90,
         f"disc screw {i + 1}",
@@ -1021,7 +1021,7 @@ expect(
 )
 expect(
     PD,
-    "vn-transgear-retaining-ring-1",
+    "pd-vn-transgear-retaining-ring-1",
     [*_S, p.CLUSTER.RING_REAR_Z],
     p.ROT_Y_180,
     "retaining ring",
@@ -1047,7 +1047,7 @@ expect(
 for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
     expect(
         PD,
-        f"vn-transgear-knob-drive-pin-{i + 1}",
+        f"pd-vn-transgear-knob-drive-pin-{i + 1}",
         [x, y, p.KNOB_DRIVE_PIN_Z0],
         p.ROT_X_NEG90,
         f"knob drive pin {i + 1}",
@@ -1087,7 +1087,7 @@ expect(
 )
 expect(
     PD,
-    "vn-transgear-knob-cup-pin-1",
+    "pd-vn-transgear-knob-cup-pin-1",
     [*_K, p.KNOB_CUP_PIN_Z0],
     IDENTITY,
     "knob cup pin",
@@ -1139,8 +1139,8 @@ def _link_expect(name, station, label):
 
 _link_ok = True
 try:
-    _link_expect("vn-chain-inner-link-1", 0, "chain seed inner @0")
-    _link_expect("vn-chain-outer-link-1", 1, "chain seed outer @1")
+    _link_expect("pd-vn-chain-inner-link-1", 0, "chain seed inner @0")
+    _link_expect("pd-vn-chain-outer-link-1", 1, "chain seed outer @1")
 except Exception as e:
     _telemetry.error(f"chain seed check errored: {e}")
     fails.append(("chain seed lookup", repr(e)))
@@ -1149,13 +1149,13 @@ if _link_ok and not fails:
     # The pattern fills stations 2..65; the closing inner link and the
     # connecting link are seated at 66 and 67.
     for k in range(1, p.LINK_COUNT // 2):
-        _link_expect(f"vn-chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
+        _link_expect(f"pd-vn-chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
     for k in range(1, p.LINK_COUNT // 2 - 1):
         _link_expect(
-            f"vn-chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"
+            f"pd-vn-chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"
         )
     closing = p.LINK_COUNT - 1
-    _link_expect("vn-chain-connecting-link-1", closing, f"chain connecting @{closing}")
+    _link_expect("pd-vn-chain-connecting-link-1", closing, f"chain connecting @{closing}")
 
 if fails:
     for f in fails:

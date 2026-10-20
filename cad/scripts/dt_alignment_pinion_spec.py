@@ -95,7 +95,7 @@ TOOTH_FORM = TOOTH_FORM_NOTE
 BORE_DIA = 8.0  # Ø8 arbor through-bore (build_dt_pinion_arbor.py)
 # Slip fit bonded with Loctite 638, not a press: a press over the full 143.2
 # bore is a seizing risk for a novice (U27, U6 precedent).  The band admits a
-# stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-DT-022's bond zone,
+# stock 8 mm H7 reamer (8.000-8.015).  The drum sits on MHA-DT-22's bond zone,
 # not its journal lands (U39: Ø8 -0.01/-0.10), so the diametral clearance
 # runs from 0.010 (the drum slides on by hand) up to the drum's upper
 # deviation minus the arbor's lower one (0.200), inside the 0.25 mm bond gap
@@ -109,7 +109,7 @@ FACE_WIDTH = 143.2  # general .X; located from the back end (drawing note)
 # printed tip corners and the retained tangent-span/fit bands independently.
 
 # Only the reamed bore carries a roughness symbol.  The two end faces bear on
-# the MHA-DT-014 straps' inner faces when the drum floats hard forward or hard
+# the MHA-DT-14 straps' inner faces when the drum floats hard forward or hard
 # aft, but no friction or end-play budget derives a grade from that slow,
 # hand-cranked contact.  So they take the title-block finish, the loosest
 # band (novice rule), rather than a 1.6 no function asks for (machinist
@@ -270,7 +270,7 @@ GEAR_DATA = gear_data_note(
 # The tip band's mate rides its callout (rule 4).
 OUTSIDE_DIA_CALLOUT = f"MESHES WITH\n{MESH_MATE}"
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  MHA-DT-022 owns its bond-zone band
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): notes never carry a dimension.  MHA-DT-22 owns its bond-zone band
 # natively (BondZoneDia).  The hand slide is this part's matched-fit
 # acceptance, so it rides the reamed bore's callout, not a general note
 # (Codex P2 on #832).  It names the mating part as well as its number
@@ -281,7 +281,7 @@ _ARBOR = _config.parts("dt-pinion-arbor")
 ARBOR_BORE_CALLOUT = (
     f"REAM THRU\nSLIDES BY HAND ON {_ARBOR['number']}\n({_ARBOR['title'].upper()})"
 )
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-022 is an assembly step (dt_pinion_arbor_spec
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the bond to MHA-DT-22 is an assembly step (dt_pinion_arbor_spec
 # ASSEMBLY_STEP owns the drum joint), not a part note.  The one note is a
 # do-not-cut requirement, so it is leadered to the teeth on the side view and
 # says what the tooth ends at both end faces get instead of the title-block

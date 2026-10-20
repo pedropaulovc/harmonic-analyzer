@@ -18,7 +18,7 @@ BORE_FIT_CALLOUT = (
     "FINISH BORE THRU;\n"
     "ALL 20 GEARS\n"
     "MATCH TO FINISHED\n"
-    "SHAFT MHA-DT-013\n"
+    "SHAFT MHA-DT-13\n"
     f"{spec.BORE_DIAMETRAL_CLEARANCE_MM[0]:.3f}-{spec.BORE_DIAMETRAL_CLEARANCE_MM[1]:.3f}\n"
     "DIAMETRAL CLEARANCE\n"
     f"{spec.CAM_WALL_MIN_MM:.2f} MIN WALL\n"
@@ -31,7 +31,7 @@ BORE_FIT_CALLOUT = (
 # and the callout no longer states an overhang bound.
 # Rows <= 18 characters: the stacking text stands right of the side view's
 # rims, clear of its extension lines, inside the border.
-STACK_FIT_CALLOUT = "STACKS CAM FACE TO\nBACK FACE ON SHAFT\nMHA-DT-013"
+STACK_FIT_CALLOUT = "STACKS CAM FACE TO\nBACK FACE ON SHAFT\nMHA-DT-13"
 GEAR_DATA = "\n".join(
     (
         "GEAR DATA",
@@ -45,7 +45,7 @@ GEAR_DATA = "\n".join(
         f"ROOT DIAMETER (mm, REF):  {sum(spec.ROOT_ENVELOPE_DIA_MM) / 2.0:.2f}",
         f"CUTTER PLUNGE (mm):  {spec.WHOLE_DEPTH:.{spec.WHOLE_DEPTH_PLACES}f} "
         f"+{spec.WHOLE_DEPTH_BAND[0]:.2f}/{spec.WHOLE_DEPTH_BAND[1]:.2f}; "
-        "SETS BACKLASH WITH CONE GEARS MHA-DT-003",
+        "SETS BACKLASH WITH CONE GEARS MHA-DT-03",
         f"FORM CUTTER:  #{spec.CUTTER_NUMBER}, "
         f"{spec.CUTTER_TEETH_RANGE[0]}-{spec.CUTTER_TEETH_RANGE[1]}T; "
         f"{spec.CUTTER_REFERENCE_TEETH}T REFERENCE",
@@ -54,7 +54,7 @@ GEAR_DATA = "\n".join(
         f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
     )
 )
-# The mesh mate (MHA-DT-003) is named at the OD callout and the eccentricity
+# The mesh mate (MHA-DT-03) is named at the OD callout and the eccentricity
 # carries its per-gear band only, so one note remains (rule 7).
 DRAWING_NOTES = (
     "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM CAM FACE."

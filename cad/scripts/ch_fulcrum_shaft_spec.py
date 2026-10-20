@@ -3,11 +3,11 @@ the channel assembly that places it.
 
 The plain Ø6.35 steel shaft the top levers rock on. It runs full length at
 one diameter (no journals, shoulders or steps) through the reamed bores of the
-two end keepers (MHA-CH-007, ``ch_fulcrum_keeper_spec``); each end stands
+two end keepers (MHA-CH-07, ``ch_fulcrum_keeper_spec``); each end stands
 END_PROUD past its keeper lug's outer face and finishes in a hemispherical
 dome (the bright dome of the ch. 17 p. 40 photo). One set-screw flat per end,
 both on +Y, sits under the keeper's crown tap on the lug mid-plane: the two
-cup-point set screws (MHA-VN-055) bearing on them are the shaft's only axial
+cup-point set screws (MHA-CH-VN-55) bearing on them are the shaft's only axial
 and rotational location.
 
 Part frame: axis along Z, centred on z = 0 (the assembly places the origin at
@@ -35,10 +35,10 @@ from ch_fulcrum_keeper_spec import (
     crown_least_height,
 )
 from ch_fulcrum_keeper_spec import DRAWING_PRECISION as KEEPER_PRECISION
-from vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
-from vn_fulcrum_set_screw_spec import LENGTH as SET_SCREW_LENGTH
-from vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
-from vn_fulcrum_set_screw_spec import POINT_LENGTH as SET_SCREW_POINT_LENGTH
+from ch_vn_fulcrum_set_screw_spec import CUP_DIA as SET_SCREW_CUP_DIA
+from ch_vn_fulcrum_set_screw_spec import LENGTH as SET_SCREW_LENGTH
+from ch_vn_fulcrum_set_screw_spec import MAJOR_DIA as SET_SCREW_MAJOR_DIA
+from ch_vn_fulcrum_set_screw_spec import POINT_LENGTH as SET_SCREW_POINT_LENGTH
 
 MM_PER_IN = 25.4
 
@@ -129,7 +129,7 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
     )
 # Socket face above the crown over the tap axis: below it at nominal; the
 # ruling lets it stand up to 0.4 proud in free air at the worst case (Main
-# ruling A, 2026-10-10; vn_fulcrum_set_screw_spec), the least round over a
+# ruling A, 2026-10-10; ch_vn_fulcrum_set_screw_spec), the least round over a
 # bore off the width's centre plane.
 SET_SCREW_PROUD_NOMINAL = FLAT_HEIGHT + SET_SCREW_LENGTH - CROWN_R
 SET_SCREW_PROUD_WORST = _SEAT_HIGH + SET_SCREW_LENGTH - crown_least_height(0.0)
@@ -189,7 +189,7 @@ DIMENSION_PREFIXES = {
 
 
 # --- Flat stations, at the worst case of every printed band and of the
-# MHA-CH-000 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
+# MHA-CH-00 fit-up (drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands)). The keepers go on the frame with their
 # lug inner faces DRO-set (KEEPER_FITUP_LOCATION_BAND_MM each); each tap
 # stands SetScrewLocation off its lug's inner face, as the keeper prints it,
 # and the lug is LugThickness thick. The shaft is free to slide until both
@@ -320,15 +320,15 @@ SHAFT_FIT_CLEARANCE_MM = (
 # vertical leader, and a trailing ';' touched it (machinist review r2).
 SHAFT_DIA_CALLOUT = "\n".join(
     (
-        "SLIDING FIT IN MHA-CH-007 BORES",
+        "SLIDING FIT IN MHA-CH-07 BORES",
         f"{SHAFT_FIT_CLEARANCE_MM[0]:.3f}-{SHAFT_FIT_CLEARANCE_MM[1]:.3f} "
         "DIAMETRAL CLEARANCE",
-        "MHA-CH-002 LEVERS RUN ON IT",
+        "MHA-CH-02 LEVERS RUN ON IT",
     )
 )
 # AcrossFlat's .XXX is the set screw's seat height: it sets both the >= 1.5D
 # engagement and the proud limit above (a .XX band breaks both).
-ACROSS_FLAT_CALLOUT = "SETS MHA-VN-055\nENGAGEMENT"
+ACROSS_FLAT_CALLOUT = "SETS MHA-CH-VN-55\nENGAGEMENT"
 DRAWING_NOTES = "\n".join(
     (
         "1/4 IN GROUND STOCK OK.",

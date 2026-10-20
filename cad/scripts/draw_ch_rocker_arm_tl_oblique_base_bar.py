@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique trammel's base bar (MHA-CH-006-TL-20).
+r"""Create the drawing for the oblique trammel's base bar (MHA-CH-06-TL-20).
 
 One part, one configuration, two off (the title block's quantity); the
 second bar is the same part turned over. Its plan (the *Front view, looking
@@ -78,7 +78,7 @@ from ch_rocker_arm_tl_oblique_base_bar_spec import (
     TAP_DRILL,
     TAP_SPEC,
 )
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_base_bar"]
 PART_STEM = SPEC.artifact_stem
@@ -426,7 +426,7 @@ _BRACKET_PLACES = part_spec.BRACKET_HOLE_PLACES
 _CBORE_PLACES = part_spec.BRACKET_CBORE_PLACES
 _BRACKET_DIA_PRINTED = round(BRACKET_HOLE_DIA, 2)
 _FROM_UNDERSIDE = ([0.0, 0.0, 1.0], ("__frame__",))
-_BRACKET_SOURCE = (("ch_rocker_arm_tl_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
+_BRACKET_SOURCE = (("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BASE_BAR_HOLES"),)
 for _index, (_x, _y) in enumerate(BRACKET_HOLES, start=1):
     # Stations from the spindle-end face, rows from the faced -Y side, at
     # .XXX: each row holds TL-28's four taps inside the screws' float.
@@ -563,7 +563,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Base Bar Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel base bar; 6061-T6511; MHA-CH-006-TL-20",
+            3: "rocker oblique trammel base bar; 6061-T6511; MHA-CH-06-TL-20",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

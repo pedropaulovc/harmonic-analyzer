@@ -14,7 +14,7 @@ import draw_ch_fulcrum_keeper as drawing
 import ch_fulcrum_keeper_spec
 import _config
 from _drawing_registry import DRAWINGS_BY_NAME
-from vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
+from ch_vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 
 
 def test_required_drawing_paths() -> None:
@@ -58,10 +58,10 @@ def test_geometry_matches_the_top_frame_contract() -> None:
     # crown rounded after it -- is on the two callouts.
     pair_ream = " ".join(spec.BORE_PAIR_CALLOUT.split())
     assert pair_ream.startswith(
-        "SUPPLIED UNDRILLED; PAIR-REAM WITH THE OTHER MHA-CH-007"
+        "SUPPLIED UNDRILLED; PAIR-REAM WITH THE OTHER MHA-CH-07"
     )
     assert f"(NOTE {spec.QUANTITY_NOTE}) AT INSTALLED SPACING" in pair_ream
-    assert "AT INSTALLED SPACING; THE MHA-CH-004 SHAFT SLIDES THROUGH BOTH" in pair_ream
+    assert "AT INSTALLED SPACING; THE MHA-CH-04 SHAFT SLIDES THROUGH BOTH" in pair_ream
     assert " ".join(spec.CROWN_ROUND_CALLOUT.split()) == (
         "FULL ROUND TANGENT TO BOTH SIDES, CENTER AT BORE HEIGHT"
     )
@@ -199,7 +199,7 @@ def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -
     # MR-fleet r10: the band names its mate (rule 4), the set screw whose full
     # thread it keeps.
     assert spec.BORE_CENTRE_CALLOUT == (
-        "ON WIDTH CENTER \u00b10.3,\nHOLDS MHA-VN-055\nTHREAD ENGAGEMENT"
+        "ON WIDTH CENTER \u00b10.3,\nHOLDS MHA-CH-VN-55\nTHREAD ENGAGEMENT"
     )
     assert drawing.DIMENSION_CALLOUTS["BoreFromSide"] is spec.BORE_CENTRE_CALLOUT
     assert spec.DRAWING_PRECISION["OverallHeightReference"] == {"OverallHeight": 1}
@@ -847,9 +847,9 @@ def test_notes_cover_the_tap_the_screw_and_the_quantity() -> None:
     assert "BLACK OXIDE" not in notes.upper()
     # The pair ream is on the bore callout (KEEPERS_PAIR_REAMED_KEY), not a note.
     assert "REAM" not in notes
-    assert "MHA-CH-004" in notes
-    assert "MHA-VN-055" in notes
-    assert "MHA-VN-022 #2-56 FILLISTER" in notes
+    assert "MHA-CH-04" in notes
+    assert "MHA-CH-VN-55" in notes
+    assert "MHA-CH-VN-52 #2-56 FILLISTER" in notes
     assert "2 REQUIRED" in notes
     assert len(notes.splitlines()) <= 4
     # MR-fleet r7: a datum-reason note drew three findings of its own.
@@ -871,7 +871,7 @@ def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
 
 def test_parts_registry_row() -> None:
     config = _config.parts("ch-fulcrum-keeper")
-    assert config["number"] == "MHA-CH-007"
+    assert config["number"] == "MHA-CH-07"
     # The MATERIAL cell names the family (rule 2): a staked tap mouth wants a
     # ductile low-carbon steel; 1018 CF is an example, not a requirement.
     assert config["material"] == "LOW-CARBON STEEL, E.G. 1018 CF"

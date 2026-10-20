@@ -1,4 +1,4 @@
-r"""Create the three-sheet pen fitter package (MHA-PN-000).
+r"""Create the three-sheet pen fitter package (MHA-PN-00).
 
 Sheet 1 shows the pen assembled (front and right) beside four details, three
 of which carry its settings as the builder's driving, toleranced model
@@ -33,7 +33,7 @@ import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
-import vn_pen_wire_geom as wire
+import pn_vn_pen_wire_geom as wire
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -320,16 +320,16 @@ PART_ROWS = {
     "pn-pen-hanger": _config.parts("pn-pen-hanger"),
     "pn-pen-rod": _config.parts("pn-pen-rod"),
     "pn-pen-v-block": _config.parts("pn-pen-v-block"),
-    "vn-pen-marker": _config.parts("vn-pen-marker"),
+    "pn-vn-pen-marker": _config.parts("pn-vn-pen-marker"),
     "pn-pen-frame": _config.parts("pn-pen-frame"),
-    "vn-pen-set-screw": _config.parts("vn-pen-set-screw"),
-    "vn-pen-rod-set-screw": _config.parts("vn-pen-rod-set-screw"),
+    "pn-vn-pen-set-screw": _config.parts("pn-vn-pen-set-screw"),
+    "pn-vn-pen-rod-set-screw": _config.parts("pn-vn-pen-rod-set-screw"),
     "pn-pen-adjust-screw": _config.parts("pn-pen-adjust-screw"),
-    "vn-pen-adjust-nut": _config.parts("vn-pen-adjust-nut"),
-    "vn-pen-wire": _config.parts("vn-pen-wire"),
-    "vn-hanger-screw": _config.parts("vn-hanger-screw"),
-    "vn-pen-hanger-nut": _config.parts("vn-pen-hanger-nut"),
-    "vn-pen-hanger-jam-nut": _config.parts("vn-pen-hanger-jam-nut"),
+    "pn-vn-pen-adjust-nut": _config.parts("pn-vn-pen-adjust-nut"),
+    "pn-vn-pen-wire": _config.parts("pn-vn-pen-wire"),
+    "pn-vn-hanger-screw": _config.parts("pn-vn-hanger-screw"),
+    "pn-vn-pen-hanger-nut": _config.parts("pn-vn-pen-hanger-nut"),
+    "pn-vn-pen-hanger-jam-nut": _config.parts("pn-vn-pen-hanger-jam-nut"),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):
     raise AssertionError("BOM registry rows must cover exactly the pen families")

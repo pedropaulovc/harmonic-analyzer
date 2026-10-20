@@ -1,4 +1,4 @@
-"""Worst-case static check of the MHA-MG-001 arm under the A1 pose (#1559).
+"""Worst-case static check of the MHA-MG-01 arm under the A1 pose (#1559).
 
 Pure data, import-time asserts. The magnifying group moved forward into the
 drum's wire lane (z -173.51), so the bracket arm grew from ~52 to ~97 mm
@@ -9,7 +9,7 @@ between the flange and the collar. This module bounds what that costs:
 * the arm's torsion (moment about Z at the collar: the arm runs along Z) and
   bending, and the resulting hook deflection along wire 1, pen-equivalent
   through the wheel's rim/drum ratio, old 52 arm against the new one;
-* the two #2-56 screws seating the flange on MHA-SM-003's front face:
+* the two #2-56 screws seating the flange on MHA-SM-03's front face:
   the prying tension increment against preload, and the shank shear.
 
 Wire-1 tension source: the pen side hangs on wire 2 from the magnifying
@@ -37,7 +37,7 @@ import math
 
 import pn_pen_carriage_geom
 import pn_pen_rod_spec
-import vn_lever_wire_geom
+import mg_vn_lever_wire_geom
 from build_mg_magnifying_bracket import ARM_HALF_X, ARM_Y, COLLAR_OD
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
@@ -95,11 +95,11 @@ LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.08 N
 LEVER_GROUP_ARM_X = 160.0
 
 COLLAR = BRACKET_ORIGIN
-HOOK = (vn_lever_wire_geom.HOOK_X, vn_lever_wire_geom.HOOK_Y, vn_lever_wire_geom.HOOK_Z)
+HOOK = (mg_vn_lever_wire_geom.HOOK_X, mg_vn_lever_wire_geom.HOOK_Y, mg_vn_lever_wire_geom.HOOK_Z)
 _wx, _wy, _wz = (
     e - s
     for e, s in zip(
-        vn_lever_wire_geom.WIRE_END, vn_lever_wire_geom.WIRE_START, strict=True
+        mg_vn_lever_wire_geom.WIRE_END, mg_vn_lever_wire_geom.WIRE_START, strict=True
     )
 )
 _wl = math.sqrt(_wx * _wx + _wy * _wy + _wz * _wz)
@@ -225,7 +225,7 @@ SCREW_MINOR_DIA = SCREW_MAJOR_DIA - 1.299 * (25.4 / 56.0)
 SCREW_SHEAR_STRESS = JOINT_SHEAR_DEMAND_N / (
     math.pi / 4.0 * SCREW_MINOR_DIA**2
 )  # 66 N/mm^2
-# 18-8 stainless (config/parts/vn-magnifying-bracket-screw.yaml, AISI 304):
+# 18-8 stainless (config/parts/mg-vn-magnifying-bracket-screw.yaml, AISI 304):
 # McMaster's 70 ksi (483 MPa) minimum tensile, shear ultimate 0.6 x = 290 MPa,
 # allowable a third of that.
 SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2

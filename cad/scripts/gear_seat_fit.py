@@ -1,4 +1,4 @@
-"""The fit class for a gear slid onto its D-flat land on MHA-DT-004.
+"""The fit class for a gear slid onto its D-flat land on MHA-DT-04.
 
 Every gear on the cone gear shaft -- the twenty cone gears and the 64T
 crank-drive gear -- slides onto a D-flat land and bears on its neighbour.

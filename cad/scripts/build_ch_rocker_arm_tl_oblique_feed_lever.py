@@ -1,4 +1,4 @@
-r"""Build the oblique-trammel jig's feed lever (MHA-CH-006-TL-26; shop fixture).
+r"""Build the oblique-trammel jig's feed lever (MHA-CH-06-TL-26; shop fixture).
 
 A 6061-T6 1/2 x 1 in flat, 300 long, bolted on the carrier plate's top by two
 5/16-18 SHCS into the carrier's lever stations; the grip end's plan corners are

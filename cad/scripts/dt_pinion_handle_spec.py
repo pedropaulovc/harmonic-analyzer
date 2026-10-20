@@ -1,8 +1,8 @@
-r"""Pure-data contract for the separate MHA-DT-015 pinion grip crossrod.
+r"""Pure-data contract for the separate MHA-DT-15 pinion grip crossrod.
 
 The registry slug remains ``dt-pinion-handle`` because this is the operator's grip
 component, but it is only the cold-finished crossrod.  The turned head, neck,
-cross-hole, and arbor are one integral MHA-DT-022 part.
+cross-hole, and arbor are one integral MHA-DT-22 part.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ SURFACE_FINISHES = ()
 # pinion fit-up step text (pinion_rig_fitup) that owns this joint.
 DRAWING_NOTES = "USE COLD-FINISHED BAR AS RECEIVED."
 ASSEMBLY_STEP = (
-    "BOND MHA-DT-015 INTO MHA-DT-022 HEAD WITH LOCTITE 638; "
+    "BOND MHA-DT-15 INTO MHA-DT-22 HEAD WITH LOCTITE 638; "
     "INSTALLED ROD SHALL NOT TURN OR SLIDE BY HAND."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

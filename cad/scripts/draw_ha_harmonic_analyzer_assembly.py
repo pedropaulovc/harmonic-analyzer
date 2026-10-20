@@ -1,4 +1,4 @@
-r"""Create the four-sheet complete-machine fitter package (MHA-HA-000).
+r"""Create the four-sheet complete-machine fitter package (MHA-HA-00).
 
 Sheet 1 shows the assembled machine (front and crank-side views at 1:5) with
 the two settings only the complete machine makes, imported as the builder's

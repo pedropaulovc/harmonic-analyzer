@@ -106,7 +106,7 @@ _SF_BOX_DOWN_M = 0.0
 # layout audit (``_drawing_layout_audit``) boxes their text from its display
 # data and checks it against text, lines and model edges on every sheet. The
 # 8 mm nominal square they used to get here was never overlap-checked, so
-# MHA-DT-021's "20.8"/"8.42" and its callouts over the right view passed.
+# MHA-DT-21's "20.8"/"8.42" and its callouts over the right view passed.
 _ANNOT_DIM = 4
 
 
@@ -263,7 +263,7 @@ def _gdt_display(
     ``IAnnotation::GetDisplayData``, read by the shared layout audit's reader
     (``annotation_display``): lines, arcs, triangles and text runs where
     SolidWorks draws them. NOT the ``IGtol`` / ``IDatumTag`` primitives
-    (``GetLineAtIndex`` and kin) this used to read -- on MHA-DT-019 at 4:1
+    (``GetLineAtIndex`` and kin) this used to read -- on MHA-DT-19 at 4:1
     (pc-gdt-ink-diag, a89a13a7a) a leadered FCF's primitives are a crossed
     2h x 2h placeholder square at the leader's far end plus the leader's last
     run, never the frame, and a datum tag's box lies about (-9.9, -5.0) mm off
@@ -496,7 +496,7 @@ def _datum_leader_segments(
 
     But the leader IS DRAWN, and it IS readable -- as the tag's display data
     (``IAnnotation::GetDisplayData`` lines, sheet space). NOT
-    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-DT-019 those primitives drew the
+    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-DT-19 those primitives drew the
     box (-9.9, -5.0) mm off its ink and a jog to it the sheet never printed
     (pc-gdt-ink-diag, a89a13a7a), a phantom leader run. Without this, a datum tag routed straight
     across a neighbouring view is invisible to BOTH audits: its box is

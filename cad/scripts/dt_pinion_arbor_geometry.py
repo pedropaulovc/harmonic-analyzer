@@ -1,4 +1,4 @@
-r"""Geometry of the integral MHA-DT-022 pinion arbor: envelope, drum station and
+r"""Geometry of the integral MHA-DT-22 pinion arbor: envelope, drum station and
 journal-land stack.
 
 GEOMETRY ONLY: no drawing notes, marks or precision maps (the
@@ -30,9 +30,9 @@ from pinion_rig_layout import (
 
 SHAFT_DIA = 8.0
 SHAFT_LEN = 226.25  # unchanged origin-to-back-crown-root station
-# Only the two short lands that run in the MHA-DT-014 strap bores (REAM_SLIDE)
+# Only the two short lands that run in the MHA-DT-14 strap bores (REAM_SLIDE)
 # carry the running band and the Ra 1.6 finish (U39).  Everything else,
-# the MHA-DT-001 drum bond zone included, is Ø8 -0.01/-0.10: the drum keeps its
+# the MHA-DT-01 drum bond zone included, is Ø8 -0.01/-0.10: the drum keeps its
 # stock-H7-reamer bore (8.000-8.100), so the guaranteed slide-on clearance
 # comes from this side (min 0.010 at 7.99), and the loosest pair (8.10 on
 # 7.90) stays a 0.20 diametral gap, inside Loctite 638's 0.25.
@@ -40,7 +40,7 @@ SHAFT_DIA_BAND = (-0.010, -0.100)
 # The drum also slides over the back land on its way on from the back crown,
 # so the lands sit 0.01 under 8.00 too (Main ruling): the same 0.02-wide band
 # as ground shafting, shifted down, so it is no harder to turn.  In the
-# MHA-DT-014 REAM_SLIDE bores (8.010-8.025) the running clearance is 0.020-0.055.
+# MHA-DT-14 REAM_SLIDE bores (8.010-8.025) the running clearance is 0.020-0.055.
 JOURNAL_DIA_BAND = (-0.010, -0.030)
 
 # Former handle-body envelope, turned integrally with the arbor.  drawing-guidelines.md rule 17 (walls and webs)
@@ -78,9 +78,9 @@ HEAD_REAR_Z = HEAD_CENTER_Z + CROSS_HOLE_STATION
 HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 
 # --- Drum station and journal-land length (Main ruling A, 2026-09-24) --------
-# MHA-DT-022 owns where the MHA-DT-001 drum is bonded: its front end sits
+# MHA-DT-22 owns where the MHA-DT-01 drum is bonded: its front end sits
 # DRUM_STATION from the head shoulder, and the drum, trapped between the two
-# MHA-DT-014 straps, is what places the arbor's lands on the straps.  Every land
+# MHA-DT-14 straps, is what places the arbor's lands on the straps.  Every land
 # end is printed from the head shoulder at .X, and the lands are centred on
 # their straps at nominal (to the one place they print at).  Each land must still cover its strap by
 # MIN_LAND_OVER_STRAP at the worst corner of every printed band (stations,
@@ -90,11 +90,11 @@ HEAD_FRONT_Z = HEAD_REAR_Z - HEAD_LEN
 # no band is tightened to make it fit (U27, Main 2026-09-24: a longer land
 # rather than a tighter station).
 LINEAR_X_BAND = printed_band_mm(1)  # .X title-block row, 0.8
-# MHA-DT-014's thickness band (STRAP_T_BAND) and the MHA-DT-001 drum length come from
+# MHA-DT-14's thickness band (STRAP_T_BAND) and the MHA-DT-01 drum length come from
 # their geometry owners, dt_pinion_bracket_geometry and pinion_rig_layout, not
 # their drawing contracts: the drive-train recipe reads this spec.
 # User ruling 2026-09-24: the drum is bonded 0.3 further aft than the as-built
-# station so MHA-DT-012 gear j=19 reads its full 3.0 face at nominal.
+# station so MHA-DT-12 gear j=19 reads its full 3.0 face at nominal.
 # The released (pre-ruling) pose, before MECHANISM_Z_SHIFT: the drum front
 # end at z -75.0 and the arbor root at z -135.0, so the drum front sits at a
 # fixed arbor-local 60.0 (BDT APINION_Z_FRONT - ARBOR_Z0 before the aft
@@ -231,7 +231,7 @@ NECK_LEN = NECK_END_Z - HEAD_REAR_Z
 EXPOSED_SHAFT_LEN = SHAFT_LEN - NECK_END_Z
 # R1 (U27 precedent, Main 2026-09-24): a stock 6 mm reamer cuts 6.000-6.015
 # and as-received bar is at most 6.000, so a novice cannot make the old 0.0125
-# press.  The hole is reamed Ø6.00 +0.10/0 and MHA-DT-015 is bonded in with
+# press.  The hole is reamed Ø6.00 +0.10/0 and MHA-DT-15 is bonded in with
 # Loctite 638; the model carries both at the 6.00 nominal (line to line).
 CROSS_HOLE_DIA = 6.0
 CROSS_HOLE_DIA_BAND = (0.100, 0.000)  # (upper, lower) deviations
@@ -283,7 +283,7 @@ if CROSS_HOLE_WEB_WORST < CROSS_HOLE_WEB_TARGET:
         f"{CROSS_HOLE_WEB_TARGET} target"
     )
 if CROSSROD_MIN_CLEARANCE < 0.0:
-    raise AssertionError("MHA-DT-015 crossrod no longer enters its reamed hole")
+    raise AssertionError("MHA-DT-15 crossrod no longer enters its reamed hole")
 if CROSSROD_MAX_CLEARANCE > RETAINING_COMPOUND_MAX_GAP_MM:
     raise AssertionError(
         f"crossrod bond gap {CROSSROD_MAX_CLEARANCE:.3f} exceeds the "
@@ -327,7 +327,7 @@ if not (
         "the bond-zone diameter must sit on the drum, clear of both lands"
     )
 
-# R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-033
+# R1a (user, 2026-09-24): the station of the cross hole for the MHA-DT-33
 # collar's spring pin, at the general .X band from the head rear face (U27:
 # the collar-to-strap gap grows to absorb it, dt_pinion_arbor_collar_spec).  The
 # drive-train assembly reads the station; the hole itself and its clearance

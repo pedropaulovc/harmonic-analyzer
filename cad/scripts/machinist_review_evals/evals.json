@@ -2808,7 +2808,7 @@
     {
       "id": 41,
       "name": "mg-lever-wire-rules",
-      "package": "vn_lever_wire",
+      "package": "mg_vn_lever_wire",
       "kind": "part",
       "release": "v40",
       "release_pdf": "mg-lever-wire.pdf",
@@ -4673,9 +4673,10 @@
     {
       "id": 76,
       "name": "vn-boss-hook-rules",
-      "package": "vn_boss_hook",
+      "package": "sm_vn_boss_hook",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "vn-boss-hook.pdf",
       "prompt": "Blind machinist review of the vn-boss-hook part package.",
       "expected_output": "Rule-coverage case (rules 1): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
@@ -4704,9 +4705,10 @@
     {
       "id": 77,
       "name": "vn-crank-hub-pin-rules",
-      "package": "vn_crank_hub_pin",
+      "package": "dt_vn_crank_hub_pin",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "vn-crank-hub-pin.pdf",
       "prompt": "Blind machinist review of the vn-crank-hub-pin part package.",
       "expected_output": "Rule-coverage case (rules 8): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
@@ -4725,9 +4727,10 @@
     {
       "id": 78,
       "name": "vn-post-mount-screw-rules",
-      "package": "vn_post_mount_screw",
+      "package": "dt_vn_post_mount_screw",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "vn-post-mount-screw.pdf",
       "prompt": "Blind machinist review of the vn-post-mount-screw part package.",
       "expected_output": "Rule-coverage case (rules 1, 20): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
@@ -4776,9 +4779,10 @@
     {
       "id": 79,
       "name": "vn-spring-hook-rules",
-      "package": "vn_spring_hook",
+      "package": "ch_vn_spring_hook",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "vn-spring-hook.pdf",
       "prompt": "Blind machinist review of the vn-spring-hook part package.",
       "expected_output": "Rule-coverage case (rules 1, 2): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [
@@ -4807,9 +4811,10 @@
     {
       "id": 80,
       "name": "vn-transgear-pivot-screw-rules",
-      "package": "vn_transgear_pivot_screw",
+      "package": "pd_vn_transgear_pivot_screw",
       "kind": "part",
       "release": "v40",
+      "release_pdf": "vn-transgear-pivot-screw.pdf",
       "prompt": "Blind machinist review of the vn-transgear-pivot-screw part package.",
       "expected_output": "Rule-coverage case (rules 20): reports each negative finding in the stated category and raises no positive-case item.",
       "expectations": [

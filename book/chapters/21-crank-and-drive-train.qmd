@@ -23,8 +23,8 @@ One input, and the 4:1 reduction that feeds the cone gear set.
 | `dt-crank-pinion` | TODO | TODO | TODO |
 | `dt-cone-swing-platform` | TODO | TODO | TODO |
 | `dt-cone-pivot-post` | TODO | TODO | TODO |
-| `vn-cone-pivot-screw` | TODO | TODO | TODO |
-| `vn-cone-lock-knob` | TODO | TODO | TODO |
+| `dt-vn-cone-pivot-screw` | TODO | TODO | TODO |
+| `dt-vn-cone-lock-knob` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

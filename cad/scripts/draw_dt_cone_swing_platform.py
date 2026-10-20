@@ -378,7 +378,7 @@ RELIEF_TIP_INSET_MM = 0.05
 # The isometric's caption, 22 mm higher than r1's 0.158 (still 9 mm under
 # the isometric's ink, ~0.189), to free the field the relief note stands in.
 ISO_CAPTION_UPPER_LEFT = (0.315, 0.180)
-# The MHA-VN-031 named-exception note (2.5 mm text, one line), anchored
+# The MHA-DT-VN-61 named-exception note (2.5 mm text, one line), anchored
 # upper-left in the empty band above the title block (0.066): right of the
 # plan caption row (x <= 0.2185) and under the A-A label (y >= 0.0853). A
 # sheet must state the shortfall pending ruling #1019 (codex review of

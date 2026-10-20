@@ -41,7 +41,7 @@ Cross-subassembly fits proven by the top-level interference check:
   at the top level its leaf name would collide with the T12/T24 instances
   nested in drive-train / paper-drive.
 
-The fitter package (draw_ha_harmonic_analyzer_assembly.py, MHA-HA-000) reads
+The fitter package (draw_ha_harmonic_analyzer_assembly.py, MHA-HA-00) reads
 two things this build authors from ha_harmonic_analyzer_assembly_spec: the
 hidden ``IntegrationSettings`` sketch, whose two driving dimensions are the
 settings only the complete machine makes (wheel-bar top above the deck, pen

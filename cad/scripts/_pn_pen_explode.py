@@ -1,4 +1,4 @@
-"""The named ``PN_EXPLODED`` presentation of pn-pen.SLDASM (MHA-PN-000).
+"""The named ``PN_EXPLODED`` presentation of pn-pen.SLDASM (MHA-PN-00).
 
 Follows ``_pd_paper_drive_explode``: the builder owns the presentation, the
 drawing only consumes it. Each step of ``pn_pen_explode_spec.EXPLODE_STEPS``

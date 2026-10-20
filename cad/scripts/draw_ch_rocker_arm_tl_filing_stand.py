@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker arm filing stand (MHA-CH-006-TL-12).
+r"""Create the drawing for the rocker arm filing stand (MHA-CH-06-TL-12).
 
 The loose set laid out side by side: a plan (``*Top``, looking down on the
 bench) carries the left block's outline, and the elevation (``*Front``,
@@ -192,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Arm Filing Stand Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm S5 filing stand; two end blocks and a hub pedestal; MHA-CH-006-TL-12",
+            3: "rocker arm S5 filing stand; two end blocks and a hub pedestal; MHA-CH-06-TL-12",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

@@ -1,13 +1,14 @@
-r"""Create the three-sheet summing-lever fitter package (MHA-SM-000).
+r"""Create the three-sheet summing-lever fitter package (MHA-SM-00).
 
 Sheet 1 shows the assembled lever on its knife mounts (front and right) with
 the counter-spring screw height the level setting finds, a 1:1 knife-edge
 detail carrying the free-rock acceptance, and the notes. Sheet 2 is the
 builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
 balloon per BOM row. Sheet 3 is the finished isometric beside the numbered
-assembly steps and checks. Both settings are the assembly's own sketch
-dimensions (``build_sm_summing_assembly._author_settings``), imported here;
-the explode from ``sm_summing_explode_spec``; every printed text comes from
+assembly steps and checks in a 190 mm left column, with the original text
+size and line pitch. Both settings are the assembly's own sketch dimensions
+(``build_sm_summing_assembly._author_settings``), imported here; the explode
+comes from ``sm_summing_explode_spec`` and every printed text comes from
 ``sm_summing_assembly_sheet``.
 
 Usage:
@@ -176,22 +177,28 @@ BOM_ANCHOR = (0.226, 0.258)
 EXPLODED_CAPTION_XY = (BOM_ANCHOR[0], 0.176)
 
 # --- Sheet 3 ------------------------------------------------------------------
+# Reflow the full vendor Numbers into the unused space between the original
+# narrow instruction column and the finished view, without shrinking either.
 ASSEMBLY_ISO_CENTER = (0.322, 0.172)
 STEPS_XY = (0.018, 0.262)
-STEPS_LINE_WIDTH = 60  # characters; default-format note text
+STEPS_LINE_WIDTH = 80  # characters; default-format note text
+# Default-format glyph advance and note pitch measured on MHA-MG-00.
+STEPS_CHAR_WIDTH = 0.00237
+NOTE_LINE_PITCH = 0.0046
+STEPS_RIGHT = STEPS_XY[0] + STEPS_LINE_WIDTH * STEPS_CHAR_WIDTH
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in notes.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 # Literal stems, so the config-dependency analysis reads exactly these rows.
 PART_ROWS = {
     "sm-knife-mount": _config.parts("sm-knife-mount"),
-    "vn-knife-hanger-washer": _config.parts("vn-knife-hanger-washer"),
-    "vn-knife-hanger-stud": _config.parts("vn-knife-hanger-stud"),
-    "vn-knife-mount-dowel": _config.parts("vn-knife-mount-dowel"),
+    "sm-vn-knife-hanger-washer": _config.parts("sm-vn-knife-hanger-washer"),
+    "sm-vn-knife-hanger-stud": _config.parts("sm-vn-knife-hanger-stud"),
+    "sm-vn-knife-mount-dowel": _config.parts("sm-vn-knife-mount-dowel"),
     "sm-summing-lever": _config.parts("sm-summing-lever"),
-    "vn-boss-hook": _config.parts("vn-boss-hook"),
-    "vn-boss-hook-jam-nut": _config.parts("vn-boss-hook-jam-nut"),
-    "vn-counter-spring": _config.parts("vn-counter-spring"),
+    "sm-vn-boss-hook": _config.parts("sm-vn-boss-hook"),
+    "sm-vn-boss-hook-jam-nut": _config.parts("sm-vn-boss-hook-jam-nut"),
+    "sm-vn-counter-spring": _config.parts("sm-vn-counter-spring"),
     "sm-gooseneck": _config.parts("sm-gooseneck"),
     "sm-gooseneck-spring-screw": _config.parts("sm-gooseneck-spring-screw"),
 }
@@ -241,9 +248,17 @@ def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
                 width=width,
                 initial_indent=f"{number}. ",
                 subsequent_indent=" " * (len(number) + 2),
+                break_long_words=False,
+                break_on_hyphens=False,
             )
         else:
-            out += textwrap.wrap(line, width=width, subsequent_indent="   ")
+            out += textwrap.wrap(
+                line,
+                width=width,
+                subsequent_indent="   ",
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
     return "\n".join(out)
 
 
@@ -257,6 +272,9 @@ STEPS_AND_CHECKS = "\n".join(
         _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH),
     )
 )
+STEPS_BOTTOM = STEPS_XY[1] - len(STEPS_AND_CHECKS.splitlines()) * NOTE_LINE_PITCH
+if STEPS_BOTTOM < SHEET_INNER_BORDER[1]:
+    raise AssertionError("the summing assembly sequence and checks overrun the sheet")
 DETAIL_LABEL = f"{notes.DETAIL_TITLE}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 
 
@@ -834,7 +852,10 @@ def _place_steps_sheet(adapter: Any) -> None:
     set_view_exploded_state(
         adapter, finished, False, configuration=configuration, label=label
     )
+    _center_view_outline(adapter, finished, ASSEMBLY_ISO_CENTER, label=label)
     _assert_view_on_sheet(finished, label=label)
+    if _view_outline(finished, label=label)[0] - STEPS_RIGHT < 0.004:
+        raise RuntimeError("summing finished view crowds the assembly sequence")
     assert_full_detail_view(adapter, label="summing assembly")
     _add_note_block(
         adapter, SHEET_NAMES[2], STEPS_AND_CHECKS, STEPS_XY, label="assembly sequence"

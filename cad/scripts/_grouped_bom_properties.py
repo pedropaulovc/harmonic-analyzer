@@ -10,8 +10,12 @@ import _telemetry
 from _com import _early_bound
 
 
-# A shop fixture carries its parent part's Number plus ``-TL-nn``.
-_PART_NUMBER = re.compile(r"MHA-[A-Z]{2}-\d{3}(?:-TL-\d{2})?\Z")
+# Purchased numbers belong to their machine or tooling parent; their own serial
+# starts at 50. Configuration qualifiers (for example T006) are not family IDs.
+_PART_NUMBER = re.compile(
+    r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?"
+    r"|VN-[5-9][0-9])\Z"
+)
 _USER_SPECIFIED_PART_NUMBER = 8  # swBOMPartNumber_UserSpecified
 
 

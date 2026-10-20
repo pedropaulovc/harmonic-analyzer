@@ -1,4 +1,4 @@
-r"""Rocker hub (MHA-CH-012) drawing-only data: the marked-dimension and
+r"""Rocker hub (MHA-CH-12) drawing-only data: the marked-dimension and
 precision contract, the callouts and the manufacturing note the part build
 stamps into the SLDPRT.
 

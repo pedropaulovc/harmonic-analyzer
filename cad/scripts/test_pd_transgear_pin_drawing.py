@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear pin (MHA-PD-023) and its drawing."""
+"""Offline contracts for the transgear pin (MHA-PD-23) and its drawing."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import build_pd_transgear_pin as part
 import draw_pd_transgear_pin as drawing
 import pd_transgear_arm_geometry as arm
 import pd_transgear_pin_spec as spec
-import vn_transgear_retaining_ring_spec as ring
+import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm

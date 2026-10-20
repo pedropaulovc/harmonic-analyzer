@@ -1,11 +1,11 @@
-r"""Pure-data contract for MHA-PD-023, the transgear pin (R9-68).
+r"""Pure-data contract for MHA-PD-23, the transgear pin (R9-68).
 
 The plain steel pin the disc cluster runs on.  It is pressed through the
-MHA-PD-018 arm's reamed hole at S from the rear until its domed head seats on
+MHA-PD-18 arm's reamed hole at S from the rear until its domed head seats on
 the arm's rear face; forward of the arm it carries, rear to front, the
-MHA-PD-024 rear bushing, the MHA-PD-010 sleeve (with the disc, hub and screws on
-it), the MHA-PD-025 front bushing and, in the groove near its front end, the
-MHA-VN-047 retaining ring (McMaster 97431A260).  Nothing on it is threaded.
+MHA-PD-24 rear bushing, the MHA-PD-10 sleeve (with the disc, hub and screws on
+it), the MHA-PD-25 front bushing and, in the groove near its front end, the
+MHA-PD-VN-61 retaining ring (McMaster 97431A260).  Nothing on it is threaded.
 
 Frame: one revolve about local +Z.  Local z = 0 is the head's underside
 (the face that seats on the arm's rear face, machine z -116.4625) and local
@@ -21,14 +21,14 @@ from __future__ import annotations
 import math
 
 import pd_transgear_arm_geometry as ARM
-import vn_transgear_retaining_ring_spec as RING
+import pd_vn_transgear_retaining_ring_spec as RING
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
-PIN_NUMBER = "MHA-PD-023"
-ARM_NUMBER = "MHA-PD-018"
-RING_NUMBER = "MHA-VN-047"
+PIN_NUMBER = "MHA-PD-23"
+ARM_NUMBER = "MHA-PD-18"
+RING_NUMBER = "MHA-PD-VN-61"
 
 # The head seats on the arm's rear face.
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
@@ -54,7 +54,7 @@ PRESS_INTERFERENCE = (
 # is a wall held to the policy's 1.5 hard floor at its printed lower limit:
 # it prints .XX, so 2.10 leaves 1.59 (1.20 left 0.69, review of e0ac6477e; a
 # 0.5 land at .X went to -0.3, review of 6de7230aa).  The dome stays 0.8
-# high on top, so the apex stands 2.9 proud, less than the MHA-VN-041 head.
+# high on top, so the apex stands 2.9 proud, less than the MHA-PD-VN-57 head.
 WALL_FLOOR = 1.5
 HEAD_DIA = 5.0
 HEAD_LAND = 2.10
@@ -143,7 +143,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked MHA-PD-023 dimension needs authored places")
+    raise AssertionError("every marked MHA-PD-23 dimension needs authored places")
 
 for _ok, _what in (
     (HEAD_DOME_SAG < HEAD_DOME_R, "the head is not a spherical cap"),
@@ -171,7 +171,7 @@ for _ok, _what in (
     ),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-PD-023: {_what}")
+        raise AssertionError(f"MHA-PD-23: {_what}")
 
 # The ring the groove takes, named once above the groove Ø (one line: an
 # above-callout holding a line break never prints).

@@ -1,0 +1,15 @@
+ch-rocker-arm-tl-vn-oblique-block-screw:
+  title: Rocker Oblique Trammel Nut Bracket Screw
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-VN-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-VN-63
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
+  supplier: McMaster-Carr
+  supplier_skus: ["91251A188"]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, 170,000 psi tensile; McMaster-Carr 91251A188"
+  finish: black oxide
+  # The fastener table's NUT_BRACKET_TO_BLOCK count (#8-32 X 1-7/8 SHCS).
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

@@ -10,7 +10,7 @@ from frame_column_stations import (
     COLUMN_SOCKET_DIAMETER,  # noqa: F401  re-exported for existing importers
 )
 from fr_harmonic_base_spec import GREEN_TOP
-from vn_tube_frame_cap_spec import TOTAL_HEIGHT as CAP_HEIGHT, WALL_THICKNESS as CAP_ROOF
+from fr_vn_tube_frame_cap_spec import TOTAL_HEIGHT as CAP_HEIGHT, WALL_THICKNESS as CAP_ROOF
 
 # The socket pair now lives in frame_column_stations: fr_harmonic_base_spec
 # authors the socket-bore surface finishes and so needs the bore size, but

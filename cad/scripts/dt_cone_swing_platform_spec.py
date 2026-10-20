@@ -66,8 +66,8 @@ PIVOT_BEARING_THICKNESS = PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH
 # r16: screw locking belongs to assembly installation, not plate acceptance.
 PIVOT_RELIEF_FIT_REQUIREMENT = (
     "TOP RELIEF: FIT DEPTH\n"
-    "TO MHA-VN-014 SHOULDER;\n"
-    "SWINGS FREE,\n"
+    "TO MHA-DT-VN-52\n"
+    "SHOULDER; SWINGS FREE,\n"
     "NO AXIAL SHAKE."
 )
 
@@ -142,7 +142,7 @@ if crank_gear_platform_clearance() < 0.5:
 # counterpart required by that purchased screw family.
 POST_MOUNT_SPEC = HoleSpec("tapped", "1/4-20")
 POST_MOUNT_TAP_DIA = blind_cut_dia_mm(POST_MOUNT_SPEC)
-# The MHA-VN-031 post screws (MSC 40923906, 1/4-20 fillister, cut to fit, U37c)
+# The MHA-DT-VN-61 post screws (MSC 40923906, 1/4-20 fillister, cut to fit, U37c)
 # thread through the plate, flush to this much short of its underside.
 POST_SCREW_CUT_TO_FIT_SHORT = post_mount.CUT_TO_FIT_SHORT_MM
 POST_MOUNT_THREAD_DIA = 0.25 * 25.4
@@ -153,10 +153,10 @@ POST_MOUNT_THREAD_DIA = 0.25 * 25.4
 # (machinist review r1: an override belongs on the feature it overrides).
 POST_MOUNT_TAP_EDGE_BREAK = 0.1
 POST_MOUNT_TAP_BREAK_CALLOUT = f"{POST_MOUNT_TAP_EDGE_BREAK:.1f} MAX BREAK EACH END"
-# U37 (2026-09-23): the user accepted short engagement for MHA-VN-031 as a named
+# U37 (2026-09-23): the user accepted short engagement for MHA-DT-VN-61 as a named
 # exception to drawing-guidelines.md rule 18 (thread engagement)'s 1.5D; the plate slides on the deck, so no boss can
 # add thread.  Worst case: the thinnest stock plate (U41) less the cut-to-fit
-# allowance and the break at both ends of the tap, counted as MHA-DT-032 counts
+# allowance and the break at both ends of the tap, counted as MHA-DT-32 counts
 # its exit break.  A MIN never rounds up, so the print floors to two places.
 POST_MOUNT_ENGAGEMENT_WORST = round(
     PLATE_THICKNESS
@@ -174,16 +174,16 @@ POST_MOUNT_ENGAGEMENT_PRINTED = (
 # The drawing-guidelines.md rule 18 (thread engagement) audit's E7 floor (0.87D, at the old .XX plate band): the stock
 # band must not print below it without a new ruling.
 if POST_MOUNT_ENGAGEMENT_PRINTED < 0.87:
-    raise AssertionError("MHA-VN-031 engagement fell below the audited 0.87D floor")
-# The sheet states the shortfall as a plain fact, worded like MHA-DT-032's.
+    raise AssertionError("MHA-DT-VN-61 engagement fell below the audited 0.87D floor")
+# The sheet states the shortfall as a plain fact, worded like MHA-DT-32's.
 # The taps' callout names the post they mount and carries the break override
 # the figure depends on, so the line names no screw (machinist review r1).
-# Pending exception ruling: MHA-VN-031 engagement (#1019).
+# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
 POST_MOUNT_ENGAGEMENT_NOTE = (
     f"1/4-20 THREAD ENGAGEMENT {POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D MIN."
 )
 
-# Pending exception ruling: MHA-VN-031 engagement (#1019).
+# Pending exception ruling: MHA-DT-VN-61 engagement (#1019).
 POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
     f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_WORST:.2f} MIN "
     f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
@@ -192,7 +192,7 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 
 # User ruling 2026-09-29 (photo eight-views-4.png, lower right): the cone tip
 # block is a plain prism standing straight on this plate, held by ONE #4-40
-# socket head cap screw (MHA-VN-030, McMaster 91251A108) rising from under the
+# socket head cap screw (MHA-DT-VN-60, McMaster 91251A108) rising from under the
 # plate into a blind tap in the block's bottom face.  The plate carries one
 # counterbored close-clearance hole; the counterbore is on the UNDERSIDE, which
 # slides on the base deck, so the head must sit below that face.
@@ -222,7 +222,7 @@ POST_MOUNT_STATION_TOL_MM = 0.10
 # McMaster 91251A108 product page (read 2026-09-29): #4-40 x 3/8 black-oxide
 # alloy steel socket head screw, head 0.183 dia x 0.112 high.  Held here as
 # numbers so this pure-data module never imports a SolidWorks builder;
-# build_dt_drive_train_assembly asserts them equal to the MHA-VN-030 part.
+# build_dt_drive_train_assembly asserts them equal to the MHA-DT-VN-60 part.
 HOLDDOWN_SCREW_HEAD_DIA = 0.183 * 25.4
 HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
 _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])

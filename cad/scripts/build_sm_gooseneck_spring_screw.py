@@ -1,7 +1,7 @@
-r"""Build MHA-SM-004, the gooseneck counter-spring clamp screw.
+r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
 A made slotted fillister screw turned from 1/2-in 12L14 round.  Its #6-32
-shank threads into the gooseneck MHA-SM-001's tapped end plug and the
+shank threads into the gooseneck MHA-SM-01's tapped end plug and the
 under-head face clamps the counter spring's upper eye against the plug face.
 Sizes and bands live in ``sm_gooseneck_spring_screw_geom``; the print's
 marks, places and notes in ``sm_gooseneck_spring_screw_spec``.

@@ -190,7 +190,7 @@ def _wheel(role: str, *, name: str = "pd-transgear-removable-17", values=None):
     )
 
 
-def _link(name: str = "vn-chain-inner-link-8") -> _Component:
+def _link(name: str = "pd-vn-chain-inner-link-8") -> _Component:
     return _Component(name)
 
 
@@ -224,7 +224,7 @@ def test_selected_mounts_allow_mesh_without_a_configuration_whitelist(
         name=f"{prefix}pd-transgear-removable-17",
         values=_mount_values(role, angle=0.37),
     )
-    link = _link(f"{prefix}vn-chain-outer-link-9")
+    link = _link(f"{prefix}pd-vn-chain-outer-link-9")
     # Keep the existing unbounded chain-mesh volume protocol unchanged.
     components = [wheel, link] if reverse_pair else [link, wheel]
     adapter = _Adapter(_Interference(components, volume_mm3=1000.0))
@@ -303,14 +303,14 @@ def test_unregistered_selection_cannot_qualify_even_at_the_mount(
 @pytest.mark.parametrize(
     ("wheel_name", "link_name"),
     [
-        ("pd-transgear-removable-copy-2", "vn-chain-inner-link-1"),
-        ("pd-transgear-removablex-2", "vn-chain-inner-link-1"),
-        ("pd-transgear-removable-2/ordinary-part-1", "vn-chain-inner-link-1"),
-        ("pd-transgear-removable-2", "vn-chain-inner-linkage-1"),
-        ("pd-transgear-removable-2", "vn-chain-inner-link-copy-1"),
-        ("pd-transgear-removable-2", "vn-chain-inner-link-1/ordinary-part-1"),
-        ("pd-transgear-removable", "vn-chain-inner-link-1"),
-        ("pd-transgear-removable-0", "vn-chain-inner-link-1"),
+        ("pd-transgear-removable-copy-2", "pd-vn-chain-inner-link-1"),
+        ("pd-transgear-removablex-2", "pd-vn-chain-inner-link-1"),
+        ("pd-transgear-removable-2/ordinary-part-1", "pd-vn-chain-inner-link-1"),
+        ("pd-transgear-removable-2", "pd-vn-chain-inner-linkage-1"),
+        ("pd-transgear-removable-2", "pd-vn-chain-inner-link-copy-1"),
+        ("pd-transgear-removable-2", "pd-vn-chain-inner-link-1/ordinary-part-1"),
+        ("pd-transgear-removable", "pd-vn-chain-inner-link-1"),
+        ("pd-transgear-removable-0", "pd-vn-chain-inner-link-1"),
     ],
 )
 def test_prefix_false_friends_are_not_chain_mesh(observations, wheel_name, link_name):
@@ -427,7 +427,7 @@ def test_nested_pose_uses_active_root_without_fallback_or_double_composition(
     # Correct world data must not be composed again; an actually displaced PD
     # must not qualify just because its purported parent-relative mount agrees.
     wheel.relative = _MathTransform(displaced if world_is_mounted else mounted)
-    adapter = _mesh_adapter(wheel, link=_link("pd-paper-drive-1/vn-chain-inner-link-1"))
+    adapter = _mesh_adapter(wheel, link=_link("pd-paper-drive-1/pd-vn-chain-inner-link-1"))
     if world_is_mounted:
         _check(adapter)
     else:
@@ -496,7 +496,7 @@ def test_link_contacts_and_allowed_pairs_keep_their_aggregate_behavior(
     names = [component.Name2 for component in pair]
     limit = {frozenset(names): 1.0}
     adapter = _Adapter(
-        _Interference([_link(), _link("vn-chain-outer-link-2")], 20.0),
+        _Interference([_link(), _link("pd-vn-chain-outer-link-2")], 20.0),
         _Interference([_link(), _wheel("crank")], 0.5),
         _Interference(pair, pair_total / 2.0),
         _Interference(tuple(reversed(pair)), pair_total / 2.0),
@@ -575,9 +575,9 @@ def test_soundness_interference_gates_get_the_chain_mounts(monkeypatch, tmp_path
 def test_the_connecting_link_has_no_generic_chain_exemption(observations) -> None:
     """It is not a gate chain-link family: its one T24 mesh is a bounded exact
     pair (test_pd_paper_drive_interference_contracts); any other touch fails."""
-    connecting = _link("vn-chain-connecting-link-1")
+    connecting = _link("pd-vn-chain-connecting-link-1")
     assert not connecting.Name2.startswith(_assembly._CHAIN_LINK_PREFIXES)
-    for other in (_link("vn-chain-inner-link-1"), _wheel("knob")):
+    for other in (_link("pd-vn-chain-inner-link-1"), _wheel("knob")):
         with pytest.raises(RuntimeError, match="interference"):
             _check(_Adapter(_Interference([connecting, other])))
 

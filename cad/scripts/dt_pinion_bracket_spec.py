@@ -42,7 +42,7 @@ from dt_pinion_bracket_geometry import (
     THICKNESS_PLACES,
     WIDTH as WIDTH,
 )
-import vn_pinion_strap_pin_spec as _strap_pin
+import dt_vn_pinion_strap_pin_spec as _strap_pin
 
 # --- Tolerance bands.  Only the three fitted bores carry one, and each traces
 # to a NAMED fit class in ``_fit_ream_h7`` or ``_fit_ream_slide``; every other feature is governed by
@@ -53,17 +53,17 @@ import vn_pinion_strap_pin_spec as _strap_pin
 # were habit, not specification, and are gone.  The one non-fit band that
 # survives is PIN_SEAT_STATION_TOL below, and it traces to a web. ---
 # Option E-a: the strap is pinned to the torque shaft, which turns with it in
-# the MHA-DT-018 block bores.  The slide fit stays so the strap goes onto the
+# the MHA-DT-18 block bores.  The slide fit stays so the strap goes onto the
 # shaft for fit-up and the cross hole can be match-drilled through both.
 PIVOT_BORE_BAND = REAM_SLIDE
 ARBOR_BORE_BAND = REAM_SLIDE  # pinion arbor turns in it
-# The MHA-DT-025 drill-rod stud slips into this seat and is bonded with LOCTITE
+# The MHA-DT-25 drill-rod stud slips into this seat and is bonded with LOCTITE
 # 638 (U27; dt_pinion_cam_pin_spec proves the 0.000-0.042 bond gap).
 PIN_SEAT_DIA_BAND = REAM_H7
 
-# Option E-a set-pin cross hole (vn_pinion_strap_pin_spec).  Its location is a
+# Option E-a set-pin cross hole (dt_vn_pinion_strap_pin_spec).  Its location is a
 # functional requirement, not habit: the hole is match-drilled on into the
-# MHA-DT-019 shaft, and every bit it runs off the bore axis comes straight off
+# MHA-DT-19 shaft, and every bit it runs off the bore axis comes straight off
 # the shaft wall beside it (SHAFT_LIGAMENT_WORST).  Codex #858 P2, user
 # ruling (a): no location lives in prose.  Through the thickness the model's
 # own CrossHoleCz (half the thickness from broad face A) prints at .XX; its
@@ -72,15 +72,15 @@ PIN_SEAT_DIA_BAND = REAM_H7
 # needs no offset: the former 3.18 from the pivot-bore wall (a hidden
 # reference sketch) ran to a hidden line, which rule 9 forbids (r1 machinist
 # review, #1007).  The diameter carries the spring pin's own functional band
-# (vn_pinion_strap_pin_spec), and the hole is drilled (rule 12).
+# (dt_vn_pinion_strap_pin_spec), and the hole is drilled (rule 12).
 CROSS_HOLE_DIA = _strap_pin.HOLE_DIA
 CROSS_HOLE_BAND = _strap_pin.HOLE_BAND
-# The pin is its own BOM line (MHA-VN-033), so the callout names it
+# The pin is its own BOM line (MHA-DT-VN-63), so the callout names it
 # instead of supplying one loose with each strap; test_dt_pinion_bracket_drawing
 # keeps the number in step with the parts registry.  The band is tighter than
 # DRILLED HOLES, so the callout also names the fit (rule 4; r2 review): a
 # slotted spring pin grips its hole by compression.
-CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-VN-033\nSPRING PIN, PRESS FIT"
+CROSS_HOLE_CALLOUT = "DRILL THRU\nFOR MHA-DT-VN-63\nSPRING PIN, PRESS FIT"
 
 # drawing-guidelines.md rule 17 (walls and webs) (#842, U27; audit W23) worst-case web from the blind seat to a broad
 # face.  Codex #858 P2, user ruling (a) (2026-09-25): the seat's station is
@@ -201,8 +201,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 DRAWING_REFERENCE_PRECISION = 1
 
 
-# The arbor bore runs on the MHA-DT-022 arbor.  The pivot bore takes no
-# symbol: the strap is pinned to the MHA-DT-019 shaft (option E-a), so nothing
+# The arbor bore runs on the MHA-DT-22 arbor.  The pivot bore takes no
+# symbol: the strap is pinned to the MHA-DT-19 shaft (option E-a), so nothing
 # runs in it (rule 6; r1 machinist review, #1007).
 SURFACE_FINISHES = (
     SurfaceFinishControl(

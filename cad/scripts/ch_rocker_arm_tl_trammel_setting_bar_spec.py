@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker trammel setting bar (MHA-CH-006-TL-17).
+r"""Pure-data contract for the rocker trammel setting bar (MHA-CH-06-TL-17).
 
 Shop gauge, not a machine part (cad/docs/subsystem-identities.md): inventory
 ``gauges.rocker-trammel-setting-bar``. The rocker outline template's trammel

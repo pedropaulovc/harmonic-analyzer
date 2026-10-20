@@ -3,7 +3,7 @@ its manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A plain 1/16 in drill-rod pin cut
 overlength, inserted through the hole match-drilled at assembly through the
-MHA-DT-016 lever hub and the MHA-DT-017 lift rod, then trimmed and peened flush at
+MHA-DT-16 lever hub and the MHA-DT-17 lift rod, then trimmed and peened flush at
 both ends (U8 + U36; Codex P1 on #844).  The pin is a slip fit in the drilled
 hole and the peened heads retain it (#1064), so the step says INSERT, not
 DRIVE.  The nominals drive the part's named equation globals AND the
@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from dt_pinion_lever_pin_geometry import PIN_DIA as PIN_DIA, PIN_LEN as PIN_LEN
 
-LEVER_NUMBER = "MHA-DT-016"
-LIFT_ROD_NUMBER = "MHA-DT-017"
+LEVER_NUMBER = "MHA-DT-16"
+LIFT_ROD_NUMBER = "MHA-DT-17"
 
 # Stock 1/16 in drill rod (h9 in the drill-rod catalogues).  The pin rides a
 # drilled hole (title-block DRILLED HOLES +0.10/0), so it is retained by the
@@ -45,15 +45,15 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the pin sheet carries no notes, and the MHA-DT-016 and MHA-DT-017 hole
-# callouts carry only the hole specification (Main, 2026-09-26, as MHA-DT-019's).
+# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the pin sheet carries no notes, and the MHA-DT-16 and MHA-DT-17 hole
+# callouts carry only the hole specification (Main, 2026-09-26, as MHA-DT-19's).
 # The grip-parked drilling pose and the insert, trim and peen sequence are
 # performed at assembly, so they print once, on this pinion fit-up step,
 # named by its first words as RIG SET and SHAFT DRILL SET are.  The part
 # callouts' pointers to it land at integration, from the step registry.
 LEVER_PIN_SET_NAME = "LEVER PIN SET"
 LEVER_PIN_SET_STEP_KEY = "lever-pin-set"
-PIN_NUMBER = "MHA-DT-030"
+PIN_NUMBER = "MHA-DT-30"
 ASSEMBLY_STEP = "\n".join(
     (
         f"{LEVER_PIN_SET_NAME}: MATCH-DRILL {LEVER_NUMBER} HUB AND {LIFT_ROD_NUMBER} ROD",
@@ -64,7 +64,7 @@ ASSEMBLY_STEP = "\n".join(
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
 # the stock band names the hole the pin slips into and says the stock holds
 # it; the overlength cut points at the step that trims it (rule 19).  That
-# pointer comes from the MHA-DT-000 step registry, which part scripts must not
+# pointer comes from the MHA-DT-00 step registry, which part scripts must not
 # reach (test_part_isolation), so the drawing composes it.
 PIN_DIA_CALLOUT = "\n".join(
     (

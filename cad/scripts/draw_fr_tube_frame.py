@@ -197,7 +197,7 @@ def _add_outer_diameter_reference(
         diameter=True,
     )
     od_suffix = (
-        ")\nSOCKETS MHA-FR-001/MHA-FR-002 ARE"
+        ")\nSOCKETS MHA-FR-01/MHA-FR-02 ARE"
         "\nMATCH-FIT TO THIS ASSIGNED TUBE"
         "\nCLOSE HAND-SLIP; NO PERCEPTIBLE ROCK"
     )

@@ -1,4 +1,4 @@
-r"""Pure-data contract for the cylinder-bank end thrust washer (MHA-DT-026).
+r"""Pure-data contract for the cylinder-bank end thrust washer (MHA-DT-26).
 
 One washer at each end of the cylinder-gear bank, between the end gear and its
 arbor-pedestal strap (issue #743). The back-side photographs (ch13

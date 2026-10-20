@@ -466,7 +466,7 @@ def _leader_detours(module) -> dict[str, tuple[float, float, float]]:
 
 
 def test_adjuster_callout_leader_takes_the_short_way_to_its_hole() -> None:
-    """#946 / MHA-DT-021: RD1's callout stood below-right of the adjuster hole and
+    """#946 / MHA-DT-21: RD1's callout stood below-right of the adjuster hole and
     its leader climbed ~28 mm over the front view to the rim, ~16 mm further
     than the hole's 11.5 mm approach from the right face, reading as an edge
     of the part.  The leader now enters by the hole's shortest approach."""
@@ -660,7 +660,7 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     three_place = {name for name, places in grades.items() if places == 3}
     assert three_place == {"Width", "Depth", "PassageCenter", "FootTapX", "FootTapZ"}
     for name in three_place:
-        assert re.search(r"MHA-[A-Z]{2}-\d{3}", texts[name]), name
+        assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
     # SolidWorks drops multi-line text placed above a dimension.
     assert all("\n" not in text for text in drawing.DIMENSION_CALLOUTS_ABOVE.values())
 
@@ -845,26 +845,26 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     rationale, not a machinist instruction: the material rides the title
     block and the purchased-part ID, so the installation note no longer
     restates it.  The sentence was deleted per the codex machinist review
-    of MHA-VN-018 and Main's ruling (a)."""
+    of MHA-DT-VN-56 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
     from _mcmaster_91794a112 import FILLISTER_SIZE
 
-    config = _config.parts("vn-cone-tip-pinch-screw")
+    config = _config.parts("dt-vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]
     assert "18-8 stainless" in config["material"]
     notes = config["installation_notes"].upper()
     assert "STAINLESS" not in notes
     assert "18-8" not in notes
     assert " STEEL" not in notes
-    assert fastener("vn-cone-tip-pinch-screw").skus == ("91794A112",)
-    assert fastener("vn-cone-tip-pinch-screw").material == "AISI 304"
+    assert fastener("dt-vn-cone-tip-pinch-screw").skus == ("91794A112",)
+    assert fastener("dt-vn-cone-tip-pinch-screw").material == "AISI 304"
     assert FILLISTER_SIZE[1] == dt_cone_tip_block_spec.PINCH_SCREW_LENGTH
     assert dt_cone_tip_block_spec.PINCH_SCREW_SKU == "91794A112"
 
 
 # --- the hold-down tap (user ruling 2026-09-29) -------------------------------
-# MHA-VN-030 rises from under the platform into a blind #4-40 tap in the foot.
+# MHA-DT-VN-60 rises from under the platform into a blind #4-40 tap in the foot.
 # Each mutation below moves one spec input past a limit the spec guards at
 # import; the unmutated module imports, so the guard is what fails.
 _FOOT_TAP_MUTATIONS = {

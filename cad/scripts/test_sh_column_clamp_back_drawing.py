@@ -1,4 +1,4 @@
-"""Offline contracts for the column-clamp-back drawing (MHA-SH-002)."""
+"""Offline contracts for the column-clamp-back drawing (MHA-SH-02)."""
 
 from __future__ import annotations
 
@@ -126,10 +126,10 @@ def test_fit_budget_closes_at_the_printed_limits() -> None:
 
 
 def test_column_limit_is_the_a513_dom_table_row() -> None:
-    # The cited table applies only while MHA-FR-003 is bought as A513 Type 5
+    # The cited table applies only while MHA-FR-03 is bought as A513 Type 5
     # (DOM) 1 x .120 in tube: OD 0.500-1.699 in carries +0.005 / -0.000 in.
     tube = _config.parts("fr-tube-frame")
-    assert tube["number"] == "MHA-FR-003"
+    assert tube["number"] == "MHA-FR-03"
     assert tube["material_specification"].startswith("ASTM A513 T5 ")
     assert "DOM 1x.120in" in tube["material_specification"]
     assert math.isclose(fit.COLUMN_OD_MAX, 25.4 + 0.127)
@@ -210,11 +210,11 @@ def test_screw_line_shortfall_is_the_owner_ruled_one() -> None:
 
 def test_tight_bands_name_their_mate() -> None:
     bore = drawing.DIMENSION_CALLOUTS["BoreDia"]
-    assert "DIAMETRAL" in bore and "MHA-FR-003" in bore
+    assert "DIAMETRAL" in bore and "MHA-FR-03" in bore
     assert f"{fit.BORE_DIAMETRAL_CLEARANCE[0]:.2f}" in bore
-    assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["GripOffset"]
-    assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
-    assert "MHA-SH-001" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
+    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["GripOffset"]
+    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHole1Z"]
+    assert "MHA-SH-01" in drawing.DIMENSION_CALLOUTS["EarHoleHeight"]
     # The grip offset says what it locates: the bore axis, off the split face.
     assert "BORE AXIS" in drawing.DIMENSION_CALLOUTS["GripOffset"]
     source = Path(part.__file__).read_text(encoding="utf-8")

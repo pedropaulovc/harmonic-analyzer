@@ -1,7 +1,7 @@
-r"""Pure support-bar (MHA-PD-007) section and hanger-hole geometry.
+r"""Pure support-bar (MHA-PD-07) section and hanger-hole geometry.
 
 PURE DATA, no SolidWorks/COM imports: ``build_pd_support_bar`` builds from it,
-and the hanger's pivot screw (MHA-VN-041) reads the pivot tap from it to judge
+and the hanger's pivot screw (MHA-PD-VN-57) reads the pivot tap from it to judge
 its engagement without importing a COM build script.
 
 Bar frame (the build's): bar axis along X with the origin at the bar centre;
@@ -13,12 +13,12 @@ plane at machine z -138.9 and its back face on the front clamp arcs at
 
 Ch. 23 hanger holes (contract §5), all entering the BACK face:
 
-* the MHA-VN-041 pivot screw's #8-32 THROUGH tap at the arm pivot P, machine
+* the MHA-PD-VN-57 pivot screw's #8-32 THROUGH tap at the arm pivot P, machine
   (-58, 303.234), countersunk Ø4.3 max both faces: the shoulder's end ring
   still bears outside the back one, and the screw's faced tip stays below
   the front face the platen slides on, staked at the front mouth;
-* the latch hook's (MHA-PD-014) two #4-40 THROUGH taps for its base screws
-  (MHA-VN-043) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
+* the latch hook's (MHA-PD-14) two #4-40 THROUGH taps for its base screws
+  (MHA-PD-VN-59) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
   max both faces (their exits on the front face lie under the platen
   footprint, machine x -33.25..236.39).
 """
@@ -46,10 +46,10 @@ BAR_HEIGHT = 28.0
 BAR_HEIGHT_BAND = 0.13
 # Deep (Z), BAR_DEPTH (sh_column_clamp_front_geom, shared with the wheel
 # bar): the back face on the clamp arcs, the front face carrying the platen's
-# back. 9.5, not the 9.0 stock read, so the MHA-VN-041 pivot screw's faced tip
+# back. 9.5, not the 9.0 stock read, so the MHA-PD-VN-57 pivot screw's faced tip
 # (0.20-0.50 below the front face) keeps rule 18's 1.5D at the thinnest bar
 # (user ruling 2026-10-15; transgear_hanger_joints).
-# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-VN-043)
+# The pivot screw's tip recess and the latch-hook-bracket-screw (MHA-PD-VN-59)
 # tips spend the bar's .XXX thickness band.
 # build_pd_support_bar authors it natively on Depth@Bar.
 BAR_DEPTH_BAND = 0.13
@@ -58,13 +58,13 @@ BACK_FACE_Z = BAR_DEPTH / 2.0
 
 HANGER_TAP_Y = -0.5  # machine y 303.234 on the 303.734 bar centre
 
-# --- MHA-VN-041 pivot tap -------------------------------------------------------
+# --- MHA-PD-VN-57 pivot tap -------------------------------------------------------
 PIVOT_TAP_X = -58.0
 PIVOT_TAP_THREAD = "#8-32"
 PIVOT_TAP_CSK_DIA = 4.3  # MAX, both faces
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_THREAD]
 
-# --- Latch-hook base taps (MHA-PD-014's base, MHA-VN-043 screws) -----------------
+# --- Latch-hook base taps (MHA-PD-14's base, MHA-PD-VN-59 screws) -----------------
 BRACKET_TAP_X = (65.0, 72.0)
 BRACKET_TAP_SPEC = HoleSpec("tapped", "#4-40")
 BRACKET_TAP_CSK_DIA = 3.1  # MAX, both faces

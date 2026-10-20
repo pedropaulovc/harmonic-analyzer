@@ -115,7 +115,7 @@ def test_the_length_is_a_cut_to_fit_reference() -> None:
     assert not hasattr(spec, "FIT_SHORTFALL")
     assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == 1
     assert spec.LENGTH_CALLOUT.startswith("CUT TO FIT")
-    assert "MHA-DT-002" in spec.LENGTH_CALLOUT
+    assert "MHA-DT-02" in spec.LENGTH_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_reference_dimension(adapter, length_annotations[0]' in source
     assert '{"Depth": LENGTH_CALLOUT}' in source

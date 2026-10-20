@@ -1,8 +1,8 @@
 """Worst-case contracts of the transgear knob stack (R9-52, R9-53, R9-54).
 
-The MHA-PD-008 knob shaft's #8-32 stud and D-core, the MHA-PD-022 drive
+The MHA-PD-08 knob shaft's #8-32 stud and D-core, the MHA-PD-22 drive
 collar's matching D-bore and rear-face clamp reaction on actual gear face F,
-and the MHA-PD-013 thumbnut, each pair judged at the printed worst case
+and the MHA-PD-13 thumbnut, each pair judged at the printed worst case
 (drawing-guidelines.md rule 17 (walls and webs)). Every corner is recomputed from printed values and places,
 not read back from derived constants; reloads prove the refusal guards.
 """
@@ -31,7 +31,7 @@ MINOR_2B_MIN = 0.130 * INCH
 # The shared tap/native-thread registry carries the basic major rounded to mm.
 BASIC_MAJOR = 4.166
 # The deepest root a die cuts: a basic half-depth under the smallest 2A pitch
-# diameter (the assumption crank_handle_pivot_screw_spec makes for #4-40).
+# diameter (the assumption dt_crank_handle_pivot_screw_spec makes for #4-40).
 ROOT_2A_MIN = PD_2A_MIN - 0.649519 * PITCH
 ENGAGEMENT_FLOOR = 1.5 * BASIC_MAJOR
 
@@ -129,7 +129,7 @@ def test_fitted_rear_face_reacts_on_actual_f_at_every_printed_corner(
     assert collar.BODY_BLANK_LENGTH_MIN >= (
         collar.LENGTH_FITTED_MAX + collar.FACING_ALLOWANCE
     )
-    assert "REAR FACE TO FIT, SEATED ON MHA-PD-008 12T FRONT FACE" in collar.BODY_LENGTH_CALLOUT
+    assert "REAR FACE TO FIT, SEATED ON MHA-PD-08 12T FRONT FACE" in collar.BODY_LENGTH_CALLOUT
     # A larger relative axis envelope consumes all real tooth-end support.
     with pytest.raises(
         AssertionError, match="collar rear face has no actual gear support"
@@ -190,7 +190,7 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     # incomplete thread rather than on the relief.
     bad_runout_end = 6.5 + printed_band_mm(3) + PITCH
     assert nut_seat + nut.REAR_THREAD_LOSS < bad_runout_end
-    with pytest.raises(AssertionError, match="MHA-PD-013 thumbnut / MHA-PD-008 core step"):
+    with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 core step"):
         _reloaded_collar(monkeypatch, shaft, "CORE_FRONT_FROM_F", 6.5)
 
 
@@ -245,7 +245,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 8 shorter leaves less than 1.5 D.
-    with pytest.raises(AssertionError, match="MHA-PD-013 thumbnut / MHA-PD-008 stud"):
+    with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 stud"):
         _reloaded_collar(monkeypatch, shaft, "TIP_STATION", shaft.TIP_STATION - 8.0)
 
 
@@ -268,7 +268,7 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
         shallow = _reloaded_nut(patch, 80.0)
         assert shallow.CSK_HALF_ANGLE_MIN == 5.0
         patch.setattr(nut, "FRONT_THREAD_LOSS", shallow.FRONT_THREAD_LOSS)
-        with pytest.raises(AssertionError, match="MHA-PD-013 thumbnut / MHA-PD-008 stud"):
+        with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 stud"):
             _reloaded_collar(patch, nut, "REAR_THREAD_LOSS", shallow.REAR_THREAD_LOSS)
 
 

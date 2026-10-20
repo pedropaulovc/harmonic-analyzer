@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker arm's riser blocks (MHA-CH-006-TL-10).
+r"""Pure-data contract for the rocker arm's riser blocks (MHA-CH-06-TL-10).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 rocker arm's S1-S4 mill setups six blocks lie flat on the PM-30MV table, each
@@ -177,7 +177,7 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 def configuration_number(number: str, configuration: str) -> str:
     """A configuration's qualified Number (subsystem-identities.md: variants
-    keep their configuration qualifier, e.g. MHA-DT-003-T006)."""
+    keep their configuration qualifier, e.g. MHA-DT-03-T006)."""
     if configuration not in LENGTHS:
         raise KeyError(f"unknown riser block configuration {configuration!r}")
     return f"{number}-{configuration}"

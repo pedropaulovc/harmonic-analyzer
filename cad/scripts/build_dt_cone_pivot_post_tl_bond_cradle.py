@@ -1,4 +1,4 @@
-r"""Build the cone pivot post's bond cradle (MHA-DT-005-TL-01; shop fixture).
+r"""Build the cone pivot post's bond cradle (MHA-DT-05-TL-01; shop fixture).
 
 A steel cradle the cone pivot post lies in, gravity-held, while the cone and
 crank sleeves' retaining compound cures (``dt_cone_pivot_post_tl_bond_cradle_spec``).

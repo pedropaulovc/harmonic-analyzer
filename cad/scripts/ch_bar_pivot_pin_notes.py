@@ -1,4 +1,4 @@
-r"""Bar pivot pin (MHA-CH-011) drawing-only data: the marked-dimension and
+r"""Bar pivot pin (MHA-CH-11) drawing-only data: the marked-dimension and
 precision contract, the dimension callouts and the manufacturing note the
 part build stamps into the SLDPRT.
 
@@ -26,8 +26,8 @@ if pin.PIN_END_PROUD_MAX != 0.0:
 
 # Mating parts the callouts name (test_ch_bar_pivot_pin_drawing pins each to
 # the part registry).
-BAR_NUMBER = "MHA-CH-001"  # pressed into its reamed top pin hole
-LEVER_NUMBER = "MHA-CH-002"  # runs in its #47 bar-pin hole
+BAR_NUMBER = "MHA-CH-01"  # pressed into its reamed top pin hole
+LEVER_NUMBER = "MHA-CH-02"  # runs in its #47 bar-pin hole
 
 # --- Drawing contract (drawing-simplicity-policy.md `How the repository
 # implements the guidelines`: the PART owns places and bands). ---

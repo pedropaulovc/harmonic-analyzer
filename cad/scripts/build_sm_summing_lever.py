@@ -163,7 +163,7 @@ SUM_H = 3.0 * IN  # summation plate height (tip reach)             76.20
 SUM_CURV = 0.3 * IN  # summation plate side curvature                7.62
 ANCHOR_R = 0.375 * IN  # summation anchor outer radius               9.525
 # ANCHOR_H (19.05, the boss height and the counter anchor's engagement) is the
-# pure spec's -- build_vn_boss_hook trims the purchased shank to it.
+# pure spec's -- build_sm_vn_boss_hook trims the purchased shank to it.
 
 # The 20 channel-spring anchors THREAD into the part-owned native tap pattern.
 # The plate is a true coplanar casting -- mid-plane ON the pivot (.cs shape):
@@ -1064,7 +1064,7 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     """Feature 8: the native through tap down the summation-anchor boss -- the
-    seat the purchased vn-counter-spring anchor (McMaster 9490T1, ``vn-boss-hook``)
+    seat the purchased sm-vn-counter-spring anchor (McMaster 9490T1, ``sm-vn-boss-hook``)
     threads straight into. NO NUT: this tap is the nut, so its size is the
     anchor's own thread (``COUNTER_HOLE_SPEC``) and the anchor's trimmed shank
     equals the boss height it engages (``ANCHOR_H``, one spec constant).

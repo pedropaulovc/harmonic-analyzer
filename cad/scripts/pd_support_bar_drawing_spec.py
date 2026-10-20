@@ -1,4 +1,4 @@
-"""Pure-data drawing contract for the support bar (MHA-PD-007).
+"""Pure-data drawing contract for the support bar (MHA-PD-07).
 
 Split from ``pd_support_bar_spec`` on purpose: the latch hook, the platen
 guide, the transgear hanger joints and the paper-drive assembly import the
@@ -46,7 +46,7 @@ TOL_MIN = 5  # swTolMIN
 TOL_MAX = 6  # swTolMAX
 HOLE_POSITION_PLACES = 3  # the hanger holes' ±0.065 prints .XXX
 # The clamp holes' row height and stations print .XX: their position band
-# (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-002 back-arc taps'
+# (build_pd_support_bar.CLAMP_POSITION_BAND) is the MHA-SH-02 back-arc taps'
 # fixed-fastener stack, so the title block's .X ±0.8 would miss the taps.
 CLAMP_POSITION_PLACES = 2
 # The clamp counterbores' depth prints .XX: under its band the shallowest
@@ -116,37 +116,37 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 
 # Below each value: what the band or limit is for, naming the mating part.
 _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
-_HOOK_TAPS = "MHA-PD-014 HOOK TAPS"
+_HOOK_TAPS = "MHA-PD-14 HOOK TAPS"
 DIMENSION_CALLOUTS = {
-    "Height": "MHA-PD-011\nHANGS ON IT",
-    "Depth": "MHA-VN-041 TIP RECESS AND\nMHA-VN-043 SCREW TIPS",
+    "Height": "MHA-PD-11\nHANGS ON IT",
+    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-PD-VN-59 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
-    "HangerRowHeight": f"MHA-VN-041 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
-    # The clamp row's band is the MHA-SH-002 taps' (CLAMP_POSITION_BAND), so
+    "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
+    # The clamp row's band is the MHA-SH-02 taps' (CLAMP_POSITION_BAND), so
     # its mate stands at the dimension, not only under the hole callout.
-    "ClampRowHeight": "MHA-SH-002\nTAPS AT BAR\nMID-HEIGHT",
-    "PivotTapStation": "MHA-VN-041 PIVOT",
+    "ClampRowHeight": "MHA-SH-02\nTAPS AT BAR\nMID-HEIGHT",
+    "PivotTapStation": "MHA-PD-VN-57 PIVOT",
     "BracketTapStation1": _HOOK_TAPS,
     "BracketTapStation2": _HOOK_TAPS,
     # The thread class is the title block's (rule 2).
     "PivotTapDrillDia": f"TAP {PIVOT_TAP_THREAD} UNC THRU",
-    # At most 24 characters a line: the latch-hook taps' callout leader
-    # passes just right of this text (layout audit: leader-through-text).
+    # The historical 24-character lane predates the full vendor number;
+    # draw_pd_support_bar now moves both hook callouts right of this text.
     # One hole countersunk on both faces: no "2X", which on the hook taps'
     # callout counts holes (r6 machinist review, rule 12).
-    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-VN-041 BEARS OUTSIDE",
+    "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
     # The west slots (rule 4: each band names its mate): the slots' width,
-    # run and stations take up the pitch of the MHA-SH-002 clamp taps the
+    # run and stations take up the pitch of the MHA-SH-02 clamp taps the
     # screws land in (build_pd_support_bar.clamp_slot_closure_margin), so
     # their limits and stations set how much they take up (the r6 machinist
     # read "take up" as licence to loosen them); the counterbore's width and
-    # run hold the MHA-VN-021 head (clamp_slot_head_clearance). Short lines:
+    # run hold the MHA-PD-VN-53 head (clamp_slot_head_clearance). Short lines:
     # detail C is 2:1 in a corner.
-    "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-002 TAKE-UP",
-    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-VN-021",
-    "ClampSlotCboreDepth": "MHA-VN-021\nHEADS BELOW\nSLIDE FACE",
+    "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-02 TAKE-UP",
+    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-PD-VN-53",
+    "ClampSlotCboreDepth": "MHA-PD-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.
 DIMENSION_PREFIXES = {
@@ -157,8 +157,8 @@ DIMENSION_PREFIXES = {
 # row height and stations locate to (rule 4: the tight band names its mate, as
 # the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
 # sink, and why the depth has a floor (the heads' worst case stays sub-flush).
-CLAMP_TAP_MATE = "LOCATE TO MHA-SH-002 TAPS"
-CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-VN-021 HEADS BELOW SLIDE FACE"
+CLAMP_TAP_MATE = "LOCATE TO MHA-SH-02 TAPS"
+CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-PD-VN-53 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
 # across the front face (build_pd_support_bar; pd_platen_guide_spec's own

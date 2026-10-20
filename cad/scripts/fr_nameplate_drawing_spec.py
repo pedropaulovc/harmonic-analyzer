@@ -28,8 +28,8 @@ from _mcmaster_90114a511 import BF_PITCH as SCREW_PITCH
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _release_artwork import bundle_path
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
-from vn_fillister_screw_spec import SHANK_DIA as SCREW_MAJOR_DIA
-from vn_fillister_screw_spec import SHANK_LEN as SCREW_LEN
+from _mcmaster_90114a511 import SHANK_DIA as SCREW_MAJOR_DIA
+from _mcmaster_90114a511 import SHANK_LEN as SCREW_LEN
 
 # --- Model dimensions the print shows: feature -> parametric names. The slab's
 # extrude depth is the plate thickness; the Hole Wizard placement sketch

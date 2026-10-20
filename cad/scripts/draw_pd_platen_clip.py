@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the platen clip (MHA-PD-003).
+r"""Create the curated machinist drawing for the platen clip (MHA-PD-03).
 
 The clip is one 0.8 brass sheet, 83.5 long: a flat screw rail carrying the two
 #2 loose screw holes, an open-ended slit from each end, and a spring rail
@@ -152,7 +152,7 @@ HOLE_FAR_X = CLIP_LENGTH - HOLE_INSET
 # width's above the plan.  A vertical dimension's text stands left of its own
 # dimension line on a shoulder that runs from the line to the text's far end
 # (r5: the hole row's "2X 3.300" spans 21 mm), so each column is its text's
-# right end: the hole row's widest line ("MHA-PD-002", ~23 mm) ends right of
+# right end: the hole row's widest line ("MHA-PD-02", ~23 mm) ends right of
 # the screw rail's line, the hole row's three-line block stands under the
 # near hole station's dimension line (r7 audit: at 0.112 that line,
 # y ~0.1132, ran 2.7 mm into it), the spring rail's right of the overall
@@ -266,7 +266,7 @@ DIMENSION_AFFIXES = {
 # measured along the bows from the bridge to the tip, not across the formed
 # profile (r2 read it as a span); the rise is each bow's crest height.
 DIMENSION_CALLOUTS = {
-    "LeftZ": "MATCHES\nMHA-PD-002",  # pd-platen-clip RV-01
+    "LeftZ": "MATCHES\nMHA-PD-02",  # pd-platen-clip RV-01
     "RailWidth": "SCREW RAIL",
     "SheetDepth": "SHEET STOCK",
     "SpringRailWidth": "FULL R ENDS",
@@ -295,7 +295,7 @@ HOLE_EDGE_XY = (
     _plan_y(HOLE_Y) - HOLE_R_SHEET * _DIAG,
 )
 HOLE_CALLOUT_XY = (0.360, 0.098)
-HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-002\nDRILL"  # pd-platen-clip RV-01
+HOLE_CALLOUT_PROCESS = "PATTERN MATCHES MHA-PD-02\nDRILL"  # pd-platen-clip RV-01
 # Where the slit-side corner radius lands (its leader target), for the layout
 # tests: the screw rail's top-right corner.
 SLIT_CORNER_XY = (

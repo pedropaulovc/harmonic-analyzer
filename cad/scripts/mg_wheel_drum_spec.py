@@ -1,4 +1,4 @@
-r"""Pure-data drawing contract for the magnifying-wheel drum (MHA-MG-010).
+r"""Pure-data drawing contract for the magnifying-wheel drum (MHA-MG-10).
 
 A brass ring pressed on the wheel's spigot; the lever wire wraps it. The
 nominals and bands live in the drawing-FREE ``mg_wheel_drum_geom`` (the wheel

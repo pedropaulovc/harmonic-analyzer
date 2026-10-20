@@ -1857,7 +1857,7 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
 
 def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch):
     """A display dimension used to become an 8 mm nominal square with NONE
-    scope, which nothing ever overlap-checked: MHA-DT-021's "20.8"/"8.42" and its
+    scope, which nothing ever overlap-checked: MHA-DT-21's "20.8"/"8.42" and its
     callouts over the right view all passed. The shared layout audit boxes
     dimension text from display data now, so the element audit carries NO
     dimension box -- only the hole callout's leader ink for crossing checks."""
@@ -2167,7 +2167,7 @@ def _recorded_events(monkeypatch):
 
 
 def test_a_leadered_frames_igtol_primitives_never_box_it(monkeypatch):
-    """pc-858x928b: MHA-DT-019's cylindricity frame printed over "STRAPS" and
+    """pc-858x928b: MHA-DT-19's cylindricity frame printed over "STRAPS" and
     "0.45" while the audit boxed it as the 7 mm placeholder its IGtol
     primitives draw at the leader's far end, 17 mm below the frame. Those
     primitives are no longer read: with no display data the symbol keeps the
@@ -2811,7 +2811,7 @@ class _FakeNote:
 
     ``placed`` is the rendered CIRCLE centre. ``GetPosition``/``SetPosition``
     read and move the ANCHOR, which native balloons keep ~(+4.0, -1.7) mm off
-    the centre (#866, MHA-DT-000 integ3 leaf, 40 balloons).
+    the centre (#866, MHA-DT-00 integ3 leaf, 40 balloons).
     """
 
     ANCHOR_OFFSET = (0.0040, -0.0017)
@@ -2987,7 +2987,7 @@ def test_spread_balloons_land_their_circles_on_the_ring_not_their_anchors():
     """#866: the ring slot is a CIRCLE centre, and SetPosition moves the anchor.
 
     Placing the anchor on the slot left every circle ~(+4.0, -1.7) mm off the
-    ring (MHA-DT-000 integ3). The spread must carry each balloon's anchor offset.
+    ring (MHA-DT-00 integ3). The spread must carry each balloon's anchor offset.
     """
     notes = [_FakeNote(0.12, 0.13), _FakeNote(0.18, 0.17), _FakeNote(0.15, 0.19)]
     margin = 0.014

@@ -11,7 +11,7 @@ User ruling (c), 2026-09-24: the two pivot blocks locate the swing cluster
 spacer.  At fit-up the cluster is pushed hard against the BACK block and the
 FRONT block is stood off the front strap with a 0.25 feeler before its base
 seats are spotted through it (the existing U28 transfer-at-assembly step).
-The same ruling moved the drum's bond station 0.3 aft on the MHA-DT-022 arbor
+The same ruling moved the drum's bond station 0.3 aft on the MHA-DT-22 arbor
 (drum front end 61.55 from the head shoulder), so j = 19 reads full face at
 nominal; RIG_AFT_SHIFT then moved the whole rig aft so it reads full face at
 the worst stack too.
@@ -19,7 +19,7 @@ the worst stack too.
 Option E-a pins both straps to the torque shaft, so the fit-up has two
 running clearances, each set with a feeler to +/- 0.10 (Main, restricted
 review of #858).  The strap / shaft / strap group slides between the blocks
-by the 0.25 front-block feeler, P.  The drum, bonded on MHA-DT-022, turns between
+by the 0.25 front-block feeler, P.  The drum, bonded on MHA-DT-22, turns between
 the pinned straps in the gap the 0.45 shim left at its front end when the
 shaft was match-drilled.  The saved pose IS that drilling set-up (Codex
 #854/#858 P1): the back strap hard on the back stop, the drum hard on the back
@@ -63,14 +63,14 @@ from dt_pinion_spring_section import WIDTH_PLACES as SPRING_W_PLACES
 # drive train asserts the whole table at import.
 RIG_MARGIN_SPARE = 0.25
 
-# The front-block feeler and its ruled band (Codex #854 P1: MHA-DT-000 prints
+# The front-block feeler and its ruled band (Codex #854 P1: MHA-DT-00 prints
 # FEELER +/- BAND).  It sets the pinned cluster's end play, and the worst
 # stacks read its band as the setting's error.
 FRONT_BLOCK_FEELER = 0.25
 FRONT_BLOCK_FEELER_BAND = 0.10
 # The drum turns between the pinned straps, so it needs running clearance:
 # the shaft is match-drilled with a feeler as a shim at the drum's FRONT end
-# (MHA-DT-000's SHAFT DRILL SET), freezing the strap spacing at the drum plus the
+# (MHA-DT-00's SHAFT DRILL SET), freezing the strap spacing at the drum plus the
 # shim.  The drum then runs in DRUM_END_SHIM +/- DRUM_END_SHIM_SET_ERROR of end
 # play (dt_pinion_arbor_geometry.drum_total_air), set with the same band as the
 # front-block feeler.  The shim is the smallest 0.05 blade whose tightest
@@ -79,7 +79,7 @@ FRONT_BLOCK_FEELER_BAND = 0.10
 # (pinion_rig_fitup.FEELER_GAGE); the rig's 0.25 feeler left 0.05.
 DRUM_END_SHIM = 0.45
 DRUM_END_SHIM_SET_ERROR = FRONT_BLOCK_FEELER_BAND
-# The shaft is set for that drill with its rear end flush with MHA-DT-018's rear
+# The shaft is set for that drill with its rear end flush with MHA-DT-18's rear
 # face.  The SR crown keeps a straightedge off the crown root, so the setting
 # carries its own error, printed on that step.
 FLUSH_SET_ERROR = 0.10
@@ -108,11 +108,11 @@ def leaf_pair(setting: float) -> tuple[float, ...]:
     return (FEELER_LEAF_MAX, round(setting - FEELER_LEAF_MAX, 2))
 
 
-# MHA-DT-001 drum.  The length is dt_alignment_pinion_spec.FACE_WIDTH (a drawing
+# MHA-DT-01 drum.  The length is dt_alignment_pinion_spec.FACE_WIDTH (a drawing
 # contract this module must not import); a lockstep test pins the two.  It is
 # trapped between the straps' inner faces, and at the drilling set-up it sits
 # hard on the back strap, so the back stop sets its station (61.55 from the
-# MHA-DT-022 head shoulder, ruling (c)'s bond station).
+# MHA-DT-22 head shoulder, ruling (c)'s bond station).
 DRUM_LEN = 143.2
 DRUM_LEN_PLACES = 1  # FaceWidth prints .X (dt_alignment_pinion_spec)
 DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
@@ -136,7 +136,7 @@ DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
 # PRRT_kwDOPHDy386mUjhU): the drum is fixed to the rig, set from g19, and g0
 # sits south of its nominal by a long g0 -> g19 pitch stack.  Those are the
 # bank's own terms, imported from cylinder_bank_layout.G0_FRONT_SOUTH_STACK
-# and named here for the part they come from (MHA-DT-012), so the bank's band
+# and named here for the part they come from (MHA-DT-12), so the bank's band
 # is booked once.
 # The rig itself cannot sit north of its set (cluster hard back, drum hard on
 # the back strap) beyond the leaf's set error, which DRUM_FRONT_RETREAT_STACK
@@ -145,22 +145,22 @@ DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
 # G19_BACK_FACE_Z is the bank's configured-grid datum, not a frozen world
 # coordinate. Every rig station and transferred base seat below follows it.
 DRUM_BACK_ADVANCE_STACK = {
-    "MHA-DT-000 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
+    "MHA-DT-00 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
     + FRONT_BLOCK_FEELER_BAND,
-    "MHA-DT-000 feeler, widest (the drum's shimmed end play)": DRUM_END_SHIM
+    "MHA-DT-00 feeler, widest (the drum's shimmed end play)": DRUM_END_SHIM
     + DRUM_END_SHIM_SET_ERROR,
     "rig-set leaf D, thinnest setting": FEELER_SET_ERROR,
 }
 DRUM_BACK_ADVANCE_OPEN_TERMS: tuple[str, ...] = ()  # the bank is held north
 DRUM_FRONT_RETREAT_STACK = {
-    "MHA-DT-001 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
+    "MHA-DT-01 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
 }
 # g0's front face south of nominal, bank held north on its datum: gears 1-19
 # long inside the L20 acceptance (partial_stack_band(19)) and gear 0's face
 # width at +0.05; no end play (#948 ruling R, PR #1292).
 G0_FRONT_SOUTH_STACK = {
-    f"MHA-DT-012 {name}": value for name, value in _BANK_G0_FRONT_SOUTH_STACK.items()
+    f"MHA-DT-12 {name}": value for name, value in _BANK_G0_FRONT_SOUTH_STACK.items()
 }
 DRUM_FRONT_RETREAT_OPEN_TERMS: tuple[str, ...] = ()  # booked in G0_FRONT_SOUTH_STACK
 RIG_SET_LEAF_D = smallest_leaf_setting(
@@ -170,7 +170,7 @@ RIG_SET_LEAVES = leaf_pair(RIG_SET_LEAF_D)  # (1.00, 0.25)
 BACK_STOP_Z = G19_BACK_FACE_Z + RIG_SET_LEAF_D + STRAP_T
 # BACK_STOP_Z, the back block's inner face, is where every station below
 # derives from.  The U28 block put it at 77.75 (its outer face at the
-# released machine z 88.0, 10.25 deep); the E-a re-size deepened MHA-DT-018
+# released machine z 88.0, 10.25 deep); the E-a re-size deepened MHA-DT-18
 # OUTWARD, and the D set-up now moves the whole rig RIG_AFT_SHIFT aft of it.
 U28_BACK_BLOCK_OUTER_Z = 88.0
 U28_BLOCK_DEPTH = 10.25
@@ -243,13 +243,13 @@ def torque_shaft_bearing_stack(shaft_len: float) -> dict[str, float]:
         "nominal (shaft - back block - inner span)": shaft_len
         - BLOCK_DEPTH
         - INNER_SPAN,
-        "MHA-DT-019 shaft length .X": printed_deviations(shaft_len, LENGTH_PLACES)[0],
-        "MHA-DT-018 back block depth .XX": -_BLOCK_DEPTH_UPPER,
-        "MHA-DT-014 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-001 drum length .X": -_DRUM_LEN_UPPER,
-        "MHA-DT-000 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
-        "MHA-DT-019 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
-        "MHA-DT-019 rear end flush set": -FLUSH_SET_ERROR,
+        "MHA-DT-19 shaft length .X": printed_deviations(shaft_len, LENGTH_PLACES)[0],
+        "MHA-DT-18 back block depth .XX": -_BLOCK_DEPTH_UPPER,
+        "MHA-DT-14 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
+        "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
+        "MHA-DT-19 rear end flush set": -FLUSH_SET_ERROR,
     }
 
 
@@ -270,8 +270,8 @@ if sum(TORQUE_SHAFT_BEARING_STACK.values()) < _FRONT_BEARING_REQUIRED - 1e-9:
     )
 TORQUE_SHAFT_Z0 = BACK_BLOCK_OUTER_Z - TORQUE_SHAFT_LEN
 
-# Option E-a (vn_pinion_strap_pin_spec): MHA-DT-019's two set-pin holes are
-# match-drilled through the MHA-DT-014 cross holes at the fit-up stack, so they
+# Option E-a (dt_vn_pinion_strap_pin_spec): MHA-DT-19's two set-pin holes are
+# match-drilled through the MHA-DT-14 cross holes at the fit-up stack, so they
 # sit at the strap mid-planes, measured from the shaft's front end (local z 0).
 # Computed here, beside the stations they come from, so the drive train reads
 # them without importing the shaft's drawing contract (restricted review).
@@ -280,7 +280,7 @@ STRAP_MID_Z = tuple(
 )  # (front, back)
 TORQUE_SHAFT_PIN_HOLE_Z = tuple(z - TORQUE_SHAFT_Z0 for z in STRAP_MID_Z)
 
-# Option E-a (vn_pinion_strap_pin_spec): pinned to the straps, the shaft rides the
+# Option E-a (dt_vn_pinion_strap_pin_spec): pinned to the straps, the shaft rides the
 # cluster's end play.  Match-drilled flush with the back block's outer face at
 # the back stop, it retreats up to the widest feeler setting into the back
 # block when the cluster runs forward to the front block, so the shallowest
@@ -294,14 +294,14 @@ BACK_BLOCK_MIN_BEARING = FRONT_BLOCK_MIN_BEARING
 def torque_shaft_back_bearing_stack() -> dict[str, float]:
     """Worst-case engagement of the pinned torque shaft in the back block."""
     return {
-        "MHA-DT-018 back block depth": BLOCK_DEPTH,
-        "MHA-DT-018 back block depth .XX": printed_deviations(
+        "MHA-DT-18 back block depth": BLOCK_DEPTH,
+        "MHA-DT-18 back block depth .XX": printed_deviations(
             BLOCK_DEPTH, BLOCK_DEPTH_PLACES
         )[0],
-        "MHA-DT-000 feeler, widest (the E-a shaft's end play)": -(
+        "MHA-DT-00 feeler, widest (the E-a shaft's end play)": -(
             FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
         ),
-        "MHA-DT-019 rear end flush set": -FLUSH_SET_ERROR,
+        "MHA-DT-19 rear end flush set": -FLUSH_SET_ERROR,
     }
 
 
@@ -313,8 +313,8 @@ if sum(TORQUE_SHAFT_BACK_BEARING_STACK.values()) < _BACK_BEARING_REQUIRED - 1e-9
         f"{_stack_text(TORQUE_SHAFT_BACK_BEARING_STACK)} < {_BACK_BEARING_REQUIRED}"
     )
 
-# The rod floats north until the back MHA-DT-023 collar lands on the back block;
-# the MHA-DT-016 lever hub must never be that stop.  User ruling (2026-09-25,
+# The rod floats north until the back MHA-DT-23 collar lands on the back block;
+# the MHA-DT-16 lever hub must never be that stop.  User ruling (2026-09-25,
 # P1-1): the back collar's back face is set BACK_COLLAR_LEAF_F off the back
 # block's inner face with a gage leaf, mirroring the front collar's feeler
 # against the front block.  Its gap is then the leaf and its set error only --
@@ -345,16 +345,16 @@ def lift_rod_seat_stack(rod_len: float) -> dict[str, float]:
         "nominal (rod - both blocks - inner span)": rod_len
         - 2.0 * BLOCK_DEPTH
         - INNER_SPAN,
-        "MHA-DT-017 rod length .X": printed_deviations(rod_len, LENGTH_PLACES)[0],
-        "MHA-DT-018 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
-        "MHA-DT-014 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
-        "MHA-DT-001 drum length .X": -_DRUM_LEN_UPPER,
-        "MHA-DT-000 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
-        "MHA-DT-019 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
+        "MHA-DT-17 rod length .X": printed_deviations(rod_len, LENGTH_PLACES)[0],
+        "MHA-DT-18 block depth .XX (2 blocks)": -2.0 * _BLOCK_DEPTH_UPPER,
+        "MHA-DT-14 strap thickness .X (2 straps)": -2.0 * _STRAP_T_UPPER,
+        "MHA-DT-01 drum length .X": -_DRUM_LEN_UPPER,
+        "MHA-DT-00 front block feeler band": -FRONT_BLOCK_FEELER_BAND,
+        "MHA-DT-19 drum end shim set error": -DRUM_END_SHIM_SET_ERROR,
     }
 
 
-# The MHA-DT-016 lever rides the rod's front end, just south of the torque
+# The MHA-DT-16 lever rides the rod's front end, just south of the torque
 # shaft's front end, so a SHORT rod pulls the lever's throw plane toward it.
 # The grip arm's axis sits GripFromB from the hub's mouth face B, which sits
 # BoreDepth from the floor the rod seats on, and the arm is RodDia across
@@ -372,19 +372,19 @@ def _lever_arm_stack(direction: str) -> dict[str, float]:
     grip = printed_deviations(LEVER_HUB_LEN / 2.0, LEVER_GRIP_FROM_B_PLACES)
     arm = printed_deviations(LEVER_ROD_DIA, LEVER_ROD_DIA_PLACES)
     return {
-        "MHA-DT-016 bore depth .X": -bore[0] if direction == "south" else bore[1],
-        "MHA-DT-016 grip from face B .XX": grip[1] if direction == "south" else -grip[0],
-        "MHA-DT-016 arm dia .X, half": arm[1] / 2.0,
+        "MHA-DT-16 bore depth .X": -bore[0] if direction == "south" else bore[1],
+        "MHA-DT-16 grip from face B .XX": grip[1] if direction == "south" else -grip[0],
+        "MHA-DT-16 arm dia .X, half": arm[1] / 2.0,
     }
 
 
 def lever_north_travel_stack(rod_len: float) -> dict[str, float]:
     """Worst-case travel of the lever's throw plane north of the pose."""
     return {
-        "MHA-DT-017 rod length .X (shortest)": -printed_deviations(rod_len, LENGTH_PLACES)[
+        "MHA-DT-17 rod length .X (shortest)": -printed_deviations(rod_len, LENGTH_PLACES)[
             0
         ],
-        "MHA-DT-017 floated north to the back collar": BACK_COLLAR_GAP_MAX,
+        "MHA-DT-17 floated north to the back collar": BACK_COLLAR_GAP_MAX,
         **_lever_arm_stack("north"),
     }
 
@@ -392,10 +392,10 @@ def lever_north_travel_stack(rod_len: float) -> dict[str, float]:
 def lever_south_travel_stack(rod_len: float) -> dict[str, float]:
     """Worst-case travel of the lever's throw plane south of the pose."""
     return {
-        "MHA-DT-017 rod length .X (longest)": printed_deviations(rod_len, LENGTH_PLACES)[
+        "MHA-DT-17 rod length .X (longest)": printed_deviations(rod_len, LENGTH_PLACES)[
             1
         ],
-        "MHA-DT-017 floated south to the front collar (widest feeler)": (
+        "MHA-DT-17 floated south to the front collar (widest feeler)": (
             FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
         ),
         **_lever_arm_stack("south"),
@@ -403,13 +403,13 @@ def lever_south_travel_stack(rod_len: float) -> dict[str, float]:
 
 
 SHAFT_FRONT_SOUTH_TRAVEL_STACK = {
-    "MHA-DT-019 length .X (longest)": printed_deviations(TORQUE_SHAFT_LEN, LENGTH_PLACES)[
+    "MHA-DT-19 length .X (longest)": printed_deviations(TORQUE_SHAFT_LEN, LENGTH_PLACES)[
         1
     ],
-    "MHA-DT-000 feeler, widest (the pinned cluster runs forward)": (
+    "MHA-DT-00 feeler, widest (the pinned cluster runs forward)": (
         FRONT_BLOCK_FEELER + FRONT_BLOCK_FEELER_BAND
     ),
-    "MHA-DT-019 rear end flush set": FLUSH_SET_ERROR,
+    "MHA-DT-19 rear end flush set": FLUSH_SET_ERROR,
 }
 
 
@@ -423,7 +423,7 @@ def lever_to_shaft_front_worst(rod_len: float) -> float:
     )
 
 
-# MHA-DT-017 is the longer of two requirements, each at its worst stack with
+# MHA-DT-17 is the longer of two requirements, each at its worst stack with
 # RIG_MARGIN_SPARE: the rod standing LEVER_SEAT_MIN proud of the front block,
 # and the lever's throw plane clearing the torque shaft's front end (the leaf
 # F shortened the seat requirement by 1.6, and the lever then crowded the
@@ -453,7 +453,7 @@ if sum(LIFT_ROD_SEAT_STACK.values()) < _LEVER_SEAT_REQUIRED - 1e-9:
 LEVER_SEAT_PROUD = LIFT_ROD_LEN - 2.0 * BLOCK_DEPTH - INNER_SPAN  # 15.60
 LIFT_ROD_Z0 = BACK_BLOCK_OUTER_Z - LIFT_ROD_LEN
 
-# MHA-DT-024 return spring: the blade rides the back strap's flank, and its foot
+# MHA-DT-24 return spring: the blade rides the back strap's flank, and its foot
 # pad lies on the base east of the back block.  Main (restricted review of
 # #858): the pad is set SPRING_PAD_LEAF off the back block's inner face with a
 # gage leaf before its seat is transferred, so the spring is stationed from

@@ -143,7 +143,7 @@ FRONT_KEEP = {
     ),
     "BoreHeight": (FRONT_CENTER[0] - 0.046, _front_y(BORE_HEIGHT / 2.0)),
     # Right of the elevation, far enough out that the three-line callout's
-    # widest row ("ARBOR MHA-DT-013", ~42 mm) clears the tapered flank.
+    # widest row ("ARBOR MHA-DT-13", ~42 mm) clears the tapered flank.
     "BoreDia": (FRONT_CENTER[0] + 0.050, _front_y(BORE_HEIGHT) - 0.010),
     "BoreLateral": BORE_LATERAL_XY,
     # Crown: the model's radius (_show_crown_radius), up and right of the dome.
@@ -185,7 +185,7 @@ TOP_KEEP = {
 # dimensioned from the foot's west side face, so the two views share one
 # origin the shop can touch off.
 
-# The arbor (MHA-DT-013) is what the reamed bore fits: the back pedestal's
+# The arbor (MHA-DT-13) is what the reamed bore fits: the back pedestal's
 # apex screw locks it, and the front pedestal slides along it while its strap
 # is set off the bank's spring blade (cylinder_bank_layout), so the bore is a
 # sliding fit and the Ra 1.6 says so (rule 4 (tighten only for function, and
@@ -195,13 +195,13 @@ DIMENSION_CALLOUTS = {
     "BoreDia": f"REAM THRU\nSLIDING FIT ON\nARBOR {ARBOR_NUMBER}",
 }
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
-# The apex tap runs down to the arbor bore and stops there; the MHA-VN-034 cup
+# The apex tap runs down to the arbor bore and stops there; the MHA-DT-VN-64 cup
 # point's spot is drilled into the arbor at fit-up through this hole. Both
 # native extents (the tap drill's and the thread's ``<hw-thru>``) say TO BORE,
 # so neither can read as a drill carried on past the bore into the strap
 # (2026-10-18 ENFORCE r1: "Ø2.26 THRU / TAP TO BORE ... THRU" gave two
 # extents), and the thread class goes: the title block states it (rule 2 (the
-# title block is the general specification)). Same rewrite as the MHA-CH-005
+# title block is the general specification)). Same rewrite as the MHA-CH-05
 # pivot bracket's apex tap. Digit-free words (rule 7 (notes: few, flagged,
 # never a method)); the plan already shows the hole at the apex, so the words
 # do not repeat it: v37's "..., AT CROWN APEX" ran the callout 22.6 mm past

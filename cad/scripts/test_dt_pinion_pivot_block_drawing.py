@@ -56,7 +56,7 @@ def test_engaged_pinion_centre_and_clocking_share_the_pivot_swing() -> None:
 
 def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None:
     import dt_pinion_pivot_block_geometry as geometry
-    import vn_slotted_screw_spec as screw
+    import dt_vn_slotted_screw_spec as screw
     from _mcmaster_90280a203 import FILLISTER_SIZE
 
     entry = _config.title_block("edge_break")
@@ -74,7 +74,7 @@ def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None
 
 
 def test_surface_finish_is_part_owned_and_consumed_by_key() -> None:
-    # Both bores run a shaft (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-019 in the pivot bore, MHA-DT-017
+    # Both bores run a shaft (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): MHA-DT-19 in the pivot bore, MHA-DT-17
     # in the lift bore.
     pivot, lift = dt_pinion_pivot_block_spec.SURFACE_FINISHES
     assert (pivot.key, lift.key) == ("pivot_bore", "lift_bore")
@@ -146,7 +146,7 @@ def test_each_ream_callout_names_its_running_mate() -> None:
         assert "RUNNING FIT ON" in lines
         assert str(row["number"]) in lines
         assert str(row["title"]).upper() in lines
-    # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-DT-014; the
+    # R2 (converged-r7): REAM_SLIDE, one fit per shaft with MHA-DT-14; the
     # stock 1/4 in reamer wording went with the line-to-line band.
     assert dt_pinion_pivot_block_spec.BORE_DIA_BAND == REAM_SLIDE
     assert "1/4 IN" not in callouts["PivotBoreDia"]
@@ -319,9 +319,9 @@ def test_rig_layout_shaft_and_rod_are_set_back_flush() -> None:
 
 
 def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
-    # Codex #854 P1: MHA-DT-017 carries both MHA-DT-018 lift bores, the two MHA-DT-023
-    # collars between them and the MHA-DT-016 lever hub past the front block --
-    # nothing else rides it (ruling (c): no collar, no spacer; the MHA-DT-030
+    # Codex #854 P1: MHA-DT-17 carries both MHA-DT-18 lift bores, the two MHA-DT-23
+    # collars between them and the MHA-DT-16 lever hub past the front block --
+    # nothing else rides it (ruling (c): no collar, no spacer; the MHA-DT-30
     # cross pin runs radially and takes no length).  The drive-train assembly
     # must place every one of them from pinion_rig_layout: before the
     # placement moved into this PR, the old hard-coded stations left the
@@ -366,7 +366,7 @@ def test_lift_rod_length_budgets_the_whole_fitted_stack() -> None:
     assert rig.FRONT_BLOCK_Z0 - hub_mouth == pytest.approx(
         rig.LEVER_SEAT_PROUD - BORE_DEPTH, abs=0.1
     )
-    # MHA-DT-030's hole stays inside the hub engagement at the title block's .X.
+    # MHA-DT-30's hole stays inside the hub engagement at the title block's .X.
     assert ROD_PIN_HOLE_FROM_END - PIN_HOLE_DIA / 2.0 - 0.8 >= 0.0
     assert ROD_PIN_HOLE_FROM_END + PIN_HOLE_DIA / 2.0 + 0.8 <= BORE_DEPTH
 
@@ -396,7 +396,7 @@ def test_front_block_feeler_setting_is_the_ruled_band() -> None:
     # Codex #854 P1: the fit-up setting that makes INNER_SPAN (and
     # so the 185.1 shaft and 197.0 rod) true is ruling (c)'s 0.25 +/- 0.10
     # feeler between the front strap and the front block.  The band is a
-    # named fit-up value so the MHA-DT-000 step and every worst-case gate read
+    # named fit-up value so the MHA-DT-00 step and every worst-case gate read
     # one source; it never closes the gap or doubles it.  The layout owns it
     # (its worst stack sizes the shaft and rod, Codex #837) and pinion_rig_fitup
     # re-exports it for the print.
@@ -451,7 +451,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     x_band, xx_band = 0.8, 0.51  # title-block .X / .XX
     assert dt_pinion_bracket_spec.DRAWING_PRECISION["Strap"]["Depth"] == 1
     assert DRAWING_PRECISION["ShaftProfile"]["ShaftLength"] == 1
-    # MHA-DT-018 is not precision-migrated, so its 10.50 Depth prints at the
+    # MHA-DT-18 is not precision-migrated, so its 10.50 Depth prints at the
     # document's two places.
     assert "draw_dt_pinion_pivot_block.py" not in PRECISION_MIGRATED_DRAWINGS
     assert f"{dt_pinion_pivot_block_spec.BLOCK_DEPTH:.2f}" == "11.00"
@@ -489,7 +489,7 @@ def test_torque_shaft_bears_the_front_block_at_the_worst_fitted_stack() -> None:
     # floor): 0.1 shorter falls under it.
     assert bearing - 0.1 < required
     # Other extreme: the longest shaft in the shortest stack stands proud of
-    # the front block, and nothing sits on its axis there -- the MHA-DT-016 lever
+    # the front block, and nothing sits on its axis there -- the MHA-DT-16 lever
     # hub rides the lift rod, which the blocks carry off the shaft axis.
     longest_shaft = rig.TORQUE_SHAFT_LEN + x_band
     shortest_outer = 2.0 * (depth - xx_band) + rig.INNER_SPAN - 2.6

@@ -1,4 +1,4 @@
-r"""Build the rocker arm hub filing button (MHA-CH-006-TL-04; shop fixture).
+r"""Build the rocker arm hub filing button (MHA-CH-06-TL-04; shop fixture).
 
 A hardened, lapped O1 button that rides the filing stud and seats on one hub
 face of the rocker arm; its rim is the filing line for the hub O.D.

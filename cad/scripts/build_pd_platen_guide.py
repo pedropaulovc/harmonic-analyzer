@@ -48,9 +48,9 @@ from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _printed_tolerance import printed_deviations
-from vn_fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
-from vn_guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
-from vn_guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
+from _mcmaster_90114a511 import SHANK_LEN as FILLISTER_SHANK_LEN
+from pd_vn_guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
+from pd_vn_guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
 from pd_platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
 from pd_guide_lock_spec import LOCK_THICK
 from pd_platen_guide_spec import (
@@ -81,9 +81,9 @@ LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
-# The front row receives the ten guide screws (MHA-VN-006 fillisters) after each
+# The front row receives the ten guide screws (MHA-PD-VN-52 fillisters) after each
 # shank passes through the platen material left below its stock-head
-# counterbore; the rear row receives the eight lock screws (MHA-VN-046 slotted
+# counterbore; the rear row receives the eight lock screws (MHA-PD-VN-60 slotted
 # pan heads, rulings R9-31, R9-48) after each shank passes through a 1/16
 # sheet lock plate. Both are #4-40 tapped through (R9-64, R9-48), the tips
 # stopping inside the rail.
@@ -134,24 +134,24 @@ if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
     raise AssertionError("platen-guide screw stack has no #4-40 thread engagement")
 if GUIDE_SCREW_TIP_INSIDE_MIN <= 0.0:
     raise AssertionError(
-        "MHA-VN-006 guide screw tip in the MHA-PD-011 platen guide: stands "
+        "MHA-PD-VN-52 guide screw tip in the MHA-PD-11 platen guide: stands "
         f"{-GUIDE_SCREW_TIP_INSIDE_MIN:.3f} out of the rear face"
     )
 if LOCK_SCREW_TIP_INSIDE_MIN <= 0.0:
     raise AssertionError(
-        "MHA-VN-046 guide-lock screw tip in the MHA-PD-011 platen guide: stands "
+        "MHA-PD-VN-60 guide-lock screw tip in the MHA-PD-11 platen guide: stands "
         f"{-LOCK_SCREW_TIP_INSIDE_MIN:.3f} out of the platen-mating face"
     )
 if LOCK_TAP_EXIT_WALL_MIN < RECEIVER_WALL_FLOOR:
     raise AssertionError(
-        "MHA-PD-011 platen guide through tap beside the other row's tap: wall "
+        "MHA-PD-11 platen guide through tap beside the other row's tap: wall "
         f"{LOCK_TAP_EXIT_WALL_MIN:.3f} < {RECEIVER_WALL_FLOOR}"
     )
 # R9-47: the as-made lock gap (shallowest rail on the deepest bar) never
 # falls under the fitted window's max, so facing the seats always cuts.
 if GUIDE_DEPTH + _GUIDE_DEPTH_DEV[0] - (BAR_DEPTH + BAR_DEPTH_BAND) < LOCK_GAP_FIT[1]:
     raise AssertionError(
-        "MHA-PD-011 platen guide on the support bar: as-made lock gap under the "
+        "MHA-PD-11 platen guide on the support bar: as-made lock gap under the "
         f"fitted max {LOCK_GAP_FIT[1]:.2f}"
     )
 

@@ -125,15 +125,15 @@ def test_bonded_slip_fit_replaces_the_press() -> None:
     assert round(seat_min - pin_max, 6) == 0.0
     assert round(seat_max - pin_min, 6) == 0.042
     assert seat_max - pin_min <= dt_pinion_cam_pin_spec.RETAINING_COMPOUND_MAX_GAP_MM
-    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-025 eye pass): the bond is the fit-up step, not a note.
+    # drawing-guidelines.md rule 7 (notes: few, flagged, never a method) (Main's MHA-DT-25 eye pass): the bond is the fit-up step, not a note.
     assert dt_pinion_cam_pin_spec.ASSEMBLY_STEP == (
-        "BOND 2X MHA-DT-025, ONE INTO EACH MHA-DT-014 FOLLOWER SEAT WITH LOCTITE 638."
+        "BOND 2X MHA-DT-25, ONE INTO EACH MHA-DT-14 FOLLOWER SEAT WITH LOCTITE 638."
     )
-    assert "MHA-DT-014" in drawing.DIMENSION_CALLOUTS["PinDia"]
+    assert "MHA-DT-14" in drawing.DIMENSION_CALLOUTS["PinDia"]
     assert "SLIP FIT" in drawing.DIMENSION_CALLOUTS["PinDia"]
     import draw_dt_pinion_bracket
 
-    assert "MHA-DT-025" in draw_dt_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
+    assert "MHA-DT-25" in draw_dt_pinion_bracket.DIMENSION_CALLOUTS["PinSeatDia"]
 
 
 def test_the_bond_step_counts_one_pin_per_strap() -> None:
@@ -147,7 +147,7 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
     assert straps["number"] == dt_pinion_cam_pin_spec.SEAT_NUMBER
     assert pins == straps["quantity"] == 2
     step = dt_pinion_cam_pin_spec.ASSEMBLY_STEP
-    assert step.startswith(f"BOND {pins}X MHA-DT-025, ONE INTO EACH MHA-DT-014 ")
+    assert step.startswith(f"BOND {pins}X MHA-DT-25, ONE INTO EACH MHA-DT-14 ")
 
 
 def test_no_gdt_the_shank_carries_the_finish_and_only_the_fit_is_banded() -> None:
@@ -253,7 +253,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("dt-pinion-cam-pin")
-    assert spec["number"] == "MHA-DT-025"
+    assert spec["number"] == "MHA-DT-25"
     assert spec["material"] == spec["material_specification"]
     assert spec["material_specification"]
     assert spec["finish"]

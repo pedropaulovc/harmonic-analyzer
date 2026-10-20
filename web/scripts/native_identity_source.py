@@ -2,14 +2,15 @@
 
 The map resolves logical current filenames to original released filenames. It
 never edits the archive, rewrites imports, or installs legacy runtime aliases.
-Native node-path projection is exclusively performed by native-identity-map.mjs.
+Current consumer names compose through current_native_identity; native archive
+path projection and its original digest remain independently sealed.
 """
 from __future__ import annotations
 
 import ast
 import operator
 import hashlib
-import importlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -18,6 +19,12 @@ from pathlib import Path, PurePosixPath
 
 
 MAP_SHA256 = "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd"
+
+_IDENTITY_SPEC = importlib.util.spec_from_file_location(
+    "current_native_identity", Path(__file__).with_name("current_native_identity.py"))
+_IDENTITY = importlib.util.module_from_spec(_IDENTITY_SPEC)
+_IDENTITY_SPEC.loader.exec_module(_IDENTITY)
+current_identity = _IDENTITY.current_identity
 
 
 def _released_models() -> dict[str, str]:
@@ -170,13 +177,15 @@ class CadIdentityMap:
     def source_file(self, cad: Path, logical_relative: str) -> Path:
         """Select exactly one map-declared filename inside the archived CAD tree."""
         logical = PurePosixPath(logical_relative)
-        if logical.is_absolute() or ".." in logical.parts or logical.as_posix() != logical_relative:
+        if (not logical_relative or logical.is_absolute() or ".." in logical.parts
+                or logical.as_posix() != logical_relative
+                or "\\" in logical_relative or ":" in logical_relative):
             raise ValueError(f"Unsafe logical CAD source path: {logical_relative}")
         canonical = "cad/" + logical_relative
-        original = self.original_paths.get(canonical, canonical)
-        candidates = [cad.parent / original]
-        if canonical != original:
-            candidates.append(cad.parent / canonical)
+        aliases = current_identity().source_aliases(self.original_paths)
+        sealed = aliases.get(canonical, canonical)
+        original = self.original_paths.get(sealed, sealed)
+        candidates = [cad.parent / relative for relative in dict.fromkeys((original, sealed, canonical))]
         present = [path for path in candidates if path.is_file()]
         if len(present) != 1:
             reason = "Ambiguous" if present else "Missing"

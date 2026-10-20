@@ -1,8 +1,8 @@
 r"""The press fit that joins the built-up rocker arm's hub to its strap.
 
-PURE DATA, no SolidWorks/COM imports. MHA-CH-006 may be built up (its
-``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-012
-is pressed into the Ø10.20 hole of the flat strap MHA-CH-013. Both detail
+PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up (its
+``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-12
+is pressed into the Ø10.20 hole of the flat strap MHA-CH-13. Both detail
 builds and their drawing tests import this one module, so the hole's band, the
 land's band and the interference they make are stated once.
 

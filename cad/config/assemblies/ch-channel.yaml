@@ -1,4 +1,4 @@
-number: MHA-CH-000
+number: MHA-CH-00
 # channel assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the channel
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
@@ -19,48 +19,48 @@ number: MHA-CH-000
 # free_dof (+ free_dof_per_active_channel x active channels): the operational
 #   DOF the saved model ships free (verify:soundness).
 flip_invert:
-  - vn frame side screw datum x
-  - vn frame side screw datum y
-  - vn frame side screw datum z
+  - ch vn frame side screw datum x
+  - ch vn frame side screw datum y
+  - ch vn frame side screw datum z
   - ch fulcrum shaft datum x
   - ch fulcrum shaft datum y
   - ch fulcrum shaft datum z
-  # MHA-VN-055 keeper set screws, datum-located IDENTITY beside the keeper
+  # MHA-CH-VN-55 keeper set screws, datum-located IDENTITY beside the keeper
   # foot screws [INFERENCE: same learned side; confirm on the farm build].
-  - vn fulcrum set screw datum x
-  - vn fulcrum set screw datum y
-  - vn fulcrum set screw datum z
+  - ch vn fulcrum set screw datum x
+  - ch vn fulcrum set screw datum y
+  - ch vn fulcrum set screw datum z
   # The old pivot-ball mounts became ch-pivot-bracket 2026-09; same
   # datum-locate idiom and learned sides, keyed by canonical component names.
   - ch pivot bracket datum x
   - ch pivot bracket datum y
   - ch pivot bracket datum z
   - ch pivot bracket datum y @npn
-  # #743 PR2: the channel's datum-located MHA-VN-071 bracket hold-downs,
+  # #743 PR2: the channel's datum-located MHA-CH-VN-57 bracket hold-downs,
   # inserted IDENTITY like the brackets whose x/y/z seeds they share
   # (r743-4D: the channel build's first MISS was the washer's x; the
   # hold-downs follow it in the same datum-locate loop).
-  - vn bracket hold down screw datum x
-  - vn bracket hold down screw datum y
-  - vn bracket hold down screw datum z
-  # #743 PR2: the thrust washers (north and south, user 2026-10-10; MHA-VN-070
+  - ch vn bracket hold down screw datum x
+  - ch vn bracket hold down screw datum y
+  - ch vn bracket hold down screw datum z
+  # #743 PR2: the thrust washers (north and south, user 2026-10-10; MHA-CH-VN-56
   # since the owner's 2026-10-15 purchased-washer ruling), datum-located
   # IDENTITY like the pivot brackets (r743-4D flip-seed MISS on its x); both
   # share the one canonical signature.
-  - vn rocker thrust washer datum x
-  - vn rocker thrust washer datum y
-  - vn rocker thrust washer datum z
-  # #948 ruling R: the MHA-VN-053 rocker bank spring, datum-located IDENTITY
+  - ch vn rocker thrust washer datum x
+  - ch vn rocker thrust washer datum y
+  - ch vn rocker thrust washer datum z
+  # #948 ruling R: the MHA-CH-VN-54 rocker bank spring, datum-located IDENTITY
   # beside the washer [INFERENCE: same learned side; confirm on the farm build].
-  - vn rocker bank spring datum x
-  - vn rocker bank spring datum y
-  - vn rocker bank spring datum z
-  # User 2026-10-10: the MHA-VN-034 apex set screws, datum-located IDENTITY
+  - ch vn rocker bank spring datum x
+  - ch vn rocker bank spring datum y
+  - ch vn rocker bank spring datum z
+  # User 2026-10-10: the MHA-CH-VN-53 apex set screws, datum-located IDENTITY
   # in the bracket loop's wake [INFERENCE: same learned side as every other
   # IDENTITY datum-located channel part; confirm on the farm build].
-  - vn arbor set screw datum x
-  - vn arbor set screw datum y
-  - vn arbor set screw datum z
+  - ch vn arbor set screw datum x
+  - ch vn arbor set screw datum y
+  - ch vn arbor set screw datum z
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod
@@ -69,7 +69,7 @@ allowed_free_stems:
   # The pressed rod-pivot pin is lock-mated to its free rod (pressed in the
   # fork tines) and reads under-constrained with it; it adds no DOF.
   - ch-rod-pivot-pin
-  # The MHA-CH-011 bar pivot pin is lock-mated to its bar, so it rides the
+  # The MHA-CH-11 bar pivot pin is lock-mated to its bar, so it rides the
   # bar's freed amplitude DOF and reads under-constrained with it (it adds no
   # DOF of its own; not a required family).
   - ch-bar-pivot-pin
@@ -93,6 +93,6 @@ free_dof_per_active_channel: 3
 machinist_exceptions:
   - id: "RV-01"
     kind: "accept"
-    where: "sheet 4 KEEPER PLAN VIEW, the lug inner faces 40.50 ±0.02 and 182.50 ±0.02 off the MHA-FR-002 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), and step 10's statement of what those bands hold"
-    finding: "lug inner faces DRO-set to ±0.02 where a fit-up of the keepers to the MHA-CH-004 flats could absorb the stack (rules 4, 19)"
-    reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±0.10 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±0.02 because the shaft flats need them. As stated in step 10, the lug centre's ±0.10 band keeps each transferred foot hole over the MHA-FR-002 rail web with a full wall round its tap; the title-block band would put the drill wall below 1.5. Both bands are named on the sheet with their mates. The south band also holds the south foot 0.06 clear of the MHA-FR-002 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS): any band past ±0.08 lets the foot meet the boss, so the boss alone needs a sub-title-block band. The ±0.02 pair is what ch_fulcrum_shaft_spec's 0.057 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-004, MHA-FR-002), and that is left to the owner (PR #1665, decisions) (owner-accepted)"
+    where: "sheet 4 KEEPER PLAN VIEW, the lug inner faces 40.50 ±0.02 and 182.50 ±0.02 off the MHA-FR-02 line of the upper socket centres (KeeperFrontFaceZ, KeeperRearFaceZ), and step 10's statement of what those bands hold"
+    finding: "lug inner faces DRO-set to ±0.02 where a fit-up of the keepers to the MHA-CH-04 flats could absorb the stack (rules 4, 19)"
+    reason: "owner ruling X-A (50072e913, 2026-10-18) loosened the lug centre's lateral band to ±0.10 and left the inner faces at KEEPER_FITUP_LOCATION_BAND_MM ±0.02 because the shaft flats need them. As stated in step 10, the lug centre's ±0.10 band keeps each transferred foot hole over the MHA-FR-02 rail web with a full wall round its tap; the title-block band would put the drill wall below 1.5. Both bands are named on the sheet with their mates. The south band also holds the south foot 0.06 clear of the MHA-FR-02 front socket boss (build_fr_top_frame KEEPER_FOOT_PRINTED_BOSS_MARGINS): any band past ±0.08 lets the foot meet the boss, so the boss alone needs a sub-title-block band. The ±0.02 pair is what ch_fulcrum_shaft_spec's 0.057 flat-station window and the frame's foot-to-boss stack are computed against. Replacing them with a fit-up to the flats changes those shared stacks (MHA-CH-04, MHA-FR-02), and that is left to the owner (PR #1665, decisions) (owner-accepted)"

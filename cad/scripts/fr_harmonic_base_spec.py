@@ -188,8 +188,8 @@ SOCKET_BORE_FINISHES = tuple(
 )
 PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 
-# The underside's rect pads, cross-tap lugs, ribs, MHA-DT-024 foot boss and
-# MHA-FR-004 nameplate bosses stand under seats the hole table does not
+# The underside's rect pads, cross-tap lugs, ribs, MHA-DT-24 foot boss and
+# MHA-FR-04 nameplate bosses stand under seats the hole table does not
 # locate (transfer seats, cross taps, nameplate taps) or under none, so their
 # sizes and their places from the table's X0 Y0
 # are model dims too (Codex P2 on #1310; machinist review of the ribs and the
@@ -381,7 +381,7 @@ DRAWING_REFERENCE_PRECISION = 1
 # general .X band is wrong in one direction here. The model carries the band.
 SPOTFACE_DEPTH_BAND_MM = (0.5, 0.0)  # (upper, lower) deviations, like _fit_deviations
 
-# The MHA-FR-001 pivot seat is located from the MHA-DT-002 pedestal seats in one
+# The MHA-FR-01 pivot seat is located from the MHA-DT-02 pedestal seats in one
 # setup (Main ruling 2026-10-10), +- this band. cone_set_stack books the same
 # value as its pivot-seat-position term, so the sheet prints what the stack
 # assumes.

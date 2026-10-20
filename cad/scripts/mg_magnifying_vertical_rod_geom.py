@@ -47,10 +47,10 @@ SEAT_LAND_WORST = (
 
 if SEAT_LAND_WORST < SEAT_LAND_MIN - 1e-9:
     raise AssertionError(
-        f"MHA-MG-004 shoulder land {SEAT_LAND_WORST:.3f} on the clamp face at worst, "
+        f"MHA-MG-04 shoulder land {SEAT_LAND_WORST:.3f} on the clamp face at worst, "
         f"under {SEAT_LAND_MIN}"
     )
 if not RELIEF_DIA < THREAD_BASIC_MINOR < THREAD_MAJOR < ROD_DIA:
-    raise AssertionError("MHA-MG-004 thread end does not step down from the bar")
+    raise AssertionError("MHA-MG-04 thread end does not step down from the bar")
 if not 0.0 < TIP_CHAMFER < RELIEF_START_X < SHOULDER_X < ROD_LENGTH - DOME_R:
-    raise AssertionError("MHA-MG-004 rod stations out of order")
+    raise AssertionError("MHA-MG-04 rod stations out of order")

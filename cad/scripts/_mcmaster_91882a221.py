@@ -2,10 +2,10 @@
 
 Separate from the other thumb-screw SKU and COM recipe to limit cache blast radius.
 
-MHA-VN-011 uses this steel raised knurled-head #4-40 x 7/16 in screw.
+MHA-MG-VN-50 and MHA-MS-VN-50 use this steel raised knurled-head #4-40 x 7/16 in screw.
 The native thumb-screw author and assembly placement read the same THUMB_SPEC.
 
-Production part frame (build_vn_thumb_screw): the outer head face lies at X=0,
+Production part frame (build_mg_vn_thumb_screw): the outer head face lies at X=0,
 the axis runs along +X, the collar bearing face is at X=HEAD_STACK_LEN and the
 thread tip at X=OVERALL_LEN.
 """

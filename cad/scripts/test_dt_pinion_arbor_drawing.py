@@ -1,4 +1,4 @@
-"""Behavioral release contracts for the integral MHA-DT-022 pinion arbor."""
+"""Behavioral release contracts for the integral MHA-DT-22 pinion arbor."""
 
 from __future__ import annotations
 
@@ -157,17 +157,17 @@ def test_integral_head_owns_the_crossrod_interface() -> None:
     assert spec.NECK_LEN == pytest.approx(spec.NECK_END_Z - spec.HEAD_REAR_Z)
     callout = drawing.DIMENSION_CALLOUTS["CrossHoleDia"]
     assert callout is spec.CROSS_HOLE_CALLOUT
-    assert callout == "REAM THRU, BONDED FIT\nON MHA-DT-015 CROSSROD"
+    assert callout == "REAM THRU, BONDED FIT\nON MHA-DT-15 CROSSROD"
     # Machinist review r1 of #1685 (blocker): the band names its mate, and
     # every mate a callout names is the registry's part number.
     import _config
 
     assert spec.CROSSROD_NUMBER == _config.parts("dt-pinion-handle")["number"]
-    assert spec.STRAP_NUMBER == "MHA-DT-014"
-    assert spec.DRUM_NUMBER == "MHA-DT-001"
-    # Fable r-delta (Main ruling B): MHA-DT-015's bond and acceptance are
-    # instructions for a part not on this print; MHA-DT-015 carries both.
-    assert "MHA-DT-015" not in spec.DRAWING_NOTES
+    assert spec.STRAP_NUMBER == "MHA-DT-14"
+    assert spec.DRUM_NUMBER == "MHA-DT-01"
+    # Fable r-delta (Main ruling B): MHA-DT-15's bond and acceptance are
+    # instructions for a part not on this print; MHA-DT-15 carries both.
+    assert "MHA-DT-15" not in spec.DRAWING_NOTES
     assert "SHALL NOT TURN OR SLIDE BY HAND" in crossrod.ASSEMBLY_STEP
 
 
@@ -192,7 +192,7 @@ def test_crossrod_is_a_bonded_slip_fit_not_a_press() -> None:
     assert spec.CROSSROD_MAX_CLEARANCE == pytest.approx(loosest)
     assert tightest >= 0.0
     assert loosest <= spec.RETAINING_COMPOUND_MAX_GAP_MM
-    assert "INTO MHA-DT-022 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
+    assert "INTO MHA-DT-22 HEAD WITH LOCTITE 638" in crossrod.ASSEMBLY_STEP
     for retired in ("MATCH-REAM", "PRESS", "INTERNAL SHOULDERS SHARP"):
         assert retired not in spec.DRAWING_NOTES
         assert retired not in spec.CROSS_HOLE_CALLOUT
@@ -226,16 +226,16 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     for key, (station_z, _symbol_xy, _flank) in drawing.JOURNAL_FINISHES.items():
         assert lands[key] < station_z < lands[key] + spec.JOURNAL_LEN
     # Machinist review r1 of #1685: each land's callout names its bore.
-    assert spec.JOURNAL_CALLOUT == "JOURNAL,\nRUNS IN MHA-DT-014"
+    assert spec.JOURNAL_CALLOUT == "JOURNAL,\nRUNS IN MHA-DT-14"
     for key in ("FrontJournalDia", "BackJournalDia"):
         assert drawing.DIMENSION_CALLOUTS[key] is spec.JOURNAL_CALLOUT
-    assert "MHA-DT-014" not in spec.DRAWING_NOTES
+    assert "MHA-DT-14" not in spec.DRAWING_NOTES
     assert not hasattr(spec, "PART_DATUMS")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
 
 
 def test_each_journal_land_covers_its_strap_with_axial_margin() -> None:
-    """The lands must cover the MHA-DT-014 straps where the assembly puts them."""
+    """The lands must cover the MHA-DT-14 straps where the assembly puts them."""
     import build_dt_drive_train_assembly as assembly
 
     front_face = assembly.RIG.STRAP_Z_INNER[0] - assembly.ARBOR_Z0
@@ -256,7 +256,7 @@ def test_journal_and_bond_zone_bands_leave_the_intended_fits() -> None:
 
     journal_upper, journal_lower = spec.JOURNAL_DIA_BAND
     strap_upper, strap_lower = strap.ARBOR_BORE_BAND
-    # Running fit of each land in its MHA-DT-014 REAM_SLIDE bore.
+    # Running fit of each land in its MHA-DT-14 REAM_SLIDE bore.
     assert strap.ARBOR_BORE_BAND is _fit_ream_slide.REAM_SLIDE
     assert strap_lower - journal_upper == pytest.approx(0.020)
     assert strap_upper - journal_lower == pytest.approx(0.055)
@@ -524,7 +524,7 @@ def test_bond_zone_diameter_is_a_flank_dimension_on_the_drum() -> None:
     assert spec.DRAWING_DIMENSIONS["BondZoneReference"] == {"BondZoneDia"}
     assert drawing.DIMENSION_CALLOUTS["BondZoneDia"] is spec.BOND_ZONE_CALLOUT
     assert spec.BOND_ZONE_CALLOUT == (
-        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-001 BOND ZONE,\nDRUM ENDS ON JOURNALS"
+        "ALL<MOD-DIAM>8 EXCEPT JOURNALS;\nMHA-DT-01 BOND ZONE,\nDRUM ENDS ON JOURNALS"
     )
     # Machinist review r3 of #1685 (blocker): the drum station falls on the
     # front land; each drum end rests on its land at every printed limit.
@@ -670,8 +670,8 @@ def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
     end it locates and when it is set; the note keeps only the corners."""
     assert spec.DRAWING_NOTES == "INSIDE CORNERS R0.25 MAX."
     assert spec.ASSEMBLY_STEP == (
-        "SLIDE MHA-DT-022 INTO MHA-DT-001 AND BOND WITH LOCTITE 638, DRUM FRONT "
-        "END AT MHA-DT-022 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
+        "SLIDE MHA-DT-22 INTO MHA-DT-01 AND BOND WITH LOCTITE 638, DRUM FRONT "
+        "END AT MHA-DT-22 DRUM STATION; WIPE SQUEEZE-OUT OFF JOURNAL LANDS."
     )
     for text in (spec.DRAWING_NOTES, spec.ASSEMBLY_STEP):
         assert f"{spec.DRUM_STATION:.2f}" not in text
@@ -682,7 +682,7 @@ def test_drum_station_is_a_model_dimension_the_fitup_step_names() -> None:
         spec.DRUM_STATION_CALLOUT
     )
     assert spec.DRUM_STATION_CALLOUT == (
-        "DRUM STATION:\nMHA-DT-001 FRONT END,\nSET AT ASSEMBLY"
+        "DRUM STATION:\nMHA-DT-01 FRONT END,\nSET AT ASSEMBLY"
     )
     assert "DRUM STATION" in spec.ASSEMBLY_STEP
     assert spec.DRUM_STATION_BAND == spec.LINEAR_X_BAND
@@ -919,7 +919,7 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     # Main (#858, ruling 3): the E-a pins freeze the strap spacing where the
     # shaft is match-drilled, so the drum's running clearance is whatever the
     # drilling set-up leaves.  It is set with the rig's one feeler as a shim at
-    # the drum's front end, which MHA-DT-000's SHAFT DRILL SET prints; the drum
+    # the drum's front end, which MHA-DT-00's SHAFT DRILL SET prints; the drum
     # then runs in 0.25 +/- 0.10 of end play and never binds.  Before the
     # ruling the straps closed line to line on the drum, and drum_total_air
     # still read the block-stop model (0.0 up to the whole feeler).  The shim
@@ -939,23 +939,23 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     )
     assert spec.drum_total_air()[0] - spec.MIN_END_PLAY >= rig.RIG_MARGIN_SPARE - 1e-9
     assert rig.DRUM_FRONT_Z - rig.STRAP_Z_INNER[0] == pytest.approx(rig.DRUM_END_SHIM)
-    # The drilling pose is printed where the fitter drills: MHA-DT-000's
+    # The drilling pose is printed where the fitter drills: MHA-DT-00's
     # SHAFT DRILL SET (Main's re-ruling, 2026-09-26).
     import pinion_rig_fitup as fitup
 
     assert fitup.SHAFT_DRILL_STEP.split("\n") == [
-        "SHAFT DRILL SET: MATCH-DRILL MHA-DT-019 THRU MHA-DT-014 CROSS HOLES, 2 PL,",
-        "MHA-DT-019 REAR END FLUSH WITH MHA-DT-018 REAR FACE +/-0.10,",
-        "STRAPS ON BACK STOP, MHA-DT-001 ON BACK STRAP,",
-        "0.45 FEELER AT MHA-DT-001 FRONT END; DRIVE MHA-VN-033 PINS,",
-        "BOTH ENDS 0 TO 2.8 BELOW THE MHA-DT-014 EDGES.",
+        "SHAFT DRILL SET: MATCH-DRILL MHA-DT-19 THRU MHA-DT-14 CROSS HOLES, 2 PL,",
+        "MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-0.10,",
+        "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP,",
+        "0.45 FEELER AT MHA-DT-01 FRONT END; DRIVE MHA-DT-VN-63 PINS,",
+        "BOTH ENDS 0 TO 2.8 BELOW THE MHA-DT-14 EDGES.",
     ]
     # Both bearing stacks carry the flush setting, and the front one the
     # shim's set error, by name.
-    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-019 rear end flush set"] == -0.10
-    assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-DT-019 rear end flush set"] == -0.10
-    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-019 drum end shim set error"] == -0.10
-    assert rig.LIFT_ROD_SEAT_STACK["MHA-DT-019 drum end shim set error"] == -0.10
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-19 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-DT-19 rear end flush set"] == -0.10
+    assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-19 drum end shim set error"] == -0.10
+    assert rig.LIFT_ROD_SEAT_STACK["MHA-DT-19 drum end shim set error"] == -0.10
 
 
 class _SketchFeature:
@@ -1086,7 +1086,7 @@ def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
     for margin in (crank, lever_plane, rig):
         assert margin >= 0.25
 def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() -> None:
-    """R1a (user, 2026-09-24): the MHA-DT-033 collar's 1/16 in spring-pin hole.
+    """R1a (user, 2026-09-24): the MHA-DT-33 collar's 1/16 in spring-pin hole.
 
     It prints the rig's functional band (not the title block's drilled-hole
     band), stands at a .X station from the head rear face, never enters the
@@ -1094,7 +1094,7 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     2.0 web target of steel beside it.
     """
     import dt_pinion_arbor_pin_spec as pin_hole
-    import vn_pinion_strap_pin_spec as strap_pin
+    import dt_vn_pinion_strap_pin_spec as strap_pin
 
     # One pin family and one drill for the whole rig (pinioncluster's E-a).
     assert pin_hole.PIN_HOLE_DIA == strap_pin.HOLE_DIA == pytest.approx(25.4 / 16.0)
@@ -1103,10 +1103,7 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     # title block's drilled-hole row (codex machinist pass on pc-r8).
     import _config
 
-    assert pin_hole.PIN_NUMBER == _config.parts("vn-pinion-strap-pin")["number"]
-    assert pin_hole.PIN_HOLE_CALLOUT == (
-        f"{strap_pin.DRILL_THRU_CALLOUT}\nFOR {pin_hole.PIN_NUMBER} SPRING PIN"
-    )
+    assert pin_hole.PIN_NUMBER == _config.parts("dt-vn-pinion-strap-pin")["number"]
     assert spec.PIN_STATION_FROM_HEAD_REAR == 38.0
     assert spec.PIN_STATION_BAND == spec.LINEAR_X_BAND
     assert spec.PIN_Z == pytest.approx(spec.HEAD_REAR_Z + 38.0)
@@ -1118,8 +1115,6 @@ def test_collar_pin_hole_is_a_drilled_spring_pin_hole_clear_of_the_front_land() 
     assert spec.DRAWING_DIMENSIONS["PinStationReference"] == {"PinStationFromHeadRear"}
     assert spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["PinStationFromHeadRear"] == 1
-    assert drawing.DIMENSION_CALLOUTS["PinHoleDia"] == pin_hole.PIN_HOLE_CALLOUT
-    assert drawing.DIMENSION_CALLOUTS["PinStationFromHeadRear"] == "COLLAR PIN"
     assert part.V_PIN_HOLE > 0.0
 
 

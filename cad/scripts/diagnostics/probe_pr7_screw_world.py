@@ -19,15 +19,15 @@ from _assembly import component_transform
 
 
 SCREWS = (
-    "vn-cone-pivot-screw-1",
-    "vn-swing-stop-screw-1",
-    "vn-slotted-screw-1",
-    "vn-slotted-screw-2",
-    "vn-slotted-screw-3",
-    "vn-slotted-screw-4",
-    "vn-foot-screw-1",
-    "vn-pedestal-hold-down-screw-1",
-    "vn-pedestal-hold-down-screw-2",
+    "dt-vn-cone-pivot-screw-1",
+    "dt-vn-swing-stop-screw-1",
+    "dt-vn-slotted-screw-1",
+    "dt-vn-slotted-screw-2",
+    "dt-vn-slotted-screw-3",
+    "dt-vn-slotted-screw-4",
+    "dt-vn-foot-screw-1",
+    "dt-vn-pedestal-hold-down-screw-1",
+    "dt-vn-pedestal-hold-down-screw-2",
 )
 
 

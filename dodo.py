@@ -1742,7 +1742,7 @@ def _channel_spring_variants() -> list[Path]:
     task targets; cleanup and cache packing share this inventory so a hit restores
     every spring component referenced by ch-channel.SLDASM.
     """
-    return sorted((CAD_OUT / "sldprt").glob("vn-channel-spring-installed-stretch*.SLDPRT"))
+    return sorted((CAD_OUT / "sldprt").glob("ch-vn-channel-spring-installed-stretch*.SLDPRT"))
 
 
 def _part_cache_outputs(stem: str) -> list[Path]:
@@ -2516,7 +2516,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
             sp.set_attribute("cache", "miss")
             _tag_cache_key(sp, key)
             # Warn only once work starts, never for a probe or farm dispatch.
-            if stem.startswith("vn_"):
+            if "_vn_" in stem:
                 _telemetry.warn(
                     f"[vendor-part] Building {label} (cache key {key[:12]}); "
                     "vendor-part rebuilds should be rare: investigate the cache "
@@ -3516,12 +3516,13 @@ def task_check():
         # and the seat put back to its declared baseline however it ends.
         SCRIPTS_DIR / "test_drawing_pdf_raster.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        SCRIPTS_DIR / "test_grouped_bom_properties.py",
         # The shared catalogue inch-fraction printer behind the BOM and ITEM
         # screw lengths: exact 1/64 fractions print, anything else refuses.
         SCRIPTS_DIR / "test_inch_fraction.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
-        SCRIPTS_DIR / "test_vn_keeper_chain.py",
+        SCRIPTS_DIR / "test_dt_vn_keeper_chain.py",
         # The removable sprocket's seat interface: its recorded web/rim
         # shortfalls and the #25 plates' clearance over the shared seat.
         SCRIPTS_DIR / "test_pd_transgear_removable_seat.py",
@@ -3540,7 +3541,7 @@ def task_check():
         # stack at the printed bands, and the retired 1/2-13 tap's failed web.
         SCRIPTS_DIR / "test_knife_hanger_worst_case.py",
         SCRIPTS_DIR / "test_summing_hanger_stack.py",
-        SCRIPTS_DIR / "test_vn_knife_hanger_hardware.py",
+        SCRIPTS_DIR / "test_sm_vn_knife_hanger_hardware.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
         SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
@@ -3593,7 +3594,7 @@ def task_check():
         # Its YAML reads ride the gate's _CONFIG_YAMLS deps; its module imports
         # ride module_deps_of.
         SCRIPTS_DIR / "test_ms_measuring_stick_assembly.py",
-        # The TL-000 oblique-trammel jig (a shop fixture outside the machine
+        # The TL-00 oblique-trammel jig (a shop fixture outside the machine
         # tree): poses closing on the calculator, the shop-fixture rule, and
         # the pinned sweep clearances of both passes.
         SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_jig_assembly.py",
@@ -3634,7 +3635,7 @@ def task_check():
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.
-        SCRIPTS_DIR / "test_vn_cone_pose_specs.py",
+        SCRIPTS_DIR / "test_dt_vn_cone_pose_specs.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         # Fixture pose, hook transform and conservative swept-wire clearance.
         SCRIPTS_DIR / "test_mg_fixture_installation.py",
@@ -3645,13 +3646,16 @@ def task_check():
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
-        # ... and #937: the cylinder-bank layout bands and MHA-VN-034's set screw.
-        SCRIPTS_DIR / "test_vn_arbor_set_screw.py",
+        # ... and #937: cylinder-bank bands and the CH/DT parent-specific apex screws.
+        SCRIPTS_DIR / "test_ch_vn_arbor_set_screw.py",
+        SCRIPTS_DIR / "test_dt_vn_fillister_screw.py",
+        SCRIPTS_DIR / "test_mg_vn_clamp_screw.py",
+        SCRIPTS_DIR / "test_mg_vn_thumb_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
-        # ... and MHA-VN-055, the fulcrum keepers' #1-72 cup-point set screw.
-        SCRIPTS_DIR / "test_vn_fulcrum_set_screw.py",
-        # ... and MHA-VN-007, the pen hanger's #8-32 screw (McMaster 93075A199).
-        SCRIPTS_DIR / "test_vn_hanger_screw.py",
+        # ... and MHA-CH-VN-55, the fulcrum keepers' #1-72 cup-point set screw.
+        SCRIPTS_DIR / "test_ch_vn_fulcrum_set_screw.py",
+        # ... and MHA-PN-VN-50, the pen hanger's #8-32 screw (McMaster 93075A199).
+        SCRIPTS_DIR / "test_pn_vn_hanger_screw.py",
         # ... and #936: the rocker-bank stack, the support's bracket seats, the
         # channel's cross-bank axial budget and the hole-callout process line.
         SCRIPTS_DIR / "test_channel_axial_budget.py",
@@ -3665,15 +3669,15 @@ def task_check():
         SCRIPTS_DIR / "test_ch_pivot_bracket_spec.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
         SCRIPTS_DIR / "test_sm_gooseneck_spring_joint.py",
-        # #1559: the MHA-MG-004 rod's threaded seat in the MHA-MG-002 hex clamp.
+        # #1559: the MHA-MG-04 rod's threaded seat in the MHA-MG-02 hex clamp.
         SCRIPTS_DIR / "test_mg_rod_clamp_joint.py",
         # ... and the A1 bracket arm's stiffness/joint check (the arm grew to
         # reach the plumb plane at the drum wire lane).
         SCRIPTS_DIR / "test_mg_magnifying_bracket_arm_check.py",
-        # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
+        # The amplitude bar's pressed MHA-CH-11 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
-        # The rod fork / peened MHA-CH-010 pin joint's worst-case budget.
+        # The rod fork / peened MHA-CH-10 pin joint's worst-case budget.
         SCRIPTS_DIR / "test_ch_rod_pivot_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-guidelines.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
@@ -3696,7 +3700,7 @@ def task_check():
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
         # Every configuration of a saved part is rebuilt and read back clean
-        # (pc-p1r: MHA-DT-030 INSTALLED saved stale failed saved-rebuild-clean).
+        # (pc-p1r: MHA-DT-30 INSTALLED saved stale failed saved-rebuild-clean).
         SCRIPTS_DIR / "test_part_save_rebuild.py",
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
@@ -3769,9 +3773,12 @@ def task_check():
                     "render_diff.py",
                 )
             ),
-            # Release pairing tests read the sealed identity map at runtime.
+            # Release pairing tests compose the current and sealed identity maps.
             str(
                 (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
+            ),
+            str(
+                (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
             ),
         }
     )

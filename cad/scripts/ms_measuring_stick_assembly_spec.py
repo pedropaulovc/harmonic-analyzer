@@ -1,8 +1,8 @@
-"""Pure placement and fitting contract for ms-measuring-stick.SLDASM (MHA-MS-000).
+"""Pure placement and fitting contract for ms-measuring-stick.SLDASM (MHA-MS-00).
 
 The ch16 measuring stick and its clamped stop (user-approved re-derivation,
 2026-10-09): the graduated bar, the brass block, its cover plate, the two
-MHA-VN-054 plate screws and one MHA-VN-011 knurled thumbscrew. The assembly
+MHA-MS-VN-51 plate screws and one MHA-MS-VN-50 knurled thumbscrew. The assembly
 frame IS the stop frame of ``ms_stop_spec`` (X along the stick, Y from the
 thumbscrew face up to the roof, Z from the cover into the block), so the
 block and plate sit at the identity and every other pose below is derived
@@ -32,8 +32,8 @@ ASM_NAME = "ms-measuring-stick"
 STICK = "ms-stick"
 BLOCK = "ms-stop-block"
 PLATE = "ms-stop-plate"
-PLATE_SCREW = "vn-ms-stop-plate-screw"
-THUMB_SCREW = "vn-thumb-screw"
+PLATE_SCREW = "ms-vn-stop-plate-screw"
+THUMB_SCREW = "ms-vn-thumb-screw"
 
 # Every component family and its count: the builder places, the explode moves
 # and the drawing's BOM proves exactly this inventory.
@@ -66,7 +66,7 @@ BLOCK_ORIGIN = (0.0, 0.0, 0.0)
 PLATE_ORIGIN = (0.0, 0.0, 0.0)
 
 # --- Thumbscrew -------------------------------------------------------------
-# vn-thumb-screw's frame: outer head face at X=0, axis +X, collar bearing face
+# ms-vn-thumb-screw's frame: outer head face at X=0, axis +X, collar bearing face
 # at HEAD_STACK_LEN, tip at OVERALL_LEN. Axis up the tapped wall: part X -> +Y.
 THUMB_ROWS: Rows = ((0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
 THUMB_TIP_Y = STICK_BOTTOM_Y  # the tip clamps the bar's underside
@@ -77,7 +77,7 @@ THUMB_EXPOSED_THREAD = 0.0 - THUMB_COLLAR_FACE_Y  # collar to the block's face
 THUMB_ENGAGED_THREAD = stop.FLOOR_THICKNESS  # the whole tapped wall
 
 # --- Plate screws -----------------------------------------------------------
-# vn-ms-stop-plate-screw's frame: head +Y, thread -Y, bearing plane Y=0. The
+# ms-vn-stop-plate-screw's frame: head +Y, thread -Y, bearing plane Y=0. The
 # thread runs +Z into the block (part -Y -> +Z, part Y -> -Z); the bearing
 # plane sits on the plate's outer face.
 PLATE_SCREW_ROWS: Rows = ((1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0))

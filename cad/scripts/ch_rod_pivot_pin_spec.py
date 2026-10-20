@@ -1,4 +1,4 @@
-r"""Rod pivot pin (MHA-CH-010) and the rod-fork-to-rocker joint it closes.
+r"""Rod pivot pin (MHA-CH-10) and the rod-fork-to-rocker joint it closes.
 
 PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the
 pattern). The part build (``build_ch_rod_pivot_pin.py``), its drawing, the
@@ -10,7 +10,7 @@ its rocker arm (``ch_rocker_arm_spec``) in the arm's own plane, and one plain
 5/64 drill-rod pin runs through both tines and the arm's #47 rod hole. The
 pin RUNS in the arm (the one moving member) and is PRESSED into holes reamed
 through both tines, its ends dressed flush with the fork's faces, exactly as
-the MHA-CH-011 bar pin (``ch_bar_pivot_pin_spec``) is pressed into the
+the MHA-CH-11 bar pin (``ch_bar_pivot_pin_spec``) is pressed into the
 amplitude bar. Press-fit retention is the user's ruling (2026-10-09, PR #1292
 review F1): a 90-degree Ø3.2 countersink sunk into each tine for a peened end
 left 0.92 of bearing land under the pin, below drawing-guidelines.md rule 17 (walls and webs)'s 1.5 floor, so the

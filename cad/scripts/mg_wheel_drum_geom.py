@@ -1,4 +1,4 @@
-r"""Wheel drum (MHA-MG-010) nominal geometry -- the drawing-FREE constant block.
+r"""Wheel drum (MHA-MG-10) nominal geometry -- the drawing-FREE constant block.
 
 The brass drum is the book's "inner hub" of the 5:1 wheel-and-axle: a plain
 ring pressed on the magnifying wheel's spigot up to the boss, its front face
@@ -31,7 +31,7 @@ DRUM_OD_PLACES = 1
 DRUM_BORE_BAND = (0.018, 0.0)
 DRUM_LEN_BAND = (0.0, -0.10)
 
-LEVER_WIRE_DIA = 0.8  # the lever wire the drum carries (vn_lever_wire_geom)
+LEVER_WIRE_DIA = 0.8  # the lever wire the drum carries (mg_vn_lever_wire_geom)
 DRUM_WIRE_R = DRUM_OD / 2.0 + LEVER_WIRE_DIA / 2.0  # 9.85, wire-centre radius
 
 MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, at the worst printed band

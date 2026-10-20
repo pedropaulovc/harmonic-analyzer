@@ -6,7 +6,8 @@ import { gunzip } from 'node:zlib'
 import { promisify } from 'node:util'
 import { validateModelRepresentation, assertNativeSourceAssociation } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
-import { loadNativeIdentityMap } from './native-identity-map.mjs'
+import { projectCurrentNativeMetadata, CURRENT_NATIVE_IDENTITY_PROJECTION } from '../current-native-identity.mjs'
+import { validateCurrentNativeIdentityInputs } from './current-native-identity-inputs.mjs'
 import { sourceVisibilityError, requiredSourceViews, physicalSourceFrameRequired } from '../source-visibility.mjs'
 import { VIDEO_IDS, INPUT_FIELDS, completeInput, canonicalJson, sourceImageError, sourceNeedsMachine, recomputeImagePlaneWarp, sameResolvedImagePlaneWarp, nativeLineAxisGeometryBound, nativeGeometryAssumptionErrors, runTool } from './verify-reference.mjs'
 
@@ -43,16 +44,19 @@ function rejectLegacy(value) {
 
 /** Re-read live authority and the independently registered actual exporter bytes on every call. */
 export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
+  await validateCurrentNativeIdentityInputs(webRoot)
   const approved = validateModelRepresentation(JSON.parse(await readFile(resolve(webRoot, 'content/model-representation.json'), 'utf8')))
   const native = nativeProvenanceFromModule(await readFile(resolve(webRoot, 'src/mechanics-data.ts'), 'utf8'))
   assertNativeSourceAssociation(approved, native)
-  await loadNativeIdentityMap()
+  assert(CURRENT_NATIVE_IDENTITY_PROJECTION.sourceMapSha256 === approved.identity.mapSha256,
+    'Current naming projection differs from the approved historical native map')
   const manifest = JSON.parse(await readFile(resolve(webRoot, 'content/canonical-native/manifest.json'), 'utf8'))
   const seal = manifest.currentSourceInventory
   assert(seal?.path === INVENTORY_PATH && hash(seal.sha256), 'Current actual native inventory has not been independently registered')
   const raw = await readFile(resolve(webRoot, 'content/v39-source/native-inventory.json'))
   assert(digest(raw) === seal.sha256, 'Current actual native inventory bytes differ from their independent seal')
-  const inventory = JSON.parse(raw)
+  // Verify exact archived bytes above; project only the current consumer view.
+  const inventory = projectCurrentNativeMetadata(JSON.parse(raw))
   assert(inventory.sha256 === approved.source.sha256 && equal(inventory.source, approved.source)
     && equal(inventory.identity, approved.identity), 'Actual inventory source/map/canonical tuple differs from live approval')
   assert(inventory.matrixConvention === 'column-major part-local-metres to native-world-metres', 'Current inventory matrix convention differs')
@@ -103,7 +107,8 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
     assert(Array.isArray(BINDINGS) && BINDINGS.every(binding => text(binding.motion) && typeof binding.pattern?.test === 'function'), 'Actual native articulation registry is missing')
     return { runtimeInstances: instances, videos, motionBindings: BINDINGS }
   })
-  return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos, motionBindings }
+  return { approved, inventory, inventorySha256: seal.sha256, currentIdentityProjection: CURRENT_NATIVE_IDENTITY_PROJECTION,
+    paths, runtimeInstances, videos, motionBindings }
 }
 
 function validateCurrentAnchors(data, authority, fields = CURRENT_ANCHOR_FIELDS) {
@@ -265,7 +270,7 @@ export function currentSourceLayoutForViews(views) {
 function compileCurrentSourceAssembly(compile, data, frame, view) {
   const label = `${data.source.videoId}@${frame.timeSeconds}/${view.id}`
   try {
-    const compiled = compile(view.sourceAssembly)
+    const compiled = compile(projectCurrentNativeMetadata(view.sourceAssembly))
     assert(compiled.state.kind === 'operating' || compiled.state.provenance.videoId === data.source.videoId,
       'Assembly support witness differs from the current source video')
     return compiled
@@ -288,6 +293,7 @@ async function withCurrentRuntime(webRoot, consume) {
  * association. The compiler may normalize accepted unit-vector roundoff in its
  * clone; never rewrite the bound source record or claim this is posed proof. */
 export async function normalizeCurrentTrackAssemblies(track, { webRoot = WEB_ROOT } = {}) {
+  track = projectCurrentNativeMetadata(track)
   assert(text(track?.source?.videoId) && Array.isArray(track.frames), 'Current assembly normalization lacks source/frames')
   return withCurrentRuntime(webRoot, async server => {
     const { compileSourceAssemblyState } = await server.ssrLoadModule('/src/source-assembly.ts')
@@ -298,7 +304,7 @@ export async function normalizeCurrentTrackAssemblies(track, { webRoot = WEB_ROO
           'Current assembly normalization has an unknown view field/identity')
         return { ...view, sourceAssembly: compileCurrentSourceAssembly(compileSourceAssemblyState, track, frame, view).state }
       }) }
-    }) }
+    }), currentIdentityProjection: CURRENT_NATIVE_IDENTITY_PROJECTION }
   })
 }
 
@@ -375,10 +381,12 @@ function requireCurrentIdentities(data, authority, videoId) {
 
 
 export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, videoId = data?.source?.videoId, inventory = null } = {}) {
+  const authored = data
+  data = projectCurrentNativeMetadata(data)
   assert(data?.schemaVersion === 1 && data.kind === 'current-source-observations', 'Expected independently measured current source observations')
   rejectLegacy(data)
   const authority = await loadCurrentAuthority(webRoot)
-  if (inventory !== null) assert(equal(inventory, authority.inventory), 'Caller inventory differs from the independently sealed actual native export')
+  if (inventory !== null) assert(equal(projectCurrentNativeMetadata(inventory), authority.inventory), 'Caller inventory differs from the independently sealed actual native export')
   requireCurrentIdentities(data, authority, videoId)
   const source = data.source, model = data.model, identity = data.nativeIdentity
   assert(Array.isArray(data.anchors) && Array.isArray(data.shots) && data.shots.length > 0
@@ -516,7 +524,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
   assert(!unresolved.length || coverage.status === 'blocked' && coverage.blockers.length > 0,
     'Current source census claims complete with unresolved time/layout/camera/input coverage')
   await validateCurrentRuntime(data, webRoot)
-  return data
+  return authored
 }
 
 async function readCurrentObservationBytes(webRoot, videoId) {
@@ -555,8 +563,8 @@ export async function validateCurrentTrackAssociation(track, observations, webRo
   rejectLegacy(observations)
   const authority = await loadCurrentAuthority(webRoot)
   requireCurrentIdentities(observations, authority, id)
-  validateCurrentAnchors(observations, authority)
-  validateCurrentTrackAnchors(track, authority)
+  validateCurrentAnchors(projectCurrentNativeMetadata(observations), authority)
+  validateCurrentTrackAnchors(projectCurrentNativeMetadata(track), authority)
   // Direct association callers must also execute the physical domain compiler;
   // an exact source-record hash is not validation of its authored assembly state.
   await currentSourceAssemblyChangeTimes(observations, { webRoot })

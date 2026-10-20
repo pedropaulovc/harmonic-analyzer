@@ -1,4 +1,4 @@
-r"""Create the curated manufacturing drawing for through hub MHA-DT-031."""
+r"""Create the curated manufacturing drawing for through hub MHA-DT-31."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ _S = VIEW_SCALE[0] / 1000.0  # sheet metres per model millimetre
 # Turned part, laid as it sits in the lathe (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the *Right view
 # rotated a quarter turn so the axis is horizontal, inboard end on the left
 # and the faced outboard end on the right.  +90 degrees sends model +Y to
-# paper-left and model +Z (the six-o'clock MHA-VN-029 seam) to paper-down.  The
+# paper-left and model +Z (the six-o'clock MHA-DT-VN-59 seam) to paper-down.  The
 # outboard end view is the *Bottom orientation turned half a turn, which is
 # exactly the third-angle RIGHT view of that profile: it sits on the profile's
 # axis to its right, with the seam at six o'clock as the notes call it.
@@ -108,12 +108,12 @@ SERVICE_PIN_TOP_RIM = (
 )
 BARREL_TOP = _sheet_y(-HUB_BARREL_DIA / 2.0)
 BARREL_BOTTOM = _sheet_y(HUB_BARREL_DIA / 2.0)
-# Pick the barrel's cylindrical face between the rear relief and the MHA-DT-009
+# Pick the barrel's cylindrical face between the rear relief and the MHA-DT-09
 # cross-hole, above the axis.  The through hole is seen end-on here, so a pick
 # inside its circle sees no face (run 20260923T023246758Z-97bfca38).
 BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0.015)
 # Every size and callout sits outside the silhouettes.
-# - Lengths: the seat from the faced outboard end, the MHA-DT-009 station from
+# - Lengths: the seat from the faced outboard end, the MHA-DT-09 station from
 #   the arm shoulder (drawing-guidelines.md rule 17 (walls and webs)) and the relief from the rear face on
 #   one row below the profile; the toleranced overall, front face to rear
 #   face, on the row below it.  The barrel is the remainder, not printed.
@@ -262,17 +262,17 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=SERVICE_PIN_TOP_RIM,
         callout_xy=HOLE_CALLOUT_XY,
-        label="MHA-DT-009 hub pilot",
+        label="MHA-DT-09 hub pilot",
         process=drill_process(SERVICE_PIN_HOLE_SPEC),
     )
-    _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "MHA-DT-009 hub pilot")
+    _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "MHA-DT-09 hub pilot")
     add_attached_note(
         adapter,
         front,
         text=SEAM_CALLOUT,
         entity_xy=SEAM_EDGE_PICK,
         note_xy=SEAM_CALLOUT_XY,
-        label="MHA-VN-029 seam callout",
+        label="MHA-DT-VN-59 seam callout",
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

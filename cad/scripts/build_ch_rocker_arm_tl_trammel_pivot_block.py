@@ -1,4 +1,4 @@
-r"""Build the rocker template trammel's pivot block (MHA-CH-006-TL-14; shop tooling).
+r"""Build the rocker template trammel's pivot block (MHA-CH-06-TL-14; shop tooling).
 
 A 1018 block that clamps on the trammel bar and holds the pivot point
 (``ch_rocker_arm_tl_trammel_pivot_block_spec``), built by the recipe it

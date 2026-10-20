@@ -1,4 +1,4 @@
-r"""Pure-data contract for the cone pivot post's saw cradle (MHA-DT-005-TL-02).
+r"""Pure-data contract for the cone pivot post's saw cradle (MHA-DT-05-TL-02).
 
 This is a shop fixture, not a machine part (cad/docs/subsystem-identities.md). In
 the built-up cone post's saw setup (prechips S10) the post lies in the cradle's

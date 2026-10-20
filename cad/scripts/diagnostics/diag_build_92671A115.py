@@ -1,6 +1,6 @@
 r"""McMaster 92671A115 -- brass hex nut, #0-80, 5/32 in across flats x 3/64 in.
 
-Used as vn-pen-adjust-nut (MHA-VN-062), the jam nut on the pen rod's top
+Used as pn-vn-pen-adjust-nut (MHA-PN-VN-53), the jam nut on the pen rod's top
 adjuster stud.  The catalogue facts are ``_mcmaster_92671a115``'s.  The
 model is the 92671A005 recipe at this size: one Top-plane profile -- the
 hexagon (flats normal to the sketch X) with the bore circle inside it --

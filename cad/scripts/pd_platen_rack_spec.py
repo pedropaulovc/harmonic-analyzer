@@ -1,4 +1,4 @@
-r"""Pure-data contract for the MHA-PD-005 composite platen rack.
+r"""Pure-data contract for the MHA-PD-05 composite platen rack.
 
 The rack is purchased SDP/SI A 1B12-Y324, a 48 in commercial brass strip.
 Its catalog face width and height are 3/16 in; its pitch and pressure angle

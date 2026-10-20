@@ -1,7 +1,7 @@
 r"""Pure-data contract for the rocker outline template's trammel kit.
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). The
-rocker arm's (MHA-CH-006) outline template is scribed in-house on blued O1
+rocker arm's (MHA-CH-06) outline template is scribed in-house on blued O1
 plate with a dedicated trammel (Pedro 2026-10-11; trial route
 ``rocker-template-route.md`` section 2.1, inventory ``tools.rocker-trammel``):
 a bought 1018 cold-finished 1/4 in square bar, used uncut and undrilled,
@@ -9,18 +9,18 @@ carries two clamp-on 1018 blocks. The pivot block's 60 degree point runs in
 the 60 degree centre-drilled cone of the pivot plate screwed to the MDF
 scribing board; the scriber block's two 30 degree scriber points, 16.000
 apart, scribe R800 and R816. The kit is set point to point in the setting
-bar's H0/H800/H816 cones (MHA-CH-006-TL-17), so R comes from the point-hole
+bar's H0/H800/H816 cones (MHA-CH-06-TL-17), so R comes from the point-hole
 positions, not from the bar.
 
 The kit is five shop-made parts, one single-body part per made piece as the
 existing fixture kits are (each spec below imports this one):
 
-* MHA-CH-006-TL-14 pivot block (``ch_rocker_arm_tl_trammel_pivot_block``);
-* MHA-CH-006-TL-15 scriber block (``ch_rocker_arm_tl_trammel_scriber_block``);
-* MHA-CH-006-TL-16 scriber point, two off
+* MHA-CH-06-TL-14 pivot block (``ch_rocker_arm_tl_trammel_pivot_block``);
+* MHA-CH-06-TL-15 scriber block (``ch_rocker_arm_tl_trammel_scriber_block``);
+* MHA-CH-06-TL-16 scriber point, two off
   (``ch_rocker_arm_tl_trammel_scriber_point``);
-* MHA-CH-006-TL-18 pivot point (``ch_rocker_arm_tl_trammel_pivot_point``);
-* MHA-CH-006-TL-19 pivot plate (``ch_rocker_arm_tl_trammel_pivot_plate``,
+* MHA-CH-06-TL-18 pivot point (``ch_rocker_arm_tl_trammel_pivot_point``);
+* MHA-CH-06-TL-19 pivot plate (``ch_rocker_arm_tl_trammel_pivot_plate``,
   its own inventory record).
 
 The bar is bought stock used as supplied, so it is not modelled (bought
@@ -154,7 +154,7 @@ TIP_Z = -BLOCK_HEIGHT - POINT_PROJECTION
 # Point holes: reamed with tools.reamers' 0.251 in over-size reamer.
 POINT_HOLE_DIA = _mm(0.251)
 
-# --- Pivot plate seat (MHA-CH-006-TL-19) --------------------------------------
+# --- Pivot plate seat (MHA-CH-06-TL-19) --------------------------------------
 # No. 2 combined centre drill (tools.center-drills-lms-4859 member "2"):
 # 5/64 in pilot, 60 degree countersink. The pivot point's 60 degree cone seats
 # on that countersink.
@@ -255,27 +255,27 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
         "pivot block",
         PIVOT_BLOCK_X,
         (PIVOT_HOLE_L,),
-        "MHA-CH-006-TL-14, 1018 3/4 x 1-1/2 bar",
+        "MHA-CH-06-TL-14, 1018 3/4 x 1-1/2 bar",
     ),
     *_block_solids(
         "scriber block",
         SCRIBER_BLOCK_X,
         SCRIBER_HOLE_L,
-        "MHA-CH-006-TL-15, 1018 3/4 x 1-1/2 bar",
+        "MHA-CH-06-TL-15, 1018 3/4 x 1-1/2 bar",
     ),
     _point(
         "pivot point",
         PIVOT_POINT_X,
-        "MHA-CH-006-TL-18, 60 degree tip in the pivot plate's cone",
+        "MHA-CH-06-TL-18, 60 degree tip in the pivot plate's cone",
     ),
     _point(
         "inner scriber",
         INNER_SCRIBER_X,
-        "MHA-CH-006-TL-16, 30 degree tip, scribes R800",
+        "MHA-CH-06-TL-16, 30 degree tip, scribes R800",
     ),
     _point(
         "outer scriber",
         OUTER_SCRIBER_X,
-        "MHA-CH-006-TL-16, 30 degree tip, scribes R816",
+        "MHA-CH-06-TL-16, 30 degree tip, scribes R816",
     ),
 ]

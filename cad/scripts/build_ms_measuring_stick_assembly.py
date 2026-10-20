@@ -1,9 +1,9 @@
-r"""Reproduction script: ms-measuring-stick.SLDASM (MHA-MS-000).
+r"""Reproduction script: ms-measuring-stick.SLDASM (MHA-MS-00).
 
 The ch16 measuring stick with its stop clamped at the 2.0 mark (user-approved
 re-derivation, 2026-10-09; sketch stop_rederive_v2): the graduated bar
 ms-stick, the brass block ms-stop-block, its cover ms-stop-plate, two brass
-#2-56 vn-ms-stop-plate-screw fillisters and one #4-40 vn-thumb-screw.
+#2-56 ms-vn-stop-plate-screw fillisters and one #4-40 ms-vn-thumb-screw.
 
 Authored in the stop frame of ``ms_stop_spec`` (X along the stick, Y up the
 thumbscrew axis from its face to the roof, Z from the cover into the block),
@@ -363,12 +363,12 @@ async def build(adapter) -> dict[str, str]:
     # division on the thumbscrew axis.
     await _place_fixed(adapter, "ms-stick", spec.STICK_ORIGIN, spec.STICK_ROWS)
     # The stop thumbscrew clamps the stick: up the #4-40 tapped wall, tip on
-    # the bar's underside (MHA-MS-000 step 5).
-    await _place_fixed(adapter, "vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS)
+    # the bar's underside (MHA-MS-00 step 5).
+    await _place_fixed(adapter, "ms-vn-thumb-screw", spec.THUMB_ORIGIN, spec.THUMB_ROWS)
     # The cover plate screws into the block: heads on the cover's outer face,
-    # threads in the #2-56 blind taps (MHA-MS-000 step 4).
+    # threads in the #2-56 blind taps (MHA-MS-00 step 4).
     for origin in spec.PLATE_SCREW_ORIGINS:
-        await _place_fixed(adapter, "vn-ms-stop-plate-screw", origin, spec.PLATE_SCREW_ROWS)
+        await _place_fixed(adapter, "ms-vn-stop-plate-screw", origin, spec.PLATE_SCREW_ROWS)
     _telemetry.info(
         f"stop clamped at mark {spec.stop.STOP_MARK:.1f}: bar x {spec.STICK_X_MIN:.2f}.."
         f"{spec.STICK_X_MAX:.2f}, top y {spec.STICK_TOP_Y:.2f} on the roof, "

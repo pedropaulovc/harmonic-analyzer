@@ -1,9 +1,9 @@
-r"""Build MHA-DT-035, the plain steel cup at the butt of the crank handle.
+r"""Build MHA-DT-35, the plain steel cup at the butt of the crank handle.
 
 User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the butt of the ebonized
 grip carries a bright steel cup with the pivot screw's slotted head recessed
-inside it.  The body is epoxied into the MHA-DT-008 counterbore, face flush, and
-MHA-DT-032's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
+inside it.  The body is epoxied into the MHA-DT-08 counterbore, face flush, and
+MHA-DT-32's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
 a plain cup with a flat face; the handle's end round is turned on the oak only.
 Dimensions live in ``dt_crank_handle_butt_cup_spec``.
 Owner ruling B on #1375 enlarges only the body and its stock; the unchanged
@@ -282,8 +282,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # The model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the body diameter that holds the
-    # pocket wall, the pocket depth that keeps the MHA-DT-032 head below the
-    # face, and the bottom chamfer that clears the MHA-DT-008 floor corner.
+    # pocket wall, the pocket depth that keeps the MHA-DT-32 head below the
+    # face, and the bottom chamfer that clears the MHA-DT-08 floor corner.
     # Every other size is routine (.X); the pocket is bored to suit the
     # head's diameter.
     set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)

@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear knob thrust ring (MHA-PD-015) drawing."""
+"""Offline contracts for the transgear knob thrust ring (MHA-PD-15) drawing."""
 
 from __future__ import annotations
 
@@ -137,7 +137,7 @@ def test_the_od_is_dimensioned_on_the_side_view_beside_the_rear_face() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_156() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-015"
+    assert row["number"] == "MHA-PD-15"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

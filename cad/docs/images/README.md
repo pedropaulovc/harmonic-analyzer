@@ -38,7 +38,7 @@ pages of its multi-sheet PDFs: zero-based PDF page 3 is drive-train assembly
 sheet 4, **Cone Set + Crank Exploded**; page 2 is frame assembly
 sheet 3, **Match-Fit and Assembly Sequence** (recipe `FITTING + ASSEMBLY`).
 The tracked assembly examples are unchanged v39 images: their title blocks show
-**MHA-A03** and **MHA-A04**, respectively (now **MHA-DT-000** and **MHA-FR-000**).
+**MHA-A03** and **MHA-A04**, respectively (now **MHA-DT-00** and **MHA-FR-00**).
 Renamed image paths do not indicate regenerated sheets; refresh them only from
 an actual published release.
 These are selected PDF pages, not the all-pages drawing contact previews. Keep

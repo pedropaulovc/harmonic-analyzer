@@ -18,12 +18,12 @@ from typing import Literal
 import _config
 import channel_kinematics
 import ch_channel_lever_spec
-import vn_channel_spring_stock_geom as channel_stock
-import vn_counter_spring_stock_geom as counter_stock
+import ch_vn_channel_spring_stock_geom as channel_stock
+import sm_vn_counter_spring_stock_geom as counter_stock
 import sm_gooseneck_geom
 import sm_gooseneck_spring_screw_geom as spring_screw
 import sm_summing_lever_spec
-import vn_boss_hook_spec
+import sm_vn_boss_hook_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -37,8 +37,8 @@ CHANNEL_ANCHOR_XY = (
     PLATE_TOP_Y - ANCHOR_9489T111.thread_start_y_mm,
 )
 # The trimmed anchor fills the boss and stands its jam-nut thread above the
-# boss top face (vn_boss_hook_spec), so the eye rides that much higher.
-COUNTER_SHANK_LENGTH_MM = vn_boss_hook_spec.SHANK_LENGTH_MM
+# boss top face (sm_vn_boss_hook_spec), so the eye rides that much higher.
+COUNTER_SHANK_LENGTH_MM = sm_vn_boss_hook_spec.SHANK_LENGTH_MM
 COUNTER_BOSS_TOP_Y = KNIFE[1] + sm_summing_lever_spec.ANCHOR_H / 2.0
 COUNTER_ANCHOR_XY = (
     KNIFE[0] + sm_summing_lever_spec.TIP_X,
@@ -49,8 +49,8 @@ COUNTER_ANCHOR_XY = (
 GOOSENECK_END_X = COLUMN_X - sm_gooseneck_geom.ARM_END_X
 COUNTER_UPPER_EYE_X = COLUMN_X - sm_gooseneck_geom.SPRING_EYE_X
 
-_channel = _config.parts("vn-channel-spring-installed")
-_counter = _config.parts("vn-counter-spring")
+_channel = _config.parts("ch-vn-channel-spring-installed")
+_counter = _config.parts("sm-vn-counter-spring")
 CHANNEL_RATE_N_PER_MM = float(_channel["spring_rate_n_per_mm"])
 CHANNEL_INITIAL_TENSION_N = float(_channel["initial_tension_n"])
 COUNTER_RATE_N_PER_MM = float(_counter["spring_rate_n_per_mm"])

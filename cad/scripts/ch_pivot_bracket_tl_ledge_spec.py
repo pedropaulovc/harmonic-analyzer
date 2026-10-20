@@ -1,8 +1,8 @@
-r"""Pure-data contract for the pivot bracket's angle-plate ledge (MHA-CH-008-TL-01).
+r"""Pure-data contract for the pivot bracket's angle-plate ledge (MHA-CH-08-TL-01).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). In the
 bracket's S4 setup (prechips bracket plan S4 hold) the bracket's seat face
-lies on the reworked angle plate's upright (MHA-CH-008-TL-02) and its foot
+lies on the reworked angle plate's upright (MHA-CH-08-TL-02) and its foot
 free end rests on this 1018 block, screwed to the upright by two
 #10-24 x 5/8 SHCS through #5 holes. The ledge top carries the downward
 facing and drilling load; S4 indicates the foot edge and touches Z on the

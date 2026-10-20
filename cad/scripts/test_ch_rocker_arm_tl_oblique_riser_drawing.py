@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel jig's acetal riser (MHA-CH-006-TL-24)."""
+"""Offline contracts for the oblique-trammel jig's acetal riser (MHA-CH-06-TL-24)."""
 
 from __future__ import annotations
 
@@ -257,7 +257,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-oblique-riser")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-24"
+    assert number == "MHA-CH-06-TL-24"
 
 
 def test_every_exported_band_endpoint_is_a_printed_value() -> None:

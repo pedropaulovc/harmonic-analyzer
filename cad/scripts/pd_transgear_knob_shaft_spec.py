@@ -1,4 +1,4 @@
-r"""MHA-PD-008 transgear-knob-shaft: the steel knob shaft with its integral 12T.
+r"""MHA-PD-08 transgear-knob-shaft: the steel knob shaft with its integral 12T.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  ``build_pd_transgear_knob_shaft`` marks and tolerances exactly
@@ -18,7 +18,7 @@ The Ø6 g6 rear journal runs in the plate's Ø6 H7 bore.  The loose Ø6.05-bore
 thrust ring retains its 5.2 length and bears on the actual rear tooth ends.
 True finite disk endcuts run out within that ring, not in the active plate
 bearing.  The rear cup is still set on the existing end-float feeler and
-match-pinned by MHA-VN-048.  No front spring pin or collar slot remains.
+match-pinned by MHA-PD-VN-62.  No front spring pin or collar slot remains.
 
 Part frame: the axis is local +Z through the origin (``Axis1``); +Z is
 machine +Z (rearward), so the assembly places the part without rotation.  The
@@ -208,7 +208,7 @@ if not (
     and THREAD_BLANK_LIMITS[1] <= THREAD_MAJOR_2A[1]
 ):
     raise AssertionError(
-        f"MHA-PD-008 thread blank / #8-32 UNC-2A major: the blank "
+        f"MHA-PD-08 thread blank / #8-32 UNC-2A major: the blank "
         f"{THREAD_BLANK_LIMITS[0]:.3f}..{THREAD_BLANK_LIMITS[1]:.3f} leaves the "
         f"2A major {THREAD_MAJOR_2A[0]:.3f}..{THREAD_MAJOR_2A[1]:.3f}"
     )
@@ -363,13 +363,13 @@ RELIEF_WIDTH_MIN = (PLAIN_CORE - _PLAIN_CORE_TOL) - (
 )  # 7.37 - 5.38 = 1.99
 if RELIEF_WIDTH_MIN < DIE_RUNOUT_MAX - 1e-9:
     raise AssertionError(
-        f"MHA-PD-008 thread relief / die run-out: the narrowest relief "
+        f"MHA-PD-08 thread relief / die run-out: the narrowest relief "
         f"{RELIEF_WIDTH_MIN:.3f} is under the {DIE_RUNOUT_MAX:.3f} "
         f"({DIE_RUNOUT_PITCHES}P) a die's lead runs out over"
     )
 if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
     raise AssertionError(
-        f"MHA-PD-008 thread relief / die root: the largest relief "
+        f"MHA-PD-08 thread relief / die root: the largest relief "
         f"Ø{RELIEF_DIA_MAX:.3f} stands above the deepest die-cut root "
         f"Ø{THREAD_ROOT_2A_MIN:.3f}"
     )
@@ -698,7 +698,7 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
 
-DISC_NUMBER = "MHA-PD-006"
+DISC_NUMBER = "MHA-PD-06"
 DISC_TEETH = DISC.TEETH
 # What a machinist needs to cut and check the teeth; design parameters stay
 # in this module (Main ruling 2026-10-10).

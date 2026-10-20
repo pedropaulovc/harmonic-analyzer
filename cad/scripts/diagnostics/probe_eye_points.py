@@ -24,7 +24,7 @@ CANDIDATES = [
     ("ch-channel-lever-1", CH_LEVER_EYE),
     ("sm-summing-lever-1", SUM_LEVER_EYE),
     ("sm-gooseneck-1", GOOSENECK_EYE),
-    ("vn-boss-hook-1", COUNTER_ANCHOR_EYE),
+    ("sm-vn-boss-hook-1", COUNTER_ANCHOR_EYE),
 ]
 
 

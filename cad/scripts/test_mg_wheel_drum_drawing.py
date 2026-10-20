@@ -1,4 +1,4 @@
-"""Offline contracts for the magnifying-wheel drum (MHA-MG-010) drawing."""
+"""Offline contracts for the magnifying-wheel drum (MHA-MG-10) drawing."""
 
 from __future__ import annotations
 
@@ -100,7 +100,7 @@ def test_each_band_states_its_need_on_its_callout() -> None:
 
 def test_registry_row() -> None:
     row = _config.parts("mg-wheel-drum")
-    assert row["number"] == "MHA-MG-010"
+    assert row["number"] == "MHA-MG-10"
     assert int(row["quantity"]) == 1
     assert "C36000" in str(row["material_specification"])
     assert part.MATERIAL == "Brass"

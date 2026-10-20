@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the removable #25 sprocket (MHA-PD-009).
+r"""Create the manufacturing drawing for the removable #25 sprocket (MHA-PD-09).
 
 One sheet for the three configurations: the main views draw the saved T24,
 and the property-linked SPROCKET DATA block lists what differs between T12,

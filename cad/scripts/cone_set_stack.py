@@ -39,7 +39,7 @@ import dt_cone_gear_spec as cone
 import dt_cone_swing_platform_pivot_spec as platform
 import dt_cylinder_gear_shaft_spec as arbor
 import dt_cylinder_gear_spec as drum
-import vn_cone_pivot_screw_spec as pivot_screw
+import dt_vn_cone_pivot_screw_spec as pivot_screw
 from cone_pitch import SEAT_PITCH
 from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
 from dt_cylinder_gear_spec import BORE_DIAMETRAL_CLEARANCE_MM as DRUM_SEAT_CLEARANCE
@@ -49,7 +49,7 @@ from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 SET_ABOVE_STANDARD_MM = float(_config.fit("cone_drum_oblique_mesh", "edge_slack_mm"))
 SET_FEELER_READING_MM = float(_config.fit("cone_drum_oblique_mesh", "set_feeler_reading_mm"))
-PIVOT_SEAT_POSITION_MM = PIVOT_SEAT_POSITION_BAND_MM  # MHA-FR-001 owns the band
+PIVOT_SEAT_POSITION_MM = PIVOT_SEAT_POSITION_BAND_MM  # MHA-FR-01 owns the band
 TOOTH_RUNOUT_TIR_MM = float(
     _config.fit("cone_drum_oblique_mesh", "tooth_cutting_runout_tir_mm")
 )

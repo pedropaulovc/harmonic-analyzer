@@ -30,25 +30,25 @@ geometry is casting-shaped, not milling-shaped.
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
   3. **`dt-cone-gear-shaft` tip** — a **Ø0.79375 mm (1/32 in) terminal land, about 33.6 mm long in steel (L/D 42)**,
-     carrying the T012/T006 seats and the MHA-VN-016 stack collar, its cup tip seated in the MHA-VN-017 adjuster.
+     carrying the T012/T006 seats and the MHA-DT-VN-54 stack collar, its cup tip seated in the MHA-DT-VN-55 adjuster.
      Support the slender work with a follower/steady and take a light finishing cut;
      the terminal D-flat continues from the T018 step through the shaft tip.
      Break the two long torque corners of the terminal flat no more than 0.02 mm; the 0.420 AF
      already pays for that break. The model leaves these corners sharp and the sheet prints the break
      as a callout, `TORQUE CORNERS: STONE BURR ONLY, 0.02 MAX`, because it is below the title block's
      R0.25 edge break. The stepped collar (Ø17.48 body, Ø6.40 × 3.5 nose, 11.5 overall;
-     `vn_cone_tip_collar_spec.OUTER_DIA`) has a
+     `dt_vn_cone_tip_collar_spec.OUTER_DIA`) has a
      finished bore of Ø0.849 ±0.030 and a radial #2-56 through tap. Fit the stock McMaster
      94355A213 #2-56 × 5/16 in flat-point screw unaltered, with no dog. To fit the collar, hold the
      gear stack south on the shaft's thrust collar, set the original 0.45 ±0.10 feeler off the
      T006 thrust face, seat both collar bore ends on the round back of the terminal, snug the
      stock flat point on the D-flat, then remove the feeler.
      Never run or swing a loose collar.
-     During the post fit-up (MHA-DT-000 step 3), hold MHA-DT-005 pushed toward
-     MHA-DT-021 along the shaft throughout: turn the post on its screws until the
-     tip centres in the cup, tighten both MHA-VN-031 screws and recheck. This takes
+     During the post fit-up (MHA-DT-00 step 3), hold MHA-DT-05 pushed toward
+     MHA-DT-21 along the shaft throughout: turn the post on its screws until the
+     tip centres in the cup, tighten both MHA-DT-VN-61 screws and recheck. This takes
      up the post's along-shaft screw clearance away from G19.
-     Installation notes are in `vn_cone_tip_collar_spec.INSTALLATION_NOTES`;
+     Installation notes are in `dt_vn_cone_tip_collar_spec.INSTALLATION_NOTES`;
      `dt_tip_collar_air.py` owns the
      air stack over the whole swing. Use worst-case arithmetic over every source if it
      clears everywhere; otherwise use the statistical method everywhere: nominal air
@@ -138,7 +138,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.15 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-VN-024 (92314A253, cut under head at MHA-SM-000 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus 8.92 ±0.15; 46.70 nominal) and new 18-8 SAE washer MHA-VN-060 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.77–9.07; full-form engagement MIN 7.711667 ≥7.239, tip air MIN 0.45. Retain removable medium-strength threadlocker. Unchanged MHA-VN-051 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
+| **`sm-knife-mount`** | rectangular block 25.4 ±0.8 wide ×29.6×14.0 (bar/plate); **2 identical** | unchanged Ø12.00 +0.03/0 reamed through bore and pose, centre 20.616 BASIC below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.866, clamped to the casting underside); #10-24 UNC-2B bottoming tap on the bore axis: #25 Ø3.7973 under the title-block DRILLED HOLES +0.10/0 row, cylindrical drill depth 11.24 ±0.05, full thread 9.65 ±0.13; fully charged drill-point crown web 2.0077656525, no break-in (conservative proof envelope Ø3.927, above accepted MAX Ø3.8973; point MIN 117°); 2× Ø3.175 reamed dowel press holes ×9.5 at ±7.632 from the tap axis (span 15.264 BASIC, pair ⌖Ø0.13 to top seat datum A, datum pattern B; row 7.0 from front face; tap ⌖Ø0.15 to A and B); bore floor and pose unchanged | hold the explicit tap/drill depth bands and accepted pilot diameter/point-angle bounds to preserve ≥2.0 crown web; all joint webs ≥2.0 at printed worst cases | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or manual. Modified #10-24 hex-head Bolt MHA-SM-VN-52 (92314A253, cut under head at MHA-SM-00 step 4 to its hole's measured crossbar-underside-to-washer-top stack plus 8.92 ±0.15; 46.70 nominal) and new 18-8 SAE washer MHA-SM-VN-54 (96659A104) clamp the block to the top-frame's integral crossbar through Ø6.045 #10 loose clearance. Crossbar width 25.0 ±0.8, symmetric about X=−15; washer seat on the whole faced top (no SPOTFACE), 36.50 (title-block ±0.51) above faced underside. Nominal reach 8.9173, range 8.77–9.07; full-form engagement MIN 7.711667 ≥7.239, tip air MIN 0.45. Retain removable medium-strength threadlocker. Unchanged MHA-SM-VN-53 dowels (98381A473, 1/8 ×3/4) enter Ø3.24 ±0.03 ×12.0 blind round hole and 3.24 ±0.03 wide ×3.95 ±0.13 long ×12.0 blind slot, BASIC 15.264 from and ⌖0.05 to round hole. One native linear pattern position control ⌖0.10 to the bar's two-face width median datum D limits X shift to ±0.05, retaining the Z socket station and ≥2.0 webs. The former #6 socket-head counterbore route is obsolete |
 
 The Ø6.045 hanger clearance hole carries a **native explicit +0.13/0
 diameter band** (MIN 6.045, MAX 6.175), not the symmetric general ±0.13
@@ -154,7 +154,7 @@ The builder authors no band on it and section F-F imports it bare under the
 title block's .XX **±0.51 mm** band (owner ruling 2026-10-18); there is no
 hanger spotface, separate floor driver or cleanup-stock offset.
 The whole top except the four corner bosses is finished Ra 3.2 µm. The right
-(west) rail alone remains flat within 0.04 so both MHA-CH-007 keeper bores
+(west) rail alone remains flat within 0.04 so both MHA-CH-07 keeper bores
 align. The finished underside and knife-mount pose remain unchanged.
 
 The casting's flange corner crops and convex edge breaks are judged at the
@@ -169,7 +169,7 @@ do not, so they stay sharp. The rib's inner bottom, the V-gussets and the
 knife-seat bottoms also stay sharp, as the sheet notes say. No band is
 tightened to recover a break.
 
-The grip no longer sets **MHA-VN-024 thread engagement**: MHA-SM-000 step 4
+The grip no longer sets **MHA-SM-VN-52 thread engagement**: MHA-SM-00 step 4
 cuts each bolt to its own hole's measured stack plus **8.92 ±0.15 mm**
 reach. The crossbar median datum D controls the hanger axes in X only:
 their BASIC X location is on D.
@@ -201,7 +201,7 @@ accepted maximum. That envelope is charged, not accepted: nothing is drilled,
 inspected or passed to Ø3.927. The row also dimensions the physical point
 using the native drill-angle variable (`<hw-drlang>`,
 `swCalloutVariable_Drill_Angle`):
-**#25 DRILL ▽ 11.24 ±0.05 ×118°**. The callout names **MHA-VN-024**
+**#25 DRILL ▽ 11.24 ±0.05 ×118°**. The callout names **MHA-SM-VN-52**
 and states that the depth bands set its tip clearance; it does not prescribe
 a tapping tool. With no duplicate diameter band, the callout remains inside
 the four-row limit. The title block supplies default class 2B; the thread
@@ -222,10 +222,10 @@ thread, which the drill's 11.19 mm shallowest limit clears by only 1.03 mm,
 under one 1.058333 mm pitch of runout. Drill-minus-full-thread runout is
 1.59 mm nominal and 1.41 mm at the adverse depth limits.
 
-**Modified hanger-bolt shop route (MHA-VN-024, two).** Source McMaster
+**Modified hanger-bolt shop route (MHA-SM-VN-52, two).** Source McMaster
 92314A253, 18-8 stainless plain external-hex #10-24 UNC-2A ×2 in stock;
 retain the supplied head. Leave the supplied length uncut at the bench:
-MHA-SM-000 step 4 seats washer 96659A104 on each crossbar hole's faced top,
+MHA-SM-00 step 4 seats washer 96659A104 on each crossbar hole's faced top,
 measures crossbar underside to washer top, and cuts the bolt to that plus
 **8.92 ±0.15 mm** under the head (46.70 mm nominal; the drawing prints it as
 a reference). Restore the cut-end chamfer to **RADIAL 0.60 ±0.05 mm
@@ -271,14 +271,14 @@ run. No COM, farm, or generated-traveler certification is claimed here.
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.44×3 + integral eccentric cam OD30.6×4.0565 (offset +Y 8.64); total H 7.0565 | Ø9.575 through bore on the Ø9.525 (3/8") arbor — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed (see [Cutter plan](#cutter-plan); wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
-| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring and shank 2.175, both faces at 1.950 / 4.125 ±0.05 from the fork's datum face, fork 6.075 REF, all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin, 18 long from the crown; tine 1.700 ±0.05 from the datum face, slot 2.675 ±0.05, 14.75 deep from the crown (#982); Ø1.968 +0.010/0 pin hole reamed through both tines (pin MHA-CH-010 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **1.700** (1.65 MIN) beside a 2.675 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.175 shank ~150 long faced from 6.35 — chatter/curl); the ream must hold +0.010/0 for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
+| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring and shank 2.175, both faces at 1.950 / 4.125 ±0.05 from the fork's datum face, fork 6.075 REF, all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin, 18 long from the crown; tine 1.700 ±0.05 from the datum face, slot 2.675 ±0.05, 14.75 deep from the crown (#982); Ø1.968 +0.010/0 pin hole reamed through both tines (pin MHA-CH-10 pressed in at assembly, ends dressed flush; user ruling 2026-10-09, PR #1292) | tines **1.700** (1.65 MIN) beside a 2.675 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.175 shank ~150 long faced from 6.35 — chatter/curl); the ream must hold +0.010/0 for the press | **2** (flip to face the second side; slot, drill and ream in the second) | **DXF/2.5D profile** the outline, face both sides to the two levels, slit the fork, drill + ream |
 
 ### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at the AGMA (N + 2)/DP blank, +0/−0.05, capped by the cutter's form (`dt_cone_gear_spec.py`; T006 Ø4.31 +0/−0.02); tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 0.79375, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA20, tooth thickness ±0.075 (T006 +0/−0.04), 2.5D through-cut | **T006 web 0.64 mm minimum** on the 1/32 in bore (the flat cuts inward from that circle; see [`gear-standard.md`](./gear-standard.md#what-it-costs)); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | stock 48DP PA20 range cutter per gear, **indexed**, set up within 0.05 TIR of the finished bore (see [Cutter plan](#cutter-plan)); T006 needs its named custom ground tool, DT6-FORM1; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.512 ±0.20** |
-| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→0.79375 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/0.420** respectively, each +0/−0.010; the Ø0.79375 flat continues through the tip end and the MHA-VN-016 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-VN-016 collar |
+| **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→0.79375 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/0.420** respectively, each +0/−0.010; the Ø0.79375 flat continues through the tip end and the MHA-DT-VN-54 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-DT-VN-54 collar |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 
@@ -452,7 +452,7 @@ teeth is possible in principle, but the part is not designed around it.
 
 No range cutter reaches 6 teeth, so T006 needs a tool made in the shop: DT6-FORM1, a custom
 ground form tool whose full grind, including the relief that clears the drum tips, is
-drawn on its own detail sheet in the MHA-DT-003 package. The root-to-bore web it leaves is
+drawn on its own detail sheet in the MHA-DT-03 package. The root-to-bore web it leaves is
 0.64 mm, over the 0.62 mm floor; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
 
 For background on shop-made form cutters, Law's *Gears and Gear Cutting*
@@ -503,4 +503,4 @@ allows for it is in `cad/config/tolerances/stock_form_quality.yaml` (`rack_pitch
 
 The chain is 68 links of ANSI #25, 12:24 from the crank sprocket to the knob sprocket. The
 sprockets are made from McMaster 6793K blanks. The transgear arm and its plate are located by two
-MHA-VN-056 dowels (McMaster 93600A189, 2 × 6 mm); the screws only clamp.
+MHA-PD-VN-64 dowels (McMaster 93600A189, 2 × 6 mm); the screws only clamp.

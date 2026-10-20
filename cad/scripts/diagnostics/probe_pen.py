@@ -97,7 +97,7 @@ async def build(adapter):
     log(f"rod top AFTER = {top1}  (flip if jumped from {top0})")
 
     # Marker rides the rod (pen carriage) via a Lock mate.
-    mk = await place_component(adapter, "vn-pen-marker", list(MARKER_POS),
+    mk = await place_component(adapter, "pn-vn-pen-marker", list(MARKER_POS),
                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{mk}", "PLANE"),
                     named_ref(f"Front Plane@{rod}", "PLANE"),

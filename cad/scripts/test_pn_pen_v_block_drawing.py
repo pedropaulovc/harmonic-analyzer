@@ -253,7 +253,7 @@ def test_relief_corners_carry_the_largest_radius_the_grip_allows() -> None:
 
 def test_pivot_bore_drops_wholly_into_the_slot_at_its_printed_limits() -> None:
     import pn_pen_carriage_geom as carriage
-    import vn_pen_marker_spec as marker
+    import pn_vn_pen_marker_spec as marker
 
     # Review final4: with the step at 10.0 the reamed bore's edge stood 0.5
     # off it, and at the printed limits (step 10.8, station 11.99, ream

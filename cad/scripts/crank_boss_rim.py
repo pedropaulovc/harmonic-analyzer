@@ -1,15 +1,15 @@
-r"""The 64T against MHA-DT-005's north side, at print-worst.
+r"""The 64T against MHA-DT-05's north side, at print-worst.
 
-SolidWorks-free.  The 64T (MHA-DT-007) turns on the inclined cone shaft just
-north of MHA-DT-005, and its south face and tip sweep past everything on the
+SolidWorks-free.  The 64T (MHA-DT-07) turns on the inclined cone shaft just
+north of MHA-DT-05, and its south face and tip sweep past everything on the
 post's north side: the crank boss's north face and rim, the Ø42.75 head,
 the turned Ø42 body and the cone boss's north end face.  The post retains
 the v36 datums (user ruling 2026-09-28), with its body/head raised for the
 normal-24DP crank. The crank boss starts on the head's tangent plane, uncut,
 and the crank bore carries no bushing. The 64T
-stands on the unchanged MHA-DT-004 collar; its south face is fixed there, while
+stands on the unchanged MHA-DT-04 collar; its south face is fixed there, while
 the solid gear stack grows its north face to touch T120. The collar and boss
-bands, not the gear face-width band, govern clearance to MHA-DT-005.
+bands, not the gear face-width band, govern clearance to MHA-DT-05.
 
 Frame: machine axes (north = +z, up = +y), origin where the cone axis crosses
 the post axis.  The cone axis leans ``post.INCLINE_DEG`` in plan, the crank
@@ -85,7 +85,7 @@ BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
 CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
-#   post.  MHA-DT-000 step 1 sets it against MHA-DT-004's thrust collar (#916),
+#   post.  MHA-DT-00 step 1 sets it against MHA-DT-04's thrust collar (#916),
 #   and the collar bears on the cone boss's north end, so the gear's south
 #   face stands the boss end plus CollarWidth off the post axis.  Both
 #   joints are butts, nominally closed (build_dt_drive_train_assembly asserts
@@ -95,11 +95,11 @@ CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
 #   FaceWidth's ±0.025 extends NORTH of the seated south face and does not
-#   consume any margin to the post; only the collar and MHA-DT-005 bands do.
+#   consume any margin to the post; only the collar and MHA-DT-05 bands do.
 #   64T tip, OutsideDia +/-OUTSIDE_DIA_TOLERANCE_MM (user, #906)
 GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
 
-# Every MHA-DT-005 north feature holds this much air to the 64T at print-worst.
+# Every MHA-DT-05 north feature holds this much air to the 64T at print-worst.
 FLOOR_CLEARANCE_MM = 0.25
 
 
@@ -176,7 +176,7 @@ def clearances(
     *, gear_offset: float, worst: bool = True,
     collar_thickness: float = shaft.COLLAR_THICKNESS,
 ) -> dict[str, float]:
-    """Least clearance from the 64T to each feature on MHA-DT-005's north side.
+    """Least clearance from the 64T to each feature on MHA-DT-05's north side.
 
     ``gear_offset`` must seat the south face on ``collar_thickness``. ``worst``
     moves each published boss/collar/gear-tip band toward its opposing surface;
@@ -256,7 +256,7 @@ GOVERNING_FEATURE = min(WORST_CLEARANCES, key=WORST_CLEARANCES.__getitem__)
 if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
     raise AssertionError(
         f"the seated 64T comes {WORST_CLEARANCES[GOVERNING_FEATURE]:.3f} "
-        f"from MHA-DT-005's {GOVERNING_FEATURE} at print-worst, under the "
+        f"from MHA-DT-05's {GOVERNING_FEATURE} at print-worst, under the "
         f"{FLOOR_CLEARANCE_MM} floor ({RULING})"
     )
 COLLAR_MARGIN_MM = WORST_CLEARANCES[GOVERNING_FEATURE] - FLOOR_CLEARANCE_MM

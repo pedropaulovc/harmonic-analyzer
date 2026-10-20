@@ -253,19 +253,19 @@ from build_pd_platen_clip import (  # noqa: E402
     HOLE_Y as CLIP_HOLE_Y,
     HOLE_DIA as CLIP_HOLE_DIA,
 )
-from vn_clamp_screw_spec import (  # noqa: E402
+from _mcmaster_90280a201 import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
     HEAD_H as CLAMP_SCREW_HEAD_H,
     SHANK_DIA as CLAMP_SCREW_DIA,
     SHANK_LEN as CLAMP_SCREW_LEN,
 )
-from vn_fillister_screw_spec import (  # noqa: E402
+from _mcmaster_90114a511 import (  # noqa: E402
     HEAD_DIA as FILLISTER_HEAD_DIA,
     HEAD_H as FILLISTER_HEAD_H,
     SHANK_DIA as FILLISTER_SHANK_DIA,
     SHANK_LEN as FILLISTER_SHANK_LEN,
 )
-from vn_platen_clip_screw_spec import (  # noqa: E402
+from pd_vn_platen_clip_screw_spec import (  # noqa: E402
     HEAD_DIA as CLIP_SCREW_HEAD_DIA,
     HEAD_H as CLIP_SCREW_HEAD_H,
     SHANK_DIA as CLIP_SCREW_SHANK_DIA,
@@ -276,7 +276,7 @@ from vn_platen_clip_screw_spec import (  # noqa: E402
 # The guide-lock screws alone are low slotted pan heads (R9-31): a fillister
 # head on the lock back would sweep into the hanger arm as the platen feeds
 # (_assert_lock_station_sweep).
-from vn_guide_lock_screw_spec import (  # noqa: E402
+from pd_vn_guide_lock_screw_spec import (  # noqa: E402
     HEAD_DIA as LOCK_SCREW_HEAD_DIA,
     HEAD_H as LOCK_SCREW_HEAD_H,
     LOCK_SET_EDGE_REACH,
@@ -346,28 +346,28 @@ import dt_crankshaft_spec  # noqa: E402
 import pd_rack_pinion_spec as DISC_SPEC  # noqa: E402
 import pd_transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
 import pd_transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
-import vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN  # noqa: E402
-import vn_transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
+import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATING_PIN  # noqa: E402
+import pd_vn_transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
 import transgear_cluster_fit as CLUSTER  # noqa: E402
 import pd_transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
 import pd_transgear_disc_hub_spec as DISC_HUB  # noqa: E402
-import vn_transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
+import pd_vn_transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
 import pd_transgear_drive_collar_spec as COLLAR  # noqa: E402
 import pd_transgear_feed_pinion_spec as FEED  # noqa: E402
 import pd_transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
 import transgear_hanger_joints as HANGER  # noqa: E402
-import vn_transgear_knob_cup_pin_spec as CUP_PIN  # noqa: E402
+import pd_vn_transgear_knob_cup_pin_spec as CUP_PIN  # noqa: E402
 import pd_transgear_knob_cup_spec as CUP  # noqa: E402
 import pd_transgear_knob_thrust_ring_spec as RING  # noqa: E402
-import vn_transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
+import pd_vn_transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
 import pd_transgear_pin_spec as PIN  # noqa: E402
-import vn_transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
+import pd_vn_transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import pd_transgear_pivot_spacer_spec as SPACER  # noqa: E402
-import vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
-import vn_transgear_pivot_shim_spec as PIVOT_SHIM  # noqa: E402
+import pd_vn_transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
+import pd_vn_transgear_pivot_shim_spec as PIVOT_SHIM  # noqa: E402
 import pd_transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
-import vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
-import vn_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
+import pd_vn_transgear_retaining_ring_spec as E_RING  # noqa: E402
+import pd_vn_latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import pd_latch_hook_spec as HOOK_SPEC  # noqa: E402
 
 FEED_PD = FEED.PITCH_DIA
@@ -418,8 +418,8 @@ SPACER_Z0 = BAR_BACK_Z  # -129.4: spacer pressed flush on the shoulder's end
 ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 if abs(SPACER_Z0 + SPACER.LENGTH - ARM_Z0) > 1e-9:
     raise AssertionError("the arm's front face is off the pivot spacer's rear face")
-# Shoulder screw MHA-VN-041 (Rx+90: shank to -Z): the shoulder bottoms on the
-# bar's back face; under its head the MHA-VN-069 shim and the MHA-VN-049
+# Shoulder screw MHA-PD-VN-57 (Rx+90: shank to -Z): the shoulder bottoms on the
+# bar's back face; under its head the MHA-PD-VN-67 shim and the MHA-PD-VN-63
 # spring (identity: its O.D. rim on the arm's spot-face floor, its I.D. rim
 # under the shim) hold the arm on the spacer.
 PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -116.7 under the head
@@ -431,7 +431,7 @@ PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
 PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
 PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -111.4625: oval heads flush
 LOCATING_PIN_XY = tuple(_on_arm(x, y) for x, y in ARM.LOCATOR_SITES_MM)
-# Dowels MHA-VN-056 (Rx-90 rows: local +Y to -Z, into the arm). The origin
+# Dowels MHA-PD-VN-64 (Rx-90 rows: local +Y to -Z, into the arm). The origin
 # end is the PROUD end, 1.70 into the plate, so the 6.0 body runs 4.30 into
 # the arm's 4.80 blind ream. Run 9 put the origin at the buried end: the body
 # then ran out of the arm's front face (9.86 mm^3 of solid arm per dowel).
@@ -443,7 +443,7 @@ if not (
     < LOCATING_PIN_Z0
 ):
     raise AssertionError("the locating dowels do not sit in the arm's blind reams")
-# Latch pin MHA-VN-042 pressed to the floor of the arm tip's hole, along U
+# Latch pin MHA-PD-VN-58 pressed to the floor of the arm tip's hole, along U
 # (rows Rz(theta - 90): the dowel's local +Y along U).
 LATCH_PIN_POS = (
     *_on_arm(ARM.TIP_STATION - ARM.PIN_HOLE_DEPTH),
@@ -476,12 +476,12 @@ if abs(_pin_hole_n - _pin_hole_offset) > 1e-9 or (
         "the largest latch pin does not bear on the hook hole's lower edge"
     )
 
-# Disc cluster on the pin MHA-PD-023 at S (R9-68).  The pin is pressed into the
+# Disc cluster on the pin MHA-PD-23 at S (R9-68).  The pin is pressed into the
 # arm, its head on the arm's rear face (Ry180: its stations run to machine
-# -Z).  On it, rear to front: the MHA-PD-024 rear bushing on the arm's front
-# face, the MHA-PD-010 feed sleeve (the disc on its round boss, its front face
+# -Z).  On it, rear to front: the MHA-PD-24 rear bushing on the arm's front
+# face, the MHA-PD-10 feed sleeve (the disc on its round boss, its front face
 # at the D-flat's end wall where the hub's D-bore bears, screwed together),
-# the MHA-PD-025 front bushing on the sleeve's nose and the MHA-VN-047 ring in the
+# the MHA-PD-25 front bushing on the sleeve's nose and the MHA-PD-VN-61 ring in the
 # pin's groove.  Both bushings and the hub are
 # faced to fit (transgear_cluster_fit); the model carries them as fitted to
 # nominal parts, the cluster rearward with its float open at the ring.
@@ -523,7 +523,7 @@ if not (
 if abs(CLUSTER.RING_FRONT_Z - (PIN_Z0 - PIN.GROOVE_STATION)) > 1e-9:
     raise AssertionError("the ring is off the pin groove's load wall")
 
-import vn_transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
+import pd_vn_transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import pd_transgear_removable_spec as REMOVABLE  # noqa: E402
 import pd_transgear_knob_shaft_spec as KNOB_SPEC  # noqa: E402
 from pd_transgear_thumbnut_spec import (  # noqa: E402
@@ -564,7 +564,7 @@ if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 KNOB_COLLAR_Z0 = REMOVABLE.SEAT_FACE_Z  # -154.3
 KNOB_SHAFT_Z0 = KNOB_COLLAR_Z0 + COLLAR.SET_NOMINAL  # F = -148.1
 KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # actual rear on F
-# The two MHA-VN-038 dowels pressed through the collar's holes (Rx-90: pin +Y ->
+# The two MHA-PD-VN-54 dowels pressed through the collar's holes (Rx-90: pin +Y ->
 # -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
 KNOB_DRIVE_PIN_Z0 = REMOVABLE.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
 if abs(KNOB_COLLAR_Z0 - REMOVABLE.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD) > 1e-9:
@@ -575,7 +575,7 @@ if COLLAR.PIN_CIRCLE_RADIUS != REMOVABLE.PIN_CIRCLE_RADIUS:
     raise AssertionError("the collar's pin circle is not the removable's")
 # Behind the 12T: the thrust ring to the plate hub's face, the knob cup on the
 # journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
-# MHA-VN-048 spring pin through cup and journal (identity: along machine X,
+# MHA-PD-VN-62 spring pin through cup and journal (identity: along machine X,
 # R9-70 K-1).
 KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
 if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
@@ -601,10 +601,10 @@ if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9 or abs(CLUSTER.F_Z - KNOB_SHAFT_Z0)
     raise AssertionError("F is off the arm, plate hub and thrust ring chain")
 if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
     raise AssertionError("the model's disc is off the knob chain's fitted station")
-# The 120T disc's rear face (the MHA-VN-039 tips sit inside it) to the platen's
+# The 120T disc's rear face (the MHA-PD-VN-55 tips sit inside it) to the platen's
 # front face at the printed worst case: the platen forward by its fitted
 # float, magnified by its yaw about the bar's end at the near lock; F
-# rearward by the arm (held on the longest spacer by the MHA-VN-049 spring), the
+# rearward by the arm (held on the longest spacer by the MHA-PD-VN-63 spring), the
 # arm, hub face, ring and 12T bands; the platen forward by the bar and its
 # own bands; then m's max, the cluster's rearward float, its tilt on the bore
 # clearance (pivot on the rear bushing's smallest Ø9, over the shortest
@@ -684,7 +684,7 @@ DISC_PLATEN_AIR_WORST = (
 )
 if DISC_PLATEN_AIR_WORST < DISC_PLATEN_AIR_MIN:
     raise AssertionError(
-        "MHA-PD-006 disc rear face comes within the platen front face's "
+        "MHA-PD-06 disc rear face comes within the platen front face's "
         f"{DISC_PLATEN_AIR_MIN} at the printed worst case: air "
         f"{DISC_PLATEN_AIR_WORST:.4f} (R9-47, R9-68)"
     )
@@ -718,10 +718,10 @@ RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
 )
 if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     raise AssertionError(
-        f"MHA-PD-010 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
+        f"MHA-PD-10 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
         f"face, inside the rack's worst reach {RACK_FRONT_FROM_SLEEVE_REAR_WORST:.3f}"
     )
-# The MHA-PD-024 rear bushing's front face to the MHA-PD-005 rack's back face (its
+# The MHA-PD-24 rear bushing's front face to the MHA-PD-05 rack's back face (its
 # Ø9 .X can reach the rack's crests radially): the arm forward on the
 # shortest spacer, the bar thinnest, the rack thickest, the bushing
 # following the sleeve forward to its fitted max, and the hanger's tilt at
@@ -738,7 +738,7 @@ BUSHING_RACK_AIR_WORST = (
 )  # 1.07
 if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
-        "MHA-PD-024 rear bushing enters the MHA-PD-005 rack at the printed worst case: "
+        "MHA-PD-24 rear bushing enters the MHA-PD-05 rack at the printed worst case: "
         f"air {BUSHING_RACK_AIR_WORST:.4f} (R9-68)"
     )
 
@@ -766,7 +766,7 @@ KNOB_COLLAR_R_WORST = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
 if KNOB_COLLAR_R_WORST + dt_crankshaft_spec.WHEEL_SEAT_FLOAT >= KNOB_CHAIN_INNER_R:
     raise AssertionError("knob drive collar reaches the knob chain plates' inner edge")
 
-# Thumbnut MHA-PD-013 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
+# Thumbnut MHA-PD-13 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
 # other gear in place"): the knurled brass nut OUTERMOST on the knob shaft,
 # tapped for the shaft's front thread, its flange's seat face ON the drive
 # collar's pilot, faced to stand THUMBNUT_AIR proud of the mounted wheel's front
@@ -813,8 +813,8 @@ CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -16
 if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 > KNOB_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
-# Latch hook MHA-PD-014 (contract §4.4): one formed 0.8 spring-steel piece,
-# its base on the bar's back face under two MHA-VN-043 screws, its ear bent
+# Latch hook MHA-PD-14 (contract §4.4): one formed 0.8 spring-steel piece,
+# its base on the bar's back face under two MHA-PD-VN-59 screws, its ear bent
 # rearward at the base's +X end and its arm hanging from the ear to the pin.
 # The part frame's axes are the machine's (pd_latch_hook_geometry's
 # LOCAL_TO_MACHINE): the assembly places it by translation only.
@@ -830,7 +830,7 @@ if HOOK.BBOX_Z[0] < BAR_BACK_Z - 1e-9:
         f"latch hook reaches z {HOOK.BBOX_Z[0]:.2f}, bar back face {BAR_BACK_Z}"
     )
 
-# The hook's two MHA-VN-043 #4-40 screws (Rx+90: shanks to -Z) bear on the
+# The hook's two MHA-PD-VN-59 #4-40 screws (Rx+90: shanks to -Z) bear on the
 # base's top face and run into the bar's through taps.
 HOOK_BRACKET_SCREW_POS = tuple(
     (x, HOOK.SCREW_Y, BAR_BACK_Z + HOOK.SHEET_T) for x in HOOK.SCREW_X
@@ -868,7 +868,7 @@ KNOB_DRIVE_PIN_XY = tuple(
 )  # local +Y first: DrivePinAxis1, even after the actual assembly spin
 # The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), so a
 # rack GAP centre must sit exactly on the stud's x. The rack is soldered with
-# its ends flush with the platen's (MHA-PD-000 "rack-soldered"), so its gaps
+# its ends flush with the platen's (MHA-PD-00 "rack-soldered"), so its gaps
 # march +X from FIRST_GAP_X in from the platen's -X end: the photo pose moves
 # by the smallest shift that lands a gap on the stud (no more than half a
 # pitch, far inside the photo fit). Machine-handed: the rack is teeth-down
@@ -913,7 +913,7 @@ assert math.isclose(
 SPARE_GEAR_POS = (140.0, BASE_DECK_Y, -75.0)
 
 # --- fasteners ----------------------------------------------------------------
-# Platen-clip screws (vn-platen-clip-screw): heads on the clips' flat sheet,
+# Platen-clip screws (pd-vn-platen-clip-screw): heads on the clips' flat sheet,
 # shanks through #2 clearance holes into #2-56 through receivers in the platen.
 CLIP_SCREW_XY = tuple((PLATE_X0 + sx, PLATE_Y0 + sy) for sx, sy in PLATEN_SOCKET_XY)
 # The clips run from the platen's top edge down; their end holes (inset
@@ -1205,7 +1205,7 @@ def _assert_fastener_stacks() -> None:
             f"{HANGER.SPRING_ROOM_NOMINAL:.4f}"
         )
     if abs(spring_room - PIVOT_SPRING.MODEL_HEIGHT) > 1e-9:
-        raise AssertionError("the MHA-VN-049 spring is not modelled in its room")
+        raise AssertionError("the MHA-PD-VN-63 spring is not modelled in its room")
     if HANGER.PIVOT_ENGAGEMENT_WORST_D + 1e-9 < HANGER.ENGAGEMENT_TARGET_D:
         raise AssertionError(
             f"pivot screw engagement {HANGER.PIVOT_ENGAGEMENT_WORST_D:.3f} D"
@@ -1225,13 +1225,13 @@ def _assert_fastener_stacks() -> None:
             f"plate-screw engagement {HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D:.3f} D"
             f" worst is under {HANGER.ENGAGEMENT_TARGET_D} D"
         )
-    # R9-44; historical filed-tip comparison MHA-DT-032. Bench-fit the matched
+    # R9-44; historical filed-tip comparison MHA-DT-32. Bench-fit the matched
     # pair, remove/pre-cut off mechanism before the guide-lock sweep, then
     # refit/reinspect. The model is CUT TO FIT, not an actual receiving record.
     plate_screw_tip = PLATE_SCREW_Z0 - PLATE_SCREW.LENGTH
     if abs(plate_screw_tip - (ARM_Z0 + HANGER.PLATE_SCREW_TIP_INSIDE_NOMINAL)) > 1e-9:
         raise AssertionError(
-            "MHA-VN-040's cut tips are not flush with the arm's front face"
+            "MHA-PD-VN-56's cut tips are not flush with the arm's front face"
         )
     latch_pin_proud = LATCH_PIN.LENGTH - ARM.PIN_HOLE_DEPTH
     low, high = HANGER.LATCH_PIN_PROUD_RANGE
@@ -1263,7 +1263,7 @@ def _assert_fastener_stacks() -> None:
         <= DISC_SCREW.TIP_BELOW_REAR_FACE[1]
     ):
         raise AssertionError(
-            "MHA-VN-039 disc-screw tip to the MHA-PD-006 disc rear face: "
+            "MHA-PD-VN-55 disc-screw tip to the MHA-PD-06 disc rear face: "
             f"{tip_below_rear:.3f} inside, off the cut window"
         )
     valid_engagement(
@@ -1714,7 +1714,7 @@ def _assert_lock_retention() -> None:
     its .XXX height band (it hangs the platen by its top edge), the rails at
     their printed height band (their taps locate from the bottom face), the
     plate at its least height, set away from the bar by its whole guide-side
-    reach (vn_guide_lock_screw_spec.LOCK_SET_EDGE_REACH, its hole bands
+    reach (pd_vn_guide_lock_screw_spec.LOCK_SET_EDGE_REACH, its hole bands
     included). The bottom plates retain the hanging platen; the top plates
     retain it lifted until its bottom rail meets the bar."""
     bar_bottom = BAR_TOP_Y - BAR_HEIGHT
@@ -1907,7 +1907,7 @@ def _assert_knob_shaft_clearance() -> None:
             f"mounted knob {REMOVABLE.KNOB_CONFIG} to disc-hub gap"
             f" {knob_wheel_hub_gap:.2f} < 0.5"
         )
-    # The MHA-PD-025 front bushing at its largest Ø against the knob stack's
+    # The MHA-PD-25 front bushing at its largest Ø against the knob stack's
     # largest neighbours, whatever their z: the knob wheel's tips, thumbnut and
     # the drive collar.
     bushing_r = (FRONT_BUSHING.OD + printed_band_mm(FRONT_BUSHING.OD_PLACES)) / 2.0
@@ -2033,9 +2033,9 @@ def _assert_chain_slack_clearance() -> None:
 
 # Every link family the closed loop holds (instance names start with these).
 _CHAIN_PARTS = (
-    "vn-chain-inner-link",
-    "vn-chain-outer-link",
-    "vn-chain-connecting-link",
+    "pd-vn-chain-inner-link",
+    "pd-vn-chain-outer-link",
+    "pd-vn-chain-connecting-link",
 )
 
 
@@ -2090,7 +2090,7 @@ async def _insert_roller_chain(adapter) -> None:
     tangent to the loop.
 
     The bought chain is cut with an inner link at each end and closed by one
-    connecting link (MHA-VN-068), so the loop holds one outer link fewer than
+    connecting link (MHA-PD-VN-66), so the loop holds one outer link fewer than
     inner links. The pattern takes one count per inner/outer PAIR and cannot
     skip an instance, so it stops one pair short; the cut chain's last inner
     link and the connecting link are seated at the two closing stations, the
@@ -2151,8 +2151,8 @@ async def _insert_roller_chain(adapter) -> None:
     sketch_name = "chain-path"
 
     # 2. Two seed links, tangent at the first two stations.
-    inner = await _place_chain_seed(adapter, "vn-chain-inner-link", 0)
-    outer = await _place_chain_seed(adapter, "vn-chain-outer-link", 1)
+    inner = await _place_chain_seed(adapter, "pd-vn-chain-inner-link", 0)
+    outer = await _place_chain_seed(adapter, "pd-vn-chain-outer-link", 1)
 
     # 3. Native connected-linkage chain pattern fills the loop.
     pattern = check(
@@ -2202,8 +2202,8 @@ async def _insert_roller_chain(adapter) -> None:
 
     # The cut chain's closing inner link and the connecting link that joins
     # it to the seed inner link, its forward pin on the T24 at pin 0.
-    await _place_chain_seed(adapter, "vn-chain-inner-link", LINK_COUNT - 2)
-    await _place_chain_seed(adapter, "vn-chain-connecting-link", LINK_COUNT - 1)
+    await _place_chain_seed(adapter, "pd-vn-chain-inner-link", LINK_COUNT - 2)
+    await _place_chain_seed(adapter, "pd-vn-chain-connecting-link", LINK_COUNT - 1)
 
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
@@ -2496,7 +2496,7 @@ async def build(adapter) -> dict[str, str]:
         target = [x, BAR_CY, BAR_FRONT_Z + CLAMP_CBORE_DEPTH]
         seed = await place_component(
             adapter,
-            "vn-clamp-screw",
+            "pd-vn-clamp-screw",
             target,
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -2682,7 +2682,7 @@ async def build(adapter) -> dict[str, str]:
     )
     clip_seed = await place_component(
         adapter,
-        "vn-platen-clip-screw",
+        "pd-vn-platen-clip-screw",
         clip_seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -2728,7 +2728,7 @@ async def build(adapter) -> dict[str, str]:
     )
     guide_seed = await place_component(
         adapter,
-        "vn-fillister-screw",
+        "pd-vn-fillister-screw",
         guide_seed_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -2777,7 +2777,7 @@ async def build(adapter) -> dict[str, str]:
     for target in lock_seed_targets:
         seed = await place_component(
             adapter,
-            "vn-guide-lock-screw",
+            "pd-vn-guide-lock-screw",
             target,
             [0.0, 180.0, 0.0],
             ROT_Y_180,
@@ -2831,23 +2831,23 @@ async def build(adapter) -> dict[str, str]:
     # Rx(+90): the shoulder runs to -Z, bottoming on the bar's back face.
     await place_component(
         adapter,
-        "vn-transgear-pivot-screw",
+        "pd-vn-transgear-pivot-screw",
         [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SCREW_Z0],
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
     )
-    # MHA-VN-049 (identity: +Z axial) in the arm's spot face, under the shim.
+    # MHA-PD-VN-63 (identity: +Z axial) in the arm's spot face, under the shim.
     await place_component(
         adapter,
-        "vn-transgear-pivot-spring",
+        "pd-vn-transgear-pivot-spring",
         [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SPRING_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    # MHA-VN-069 (Rx+90: local +Y axial to +Z) on the spring, under the head.
+    # MHA-PD-VN-67 (Rx+90: local +Y axial to +Z) on the spring, under the head.
     await place_component(
         adapter,
-        "vn-transgear-pivot-shim",
+        "pd-vn-transgear-pivot-shim",
         [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SHIM_Z0],
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
@@ -2883,7 +2883,7 @@ async def build(adapter) -> dict[str, str]:
     for index, (x, y) in enumerate(LOCATING_PIN_XY, 1):
         pin_origin = [x, y, LOCATING_PIN_Z0]
         locating_pin = await place_component(
-            adapter, "vn-transgear-arm-plate-locating-pin", pin_origin,
+            adapter, "pd-vn-transgear-arm-plate-locating-pin", pin_origin,
             [-90.0, 0.0, 0.0], ROT_X_NEG90, ground=False,
         )
         await coincident_mate(
@@ -2912,7 +2912,7 @@ async def build(adapter) -> dict[str, str]:
     for k, (x, y) in enumerate(PLATE_SCREW_XY, start=1):
         await place_component(
             adapter,
-            "vn-transgear-arm-plate-screw",
+            "pd-vn-transgear-arm-plate-screw",
             [x, y, PLATE_SCREW_Z0],
             [90.0, 0.0, 0.0],
             ROT_X_POS90,
@@ -2920,12 +2920,12 @@ async def build(adapter) -> dict[str, str]:
         )
     await place_component(
         adapter,
-        "vn-transgear-latch-pin",
+        "pd-vn-transgear-latch-pin",
         list(LATCH_PIN_POS),
         [0.0, 0.0, ARM_ANGLE_DEG - 90.0],
         rot_z_rows(ARM_ANGLE_DEG - 90.0),
     )
-    # Latch hook MHA-PD-014 behind the bar: the one-piece hook by translation,
+    # Latch hook MHA-PD-14 behind the bar: the one-piece hook by translation,
     # its base on the bar's back face, its two screws through the base into
     # the bar's taps.
     await place_component(
@@ -2939,7 +2939,7 @@ async def build(adapter) -> dict[str, str]:
     for x, y, z in HOOK_BRACKET_SCREW_POS:
         await place_component(
             adapter,
-            "vn-latch-hook-bracket-screw",
+            "pd-vn-latch-hook-bracket-screw",
             [x, y, z],
             [90.0, 0.0, 0.0],
             ROT_X_POS90,
@@ -3025,7 +3025,7 @@ async def build(adapter) -> dict[str, str]:
     ):
         disc_screw = await place_component(
             adapter,
-            "vn-transgear-disc-screw",
+            "pd-vn-transgear-disc-screw",
             [x, y, DISC_SCREW_Z0],
             [-90.0, 0.0, 0.0],
             ROT_X_NEG90,
@@ -3039,7 +3039,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"disc screw at {angle:.0f} deg locked to the disc",
         )
     # Ry(180): the front bushing's rear face on the sleeve's nose, faced to
-    # fit; the MHA-VN-047 ring in the pin's groove SLEEVE_FLOAT_WINDOW_CENTRE in
+    # fit; the MHA-PD-VN-61 ring in the pin's groove SLEEVE_FLOAT_WINDOW_CENTRE in
     # front of it, its front face on the groove's load wall.
     await place_component(
         adapter,
@@ -3050,7 +3050,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await place_component(
         adapter,
-        "vn-transgear-retaining-ring",
+        "pd-vn-transgear-retaining-ring",
         [STUD_XY[0], STUD_XY[1], CLUSTER.RING_REAR_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
@@ -3119,20 +3119,20 @@ async def build(adapter) -> dict[str, str]:
             label=f"knob stack: {label} locked to the drive collar",
         )
 
-    # The two MHA-VN-038 dowels pressed through the collar (Rx-90: rounded ends
+    # The two MHA-PD-VN-54 dowels pressed through the collar (Rx-90: rounded ends
     # forward in the knob wheel's pin holes), +Y first.
     for k, (x, y) in enumerate(KNOB_DRIVE_PIN_XY, start=1):
         knob_pin = await place_component(
             adapter,
-            "vn-transgear-knob-drive-pin",
+            "pd-vn-transgear-knob-drive-pin",
             [x, y, KNOB_DRIVE_PIN_Z0],
             euler_from_rows(KNOB_DRIVE_PIN_ROT),
             KNOB_DRIVE_PIN_ROT,
             ground=False,
-            label=f"MHA-VN-038 knob drive pin #{k} (y{y:.1f})",
+            label=f"MHA-PD-VN-54 knob drive pin #{k} (y{y:.1f})",
         )
         await _lock_to_collar(knob_pin, f"drive pin #{k}")
-    # Knob shaft MHA-PD-008 on its datum F (the 12T's front face), spun so a gap
+    # Knob shaft MHA-PD-08 on its datum F (the 12T's front face), spun so a gap
     # of its 12T faces the disc's tooth on the S -> K line.
     knob_shaft = await place_component(
         adapter,
@@ -3195,7 +3195,7 @@ async def build(adapter) -> dict[str, str]:
         f" {_chain_inner_wrap_r - THUMBNUT_HEAD_DIA / 2.0:.1f})"
     )
     # Behind the 12T (Rx+90): the thrust ring to the plate hub, the knob cup on
-    # the journal's rear end, and the MHA-VN-048 spring pin through both (R9-70).
+    # the journal's rear end, and the MHA-PD-VN-62 spring pin through both (R9-70).
     ring = await place_component(
         adapter,
         "pd-transgear-knob-thrust-ring",
@@ -3216,7 +3216,7 @@ async def build(adapter) -> dict[str, str]:
     await _lock_to_shaft(cup, "knob cup")
     cup_pin = await place_component(
         adapter,
-        "vn-transgear-knob-cup-pin",
+        "pd-vn-transgear-knob-cup-pin",
         [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_PIN_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,

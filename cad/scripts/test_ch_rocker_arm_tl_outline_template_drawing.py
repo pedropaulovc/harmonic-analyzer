@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker arm outline template (MHA-CH-006-TL-13)."""
+"""Offline contracts for the rocker arm outline template (MHA-CH-06-TL-13)."""
 
 from __future__ import annotations
 
@@ -296,7 +296,7 @@ def test_rod_slot_run_takes_the_pin_wherever_the_rocker_puts_its_hole() -> None:
     assert spec.ROD_SLOT_WEB_MIN >= 1.5
     # The three-place run states its function and the hole it reaches.
     assert drawing.CALLOUTS_BELOW["RodSlotFlat"] == spec.ROD_SLOT_FLAT_CALLOUT
-    assert spec.ROD_SLOT_FLAT_CALLOUT == "PIN REACH TO ROD-PIN\nHOLE, MHA-CH-006"
+    assert spec.ROD_SLOT_FLAT_CALLOUT == "PIN REACH TO ROD-PIN\nHOLE, MHA-CH-06"
     # The station's flag says the slot is radial (its axis passes the pivot).
     assert drawing.CALLOUTS_BELOW["RodSlotX"] == "ROD SLOT, RADIAL TO PIVOT"
     assert spec.ROD_SLOT_AXIS == pytest.approx(

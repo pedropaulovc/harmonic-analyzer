@@ -1,4 +1,4 @@
-r"""Create the crankshaft MHA-DT-011 manufacturing drawing under drawing-guidelines.md.
+r"""Create the crankshaft MHA-DT-11 manufacturing drawing under drawing-guidelines.md.
 
 The SLDPRT remains authoritative.  A shaft carries no datum and no
 geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the three running/seat diameters keep
@@ -6,10 +6,10 @@ their native size bands, the journal keeps one bearing-surface finish, and
 every length is an ordinary model dimension at its part-authored places.
 
 The model's shaft axis runs along +Y from the dome root (local y=0, the plane
-where MHA-DT-006 and MHA-DT-031 finish flush).  The single longitudinal view is the
+where MHA-DT-06 and MHA-DT-31 finish flush).  The single longitudinal view is the
 ``*Right`` orientation rotated a quarter turn in the sheet so the shaft lies
 horizontal, as it sits in the lathe: dome on the left, far end on the right,
-the MHA-DT-009 cross-hole seen as a true circle.  The crank-end view is the
+the MHA-DT-09 cross-hole seen as a true circle.  The crank-end view is the
 ``*Bottom`` orientation, which is exactly the third-angle LEFT view of that
 rotated profile, so it sits on the profile's axis to its left at sheet scale.
 It looks onto the seat spigot's face, so the two drive-pin holes show there

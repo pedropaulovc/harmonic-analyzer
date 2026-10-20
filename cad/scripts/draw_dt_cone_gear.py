@@ -1,4 +1,4 @@
-r"""Create the complete cone-gear batch drawing package (MHA-DT-003).
+r"""Create the complete cone-gear batch drawing package (MHA-DT-03).
 
 Every configured family member T006..T120 by six receives a standalone sheet.
 Each sheet selects its own part configuration, imports the native model-owned
@@ -143,7 +143,7 @@ FRONT_CENTER = (0.105, 0.150)
 RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 # The D-bore prints in its own enlarged view: a *Front model view of the
-# sheet's configuration, cropped by a circle round the bore (the MHA-VN-031
+# sheet's configuration, cropped by a circle round the bore (the MHA-DT-VN-61
 # pattern of draw_amplitude_bar and draw_pinion_arbor; their native detail
 # views would not take moved or imported dimensions).  At sheet scale the
 # flat is 0.76-2.3 mm deep, 1.02 mm on T006's 8:1; enlarged, 2.5-3.1 mm.
@@ -183,12 +183,12 @@ BORE_VIEW_LABEL_DROP = 0.016
 # THRU would lower the leader shoulder under it ~5.3 mm, onto the bore.
 BORE_VIEW_DIA_LIFT = 0.0115
 # The across-flat text stands OUTSIDE its witnesses, right of the flat's, as
-# MHA-DT-007's does. Centred between them, its lines (~2.65 mm a character in
+# MHA-DT-07's does. Centred between them, its lines (~2.65 mm a character in
 # the #1128 full-5 render) ran wider than the 29-35 mm witness span on every
 # sheet, so both witness lines crossed the callout, and its tolerance stack
 # sat on the diameter leader's lower end (machinist review of full-5).
 # BORE_VIEW_AF_HALF_WIDTH is half the widest line, the mate's 20-character
-# SLIDES ON MHA-DT-004, rounded up; the text's left edge clears the flat's
+# SLIDES ON MHA-DT-04, rounded up; the text's left edge clears the flat's
 # witness by BORE_VIEW_AF_GAP.
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.027
@@ -471,8 +471,8 @@ def cutter_grind_data() -> str:
 
 # Each tight band names its mate and fit at its callout (drawing-guidelines
 # rule 4; ENFORCE round 1 of #971 found them only in Gear Data, or nowhere).
-SHAFT_MATE = "MHA-DT-004"
-CYLINDER_MATE = "MHA-DT-012"
+SHAFT_MATE = "MHA-DT-04"
+CYLINDER_MATE = "MHA-DT-12"
 DIMENSION_CALLOUTS = {
     # No process word: a reamer would cut away the flat, and the dimensions
     # define the D-profile (user ruling 2026-09-29, machinist review of the
@@ -481,7 +481,7 @@ DIMENSION_CALLOUTS = {
     # right of it, and a wider block's shoulder crosses that witness.
     "BoreCutDia": f"THRU\nSLIDES ON\n{SHAFT_MATE}",
     # The value is the gear bore's own; naming the bore, not the shaft it
-    # slides on, keeps it from reading as MHA-DT-004's across-flat.
+    # slides on, keeps it from reading as MHA-DT-04's across-flat.
     "BoreAF": f"BORE ACROSS FLAT\nSLIDES ON {SHAFT_MATE}",
     # The flat's normal runs through the bore axis and the +X tooth's centre;
     # the bore view crops the teeth off, so the callout names the reference

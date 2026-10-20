@@ -1,6 +1,6 @@
 dt-cone-gear-shaft:
   title: Cone Gear Shaft
-  number: MHA-DT-004
+  number: MHA-DT-04
   material: AISI 1018 cold-finished steel shafting
   material_specification: ASTM A108 1018
   finish: oiled
@@ -13,7 +13,7 @@ dt-cone-gear-shaft:
       kind: "accept"
       where: "sheet 1, the terminal (tip) land: Ø0.794 0/-0.02 about 33.6 long (L/D about 42), its through-length D-flat AF 0.420 0/-0.01 in section D-D, and CORNERS 0.02 MAX above that across-flat"
       finding: "slender tip land and its flat unbuildable or unreliable as one integral piece (rules 16, 21)"
-      reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat); 1/32 in is cutter-native for the 48DP T006/T012 webs (#1272); the 0.02 corner limit keeps the MHA-VN-016 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
+      reason: "owner rulings U40 2026-09-23 (the terminal land is turned integral with tailstock support) and 2026-09-28 (every gear land, terminal included, carries one flat); 1/32 in is cutter-native for the 48DP T006/T012 webs (#1272); the 0.02 corner limit keeps the MHA-DT-VN-54 set screw landing on the flat; temporary: two-piece and pinion-wire alternatives await an owner ruling in #1649"
     - id: "RV-02"
       kind: "accept"
       where: "sheet 1, note: TURN THE TIP LAND WITH TAILSTOCK SUPPORT."

@@ -1,4 +1,4 @@
-"""Offline contracts for the oblique-trammel jig's end bracket (MHA-CH-006-TL-28)."""
+"""Offline contracts for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import _config
 import _drawing_contract
 import build_ch_rocker_arm_tl_oblique_end_bracket as part
 import ch_rocker_arm_tl_oblique_end_bracket_spec as spec
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_end_bracket as drawing
 import export_features
@@ -102,8 +102,8 @@ def test_every_tight_band_names_its_mate() -> None:
         assert spec.CALLOUTS_BELOW[name] == spec.BAR_MATE_CALLOUT
     assert spec.CALLOUTS_BELOW["HoleRowY"] == spec.ROW_CALLOUT
     assert "KP08" in spec.KP08_MATE_CALLOUT
-    assert "MHA-CH-006-TL-20" in spec.BAR_MATE_CALLOUT
-    assert "KP08" in spec.ROW_CALLOUT and "MHA-CH-006-TL-20" in spec.ROW_CALLOUT
+    assert "MHA-CH-06-TL-20" in spec.BAR_MATE_CALLOUT
+    assert "KP08" in spec.ROW_CALLOUT and "MHA-CH-06-TL-20" in spec.ROW_CALLOUT
     # Every three-place dimension on the sheet carries its mate.
     three_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 3
@@ -506,7 +506,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     row = _config.parts(ARTIFACT)
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", row["number"])
-    assert row["number"] == spec.NUMBER == "MHA-CH-006-TL-28"
+    assert row["number"] == spec.NUMBER == "MHA-CH-06-TL-28"
     assert row["quantity"] == spec.QUANTITY == 2
     assert part.PART_NAME == ARTIFACT == leadscrew.END_BRACKET
 

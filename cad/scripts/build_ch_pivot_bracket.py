@@ -1,4 +1,4 @@
-r"""Reproduction script: rocker pivot bracket (MHA-CH-008; book ch. 14 pp. 26-27; 2 used).
+r"""Reproduction script: rocker pivot bracket (MHA-CH-08; book ch. 14 pp. 26-27; 2 used).
 
 The black steel bracket that carries each end of the rocker pivot shaft on
 the green rocker-arm support (ch14 page002_img01/img02, page002_img07
@@ -10,8 +10,8 @@ arched EAR_W/2 over the O6.5 cross-bore, its apex EAR_TOP_Y over the seat
 (#1371: the arch's centre stands ARCH_LIFT over the bore so the apex tap
 keeps 1.5D of full thread). The north ear's inner face is the
 rocker bank's axial datum (the north thrust washer behind hub 19 bears on
-it); the south one is set off the MHA-VN-053 preload spring
-(``rocker_bank_layout``). One MHA-VN-034 #4-40 set screw
+it); the south one is set off the MHA-CH-VN-54 preload spring
+(``rocker_bank_layout``). One MHA-CH-VN-53 #4-40 set screw
 drops through each ear's arch apex onto the pivot shaft's flat (user,
 2026-10-10).
 
@@ -405,7 +405,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "Ear")
     # The ear thickness carries its +/-0.10 band natively: named so the band
-    # selects it by name (the MHA-CH-003 ForkThick idiom).
+    # selects it by name (the MHA-CH-03 ForkThick idiom).
     ear_thick_dim = name_dimensions(adapter, "Ear", ["EarThick"])
     drive_jobs.append((ear_thick_dim[0], '"EarT"'))
     expected += V_BLOCK

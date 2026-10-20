@@ -5,7 +5,7 @@ modules stay free of their mates (their stock builds rebuild only when the
 catalogue changes); this module reads both sides of each joint.  The
 paper-drive assembly may import it; no part build does.
 
-* MHA-VN-041 pivot screw (90325A174, faced to fit) in the MHA-PD-007 bar's
+* MHA-PD-VN-57 pivot screw (90325A174, faced to fit) in the MHA-PD-07 bar's
   THROUGH #8-32 tap (user rulings 2026-10-15): the tip is faced at fit-up to
   stand TIP_RECESS below the bar's front face and staked at the tap's front
   mouth (rule 23, staked end).  Engagement runs from the vendor neck's full
@@ -13,19 +13,19 @@ paper-drive assembly may import it; no part build does.
   tip); the thinnest bar at the deepest recess is the worst, >= 1.5 D.  The
   back countersink lies inside the neck zone (R9-63); the front one lies
   beyond the tip's charged pitch.
-* MHA-VN-040 OVAL plate screws (verified1in stock, pre-cut OFF MECHANISM)
+* MHA-PD-VN-56 OVAL plate screws (verified1in stock, pre-cut OFF MECHANISM)
   use published ASME head, eccentricity, fillet and thread-length bounds.
   Critical gear-centre/seat controls remain separate; nominal CAD pose is
   not a stock-pin whole-body or positive-load retention certificate.
-* The MHA-PD-020 spacer pressed on the MHA-VN-041 shoulder, and the MHA-VN-049
+* The MHA-PD-20 spacer pressed on the MHA-PD-VN-57 shoulder, and the MHA-PD-VN-63
   spring's room under the head: shoulder - spacer - spot-face floor (from
-  the arm's front face) - the MHA-VN-069 shim under the head.  The spring
+  the arm's front face) - the MHA-PD-VN-67 shim under the head.  The spring
   holds the arm on the spacer, so the hanger's tilt is the spacer's face
   squareness, fixed in the bar's frame.
-* The MHA-VN-042 latch pin pressed to the floor of the arm's blind end-face
+* The MHA-PD-VN-58 latch pin pressed to the floor of the arm's blind end-face
   hole (R9-12): the hole's reamed band keeps the press, its depth band and
   the dowel's length grade set the proud range, the shallowest hole still
-  grips the pin 1.5 D, and the pin's full diameter passes the MHA-PD-014
+  grips the pin 1.5 D, and the pin's full diameter passes the MHA-PD-14
   hook strip's far face at every corner of the latch stack (R9-23, R9-50).
   The hook sheet prints that face's X and Y only as references, so this
   margin rests on the fit-up step (its note 3): the annealed arm is set
@@ -44,17 +44,17 @@ import pd_support_bar_spec as BAR
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
 import paper_drive_arm_registration as REGISTRATION
-import vn_transgear_arm_plate_screw_spec as PLATE_SCREW
-import vn_transgear_pivot_screw_spec as PIVOT
-import vn_transgear_latch_pin_spec as LATCH_PIN
+import pd_vn_transgear_arm_plate_screw_spec as PLATE_SCREW
+import pd_vn_transgear_pivot_screw_spec as PIVOT
+import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_pivot_spacer_spec as SPACER
-import vn_transgear_pivot_spring_spec as SPRING
-import vn_transgear_pivot_shim_spec as SHIM
+import pd_vn_transgear_pivot_spring_spec as SPRING
+import pd_vn_transgear_pivot_shim_spec as SHIM
 
 ENGAGEMENT_TARGET_D = 1.5
 
 
-# --- MHA-VN-041 pivot screw in the bar -----------------------------------------
+# --- MHA-PD-VN-57 pivot screw in the bar -----------------------------------------
 if PIVOT.THREAD != BAR.PIVOT_TAP_THREAD:
     raise AssertionError("the pivot screw's thread is not the bar's pivot tap")
 # The printed REFERENCE length is the nominal bar less the recess window's
@@ -88,7 +88,7 @@ PIVOT_ENGAGEMENT_NOMINAL_D = PIVOT_ENGAGEMENT_NOMINAL / PIVOT.THREAD_MAJOR
 PIVOT_ENGAGEMENT_WORST_D = PIVOT_ENGAGEMENT_WORST / PIVOT.THREAD_MAJOR
 if PIVOT_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
     raise AssertionError(
-        f"MHA-VN-041 worst engagement {PIVOT_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
+        f"MHA-PD-VN-57 worst engagement {PIVOT_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
     )
 # The gauged full-form tail reaches the neck's full thread at the shortest fit.
 if PIVOT_FITTED_LEN_MIN - PIVOT.FULL_THREAD_START < PIVOT.THREAD_LENGTH_MIN:
@@ -106,7 +106,7 @@ PIVOT_STOCK_SHORTFALL_AT_THICKEST_BAR = max(
 if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]:
     raise AssertionError("the bar tap's countersink swallows the shoulder end")
 
-# --- MHA-PD-020 spacer pressed on the MHA-VN-041 shoulder (R9-71) -----------------
+# --- MHA-PD-20 spacer pressed on the MHA-PD-VN-57 shoulder (R9-71) -----------------
 # Pressed at the bench, its front face flush with the shoulder's end on a
 # flat, so the screw seats both on the bar as one body: the spacer turns with
 # the screw while it is tightened and is then fixed in the bar's frame, its
@@ -115,7 +115,7 @@ if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]
 _SHOULDER_MIN = PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
 _SHOULDER_MAX = PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS)
 
-# --- MHA-VN-049 spring room: shoulder - spacer - floor - shim -------------------
+# --- MHA-PD-VN-63 spring room: shoulder - spacer - floor - shim -------------------
 # The spring holds the arm's front face on the spacer's rear face, so the
 # hanger has no end play; the room between the spot-face floor and the shim
 # under the head must stay between the spring's catalogue working height and
@@ -139,7 +139,7 @@ SPRING_ROOM_MAX = (
 )  # 1.0008
 if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
     raise AssertionError(
-        f"MHA-VN-049 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
+        f"MHA-PD-VN-63 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
         f"spring's {SPRING.WORKING_HEIGHT:.4f}..{SPRING.FREE_HEIGHT:.4f}"
     )
 if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
@@ -170,7 +170,7 @@ SPRING_RIM_CLEARANCE = (
 ) / 2.0  # 0.21
 if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot screw or its spring binds in the arm")
-# The MHA-VN-069 shim slides on the shoulder and, floated to one side on it,
+# The MHA-PD-VN-67 shim slides on the shoulder and, floated to one side on it,
 # stays inside the spot face.
 SHIM_BORE_CLEARANCE = (SHIM.ID_MIN - _SHOULDER_MAX) / 2.0
 SHIM_RIM_CLEARANCE = (
@@ -179,7 +179,7 @@ SHIM_RIM_CLEARANCE = (
 if min(SHIM_BORE_CLEARANCE, SHIM_RIM_CLEARANCE) <= 0.0:
     raise AssertionError("the pivot shim binds on the shoulder or in the spot face")
 
-# --- MHA-VN-040 plate screws in the arm ------------------------------------------
+# --- MHA-PD-VN-56 plate screws in the arm ------------------------------------------
 if PLATE_SCREW.THREAD != ARM.PLATE_TAP_SPEC.size:
     raise AssertionError("the plate screws' thread is not the arm's plate tap")
 if abs(PLATE_SCREW.HEAD_DIA - PLATE.CSK_DIA) > 1e-9:
@@ -280,7 +280,7 @@ PLATE_SCREW_STOCK_LEAD_MARGIN_MM = (
     - PLATE_SCREW.POINT_CHAMFER_LENGTH_MAX_MM
 )
 if PLATE_SCREW_STOCK_LEAD_MARGIN_MM < 0.0:
-    raise AssertionError("MHA-VN-040 published-standard stock cannot retain the full-thread cut")
+    raise AssertionError("MHA-PD-VN-56 published-standard stock cannot retain the full-thread cut")
 # Separate complete-metal cap, already paying the actual standard fillet;
 # do not add the fillet twice or use total O=.152 REF as a maximum.
 _WHOLE_HEAD_HEIGHT_MAX_MM = PLATE_SCREW.HEAD_WHOLE_METAL_HEIGHT_MAX_MM
@@ -306,7 +306,7 @@ PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
 PLATE_SCREW_ENGAGEMENT_NOMINAL_D = PLATE_SCREW_ENGAGEMENT_NOMINAL / PLATE_SCREW.THREAD_MAJOR
 PLATE_SCREW_ENGAGEMENT_WORST_D = PLATE_SCREW_ENGAGEMENT_WORST / PLATE_SCREW.THREAD_MAJOR
 if PLATE_SCREW_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
-    raise AssertionError(f"MHA-VN-040 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D")
+    raise AssertionError(f"MHA-PD-VN-56 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D")
 # The modelled (cut) tip ends short of (positive) or proud of (negative) the
 # arm's front face: flush.
 PLATE_SCREW_TIP_INSIDE_NOMINAL = ARM.THICKNESS - (
@@ -314,7 +314,7 @@ PLATE_SCREW_TIP_INSIDE_NOMINAL = ARM.THICKNESS - (
 )
 if abs(PLATE_SCREW_TIP_INSIDE_NOMINAL) > 1e-9:
     raise AssertionError(
-        "MHA-VN-040's modelled cut is not flush with the arm's front face"
+        "MHA-PD-VN-56's modelled cut is not flush with the arm's front face"
     )
 # Furthest a cut tip stands proud of the arm's front face: the assembly holds
 # the lock-station sweep clear of this.
@@ -349,11 +349,11 @@ NOTCH_REFERENCE_AIR_WORST_MM = (
 )
 if NOTCH_REFERENCE_AIR_WORST_MM <= 0.0:
     raise AssertionError(
-        f"MHA-PD-019 reference notch face meets the arm's lower edge: "
+        f"MHA-PD-19 reference notch face meets the arm's lower edge: "
         f"{NOTCH_REFERENCE_AIR_WORST_MM:.3f}"
     )
 
-# --- MHA-VN-042 latch pin pressed to the floor of the arm's end-face hole ---------
+# --- MHA-PD-VN-58 latch pin pressed to the floor of the arm's end-face hole ---------
 if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:
     raise AssertionError("the arm's press hole is not the latch pin's Ø")
 # The reamed band against the dowel's catalogue band: interference at both
@@ -391,7 +391,7 @@ if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
         f" {LATCH_PIN.PRESS_ENGAGEMENT_MIN_D} D"
     )
 
-# --- MHA-VN-042 pin through the MHA-PD-014 strip's far face (R9-23, R9-50) ----------
+# --- MHA-PD-VN-58 pin through the MHA-PD-14 strip's far face (R9-23, R9-50) ----------
 # The hook's pin hole is match-drilled from the pin at fit-up, which takes up
 # where the strip lies across the pin; nothing takes up the pin's reach along
 # its own axis, so its crowned end's full-diameter circle must pass the
@@ -529,7 +529,7 @@ def latch_pin_far_face_margin(
 LATCH_PIN_FAR_FACE_MARGIN_WORST = latch_pin_far_face_margin()
 if LATCH_PIN_FAR_FACE_MARGIN_WORST <= 0.0:
     raise AssertionError(
-        "MHA-VN-042 pin / MHA-PD-014 strip far face: the pin's full diameter stops"
+        "MHA-PD-VN-58 pin / MHA-PD-14 strip far face: the pin's full diameter stops"
         f" {-LATCH_PIN_FAR_FACE_MARGIN_WORST:.3f} short at the printed worst case"
     )
 

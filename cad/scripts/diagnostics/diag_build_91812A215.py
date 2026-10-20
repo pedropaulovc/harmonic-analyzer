@@ -1,8 +1,8 @@
 r"""McMaster 91812A215 -- #8 wedge-lock washer pair, ID 0.170 x OD 0.300 in.
 
-Used as ch-rocker-arm-tl-oblique-block-washer (MHA-CH-006-TL-50).  The
+Used as ch-rocker-arm-tl-vn-oblique-block-washer (MHA-CH-06-TL-VN-70).  The
 catalogue facts and the part frame are
-``ch_rocker_arm_tl_oblique_block_washer_spec``'s.  The model is the
+``ch_rocker_arm_tl_vn_oblique_block_washer_spec``'s.  The model is the
 pair's envelope: one Top-plane ID x OD annulus extruded blind THICKNESS (the
 0.080-0.100 in band's maximum, taken as the pair's stack: UNVERIFIED) along
 +Y from the y = 0 face, the part frame's axis.  The cam faces, serrations and
@@ -34,7 +34,7 @@ from _check import check  # noqa: E402
 from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
-from ch_rocker_arm_tl_oblique_block_washer_spec import (  # noqa: E402
+from ch_rocker_arm_tl_vn_oblique_block_washer_spec import (  # noqa: E402
     ID,
     OD,
     SKU,

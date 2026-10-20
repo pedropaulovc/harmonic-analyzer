@@ -101,7 +101,7 @@ def test_full_thread_covers_engagement_nut_and_adjustment() -> None:
     the rod engagement, the jam nut and the adjustment; the worst-case
     printed stack still leaves the die a pitch of run-out under the head
     (drawing-guidelines.md rule 16)."""
-    import vn_pen_adjust_nut_spec as jam_nut
+    import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(1)
@@ -157,7 +157,7 @@ def test_shoulder_root_is_a_modelled_max_radius() -> None:
     nut bears on the rod top and never reaches the shoulder), so the radius
     is bounded by the die's worst-case run-out alone; 0.2 is the largest one
     place value inside it. No callout: there is no mate to name."""
-    import vn_pen_adjust_nut_spec as jam_nut
+    import pn_vn_pen_adjust_nut_spec as jam_nut
     from _printed_tolerance import printed_band_mm
 
     band = printed_band_mm(1)
@@ -481,14 +481,14 @@ def test_part_stamps_make_critical_properties() -> None:
     )
     assert part.MATERIAL == "Brass"
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PN-007"
+    assert row["number"] == "MHA-PN-07"
     assert row["material"] == "Brass"
     assert "brass" in row["material_specification"].lower()
     assert row["finish"]
     assert "DEBUR" not in row["finish"].upper()
     assert int(row["quantity"]) == 1
     numbers = [str(other["number"]) for other in _config.parts().values()]
-    assert numbers.count("MHA-PN-007") == 1
+    assert numbers.count("MHA-PN-07") == 1
 
 
 def test_the_part_owns_the_printed_precision() -> None:

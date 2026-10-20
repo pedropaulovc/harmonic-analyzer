@@ -1,4 +1,4 @@
-r"""Crank-pin keeper ring (MHA-DT-027) drawing-only data: the marked-dimension
+r"""Crank-pin keeper ring (MHA-DT-27) drawing-only data: the marked-dimension
 and precision contract and the manufacturing notes the part build stamps into
 the SLDPRT.
 
@@ -66,6 +66,6 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 DRAWING_NOTES = "\n".join(
     (
         "1. ENDS BUTTED AND SILVER-SOLDERED AT THE JOINT BEAD.",
-        "2. CLOSED WITH THE WIRE THROUGH THE MHA-DT-009 TAPER-PIN CROSS-HOLE.",
+        "2. CLOSED WITH THE WIRE THROUGH THE MHA-DT-09 TAPER-PIN CROSS-HOLE.",
     )
 )

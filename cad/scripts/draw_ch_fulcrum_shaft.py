@@ -113,9 +113,10 @@ RIGHT_KEEP = {
     "DomeRadius": (_LEFT_TIP_X + 0.030, AXIS_Y - 0.018),
     # Below and right of the right tip, outside its extension lines, so the
     # dimension line stops at the value instead of running through the
-    # two-line callout under it (r1). The block is left-aligned on the
-    # dimension line, so it ends ~35 mm right of the anchor.
-    "AcrossFlat": (_RIGHT_TIP_X + 0.010, AXIS_Y - 0.022),
+    # callout under it (r1). The parent-vendor identity makes the block and
+    # shelf ~45 mm wide; move both 4 mm left from the border-touching layout,
+    # retaining 6 mm between the dimension line and the right dome tip.
+    "AcrossFlat": (_RIGHT_TIP_X + 0.006, AXIS_Y - 0.022),
 }
 
 

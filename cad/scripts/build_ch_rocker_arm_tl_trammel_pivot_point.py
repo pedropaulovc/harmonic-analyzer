@@ -1,4 +1,4 @@
-r"""Build the rocker template trammel's pivot point (MHA-CH-006-TL-18; shop tooling).
+r"""Build the rocker template trammel's pivot point (MHA-CH-06-TL-18; shop tooling).
 
 A 1/4 in O1 drill-rod point cut to length with a 60 degree tip cone and a
 stated tip flat (``ch_rocker_arm_tl_trammel_pivot_point_spec``). Layout:

@@ -1,13 +1,13 @@
-r"""Rocker strap (MHA-CH-013): the flat strap of the built-up rocker arm.
+r"""Rocker strap (MHA-CH-13): the flat strap of the built-up rocker arm.
 
-PURE DATA, no SolidWorks/COM imports. MHA-CH-006 may be built up
-(``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-012
+PURE DATA, no SolidWorks/COM imports. MHA-CH-06 may be built up
+(``ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE``): the turned hub MHA-CH-12
 is pressed into this strap's Ø10.20 H7 hole (``ch_rocker_hub_fit``). The
 strap's outline, faces and thickness are FINISHED here and never cut again;
 only the #47 rod-pin hole is added after joining (it is located from the
 joined part's reamed bore, so it is not on this detail).
 
-Frame: the MHA-CH-006 frame, so every value below is the finished part's own
+Frame: the MHA-CH-06 frame, so every value below is the finished part's own
 (``ch_rocker_arm_spec``): origin on the bottom arc's midpoint, +X the rod
 side, the hub hole on the mirror axis PIVOT_MID_Y up, the arcs' shared centre
 CENTER_Y up. Nothing here is a new number.
@@ -65,9 +65,9 @@ __all__ = [
     "strap_area",
 ]
 
-NUMBER = "MHA-CH-013"
-HUB_NUMBER = "MHA-CH-012"
-ROCKER_NUMBER = "MHA-CH-006"
+NUMBER = "MHA-CH-13"
+HUB_NUMBER = "MHA-CH-12"
+ROCKER_NUMBER = "MHA-CH-06"
 
 # The hub hole: the finished hub O.D.'s nominal, H7 (ch_rocker_hub_fit).
 HOLE_DIA = HUB_DIA

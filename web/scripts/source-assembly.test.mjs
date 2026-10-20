@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import { Matrix4, Quaternion, Vector3 } from 'three'
+import { projectCurrentNativeMetadata } from '../current-native-identity.mjs'
 
 // Consumer constraint controls, not recovered source poses or browser/GL proof.
 // The provider contains released native bodies with current mechanics transforms;
@@ -31,7 +32,7 @@ try {
   await server.close()
   throw error
 }
-const inventory = JSON.parse(await readFile(new URL('../content/v39-source/native-inventory.json', import.meta.url), 'utf8'))
+const inventory = projectCurrentNativeMetadata(JSON.parse(await readFile(new URL('../content/v39-source/native-inventory.json', import.meta.url), 'utf8')))
 const released = new Map(inventory.inventory.map(row => [row.path, new Matrix4().fromArray(row.world)]))
 const ROOT = 'ha-harmonic-analyzer'
 const CHANNEL = `${ROOT}/ch-channel`
@@ -47,8 +48,8 @@ const NUT = `${PAPER}pd-transgear-thumbnut-1`
 const ROD = `${PEN}pn-pen-rod-1`
 const GUIDE = `${PEN}pn-pen-hanger-1`
 const FRAME = SOURCE_ASSEMBLY_GROUPS.penFrame[0]
-const MARKER = `${PEN}pn-pen-marker-1`
-const WIRE = `${PEN}pn-pen-wire-1`
+const MARKER = `${PEN}pn-vn-pen-marker-1`
+const WIRE = `${PEN}pn-vn-pen-wire-1`
 const GEAR_IDS = Object.keys(SOURCE_GEAR_PART_PATHS)
 const EPS = 2e-8
 const provenance = {
@@ -358,16 +359,16 @@ test('F4: latch aperture tests the final current geometry, not release history',
   const f = fixture()
   reject({ hanger: { attachment: 'unlatched', swingRad: 0, hookReleaseRad: -.1 } }, f, /hook|positive|range|bound/i)
   const latched = solve({ hanger: { attachment: 'latched', swingRad: 0, hookReleaseRad: 0 } }, f)
-  samePose(latched.matrix(`${PAPER}vn-transgear-latch-pin-1`), f.matrices.get(`${PAPER}vn-transgear-latch-pin-1`))
-  assert.ok(observeLatchAperture(latched.matrix(`${PAPER}vn-transgear-latch-pin-1`), latched.matrix(`${PAPER}pd-latch-hook-1`)) <= .0027)
+  samePose(latched.matrix(`${PAPER}pd-vn-transgear-latch-pin-1`), f.matrices.get(`${PAPER}pd-vn-transgear-latch-pin-1`))
+  assert.ok(observeLatchAperture(latched.matrix(`${PAPER}pd-vn-transgear-latch-pin-1`), latched.matrix(`${PAPER}pd-latch-hook-1`)) <= .0027)
   const inside = solve({ hanger: { attachment: 'open', swingRad: .00768479506454, hookReleaseRad: 0 }, chain: closedChain() }, f)
-  assert.ok(observeLatchAperture(inside.matrix(`${PAPER}vn-transgear-latch-pin-1`), inside.matrix(`${PAPER}pd-latch-hook-1`)) <= .0027)
+  assert.ok(observeLatchAperture(inside.matrix(`${PAPER}pd-vn-transgear-latch-pin-1`), inside.matrix(`${PAPER}pd-latch-hook-1`)) <= .0027)
   const pivot = f.matrices.get(`${PAPER}pd-transgear-pivot-spacer-1`)
-  const outsidePin = rotationAt(f.matrices.get(`${PAPER}vn-transgear-latch-pin-1`), .00768679506454, pivot.elements[12], pivot.elements[13])
+  const outsidePin = rotationAt(f.matrices.get(`${PAPER}pd-vn-transgear-latch-pin-1`), .00768679506454, pivot.elements[12], pivot.elements[13])
   assert.ok(observeLatchAperture(outsidePin, f.matrices.get(`${PAPER}pd-latch-hook-1`)) > .0027001)
   reject({ hanger: { attachment: 'open', swingRad: .00768679506454, hookReleaseRad: 0 }, chain: closedChain() }, f, /latch|hook|aperture|pin/i)
   const clear = solve({ hanger: { attachment: 'open', swingRad: -.3, hookReleaseRad: 0 }, chain: closedChain() }, f)
-  const clearRelative = clear.matrix(`${PAPER}pd-latch-hook-1`).invert().multiply(clear.matrix(`${PAPER}vn-transgear-latch-pin-1`))
+  const clearRelative = clear.matrix(`${PAPER}pd-latch-hook-1`).invert().multiply(clear.matrix(`${PAPER}pd-vn-transgear-latch-pin-1`))
   const baseZ = point(clearRelative, [0, 0, 0]).z, tipZ = point(clearRelative, [0, .022224999964237213, 0]).z
   const radialZ = .001587500050 * Math.hypot(clearRelative.elements[2], clearRelative.elements[10])
   assert.ok(Math.max(baseZ, tipZ) + radialZ < 0, 'The entire finite pin clears the unchanged hook plane')

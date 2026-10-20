@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the cylinder-bank thrust washer (MHA-DT-026)."""
+r"""Create the manufacturing drawing for the cylinder-bank thrust washer (MHA-DT-26)."""
 
 from __future__ import annotations
 

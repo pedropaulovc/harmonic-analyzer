@@ -533,7 +533,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Hub-to-strap root (Opus #1020 r2 C2, drawing-guidelines rule 16): the
     # circle where the hub meets each strap face, filleted AT the largest
-    # radius the MHA-CH-001 foot cheeks clear (test_rocker_bank_layout), the
+    # radius the MHA-CH-01 foot cheeks clear (test_rocker_bank_layout), the
     # radius the print gives as a single MAX limit.
     check(
         "fillet hub roots",

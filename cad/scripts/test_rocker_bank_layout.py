@@ -19,7 +19,7 @@ import ch_rocker_arm_notes as arm_notes
 import cylinder_bank_layout as drum_bank
 import ch_pivot_bracket_spec as bracket
 import ch_pivot_shaft_spec as shaft
-import vn_rocker_thrust_washer_spec as washer
+import ch_vn_rocker_thrust_washer_spec as washer
 import ch_rocker_arm_spec as arm
 import rocker_bank_layout as bank
 from _buildgraph import config_files_of, module_deps_of
@@ -72,7 +72,7 @@ def test_the_bank_is_preloaded_by_its_spring() -> None:
 
 
 def test_the_rocker_spring_fits_the_shaft_and_under_the_bar_foot() -> None:
-    import vn_rocker_bank_spring_spec as spring
+    import ch_vn_rocker_bank_spring_spec as spring
 
     # The ch0 bar's foot passes over it as over the hubs; the washer is
     # smaller still.
@@ -101,7 +101,7 @@ def test_hub_mid_planes_are_the_channel_arm_planes() -> None:
 
 def test_stack_closes_north_on_a_washer_against_the_north_ear() -> None:
     """User, 2026-10-10: the shaft's shoulder is gone; hub 19 bears on a
-    MHA-VN-070 thrust washer against the north ear's inner face, the bank's
+    MHA-CH-VN-56 thrust washer against the north ear's inner face, the bank's
     datum."""
     assert bank.HUB19_NORTH_FACE_Z == pytest.approx(
         bank.hub_mid_z(19) + arm.HUB_LENGTH / 2
@@ -144,7 +144,7 @@ def test_the_washers_are_purchased_0_031_ring_shims() -> None:
     assert (washer.THICKNESS_MIN, washer.THICKNESS_MAX) == pytest.approx(
         (0.7366, 0.8382), abs=5e-5
     )
-    assert _config.parts("vn-rocker-thrust-washer")["number"] == "MHA-VN-070"
+    assert _config.parts("ch-vn-rocker-thrust-washer")["number"] == "MHA-CH-VN-56"
 
 
 def test_brackets_sit_on_their_ears_and_move_in_from_78() -> None:

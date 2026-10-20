@@ -30,7 +30,7 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     TERMINAL_FLAT_EDGE_BREAK_MAX,
 )
 from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
-from vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
+from dt_vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
 from _mcmaster_94025a164 import CUP_DEPTH
 from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
@@ -140,7 +140,7 @@ if THRUST_RING_MIN - 2.0 * THRUST_EDGE_BREAK_MAX < THRUST_RING_FLOOR - 1e-9:
         f"breaks is under the {THRUST_RING_FLOOR} floor"
     )
 # The collar's two roots stay sharp in the model (#914): its south face seats
-# on the MHA-DT-005 boss round the journal rim, its north face carries the
+# on the MHA-DT-05 boss round the journal rim, its north face carries the
 # 64T.  The 64T clears any root under its 1.0 bore chamfer; the post's rim
 # break has no minimum, so the root's limit is the one a sharp rim still
 # seats against: an R0.05 root stands a sharp rim off the face by under
@@ -157,7 +157,7 @@ COLLAR_STOCK_CALLOUT = "\n".join(
         "5/8 BAR AS SUPPLIED",
         f"EDGE BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX",
         f"ROOTS R{COLLAR_ROOT_RADIUS_MAX:.2f} MAX",
-        "SEATS MHA-DT-005 AND 64T",
+        "SEATS MHA-DT-05 AND 64T",
     )
 )
 # The same break on the post's journal rims, the ring's other bounding edge;
@@ -190,11 +190,11 @@ def _land_1_gears() -> str:
 # suffixes on the stepped tip, whose texts climb over each other, and on
 # every across-flat (machinist review r2: A-A's too).
 SEAT_MATE_CALLOUTS = {
-    "Sec0Dia": "RUNNING FIT IN\nMHA-DT-005 BORE",
+    "Sec0Dia": "RUNNING FIT IN\nMHA-DT-05 BORE",
     "Sec1Dia": f"SLIDES IN 64T AND\n{_land_1_gears()}",
 }
-# The terminal land's band also carries the MHA-VN-016 collar, whose bore
-# clearance is derived from this diameter (vn_cone_tip_collar_spec; codex
+# The terminal land's band also carries the MHA-DT-VN-54 collar, whose bore
+# clearance is derived from this diameter (dt_vn_cone_tip_collar_spec; codex
 # review of #1644 at fd9aa2df7), so its callout names the collar too.
 TERMINAL_LAND = 4
 SEAT_MATE_SUFFIXES = {
@@ -202,7 +202,7 @@ SEAT_MATE_SUFFIXES = {
     + ", ".join(
         (
             *(_gear(t) for t in SECTION_CONE_GEAR_TEETH[land]),
-            *(("MHA-VN-016",) if land == TERMINAL_LAND else ()),
+            *(("MHA-DT-VN-54",) if land == TERMINAL_LAND else ()),
         )
     )
     for land in (2, 3, TERMINAL_LAND)
@@ -220,7 +220,7 @@ FLATS_IN_LINE_CALLOUT = "4 FLATS IN LINE"
 # Why the three land steps and the collar web print three places: each step
 # stands SEAT_STEP_SETBACK inside the bore of the smallest gear on the larger
 # land (the step proof below), and the web is the 64T's station toward
-# MHA-DT-005.  One-line suffixes: a length tier carries one line.
+# MHA-DT-05.  One-line suffixes: a length tier carries one line.
 LENGTH_FUNCTION_SUFFIXES = {
     **{
         f"Sec{land}End": f" INSIDE {_gear(min(SECTION_CONE_GEAR_TEETH[land]))} BORE"
@@ -260,9 +260,9 @@ if not (
         f"{gear_faces(0)[0]:.6f} within 0..{PITCH_LOCKSTEP_TOLERANCE}"
     )
 
-# The tip end: the custom MHA-VN-016 stack collar is set one COLLAR_FEELER
+# The tip end: the custom MHA-DT-VN-54 stack collar is set one COLLAR_FEELER
 # north of T006's face and locked on the
-# Sec4 D-flat.  The MHA-DT-021 tip block is a straight prism fixed by its
+# Sec4 D-flat.  The MHA-DT-21 tip block is a straight prism fixed by its
 # hold-down: its north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of
 # the pivot, itself PIVOT_FROM_T006_NORTH_FACE north of T006's face
 # (cone_line's constants).  drawing-guidelines.md rule 18 (thread engagement) E11's #10-32 McMaster 94025A164 cup
@@ -341,9 +341,9 @@ def validate_gear_loading_clearances() -> None:
 # flat SECTION_FLAT_AF (flat to the opposite side of the land, the size a
 # micrometer reads) with FLAT_AF_BAND.  Each flat runs its whole land, from
 # the collar's (or the larger land's) face to the land's end, and the gears'
-# D-bores (MHA-DT-003, MHA-DT-007) slide straight on.  The terminal land's flat runs
+# D-bores (MHA-DT-03, MHA-DT-07) slide straight on.  The terminal land's flat runs
 # out THROUGH THE TIP (user ruling 2026-09-28): T012 and T006 slide on over
-# it and MHA-VN-016 is a thrust spacer riding the D, so the end face is a D too.
+# it and MHA-DT-VN-54 is a thrust spacer riding the D, so the end face is a D too.
 # FLAT_OFFSETS[i] is the flat's distance from the axis.
 FLAT_OFFSETS: tuple[float | None, ...] = tuple(
     None if af is None else af - dia / 2.0
@@ -417,7 +417,7 @@ FILLET_CALLOUT = "3X"
 
 # Surface texture, on the one land that runs: the Ø12.2308 journal turns in
 # the pivot post bore.  Every other land only carries parts locked to the
-# shaft -- the gears slide on and are driven by the flats, the MHA-VN-016
+# shaft -- the gears slide on and are driven by the flats, the MHA-DT-VN-54
 # collar is screwed to the terminal flat -- and the tip bears on the
 # adjuster's cup with its end, not its round, so they are left to the
 # title-block process row (drawing-guidelines.md rule 6; machinist review
@@ -451,7 +451,7 @@ DRAWING_NOTES = "\n".join(
     (
         f"{_gear(min(min(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
         f"-{_gear(max(max(g) for g in SECTION_CONE_GEAR_TEETH if g))}"
-        ": MHA-DT-003 CONE GEARS. 64T: MHA-DT-007.",
+        ": MHA-DT-03 CONE GEARS. 64T: MHA-DT-07.",
         FLAT_FIT_NOTE,
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
@@ -503,7 +503,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as a two-place reference, 15.88, the bar's own size; the web
-# prints three places because it is the 64T's station toward MHA-DT-005
+# prints three places because it is the 64T's station toward MHA-DT-05
 # (crank_boss_rim.GEAR64_STATION_TOWARD_POST) and the gear stack's origin:
 # at .XX the station term grows from 0.53 to 0.91 and the widest face holding
 # the post floor falls from 6.5 to 6.2.

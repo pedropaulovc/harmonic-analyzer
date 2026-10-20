@@ -1,8 +1,8 @@
 r"""Column-clamp pair fit budget -- the limits the two arc sheets share.
 
 PURE DATA over the two arcs' drawing-free geometry; no SolidWorks/COM and no
-drawing imports.  The FRONT arc (MHA-SH-001) and the BACK arc (MHA-SH-002)
-close on one Ø25.4 frame column (MHA-FR-003) with two #8-32 clamp screws:
+drawing imports.  The FRONT arc (MHA-SH-01) and the BACK arc (MHA-SH-02)
+close on one Ø25.4 frame column (MHA-FR-03) with two #8-32 clamp screws:
 bar -> front arc (#8 clearance) -> back arc (tapped).  Three things must hold
 at the printed worst case, and each sheet prints its share:
 
@@ -20,10 +20,10 @@ at the printed worst case, and each sheet prints its share:
   screw's major diameter.
 
 The column is purchased 1 x .120 in ASTM A513 Type 5 (DOM) tube
-(``fr_tube_frame_spec.OUTER_DIA``; MHA-FR-003 prints its OD as a reference
+(``fr_tube_frame_spec.OUTER_DIA``; MHA-FR-03 prints its OD as a reference
 only), so the bores are MATCHED to the column they clamp: each sheet prints
 its bore as a reference nominal with this diametral-clearance acceptance on
-MHA-FR-003, never a free-standing size band (drawing-guidelines.md rule 4,
+MHA-FR-03, never a free-standing size band (drawing-guidelines.md rule 4,
 matched pairs).  The walls are judged on the largest bore that acceptance
 admits on the largest tube A513 admits (``COLUMN_OD_MAX``).
 """
@@ -37,9 +37,9 @@ from _printed_tolerance import printed_deviations
 from fr_tube_frame_spec import MM_PER_IN, OUTER_DIA as COLUMN_DIA
 from sh_column_clamp_back_geom import BLOCK_DEPTH, GRIP_OFFSET
 from sh_column_clamp_front_geom import ARC_DEPTH, COLUMN_BORE, EAR_HOLE_SPEC
-from vn_clamp_screw_spec import SHANK_DIA as CLAMP_SCREW_MAJOR
+from _mcmaster_90280a201 import SHANK_DIA as CLAMP_SCREW_MAJOR
 
-COLUMN_MATE = "MHA-FR-003 COLUMN"
+COLUMN_MATE = "MHA-FR-03 COLUMN"
 
 # Owner rulings 2026-10-15 (PR #1467 round-3 review), drawing-guidelines.md
 # rule 20, each a stated shortfall with no geometry change, declared as kind

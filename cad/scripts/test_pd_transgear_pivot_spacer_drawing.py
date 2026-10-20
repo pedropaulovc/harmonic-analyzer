@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear pivot spacer (MHA-PD-020) and its drawing."""
+"""Offline contracts for the transgear pivot spacer (MHA-PD-20) and its drawing."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from _surface_finish import MACHINED_UM
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
 import pd_transgear_pivot_spacer_spec as spec
-import vn_transgear_pivot_screw_spec as screw
+import pd_vn_transgear_pivot_screw_spec as screw
 
 
 def test_required_drawing_paths() -> None:
@@ -50,7 +50,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
-    """The MHA-VN-049 spring's room rides the length and the shoulder press the
+    """The MHA-PD-VN-63 spring's room rides the length and the shoulder press the
     bore, so each band is a native model tolerance from the spec (policy
     drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .XXX and the title block's row governs it;
     restating that row on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
@@ -66,7 +66,7 @@ def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
 
 
 def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
-    """The ring is pressed flush on the MHA-VN-041 shoulder (Ø4.7625 -0.0254/0)
+    """The ring is pressed flush on the MHA-PD-VN-57 shoulder (Ø4.7625 -0.0254/0)
     so screw and spacer seat on the bar as one body: the smallest shoulder in
     the largest ream still grips, and the largest in the smallest stays
     light."""
@@ -436,7 +436,7 @@ def test_turned_part_diameters_follow_the_machinist() -> None:
 
 
 def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
-    """The bore is a light press on the MHA-VN-041 shoulder: a fit bore, so it
+    """The bore is a light press on the MHA-PD-VN-57 shoulder: a fit bore, so it
     is reamed (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)) and its one-sided band holds the press; its callout
     rides the end-view diameter, the hole's defining view."""
     drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
@@ -448,7 +448,7 @@ def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_167() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-020"
+    assert row["number"] == "MHA-PD-20"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

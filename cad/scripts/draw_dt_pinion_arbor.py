@@ -1,10 +1,11 @@
-r"""Create the integral MHA-DT-022 pinion-arbor manufacturing drawing."""
+r"""Create the integral MHA-DT-22 pinion-arbor manufacturing drawing."""
 
 from __future__ import annotations
 
 import argparse
 import math
 import sys
+import textwrap
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -51,7 +52,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
-from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
+from dt_pinion_arbor_pin_spec import PIN_HOLE_CALLOUT as _PIN_HOLE_CALLOUT
 from dt_pinion_arbor_spec import (
     BACK_JOURNAL_Z,
     BOND_ZONE_CALLOUT,
@@ -100,7 +101,7 @@ DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
 # tried (drag from the profile or the end-on donor, move or copy, the
 # detail's own feature import, a hidden reference sketch: neckbisect-ecef,
 # neckref-84e5, 20260926T141154Z-1-b0f89771).  A cropped model view is the
-# MHA-VN-031 pattern: a *Top view at 2:1, turned like the profile, moved so the
+# MHA-DT-VN-61 pattern: a *Top view at 2:1, turned like the profile, moved so the
 # head centre lands on DETAIL_CENTER and cropped by a sketch circle.
 DETAIL_LETTER = "A"
 # A model view has no native label the API can show, so the label is a note
@@ -319,6 +320,12 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # it, crossing the 38.0 line 6 mm inside that witness and passing 5 mm
 # right of the 19.0's head-end witness; the underline still starts right of
 # detail A's view box (x 0.1928).
+# Reflow across the old line break: FOR stays on the drill row, leaving the
+# full vendor number and SPRING PIN together below it.  Two rows preserve
+# the measured underline height between the crown-sag and cross-hole text.
+PIN_HOLE_CALLOUT = textwrap.fill(
+    _PIN_HOLE_CALLOUT, width=24, break_long_words=False, break_on_hyphens=False
+)
 PIN_HOLE_CALLOUT_ADVANCE = 0.00267
 PIN_HOLE_CALLOUT_CENTRE_DX = 0.00075
 PIN_HOLE_LEADER_ARROW_DX = -0.0004
@@ -669,7 +676,7 @@ def _axis_on_sheet(
 def _cropped_head_view(adapter: Any, principal: Any) -> Any:
     """Detail A: a standalone 2:1 *Top model view cropped to the head.
 
-    Sequence (the MHA-VN-031 tip view, diag/mha142-bisect b6552f13b, and
+    Sequence (the MHA-DT-VN-61 tip view, diag/mha142-bisect b6552f13b, and
     draw_crank_arm's merged top-view crop): place *Top at 2:1 and turn it like
     the profile (IView.Angle -90 deg); prove the model axis runs the profile's
     way at twice its scale; move it so the head centre lands on DETAIL_CENTER

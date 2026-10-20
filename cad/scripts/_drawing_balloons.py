@@ -287,7 +287,7 @@ def _spread_balloons(
             "GetLeaderPointsAtIndex",
         )
         # SetPosition moves the ANCHOR, which is not the circle centre: it sits
-        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-DT-000).
+        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-DT-00).
         # Carry that offset so the CIRCLE lands on its ring slot.
         anchor = annotation.GetPosition()
         if anchor is None or len(anchor) < 2:
@@ -515,7 +515,7 @@ def _component_path(adapter: Any, component: Any) -> str:
     """A model component's full instance path, ``IComponent2.Name2``.
 
     A drawing component's ``Name`` carries the view's root prefix
-    (``fr-frame-4/vn-tube-frame-cap-1``) while an edge's owning component reads
+    (``fr-frame-4/fr-vn-tube-frame-cap-1``) while an edge's owning component reads
     ``fr-tube-frame-3`` (farm probe on the frame drawing): ``Name2`` of the
     model component is the one string both sides share, and it keeps every
     sub-assembly segment (``sub-1/dt-cone-gear-1``).

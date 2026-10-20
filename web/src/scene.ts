@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { MeshoptDecoder } from 'meshoptimizer'
 import modelRepresentation from '../content/model-representation.json'
 import { assertModelRepresentationBytes, REPRESENTATION_KIND, REPRESENTATION_PATH } from '../model-representation.mjs'
+import { CURRENT_NATIVE_IDENTITY_PROJECTION, projectCurrentNativeDocument, validateCurrentNativeIdentityTable, type CurrentNativeIdentityProjection } from '../current-native-identity.mjs'
 import { BINDINGS, instanceIndex, unboundThumbScrewFailures, type Binding } from './bindings'
 import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
@@ -193,6 +194,8 @@ export interface ModelProvenance {
   /** Pinned RAW native CAD identity, not an observation of downloaded bytes. */
   sourceSha256: string
   representationKind: typeof REPRESENTATION_KIND
+  /** Current naming only; the source/representation hashes above remain archival. */
+  currentIdentityProjection: Readonly<CurrentNativeIdentityProjection>
   expectedSha256: string
   observedSha256: string | null
   expectedByteLength: number
@@ -2350,6 +2353,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     sourceCommit: MECHANISM_DATA.provenance.sourceCommit,
     sourceSha256: MECHANISM_DATA.provenance.modelSha256,
     representationKind: REPRESENTATION_KIND,
+    currentIdentityProjection: CURRENT_NATIVE_IDENTITY_PROJECTION,
     expectedSha256: modelRepresentation.representation.sha256,
     expectedByteLength: modelRepresentation.representation.byteLength,
     observedSha256: null, observedByteLength: null, generator: null, identity: 'unavailable', url,
@@ -2400,7 +2404,15 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     if (provenance.identity === 'matched') {
       if (!MeshoptDecoder.supported) throw new Error('This browser does not support the lossless Meshopt model decoder')
       await MeshoptDecoder.ready
-      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).register(parser => ({
+        name: 'CurrentNativeIdentityProjection',
+        beforeRoot: async () => {
+          // The downloaded bytes were checked above. Project only identity
+          // metadata before object construction; never rewrite the sealed GLB.
+          await validateCurrentNativeIdentityTable()
+          projectCurrentNativeDocument(parser.json)
+        },
+      })).parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
       provenance.generator = gltf.asset.generator ?? null
       if (options.nativePrimitiveSnapshots) {
         const associations = new WeakMap<THREE.Object3D, NativeGLTFAssociation>()
@@ -2506,7 +2518,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     if (spring.binding!.motion !== 'channel-spring') continue
     const station = spring.station + 1
     const lever = parts.get(`ha-harmonic-analyzer/ch-channel/ch-channel-lever-${station}`)
-    const hook = parts.get(`ha-harmonic-analyzer/ch-channel/vn-spring-hook-${station}`)
+    const hook = parts.get(`ha-harmonic-analyzer/ch-channel/ch-vn-spring-hook-${station}`)
     if (lever && hook) channelSpringAttachments.push({ spring, lever, hook })
   }
   // cad/scripts/channel_lever_spec.py:LEVER_SPRING_X, exported as the

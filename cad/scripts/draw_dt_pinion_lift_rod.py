@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the pinion lift rod.
 
-A plain 6.35 bearing rod, crowned at its back end, with the MHA-DT-030 pin hole
+A plain 6.35 bearing rod, crowned at its back end, with the MHA-DT-30 pin hole
 match-drilled at assembly near its flat front end (U36).  The 1:1 side view
 carries everything the lathe needs -- the bearing diameter and its mate, the
 body length, the crown and the (overall) -- plus the bearing finish; a 5:1
@@ -124,7 +124,7 @@ DIMENSION_CALLOUTS = {
     # Below the value: SolidWorks stores a multi-line ABOVE callout but prints
     # none of it (r2 layout audit text-unmatched; draw_dt_cone_gear_shaft).
     "RodDia": ROD_DIA_CALLOUT,
-    # Drilled at MHA-DT-000's LEVER PIN SET; the pointer comes from the registry.
+    # Drilled at MHA-DT-00's LEVER PIN SET; the pointer comes from the registry.
     "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(LEVER_PIN_SET_STEP_KEY)}",
     # The rod has one flat end and one crowned end; "front" named nothing on
     # the sheet (machinist review r2).
@@ -218,7 +218,7 @@ def _show_as_reference(
             raise RuntimeError(
                 f"expected one {name} on the side view, found {len(found)}"
             )
-        set_reference_dimension(adapter, found[0], label=f"MHA-DT-017 {name}")
+        set_reference_dimension(adapter, found[0], label=f"MHA-DT-17 {name}")
 
 
 async def build(adapter: Any) -> dict[str, str]:

@@ -33,6 +33,13 @@ import json
 import math
 from pathlib import Path
 
+_IDENTITY_SPEC = importlib.util.spec_from_file_location(
+    "current_native_identity", Path(__file__).with_name("current_native_identity.py"))
+_IDENTITY = importlib.util.module_from_spec(_IDENTITY_SPEC)
+_IDENTITY_SPEC.loader.exec_module(_IDENTITY)
+current_inventory_parts = _IDENTITY.current_inventory_parts
+project_current_native_path = _IDENTITY.project_current_native_path
+
 import cv2
 import numpy as np
 from scipy.optimize import least_squares
@@ -149,7 +156,7 @@ def world_points(observations, inventory):
     require_rest_projection(observations)
     if observations["model"]["sha256"] != inventory["sha256"]:
         raise ValueError("Model hash differs from landmark inventory")
-    parts = {item["path"]: item for item in inventory["inventory"]}
+    parts = current_inventory_parts(inventory)
     points = {}
     for anchor in observations["anchors"]:
         key = anchor["id"]
@@ -161,10 +168,10 @@ def world_points(observations, inventory):
             if "partLocalMetres" in anchor:
                 raise ValueError(f"{key}: specify local OR world coordinates")
             point = finite_vector(anchor["worldMetres"], 3, key)
-            if anchor.get("partPath") not in parts:
+            if project_current_native_path(anchor.get("partPath")) not in parts:
                 raise ValueError(f"{key}: unknown named CAD part")
         else:
-            part = parts.get(anchor.get("partPath"))
+            part = parts.get(project_current_native_path(anchor.get("partPath")))
             if part is None:
                 raise ValueError(f"{key}: unknown named CAD part")
             matrix = np.array(part["world"], dtype=float).reshape(4, 4, order="F")
@@ -826,7 +833,7 @@ def prepare_camera_rigs(observations, points):
 def prepare_native_line_checks(observations, contexts, inventory):
     """Keep finite native line geometry separate from actual image edge observations."""
     prepared = {}
-    parts = {part["path"]: part for part in inventory["inventory"]} if inventory else {}
+    parts = current_inventory_parts(inventory) if inventory else {}
     source = observations["source"]
     for key, (frame, view, _, _) in contexts.items():
         lines, ids = [], set()
@@ -844,7 +851,7 @@ def prepare_native_line_checks(observations, contexts, inventory):
                 f"{key}: unsupported CPU source presentation {presentation}"
             )
         for line in view.get("nativeLineChecks", []):
-            identity, path = line.get("id"), line.get("partPath")
+            identity, path = line.get("id"), project_current_native_path(line.get("partPath"))
             if (
                 not isinstance(identity, str)
                 or not identity
@@ -1012,19 +1019,19 @@ def prepare_native_line_checks(observations, contexts, inventory):
                 (
                     item
                     for item in view.get("partOverrides", [])
-                    if path == item["partPath"]
-                    or path.startswith(item["partPath"] + "/")
+                    if project_current_native_path(path) == project_current_native_path(item["partPath"])
+                    or project_current_native_path(path).startswith(project_current_native_path(item["partPath"]) + "/")
                 ),
                 key=lambda item: len(item["partPath"]),
             ):
                 if (
-                    override["partPath"] not in parts
+                    project_current_native_path(override["partPath"]) not in parts
                     or override.get("visibility") == "hidden"
                 ):
                     raise ValueError(
                         "Observed native line belongs to unknown or source-hidden geometry"
                     )
-                rest = np.array(parts[override["partPath"]]["world"]).reshape(
+                rest = np.array(parts[project_current_native_path(override["partPath"])]["world"]).reshape(
                     4, 4, order="F"
                 )
                 current = accumulated @ rest
@@ -1051,7 +1058,7 @@ def prepare_native_line_checks(observations, contexts, inventory):
             lines.append(
                 {
                     "id": identity,
-                    "partPath": path,
+                    "partPath": line["partPath"],
                     "worldMetres": world_points,
                     "viewportPixels": viewport_pixels[:2],
                     "viewportObservedPixels": viewport_pixels,
@@ -1580,14 +1587,14 @@ def _run_computation(observations, inventory):
                 for landmark in landmarks:
                     landmark["pixel"][0] = width - 1 - landmark["pixel"][0]
             posed_points = dict(points)
-            parts = {part["path"]: part for part in inventory["inventory"]}
+            parts = current_inventory_parts(inventory)
             part_overrides = view.get("partOverrides", [])
             for anchor in observations["anchors"]:
                 candidates = [
                     override
                     for override in part_overrides
-                    if anchor["partPath"] == override["partPath"]
-                    or anchor["partPath"].startswith(override["partPath"] + "/")
+                    if project_current_native_path(anchor["partPath"]) == project_current_native_path(override["partPath"])
+                    or project_current_native_path(anchor["partPath"]).startswith(project_current_native_path(override["partPath"]) + "/")
                 ]
                 if not candidates:
                     continue
@@ -1595,7 +1602,7 @@ def _run_computation(observations, inventory):
                 for override in sorted(
                     candidates, key=lambda item: len(item["partPath"])
                 ):
-                    if override["partPath"] not in parts:
+                    if project_current_native_path(override["partPath"]) not in parts:
                         raise ValueError(
                             f"Unknown source part override {override['partPath']}"
                         )
@@ -1608,7 +1615,7 @@ def _run_computation(observations, inventory):
                                 f"Observed landmark {anchor['id']} belongs to hidden source part"
                             )
                         continue
-                    rest = np.array(parts[override["partPath"]]["world"]).reshape(
+                    rest = np.array(parts[project_current_native_path(override["partPath"])]["world"]).reshape(
                         4, 4, order="F"
                     )
                     current = accumulated @ rest

@@ -121,6 +121,9 @@ CURRENT_BASE_PATHS = (
     'web/src/mechanics-data.ts', 'web/src/magnifier.ts', 'web/src/kinematics.ts',
     'web/scripts/native-identity-map.mjs', 'web/scripts/released-models.json',
     'cad/config/identity-migration-map.json',
+    'cad/config/current-identity-map.json', 'web/scripts/current-native-identity-inputs.mjs',
+    'web/current-native-identity.mjs', 'web/content/current-native-identities.json',
+    'web/src/current-mechanics-data.ts', 'web/scripts/current_native_identity.py',
 )
 CURRENT_PRODUCERS = (
     ('generate-analysis-synthesis-source-tracks.py', '6dW6VYXp9HM', 'Generator'),

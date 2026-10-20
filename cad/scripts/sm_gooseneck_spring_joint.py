@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import _config
 import sm_gooseneck_geom as gooseneck
-import vn_counter_spring_stock_geom as spring
+import sm_vn_counter_spring_stock_geom as spring
 import sm_gooseneck_spring_screw_geom as screw
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm

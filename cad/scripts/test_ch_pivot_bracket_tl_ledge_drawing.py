@@ -1,4 +1,4 @@
-"""Offline contracts for the pivot bracket's angle-plate ledge (MHA-CH-008-TL-01)."""
+"""Offline contracts for the pivot bracket's angle-plate ledge (MHA-CH-08-TL-01)."""
 
 from __future__ import annotations
 
@@ -130,14 +130,14 @@ def test_spot_transfer_rides_the_hole_callout_and_names_the_angle_plate() -> Non
     nothing. The words ride the 2X #5 callout now, naming the plate by part
     number, and the sheet carries no general note."""
     angle_plate = _config.parts("ch-pivot-bracket-tl-angle-plate")["number"]
-    assert spec.ANGLE_PLATE_NUMBER == angle_plate == "MHA-CH-008-TL-02"
+    assert spec.ANGLE_PLATE_NUMBER == angle_plate == "MHA-CH-08-TL-02"
     assert spec.SPOT_TAPS_LINES == (
         "SPOT TAPS IN ANGLE PLATE",
-        "MHA-CH-008-TL-02 THROUGH",
+        "MHA-CH-08-TL-02 THROUGH",
         "THESE HOLES AT ASSEMBLY;",
     )
     assert drawing.HOLE_CALLOUT_PROCESS == (
-        "SPOT TAPS IN ANGLE PLATE\nMHA-CH-008-TL-02 THROUGH\n"
+        "SPOT TAPS IN ANGLE PLATE\nMHA-CH-08-TL-02 THROUGH\n"
         "THESE HOLES AT ASSEMBLY;\n#5 DRILL"
     )
     # Digit-free apart from the mate's part number; never a method beyond the

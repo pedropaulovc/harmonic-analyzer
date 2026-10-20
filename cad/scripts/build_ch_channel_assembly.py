@@ -13,10 +13,10 @@ the M6.8 mirror layer is gone).
 * pivot-shaft x1 (rocker bank at (72.9, 253.8), along Z; a plain rod whose
   cylinder spans both ears' outer faces, each end domed, held axially and in
   rotation by two set screws on flats milled at the ears -- rocker_bank_layout)
-* vn-rocker-thrust-washer x2 (MHA-VN-070, McMaster 3088A429: north, between
+* ch-vn-rocker-thrust-washer x2 (MHA-CH-VN-56, McMaster 3088A429: north, between
   rocker 19's hub and the
   north ear, the bank's datum; south, on rocker 0's hub) +
-  vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between the
+  ch-vn-rocker-bank-spring x1 (MHA-CH-VN-54, the wave disc spring between the
   south washer and the south ear that preloads the bank north; #948 ruling R)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4); plain Ø6.35 x 166.4,
   domed 1.025 proud of each keeper lug, set-screw flats up)
@@ -25,11 +25,11 @@ the M6.8 mirror layer is gone).
   fit-up-located S/N stations (the old chrome pivot-ball-mount pair is retired
   -- photo-refuted, and its south pillar stood 19 mm past the support's end
   in mid-air); since the 2026-10-09 sketch both feet run OUTBOARD, and one
-  MHA-CH-008 serves both sides, flush with the south support end face and
+  MHA-CH-08 serves both sides, flush with the south support end face and
   short of the north one, #1341) +
-  bracket-hold-down-screw x2 (MHA-VN-071, one down through each foot into
+  bracket-hold-down-screw x2 (MHA-CH-VN-57, one down through each foot into
   the support's transferred #8-32 seat -- rocker_bracket_seat_layout) +
-  vn-arbor-set-screw x2 (MHA-VN-034, one down through each MHA-CH-008 ear's
+  ch-vn-arbor-set-screw x2 (MHA-CH-VN-53, one down through each MHA-CH-08 ear's
   apex onto the shaft's flat)
 * fulcrum-keeper x2 + frame-side-screw x2 + fulcrum-set-screw x2 (the black
   shaft-END brackets on the top-frame west rail top face -- ch17 p.40
@@ -42,10 +42,10 @@ the M6.8 mirror layer is gone).
 * rocker-arm x20, connecting-rod x20, amplitude-bar x20, channel-lever
   x20 (2026-09-02: the arms and levers carry INTEGRAL hubs whose faces
   set the station pitch -- the 19 + 19 spacer bushings are retired),
-  rod-pivot-pin x20 (MHA-CH-010, one 5/64 drill-rod pin pressed through
+  rod-pivot-pin x20 (MHA-CH-10, one 5/64 drill-rod pin pressed through
   each rod's fork tines and running in its arm's #47 rod hole, lock-mated to
   the rod),
-  bar-pivot-pin x20 (MHA-CH-011, one 5/64 drill-rod pin pressed through
+  bar-pivot-pin x20 (MHA-CH-11, one 5/64 drill-rod pin pressed through
   each bar's top-notch cheeks and running in its lever's #47 bar-pin hole,
   lock-mated to the bar),
   channel-spring-installed x20 (McMaster 9432K31, with fixed measured
@@ -385,10 +385,10 @@ SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # Rocker pivot brackets, shaft, washers, spring and set screws (#948 ruling R,
 # PR #1292; user, 2026-10-10): the rocker bank's retention stack, from
-# rocker_bank_layout. Hub 19 bears on the north MHA-VN-070 washer, which bears
-# on the north ear's inner face, the bank's datum; the MHA-VN-053 spring
+# rocker_bank_layout. Hub 19 bears on the north MHA-CH-VN-56 washer, which bears
+# on the north ear's inner face, the bank's datum; the MHA-CH-VN-54 spring
 # between the south ear and the south washer on hub 0 preloads the bank north
-# onto it. The plain shaft is held by one MHA-VN-034 set screw per ear on a
+# onto it. The plain shaft is held by one MHA-CH-VN-53 set screw per ear on a
 # flat. Feet outboard to the rocker-arm-support's +-90.25 end faces (it is the
 # only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
@@ -432,12 +432,12 @@ if any(
 # washer's z0 puts the south one's north face on hub 0's south face, and the
 # north one between hub 19's north face and the north ear's inner face.
 from ch_rocker_arm_spec import HUB_LENGTH as _ROCKER_HUB_LENGTH  # noqa: E402
-from vn_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
+from ch_vn_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E402
 
 for _washer_z in (SOUTH_WASHER_Z, NORTH_WASHER_Z):
     if abs(_washer_z[1] - _washer_z[0] - _WASHER_THICK) > 1e-9:
         raise AssertionError(
-            "a thrust washer is not vn_rocker_thrust_washer_spec's thickness"
+            "a thrust washer is not ch_vn_rocker_thrust_washer_spec's thickness"
         )
 if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
@@ -452,24 +452,24 @@ if (
     )
 # The spring's part runs z 0..MODEL_HEIGHT from its origin (axis +Z), so
 # IDENTITY at ROCKER_SPRING_Z[0] fills the south ear to washer envelope.
-import vn_rocker_bank_spring_spec as _rocker_spring  # noqa: E402
+import ch_vn_rocker_bank_spring_spec as _rocker_spring  # noqa: E402
 
 if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 1e-9:
     raise AssertionError("rocker bank spring is not its installed envelope")
 if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
     raise AssertionError("rocker bank spring's north face is not on the washer")
-# Apex set screws (MHA-VN-034, user 2026-10-10): the part's cup end is its
-# origin and its axis +Y (build_vn_arbor_set_screw, the drive train's IDENTITY
+# Apex set screws (MHA-CH-VN-53, user 2026-10-10): the part's cup end is its
+# origin and its axis +Y (build_ch_vn_arbor_set_screw, the drive train's IDENTITY
 # placement), so IDENTITY at the flat's height drops each one down through its
 # ear's apex tap onto the flat. The shaft is the concentric seed, so the cup
 # sits on the MODELLED flat, as the arbor's screws sit on the modelled arbor
 # top (build_dt_drive_train_assembly SET_SCREW_TIP_Y). IDENTITY keeps the
 # shaft's part +Y, its flats, on machine +Y.
-from vn_arbor_set_screw_spec import LENGTH as _SET_SCREW_LEN  # noqa: E402
-from vn_arbor_set_screw_spec import THREAD as _SET_SCREW_THREAD  # noqa: E402
+from _mcmaster_91375a106 import LENGTH as _SET_SCREW_LEN  # noqa: E402
+from _mcmaster_91375a106 import THREAD as _SET_SCREW_THREAD  # noqa: E402
 
 if _SET_SCREW_THREAD != _bracket_spec.SET_SCREW_THREAD:
-    raise AssertionError("the ears' apex tap is not the MHA-VN-034 thread")
+    raise AssertionError("the ears' apex tap is not the MHA-CH-VN-53 thread")
 SET_SCREW_TIP_Y = PIVOT[1] + _PIVOT_SHAFT_DIA / 2.0 - _PIVOT_FLAT_DEPTH
 if abs(SUPPORT_APEX_Y + _bracket_spec.BORE_H - PIVOT[1]) > 1e-9:
     raise AssertionError("pivot bracket bore is off the rocker pivot axis")
@@ -488,7 +488,7 @@ SET_SCREW_PROUD = SET_SCREW_TIP_Y + _SET_SCREW_LEN - (
 SET_SCREW_PROUD_INSTALLED = SET_SCREW_PROUD - SET_SCREW_SHAFT_DROP
 if min(_bracket_spec.SET_SCREW_WALLS_MIN.values()) <= 0.0:
     raise AssertionError("an apex set screw breaks out of its ear's faces")
-# Bracket hold-downs (#743 PR2): one MHA-VN-071 (#8-32 x 5/8 fillister, owner
+# Bracket hold-downs (#743 PR2): one MHA-CH-VN-57 (#8-32 x 5/8 fillister, owner
 # Q13c) per bracket, through its #8 close-clearance foot hole into the support's
 # transferred seat. rocker_bracket_seat_layout owns the seats and their
 # worst-case stack, ch_pivot_bracket_sides the head's clearance to the ear;
@@ -496,7 +496,7 @@ if min(_bracket_spec.SET_SCREW_WALLS_MIN.values()) <= 0.0:
 # on the support's centreline, each head must sit on its foot, and the hole
 # must clear the screw's under-head junction fillet (P/10 in the fillister
 # recipe, diag_mcmaster_fillister), which a #19 caught (r743-3C).
-from vn_bracket_hold_down_screw_spec import (  # noqa: E402
+from ch_vn_bracket_hold_down_screw_spec import (  # noqa: E402
     _PITCH as _HDSCREW_PITCH,
     HEAD_DIA as _HDSCREW_HEAD_DIA,
     SHANK_LEN as _HDSCREW_LEN,
@@ -519,7 +519,7 @@ if (
     _HDSCREW_THREAD != _SEAT_SCREW_THREAD
     or abs(_HDSCREW_LEN - _SEAT_SCREW_LENGTH) > 1e-9
 ):
-    raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-VN-071 placed")
+    raise AssertionError("rocker_bracket_seat_layout's screw is not the MHA-CH-VN-57 placed")
 if abs(PIVOT[0] - _SUPPORT_WORLD_X) > 1e-9:
     raise AssertionError("pivot brackets are off the rocker-arm-support's centreline")
 BRACKET_HOLE_FILLET_CLEARANCE = (
@@ -549,7 +549,7 @@ if abs(FULCRUM_SHAFT_Z - _STACK_MID_Z) > 1e-9:
 # Part +X (outboard) -> machine +Z for the rear keeper; ROT_Y_POS90 maps
 # +X -> machine -Z for the flipped front keeper.
 ROT_Y_NEG90 = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
-# Fulcrum end keepers (MHA-CH-007) replace the baluster lever pair (the ch17
+# Fulcrum end keepers (MHA-CH-07) replace the baluster lever pair (the ch17
 # p.40 / ch30 p008 black shaft-END brackets). Each lug's inner face must float
 # clear of the end lever hub: the levers sit at hub_mid_z(j) (= z_j +
 # ARM_MID_DZ, asserted above) with their integral hubs one pitch long, so the
@@ -570,12 +570,12 @@ if min(KEEPER_HUB_FLOAT) < KEEPER_HUB_FLOAT_MIN:
         f"keeper lug float to the lever-hub bank {KEEPER_HUB_FLOAT} <"
         f" {KEEPER_HUB_FLOAT_MIN}"
     )
-# Foot screws (frame-side-screw MHA-VN-022) at the outboard foot centres,
+# Foot screws (frame-side-screw MHA-CH-VN-52) at the outboard foot centres,
 # KEEPER_SCREW_Z_OFF off the centre. The under-head plane is derived from the
 # keeper foot and its exact flush counterbore; the screws thread the
 # top-frame's tapped #2-56 holes (build_fr_top_frame.py KeeperTaps).
 KEEPER_SCREW_SEAT_H = KEEPER_FOOT_H - KEEPER_CBORE_DEPTH
-# Set screws (MHA-VN-055): cup point down on each shaft flat, on the keeper's
+# Set screws (MHA-CH-VN-55): cup point down on each shaft flat, on the keeper's
 # crown tap axis (the lug mid-plane, over the shaft axis).
 SET_SCREW_SEAT_Y = FULCRUM[1] + FULCRUM_FLAT_HEIGHT
 if abs(FULCRUM[1] - (RAIL_TOP_Y + KEEPER_SHAFT_AXIS_H)) > 1e-9:
@@ -586,9 +586,9 @@ if abs(FULCRUM_FLAT_PITCH / 2.0 - KEEPER_Z_OFF) > 1e-9:
 # --- purchased channel springs and retained lower anchors ------------------
 from _spring import build_spring  # noqa: E402
 import ch_channel_lever_spec  # noqa: E402
-import vn_channel_spring_stock_geom as spring_stock  # noqa: E402
+import ch_vn_channel_spring_stock_geom as spring_stock  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
-import vn_spring_hook_spec  # noqa: E402
+import ch_vn_spring_hook_spec  # noqa: E402
 import ch_anchor_jam_nut_spec  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9489T111  # noqa: E402
@@ -609,7 +609,7 @@ def rot_z_rows(deg: float) -> list[list[float]]:
     return [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
 
 
-# MHA-CH-014 on each anchor axis, its z = 0 bearing face on the lever's spring
+# MHA-CH-14 on each anchor axis, its z = 0 bearing face on the lever's spring
 # pad underside: ROT_X_POS90 turns the nut's local +Z thread axis to machine
 # -Y, so the round nut hangs below the pad around the anchor's protruding shank.
 CHANNEL_ANCHOR_NUT_XY = (
@@ -935,29 +935,29 @@ def _assert_spring_mount(
         )
     # The production anchor is CUT to length, so its thread ends at the trimmed
     # end, not at the vendor's 19.05 mm shank end.
-    thread_bottom = anchor_y + vn_spring_hook_spec.TRIM.shank_end_y_mm
+    thread_bottom = anchor_y + ch_vn_spring_hook_spec.TRIM.shank_end_y_mm
     engagement = min(top, thread_top) - max(bottom, thread_bottom)
-    if abs(engagement - vn_spring_hook_spec.THREAD_ENGAGEMENT_MM) > 1e-6:
+    if abs(engagement - ch_vn_spring_hook_spec.THREAD_ENGAGEMENT_MM) > 1e-6:
         raise RuntimeError(
             f"channel anchor engages {engagement:.4f} mm of plate, expected "
-            f"{vn_spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
+            f"{ch_vn_spring_hook_spec.THREAD_ENGAGEMENT_MM:.4f}"
         )
-    # The cut end crosses the plate and carries the MHA-CH-014 jam nut on the
+    # The cut end crosses the plate and carries the MHA-CH-14 jam nut on the
     # underside; at the worst case (shortest in-band part under the thickest
     # nut, through the thickest in-band pad, backed out the whole calibration
     # budget) full threads must still show below the nut.
     protrusion = bottom - thread_bottom
-    nominal_protrusion = vn_spring_hook_spec.PROTRUSION_MM
+    nominal_protrusion = ch_vn_spring_hook_spec.PROTRUSION_MM
     if abs(protrusion - nominal_protrusion) > 1e-6:
         raise RuntimeError(
             f"channel anchor cut end hangs {protrusion:.4f} mm below the plate "
             f"underside, expected {nominal_protrusion:.4f}"
         )
-    budget = vn_spring_hook_spec.ADJUSTMENT_TRAVEL_MM
-    past_nut = vn_spring_hook_spec.full_threads_past_nut_mm(
-        budget, -vn_spring_hook_spec.LENGTH_BAND_WORST_MM
+    budget = ch_vn_spring_hook_spec.ADJUSTMENT_TRAVEL_MM
+    past_nut = ch_vn_spring_hook_spec.full_threads_past_nut_mm(
+        budget, -ch_vn_spring_hook_spec.LENGTH_BAND_WORST_MM
     )
-    floor = vn_spring_hook_spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
+    floor = ch_vn_spring_hook_spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm
     if past_nut < floor - 1e-9:
         raise RuntimeError(
             f"channel anchor shows {past_nut:.4f} mm of full thread past its jam "
@@ -990,7 +990,7 @@ def _assert_spring_mount(
         f"cut end {protrusion:.3f} mm below the plate underside, "
         f"{past_nut:.3f} mm full thread past the jam nut after the "
         f"{budget:.3f} mm back-out budget "
-        f"({vn_spring_hook_spec.ADJUSTMENT_TURNS} turn), "
+        f"({ch_vn_spring_hook_spec.ADJUSTMENT_TURNS} turn), "
         f"{nut_gap:.3f} mm between neighbouring jam nuts"
     )
 
@@ -1032,7 +1032,7 @@ async def _author_settings_reference(adapter) -> None:
     construction sketch per bank view (ch_channel_assembly_spec) -- a chain on
     the pivot axis (south ear inner face, south washer, hub 0, hub 19) and a
     leg on the fulcrum axis between the keeper lugs' inner faces -- and one
-    for the keeper plan view (the MHA-FR-002 socket bore and boss, socket
+    for the keeper plan view (the MHA-FR-02 socket bore and boss, socket
     line, web centre line, the lug centre line and the two inner-face
     stations, plus the web faces as its only non-construction lines), each
     dimensioned from
@@ -1120,7 +1120,7 @@ async def _author_settings_reference(adapter) -> None:
     dims = SketchDims()
     check("create keeper-plan settings sketch", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    # The MHA-FR-002 features (ch_channel_assembly_spec): the socket line
+    # The MHA-FR-02 features (ch_channel_assembly_spec): the socket line
     # runs east (-x) past the boss toward the upper-left socket; the socket's
     # bore and boss circles sit on its centre; the web centre line runs
     # rearward (+z, sketch -y) to the front lug inner-face station; the lug
@@ -1322,7 +1322,7 @@ async def _author_settings_reference(adapter) -> None:
             adapter, feature, set(spec.DRAWING_DIMENSIONS[feature])
         )
         # Blanked so no view of this assembly or of the top assembly renders
-        # the chain; the MHA-CH-000 fit-up views show it in their view only.
+        # the chain; the MHA-CH-00 fit-up views show it in their view only.
         blank_sketch(adapter, feature)
         visible = _early_bound(assembly.FeatureByName(feature), "IFeature").Visible
         if int(visible) != 1:  # swVisibilityStateHide
@@ -1347,11 +1347,11 @@ async def _prepare_native_spring_specs(adapter, amplitudes: list[float]) -> list
         pose = seat.pose
         spring_stock.check_length_mm(pose.length_mm)
         if spring_mounts.channel_force_n(pose.length_mm) > float(
-            _config.parts("vn-channel-spring-installed")["maximum_load_n"]
+            _config.parts("ch-vn-channel-spring-installed")["maximum_load_n"]
         ):
             raise RuntimeError("settled channel spring exceeds catalog load")
         variant_index = len(by_amplitude)
-        part = "vn-channel-spring-installed"
+        part = "ch-vn-channel-spring-installed"
         variant = f"{part}-stretch{variant_index:02d}"
         await build_spring(adapter, variant, pose.length_mm, views=[])
         adapter.swApp.CloseDoc(
@@ -1415,7 +1415,7 @@ async def build(adapter) -> dict[str, str]:
     spring_specs = await _prepare_native_spring_specs(adapter, amplitudes)
     # Keep the generated variant family explicit for the static build graph.
     for spec in spring_specs:
-        spec["part"] = f"vn-channel-spring-installed-stretch{spec['variant_index']:02d}"
+        spec["part"] = f"ch-vn-channel-spring-installed-stretch{spec['variant_index']:02d}"
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -1478,14 +1478,14 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket {name} z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    # Apex set screws (MHA-VN-034): one per ear, on its mid-plane, cup down on
+    # Apex set screws (MHA-CH-VN-53): one per ear, on its mid-plane, cup down on
     # the shaft's flat. Placed in the brackets' order (south first), so screw
     # n is in bracket n (_interference_contracts names the pairs).
     for name in _bracket_sides.SIDES:
         screw_z = _bracket_sides.MOUNT_Z[name]
         set_screw = await place_component(
             adapter,
-            "vn-arbor-set-screw",
+            "ch-vn-arbor-set-screw",
             [PIVOT[0], SET_SCREW_TIP_Y, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -1493,13 +1493,13 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket set screw {name} z{screw_z:+.1f}",
         )
         await _locate_to_datum(adapter, set_screw)
-    # Thrust washers (MHA-VN-070): south on the shaft against rocker 0's hub,
+    # Thrust washers (MHA-CH-VN-56): south on the shaft against rocker 0's hub,
     # north between rocker 19's hub and the north ear. Free-space structure
     # here, datum-located like the brackets.
     for washer_z, side in ((SOUTH_WASHER_Z, "south"), (NORTH_WASHER_Z, "north")):
         washer = await place_component(
             adapter,
-            "vn-rocker-thrust-washer",
+            "ch-vn-rocker-thrust-washer",
             [PIVOT[0], PIVOT[1], washer_z[0]],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -1507,11 +1507,11 @@ async def build(adapter) -> dict[str, str]:
             label=f"rocker-thrust-washer {side}",
         )
         await _locate_to_datum(adapter, washer)
-    # Rocker bank spring (MHA-VN-053, #948 ruling R): coaxial on the shaft,
+    # Rocker bank spring (MHA-CH-VN-54, #948 ruling R): coaxial on the shaft,
     # south face on the south ear's inner face, north face on the washer.
     rocker_spring = await place_component(
         adapter,
-        "vn-rocker-bank-spring",
+        "ch-vn-rocker-bank-spring",
         [PIVOT[0], PIVOT[1], ROCKER_SPRING_Z[0]],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -1519,13 +1519,13 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-bank-spring south",
     )
     await _locate_to_datum(adapter, rocker_spring)
-    # Bracket hold-downs (MHA-VN-071): head down on each bracket foot's top,
+    # Bracket hold-downs (MHA-CH-VN-57): head down on each bracket foot's top,
     # over the seat rocker_bracket_seat_layout derived from its hole.
     # Free-space here (the support is the frame's), datum-located likewise.
     for screw_x, screw_z in BRACKET_SCREW_XZ:
         hold_down = await place_component(
             adapter,
-            "vn-bracket-hold-down-screw",
+            "ch-vn-bracket-hold-down-screw",
             [screw_x, SUPPORT_APEX_Y + PIVOT_BRACKET_FOOT_H, screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -1533,7 +1533,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket hold-down z{screw_z:+.1f}",
         )
         await _locate_to_datum(adapter, hold_down)
-    # Fulcrum end keepers (MHA-CH-007): the black shaft-END brackets of the
+    # Fulcrum end keepers (MHA-CH-07): the black shaft-END brackets of the
     # ch17 p.40 closeup -- an upright lug carries the shaft in its reamed bore,
     # the outboard foot screwed down to the rail top face. Part +X points
     # outboard along the shaft: the rear (+Z) keeper maps part X -> machine +Z
@@ -1559,7 +1559,7 @@ async def build(adapter) -> dict[str, str]:
         )
         screw = await place_component(
             adapter,
-            "vn-frame-side-screw",
+            "ch-vn-frame-side-screw",
             [
                 FULCRUM[0],
                 RAIL_TOP_Y + KEEPER_SCREW_SEAT_H,
@@ -1573,7 +1573,7 @@ async def build(adapter) -> dict[str, str]:
         await _locate_to_datum(adapter, screw)
         set_screw = await place_component(
             adapter,
-            "vn-fulcrum-set-screw",
+            "ch-vn-fulcrum-set-screw",
             [FULCRUM[0], SET_SCREW_SEAT_Y, FULCRUM_SHAFT_Z + sign * KEEPER_Z_OFF],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -1590,7 +1590,7 @@ async def build(adapter) -> dict[str, str]:
     # rocker instance every later neighbour seat refers to; rod_by_channel[j]
     # is the rod each rod-pivot pin is locked into.
     rocker_by_channel: dict[int, str] = {}
-    # The bar and lever each channel's MHA-CH-011 pin joins (inserted once
+    # The bar and lever each channel's MHA-CH-11 pin joins (inserted once
     # every chain is landed, outside the CopyWithMates slice).
     bar_by_channel: dict[int, str] = {}
     lever_by_channel: dict[int, str] = {}
@@ -2287,7 +2287,7 @@ async def build(adapter) -> dict[str, str]:
             )
             free_dof_keys.append(f"bar_amplitude_{j:02d}")
 
-    # Rod-pivot pins (MHA-CH-010): one per channel, OUTSIDE the CopyWithMates
+    # Rod-pivot pins (MHA-CH-10): one per channel, OUTSIDE the CopyWithMates
     # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
     # per-part mate counts above) never sees them. Each pin is modelled
     # installed -- pressed through the fork's reamed tines and dressed flush
@@ -2341,7 +2341,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"rod-pivot-pin ch{j:02d} locked to {rod}",
         )
 
-    # Bar pivot pins (MHA-CH-011): one per channel, OUTSIDE the CopyWithMates
+    # Bar pivot pins (MHA-CH-11): one per channel, OUTSIDE the CopyWithMates
     # slice, so the pinned slice contract (SLICE_MATES / SLICE_EXTERNAL / the
     # per-part mate counts above) never sees them. Each pin is modelled
     # installed -- pressed through the bar's top-notch cheeks and dressed
@@ -2419,7 +2419,7 @@ async def build(adapter) -> dict[str, str]:
         )
         grounded_specs.append(
             {
-                "part": "vn-spring-hook",
+                "part": "ch-vn-spring-hook",
                 "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
                 "rotation": [0.0, 0.0, 0.0],
                 "rows": IDENTITY,

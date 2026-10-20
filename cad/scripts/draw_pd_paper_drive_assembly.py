@@ -1,4 +1,4 @@
-r"""Create the six-sheet paper-drive assembly drawing (MHA-PD-000).
+r"""Create the six-sheet paper-drive assembly drawing (MHA-PD-00).
 
 Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
 balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
@@ -107,16 +107,16 @@ import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_transgear_removable_spec as sprocket
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
-import vn_transgear_arm_plate_screw_spec as plate_screw
-import vn_transgear_disc_screw_spec as disc_screw
-import vn_transgear_knob_cup_pin_spec as cup_pin
-import vn_transgear_knob_drive_pin_spec as drive_pin
-import vn_transgear_pivot_screw_spec as pivot_screw
-import vn_transgear_pivot_spring_spec as spring
+import pd_vn_transgear_arm_plate_screw_spec as plate_screw
+import pd_vn_transgear_disc_screw_spec as disc_screw
+import pd_vn_transgear_knob_cup_pin_spec as cup_pin
+import pd_vn_transgear_knob_drive_pin_spec as drive_pin
+import pd_vn_transgear_pivot_screw_spec as pivot_screw
+import pd_vn_transgear_pivot_spring_spec as spring
 import _gear_quality as quality
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
-import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
 
 
@@ -197,7 +197,7 @@ BOM_BORDER_CLEARANCE = 0.003
 # The transgear alone at 2:3, right of the inner view's ring and above the
 # title block. The v40 sheet 2 (594749aec's layout) printed its outline at
 # x 285.3 to 396.6, y 111.2 to 244.8 mm: a ring top of 261.8 in the 262.0
-# limit. The one-piece MHA-PD-014 hook's ear stands at machine x 77.6, 17.6
+# limit. The one-piece MHA-PD-14 hook's ear stands at machine x 77.6, 17.6
 # further +X than the bracket's flap. The isometric looks along (-1, +1, -1),
 # so sheet up is 0.408 x and sheet right -0.707 x, and the outline grew to
 # x 278.5 and y 248.8 (farm run of 9055bc155: ring top 265.8). The view is
@@ -235,7 +235,7 @@ SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
 # The hanger pivot (step 13, rules 9 and 22) in sheet 2's empty left field,
 # clear of the inner view's ring (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
-# locator, cropped to a circle on the MHA-VN-041 axis and showing only the
+# locator, cropped to a circle on the MHA-PD-VN-57 axis and showing only the
 # pivot stack, carries cutting line A-A along that axis. SECTION A-A at 2:1
 # shows every part of the stack cut (the shim and spring under the head and
 # arm too, so no hidden lines are needed) and balloons each part. It is cropped
@@ -269,13 +269,13 @@ PIVOT_SECTION_CAPTION_XY = (
     PIVOT_SECTION_CENTER[0],
     PIVOT_SECTION_CENTER[1] - PIVOT_SECTION_RADIUS - BALLOON_RING_REACH - 0.010,
 )
-PIVOT_SCREW_INSTANCE = "vn-transgear-pivot-screw-1"
+PIVOT_SCREW_INSTANCE = "pd-vn-transgear-pivot-screw-1"
 PIVOT_VIEW_INSTANCES = frozenset(
     {
         "pd-support-bar-1",
         PIVOT_SCREW_INSTANCE,
-        "vn-transgear-pivot-shim-1",
-        "vn-transgear-pivot-spring-1",
+        "pd-vn-transgear-pivot-shim-1",
+        "pd-vn-transgear-pivot-spring-1",
         "pd-transgear-pivot-spacer-1",
         "pd-transgear-arm-1",
     }
@@ -301,19 +301,19 @@ _PIVOT_FLOOR_Y = -(joints.SHIM.THICKNESS + spring.MODEL_HEIGHT)
 _PIVOT_ARM_FRONT_Y = -(pivot_screw.SHOULDER_LEN - joints.SPACER.LENGTH)
 PIVOT_BALLOON_TIPS = (
     (
-        "vn-transgear-pivot-screw",
+        "pd-vn-transgear-pivot-screw",
         "right",
         pivot_screw.HEAD_H / 2.0,
         (pivot_screw.SOCKET_AF / math.sqrt(3.0) + pivot_screw.HEAD_DIA / 2.0) / 2.0,
     ),
     (
-        "vn-transgear-pivot-shim",
+        "pd-vn-transgear-pivot-shim",
         "left",
         -joints.SHIM.THICKNESS / 2.0,
         (joints.SHIM.ID + joints.SHIM.OD) / 4.0,
     ),
     (
-        "vn-transgear-pivot-spring",
+        "pd-vn-transgear-pivot-spring",
         "right",
         -joints.SHIM.THICKNESS - spring.MODEL_HEIGHT / 2.0,
         (spring.ID + spring.OD) / 4.0,
@@ -470,85 +470,85 @@ BOM_PART_NUMBERS = {
     "pd-support-bar": _config.parts("pd-support-bar")["number"],
     "sh-column-clamp-front": _config.parts("sh-column-clamp-front")["number"],
     "sh-column-clamp-back": _config.parts("sh-column-clamp-back")["number"],
-    "vn-clamp-screw": _config.parts("vn-clamp-screw")["number"],
+    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["number"],
     "pd-platen": _config.parts("pd-platen")["number"],
     "pd-platen-rack": _config.parts("pd-platen-rack")["number"],
     "pd-platen-guide": _config.parts("pd-platen-guide")["number"],
     "pd-guide-lock": _config.parts("pd-guide-lock")["number"],
     "pd-platen-clip": _config.parts("pd-platen-clip")["number"],
     "pd-platen-paper": _config.parts("pd-platen-paper")["number"],
-    "vn-fillister-screw": _config.parts("vn-fillister-screw")["number"],
-    "vn-platen-clip-screw": _config.parts("vn-platen-clip-screw")["number"],
-    "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["number"],
-    "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["number"],
-    "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["number"],
-    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link")["number"],
+    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["number"],
+    "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["number"],
+    "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["number"],
+    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["number"],
+    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["number"],
+    "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")["number"],
     "pd-transgear-removable": _config.parts("pd-transgear-removable")["number"],
     "pd-transgear-arm": _config.parts("pd-transgear-arm")["number"],
     "pd-transgear-arm-plate": _config.parts("pd-transgear-arm-plate")["number"],
-    "vn-transgear-arm-plate-screw": _config.parts("vn-transgear-arm-plate-screw")["number"],
-    "vn-transgear-arm-plate-locating-pin": _config.parts(
-        "vn-transgear-arm-plate-locating-pin"
+    "pd-vn-transgear-arm-plate-screw": _config.parts("pd-vn-transgear-arm-plate-screw")["number"],
+    "pd-vn-transgear-arm-plate-locating-pin": _config.parts(
+        "pd-vn-transgear-arm-plate-locating-pin"
     )["number"],
     "pd-transgear-pivot-spacer": _config.parts("pd-transgear-pivot-spacer")["number"],
-    "vn-transgear-pivot-screw": _config.parts("vn-transgear-pivot-screw")["number"],
-    "vn-transgear-pivot-spring": _config.parts("vn-transgear-pivot-spring")["number"],
-    "vn-transgear-pivot-shim": _config.parts("vn-transgear-pivot-shim")["number"],
-    "vn-transgear-latch-pin": _config.parts("vn-transgear-latch-pin")["number"],
-    "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")["number"],
+    "pd-vn-transgear-pivot-screw": _config.parts("pd-vn-transgear-pivot-screw")["number"],
+    "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["number"],
+    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")["number"],
+    "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["number"],
+    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")["number"],
     "pd-latch-hook": _config.parts("pd-latch-hook")["number"],
     "pd-transgear-pin": _config.parts("pd-transgear-pin")["number"],
     "pd-transgear-rear-bushing": _config.parts("pd-transgear-rear-bushing")["number"],
     "pd-transgear-feed-pinion": _config.parts("pd-transgear-feed-pinion")["number"],
     "pd-transgear-disc-hub": _config.parts("pd-transgear-disc-hub")["number"],
     "pd-transgear-front-bushing": _config.parts("pd-transgear-front-bushing")["number"],
-    "vn-transgear-retaining-ring": _config.parts("vn-transgear-retaining-ring")["number"],
+    "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")["number"],
     "pd-rack-pinion": _config.parts("pd-rack-pinion")["number"],
-    "vn-transgear-disc-screw": _config.parts("vn-transgear-disc-screw")["number"],
+    "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["number"],
     "pd-transgear-knob-shaft": _config.parts("pd-transgear-knob-shaft")["number"],
     "pd-transgear-drive-collar": _config.parts("pd-transgear-drive-collar")["number"],
-    "vn-transgear-knob-drive-pin": _config.parts("vn-transgear-knob-drive-pin")["number"],
+    "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")["number"],
     "pd-transgear-thumbnut": _config.parts("pd-transgear-thumbnut")["number"],
     "pd-transgear-knob-thrust-ring": _config.parts("pd-transgear-knob-thrust-ring")["number"],
     "pd-transgear-knob-cup": _config.parts("pd-transgear-knob-cup")["number"],
-    "vn-transgear-knob-cup-pin": _config.parts("vn-transgear-knob-cup-pin")["number"],
+    "pd-vn-transgear-knob-cup-pin": _config.parts("pd-vn-transgear-knob-cup-pin")["number"],
 }
 # A purchased part's registry SKU, printed in its description.
 _SKU = {
-    "vn-clamp-screw": _config.parts("vn-clamp-screw")["supplier_skus"][0],
-    "vn-fillister-screw": _config.parts("vn-fillister-screw")["supplier_skus"][0],
-    "vn-platen-clip-screw": _config.parts("vn-platen-clip-screw")["supplier_skus"][0],
-    "vn-guide-lock-screw": _config.parts("vn-guide-lock-screw")["supplier_skus"][0],
-    "vn-chain-inner-link": _config.parts("vn-chain-inner-link")["supplier_skus"][0],
-    "vn-chain-outer-link": _config.parts("vn-chain-outer-link")["supplier_skus"][0],
-    "vn-chain-connecting-link": _config.parts("vn-chain-connecting-link")[
+    "pd-vn-clamp-screw": _config.parts("pd-vn-clamp-screw")["supplier_skus"][0],
+    "pd-vn-fillister-screw": _config.parts("pd-vn-fillister-screw")["supplier_skus"][0],
+    "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["supplier_skus"][0],
+    "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["supplier_skus"][0],
+    "pd-vn-chain-inner-link": _config.parts("pd-vn-chain-inner-link")["supplier_skus"][0],
+    "pd-vn-chain-outer-link": _config.parts("pd-vn-chain-outer-link")["supplier_skus"][0],
+    "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")[
         "supplier_skus"
     ][0],
-    "vn-transgear-arm-plate-screw": _config.parts("vn-transgear-arm-plate-screw")[
+    "pd-vn-transgear-arm-plate-screw": _config.parts("pd-vn-transgear-arm-plate-screw")[
         "supplier_skus"
     ][0],
-    "vn-transgear-arm-plate-locating-pin": _config.parts(
-        "vn-transgear-arm-plate-locating-pin"
+    "pd-vn-transgear-arm-plate-locating-pin": _config.parts(
+        "pd-vn-transgear-arm-plate-locating-pin"
     )["supplier_skus"][0],
-    "vn-transgear-pivot-screw": _config.parts("vn-transgear-pivot-screw")["supplier_skus"][0],
-    "vn-transgear-pivot-spring": _config.parts("vn-transgear-pivot-spring")["supplier_skus"][
+    "pd-vn-transgear-pivot-screw": _config.parts("pd-vn-transgear-pivot-screw")["supplier_skus"][0],
+    "pd-vn-transgear-pivot-spring": _config.parts("pd-vn-transgear-pivot-spring")["supplier_skus"][
         0
     ],
-    "vn-transgear-pivot-shim": _config.parts("vn-transgear-pivot-shim")[
+    "pd-vn-transgear-pivot-shim": _config.parts("pd-vn-transgear-pivot-shim")[
         "supplier_skus"
     ][0],
-    "vn-transgear-latch-pin": _config.parts("vn-transgear-latch-pin")["supplier_skus"][0],
-    "vn-latch-hook-bracket-screw": _config.parts("vn-latch-hook-bracket-screw")[
+    "pd-vn-transgear-latch-pin": _config.parts("pd-vn-transgear-latch-pin")["supplier_skus"][0],
+    "pd-vn-latch-hook-bracket-screw": _config.parts("pd-vn-latch-hook-bracket-screw")[
         "supplier_skus"
     ][0],
-    "vn-transgear-disc-screw": _config.parts("vn-transgear-disc-screw")["supplier_skus"][0],
-    "vn-transgear-retaining-ring": _config.parts("vn-transgear-retaining-ring")[
+    "pd-vn-transgear-disc-screw": _config.parts("pd-vn-transgear-disc-screw")["supplier_skus"][0],
+    "pd-vn-transgear-retaining-ring": _config.parts("pd-vn-transgear-retaining-ring")[
         "supplier_skus"
     ][0],
-    "vn-transgear-knob-drive-pin": _config.parts("vn-transgear-knob-drive-pin")[
+    "pd-vn-transgear-knob-drive-pin": _config.parts("pd-vn-transgear-knob-drive-pin")[
         "supplier_skus"
     ][0],
-    "vn-transgear-knob-cup-pin": _config.parts("vn-transgear-knob-cup-pin")["supplier_skus"][
+    "pd-vn-transgear-knob-cup-pin": _config.parts("pd-vn-transgear-knob-cup-pin")["supplier_skus"][
         0
     ],
 }
@@ -557,7 +557,7 @@ BOM_DESCRIPTIONS = {
     "pd-support-bar": "PAPER-DRIVE SUPPORT BAR",
     "sh-column-clamp-front": "COLUMN CLAMP, FRONT",
     "sh-column-clamp-back": "COLUMN CLAMP, BACK",
-    "vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['vn-clamp-screw']}",
+    "pd-vn-clamp-screw": f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-clamp-screw']}",
     "pd-platen": "PLATEN",
     "pd-platen-rack": (
         f"PLATEN RACK + BACKER, {feed_pinion.DIAMETRAL_PITCH:g}DP "
@@ -567,39 +567,39 @@ BOM_DESCRIPTIONS = {
     "pd-guide-lock": "PLATEN GUIDE LOCK",
     "pd-platen-clip": "PLATEN PAPER CLIP",
     "pd-platen-paper": "PLATEN PAPER",
-    "vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['vn-fillister-screw']}",
-    "vn-platen-clip-screw": (
-        f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['vn-platen-clip-screw']}"
+    "pd-vn-fillister-screw": f"BRASS FILLISTER SCREW, MCMASTER {_SKU['pd-vn-fillister-screw']}",
+    "pd-vn-platen-clip-screw": (
+        f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-platen-clip-screw']}"
     ),
-    "vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['vn-guide-lock-screw']}",
-    "vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['vn-chain-inner-link']}",
-    "vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['vn-chain-outer-link']}",
-    "vn-chain-connecting-link": (
-        f"ANSI #25 CONN. LINK, MCMASTER {_SKU['vn-chain-connecting-link']}"
+    "pd-vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-guide-lock-screw']}",
+    "pd-vn-chain-inner-link": f"ANSI #25 INNER LINK, MCMASTER {_SKU['pd-vn-chain-inner-link']}",
+    "pd-vn-chain-outer-link": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['pd-vn-chain-outer-link']}",
+    "pd-vn-chain-connecting-link": (
+        f"ANSI #25 CONN. LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}"
     ),
     # Grouped: its configurations' BOM description wins over a written cell,
     # so the row prints the registry description the builder stamps.
     "pd-transgear-removable": str(_config.parts("pd-transgear-removable")["description"]),
     "pd-transgear-arm": "TRANSGEAR ARM",
     "pd-transgear-arm-plate": "TRANSGEAR ARM PLATE",
-    "vn-transgear-arm-plate-screw": (
+    "pd-vn-transgear-arm-plate-screw": (
         f"{plate_screw.THREAD} OVAL HEAD SCREW, MCMASTER "
-        f"{_SKU['vn-transgear-arm-plate-screw']}"
+        f"{_SKU['pd-vn-transgear-arm-plate-screw']}"
     ),
-    "vn-transgear-arm-plate-locating-pin": (
-        f"PLATE LOCATING DOWEL, MCMASTER {_SKU['vn-transgear-arm-plate-locating-pin']}"
+    "pd-vn-transgear-arm-plate-locating-pin": (
+        f"PLATE LOCATING DOWEL, MCMASTER {_SKU['pd-vn-transgear-arm-plate-locating-pin']}"
     ),
     "pd-transgear-pivot-spacer": "TRANSGEAR PIVOT SPACER",
-    "vn-transgear-pivot-screw": (
-        f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER {_SKU['vn-transgear-pivot-screw']}"
+    "pd-vn-transgear-pivot-screw": (
+        f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER {_SKU['pd-vn-transgear-pivot-screw']}"
     ),
-    "vn-transgear-pivot-spring": (
-        f"CURVED DISC SPRING, MCMASTER {_SKU['vn-transgear-pivot-spring']}"
+    "pd-vn-transgear-pivot-spring": (
+        f"CURVED DISC SPRING, MCMASTER {_SKU['pd-vn-transgear-pivot-spring']}"
     ),
-    "vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['vn-transgear-pivot-shim']}",
-    "vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['vn-transgear-latch-pin']}",
-    "vn-latch-hook-bracket-screw": (
-        f"FILLISTER SCREW, MCMASTER {_SKU['vn-latch-hook-bracket-screw']}"
+    "pd-vn-transgear-pivot-shim": f"SHIM WASHER, MCMASTER {_SKU['pd-vn-transgear-pivot-shim']}",
+    "pd-vn-transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['pd-vn-transgear-latch-pin']}",
+    "pd-vn-latch-hook-bracket-screw": (
+        f"FILLISTER SCREW, MCMASTER {_SKU['pd-vn-latch-hook-bracket-screw']}"
     ),
     "pd-latch-hook": "LATCH HOOK",
     "pd-transgear-pin": "TRANSGEAR PIN",
@@ -610,28 +610,28 @@ BOM_DESCRIPTIONS = {
     ),
     "pd-transgear-disc-hub": "TRANSGEAR DISC HUB",
     "pd-transgear-front-bushing": "TRANSGEAR FRONT BUSHING",
-    "vn-transgear-retaining-ring": (
-        f"RETAINING RING, MCMASTER {_SKU['vn-transgear-retaining-ring']}"
+    "pd-vn-transgear-retaining-ring": (
+        f"RETAINING RING, MCMASTER {_SKU['pd-vn-transgear-retaining-ring']}"
     ),
     "pd-rack-pinion": (
         f"REDUCER DISC, STOCK {disc.TEETH}T {disc.DIAMETRAL_PITCH:g}DP "
         f"PA{disc.PRESSURE_ANGLE_DEG:g}"
     ),
-    "vn-transgear-disc-screw": (
-        f"{disc_screw.THREAD} FILLISTER SCREW, MCMASTER {_SKU['vn-transgear-disc-screw']}"
+    "pd-vn-transgear-disc-screw": (
+        f"{disc_screw.THREAD} FILLISTER SCREW, MCMASTER {_SKU['pd-vn-transgear-disc-screw']}"
     ),
     "pd-transgear-knob-shaft": (
         f"KNOB SHAFT, STOCK {knob_shaft.TEETH}T "
         f"{knob_shaft.DIAMETRAL_PITCH:g}DP PA{knob_shaft.PRESSURE_ANGLE_DEG:g}"
     ),
     "pd-transgear-drive-collar": "KNOB DRIVE COLLAR",
-    "vn-transgear-knob-drive-pin": (
-        f"WHEEL DRIVE DOWEL, MCMASTER {_SKU['vn-transgear-knob-drive-pin']}"
+    "pd-vn-transgear-knob-drive-pin": (
+        f"WHEEL DRIVE DOWEL, MCMASTER {_SKU['pd-vn-transgear-knob-drive-pin']}"
     ),
     "pd-transgear-thumbnut": "TRANSGEAR THUMBNUT",
     "pd-transgear-knob-thrust-ring": "KNOB THRUST RING",
     "pd-transgear-knob-cup": "KNOB CUP",
-    "vn-transgear-knob-cup-pin": f"SPRING PIN, MCMASTER {_SKU['vn-transgear-knob-cup-pin']}",
+    "pd-vn-transgear-knob-cup-pin": f"SPRING PIN, MCMASTER {_SKU['pd-vn-transgear-knob-cup-pin']}",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("paper-drive BOM description coverage is incomplete")
@@ -656,39 +656,39 @@ BOM_NORMALIZED_ALIASES = {
 TRANSGEAR_QUANTITIES = {
     "pd-transgear-arm": 1,
     "pd-transgear-arm-plate": 1,
-    "vn-transgear-arm-plate-screw": len(arm_geometry.PLATE_TAP_STATIONS),
-    "vn-transgear-arm-plate-locating-pin": plate_locating_pin.ASSEMBLY_QUANTITY,
+    "pd-vn-transgear-arm-plate-screw": len(arm_geometry.PLATE_TAP_STATIONS),
+    "pd-vn-transgear-arm-plate-locating-pin": plate_locating_pin.ASSEMBLY_QUANTITY,
     "pd-transgear-pivot-spacer": 1,
-    "vn-transgear-pivot-screw": 1,
-    "vn-transgear-pivot-spring": spring.COUNT,
-    "vn-transgear-pivot-shim": 1,
-    "vn-transgear-latch-pin": 1,
-    "vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
+    "pd-vn-transgear-pivot-screw": 1,
+    "pd-vn-transgear-pivot-spring": spring.COUNT,
+    "pd-vn-transgear-pivot-shim": 1,
+    "pd-vn-transgear-latch-pin": 1,
+    "pd-vn-latch-hook-bracket-screw": len(hook_geometry.SCREW_X),
     "pd-latch-hook": 1,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
-    "vn-transgear-retaining-ring": 1,
+    "pd-vn-transgear-retaining-ring": 1,
     "pd-rack-pinion": 1,
-    "vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
+    "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
-    "vn-transgear-knob-drive-pin": len(sprocket.PIN_HOLE_ANGLES_DEG),
+    "pd-vn-transgear-knob-drive-pin": len(sprocket.PIN_HOLE_ANGLES_DEG),
     "pd-transgear-removable": 3,  # two mounted wheels plus the loose T18 spare
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
     "pd-transgear-knob-cup": 1,
-    "vn-transgear-knob-cup-pin": 1,
+    "pd-vn-transgear-knob-cup-pin": 1,
 }
 # One assembled inner or outer link spans one pitch. The chain is cut with an
 # inner link at each end, and the connecting link closes the loop as its last
 # outer link.
 CHAIN_QUANTITIES = {
-    "vn-chain-inner-link": chain.LINK_COUNT // 2,
-    "vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
-    "vn-chain-connecting-link": 1,
+    "pd-vn-chain-inner-link": chain.LINK_COUNT // 2,
+    "pd-vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+    "pd-vn-chain-connecting-link": 1,
 }
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
@@ -784,11 +784,11 @@ INNER_STEMS = frozenset(
         "pd-transgear-feed-pinion",
         "pd-transgear-knob-shaft",
         "pd-transgear-drive-collar",
-        "vn-transgear-knob-drive-pin",
-        "vn-transgear-knob-cup-pin",
-        "vn-transgear-arm-plate-screw",
-        "vn-transgear-arm-plate-locating-pin",
-        "vn-transgear-latch-pin",
+        "pd-vn-transgear-knob-drive-pin",
+        "pd-vn-transgear-knob-cup-pin",
+        "pd-vn-transgear-arm-plate-screw",
+        "pd-vn-transgear-arm-plate-locating-pin",
+        "pd-vn-transgear-latch-pin",
         "pd-transgear-rear-bushing",
     }
 )
@@ -967,9 +967,9 @@ def _uncross_ring(
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
 ASSEMBLED_BALLOON_ANCHORS = {
-    "vn-chain-inner-link": BalloonAnchor(),
-    "vn-chain-outer-link": BalloonAnchor(),
-    "vn-chain-connecting-link": BalloonAnchor(),
+    "pd-vn-chain-inner-link": BalloonAnchor(),
+    "pd-vn-chain-outer-link": BalloonAnchor(),
+    "pd-vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 3's exploded view balloons every family it shows.
@@ -1173,7 +1173,7 @@ KNOB_STACK: tuple[tuple[str | None, str], ...] = (
     ("pd-transgear-arm-plate", "PLATE"),
     (None, "REAR BOSS"),
     ("pd-transgear-knob-cup", "CUP"),
-    ("vn-transgear-knob-cup-pin", "PIN"),
+    ("pd-vn-transgear-knob-cup-pin", "PIN"),
 )
 # The knob's end float: the cup set on a feeler END_FLOAT behind the plate's
 # boss and pinned there (R9-70, K-1), accepted at the feeler's own band.
@@ -1202,7 +1202,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "bar-clamped": (
             f"CLAMP THE {_N['pd-support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
             f"{_N['sh-column-clamp-front']} FRONT AND A {_N['sh-column-clamp-back']} BACK "
-            f"ARC, WITH THE {_N['vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
+            f"ARC, WITH THE {_N['pd-vn-clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
             f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
             # Rule 19 fit-up for the slotted west pair (owner ruling
             # 2026-10-15, #1471 option A): the round pair locates.  Named by
@@ -1215,27 +1215,27 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"SOFT-SOLDER (60/40 TIN-LEAD, ROSIN FLUX) THE {_N['pd-platen-rack']} RACK "
             f"TO THE {_N['pd-platen']} PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE "
             f"PLATEN'S, CRESTS {steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE: THIS "
-            f"HOLDS THE {_N['vn-transgear-latch-pin']} PIN ON THE "
+            f"HOLDS THE {_N['pd-vn-transgear-latch-pin']} PIN ON THE "
             f"{_N['pd-latch-hook']} HOOK'S STRAIGHT RUN. SIGHT ALONG IT: TEETH "
             "STRAIGHT, NO SOLDER IN THE GAPS."
         ),
         "guides-screwed": (
             f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['pd-platen-guide']} GUIDES TO "
-            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['vn-fillister-screw']} SCREWS "
+            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['pd-vn-fillister-screw']} SCREWS "
             "FROM THE FRONT, HEADS IN THE COUNTERBORES."
         ),
         "clips-fitted": (
             f"SCREW THE {_N['pd-platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
-            f"{CLIP_SCREWS} {_N['vn-platen-clip-screw']} SCREWS, SPRING RAILS "
+            f"{CLIP_SCREWS} {_N['pd-vn-platen-clip-screw']} SCREWS, SPRING RAILS "
             f"INBOARD; LAY THE {_N['pd-platen-paper']} PAPER BETWEEN THEM."
         ),
         "platen-hung": (
             "TRIAL-HANG THE PLATEN ON THE BAR, THE TOP GUIDE ON THE BAR TOP. FIT THE "
             f"{_N['pd-guide-lock']} LOCKS TO THE GUIDE BACKS BEHIND THE BAR WITH "
-            f"THEIR {_N['vn-guide-lock-screw']} SCREWS, LOOSE."
+            f"THEIR {_N['pd-vn-guide-lock-screw']} SCREWS, LOOSE."
         ),
         "guide-locks-set": (
-            f"SNUG EACH {_N['pd-guide-lock']} LOCK'S {_N['vn-guide-lock-screw']} SCREWS, "
+            f"SNUG EACH {_N['pd-guide-lock']} LOCK'S {_N['pd-vn-guide-lock-screw']} SCREWS, "
             "PUSH THE LOCK AT ITS MIDDLE AWAY FROM THE BAR TILL ITS HOLES BEAR ON "
             "THEM; TIGHTEN."
         ),
@@ -1244,7 +1244,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "ELSE STOP AND REPORT."
         ),
         "latch-pin-pressed": (
-            f"PRESS THE {_N['vn-transgear-latch-pin']} DOWEL INTO THE "
+            f"PRESS THE {_N['pd-vn-transgear-latch-pin']} DOWEL INTO THE "
             f"{_N['pd-transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
             f"{pin_lo:.2f} TO {pin_hi:.2f} PROUD."
         ),
@@ -1257,34 +1257,34 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
             f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE, PER THEIR DRAWINGS; "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
-            f"PRESS {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-locating-pin']} "
-            f"{_N['vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
+            f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
+            f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
             f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
             f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
             "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['pd-transgear-arm-plate']} PLATE ON THE LOCATING DOWELS. "
-            f"FIT {TRANSGEAR_QUANTITIES['vn-transgear-arm-plate-screw']} "
-            f"{_N['vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
+            f"FIT {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-screw']} "
+            f"{_N['pd-vn-transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
             "SNUG BOTH, THEN TIGHTEN THEM IN TURN. DOWELS LOCATE; SCREWS CLAMP ONLY. "
             "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS, NO DAYLIGHT "
             "UNDER IT. RE-CHECK AFTER EVERY REMOVAL."
         ),
         "arm-plate-screws-cut": (
-            f"TAKE BOTH {_N['vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
+            f"TAKE BOTH {_N['pd-vn-transgear-arm-plate-screw']} SCREWS OUT; CUT THEIR "
             f"TIPS FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S "
             f"FRONT FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}. "
             "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER."
         ),
         # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
-        # fixed in the bar; the MHA-VN-049 spring holds the arm on it. The
+        # fixed in the bar; the MHA-PD-VN-63 spring holds the arm on it. The
         # screw's tip is faced below the bar's front face, where the platen
-        # slides, and staked there (rule 23); MHA-VN-069 restores the spring
+        # slides, and staked there (rule 23); MHA-PD-VN-67 restores the spring
         # room the 9.5 bar took (transgear_hanger_joints).
         "hanger-pivoted": (
-            f"ON THE {_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR: "
-            f"{_N['vn-transgear-pivot-shim']} SHIM, {_N['vn-transgear-pivot-spring']} "
+            f"ON THE {_N['pd-vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR: "
+            f"{_N['pd-vn-transgear-pivot-shim']} SHIM, {_N['pd-vn-transgear-pivot-spring']} "
             f"SPRING, THEN ARM; PRESS THE {_N['pd-transgear-pivot-spacer']} SPACER, AS "
             "MADE, ON THE SHOULDER, FLUSH WITH ITS END ON A FLAT. FACE THE SCREW'S "
             f"TIP SO THAT, SEATED IN THE {_N['pd-support-bar']} BAR'S THROUGH TAP, IT "
@@ -1314,12 +1314,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"TILL THE DIAL READS {quality.toothspace_runout_tir_mm():.2f} TIR MAX. "
             "SPOT-DRILL THE DISC THROUGH THE "
             f"{hub_geometry.SCREW_COUNT} FLANGE HOLES; DRILL AND TAP {disc_screw.THREAD}. "
-            f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['vn-transgear-disc-screw']} SCREWS. "
+            f"FIX WITH {hub_geometry.SCREW_COUNT} {_N['pd-vn-transgear-disc-screw']} SCREWS. "
             f"RECHECK ALL {disc.TEETH} SPACES; "
             "THEN MATCH-MARK DISC AND HUB."
         ),
         "disc-screws-cut": (
-            f"CUT {_N['vn-transgear-disc-screw']} TIPS "
+            f"CUT {_N['pd-vn-transgear-disc-screw']} TIPS "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
             f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
         ),
@@ -1332,12 +1332,12 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "disc-cluster-hung": (
             "OIL THE PIN (LIGHT MACHINE OIL); CLUSTER ON, PINION REARWARD; A "
             f"{_N['pd-transgear-front-bushing']} BUSHING BLANK ON THE NOSE TRAPS HUB "
-            f"AND DISC; {_N['vn-transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
+            f"AND DISC; {_N['pd-vn-transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
             "GROOVE. NO REAR BUSHING YET: CLUSTER FORWARD ON THE RING."
         ),
         "collar-pins-pressed": (
-            f"PRESS {TRANSGEAR_QUANTITIES['vn-transgear-knob-drive-pin']} "
-            f"{_N['vn-transgear-knob-drive-pin']} DOWELS INTO THE "
+            f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-knob-drive-pin']} "
+            f"{_N['pd-vn-transgear-knob-drive-pin']} DOWELS INTO THE "
             f"{_N['pd-transgear-drive-collar']} COLLAR TO A STOP, {drive_lo:.2f} TO "
             f"{drive_hi:.2f} PROUD OF ITS FRONT FACE."
         ),
@@ -1358,8 +1358,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "latch-hook-fitted": (
             f"SCREW THE {_N['pd-latch-hook']} HOOK'S BASE TO THE BAR'S BACK FACE "
-            f"WITH {TRANSGEAR_QUANTITIES['vn-latch-hook-bracket-screw']} "
-            f"{_N['vn-latch-hook-bracket-screw']} SCREWS, ARM HANGING DOWN; ITS "
+            f"WITH {TRANSGEAR_QUANTITIES['pd-vn-latch-hook-bracket-screw']} "
+            f"{_N['pd-vn-latch-hook-bracket-screw']} SCREWS, ARM HANGING DOWN; ITS "
             "PIN HOLE IS NOT YET DRILLED."
         ),
         "hanger-meshed": (
@@ -1379,11 +1379,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         # room to fall and open the mesh (rack_setup.LATCH_SLACK_ALONG; Codex P1 on
         # b2eb9a0e1).
         "hook-pin-hole-match-drilled": (
-            f"HOLDING THAT MESH, MARK THE {_N['vn-transgear-latch-pin']} PIN'S "
+            f"HOLDING THAT MESH, MARK THE {_N['pd-vn-transgear-latch-pin']} PIN'S "
             f"AXIS WHERE ITS END BEARS ON THE {_N['pd-latch-hook']} HOOK'S "
             "STRAIGHT RUN. REMOVE THE HOOK; DRILL ITS PIN HOLE AT THE MARK PER "
             f"{_N['pd-latch-hook']}; HARDEN AND TEMPER PER {_N['pd-latch-hook']}. "
-            f"REFIT, ITS HOLE'S LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, "
+            f"REFIT, ITS HOLE'S LOWER EDGE ON THE {_N['pd-vn-transgear-latch-pin']} PIN, "
             "THEN TIGHTEN THE SCREWS. UNCLAMP, LATCH, RE-RUN THE DEFINED "
             f"ENGAGED-FEED WINDOW; RE-CHECK {steps.RACK_DATUM_BACKLASH_TEXT} SHAKE AT "
             "THE DATUM."
@@ -1413,7 +1413,7 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"{_N['pd-transgear-front-bushing']} BUSHING'S REAR TILL m IS "
             f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE REPORT."
         ),
-        # The blank (MHA-PD-024 BLANK_LENGTH_MIN) is longer than the nominal gap
+        # The blank (MHA-PD-24 BLANK_LENGTH_MIN) is longer than the nominal gap
         # it fills, so it is faced to the gap gauged before it goes on.
         "rear-bushing-faced-to-fit": (
             "CLUSTER FORWARD, DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM; "
@@ -1467,11 +1467,11 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF ANSI #25 CHAIN, "
-            f"{CHAIN_QUANTITIES['vn-chain-inner-link']} {_N['vn-chain-inner-link']} INNER "
-            f"AND {CHAIN_QUANTITIES['vn-chain-outer-link']} {_N['vn-chain-outer-link']} "
+            f"{CHAIN_QUANTITIES['pd-vn-chain-inner-link']} {_N['pd-vn-chain-inner-link']} INNER "
+            f"AND {CHAIN_QUANTITIES['pd-vn-chain-outer-link']} {_N['pd-vn-chain-outer-link']} "
             f"OUTER LINKS, OVER THE {sprocket.KNOB_CONFIG} AND THE {sprocket.CRANK_CONFIG}; "
-            f"JOIN THE ENDS WITH THE {_N['vn-chain-connecting-link']} #25 CONNECTING "
-            f"LINK, MCMASTER {_SKU['vn-chain-connecting-link']}, ITS CLIP'S CLOSED END "
+            f"JOIN THE ENDS WITH THE {_N['pd-vn-chain-connecting-link']} #25 CONNECTING "
+            f"LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}, ITS CLIP'S CLOSED END "
             "LEADING IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
             "THE SLACK RUN HANGS FREE."
         ),
@@ -2312,7 +2312,7 @@ def _pivot_sheet_points(
     """Sheet points of ``points_mm``, in the pivot screw's part frame (mm)."""
     leaf = _shown_instances(
         _view_component_leaves(adapter, view, label=label),
-        "vn-transgear-pivot-screw",
+        "pd-vn-transgear-pivot-screw",
         BalloonAnchor(instance=PIVOT_SCREW_INSTANCE),
         label=label,
     )[0]
@@ -2324,7 +2324,7 @@ def _pivot_sheet_points(
             leaf,
             tuple(tuple(value / 1000.0 for value in point) for point in points_mm),
             _view_explode_offsets(adapter, view, label=label),
-            stem="vn-transgear-pivot-screw",
+            stem="pd-vn-transgear-pivot-screw",
             label=label,
         ),
         label=label,

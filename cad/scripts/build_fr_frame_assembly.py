@@ -141,7 +141,7 @@ from dt_cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
     FRAME_REAR_COLUMN_Z,
 )
-from vn_fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
+from _mcmaster_90114a511 import SHANK_LEN as NAMEPLATE_SCREW_SHANK_LEN
 from fr_nameplate_spec import (
     MOUNT_EULER as NAMEPLATE_EULER,
     MOUNT_FRONT_Y as NAMEPLATE_FRONT_Y,
@@ -160,14 +160,14 @@ from fr_rocker_arm_support_spec import (
     SUPPORT_WORLD_Z,
 )
 from _mcmaster_91410a540 import SHANK_LEN as GOOSENECK_SHANK_LEN
-from vn_frame_cross_screw_spec import (
+from fr_vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
     THREAD as CROSS_SCREW_THREAD,
     THREAD_CLASS as CROSS_SCREW_THREAD_CLASS,
 )
-from vn_lag_screw_spec import (
+from fr_vn_lag_screw_spec import (
     BEARING_OFFSET as LAG_BEARING_OFFSET,
     HEAD_AF as LAG_HEAD_AF,
     SHANK_DIA as LAG_SHANK_DIA,
@@ -193,7 +193,7 @@ from fr_frame_attachment_spec import (
     TUBE_CROSS_HOLE_DIAMETER,
 )
 from fr_harmonic_base_spec import STACK_HEIGHT
-from vn_tube_frame_cap_spec import (
+from fr_vn_tube_frame_cap_spec import (
     INSIDE_HEIGHT as CAP_INSIDE_HEIGHT,
     TOTAL_HEIGHT as CAP_TOTAL_HEIGHT,
 )
@@ -418,10 +418,10 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(f"{view_name}: {configuration_name} unexpectedly contains exploded views")
 
     quantities = {
-        "fr-harmonic-base": 1, "fr-tube-frame": 4, "vn-tube-frame-cap": 4,
-        "fr-top-frame": 1, "fr-rocker-arm-support": 1, "vn-lag-screw": 4,
-        "fr-nameplate": 1, "vn-fillister-screw": 4, "vn-frame-cross-screw": 8,
-        "vn-gooseneck-set-screw": 1,
+        "fr-harmonic-base": 1, "fr-tube-frame": 4, "fr-vn-tube-frame-cap": 4,
+        "fr-top-frame": 1, "fr-rocker-arm-support": 1, "fr-vn-lag-screw": 4,
+        "fr-nameplate": 1, "fr-vn-fillister-screw": 4, "fr-vn-frame-cross-screw": 8,
+        "fr-vn-gooseneck-set-screw": 1,
     }
     components = tuple(
         _early_bound(component, "IComponent2")
@@ -443,7 +443,7 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
         raise RuntimeError(f"{view_name}: duplicate component identities")
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     front, rear, upper, lower = [], [], [], []
-    for component in groups["vn-frame-cross-screw"]:
+    for component in groups["fr-vn-frame-cross-screw"]:
         _, y, z = baseline[str(component.Name2)][9:12]
         if abs(y * 1000.0 - TOP_SCREW_Y) <= 1e-3:
             upper.append(component)
@@ -457,18 +457,18 @@ def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
     if tuple(map(len, (front, rear, upper, lower))) != (4, 4, 4, 4):
         raise RuntimeError(f"{view_name}: cross-screw station split is not 4/4/4/4")
     plans = (
-        ("tube caps lift", groups["vn-tube-frame-cap"], "y", 0.250),
-        ("top frame clears columns", [*groups["fr-top-frame"], *upper, *groups["vn-gooseneck-set-screw"]], "y", 0.150),
+        ("tube caps lift", groups["fr-vn-tube-frame-cap"], "y", 0.250),
+        ("top frame clears columns", [*groups["fr-top-frame"], *upper, *groups["fr-vn-gooseneck-set-screw"]], "y", 0.150),
         ("front cross screws withdraw", front, "z", -0.050),
         ("rear cross screws withdraw", rear, "z", 0.050),
-        ("gooseneck screw withdraws", groups["vn-gooseneck-set-screw"], "x", -0.050),
+        ("gooseneck screw withdraws", groups["fr-vn-gooseneck-set-screw"], "x", -0.050),
         ("columns clear base seats", groups["fr-tube-frame"], "y", 0.060),
-        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["vn-lag-screw"]], "y", 0.035),
-        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["vn-lag-screw"]], "x", -0.320),
-        ("support screws withdraw", groups["vn-lag-screw"], "y", 0.050),
-        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["vn-fillister-screw"]], "y", 0.025),
-        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["vn-fillister-screw"]], "x", 0.080),
-        ("nameplate screws withdraw", groups["vn-fillister-screw"], "y", 0.035),
+        ("support lifts from deck", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "y", 0.035),
+        ("support moves beside base", [*groups["fr-rocker-arm-support"], *groups["fr-vn-lag-screw"]], "x", -0.320),
+        ("support screws withdraw", groups["fr-vn-lag-screw"], "y", 0.050),
+        ("nameplate lifts from deck", [*groups["fr-nameplate"], *groups["fr-vn-fillister-screw"]], "y", 0.025),
+        ("nameplate moves beside base", [*groups["fr-nameplate"], *groups["fr-vn-fillister-screw"]], "x", 0.080),
+        ("nameplate screws withdraw", groups["fr-vn-fillister-screw"], "y", 0.035),
     )
     # Reuse the native assembly axes already used by component patterns. Unlike
     # manipulator indices, Mark=2 direction entities are independent of each
@@ -626,11 +626,11 @@ async def build(adapter) -> dict[str, str]:
     base_path = _part("fr-harmonic-base")
     column_path = _part("fr-tube-frame")
     _part("fr-rocker-arm-support")  # placed via place_component below; assert it exists
-    _part("vn-lag-screw")  # support hold-down; placed via place_component below
-    _part("vn-frame-cross-screw")  # eight casting/column retainers
-    _part("vn-gooseneck-set-screw")  # west-hub set screw; placed via place_component
-    _part("vn-fillister-screw")  # nameplate corner screws; placed via place_component
-    _part("vn-tube-frame-cap")  # four intact stock push-on caps
+    _part("fr-vn-lag-screw")  # support hold-down; placed via place_component below
+    _part("fr-vn-frame-cross-screw")  # eight casting/column retainers
+    _part("fr-vn-gooseneck-set-screw")  # west-hub set screw; placed via place_component
+    _part("fr-vn-fillister-screw")  # nameplate corner screws; placed via place_component
+    _part("fr-vn-tube-frame-cap")  # four intact stock push-on caps
     top_frame_path = _part("fr-top-frame")
 
     check("create_assembly", await adapter.create_assembly())
@@ -727,7 +727,7 @@ async def build(adapter) -> dict[str, str]:
     screw_target = [bx, LAG_SCREW_UNDER_HEAD_Y, bz]
     screw_name = await place_component(
         adapter,
-        "vn-lag-screw",
+        "fr-vn-lag-screw",
         screw_target,
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -789,7 +789,7 @@ async def build(adapter) -> dict[str, str]:
         cap_target = [cx, CAP_MOUTH_Y, cz]
         cap_name = await place_component(
             adapter,
-            "vn-tube-frame-cap",
+            "fr-vn-tube-frame-cap",
             cap_target,
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -836,7 +836,7 @@ async def build(adapter) -> dict[str, str]:
         np_target = [nx, NAMEPLATE_FRONT_Y, nz]
         np_screw = await place_component(
             adapter,
-            "vn-fillister-screw",
+            "fr-vn-fillister-screw",
             np_target,
             NAMEPLATE_SCREW_EULER,
             NAMEPLATE_SCREW_ROWS,
@@ -869,7 +869,7 @@ async def build(adapter) -> dict[str, str]:
             cross_target = [sx, screw_y, sz]
             cross_screw = await place_component(
                 adapter,
-                "vn-frame-cross-screw",
+                "fr-vn-frame-cross-screw",
                 cross_target,
                 s_euler,
                 s_rows,
@@ -891,7 +891,7 @@ async def build(adapter) -> dict[str, str]:
     set_rows = rot_z_rows(90.0)
     set_screw = await place_component(
         adapter,
-        "vn-gooseneck-set-screw",
+        "fr-vn-gooseneck-set-screw",
         set_target,
         [0.0, 0.0, 90.0],
         set_rows,

@@ -13,7 +13,7 @@ vendor model is downloaded or committed, so this size has no replica gate;
 the standalone run is catalog-only and saves the build under
 cad/out/reference for inspection.
 
-2026-10-15: the MHA-VN-059 platen-clip screws become this pan head; the
+2026-10-15: the MHA-PD-VN-65 platen-clip screws become this pan head; the
 90114A124 fillister's Ø0.124 in least head left 0.05 mm of bearing land
 over the clip's largest drilled #2 loose hole.
 

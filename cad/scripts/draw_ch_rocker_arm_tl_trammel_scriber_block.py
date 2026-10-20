@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker template trammel's scriber block (MHA-CH-006-TL-15).
+r"""Create the drawing for the rocker template trammel's scriber block (MHA-CH-06-TL-15).
 
 The pivot block's sheet (``draw_ch_rocker_arm_tl_trammel_pivot_block``) for
 the block with two reamed point holes 16.000 apart, the longer slit ending in
@@ -556,7 +556,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Template Trammel Scriber Block Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker outline-template trammel scriber block; 1018; MHA-CH-006-TL-15",
+            3: "rocker outline-template trammel scriber block; 1018; MHA-CH-06-TL-15",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

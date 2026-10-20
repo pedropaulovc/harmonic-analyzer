@@ -1,4 +1,4 @@
-"""Offline release contracts for MHA-SM-004, the gooseneck spring screw."""
+"""Offline release contracts for MHA-SM-04, the gooseneck spring screw."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_registry_paths_and_part_name() -> None:
 
 def test_part_registry_row_is_the_made_screw() -> None:
     row = _config.parts("sm-gooseneck-spring-screw")
-    assert row["number"] == "MHA-SM-004"
+    assert row["number"] == "MHA-SM-04"
     assert row["title"] == "Gooseneck Spring Screw"
     assert row["description"] == "GOOSENECK SPRING SCREW"
     for grade in ("12L14", "1/2 in"):
@@ -163,7 +163,7 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
     for line in lines:
         # Only the mating parts' numbers are quoted.
         text = line.split(". ", 1)[-1]
-        for number in ("MHA-SM-001", "MHA-VN-005"):
+        for number in ("MHA-SM-01", "MHA-SM-VN-51"):
             text = text.replace(number, "")
         assert not any(ch.isdigit() for ch in text), line
         for word in ("TORQUE", "LOCTITE", "N-M", "IN-LB"):
@@ -177,7 +177,7 @@ def test_sheet_prints_the_ruled_clamp_instruction() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split())
     assert spec.CLAMP_INSTRUCTION in spec.DRAWING_NOTES
     assert (
-        "TIGHTEN UNTIL THE MHA-VN-005 UPPER EYE IS CLAMPED AND CANNOT SWIVEL" in notes
+        "TIGHTEN UNTIL THE MHA-SM-VN-51 UPPER EYE IS CLAMPED AND CANNOT SWIVEL" in notes
     )
     assert notes.endswith("NO THREADLOCKER.")
     build = Path(part.__file__).read_text(encoding="utf-8")

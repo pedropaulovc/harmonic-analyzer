@@ -1,4 +1,4 @@
-r"""Fastener table for the oblique-trammel jig (MHA-CH-006-TL-000).
+r"""Fastener table for the oblique-trammel jig (MHA-CH-06-TL-00).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). Pure
 data: every screw and stud the jig consumes, one row per joint, with its
@@ -24,15 +24,15 @@ the row:
 
 Washers: a wedge-lock pair under each head of two joints (``WASHERS``), each
 screw carrying a reversing load, so rule 23 wants a mechanical lock: the two
-TL-29 block screws (the leadscrew's reversing thrust, TL-50) and the two
-feed lever screws (the operator's push and pull on the lever, TL-51). Each
+TL-29 block screws (the leadscrew's reversing thrust, TL-VN-70) and the two
+feed lever screws (the operator's push and pull on the lever, TL-VN-71). Each
 pair's stack adds to its row's grip. Every other head seats in a counterbore
 or countersink, or on a flat face. Hold-down studs: 1/2-13 x 3 in only, from
 the clamping kit. A longer stud reaches the swinging carrier (the jig spec's
 ``STUD_LENGTH_MAX``).
 
-Each joint's screw is its own bought part and BOM row (TL-41 to TL-49, the
-wedge-lock pairs TL-50 and TL-51); the assembly steps name each by its
+Each joint's screw is its own bought part and BOM row (TL-VN-61 to TL-VN-69, the
+wedge-lock pairs TL-VN-70 and TL-VN-71); the assembly steps name each by its
 callout (``callout``) and its item number.
 """
 
@@ -44,7 +44,7 @@ from fractions import Fraction
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
-import ch_rocker_arm_tl_oblique_leadscrew_spec as leadscrew
+import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -56,7 +56,7 @@ SHCS = "SHCS"
 # The riser's countersinks take only the B18.6.3 machine-screw head; a B18.3
 # socket flat head stands proud of them (trammel spec; Codex #1583).
 FLAT_HEAD = "B18.6.3 FLAT HEAD"
-# The TL-51 wedge-lock pair's stack under each feed lever screw head: the
+# The TL-VN-71 wedge-lock pair's stack under each feed lever screw head: the
 # 91812A230 band's 0.090 in maximum (the lever washer spec pins it).
 LEVER_LOCK_STACK = 0.090 * INCH  # 2.286
 
@@ -149,7 +149,7 @@ NUT_BRACKET_TO_BLOCK = Fastener(
     SHCS,
     leadscrew.BLOCK_SCREW_LENGTH,
     len(leadscrew.PIVOT_BLOCK_HOLES),
-    # head on the TL-50 pair, on TL-22's 4.40 counterbore floor
+    # head on the TL-VN-70 pair, on TL-22's 4.40 counterbore floor
     leadscrew.BLOCK_SCREW_GRIP + leadscrew.BLOCK_SCREW_LOCK_STACK,
     leadscrew.NUT_BRACKET_TAP_DEPTH,  # blind
 )
@@ -207,7 +207,7 @@ LEVER_TO_CARRIER = Fastener(
     SHCS,
     "1",
     len(carrier.LEVER_HOLES),
-    # head on the TL-51 pair, on the lever's top face
+    # head on the TL-VN-71 pair, on the lever's top face
     feed_lever.LEVER_THICK + LEVER_LOCK_STACK,
     carrier.THICKNESS,  # tapped THRU
     min_engagement_d=1.3,

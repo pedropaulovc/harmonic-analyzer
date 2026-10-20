@@ -77,7 +77,7 @@ from fr_frame_attachment_spec import (
 )
 from fr_harmonic_base_spec import BOTTOM_WIDTH, DECK_HALF_X
 from fr_nameplate_spec import MOUNT_POS as NAMEPLATE_MOUNT_POS
-from vn_frame_cross_screw_spec import (
+from fr_vn_frame_cross_screw_spec import (
     HEAD_DIA as CROSS_SCREW_HEAD_DIA,
     SHANK_DIA as CROSS_SCREW_SHANK_DIA,
     SHANK_LEN as CROSS_SCREW_SHANK_LEN,
@@ -97,9 +97,9 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Step 9 sets MHA-FR-004 before its base seats are spotted through it (#628):
+# Step 9 sets MHA-FR-04 before its base seats are spotted through it (#628):
 # the plate's lower edge as lettered (plate y = 0) lies at machine x =
-# MOUNT_POS[0], parallel to the deck's MHA-FR-004 end at DECK_HALF_X. Section
+# MOUNT_POS[0], parallel to the deck's MHA-FR-04 end at DECK_HALF_X. Section
 # B-B looks down on both edges and dimensions the inset between them; step 9
 # points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
@@ -186,14 +186,14 @@ _LEFT_COLUMN_X_M = -0.197
 BOM_QUANTITIES = {
     "fr-harmonic-base": 1,
     "fr-tube-frame": 4,
-    "vn-tube-frame-cap": 4,
+    "fr-vn-tube-frame-cap": 4,
     "fr-rocker-arm-support": 1,
-    "vn-lag-screw": 4,
+    "fr-vn-lag-screw": 4,
     "fr-top-frame": 1,
     "fr-nameplate": 1,
-    "vn-fillister-screw": 4,
-    "vn-frame-cross-screw": 8,
-    "vn-gooseneck-set-screw": 1,
+    "fr-vn-fillister-screw": 4,
+    "fr-vn-frame-cross-screw": 8,
+    "fr-vn-gooseneck-set-screw": 1,
 }
 if sum(BOM_QUANTITIES.values()) != 29:
     raise AssertionError("the released frame assembly must contain 29 components")
@@ -201,28 +201,28 @@ BOM_COMPONENTS = tuple(BOM_QUANTITIES)
 BOM_DESCRIPTIONS = {
     "fr-harmonic-base": "TWO-PLATE FRAME BASE",
     "fr-tube-frame": "OPEN-END TUBULAR FRAME COLUMN",
-    "vn-tube-frame-cap": "STEEL PUSH-ON CAP FOR 1 IN OD TUBE",
+    "fr-vn-tube-frame-cap": "STEEL PUSH-ON CAP FOR 1 IN OD TUBE",
     "fr-rocker-arm-support": "ROCKER-ARM SUPPORT CASTING",
-    "vn-lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
+    "fr-vn-lag-screw": "1/4-20 X 3/4 HEX-HEAD SCREW, 18-8 SS",
     "fr-top-frame": "TOP-FRAME CASTING",
     "fr-nameplate": "ENGRAVED BRASS MAKER'S NAMEPLATE",
-    "vn-fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
-    "vn-frame-cross-screw": (
+    "fr-vn-fillister-screw": "BRASS #4-40 X 1/4 FILLISTER-HEAD SLOTTED SCREW",
+    "fr-vn-frame-cross-screw": (
         "ZINC-PLATED STEEL #10-32 X 1-3/4 NARROW FILLISTER-HEAD SLOTTED SCREW"
     ),
-    "vn-gooseneck-set-screw": "STEEL 1/4-20 X 3/4 SQUARE-HEAD CUP-POINT SET SCREW",
+    "fr-vn-gooseneck-set-screw": "STEEL 1/4-20 X 3/4 SQUARE-HEAD CUP-POINT SET SCREW",
 }
 BOM_PART_NUMBERS = {
-    "fr-harmonic-base": "MHA-FR-001",
-    "fr-tube-frame": "MHA-FR-003",
-    "vn-tube-frame-cap": "MHA-VN-028",
-    "fr-rocker-arm-support": "MHA-FR-005",
-    "vn-lag-screw": "MHA-VN-009",
-    "fr-top-frame": "MHA-FR-002",
-    "fr-nameplate": "MHA-FR-004",
-    "vn-fillister-screw": "MHA-VN-006",
-    "vn-frame-cross-screw": "MHA-VN-027",
-    "vn-gooseneck-set-screw": "MHA-VN-023",
+    "fr-harmonic-base": "MHA-FR-01",
+    "fr-tube-frame": "MHA-FR-03",
+    "fr-vn-tube-frame-cap": "MHA-FR-VN-54",
+    "fr-rocker-arm-support": "MHA-FR-05",
+    "fr-vn-lag-screw": "MHA-FR-VN-51",
+    "fr-top-frame": "MHA-FR-02",
+    "fr-nameplate": "MHA-FR-04",
+    "fr-vn-fillister-screw": "MHA-FR-VN-50",
+    "fr-vn-frame-cross-screw": "MHA-FR-VN-53",
+    "fr-vn-gooseneck-set-screw": "MHA-FR-VN-52",
 }
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 BOM_NORMALIZED_ALIASES = {
@@ -230,7 +230,7 @@ BOM_NORMALIZED_ALIASES = {
 }
 
 if CROSS_SCREW_THREAD != "#10-32":
-    raise AssertionError("MHA-VN-027 must remain the approved #10-32 stock screw")
+    raise AssertionError("MHA-FR-VN-53 must remain the approved #10-32 stock screw")
 if TUBE_CROSS_HOLE_DIAMETER <= CROSS_SCREW_SHANK_DIA:
     raise AssertionError("tube match holes must clear the stock screw shank")
 if CROSS_SCREW_SHANK_LEN >= CASTING_FULL_THREAD_DEPTH:
@@ -253,7 +253,7 @@ EXPLODED_VIEW_NAMES = {
 ASSEMBLY_STEPS = "\n".join(
     (
         "MATCH-FIT AND ASSEMBLY SEQUENCE",
-        "1. ROUGH-CUT MHA-FR-003 OVERSIZE. DECK UP; FIT EACH MHA-FR-001 SOCKET",
+        "1. ROUGH-CUT MHA-FR-03 OVERSIZE. DECK UP; FIT EACH MHA-FR-01 SOCKET",
         "   TO ITS ASSIGNED ACTUAL TUBE: CLOSE HAND-SLIP, NO PERCEPTIBLE ROCK,",
         "   FULL SHOULDER SEATING. RETAIN COLUMN/CORNER/ORIENTATION MATCH",
         "   MARKS.",
@@ -262,38 +262,38 @@ ASSEMBLY_STEPS = "\n".join(
         "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS. REMOVE",
         f"   COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
         "AND DEBURR. THE ACTUAL",
-        "   MHA-VN-027 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
-        "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET. FIT MHA-FR-002 OVER",
-        "   THE COLUMNS, HUB OPPOSITE THE MHA-FR-004 END. FIT EACH TOP SOCKET",
-        "   TO ITS ASSIGNED ACTUAL MHA-FR-003 TUBE: CLOSE HAND-SLIP WITH NO",
+        "   MHA-FR-VN-53 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
+        "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET. FIT MHA-FR-02 OVER",
+        "   THE COLUMNS, HUB OPPOSITE THE MHA-FR-04 END. FIT EACH TOP SOCKET",
+        "   TO ITS ASSIGNED ACTUAL MHA-FR-03 TUBE: CLOSE HAND-SLIP WITH NO",
         "   PERCEPTIBLE ROCK. SET EVERY FRONT/REAR CROSS-BORE AXIS TO THE",
         "   CONTROLLING TOP-AXIS HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES",
         "   FROM THE BASE UNDERSIDE. CLAMP; RETAIN EACH TOP CORNER/COLUMN",
         "   ORIENTATION MATCH MARK.",
         "4. AT THAT HEIGHT, FINAL MATCH-CUT EACH IDENTIFIED COLUMN TO THE",
-        "   ACTUAL BASE/TOP/CAP STACK: MHA-VN-028 FULLY ON ITS INSIDE SEAT,",
+        "   ACTUAL BASE/TOP/CAP STACK: MHA-FR-VN-54 FULLY ON ITS INSIDE SEAT,",
         "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS. FINISH",
         "   THE TOP CHAMFER; RESEAT COLUMNS AND RESET THE TOP-AXIS HEIGHT.",
-        "5. THROUGH THE EXISTING MHA-FR-002 CASTING BORES, PILOT-TRANSFER EACH",
+        "5. THROUGH THE EXISTING MHA-FR-02 CASTING BORES, PILOT-TRANSFER EACH",
         "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD",
-        "   SEGMENTS. REMOVE MHA-FR-002/COLUMNS; ENLARGE BOTH WALLS TO",
+        "   SEGMENTS. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
         f"   DIA {TUBE_CROSS_HOLE_DIAMETER:.2f}, DEBURR, AND VERIFY FREE PASSAGE "
-        "OF THE ACTUAL MHA-VN-027",
+        "OF THE ACTUAL MHA-FR-VN-53",
         "   SHANK.",
-        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-VN-027 FROM THE SIDES",
+        "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-FR-VN-53 FROM THE SIDES",
         "   USED FOR PILOT-DRILLING; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
-        "7. VERIFY EACH MHA-FR-002 CAP RECESS CLEARS ITS ACTUAL MHA-VN-028",
-        "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-VN-027 HEADS SEAT, PUSH EACH",
+        "7. VERIFY EACH MHA-FR-02 CAP RECESS CLEARS ITS ACTUAL MHA-FR-VN-54",
+        "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-FR-VN-53 HEADS SEAT, PUSH EACH",
         "   CAP OVER THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S",
         "   INSIDE SEAT.",
-        "8. SEAT MHA-FR-005 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
-        "   MHA-VN-009 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
+        "8. SEAT MHA-FR-05 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
+        "   MHA-FR-VN-51 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
         # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
-        "9. SET MHA-FR-004 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
+        "9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
         "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
-        "   SPOT MHA-FR-001 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
-        "   MHA-FR-001 TRANSFER CALLOUT. SEAT ALL FOUR MHA-VN-006 HEADS.",
-        "10. START MHA-VN-023 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
+        "   SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
+        "   MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-FR-VN-50 HEADS.",
+        "10. START MHA-FR-VN-52 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
 ASSEMBLY_CHECKS = "\n".join(
@@ -301,14 +301,14 @@ ASSEMBLY_CHECKS = "\n".join(
         "ASSEMBLY-ONLY CHECKS",
         "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED.",
         "   EACH FRONT/REAR TOP AXIS MEETS THE HEIGHT FROM THE BASE UNDERSIDE.",
-        "2. ALL EIGHT MHA-VN-027 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
+        "2. ALL EIGHT MHA-FR-VN-53 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
         "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
         "   NEAR AND FAR CASTING THREAD SEGMENTS.",
-        "3. ALL FOUR MHA-VN-028 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
-        "   MHA-FR-002 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
-        "4. MHA-FR-005 AND MHA-FR-004 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
+        "3. ALL FOUR MHA-FR-VN-54 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
+        "   MHA-FR-02 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
+        "4. MHA-FR-05 AND MHA-FR-04 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
         "   BEAR.",
-        "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-VN-023 BACKED CLEAR.",
+        "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-FR-VN-52 BACKED CLEAR.",
     )
 )
 
@@ -554,7 +554,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
     )
     cap_top = _visible_circle_at_height(
         front,
-        component_stem="vn-tube-frame-cap",
+        component_stem="fr-vn-tube-frame-cap",
         height_mm=CAP_TOP_Y,
         target_x_m=-_LEFT_COLUMN_X_M,
         label="finished cap top",
@@ -581,7 +581,7 @@ def _add_frame_height_dimensions(adapter: Any, front: Any) -> tuple[Any, Any]:
 
     screw_head = _visible_circle_at_height(
         front,
-        component_stem="vn-frame-cross-screw",
+        component_stem="fr-vn-frame-cross-screw",
         height_mm=TOP_SCREW_Y,
         target_x_m=-_LEFT_COLUMN_X_M,
         radius_mm=CROSS_SCREW_HEAD_DIA / 2.0,
@@ -1147,7 +1147,7 @@ def _upper_frame_balloon_edges(
 ) -> dict[str, Any]:
     """Choose exposed support-body and screw-head edges, not feet or shanks."""
     winners = {}
-    for stem in ("fr-rocker-arm-support", "vn-lag-screw"):
+    for stem in ("fr-rocker-arm-support", "fr-vn-lag-screw"):
         for component, full in families[stem]:
             name = str(component.Name2)
             transform = None  # read at the first usable edge, as before batching
@@ -1162,7 +1162,7 @@ def _upper_frame_balloon_edges(
                 score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
                 if stem not in winners or score > winners[stem][0]:
                     winners[stem] = (score, edge)
-    if set(winners) != {"fr-rocker-arm-support", "vn-lag-screw"}:
+    if set(winners) != {"fr-rocker-arm-support", "fr-vn-lag-screw"}:
         raise RuntimeError("missing visible upper support-body or screw-head edge")
     return {stem: row[1] for stem, row in winners.items()}
 
@@ -1601,9 +1601,9 @@ def _reattach_frame_balloons(
         adapter, view, notes[item], item, families["fr-tube-frame"]
     )
 
-    item = item_by_stem["vn-frame-cross-screw"]
+    item = item_by_stem["fr-vn-frame-cross-screw"]
     shanks = []
-    for component, full in families["vn-frame-cross-screw"]:
+    for component, full in families["fr-vn-frame-cross-screw"]:
         if (
             abs(
                 _component_point_in_assembly(full, (0.0, 0.0, 0.0))[1] * 1000.0
@@ -1640,11 +1640,11 @@ def _reattach_frame_balloons(
     # (-18, -12) and (-16, -8) mm their circles printed 1.50 mm apart, under the
     # audit's 0.5 x text-height clearance (1.74 mm); 9 now rises above the
     # screw instead. Item 5 at (+14, +10) mm printed onto the rear-right
-    # MHA-VN-028 cap; (+8, +16) mm clears it above the rear rail.
+    # MHA-FR-VN-54 cap; (+8, +16) mm clears it above the rear rail.
     short = {
         item_by_stem["fr-tube-frame"]: (-0.018, -0.012),
         item_by_stem["fr-top-frame"]: (0.008, 0.016),
-        item_by_stem["vn-frame-cross-screw"]: (-0.018, 0.004),
+        item_by_stem["fr-vn-frame-cross-screw"]: (-0.018, 0.004),
     }
     _spread_balloons(
         adapter,
@@ -1667,7 +1667,7 @@ def _reattach_frame_balloons(
         tip = state["actual_leader_points"][-3:-1]
         held.append(_BoundBalloonProof(item=item, annotation=annotation, entity=entity, tip=tip))
     return _FrameBalloonProof(
-        rebound=frozenset((*anchors, "fr-tube-frame", "vn-frame-cross-screw")),
+        rebound=frozenset((*anchors, "fr-tube-frame", "fr-vn-frame-cross-screw")),
         bound=tuple(held),
         short=proofs,
     )

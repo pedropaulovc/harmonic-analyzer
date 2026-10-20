@@ -17,7 +17,7 @@ import draw_pd_rack_pinion as drawing
 import pd_rack_pinion_spec as spec
 import pd_transgear_feed_pinion_spec as feed_spec
 import pd_transgear_disc_hub_geometry as hub_geometry
-import vn_transgear_disc_screw_spec as disc_screw
+import pd_vn_transgear_disc_screw_spec as disc_screw
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
@@ -62,7 +62,7 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
 
 
 def test_the_disc_prints_no_tap_position() -> None:
-    """R9-9: the taps are transferred from the MHA-PD-017 flange at assembly."""
+    """R9-9: the taps are transferred from the MHA-PD-17 flange at assembly."""
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert not any("Tap" in name or "BoltCircle" in name for name in marked)
     assert "DiscTaps" not in spec.DRAWING_DIMENSIONS
@@ -79,7 +79,7 @@ def test_taps_sit_on_the_flange_bolt_circle() -> None:
 
 
 def test_disc_screw_engages_at_least_one_and_a_half_diameters_worst_case() -> None:
-    """R9-47: the MHA-VN-039 tips are cut to fit inside the rear face, so the
+    """R9-47: the MHA-PD-VN-55 tips are cut to fit inside the rear face, so the
     joint (judged in transgear_disc_screw_spec) spends the tap's losses here."""
     assert spec.TAP_SPEC.size == hub_geometry.SCREW_THREAD == "#0-80"
     assert disc_screw.ENGAGEMENT_WORST_D >= spec.ENGAGEMENT_FLOOR_D == 1.5
@@ -112,7 +112,7 @@ def test_the_tap_mouths_lose_only_their_breaks_counted_from_the_drill() -> None:
 
 
 def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:
-    """The 3/64 (1.191) tap drill for the MHA-VN-039 #0-80 UNF-2B disc taps,
+    """The 3/64 (1.191) tap drill for the MHA-PD-VN-55 #0-80 UNF-2B disc taps,
     against ASME B1.1's 2B table: minor 0.0465..0.0514 in, and the
     tap-drill rule %thread = (major - drill) / (1.299038 P)."""
     inch = 25.4
@@ -132,7 +132,7 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
 
 
 def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
-    """The bands the two builds apply (the disc's H7 bore, the MHA-PD-017 hub's
+    """The bands the two builds apply (the disc's H7 bore, the MHA-PD-17 hub's
     h6 spigot) never bind: at the tightest corner, the smallest bore over the
     largest spigot, they meet line on line, and the fit note quotes the
     clearance the limits give."""
@@ -153,7 +153,7 @@ def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
     # The disc's float on the spigot feeds the transferred taps' wall.
     assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
     note = spec.BORE_FIT_CALLOUT
-    assert "MATE HUB MHA-PD-017 SPIGOT" in note
+    assert "MATE HUB MHA-PD-17 SPIGOT" in note
     assert f"(DIA CLR {least:.3f}-{greatest:.3f} mm)" in note
     assert f"\N{DIAMETER SIGN}{hub.SPIGOT_DIA:.3f} +{spigot_upper:.3f}/" in note
     assert all(len(line) <= 70 for line in note.splitlines())
@@ -185,7 +185,7 @@ def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
     text = spec.TAP_CALLOUT_QUALIFIER
     assert "CSK" not in text
     assert f"BREAK EDGE {spec.MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES" in text
-    assert "MHA-PD-017" in text and "MATCH-MARK" in text
+    assert "MHA-PD-17" in text and "MATCH-MARK" in text
     for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
         assert banned not in text.upper()
     with pytest.raises(RuntimeError):
@@ -207,7 +207,7 @@ def test_gear_data_block_is_what_the_machinist_needs() -> None:
             f"{spec.CUTTER_TOOTH_RANGE[0]}-{spec.CUTTER_TOOTH_RANGE[1]}T",
         ),
         (f"SPAN OVER {spec.SPAN_TEETH} TEETH", f"{lower:.4f}-{upper:.4f}"),
-        ("MATES WITH", f"KNOB SHAFT MHA-PD-008, {spec.MESH_PINION_TEETH}T"),
+        ("MATES WITH", f"KNOB SHAFT MHA-PD-08, {spec.MESH_PINION_TEETH}T"),
     ):
         assert f"{label}:  {value}" in data
     assert len(data.splitlines()) == 9

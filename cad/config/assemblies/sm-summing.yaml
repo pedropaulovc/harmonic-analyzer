@@ -1,4 +1,4 @@
-number: MHA-SM-000
+number: MHA-SM-00
 # summing assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the summing
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
@@ -22,18 +22,18 @@ flip_invert:
   - summing lever axial
 allowed_free_stems:
   - sm-summing-lever
-  - vn-boss-hook
-  - vn-boss-hook-jam-nut
+  - sm-vn-boss-hook
+  - sm-vn-boss-hook-jam-nut
 # One freed DOF (the lever knife-edge rock); the lock-mated boss-hook and
 # its jam nut must read under-constrained WITH it (a grounded/fixed
 # regression would freeze the counter-spring anchor while the lever still
 # swings, codex #201).
-# The made MHA-SM-004 spring screw is locked to the fixed gooseneck; its
+# The made MHA-SM-04 spring screw is locked to the fixed gooseneck; its
 # head clamps the upper eye to the plug and adds no operational freedom.
 required_free_stems:
   - sm-summing-lever
-  - vn-boss-hook
-  - vn-boss-hook-jam-nut
+  - sm-vn-boss-hook
+  - sm-vn-boss-hook-jam-nut
 # The freed lever knife-edge rock; the boss-hook and jam nut ride it locked.
 free_dof: 1
 # machinist_exceptions: the assembly drawing's owner-declared machinist-review
@@ -42,6 +42,6 @@ free_dof: 1
 machinist_exceptions:
   - id: "SM-01"
     kind: "accept"
-    where: "sheet 3 step 7 and check 3: MHA-SM-004 clamping the upper loop of MHA-VN-005 to the MHA-SM-001 plug face, tightened"
+    where: "sheet 3 step 7 and check 3: MHA-SM-04 clamping the upper loop of MHA-SM-VN-51 to the MHA-SM-01 plug face, tightened"
     finding: "threaded joint under operating load without a lock (rule 23)"
     reason: "owner ruling 2026-09-21: the upper eye is a static clamp, not a swivel. The head's preload clamps the loop to the plug face so it cannot rotate, the spring flexes in its coils below the clamp, and no operating torque reaches the screw axis, so the joint is a static clamp that needs no lock (joint_retention.py sm-summing/gooseneck-spring-screw, STATIC_CLAMP). Check 3 is the acceptance (owner-accepted)"

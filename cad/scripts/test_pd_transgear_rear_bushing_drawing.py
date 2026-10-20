@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear rear bushing (MHA-PD-024) and its drawing."""
+"""Offline contracts for the transgear rear bushing (MHA-PD-24) and its drawing."""
 
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ def test_sheet_text_stays_short() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_180() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-024"
+    assert row["number"] == "MHA-PD-24"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

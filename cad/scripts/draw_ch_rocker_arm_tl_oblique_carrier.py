@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-006-TL-21).
+r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
 The top view at 1:2 carries the outline, the reamed pin holes, the two
 centre-drill spots and every tap station. Datums: X from the HUB spot's axis
@@ -882,7 +882,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Carrier Plate Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel carrier plate; 6061-T6; MHA-CH-006-TL-21",
+            3: "rocker oblique trammel carrier plate; 6061-T6; MHA-CH-06-TL-21",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

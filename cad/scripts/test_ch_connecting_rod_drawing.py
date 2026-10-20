@@ -137,7 +137,7 @@ def test_inside_corner_volume_is_the_fillets_closed_form() -> None:
 
 
 def test_pin_hole_is_the_reamed_press_hole_for_the_rod_pivot_pin() -> None:
-    """User ruling 2026-10-09 (PR #1292 review F1): the MHA-CH-010 pin is
+    """User ruling 2026-10-09 (PR #1292 review F1): the MHA-CH-10 pin is
     pressed into both tines as the bar pin is into the amplitude bar
     (ch_rod_pivot_pin_spec holds the fit), so the hole is reamed to a band of
     its own, native on PinHoleDia, not a #47 drill."""
@@ -256,7 +256,7 @@ def test_every_tight_band_names_its_mate() -> None:
     assert drawing.ARM_NUMBER in drawing.DETAIL_CALLOUTS["SlotWidth"]
     # The tine's band locates the slot from the datum face and holds the gap
     # to the next channel's rod, the same part (#982 review r2).
-    assert drawing.ROD_NUMBER == "MHA-CH-003"
+    assert drawing.ROD_NUMBER == "MHA-CH-03"
     assert drawing.ROD_NUMBER in drawing.DETAIL_CALLOUTS["TineNear"]
     assert drawing.DETAIL_CALLOUTS["TineNear"].startswith("2X; LOCATES SLOT;")
     assert drawing.CAM_NUMBER in drawing.DETAIL_CALLOUTS["RingFaceNear"]

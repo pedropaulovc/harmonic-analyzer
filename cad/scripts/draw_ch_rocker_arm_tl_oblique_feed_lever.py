@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-006-TL-26).
+r"""Create the drawing for the oblique-trammel jig's feed lever (MHA-CH-06-TL-26).
 
 A 300 x 25.4 x 12.7 flat at 1:1: the top view carries the length, the width,
 both bolt-hole stations from the inner end, their shared row from the back
@@ -260,7 +260,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel Feed Lever Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel feed lever; 6061-T6 flat; MHA-CH-006-TL-26",
+            3: "rocker oblique trammel feed lever; 6061-T6 flat; MHA-CH-06-TL-26",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

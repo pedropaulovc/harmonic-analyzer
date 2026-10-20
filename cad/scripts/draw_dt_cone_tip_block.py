@@ -28,7 +28,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import visible_view_entities
 from _drawing_finish import add_surface_finish
 import _drawing_hidden_sketches as hidden_sketches
@@ -149,7 +153,7 @@ TEXT_CLEARANCE = 0.0015
 ROUND_OUT = 0.0001
 
 # The adjuster's hole callout stands between the adjuster elevation and the
-# right view.  #946 / MHA-DT-021: at 9a0f50b1c it stood below-right of the hole
+# right view.  #946 / MHA-DT-21: at 9a0f50b1c it stood below-right of the hole
 # and its leader climbed ~28 mm over the front view to the rim, ~16 mm
 # further than the hole's approach from the right face, reading as an edge of
 # the part.  The short way in, from the right face, is SLOT DEPTH's: its
@@ -214,7 +218,7 @@ SLIT_TEXT_OFFSET = (
 # Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
-# above a dimension); below it, it may run to two.
+# above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
     # The slit's depth only has to break into the adjuster bore: its floor
     # stands inside the bore, so the line ends where no edge is left
@@ -222,17 +226,18 @@ DIMENSION_CALLOUTS = {
     "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
-    # stack).
-    "Depth": "SETS MHA-VN-017\nENGAGEMENT",
+    # stack).  Separate the full number at the existing font size; the whole
+    # value/mate block sits on a native offset shelf right of the plan.
+    "Depth": "SETS\nMHA-DT-VN-55\nENGAGEMENT",
 }
 DIMENSION_CALLOUTS_ABOVE = {
     # The +X face stands over the platform's narrow west edge
     # (build_dt_drive_train_assembly's print-worst containment): no fit, so
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
-    "Width": "WITHIN MHA-DT-020 EDGE",
+    "Width": "WITHIN MHA-DT-20 EDGE",
     # The adjuster axis across the block: the shaft tip's lateral stack.
-    "PassageCenter": "LOCATES MHA-DT-004 TIP",
+    "PassageCenter": "LOCATES MHA-DT-04 TIP",
 }
 # Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
 # print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
@@ -281,7 +286,7 @@ FRONT_KEEP = {
 PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.  The plan depth's
-# three rows and the 4.875's short span leave no room for inside arrows
+# value and mate rows and the 4.875's short span leave no room for inside arrows
 # (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
 # vertical dimension prints no line between them.
 ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
@@ -301,15 +306,21 @@ ARROWS_INSIDE = (
 )
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
-# The plan: the block depth left of it, its value and rows mid-span on its
-# line, a text clearance off the plan.
-_PLAN_LEFT = TOP_CENTER[0] - BLOCK_X * _S / 2.0
+# The 9.750 value and its three mate/function rows are almost as tall as
+# the depth's 19.5 mm printed span.  Outside arrows alone still strike the
+# first and last rows (PR1709's reviewed PDF).  Put the dimension right of
+# the plan, then use native OffsetText so moving the complete text block
+# onto its right-hand shelf cannot drag the witnesses through it again.
 _PLAN_RIGHT = TOP_CENTER[0] + BLOCK_X * _S / 2.0
-PLAN_DEPTH_LINE_X = (
-    _PLAN_LEFT - TEXT_CLEARANCE - ROUND_OUT - _callout_half_width(DIMENSION_CALLOUTS["Depth"])
-)
+PLAN_DEPTH_LINE_X = _PLAN_RIGHT + 0.010
 TOP_KEEP = {
     "Depth": (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
+}
+TOP_TEXT_OFFSETS = {
+    "Depth": (
+        PLAN_DEPTH_LINE_X + 0.010 + _callout_half_width(DIMENSION_CALLOUTS["Depth"]),
+        _plan_y(0.0),
+    ),
 }
 # The half-block station below runs from the north face to the pinch-hole
 # centre, so its value sits midway along its span.  Centred on the hole (run
@@ -560,7 +571,7 @@ PINCH_THREAD_CALLOUT_EXTENT = (0.0322, 0.0085, 0.0310, 0.0078)
 # shoulder, measured on the c4c0e848a render: SolidWorks centres the block
 # on the point, 7.8 mm over it to the shoulder 8.35 under it, and the mate
 # line prints 57.6 mm wide.
-FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-020"
+FOOT_TAP_QUALIFIER = "LOCATES ON MHA-DT-20"
 FOOT_TAP_CALLOUT_EXTENT = (0.0293, 0.0086, 0.0293, 0.0080)
 # Free notes are placed by their upper-left corner.
 _NOTE_EXTENTS = {
@@ -679,6 +690,7 @@ def sheet_text_boxes(adjuster_center: tuple[float, float] = FRONT_CENTER) -> dic
         **LEFT_KEEP,
         **BOTTOM_KEEP,
     }
+    keeps.update(TOP_TEXT_OFFSETS)
     boxes = {
         name: _extent_box(point, _VALUE_EXTENTS.get(name, _VALUE_EXTENT))
         for name, point in keeps.items()
@@ -840,7 +852,7 @@ def sheet_dimension_ink(
         "Depth": (
             v,
             (_plan_y(Z_NORTH), _plan_y(Z_SOUTH)),
-            (_PLAN_LEFT,) * 2,
+            (_PLAN_RIGHT,) * 2,
             PLAN_DEPTH_LINE_X,
             inside,
         ),
@@ -869,6 +881,19 @@ def sheet_dimension_ink(
         )
         for name, (axis, ends, origins, line, arrows) in specs.items()
     }
+    # The offset shelf belongs to the same native dimension.  Keep its text
+    # and connecting run in this recipe's ink model, not at the import seed.
+    depth = ink["Depth"]
+    ink["Depth"] = DimensionInk(
+        (
+            *depth.lines,
+            (
+                (PLAN_DEPTH_LINE_X, _plan_y(0.0)),
+                (texts["Depth"][0], TOP_TEXT_OFFSETS["Depth"][1]),
+            ),
+        ),
+        depth.arrows,
+    )
     # The hold-down tap's stations: both witnesses of each leave the model's
     # reference line, which runs through the tap's centre.
     ink["FootTapX"] = _dimension_ink(
@@ -1663,6 +1688,7 @@ async def build(adapter: Any) -> dict[str, str]:
             **{name: _DIM_ARROWS_INSIDE for name in ARROWS_INSIDE},
         },
     )
+    offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (

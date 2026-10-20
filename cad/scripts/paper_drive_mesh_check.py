@@ -1,8 +1,8 @@
 """Closed-form AGMA-style checks for the paper drive's two gear meshes.
 
 Geometry comes only from the part specs: the 12T:120T 48DP PA20 reducer
-(MHA-PD knob shaft on the MHA-PD-006 disc) and the 12T 32DP PA20 feed pinion
-(MHA-PD-010) on the purchased 32DP PA20 rack (MHA-PD-005). Each mesh is
+(MHA-PD knob shaft on the MHA-PD-06 disc) and the 12T 32DP PA20 feed pinion
+(MHA-PD-10) on the purchased 32DP PA20 rack (MHA-PD-05). Each mesh is
 checked at its assembled (datum) state over every manufactured profile
 corner the spec prints (tip band x translation band): contact ratio at the
 minimum outside diameters, positive backlash at the tight extreme, root

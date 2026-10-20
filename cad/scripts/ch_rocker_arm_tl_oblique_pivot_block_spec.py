@@ -1,9 +1,9 @@
-r"""Pure-data contract for the oblique-trammel jig's pivot block (MHA-CH-006-TL-22).
+r"""Pure-data contract for the oblique-trammel jig's pivot block (MHA-CH-06-TL-22).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). Two are
 made: one bolts on each rail's HIWIN HGH15CA carriage and carries, in two
-6200-2RS bearings, the pivot pin (MHA-CH-006-TL-23) that the carrier plate
-(MHA-CH-006-TL-21) turns on (``ch_rocker_arm_tl_oblique_trammel_spec``,
+6200-2RS bearings, the pivot pin (MHA-CH-06-TL-23) that the carrier plate
+(MHA-CH-06-TL-21) turns on (``ch_rocker_arm_tl_oblique_trammel_spec``,
 imported as ``trammel``; values read from it are marked ⚙).
 
 Material and stock: 6061-T6 aluminium, a 70 x 40 x ``PIVOT_BLOCK_HEIGHT`` ⚙
@@ -103,12 +103,12 @@ both.
 
 Side screws (PR C4). Two Ø4.98 THRU along Y with a Ø7.94 counterbore
 4.40 deep from the +Y face, at (X, Z) = (+/-5, 9), for #8-32 x 1-7/8 SHCS
-into the tapped holes of the leadscrew nut bracket (MHA-CH-006-TL-29) on
+into the tapped holes of the leadscrew nut bracket (MHA-CH-06-TL-29) on
 the -Y face. TL-22 owns the positions (``SIDE_SCREW_*``); the leadscrew spec
 aliases them, so TL-29's tapped pattern follows them. The row is measured
 from the bottom face, which stays on the carriage when the block grows
 upward, so the 24 mm block leaves it where it was. One native Hole Wizard
-counterbore, the base bar's #8 sizes (MHA-CH-006-TL-20) with the
+counterbore, the base bar's #8 sizes (MHA-CH-06-TL-20) with the
 counterbore depth cut to 4.40 so the head (0.164 in) sits 0.10 .. 0.36
 below the face. Their walls run against the carriage holes, which stand
 along Z at (+/-13, +13): the counterbore and both stations print three
@@ -116,7 +116,7 @@ places, and the pinch walls under the 2.0 target are rule-20 shortfalls
 the side callout states (``SIDE_WALL_CALLOUT``). The stations print from
 the -X end and the bottom face, carried by a hidden reference sketch the
 same knobs drive; TL-29's taps are spotted through these holes at assembly
-(TL-000), so the pair's spacing need only stay inside the screws' float,
+(TL-00), so the pair's spacing need only stay inside the screws' float,
 and the callout names the mate.
 """
 
@@ -295,7 +295,7 @@ SIDE_SCREW_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": SIDE_CBORE_DEPTH,
     },
 )
-SIDE_SCREW_MATE = "MHA-CH-006-TL-29"
+SIDE_SCREW_MATE = "MHA-CH-06-TL-29"
 SIDE_SCREW_REFERENCE = "SideScrewReference"
 # Stations and the counterbore print three places (walls, hole to hole); the
 # THRU diameter prints the template's two (base bar BRACKET_CALLOUT_PRECISION).
@@ -655,7 +655,7 @@ CALLOUTS_ABOVE = {
 # narrow rows keep the block clear of the side view. Its three places serve
 # the #8 float to the bracket (rule 4, close-c4-r5): the mate prints by its
 # short number (owner ruling 2026-10-17), the full one too wide for the gap.
-SIDE_ROW_MATE = SIDE_SCREW_MATE.removeprefix("MHA-CH-006-")
+SIDE_ROW_MATE = SIDE_SCREW_MATE.removeprefix("MHA-CH-06-")
 SIDE_ROW_CALLOUT = f"FROM\nCARRIAGE\nSEAT FACE;\nMATCHES\n{SIDE_ROW_MATE}"
 CALLOUTS_BELOW = {
     "BlockLength": LENGTH_WALL_CALLOUT,

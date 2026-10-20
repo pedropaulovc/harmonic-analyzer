@@ -1,5 +1,5 @@
 pd-platen:
-  number: MHA-PD-002
+  number: MHA-PD-02
   material: Brass
   material_specification: C36000 free-machining brass plate, 1/4 in
   finish: machined; chemically blackened (brass black)
@@ -9,7 +9,7 @@ pd-platen:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the clip-screw #2-56 through-tap stations 2X 4.500 and 2X 265.140 from the left edge and 2X 58.510 and 2X 127.630 from the bottom edge, with the TAP 2-56 UNC THRU ALL callout PATTERN MATCHES MHA-PD-003"
+      where: "the clip-screw #2-56 through-tap stations 2X 4.500 and 2X 265.140 from the left edge and 2X 58.510 and 2X 127.630 from the bottom edge, with the TAP 2-56 UNC THRU ALL callout PATTERN MATCHES MHA-PD-03"
       finding: "three-place tap stations read as a tight band or over-specification (rules 3, 4)"
       reason: "the clip screws are fixed in these taps and float only in the clip's #2 loose holes (0.76 min over the shank); that float holds the clip's and these taps' position zones (0.37 each, 0.74 together) only with both patterns at .XXX; transfer-drilling the clips from the platen was rejected so any clip fits any platen (owner-accepted)"
     - id: "RV-02"

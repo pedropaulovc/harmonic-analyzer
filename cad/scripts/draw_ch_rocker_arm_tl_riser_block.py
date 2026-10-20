@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker arm's riser block (MHA-CH-006-TL-10).
+r"""Create the drawing for the rocker arm's riser block (MHA-CH-06-TL-10).
 
 One sheet for both configurations: the main views draw the saved L036 (four
 off); L045 (two off) differs only in length, so it gets one labelled front
@@ -348,7 +348,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Riser Block Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker riser block; L036 / L045; 1018 CR; MHA-CH-006-TL-10",
+            3: "rocker riser block; L036 / L045; 1018 CR; MHA-CH-06-TL-10",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

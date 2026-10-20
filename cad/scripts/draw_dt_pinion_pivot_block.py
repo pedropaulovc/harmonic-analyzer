@@ -368,7 +368,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot bore finish",
         char_height=0.0025,
     )
-    # The lift bore runs MHA-DT-017 (drawing-guidelines.md rule 6 (roughness
+    # The lift bore runs MHA-DT-17 (drawing-guidelines.md rule 6 (roughness
     # symbols only where a surface runs, slides or locates)).  Its REAM
     # callout leaves the rim upper-left, its centre lines leave at 180 and
     # 270 deg, and the lift-bore rise's pivot-centre witness cuts the rim at

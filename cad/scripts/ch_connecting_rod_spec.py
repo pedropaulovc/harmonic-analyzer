@@ -36,7 +36,7 @@ _HOME_CAM_XY = (
 CENTER_DISTANCE = math.dist(_HOME_PIN_XY, _HOME_CAM_XY)
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
-# The bore runs on the cylinder gear's integral eccentric cam (MHA-DT-012):
+# The bore runs on the cylinder gear's integral eccentric cam (MHA-DT-12):
 # (least, most) diametral clearance over both printed bands.
 STRAP_DIAMETRAL_CLEARANCE = (
     RING_BORE_DIA + RING_BORE_DIA_BAND[1]
@@ -77,7 +77,7 @@ FORK_SLOT_WIDTH = 2.675
 FORK_SLOT_BAND = (0.05, -0.05)  # (upper, lower) deviations
 # Each tine, outer face to slot wall. The pitch fixes the tine below the
 # 2.0 wall target: 1.65 at its thinnest.
-# Pending exception ruling: MHA-CH-003 tine 1.65 MIN (#982).
+# Pending exception ruling: MHA-CH-03 tine 1.65 MIN (#982).
 TINE_THICKNESS = 1.70
 TINE_BAND = (0.05, -0.05)  # (upper, lower) deviations
 TINE_MIN = TINE_THICKNESS + TINE_BAND[1]
@@ -106,7 +106,7 @@ FORK_CROTCH_BELOW_PIN = 9.75
 # The fork boss's root step onto the shank. The bridge below the slot floor
 # (ForkBossLength less SlotDepth, both .XX from the crown top) keeps 2.0 MIN.
 FORK_BASE_BELOW_PIN = 13.0
-# The MHA-CH-010 rod pivot pin presses into this hole through both tines and
+# The MHA-CH-10 rod pivot pin presses into this hole through both tines and
 # runs in the arm's #47 rod hole (user ruling 2026-10-09, PR #1292 review F1,
 # press fit as the bar pin; ch_rod_pivot_pin_spec holds the fit budget).
 # Reamed to H7 under the 5/64 drill rod: the 0.0775 in stock reamer cuts

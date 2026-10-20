@@ -1,7 +1,7 @@
 """Every cone gear D-bore against the D-flat land it slides onto.
 
-Cross-part contract between the cone gear family (MHA-DT-003) and the cone gear
-shaft (MHA-DT-004), closing two Codex findings:
+Cross-part contract between the cone gear family (MHA-DT-03) and the cone gear
+shaft (MHA-DT-04), closing two Codex findings:
 
 * #834: a gear's bore must be the land under its station (the U40 S1 bores
   and #839's moved lands arrive in different PRs);

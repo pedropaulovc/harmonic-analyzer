@@ -1,6 +1,6 @@
-"""The MHA-CH-000 channel-assembly fit-up sequence, numbered in one place.
+"""The MHA-CH-00 channel-assembly fit-up sequence, numbered in one place.
 
-The drive_train_steps pattern (MHA-DT-000): a step's number is its position in
+The drive_train_steps pattern (MHA-DT-00): a step's number is its position in
 SEQUENCE, so inserting a step renumbers every later one and every pointer that
 cites a step by key follows. The sheet prints the step text; this module holds
 only the order. Pure data: no SolidWorks, no config reads.
@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import dt_drive_train_steps
 
-DRAWING_NUMBER = "MHA-CH-000"
+DRAWING_NUMBER = "MHA-CH-00"
 # The north pivot bracket is set by DRO in the drive-train fit-up, off the
 # located drum bank's datum (user ruling on #936 P1 b, option A), so this sheet
-# points there by key: MHA-DT-000 prints the same key's number as the step head,
-# so the pointer follows any renumbering of MHA-DT-000.
+# points there by key: MHA-DT-00 prints the same key's number as the step head,
+# so the pointer follows any renumbering of MHA-DT-00.
 NORTH_BRACKET_SET_KEY = "north-pivot-bracket-set"
 NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 # Each rod's ring is captured in its closed cam slot as the cylinder stack goes
-# together (MHA-DT-000 BANK_STEPS), and the rod's fork is pinned to its arm with
+# together (MHA-DT-00 BANK_STEPS), and the rod's fork is pinned to its arm with
 # a pin pressed at the bench, so the rod + arm pair must be pinned BEFORE that
 # step: the pinning step points there by key, and that drive-train step points
 # back at the pinning step (RODS_PINNED_KEY). The hub stack is proved on the
@@ -26,7 +26,7 @@ NORTH_BRACKET_SET_REF = dt_drive_train_steps.step_ref(NORTH_BRACKET_SET_KEY)
 CYLINDER_STACK_KEY = "cylinder-stack-accepted"
 CYLINDER_STACK_REF = dt_drive_train_steps.step_ref(CYLINDER_STACK_KEY)
 RODS_PINNED_KEY = "rod-forks-pinned"
-# The fulcrum shaft's end keepers (MHA-CH-007) are reamed as a pair at the
+# The fulcrum shaft's end keepers (MHA-CH-07) are reamed as a pair at the
 # bench, so their bores share one axis whatever their printed bore heights;
 # the pair is then set on the top frame by DRO with the shaft through both
 # (the frame's keeper taps are transferred from the foot holes), and the set
@@ -39,15 +39,15 @@ SET_SCREWS_STAKED_KEY = "fulcrum-set-screws-staked"
 # go onto the fulcrum shaft between the set keepers in channel order, each
 # bar's foot notch dropped over its rocker's strap, before the keeper set
 # screws are staked onto the shaft's flats. The channel springs are hooked
-# last; their anchors are threaded and set at MHA-HA-000.
+# last; their anchors are threaded and set at MHA-HA-00.
 BARS_PINNED_KEY = "bars-pinned"
 LEVER_BANK_THREADED_KEY = "lever-bank-threaded"
 SPRINGS_HOOKED_KEY = "springs-hooked"
-# The anchors are threaded, locked and set at MHA-HA-000 (key
+# The anchors are threaded, locked and set at MHA-HA-00 (key
 # "channel-anchors-set"). That sheet's steps module is not on this branch's
 # base yet, so the pointer is literal; once it lands this becomes
 # ha_harmonic_analyzer_assembly_steps.step_ref("channel-anchors-set").
-HA_ANCHORS_SET_REF = "MHA-HA-000 STEP 5"
+HA_ANCHORS_SET_REF = "MHA-HA-00 STEP 5"
 
 # The spring-back acceptance belongs to the spring-set step, run while the
 # south bracket is still only clamped: it used to be a separate step after the
@@ -84,7 +84,7 @@ def step_number(key: str) -> int:
 
 
 def step_ref(key: str) -> str:
-    """A pointer another sheet prints, e.g. ``MHA-CH-000 STEP 4``."""
+    """A pointer another sheet prints, e.g. ``MHA-CH-00 STEP 4``."""
     return f"{DRAWING_NUMBER} STEP {step_number(key)}"
 
 

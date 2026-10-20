@@ -151,14 +151,16 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     # Machinist review r1: the across-flat value and callout sat between its
     # own extension lines, which struck them. They now hang below the shaft,
     # right of the dome tip. The block is left-aligned on the dimension line
-    # (r2 render: 15 characters ran 35 mm), and stays inside the border.
+    # and stays inside the border. The PR1709 PDF's parent-vendor identity
+    # and shelf span ~45 mm: the older per-character estimate missed the
+    # final "55" and shelf touching the border.
     across_x, across_y = keep["AcrossFlat"]
     widest = max(
         len(line) for line in ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT.splitlines()
     )
     assert across_y + 0.004 <= drawing._SHAFT_BOTTOM_Y - 0.010
     assert across_x > right_tip + 0.005
-    assert across_x + widest * 0.00235 <= 0.4318 - 0.0127 - 0.003
+    assert across_x + max(widest * 0.00235, 0.045) <= 0.4318 - 0.0127 - 0.003
     # Machinist review r1: the Ø callout block (hanging left of its line,
     # ~36 characters) printed over the dome radius, and its upper limit
     # (~7 mm over the anchor) inside the outline.
@@ -196,9 +198,9 @@ def test_three_place_sizes_name_their_mates() -> None:
         keeper.BORE_DIA_BAND[0] - spec.SHAFT_DIA_BAND[1],
     )
     assert "0.038-0.070 DIAMETRAL CLEARANCE" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-CH-007" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-CH-002" in spec.SHAFT_DIA_CALLOUT
-    assert "MHA-VN-055" in spec.ACROSS_FLAT_CALLOUT
+    assert "MHA-CH-07" in spec.SHAFT_DIA_CALLOUT
+    assert "MHA-CH-02" in spec.SHAFT_DIA_CALLOUT
+    assert "MHA-CH-VN-55" in spec.ACROSS_FLAT_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"ShaftDia": SHAFT_DIA_CALLOUT' in source
     assert '"AcrossFlat": ACROSS_FLAT_CALLOUT' in source
@@ -227,7 +229,7 @@ def test_paired_keeper_bores_keep_a_running_fit_on_the_rail_seats() -> None:
     # 1.02 out of line, far past the fit; reamed through in one pass at their
     # installed spacing they are one straight line, so a setup tilt of that
     # line costs nothing. GPT round 3 (PR #1311): the residual is the rail
-    # under the two feet, MHA-FR-002's faced rail top, flat to one 0.04 zone: a
+    # under the two feet, MHA-FR-02's faced rail top, flat to one 0.04 zone: a
     # step, opposite rolls across the 14 width (each lug centre 25.2 high) and
     # a pitch over the 16.5 seat; the shaft runs through both lug centres
     # 150 apart and each 8.0 lug spends its thickness x (pitch + slope).
@@ -308,7 +310,7 @@ def test_precision_matches_the_marked_dimensions() -> None:
 
 def test_interference_literals_track_the_set_screw_and_keeper() -> None:
     import _interference_contracts
-    import vn_fulcrum_set_screw_spec as set_screw
+    import ch_vn_fulcrum_set_screw_spec as set_screw
     from _hole_spec import TAP_DRILL_MM
 
     assert _interference_contracts.FULCRUM_SET_SCREW_THREAD == (

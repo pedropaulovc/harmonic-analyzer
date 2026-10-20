@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear arm plate (MHA-PD-019) drawing."""
+"""Offline contracts for the transgear arm plate (MHA-PD-19) drawing."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import draw_pd_transgear_arm_plate as drawing
 import pd_transgear_arm_geometry as arm
 import pd_rack_pinion_spec as disc
 import pd_transgear_arm_plate_geometry as geometry
-import vn_transgear_arm_plate_screw_spec as screw
+import pd_vn_transgear_arm_plate_screw_spec as screw
 import pd_transgear_arm_plate_spec as spec
 import transgear_hanger_joints as joints
 import pd_transgear_knob_shaft_spec as knob_shaft
@@ -168,7 +168,7 @@ def test_the_section_cuts_the_whole_plate_on_the_bore_axis() -> None:
 
 def test_registry_row_is_the_made_steel_mha_165() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-PD-019"
+    assert row["number"] == "MHA-PD-19"
     assert int(row["quantity"]) == 1
     assert "1018" in row["material_specification"]
     assert str(row["finish"]).strip()

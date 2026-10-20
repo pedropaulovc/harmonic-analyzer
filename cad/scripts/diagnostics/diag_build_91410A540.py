@@ -1,6 +1,6 @@
 r"""McMaster 91410A540 -- square-head cup-point set screw, 1/4"-20 x 3/4".
 
-MHA-VN-023, the gooseneck set screw in the top frame's hub boss since the
+MHA-FR-VN-52, the gooseneck set screw in the top frame's hub boss since the
 2026-10-12 Q5 ruling. McMaster's family row (read live 2026-10-12) lists
 every field of 91410A538 but the length: 1/4"-20 UNC-2A, 1/4" square head
 3/16" high, cup point, ASME B18.6.2. So this replay is the 91410A538 family

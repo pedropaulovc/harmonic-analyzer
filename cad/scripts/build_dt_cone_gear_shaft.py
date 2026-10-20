@@ -23,7 +23,7 @@ configured cone face/seat pitch and the tip-block/adjuster owners:
 * The 3/8 in land carries the 64T and T120..T030.
 * The 1/4 in land carries T024; the 1/8 in land carries T018.
 * The reader-owned terminal land carries T012, T006 and the custom
-  MHA-VN-016 stack collar, ending at the retained cup apex.
+  MHA-DT-VN-54 stack collar, ending at the retained cup apex.
 
 Each land step is SEAT_STEP_SETBACK south of the last larger gear's north
 face. The current T006 special-profile web and manufacturing disposition

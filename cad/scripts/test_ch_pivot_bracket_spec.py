@@ -1,4 +1,4 @@
-"""Offline contracts for MHA-CH-008's apex set-screw tap (user, 2026-10-10)."""
+"""Offline contracts for MHA-CH-08's apex set-screw tap (user, 2026-10-10)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import pytest
 
 import build_ch_pivot_bracket as bracket_build
 import ch_pivot_bracket_spec as bracket
-import vn_arbor_set_screw_spec as set_screw
+import _mcmaster_91375a106 as set_screw
 from _hole_spec import TAP_DRILL_MM, blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3
 

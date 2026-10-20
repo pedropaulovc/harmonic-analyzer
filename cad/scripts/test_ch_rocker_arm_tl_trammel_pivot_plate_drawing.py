@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker template trammel pivot plate (MHA-CH-006-TL-19)."""
+"""Offline contracts for the rocker template trammel pivot plate (MHA-CH-06-TL-19)."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
     number = _config.parts("ch-rocker-arm-tl-trammel-pivot-plate")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-    assert number == "MHA-CH-006-TL-19"
+    assert number == "MHA-CH-06-TL-19"
 
 
 def test_sheet_carries_no_notes_and_callouts_name_processes() -> None:

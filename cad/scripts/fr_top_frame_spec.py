@@ -18,9 +18,9 @@ from __future__ import annotations
 from math import radians, sqrt, tan
 
 import _config
-import vn_knife_hanger_stud_spec as HANGER_SCREW
-import vn_knife_hanger_washer_spec as HANGER_WASHER
-import vn_knife_mount_dowel_spec as KNIFE_DOWEL
+import sm_vn_knife_hanger_stud_spec as HANGER_SCREW
+import sm_vn_knife_hanger_washer_spec as HANGER_WASHER
+import sm_vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
@@ -53,7 +53,7 @@ BOSS_DIA = (
 )
 BORE_DIA = COLUMN_SOCKET_DIAMETER
 # Every rail's web thickness, centred on its centreline (the keeper plan of
-# MHA-CH-000 draws the west rail's web faces from it).
+# MHA-CH-00 draws the west rail's web faces from it).
 WEB_T = 13.0  # user ruling: retain loose bands plus realistic deep-drill wander
 CAP_RECESS_FLOOR_Y = HALF_H + BOSS_ABOVE - CAP_RECESS_DEPTH  # 6.45
 GOOSENECK_X = -COLUMN_X  # east rail, -X crank side (summing's post station)
@@ -61,7 +61,7 @@ GOOSENECK_BORE_DIA = 17.0  # O16 post slides through
 
 # --- Gooseneck set-screw boss (east-rail hub) ---------------------------------
 #
-# User ruling 2026-10-12 (option (a), no jam nut): the MHA-VN-023 square-head
+# User ruling 2026-10-12 (option (a), no jam nut): the MHA-FR-VN-52 square-head
 # cup-point set screw that pinches the O16 post enters the hub through a cast
 # boss on the hub pad's outer face -- square-sided and blended into the rail
 # under the top flange, as the ch19 img04 hub shows it -- spot-faced square
@@ -86,10 +86,10 @@ def _sag(radius: float) -> float:
 
 # --- Knife-hanger hex-bolt clearance holes and dowel slip holes (crossbar) ----
 #
-# Each MHA-SM-002 knife mount hangs under the integral crossbar on one
-# cut-to-length #10-24 plain hex bolt (MHA-VN-024). Its SAE washer bears on
+# Each MHA-SM-02 knife mount hangs under the integral crossbar on one
+# cut-to-length #10-24 plain hex bolt (MHA-SM-VN-52). Its SAE washer bears on
 # the FACED top plane; the block's top seat bears on the FINISHED
-# underside. The two MHA-VN-051 dowels retain their round-hole/slot scheme:
+# underside. The two MHA-SM-VN-53 dowels retain their round-hole/slot scheme:
 # +X locates in a round blind slip hole, -X in a blind slip-width slot.
 # Slot travel absorbs the pair's spacing mismatch (drawing-guidelines.md
 # rule 19 (absorb stacks at fit-up, not with tighter bands)).
@@ -111,8 +111,8 @@ HANGER_CLEARANCE_DIA_MAX = HANGER_CLEARANCE_DIA + max(HANGER_CLEARANCE_DIA_BAND)
 # carries, so the grip is the crossbar's own full-height extrude,
 # HangerGrip@Crossbar, driven by the "RingHeight" global and imported in
 # section F-F. Owner ruling 2026-10-18 (machinist review r1, rule 4/19): the
-# grip prints under the title block's .XX band; the MHA-VN-024 bolt is cut to
-# the measured grip at MHA-SM-000 fit-up (build_sm_summing_assembly), so no
+# grip prints under the title block's .XX band; the MHA-SM-VN-52 bolt is cut to
+# the measured grip at MHA-SM-00 fit-up (build_sm_summing_assembly), so no
 # tightened band rescues its thread engagement.
 HANGER_GRIP = RING_HEIGHT
 HANGER_GRIP_PLACES = 2
@@ -217,13 +217,13 @@ HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
 # all four (both holes and both slots floor at one height) and the slots'
 # length; the underside locator the slots' width.  Each names its mate by
 # number and name (codex review of 59f405ab).
-HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-VN-051 DOWEL"
+HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-SM-VN-53 DOWEL"
 HANGER_PIN_DEPTH_CALLOUT = "4X"
 # Milled to width: a reamer cannot make a slot 0.71 longer than it is wide
 # (machinist review r1, 2026-10-18).
-HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT WIDTH\nSLIP FIT MHA-VN-051 DOWEL"
+HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT WIDTH\nSLIP FIT MHA-SM-VN-53 DOWEL"
 # The length's three places are functional (above): name the travel it holds.
-HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH,\nMHA-VN-051 DOWEL TRAVEL"
+HANGER_SLOT_LENGTH_CALLOUT = "2X SLOT LENGTH,\nMHA-SM-VN-53 DOWEL TRAVEL"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
@@ -256,16 +256,16 @@ if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
 # --- Machining-required surfaces ---------------------------------------------
 #
 # These four faces own native finish controls. The top plane between the
-# corner bosses, which seats both MHA-CH-007 keepers on the right (west) rail
-# and both MHA-VN-060 washers on the crossbar, and the underside plane between
-# the bosses, which seats both MHA-SM-002 knife mounts, carry SEAT_UM in the
+# corner bosses, which seats both MHA-CH-07 keepers on the right (west) rail
+# and both MHA-SM-VN-54 washers on the crossbar, and the underside plane between
+# the bosses, which seats both MHA-SM-02 knife mounts, carry SEAT_UM in the
 # linked facing notes below: each is one plane, so its note names the extent
 # instead of a split-line region. The locating-seat finish is not a general
 # grade.
 #
-# * The four tube-socket bores take the MHA-FR-003 columns on a match-fitted close
+# * The four tube-socket bores take the MHA-FR-03 columns on a match-fitted close
 #   hand-slip; a cast bore wall cannot hold that fit and would score the tube.
-# * The four cap-recess floors carry no finish: each MHA-VN-028 cap seats on
+# * The four cap-recess floors carry no finish: each MHA-FR-VN-54 cap seats on
 #   its tube end (build_fr_frame_assembly asserts it), 1.5 mm above the floor,
 #   so the recess only clears the cap skirt.
 # * The gooseneck bore (a drilled hole the set screw clamps the post in) and
@@ -430,7 +430,7 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "crossbar flange thickness": FLANGE_THICKNESS_PLACES,
     "crossbar pocket depth": 1,
     # Sheet 2, HOLES-SOCKETS: the socket pitches are the setup datums the
-    # column plan is drilled from, and MHA-FR-001 states them to 0.01, so they
+    # column plan is drilled from, and MHA-FR-01 states them to 0.01, so they
     # are the one pair of sheet-derived numbers that earns a second place.
     "socket horizontal pitch": 2,
     "socket vertical pitch": 2,
@@ -497,7 +497,7 @@ DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit
 # (the socket callout names the mate and the acceptance; the frame assembly
-# MHA-FR-000 carries the corner match marks).
+# MHA-FR-00 carries the corner match marks).
 # User rulings 2026-10-14 and 2026-10-18 (aesthetics; exception RV-04): the
 # base's 1/16 in x 45 general break (printed at the base rim break's one
 # place, 1.6) overrides the title block's 0.25 max break on the convex casting
@@ -534,13 +534,13 @@ DRAWING_NOTES = (
 # regions and no geometry change: the model's top is the finished plane.  Its
 # own property, placed beside the keeper callout on HOLES-SOCKETS.  The
 # keeper seats carry no flatness frame (rule 5; codex review of PR #1640,
-# owner ruling pending in #1659): MHA-CH-000 pair-reams the keepers and sets
+# owner ruling pending in #1659): MHA-CH-00 pair-reams the keepers and sets
 # them on this face with the shaft through both.
 DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {SEAT_UM:.1f} UM."
 # User ruling 2026-10-12 (reading (i)): every face on the 999.7 underside
 # plane between the bosses is faced at the seat finish -- the rail web
 # bottoms, the junction lands and plan gussets, and the crossbar's full-depth
-# ends that seat both MHA-SM-002 knife mounts.  The 4X corner-boss bottoms
+# ends that seat both MHA-SM-02 knife mounts.  The 4X corner-boss bottoms
 # (6.3 below the plane) and the hub boss and its V-gussets (8.0 below) stay
 # off it.  No flatness zone (both knife seats lie on the one faced plane; no
 # stack spends a form budget on it) and no geometry change: the model's
@@ -548,7 +548,7 @@ DRAWING_NOTES_B = f"WHOLE TOP EXCEPT 4 BOSSES:\nRa {SEAT_UM:.1f} UM."
 # beside the enlarged detail of the hub boss and gussets it excludes.
 DRAWING_NOTES_C = (
     "UNDERSIDE PLANE BETWEEN BOSSES\n"
-    "(MHA-SM-002 KNIFE-MOUNT SEATS):\n"
+    "(MHA-SM-02 KNIFE-MOUNT SEATS):\n"
     f"Ra {SEAT_UM:.1f} UM; BOSS BOTTOMS AND\n"
     "HUB GUSSETS EXCLUDED."
 )

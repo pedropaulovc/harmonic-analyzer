@@ -1,4 +1,4 @@
-r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-006-TL-28).
+r"""Create the drawing for the oblique-trammel jig's end bracket (MHA-CH-06-TL-28).
 
 One part, two off (the title block's quantity). A 68.9 x 19.05 x 12.7 flat at
 2:1: the plan (the *Front view, looking down on the top face) carries the
@@ -347,7 +347,7 @@ for _index, _x in enumerate(part_spec.BAR_TAP_X, start=1):
                 (
                     "BAR_TAP_X",
                     "HOLE_PLACES",
-                    ("ch_rocker_arm_tl_oblique_leadscrew_spec", "BRACKET_BAR_HOLES_X"),
+                    ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BRACKET_BAR_HOLES_X"),
                 ),
             ),
             "station_nominal": (_x, ("BAR_TAP_X",)),
@@ -385,8 +385,8 @@ for _index, _x in enumerate(part_spec.KP08_TAP_X, start=1):
                 (
                     "KP08_TAP_X",
                     "HOLE_PLACES",
-                    ("ch_rocker_arm_tl_oblique_leadscrew_spec", "BRACKET_KP08_HOLES_X"),
-                    ("ch_rocker_arm_tl_oblique_leadscrew_spec", "KP08_BOLT_SPACING"),
+                    ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "BRACKET_KP08_HOLES_X"),
+                    ("ch_rocker_arm_tl_vn_oblique_leadscrew_spec", "KP08_BOLT_SPACING"),
                 ),
             ),
             "station_nominal": (_x, ("KP08_TAP_X",)),
@@ -505,7 +505,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel End Bracket Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel end bracket; 6061-T6 flat; MHA-CH-006-TL-28",
+            3: "rocker oblique trammel end bracket; 6061-T6 flat; MHA-CH-06-TL-28",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

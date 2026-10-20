@@ -6,7 +6,7 @@ trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
-depth added across the right-view section.  The two MHA-VN-051 dowel holes
+depth added across the right-view section.  The two MHA-SM-VN-53 dowel holes
 print their 2X reamed Ø (with its band and press callout) and a position
 frame under it, Ø0.13 to A, carrying the datum feature symbol B for the pair,
 at their BASIC span in the top view, and their flat-floor depth in section
@@ -216,11 +216,11 @@ TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 # of the top view (drawing-guidelines.md rule 14 (keep text off the part): callout text outside the silhouette, no text
 # on a line).  SolidWorks hangs the block left of its text position by half
 # the widest line plus the shoulder's overhang and runs the shoulder under the
-# last line; both are measured on the dda9a33a8 farm render (3.5 mm text,
-# "PRESS MHA-VN-05x DOWEL TO FLOOR" 84.5 wide, shoulder 1.6 past it and 12.86
-# under the text position).  The shoulder's near end stands 6 mm right of the
-# block's +X face and 10 mm below the hole centre, so the leader reaches the
-# hole's lower-right rim at ~33 degrees, clear of its centre mark's arm.
+# last line. The dda9a33a8 farm render measured the previous label at 84.5 mm
+# wide, with the shoulder 1.6 mm past it and 12.86 mm below the text position.
+# These historical offsets seed placement; they do not measure the full current
+# MHA-SM-VN-53 callout. Its text width and leader clearance require native
+# readback and printed-sheet inspection before acceptance.
 PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
@@ -956,7 +956,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     # The dowel hole's floor depth (section A-A) is imported before its
-    # profile's Ø and station (top), the MHA-PD-018 section-before-end order.
+    # profile's Ø and station (top), the MHA-PD-18 section-before-end order.
     annotations = [
         *curate_view_dimensions(
             adapter,
@@ -1232,7 +1232,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_basic_dimension(adapter, station, label="dowel hole from tap axis")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
-    # carries the #10-24 knife-hanger-bolt tap and the MHA-VN-051 dowel
+    # carries the #10-24 knife-hanger-bolt tap and the MHA-SM-VN-53 dowel
     # holes); datum B = the dowel pair, its symbol on the position frame
     # under their 2X Ø (a tag on the dimension attaches to nothing, farm run
     # 20261009T155421516Z).  Ra 1.6

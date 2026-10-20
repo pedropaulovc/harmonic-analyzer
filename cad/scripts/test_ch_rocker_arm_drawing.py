@@ -199,7 +199,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     # hub-length callout, naming the stack's mate; strap symmetry moved onto
     # its native right-view 2X offset band.
     assert "HUB LENGTH SETS" not in notes
-    assert "MHA-CH-005" in ch_rocker_arm_notes.HUB_LENGTH_CALLOUT
+    assert "MHA-CH-05" in ch_rocker_arm_notes.HUB_LENGTH_CALLOUT
     assert "STRAP SYMMETRIC" not in notes
     assert "ARC LENGTHS" not in notes
     assert "EACH END:" not in notes
@@ -218,11 +218,11 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "°" not in notes
     assert "NORMAL TO LENGTH" not in notes and "NOMINAL MIRROR PLANE" not in notes
     # Named-exception wall and the mate that caps the OD.
-    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-001 FOOT CHEEKS." in notes
+    assert f"2. {ch_rocker_arm_notes.HUB_WALL_NOTE}; OD CLEARS MHA-CH-01 FOOT CHEEKS." in notes
     # Route v3: permission for the hub + strap construction, with the joint
-    # referred to MHA-CH-012/-013's own drawings, never a method here.
+    # referred to MHA-CH-12/-13's own drawings, never a method here.
     assert (
-        "3. MAY BE HUB MHA-CH-012 JOINED TO STRAP MHA-CH-013 PER THEIR DWGS."
+        "3. MAY BE HUB MHA-CH-12 JOINED TO STRAP MHA-CH-13 PER THEIR DWGS."
         in notes.splitlines()
     )
     assert ch_rocker_arm_notes.BUILT_UP_PERMISSION_NOTE == notes.splitlines()[2]
@@ -245,7 +245,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
 
 def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> None:
     """r5 Opus C2 (rule 19): 20 hubs at +0.05/0 can run 1.0 long; the sheet
-    names the MHA-CH-000 step whose stack acceptance re-faces a long stack."""
+    names the MHA-CH-00 step whose stack acceptance re-faces a long stack."""
     import ch_channel_assembly_steps as channel_steps
     import draw_ch_channel_assembly as channel_sheet
     import rocker_bank_layout as bank
@@ -257,7 +257,7 @@ def test_hub_width_callout_names_the_fit_up_step_that_takes_up_the_stack() -> No
     printed = " ".join(channel_sheet.FITUP_STEPS.split())
     step = printed.split(f" {number}. ", 1)[1].split(f" {number + 1}. ", 1)[0]
     assert "RE-FACE A LONG STACK" in step
-    # The MHA-CH-000 fitter package prints the acceptance band on the rocker
+    # The MHA-CH-00 fitter package prints the acceptance band on the rocker
     # bank view's native stack dimension (drawing policy: no limits in note
     # text), so the step names that dimension and the dimension carries
     # STACK_L20_ACCEPT.
@@ -741,7 +741,7 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         assert kwargs["label"] == f"arc-system {name} profile"
         # The top frame names the mate that rides the edge, below the frame.
         assert kwargs["quantity"] == quantity
-        assert ("MHA-CH-001" in kwargs["quantity"]) is (name == "TopRadius")
+        assert ("MHA-CH-01" in kwargs["quantity"]) is (name == "TopRadius")
         assert kwargs["frame_xy"] == frame_xy
         sheet_x, sheet_y = kwargs["leader_attach_xy"]
         x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
@@ -2704,7 +2704,7 @@ def test_rod_drill_identifier_and_native_callout_process_share_the_hole_spec() -
         "rocker_notes.ROD_PIN_MATE_CALLOUT + '\\n' + drill_process(ROD_HOLE_SPEC) + '\\n'"
     )
     # The pin that runs in the hole is named over the drill (Opus #1020 r3 C5).
-    assert "MHA-CH-010" in ch_rocker_arm_notes.ROD_PIN_MATE_CALLOUT
+    assert "MHA-CH-10" in ch_rocker_arm_notes.ROD_PIN_MATE_CALLOUT
     assert drawing.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
 
 
@@ -2988,7 +2988,7 @@ def test_front_native_process_keeps_the_nominal_token_and_model_bore_band(
     # The ream band reads as clearance on its named mate (MR #1020).
     assert (pivot.text[3], pivot.text[4]) == ("<native-upper>", ch_rocker_arm_notes.PIVOT_FIT_CALLOUT)
     assert ch_rocker_arm_notes.PIVOT_FIT_CALLOUT == (
-        "(0.15-0.20 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-005)"
+        "(0.15-0.20 DIAMETRAL\nCLEARANCE ON PIVOT\nSHAFT MHA-CH-05)"
     )
 
 
@@ -5671,9 +5671,9 @@ def test_hub_length_stack_callout_is_below_and_preserves_native_size(
         # Hub length names its stack mate and the strap its fork fit, both in
         # below rows (above-text line breaks print as one run).
         assert hub.writes == [(4, drawing.HUB_LENGTH_TEXT)]
-        assert "MHA-CH-005" in drawing.HUB_LENGTH_TEXT
+        assert "MHA-CH-05" in drawing.HUB_LENGTH_TEXT
         assert strap.writes == [(4, ch_rocker_arm_notes.STRAP_FIT_CALLOUT)]
-        assert "MHA-CH-003" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
+        assert "MHA-CH-03" in ch_rocker_arm_notes.STRAP_FIT_CALLOUT
         # The position frame hangs on the strap width, then the centre plane
         # it locates, then G on the -Z face with its BASIC to that plane, read
         # back against the hub width.
@@ -9917,7 +9917,7 @@ def test_option_four_notes_carry_no_angle_and_leave_datum_c_to_the_views():
     assert "DATUM C: STRAP END LAND" not in notes
     assert "5." not in re.findall(r"^\d+\.", notes, re.MULTILINE)
     assert notes.count(ch_rocker_arm_notes.HUB_WALL_NOTE) == 1
-    assert "MHA-CH-001" in notes
+    assert "MHA-CH-01" in notes
     assert _notes_fit_left_of_the_title_block(notes)
 
 

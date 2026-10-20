@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the magnifying-lever bracket.
 
 The bracket is the black fitting that affixes the Ø6 magnifying lever
-(MHA-MG-003) to the summing plate: an extruded COLLAR tube (Ø12 OD, 10 long
+(MHA-MG-03) to the summing plate: an extruded COLLAR tube (Ø12 OD, 10 long
 about local X) whose bore is the lever's PRESS seat, a rectangular ARM
 cantilevering +Z, and a mounting FLANGE whose +Z face butts the summing-plate
 front face.  One third-angle set (blind machinist review, mreview09):
@@ -14,7 +14,7 @@ front face.  One third-angle set (blind machinist review, mreview09):
 - BOTTOM (``*Front``, under the front view, looking at the mounting face,
   captioned VIEW A): the flange's height, the two mounting holes'
   coordinates from the flange's west end and lower face, the native plain
-  clearance-hole callout (naming the MHA-SM-003 summing lever's tapped holes
+  clearance-hole callout (naming the MHA-SM-03 summing lever's tapped holes
   the banded pattern matches) and, from the part's blanked
   ``ArmFootprint`` witness, the arm's thickness and its lower face from the
   flange's hole-datum edge (both controlling), beside the arm's end face
@@ -171,7 +171,7 @@ SIDE_AXIS_X = 0.228
 # (y 236.15 mm), its witnesses from 237.15 mm.
 # Machinist review r4 (rule 14): centred on x 119 mm the rows stood over the
 # collar's own span (x 93..103 mm), so its arrows sat on the shelf right
-# under "MHA-MG-003" and its witnesses ran up into the letters.  The block
+# under "MHA-MG-03" and its witnesses ran up into the letters.  The block
 # cannot rise off the line: a hung block's line always runs on its lowest
 # row's baseline, and its top already stands 1.8 mm under the drawable top.
 # So it hangs RIGHT of the span instead, the ARM WIDTH's pattern below: the
@@ -195,7 +195,7 @@ SIDE_AXIS_X = 0.228
 # its rows centred on x ~36.5 mm with their near end on its column (x 53
 # mm): the value (y 178.79 mm, as r3b), then three rows
 # (FLANGE_DEPTH_CALLOUT, widest "FLANGE DEPTH", 33.1 mm over x 19.9..53 mm)
-# naming the MHA-VN-050 screws' grip the three places hold, the lowest at y
+# naming the MHA-MG-VN-53 screws' grip the three places hold, the lowest at y
 # ~162.1 mm: left of the flange width's west witness (x 55 mm) and the arm
 # root's block (x >= 59.6 mm).  A block's value row prints (rows - 2) half
 # pitches over the requested y (r3b: 2 rows +0, 3 rows +2.78 mm, 4 rows
@@ -516,7 +516,7 @@ BOTTOM_WEST_AXES = {
 # direction (machinist review: 10.00 vs the Ø12 read as one feature) and the
 # stack its band sets, the lever's press zone (machinist review r1, blocker:
 # the band named no stack).  The flange's thickness prints three places, the
-# title block's .XXX band, because it is the MHA-VN-050 screws' grip
+# title block's .XXX band, because it is the MHA-MG-VN-53 screws' grip
 # (machinist review r2: the third place named no function); the callout,
 # derived in the spec with the stack that needs it, says so.  The
 # inside corners' one MAX radius names the corners it controls: all of the
@@ -551,7 +551,7 @@ SECTION_CALLOUTS = {
 # space), "DRILL 2X Ø2.59 THRU ALL" -- three physical rows.  The size row is
 # the widest and the lowest, the leader's elbow at its near end, so neither
 # row over it reaches past that end toward the leader.
-MOUNTING_HOLE_PROCESS = "MATCHES MHA-SM-003\nSUMMING LEVER TAPS\nDRILL"
+MOUNTING_HOLE_PROCESS = "MATCHES MHA-SM-03\nSUMMING LEVER TAPS\nDRILL"
 
 # Third-angle projection of the side view: model +Z (down the front view)
 # points down the sheet, model +Y left (the viewer is at +X, the front view's
@@ -1287,7 +1287,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # word leads ("DRILL 2X Ø2.59 THRU ALL"): three physical rows
         # (~14.6 mm), each centred on the anchor's x, the block centred 1 mm
         # under its y.  r3b measured the block at (162, 56) mm: baselines at
-        # y 58.8, 53.25 and 47.7 mm, "MATCHES MHA-SM-003" (the widest, 51.2
+        # y 58.8, 53.25 and 47.7 mm, "MATCHES MHA-SM-03" (the widest, 51.2
         # mm) over x 136.4..187.6 mm, the size row 45.1 mm, the elbow 1.6 mm
         # before the widest row's near end, at (134.8, 47.6) mm.  "DRILL"
         # widens the size row to ~56.7 mm, now the widest, so the anchor moves

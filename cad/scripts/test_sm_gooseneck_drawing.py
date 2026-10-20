@@ -102,7 +102,7 @@ def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
 
 def test_weldment_keeps_the_made_screw_in_the_assembly() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split()).upper()
-    assert "MHA-SM-004" in notes and "MADE SEPARATELY" in notes
+    assert "MHA-SM-04" in notes and "MADE SEPARATELY" in notes
     assert "NOT INCLUDED IN THIS WELDMENT" in notes
     assert "PURCHASED" not in notes and "INTEGRAL" not in notes
     assert "SHANK EXPOSED" not in notes and "SLOT" not in notes

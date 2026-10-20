@@ -1,9 +1,9 @@
-r"""Reproduction script: pinion-arbor collar (book ch. 25; MHA-DT-033, R1a).
+r"""Reproduction script: pinion-arbor collar (book ch. 25; MHA-DT-33, R1a).
 
 The ch25 photos show a sleeve on the arbor outboard of the front strap with a
 flush pin end about 10 out (page001_img01, page002_img07).  User ruling R1a
 (2026-09-24): a plain turned steel collar, Ø15 x 20 with a drilled Ø8 bore,
-cross-pinned to MHA-DT-022 with the rig's 1/16 in slotted spring pin through a
+cross-pinned to MHA-DT-22 with the rig's 1/16 in slotted spring pin through a
 hole centred on its length.  It is a northward walk-out backstop behind the
 drum's bond; the gap stack lives in ``dt_pinion_arbor_collar_spec``.
 
@@ -58,7 +58,7 @@ from dt_pinion_arbor_collar_spec import (
 )
 
 PART_NAME = "dt-pinion-arbor-collar"
-MATERIAL = "Plain Carbon Steel"  # AISI 1018 bar, as MHA-DT-022
+MATERIAL = "Plain Carbon Steel"  # AISI 1018 bar, as MHA-DT-22
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",

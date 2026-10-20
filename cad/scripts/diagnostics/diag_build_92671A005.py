@@ -1,7 +1,7 @@
 r"""McMaster 92671A005 -- brass hex nut, #4-40, 1/4 in across flats x 3/32 in.
 
-Used as vn-wheel-axle-nut (MHA-VN-025, two per wheel: nut and locknut).  The
-catalogue facts and the part frame are ``vn_wheel_axle_nut_spec``'s.  The
+Used as mg-vn-wheel-axle-nut (MHA-MG-VN-52, two per wheel: nut and locknut).  The
+catalogue facts and the part frame are ``mg_vn_wheel_axle_nut_spec``'s.  The
 model is one Top-plane profile -- the hexagon (flats normal to the sketch X,
 as ``build_9489T111``'s nut) with the bore circle inside it -- extruded blind
 THICKNESS along +Y from the y = 0 bearing face.  The thread is not modelled:
@@ -37,7 +37,7 @@ from _part_checks import volume_check  # noqa: E402
 from _sketch import add_line_chain  # noqa: E402
 from _sketch_circle import define_circle  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_wheel_axle_nut_spec import (  # noqa: E402
+from mg_vn_wheel_axle_nut_spec import (  # noqa: E402
     ACROSS_CORNERS,
     BORE_DIA,
     SKU,

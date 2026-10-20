@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker hub (MHA-CH-012) drawing."""
+"""Offline contracts for the rocker hub (MHA-CH-12) drawing."""
 
 from __future__ import annotations
 
@@ -86,7 +86,7 @@ def test_the_sheet_never_repeats_a_finished_size() -> None:
     assert f"{rocker.HUB_LENGTH:.2f}" not in printed
     assert f"{rocker.HUB_LENGTH:.4f}" not in printed
     assert notes.DRAWING_NOTES == (
-        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-013; SEE MHA-CH-006."
+        "1. BORE AND LENGTH ARE FINISHED AFTER JOINING TO MHA-CH-13; SEE MHA-CH-06."
     )
 
 
@@ -113,7 +113,7 @@ def test_every_band_is_native_and_named() -> None:
     assert "tolerance.Type = SUPPLY_LENGTH_TOL_TYPE" in build
     assert "tolerance.SetValues(0.0, 0.0)" in build
     assert notes.LAND_CALLOUT.splitlines() == [
-        "PRESS FIT IN MHA-CH-013 STRAP HOLE",
+        "PRESS FIT IN MHA-CH-13 STRAP HOLE",
         "0.005-0.034 DIAMETRAL INTERFERENCE",
     ]
     assert notes.SUPPLY_BORE_CALLOUT.splitlines() == ["DRILL THRU", "SUPPLY SIZE"]
@@ -136,7 +136,7 @@ def test_drawing_quality_and_no_gdt() -> None:
 
 def test_registry_row() -> None:
     row = _config.parts("ch-rocker-hub")
-    assert row["number"] == spec.NUMBER == "MHA-CH-012"
+    assert row["number"] == spec.NUMBER == "MHA-CH-12"
     assert row["component_of"] == "ch-rocker-arm"
     assert int(row["quantity"]) == int(_config.parts("ch-rocker-arm")["quantity"])
     assert "1018" in str(row["material_specification"])

@@ -7,7 +7,7 @@ import pytest
 import _config
 
 import build_ch_channel_assembly as channel
-import vn_channel_spring_stock_geom as channel_stock
+import ch_vn_channel_spring_stock_geom as channel_stock
 import sm_gooseneck_geom
 import spring_mount_geom
 
@@ -22,7 +22,7 @@ def test_counter_leading_half_turn_clears_tube_and_head() -> None:
 
 
 def test_counter_upper_eye_bears_on_full_thread_and_clears_the_tube() -> None:
-    """The MHA-SM-004 shank supports the plumb eye on its full-thread major."""
+    """The MHA-SM-04 shank supports the plumb eye on its full-thread major."""
     import build_sm_summing_assembly as summing
     import sm_gooseneck_spring_screw_geom as spring_screw
 

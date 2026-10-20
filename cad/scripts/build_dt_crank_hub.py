@@ -1,10 +1,10 @@
-r"""Build separate through hub MHA-DT-031.
+r"""Build separate through hub MHA-DT-31.
 
 The local +Y axis runs inboard from the arm's outboard face.  The O19.4 seat is
 flush through the 8-mm arm; the O22.25 rear barrel supplies the inboard shoulder
-and carries the removable MHA-DT-009 hub-to-shaft cross-hole, located from that
+and carries the removable MHA-DT-09 hub-to-shaft cross-hole, located from that
 shoulder; behind it a O16.5 relief turned to the rear face lets the #25 chain
-plates wrapping the crank T12 pass.  MHA-VN-029 is an axial
+plates wrapping the crank T12 pass.  MHA-DT-VN-59 is an axial
 seam groove at local +Z (six o'clock after assembly), match-reamed through arm
 and hub for only half the arm thickness.
 """
@@ -257,7 +257,7 @@ async def build(adapter) -> dict[str, str]:
         V_BODY - V_BORE - V_SEAM_GROOVE,
         max(0.5, 0.02 * V_SEAM_GROOVE),
     )
-    # Inboard shoulder and the plane locating the MHA-DT-009 match-ream station.
+    # Inboard shoulder and the plane locating the MHA-DT-09 match-ream station.
     # The plane offset is not printable through a drawing view (targeted import
     # selects sketches/body features); it is driven from the same two globals
     # as the printed shoulder-to-pin dimension on the reference sketch below.
@@ -280,7 +280,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         SERVICE_PIN_HOLE_SPEC,
         [-BARREL_R, SERVICE_PIN_STATION, 0.0],
-        "MHA-DT-009 hub pilot",
+        "MHA-DT-09 hub pilot",
         name="ServicePinHole",
         point_planes=("ServicePinStationPlane", "Front Plane"),
     )
@@ -289,7 +289,7 @@ async def build(adapter) -> dict[str, str]:
         f"volume after {blind_cut_dia_mm(SERVICE_PIN_HOLE_SPEC):.3f} service pilot: "
         f"{final_volume:.1f} mm^3"
     )
-    # Drawing-only station reference on the hub axis, printing the MHA-DT-009
+    # Drawing-only station reference on the hub axis, printing the MHA-DT-09
     # station from the arm shoulder it must not break into (drawing-guidelines.md rule 17 (walls and webs)).
     # Keeping the construction line under the view centreline avoids extra
     # printed geometry while giving targeted model-item import a real sketch
@@ -356,7 +356,7 @@ async def build(adapter) -> dict[str, str]:
     assert_signed_circle_center(
         adapter,
         "AxialPinGrooveProfile",
-        label="MHA-DT-031 six-o'clock seam",
+        label="MHA-DT-31 six-o'clock seam",
         expected_sketch_xy_mm=(0.0, -AXIAL_PIN_RADIUS_FROM_AXIS),
         expected_model_xyz_mm=(0.0, 0.0, AXIAL_PIN_RADIUS_FROM_AXIS),
         axis_name=seam_axis,

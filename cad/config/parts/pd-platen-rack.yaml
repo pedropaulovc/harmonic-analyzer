@@ -1,7 +1,7 @@
 pd-platen-rack:
   title: Platen Rack and Backer
-  number: MHA-PD-005
-  # Purchased toothed stock only; MHA-PD-005 is the fabricated rack/backer.
+  number: MHA-PD-05
+  # Purchased toothed stock only; MHA-PD-05 is the fabricated rack/backer.
   stock_name: Purchased Brass Rack Stock, 32DP PA20, 3/16 in Square, 48 in
   supplier: SDP/SI
   supplier_skus: [A 1B12-Y324]

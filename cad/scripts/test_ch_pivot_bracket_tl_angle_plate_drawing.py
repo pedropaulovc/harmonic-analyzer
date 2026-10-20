@@ -1,4 +1,4 @@
-"""Offline contracts for the pivot bracket's reworked angle plate (MHA-CH-008-TL-02)."""
+"""Offline contracts for the pivot bracket's reworked angle plate (MHA-CH-08-TL-02)."""
 
 from __future__ import annotations
 

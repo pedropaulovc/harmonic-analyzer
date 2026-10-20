@@ -1,4 +1,4 @@
-"""Two fillister screws seat MHA-MG-001 on MHA-SM-003's front face.
+"""Two fillister screws seat MHA-MG-01 on MHA-SM-03's front face.
 
 Pure joint data: no assembly or COM imports enter either part recipe. Machine
 seat coordinates are pinned to the live summing installation by the offline

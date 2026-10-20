@@ -1979,13 +1979,13 @@ END_KEEP = {
 STRAP_THICKNESS_TEXT_XY = (0.044, 0.2246)
 # The hub width's below rows end on the fit-up step that takes up the 20-hub
 # stack's excess (r5 Opus C2, drawing-guidelines.md rule 19 (absorb stacks at
-# fit-up)): MHA-CH-000 step "rocker-stack-accepted" re-faces a long stack.
+# fit-up)): MHA-CH-00 step "rocker-stack-accepted" re-faces a long stack.
 ROCKER_STACK_STEP_KEY = "rocker-stack-accepted"
 HUB_LENGTH_TEXT = (
     f"{rocker_notes.HUB_LENGTH_CALLOUT} PER\n{channel_step_ref(ROCKER_STACK_STEP_KEY)}"
 )
 # Half a row up for that fourth row keeps the line (~0.142) where it was; the
-# widest row ("MHA-CH-000 STEP 1") clears the hub end.
+# widest row ("MHA-CH-00 STEP 1") clears the hub end.
 HUB_LENGTH_TEXT_XY = (0.040, 0.1578)
 HUB_ROOT_TEXT_XY = (0.047, 0.199)
 # Datum G is the hub's -Z end face (#1579 owner ruling, option 1): the face

@@ -1,5 +1,5 @@
-"""Offline worst-case contract for the MHA-MG-004 rod's threaded seat in the
-MHA-MG-002 hex clamp (#1559): engagement, tap depths, relief, floor wall,
+"""Offline worst-case contract for the MHA-MG-04 rod's threaded seat in the
+MHA-MG-02 hex clamp (#1559): engagement, tap depths, relief, floor wall,
 shoulder land and the installed coaxial/coplanar pose."""
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import build_mg_magnifier_assembly as magnifier
 import mg_magnifying_clamp_geom as clamp
 import mg_magnifying_vertical_rod_geom as rod
 import mg_rod_clamp_joint as joint
-import vn_lever_wire_geom as wire
+import mg_vn_lever_wire_geom as wire
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 

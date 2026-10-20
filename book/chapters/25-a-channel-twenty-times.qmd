@@ -23,7 +23,7 @@ One channel is easy. Twenty identical channels is the actual project. This chapt
 | `lever-bushing` ×19 | TODO | TODO | TODO |
 | `ch-pivot-shaft` | TODO | TODO | TODO |
 | `ch-fulcrum-shaft` | TODO | TODO | TODO |
-| `vn-spring-hook` | TODO | TODO | TODO |
+| `ch-vn-spring-hook` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

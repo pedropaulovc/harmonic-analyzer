@@ -1,6 +1,6 @@
 r"""McMaster 9715K43 -- high-carbon steel curved disc spring for a 0.190" shaft.
 
-Used as transgear-pivot-spring (MHA-VN-049).  The catalogue facts and the part
+Used as transgear-pivot-spring (MHA-PD-VN-63).  The catalogue facts and the part
 frame are ``transgear_pivot_spring_spec``'s.  One Front-plane half-section
 revolved 360 deg about the Y axis: [INFERENCE: the page's "two contact
 points" describe a bowed washer, which a single revolve cannot make] the
@@ -38,7 +38,7 @@ from _feature_tree import name_last_feature  # noqa: E402
 from _part_checks import volume_check  # noqa: E402
 from _sketch import add_line_chain  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from vn_transgear_pivot_spring_spec import (  # noqa: E402
+from pd_vn_transgear_pivot_spring_spec import (  # noqa: E402
     ID,
     MODEL_HEIGHT,
     OD,

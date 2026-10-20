@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker trammel setting bar (MHA-CH-006-TL-17)."""
+"""Offline contracts for the rocker trammel setting bar (MHA-CH-06-TL-17)."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     # Callouts carry counts and mate part numbers, never a dimension.
     for callout in (*drawing.CALLOUTS_ABOVE.values(), *drawing.CALLOUTS_BELOW.values()):
-        bare = re.sub(r"MHA-CH-006-TL-\d\d\b", "", callout)
+        bare = re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", callout)
         assert not re.search(r"\d(?!X\b)", bare), callout
 
 

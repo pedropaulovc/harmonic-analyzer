@@ -43,12 +43,12 @@ from dt_pinion_cam_geometry import (
     TAP_DRILL_DIA as TAP_DRILL_DIA,
 )
 
-# U27 (Main, 2026-09-23): the cam is set-screwed to the lift rod (MHA-DT-017), so
+# U27 (Main, 2026-09-23): the cam is set-screwed to the lift rod (MHA-DT-17), so
 # the bore only has to slip over it.  A stock 6.4 mm reamer holds +/-0.03, and
 # against the rod's h band that leaves 0.02-0.10 diametral clearance -- enough
 # to slide on at assembly, small enough that the set screw's shift is noise
 # under the feeler-set rig location.
-LIFT_ROD_NUMBER = "MHA-DT-017"
+LIFT_ROD_NUMBER = "MHA-DT-17"
 # Equal bilateral, so the model authors it symmetric and the sheet prints
 # +/-0.03 rather than stacked limits (ENFORCE r5).
 BORE_TOLERANCE_MM = 0.03
@@ -69,9 +69,9 @@ if SLIP_CLEARANCE_MIN < 0.02 or SLIP_CLEARANCE_MAX > 0.10:
 # else on this collar mates with anything, so nothing else carries a band.
 # Routine controlling dimensions use the title block's general grade.
 # drawing-guidelines.md rule 4 (tighten only for function, and name the mate):
-# both tight bands name the MHA-DT-025 follower pin they serve (machinist
+# both tight bands name the MHA-DT-25 follower pin they serve (machinist
 # review ENFORCE r1: the bands named no mate).
-FOLLOWER_PIN_NUMBER = "MHA-DT-025"
+FOLLOWER_PIN_NUMBER = "MHA-DT-25"
 COLLAR_OD_TOLERANCE_MM = 0.05
 COLLAR_AXIS_TOLERANCE_MM = 0.05
 
@@ -169,11 +169,11 @@ ECCENTRICITY_CALLOUT = (
     f"ECCENTRICITY\nBORE AXIS TO OD AXIS\nSETS {FOLLOWER_PIN_NUMBER} PIN LIFT"
 )
 # drawing-guidelines.md rule 23 (lock threaded joints exposed to operating
-# loads), #1176: MHA-DT-000's cam-collars-set step stakes the tap mouth over
+# loads), #1176: MHA-DT-00's cam-collars-set step stakes the tap mouth over
 # the set screw; the drawing resolves this key through dt_drive_train_steps
 # so the number follows the assembly sequence.  The spec holds only the key:
 # importing the steps module here would re-key the part on every step edit
-# (as MHA-DT-016 / MHA-DT-017 hold LEVER_PIN_SET_STEP_KEY).
+# (as MHA-DT-16 / MHA-DT-17 hold LEVER_PIN_SET_STEP_KEY).
 SET_SCREW_STAKE_STEP_KEY = "cam-collars-set"
 TAP_DRILL_CALLOUT = "TAP DRILL THRU TO BORE\n#2-56 UNC\nSTAKE AT ASSEMBLY PER"
 

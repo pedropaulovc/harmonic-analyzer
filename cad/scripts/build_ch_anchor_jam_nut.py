@@ -1,7 +1,7 @@
-r"""Reproduction script: channel anchor jam nut (MHA-CH-014; 20 used).
+r"""Reproduction script: channel anchor jam nut (MHA-CH-14; 20 used).
 
-A turned brass round nut, #6-32 tapped through, one on each MHA-VN-012
-channel anchor, jammed against the MHA-SM-003 plate underside
+A turned brass round nut, #6-32 tapped through, one on each MHA-CH-VN-51
+channel anchor, jammed against the MHA-SM-03 plate underside
 (``ch_anchor_jam_nut_spec``).  One saw cut across the driven face gives the
 two drive notches, the bore between them.
 

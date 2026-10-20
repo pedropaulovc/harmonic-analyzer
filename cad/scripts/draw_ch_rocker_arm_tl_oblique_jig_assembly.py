@@ -1,13 +1,16 @@
-r"""Create the six-sheet oblique-trammel jig fitter package (MHA-CH-006-TL-000).
+r"""Create the six-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
 the plan tagging the carrier's pass holes A1-B2, both rails and the spindle
 origin, beside the pose caption and the rail-alignment targets the fitter
-indicates the pivot pins to. Sheet 2 is the BOM: every family TL-20 to TL-49
-from the part registry, made and bought, numbered in the spec's BOM order
+indicates the pivot pins to. Sheet 2 is the BOM: every fabricated TL family and
+purchased TL-VN family from the part registry, numbered in the spec's BOM order
 with its full description and total quantity, one line a row, beside its
-parent view, the jig collapsed. Sheets 3 to 5 each show the builder-owned
+parent view, the jig collapsed. Full parent-scoped vendor Numbers have their
+own 56 mm column; the descriptive column gives it 8 mm without changing the
+table's sheet footprint or the reference view's room. Sheets 3 to 5 each show
+the builder-owned
 ``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail
 bars, leadscrew feed, carrier), at the largest scale whose balloon ring fits
 the sheet, each family ballooned once on one ring, on no other sheet. Sheet 6
@@ -282,20 +285,23 @@ ELEVATION_LABEL_XY = _label_under(
     ELEVATION_CENTER, _EZ1 - _EZ0, spec.ELEVATION_VIEW_LABEL
 )
 
-# Sheet 2: the BOM right, four columns to the inner border. The 29 rows fit
-# one table above the title block at one line a row, so the BOM is not
-# split: draw_pd_paper_drive_assembly's proven column widths (a 41-character
-# description prints on one line in 118 mm) and row height, every row set
-# and the rebuilt table measured against its paper.
-# Table text runs about 2.9 mm a character (default format).
+# Sheet 2: the BOM right, four columns to the inner border. All 31 families
+# fit above the title block at one line a row. Reallocate 8 mm of the former
+# 118 mm description column to the Number column: full 18-character vendor
+# Numbers need 52.2 mm at the unchanged default format. Both text columns
+# retain 2 mm of horizontal clearance, and the rebuilt table is measured
+# against its paper. Table text runs about 2.9 mm a character.
 BOM_CHAR_M = 0.0029
+BOM_CELL_PADDING_M = 0.002  # total horizontal clearance inside each text column
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.048,
-    "description": 0.118,
+    "part": 0.056,
+    "description": 0.110,
     "quantity": 0.012,
 }
-BOM_DESCRIPTION_MAX_CHARS = spec.BOM_DESCRIPTION_CHARS  # one line in 118 mm
+BOM_DESCRIPTION_MAX_CHARS = int(
+    (BOM_COLUMN_WIDTHS["description"] - BOM_CELL_PADDING_M) / BOM_CHAR_M
+)
 BOM_ROW_HEIGHT = 0.0055
 BOM_SHEET_CLEARANCE = 0.003  # the paper the BOM keeps off the title block
 BOM_ANCHOR = (SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()), 0.262)
@@ -390,67 +396,67 @@ PART_ROWS = {
     "ch-rocker-arm-tl-oblique-nut-bracket": _config.parts(
         "ch-rocker-arm-tl-oblique-nut-bracket"
     ),
-    "ch-rocker-arm-tl-oblique-rail": _config.parts("ch-rocker-arm-tl-oblique-rail"),
-    "ch-rocker-arm-tl-oblique-carriage": _config.parts(
-        "ch-rocker-arm-tl-oblique-carriage"
+    "ch-rocker-arm-tl-vn-oblique-rail": _config.parts("ch-rocker-arm-tl-vn-oblique-rail"),
+    "ch-rocker-arm-tl-vn-oblique-carriage": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-carriage"
     ),
-    "ch-rocker-arm-tl-oblique-bearing": _config.parts(
-        "ch-rocker-arm-tl-oblique-bearing"
+    "ch-rocker-arm-tl-vn-oblique-bearing": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-bearing"
     ),
-    "ch-rocker-arm-tl-oblique-cl-dowel": _config.parts(
-        "ch-rocker-arm-tl-oblique-cl-dowel"
+    "ch-rocker-arm-tl-vn-oblique-cl-dowel": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-cl-dowel"
     ),
-    "ch-rocker-arm-tl-oblique-leadscrew": _config.parts(
-        "ch-rocker-arm-tl-oblique-leadscrew"
+    "ch-rocker-arm-tl-vn-oblique-leadscrew": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-leadscrew"
     ),
-    "ch-rocker-arm-tl-oblique-leadscrew-nut": _config.parts(
-        "ch-rocker-arm-tl-oblique-leadscrew-nut"
+    "ch-rocker-arm-tl-vn-oblique-leadscrew-nut": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
     ),
-    "ch-rocker-arm-tl-oblique-pillow-block": _config.parts(
-        "ch-rocker-arm-tl-oblique-pillow-block"
+    "ch-rocker-arm-tl-vn-oblique-pillow-block": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-pillow-block"
     ),
-    "ch-rocker-arm-tl-oblique-handwheel": _config.parts(
-        "ch-rocker-arm-tl-oblique-handwheel"
+    "ch-rocker-arm-tl-vn-oblique-handwheel": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-handwheel"
     ),
-    "ch-rocker-arm-tl-oblique-hold-down-stud": _config.parts(
-        "ch-rocker-arm-tl-oblique-hold-down-stud"
+    "ch-rocker-arm-tl-vn-oblique-hold-down-stud": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-hold-down-stud"
     ),
-    "ch-rocker-arm-tl-oblique-t-nut": _config.parts("ch-rocker-arm-tl-oblique-t-nut"),
-    "ch-rocker-arm-tl-oblique-flange-nut": _config.parts(
-        "ch-rocker-arm-tl-oblique-flange-nut"
+    "ch-rocker-arm-tl-vn-oblique-t-nut": _config.parts("ch-rocker-arm-tl-vn-oblique-t-nut"),
+    "ch-rocker-arm-tl-vn-oblique-flange-nut": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-flange-nut"
     ),
-    "ch-rocker-arm-tl-oblique-rail-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-rail-screw"
+    "ch-rocker-arm-tl-vn-oblique-rail-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-rail-screw"
     ),
-    "ch-rocker-arm-tl-oblique-bracket-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-bracket-screw"
+    "ch-rocker-arm-tl-vn-oblique-bracket-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw"
     ),
-    "ch-rocker-arm-tl-oblique-block-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-block-screw"
+    "ch-rocker-arm-tl-vn-oblique-block-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-block-screw"
     ),
-    "ch-rocker-arm-tl-oblique-carriage-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-carriage-screw"
+    "ch-rocker-arm-tl-vn-oblique-carriage-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-carriage-screw"
     ),
-    "ch-rocker-arm-tl-oblique-kp08-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-kp08-screw"
+    "ch-rocker-arm-tl-vn-oblique-kp08-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-kp08-screw"
     ),
-    "ch-rocker-arm-tl-oblique-nut-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-nut-screw"
+    "ch-rocker-arm-tl-vn-oblique-nut-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-nut-screw"
     ),
-    "ch-rocker-arm-tl-oblique-riser-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-riser-screw"
+    "ch-rocker-arm-tl-vn-oblique-riser-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-riser-screw"
     ),
-    "ch-rocker-arm-tl-oblique-clamp-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-clamp-screw"
+    "ch-rocker-arm-tl-vn-oblique-clamp-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-clamp-screw"
     ),
-    "ch-rocker-arm-tl-oblique-lever-screw": _config.parts(
-        "ch-rocker-arm-tl-oblique-lever-screw"
+    "ch-rocker-arm-tl-vn-oblique-lever-screw": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-lever-screw"
     ),
-    "ch-rocker-arm-tl-oblique-block-washer": _config.parts(
-        "ch-rocker-arm-tl-oblique-block-washer"
+    "ch-rocker-arm-tl-vn-oblique-block-washer": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-block-washer"
     ),
-    "ch-rocker-arm-tl-oblique-lever-washer": _config.parts(
-        "ch-rocker-arm-tl-oblique-lever-washer"
+    "ch-rocker-arm-tl-vn-oblique-lever-washer": _config.parts(
+        "ch-rocker-arm-tl-vn-oblique-lever-washer"
     ),
 }
 if set(PART_ROWS) != set(BOM_COMPONENTS):

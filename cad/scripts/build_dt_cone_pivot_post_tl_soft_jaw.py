@@ -1,4 +1,4 @@
-r"""Build the cone pivot post's tall vise soft jaw (MHA-DT-005-TL-04; shop fixture).
+r"""Build the cone pivot post's tall vise soft jaw (MHA-DT-05-TL-04; shop fixture).
 
 A 6061 plate that replaces one of the PM 6 in vise's hardened jaw plates on
 the vise's own M10 jaw screws, tall enough to close over the cone post's

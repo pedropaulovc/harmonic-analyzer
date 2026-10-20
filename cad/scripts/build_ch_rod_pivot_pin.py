@@ -1,10 +1,10 @@
-r"""Reproduction script: rod pivot pin (MHA-CH-010; 20 used, one per channel).
+r"""Reproduction script: rod pivot pin (MHA-CH-10; 20 used, one per channel).
 
 The plain 5/64 drill-rod pin that closes each connecting rod's fork round its
 rocker arm (``ch_rod_pivot_pin_spec`` owns the joint and its budget). It RUNS
 in the arm's #47 rod hole and is PRESSED into the reamed pin hole through
 both tines, its ends dressed flush with the fork's faces (user ruling
-2026-10-09, PR #1292 review F1: press fit as the MHA-CH-011 bar pin, removable
+2026-10-09, PR #1292 review F1: press fit as the MHA-CH-11 bar pin, removable
 with a punch; it reverses the #746 peening reconstruction choice).
 
 The model is the INSTALLED pin: a Ø PIN_DIA cylinder PIN_INSTALLED_LENGTH (the

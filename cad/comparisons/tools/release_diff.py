@@ -19,11 +19,13 @@ Bundles are read straight from the GitHub release zips over HTTP range
 requests -- only the central directory and the needed members are fetched,
 never the whole 460 MB asset.
 
-The committed schema-2 identity map groups actual STEP inventory members by
-canonical identity while retaining configuration suffixes and actual cache
-basenames on both sides. Duplicate logical identities are rejected. New,
-deleted and renamed members are reported separately from geometry verdicts;
-``--parts`` accepts either spelling, but only members paired in both bundles.
+The current identity map projects prior category identities, composed with the
+sealed historical map for archived releases. A shared prior vendor member can
+pair with every current parent-specific clone without merging those clones.
+Configuration suffixes and actual cache basenames are retained on both sides.
+Overlapping identities in one bundle are rejected; new, deleted and renamed
+members are separate from geometry verdicts. ``--parts`` accepts any mapped
+historical or current spelling, but only members paired in both bundles.
 
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --parts summing-lever,knife-mount
@@ -44,28 +46,61 @@ import numpy as np
 import trimesh
 
 CACHE = Path(os.environ.get("RELEASE_DIFF_CACHE", "/tmp/release_diff_cache"))
-IDENTITY_MAP = Path(__file__).resolve().parents[2] / "config" / "identity-migration-map.json"
+IDENTITY_MAP = Path(__file__).resolve().parents[2] / "config" / "current-identity-map.json"
+HISTORICAL_IDENTITY_MAP = IDENTITY_MAP.with_name("identity-migration-map.json")
 
 
-def load_identity_map(path=IDENTITY_MAP):
-    """Load the sealed schema-2 rename table for diff pairing only."""
+def _check_stems(*stems):
+    for stem in stems:
+        if not isinstance(stem, str) or re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", stem) is None:
+            raise ValueError(f"identity map requires dashed lowercase stems: {stem!r}")
+
+
+def load_identity_map(path=IDENTITY_MAP, historical_path=HISTORICAL_IDENTITY_MAP):
+    """Map historical/prior stems to all current targets, without changing either map."""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if payload.get("schema_version") != 2:
-        raise ValueError("release diff identity map requires schema_version 2")
+    if payload.get("schema_version") != 1:
+        raise ValueError("release diff current identity map requires schema_version 1")
     mapping = {}
     targets = set()
-    for row in payload["identities"]:
-        old, new = row["old_stem"], row["new_stem"]
+    for row in payload["parts_and_assemblies"]:
+        old = row["old_stem"]
+        current = tuple(identity["stem"] for identity in row["new_identities"])
+        _check_stems(old, *current)
+        if not current or old in mapping or len(set(current)) != len(current) or targets.intersection(current):
+            raise ValueError(f"duplicate or empty current identity map entry: {old!r}, {current!r}")
+        mapping[old] = current
+        targets.update(current)
+
+    # These explicit post-v39 category changes bridge the sealed targets to the
+    # prior vendor namespace. They are aliases only in historical comparisons.
+    for row in payload.get("historical_current_aliases", []):
+        old, prior, current = row["old_stem"], row["prior_current_stem"], row["current_stem"]
+        _check_stems(old, prior, current)
+        if current not in mapping.get(prior, ()):
+            raise ValueError(f"historical alias has no current identity: {row!r}")
+        if old in mapping and mapping[old] != (current,):
+            raise ValueError(f"conflicting historical identity alias: {old!r}")
+        mapping[old] = (current,)
+
+    historical = json.loads(Path(historical_path).read_text(encoding="utf-8"))
+    if historical.get("schema_version") != 2:
+        raise ValueError("release diff historical identity map requires schema_version 2")
+    old_stems, historical_targets = set(), set()
+    for row in historical["identities"]:
+        old, prior = row["old_stem"], row["new_stem"]
         if old is None:
-            # Families created after the cutover (e.g. the MS stop plate) have
-            # no old-tree member to pair with.
+            # Families introduced at that cutover have no archived counterpart.
             continue
-        if old != old.lower() or new != new.lower() or "_" in old or "_" in new:
-            raise ValueError(f"identity map requires dashed lowercase stems: {old!r}, {new!r}")
-        if old in mapping or new in targets:
-            raise ValueError(f"duplicate identity map entry: {old!r}, {new!r}")
-        mapping[old] = new
-        targets.add(new)
+        _check_stems(old, prior)
+        if old in old_stems or prior in historical_targets:
+            raise ValueError(f"duplicate historical identity map entry: {old!r}, {prior!r}")
+        old_stems.add(old)
+        historical_targets.add(prior)
+        current = mapping.get(prior, (prior,))
+        if old in mapping and mapping[old] != current:
+            raise ValueError(f"conflicting historical identity alias: {old!r}")
+        mapping[old] = current
     return mapping
 
 
@@ -78,31 +113,41 @@ def split_mesh_key(key):
     return (key[:suffix.start()], suffix.group()) if suffix else (key, "")
 
 
-def canonical_key(key, mapping):
-    """Translate only the stem, preserving the complete configuration qualifier."""
+def canonical_keys(key, mapping):
+    """Project only the stem, retaining every target and the complete qualifier."""
     stem, suffix = split_mesh_key(key)
     stem = stem.lower()
-    return mapping.get(stem, stem) + suffix
+    return tuple(target + suffix for target in mapping.get(stem, (stem,)))
 
 
 def identity_inventory(keys, mapping):
-    """Index actual members by logical identity; ambiguous bundles are invalid."""
+    """Index projected identities; distinct current clones never collapse."""
     inventory = {}
     for actual in keys:
-        logical = canonical_key(actual, mapping)
-        if logical in inventory:
-            raise ValueError(
-                f"duplicate logical identity {logical!r}: {inventory[logical]!r}, {actual!r}"
-            )
-        inventory[logical] = actual
+        for logical in canonical_keys(actual, mapping):
+            if logical in inventory:
+                raise ValueError(
+                    f"duplicate logical identity {logical!r}: {inventory[logical]!r}, {actual!r}"
+                )
+            inventory[logical] = actual
     return inventory
 
 
 def paired_keys(old_keys, new_keys, mapping):
-    """Return new-actual -> old-actual pairs from the two actual inventories."""
+    """Return every new-actual -> old-actual pair, reusing shared prior sources."""
     old = identity_inventory(old_keys, mapping)
     new = identity_inventory(new_keys, mapping)
-    return {actual: old[logical] for logical, actual in new.items() if logical in old}
+    pairs = {}
+    for logical, actual in new.items():
+        if logical not in old:
+            continue
+        previous = old[logical]
+        if actual in pairs and pairs[actual] != previous:
+            raise ValueError(
+                f"ambiguous prior identity for {actual!r}: {pairs[actual]!r}, {previous!r}"
+            )
+        pairs[actual] = previous
+    return pairs
 
 
 # --------------------------------------------------------------------------- #
@@ -325,7 +370,7 @@ def main():
     ap.add_argument("tag_b")
     ap.add_argument("--parts", help="comma-separated part basenames")
     ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
-                    help="schema-2 diff-only identity rename table")
+                    help="current schema-1 identity table (composed with sealed historical identities)")
     ap.add_argument("--top", type=int, default=0,
                     help="auto-select N parts with largest STEP byte delta")
     ap.add_argument("--no-boolean", action="store_true",
@@ -362,9 +407,13 @@ def main():
     changed_crc.sort(key=lambda k: -abs(sb[k]["uncomp"] - sa[pairs[k]]["uncomp"]))
 
     if args.parts:
-        requested = {canonical_key(p.strip(), mapping) for p in args.parts.split(",")}
-        parts = [k for k in common if canonical_key(k, mapping) in requested]
-        missing = requested - {canonical_key(k, mapping) for k in parts}
+        requested = {p.strip(): set(canonical_keys(p.strip(), mapping))
+                     for p in args.parts.split(",")}
+        candidates = {key: set(canonical_keys(key, mapping)) for key in common}
+        parts = [key for key, logical in candidates.items()
+                 if any(logical & selected for selected in requested.values())]
+        missing = [name for name, selected in requested.items()
+                   if not any(selected & candidates[key] for key in parts)]
         if missing:
             ap.error(f"requested parts are not paired in both bundles: {sorted(missing)}")
     elif args.top:

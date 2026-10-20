@@ -140,7 +140,7 @@ HUB_LENGTH_BAND = (0.05, 0.0)
 # Owner ruling 2026-10-19 retains this frame and datum scheme (RV-05).
 STRAP_HUB_SYMMETRY = 0.10
 # The hub-to-strap root fillet (drawing-guidelines rule 16), printed as the
-# single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-001 foot cheeks pass
+# single limit "R0.2 MAX" (Opus #1020 r2 C2). The MHA-CH-01 foot cheeks pass
 # over the hub at d = 0 and the bar floats axially in its foot notch, so a
 # cheek can run on the strap face, where the fillet stands its full radius
 # proud of the hub wall: the radius is capped by the cheeks' radial air over

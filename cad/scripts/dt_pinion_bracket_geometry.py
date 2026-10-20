@@ -46,7 +46,7 @@ PIN_DROP = -7.0  # NEGATIVE: the stud seat is 7 ABOVE the pivot bore (on the
 PIN_SEAT = 4.0
 # Option E-a: the 1/16 cross hole runs along local X on the strap mid-plane,
 # this far from the part origin face (build_dt_pinion_bracket drives it, the
-# drive train reads it to place the MHA-VN-033 pins).
+# drive train reads it to place the MHA-DT-VN-63 pins).
 CROSS_HOLE_CZ = THICKNESS / 2.0
 
 R_END = WIDTH / 2.0
@@ -54,12 +54,12 @@ HALF_WIDTH = R_END
 OVERALL_LENGTH = C2C + 2.0 * R_END
 
 # Printed places of the dimensions whose bands the E-a cross-hole webs read
-# (vn_pinion_strap_pin_spec).  dt_pinion_bracket_spec.DRAWING_PRECISION states them
+# (dt_vn_pinion_strap_pin_spec).  dt_pinion_bracket_spec.DRAWING_PRECISION states them
 # natively from these, so a precision change reaches the web gates by itself
 # (restricted review, ruling 3).
 END_RADIUS_PLACES = 1  # BottomCapRadius / TopCapRadius
 # CrossHoleCz, from broad face A.  The hole's height prints no offset: its
 # centre sits on the pivot-axis line the flank view draws, an implied zero
-# the webs charge the coarsest grade (vn_pinion_strap_pin_spec).
+# the webs charge the coarsest grade (dt_vn_pinion_strap_pin_spec).
 CROSS_HOLE_CZ_PLACES = 2
 

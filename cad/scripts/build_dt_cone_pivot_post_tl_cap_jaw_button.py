@@ -1,4 +1,4 @@
-r"""Build the cone pivot post's cap jaw button (MHA-DT-005-TL-03; shop fixture).
+r"""Build the cone pivot post's cap jaw button (MHA-DT-05-TL-03; shop fixture).
 
 A turned aluminium button that sits between a soft vise jaw and a cone-boss
 cap of the built-up cone pivot post: the spigot centres in the journal bore

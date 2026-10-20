@@ -105,10 +105,10 @@ def test_pin_hole_sits_at_mid_engagement_and_is_match_drilled() -> None:
     assert geometry.PIN_HOLE_Z == geometry.HUB_LEN / 2.0 - geometry.PIN_HOLE_FROM_MOUTH
     callout = drawing.DIMENSION_CALLOUTS["PinHoleDia"]
     # The hole specification only; LEVER PIN SET drives and peens the pin,
-    # and the sheet points at that MHA-DT-000 step through the registry.
+    # and the sheet points at that MHA-DT-00 step through the registry.
     import dt_drive_train_steps
 
-    assert dt_pinion_lever_spec.PIN_HOLE_CALLOUT == "MATCH-DRILL THRU AT ASSEMBLY ON MHA-DT-017"
+    assert dt_pinion_lever_spec.PIN_HOLE_CALLOUT == "MATCH-DRILL THRU AT ASSEMBLY ON MHA-DT-17"
     assert drawing.LEVER_PIN_SET_STEP_KEY == "lever-pin-set"
     assert callout == (
         f"{dt_pinion_lever_spec.PIN_HOLE_CALLOUT},\n"

@@ -458,6 +458,21 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   zero-padding guarantee** or an assumed fixed capacity. Keep the existing
   1e-7 m displayed-height tolerance and original-exception forensic capture.
 
+## Longer parent-scoped identity callouts
+
+Budget the whole printed block, including its shelf, rather than just the
+dimension anchor. The fulcrum shaft's `SETS MHA-CH-VN-55` block measured 44.9 mm
+wide in the native PDF and overran the inner border by 0.19 mm. Its recipe moves
+the anchor 4 mm left; the containment check uses a 45 mm envelope and retains
+the 3 mm border clearance and greater-than-5 mm tip clearance.
+
+For a linear dimension whose identity/function text no longer fits between
+the witnesses, use `offset_dimension_text` to put the complete block on a
+native shelf, as on the cone-tip block's `9.750` engagement dimension. Preserve
+the value, precision and attachments; audit the new text box and leader, then
+check the native PDF for line strikes. This is not the radial/diametric
+`OffsetText` case below.
+
 ## Refusal catalogue — do / don't
 
 **a. `IDisplayDimension::OffsetText` on a radial or diametric dimension.**
@@ -908,6 +923,19 @@ Wizard holes: the bracket's collar end view arrived with one mark on the bore
 read 1 → 2 the same way in #913). Add none; prove the one on the axis
 (`draw_mg_magnifying_bracket._prove_collar_centre_mark`).
 
+The census is not a manufacturing count when the same recipe emits different
+automatic labels. Summing lever already recorded view-dependent labels in
+#1591. The PR1709 native leaf (`5c5d3e3b3672`, 2026-10-19) imported four
+cosmetic threads into H-H and put all four on `TAP-THREAD-SECTION`, but H-H
+emitted no `Tapped Hole` note: the package had seven notes, not the eight
+another build had emitted. That is not evidence of a missing tapped hole.
+Following top frame's per-view cleanup, summing lever deletes every actual
+automatic label and reads back each view to reject survivors. Its final
+settled check rejects any late label and requires the three original native
+callouts (counter-anchor, spring-hole pattern, blind bracket taps) to remain
+in their authored views, non-dangling, with unchanged native definitions.
+The shared finalizer's exact-count contract is unchanged for other recipes.
+
 **q. A standard view placed as-is is not necessarily in projection.**
 Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
 `*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
@@ -1002,7 +1030,7 @@ bottom outline where neither mounting witnesses nor the hole leader crosses
 it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
 view's printed dimension ink.
 
-The MG-006 hex fixture's principal `*Top` view looks down the rod bore,
+The MG-06 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.
 Its height is AF 11.1125, with one projected corner ridge through the bore
 circle. An unturned `*Right` end view instead puts Y up and shows the

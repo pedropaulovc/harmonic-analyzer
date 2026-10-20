@@ -11,7 +11,7 @@ photo shows plain rod + separate set-pinned collars, and the collar
 mechanism replaced the crossed-pin lift.
 
 Layout: rod axis Z, z 0..ROD_LEN, one revolved half-profile crowned at its
-back end. U36: the MHA-DT-030 pin hole crosses it along local X, 4.0 in from
+back end. U36: the MHA-DT-30 pin hole crosses it along local X, 4.0 in from
 the flat front end (the lever hub's mid-engagement), match-drilled at assembly.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25".
@@ -234,7 +234,7 @@ async def build(adapter) -> dict[str, str]:
     # Named centreline axis (Axis1): the assembly's revolute (coaxial to the
     # block's lift-bore axis) and the cam/lever clamps all key off it (PR8).
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "rod axis")
-    # Named pin-hole axis (along X at the pin station): the MHA-DT-030 pin's
+    # Named pin-hole axis (along X at the pin station): the MHA-DT-30 pin's
     # coaxial reference in the assembly.
     await name_bore_axis(
         adapter, "Top Plane", 0.0, "Front Plane", ROD_PIN_HOLE_FROM_END, "lever pin"

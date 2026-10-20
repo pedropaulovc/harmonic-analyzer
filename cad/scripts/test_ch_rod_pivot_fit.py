@@ -1,9 +1,9 @@
 """Offline contract: the rod fork straddles its rocker arm in one plane, and
-the MHA-CH-010 pin is pressed into the fork's reamed tines and runs in the
+the MHA-CH-10 pin is pressed into the fork's reamed tines and runs in the
 arm. The printed BASIC/profile controls and fork bands prove the crotch fit;
 the pin spec's older radius-band budget is a separate regression, not the
 current arc acceptance. Press fit, ends dressed flush: the user's ruling
-(2026-10-09, PR #1292 review F1), the MHA-CH-011 bar pin's joint
+(2026-10-09, PR #1292 review F1), the MHA-CH-11 bar pin's joint
 (``test_ch_bar_pivot_fit``). Drawing-guidelines.md rule 17 (walls and webs)
 governs the remaining fits.
 
@@ -243,13 +243,13 @@ def test_the_assembly_press_allowance_is_this_joint() -> None:
         for n in range(1, 21)
     }
     set_screw_pairs = {
-        frozenset((f"vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")) for n in (1, 2)
+        frozenset((f"ch-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}")) for n in (1, 2)
     } | {
-        frozenset((f"vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}"))
+        frozenset((f"ch-vn-fulcrum-set-screw-{n}", f"ch-fulcrum-keeper-{n}"))
         for n in (1, 2)
     }
     anchor_nut_pairs = {
-        frozenset((f"vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}"))
+        frozenset((f"ch-vn-spring-hook-{n}", f"ch-anchor-jam-nut-{n}"))
         for n in range(1, 21)
     }
     assert set(pairs) == rod_pairs | bar_pairs | set_screw_pairs | anchor_nut_pairs

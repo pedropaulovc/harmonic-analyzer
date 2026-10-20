@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the rocker pivot shaft (MHA-CH-005)."""
+r"""Create the curated machinist drawing for the rocker pivot shaft (MHA-CH-05)."""
 
 from __future__ import annotations
 
@@ -342,7 +342,7 @@ def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> No
     The radius is read-only: a spherical cap of the printed dome height on the
     toleranced diameter already fixes it. Whatever radius prefix the display
     carries is kept behind the ``(S``; the readback proves it stuck (the
-    MHA-DT-001 crankshaft's dome prints the same way).
+    MHA-DT-01 crankshaft's dome prints the same way).
     """
     annotation = _early_bound(annotation, "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")

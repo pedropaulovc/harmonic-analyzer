@@ -1,4 +1,4 @@
-r"""Reproduction script: transgear knob thrust ring (MHA-PD-015; ch. 23; 1 used).
+r"""Reproduction script: transgear knob thrust ring (MHA-PD-15; ch. 23; 1 used).
 
 The loose brass ring clears the new six-millimetre rear journal between the
 12T's rear face and the arm-plate front hub. Its source-owned length and

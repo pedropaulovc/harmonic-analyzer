@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker template trammel scriber block (MHA-CH-006-TL-15)."""
+"""Offline contracts for the rocker template trammel scriber block (MHA-CH-06-TL-15)."""
 
 from __future__ import annotations
 
@@ -116,17 +116,17 @@ def test_point_holes_are_the_reamed_fit_named_on_the_scriber_points() -> None:
     features = _features()
     for name in ("point_hole_inner", "point_hole_outer"):
         assert features[name]["dia"] == [6.375, 6.388]
-    assert "MHA-CH-006-TL-16" in features["point_hole_inner"]["note"]
+    assert "MHA-CH-06-TL-16" in features["point_hole_inner"]["note"]
     assert spec.POINT_HOLE_CALLOUT.startswith("2X ")
-    assert "MHA-CH-006-TL-16" in spec.POINT_HOLE_CALLOUT
+    assert "MHA-CH-06-TL-16" in spec.POINT_HOLE_CALLOUT
 
 
 def test_spacing_is_the_kit_band_and_names_its_check() -> None:
     outer = _features()["point_hole_outer"]
     # The spacing is the outer hole's station from the inner hole's axis.
     assert outer["station"] == [15.975, 16.025]
-    assert "MHA-CH-006-TL-17" in outer["note"]
-    assert "MHA-CH-006-TL-17" in spec.SCRIBER_SPACING_CALLOUT
+    assert "MHA-CH-06-TL-17" in outer["note"]
+    assert "MHA-CH-06-TL-17" in spec.SCRIBER_SPACING_CALLOUT
     assert kit.TEMPLATE_RADII[1] - kit.TEMPLATE_RADII[0] == spec.SCRIBER_SPACING
 
 

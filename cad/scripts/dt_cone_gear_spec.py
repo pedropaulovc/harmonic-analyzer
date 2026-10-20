@@ -302,17 +302,17 @@ def over_pins_limits_mm(teeth: int) -> tuple[float, float]:
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
 # gear is one seat pitch thick, so each bears on its neighbour and the stack
-# on MHA-DT-007 sets every station (dt_cone_gear_stack); no gear is bonded.  The
+# on MHA-DT-07 sets every station (dt_cone_gear_stack); no gear is bonded.  The
 # face is SEAT_PITCH floored to the four places it prints, so the modelled
 # stack closes without interference.  Every gear grew SOUTH: its north face
 # stays on the station layout (cone_line), so T006's north face -- the
-# datum the MHA-VN-016 stack collar is feelered off -- does not move.  The band
+# datum the MHA-DT-VN-54 stack collar is feelered off -- does not move.  The band
 # is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
 # accepted at +/-0.20), so it is faced to a micrometer on both sides.
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = (0.025, -0.025)
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
-# angular datum on MHA-DT-004, and its outward normal passes through the centre
+# angular datum on MHA-DT-04, and its outward normal passes through the centre
 # of the phase-0 tooth on local +X, so every gear keeps the clock it is
 # placed at.  Index the teeth off the flat on one setup; the native
 # BoreFlatClock angular dimension carries this band (error_budget.yaml
@@ -443,12 +443,12 @@ BORE_AF_PLACES = 3
 
 
 def land_section(teeth: int) -> int:
-    """Index of the MHA-DT-004 land (cone_shaft_land_bands) carrying ``teeth``."""
+    """Index of the MHA-DT-04 land (cone_shaft_land_bands) carrying ``teeth``."""
     _require_member(teeth)
     for section, carried in enumerate(SECTION_CONE_GEAR_TEETH):
         if teeth in carried:
             return section
-    raise AssertionError(f"no MHA-DT-004 land carries the T{teeth:03d} cone gear")
+    raise AssertionError(f"no MHA-DT-04 land carries the T{teeth:03d} cone gear")
 
 
 def bore_flat_af_mm(teeth: int) -> float:
@@ -623,7 +623,7 @@ def custom_six_form_points_mm() -> tuple[tuple[float, float, float], ...]:
 
 
 def configuration_number(part_number: str, teeth: int) -> str:
-    """Return one configuration sheet's drawing number, e.g. ``MHA-DT-003-T006``."""
+    """Return one configuration sheet's drawing number, e.g. ``MHA-DT-03-T006``."""
     _require_member(teeth)
     number = part_number.strip().upper()
     if not number:

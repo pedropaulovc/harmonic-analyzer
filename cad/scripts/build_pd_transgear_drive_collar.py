@@ -1,4 +1,4 @@
-r"""Build MHA-PD-022, the transgear drive collar (contract §1.2, round 10).
+r"""Build MHA-PD-22, the transgear drive collar (contract §1.2, round 10).
 
 A brass collar with a true D-bore on the integral knob's solid D-core.
 Its rear face reacts on the actual gear front F; the body is supplied long

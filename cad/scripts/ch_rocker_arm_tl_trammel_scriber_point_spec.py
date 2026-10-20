@@ -1,8 +1,8 @@
 r"""Pure-data contract for the rocker template trammel's scriber point
-(MHA-CH-006-TL-16; shop tooling, two off).
+(MHA-CH-06-TL-16; shop tooling, two off).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). Two of
-these 1/4 in O1 drill-rod points stand in the scriber block's (MHA-CH-006-TL-15)
+these 1/4 in O1 drill-rod points stand in the scriber block's (MHA-CH-06-TL-15)
 reamed point holes, 16.000 apart, and scribe the rocker outline template's
 R800 and R816 arcs on blued O1 plate (trial route ``rocker-template-route.md``
 sections 2.1-2.4, kit contract ``ch_rocker_arm_tl_trammel_spec``). R comes from
@@ -121,12 +121,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 REFERENCE_DIMENSIONS = frozenset({"RodDia"})
 # Callouts ride the below lane only, one short line each (about 30
 # characters at most): SolidWorks does not wrap callout text.
-ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-15\nPOINT HOLES"
+ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-06-TL-15\nPOINT HOLES"
 ROD_NOTE = " ".join(ROD_CALLOUT.splitlines())
 # Drawing-guidelines rule 4: the half-angle's band serves the setting bar's
 # centre-drilled seats, which centre the scriber on the pilot rim, so the angle
 # callout names that mate by Number.
-TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS\nSEATS IN MHA-CH-006-TL-17"
+TIP_ANGLE_CALLOUT = "EACH SIDE OF AXIS\nSEATS IN MHA-CH-06-TL-17"
 HARDENED_CALLOUT = "HARDENED ZONE"
 TIP_FLAT_CALLOUT = "TIP FLAT"
 DIMENSION_CALLOUTS = {

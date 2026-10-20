@@ -139,7 +139,7 @@ def test_crown_radius_is_the_dome_radius_the_part_drives() -> None:
 # Every Diametric write a drawing script may make, each onto a dimension that
 # is ALREADY a diameter, so the write changes nothing the model solves. Setting
 # Diametric on a MODEL dimension keeps its value and re-reads it as the other
-# kind: False on a diameter doubles the feature (v37 MHA-DT-002 printed an R22
+# kind: False on a diameter doubles the feature (v37 MHA-DT-02 printed an R22
 # crown on the R11 part), True on a radius halves it. A new writer must show
 # its dimension is sheet-made or already the kind it sets, and join this list.
 _DIAMETRIC_WRITERS = {
@@ -292,7 +292,7 @@ def test_hold_down_hole_webs_hold_u27_at_the_printed_worst_case() -> None:
     assert to_strap_root - 2 * band_1pl >= 2.0
     assert to_ledge_end - 2 * band_1pl >= 2.0
     assert to_side - band_1pl - band_1pl / 2.0 >= 2.0
-    # The MHA-VN-032 head (Ø6.858) floats with the shank in the hole; it must
+    # The MHA-DT-VN-62 head (Ø6.858) floats with the shank in the hole; it must
     # still clear the strap root it is tightened beside.
     head_r = 6.858 / 2.0
     float_r = (spec.SCREW_HOLE_DIA - 4.1656) / 2.0
@@ -446,7 +446,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         ), f"{label} is inside the title block"
 
 
-# The native hole-callout font as v37 MHA-DT-002 printed it: the thread line
+# The native hole-callout font as v37 MHA-DT-02 printed it: the thread line
 # "TAP TO BORE, AT CROWN APEX 4-40 UNC <depth> 0.00" (42 glyphs) ran
 # 109.7 mm at the 3.5 mm cap height, and its two lines stood 16.8 pt apart.
 _CALLOUT_CAP_M = 0.0035

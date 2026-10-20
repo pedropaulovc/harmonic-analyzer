@@ -1,4 +1,4 @@
-"""Offline contracts for the rod pivot pin (MHA-CH-010) part and drawing.
+"""Offline contracts for the rod pivot pin (MHA-CH-10) part and drawing.
 
 The installed pressed pin under ``cad/docs/drawing-guidelines.md``
 (user ruling 2026-10-09, PR #1292 review F1): three native model dimensions
@@ -155,8 +155,8 @@ def test_journal_callout_names_both_mates_and_stock() -> None:
     are flagged at the callout, and the drill rod as supplied meets it."""
     assert notes.PIN_DIA_CALLOUT.splitlines() == [
         "STOCK OK",
-        "PRESS FIT IN MHA-CH-003 FORK HOLE",
-        "RUNNING FIT IN MHA-CH-006 #47 HOLE",
+        "PRESS FIT IN MHA-CH-03 FORK HOLE",
+        "RUNNING FIT IN MHA-CH-06 #47 HOLE",
     ]
     # The press and the running fit hold at the drill rod's own grind band.
     assert spec.BUDGET["interference_min"] > 0.0
@@ -171,7 +171,7 @@ def test_note_states_installed_state_and_flush_ends() -> None:
     lines = notes.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4  # drawing-guidelines.md rule 7 (notes: few, flagged, never a method)
     assert lines == [
-        "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-003"
+        "1. INSTALLED STATE SHOWN: BOTH ENDS DRESSED FLUSH WITH THE MHA-CH-03"
         " FORK FACES AT ASSEMBLY, NEVER PROUD.",
     ]
     text = notes.DRAWING_NOTES
@@ -189,8 +189,8 @@ def test_note_states_installed_state_and_flush_ends() -> None:
 
 
 def test_mating_part_numbers_on_the_sheet_are_live() -> None:
-    assert _config.parts("ch-connecting-rod")["number"] == "MHA-CH-003"
-    assert _config.parts("ch-rocker-arm")["number"] == "MHA-CH-006"
+    assert _config.parts("ch-connecting-rod")["number"] == "MHA-CH-03"
+    assert _config.parts("ch-rocker-arm")["number"] == "MHA-CH-06"
     import ch_rocker_arm_spec as arm
 
     assert str(arm.ROD_HOLE_SPEC.size).lstrip("#") == "47"
@@ -221,7 +221,7 @@ def test_sheet_runs_at_10_to_1_and_lands_clear_of_the_title_block() -> None:
 
 def test_part_registry_row() -> None:
     config = _config.parts("ch-rod-pivot-pin")
-    assert config["number"] == "MHA-CH-010"
+    assert config["number"] == "MHA-CH-10"
     assert int(config["quantity"]) == 20
     assert config["tolerance_class"] == "machined_block"
     assert "fit_class" not in config

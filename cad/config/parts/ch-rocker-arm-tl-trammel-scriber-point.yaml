@@ -1,7 +1,7 @@
 ch-rocker-arm-tl-trammel-scriber-point:
   title: Rocker Template Trammel Scriber Point
-  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
-  number: MHA-CH-006-TL-16
+  # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-06-TL-16
   material: O1 tool steel
   material_specification: O1 drill rod, 1/4 in, precision ground +/-0.0005 in, annealed (Abrams Industries O1 drill rod 1/4 x 36 in)
   finish: 58-62 HRC hardened zone; rest annealed

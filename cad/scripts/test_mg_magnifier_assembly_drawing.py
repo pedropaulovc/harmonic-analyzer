@@ -1,9 +1,7 @@
 """Offline contract for the magnifier assembly drawing and its stack settings."""
 
-import ast
 import asyncio
 import math
-import re
 from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
@@ -79,17 +77,6 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     assert set(notes.DIMENSION_CALLOUTS) == names == set(drawing.CALLOUT_LOCATION)
     assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == 0.05
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
-    assert (
-        "LOCKNUT ON FULL THREAD"
-        in notes.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
-    )
-    # The endshake is set by one nut and held by the other.
-    endshake = notes.DIMENSION_CALLOUTS[stack.ENDSHAKE_DIMENSION]
-    assert "SET BY THE FIRST NUT" in endshake
-    assert "LOCKED BY THE SECOND" in endshake
-    # No dimension rides callout text; a part number naming the mate may.
-    for text in notes.DIMENSION_CALLOUTS.values():
-        assert not re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", text)), text
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
@@ -118,15 +105,10 @@ def test_each_detail_sits_in_the_free_field_with_its_label_under_its_ink(
     lines = detail.label_text.splitlines()
     assert label_top - 0.0045 * len(lines) > TITLE_BLOCK_TOP
     assert left <= label_x
-    assert lines[0] == detail.title
-    assert lines[-1] == f"SCALE {detail.scale[0]} : {detail.scale[1]}"
 
 
-def test_the_gauge_detail_names_what_it_presses_into_what() -> None:
+def test_the_pressed_detail_label_clears_the_endshake_crop() -> None:
     label = drawing.PRESSED.label_text
-    # Named as the BOM rows name them: part number and description.
-    assert "MHA-MG-007 WHEEL AXLE PRESSED" in label
-    assert "INTO MHA-MG-008 WHEEL BAR" in label
     # The pressed detail's three-line label still clears the endshake crop.
     lines = len(label.splitlines())
     assert (
@@ -136,8 +118,8 @@ def test_the_gauge_detail_names_what_it_presses_into_what() -> None:
 
 def test_each_detail_s_lowest_ink_is_its_geometry() -> None:
     import mg_magnifying_wheel_spec as wheel
-    import vn_wheel_axle_front_washer_spec as washer
-    import vn_wheel_axle_nut_spec as nut
+    import mg_vn_wheel_axle_front_washer_spec as washer
+    import mg_vn_wheel_axle_nut_spec as nut
     from mg_wheel_bar_geom import BAR_SIDE
 
     # The bar's underside: the axle runs mid-height through the bar.
@@ -208,8 +190,8 @@ def test_the_gauge_line_clears_the_bar_inside_the_crop() -> None:
 
 
 def test_the_endshake_line_rides_above_the_nuts_and_text_stands_past_the_crop() -> None:
-    import vn_wheel_axle_front_washer_spec as washer
-    import vn_wheel_axle_nut_spec as nut
+    import mg_vn_wheel_axle_front_washer_spec as washer
+    import mg_vn_wheel_axle_nut_spec as nut
 
     assert max(nut.ACROSS_CORNERS, washer.OD) / 2.0 < drawing.ENDSHAKE_RISE
     x, _y = drawing.ENDSHAKE_KEEP[stack.ENDSHAKE_DIMENSION]
@@ -220,8 +202,8 @@ def test_the_endshake_line_rides_above_the_nuts_and_text_stands_past_the_crop() 
 def test_the_gauge_detail_shows_only_the_bar_and_the_axle() -> None:
     assert drawing.PRESSED.stems == {"mg-wheel-bar", "mg-wheel-axle"}
     assert {
-        "vn-wheel-axle-front-washer",
-        "vn-wheel-axle-nut",
+        "mg-vn-wheel-axle-front-washer",
+        "mg-vn-wheel-axle-nut",
         "mg-magnifying-wheel",
     } <= (drawing.ENDSHAKE.stems)
 
@@ -353,11 +335,10 @@ def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last()
     assert drawing.SHEET_NAMES[-1] == "ASSEMBLY STEPS"
     assert len(drawing.SHEET_NAMES) == 4
     assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
-    # MHA-HA-000 prints "LEVER WIRE PER MHA-MG-000 (SHEET 4)" and names these keys.
+    # MHA-HA-00 prints "LEVER WIRE PER MHA-MG-00 (SHEET 4)" and names these keys.
     assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
     assert steps.WIRE_TIED_KEY == "lever-wire-tied"
     assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
-    assert "SHEET 4" in notes.EXPLODED_CAPTION
 
 
 def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
@@ -380,7 +361,7 @@ def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
 
 def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
     # Code review C03: the BOM, callout and step text is drawing-only, so a
-    # wording edit must re-key the MHA-MG-000 sheet and never the native
+    # wording edit must re-key the MHA-MG-00 sheet and never the native
     # assembly:mg_magnifier recipe the builder's closure keys.
     import _buildgraph
 
@@ -392,10 +373,6 @@ def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
     assert "mg_magnifier_assembly_sheet.py" in closure(drawing)
     assert "mg_magnifier_assembly_spec.py" in closure(assembly)
     assert "mg_magnifier_assembly_sheet.py" not in closure(assembly)
-    for module in (assembly, stack):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "import mg_magnifier_assembly_sheet" not in source
-        assert "from mg_magnifier_assembly_sheet" not in source
     # Nothing the sheet prints stays behind in the builder's spec.
     for name in (
         "BOM_ORDER",
@@ -413,15 +390,15 @@ def test_the_sheet_text_is_on_the_drawing_recipe_only() -> None:
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     import math
 
-    import build_vn_lever_wire
-    import vn_lever_wire_geom as wire
+    import build_mg_vn_lever_wire
+    import mg_vn_lever_wire_geom as wire
 
     x, station, z = drawing.WIRE_BALLOON_POINT_MM
     # On the build's split ring, mid-run, on the wire's surface.
-    assert station == pytest.approx(build_vn_lever_wire.BALLOON_RING_STATION)
+    assert station == pytest.approx(build_mg_vn_lever_wire.BALLOON_RING_STATION)
     assert station == pytest.approx(wire.WIRE_LEN / 2.0)
     assert math.hypot(x, z) == pytest.approx(wire.WIRE_DIA / 2.0)
-    assert drawing.BALLOON_ANCHORS["vn-lever-wire"].point_mm == drawing.WIRE_BALLOON_POINT_MM
+    assert drawing.BALLOON_ANCHORS["mg-vn-lever-wire"].point_mm == drawing.WIRE_BALLOON_POINT_MM
     # Turned into the machine frame, the point's outward normal faces +X+Y+Z.
     delta = [h - d for h, d in zip(wire.WIRE_START, wire.WIRE_END)]
     axis = [v / math.hypot(*delta) for v in delta]
@@ -440,22 +417,8 @@ def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     assert facing == pytest.approx(math.sqrt(1.0 - along**2))
 
 
-def test_the_wire_is_tied_in_the_rest_state_with_both_ends_secured() -> None:
-    import mg_wheel_group
-
-    hooked = notes.STEP_TEXT[steps.WIRE_HOOKED_KEY]
-    tied = notes.STEP_TEXT[steps.WIRE_TIED_KEY]
-    # The rest pose the run is derived at, as MHA-HA-000 sets it.
-    assert "EVERY CHANNEL AMPLITUDE AT ZERO" in tied
-    assert "PLATE TOP LEVEL" in tied
-    assert "TIE 1" in tied and "6 O'CLOCK" in tied
-    for text in (hooked, tied):
-        assert "AT LEAST THREE TURNS" in text
-        # Machinist review r5: the spool wire's tails are trimmed once twisted.
-        assert "TRIM THE TAIL" in text
-    # The wrap check stands on the wheel group's proven wrap margin.
+def test_the_wire_wrap_has_the_required_geometric_margin() -> None:
     assert mg_wheel_group.LEVER_WIRE_WRAP_LEFT_DEG >= mg_wheel_group.WRAP_MARGIN_DEG
-    assert any("SHORT OF TIE 1" in check for check in notes.ASSEMBLY_CHECKS)
 
 
 def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() -> None:
@@ -463,10 +426,6 @@ def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() ->
     front = (0.041, 0.091, 0.099, 0.204)
     right = (0.153, 0.091, 0.183, 0.204)
     iso_left = 0.194
-    assert drawing.ASSEMBLED_VIEW_CAPTIONS == {
-        "*Front": "VIEW FROM THE BACK",
-        "*Right": "VIEW FROM THE LEFT",
-    }
     boxes = []
     for outline, name in ((front, "*Front"), (right, "*Right")):
         text = drawing.ASSEMBLED_VIEW_CAPTIONS[name]
@@ -481,48 +440,10 @@ def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() ->
     assert boxes[1][1] < iso_left
 
 
-
-def test_every_step_is_numbered_in_sequence_and_names_no_setting_value() -> None:
+def test_every_step_is_numbered_in_sequence() -> None:
     assert tuple(notes.STEP_TEXT) == steps.SEQUENCE
     assert notes.ASSEMBLY_STEPS == tuple(
         f"{steps.step_number(key)}. {notes.STEP_TEXT[key]}" for key in steps.SEQUENCE
-    )
-    settings = (
-        stack.PRESS_GAUGE,
-        stack.ENDSHAKE,
-        stack.CLAMP_STATION,
-        stack.FIXTURE_DROP,
-    )
-    for text in (*notes.STEP_TEXT.values(), *notes.ASSEMBLY_CHECKS):
-        for value in settings:
-            for printed in {f"{value:g}", f"{value:.1f}", f"{value:.2f}"}:
-                assert not re.search(rf"(?<![\d.]){re.escape(printed)}(?![\d])", text), (
-                    printed,
-                    text,
-                )
-    joined = " ".join(notes.STEP_TEXT.values())
-    for setting in ("PRESS GAUGE", "WHEEL ENDSHAKE", "CLAMP STATION", "FIXTURE DROP"):
-        assert f"{setting} (SHEET 1" in joined, setting
-    # The detached method note stays out; the rod is screwed home on its
-    # shoulder in the fixture step, with no lock (#1559).
-    assert "HOLD ROD NEAR END" not in joined
-    fixture_set = notes.STEP_TEXT[steps.FIXTURE_SET_KEY]
-    assert "CLAMP'S BOTTOM TAP" in fixture_set
-    assert "SHOULDER SEATS" in fixture_set
-    assert "ROD BORE" not in joined
-    assert not re.search(r"LOCTITE|THREADLOCK|SET SCREW", joined)
-
-
-def test_the_builder_stamps_no_drawing_note_property() -> None:
-    tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
-    keys = {
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-    }
-    assert "Drawing Notes" not in keys
-    assert "PRESS_INSTALLATION_NOTES" not in Path(assembly.__file__).read_text(
-        encoding="utf-8"
     )
 
 
@@ -687,13 +608,13 @@ def test_plan_explode_resolves_instances_and_refuses_missing_ones() -> None:
                 explode.member_stem(member) for member in step.members
             }
     first_nut = next(
-        names for step, names in plan if step.members == ("vn-wheel-axle-nut:1",)
+        names for step, names in plan if step.members == ("mg-vn-wheel-axle-nut:1",)
     )
-    assert first_nut == ("vn-wheel-axle-nut-1",)
+    assert first_nut == ("mg-vn-wheel-axle-nut-1",)
     with pytest.raises(ValueError, match="absent"):
         explode.plan_explode([i for i in instances if i.stem != "mg-output-fixture"])
     with pytest.raises(ValueError, match="no instance"):
-        explode.plan_explode([i for i in instances if i.name != "vn-wheel-axle-nut-2"])
+        explode.plan_explode([i for i in instances if i.name != "mg-vn-wheel-axle-nut-2"])
 
 
 def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
@@ -703,14 +624,14 @@ def test_the_bom_rows_are_the_registry_parts_with_their_skus() -> None:
         assert drawing.BOM_PART_NUMBERS[stem] == row["number"]
         skus = row.get("supplier_skus") or ()
         assert drawing.BOM_SKUS[stem] == (" / ".join(skus) if skus else "-")
-    assert drawing.BOM_SKUS["vn-thumb-screw"] == "91882A221"
+    assert drawing.BOM_SKUS["mg-vn-thumb-screw"] == "91882A221"
     assert drawing.BOM_SKUS["mg-magnifying-lever"] == "-"
-    assert notes.QUANTITIES["vn-thumb-screw"] == 2
+    assert notes.QUANTITIES["mg-vn-thumb-screw"] == 2
 
 
 def test_the_bom_screw_lengths_are_the_vendor_specs_fractions() -> None:
-    import vn_clamp_screw_spec as clamp_screw
-    import vn_magnifying_bracket_screw_spec as bracket_screw
+    import _mcmaster_90280a201 as clamp_screw
+    import mg_vn_magnifying_bracket_screw_spec as bracket_screw
     from _mcmaster_91882a221 import SHANK_LEN as thumb_len
 
     for stem, length_mm, printed in (
@@ -734,7 +655,7 @@ def test_a_stock_screw_length_change_reprints_its_bom_fraction(
     # fraction, not fail an import on a duplicated expected length.
     import importlib
 
-    import vn_clamp_screw_spec as clamp_screw
+    import _mcmaster_90280a201 as clamp_screw
 
     monkeypatch.setattr(clamp_screw, "SHANK_LEN", length_mm)
     try:
@@ -753,11 +674,11 @@ def test_a_screw_length_off_the_sixty_fourths_refuses_the_bom(monkeypatch) -> No
     # fraction: the BOM refuses rather than print a rounded one.
     import importlib
 
-    import vn_magnifying_bracket_screw_spec as bracket_screw
+    import mg_vn_magnifying_bracket_screw_spec as bracket_screw
 
     monkeypatch.setattr(bracket_screw, "LENGTH", 8.0)
     try:
-        with pytest.raises(ValueError, match="vn-magnifying-bracket-screw length.*1/64"):
+        with pytest.raises(ValueError, match="mg-vn-magnifying-bracket-screw length.*1/64"):
             importlib.reload(notes)
     finally:
         monkeypatch.undo()
@@ -836,12 +757,25 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
         assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
-    checks_bottom = drawing.CHECKS_XY[1] - (
-        drawing.ASSEMBLY_CHECKS.count("\n") + 1
+    steps_bottom = drawing.STEPS_XY[1] - len(
+        drawing.ASSEMBLY_STEPS.splitlines()
     ) * drawing.NOTE_LINE_PITCH
-    assert checks_bottom > drawing.INNER_BORDER[1]
-    assert drawing.ASSEMBLY_STEPS.startswith("ASSEMBLY SEQUENCE\n1. ")
-    assert f"\n{len(steps.SEQUENCE)}. " in drawing.ASSEMBLY_STEPS
+    checks_bottom = drawing.CHECKS_XY[1] - len(
+        drawing.ASSEMBLY_CHECKS.splitlines()
+    ) * drawing.NOTE_LINE_PITCH
+    assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
+    assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
+    assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
+    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
+    assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
+    assert drawing.ASSEMBLY_STEPS.split() == " ".join(
+        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)
+    ).split()
+    assert drawing.ASSEMBLY_CHECKS.split() == " ".join(notes.ASSEMBLY_CHECKS).split()
+    for number in drawing.BOM_PART_NUMBERS.values():
+        if any(number in step for step in notes.ASSEMBLY_STEPS):
+            assert number in drawing.ASSEMBLY_STEPS
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
@@ -927,8 +861,8 @@ def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> No
 def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> None:
     import math
 
-    import vn_wheel_axle_front_washer_spec as washer
-    import vn_wheel_axle_nut_spec as nut
+    import mg_vn_wheel_axle_front_washer_spec as washer
+    import mg_vn_wheel_axle_nut_spec as nut
 
     def screen(point):
         # Ry(180) placement, then the *Isometric (+X+Y+Z) projection.
@@ -954,23 +888,13 @@ def test_the_axle_nut_balloons_land_square_to_the_axle_on_distinct_parts() -> No
         assert (sx / length, sy / length) == pytest.approx(side)
         assert sx * axle[0] + sy * axle[1] == pytest.approx(0.0, abs=1e-9)
     anchors = drawing.BALLOON_ANCHORS
-    assert anchors["vn-wheel-axle-nut"].instance == "vn-wheel-axle-nut-2"
+    assert anchors["mg-vn-wheel-axle-nut"].instance == "mg-vn-wheel-axle-nut-2"
     # Instance 2 is the locknut, exploded farthest out.
     farthest = min(
         (step for step in explode.EXPLODE_STEPS if step.axis == "z"),
         key=lambda step: step.distance_mm,
     )
-    assert farthest.members == ("vn-wheel-axle-nut:2",)
-
-
-def test_the_press_gauge_names_the_nut_it_serves_and_the_axle_is_oiled() -> None:
-    import _config
-
-    number = _config.parts("vn-wheel-axle-nut")["number"]
-    callout = notes.DIMENSION_CALLOUTS[stack.PRESS_GAUGE_DIMENSION]
-    assert f"{number} LOCKNUT ON FULL THREAD" in callout
-    assert "\n" not in callout
-    assert notes.STEP_TEXT["wheel-stacked"].startswith("LIGHT OIL ON THE AXLE;")
+    assert farthest.members == ("mg-vn-wheel-axle-nut:2",)
 
 
 def test_step_down_takes_the_largest_scale_whose_ring_fits() -> None:

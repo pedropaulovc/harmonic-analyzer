@@ -1,6 +1,6 @@
 # Building the model
 
-Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 000 and retain the `-assembly` artifact suffix; parts start at 001 within each subsystem.
+Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 00 and retain the `-assembly` artifact suffix; fabricated parts start at 01 within each subsystem, and vendor parts start at VN-50 within their direct parent assembly.
 
 The CAD model is generated headlessly from a clean checkout. Every task that
 drives COM needs a SolidWorks seat, and there are two ways to have one:

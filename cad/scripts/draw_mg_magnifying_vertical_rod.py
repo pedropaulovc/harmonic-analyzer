@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the magnifying vertical rod.
 
-A Ø5 x 132.5 brass rod (MHA-MG-004, #1559): a #4-40 threaded top end with a
-relief at the shoulder that seats on MHA-MG-002, a full hemisphere at the
+A Ø5 x 132.5 brass rod (MHA-MG-04, #1559): a #4-40 threaded top end with a
+relief at the shoulder that seats on MHA-MG-02, a full hemisphere at the
 bottom. The rod axis is local +X, so the *Front view is the long side
 elevation, thread tip left.
 
@@ -213,10 +213,10 @@ DRAWING_PRECISION_BY_NAME = {
 }
 # Each length names the face it reads from (drawing-guidelines.md rule 4);
 # the thread length's band names its mate at the callout: it keeps the tip
-# off the bottom of MHA-MG-002's tap so the shoulder, not the tip, seats.
+# off the bottom of MHA-MG-02's tap so the shoulder, not the tip, seats.
 DIMENSION_CALLOUTS = {
     "BodyLength": "FROM SHOULDER",
-    "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-002;\nTIP CLEARS ITS TAP",
+    "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-02;\nTIP CLEARS ITS TAP",
     "DomeR": "TANGENT HEMISPHERE",
 }
 # The roots' count stands above their one radius.

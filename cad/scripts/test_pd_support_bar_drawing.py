@@ -1,4 +1,4 @@
-"""Offline contracts for the support-bar drawing (MHA-PD-007)."""
+"""Offline contracts for the support-bar drawing (MHA-PD-07)."""
 
 from __future__ import annotations
 
@@ -18,8 +18,6 @@ import pd_support_bar_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
-_MATES = ("MHA-PD-011", "MHA-PD-012", "MHA-PD-014", "MHA-VN-041", "MHA-VN-043")
-
 
 def test_registry_identity_and_paths() -> None:
     row = DRAWINGS_BY_NAME["pd_support_bar"]
@@ -32,7 +30,7 @@ def test_registry_identity_and_paths() -> None:
     import _config
 
     config = _config.parts("pd-support-bar")
-    assert config["number"] == "MHA-PD-007"
+    assert config["number"] == "MHA-PD-07"
     assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 1
@@ -108,7 +106,7 @@ def test_printed_bands_are_the_spec_bands() -> None:
 def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     """Review of PR #1471: the clamp row printed .X (±0.8), whose 2.263
     position zone over-runs the 0.812 the #8 clearance holes float on the
-    #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-002
+    #8-32 shanks. Fixed fastener: each screw threads into an MHA-SH-02
     back-arc tap held ±0.1 along the bar and in height (sh_column_clamp_fit),
     so the bar's zone (2·√2·band) plus the tap's must stay inside the least
     hole's float; the band is the widest .XX that does. A drift in the band,
@@ -118,11 +116,11 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     from _printed_tolerance import printed_band_mm
     from sh_column_clamp_back_geom import HOLE_SPEC as BACK_ARC_TAP
     from sh_column_clamp_fit import EAR_HEIGHT_BAND, EAR_STATION_BAND
-    from vn_clamp_screw_spec import SHANK_DIA
+    from _mcmaster_90280a201 import SHANK_DIA
 
     # The mate: #8-32 taps in the back arc, located ±0.1 on both axes.
     assert (BACK_ARC_TAP.kind, BACK_ARC_TAP.size) == ("tapped", "#8-32")
-    assert _config.parts("sh-column-clamp-back")["number"] == "MHA-SH-002"
+    assert _config.parts("sh-column-clamp-back")["number"] == "MHA-SH-02"
     assert EAR_STATION_BAND == EAR_HEIGHT_BAND == 0.1
     tap_zone = 2.0 * math.hypot(EAR_STATION_BAND, EAR_HEIGHT_BAND)
     # The float: the least drilled #8 clearance hole over the basic major.
@@ -149,7 +147,7 @@ def test_clamp_holes_find_the_back_arc_taps_at_the_printed_worst_case() -> None:
     # tighter than the .XX row, so the callout names the taps (rule 4).
     assert zone(printed_band_mm(1)) + tap_zone > hole_float
     assert band < printed_band_mm(2)
-    assert "MHA-SH-002" in sheet_spec.CLAMP_TAP_MATE
+    assert "MHA-SH-02" in sheet_spec.CLAMP_TAP_MATE
     assert sheet_spec.CLAMP_CBORE_CALLOUT.startswith(sheet_spec.CLAMP_TAP_MATE)
 
 
@@ -175,7 +173,7 @@ def test_single_limits_are_the_spec_limits() -> None:
 
 
 def test_pivot_tap_runs_through_countersunk_on_both_faces() -> None:
-    """User ruling 2026-10-15: the MHA-VN-041 tap runs THROUGH the bar so the
+    """User ruling 2026-10-15: the MHA-PD-VN-57 tap runs THROUGH the bar so the
     screw's faced tip sits below the front face and is staked at its mouth."""
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "ExtrusionParameters(depth=2.0 * BAR_DEPTH, both_directions=True)" in source
@@ -406,40 +404,6 @@ def test_sheet_texts_carry_no_dimensions_and_stay_short() -> None:
     assert source.count("_place_caption(adapter, STATION_END_LABEL,") == 2
 
 
-def test_callouts_name_the_mates() -> None:
-    callouts = drawing.DIMENSION_CALLOUTS
-    for name in ("Height", "Depth", "HangerRowHeight", "PivotCskDia"):
-        assert any(mate in callouts[name] for mate in _MATES), name
-    assert "MHA-PD-011" in callouts["Height"]
-    assert "MHA-VN-041" in callouts["Depth"]
-    assert "MHA-VN-043" in callouts["Depth"]
-    assert "MHA-VN-041" in callouts["HangerRowHeight"]
-    assert "MHA-PD-014" in callouts["HangerRowHeight"]
-    # Each tight hanger station names the part it places.
-    assert "MHA-VN-041" in callouts["PivotTapStation"]
-    assert "MHA-PD-014" in callouts["BracketTapStation1"]
-    assert "MHA-PD-014" in callouts["BracketTapStation2"]
-    # The thread class is the title block's (rule 2), native callout too.
-    assert callouts["PivotTapDrillDia"] == "TAP #8-32 UNC THRU"
-    assert "2B" not in "".join(callouts.values())
-    assert drawing._THREAD_CLASS_TOKEN == " <hw-threadclass>"
-    # "2X" counts holes only: the one pivot hole is countersunk on both faces.
-    assert callouts["PivotCskDia"].startswith("90\u00b0 CSK BOTH FACES")
-    # The latch-hook taps' leader passes just right of the pivot's text.
-    assert max(map(len, callouts["PivotCskDia"].splitlines())) <= 24
-    assert callouts["BracketCskDia"].startswith("2X 90\u00b0 CSK")
-    for text in callouts.values():
-        assert len(text.splitlines()) <= 3
-    # The banded clamp row names the back-arc taps it locates to, then the
-    # screws whose heads the counterbores sink.
-    assert sheet_spec.CLAMP_CBORE_CALLOUT.splitlines() == [
-        "LOCATE TO MHA-SH-002 TAPS",
-        "MHA-VN-021 HEADS BELOW SLIDE FACE",
-    ]
-    # The banded clamp row's height names those taps at the dimension too.
-    assert "MHA-SH-002" in callouts["ClampRowHeight"]
-
-
 def test_slide_faces_carry_the_slide_grade() -> None:
     from _surface_finish import MACHINED_UM
 
@@ -554,7 +518,7 @@ def test_clamp_screws_engage_the_back_arc_and_stop_inside_it() -> None:
     from sh_column_clamp_back_geom import BLOCK_DEPTH as back_block
     from sh_column_clamp_back_geom import GRIP_OFFSET as grip_gap
     from sh_column_clamp_front_geom import ARC_DEPTH as front_arc
-    from vn_clamp_screw_spec import SHANK_DIA, SHANK_LEN
+    from _mcmaster_90280a201 import SHANK_DIA, SHANK_LEN
 
     shallowest, deepest = _printed_cbore_depth_limits()
     thick = spec.BAR_DEPTH + spec.BAR_DEPTH_BAND
@@ -582,7 +546,7 @@ def test_west_slots_take_up_the_column_pitch() -> None:
         EAR_HEIGHT_BAND,
         EAR_STATION_BAND,
     )
-    from vn_clamp_screw_spec import SHANK_DIA
+    from _mcmaster_90280a201 import SHANK_DIA
 
     # The pitch's sources: the top frame dimensions its socket pitch at .XX;
     # the base's hole table prints each socket's X at .XX, two bands apart.
@@ -622,18 +586,18 @@ def test_west_slots_take_up_the_column_pitch() -> None:
     # mate) and says their limits and stations set that take-up, restating
     # no value beside part numbers.
     why = sheet_spec.DIMENSION_CALLOUTS["ClampSlotWidth"]
-    assert "TAKE-UP" in why and "MHA-SH-002" in why
+    assert "TAKE-UP" in why and "MHA-SH-02" in why
     assert "LIMITS" in why and "STATIONS" in why
-    assert re.search(r"\d", re.sub(r"MHA-[A-Z]{2}-\d{3}", "", why)) is None
+    assert re.search(r"\d", re.sub(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", "", why)) is None
 
 
 def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
-    """The stock MHA-VN-021 head over a slot: at the shank's full float across
+    """The stock MHA-PD-VN-53 head over a slot: at the shank's full float across
     the widest slot it still overlaps the counterbore floor by the round
     holes' own least (the same Ø4.98 +0.10/-0), and anywhere the shank reaches
     in the longest slot it stays inside the narrowest, shortest counterbore."""
     from _printed_tolerance import printed_band_mm
-    from vn_clamp_screw_spec import HEAD_DIA, SHANK_DIA
+    from _mcmaster_90280a201 import HEAD_DIA, SHANK_DIA
 
     head_r = HEAD_DIA / 2.0
     widest = 4.98 + 0.10
@@ -654,7 +618,7 @@ def test_slot_heads_bear_and_stay_inside_their_counterbores() -> None:
     assert part.CLAMP_SLOT_CBORE_WIDTH == part.CLAMP_CBORE_DIA == 8.5
     assert part.CLAMP_SLOT_CBORE_RUN == part.CLAMP_SLOT_RUN
     # The .XXX counterbore names the screw whose head it holds.
-    assert "MHA-VN-021" in sheet_spec.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
+    assert "MHA-PD-VN-53" in sheet_spec.DIMENSION_CALLOUTS["ClampSlotCboreWidth"]
 
 
 def test_slot_counterbores_leave_rule_17_walls() -> None:

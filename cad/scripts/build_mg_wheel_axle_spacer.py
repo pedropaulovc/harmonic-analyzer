@@ -1,7 +1,7 @@
-r"""Reproduction script: wheel-axle spacer (MHA-MG-011; ch. 21; 1 used).
+r"""Reproduction script: wheel-axle spacer (MHA-MG-11; ch. 21; 1 used).
 
 The turned brass sleeve on the mg-wheel-axle between the mg-wheel-bar's front
-face and the MHA-VN-057 back washer (``mg_wheel_axle_spacer_spec``).  Its
+face and the MHA-MG-VN-54 back washer (``mg_wheel_axle_spacer_spec``).  Its
 length carries the magnifying wheel off the bar onto the pen-rod line, so it
 is derived from ``paper_drive_geom.PEN_Z_MID``; it sets the wheel's station on
 the pin's thread stack, so it carries an explicit band.  The bore is a drilled

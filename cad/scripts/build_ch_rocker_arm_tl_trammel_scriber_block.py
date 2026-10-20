@@ -1,4 +1,4 @@
-r"""Build the rocker template trammel's scriber block (MHA-CH-006-TL-15; shop tooling).
+r"""Build the rocker template trammel's scriber block (MHA-CH-06-TL-15; shop tooling).
 
 The pivot block's recipe (``_trammel_block.build_block``) with the scriber
 block's spec (``ch_rocker_arm_tl_trammel_scriber_block_spec``):

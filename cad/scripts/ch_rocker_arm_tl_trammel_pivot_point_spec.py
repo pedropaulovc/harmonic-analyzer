@@ -1,10 +1,10 @@
 r"""Pure-data contract for the rocker template trammel's pivot point
-(MHA-CH-006-TL-18; shop tooling, one off).
+(MHA-CH-06-TL-18; shop tooling, one off).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). This
-1/4 in O1 drill-rod point stands in the pivot block's (MHA-CH-006-TL-14) reamed
+1/4 in O1 drill-rod point stands in the pivot block's (MHA-CH-06-TL-14) reamed
 point hole. Its 60 degree tip runs in the 60 degree centre-drilled cone of the
-pivot plate (MHA-CH-006-TL-19), so the trammel swings about the plate with no
+pivot plate (MHA-CH-06-TL-19), so the trammel swings about the plate with no
 play (trial route ``rocker-template-route.md`` sections 2.1-2.4, kit contract
 ``ch_rocker_arm_tl_trammel_spec``). It also drops into the setting bar's H0
 cone when the kit is set. The point slides up or down in its pinch hole to
@@ -151,13 +151,13 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 REFERENCE_DIMENSIONS = frozenset({"RodDia"})
 # Callouts ride the below lane only, one short line each (about 30
 # characters at most): SolidWorks does not wrap callout text.
-ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-006-TL-14\nPOINT HOLE"
+ROD_CALLOUT = "DRILL ROD AS SUPPLIED\nSLIDES IN MHA-CH-06-TL-14\nPOINT HOLE"
 ROD_NOTE = " ".join(ROD_CALLOUT.splitlines())
 # Drawing-guidelines rule 4: the half-angle's band serves the seats, so the
 # angle callout names them by Number: the pivot plate's and the setting bar's
 # centre-drilled cones.
 TIP_ANGLE_CALLOUT = (
-    "EACH SIDE OF AXIS\nSEATS IN MHA-CH-006-TL-19\nAND MHA-CH-006-TL-17 CONES"
+    "EACH SIDE OF AXIS\nSEATS IN MHA-CH-06-TL-19\nAND MHA-CH-06-TL-17 CONES"
 )
 HARDENED_CALLOUT = "HARDENED ZONE"
 TIP_FLAT_CALLOUT = "TIP FLAT"

@@ -36,6 +36,7 @@ EXECUTED_INPUTS = (
     "web/scripts/executed-point-motion.mjs",
     "web/scripts/verify-reference.mjs", "web/scripts/fetch-model.mjs",
     "web/scripts/native-identity-map.mjs", "web/scripts/released-models.json",
+    "web/scripts/current-native-identity-inputs.mjs", "cad/config/current-identity-map.json",
     "web/scripts/canonical-native-evidence.py",
     "web/src/source-witness.ts", "web/src/image-plane-homography.ts", "web/src/video-catalog.ts",
     "web/src/native-primitive-snapshot.ts", "web/src/source-assembly.ts",

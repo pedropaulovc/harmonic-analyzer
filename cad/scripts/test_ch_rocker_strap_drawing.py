@@ -1,4 +1,4 @@
-"""Offline contracts for the rocker strap (MHA-CH-013) drawing."""
+"""Offline contracts for the rocker strap (MHA-CH-13) drawing."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_required_drawing_paths() -> None:
 
 
 def test_outline_is_the_finished_rocker_strap() -> None:
-    # Same frame and the same vertices as MHA-CH-006's strap profile.
+    # Same frame and the same vertices as MHA-CH-06's strap profile.
     assert spec.HOLE_DIA == rocker.HUB_DIA
     assert spec.PIVOT_MID_Y == rocker.PIVOT_MID_Y
     assert spec.ROD_TIP_X == rocker.ROD_TIP_X
@@ -65,7 +65,7 @@ def test_outline_is_the_finished_rocker_strap() -> None:
         spec.BOTTOM_EDGE_BELOW_PIVOT + spec.BOTTOM_EDGE_BAND[1] - hole_radius_max
     )
     assert min(top_wall, bottom_wall) >= 2.0
-    # The bottom edge sits where MHA-CH-006's R816 puts it on the axis.
+    # The bottom edge sits where MHA-CH-06's R816 puts it on the axis.
     assert spec.BOTTOM_EDGE_BELOW_PIVOT == pytest.approx(
         rocker.PIVOT_MID_Y - (rocker.CENTER_Y - rocker.R_BOTTOM)
     )
@@ -103,14 +103,14 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     # profile zone, wholly in material.
     assert spec.BOTTOM_EDGE_BAND == (0.0, -0.5)
     # The hole's edges override the title block's break: a groove round the
-    # pressed hub's root would replace MHA-CH-006's R0.2 MAX corner.
+    # pressed hub's root would replace MHA-CH-06's R0.2 MAX corner.
     assert notes.HOLE_EDGE_CALLOUT.splitlines() == [
         "BOTH EDGES SHARP, NO BURR",
         "(NO GROOVE AT HUB ROOT)",
     ]
     assert notes.HOLE_CALLOUT.splitlines() == [
         "REAM THRU",
-        "PRESS FIT ON MHA-CH-012 HUB",
+        "PRESS FIT ON MHA-CH-12 HUB",
         "0.005-0.034 DIAMETRAL INTERFERENCE",
         *notes.HOLE_EDGE_CALLOUT.splitlines(),
     ]
@@ -121,7 +121,7 @@ def test_every_band_is_native_and_names_its_mate() -> None:
     )
     assert notes.DIMENSION_CALLOUTS["StrapThickness"] == rocker_notes.STRAP_FIT_CALLOUT
     assert notes.DIMENSION_CALLOUTS["BottomBelowPivot"].splitlines() == [
-        "MHA-CH-006 PROFILE",
+        "MHA-CH-06 PROFILE",
         "CONCENTRIC WITH R800",
     ]
     # The arc centre and the lands' direction ride on their own dimensions,
@@ -150,7 +150,7 @@ def test_drawing_quality_and_no_gdt() -> None:
         "add_surface_finish",
     }
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. JOINED TO HUB MHA-CH-012 AS MHA-CH-006.",
+        "1. JOINED TO HUB MHA-CH-12 AS MHA-CH-06.",
     ]
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert drawing.ISO_SCALE == (1, 2)
@@ -158,7 +158,7 @@ def test_drawing_quality_and_no_gdt() -> None:
 
 def test_registry_row() -> None:
     row = _config.parts("ch-rocker-strap")
-    assert row["number"] == spec.NUMBER == "MHA-CH-013"
+    assert row["number"] == spec.NUMBER == "MHA-CH-13"
     assert row["component_of"] == "ch-rocker-arm"
     assert int(row["quantity"]) == int(_config.parts("ch-rocker-arm")["quantity"])
     assert "1018" in str(row["material_specification"])

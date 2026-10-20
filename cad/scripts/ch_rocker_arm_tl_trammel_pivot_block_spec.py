@@ -1,4 +1,4 @@
-r"""Pure-data contract for the rocker template trammel's pivot block (MHA-CH-006-TL-14).
+r"""Pure-data contract for the rocker template trammel's pivot block (MHA-CH-06-TL-14).
 
 Shop tooling, not a machine part (cad/docs/subsystem-identities.md). One of
 the two clamp-on blocks of the rocker outline-template trammel kit
@@ -9,7 +9,7 @@ lying on its 38.1 face, slides onto the bought 1/4 in square trammel bar:
 * the bar runs in a 6.45 +0.05/0 slot along the block's top face, 13.0 from
   edge A; two 10-24 cup-point set screws from edge A push it against the
   slot's edge-B wall, so the wall, not the screws, locates the block;
-* the pivot point (MHA-CH-006-TL-18, 1/4 in O1 drill rod) stands in a hole
+* the pivot point (MHA-CH-06-TL-18, 1/4 in O1 drill rod) stands in a hole
   reamed with the shop's 0.251 in reamer, 28.0 from edge A and 25 from the
   block's end, the end that sits flush with the bar's pivot-end face;
 * a 1.0 slit on the point-hole axis runs from the near end face, through the
@@ -118,7 +118,7 @@ if POINT_CLEARANCE_MIN <= 0.0:
     raise AssertionError(
         "the largest trammel point does not enter the smallest reamed hole"
     )
-POINT_MATE_NUMBER = "MHA-CH-006-TL-18"
+POINT_MATE_NUMBER = "MHA-CH-06-TL-18"
 
 
 def point_hole_callout(count: int, mate_number: str) -> str:

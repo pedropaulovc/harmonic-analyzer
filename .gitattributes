@@ -8,4 +8,5 @@ web/content/*.source-track.json text eol=lf
 web/content/model-representation.json text eol=lf
 web/content/analysis-recovery-calibration-evidence/** -text
 cad/config/identity-migration-map.json -text
+cad/config/current-identity-map.json -text
 cad/references/fr-nameplate-engraving.dxf -text

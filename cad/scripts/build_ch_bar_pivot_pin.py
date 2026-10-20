@@ -1,4 +1,4 @@
-r"""Reproduction script: bar pivot pin (MHA-CH-011; 20 used, one per channel).
+r"""Reproduction script: bar pivot pin (MHA-CH-11; 20 used, one per channel).
 
 The plain 5/64 drill-rod pin that hangs each amplitude bar on its channel
 lever (``ch_bar_pivot_pin_spec`` owns the joint and its budget). It RUNS in

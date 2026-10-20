@@ -132,7 +132,7 @@ def _sheet_x(mx: float) -> float:
 SHAFT_NUMBER = _config.parts("ch-fulcrum-shaft")["number"]
 BAR_NUMBER = _config.parts("ch-amplitude-bar")["number"]
 PIN_NUMBER = _config.parts("ch-bar-pivot-pin")["number"]
-SPRING_NUMBER = _config.parts("vn-channel-spring-installed")["number"]
+SPRING_NUMBER = _config.parts("ch-vn-channel-spring-installed")["number"]
 STATIONS = _config.machine("channels", "count")
 _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
 _CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])

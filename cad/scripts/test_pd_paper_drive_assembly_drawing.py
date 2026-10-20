@@ -1,4 +1,4 @@
-"""Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
+"""Offline contracts for the paper-drive assembly and its drawing (MHA-PD-00)."""
 
 from itertools import product
 import math
@@ -30,16 +30,16 @@ import pd_transgear_front_bushing_spec as front_bushing
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
-import vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
-import vn_transgear_arm_plate_screw_spec as plate_screw
-import vn_transgear_knob_drive_pin_spec as drive_pin
+import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import pd_vn_transgear_arm_plate_screw_spec as plate_screw
+import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
 from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
-import vn_transgear_knob_cup_pin_spec as cup_pin
-import vn_transgear_pivot_screw_spec as pivot_screw
+import pd_vn_transgear_knob_cup_pin_spec as cup_pin
+import pd_vn_transgear_pivot_screw_spec as pivot_screw
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
@@ -55,49 +55,49 @@ UNCHANGED_FAMILIES = {
     "pd-support-bar",
     "sh-column-clamp-front",
     "sh-column-clamp-back",
-    "vn-clamp-screw",
+    "pd-vn-clamp-screw",
     "pd-platen",
     "pd-platen-rack",
     "pd-platen-guide",
     "pd-guide-lock",
     "pd-platen-clip",
     "pd-platen-paper",
-    "vn-fillister-screw",
-    "vn-platen-clip-screw",  # the four #2-56 clip screws leave MHA-VN-006
-    "vn-guide-lock-screw",  # R9-31: the eight lock screws leave MHA-VN-006
-    "vn-chain-inner-link",
-    "vn-chain-outer-link",
-    "vn-chain-connecting-link",  # MHA-VN-068 closes the loop as its last outer link
+    "pd-vn-fillister-screw",
+    "pd-vn-platen-clip-screw",  # the four #2-56 clip screws leave MHA-PD-VN-52
+    "pd-vn-guide-lock-screw",  # R9-31: the eight lock screws leave MHA-PD-VN-52
+    "pd-vn-chain-inner-link",
+    "pd-vn-chain-outer-link",
+    "pd-vn-chain-connecting-link",  # MHA-PD-VN-66 closes the loop as its last outer link
     "pd-transgear-removable",
 }
 CONTRACT_TRANSGEAR_QUANTITIES = {
     "pd-transgear-arm": 1,
     "pd-transgear-arm-plate": 1,
-    "vn-transgear-arm-plate-screw": 2,
-    "vn-transgear-arm-plate-locating-pin": plate_locating_pin.ASSEMBLY_QUANTITY,
+    "pd-vn-transgear-arm-plate-screw": 2,
+    "pd-vn-transgear-arm-plate-locating-pin": plate_locating_pin.ASSEMBLY_QUANTITY,
     "pd-transgear-pivot-spacer": 1,
-    "vn-transgear-pivot-screw": 1,
-    "vn-transgear-pivot-spring": 1,
-    "vn-transgear-pivot-shim": 1,
-    "vn-transgear-latch-pin": 1,
-    "vn-latch-hook-bracket-screw": 2,
+    "pd-vn-transgear-pivot-screw": 1,
+    "pd-vn-transgear-pivot-spring": 1,
+    "pd-vn-transgear-pivot-shim": 1,
+    "pd-vn-transgear-latch-pin": 1,
+    "pd-vn-latch-hook-bracket-screw": 2,
     "pd-latch-hook": 1,
     "pd-transgear-pin": 1,
     "pd-transgear-rear-bushing": 1,
     "pd-transgear-feed-pinion": 1,
     "pd-transgear-disc-hub": 1,
     "pd-transgear-front-bushing": 1,
-    "vn-transgear-retaining-ring": 1,
+    "pd-vn-transgear-retaining-ring": 1,
     "pd-rack-pinion": 1,
-    "vn-transgear-disc-screw": 3,
+    "pd-vn-transgear-disc-screw": 3,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
-    "vn-transgear-knob-drive-pin": 2,
+    "pd-vn-transgear-knob-drive-pin": 2,
     "pd-transgear-removable": 3,
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
     "pd-transgear-knob-cup": 1,
-    "vn-transgear-knob-cup-pin": 1,
+    "pd-vn-transgear-knob-cup-pin": 1,
 }
 RETIRED_FAMILIES = {
     "transgear-latch",
@@ -162,12 +162,12 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
     """§13.2 (1): the chain fit-up starts from the crank side's own fit-up,
-    and the pointer names the MHA-DT-000 sheet whose note prints both steps."""
+    and the pointer names the MHA-DT-00 sheet whose note prints both steps."""
     import draw_dt_drive_train_assembly as drive_train
     notes = _unit_step_notes()
 
     pointers = re.findall(
-        r"(MHA-[A-Z]{2}-000) SHEET (\d+), STEPS (\d+) AND (\d+)",
+        r"(MHA-[A-Z]{2}-00)\b SHEET (\d+), STEPS (\d+) AND (\d+)",
         notes.chain_notes[0].replace("\n", " "),
     )
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
@@ -283,8 +283,8 @@ def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
 
 
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
-    locating = "vn-transgear-arm-plate-locating-pin"
-    driving = "vn-transgear-knob-drive-pin"
+    locating = "pd-vn-transgear-arm-plate-locating-pin"
+    driving = "pd-vn-transgear-knob-drive-pin"
     assert plate_locating_pin.ASSEMBLY_QUANTITY == 2
     assert drawing.TRANSGEAR_QUANTITIES[locating] == plate_locating_pin.ASSEMBLY_QUANTITY
     assert drawing.TRANSGEAR_QUANTITIES[driving] == len(sprocket.PIN_HOLE_ANGLES_DEG)
@@ -300,7 +300,7 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     located = _step_body("arm-plate-located")
     assert (
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
-        f"{_number('vn-transgear-arm-plate-locating-pin')} DOWELS"
+        f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
     assert (
         "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
@@ -611,11 +611,11 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-feed-pinion",
     "pd-transgear-knob-shaft",
     "pd-transgear-drive-collar",
-    "vn-transgear-knob-drive-pin",
-    "vn-transgear-knob-cup-pin",
-    "vn-transgear-arm-plate-screw",
-    "vn-transgear-arm-plate-locating-pin",
-    "vn-transgear-latch-pin",
+    "pd-vn-transgear-knob-drive-pin",
+    "pd-vn-transgear-knob-cup-pin",
+    "pd-vn-transgear-arm-plate-screw",
+    "pd-vn-transgear-arm-plate-locating-pin",
+    "pd-vn-transgear-latch-pin",
     "pd-transgear-rear-bushing",
 }
 
@@ -813,7 +813,7 @@ def test_no_sheet_prints_a_forbidden_word() -> None:
 def test_no_retired_part_is_named_on_the_sheet() -> None:
     retired = {"MHA-079", "MHA-080", "MHA-108", "MHA-109"}
     text = _unit_step_notes().fitup_steps
-    printed = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", text))
+    printed = set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", text))
     assert not any(number in text for number in retired)
     assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {
         assembly_contract("dt-drive-train").number
@@ -832,7 +832,7 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
         "pd-transgear-knob-thrust-ring",
         "pd-transgear-arm-plate",
         "pd-transgear-knob-cup",
-        "vn-transgear-knob-cup-pin",
+        "pd-vn-transgear-knob-cup-pin",
     ]
     assert [stem for stem, _label in drawing.KNOB_STACK if stem] == order
     positions = [body.index(_number(stem)) for stem in order]
@@ -842,11 +842,11 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
 
 
 def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
-    """Rule 23: MHA-VN-041 runs through the bar, its tip faced below the
+    """Rule 23: MHA-PD-VN-57 runs through the bar, its tip faced below the
     front face and staked there, shown in the pivot view; threadlocker is
-    optional. R9-6 never faces MHA-PD-020.  R9-71: the spacer is pressed on
-    the shoulder flush with its end, and the MHA-VN-049 spring under the
-    MHA-VN-069 shim holds the arm on it."""
+    optional. R9-6 never faces MHA-PD-20.  R9-71: the spacer is pressed on
+    the shoulder flush with its end, and the MHA-PD-VN-63 spring under the
+    MHA-PD-VN-67 shim holds the arm on it."""
     body = _step_body("hanger-pivoted")
     low, high = pivot_screw.TIP_RECESS
     assert "THREADLOCKER OPTIONAL" in body
@@ -864,12 +864,12 @@ def test_the_pivot_screw_is_staked_and_the_spacer_pressed_as_made() -> None:
     assert face < body.index("CHOSEN BEFORE REAMING")
     assert "ANOTHER SCREW" not in body
     assert drawing.PIVOT_VIEW_REF in body
-    assert body.index(_number("vn-transgear-pivot-shim")) < body.index(
-        _number("vn-transgear-pivot-spring")
+    assert body.index(_number("pd-vn-transgear-pivot-shim")) < body.index(
+        _number("pd-vn-transgear-pivot-spring")
     )
-    assert _number("vn-transgear-pivot-screw") in body
+    assert _number("pd-vn-transgear-pivot-screw") in body
     assert _number("pd-transgear-pivot-spacer") in body
-    assert _number("vn-transgear-pivot-spring") in body
+    assert _number("pd-vn-transgear-pivot-spring") in body
     assert "AS MADE" in body
     assert "FLUSH WITH ITS END ON A FLAT" in body
     # No step shortens the spacer.
@@ -936,8 +936,8 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     )
     assert drawing.PIVOT_VIEW_INSTANCES >= {
         "pd-support-bar-1",
-        "vn-transgear-pivot-screw-1",
-        "vn-transgear-pivot-shim-1",
+        "pd-vn-transgear-pivot-screw-1",
+        "pd-vn-transgear-pivot-shim-1",
     }
 
 
@@ -953,12 +953,12 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
     # (y span along the axis, r span off it) of each part's cut face, in the
     # screw's frame, head underside y 0.
     faces = {
-        "vn-transgear-pivot-screw": (
+        "pd-vn-transgear-pivot-screw": (
             (0.0, pivot_screw.HEAD_H),
             (pivot_screw.SOCKET_AF / math.sqrt(3.0), pivot_screw.HEAD_DIA / 2.0),
         ),
-        "vn-transgear-pivot-shim": ((-shim.THICKNESS, 0.0), (shim.ID / 2, shim.OD / 2)),
-        "vn-transgear-pivot-spring": (
+        "pd-vn-transgear-pivot-shim": ((-shim.THICKNESS, 0.0), (shim.ID / 2, shim.OD / 2)),
+        "pd-vn-transgear-pivot-spring": (
             (floor, -shim.THICKNESS),
             (spring.ID / 2, spring.OD / 2),
         ),
@@ -983,7 +983,7 @@ def test_each_pivot_section_balloon_points_into_its_own_cut_face() -> None:
         # Inside the crop circle.
         assert math.hypot(r, y - centre_y) < drawing.PIVOT_FRAME_RADIUS_MM, stem
     # The spring's tip is on its cone's diagonal, inside its thin wall.
-    _side, y, r = tips["vn-transgear-pivot-spring"]
+    _side, y, r = tips["pd-vn-transgear-pivot-spring"]
     assert y == pytest.approx((floor - shim.THICKNESS) / 2.0)
     assert r == pytest.approx((spring.ID + spring.OD) / 4.0)
     # Down the stack the tips alternate sides.
@@ -1141,7 +1141,7 @@ def test_the_rear_cup_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
     seated = _step_body("collar-shoulder-seated")
     assert "NUT TIGHT ON THE PILOT." in seated
     # The nut is a static clamp (the D-flat and dowels drive): rule 23's
-    # U-MHA-PD-013-no-lock holds only while nobody turns it to drive.
+    # U-MHA-PD-13-no-lock holds only while nobody turns it to drive.
     assert seated.endswith("THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE.")
 
 
@@ -1171,7 +1171,7 @@ def test_the_fitted_collar_rear_face_reacts_on_the_actual_gear_shoulder() -> Non
     ) in faced
     seated = _step_body("collar-shoulder-seated")
     assert "D-BORE ON THE SHAFT D-FLAT" in seated
-    assert "REAR FACE BEARING ON THE MHA-PD-008 12T FRONT FACE" in seated
+    assert "REAR FACE BEARING ON THE MHA-PD-08 12T FRONT FACE" in seated
     assert "ON THE DRIVE DOWELS" in seated
     assert collar.BODY_REAR_FACE_FROM_F == 0.0
     assert collar.LENGTH_FITTED_MIN <= collar.LENGTH <= collar.LENGTH_FITTED_MAX
@@ -1258,7 +1258,7 @@ def test_the_hub_recess_is_in_m_and_in_the_disc_end_float() -> None:
 
 
 def test_the_rear_bushing_blank_is_faced_to_the_gauged_gap_before_it_goes_on() -> None:
-    """Codex P2 (724f78f26): the MHA-PD-024 blank is longer than the gap it
+    """Codex P2 (724f78f26): the MHA-PD-24 blank is longer than the gap it
     fills (6.85 MIN against 6.30 nominal, cluster forward), so refitted
     unfaced it keeps the ring out of its groove. The step gauges that gap,
     sleeve rear face from the arm's front face, with the front bushing and
@@ -1337,14 +1337,14 @@ def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
     assert numbers == list(range(numbers[0], numbers[0] + 3))
     body = _step_body("arm-plate-screws-cut")
     assert body.startswith(
-        f"TAKE BOTH {_number('vn-transgear-arm-plate-screw')} SCREWS OUT"
+        f"TAKE BOTH {_number('pd-vn-transgear-arm-plate-screw')} SCREWS OUT"
     )
     assert "REFIT THE SAME SCREWS IN THE SAME HOLES BEFORE PIVOTING THE HANGER" in body
     limit = f"FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD"
     assert limit in body
     assert f"BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}" in body
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
-    row = _config.parts("vn-transgear-arm-plate-screw")
+    row = _config.parts("pd-vn-transgear-arm-plate-screw")
     assert " ".join(row["installation_notes"].split()) == (
         " ".join(plate_screw.PURCHASED_STOCK_NOTE.split())
     )
@@ -1454,16 +1454,16 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
         "pd-support-bar",
         "sh-column-clamp-front",
         "sh-column-clamp-back",
-        "vn-clamp-screw",
+        "pd-vn-clamp-screw",
         "pd-platen",
         "pd-platen-rack",
         "pd-platen-guide",
         "pd-guide-lock",
         "pd-platen-clip",
         "pd-platen-paper",
-        "vn-fillister-screw",
-        "vn-platen-clip-screw",
-        "vn-guide-lock-screw",
+        "pd-vn-fillister-screw",
+        "pd-vn-platen-clip-screw",
+        "pd-vn-guide-lock-screw",
     }
     assert set(drawing.PLATEN_BALLOON_ANCHORS) == platen_group
     assert explode.SHOWN_STEMS == platen_group
@@ -1487,12 +1487,12 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
     # The guide screws leave with the guides' step, the clip screws with the
     # clips': the two screw families never share a step.
     for _step, names in plan:
-        assert not {"vn-fillister-screw-1", "vn-platen-clip-screw-1"} <= set(names)
+        assert not {"pd-vn-fillister-screw-1", "pd-vn-platen-clip-screw-1"} <= set(names)
 
 
 def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
-    instances = [i for i in _platen_instances() if i.stem != "vn-platen-clip-screw"]
-    with pytest.raises(ValueError, match="vn-platen-clip-screw"):
+    instances = [i for i in _platen_instances() if i.stem != "pd-vn-platen-clip-screw"]
+    with pytest.raises(ValueError, match="pd-vn-platen-clip-screw"):
         explode.plan_explode(instances)
 
 
@@ -1548,16 +1548,16 @@ def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
         chain.LINK_COUNT * sprocket.CHAIN_PITCH
     )
     assert drawing.CHAIN_QUANTITIES == {
-        "vn-chain-inner-link": chain.LINK_COUNT // 2,
-        "vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
-        "vn-chain-connecting-link": 1,
+        "pd-vn-chain-inner-link": chain.LINK_COUNT // 2,
+        "pd-vn-chain-outer-link": chain.LINK_COUNT // 2 - 1,
+        "pd-vn-chain-connecting-link": 1,
     }
     assert sum(drawing.CHAIN_QUANTITIES.values()) == chain.LINK_COUNT
     assert (
-        f"{chain.LINK_COUNT // 2} {_number('vn-chain-inner-link')} INNER AND "
-        f"{chain.LINK_COUNT // 2 - 1} {_number('vn-chain-outer-link')} OUTER LINKS"
+        f"{chain.LINK_COUNT // 2} {_number('pd-vn-chain-inner-link')} INNER AND "
+        f"{chain.LINK_COUNT // 2 - 1} {_number('pd-vn-chain-outer-link')} OUTER LINKS"
     ) in closed
-    assert f"THE {_number('vn-chain-connecting-link')} #25 CONNECTING LINK" in closed
+    assert f"THE {_number('pd-vn-chain-connecting-link')} #25 CONNECTING LINK" in closed
     for stem in drawing.CHAIN_QUANTITIES:
         assert "ANSI #25" in drawing.BOM_DESCRIPTIONS[stem]
     assert "CONNECTING LINK" in closed and "CLOSED END LEADING" in closed
@@ -1728,7 +1728,7 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert hook.startswith("HOLDING THAT MESH")
     # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
     # through the hole's clearance and opened the feed mesh.
-    pin = drawing._N["vn-transgear-latch-pin"]
+    pin = drawing._N["pd-vn-transgear-latch-pin"]
     assert f"ITS HOLE'S LOWER EDGE ON THE {pin} PIN" in hook
     assert "CLEAR" not in hook
     # The one-piece hook's pin hole is drilled from the pin at the set mesh,

@@ -1,4 +1,4 @@
-r"""Pure-data contract for the cone pivot post's bond cradle (MHA-DT-005-TL-01).
+r"""Pure-data contract for the cone pivot post's bond cradle (MHA-DT-05-TL-01).
 
 Shop fixture, not a machine part (cad/docs/subsystem-identities.md). While the
 retaining compound in the cone and crank sockets cures (prechips S6/S7), the

@@ -1,4 +1,4 @@
-r"""Create the drawing for the rocker template trammel's pivot block (MHA-CH-006-TL-14).
+r"""Create the drawing for the rocker template trammel's pivot block (MHA-CH-06-TL-14).
 
 Four orthographic views at 2:1, section A-A and a 1:1 shaded isometric: the
 top face (length, width, the reamed point hole, the slit and its drilled
@@ -498,7 +498,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Template Trammel Pivot Block Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker outline-template trammel pivot block; 1018; MHA-CH-006-TL-14",
+            3: "rocker outline-template trammel pivot block; 1018; MHA-CH-06-TL-14",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

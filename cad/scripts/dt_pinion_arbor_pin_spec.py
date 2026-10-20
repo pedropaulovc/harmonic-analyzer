@@ -1,8 +1,8 @@
-r"""Pure data: MHA-DT-022's cross hole for the MHA-DT-033 collar's spring pin (R1a).
+r"""Pure data: MHA-DT-22's cross hole for the MHA-DT-33 collar's spring pin (R1a).
 
 User ruling 2026-09-24: the collar is pinned to the arbor with the rig's one
 pin family, the ASME B18.8.2 1/16 x 1/2 slotted spring pin, in a hole drilled
-with the MHA-DT-030 1/16 drill (``vn_pinion_strap_pin_spec``).  The hole is drilled
+with the MHA-DT-30 1/16 drill (``dt_vn_pinion_strap_pin_spec``).  The hole is drilled
 at the bench at a .X station from the head rear face, on the crossrod's local
 axis so one V-block setup serves both cross holes.
 
@@ -14,7 +14,7 @@ spec read the hole from here.
 
 from __future__ import annotations
 
-import vn_pinion_strap_pin_spec as _pin
+import dt_vn_pinion_strap_pin_spec as _pin
 from dt_pinion_arbor_spec import (
     FRONT_JOURNAL_FROM_HEAD_REAR,
     LAND_FINISH_RUNOUT,
@@ -29,12 +29,12 @@ from dt_pinion_arbor_spec import (
 PIN_HOLE_DIA = _pin.HOLE_DIA
 PIN_HOLE_DIA_BAND = _pin.HOLE_BAND
 PIN_HOLE_DIA_MAX = _pin.HOLE_MAX
-# The hole's function is the pin it takes: the stock MHA-VN-033 (McMaster
+# The hole's function is the pin it takes: the stock MHA-DT-VN-63 (McMaster
 # 98296A027), the third of its BOM line.  Both sheets that drill for it,
-# MHA-DT-022 and the MHA-DT-033 collar, print this one callout, so a machinist
+# MHA-DT-22 and the MHA-DT-33 collar, print this one callout, so a machinist
 # reading the arbor's +0.06/0 band sees why it beats the title block's
 # drilled-hole row (codex machinist pass on pc-r8; Main, 2026-09-26).
-PIN_NUMBER = "MHA-VN-033"
+PIN_NUMBER = "MHA-DT-VN-63"
 PIN_HOLE_CALLOUT = f"{_pin.DRILL_THRU_CALLOUT}\nFOR {PIN_NUMBER} SPRING PIN"
 
 # At its worst corner the hole stays clear of the front land and its Ra 1.6

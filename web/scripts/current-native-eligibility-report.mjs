@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CURRENT_NATIVE_IDENTITY_PROJECTION } from '../current-native-identity.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MODULE_PATH = 'web/src/native-landmark-eligibility.ts'
@@ -14,6 +15,8 @@ const PRODUCER_PATHS = [
   'web/src/native-primitive-snapshot.ts', 'web/src/scene.ts', 'web/src/mechanics.ts',
   'web/src/kinematics.ts', 'web/src/magnifier.ts', 'web/src/native-target-shader-feedback.ts',
   'web/model-representation.mjs', CPU_PATH, 'web/content/model-representation.json',
+  'web/current-native-identity.mjs', 'web/content/current-native-identities.json',
+  'web/src/current-mechanics-data.ts',
 ]
 const CHUNK_BYTES = 1024 * 1024
 const ARRAY_TYPES = { Float32Array, Uint32Array, Float64Array }
@@ -262,6 +265,7 @@ export async function joinCurrentNativeEligibilityReport(joinNativeLandmarkEligi
     })
   }
   return { method: 'optional-current-native-landmark-eligibility-report', eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, gating: false,
+    currentIdentityProjection: CURRENT_NATIVE_IDENTITY_PROJECTION,
     state: landmarks.length && landmarks.every(item => item.state === 'eligible') ? 'eligible'
       : landmarks.some(item => item.state === 'ineligible') ? 'ineligible' : 'unresolved',
     sourceProof: false, sourceAcceptance: false, currentMetadata: evidence?.currentMetadata ?? null, landmarks,
@@ -271,6 +275,7 @@ export async function joinCurrentNativeEligibilityReport(joinNativeLandmarkEligi
 /** A loader/capture refusal stays visible without becoming pixel unavailability. */
 export function unavailableCurrentNativeEligibilityReport(frame, reason, collectionReason = 'module-seal-unavailable') {
   return { method: 'optional-current-native-landmark-eligibility-report', eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, gating: false,
+    currentIdentityProjection: CURRENT_NATIVE_IDENTITY_PROJECTION,
     state: 'unresolved', sourceProof: false, sourceAcceptance: false,
     landmarks: (frame?.landmarks ?? []).map(observed => ({ viewId: observed.viewId ?? 'main', anchorId: observed.anchorId,
       role: observed.role, eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, state: 'unresolved', reasons: [reason], collection: { status: 'not-collected', reason: collectionReason } })),

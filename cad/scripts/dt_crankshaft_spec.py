@@ -1,10 +1,10 @@
 r"""Crankshaft manufacturing contract.
 
-The v36 MHA-DT-005 bore carries integral running lands again; the pinion sits
+The v36 MHA-DT-05 bore carries integral running lands again; the pinion sits
 SEAT_FEELER_MM off its north boss face. All axial stations are measured from
 the dome root in the model and printed from the far end.  Behind the crank
 hub an integral
-collar carries the removable sprocket MHA-PD-009's seat and its two pressed
+collar carries the removable sprocket MHA-PD-09's seat and its two pressed
 drive pins (ch. 23); its rear face bears on the post boss's south face (owner
 ruling D1, 2026-10-15: no crank-seat washer).
 """
@@ -23,7 +23,7 @@ from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
-import vn_crank_seat_drive_pin_spec
+import dt_vn_crank_seat_drive_pin_spec
 import pd_transgear_removable_spec
 from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
@@ -96,10 +96,10 @@ def shaft_end_proud_links(shaft_length: float) -> dict[str, tuple[float, float, 
         overall, dt_crank_pinion_spec.OVERALL_LENGTH_PLACES
     )
     return {
-        "MHA-DT-011 CollarRearStation": (station, station_lower, station_upper),
-        "MHA-DT-005 crank boss length": (-boss, -boss_upper, -boss_lower),
-        "MHA-DT-010 seat feeler": (-dt_crank_pinion_spec.SEAT_FEELER_MM, 0.0, 0.0),
-        "MHA-DT-010 overall length": (-overall, -overall_upper, -overall_lower),
+        "MHA-DT-11 CollarRearStation": (station, station_lower, station_upper),
+        "MHA-DT-05 crank boss length": (-boss, -boss_upper, -boss_lower),
+        "MHA-DT-10 seat feeler": (-dt_crank_pinion_spec.SEAT_FEELER_MM, 0.0, 0.0),
+        "MHA-DT-10 overall length": (-overall, -overall_upper, -overall_lower),
     }
 
 
@@ -260,13 +260,13 @@ PINION_PIN_EDGE_TO_END_WORST = (
 )
 if PINION_PIN_EDGE_TO_END_WORST < dt_crank_pinion_spec.PIN_EDGE_MIN_WORST - 1e-9:
     raise AssertionError("W15 pin edge-to-shaft-end wall falls below its print-worst floor")
-# MHA-DT-009 hub-to-shaft cross-hole behind the crank arm.
+# MHA-DT-09 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 
 # --- ch. 23 crank seat (CONTRACT-crank): the integral collar replaces the
 # plain 5-mm T12 band.  Its front is a Ø17.5 seat spigot whose face is
-# MHA-PD-009's seat, at the removable's SEAT_FACE_Z, stepping up to the Ø20.6
+# MHA-PD-09's seat, at the removable's SEAT_FACE_Z, stepping up to the Ø20.6
 # collar body, whose rear face bears on the post boss's south face.  The #25
 # plates wrapping the T12 pass over the spigot and in front of the body's
 # front face: long enough that a bought chain's
@@ -285,7 +285,7 @@ SPIGOT_DIA = pd_transgear_removable_spec.SEAT_SPIGOT_DIA
 SPIGOT_LENGTH = 5.8
 COLLAR_DIA = 20.6
 SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
-# Two pressed MHA-VN-044 dowels on the wheel's pin circle at its +/-Y holes,
+# Two pressed MHA-DT-VN-67 dowels on the wheel's pin circle at its +/-Y holes,
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set
 # by the proud length the wheel needs.
@@ -293,7 +293,7 @@ if pd_transgear_removable_spec.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("the drive-pin holes are laid out on local +/-Z only")
 DRIVE_PIN_CIRCLE_RADIUS = pd_transgear_removable_spec.PIN_CIRCLE_RADIUS
 DRIVE_PIN_HOLE_DIA = pd_transgear_removable_spec.DRIVE_PIN_HOLE_DIA
-DRIVE_PIN_DEPTH = vn_crank_seat_drive_pin_spec.PRESS_DEPTH  # 3.95
+DRIVE_PIN_DEPTH = dt_vn_crank_seat_drive_pin_spec.PRESS_DEPTH  # 3.95
 DRIVE_PIN_FLOOR = SEAT_COLLAR + DRIVE_PIN_DEPTH
 if not SEAT_COLLAR < SPIGOT_END < COLLAR_REAR:
     raise AssertionError("the seat spigot must end inside the collar")
@@ -320,7 +320,7 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 # - The collar body OD is not a seat and meets no mate (machinist review of
 #   5a219a81904f): it prints at one place under the title block's .X band,
 #   and the bearing ring it gives the post boss holds at either limit.
-# - The MHA-PD-009 holes (PIN_HOLE_DIA) slip over the pins with 0.119 diametral
+# - The MHA-PD-09 holes (PIN_HOLE_DIA) slip over the pins with 0.119 diametral
 #   clearance, which absorbs the pin spacing error of BOTH parts; each pin
 #   located +/-0.025 from the axis spends 0.05 of it here, leaving the
 #   wheel the same share.  Printed at .XXX.
@@ -340,13 +340,13 @@ SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[1] - COLLAR_STATION_TOL,
 )
 # Reamed for a light press of the stock hardened 3/32 dowel (its catalogue
-# diameter tolerance is vn_crank_seat_drive_pin_spec.DIA_BAND_IN).
+# diameter tolerance is dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN).
 DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
 _DOWEL_OD = tuple(
-    vn_crank_seat_drive_pin_spec.DIA + inch * vn_crank_seat_drive_pin_spec.MM_PER_IN
-    for inch in vn_crank_seat_drive_pin_spec.DIA_BAND_IN
+    dt_vn_crank_seat_drive_pin_spec.DIA + inch * dt_vn_crank_seat_drive_pin_spec.MM_PER_IN
+    for inch in dt_vn_crank_seat_drive_pin_spec.DIA_BAND_IN
 )
-# The stock dowel's length grade, +/-0.010 in (the knob shaft's MHA-VN-038 is the
+# The stock dowel's length grade, +/-0.010 in (the knob shaft's MHA-PD-VN-54 is the
 # same 98381A family and reads it here too).
 DRIVE_PIN_LENGTH_GRADE = 0.010 * pd_transgear_removable_spec.MM_PER_IN
 DRIVE_PIN_PRESS_INTERFERENCE = (
@@ -421,7 +421,7 @@ _WHEEL_BORE_FLOAT = (
     - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 ) / 2.0
 WHEEL_SEAT_FLOAT = min(_WHEEL_PIN_FLOAT, _WHEEL_BORE_FLOAT)  # 0.158
-_PROUD = vn_crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
+_PROUD = dt_vn_crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 DRIVE_PIN_PROUD_RANGE = (
     _PROUD - DRIVE_PIN_DEPTH_TOL - DRIVE_PIN_LENGTH_GRADE,
     _PROUD + DRIVE_PIN_DEPTH_TOL + DRIVE_PIN_LENGTH_GRADE,
@@ -504,7 +504,7 @@ if SHAFT_DIA + dt_crank_pinion_spec.printed_band_mm(NECK_DIA_PLACES) >= (
     JOURNAL_DIA + JOURNAL_DIA_BAND[1]
 ):
     raise AssertionError("a loose neck must stay under the journal at print-worst")
-# Both Ø11.388 lands run in MHA-DT-005 and therefore need their own Ra 1.6
+# Both Ø11.388 lands run in MHA-DT-05 and therefore need their own Ra 1.6
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the post boss's south face, so it
 # carries the running grade too; the wheel's seat face is a static sprocket

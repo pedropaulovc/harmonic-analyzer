@@ -44,7 +44,7 @@ from dt_pinion_spring_geometry import (
 
 # U27 + Main's r6 ruling (c): the profile is hand-formed, so every formed
 # feature prints one place.  The five that set the crest's preload on the
-# MHA-DT-014 strap flank (dt_pinion_spring_geometry.FORMED_CONTACT_BANDS) carry
+# MHA-DT-14 strap flank (dt_pinion_spring_geometry.FORMED_CONTACT_BANDS) carry
 # a +/-0.5 band -- looser than a formed leaf could ever be held to +/-0.10,
 # tighter than the .X row's +/-0.8, which the drive train's preload and stress
 # corner walk would not pass -- and their callouts name the mate (rule 4).

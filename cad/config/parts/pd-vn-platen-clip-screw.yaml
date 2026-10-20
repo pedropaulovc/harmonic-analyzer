@@ -1,0 +1,13 @@
+pd-vn-platen-clip-screw:
+  title: Brass Pan Head Slotted Screw
+  number: MHA-PD-VN-65
+  stock_name: Brass Pan Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [92446A077]
+  material: Brass
+  material_specification: "Brass, slotted pan head, ASME B18.6.3; McMaster-Carr 92446A077"
+  finish: plain
+  quantity: 4
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

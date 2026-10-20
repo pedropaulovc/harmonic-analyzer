@@ -1,4 +1,4 @@
-r"""Create the curated manufacturing drawing for the bar pivot pin (MHA-CH-011).
+r"""Create the curated manufacturing drawing for the bar pivot pin (MHA-CH-11).
 
 Under ``cad/docs/drawing-guidelines.md``: the INSTALLED pin -- a 5/64
 drill-rod cylinder pressed into the amplitude bar's reamed top pin hole and
@@ -6,7 +6,7 @@ dressed flush with the bar's faces -- on three native model dimensions, all
 on the side view where a turned part's diameter sits beside its length
 (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the Ø
 with the drill rod's own grind band, its callout naming the stock and both
-mates; the installed length as REFERENCE (the bar's width; the MHA-CH-001
+mates; the installed length as REFERENCE (the bar's width; the MHA-CH-01
 stock owns it); and the blank's cut length with its band from the part's
 blanked ``BlankReference`` sketch. An axis centerline, a bare end view with
 its center mark, the isometric, and the one property-linked note. No datums,
