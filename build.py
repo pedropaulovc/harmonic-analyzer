@@ -667,7 +667,12 @@ def _require_leaf_admission(
         program,
         str(pool),
     ]
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    # Both selectors belong to the caller, not the selected pool project.
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"}
+    }
     try:
         result = subprocess.run(
             argv,
@@ -723,9 +728,9 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
     stderr is inherited so the pool's own progress and diagnostics reach the
     console as they happen; stdout is the machine-readable result. The nested
-    ``uv`` targets the pool's own environment (``--project``); the
-    ``VIRTUAL_ENV`` this process inherited from the outer ``uv run`` names
-    ours, which uv would (correctly) ignore with a warning on every call.
+    ``uv`` targets the pool's own environment (``--project``). Strip the
+    caller's ``VIRTUAL_ENV`` to avoid an unrelated-active-environment warning
+    and ``UV_PROJECT_ENVIRONMENT`` so it cannot override the pool environment.
     """
     argv = [
         "uv",
@@ -737,7 +742,11 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         str(pool / "farm.py"),
         *args,
     ]
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"}
+    }
     try:
         return subprocess.run(
             argv, cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, text=True
