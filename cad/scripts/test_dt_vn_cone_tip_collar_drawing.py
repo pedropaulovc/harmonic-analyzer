@@ -609,6 +609,7 @@ def test_collar_air_books_each_printed_source_once():
         *air.SWING_TERMS_MM, "T120 set of the swing",
         "collar float on the journal", "collar cock on the journal",
         *(f"bank {name}" for name in air.bank.DATUM_CHAIN_STACK),
+        "bank accepted stack length",
         "drum tier limits", "G19 cock in its running fit",
     }
     for tier in air.TIERS:
@@ -622,6 +623,9 @@ def test_collar_air_books_each_printed_source_once():
     along = abs(air.collar_pose_frame(0.0)[1][2])
     for name in ("post platform tap station", "post screw clearance", "post counterbore pattern"):
         assert terms[name] > air.AXIAL_TERMS_MM[name] * along
+    assert terms["bank accepted stack length"] == pytest.approx(
+        air.bank.STACK_L20_ACCEPT_BAND[0]
+    )
 
 
 def test_collar_air_splits_the_stock_screw_limits_into_their_sources():

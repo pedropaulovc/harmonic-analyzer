@@ -1,4 +1,4 @@
-r"""Create the native twelve-sheet drive-train assembly drawing package (MHA-DT-00).
+r"""Create the native thirteen-sheet drive-train assembly drawing package (MHA-DT-00).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -27,7 +27,12 @@ import textwrap
 from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    dimension_name,
+    place_view,
+    view_name,
+)
 
 from _check import check
 from _com import _early_bound
@@ -51,6 +56,9 @@ from _drawing_common import (
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
 )
+from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_layout_collect import (
     _leader_segments_of,
@@ -87,6 +95,7 @@ import cone_line
 import cone_set_stack as set_stack
 from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
 import cylinder_bank_layout as bank
+import dt_cylinder_bank_setting_spec as bank_settings
 from dt_cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
 from dt_cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from dt_cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT, ADJUSTER_THREAD
@@ -162,6 +171,7 @@ SHEET_NAMES = (
     "ASSEMBLY SEQUENCE CONT. + CRANK END FIT",
     "FULL-DETAIL SIDE VIEW",
     "CHECKS + SETUP",
+    "CYLINDER BANK SETTINGS",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -194,6 +204,14 @@ CONTINUATION_SHEET = 10
 # tooth and thread, so sheet 11 carries it.
 FULL_DETAIL_SHEET = 11
 CHECKS_SHEET = 12
+BANK_SETTINGS_SHEET = 13
+BANK_SETTING_SCALE = (1.0, 1.0)
+BANK_SPRING_DETAIL_SCALE = (4.0, 1.0)
+BANK_SETTING_CENTER = (0.205, 0.195)
+BANK_SPRING_DETAIL_CENTER = (0.105, 0.075)
+BANK_SPRING_CROP_RADIUS_MM = 8.0
+BANK_SETTING_KEEP = {bank_settings.STACK_DIMENSION: (0.205, 0.250)}
+BANK_SPRING_KEEP = {bank_settings.SPRING_DIMENSION: (0.165, 0.125)}
 
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
@@ -255,6 +273,7 @@ def package_sheet_scales(
         SHEET_NAMES[0]: ASSEMBLED_SCALE,
         **{SHEET_NAMES[number - 1]: cluster_scales[c] for c, number in CLUSTER_SHEETS.items()},
         SHEET_NAMES[FULL_DETAIL_SHEET - 1]: full_detail_scale,
+        SHEET_NAMES[BANK_SETTINGS_SHEET - 1]: BANK_SETTING_SCALE,
     }
 
 
@@ -469,7 +488,7 @@ BOM_PART_NUMBERS = {
 BOM_DESCRIPTIONS = {
     "dt-cylinder-gear-shaft": "CYLINDER GEAR ARBOR",
     "dt-arbor-pedestal": "ARBOR PEDESTAL",
-    "dt-cylinder-end-disc": "CYLINDER BANK THRUST WASHER",
+    "dt-cylinder-end-disc": "CYLINDER BANK SOUTH END DISC",
     "dt-vn-cylinder-bank-spring": "WAVE DISC SPRING, MCMASTER 9714K392",
     "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "dt-vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
@@ -618,12 +637,12 @@ def _inward_limits(low: float, high: float) -> str:
 
 _BANK_X = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
 BANK_X_LIMITS = _inward_limits(
-    _BANK_X - bank.BACK_STRAP_LOCATE_BAND, _BANK_X + bank.BACK_STRAP_LOCATE_BAND
+    _BANK_X - bank.FRONT_STRAP_LOCATE_BAND, _BANK_X + bank.FRONT_STRAP_LOCATE_BAND
 )
-_BACK_STRAP_Y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
-BACK_STRAP_Y_LIMITS = _inward_limits(
-    _BACK_STRAP_Y - bank.BACK_STRAP_LOCATE_BAND,
-    _BACK_STRAP_Y + bank.BACK_STRAP_LOCATE_BAND,
+_FRONT_STRAP_Y = base.BOTTOM_REAR_Z - bank.FRONT_STRAP_INNER_Z
+FRONT_STRAP_Y_LIMITS = _inward_limits(
+    _FRONT_STRAP_Y - bank.FRONT_STRAP_LOCATE_BAND,
+    _FRONT_STRAP_Y + bank.FRONT_STRAP_LOCATE_BAND,
 )
 _NORTH_EAR_Y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
 NORTH_EAR_Y_LIMITS = _inward_limits(
@@ -877,25 +896,11 @@ BANK_STEPS = _note_text(
         # (depthed at assembly) or the pinion rig (feeler-set).
         # The MHA-DT-13 print owns the stock (3/8 1018 CF X 190, long enough for
         # the edge finder) and its cut-to-fit rule (Main, r9).
-        # #743 (retention743 plan section 4, user rulings Q1-Q3): the bank is
-        # a solid stack, so fit-up proves the stack length, locates the back
-        # strap as the Z datum and swaps a setting mandrel for the finished
-        # arbor, which the MHA-DT-VN-64 apex set screws hold. #948 ruling R
-        # (PR #1292): the front strap is set one BANK_SPRING_SET blade off the
-        # front washer and the MHA-DT-VN-68 wave spring in that gap holds the
-        # bank back (no end play); the back strap's DRO target moves north by
-        # the miced back washer's excess, W - 1.500. Supersedes U34's
-        # disc/feeler end play and its "span -6.0" arbor. Every limit is
-        # cylinder_bank_layout's, rounded inward
-        # (test_bank_fitup_limits_are_the_layout_bands):
-        # 9A: Y is the hole-table rear-face distance of the back strap inner
-        # face, 70.538 +/-0.10; north (+Z) is LESS Y.
-        # 8 (user ruling L20 d'): L20 141.13 +/-0.10, exact at the places
-        # printed, read from the layout's limits. A short stack cannot be
-        # re-faced longer: its thinnest gear is remade. Each gear's own
-        # thickness band stays on the MHA-DT-12 print (rules 2 and 24,
-        # machinist review of 9ebf51696): the step records the mics only to
-        # find the thickest and thinnest cams.
+        # User ruling 2026-10-20: one reduced-OD brass disc on the SOUTH strap;
+        # north spring directly on gear 19. Preserve the nominal gear grid.
+        # A thick south disc moves its strap south, hence PLUS its measured
+        # excess in the base's rear-face Y coordinate. The north pedestal is
+        # then set from the actual accepted stack, not a frozen nominal end.
         "8. MIC EACH OF {cylinder_gears}X MHA-DT-12, CAM FACE TO BACK FACE;",
         "   RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
         # Each connecting rod comes pinned to its rocker arm (MHA-CH-00's
@@ -903,22 +908,17 @@ BANK_STEPS = _note_text(
         # cam slot as the next gear goes on, so the pair travels with its gear.
         "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
         f"   ROD + ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM AS ITS GEAR GOES ON.",
-        "   CLAMP LIGHTLY END TO END: GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
-        f"   {bank.STACK_L20_ACCEPT[0]:.2f}-{bank.STACK_L20_ACCEPT[1]:.2f}."
-        " LONG: SLIDE THE GEARS OFF IN ORDER WITH THEIR PAIRS TO THE THICKEST",
-        "   CAM; RE-FACE ITS CAM FACE, RESTACK, REMEASURE.",
-        f"   SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR,"
-        " REMEASURE.",
+        "   CLAMP LIGHTLY END TO END: ACCEPT THE GEAR 0 CAM FACE TO GEAR 19",
+        f"   NORTH FACE LENGTH SHOWN ON SHEET {BANK_SETTINGS_SHEET}. LONG: SLIDE THE GEARS",
+        "   OFF IN ORDER WITH THEIR PAIRS TO THE THICKEST CAM; RE-FACE ITS",
+        "   CAM FACE, RESTACK, REMEASURE. SHORT: REMAKE THE THINNEST GEAR, REMEASURE.",
         "   SLIDE THE STACK OFF, GEAR 0 FIRST, EACH GEAR WITH ITS PAIR.",
         "9. BASE MHA-FR-01 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-20) NOT FITTED.",
-        "9A. BACK MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
+        "9A. FRONT MHA-DT-02 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
         "   MHA-FR-01 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
-        # "THE STRAP" read as item 18, the MHA-DT-14 PINION BRACKET STRAP
-        # (machinist review of 15cf1dcbc): name the pedestal's face instead,
-        # and keep 9A to its eight lines (sheet 8's field has none spare).
-        "   MIC ONE MHA-DT-26, W, FOR THE BACK. SET THE MHA-DT-02 INNER",
-        f"   FACE TO Y {BACK_STRAP_Y_LIMITS} LESS (W - {BANK_WASHER_THICK:.3f}) AND THE MANDREL",
+        "   MIC THE MHA-DT-26, W. SET THE FRONT MHA-DT-02 INNER FACE",
+        f"   TO Y {FRONT_STRAP_Y_LIMITS} PLUS (W - {BANK_WASHER_THICK:.3f}) AND THE MANDREL",
         f"   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
         "   SPOT MHA-FR-01 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
@@ -926,27 +926,23 @@ BANK_STEPS = _note_text(
         # Check 4 re-reads both coordinates against the step 9 setting bands
         # after the cone swing's radial shims move the pedestals.
         "   MHA-DT-VN-62, RECHECK AND RECORD X AND Y.",
-        # dtrefactor's #937 review: the loaded mandrel hangs from the back
-        # strap alone until the front one goes on (F2), and its front end sits
-        # over the front foot hole, where no chuck or tap wrench reaches (F1).
-        # So the loaded mandrel leaves the base for the drill and tap.
-        # The machinist review of 53a7c4266 read "THE STACK IN ORDER" either way
-        # round: loaded from the front, the first gear on goes to the back.
-        "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-26, GEARS 19 TO 0,",
-        "   CAM SIDE FRONT, THEIR PAIRS HANGING FREE, THE OTHER MHA-DT-26,",
-        "   THEN MHA-DT-VN-68; IT SLIDES FREE ON THE MANDREL",
-        "   (ELSE STONE ITS BORE BURR). CLOSE THE BANK ON THE BACK MHA-DT-26.",
-        "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
-        "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-02 ON.",
-        "9C. SLIDE THE FRONT MHA-DT-02 ON UNTIL A "
-        f"{bank.BANK_SPRING_SET:.2f} BLADE BETWEEN IT",
-        "   AND THE FRONT MHA-DT-26, BESIDE MHA-DT-VN-68, IS LIGHTLY PINCHED. SET",
-        f"   X {BANK_X_LIMITS} AND SPOT AS 9A. SLIDE THE FRONT MHA-DT-02 OFF; DRAW",
-        "   THE LOADED MANDREL OUT OF THE BACK MHA-DT-02, HOLDING BOTH",
-        "   MHA-DT-26 AND MHA-DT-VN-68, AND LAY IT IN V-BLOCKS ON PARALLELS OFF",
+        # Support the loaded mandrel until the second pedestal is fitted.
+        # Lift it off before drilling: the mandrel covers that foot's hole.
+        "9B. FROM THE BACK, LOAD THE MICED MHA-DT-26, THEN GEARS 0 TO 19,",
+        "   CAM SIDE FRONT, THEIR PAIRS HANGING FREE, THEN MHA-DT-VN-68;",
+        "   IT SLIDES FREE ON THE MANDREL (ELSE STONE ITS BORE BURR).",
+        "   SEAT MHA-DT-26 DIRECTLY ON THE FRONT MHA-DT-02 AND CLOSE THE",
+        "   BANK SOUTH ON THE DISC. PROP THE MANDREL BACK END AT BORE HEIGHT",
+        "   (V-BLOCK ON PARALLELS); REMOVE THE PROP ONLY TO SLIDE THE BACK MHA-DT-02 ON.",
+        "9C. SLIDE THE BACK MHA-DT-02 ON UNTIL THE SPRING-SET BLADE",
+        f"   (SHEET {BANK_SETTINGS_SHEET}, DETAIL A), BESIDE MHA-DT-VN-68 BETWEEN THE STRAP",
+        "   INNER FACE AND GEAR 19'S NORTH FACE, IS LIGHTLY PINCHED.",
+        f"   SET X {BANK_X_LIMITS} AND SPOT AS 9A. SLIDE THE BACK MHA-DT-02 OFF;",
+        "   DRAW THE LOADED MANDREL OUT OF THE FRONT MHA-DT-02, HOLDING",
+        "   MHA-DT-26 AND MHA-DT-VN-68; LAY IT IN V-BLOCKS ON PARALLELS OFF",
         "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
-        "   BACK THROUGH THE BACK MHA-DT-02, PUSH THE BANK BACK AND",
-        "   PROP IT AS 9B. REFIT THE FRONT MHA-DT-02; RE-SET THE BLADE AND X, TIGHTEN",
+        "   BACK THROUGH THE FRONT MHA-DT-02; SEAT THE DISC AND BANK SOUTH,",
+        "   PROP AS 9B. REFIT THE BACK MHA-DT-02; RE-SET THE BLADE AND X, TIGHTEN",
         "   MHA-DT-VN-62, REMOVE THE BLADE, RECHECK AND RECORD X. DRO STILL ZEROED,",
         "   DRILL AND TAP THE MHA-FR-01 PIVOT SEAT PER ITS PRINT NOTE.",
         "9D. MEASURE MHA-DT-02 OUTER FACE TO OUTER FACE. TURN MHA-DT-13: ITS",
@@ -954,10 +950,8 @@ BANK_STEPS = _note_text(
         "9E. PUSH MHA-DT-13 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
         f"   THE MANDREL IS OUT AND EACH DOME STANDS {bank.ARBOR_DOME_HEIGHT:.1f} PROUD (DEPTH GAUGE).",
         "   SPOT MHA-DT-13 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
-        "   BLOW OUT CHIPS. RUN THE BACK MHA-DT-VN-64 IN TIGHT, THEN THE FRONT ONE.",
-        # #948 ruling R (PR #1292): MHA-DT-VN-68 holds the bank back on its
-        # datum, so there is no end play to read; check 3 proves the preload.
-        "9F. THE BANK TURNS FREE BY HAND, HELD BACK BY MHA-DT-VN-68.",
+        "   BLOW OUT CHIPS. RUN THE FRONT MHA-DT-VN-64 IN TIGHT, THEN THE BACK ONE.",
+        "9F. EACH GEAR TURNS FREE BY HAND, THE BANK HELD SOUTH BY MHA-DT-VN-68.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-08 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
@@ -1117,10 +1111,9 @@ CHECKS = _note_text(
         "   TURN, MHA-DT-07 CLEAR OF THE UNRELIEVED MHA-DT-20 TOP THROUGHOUT;",
         "   EACH CONE GEAR MESHES ITS MHA-DT-12 PER THE MHA-DT-03 PRINT.",
         "3. EACH MHA-DT-12 TURNS FREELY ON MHA-DT-13 WITHOUT AXIAL BINDING.",
-        # #948 ruling R (PR #1292): MHA-DT-VN-68 preloads the bank back, so no
-        # ring overhangs its cam; the fitter proves the spring holds.
-        "   PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE; THE BANK SPRINGS",
-        "   BACK ONTO THE BACK MHA-DT-26.",
+        # Prove the reversed preload seats on the south disc.
+        "   PUSH GEAR 0 TOWARD THE BACK BY HAND AND RELEASE; THE BANK SPRINGS",
+        "   BACK ONTO THE FRONT MHA-DT-26.",
         # MHA-DT-VN-53 is the DISENGAGED stop (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
         # it. The engaged mesh is SET here with MHA-DT-VN-51, not by the stop:
@@ -1133,13 +1126,13 @@ CHECKS = _note_text(
         # off would undo the T120 set (#1691 review r2).
         "4. CONE SWING SET (P1): LOOSEN MHA-DT-VN-51; SWING THE CONE SET ON MHA-DT-VN-52",
         "   TO THE MHA-DT-VN-53 STOP, CLEAR OF EVERY MHA-DT-12. ZERO AN INDICATOR ON",
-        "   EACH MHA-DT-02 IN X AND ONE ON THE BACK MHA-DT-02 IN Y. EASE THE",
+        "   EACH MHA-DT-02 IN X AND ONE ON THE FRONT MHA-DT-02 IN Y. EASE THE",
         "   MHA-DT-02 SCREWS (MHA-DT-VN-62) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
         f"   TIP TO MHA-DT-12 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
         f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-DT-VN-62.",
         "   EACH RECORDED X (9A, 9C) PLUS ITS X READING IS "
         f"{BANK_X_LIMITS};",
-        "   BACK INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
+        "   FRONT INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
         "   THE 9A Y LIMITS, USING THE SAME W. IF OUT, EASE THAT PEDESTAL,",
         "   RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN. STEPS "
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}",
@@ -3028,6 +3021,130 @@ def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return _stack_sheet_note_fields(adapter, facts, CONTINUATION_SHEET)
 
 
+def _bank_setting_view(
+    adapter: Any, facts: SourceFacts, *, centre: tuple[float, float],
+    model_z: float, scale: tuple[float, float], label: str,
+) -> Any:
+    view = _early_bound(
+        place_view(adapter, str(SOURCE), "*Right", *centre, scale=scale), "IView"
+    )
+    set_hidden_lines_removed(adapter, view)
+    _configure_view(adapter, view, exploded=False, label=label)
+    _isolate_instances(adapter, view, frozenset(facts.clusters["cylinder-bank"]), label=label)
+    projected = model_point_in_view(
+        adapter, view, (cone_line.X_DRUM / 1000.0, bank_settings.AXIS_Y / 1000.0,
+                        model_z / 1000.0), label=label
+    )
+    _shift_view(adapter, view, (centre[0] - projected[0], centre[1] - projected[1]), label=label)
+    return view
+
+
+def _bank_setting_circle(
+    adapter: Any, view: Any, centre: tuple[float, float], radius: float
+) -> None:
+    """The channel package's view-sketch circle pattern, in sheet metres."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"cannot activate bank setting view {name}")
+    adapter.currentModel.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in (centre, (centre[0] + radius, centre[1])):
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = False
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError("cannot create bank setting crop circle")
+
+
+def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], None]:
+    """Full bank at 1:1 and a 4:1 north bearing-face detail; no scaled-down views."""
+    _activate_sheet(adapter, SHEET_NAMES[BANK_SETTINGS_SHEET - 1])
+    _heading(adapter, BANK_SETTINGS_SHEET)
+    overall = _bank_setting_view(
+        adapter, facts, centre=BANK_SETTING_CENTER,
+        model_z=(bank.FRONT_STRAP_INNER_Z + bank.BACK_STRAP_INNER_Z) / 2.0,
+        scale=BANK_SETTING_SCALE, label="cylinder bank setting",
+    )
+    spring_z = sum(bank.BANK_SPRING_Z) / 2.0
+    detail = _bank_setting_view(
+        adapter, facts, centre=BANK_SPRING_DETAIL_CENTER, model_z=spring_z,
+        scale=BANK_SPRING_DETAIL_SCALE, label="north spring setting",
+    )
+    annotations = []
+    for view, feature, keep, label in (
+        (overall, bank_settings.STACK_FEATURE, BANK_SETTING_KEEP, "closed bank length"),
+        (detail, bank_settings.SPRING_FEATURE, BANK_SPRING_KEEP, "north spring gap"),
+    ):
+        _show_base_view_sketches(adapter, view, (feature,), label=label)
+        imported = curate_view_dimensions(
+            adapter, view, keep=keep, view_label=label,
+            dimensions_by_feature=bank_settings.DRAWING_DIMENSIONS,
+        )
+        set_dimension_callouts(adapter, imported, {
+            name: ("CLOSED GEAR STACK" if name == bank_settings.STACK_DIMENSION
+                   else "GEAR 19 TO NORTH PEDESTAL / SET WITH BLADE")
+            for name in keep
+        })
+        annotations.extend(imported)
+    radius = BANK_SPRING_CROP_RADIUS_MM / 1000.0
+    parent_centre = model_point_in_view(
+        adapter, overall,
+        (cone_line.X_DRUM / 1000.0, bank_settings.AXIS_Y / 1000.0, spring_z / 1000.0),
+        label="spring detail boundary",
+    )
+    _bank_setting_circle(adapter, overall, parent_centre, radius)
+    adapter.currentModel.ClearSelection2(True)
+    _bank_setting_circle(adapter, detail, BANK_SPRING_DETAIL_CENTER, radius * 4.0)
+    status = int(detail.Crop2(False, False, 1))
+    adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="bank setting crop")
+    detail.UpdateViewDisplayGeometry()
+    if status != 1 or not bool(detail.IsCropped()):
+        raise RuntimeError(f"north spring setting Crop2 failed: {status}")
+    _add_note_block(adapter, "CYLINDER BANK RIGHT 1:1",
+                    (0.165, 0.145), label="bank setting caption")
+    _add_note_block(adapter, "DETAIL A 4:1 - NORTH SPRING SET",
+                    (0.060, 0.035), label="spring detail caption")
+    _add_note_block(adapter, "A", (parent_centre[0] - 0.014, parent_centre[1] + 0.010),
+                    label="spring detail letter")
+
+    def settled() -> None:
+        assert_imported_precision(
+            adapter, annotations,
+            {name: 2 for names in bank_settings.DRAWING_DIMENSIONS.values() for name in names},
+        )
+        for annotation in annotations:
+            name = dimension_name(adapter, annotation)
+            display = _early_bound(
+                _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+            )
+            dimension = _early_bound(display.GetDimension2(0), "IDimension")
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            upper, lower = bank_settings.DIMENSION_BANDS[name]
+            if (abs(float(tolerance.GetMaxValue()) - upper / 1000.0) > 1e-9
+                    or abs(float(tolerance.GetMinValue()) - lower / 1000.0) > 1e-9):
+                raise RuntimeError(f"{name} lost its model-authored setting band")
+        names = {
+            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
+            for annotation in (detail.GetAnnotations() or ())
+        }
+        if bank_settings.SPRING_DIMENSION not in names:
+            raise RuntimeError("north spring setting dimension did not survive its crop")
+
+    settled()
+    return settled
+
+
 def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     """The whole drive train, side-on, every modeled tooth and thread.
 
@@ -3209,7 +3326,7 @@ def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
 
 def _place_package(
     adapter: Any, facts: SourceFacts, step: Callable[[str], None]
-) -> tuple[dict[str, tuple[float, float]], list[BalloonLanding]]:
+) -> tuple[dict[str, tuple[float, float]], list[BalloonLanding], Callable[[], None]]:
     """Place every sheet; return each sheet's scale as placed, and every
     balloon landing.
 
@@ -3235,6 +3352,8 @@ def _place_package(
     step("sequence sheet")
     findings += _place_bank_sheet(adapter, facts)
     step("bank sheet")
+    settings_settled = _place_bank_setting_sheet(adapter, facts)
+    step("bank setting dimensions")
     findings += _place_fit_sheet(adapter, facts)
     step("fit sheet")
     findings += _place_checks_sheet(adapter, facts)
@@ -3266,7 +3385,7 @@ def _place_package(
     _check_package_layout(adapter, findings)
     step("layout check")
     landings = [landing for _balloons, sheet in placed.values() for landing in sheet]
-    return package_sheet_scales(cluster_scales, full_detail), landings
+    return package_sheet_scales(cluster_scales, full_detail), landings, settings_settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -3292,7 +3411,7 @@ async def build(adapter: Any) -> dict[str, str]:
             facts = _validate_source(source_model)
             step = _source_dirty_tracer(source_model)
             step("validate source")
-            sheet_scales, landings = _place_package(adapter, facts, step)
+            sheet_scales, landings, settings_settled = _place_package(adapter, facts, step)
 
             def assert_source_clean(where: str) -> None:
                 # Saving the drawing would write a dirty released source.
@@ -3316,6 +3435,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 settled_checks=(
                     lambda: assert_balloon_landings(adapter, landings),
                     lambda: assert_source_clean("finalize rebuilds"),
+                    settings_settled,
                 ),
             )
         except Exception:

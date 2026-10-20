@@ -492,15 +492,15 @@ sections:
         - derived from matched fit
         - med
       - - Cylinder arbor length
-        - 165.08 mm cylindrical strap-to-strap span; 168.08 mm including two domes
+        - 163.58 mm cylindrical strap-to-strap span; 166.58 mm including two domes
         - —
-        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: full depth of both 10 mm pedestal straps, each dome 1.5 mm proud. The earlier ~200 mm estimate was derived from the photo-scale stack, not a current cut length.'
+        - 'Current cylinder_bank_layout.ARBOR_LENGTH / ARBOR_OVERALL_LENGTH: accepted gear stack plus one 1.5 mm south disc and the 0.95 mm north spring gap, with full depth of both 10 mm pedestal straps; each dome 1.5 mm proud. User ruling 2026-10-20 removes the north disc and relocates both pedestal origins from this stack. The earlier ~200 mm estimate and 165.08 mm cylinder are historical, not current cut lengths; final length is measured at fit-up.'
         - derived from current bank layout
         - med
-      - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
-        - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-DT-26)
-        - '0.98'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap (target offset by the measured washer''s W − 1.500, #948 ruling R), the front one sits 0.95 off the front strap on the MHA-DT-VN-68 preload spring (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+      - - Cylinder bank south end disc ×1 (user ruling 2026-10-20)
+        - C36000 brass, Ø55.0 with ordinary .X title-block band (±0.8); bore Ø9.6 +0.10/0 and thickness 1.50 ±0.05 retained (MHA-DT-26)
+        - —
+        - 'Supersedes #743 two Ø25 steel thrust washers: the south disc seats directly against the south pedestal and closes gear 0''s cam slot; there is no north disc. The nominal gear station grid stays fixed. Mic the disc W and locate the south strap to nominal machine Z minus (W − 1.500), equivalently rear-face drawing Y PLUS that excess. North spring preloads south; tooth station j accumulates gears 0 through j, while the gear-19 north face carries the full accepted stack deviation. The pinion rig is still feeler-set from the ACTUAL gear-19 north face, so its relative gear-to-gear budget is unchanged.'
         - derived
         - med
       - - Arbor ends and set screws (#743, 2026-09-25)
@@ -510,9 +510,9 @@ sections:
         - derived
         - med
       - - Cylinder bank preload spring (#948 ruling R, PR #1292)
-        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade between the front washer and the front strap, 2.2–4.2 N over the ±0.10 set band (MHA-DT-VN-68)
+        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade directly between gear 19's north planar face and the north pedestal strap, 2.2–4.2 N over the ±0.10 set band (MHA-DT-VN-68)
         - —
-        - 'design: replaces the 0.45 end-play leaf and reverses #743 Q1 ("bank is not preloaded"): the stack is held north on its datum, so a flat rod held at cam and arm needs no end-play allowance (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`)'
+        - 'User ruling 2026-10-20 reverses preload south onto the single brass disc and south hard datum, retaining the existing installed-gap and inferred linear-rate contracts. The north pedestal follows the accepted stack, not a nominal gear-19 hard datum (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`).'
         - derived
         - med
   - prose: |2
@@ -521,6 +521,32 @@ sections:
       connecting rods. Each rod rides the cam on the gear to its right; cam converts
       rotation to near-sinusoidal reciprocation of the rod → rocker arm. Notches aligned
       to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
+
+      The later 2026-10-20 owner ruling reduces the south disc enough to
+      prevent interference, superseding same-gear OD. Use a full circular
+      Ø55.0 C36000 brass disc at the existing ordinary .X ±0.8 band, not a
+      relieved disc or a relocated drive. The original Ø64.44 intersects the
+      64T gear's solid root and the engaged alignment-pinion drum.
+      dt_cylinder_end_disc_clearance derives the reduced disc's arithmetic
+      worst-case envelopes from the actual printed size limits, the 64T's
+      chamfer-shortened bore support, T120 feeler/set and seat floats, tooth
+      runout, compensated south datum and all disc tilt permitted by its bore.
+      The 64T separating-plane air is 0.510140 mm, the engaged pinion's
+      enclosing-sphere radial air 3.543405 mm; both exceed 0.10 running air
+      plus 0.25 spare. Minimum projected retaining land beyond the farthest
+      accepted rod-ring bore edge is 2.435715 mm. Covering the entire ring
+      outer rim is neither required nor claimed; continuous axial capture is.
+      All 20 cone gears share the drive axis: their maximum printed tip radius
+      is 32.175 mm (T120), below the 64T's 35.570 mm maximum by 3.395 mm.
+      The nearest cone's full-cylinder nominal axial gap is 1.928227 mm
+      (T120), increasing northward for every smaller cone. This axial gap is
+      not claimed at free-bore disc tilt; the radial separating plane is the
+      controlling clearance proof.
+      cylinder_bank_layout calls the pure owning-spec guard with its actual
+      datum budget. Native assembly checks remain required, including an
+      engaged-pinion sweep; a parked-pose interference result alone cannot
+      certify that sweep. MHA-DT-00 sheet 13 carries native associative closed
+      stack and north spring-gap settings; assembly steps 8 and 9C use them.
 
       Current build (`build_dt_cylinder_gear.py`): single non-configured custom
       120T 48DP PA20 gear/cam composite with a finite #2 / 55T-reference stock
@@ -615,7 +641,7 @@ sections:
         - 'cone_line exact tracking retains sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, making the drum-side generator parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylindrical span z −82.018912220..+83.061087780 (165.08 mm), domes 1.5 mm proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −81.068912220..+82.511087780 (163.58 mm), domes 1.5 mm proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
         - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j

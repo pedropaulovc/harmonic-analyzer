@@ -27,8 +27,8 @@ fastener/thread class, read from the spec the drawing prints it from:
 * the collar on the shaft: its nose and body sizes, its float and cock on
   the journal, and the stock set screw's tap station, centring and angle,
   length, the D-flat it seats on and its rock in the thread;
-* the bank: the back strap and washer datum chain and G19's cock in its
-  running fit.
+* the bank: the south strap/disc datum chain, accepted full-stack length and
+  G19's cock in its running fit.
 
 Vertical (Y) errors move the collar across Z, not along it.
 
@@ -324,6 +324,7 @@ INDEPENDENT_TOLERANCES = frozenset({
     "set screw length",
     "terminal flat depth",
     *(f"bank {name}" for name in bank.DATUM_CHAIN_STACK),
+    "bank accepted stack length",
     "drum tier limits",
 })
 if IN_SERVICE_CLEARANCES & INDEPENDENT_TOLERANCES:
@@ -457,8 +458,10 @@ def closure_terms_mm(tier: CollarTier, fixed: DrumTier, angle_deg: float = 0.0) 
     )
     for name, (axial, radial) in tier.limits.items():
         terms[name] = terms.get(name, 0.0) + axial * along + radial * across
-    # The bank: its datum chain, then G19's cock within its running fit.
+    # G19 is now the free end: its north face carries the accepted full
+    # stack deviation as well as the south datum chain.
     terms.update({f"bank {name}": value for name, value in bank.DATUM_CHAIN_STACK.items()})
+    terms["bank accepted stack length"] = bank.G19_BACK_FACE_BAND[1]
     manufactured = _tilted_fixed_support(fixed, Z, 0.0)
     nominal = cylinder_support((0.0, 0.0, 0.0), Z, fixed.south_mm, fixed.north_mm,
                                fixed.radius_mm, Z, maximum=True)

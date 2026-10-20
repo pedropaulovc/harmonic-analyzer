@@ -1,9 +1,9 @@
 dt-cylinder-end-disc:
   number: MHA-DT-26
-  title: Cylinder Bank Thrust Washer
-  material: Plain Carbon Steel
-  material_specification: SAE 1018 CF bar, ASTM A108-24
-  finish: oiled
+  title: Cylinder Bank South End Disc
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: as machined
   tolerance_class: machined_block
-  quantity: 2
-  process: "turned (steel)"
+  quantity: 1
+  process: "turned (brass)"

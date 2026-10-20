@@ -13,10 +13,10 @@ import it.
 - MHA-DT-19 is match-drilled on a DRUM_END_SHIM leaf at the drum's front end
   (SHAFT_DRILL_STEP), which sets the drum's end play.
 - The rig's axial datum (user ruling P1-2): with the cylinder-gear bank
-  pushed north, the drum's back end is set RIG_SET_LEAF_D off the north
-  MHA-DT-12's back face before the block seats are transferred (the base's
-  RIG SET note, RIG_SET_STEP, which both transfer callouts name).  The bank pushed north is what keeps its end
-  play out of j = 19's stack (#743), so the step says so.
+  preloaded south onto its disc, the drum's back end is set RIG_SET_LEAF_D
+  off the ACTUAL north MHA-DT-12 back face before the block seats are
+  transferred. The setting follows the accepted bank length; it does not
+  assume gear 19 is fixed to a north hard datum.
 - The MHA-DT-23 cams (user ruling P1-1): the front cam's front face
   FRONT_COLLAR_LEAF off the front block, the back cam's back face
   BACK_COLLAR_LEAF_F off the back block, then staked (COLLAR_SET_STEP).  Nothing is cut
@@ -97,9 +97,8 @@ if FEELER_SET_ERROR != FRONT_BLOCK_FEELER_BAND or DRUM_END_SHIM_SET_ERROR != (
     raise AssertionError("a fit-up setting carries its own band")
 
 
-# The set-up the rig-set leaf assumes (#743): the bank's end play taken up
-# north, so g19 never sits north of the datum D is measured from.
-RIG_SET_BANK_PRECONDITION = "BANK PUSHED NORTH"
+# The bank is seated on its south hard datum before the rig follows actual g19.
+RIG_SET_BANK_PRECONDITION = "BANK HELD SOUTH ON MHA-DT-26"
 
 
 def _leaves_text(leaves: tuple[float, ...]) -> str:
@@ -119,7 +118,7 @@ RIG_SET_STEP = "\n".join(
         f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS:",
         f"FRONT MHA-DT-18 {FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-DT-14;",
         f"MHA-DT-01 BACK END {_leaves_text(RIG_SET_LEAVES)} LEAVES OFF",
-        f"NORTH MHA-DT-12 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
+        f"ACTUAL NORTH MHA-DT-12 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
         f"MHA-DT-24 PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-DT-18.",
     )
 )

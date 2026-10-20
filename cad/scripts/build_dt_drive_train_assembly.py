@@ -141,9 +141,22 @@ import _telemetry
 from _check import check, log
 from _com import _early_bound
 from _custom_properties import apply_custom_properties
+from _dimensions import drive_dimension, set_global
+from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
+from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import _set_tolerance_precision, set_dimension_symmetric_tolerance
+from _feature_tree import name_last_feature
+from _sketch import (
+    SketchDims,
+    anchor_point_to_origin,
+    blank_sketch,
+    dimension_between,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
+import dt_cylinder_bank_setting_spec as bank_settings
 from _rebuild import force_rebuild
 from _session import run_build
-from _drawing_marks import DRAWN_BY
 from _printed_tolerance import printed_deviations
 from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
@@ -687,34 +700,31 @@ if abs(CRANK_DRIVE_PIN_Z0 - SEAT_PIN.LENGTH - seat_geometry.DRIVE_PIN_TIP_Z) > 1
     raise AssertionError("crank drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
 if abs(SEAT_PIN.DIA - seat_geometry.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("crank-seat-drive-pin is not the removable's drive pin")
-from build_dt_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
-from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
+from dt_cylinder_end_disc_spec import (  # noqa: E402
+    OUTSIDE_DIA_PLACES as END_DISC_OD_PLACES,
+    WASHER_OD as END_DISC_DIA,
+    WASHER_THICK as END_DISC_THICK,
+)
 
-# The cylinder bank is a SOLID STACK (#743, cylinder_bank_layout): each
-# MHA-DT-12 is one station pitch thick, cam face to back face, and a turned
-# MHA-DT-26 thrust washer closes each end. The back (north) strap is the bank's
-# axial datum and the bank is modelled held back against it; the front strap
-# stands one BANK_SPRING_SET blade off the front washer, and the MHA-DT-VN-68
-# wave spring in that gap preloads the stack north (#948 ruling R, PR #1292).
-# Every station below is the layout module's, so the ladder, the washers, the
-# spring, the straps, the arbor and the apex set screws cannot drift apart.
-# (Supersedes U34's END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
+# The cylinder bank is a solid stack on its unchanged station grid. One
+# brass MHA-DT-26 disc seats directly on the south datum strap and
+# closes gear 0's cam slot. At the north, MHA-DT-VN-68 bears directly between
+# gear 19's planar face and the adjustable strap, preloading the bank south
+# (user ruling 2026-10-20). All retention stations come from the layout.
 import cylinder_bank_layout as _bank  # noqa: E402
 import dt_vn_cylinder_bank_spring_spec as BANK_SPRING  # noqa: E402
 
 if abs(Z_DRUM0 - _bank.STATION_Z0) > 1e-9 or abs(Z_PITCH - _bank.BANK_PITCH) > 1e-9:
     raise AssertionError("drive-train drum ladder left the cylinder-bank stations")
-if abs(END_DISC_THICK - (_bank.BACK_WASHER_Z[1] - _bank.BACK_WASHER_Z[0])) > 1e-9:
-    raise AssertionError("placed thrust washer is not the bank layout's washer")
-END_DISC_SOUTH_Z0 = _bank.FRONT_WASHER_Z[0]
-END_DISC_NORTH_Z0 = _bank.BACK_WASHER_Z[0]
-# The spring's model is its installed envelope: z = 0 on the front strap's
-# inner face, z = MODEL_HEIGHT on the front washer.
+if abs(END_DISC_THICK - (_bank.SOUTH_DISC_Z[1] - _bank.SOUTH_DISC_Z[0])) > 1e-9:
+    raise AssertionError("placed end disc is not the bank layout's disc")
+END_DISC_SOUTH_Z0 = _bank.SOUTH_DISC_Z[0]
+# The installed spring envelope runs +Z from gear 19 to the north strap.
 BANK_SPRING_Z0 = _bank.BANK_SPRING_Z[0]
 if abs(_bank.BANK_SPRING_Z[1] - _bank.BANK_SPRING_Z[0] - BANK_SPRING.MODEL_HEIGHT) > 1e-9:
-    raise AssertionError("placed bank spring is not the layout's front-strap gap")
-if abs(_bank.BANK_SPRING_Z[1] - END_DISC_SOUTH_Z0) > 1e-9:
-    raise AssertionError("bank spring does not bear on the front thrust washer")
+    raise AssertionError("placed bank spring is not the layout's north-strap gap")
+if abs(BANK_SPRING_Z0 - _bank.G19_BACK_FACE_Z) > 1e-9:
+    raise AssertionError("bank spring does not bear directly on gear 19")
 
 # Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
 # casting twice -- south as built, north rotated 180 about Y so its strap looks
@@ -727,21 +737,20 @@ from dt_arbor_pedestal_spec import (  # noqa: E402
     STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
 )
 
-ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -72.019
-ARBOR_STRAP_NORTH_Z = _bank.BACK_STRAP_INNER_Z  # +73.062
-# Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
-# +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
-ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 80.019
-ARBOR_PEDESTAL_NORTH_Z = _bank.BACK_PEDESTAL_ORIGIN_Z  # 81.062
+ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z
+ARBOR_STRAP_NORTH_Z = _bank.BACK_STRAP_INNER_Z
+# South as built, north Ry180: origins follow their strap inner faces.
+ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z
+ARBOR_PEDESTAL_NORTH_Z = _bank.BACK_PEDESTAL_ORIGIN_Z
 # Plan z band of each whole foot (strap inner face .. ledge end).
 ARBOR_PED_SOUTH_Z_BAND = (
     -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
     -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
-)  # -100.019..-72.019
+)
 ARBOR_PED_NORTH_Z_BAND = (
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
-)  # +73.062..+101.062
+)
 if (
     abs(-ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z - ARBOR_STRAP_SOUTH_Z) > 1e-9
     or abs(ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z - ARBOR_STRAP_NORTH_Z)
@@ -788,10 +797,10 @@ if _bank.SET_SCREW_POINT_MARGIN < _bank.SET_SCREW_POINT_MARGIN_MIN:
     raise AssertionError(
         "arbor set screw's cup point spans the bore clearance by < SET_SCREW_POINT_MARGIN_MIN"
     )
-if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
-    raise AssertionError("south thrust washer reaches the south pedestal strap")
-if abs(ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK)) > 1e-9:
-    raise AssertionError("north thrust washer does not bear on the datum strap")
+if abs(END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z) > 1e-9:
+    raise AssertionError("south end disc does not bear directly on the datum strap")
+if abs(ARBOR_STRAP_NORTH_Z - _bank.BANK_SPRING_Z[1]) > 1e-9:
+    raise AssertionError("north spring does not bear directly on the adjustable strap")
 # Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
 # 104.65 about SUPPORT_WORLD_X, z +-90.25): the north foot shares its z band but
 # stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
@@ -3220,13 +3229,10 @@ if _CREST_T > STRAP_C2C - 1.0:
     raise AssertionError("spring crest bears on the arbor end cap, not the flank")
 if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
-# The cylinder drum: the leaf rides axially PAST its last (j = 19) gear
-# (RIG_MARGINS books its front edge against that gear's back face at the
-# worst fit-up), so the flexed blade can never meet the 120T tips; only the
-# north end disc (Ø55, END_DISC_AIR outboard of that gear) shares its z
-# band.  Parked, the crest and the flick tip also clear the tip circle
-# itself in 2D; the engaged blade is gated against the disc with the swing
-# gates below.  Each books the strip's full thickness on the east side.
+# The return leaf rides axially past gear 19 at worst fit-up (RIG_MARGINS).
+# The north end disc is gone; the remaining south disc is at the other end
+# of the bank. Parked, the crest and flick tip also clear the gear circle
+# radially. Each check books the strip's full thickness on the east side.
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     if math.hypot(X_DRUM - _p[0], Y_DRIVE - _p[1]) - SPRING_T < TIP_DRUM120 + 0.25:
         raise AssertionError(f"spring {_label} crowds the cylinder-gear tips")
@@ -3633,17 +3639,6 @@ if SPRING_STRESS_SF < _STRESS_SF:
     raise AssertionError(
         f"spring root stress SF {SPRING_STRESS_SF:.2f} engaged at the stiff corner"
     )
-# The engaged blade flexes east toward the cylinder drum: the crest and the
-# flick tip, carried east by the extra deflection, keep 0.25 to the north end
-# disc beside them (the gears themselves end axially short of the leaf).
-_spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
-for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
-    _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
-    if (
-        math.hypot(X_DRUM - _q[0], Y_DRIVE - _q[1]) - _SPR_T_HI
-        < END_DISC_DIA / 2.0 + 0.25
-    ):
-        raise AssertionError(f"engaged spring {_label} reaches the drum end disc")
 
 # --- full-rotation clearance proofs (PR6) -------------------------------------
 # The interference gate sees only the PARKED pose; the grip crossrod spins full
@@ -3831,16 +3826,13 @@ GRIP_HEAD_NORTH_TRAVEL_STACK = {
     **ARBOR_NORTH_TRAVEL_STACK,
     "MHA-DT-22 neck length .XX": _upper(ARBOR_NECK_LEN, ARBOR_NECK_LEN_PLACES),
 }
-# TODO(#743): the bank retention replaces the Ø55 end discs (MHA-DT-26) with
-# Ø25 x 1.50 steel thrust washers, so this row changes or retires with it
-# (retention743 owns the update).
-# Radial: the widest drum tip against the largest end disc, which has no
-# sheet and so carries the title block's general .X row on its diameter.
+# Radial envelope of the alignment drum against the enlarged south end disc.
+# DiscDia's own precision selects its actual ordinary title-block band.
 DRUM_TIP_TO_END_DISC_STACK = {
     "MHA-DT-01 critical tip, half": (
         _ALIGNMENT_PINION.outside_dia_limits_mm()[1] / 2.0 - TIP_APINION
     ),
-    "end disc dia, general .X, half": _upper(END_DISC_DIA, 1) / 2.0,
+    "end disc dia, general band, half": _upper(END_DISC_DIA, END_DISC_OD_PLACES) / 2.0,
 }
 
 
@@ -3866,7 +3858,7 @@ def _worst(nominal: float, *stacks: dict[str, float]) -> float:
 # clearance the rig's axial stations set against its neighbours -- stands at
 # least RIG_MARGIN_SPARE over its floor.  name -> (worst value, floor).
 RIG_MARGINS = {
-    "j = 19 past its full face (bank pushed north)": (J19_FULL_FACE_MARGIN, 0.0),
+    "j = 19 past its full face (bank preloaded south)": (J19_FULL_FACE_MARGIN, 0.0),
     "j = 0 drum overhang slack (rig and bank terms)": (J0_SLACK_WORST, 0.0),
     "torque shaft bearing in the front block": (
         sum(RIG.TORQUE_SHAFT_BEARING_STACK.values()),
@@ -3928,7 +3920,7 @@ RIG_MARGINS = {
         ),
         0.25,
     ),
-    "engaged drum tips to the north end disc": (
+    "engaged drum tips to the south end disc": (
         _worst(
             ENGAGED_C2C - TIP_APINION - END_DISC_DIA / 2.0,
             DRUM_TIP_TO_END_DISC_STACK,
@@ -4604,6 +4596,59 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
         raise AssertionError(f"{pin} stands {off_axis * 1000.0:.4f} mm off {collar}'s pin hole")
 
 
+async def _author_bank_settings_reference(adapter) -> None:
+    """Native, globals-driven bearing-face settings; no solids or mate edits."""
+    drives = []
+    for feature, name, south, north in bank_settings.LEGS:
+        x0, x1 = -south, -north  # Right-plane sketch x is machine -Z
+        y = bank_settings.AXIS_Y
+        start_global, axis_global = f"{name}StartX", f"{name}AxisY"
+        await set_global(adapter, start_global, f"{abs(x0)}mm")
+        await set_global(adapter, axis_global, f"{y}mm")
+        await set_global(adapter, name, f"{north - south}mm")
+        check(f"create {feature}", await adapter.create_sketch("Right"))
+        set_sketch_direct_db(adapter, True)
+        try:
+            leg = check(f"{name} leg", await adapter.add_line(x0, y, x1, y))
+        finally:
+            set_sketch_direct_db(adapter, False)
+        segment = _early_bound(adapter._sketch_entities[leg], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{name} is not construction geometry")
+        check(f"{name} horizontal", await adapter.add_sketch_constraint(leg, None, "horizontal"))
+        await anchor_point_to_origin(adapter, f"{leg}.start", x0, y, f"{name} south face")
+        dims = SketchDims()
+        dims.record("SouthFaceX", f'"{start_global}"')
+        dims.record("ArborAxisY", f'"{axis_global}"')
+        await dimension_between(
+            adapter, f"{leg}.start", f"{leg}.end", "horizontal_distance", north - south, name
+        )
+        dims.record(name, f'"{name}"')
+        await ensure_fully_defined(adapter, feature)
+        check(f"exit {feature}", await adapter.exit_sketch())
+        name_last_feature(adapter, feature)
+        drives += dims.apply(adapter, feature)
+    for name, expression in drives:
+        await drive_dimension(adapter, name, expression)
+    for feature, name, _south, _north in bank_settings.LEGS:
+        upper, lower = bank_settings.DIMENSION_BANDS[name]
+        if abs(upper + lower) > 1e-12:
+            raise AssertionError(f"{name} needs a centred setting band")
+        set_dimension_symmetric_tolerance(adapter, feature, name, upper)
+        display, _ = _named_dimension(adapter, feature, name)
+        _set_tolerance_precision(
+            display, (lower, upper), label=name, places=bank_settings.TOLERANCE_PRECISION
+        )
+    apply_drawing_precision(adapter, bank_settings.DRAWING_PRECISION)
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    for feature, names in bank_settings.DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature, names)
+        blank_sketch(adapter, feature)
+        if int(_early_bound(assembly.FeatureByName(feature), "IFeature").Visible) != 1:
+            raise RuntimeError(f"{feature} remained visible after BlankSketch")
+
+
 async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
@@ -4673,13 +4718,8 @@ async def build(adapter) -> dict[str, str]:
     # retained by one lock to the fixed seed arbor. (The old separate
     # crank-pedestal is GONE: the merged green
     # column below rides the swing platform.)
-    # South arbor pedestal only (2026-06-19): the rocker support's arbor-clamp
-    # boss is gone with the portal unification, AND the now-solid portal north
-    # upright occupies the space the arbor's north end used to pass through. The
-    # arbor seats in the support ArborClampBoss at its north end (PR8) and is
-    # left unsupported for now -- the dedicated north-end support (pedestal) and
-    # the cone small-end bracket are DEFERRED to the cone-position rework, since
-    # the cone is currently mis-positioned and that region will be re-laid out.
+    # Both pedestals support the complete strap depth; their transferred base
+    # seats follow the revised disc/spring stack rather than old coordinates.
     arbor_pedestal = await place_component(
         adapter,
         "dt-arbor-pedestal",
@@ -4691,9 +4731,8 @@ async def build(adapter) -> dict[str, str]:
     )
     await _lock_static(adapter, arbor_pedestal, arbor)
     # NORTH pedestal (PR8, ch12 img09): the same casting rotated 180 about Y
-    # so its strap face looks south at the drum's north end; the arbor's north
-    # end seats ~7.0 into its strap bore (U34c). Base-bolted static like the
-    # south one.
+    # so its strap face looks south at the bank's spring. Its full strap bore
+    # supports the arbor, like the south one.
     north_pedestal = await place_component(
         adapter,
         "dt-arbor-pedestal",
@@ -4704,24 +4743,18 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     await _lock_static(adapter, north_pedestal, arbor)
-    # Thrust washers (MHA-DT-26, #743): the front one on gear 0's cam face, the
-    # back one on gear 19's back face against the datum strap -- the bank
-    # modelled held back. They turn with nothing, so each is held like the
-    # pedestals: one lock to the fixed seed arbor.
-    for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
-        end_disc = await place_component(
-            adapter,
-            "dt-cylinder-end-disc",
-            [X_DRUM, Y_DRIVE, _disc_z0],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
-        )
-        await _lock_static(adapter, end_disc, arbor)
-    # Bank spring (MHA-DT-VN-68, #948 ruling R, PR #1292): its installed envelope
-    # fills the front-strap gap, south face on the strap, north face on the
-    # front washer, coaxial with the arbor; static like the washers.
+    # One stationary south disc, seated directly against the datum pedestal.
+    end_disc = await place_component(
+        adapter,
+        "dt-cylinder-end-disc",
+        [X_DRUM, Y_DRIVE, END_DISC_SOUTH_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label=f"cylinder south end disc z0={END_DISC_SOUTH_Z0:.3f}",
+    )
+    await _lock_static(adapter, end_disc, arbor)
+    # North spring: south face directly on gear 19, north face on its strap.
     bank_spring = await place_component(
         adapter,
         "dt-vn-cylinder-bank-spring",
@@ -7024,6 +7057,7 @@ async def build(adapter) -> dict[str, str]:
             solved_adapter, collar_component=tip_collar, shaft_component=cone_shaft,
         )
 
+    await _author_bank_settings_reference(adapter)
     # Title-block identity for the assembly drawing (draw_dt_drive_train_assembly.py):
     # assembly_title_properties supplies the Title/Generator and TOL_* cells
     # finalize_drawing requires without consulting the part registry;

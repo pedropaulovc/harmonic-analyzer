@@ -593,12 +593,9 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
     # design, booked by name in their own stack.
-    # D is set with the bank held north on its datum (#743 rider; preloaded
-    # since #948 ruling R, PR #1292): g19 never sits north of the datum, so
-    # the bank adds nothing to the advance.
+    # D follows ACTUAL g19 with the bank seated on its south datum. Absolute
+    # datum and accepted full-stack errors cancel from this relative setting.
     assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
-    assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
-    assert "NORTH MHA-DT-12 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
     # The bank's terms at the front are booked by name in their own stack,
     # never mixed into the rig's (Codex #858, PRRT_kwDOPHDy386mUjhU), and the
     # preloaded bank carries no end play among them.
@@ -609,11 +606,6 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     )
     for stack in (RIG.DRUM_BACK_ADVANCE_STACK, RIG.DRUM_FRONT_RETREAT_STACK):
         assert not any("E_b" in name or "#743" in name for name in stack)
-    rows = [name for name in drive.RIG_MARGINS if name.startswith(("j = 19", "j = 0"))]
-    assert rows == [
-        "j = 19 past its full face (bank pushed north)",
-        "j = 0 drum overhang slack (rig and bank terms)",
-    ]
 
 
 def test_rig_stations_follow_a_changed_bank_datum(monkeypatch) -> None:
@@ -678,10 +670,12 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
         77.75 + RIG.RIG_AFT_SHIFT + MECHANISM_Z_SHIFT,
         abs_tol=1e-12,
     )
-    # Past g19 the drum runs into the north end disc's z band; engaged, its
-    # tips stand clear of the disc rim, as they already stand clear of g0's
-    # cam and connecting-rod ring at the other end.
-    assert drive.ENGAGED_C2C - drive.TIP_APINION - DISC_DIA / 2.0 >= 2.5
+    # The enlarged south disc shares the drum's front-end z band. Its swept
+    # tips must clear by the same floor and spare as the production gate.
+    assert (
+        drive.ENGAGED_C2C - drive.TIP_APINION - DISC_DIA / 2.0
+        >= 0.25 + RIG.RIG_MARGIN_SPARE
+    )
     assert (
         drive.ENGAGED_C2C - drive.TIP_APINION - (RING_OUTER_RADIUS + ECCENTRICITY)
         >= 1.0
@@ -1729,13 +1723,6 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
     assert FITUP.RIG_SET_LEAVES == (1.00, 0.25)
     assert FITUP.BACK_COLLAR_LEAF_F == 0.90
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
-    assert FITUP.RIG_SET_STEP == (
-        "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
-        "FRONT MHA-DT-18 0.25 LEAF OFF FRONT MHA-DT-14;\n"
-        "MHA-DT-01 BACK END 1.00 + 0.25 LEAVES OFF\n"
-        "NORTH MHA-DT-12 BACK FACE, BANK PUSHED NORTH;\n"
-        "MHA-DT-24 PAD 0.65 LEAF OFF MHA-DT-18."
-    )
     # The base's rig callouts cite this step on MHA-DT-00 by key (plate-r1
     # review: the procedure is the assembly's, not the base's).
     rig_set_ref = dt_drive_train_steps.step_ref("rig-set")

@@ -119,31 +119,25 @@ DRUM_LEN_BAND = printed_band_mm(DRUM_LEN_PLACES)  # 0.8
 
 # The rig's axial datum (user ruling, 2026-09-25, P1-2): the base seats are
 # transferred from the blocks, so nothing in the frame fixes the rig along z
-# until the fitter sets it.  With the cluster hard back and the drum hard on
-# the back strap, and the cylinder-gear bank held north (back) on its datum,
-# the drum's back end is set RIG_SET_LEAF_D off gear j = 19's back face, and
-# only then are the block seats spotted (the base's transfer callout,
-# pinion_rig_fitup.RIG_SET_STEP).  The bank is preloaded north (#948 ruling R,
-# PR #1292): it has no end play, so g19 stays on that datum and the bank adds
-# nothing to the advance.  The drum is located from g19
-# directly, so neither the strap thickness nor g19's own station reaches
-# j = 19.  From that set-up the drum's back end can only advance: the pinned
-# cluster runs forward to the front block, the drum forward in its shimmed
-# end play, and the leaf itself sets to its band.  j = 19 keeps its FULL 3.0
-# face with RIG_MARGIN_SPARE to spare, so D is the thinnest gage setting that
-# covers the advance plus the spare.
-# At the front the bank's own terms do reach the drum (Codex #858,
-# PRRT_kwDOPHDy386mUjhU): the drum is fixed to the rig, set from g19, and g0
-# sits south of its nominal by a long g0 -> g19 pitch stack.  Those are the
-# bank's own terms, imported from cylinder_bank_layout.G0_FRONT_SOUTH_STACK
-# and named here for the part they come from (MHA-DT-12), so the bank's band
-# is booked once.
+# until the fitter sets it. With the cluster hard back and the drum hard on
+# the back strap, the drum's back end is set RIG_SET_LEAF_D off the ACTUAL
+# gear 19 north face, only then spotting the block seats. The cylinder bank
+# is spring-preloaded south (user ruling 2026-10-20); its accepted stack may
+# move g19, but the feeler setting follows it, so neither that absolute
+# position nor the south strap/disc chain reaches this relative budget.
+# From the set-up the drum's back end can only advance: the pinned cluster
+# runs forward to the front block, the drum forward in its shimmed end play,
+# and the leaf itself sets to its band. Gear 19 keeps its full face with
+# RIG_MARGIN_SPARE to spare.
+# At the front, g0's tooth-front face relative to the ACTUAL g19 still
+# carries gears 1-19 and gear 0's face width. These relative terms do not
+# change when the bank's hard datum reverses, and are booked once.
 # The rig itself cannot sit north of its set (cluster hard back, drum hard on
 # the back strap) beyond the leaf's set error, which DRUM_FRONT_RETREAT_STACK
 # books; its float south is DRUM_BACK_ADVANCE_STACK at j = 19 and
 # grows the drum's overhang at j = 0.
-# G19_BACK_FACE_Z is the bank's configured-grid datum, not a frozen world
-# coordinate. Every rig station and transferred base seat below follows it.
+# G19_BACK_FACE_Z is the nominal configured-grid end face, not a hard datum.
+# At fit-up every rig station and transferred seat follows its ACTUAL face.
 DRUM_BACK_ADVANCE_STACK = {
     "MHA-DT-00 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
     + FRONT_BLOCK_FEELER_BAND,
@@ -156,9 +150,9 @@ DRUM_FRONT_RETREAT_STACK = {
     "MHA-DT-01 drum length .X": -printed_deviations(DRUM_LEN, DRUM_LEN_PLACES)[0],
     "rig-set leaf D, thickest setting": FEELER_SET_ERROR,
 }
-# g0's front face south of nominal, bank held north on its datum: gears 1-19
-# long inside the L20 acceptance (partial_stack_band(19)) and gear 0's face
-# width at +0.05; no end play (#948 ruling R, PR #1292).
+# g0's front face south of the rig's g19-based set: gears 1-19 long inside
+# the L20 acceptance and gear 0's face width at +0.05. These are relative
+# gear-to-gear terms, independent of which end preloads onto a hard datum.
 G0_FRONT_SOUTH_STACK = {
     f"MHA-DT-12 {name}": value for name, value in _BANK_G0_FRONT_SOUTH_STACK.items()
 }

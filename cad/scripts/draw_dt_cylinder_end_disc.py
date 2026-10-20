@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the cylinder-bank thrust washer (MHA-DT-26)."""
+r"""Create the manufacturing drawing for the south cylinder-bank end disc (MHA-DT-26)."""
 
 from __future__ import annotations
 
@@ -39,20 +39,20 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A O25 x 1.5 washer: 2:1 keeps both diameters and the thickness legible
-# without crowding the landscape sheet.
+# Retain the useful 2:1 scale for the enlarged south disc. Separate the projected
+# side view and move both diameter lanes clear of the enlarged face.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
-FRONT_CENTER = (0.110, 0.180)
-RIGHT_CENTER = (0.200, 0.180)
-ISO_CENTER = (0.320, 0.180)
+FRONT_CENTER = (0.105, 0.175)
+RIGHT_CENTER = (0.225, 0.175)
+ISO_CENTER = (0.330, 0.175)
 
 FRONT_KEEP = {
-    "DiscDia": (0.060, 0.240),
-    "BoreDia": (0.150, 0.240),
+    "DiscDia": (0.025, 0.255),
+    "BoreDia": (0.180, 0.255),
 }
 RIGHT_KEEP = {
-    "DiscThick": (0.235, 0.225),
+    "DiscThick": (0.255, 0.255),
 }
 
 
@@ -80,10 +80,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Cylinder Bank Thrust Washer Manufacturing Drawing",
+            0: "Cylinder Bank South End Disc Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "cylinder bank thrust washer; turned steel",
+            3: "cylinder bank south end disc; C36000 brass",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -97,12 +97,12 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the washer face view")
+        raise RuntimeError("failed to add ASME center mark to the disc face view")
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Cylinder Bank Thrust Washer Manufacturing Drawing",
+        pdf_title="Cylinder Bank South End Disc Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
