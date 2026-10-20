@@ -496,6 +496,9 @@ def compare_exact_edge(adapter, view, leaf, point_mm, sheet_xy, balloons, diagno
         capture.ready = capture.ready and capture.out["guards"]["original_first_miss_context"]
         if not capture.ready:
             raise ValueError("unbound original first-miss caller/target/projection; no edge census")
+        zoom = capture.out["queries"].get("IModelView.Scale2", {}).get("value")
+        if not isinstance(zoom, (int, float)) or abs(zoom - 86.36) > 1e-6:
+            raise ValueError("original zoom changed after diagnostic coordinate miss; no edge census")
         capture.edges()
         result["status"] = result["exact_edge_comparison"]["status"]
     except Exception as error:
