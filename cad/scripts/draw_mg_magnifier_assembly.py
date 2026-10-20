@@ -32,12 +32,13 @@ the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
 import math
 from pathlib import Path
 import sys
 import textwrap
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -1526,6 +1527,57 @@ def balloon_items(
     return tuple((stem, items[stem]) for stem in BOM_COMPONENTS if stem in stems)
 
 
+@contextmanager
+def _source_configuration_active(view: Any, *, label: str) -> Iterator[None]:
+    """Read an exploded view's steps with its source configuration active.
+
+    Named model views preserve a camera, not an active-configuration contract.
+    On d58d05d82 the simplified MG explode read zero steps while the source
+    remained in Default. As on the pen and oblique-jig drawings, activate the
+    referenced configuration for the balloon walk; the shared reader still
+    shows/collapses its real explode and refuses missing steps. Restore the
+    source configuration before any later view or final readback.
+    """
+    bound = _early_bound(view, "IView")
+    if not bool(bound.IsExploded()):
+        yield
+        return
+    wanted = str(bound.ReferencedConfiguration)
+    model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+
+    def active() -> str:
+        return str(_early_bound(manager.ActiveConfiguration, "IConfiguration").Name)
+
+    rest = active()
+    try:
+        if rest != wanted and (
+            not bool(model.ShowConfiguration2(wanted)) or active() != wanted
+        ):
+            raise RuntimeError(f"{label}: the source did not activate {wanted!r}")
+        if not bool(bound.IsExploded()) or str(bound.ReferencedConfiguration) != wanted:
+            raise RuntimeError(
+                f"{label}: activating {wanted!r} on the source changed the view"
+            )
+        yield
+    finally:
+        primary_error = sys.exception()
+        try:
+            if active() != rest and (
+                not bool(model.ShowConfiguration2(rest)) or active() != rest
+            ):
+                raise RuntimeError(f"{label}: the source did not re-activate {rest!r}")
+            if (
+                not bool(bound.IsExploded())
+                or str(bound.ReferencedConfiguration) != wanted
+            ):
+                raise RuntimeError(f"{label}: restoring {rest!r} changed the view")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{label}: restoring {rest!r}: {cleanup_error}")
+
+
 def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
     """Preserved back, left and isometric at 1:4, the lever settings on the
     back view and the two axle-stack details."""
@@ -1653,8 +1705,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _validate_source(source_model)
     _create_sheets(adapter)
     settled_checks = _place_assembled_sheet(adapter)
-    # Every view's configuration and exploded state is final before the BOM
-    # binds: a configuration switch after it re-dirties the source.
+    # Every drawing view's configuration and exploded state is final before
+    # the BOM binds; only the source's active configuration changes for reads.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
     reference = _place_collapsed_view(
         adapter,
@@ -1737,14 +1789,15 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _activate_sheet(adapter, sheet_name)
         scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
-        landings += add_component_bom_balloons(
-            adapter,
-            view,
-            items=balloon_items(items, stems),
-            anchors=BALLOON_ANCHORS,
-            label=f"magnifier {label} BOM coverage",
-            margin=BALLOON_MARGIN,
-        )
+        with _source_configuration_active(view, label=label):
+            landings += add_component_bom_balloons(
+                adapter,
+                view,
+                items=balloon_items(items, stems),
+                anchors=BALLOON_ANCHORS,
+                label=f"magnifier {label} BOM coverage",
+                margin=BALLOON_MARGIN,
+            )
     if len(landings) != len(BOM_COMPONENTS):
         raise RuntimeError(
             f"magnifier package carries {len(landings)} balloons, expected one per "

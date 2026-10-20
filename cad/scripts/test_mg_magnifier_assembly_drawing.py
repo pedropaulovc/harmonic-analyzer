@@ -997,3 +997,144 @@ def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
         # Opposite the revolve seam (x, R, 0): a vertex of the drawn circle
         # for any even segment count (r12 missed mid-chord at 1:2).
         assert (y, z) == pytest.approx((-radius, 0.0))
+
+
+class _ExplodeSource:
+    """Saved explode steps are unreadable until their active owner is shown."""
+
+    def __init__(self, instance: str, *, missing_steps: bool = False) -> None:
+        self.active = drawing.ASSEMBLY_VIEW_CONFIGURATION
+        self.owner = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        self.readable = False
+        self.exploded = False
+        self.refuse: set[str] = set()
+        self.ignore: set[str] = set()
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=self.active)
+        )
+        self.steps = [] if missing_steps else [
+            SimpleNamespace(
+                Name=f"step {index}",
+                GetComponentXform=lambda move=move: (
+                    1, 0, 0, 0, 1, 0, 0, 0, 1, *move, 1, 0, 0, 0
+                ),
+                GetNumOfComponents=lambda: 1,
+                GetComponent=lambda _member: SimpleNamespace(Name2=instance),
+            )
+            for index, move in enumerate(((0.030, 0.0, 0.0), (0.0, 0.025, 0.0)))
+        ]
+        self.configuration = SimpleNamespace(
+            Name=self.owner,
+            GetNumberOfExplodeSteps=lambda: (
+                len(self.steps) if self.active == self.owner and self.readable else 0
+            ),
+            GetExplodeStep=lambda index: self.steps[index],
+        )
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        if name in self.refuse:
+            return False
+        if name not in self.ignore:
+            self.active = name
+            self.ConfigurationManager.ActiveConfiguration.Name = name
+        return True
+
+    def GetConfigurationByName(self, name: str):
+        return self.configuration if name == self.owner else None
+
+    def GetExplodedViewNames2(self, name: str):
+        return (explode.exploded_view_name(name),)
+
+    def ShowExploded2(self, show: bool, name: str) -> bool:
+        if self.active != self.owner or name != explode.exploded_view_name(self.owner):
+            return False
+        self.exploded = show
+        self.readable |= show
+        return True
+
+    def drawing_view(self):
+        return SimpleNamespace(
+            ReferencedConfiguration=self.owner,
+            ReferencedDocument=self,
+            IsExploded=lambda: True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("label", "instance"),
+    [
+        (drawing.WHEEL_LABEL, "mg-wheel-axle-1"),
+        (drawing.LEVER_LABEL, "mg-magnifying-lever-1"),
+    ],
+)
+def test_mg_explode_offsets_read_real_steps_and_restore_the_source(
+    monkeypatch, label, instance
+) -> None:
+    import _drawing_balloons as balloons
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(balloons, "_early_bound", lambda value, _interface: value)
+    adapter = SimpleNamespace(_attempt=lambda action, **_kwargs: action())
+    source = _ExplodeSource(instance)
+    view = source.drawing_view()
+    # The native failure: the view references Simplified but its source is
+    # Default, so the unchanged real balloon reader must refuse zero steps.
+    with pytest.raises(RuntimeError, match="not the model's active configuration"):
+        balloons._view_explode_offsets(adapter, view, label=label)
+    with drawing._source_configuration_active(view, label=label):
+        offsets = balloons._view_explode_offsets(adapter, view, label=label)
+        assert offsets == {instance: pytest.approx((0.030, 0.025, 0.0))}
+        assert not source.exploded
+        assert view.IsExploded()
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert view.ReferencedConfiguration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    assert view.IsExploded()
+
+
+def test_mg_missing_explode_steps_still_fail_and_restore_the_source(monkeypatch) -> None:
+    import _drawing_balloons as balloons
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(balloons, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1", missing_steps=True)
+    with pytest.raises(RuntimeError, match="reads no explode steps"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            balloons._view_explode_offsets(None, source.drawing_view(), label="t")
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    assert not source.exploded
+
+
+@pytest.mark.parametrize("failure", ["refuse", "ignore"])
+def test_mg_source_configuration_activation_is_read_back(monkeypatch, failure) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    getattr(source, failure).add(source.owner)
+    with pytest.raises(RuntimeError, match="did not activate"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            pytest.fail("an unreadable explode reached the balloon walk")
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+
+
+@pytest.mark.parametrize("failure", ["refuse", "ignore"])
+def test_mg_source_configuration_restoration_is_read_back(monkeypatch, failure) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    getattr(source, failure).add(source.active)
+    with pytest.raises(RuntimeError, match="did not re-activate"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            pass
+
+
+def test_mg_source_configuration_restores_after_balloon_failure(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    source = _ExplodeSource("mg-wheel-axle-1")
+    with pytest.raises(RuntimeError, match="balloon attachment failed"):
+        with drawing._source_configuration_active(source.drawing_view(), label="t"):
+            raise RuntimeError("balloon attachment failed")
+    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+
+
+def test_mg_collapsed_view_does_not_switch_the_source_configuration() -> None:
+    view = SimpleNamespace(IsExploded=lambda: False)
+    with drawing._source_configuration_active(view, label="finished"):
+        assert not view.IsExploded()
