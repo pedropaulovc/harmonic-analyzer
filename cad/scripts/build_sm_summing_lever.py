@@ -205,16 +205,17 @@ SUM_BASE = PLATE_L / 2.0  # summation plate base length             76.20
 TIP_X = SX * SUM_H  # summation tip / anchor x (counter-spring arm) -76.20
 ARC_R = CYL_R + RIB_PAD  # rib arc radius wrapping the cylinder     15.24
 RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
-# The -Z edge rib is the magnifier bracket's receiver: deeper (7.3) so the
-# whole #2-56 tap drill stays in it (magnifying_bracket_joint_layout).
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.90
+# Only the -Z edge rib is the magnifier bracket's receiver: its inward
+# extension gives the #2-56 drill an ordinary depth band without moving the
+# entry face. The independent +Z rib retains RIB_T.
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.00
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
 # Every rib extrudes AFTER the spring holes (feature 1), so a rib reaching the
 # hole column at HOLE_X re-fills any hole whose z lands in its z-span. The middle
 # rib (+-RIB_T/2 = +-2.54) once refilled j=10 (the 4.21 mm^3
 # channel-spring-installed-6 clash); on the cam plane (HOLE_Z_OFFSET -3.528) the
-# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-68.90),
+# j=0 tap (z -70.63) lies inside the -Z receiver rib's z-span (-76.20..-68.00),
 # so that rib would refill it. Every rib's +X end therefore stops inboard of the
 # hole column by the spring coil radius (~3.25) + margin so every hole stays
 # open; the ribs still stiffen the inner lever, the outer plate arm is the (thin)
@@ -740,6 +741,63 @@ def _knife_ridge_max_limit(adapter) -> None:
     _telemetry.success(f"{label}: single limit {KNIFE_RIDGE_R:g} MAX")
 
 
+def edge_rib_added_area_mm2() -> float:
+    """Net rib section outside the already-built cylinder, plate and pad.
+
+    The circle lies wholly inside the clipped rib profile. The positive-X
+    plate overlaps its central stripe; the pad fills the lower rib tip.
+    Neither the spring-hole column nor the knife prism removes this area.
+    This is evaluated before the summation web is added.
+    """
+    reach, radius, half_plate = RIB_PLATE_REACH, CYL_R, PLATE_T / 2.0
+    gross = math.pi * ARC_R**2 / 2.0 + 2.0 * ARC_R * reach - ARC_R * reach**2 / PLATE_W
+    circle_plate_overlap = (
+        half_plate * math.sqrt(radius**2 - half_plate**2)
+        + radius**2 * math.asin(half_plate / radius)
+    )
+    pad_start = PLATE_W - SPRING_PAD_W
+    pad_overlap = (
+        (ARC_R - half_plate) * (reach - pad_start)
+        - ARC_R * (reach**2 - pad_start**2) / (2.0 * PLATE_W)
+    )
+    return gross - math.pi * radius**2 - PLATE_T * reach + circle_plate_overlap - pad_overlap
+
+
+def _assert_edge_rib_end_planes(adapter) -> None:
+    """Prove the receiver grows inward, with both outside end faces preserved."""
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    expected = {
+        "EdgeRibBack": (-PLATE_L / 2.0, -RECEIVER_RIB_OFFSET),
+        "EdgeRibFront": (RIB_OFFSET, PLATE_L / 2.0),
+    }
+    tolerance_mm = 1e-5
+    for name, wanted in expected.items():
+        raw = model.FeatureByName(name)
+        if raw is None:
+            raise RuntimeError(f"{name}: missing native rib feature")
+        feature = _early_bound(raw, "IFeature")
+        planes: list[float] = []
+        for raw_face in feature.GetFaces() or ():
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if surface is None or not surface.IsPlane():
+                continue
+            values = tuple(float(value) for value in surface.PlaneParams)
+            if len(values) != 6 or not all(math.isfinite(value) for value in values):
+                raise RuntimeError(f"{name}: invalid native plane parameters {values}")
+            if abs(values[0]) > 1e-7 or abs(values[1]) > 1e-7 or abs(abs(values[2]) - 1.0) > 1e-7:
+                continue
+            z_mm = values[5] * 1000.0
+            if not any(abs(z_mm - previous) <= tolerance_mm for previous in planes):
+                planes.append(z_mm)
+        if len(planes) != 2 or any(
+            not any(abs(z - observed) <= tolerance_mm for observed in planes)
+            for z in wanted
+        ):
+            raise RuntimeError(f"{name}: native end planes {planes} mm != {wanted} mm")
+        _telemetry.success(f"{name}: native end planes {sorted(planes)} mm")
+
+
 async def _edge_rib(
     adapter, flip: bool, name: str, stem: str, drive_jobs: list[tuple[str, str]]
 ) -> None:
@@ -760,6 +818,7 @@ async def _edge_rib(
     end face is two collinear segments so the printed step runs from P, the
     corner where the face meets the plate top -- below P the face lies inside
     the plate and the spring pad, so the solid is the one-segment face's."""
+    v_before = await _measured_volume(adapter, f"before {stem}")
     rib = SketchDims()
     check(f"create_sketch {name}", await adapter.create_sketch("Front"))
     end_x = SX * -RIB_PLATE_REACH
@@ -839,6 +898,11 @@ async def _edge_rib(
     else:
         extrude_at_offset(adapter, RIB_T, RIB_OFFSET)
     name_last_feature(adapter, stem)
+    added_volume = edge_rib_added_area_mm2() * (RECEIVER_RIB_T if flip else RIB_T)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, f"{stem} net rib addition", v_before + added_volume, 1e-4 * added_volume
+    )
     if stem == "EdgeRibFront":
         # The -Z rib's depth is the receiver's named RibDepth
         # (_receiver_model_bands); only the +Z rib takes a plain name here.
@@ -1744,6 +1808,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
     _assert_knife_sides_coplanar(adapter)
+    _assert_edge_rib_end_planes(adapter)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -127,21 +128,20 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
     assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
     assert joint.TAP_SPEC.thread_class == "2B"
     assert joint.TAP_SPEC.end == "blind"
-    assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.05
+    assert joint.TAP_SPEC.depth_mm == joint.DRILL_DEPTH == 6.50
     assert joint.TAP_SPEC.overrides_mm["ThreadDepth"] == joint.THREAD_DEPTH == 4.95
-    assert joint.RIB_DEPTH == 7.3
+    assert joint.RIB_DEPTH == 8.2
     assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND == 0.51
-    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(1.79)
+    assert joint.THREAD_RIB_MARGIN_MIN == pytest.approx(2.69)
     assert joint.SCREW_TIP_GAP_MIN == pytest.approx(0.0075)
-    # The drill is one-sided, +0.10/0: its shallowest is the nominal 6.05.
-    assert joint.DRILL_DEPTH_MIN == joint.DRILL_DEPTH
-    assert joint.DRILL_DEPTH_MAX == pytest.approx(6.15)
-    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.142857142857)
-    # The whole tap drill, point included, stays in the deepened end rib at
-    # the title block's band, its wander counted as if axial.
-    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(0.71583546)
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.0406367, abs=1e-6)
-    assert joint.DRILL_WANDER_MAX == pytest.approx(0.0351558, abs=1e-7)
+    assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
+    assert joint.DRILL_DEPTH_MIN == pytest.approx(5.99)
+    assert joint.DRILL_DEPTH_MAX == pytest.approx(7.01)
+    assert joint.TAP_LEAD_MARGIN_MIN == pytest.approx(0.082857142857)
+    # This is point containment, not a rule-17 bottom-wall thickness.
+    assert joint.DRILL_POINT_RIB_MARGIN == pytest.approx(1.16583546)
+    assert joint.DRILL_POINT_RIB_MARGIN_MIN == pytest.approx(0.076133, abs=1e-6)
+    assert joint.DRILL_WANDER_MAX == pytest.approx(0.039659, abs=1e-6)
 
 
 @pytest.mark.parametrize(
@@ -150,9 +150,6 @@ def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
         ("SCREW_LENGTH = 7.9375", "1.5D full engagement"),
         ("FLANGE_THICKNESS_BAND = 0.13", "1.5D full engagement"),
         ("THREAD_DEPTH = 4.95", "bottoms"),
-        ("RIB_DEPTH = 7.3", "breaks out of the front rib"),
-        ("RIB_DEPTH_BAND = LINEAR_BAND", "breaks out of the front rib"),
-        ("DRILL_DEPTH_DEVIATIONS = (0.0, 0.10)", "bottoming-tap lead"),
         ("SIDE_PLATE_HEIGHT = 12.7", r"drawing-guidelines\.md rule 17 \(walls and webs\) wall"),
         ("COUNTERBORE_DIA = 3.8", "head float"),
     ),
@@ -163,10 +160,6 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
         "SCREW_LENGTH": 7.85,
         "FLANGE_THICKNESS_BAND": 0.20,
         "THREAD_DEPTH": 4.85,
-        "RIB_DEPTH": 7.2,
-        "RIB_DEPTH_BAND": 0.60,
-        # A 0.15 undercut of the shallowest drill (0.143 of lead) loses it.
-        "DRILL_DEPTH_DEVIATIONS": (-0.15, 0.10),
         "SIDE_PLATE_HEIGHT": 8.0,
         "COUNTERBORE_DIA": 3.70,
     }[replacement.split(" = ")[0]]
@@ -174,6 +167,71 @@ def test_joint_guards_reject_lost_margins(replacement: str, failure: str) -> Non
     changed = source.replace(replacement, f'{replacement.split(" = ")[0]} = {bad_value}')
     with pytest.raises(AssertionError, match=failure):
         exec(compile(changed, str(joint.__file__), "exec"), {})
+
+
+def _joint_with_values(**values):
+    """Exercise the real guards with changed inputs, independent of spelling."""
+    tree = ast.parse(Path(joint.__file__).read_text(encoding="utf-8"))
+    replaced = set()
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in values:
+                    node.value = ast.parse(repr(values[target.id]), mode="eval").body
+                    replaced.add(target.id)
+    assert replaced == values.keys()
+    namespace = {}
+    exec(compile(ast.fix_missing_locations(tree), str(joint.__file__), "exec"), namespace)
+    return namespace
+
+
+def test_drill_limits_discriminate_tap_lead_and_point_wander_boundaries() -> None:
+    # Independently solve the two physical inequalities, not the guard's
+    # cached margin: two pitches after the longest full thread, and the
+    # whole drill point plus conservative axial wander inside the shortest rib.
+    wander_slope = math.tan(math.radians(joint.DRILL_WANDER_DEG))
+    shallow_limit = joint.THREAD_DEPTH + joint.THREAD_DEPTH_BAND + 2 * joint.SCREW_PITCH
+    deep_limit = (
+        (joint.RIB_DEPTH - joint.RIB_DEPTH_BAND) / (1 + wander_slope)
+        - joint.DRILL_POINT_DEPTH_MAX
+    )
+    epsilon = 1e-6
+    for limit, side, failure in (
+        (shallow_limit, 0, "bottoming-tap lead"),
+        (deep_limit, 1, "breaks out of the front rib"),
+    ):
+        for safe in (True, False):
+            depths = list(joint.DRILL_DEPTH_DEVIATIONS)
+            direction = 1 if side == 0 else -1
+            depths[side] = limit - joint.DRILL_DEPTH + direction * epsilon * (1 if safe else -1)
+            if safe:
+                _joint_with_values(DRILL_DEPTH_DEVIATIONS=tuple(depths))
+            else:
+                with pytest.raises(AssertionError, match=failure):
+                    _joint_with_values(DRILL_DEPTH_DEVIATIONS=tuple(depths))
+
+    feasible_band = min(joint.DRILL_DEPTH - shallow_limit, deep_limit - joint.DRILL_DEPTH)
+    assert joint.LINEAR_BAND < feasible_band
+    ordinary = _joint_with_values(DRILL_DEPTH_DEVIATIONS=(-joint.LINEAR_BAND, joint.LINEAR_BAND))
+    assert ordinary["TAP_LEAD_MARGIN_MIN"] > 0
+    assert ordinary["DRILL_POINT_RIB_MARGIN_MIN"] > 0
+    wider = feasible_band + epsilon
+    with pytest.raises(AssertionError, match="bottoming-tap lead|breaks out of the front rib"):
+        _joint_with_values(DRILL_DEPTH_DEVIATIONS=(-wider, wider))
+
+
+def test_rib_depth_and_band_discriminate_point_containment_boundary() -> None:
+    minimum_rib = (
+        joint.DRILL_DEPTH_MAX + joint.DRILL_POINT_DEPTH_MAX
+    ) * (1 + math.tan(math.radians(joint.DRILL_WANDER_DEG)))
+    epsilon = 1e-6
+    for name, boundary, direction in (
+        ("RIB_DEPTH", minimum_rib + joint.RIB_DEPTH_BAND, 1),
+        ("RIB_DEPTH_BAND", joint.RIB_DEPTH - minimum_rib, -1),
+    ):
+        _joint_with_values(**{name: boundary + direction * epsilon})
+        with pytest.raises(AssertionError, match="breaks out of the front rib"):
+            _joint_with_values(**{name: boundary - direction * epsilon})
 
 
 def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
@@ -232,7 +290,7 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
         (arc_min * from_slant_end_min - width_max * row_max)
         / math.hypot(arc_min, width_max) - thread_radius - joint.DRILL_WANDER_MAX
     )
-    assert rib_wall_min == pytest.approx(3.15952, abs=1e-5)
+    assert rib_wall_min == pytest.approx(3.15502, abs=1e-5)
     assert rib_wall_min >= 2.0
     # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
     # Separate X/Z extremes are conservative.
@@ -251,7 +309,7 @@ def test_stations_clear_the_pivot_cylinder_and_channel_spring_taps() -> None:
         math.hypot(spring_dx_min, max(spring_dz_min, 0.0))
         - thread_radius - spring_radius - joint.DRILL_WANDER_MAX
     )
-    assert spring_web_min == pytest.approx(6.63514, abs=1e-5)
+    assert spring_web_min == pytest.approx(6.63064, abs=1e-5)
     assert spring_web_min >= 2.0
 
 

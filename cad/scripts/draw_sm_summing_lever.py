@@ -257,12 +257,15 @@ TAP_SECTION_LINE_Y = (-11.0, 16.0)
 TAP_SECTION_SCALE = (4, 1)
 TAP_SECTION_PLATE_BEYOND = 4.0
 _TAP_SECTION_FAR_Z = TAP_SECTION_HOLE[2] + RIB_DEPTH + TAP_SECTION_PLATE_BEYOND
-# The crop circle's centre, on the mid-plane 4.75 in from the end face, lands
-# on TAP_SECTION_CENTER; its radius holds the end face's corners (5.06
-# half-height at x 29.7, 6.94 from the centre) and leaves the plate's faces
-# 0.19 past the break, so the plate ends at the break line.
-_TAP_SECTION_ANCHOR_MM = (TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + 4.75)
-TAP_SECTION_CROP_RADIUS = 7.2
+# Centre the crop relative to the receiver depth, not the superseded rib.
+# Its radius leaves the plate faces 0.20 beyond the break while retaining
+# both full-height rib end corners. These are view extents, not part sizes.
+_TAP_SECTION_ANCHOR_MM = (
+    TAP_SECTION_HOLE[0], 0.0, TAP_SECTION_HOLE[2] + RIB_DEPTH / 2.0 + 1.1
+)
+TAP_SECTION_CROP_RADIUS = math.hypot(
+    _TAP_SECTION_FAR_Z + 0.20 - _TAP_SECTION_ANCHOR_MM[2], PLATE_T / 2.0
+)
 TAP_SECTION_CENTER = (0.140, 0.064)
 TAP_SECTION_CAPTION_XY = (0.145, 0.037)
 # A long-break line (thin, one Z at mid-thickness) across the cut-off plate,
@@ -282,7 +285,7 @@ TAP_SECTION_BREAK = (
 TAP_THREAD_LAYER = "TAP-THREAD-SECTION"
 _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 
-# The -Z end rib's banded depth is named by
+# The -Z end rib's ordinary depth is named by
 # build_sm_summing_lever._receiver_model_bands, and the receiver stations by
 # its hidden coordinate sketch, outside the marked-dimension contract.
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
@@ -1620,11 +1623,11 @@ TOP_KEEP = {
     "EdgeRibThickness": (0.2095, 0.1035),
     # Outside the part, right of the free edge (machinist review b4df34ad9
     # r2/r3: inside the web, between the R138.85, the boss and the cylinder,
-    # it read as crowded), as the -Z rib's 7.30 does: its extension lines run
+    # it read as crowded), as the -Z receiver rib's depth does: its extension lines run
     # from the rib's end across the hole column (one hole sits on the rib's
     # mid-plane, its rim 0.5 mm inside them) to the line 8 mm past the free
     # edge (x 0.2576), and the text stands right of the line, 6.2 mm over the
-    # rib's upper face as the 7.30's does: 4.8 mm right of section C-C's
+    # rib's upper face as the receiver depth's does: 4.8 mm right of section C-C's
     # outboard arrow (x 0.2617, tail y 0.139) and 4 mm over the 20X callout's
     # first line, whose left end moved to 0.277 for its extension lines.
     "MiddleRibThickness": (0.2655, 0.1374),
@@ -2224,21 +2227,21 @@ async def build(adapter: Any) -> dict[str, str]:
                     "persist as a MIN limit"
                 )
             continue
-        # The drill depth is one-sided, +0.10/0 (joint DRILL_DEPTH_DEVIATIONS).
+        # Ordinary bounded .XX depth: symmetric, not an unbounded MIN.
         lower, upper = DRILL_DEPTH_DEVIATIONS
-        variable.ToleranceType = 2  # swTolType_e.swTolBILAT
+        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
         variable.ToleranceMin = lower / 1000.0
         variable.ToleranceMax = upper / 1000.0
         length.TolerancePrecision = 2
         if (
-            int(variable.ToleranceType) != 2
+            int(variable.ToleranceType) != 4
             or abs(float(variable.ToleranceMin) * 1000.0 - lower) > 1e-5
             or abs(float(variable.ToleranceMax) * 1000.0 - upper) > 1e-5
             or int(length.TolerancePrecision) != 2
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted swTolBILAT (lower, upper) {DRILL_DEPTH_DEVIATIONS!r} "
+                f"persist: wanted swTolSYMMETRIC (lower, upper) {DRILL_DEPTH_DEVIATIONS!r} "
                 "mm at 2 places"
             )
     if required_depths:

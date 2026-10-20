@@ -133,10 +133,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "AnchorOuterDia": "WEB ARCS RUN\nFROM QUADRANTS\nTO AXIS A AT ENDS",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
     "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
-    # The -Z rib's 7.30 at the title block's band holds the whole 2-56 drill,
-    # point included (magnifying_bracket_joint_layout), so it carries no
-    # words (machinist review r12 read a tight band and its reason as
-    # rescuing a wall).
+    # The -Z rib and its bounded tap-drill depth both take the ordinary
+    # title-block .XX band (magnifying_bracket_joint_layout).
     "SpringPadWidth": "UNDERSIDE PAD\nFULL LENGTH",
     # VIEW F's 7.00 runs from the plate top to the pad's underside: it names
     # both (machinist review r12 found no pad depth, reading it as the plan's
@@ -163,18 +161,12 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
 # reference dimensions in parentheses are welcome): linear, no Ø glyph.
 REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"EdgeRibFrontEndStep"})
 
-# Leads the 2-56 receiver callout: what its two depth limits hold.  The full
-# thread prints as a minimum; the drill's one-sided +0.10/0 keeps the
-# bottoming tap's two pitches of lead inside the shallowest (nominal) drill
-# (``magnifying_bracket_joint_layout.TAP_LEAD_MARGIN_MIN``).  The drill runs
-# along the plate's mid-plane: section H-H shows the rib stepping down to
-# the thinner plate beyond the drill point, not a bottom wall.  The receiver
-# stations are inboard of the spring-anchor pad, so the pad does not back
-# those walls.  DRILL_POINT_RIB_MARGIN_MIN keeps the point out of that thin
-# section.  Name that function at the callout: "solid plate beyond" alone
-# was read as making the upper limit unnecessary (review f3d4605b7cef).
-# The thread is shallower than the drill, so it stays in the rib too.
-# Two reason lines keep the audit's four rows (farm r15: three made five).
+# Leads the 2-56 receiver callout: the rib now contains the drill with an
+# ordinary bounded .XX depth band. The lower limit clears the unchanged screw
+# and two-pitch tap lead; the upper limit keeps its point inside the rib.
+# Section H-H shows the transition to thinner plate beyond the point, not a
+# bottom wall. The spring-anchor pad does not back these inboard receivers.
+# Keep both physical functions visible; this is not an accepted exception.
 BRACKET_TAP_CALLOUT_PROCESS = (
     "DRILL ENDS IN RIB TO RETAIN PLATE WALLS\n"
     f"DRILL CLEARS {BRACKET_SCREW_NUMBER} TIP AND TAP LEAD\n"

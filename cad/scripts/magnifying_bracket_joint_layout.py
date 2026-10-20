@@ -63,29 +63,23 @@ HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
 # The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
 FLANGE_THICKNESS_BAND = 0.13
 
-# Joint-specific native bands authorized by the October 8, 2026 user ruling
-# on the thread and drill depths: the stack below leaves 0.04-0.08 of margin
-# at them, so neither can take the title block's .XX band.
-# The -Z end rib was 5.08 deep, so the drill's tip ran past it into the 5.08
-# plate and held the plate to +/-0.05 for its wall.  Owner ruling 2026-10-16
-# (option A; the user's ask timed out and the recommended option was
-# auto-selected) deepened the rib to 7.0 at a 0.25 band, so the whole tap
-# drill, point and wander stay in the rib.  Machinist review r12 read that
-# band as tightening to rescue a wall, with no mate; per the standing user
-# preference (move the nominal so the title block holds, coordinator
-# 2026-10-16) the rib is 7.3, the least one-place depth whose drill-point
-# margin holds at the title block's .XX band, so it takes no native band.
+# The full-thread band preserves the unchanged screw/grip stack. The receiver
+# rib was extended inward on 2026-10-20 (auto-selected after the illustrated
+# owner choice timed out), without moving its entry face or either hole axis.
+# Its 8.20 depth lets the cylindrical drill take the ordinary title-block
+# .XX band, including two pitches of tap lead and the drill point/wander.
+# This is a geometry repair, not an exception allowing a tight wall-saving
+# drill band. The opposite end rib remains 5.08 deep.
 PLATE_THICKNESS_BAND = 0.05
 COUNTERBORE_DEPTH_BAND = 0.05
 THREAD_DEPTH_BAND = 0.05
-# The tap drill's depth is one-sided, +0.10/0 (owner ruling 2026-10-18 on
-# machinist review 4b89c4336): its shallowest is the nominal, which holds the
-# bottoming tap's lead; its deepest, 6.15, keeps the point in the rib.
-DRILL_DEPTH_DEVIATIONS = (0.0, 0.10)  # (lower, upper), mm
-RIB_DEPTH = 7.3
+LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
+# A bounded ordinary band is still necessary: an unlimited MIN depth could
+# run the drill beyond any finite rib into the unbacked 5.08 plate.
+DRILL_DEPTH_DEVIATIONS = (-LINEAR_BAND, LINEAR_BAND)  # (lower, upper), mm
+RIB_DEPTH = 8.2
 POSITION_BAND = 0.05
 DRILLED_DIAMETER_PLUS = 0.10
-LINEAR_BAND = 0.51  # PRINTED title-block .XX band, not the unrounded .02 in
 RIB_DEPTH_BAND = LINEAR_BAND  # the title block's: the rib takes no native band
 HEAD_FLOAT_MIN = (COUNTERBORE_DIA - SCREW_HEAD_DIA) / 2.0
 HEAD_POSITION_MISMATCH_MAX = 2.0 * POSITION_BAND
@@ -99,7 +93,7 @@ ENGAGEMENT_MIN = (
 )
 SCREW_REACH_MAX = ENGAGEMENT + GRIP_BAND
 THREAD_DEPTH = 4.95
-DRILL_DEPTH = 6.05
+DRILL_DEPTH = 6.50
 DRILL_DEPTH_MIN = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[0]
 DRILL_DEPTH_MAX = DRILL_DEPTH + DRILL_DEPTH_DEVIATIONS[1]
 TAP_SPEC = HoleSpec(
@@ -129,7 +123,7 @@ DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX
 )
 # The drill point's floor margin also takes the whole wander, as if it were
-# axial (it is lateral: an upper bound, so the 7.3 rib holds even then).
+# axial (it is lateral: an upper bound, so the receiver rib holds even then).
 DRILL_POINT_RIB_MARGIN_MIN = (
     RIB_DEPTH - RIB_DEPTH_BAND - DRILL_DEPTH_MAX
     - DRILL_POINT_DEPTH_MAX - DRILL_WANDER_MAX
