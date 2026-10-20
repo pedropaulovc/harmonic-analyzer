@@ -101,6 +101,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
+import _machinist_review_settings as _review_settings  # noqa: E402
 
 # ``_resolved`` is the graph's per-process ``Path.resolve()`` memo (dropped by
 # ``clear_import_caches``); dodo's per-task path plumbing shares it.
@@ -3220,10 +3221,29 @@ _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
+    "_machinist_review_settings.py",
 )
 
 
-def _machinist_review_file_deps(stem: str) -> list[str]:
+def _machinist_review_settings() -> _review_settings.ReviewSettings:
+    return _review_settings.from_carrier(os.environ.get(_review_settings.SETTINGS_ENV))
+
+
+@functools.cache
+def _machinist_review_settings_dep(
+    reports: Path, settings: _review_settings.ReviewSettings,
+) -> str:
+    digest = settings.identity()
+    path = reports / ".machinist-review-settings" / f"{digest}.digest"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path.with_suffix(".lock"))):
+        return _write_digest_sidecar(path, digest)
+
+
+def _machinist_review_file_deps(
+    stem: str, settings: _review_settings.ReviewSettings | None = None,
+) -> list[str]:
+    settings = _machinist_review_settings() if settings is None else settings
     spec = DRAWINGS_BY_NAME[stem]
     dashed = stem.replace("_", "-")
     if spec.source_kind == "part":
@@ -3247,6 +3267,7 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         str(path.resolve())
         for path in (
             spec.outputs["pdf"],
+            Path(_machinist_review_settings_dep(REPORTS.resolve(), settings)),
             *(
                 SCRIPTS_DIR / name
                 for name in _MACHINIST_REVIEW_MODULES
@@ -3267,17 +3288,24 @@ def _machinist_review_stamp(stem: str) -> Path:
     return REPORTS / f"check-machinist-review-{stem}.ok"
 
 
-def _machinist_review_command(stem: str) -> list[str]:
+def _machinist_review_command(
+    stem: str, settings: _review_settings.ReviewSettings | None = None,
+) -> list[str]:
+    settings = _machinist_review_settings() if settings is None else settings
     spec = DRAWINGS_BY_NAME[stem]
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
-        "--kind", spec.source_kind, "--runs", "3",
+        "--kind", spec.source_kind, "--runs", str(_review_settings.BUILD_RUNS),
+        *settings.cli_args(),
         "--report-dir", str(_machinist_review_dir(stem)),
     ]
 
 
-def _read_machinist_aggregate(stem: str) -> dict[str, Any]:
+def _read_machinist_aggregate(
+    stem: str, settings: _review_settings.ReviewSettings | None = None,
+) -> dict[str, Any]:
+    settings = _machinist_review_settings() if settings is None else settings
     path = _machinist_review_dir(stem) / f"{stem}.aggregate.json"
     aggregate = json.loads(path.read_text(encoding="utf-8"))
     if (
@@ -3291,6 +3319,46 @@ def _read_machinist_aggregate(stem: str) -> dict[str, Any]:
             and not isinstance(aggregate["error"], str))
     ):
         raise ValueError(f"{path}: invalid machinist aggregate")
+    expected = (settings.reviewer, settings.model, settings.effort)
+    expected_judge = (
+        settings.judge_reviewer, settings.judge_model, settings.judge_effort,
+    )
+
+    def matches(report: Any, selection: tuple[str, str, str]) -> bool:
+        return isinstance(report, dict) and (
+            report.get("reviewer"), report.get("model"), report.get("effort"),
+        ) == selection
+
+    runs = aggregate.get("runs")
+    judge = aggregate.get("judge")
+    run_ids = [f"r{index}" for index in range(1, _review_settings.BUILD_RUNS + 1)]
+    if (
+        not matches(aggregate, expected)
+        or not matches(judge, expected_judge)
+        or type(judge.get("skipped")) is not bool
+        or not isinstance(runs, list)
+        or any(not isinstance(run, dict) for run in runs)
+        or [run.get("run_id") for run in runs] != run_ids
+        or any(run.get("error") is not None and not isinstance(run["error"], str) for run in runs)
+    ):
+        raise ValueError(f"{path}: machinist selection/run provenance mismatch")
+    directory = _machinist_review_dir(stem) / stem
+    for run in runs:
+        run_path = directory / "runs" / run["run_id"] / f"{stem}.json"
+        try:
+            report = json.loads(run_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            # An explicitly failed attempt is not a successful review whose
+            # evidence is missing. Keep the existing partial-run policy.
+            if run.get("error"):
+                continue
+            raise
+        if not matches(report, expected):
+            raise ValueError(f"{run_path}: machinist selection provenance mismatch")
+    if not judge["skipped"]:
+        judge_path = directory / "judge" / f"{stem}.json"
+        if not matches(json.loads(judge_path.read_text(encoding="utf-8")), expected_judge):
+            raise ValueError(f"{judge_path}: machinist selection provenance mismatch")
     return aggregate
 
 
@@ -3322,8 +3390,10 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
 
     Cache the complete leaf directory, including attempt evidence and per-run
     reports: no transcripts or source snapshots are pruned from the payload.
-    Provider/runner errors never publish and never leave a freshness stamp.
+    Ensemble errors never publish or leave a freshness stamp; failed individual
+    runs remain evidence and do not change the aggregate's partial-run policy.
     """
+    settings = _machinist_review_settings()
     label = f"check:machinist_review:{stem}"
     directory = _machinist_review_dir(stem)
     stamp = _machinist_review_stamp(stem)
@@ -3331,7 +3401,7 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
     with _telemetry.span(
         f"cache.probe {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as probe:
-        key = _cache_key(_machinist_review_file_deps(stem), label)
+        key = _cache_key(_machinist_review_file_deps(stem, settings), label)
         try:
             # Restore into a clean evidence directory: an archive must not be
             # mixed with attempts retained under a previous input key.
@@ -3354,10 +3424,10 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
                 _tag_cache_key(work, key)
                 work.set_attribute("cache", "miss")
                 code = _run_subprocess(
-                    _machinist_review_command(stem), label,
+                    _machinist_review_command(stem, settings), label,
                     log_stem=f"machinist-review-{stem}", task=label,
                 )
-            aggregate = _read_machinist_aggregate(stem)
+            aggregate = _read_machinist_aggregate(stem, settings)
             if code not in (0, 1) or (code and aggregate["verdict"] == "SHIP"):
                 raise ValueError(f"review command exited {code}")
             if aggregate["verdict"] != "ERROR" and aggregate.get("error") is None:
@@ -3384,7 +3454,7 @@ def _cached_machinist_review_action(stem: str, mode: MachinistReviewMode) -> Non
                             f"{label}: could not adopt canonical reports: {error}"
                         ) from error
         else:
-            aggregate = _read_machinist_aggregate(stem)
+            aggregate = _read_machinist_aggregate(stem, settings)
     except (OSError, ValueError) as error:
         aggregate = {"verdict": "ERROR", "gating_count": 0, "error": str(error)}
     _evaluate_machinist_review(stem, mode, aggregate)
@@ -3409,8 +3479,10 @@ def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
 
 
 def _machinist_review_tasks():
+    # Validate on every graph enumeration, including all-OFF/preimported graphs.
+    settings = _machinist_review_settings()
     for stem, mode in _reviewed_drawings():
-        deps = _machinist_review_file_deps(stem)
+        deps = _machinist_review_file_deps(stem, settings)
         directory = _machinist_review_dir(stem)
         yield {
             "name": f"machinist_review:{stem}",
@@ -3430,7 +3502,7 @@ def _machinist_review_tasks():
                 str(directory / f"{stem}.aggregate.md"),
                 *(
                     str(directory / stem / "runs" / f"r{run}" / f"{stem}.json")
-                    for run in range(1, 4)
+                    for run in range(1, _review_settings.BUILD_RUNS + 1)
                 ),
             ],
             "actions": [(_cached_machinist_review_action, [stem, mode])],
@@ -3478,6 +3550,7 @@ def task_check():
         SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
+        SCRIPTS_DIR / "test_machinist_review_settings.py",
         # Which recorded-input changes may skip the insert/mate loop (the
         # explode tier), and the in-place explode re-authoring against fakes.
         SCRIPTS_DIR / "test_refresh_tier.py",

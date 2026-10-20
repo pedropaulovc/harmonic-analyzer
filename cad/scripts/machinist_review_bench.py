@@ -31,6 +31,7 @@ from typing import Any, Mapping, Sequence
 import zipfile
 
 import _telemetry as telemetry
+import _machinist_review_settings as review_settings
 import machinist_review as mr
 
 REPO_ROOT = mr.CAD_ROOT.parent
@@ -1495,7 +1496,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="origin/main",
         help="baseline Git ref; use none to run with_skill only",
     )
-    run.add_argument("--reviewer", choices=mr.REVIEWERS, default="claude")
+    run.add_argument("--reviewer", choices=review_settings.REVIEWERS, default="claude")
     run.add_argument("--model")
     run.add_argument("--effort")
     run.add_argument("--timeout", type=float, default=1800)
