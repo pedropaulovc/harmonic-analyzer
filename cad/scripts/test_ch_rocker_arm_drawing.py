@@ -2480,14 +2480,14 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     from _printed_tolerance import drilled_oversize_mm
 
     spec = ch_rocker_arm_spec
-    centre = (spec.ROD_HOLE_X, spec.ROD_HOLE_Y)
+    centre = (rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y)
     tip = (
         spec.ROD_TIP_X,
-        spec.TOP_END_Y + spec.TIP_FACE * (spec.TOP_END_Y - spec.CENTER_Y) / spec.R_TOP,
+        spec.TOP_END_Y + spec.TIP_FACE * (spec.TOP_END_Y - rocker_interface.CENTER_Y) / spec.R_TOP,
     )
     bottom = (
         spec.BOT_END_X,
-        spec.CENTER_Y - math.sqrt(spec.R_BOTTOM**2 - spec.BOT_END_X**2),
+        rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - spec.BOT_END_X**2),
     )
     direction = (bottom[0] - tip[0], bottom[1] - tip[1])
     fraction = sum(
