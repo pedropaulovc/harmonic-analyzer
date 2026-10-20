@@ -3652,6 +3652,7 @@ def task_check():
         SCRIPTS_DIR / "test_pd48_knob_mechanics.py",
         # Source-only adapter member/signature census; no SDK or native import.
         SCRIPTS_DIR / "test_pd_transgear_adapter_contract.py",
+        SCRIPTS_DIR / "test_native_bank_retention_contract.py",
         # Finite purchased-rack ends and the complete recording-paper sweep.
         SCRIPTS_DIR / "test_paper_drive_rack_travel.py",
         SCRIPTS_DIR / "test_pd_platen_refit.py",
