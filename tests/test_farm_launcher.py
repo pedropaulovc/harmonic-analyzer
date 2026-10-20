@@ -2623,9 +2623,35 @@ ORPHAN_WAITER = (
 )
 
 
-def _open_held_process(pid: int) -> int:
-    """A handle that pins `pid` to this process: Windows never reuses a PID
-    while any handle to its process is open."""
+# FILETIME creation time of the process behind a handle; the spawning parent
+# reads the same value from its own original child handle.
+PROCESS_CREATED = (
+    "k=ctypes.WinDLL('kernel32'); "
+    "k.GetProcessTimes.argtypes=[ctypes.c_void_p]+[ctypes.POINTER(ctypes.c_ulonglong)]*4; "
+    "t=[ctypes.c_ulonglong() for _ in range(4)]; "
+    "assert k.GetProcessTimes(int(child._handle),*map(ctypes.byref,t)); "
+)
+
+
+def _process_created(handle: int) -> int:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE, *[ctypes.POINTER(ctypes.c_ulonglong)] * 4,
+    )
+    times = [ctypes.c_ulonglong() for _ in range(4)]
+    if not kernel32.GetProcessTimes(handle, *map(ctypes.byref, times)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return times[0].value
+
+
+def _open_held_process(pid: int, created: int) -> int:
+    """A handle that pins `pid` to this process (Windows never reuses a PID
+    while any handle to its process is open), proven to be the process created
+    at `created` rather than a later one that reused its PID."""
     import ctypes
     from ctypes import wintypes
 
@@ -2636,6 +2662,14 @@ def _open_held_process(pid: int) -> int:
     handle = kernel32.OpenProcess(0x00100000 | 0x1000 | 0x0001, False, pid)
     if not handle:
         raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        opened = _process_created(handle)
+    except BaseException:
+        _close_held_process(handle)
+        raise
+    if opened != created:
+        _close_held_process(handle)
+        raise AssertionError(f"PID {pid} now names a process created at {opened}, not {created}")
     return handle
 
 
@@ -2693,12 +2727,14 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
                 [
                     sys.executable,
                     "-c",
-                    "import json, os, subprocess, sys; "
+                    "import ctypes, json, os, subprocess, sys; "
                     f"child=subprocess.Popen([sys.executable, '-c', {ORPHAN_WAITER!r}, "
                     f"'{listener.getsockname()[1]}', *{extra!r}], "
                     "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
                     "stderr=subprocess.DEVNULL); "
-                    "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid}))",
+                    + PROCESS_CREATED
+                    + "print(json.dumps({'parent_pid':os.getpid(), 'child_pid':child.pid, "
+                    "'child_created':t[0].value}))",
                 ],
                 check=True,
                 capture_output=True,
@@ -2709,10 +2745,9 @@ def _orphan_process(extra: list[str]) -> Iterator[tuple[int, int]]:
             child = int(evidence["child_pid"])
             parent_pid = int(evidence["parent_pid"])
             gate, _ = listener.accept()
-            # The connected waiter blocks on the gate, so `child` is still the
-            # process the parent started: pin it before trusting its PID again.
-            # Without a gate there is no identity proof, so nothing is killed.
-            held = _open_held_process(child)
+            # Pin the PID, then prove it still names the process the parent
+            # started; a mismatch is closed unused, so nothing else is killed.
+            held = _open_held_process(child, int(evidence["child_created"]))
             assert not _process_alive(parent_pid), evidence
             assert not _held_process_exited(held, 0), evidence
             yield parent_pid, child
