@@ -371,9 +371,10 @@ pose is changed to buy material.
 
 The intended drawing reduction is **9 → 6 views**, pending native
 regeneration/inspection: remove C-C and H-H entirely, combine knife detail
-D and root detail E into **D at 10:1** with all existing knife dimensions,
-root radius and datum A, and retain the ordinary views and both isometrics.
-`PlateThickness@CoefficientsPlate` stays model-owned at **7.00 mm** under
+D and ridge detail E into **D at 10:1** with all existing knife dimensions,
+knife ridge **R0.1 MAX** and datum A; the rib-side/profile **R1 MAX** appears
+in VIEW G. Retain the ordinary views and both isometrics.
+`PlateThickness@PlateProfile` stays model-owned at **7.00 mm** under
 the ordinary two-place band; a section solely to distinguish plate and
 pad thickness is no longer required. This is source intent, not evidence
 that the regenerated ink, witnesses or clearances have passed.
