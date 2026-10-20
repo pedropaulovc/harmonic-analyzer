@@ -183,6 +183,19 @@ def test_local_declaration_preserves_the_author_and_stock_rework_wrapper() -> No
     assert recipe_declaration("TEST123", reworked) is declaration
 
 
+@pytest.mark.parametrize("sku", ("CLPS6P-0187-1000", "CP-062-0500", "05-02685"))
+def test_hyphenated_supplier_sku_keeps_identity_and_uses_python_recipe_name(sku) -> None:
+    identifier = sku.replace("-", "_")
+    author = _author(identifier)
+    stock_recipe(sku, threaded=False)(author)
+    declaration = recipe_declaration(sku, author)
+    assert declaration.sku == sku
+    assert declaration.module == f"diagnostics.diag_build_{identifier}"
+    assert declaration.callable_name == f"build_{identifier}"
+    with pytest.raises(ValueError, match="requires its own recipe"):
+        recipe_declaration(identifier, author)
+
+
 @pytest.mark.parametrize("author", [None, False, object()])
 def test_noncallable_stock_recipe_authors_are_refused(author) -> None:
     with pytest.raises(TypeError, match="recipe author is not callable"):
