@@ -35,7 +35,7 @@ Cross-subassembly fits proven by the top-level interference check:
   to the drive-train's cylinder gears;
 * the measuring stick (ms-measuring-stick.SLDASM, stop clamped at the 2.0
   mark) is parked on the base's green land (y 47.8) east of the deck, the
-  stop's thumbscrew head just above the land. The spare T18
+  block just above the land and the thumbscrew above the stick. The spare T18
   transgear-removable, a swap part for the platen drive, rides inside
   paper-drive (a flat sibling of its mounted T24) rather than floating here --
   at the top level its leaf name would collide with the T12/T24 instances
@@ -55,6 +55,8 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+from itertools import product
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -109,21 +111,13 @@ SUBASSEMBLIES = (
 if (*SUBASSEMBLIES, spec.MEASURING_STICK) != spec.BOM_ORDER:
     raise AssertionError("the drawing's BOM order is the insertion order")
 
-# The measuring stick and its clamped stop -- a generic tool, not part of any
-# mechanism -- parked on the base's green land just INBOARD of the east
-# columns, the stick along Z, GRADUATIONS UP (ms_measuring_stick_assembly_spec:
-# the bar's graduated face bears on the stop's roof, +Y of the stop frame). The
-# user ruling of 2026-10-09 (#1310) took away the raised rim and set a black
-# deck at x -167..167, 3.0 above the land, so the whole stop sits in the land
-# corridor between the deck's east edge and the east columns' inboard faces
-# (x -184.3).
-# The column pair leaves only 198.6 along Z for the 200 bar, so the bar stays
-# inboard of the column band, clear of the crank column (x >= -150.7) and the front
-# rocker-support band (z <= -118).
-#
-# The stop frame maps X (along the stick) -> machine +Z, Y (thumbscrew axis,
-# up to the roof) -> machine +Y, Z (cover into the block) -> machine -X; the
-# bar's own rows compose to part X -> +Z, part Y -> -X, part Z -> -Y.
+# The measuring stick and its clamped stop are parked thumbscrew-up on the
+# green land, as ruled 2026-10-20. Its own working frame already has +Y up;
+# X (along the stick) maps to machine +Z and Z (toward the cover) to -X.
+# The graduated face stays opposite the screw, now facing down. The full
+# assembly envelope, not the old screw-head datum, locates the parked tool.
+# The land corridor is between the deck's east edge and the east columns'
+# inboard faces. Keep the 200 bar inboard of the column band and centred on Z.
 MS_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 MS_EULER = euler_from_rows(MS_ROWS)
 assert all(
@@ -133,35 +127,43 @@ assert all(
 ), MS_EULER
 
 LAND_TOP_Y = fr_harmonic_base_spec.GREEN_TOP  # the green land the stop rests on
-STOP_LAND_GAP = 0.25  # thumbscrew head bottom above the land (sliver margin)
+STOP_LAND_GAP = 0.25  # block underside above the land (sliver margin)
 PARK_WEST_LIMIT_X = -184.3  # east columns' inboard faces
 PARK_EAST_LIMIT_X = -fr_harmonic_base_spec.DECK_HALF_X  # the deck's east edge
 PARK_FRONT_LIMIT_Z = -118.0  # front rocker-support band (z <= -118)
 
-# Machine image of a stop-frame point p: (P.x - p.z, P.y + p.y, P.z + p.x).
-# The stop's machine-X envelope (stop Z, cover-screw heads to the block's back
-# wall) is centred in the land corridor; the thumbscrew's head face (the stop's
-# lowest Y) sits STOP_LAND_GAP above the land; the 200 bar is centred on z = 0.
-MS_POS = (
-    (PARK_WEST_LIMIT_X + PARK_EAST_LIMIT_X) / 2.0
-    + (ms.EXTENT_MIN[2] + ms.EXTENT_MAX[2]) / 2.0,
-    LAND_TOP_Y + STOP_LAND_GAP - ms.THUMB_HEAD_FACE_Y,
-    -(ms.STICK_X_MIN + ms.STICK_X_MAX) / 2.0,
+# Transform all eight envelope corners; axis extrema cannot be carried over
+# from the old screw-down placement. This also remains correct if the park
+# rotation is changed later.
+_MS_ROTATED_CORNERS = tuple(
+    tuple(sum(point[i] * MS_ROWS[i][axis] for i in range(3)) for axis in range(3))
+    for point in product(*zip(ms.EXTENT_MIN, ms.EXTENT_MAX, strict=True))
 )
-MS_WEST_X = MS_POS[0] - ms.EXTENT_MAX[2]
-MS_EAST_X = MS_POS[0] - ms.EXTENT_MIN[2]
-MS_FRONT_Z = MS_POS[2] + ms.EXTENT_MIN[0]
-MS_HEAD_BOTTOM_Y = MS_POS[1] + ms.THUMB_HEAD_FACE_Y
+_MS_ROTATED_MIN = tuple(min(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3))
+_MS_ROTATED_MAX = tuple(max(point[i] for point in _MS_ROTATED_CORNERS) for i in range(3))
+MS_POS = (
+    (PARK_WEST_LIMIT_X + PARK_EAST_LIMIT_X - _MS_ROTATED_MIN[0] - _MS_ROTATED_MAX[0]) / 2.0,
+    LAND_TOP_Y + STOP_LAND_GAP - _MS_ROTATED_MIN[1],
+    -(_MS_ROTATED_MIN[2] + _MS_ROTATED_MAX[2]) / 2.0,
+)
+MS_PARK_CORNERS = tuple(
+    tuple(point[i] + MS_POS[i] for i in range(3)) for point in _MS_ROTATED_CORNERS
+)
+MS_WEST_X = min(point[0] for point in MS_PARK_CORNERS)
+MS_EAST_X = max(point[0] for point in MS_PARK_CORNERS)
+MS_FRONT_Z = min(point[2] for point in MS_PARK_CORNERS)
+MS_BLOCK_BOTTOM_Y = min(point[1] for point in MS_PARK_CORNERS)
+MS_HEAD_TOP_Y = MS_POS[1] + ms.THUMB_HEAD_FACE_Y
 MS_STICK_BOTTOM_Y = MS_POS[1] + ms.STICK_BOTTOM_Y
 assert MS_WEST_X > PARK_WEST_LIMIT_X, MS_WEST_X
 assert MS_EAST_X < PARK_EAST_LIMIT_X, MS_EAST_X
 assert MS_FRONT_Z > PARK_FRONT_LIMIT_Z, MS_FRONT_Z
-assert abs(MS_HEAD_BOTTOM_Y - LAND_TOP_Y - STOP_LAND_GAP) < 1e-9, MS_HEAD_BOTTOM_Y
-assert MS_POS[1] + ms.EXTENT_MIN[1] > LAND_TOP_Y, MS_POS
+assert abs(MS_BLOCK_BOTTOM_Y - LAND_TOP_Y - STOP_LAND_GAP) < 1e-9, MS_BLOCK_BOTTOM_Y
+assert MS_HEAD_TOP_Y > MS_POS[1] + ms.THUMB_TIP_Y, MS_HEAD_TOP_Y
 _telemetry.info(
-    f"measuring stick parked: stop x {MS_WEST_X:.2f}..{MS_EAST_X:.2f}, bar underside "
-    f"y {MS_STICK_BOTTOM_Y:.2f}, front z {MS_FRONT_Z:.2f} (head bottom "
-    f"{MS_HEAD_BOTTOM_Y:.2f}, land {LAND_TOP_Y})"
+    f"measuring stick parked screw-up: stop x {MS_WEST_X:.2f}..{MS_EAST_X:.2f}, "
+    f"bar underside y {MS_STICK_BOTTOM_Y:.2f}, front z {MS_FRONT_Z:.2f}, "
+    f"block bottom {MS_BLOCK_BOTTOM_Y:.2f}, land {LAND_TOP_Y}"
 )
 
 
@@ -172,6 +174,29 @@ def _subassembly(name: str) -> str:
             f"missing subassembly {path}; run build_{name.replace('-', '_')}_assembly.py first"
         )
     return str(path)
+
+
+def _assert_ms_working_pose(adapter: Any, instance: str) -> None:
+    """Check the nested screw's live root-frame axis after the final solve."""
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    component = _early_bound(assembly.GetComponentByName(instance), "IComponent2")
+    if component is None:
+        raise RuntimeError(f"{ASM_NAME}: missing measuring-stick instance {instance!r}")
+    screws = [
+        _early_bound(child, "IComponent2")
+        for child in (component.GetChildren() or ())
+        if Path(str(_early_bound(child, "IComponent2").GetPathName())).stem == ms.THUMB_SCREW
+    ]
+    if len(screws) != 1:
+        raise RuntimeError(f"{ASM_NAME}: expected one measuring-stick thumbscrew, got {len(screws)}")
+    # Transform2 is relative to the active assembly's root, including for
+    # children of a subassembly (IComponent2::Transform2).
+    transform = _early_bound(screws[0].Transform2, "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{ASM_NAME}: missing measuring-stick thumbscrew transform")
+    ms.assert_thumbscrew_up(
+        tuple(float(value) for value in transform.ArrayData[:3]), label=ASM_NAME
+    )
 
 
 async def _author_integration_settings(adapter: Any) -> None:
@@ -256,7 +281,7 @@ async def build(adapter) -> dict[str, str]:
             )
         assert_component_placed(adapter, comp, [0.0, 0.0, 0.0], IDENTITY)
     # The measuring stick and its clamped stop, fixed at the exact park
-    # transform (not the identity: it is authored in the stop frame).
+    # transform (not the identity: it is authored in its own working frame).
     data = check(
         "insert ms-measuring-stick.SLDASM",
         await adapter.insert_component(
@@ -267,13 +292,13 @@ async def build(adapter) -> dict[str, str]:
             )
         ),
     )
-    comp = data["name"]
+    ms_component = data["name"]
     if not data.get("fixed"):
         check(
             "fix ms-measuring-stick",
-            await adapter.fix_component(ComponentRefParameters(name=comp)),
+            await adapter.fix_component(ComponentRefParameters(name=ms_component)),
         )
-    assert_component_placed(adapter, comp, list(MS_POS), MS_ROWS)
+    assert_component_placed(adapter, ms_component, list(MS_POS), MS_ROWS)
 
     assert_components_fully_defined(adapter)
     check_no_interference(
@@ -303,7 +328,7 @@ async def build(adapter) -> dict[str, str]:
     # The machine is authored output-side -Z, so SolidWorks' native Front view
     # shows the BACK. Redefine the document's standard views so Front (and the
     # eight-views gallery below, which goes through ShowNamedView2) shows the
-    # machine front, and the file opens on it. Geometry is untouched.
+    # machine front. The shared save selects its rebased isometric. Geometry is untouched.
     remap_front_to_machine_front(adapter)
     # Both drawing configurations own the explode: the exploded sheet's 1:10
     # view references Default Simplified.
@@ -312,7 +337,11 @@ async def build(adapter) -> dict[str, str]:
         ASM_NAME,
         lambda configuration: create_harmonic_analyzer_explode(adapter, configuration),
     )
-    artefacts = await save_assembly_and_images(adapter, ASM_NAME)
+    artefacts = await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        solved_gates=lambda current: _assert_ms_working_pose(current, ms_component),
+    )
     # save_assembly_and_images deliberately discards the dirty anonymous source
     # after its SaveAsCopy.  Reopen the clean copy for the top-only gallery/BOM;
     # those exports dirty the reopened document, so discard it again without

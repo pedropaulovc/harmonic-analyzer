@@ -1,8 +1,8 @@
 r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
-Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
-and every assembly setting printed as the assembly's own model dimension
-(mg_magnifier_assembly_spec). The Front view prints the lever group's two
+Sheet 1, ASSEMBLED + SETTINGS: the preserved back, left and back-top-left
+views at 1:4, and every assembly setting printed as the assembly's own model
+dimension (mg_magnifier_assembly_spec). The back view prints the lever group's two
 operator settings, the clamp station and the fixture drop. Two cropped
 side-view details of the wheel axle print one stack setting each:
 - AXLE AS PRESSED (2:1) shows only the bar and the axle. It prints the press
@@ -11,7 +11,7 @@ side-view details of the wheel axle print one stack setting each:
 - WHEEL ENDSHAKE (4:1) shows the stack. It prints the endshake between the
   wheel's spigot face and the front washer.
 
-Each detail is a cropped *Right model view, dimensioned while uncropped and
+Each detail is a cropped MG LEFT model view, dimensioned while uncropped and
 cropped after. On a native detail, the targeted import delivered nothing
 (the ch-amplitude-bar finding). The dimensions belong to construction chains
 the assembly saves blanked. Each view shows its chain in that view only
@@ -152,15 +152,15 @@ RIGHT_CENTER = (0.168, 0.150)
 ISO_CENTER = (0.225, 0.140)
 # Machinist review r3 (run 20261016T120248930Z-2fa1ae0c1aaa4f1ea2370a197868591c):
 # the unlabelled principal view shows the bar in front of the wheel, while
-# step 11 leads the wire "seen from the front". The model's *Front looks from
-# the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view mirrors
-# local x), and its *Right from +x, the fitter's left as he faces the machine
-# front: the drum, at machine -z, prints on its right. Each caption is centred
+# step 11 leads the wire "seen from the front". The preserved MG BACK looks
+# from the bar side, +z (mg_magnifying_wheel_geom: the pen-side front view
+# mirrors local x), and MG LEFT from +x, the fitter's left as he faces the
+# machine front: the drum, at machine -z, prints on its right. Each caption is centred
 # under its view (caption_under); the side view's stays short so it ends left
 # of the isometric (r8's outlines: Right 153-183 mm, Isometric from 194 mm).
 ASSEMBLED_VIEW_CAPTIONS = {
-    "*Front": "VIEW FROM THE BACK",
-    "*Right": "VIEW FROM THE LEFT",
+    stack.DRAWING_BACK_VIEW: "VIEW FROM THE BACK",
+    stack.DRAWING_LEFT_VIEW: "VIEW FROM THE LEFT",
 }
 
 # Sheet geometry, metres: the template's inner border and the title block in
@@ -177,7 +177,7 @@ TITLE_BLOCK = (
 )
 _PAD = 0.004
 
-# Sheet 1, Front view: the lever settings' text, in sheet metres from the
+# Sheet 1, back view: the lever settings' text, in sheet metres from the
 # projected chain points. The clamp station's line runs above the clamp's
 # thumb-screw head with its callout above it. The fixture drop's text stands
 # right of the vertical rod, clear of the fixture screw (toward the bracket,
@@ -192,7 +192,7 @@ LEVER_CALLOUT_LOCATION = {
     stack.CLAMP_STATION_DIMENSION: "above",
     stack.FIXTURE_DROP_DIMENSION: "below",
 }
-LEVER_VIEW_LABEL = "lever settings (Front)"
+LEVER_VIEW_LABEL = "lever settings (back)"
 
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
 # its caption under it (as the lever sheet's), the BOM in the top-right
@@ -308,12 +308,12 @@ FINISHED_CAPTION = "FINISHED ASSEMBLY"
 # on the drum end inside the wheel and read as pointing at a spoke. MHA-MG-VN-56
 # now carries a shape-neutral split ring at BALLOON_RING_FRACTION of its run
 # (build_mg_vn_lever_wire.BalloonRingSplit), and the balloon is frozen to the
-# ring's point facing the *Isometric viewer (wire_facing_point). The balloon
+# ring's point facing the preserved fitter isometric viewer (wire_facing_point). The balloon
 # then stands right of the view, its leader dropping this little from the
 # ring so it passes under the vertical rod's lower end, the one part right of
 # the run.
 FINISHED_WIRE_BALLOON_RISE_DEG = -10.0
-ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # *Isometric looks from +X+Y+Z
+ISOMETRIC_VIEWER = (1.0, 1.0, 1.0)  # MG BACK-TOP-LEFT looks from +X+Y+Z
 
 
 def wire_facing_point(
@@ -324,7 +324,7 @@ def wire_facing_point(
     station: float,
 ) -> tuple[float, float, float]:
     """Part-frame point (mm) on the wire's ring at ``station`` that faces the
-    *Isometric viewer.
+    preserved MG BACK-TOP-LEFT viewer.
 
     The frame is ``build_mg_magnifier_assembly._lever_wire_rows``': part +Y
     onto drum->hook, +X the horizontal perpendicular (d_y, -d_x, 0), +Z = X x Y.
@@ -406,7 +406,7 @@ BOM_NORMALIZED_ALIASES = {
 # shoulder (#1559); the shoulder's Ø5 edge is its one full-diameter hard
 # circle, 45 below the clamp's bottom face once the explode drops the rod
 # (the bottom dome is tangent, like the lever's). Each is
-# pinned to the point of a circle that faces the *Isometric viewer (+X+Y+Z,
+# pinned to the point of a circle that faces the fitter isometric viewer (+X+Y+Z,
 # mg_magnifier_explode_spec): its part normal is the view direction
 # projected square to the rod axis.
 #   lever, Ry(180) in the assembly (local y = +Y, z = -Z): the west junction
@@ -430,7 +430,7 @@ _VROD_R = VROD_DIA / 2.0
 # runs nearly along the rays from the view centre, so walked anchors (washer
 # rim, first nut) left 17's leader through both nuts onto 18's arrowhead.
 # Washer and nuts are Ry(180) in the assembly (local x = -X, y = +Y, z = -Z),
-# so their local z = 0 faces the *Isometric viewer, and a local polar angle
+# so their local z = 0 faces the fitter isometric viewer, and a local polar angle
 # phi draws at screen (-cos(phi)/sqrt2, (cos(phi) + 2 sin(phi))/sqrt6): the
 # major-axis ends square to the axle's 30 deg sheet direction are phi 45
 # (up-left) and 225 (down-right). 17 takes the washer rim's up-left end, so its
@@ -521,9 +521,9 @@ LABEL_INSET = 0.016
 
 @dataclass(frozen=True)
 class StackDetail:
-    """One cropped *Right model view of the axle station.
+    """One cropped MG LEFT model view of the axle station.
 
-    On the Right view, sheet x runs with machine -z (away from the bar) and
+    On this preserved view, sheet x runs with machine -z (away from the bar) and
     sheet y with machine y. ``centre_d`` is the circle's centre as a stack
     station d (from the bar front face, on the axle line); ``centre`` is where
     that point lands on the sheet. ``ink_drop_mm`` is how far below the axle
@@ -683,10 +683,12 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
 
 
 def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
-    """``detail`` uncropped: a *Right model view at its scale, moved so its
+    """``detail`` uncropped: an MG LEFT model view at its scale, moved so its
     circle's centre lands on ``detail.centre``."""
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Right", *detail.centre, scale=detail.scale),
+        place_view(
+            adapter, str(SOURCE), stack.DRAWING_LEFT_VIEW, *detail.centre, scale=detail.scale
+        ),
         "IView",
     )
     label = f"{detail.title} centre"
@@ -879,7 +881,7 @@ def lever_keep(
 
 
 def _lever_settings(adapter: Any, view: Any) -> Callable[[], None]:
-    """The clamp station and the fixture drop on the Front view, with their
+    """The clamp station and the fixture drop on the back view, with their
     callouts; the returned check re-reads the callouts once settled."""
     callouts = _printable_lever_callouts()
     tip, clamp, fixture = model_points_in_view(
@@ -1525,22 +1527,22 @@ def balloon_items(
 
 
 def _place_assembled_sheet(adapter: Any) -> tuple[Callable[[], None], ...]:
-    """Front, Right and Isometric at 1:4, the lever settings on the Front
-    view and the two axle-stack details."""
+    """Preserved back, left and isometric at 1:4, the lever settings on the
+    back view and the two axle-stack details."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = None
     captioned = []
     for name, centre in (
-        ("*Front", FRONT_CENTER),
-        ("*Right", RIGHT_CENTER),
-        ("*Isometric", ISO_CENTER),
+        (stack.DRAWING_BACK_VIEW, FRONT_CENTER),
+        (stack.DRAWING_LEFT_VIEW, RIGHT_CENTER),
+        (stack.DRAWING_ISOMETRIC_VIEW, ISO_CENTER),
     ):
         view = place_view(adapter, str(SOURCE), name, *centre, scale=SHEET_SCALE)
-        # Front and Right print the simplified configuration at 1:4; the
-        # isometric is the full-detail view.
-        role = ViewRole.FULL_DETAIL if name == "*Isometric" else ViewRole.PLAIN
+        # Back and left print the simplified configuration at 1:4; the
+        # preserved isometric is the full-detail view.
+        role = ViewRole.FULL_DETAIL if name == stack.DRAWING_ISOMETRIC_VIEW else ViewRole.PLAIN
         apply_view_configuration(adapter, view, role=role, label=f"{PDF_TITLE} {name}")
-        if name == "*Front":
+        if name == stack.DRAWING_BACK_VIEW:
             front = view
         if name in ASSEMBLED_VIEW_CAPTIONS:
             captioned.append((view, name))
@@ -1566,7 +1568,7 @@ def _place_exploded_view(
     view = place_view(
         adapter,
         str(SOURCE),
-        "*Isometric",
+        stack.DRAWING_ISOMETRIC_VIEW,
         (field[0] + field[2]) / 2.0,
         (field[1] + field[3]) / 2.0,
         scale=EXPLODED_SCALE,
@@ -1592,7 +1594,7 @@ def _place_collapsed_view(
     view = place_view(
         adapter,
         str(SOURCE),
-        "*Isometric",
+        stack.DRAWING_ISOMETRIC_VIEW,
         (field[0] + field[2]) / 2.0,
         (field[1] + field[3]) / 2.0,
         scale=scale,
