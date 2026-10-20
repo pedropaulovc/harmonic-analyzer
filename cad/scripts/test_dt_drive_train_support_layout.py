@@ -358,8 +358,9 @@ def _world(origin, rows, local):
 def test_mha135_pin_holes_share_one_axis_at_the_drive_train_pose() -> None:
     # MHA-DT-30 is match-drilled through the lever hub and the lift rod at
     # assembly, so the model's two holes must be one line.  Each part cuts its
-    # hole along its own local X (build_pinion_lift_rod / build_pinion_lever
-    # "lever pin" axes); the rod is phased to the lever to make them coincide.
+    # hole along its own local X (build_dt_pinion_lift_rod /
+    # build_dt_pinion_lever "lever pin" axes); the rod is phased to the lever
+    # to make them coincide.
     from dt_pinion_lever_geometry import PIN_HOLE_Z, ROD_PIN_HOLE_FROM_END
 
     rod_origin = [drive.LIFT_X, drive.LIFT_Y, drive.LIFT_ROD_Z0]

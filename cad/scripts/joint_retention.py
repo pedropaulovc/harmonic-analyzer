@@ -1035,8 +1035,8 @@ JOINTS: tuple[Joint, ...] = (
             "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 7 (crank-handle-fitted 'NO THREADLOCKER, "
             "SHOULDER TIGHT. FILE THE TIP FLUSH ... THEN STAKE THE TAP MOUTH ONTO IT AT 2 OPPOSITE "
             "POINTS') and HANDLE_STAKE_NOTE; build_dt_drive_train_assembly.py handle_screw placement "
-            "and 'MHA-DT-32 shoulder seated' mates; crank_handle_pivot_screw_spec THREAD_SIZE and "
-            "INSTALLED_CONFIG (tip filed flush); crank_arm_spec HANDLE_PIVOT_HOLE_SPEC"
+            "and 'MHA-DT-32 shoulder seated' mates; dt_crank_handle_pivot_screw_spec THREAD_SIZE and "
+            "INSTALLED_CONFIG (tip filed flush); dt_crank_arm_spec HANDLE_PIVOT_HOLE_SPEC"
         ),
     ),
     Joint(

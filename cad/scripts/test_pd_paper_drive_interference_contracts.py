@@ -3,7 +3,7 @@
 ``_interference_contracts`` writes every transgear size as a literal so no
 assembly re-keys on a transgear spec edit; these tests re-derive each row from
 the owners, so a spec change that moves a fit fails here instead of passing
-a stale bound (the MHA-DT-32 precedent in test_crank_handle_pivot_screw_drawing).
+a stale bound (the MHA-DT-32 precedent in test_dt_crank_handle_pivot_screw_drawing).
 """
 
 from __future__ import annotations

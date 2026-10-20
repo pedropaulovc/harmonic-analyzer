@@ -3256,7 +3256,7 @@ if _S_CAM - _FPIN_S0 < 2.0:
 _FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
 
 # Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
-# U28 deleted the set-pin boss; DT-23 now has a sub-flush #2-56 set screw at
+# U28 deleted the set-pin boss; MHA-DT-23 now has a sub-flush #2-56 set screw at
 # its geometry-owned SET_SCREW_Z, so the collar is a bare cylinder throughout
 # free cam spin.  Ruling (c): the FRONT collar is set against the front
 # block's inner face (0.25 feeler) -- flush with the strap's outer face, so

@@ -133,8 +133,8 @@ DIMENSION_CALLOUTS = {
     "CollarCy": ECCENTRICITY_CALLOUT,
     "TapDrillDia": f"{TAP_DRILL_CALLOUT}\n{step_ref(SET_SCREW_STAKE_STEP_KEY)}",
 }
-# Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
-# by build_pinion_cam): two on the critical bore, OD and eccentricity and on
+# Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
+# by build_dt_pinion_cam): two on the critical bore, OD and eccentricity and on
 # the tap drill, one everywhere else.  The sheet only reads them back.
 
 

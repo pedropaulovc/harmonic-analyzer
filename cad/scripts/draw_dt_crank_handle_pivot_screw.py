@@ -9,7 +9,7 @@ dimension at its part-authored places.
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the thread tip on
 the left and the slotted head on the right.  Lengths baseline from the
-under-head face (see ``crank_handle_pivot_screw_spec``).  The head-end view is
+under-head face (see ``dt_crank_handle_pivot_screw_spec``).  The head-end view is
 the ``*Back`` orientation, which is exactly the third-angle RIGHT view of that
 profile, so it sits on the profile's axis to its right and shows the slot.
 

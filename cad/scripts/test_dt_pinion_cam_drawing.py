@@ -141,7 +141,7 @@ def test_both_tight_collar_bands_name_the_follower_pin_they_serve() -> None:
 
 
 def test_od_callout_claims_the_follower_arc_the_assembly_proves() -> None:
-    # ENFORCE r8: the callout's "clear of the tap" is the DT-00 layout proof,
+    # ENFORCE r8: the callout's "clear of the tap" is the MHA-DT-00 layout proof,
     # not a free claim; keep the proof present while the sheet states it.
     import test_dt_drive_train_support_layout as layout
 
@@ -162,7 +162,7 @@ def test_tap_callout_points_at_the_drive_train_step_that_stakes_it() -> None:
 
 def test_part_recipe_does_not_reach_the_assembly_sequence() -> None:
     # Codex P2 (#1686): the step number is sheet data; a steps import in the
-    # spec would re-key the cam (and DT-00) on every step edit.
+    # spec would re-key the cam (and MHA-DT-00) on every step edit.
     from pathlib import Path
 
     import _buildgraph

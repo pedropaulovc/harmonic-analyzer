@@ -31,7 +31,7 @@ MINOR_2B_MIN = 0.130 * INCH
 # The shared tap/native-thread registry carries the basic major rounded to mm.
 BASIC_MAJOR = 4.166
 # The deepest root a die cuts: a basic half-depth under the smallest 2A pitch
-# diameter (the assumption crank_handle_pivot_screw_spec makes for #4-40).
+# diameter (the assumption dt_crank_handle_pivot_screw_spec makes for #4-40).
 ROOT_2A_MIN = PD_2A_MIN - 0.649519 * PITCH
 ENGAGEMENT_FLOOR = 1.5 * BASIC_MAJOR
 
