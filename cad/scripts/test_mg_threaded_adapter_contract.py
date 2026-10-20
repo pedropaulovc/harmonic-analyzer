@@ -164,6 +164,7 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
         ("ISketchPoint", "X"),
         ("ISketchPoint", "Y"),
         ("IMathPoint", "ArrayData"),
+        ("IFeature", "Name"),
     ):
         _methods, maps = _native_declaration(interface)
         assert property_name in maps["_prop_map_get_"]
@@ -173,6 +174,10 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
     rim = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
     rim.func.attr = "SetSelectionPoint"
     assert "ISelectionMgr.SetSelectionPoint arguments" in _undeclared_bound_calls(mutated)
+    mutated = copy.deepcopy(tree)
+    identifier = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetID")
+    identifier.args.append(ast.Constant(0))
+    assert "ISketchSegment.GetID arguments" in _undeclared_bound_calls(mutated)
 
 
 @pytest.mark.parametrize("recipe", ("draw_mg_magnifying_bracket.py", "draw_mg_magnifying_lever.py"))
@@ -185,5 +190,15 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
         ("IView", "ModelToViewTransform"),
         ("IDimension", "FullName"),
         ("IDimension", "SystemValue"),
+        ("ICThread", "ThreadCallout"),
+        ("IAnnotation", "Owner"),
+        ("IAnnotation", "OwnerType"),
+        ("ICalloutVariable", "VariableName"),
+        ("ICalloutVariable", "Type"),
+        ("ICalloutStringVariable", "String"),
     ):
         assert property_name in _native_declaration(interface)[1]["_prop_map_get_"]
+    # This drawing property returns INote; it is not the model feature's
+    # writable ThreadCallout string. Owner/OwnerType are read only in practice
+    # per SDK remarks even though the typelib also advertises their setters.
+    assert "ThreadCallout" not in _native_declaration("ICThread")[1]["_prop_map_put_"]

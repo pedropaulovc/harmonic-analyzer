@@ -15,6 +15,8 @@ import magnifying_bracket_joint_layout as mounting
 import mg_lever_thread_joint as joint
 import mg_magnifying_bracket_spec as spec
 from _drawing_edges import ViewEdge, ViewEdges
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _layout_geometry import Box, Segment, segment_box_overlap_length
 from _printed_tolerance import printed_band_mm
 
 
@@ -310,3 +312,202 @@ def test_mouth_section_shows_both_chamfer_legs_on_the_axis_plane(monkeypatch, fa
         message = "geometry beyond the cutting plane" if fault == "uncut_geometry" else "both chamfer legs in true profile"
         with pytest.raises(RuntimeError, match=message):
             drawing._mouth_section(object(), parent)
+
+
+def _tap_name_adapter(*, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
+    state = SimpleNamespace(selected=None, notes=[], deleted=[])
+
+    def clear(_all):
+        state.selected = None
+
+    def delete():
+        if fault != "deletion_ignored":
+            state.notes.remove(state.selected)
+            state.deleted.append(state.selected)
+        # IModelDoc2.EditDelete returns void.
+
+    def note(text):
+        native = SimpleNamespace(GetText=lambda: text)
+
+        def select(append, mark):
+            assert append is False and mark == 0
+            state.selected = native
+            return fault != "selection_refused"
+
+        native.GetAnnotation = lambda: SimpleNamespace(Select2=select)
+        return native
+
+    state.notes = [note(f"{joint.THREAD} Tapped Hole") for _ in range(count)]
+    required = (note(spec.WALL_CALLOUT), note("MATES MHA-MG-03 LEVER"))
+    state.notes.extend(required)
+    view = SimpleNamespace(GetNotes=lambda: tuple(state.notes))
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(ClearSelection2=clear, EditDelete=delete))
+    native_definition = "THRU\nMATES MHA-MG-03 LEVER <hw-threaddesc> <hw-threadclass> <hw-thru>" if definition is None else definition
+    state.definition = native_definition
+    state.native_class = SimpleNamespace(VariableName="hw-threadclass", Type=3, String=native_class)
+    state.native_description = SimpleNamespace(VariableName="hw-threaddesc", Type=3, String=f"{joint.THREAD} UNC")
+    state.set_text = []
+
+    def get_text(location):
+        if location == 5:
+            return state.definition
+        if location != 1:
+            return ""
+        if resolved is not None:
+            return resolved
+        text = state.definition.replace("<hw-threaddesc>", state.native_description.String)
+        text = text.replace("<hw-threadclass>", state.native_class.String).replace("<hw-thru>", "THRU")
+        if fault == "stale_resolved_class" and state.set_text:
+            return text + " 2B"
+        if fault == "lost_resolved_size" and state.set_text:
+            return ""
+        return text
+
+    def set_text(location, text):
+        assert location == 1
+        state.set_text.append(text)
+        if fault != "class_definition_ignored":
+            state.definition = text
+        if fault == "native_class_changed":
+            state.native_class.String = "3B"
+        # IDisplayDimension.SetText returns void.
+
+    variables = (state.native_description, state.native_class)
+    if fault == "missing_class_variable":
+        variables = (state.native_description,)
+    elif fault == "duplicate_class_variable":
+        variables = (*variables, state.native_class)
+    elif fault == "non_string_class":
+        state.native_class.Type = 1
+    callout = SimpleNamespace(
+        GetText=get_text, SetText=set_text, IsHoleCallout=lambda: True,
+        GetHoleCalloutVariables=lambda: variables,
+    )
+    return adapter, view, callout, state, required
+
+
+@pytest.mark.parametrize("count", (0, 1, 2))
+def test_automatic_tap_name_cleanup_keeps_the_associative_thread_and_required_notes(monkeypatch, count) -> None:
+    adapter, view, callout, state, required = _tap_name_adapter(count=count)
+    definition = callout.GetText(5)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    assert drawing._curate_tap_callout(adapter, view, callout) == count
+    assert tuple(state.notes) == required
+    assert len(state.deleted) == count and state.selected is None
+    assert callout.GetText(5) == definition.replace(" <hw-threadclass>", "")
+    assert state.native_class.String == " - 2B"
+    assert state.native_description.String == f"{joint.THREAD} UNC"
+    assert "<hw-threaddesc>" in callout.GetText(5) and "<hw-thru>" in callout.GetText(5)
+    assert "MATES MHA-MG-03 LEVER" in callout.GetText(1)
+    assert joint.THREAD in callout.GetText(1) and "2B" not in callout.GetText(1)
+
+
+@pytest.mark.parametrize("missing", ("<hw-threaddesc>", "<hw-threadclass>", "<hw-thru>"))
+def test_tap_name_is_not_removed_without_an_authoritative_native_thread_callout(monkeypatch, missing) -> None:
+    adapter, view, callout, state, _required = _tap_name_adapter()
+    definition = callout.GetText(5).replace(missing, "")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="native thread description/class/extent"):
+        drawing._curate_tap_callout(adapter, view, SimpleNamespace(GetText=lambda _location: definition))
+    assert not state.deleted
+    assert any(note.GetText() == f"{joint.THREAD} Tapped Hole" for note in state.notes)
+
+
+@pytest.mark.parametrize("resolved", ("", "THRU MATES MHA-MG-03 LEVER", "10-32 UNF 2B THRU"))
+def test_tap_name_cleanup_requires_the_actual_resolved_thread_size(monkeypatch, resolved) -> None:
+    adapter, view, callout, state, _required = _tap_name_adapter(resolved=resolved)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="no resolved native thread size"):
+        drawing._curate_tap_callout(adapter, view, callout)
+    assert not state.deleted and not state.set_text
+
+
+@pytest.mark.parametrize("fault, message", (
+    ("missing_class_variable", "one native string thread-class"),
+    ("duplicate_class_variable", "one native string thread-class"),
+    ("non_string_class", "one native string thread-class"),
+    ("class_definition_ignored", "kept its thread class"),
+    ("native_class_changed", "changed its native variable"),
+    ("stale_resolved_class", "still prints 2B"),
+    ("lost_resolved_size", "lost its resolved thread size"),
+))
+def test_tap_curation_refuses_lost_or_modified_native_thread_metadata(monkeypatch, fault, message) -> None:
+    adapter, view, callout, state, _required = _tap_name_adapter(fault=fault)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._curate_tap_callout(adapter, view, callout)
+    assert not state.deleted
+
+
+def test_tap_curation_preserves_a_nondefault_native_class_instead_of_hiding_it(monkeypatch) -> None:
+    adapter, view, callout, state, _required = _tap_name_adapter(native_class="3B")
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="not the title-block default 2B"):
+        drawing._curate_tap_callout(adapter, view, callout)
+    assert not state.deleted and not state.set_text
+    assert state.native_class.String == "3B"
+
+
+@pytest.mark.parametrize("fault", ("selection_refused", "deletion_ignored"))
+def test_tap_name_cleanup_requires_native_selection_and_actual_deletion(monkeypatch, fault) -> None:
+    adapter, view, callout, state, _required = _tap_name_adapter(fault=fault)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_kw: None)
+    with pytest.raises(RuntimeError, match="redundant tap feature-name note"):
+        drawing._curate_tap_callout(adapter, view, callout)
+    assert not state.deleted
+
+
+def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_moving_its_tip(monkeypatch, tmp_path) -> None:
+    """Replay observed collisions; relocated native ink still needs seat proof."""
+    adapter, side, callout, state, required = _tap_name_adapter()
+    source = tmp_path / "bracket.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    captured = {}
+
+    async def open_model(_path):
+        return SimpleNamespace(is_success=True, data=None)
+
+    async def finalize(*_args, **kwargs):
+        captured["finalize"] = kwargs
+        return {"slddrw": "bracket.SLDDRW"}
+
+    def project(_adapter, view, point, *, label):
+        assert view is side
+        assert point == pytest.approx((joint.NECK_HALF_X / 1000.0, 0.0, -0.0045))
+        return (0.2280, 0.2169)  # Frozen R6 manufactured-wall landing.
+
+    def leader(_adapter, text, **kwargs):
+        captured["wall"] = (text, kwargs)
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (adapter.currentModel, object()))
+    monkeypatch.setattr(drawing, "place_view", lambda _a, _source, orientation, *_xy, **_kw: side if orientation == "*Right" else object())
+    monkeypatch.setattr(drawing, "_mouth_section", lambda *_a: object())
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    for name in ("curate_view_dimensions", "curate_hidden_dimensions"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: [])
+    monkeypatch.setattr(drawing, "_mounting_rims", lambda _view: (SimpleNamespace(edge=object()), SimpleNamespace(edge=object())))
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_kw: SimpleNamespace(circle_at=lambda *_a, **_kw: SimpleNamespace(edge=object())))
+    monkeypatch.setattr(drawing, "add_native_hole_callout", lambda *_a, **_kw: callout)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "add_leader_note", leader)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    assert asyncio.run(drawing.build(adapter)) == {"slddrw": "bracket.SLDDRW"}
+    text, wall = captured["wall"]
+    assert text == spec.WALL_CALLOUT and wall["view"] is side
+    assert wall["attach_xy"] == (0.2280, 0.2169)
+    assert tuple(state.notes) == required  # Only the duplicate name disappeared.
+    assert "redundant_note_substrings" not in captured["finalize"]
+
+    tap = LeaderSegment("tap", "hole-callout", 0.2305, 0.2131, 0.2856, 0.2276)
+    automatic = LeaderSegment("automatic name", "note", 0.2344, 0.2274, 0.2280, 0.2156)
+    old_wall = LeaderSegment("wall", "note", 0.2993, 0.1797, *wall["attach_xy"])
+    assert len(find_leader_leader_crossings([tap, automatic, old_wall])) == 2
+    assert segment_box_overlap_length(Segment(tap.x0, tap.y0, tap.x1, tap.y1), Box(0.2421, 0.2247, 0.2857, 0.2291)) > 0.011
+    # Exercise both possible note-side junctions, not a single assumed side.
+    # This is a route control, not fabricated post-move native display data.
+    for junction_x in (wall["text_xy"][0] - 0.0007, wall["text_xy"][0] + 0.120):
+        moved = LeaderSegment("wall", "note", junction_x, wall["text_xy"][1] - 0.0013, *wall["attach_xy"])
+        assert not find_leader_leader_crossings([tap, moved])
