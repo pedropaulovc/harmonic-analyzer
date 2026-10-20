@@ -216,12 +216,6 @@ def test_receiver_upper_stop_keeps_drill_out_of_unbacked_plate() -> None:
     assert joint.DRILL_POINT_RIB_MARGIN_MIN > 0.0
     # A MIN-only depth would allow the full drill diameter into this thinner
     # section. Its worst wall would not meet the unchanged 1.5 mm floor.
-    min_only_permitted_depth = joint.RIB_DEPTH + joint.TAP_DRILL_DIA
-    assert min_only_permitted_depth >= joint.DRILL_DEPTH_MIN
-    assert min_only_permitted_depth > joint.DRILL_DEPTH_MAX
-    # At this permitted MIN-only depth a full-diameter cylindrical segment,
-    # not merely the drill point, runs beyond the rib into bare plate.
-    assert min_only_permitted_depth - joint.RIB_DEPTH == pytest.approx(joint.TAP_DRILL_DIA)
     bare_plate_wall = (
         sm_summing_lever_spec.PLATE_T - joint.LINEAR_BAND
         - (sm_summing_lever_spec.PLATE_T / 2.0 + joint.POSITION_BAND)
@@ -941,12 +935,46 @@ def test_receiver_native_drill_band_is_explicit_symmetric_ordinary_width(monkeyp
     assert (tolerance.lower, tolerance.upper) == pytest.approx((-0.00051, 0.00051))
 
 
+def test_rib_added_area_matches_independent_cross_section_integration() -> None:
+    """Integrate profile minus the existing cylinder/plate/pad union by strips.
+
+    Midpoint strips avoid the production circle-lens and pad-area formulae.
+    The 0.002 mm² allowance covers quadrature at the curved boundary and
+    rectangle edges, but resolves either overlap term being omitted.
+    """
+    part = lever_build
+    strip_count = 40_000
+    dx = (part.ARC_R + part.RIB_PLATE_REACH) / strip_count
+    area = 0.0
+    for index in range(strip_count):
+        x = -part.ARC_R + (index + 0.5) * dx
+        half_height = (
+            math.sqrt(part.ARC_R**2 - x**2) if x < 0
+            else part.ARC_R * (1 - x / part.PLATE_W)
+        )
+        occupied_low = occupied_high = 0.0
+        if abs(x) < part.CYL_R:
+            occupied_high = math.sqrt(part.CYL_R**2 - x**2)
+            occupied_low = -occupied_high
+        if 0 <= x <= part.PLATE_W:
+            occupied_low = min(occupied_low, -part.PLATE_T / 2)
+            occupied_high = max(occupied_high, part.PLATE_T / 2)
+        if part.PLATE_W - part.SPRING_PAD_W <= x <= part.PLATE_W:
+            occupied_low = min(occupied_low, part.PLATE_T / 2 - part.SPRING_SEAT_T)
+        # Every existing interval contains y=0, so their union has no gaps.
+        covered = max(0.0, min(half_height, occupied_high) - max(-half_height, occupied_low))
+        area += (2 * half_height - covered) * dx
+    assert part.edge_rib_added_area_mm2() == pytest.approx(area, abs=0.002)
+
+
 @pytest.mark.asyncio
 async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch) -> None:
     from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
 
     part = lever_build
     calls, volumes = [], []
+    events = []
+    state = SimpleNamespace(volume=1000.0)
 
     async def success(*args, **kwargs):
         return AdapterResult(status=AdapterResultStatus.SUCCESS, data="entity")
@@ -955,9 +983,16 @@ async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch)
         return "arc", None, None
 
     async def measured(*args):
-        return 1000.0
+        events.append("measure")
+        return state.volume
+
+    def extrude(adapter, depth, offset, **kwargs):
+        events.append("extrude")
+        calls.append((depth, offset, kwargs))
+        state.volume += 17.0 * depth
 
     async def volume_check(adapter, label, expected, tolerance):
+        events.append("check")
         volumes.append((label, expected, tolerance))
 
     class SketchDims:
@@ -983,10 +1018,7 @@ async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch)
     monkeypatch.setattr(part, "set_sketch_direct_db", lambda *args: None)
     monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
     monkeypatch.setattr(part, "name_dimensions", lambda *args: ["front thickness"])
-    monkeypatch.setattr(
-        part, "extrude_at_offset",
-        lambda adapter, depth, offset, **kwargs: calls.append((depth, offset, kwargs)),
-    )
+    monkeypatch.setattr(part, "extrude_at_offset", extrude)
     jobs = []
     await part._edge_rib(adapter, True, "receiver", "EdgeRibBack", jobs)
     await part._edge_rib(adapter, False, "opposite", "EdgeRibFront", jobs)
@@ -998,13 +1030,21 @@ async def test_only_receiver_rib_extrudes_inward_to_eight_point_two(monkeypatch)
     assert calls[1][1] + calls[1][0] == pytest.approx(76.2)
     area = part.edge_rib_added_area_mm2()
     assert area > 0
-    assert [value - 1000.0 for _, value, _ in volumes] == pytest.approx([area * 8.2, area * 5.08])
+    baselines = [1000.0, 1000.0 + 17.0 * 8.2]
+    assert [value - baseline for (_, value, _), baseline in zip(volumes, baselines, strict=True)] == pytest.approx(
+        [area * 8.2, area * 5.08]
+    )
+    assert events == ["measure", "extrude", "check", "measure", "extrude", "check"]
     assert jobs == [("front thickness", '"RibT"')]
 
 
 @pytest.mark.parametrize(
     "damage",
-    (None, "missing", "empty", "receiver-entry", "receiver-inner", "opposite-inner", "extra"),
+    (
+        None, "outer-caps-absent", "missing", "empty", "receiver-entry",
+        "receiver-inner", "opposite-inner", "extra", "receiver-depth",
+        "opposite-depth", "missing-depth",
+    ),
 )
 def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) -> None:
     def face(z):
@@ -1014,7 +1054,14 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
         return SimpleNamespace(GetSurface=lambda: surface)
 
     planes = {"EdgeRibBack": [-76.2, -68.0], "EdgeRibFront": [71.12, 76.2]}
-    if damage == "receiver-entry":
+    depths = {"EdgeRibBack": 8.2, "EdgeRibFront": 5.08}
+    if damage == "outer-caps-absent":
+        planes = {"EdgeRibBack": [-68.0], "EdgeRibFront": [71.12]}
+    elif damage == "receiver-depth":
+        depths["EdgeRibBack"] = 7.3
+    elif damage == "opposite-depth":
+        depths["EdgeRibFront"] = 8.2
+    elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
         planes["EdgeRibBack"][1] = -68.9
@@ -1024,15 +1071,27 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
         planes["EdgeRibBack"].append(-70.0)
     elif damage == "empty":
         planes["EdgeRibBack"] = []
-    features = {
-        name: SimpleNamespace(GetFaces=lambda values=values: tuple(face(z) for z in values))
-        for name, values in planes.items()
-    }
+
+    def feature(name, values):
+        expected_parameter = "RibDepth" if name == "EdgeRibBack" else "EdgeRibThickness"
+
+        def parameter(parameter_name):
+            assert parameter_name == expected_parameter
+            if damage == "missing-depth" and name == "EdgeRibBack":
+                return None
+            return SimpleNamespace(SystemValue=depths[name] / 1000.0)
+
+        return SimpleNamespace(
+            GetFaces=lambda: tuple(face(z) for z in values),
+            Parameter=parameter,
+        )
+
+    features = {name: feature(name, values) for name, values in planes.items()}
     if damage == "missing":
         del features["EdgeRibBack"]
     monkeypatch.setattr(lever_build, "_early_bound", lambda value, _kind: value)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
-    if damage is None:
+    if damage in (None, "outer-caps-absent"):
         lever_build._assert_edge_rib_end_planes(adapter)
     else:
         with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront"):

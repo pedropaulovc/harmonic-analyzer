@@ -764,18 +764,24 @@ def edge_rib_added_area_mm2() -> float:
 
 
 def _assert_edge_rib_end_planes(adapter) -> None:
-    """Prove the receiver grows inward, with both outside end faces preserved."""
+    """Read the inner caps and depths; outer caps may merge with earlier faces."""
     model = _early_bound(adapter.currentModel, "IPartDoc")
     expected = {
-        "EdgeRibBack": (-PLATE_L / 2.0, -RECEIVER_RIB_OFFSET),
-        "EdgeRibFront": (RIB_OFFSET, PLATE_L / 2.0),
+        "EdgeRibBack": (-RECEIVER_RIB_OFFSET, -PLATE_L / 2.0, "RibDepth", RECEIVER_RIB_T),
+        "EdgeRibFront": (RIB_OFFSET, PLATE_L / 2.0, "EdgeRibThickness", RIB_T),
     }
     tolerance_mm = 1e-5
-    for name, wanted in expected.items():
+    for name, (inner, outer, depth_name, depth_mm) in expected.items():
         raw = model.FeatureByName(name)
         if raw is None:
             raise RuntimeError(f"{name}: missing native rib feature")
         feature = _early_bound(raw, "IFeature")
+        dimension = feature.Parameter(depth_name)
+        if dimension is None or not math.isclose(
+            float(_early_bound(dimension, "IDimension").SystemValue) * 1000.0,
+            depth_mm, rel_tol=0.0, abs_tol=tolerance_mm,
+        ):
+            raise RuntimeError(f"{name}: native {depth_name} is not {depth_mm} mm")
         planes: list[float] = []
         for raw_face in feature.GetFaces() or ():
             face = _early_bound(raw_face, "IFace2")
@@ -790,12 +796,19 @@ def _assert_edge_rib_end_planes(adapter) -> None:
             z_mm = values[5] * 1000.0
             if not any(abs(z_mm - previous) <= tolerance_mm for previous in planes):
                 planes.append(z_mm)
-        if len(planes) != 2 or any(
-            not any(abs(z - observed) <= tolerance_mm for observed in planes)
-            for z in wanted
+        # Coplanar outside caps can be owned by the earlier plate/cylinder.
+        # The required inner cap plus native extrusion depth independently
+        # locates that outside cap; any cap this feature does own must agree.
+        if not any(abs(inner - z) <= tolerance_mm for z in planes) or any(
+            min(abs(z - inner), abs(z - outer)) > tolerance_mm for z in planes
         ):
-            raise RuntimeError(f"{name}: native end planes {planes} mm != {wanted} mm")
-        _telemetry.success(f"{name}: native end planes {sorted(planes)} mm")
+            raise RuntimeError(
+                f"{name}: native end planes {planes} mm do not establish {(inner, outer)} mm"
+            )
+        _telemetry.success(
+            f"{name}: native depth {depth_mm} mm; end planes {sorted(planes)} mm; "
+            f"outer boundary {outer} mm"
+        )
 
 
 async def _edge_rib(
@@ -1808,7 +1821,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven summing lever (equations neutral)", v_built, 1e-3 * v_built
     )
     _assert_knife_sides_coplanar(adapter)
-    _assert_edge_rib_end_planes(adapter)
 
     # pivot axis (Axis1) = cylinder centreline along Z -- the static mate
     # reference to the knife-mount (keeps the lever at the knife line with no
@@ -1852,6 +1864,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
+    _assert_edge_rib_end_planes(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

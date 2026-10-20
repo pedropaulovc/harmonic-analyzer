@@ -2229,6 +2229,8 @@ async def build(adapter: Any) -> dict[str, str]:
             continue
         # Ordinary bounded .XX depth: symmetric, not an unbounded MIN.
         lower, upper = DRILL_DEPTH_DEVIATIONS
+        if not math.isclose(lower, -upper):
+            raise RuntimeError("bracket tap drill depth must retain its ordinary symmetric band")
         variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
         variable.ToleranceMin = lower / 1000.0
         variable.ToleranceMax = upper / 1000.0
