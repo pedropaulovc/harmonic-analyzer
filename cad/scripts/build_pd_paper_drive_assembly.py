@@ -129,6 +129,7 @@ from _assembly import (
     remap_front_to_machine_front,
     reset_dof_manifest,
     save_assembly_and_images,
+    set_component_reference,
     world_point,
     write_dof_manifest,
 )
@@ -2119,13 +2120,20 @@ def _chain_reference_names(model) -> dict[str, str]:
     return names
 
 
-def _assign_chain_references(model) -> dict[str, str]:
-    """Overwrite inherited pattern references only after every member exists."""
+def _assign_chain_references(adapter) -> dict[str, str]:
+    """Assign checked pattern references only after every member exists."""
+    model = adapter.currentModel
     for station, component in _chain_station_components(model).items():
         if station != LINK_COUNT - 1:
             role = INNER_LINK_CONFIGURATION if station % 2 == 0 else OUTER_LINK_CONFIGURATION
-            component.ComponentReference = f"{role}:{station // 2 + 1}"
-    model.ForceRebuild3(False)
+            set_component_reference(
+                adapter,
+                str(component.Name2),
+                f"{role}:{station // 2 + 1}",
+                rebuild=False,
+            )
+    if not bool(model.ForceRebuild3(False)):
+        raise RuntimeError("chain component reference rebuild failed")
     return _chain_reference_names(model)
 
 
@@ -2323,7 +2331,7 @@ async def _insert_roller_chain(adapter) -> None:
 
     # Pattern copies may inherit a seed's ComponentReference. Assign all
     # role-local ordinals from validated loop poses after the final copy exists.
-    _assign_chain_references(adapter.currentModel)
+    _assign_chain_references(adapter)
     links = [str(component.Name2) for component in _chain_station_components(adapter.currentModel).values()]
     worst = 0.0
     for name in links:

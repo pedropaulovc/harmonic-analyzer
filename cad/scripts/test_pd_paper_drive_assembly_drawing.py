@@ -2058,6 +2058,8 @@ def _native_pd_component(name, stem, configuration, *, origin=None):
 
 def _native_chain_fixture(monkeypatch):
     monkeypatch.setattr(assembly, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(_assembly, "_POSE_LEDGER", {})
     monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
     components = []
     for station in range(chain.LINK_COUNT):
@@ -2080,12 +2082,17 @@ def _native_chain_fixture(monkeypatch):
         components.append(component)
     model = MagicMock()
     model.GetComponents.side_effect = lambda _top_only: tuple(reversed(components))
-    return model, components
+    model.GetComponentByName.side_effect = lambda name: next(
+        (component for component in components if component.Name2 == name), None
+    )
+    model.ForceRebuild3.return_value = True
+    return SimpleNamespace(currentModel=model), components
 
 
 def test_chain_roles_follow_validated_loop_stations_not_native_indices(monkeypatch):
-    model, components = _native_chain_fixture(monkeypatch)
-    names = assembly._assign_chain_references(model)
+    adapter, components = _native_chain_fixture(monkeypatch)
+    model = adapter.currentModel
+    names = assembly._assign_chain_references(adapter)
     assert len(names) == 67
     assert names["@InnerLink:1"] == components[0].Name2
     assert names["@InnerLink:34"] == components[66].Name2
@@ -2100,7 +2107,7 @@ def test_chain_roles_follow_validated_loop_stations_not_native_indices(monkeypat
 
 @pytest.mark.parametrize("fault", ("wrong-member", "duplicate-station", "off-plane", "missing"))
 def test_chain_station_census_rejects_wrong_or_duplicate_members(monkeypatch, fault):
-    model, components = _native_chain_fixture(monkeypatch)
+    adapter, components = _native_chain_fixture(monkeypatch)
     if fault == "wrong-member":
         components[3].ReferencedConfiguration = assembly.INNER_LINK_CONFIGURATION
     elif fault == "duplicate-station":
@@ -2110,11 +2117,12 @@ def test_chain_station_census_rejects_wrong_or_duplicate_members(monkeypatch, fa
     else:
         components.pop(3)
     with pytest.raises(RuntimeError):
-        assembly._assign_chain_references(model)
+        assembly._assign_chain_references(adapter)
 
 
 def test_chain_roles_are_read_back_after_pattern_rebuild(monkeypatch):
-    model, components = _native_chain_fixture(monkeypatch)
+    adapter, components = _native_chain_fixture(monkeypatch)
+    model = adapter.currentModel
 
     def overwrite_inherited_references(_top_only):
         for component in components[0:-1:2]:
@@ -2123,7 +2131,45 @@ def test_chain_roles_are_read_back_after_pattern_rebuild(monkeypatch):
 
     model.ForceRebuild3.side_effect = overwrite_inherited_references
     with pytest.raises(RuntimeError, match="duplicated"):
-        assembly._assign_chain_references(model)
+        assembly._assign_chain_references(adapter)
+
+
+def test_chain_reference_assignment_refuses_failed_native_rebuild(monkeypatch):
+    adapter, components = _native_chain_fixture(monkeypatch)
+    model = adapter.currentModel
+    names_before = [component.Name2 for component in components]
+    configurations_before = [
+        component.ReferencedConfiguration for component in components
+    ]
+    transforms_before = [
+        list(component.Transform2.ArrayData) for component in components
+    ]
+    connecting_reference = components[-1].ComponentReference
+    model.ForceRebuild3.return_value = False
+
+    with pytest.raises(RuntimeError, match="chain component reference rebuild failed"):
+        assembly._assign_chain_references(adapter)
+
+    model.ForceRebuild3.assert_called_once_with(False)
+    # No post-rebuild association census can certify a failed native solve.
+    assert model.GetComponents.call_count == 1
+    roles = (assembly.INNER_LINK_CONFIGURATION, assembly.OUTER_LINK_CONFIGURATION)
+    expected_references = [
+        f"{roles[station % 2]}:{station // 2 + 1}"
+        for station in range(chain.LINK_COUNT - 1)
+    ]
+    assert [component.ComponentReference for component in components[:-1]] == (
+        expected_references
+    )
+    assert len(set(expected_references)) == 67
+    assert components[-1].ComponentReference == connecting_reference
+    assert [component.Name2 for component in components] == names_before
+    assert [
+        component.ReferencedConfiguration for component in components
+    ] == configurations_before
+    assert [
+        list(component.Transform2.ArrayData) for component in components
+    ] == transforms_before
 
 
 

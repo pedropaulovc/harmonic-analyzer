@@ -1240,57 +1240,100 @@ def _set_component_reference(
         raise RuntimeError(
             f"reference {reference!r} requires {expected!r}, not {actual!r}"
         )
-    component.ComponentReference = reference
-    if str(component.ComponentReference or "") != reference:
-        raise RuntimeError(f"component reference {reference!r} did not persist")
     name = str(component.Name2)
-    if not occurrence_basename:
-        return name
-    role = reference.split(":", 1)[0]
-    expected_basename = (
-        f"{actual[0]}__{role}"
-        if actual[1] == "Default"
-        else f"{actual[0]}--{actual[1]}"
-    )
-    if occurrence_basename != expected_basename:
-        raise ValueError(
-            f"{reference}: occurrence basename must be {expected_basename!r}"
+    expected_name = name
+    if occurrence_basename:
+        role = reference.split(":", 1)[0]
+        expected_basename = (
+            f"{actual[0]}__{role}"
+            if actual[1] == "Default"
+            else f"{actual[0]}--{actual[1]}"
         )
-    parent, separator, leaf = name.replace("\\", "/").rpartition("/")
-    index = leaf.rsplit("-", 1)[-1]
-    if not index.isdigit():
-        raise RuntimeError(f"component name has no native instance index: {name!r}")
-    expected_name = f"{occurrence_basename}-{index}"
-    if separator:
-        expected_name = f"{parent}/{expected_name}"
-    if name == expected_name:
-        return name
-    # Generated interface wrappers do not populate makepy's swconst globals.
-    preference = sw_type_info.constant("swExtRefUpdateCompNames")
-    previous = bool(adapter.swApp.GetUserPreferenceToggle(preference))
-    try:
-        # ISldWorks.SetUserPreferenceToggle is void; verify the getter instead.
-        adapter.swApp.SetUserPreferenceToggle(preference, False)
-        if bool(adapter.swApp.GetUserPreferenceToggle(preference)):
-            raise RuntimeError("component-name replacement updates remain enabled")
-        if not component.Select2(False, 0):
-            raise RuntimeError(f"could not select component {name!r} for its role name")
-        component.Name2 = occurrence_basename
-        renamed = str(component.Name2)
-        if renamed != expected_name:
-            raise RuntimeError(
-                f"role basename readback {renamed!r} != {expected_name!r}"
+        if occurrence_basename != expected_basename:
+            raise ValueError(
+                f"{reference}: occurrence basename must be {expected_basename!r}"
             )
-        return renamed
-    finally:
+        parent, separator, leaf = name.replace("\\", "/").rpartition("/")
+        index = leaf.rsplit("-", 1)[-1]
+        if not index.isdigit():
+            raise RuntimeError(f"component name has no native instance index: {name!r}")
+        expected_name = f"{occurrence_basename}-{index}"
+        if separator:
+            expected_name = f"{parent}/{expected_name}"
+    with _telemetry.span(
+        "assembly.component_reference.read", component=name, reference=reference
+    ):
+        current_reference = str(component.ComponentReference or "")
+    _telemetry.event(
+        "assembly.component_reference.observed",
+        component=name,
+        reference=current_reference,
+        requested_reference=reference,
+        expected_name=expected_name,
+    )
+    if name != expected_name:
+        if current_reference:
+            raise RuntimeError(
+                f"cannot rename component {name!r} with existing reference "
+                f"{current_reference!r}"
+            )
+        # Use the documented unindexed setter; prove the native index survives.
+        preference = sw_type_info.constant("swExtRefUpdateCompNames")
+        previous = bool(adapter.swApp.GetUserPreferenceToggle(preference))
         try:
-            adapter.currentModel.ClearSelection2(True)
+            # ISldWorks.SetUserPreferenceToggle is void; verify the getter instead.
+            adapter.swApp.SetUserPreferenceToggle(preference, False)
+            if bool(adapter.swApp.GetUserPreferenceToggle(preference)):
+                raise RuntimeError("component-name replacement updates remain enabled")
+            if not component.Select2(False, 0):
+                raise RuntimeError(f"could not select component {name!r} for its role name")
+            with _telemetry.span(
+                "assembly.component_name.write",
+                component=name,
+                basename=occurrence_basename,
+                expected_name=expected_name,
+            ):
+                component.Name2 = occurrence_basename
+            with _telemetry.span("assembly.component_name.readback", component=name):
+                renamed = str(component.Name2)
+                if renamed != expected_name:
+                    raise RuntimeError(
+                        f"role basename readback {renamed!r} != {expected_name!r}"
+                    )
+            name = renamed
         finally:
-            adapter.swApp.SetUserPreferenceToggle(preference, previous)
-            if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
-                raise RuntimeError(
-                    "component-name replacement preference did not restore"
-                )
+            try:
+                adapter.currentModel.ClearSelection2(True)
+            finally:
+                adapter.swApp.SetUserPreferenceToggle(preference, previous)
+                if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
+                    raise RuntimeError(
+                        "component-name replacement preference did not restore"
+                    )
+    # A native rename must finish before its new semantic reference is written.
+    if current_reference != reference:
+        with _telemetry.span(
+            "assembly.component_reference.write",
+            component=name,
+            reference=reference,
+            previous_reference=current_reference,
+        ):
+            component.ComponentReference = reference
+    with _telemetry.span(
+        "assembly.component_reference.readback", component=name, reference=reference
+    ):
+        if str(component.ComponentReference or "") != reference:
+            raise RuntimeError(f"component reference {reference!r} did not persist")
+    with _telemetry.span(
+        "assembly.component_name.readback", component=name, phase="after_reference"
+    ):
+        actual_name = str(component.Name2)
+        if actual_name != name:
+            raise RuntimeError(
+                f"component reference {reference!r} changed native name "
+                f"{name!r} to {actual_name!r}"
+            )
+    return name
 
 
 @_telemetry.traced("assembly.set_component_reference", label_param="reference")
