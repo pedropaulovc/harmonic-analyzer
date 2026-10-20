@@ -94,13 +94,13 @@ RING_HOLE_CENTER = (
 # A point on the conical face, clear of the cross-hole, for the axis.
 AXIS_FACE_PICK = (FRONT_CENTER[0] + 0.020, FRONT_CENTER[1] + 0.002)
 
-# Above the pin: the hole's station from the big-end face, clear of the
-# finish symbol to its right. Below and right of the hole: its Ø callout,
-# whose leader reaches the hole from the bare side, then the overall length
-# below that callout's lines.
+# The 3.70 station's 9.05-mm-wide text cannot fit between its extension
+# lines, only 7.4 mm apart at 2:1. Put the text outboard right, clear of
+# the outside arrow's 6.35-mm tail and left of the taper-note leader.
+# Below the hole: its Ø callout, then the overall length.
 FRONT_KEEP = {
     "RingHoleX": (
-        (BIG_END_EDGE[0] + RING_HOLE_CENTER[0]) / 2.0,
+        RING_HOLE_CENTER[0] + 0.014,
         FRONT_CENTER[1] + 0.016,
     ),
     "RingHoleDia": (RING_HOLE_CENTER[0] + 0.020, FRONT_CENTER[1] - 0.016),
