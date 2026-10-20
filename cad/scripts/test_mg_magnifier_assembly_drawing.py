@@ -1,7 +1,9 @@
 """Offline contract for the magnifier assembly drawing and its stack settings."""
 
 import asyncio
+import json
 import math
+from dataclasses import replace
 from fractions import Fraction
 from types import SimpleNamespace
 
@@ -1005,244 +1007,560 @@ def test_rod_balloon_anchors_sit_on_a_drawn_circle_facing_the_isometric(
         assert (y, z) == pytest.approx((-radius, 0.0))
 
 
-class _ExplodeSource:
-    """Saved explode steps are unreadable until their active owner is shown."""
+def _metadata_instances():
+    return [
+        explode.Instance(f"{stem}-{number}", stem)
+        for stem in notes.BOM_ORDER
+        for number in range(1, notes.QUANTITIES[stem] + 1)
+    ]
 
-    def __init__(self, instance: str, *, missing_steps: bool = False) -> None:
+
+def _metadata_offsets():
+    """Aggregate the actual component plan, retaining stationary instances."""
+    instances = _metadata_instances()
+    offsets = {item.name.casefold(): [0.0, 0.0, 0.0] for item in instances}
+    for step, names in explode.plan_explode(instances):
+        for name in names:
+            offsets[name.casefold()]["xyz".index(step.axis)] += step.distance_mm / 1000.0
+    return {name: tuple(vector) for name, vector in offsets.items()}
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_builder_owned_offsets_roundtrip_actual_component_plan(configuration) -> None:
+    offsets = _metadata_offsets()
+    instances = [
+        explode.Instance(item.name.upper(), item.stem) for item in _metadata_instances()
+    ]
+    encoded = explode.encode_explode_offsets(configuration, offsets, instances)
+    payload = json.loads(encoded)
+    assert set(payload) == {
+        "configuration", "view", "steps", "contract_sha256", "offsets_m"
+    }
+    assert payload["contract_sha256"] == explode.explode_contract_fingerprint(instances)
+    assert len(payload["contract_sha256"]) == 64
+    assert all(character in "0123456789abcdef" for character in payload["contract_sha256"])
+    decoded = explode.decode_explode_offsets(encoded, configuration, instances)
+    assert decoded == offsets
+    assert any(vector == (0.0, 0.0, 0.0) for vector in decoded.values())
+    # The format preserves native aggregate world translations, not a single
+    # nominal axis/step. Multiple native steps may move the same component.
+    name = next(iter(offsets))
+    cumulative = dict(offsets)
+    cumulative[name] = (0.030 + 0.012, -0.025, 0.007)
+    assert explode.decode_explode_offsets(
+        explode.encode_explode_offsets(configuration, cumulative, instances),
+        configuration,
+        instances,
+    )[name] == pytest.approx((0.042, -0.025, 0.007))
+    assert explode.explode_offsets_property(configuration) != (
+        explode.explode_offsets_property(
+            "Default Simplified" if configuration == "Default" else "Default"
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "missing configuration", "wrong configuration", "missing view", "wrong view",
+        "missing steps", "wrong steps", "missing contract_sha256", "wrong contract_sha256",
+        "missing offsets", "missing instance",
+        "extra instance", "short vector", "long vector", "nonnumeric", "boolean",
+        "nan", "infinity", "malformed", "empty",
+    ],
+)
+def test_mg_builder_owned_offsets_refuse_invalid_metadata(damage) -> None:
+    configuration = "Default Simplified"
+    payload = json.loads(
+        explode.encode_explode_offsets(
+            configuration, _metadata_offsets(), _metadata_instances()
+        )
+    )
+    name = next(iter(payload["offsets_m"]))
+    field = damage.removeprefix("missing ")
+    if field in {"configuration", "view", "steps", "contract_sha256", "offsets"}:
+        payload.pop("offsets_m" if field == "offsets" else field)
+    elif damage == "wrong configuration":
+        payload["configuration"] = "Default"
+    elif damage == "wrong view":
+        payload["view"] = "unowned view"
+    elif damage == "wrong steps":
+        payload["steps"] = len(explode.EXPLODE_STEPS) + 1
+    elif damage == "wrong contract_sha256":
+        payload["contract_sha256"] = "0" * 64
+    elif damage == "missing instance":
+        payload["offsets_m"].pop(name)
+    elif damage == "extra instance":
+        payload["offsets_m"]["unexpected-1"] = [0.0, 0.0, 0.0]
+    elif damage in {"short vector", "long vector"}:
+        payload["offsets_m"][name] = [0.0] * (2 if damage == "short vector" else 4)
+    elif damage in {"nonnumeric", "boolean", "nan", "infinity"}:
+        value = {
+            "nonnumeric": "0.1", "boolean": True,
+            "nan": float("nan"), "infinity": float("inf"),
+        }[damage]
+        payload["offsets_m"][name] = [value, 0.0, 0.0]
+    text = json.dumps(payload)
+    if damage == "malformed":
+        text = "{"
+    elif damage == "empty":
+        text = ""
+    with pytest.raises(ValueError) as caught:
+        explode.decode_explode_offsets(
+            text, configuration, _metadata_instances()
+        )
+    assert "builder-owned explode offsets" in str(caught.value)
+    assert "rebuild assembly:mg_magnifier" in str(caught.value)
+
+
+@pytest.mark.parametrize("mutation", ["distance", "axis", "raw members", "resolved members"])
+def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, mutation):
+    configuration = "Default Simplified"
+    instances = _metadata_instances()
+    offsets = _metadata_offsets()
+    encoded = explode.encode_explode_offsets(configuration, offsets, instances)
+    old_plan = explode.plan_explode(instances)
+    changed_steps = list(explode.EXPLODE_STEPS)
+    if mutation == "distance":
+        # A changed spec-derived distance must invalidate the readback even
+        # when the native step count and every component identity still match.
+        changed_steps[0] = replace(
+            changed_steps[0], distance_mm=changed_steps[0].distance_mm - 1.0
+        )
+    elif mutation == "axis":
+        changed_steps[0] = replace(changed_steps[0], axis="x")
+    elif mutation == "raw members":
+        # :02 resolves to exactly the same nut as :2, isolating raw recipe
+        # membership from the separately fingerprinted resolved names.
+        changed_steps[0] = replace(
+            changed_steps[0], members=("mg-vn-wheel-axle-nut:02",)
+        )
+    else:
+        swapped = {
+            "mg-magnifying-wheel": "mg-wheel-drum",
+            "mg-wheel-drum": "mg-magnifying-wheel",
+        }
+        instances = [
+            replace(item, stem=swapped.get(item.stem, item.stem)) for item in instances
+        ]
+    monkeypatch.setattr(explode, "EXPLODE_STEPS", tuple(changed_steps))
+    current_plan = explode.plan_explode(instances)
+    assert len(current_plan) == len(old_plan) == json.loads(encoded)["steps"]
+    assert {item.name.casefold() for item in instances} == set(offsets)
+    if mutation == "raw members":
+        assert [names for _step, names in current_plan] == [
+            names for _step, names in old_plan
+        ]
+    elif mutation == "resolved members":
+        assert [step for step, _names in current_plan] == [
+            step for step, _names in old_plan
+        ]
+        assert [names for _step, names in current_plan] != [
+            names for _step, names in old_plan
+        ]
+    with pytest.raises(ValueError, match="explode contract differs"):
+        explode.decode_explode_offsets(encoded, configuration, instances)
+
+
+def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
+    """Native readbacks are fixed independently of the recipe being authored."""
+    import _mg_magnifier_explode as author
+    from solidworks_mcp.adapters import com_variant
+
+    monkeypatch.setattr(
+        explode,
+        "EXPLODE_STEPS",
+        (
+            explode.ExplodeStep("group out", ("slider",), "x", 30.0),
+            explode.ExplodeStep("first farther", ("slider:1",), "x", 12.0),
+            explode.ExplodeStep("first down", ("slider:1",), "y", -25.0),
+            explode.ExplodeStep("first back", ("slider:1",), "z", 7.0),
+        ),
+    )
+    monkeypatch.setattr(explode, "SHOWN_STEMS", frozenset({"slider", "stationary"}))
+    # Absolute native positions, not recipe vectors or encoder output. All
+    # three baseline translations are nonzero. The small final residuals are
+    # deliberately inside the author's existing 1e-7 m verification tolerance.
+    native_positions = {
+        "slider-1": (
+            (0.500, -0.250, 0.125),
+            (0.53000002, -0.250, 0.125),
+            (0.54200003, -0.250, 0.125),
+            (0.54200003, -0.27500002, 0.125),
+            (0.54200003, -0.27500002, 0.13200004),
+        ),
+        "slider-2": (
+            (-0.200, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+            (-0.16999999, 0.350, -0.400),
+        ),
+        "stationary-1": ((0.100, 0.200, 0.300),) * 5,
+    }
+    requests = (
+        (0.030, ("slider-1", "slider-2"), "X", False),
+        (0.012, ("slider-1",), "X", False),
+        (0.025, ("slider-1",), "Y", True),
+        (0.007, ("slider-1",), "Z", False),
+    )
+    state = SimpleNamespace(
+        stage=0, exploded=False, selected=[], axis=None, views=(),
+        steps=[SimpleNamespace(Name="automatic seed")], show_calls=[], published=[],
+    )
+
+    def transform(name, stage):
+        values = [
+            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+            *native_positions[name][stage], 1.0, 0.0, 0.0, 0.0,
+        ]
+        if stage == 4:
+            if mismatch == "translation" and name == "slider-1":
+                values[9] += 0.001
+            elif mismatch == "stationary follower" and name == "stationary-1":
+                values[10] += 0.001
+            elif mismatch == "rotation" and name == "slider-1":
+                values[0] = 0.0
+        return SimpleNamespace(ArrayData=tuple(values))
+
+    def select_component(name, append, data, show_popup):
+        assert append is True and data.Mark == 1 and show_popup is False
+        state.selected.append(name)
+        return True
+
+    components = {
+        name: SimpleNamespace(
+            Name2=name,
+            GetPathName=lambda name=name: f"C:/parts/{name.rsplit('-', 1)[0]}.SLDPRT",
+            GetTotalTransform=lambda presentation, name=name: transform(
+                name, state.stage if presentation and state.exploded else 0
+            ),
+            Transform2=transform(name, 0),
+            Select4=lambda append, data, popup, name=name: select_component(
+                name, append, data, popup
+            ),
+        )
+        for name in native_positions
+    }
+
+    def clear_selection(all_selections):
+        assert all_selections is True
+        state.selected.clear()
+        state.axis = None
+
+    def select_axis(name, kind, x, y, z, append, mark, callout, options):
+        assert (kind, x, y, z, append, mark, callout, options) == (
+            "AXIS", 0.0, 0.0, 0.0, True, 2, None, 0
+        )
+        state.axis = name
+        return True
+
+    def add_step(distance, manipulator, reverse, angle, rotation_axis, *options):
+        expected_distance, names, axis, expected_reverse = requests[state.stage]
+        assert (distance, tuple(state.selected), state.axis, reverse) == (
+            expected_distance, names, axis, expected_reverse
+        )
+        assert (manipulator, angle, rotation_axis, options) == (
+            -1, 0.0, -1, (False, True, False)
+        )
+        state.stage += 1
+        if state.stage == 4 and mismatch == "native members":
+            names = ("stationary-1",)
+        native = SimpleNamespace(
+            Name="unnamed",
+            ExplodeDistance=distance + (
+                0.001 if state.stage == 4 and mismatch == "native distance" else 0.0
+            ),
+            GetComponents=lambda: tuple(components[name] for name in names),
+        )
+        state.steps.append(native)
+        return native, 0
+
+    def delete_seed(name):
+        assert name == "automatic seed" and state.stage == 0
+        state.steps.clear()
+        return True
+
+    def show_exploded(show, view_name):
+        assert state.views == (view_name,)
+        state.exploded = show
+        state.show_calls.append(show)
+        return True
+
+    configuration = SimpleNamespace(
+        Name=configuration_name,
+        GetNumberOfExplodeSteps=lambda: len(state.steps),
+        GetExplodeStep=lambda index: state.steps[index],
+        DeleteExplodeStep=delete_seed,
+        AddExplodeStep2=add_step,
+    )
+    model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(ActiveConfiguration=configuration),
+        GetExplodedViewCount2=lambda owner: len(state.views),
+        GetComponents=lambda top_level: tuple(components.values()),
+        GetExplodedViewNames2=lambda owner: state.views,
+        GetExplodedViewConfigurationName=lambda view: configuration_name,
+        ShowExploded2=show_exploded,
+        ClearSelection2=clear_selection,
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(Mark=0)
+        ),
+        Extension=SimpleNamespace(SelectByID2=select_axis),
+        EditRebuild3=lambda: True,
+    )
+    adapter = SimpleNamespace(currentModel=model)
+
+    def create_named_view(actual_model, actual_assembly, owner, view_name):
+        assert actual_model is model and actual_assembly is model
+        assert owner == configuration_name
+        state.views = (view_name,)
+
+    def publish(actual_adapter, properties, *, model):
+        assert actual_adapter is adapter and model is adapter.currentModel
+        assert not state.exploded and state.show_calls == [True, False]
+        assert state.stage == len(state.steps) == 4
+        state.published.append(properties)
+
+    monkeypatch.setattr(author, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(com_variant, "null_callout", lambda: None)
+    monkeypatch.setattr(
+        author, "_global_directions",
+        lambda _adapter, _assembly: {
+            "x": author._Direction("X", True, (1.0, 0.0, 0.0)),
+            "y": author._Direction("Y", True, (0.0, 1.0, 0.0)),
+            "z": author._Direction("Z", True, (0.0, 0.0, 1.0)),
+        },
+    )
+    monkeypatch.setattr(author, "_create_named_view", create_named_view)
+    monkeypatch.setattr(author, "apply_custom_properties", publish)
+    return author, adapter, state
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_actual_mg_author_publishes_final_measured_offsets(monkeypatch, configuration):
+    author, adapter, state = _native_mg_author(monkeypatch, configuration)
+    author.create_mg_magnifier_explode(adapter, configuration)
+    assert len(state.published) == 1
+    properties = state.published[0]
+    assert set(properties) == {explode.explode_offsets_property(configuration)}
+    payload = json.loads(properties[explode.explode_offsets_property(configuration)])
+    assert payload["configuration"] == configuration
+    assert payload["view"] == explode.exploded_view_name(configuration)
+    assert payload["steps"] == 4
+    # Tight absolute tolerance distinguishes native residuals from nominal
+    # recipe sums, earlier steps, absolute positions, and post-collapse zeros.
+    expected = {
+        "slider-1": (0.04200003, -0.02500002, 0.00700004),
+        "slider-2": (0.03000001, 0.0, 0.0),
+        "stationary-1": (0.0, 0.0, 0.0),
+    }
+    assert set(payload["offsets_m"]) == set(expected)
+    for name, vector in expected.items():
+        assert payload["offsets_m"][name] == pytest.approx(vector, abs=1e-14, rel=0)
+    instances = [
+        explode.Instance(name, name.rsplit("-", 1)[0]) for name in expected
+    ]
+    decoded = explode.decode_explode_offsets(
+        properties[explode.explode_offsets_property(configuration)],
+        configuration,
+        instances,
+    )
+    assert decoded["stationary-1"] == (0.0, 0.0, 0.0)
+    assert [step.Name for step in state.steps] == [
+        f"MG {label}" + (" Simplified" if configuration != "Default" else "")
+        for label in ("GROUP OUT", "FIRST FARTHER", "FIRST DOWN", "FIRST BACK")
+    ]
+    assert state.show_calls == [True, False] and not state.exploded
+
+
+@pytest.mark.parametrize(
+    ("mismatch", "message"),
+    [
+        ("translation", "slider-1 moved"),
+        ("stationary follower", "stationary-1 moved"),
+        ("rotation", "presentation rotated or scaled"),
+        ("native distance", "step component/distance readback mismatch"),
+        ("native members", "step component/distance readback mismatch"),
+    ],
+)
+def test_actual_mg_author_never_publishes_failed_readback(monkeypatch, mismatch, message):
+    configuration = "Default Simplified"
+    author, adapter, state = _native_mg_author(monkeypatch, configuration, mismatch)
+    with pytest.raises(RuntimeError, match=message):
+        author.create_mg_magnifier_explode(adapter, configuration)
+    assert state.stage == 4
+    assert state.show_calls == [True, False] and not state.exploded
+    assert state.published == []
+
+
+class _ExplodeSource:
+    """Read-only API contract fake; not evidence of native/byte cleanliness."""
+
+    def __init__(self) -> None:
         self.active = drawing.ASSEMBLY_VIEW_CONFIGURATION
-        self.owner = drawing.SIMPLIFIED_VIEW_CONFIGURATION
-        self.readable = False
         self.exploded = False
         self.dirty = False
-        self.dirty_on_show: set[str] = set()
-        self.configuration_switches: list[str] = []
-        self.refuse: set[str] = set()
-        self.ignore: set[str] = set()
-        self.view_changes_on_show: dict[str, dict[str, object]] = {}
-        self.view = SimpleNamespace(
-            ReferencedConfiguration=self.owner,
-            ReferencedDocument=self,
-            exploded=True,
-            IsExploded=lambda: self.view.exploded,
-        )
+        self.configuration_switches = []
         self.ConfigurationManager = SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name=self.active)
         )
-        self.steps = [] if missing_steps else [
-            SimpleNamespace(
-                Name=f"step {index}",
-                GetComponentXform=lambda move=move: (
-                    1, 0, 0, 0, 1, 0, 0, 0, 1, *move, 1, 0, 0, 0
-                ),
-                GetNumOfComponents=lambda: 1,
-                GetComponent=lambda _member: SimpleNamespace(Name2=instance),
+        self.properties = {
+            explode.explode_offsets_property(owner): explode.encode_explode_offsets(
+                owner, _metadata_offsets(), _metadata_instances()
             )
-            for index, move in enumerate(((0.030, 0.0, 0.0), (0.0, 0.025, 0.0)))
-        ]
-        self.configuration = SimpleNamespace(
-            Name=self.owner,
-            GetNumberOfExplodeSteps=lambda: (
-                len(self.steps) if self.active == self.owner and self.readable else 0
-            ),
-            GetExplodeStep=lambda index: self.steps[index],
+            for owner in drawing.EXPLODED_VIEW_NAMES
+        }
+        transform = SimpleNamespace(
+            ArrayData=(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
         )
+        self.components = [
+            SimpleNamespace(
+                Name2=item.name,
+                GetPathName=lambda stem=item.stem: f"C:/parts/{stem}.SLDPRT",
+                GetTotalTransform=lambda _presentation: transform,
+            )
+            for item in _metadata_instances()
+        ]
+        self.Extension = SimpleNamespace(CustomPropertyManager=self._forbidden)
 
-    def ShowConfiguration2(self, name: str) -> bool:
-        self.configuration_switches.append(name)
-        if name in self.refuse:
-            return False
-        if name not in self.ignore:
-            self.active = name
-            self.ConfigurationManager.ActiveConfiguration.Name = name
-            self.dirty |= name in self.dirty_on_show
-            for attribute, value in self.view_changes_on_show.get(name, {}).items():
-                setattr(self.view, attribute, value)
-        return True
+    def _forbidden(self, *_args, **_kwargs):
+        pytest.fail("drawing must not mutate or reset its released source")
 
-    def GetSaveFlag(self) -> bool:
+    ShowConfiguration2 = _forbidden
+    ShowExploded2 = _forbidden
+    SetSaveFlag = _forbidden
+    ResetSaveFlag = _forbidden
+    Save3 = _forbidden
+    SaveAs3 = _forbidden
+    AddCustomInfo3 = _forbidden
+    SetCustomInfo2 = _forbidden
+    DeleteCustomInfo2 = _forbidden
+
+    def GetSaveFlag(self):
         return self.dirty
 
-    def GetConfigurationByName(self, name: str):
-        return self.configuration if name == self.owner else None
+    def GetComponents(self, top_level):
+        assert top_level is True
+        return self.components
 
-    def GetExplodedViewNames2(self, name: str):
-        return (explode.exploded_view_name(name),)
+    def GetExplodedViewNames2(self, configuration):
+        return (explode.exploded_view_name(configuration),)
 
-    def ShowExploded2(self, show: bool, name: str) -> bool:
-        if self.active != self.owner or name != explode.exploded_view_name(self.owner):
-            return False
-        self.exploded = show
-        self.readable |= show
-        return True
-
-    def drawing_view(self):
-        return self.view
+    def GetCustomInfoValue(self, configuration, name):
+        assert configuration == ""
+        return self.properties.get(name, "")
 
 
-@pytest.mark.parametrize(
-    ("label", "instance"),
-    [
-        (drawing.WHEEL_LABEL, "mg-wheel-axle-1"),
-        (drawing.LEVER_LABEL, "mg-magnifying-lever-1"),
-    ],
-)
-def test_mg_explode_offsets_read_real_steps_and_restore_the_source(
-    monkeypatch, label, instance
-) -> None:
-    import _drawing_balloons as balloons
-
+def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(balloons, "_early_bound", lambda value, _interface: value)
-    adapter = SimpleNamespace(_attempt=lambda action, **_kwargs: action())
-    source = _ExplodeSource(instance)
-    view = source.drawing_view()
-    # The native failure: the view references Simplified but its source is
-    # Default, so the unchanged real balloon reader must refuse zero steps.
-    with pytest.raises(RuntimeError, match="not the model's active configuration"):
-        balloons._view_explode_offsets(adapter, view, label=label)
-    with drawing._source_configuration_active(view, label=label):
-        offsets = balloons._view_explode_offsets(adapter, view, label=label)
-        assert offsets == {instance: pytest.approx((0.030, 0.025, 0.0))}
-        assert not source.exploded
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-
-
-def test_mg_missing_explode_steps_still_fail_and_restore_the_source(monkeypatch) -> None:
-    import _drawing_balloons as balloons
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(balloons, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1", missing_steps=True)
-    with pytest.raises(RuntimeError, match="reads no explode steps"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            balloons._view_explode_offsets(None, source.drawing_view(), label="t")
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    source = _ExplodeSource()
+    offsets = drawing._validate_source(source)
+    assert offsets == {
+        configuration: _metadata_offsets()
+        for configuration in drawing.EXPLODED_VIEW_NAMES
+    }
+    assert source.active == "Default"
     assert not source.exploded
+    assert not source.dirty
 
 
-@pytest.mark.parametrize("failure", ["refuse", "ignore"])
-def test_mg_source_configuration_activation_is_read_back(monkeypatch, failure) -> None:
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    getattr(source, failure).add(source.owner)
-    with pytest.raises(RuntimeError, match="did not activate"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            pytest.fail("an unreadable explode reached the balloon walk")
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
+    source = _ExplodeSource()
+    source.properties.pop(explode.explode_offsets_property(configuration))
+    with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
+        drawing._validate_source(source)
 
-
-@pytest.mark.parametrize("failure", ["refuse", "ignore"])
-def test_mg_source_configuration_restoration_is_read_back(monkeypatch, failure) -> None:
+@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
+def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    getattr(source, failure).add(source.active)
-    with pytest.raises(RuntimeError, match="did not re-activate"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            pass
-
-
-@pytest.mark.parametrize("during", ["activation", "restoration"])
-@pytest.mark.parametrize(
-    ("attribute", "value"),
-    [("exploded", False), ("ReferencedConfiguration", "unexpected")],
-)
-def test_mg_source_configuration_refuses_changed_view(
-    monkeypatch, during, attribute, value
-) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    target = source.owner if during == "activation" else source.active
-    source.view_changes_on_show[target] = {attribute: value}
-    entered = False
-    message = "activating" if during == "activation" else "restoring"
-    with pytest.raises(RuntimeError, match=f"{message} .* changed the view"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            entered = True
-    assert entered == (during == "restoration")
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-    assert getattr(source.view, attribute) == value
-
-
-def test_mg_source_configuration_restores_after_balloon_failure(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    with pytest.raises(RuntimeError, match="balloon attachment failed"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            raise RuntimeError("balloon attachment failed")
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-
-
-def test_mg_collapsed_view_does_not_switch_the_source_configuration(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    view = source.drawing_view()
-    view.exploded = False
-    with drawing._source_configuration_active(view, label="finished"):
-        pass
-    assert source.configuration_switches == []
-
-
-@pytest.mark.parametrize("dirty_during", ["activation", "restoration"])
-def test_mg_source_configuration_refuses_newly_dirty_source(
-    monkeypatch, dirty_during
-) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    source.dirty_on_show.add(
-        source.owner if dirty_during == "activation" else source.active
-    )
-    with pytest.raises(RuntimeError, match="scoped balloon/config readback dirtied"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            pass
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-    assert source.dirty  # Refuse, never save the released assembly or clear its flag.
-
-
-def test_mg_same_configuration_readback_refuses_newly_dirty_source(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    source.active = source.owner
-    source.ConfigurationManager.ActiveConfiguration.Name = source.owner
-    with pytest.raises(RuntimeError, match="scoped balloon/config readback dirtied"):
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            source.dirty = True
-    assert source.configuration_switches == []
-    assert source.dirty
-
-
-def test_mg_source_configuration_preserves_existing_dirty_state(monkeypatch) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    source.dirty = True
-    with drawing._source_configuration_active(source.drawing_view(), label="t"):
-        pass
-    assert source.active == drawing.ASSEMBLY_VIEW_CONFIGURATION
-    assert source.dirty
-
-
-@pytest.mark.parametrize("cleanup_failure", ["restore", "dirty"])
-def test_mg_source_cleanup_failure_preserves_balloon_error(
-    monkeypatch, cleanup_failure
-) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    warnings = []
-    monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
-    source = _ExplodeSource("mg-wheel-axle-1")
-    if cleanup_failure == "restore":
-        source.refuse.add(source.active)
+    source = _ExplodeSource()
+    if failure == "active configuration":
+        source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
+    elif failure == "families":
+        source.components.pop()
     else:
-        source.dirty_on_show.add(source.active)
-    primary_error = RuntimeError("balloon attachment failed")
-    with pytest.raises(RuntimeError) as caught:
-        with drawing._source_configuration_active(source.drawing_view(), label="t"):
-            raise primary_error
-    assert caught.value is primary_error
-    assert len(warnings) == 1
-    assert (
-        "did not re-activate"
-        if cleanup_failure == "restore"
-        else "scoped balloon/config readback dirtied"
-    ) in warnings[0]
+        base = source.components[0].GetTotalTransform(False).ArrayData
+        displaced = list(base)
+        displaced[9] = 0.001
+        source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
+            ArrayData=displaced if presentation else base
+        )
+    with pytest.raises(RuntimeError):
+        drawing._validate_source(source)
+
+
+
+@pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
+def test_mg_exploded_view_uses_only_its_config_metadata(configuration):
+    metadata = {
+        "Default": {"part-1": (0.01, 0.02, 0.03)},
+        "Default Simplified": {"part-1": (-0.04, 0.05, 0.06)},
+    }
+    view = SimpleNamespace(
+        ReferencedConfiguration=configuration, IsExploded=lambda: True
+    )
+    assert drawing._view_source_explode_offsets(
+        view, metadata, label="wheel"
+    ) == metadata[configuration]
+
+
+def test_mg_collapsed_view_needs_no_source_or_configuration():
+    view = SimpleNamespace(IsExploded=lambda: False)
+    assert drawing._view_source_explode_offsets(view, {}, label="finished") == {}
+
+
+@pytest.mark.parametrize("configuration", ["unknown", "", None])
+def test_mg_exploded_view_refuses_unknown_or_missing_configuration(configuration):
+    view = SimpleNamespace(
+        ReferencedConfiguration=configuration, IsExploded=lambda: True
+    )
+    with pytest.raises(RuntimeError):
+        drawing._view_source_explode_offsets(view, {}, label="wheel")
+
+def test_mg_source_sha256_streams_known_bytes(tmp_path):
+    path = tmp_path / "source.SLDASM"
+    path.write_bytes(b"abc")
+    assert drawing._source_sha256(path) == (
+        "ba7816bf8f01cfea414140de5dae2223"
+        "b00361a396177a9cb410ff61f20015ad"
+    )
+    # Cross two 1 MiB block boundaries; a small fixture alone would not catch
+    # hashing only the first chunk.
+    path.write_bytes(b"\0" * (2 * 1024 * 1024 + 3))
+    import hashlib
+
+    assert drawing._source_sha256(path) == hashlib.sha256(
+        b"\0" * (2 * 1024 * 1024 + 3)
+    ).hexdigest()
+
+
+@pytest.mark.parametrize("failure", [None, "bytes", "dirty"])
+def test_mg_source_identity_requires_same_bytes_and_clean_flag(
+    monkeypatch, tmp_path, failure
+):
+    path = tmp_path / "source.SLDASM"
+    path.write_bytes(b"released assembly")
+    monkeypatch.setattr(drawing, "SOURCE", path)
+    source = _ExplodeSource()
+    expected = drawing._source_sha256(path)
+    if failure == "bytes":
+        path.write_bytes(b"changed assembly")
+        assert not source.GetSaveFlag()
+    elif failure == "dirty":
+        source.dirty = True
+        assert drawing._source_sha256(path) == expected
+    if failure is None:
+        drawing._assert_source_identity(source, expected, phase="offline contract")
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._assert_source_identity(source, expected, phase="offline contract")
+    assert path.read_bytes() == (
+        b"changed assembly" if failure == "bytes" else b"released assembly"
+    )
+    assert source.dirty == (failure == "dirty")
+
 
 
 def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
@@ -1256,10 +1574,10 @@ def test_mg_source_dirty_trace_names_out_of_scope_transition_without_edits(
         lambda name, **fields: events.append((name, fields)),
     )
     monkeypatch.setattr(drawing._telemetry, "warn", warnings.append)
-    source = _ExplodeSource("mg-wheel-axle-1")
+    source = _ExplodeSource()
     step = drawing._source_dirty_tracer(source)
     step("prepared views")
-    source.dirty = True  # Outside the guarded balloon/configuration read.
+    source.dirty = True  # Outside the immutable metadata read.
     step("BOM insertion")
     step("wheel balloons")
     assert events == [

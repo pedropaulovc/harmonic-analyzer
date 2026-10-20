@@ -228,7 +228,6 @@ def _spread_balloons(
     *,
     margin: float = 0.014,
     clearance: float = _BALLOON_CLEARANCE_M,
-    source_probe: Callable[[str], None] | None = None,
 ) -> None:
     """Re-ring auto-balloons evenly around ``view`` (the layout audit fails loud).
 
@@ -368,11 +367,7 @@ def _spread_balloons(
     for angle, (_theta, _x, _y, _item, (annotation, offset)) in zip(angles, items):
         target_x = center_x + radius_x * math.cos(angle) + offset[0]
         target_y = center_y + radius_y * math.sin(angle) + offset[1]
-        if source_probe is not None:
-            source_probe(f"before balloon ring position {_item!r}")
         positioned = annotation.SetPosition(target_x, target_y, 0.0)
-        if source_probe is not None:
-            source_probe(f"after balloon ring position {_item!r}")
         if not positioned:
             raise RuntimeError("failed to re-ring a BOM balloon")
 
@@ -712,7 +707,6 @@ def _view_explode_offsets(
     view: Any,
     *,
     label: str,
-    source_probe: Callable[[str], None] | None = None,
 ) -> dict[str, tuple[float, float, float]]:
     """Each exploded component's explode translation, in model metres, keyed
     by its casefolded full instance path (:func:`_component_path`).
@@ -753,11 +747,7 @@ def _view_explode_offsets(
     if configuration is None:
         raise RuntimeError(f"{label}: exploded view has no referenced configuration")
     configuration = _early_bound(configuration, "IConfiguration")
-    if source_probe is not None:
-        source_probe("before explode step-count readback")
     count = int(configuration.GetNumberOfExplodeSteps())
-    if source_probe is not None:
-        source_probe("after explode step-count readback")
     read = "direct"
     if count == 0:
         count = _shown_explode_step_count(
@@ -765,7 +755,6 @@ def _view_explode_offsets(
             configuration,
             configuration_name,
             label=label,
-            source_probe=source_probe,
         )
         read = "shown on model"
         if not bool(bound.IsExploded()):
@@ -793,11 +782,7 @@ def _view_explode_offsets(
             path = _component_path(adapter, step.GetComponent(member))
             if not path:
                 if instances is None:
-                    if source_probe is not None:
-                        source_probe("before explode component-tree resolution")
                     instances = _configuration_instance_paths(adapter, configuration)
-                    if source_probe is not None:
-                        source_probe("after explode component-tree resolution")
                 name = str(step.GetComponentName(member) or "").replace("\\", "/")
                 path = instances.get(name.casefold(), "")
                 if not path:
@@ -809,8 +794,6 @@ def _view_explode_offsets(
             row = offsets.setdefault(path.casefold(), [0.0, 0.0, 0.0])
             for axis in range(3):
                 row[axis] += xform[9 + axis]
-    if source_probe is not None:
-        source_probe("after explode step/component readback")
     _span_scan_attrs(steps=count, moved=len(offsets), by_name=by_name)
     _telemetry.annotate(explode_read=read)
     return {name: (row[0], row[1], row[2]) for name, row in offsets.items()}
@@ -822,7 +805,6 @@ def _shown_explode_step_count(
     configuration_name: str,
     *,
     label: str,
-    source_probe: Callable[[str], None] | None = None,
 ) -> int:
     """Show the active configuration's one named explode on the model, then
     collapse it again, and return the step count that makes readable."""
@@ -841,19 +823,11 @@ def _shown_explode_step_count(
         raise RuntimeError(
             f"{label}: {configuration_name!r} owns explodes {names!r}, not one"
         )
-    if source_probe is not None:
-        source_probe("before source explode show")
     shown = bool(assembly.ShowExploded2(True, names[0]))
-    if source_probe is not None:
-        source_probe("after source explode show")
     if not shown:
         raise RuntimeError(f"{label}: cannot show {names[0]!r} on the model")
     count = int(configuration.GetNumberOfExplodeSteps())
-    if source_probe is not None:
-        source_probe("after shown explode step-count readback")
     collapsed = bool(assembly.ShowExploded2(False, names[0]))
-    if source_probe is not None:
-        source_probe("after source explode collapse")
     if not collapsed:
         raise RuntimeError(f"{label}: cannot collapse {names[0]!r} on the model")
     return count
@@ -1502,7 +1476,6 @@ def _create_component_bom_balloon(
     choice: _AnchorChoice,
     expected_item: str,
     label: str,
-    source_probe: Callable[[str], None] | None = None,
 ) -> BalloonLanding:
     """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed.
 
@@ -1556,11 +1529,7 @@ def _create_component_bom_balloon(
     options.ItemNumberStart = 1
     options.ItemNumberIncrement = 1
     options.ItemOrder = 1
-    if source_probe is not None:
-        source_probe(f"before balloon insertion {stem}")
     note = extension.InsertBOMBalloon2(options)
-    if source_probe is not None:
-        source_probe(f"after balloon insertion {stem}")
     draw.ClearSelection2(True)
     if note is None:
         raise RuntimeError(f"{label}: failed to insert {stem} balloon")
@@ -1577,8 +1546,6 @@ def _create_component_bom_balloon(
         label=label,
     )
     _prove_landing(adapter, landing)
-    if source_probe is not None:
-        source_probe(f"after balloon readback {stem}")
     return landing
 
 
@@ -1591,7 +1558,7 @@ def add_component_bom_balloons(
     anchors: Mapping[str, BalloonAnchor],
     label: str,
     margin: float = 0.014,
-    source_probe: Callable[[str], None] | None = None,
+    explode_offsets: Mapping[str, tuple[float, float, float]] | None = None,
 ) -> list[BalloonLanding]:
     """Insert and ring one checked balloon per requested component family.
 
@@ -1603,10 +1570,11 @@ def add_component_bom_balloons(
     :class:`BalloonLanding`, for :func:`assert_balloon_landings` to prove
     again after the drawing's last rebuild.
 
-    ``source_probe`` is an opt-in read-only diagnostic observer. It brackets
-    model explode show/collapse, each balloon insertion and ring move, and the
-    drawing rebuild, so a caller can attribute its source's save-flag transition
-    without changing or saving the referenced model.
+    ``explode_offsets`` supplies model-metre translations keyed by casefolded
+    full instance path, already native-verified by the source builder and
+    validated by the drawing. This is not a missing-step fallback: when supplied
+    (including an empty mapping), no source explode is queried or shown.
+    ``None`` retains the native view explode-step reader.
     """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")
@@ -1620,14 +1588,14 @@ def add_component_bom_balloons(
     if missing:
         raise ValueError(f"{label}: no balloon anchor for {missing}")
     leaves = _view_component_leaves(adapter, view, label=label)
-    if source_probe is not None:
-        source_probe("after component traversal")
     candidates = {
         stem: _shown_instances(leaves, stem, anchors[stem], label=label)
         for stem in stems
     }
-    offsets = _view_explode_offsets(
-        adapter, view, label=label, source_probe=source_probe
+    offsets = (
+        _view_explode_offsets(adapter, view, label=label)
+        if explode_offsets is None
+        else explode_offsets
     )
     frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
     projected = (
@@ -1652,17 +1620,11 @@ def add_component_bom_balloons(
         else []
     )
     sheet_points: dict[str, tuple[float, float]] = dict(zip(frozen, projected))
-    if source_probe is not None:
-        source_probe("after anchor projection")
     draw = adapter.currentModel
     if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
         raise RuntimeError(f"{label}: failed to activate the balloon view")
-    if source_probe is not None:
-        source_probe("after drawing balloon-view activation")
     # A coordinate hit test reads the view's display geometry: make it current once.
     _early_bound(view, "IView").UpdateViewDisplayGeometry()
-    if source_probe is not None:
-        source_probe("after drawing display-geometry update")
     # Every anchor is hit-tested before the first balloon exists: a balloon
     # dropped near its own anchor would otherwise sit on the next family's
     # point and swallow its hit test.
@@ -1679,8 +1641,6 @@ def add_component_bom_balloons(
         )
         for stem in stems
     ]
-    if source_probe is not None:
-        source_probe("after balloon anchor selections")
     landings = [
         _create_component_bom_balloon(
             adapter,
@@ -1689,7 +1649,6 @@ def add_component_bom_balloons(
             choice=choice,
             expected_item=item,
             label=label,
-            source_probe=source_probe,
         )
         for (stem, item), choice in zip(items, picks)
     ]
@@ -1698,13 +1657,8 @@ def add_component_bom_balloons(
         view,
         [landing.note for landing in landings],
         margin=margin,
-        source_probe=source_probe,
     )
-    if source_probe is not None:
-        source_probe("before drawing balloon rebuild")
     rebuild_drawing(adapter, label="add_component_bom_balloons")
-    if source_probe is not None:
-        source_probe("after drawing balloon rebuild")
     _telemetry.success(f"{label}: inserted {len(landings)} targeted balloons")
     return landings
 

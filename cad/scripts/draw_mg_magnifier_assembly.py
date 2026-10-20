@@ -32,13 +32,13 @@ the source assembly or its explodes.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 from dataclasses import dataclass
+import hashlib
 import math
 from pathlib import Path
 import sys
 import textwrap
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -1082,9 +1082,14 @@ def _component_stem(component: Any) -> str:
     return Path(path).stem.casefold()
 
 
-def _validate_source(source_model: Any) -> None:
-    """The builder-owned explodes exist, and the source opens collapsed with
-    exactly the contracted families."""
+def _validate_source(
+    source_model: Any,
+) -> dict[str, dict[str, tuple[float, float, float]]]:
+    """Require the collapsed Default source and its builder-owned explode data.
+
+    File-level native readbacks keep configuration activation and source
+    show/collapse out of drawing generation.
+    """
     assembly = _early_bound(source_model, "IAssemblyDoc")
     manager = _early_bound(source_model.ConfigurationManager, "IConfigurationManager")
     configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
@@ -1097,9 +1102,11 @@ def _validate_source(source_model: Any) -> None:
                 f"magnifier {owner} exploded views {names!r} != {(wanted,)!r}"
             )
     counts: dict[str, int] = {}
+    instances = []
     for raw in tuple(assembly.GetComponents(True) or ()):
         component = _early_bound(raw, "IComponent2")
         stem = _component_stem(component)
+        instances.append(explode.Instance(str(component.Name2), stem))
         counts[stem] = counts.get(stem, 0) + 1
         total = _early_bound(component.GetTotalTransform(True), "IMathTransform")
         base = _early_bound(component.GetTotalTransform(False), "IMathTransform")
@@ -1115,6 +1122,23 @@ def _validate_source(source_model: Any) -> None:
         raise RuntimeError(
             f"magnifier families {counts!r} != contract {BOM_QUANTITIES!r}"
         )
+    offsets_by_configuration = {}
+    for owner in EXPLODED_VIEW_NAMES:
+        text = str(
+            source_model.GetCustomInfoValue("", explode.explode_offsets_property(owner))
+            or ""
+        )
+        try:
+            offsets_by_configuration[owner] = explode.decode_explode_offsets(
+                text, owner, instances
+            )
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        _telemetry.info(
+            f"magnifier {owner}: builder-owned explode offsets read for "
+            f"{len(instances)} instances without source activation"
+        )
+    return offsets_by_configuration
 
 
 def _create_sheets(adapter: Any) -> None:
@@ -1475,89 +1499,30 @@ def balloon_items(
     return tuple((stem, items[stem]) for stem in BOM_COMPONENTS if stem in stems)
 
 
-@contextmanager
-def _source_configuration_active(
-    view: Any, *, label: str
-) -> Iterator[Callable[[str], None] | None]:
-    """Read an exploded view's steps with its source configuration active.
+def _view_source_explode_offsets(
+    view: Any,
+    offsets_by_configuration: dict[str, dict[str, tuple[float, float, float]]],
+    *,
+    label: str,
+) -> dict[str, tuple[float, float, float]]:
+    """Use the source builder's measured presentation, not source activation.
 
-    Named model views preserve a camera, not an active-configuration contract.
-    On d58d05d82 the simplified MG explode read zero steps while the source
-    remained in Default. As on the pen and oblique-jig drawings, activate the
-    referenced configuration for the balloon walk; the shared reader still
-    shows/collapses its real explode and refuses missing steps. Restore the
-    source configuration before any later view or final readback, and refuse a
-    newly dirty source: drawing SaveAs3 would persist the released assembly.
-
-    Native artifact214 placed all 11 wheel-group balloons before this scope's
-    dirty guard failed. Probe activation, balloon work and restoration
-    separately, including the shared helper's explode/insertion/rebuild
-    boundaries: that log does not identify which transition dirtied the source.
+    r7 at 6bb872b2b opened clean; ShowConfiguration2(Default Simplified)
+    immediately dirtied it, before any balloon work. IConfiguration's direct
+    step reader had already read zero for that inactive configuration, while
+    ShowExploded2 only applies to the active one. The builder now publishes
+    every native-verified instance translation before its normal save.
     """
     bound = _early_bound(view, "IView")
     if not bool(bound.IsExploded()):
-        yield
-        return
-    wanted = str(bound.ReferencedConfiguration)
-    model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
-    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
-
-    def active() -> str:
-        return str(_early_bound(manager.ActiveConfiguration, "IConfiguration").Name)
-
-    rest = active()
-    was_dirty = bool(model.GetSaveFlag())
-
-    def probe(phase: str) -> None:
-        try:
-            dirty = bool(model.GetSaveFlag())
-            _telemetry.info(
-                f"{label}: source scope {phase}: dirty={dirty}, "
-                f"rest={rest!r}, wanted={wanted!r}",
-                source_scope_phase=phase,
-                source_dirty=dirty,
-                source_rest_configuration=rest,
-                source_wanted_configuration=wanted,
-            )
-        except Exception as error:
-            _telemetry.warn(f"{label}: source scope probe {phase!r} failed: {error}")
-
-    try:
-        probe("entry")
-        if rest != wanted:
-            activated = bool(model.ShowConfiguration2(wanted))
-            probe("after source activation")
-            if not activated or active() != wanted:
-                raise RuntimeError(f"{label}: the source did not activate {wanted!r}")
-        if not bool(bound.IsExploded()) or str(bound.ReferencedConfiguration) != wanted:
-            raise RuntimeError(
-                f"{label}: activating {wanted!r} on the source changed the view"
-            )
-        probe("before balloon work")
-        yield probe
-    finally:
-        primary_error = sys.exception()
-        try:
-            probe("before source restoration")
-            if active() != rest:
-                restored = bool(model.ShowConfiguration2(rest))
-                probe("after source restoration")
-                if not restored or active() != rest:
-                    raise RuntimeError(f"{label}: the source did not re-activate {rest!r}")
-            if (
-                not bool(bound.IsExploded())
-                or str(bound.ReferencedConfiguration) != wanted
-            ):
-                raise RuntimeError(f"{label}: restoring {rest!r} changed the view")
-            probe("after restoration readback")
-            if bool(model.GetSaveFlag()) and not was_dirty:
-                raise RuntimeError(
-                    f"{label}: scoped balloon/config readback dirtied the source"
-                )
-        except Exception as cleanup_error:
-            if primary_error is None:
-                raise
-            _telemetry.warn(f"{label}: restoring {rest!r}: {cleanup_error}")
+        return {}
+    configuration = str(bound.ReferencedConfiguration)
+    if configuration not in offsets_by_configuration:
+        raise RuntimeError(
+            f"{label}: no builder-owned explode offsets for {configuration!r}; "
+            "rebuild assembly:mg_magnifier"
+        )
+    return offsets_by_configuration[configuration]
 
 
 def _place_assembled_sheet(
@@ -1697,16 +1662,53 @@ def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
     return step
 
 
+def _source_sha256(path: Path) -> str:
+    """Stream the released source, following the drive-train identity guard."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _assert_source_identity(
+    source_model: Any, expected_sha256: str, *, phase: str
+) -> None:
+    """Log exact native-leaf evidence; never save or reset a dirty source."""
+    actual_sha256 = _source_sha256(SOURCE)
+    dirty = bool(source_model.GetSaveFlag())
+    _telemetry.info(
+        f"magnifier source {phase}: SHA256 {actual_sha256}; "
+        f"expected {expected_sha256}; dirty={dirty}",
+        source_identity_phase=phase,
+        source_sha256=actual_sha256,
+        source_expected_sha256=expected_sha256,
+        source_dirty=dirty,
+    )
+    if dirty:
+        raise RuntimeError(
+            f"magnifier drawing dirtied the source assembly {phase}; "
+            "refusing to save or reset it"
+        )
+    if actual_sha256 != expected_sha256:
+        raise RuntimeError(
+            f"magnifier drawing changed the source assembly {phase}: "
+            f"SHA256 {expected_sha256} -> {actual_sha256}"
+        )
+
+
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
+    source_sha256 = _source_sha256(SOURCE)
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
     source_model = _early_bound(adapter.currentModel, "IModelDoc2")
     if bool(source_model.GetSaveFlag()):
         raise RuntimeError(
             "magnifier source assembly is already dirty; refusing to discard user changes"
         )
+    _assert_source_identity(source_model, source_sha256, phase="on source open")
     source_step = _source_dirty_tracer(source_model)
     source_step("open source")
     properties = read_required_properties(
@@ -1719,7 +1721,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"magnifier source Number {properties['Number']!r} != "
             f"{notes.DRAWING_NUMBER!r}"
         )
-    _validate_source(source_model)
+    offsets_by_configuration = _validate_source(source_model)
     source_step("validate source and properties")
     _create_sheets(adapter)
     source_step("create sheets")
@@ -1728,8 +1730,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Follow the drive-train package order: place/configure every view, then
     # explode/isolate/fit it, and only then insert the BOM and bind balloons.
     # That recipe's native probes found post-BOM configuration-switch rebuilds
-    # dirty the source. MG artifact198 isolated imported callout SetText as its
-    # first dirty operation; settings now inherit model-owned text read-only.
+    # dirty the source. MG's callouts and explode readbacks are model-owned;
+    # drawing generation never activates a source configuration.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
     source_step(f"{WHEEL_LABEL} view configuration and explode")
     reference = _place_collapsed_view(
@@ -1841,6 +1843,9 @@ async def build(adapter: Any) -> dict[str, str]:
         #     anchors=BALLOON_ANCHORS,
         #     label=f"magnifier {label} BOM coverage",
         #     margin=BALLOON_MARGIN,
+        #     explode_offsets=_view_source_explode_offsets(
+        #         view, offsets_by_configuration, label=label
+        #     ),
         # )
     # Preserve the finished-wire partial balloon path.
     landings += add_component_bom_balloons(
@@ -1850,6 +1855,9 @@ async def build(adapter: Any) -> dict[str, str]:
         anchors=BALLOON_ANCHORS,
         label=f"magnifier {FINISHED_LABEL} BOM coverage",
         margin=BALLOON_MARGIN,
+        explode_offsets=_view_source_explode_offsets(
+            finished, offsets_by_configuration, label=FINISHED_LABEL
+        ),
     )
     source_step(f"{FINISHED_LABEL} balloons")
     # if len(landings) != len(BOM_COMPONENTS):
@@ -1899,31 +1907,54 @@ async def build(adapter: Any) -> dict[str, str]:
     source_step("BOM sheet activation before reference hide")
     _hide_bom_reference(adapter, reference, table, items)
     source_step("hide BOM reference")
-    if bool(source_model.GetSaveFlag()):
-        raise RuntimeError(
-            "magnifier drawing dirtied the source assembly; refusing to save it"
+    _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
+    try:
+        artifacts = await finalize_drawing(
+            adapter,
+            OUTPUTS,
+            layout=SPEC.layout,
+            pdf_title=PDF_TITLE,
+            scale=SHEET_SCALE,
+            expected_sheet_names=SHEET_NAMES,
+            sheet_layouts=SHEET_LAYOUTS,
+            # Each sheet's title-block scale is its main view's: the ladder's
+            # rung the exploded and finished views settled on.
+            sheet_scales={
+                SHEET_NAMES[0]: SHEET_SCALE,
+                SHEET_NAMES[1]: scales[WHEEL_LABEL],
+                SHEET_NAMES[2]: scales[LEVER_LABEL],
+                SHEET_NAMES[3]: scales[FINISHED_LABEL],
+            },
+            settled_checks=(
+                *settled_checks,
+                lambda: assert_balloon_landings(adapter, landings),
+                lambda: _assert_source_identity(
+                    source_model,
+                    source_sha256,
+                    phase="settled checks before drawing SaveAs",
+                ),
+            ),
         )
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title=PDF_TITLE,
-        scale=SHEET_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        # Each sheet's title-block scale is its main view's: the ladder's
-        # rung the exploded and finished views settled on.
-        sheet_scales={
-            SHEET_NAMES[0]: SHEET_SCALE,
-            SHEET_NAMES[1]: scales[WHEEL_LABEL],
-            SHEET_NAMES[2]: scales[LEVER_LABEL],
-            SHEET_NAMES[3]: scales[FINISHED_LABEL],
-        },
-        settled_checks=(
-            *settled_checks,
-            lambda: assert_balloon_landings(adapter, landings),
-        ),
-    )
+    finally:
+        primary_error = sys.exception()
+        try:
+            try:
+                _validate_source(source_model)
+            finally:
+                _assert_source_identity(
+                    source_model, source_sha256, phase="after drawing finalization"
+                )
+            _telemetry.success(
+                "magnifier source preserved: Default, collapsed and clean; "
+                f"SHA256 {source_sha256}"
+            )
+        except Exception as proof_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(
+                f"magnifier source identity proof after drawing failure: {proof_error}"
+            )
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:
