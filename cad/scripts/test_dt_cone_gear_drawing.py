@@ -1157,8 +1157,8 @@ def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
 
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:
-    """Both sketches' dimensions live on the front view, which takes the
-    opt-in import; the side, iso and bore views show the part as saved."""
+    """The two inspection references belong only to Front; other views keep
+    those hidden. The consumed BlankProfile is separately shown in Right."""
     for sketch in (spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH):
         owned = spec.DRAWING_DIMENSIONS[sketch]
         for teeth in spec.CONFIGURATION_TEETH:
@@ -1654,6 +1654,13 @@ def test_settled_blank_refuses_native_regression_on_any_sheet(
     assert "BlankDia" in str(failure.value)
 
 
+class _BlankReferencePart:
+    """Tripwire at the actual view-to-part boundary, not disconnected state."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"drawing-only blank reference accessed part member {name}")
+
+
 class _BlankReferenceView:
     def __init__(self, configuration, role, instance):
         self.name = f"Drawing View{instance}"
@@ -1686,9 +1693,11 @@ class _BlankReferenceDrawing:
 
     def __init__(self):
         self.views = {}
+        part_model = _BlankReferencePart()
         for configuration, _teeth in spec.CONFIGS:
             for role in ("front", "right", "iso", "bore"):
                 view = _BlankReferenceView(configuration, role, len(self.views) + 1)
+                view.ReferencedDocument = part_model
                 self.views[configuration, role] = view
         self.Extension = self
         self.active = None
@@ -1697,9 +1706,6 @@ class _BlankReferenceDrawing:
         self.refused_selection = set()
         self.attempts = []
         self.unblanked = []
-        # The fake model has independent saved visibility, never changed by
-        # the drawing override. Other features must also retain their state.
-        self.part_visibility = {"BlankProfile": False, "BoreProfile": False}
 
     def ActivateView(self, name):
         if name in self.refused_activation:
@@ -1761,7 +1767,6 @@ def test_blank_reference_persists_only_in_each_exact_right_view(blank_reference_
     adapter = blank_reference_adapter
     draw = adapter.currentModel
     original = {key: set(view.shown) for key, view in draw.views.items()}
-    part_visibility = dict(draw.part_visibility)
     for index, (configuration, _teeth) in enumerate(spec.CONFIGS, start=1):
         right = draw.views[configuration, "right"]
         drawing._show_blank_profile(adapter, right)
@@ -1775,7 +1780,6 @@ def test_blank_reference_persists_only_in_each_exact_right_view(blank_reference_
         for (sheet, role), view in draw.views.items():
             added = {"BlankProfile"} if role == "right" and sheet in visited else set()
             assert view.shown == original[sheet, role] | added
-        assert draw.part_visibility == part_visibility
 
 
 @pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
@@ -1798,14 +1802,12 @@ def test_blank_reference_refuses_without_showing_another_owner(
             right.base = None
     draw.ActivateView(front.name)
     before = {key: set(view.shown) for key, view in draw.views.items()}
-    part_visibility = dict(draw.part_visibility)
     with pytest.raises(RuntimeError, match="activate|cannot select"):
         drawing._show_blank_profile(adapter, right)
     assert draw.attempts == ([] if failure == "activation" else [exact])
     assert not draw.unblanked
     assert draw.selected is None
     assert {key: view.shown for key, view in draw.views.items()} == before
-    assert draw.part_visibility == part_visibility
 
 
 @pytest.mark.parametrize("role", ("front", "iso", "bore"))
@@ -1818,14 +1820,99 @@ def test_blank_reference_rejects_nonright_targets_before_activation(
     right = draw.views[configuration, "right"]
     draw.ActivateView(right.name)
     before = {key: set(view.shown) for key, view in draw.views.items()}
-    part_visibility = dict(draw.part_visibility)
     with pytest.raises(RuntimeError, match=r"requires \*Right"):
         drawing._show_blank_profile(adapter, draw.views[configuration, role])
     assert draw.active is right
     assert not draw.attempts
     assert not draw.unblanked
     assert {key: view.shown for key, view in draw.views.items()} == before
-    assert draw.part_visibility == part_visibility
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_build_shows_configured_blank_reference_before_right_import(
+    blank_reference_adapter, monkeypatch: pytest.MonkeyPatch, configuration, teeth,
+):
+    """Exercise build wiring; the fake selection state cannot prove printing."""
+    import asyncio
+    from types import SimpleNamespace
+
+    class RightImportReached(Exception):
+        pass
+
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    roles = ("front", "right", "iso", "bore")
+    views = tuple(draw.views[configuration, role] for role in roles)
+    for view in views:
+        view.ReferencedConfiguration = "not-yet-configured"
+    original = {key: set(view.shown) for key, view in draw.views.items()}
+    placement = iter(views)
+    configured = []
+
+    async def open_model(_source):
+        return True
+
+    async def topology(_adapter, *, phase):
+        pass
+
+    def no_op(*args, **kwargs):
+        pass
+
+    def activate_sheet(sheet):
+        assert sheet == configuration
+        return True
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        view = next(placement)
+        assert orientation == view.orientation
+        return view
+
+    def rebuild(_adapter, *, label):
+        # Keep the real _configure_views assignment/readback. This checkpoint
+        # also rejects moving the show operation before configuration.
+        assert all(view.ReferencedConfiguration == configuration for view in views)
+        assert not draw.unblanked
+        configured.append(configuration)
+
+    def import_other_view(_adapter, view, **kwargs):
+        assert view in (views[0], views[3])
+        draw.ActivateView(view.name)
+        return []
+
+    def right_import(_adapter, view, *, keep, view_label):
+        right = views[1]
+        assert configured == [configuration]
+        assert view is right
+        assert right.ReferencedConfiguration == configuration
+        assert draw.active is right
+        assert draw.selected is None
+        assert draw.unblanked == [(right, "BlankProfile")]
+        assert draw.attempts == [f"BlankProfile@{right.component}@{right.name}"]
+        for key, owner in draw.views.items():
+            added = {"BlankProfile"} if owner is right else set()
+            assert owner.shown == original[key] | added
+        raise RightImportReached
+
+    monkeypatch.setattr(drawing, "SOURCE", SimpleNamespace(is_file=lambda: True))
+    monkeypatch.setattr(drawing, "CONFIGURATION_TEETH", (teeth,))
+    monkeypatch.setattr(adapter, "open_model", open_model, raising=False)
+    monkeypatch.setattr(draw, "ActivateSheet", activate_sheet, raising=False)
+    monkeypatch.setattr(drawing, "check", no_op)
+    monkeypatch.setattr(drawing, "assert_saved_configuration_topology", topology)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **k: (draw, None))
+    for name in (
+        "read_required_properties", "_assert_dimension_arrow_length",
+        "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "_hide_tangent_edges", "_assert_tooth_geometry",
+        "_center_bore_view", "_sweep_clock_right_of_flat", "_crop_bore_view",
+    ):
+        monkeypatch.setattr(drawing, name, no_op)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", import_other_view)
+    monkeypatch.setattr(drawing, "_curate_repeated_dimensions", right_import)
+    with pytest.raises(RightImportReached):
+        asyncio.run(drawing.build(adapter))
 
 
 def test_invalid_family_member_is_rejected() -> None:
