@@ -999,6 +999,9 @@ Keep fit-up wording in the assembly sheet too: for example,
 Test fit-up behavior through physical clearance floors, worst-service readings,
 feature-specific cut decisions and limits, sequence, and available sheet space.
 Do not pin the narration or exact note wording.
+Identity changes can make a 70-character line wider in the drawing font.
+Use receiver-headed, indented paragraphs for meaningful native-field clearance;
+do not loosen the field bounds or its native audit.
 `test_assembly_sheet_isolation.py` (`check:graph`) fails if a builder's closure
 reaches a sheet/steps/`draw_*` module, their literals type a dimension (`22.0`
 or `1/16`), they rebind a name the spec/explode spec defines, or a drawing-only
