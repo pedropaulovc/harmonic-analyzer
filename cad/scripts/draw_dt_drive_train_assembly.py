@@ -1315,8 +1315,12 @@ def bank_setting_caption_violations(
     if not all(map(math.isfinite, (*extent, *outline))):
         return ["non-finite caption extent or view outline"]
     findings = []
-    if outline[1] - extent[3] < VIEW_CAPTION_GAP:
-        findings.append("caption is not 4 mm below its view")
+    gap = outline[1] - extent[3]
+    if gap < VIEW_CAPTION_GAP:
+        findings.append(
+            f"caption is not 4 mm below its view: actual_gap_mm={gap * 1000.0:.6f}, "
+            f"view_outline_m={outline!r}"
+        )
     return findings
 
 
@@ -1329,7 +1333,13 @@ def bank_setting_letter_violations(
     if not all(map(math.isfinite, (*extent, *centre, radius))):
         return ["non-finite detail identifier extent or circle"]
     air = (centre[0] - radius - extent[2], extent[1] - centre[1] - radius)
-    return ["detail identifier crowds its boundary circle"] if min(air) < VIEW_CAPTION_GAP else []
+    if min(air) < VIEW_CAPTION_GAP:
+        return [
+            "detail identifier crowds its boundary circle: "
+            f"actual_gaps_mm={tuple(value * 1000.0 for value in air)!r}, "
+            f"circle_centre_m={centre!r}, circle_radius_mm={radius * 1000.0:.6f}"
+        ]
+    return []
 
 
 def ring_fit_shift(
@@ -3147,6 +3157,10 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
     # Follow the rebuilt outlines, not insertion coordinates. Centering the
     # overall caption below its view would hit the spring dimension's two-line
     # callout; its right end has clear space below the south pedestal instead.
+    # All three annotations target 8 mm, inside their 4 mm minimum-air
+    # regions. Bounded anchoring cannot promise a corner on the boundary
+    # (R6's detail caption undershot); the actual 4 mm guards stay unchanged.
+    placement_gap = 2.0 * VIEW_CAPTION_GAP
     captions = []
     for view, text, right_aligned, label in (
         (overall, "CYLINDER BANK RIGHT 1:1", True, "bank setting caption"),
@@ -3159,7 +3173,7 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
         extent = _note_extent(adapter, note, label=label)
         width = extent[2] - extent[0]
         left = outline[2] - width if right_aligned else (outline[0] + outline[2] - width) / 2.0
-        corner = (left, outline[1] - VIEW_CAPTION_GAP)
+        corner = (left, outline[1] - placement_gap)
         _anchor_note(adapter, note, corner, label=label)
         captions.append((note, view, label))
 
@@ -3174,10 +3188,9 @@ def _place_bank_setting_sheet(adapter: Any, facts: SourceFacts) -> Callable[[], 
     letter_extent = _note_extent(adapter, letter, label="spring detail letter")
     # Seed inside the clear region, not on its minimum-air boundary: the
     # bounded anchor helper does not guarantee its requested text-box corner.
-    letter_gap = 2.0 * VIEW_CAPTION_GAP
     letter_corner = (
-        parent_centre[0] - radius - letter_gap - (letter_extent[2] - letter_extent[0]),
-        parent_centre[1] + radius + letter_gap + (letter_extent[3] - letter_extent[1]),
+        parent_centre[0] - radius - placement_gap - (letter_extent[2] - letter_extent[0]),
+        parent_centre[1] + radius + placement_gap + (letter_extent[3] - letter_extent[1]),
     )
     _anchor_note(adapter, letter, letter_corner, label="spring detail letter")
     placements = []

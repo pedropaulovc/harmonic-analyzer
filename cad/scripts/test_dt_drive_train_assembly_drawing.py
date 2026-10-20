@@ -794,6 +794,32 @@ def test_bank_setting_caption_accepts_native_r4_extent_not_exact_anchor_target()
         assert drawing.bank_setting_caption_violations((*extent[:3], top), outline)
 
 
+def test_bank_setting_caption_margin_clears_native_r6_failure_and_printed_border() -> None:
+    # Native R6 actual extent (source 881d1eddc90d, 20261020T225444Z).
+    # The unchanged view's R3 outline bottom was reported as 31.1 mm;
+    # its 0.05 mm reporting precision cannot change either result below.
+    extent = (
+        0.06864031438127086, 0.022464133779264206,
+        0.14107873578595315, 0.027229819397993293,
+    )
+    outline = (0.061, 0.0311, 0.149, 0.1189)
+    assert drawing.bank_setting_caption_violations(extent, outline)
+    # Moving the placement target from 4 to 8 mm drops the whole caption
+    # another 4 mm; this is an offline placement envelope, not native proof.
+    drop = drawing.VIEW_CAPTION_GAP
+    moved = (extent[0], extent[1] - drop, extent[2], extent[3] - drop)
+    assert drawing.bank_setting_caption_violations(moved, outline) == []
+    # Actual R4 sheet-13 PDF frame: centre y35.90001 pt, stroke1.41733 pt.
+    # Check its INNER ink edge, more conservative than 12.7 mm zone metadata.
+    border_inner = (35.90001 + 1.41733 / 2.0) * 25.4 / 72.0 / 1000.0
+    assert moved[1] - border_inner > 0.0055
+    field = (0.0127, 0.2667, 0.4191, border_inner)
+    assert drawing.note_field_violations(moved, field) == []
+    # A further drop through the frame is still refused by containment.
+    through_frame = (moved[0], border_inner - 0.001, moved[2], moved[3])
+    assert drawing.note_field_violations(through_frame, field)
+
+
 @pytest.mark.parametrize(
     ("extent", "outline"),
     (
