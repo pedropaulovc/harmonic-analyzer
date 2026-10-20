@@ -134,6 +134,16 @@ geometry is casting-shaped, not milling-shaped.
   cells are not editable. Both the numbered note and curated view-tag layout
   follow station identity if native size families re-letter or merge.
 
+Owner exception **RV-02**, selected **2026-10-20** and registered under
+`fr-harmonic-base` in its package YAML, permits redundant default **2B** only
+in the generated native hole-table **SIZE cells** on sheet 2. The cells stay
+model-linked and are not rewritten; all physical Hole Wizard threads remain
+class 2B. The five separate native tap callouts still omit the duplicated
+class token. This presentation-only exception does not extend to other
+callouts, packages, tolerances, engagement or clearance limits. The existing
+reviewer and judge consume the package declaration through their standard
+owner-exception mechanism; the general drawing rubric is unchanged.
+
 The flange perimeter remains the hole table's coordinate origin, not a
 specified mating seat. A layout reference alone does not justify Ra 3.2 under
 drawing-guidelines rule 6, so the four flange-side roughness controls are

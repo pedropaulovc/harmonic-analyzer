@@ -122,6 +122,15 @@ minor. Whoever runs the gate matches each one to the part's declared entry
 matching declaration gates the package like a blocker. An emitter of an
 approved declaration carries a comment naming it.
 
+The owner's **2026-10-20** ruling for **MHA-FR-01 `fr-harmonic-base` RV-02**
+accepts one nonnumeric departure from rule 2: redundant default **2B** in that
+package's generated native hole-table **SIZE cells only**. The package-local
+declaration in [`fr-harmonic-base.yaml`](../config/parts/fr-harmonic-base.yaml)
+is the reviewer-consumed register. Physical model threads remain class 2B,
+and the five separate native tap callouts still omit the duplicate class.
+The generated cells are not rewritten. This is not a general native-table
+exemption and accepts no other specification, geometry or numeric shortfall.
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>...` (or `--all`) runs three
