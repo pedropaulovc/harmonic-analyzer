@@ -15,6 +15,7 @@ stock name, which restates the material, is read and checked but not printed.
 
 from __future__ import annotations
 
+import json
 import math
 from enum import StrEnum
 from pathlib import Path
@@ -41,8 +42,10 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
+from _drawing_layout_audit import annotation_display
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
+from _drawing_scan import _zoomed_on
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _fastener_catalog import fastener
@@ -110,7 +113,18 @@ _NUMBER_LIMIT = (0.3084, 0.0200, 0.3723 - 0.0012, 0.0359)
 # Never smaller than the sheet's 3 mm notes.
 _NUMBER_MIN_HEIGHT = 0.003
 _NUMBER_HEIGHT_TOL = 1e-7
-_POINT = 0.0254 / 72.0
+# INote.GetExtent is the note as displayed, floored to the window's pixels:
+# the fitted landscape sheet reads in 0.4766 mm steps on the farm seats (the
+# 8d9c8dbba box was 121 x 33 of them, as draw_dt_cone_swing_platform found).
+# Every DWG. NO. readback is zoomed onto this square about the cell, a pixel
+# there being about a tenth of a millimetre, and the fit aims this far inside
+# the limit so that readback quantization cannot chase the hard guard.
+_NUMBER_ZOOM_HALF = 0.040
+_NUMBER_FIT_AIM = 0.0003
+_NUMBER_CENTRE = (
+    (_NUMBER_LIMIT[0] + _NUMBER_LIMIT[2]) / 2.0,
+    (_NUMBER_LIMIT[1] + _NUMBER_LIMIT[3]) / 2.0,
+)
 
 
 def _box(
@@ -428,15 +442,20 @@ def _number_note(draw: Any) -> tuple[Any, Any]:
 
 
 def _number_format(annotation: Any) -> tuple[Any, float, str]:
-    """The note's format, its authoritative height in metres, and its face."""
+    """The note's format, its native ``CharHeight`` in metres, and its face.
+
+    ``CharHeight`` is read whatever the height's authority, because it is the
+    scale the metre setter writes.  The templates-1636 census read the
+    landscape template's 18 pt DWG. NO. as 0.0047625 m and its 15 pt title as
+    0.00396875 m.  8d9c8dbba instead took 18 pt as 18 x 0.0254/72 = 6.35 mm
+    and wrote 0.00618 m, 1.30x the note's native 0.0047625 m, and its
+    readback ran down to y = 13.41 mm, below the cell.
+    """
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError("DWG. NO.: note has no text format")
     text_format = _early_bound(text_format, "ITextFormat")
-    in_points = text_format.IsHeightSpecifiedInPts()
-    if type(in_points) is not bool:
-        raise RuntimeError(f"DWG. NO.: unreadable height authority {in_points!r}")
-    height = text_format.CharHeightInPts if in_points else text_format.CharHeight
+    height = text_format.CharHeight
     face = text_format.TypeFaceName
     if (
         type(height) not in (int, float)
@@ -446,37 +465,123 @@ def _number_format(annotation: Any) -> tuple[Any, float, str]:
         or not face.strip()
     ):
         raise RuntimeError(f"DWG. NO.: unreadable font {height!r}, {face!r}")
-    return text_format, float(height) * (_POINT if in_points else 1.0), face
+    return text_format, float(height), face
+
+
+def _number_state(adapter: Any, note: Any, annotation: Any) -> str:
+    """The note's readback that explains a fit, as JSON; never raises.
+
+    Diagnostic only: a failure building or serializing it is recorded in its
+    place, so it cannot mask the authoritative extent and guard around it.
+    """
+    try:
+        return _read_number_state(adapter, note, annotation)
+    except Exception as exc:
+        return f"<state refused {type(exc).__name__}: {exc}>"
+
+
+def _read_number_state(adapter: Any, note: Any, annotation: Any) -> str:
+    """Extent and position are sheet metres (``GetPosition`` is the text
+    box's upper-left); the format is both height authorities and the
+    line/spacing members ``ITextFormat`` exposes; rows are
+    ``IDisplayData``'s text runs.  A refused read is recorded as such.
+    """
+
+    def read(call: Callable[[], Any]) -> Any:
+        try:
+            value = call()
+        except Exception as exc:
+            return f"<refused {type(exc).__name__}>"
+        if isinstance(value, (tuple, list)):
+            try:
+                return [round(float(item), 9) for item in value]
+            except (TypeError, ValueError):
+                return repr(value)
+        if isinstance(value, float):
+            return round(value, 9)
+        if value is None or isinstance(value, (bool, int, str)):
+            return value
+        return repr(value)
+
+    state: dict[str, Any] = {
+        "extent": read(lambda: note.GetExtent()),
+        "position": read(lambda: annotation.GetPosition()),
+        "use_doc": read(lambda: annotation.GetUseDocTextFormat(0)),
+        "justification": read(lambda: note.GetTextJustification()),
+        "vertical": read(lambda: note.GetTextVerticalJustification()),
+    }
+    try:
+        text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    except Exception as exc:
+        state["format"] = f"<refused {type(exc).__name__}>"
+    else:
+        state["format"] = {
+            name: read(lambda name=name: getattr(text_format, name))
+            for name in (
+                "TypeFaceName",
+                "CharHeight",
+                "CharHeightInPts",
+                "WidthFactor",
+                "CharSpacingFactor",
+                "LineSpacing",
+                "LineLength",
+            )
+        }
+        state["format"]["IsHeightSpecifiedInPts"] = read(
+            lambda: text_format.IsHeightSpecifiedInPts()
+        )
+    try:
+        display, refused = annotation_display(adapter, annotation)
+    except Exception as exc:
+        state["rows"] = f"<refused {type(exc).__name__}>"
+    else:
+        state["rows"] = [
+            {key: text[key] for key in ("t", "pos", "h", "ls", "w") if key in text}
+            for text in display.get("texts", ())
+        ]
+        if refused:
+            state["display_refused"] = refused
+    return json.dumps(state, sort_keys=True)
 
 
 @_telemetry.traced("drawing.purchased_number_fit")
-def _fit_number(draw: Any, *, layout: DrawingLayout, number: str) -> Callable[[], None]:
+def _fit_number(
+    adapter: Any, draw: Any, *, layout: DrawingLayout, number: str
+) -> Callable[[], None]:
     """Shrink this drawing's DWG. NO. note, never the template, clear of REV.
 
-    One proportional write from the measured extent, in the note's own face.
-    Returns the settled check that re-proves the link, number, face, height
-    and fit after the final rebuild.
+    One proportional write of the note's native ``CharHeight`` from its
+    measured extent, in its own face, aimed :data:`_NUMBER_FIT_AIM` inside
+    the limit.  Returns the settled check that re-proves the link, number,
+    face, height and fit after the final rebuild.  The note's state before
+    the write and at every check is a span event, and in any failure.
     """
     if layout is not DrawingLayout.LANDSCAPE:
         raise ValueError(f"DWG. NO.: the {layout} template's cell is unmeasured")
     link = property_link("Number")
     note, annotation = _number_note(draw)
 
-    def measure() -> tuple[float, float, float, float]:
+    def measure(phase: str) -> tuple[tuple[float, float, float, float], str]:
+        """The zoomed extent, and the state it was read in."""
         if note.PropertyLinkedText != link or note.GetText() != number:
             raise RuntimeError(
                 f"DWG. NO.: readback {note.PropertyLinkedText!r} = "
                 f"{note.GetText()!r}, expected {link!r} = {number!r}"
             )
-        return _box(note.GetExtent(), label="DWG. NO.", kind="note")
+        with _zoomed_on(adapter, _NUMBER_CENTRE, _NUMBER_ZOOM_HALF):
+            state = _number_state(adapter, note, annotation)
+            _telemetry.event(
+                "drawing.purchased_number_fit.state", phase=phase, state=state
+            )
+            return _box(note.GetExtent(), label="DWG. NO.", kind="note"), state
 
     text_format, height, face = _number_format(annotation)
-    box = measure()
+    box, before = measure("template")
     # Only an overrun across the REV divider is this fit's to repair.
     if not _inside(box, (*_NUMBER_LIMIT[:2], math.inf, _NUMBER_LIMIT[3])):
-        raise RuntimeError(f"DWG. NO.: note leaves its cell: {box!r}")
+        raise RuntimeError(f"DWG. NO.: note leaves its cell: {box!r}; state {before}")
     if box[2] > _NUMBER_LIMIT[2]:
-        ratio = (_NUMBER_LIMIT[2] - box[0]) / (box[2] - box[0])
+        ratio = (_NUMBER_LIMIT[2] - _NUMBER_FIT_AIM - box[0]) / (box[2] - box[0])
         target = math.floor(height * ratio * 1e5) / 1e5  # 0.01 mm, downward
         if target < _NUMBER_MIN_HEIGHT:
             raise RuntimeError(
@@ -493,7 +598,7 @@ def _fit_number(draw: Any, *, layout: DrawingLayout, number: str) -> Callable[[]
 
     def settled() -> None:
         _format, actual, actual_face = _number_format(annotation)
-        box = measure()
+        box, state = measure("settled")
         if (
             abs(actual - height) > _NUMBER_HEIGHT_TOL
             or actual_face != face
@@ -501,11 +606,12 @@ def _fit_number(draw: Any, *, layout: DrawingLayout, number: str) -> Callable[[]
         ):
             raise RuntimeError(
                 f"DWG. NO.: note left its fit: {actual!r} m {actual_face!r} at "
-                f"{box!r}, fitted {height!r} m {face!r} within {_NUMBER_LIMIT!r}"
+                f"{box!r}, fitted {height!r} m {face!r} within {_NUMBER_LIMIT!r}; "
+                f"template state {before}; settled state {state}"
             )
 
     settled()
-    _telemetry.info(f"DWG. NO. fit: {number!r} at {height!r} m, extent {measure()!r}")
+    _telemetry.info(f"DWG. NO. fit: {number!r} at {height!r} m, from {before}")
     return settled
 
 
@@ -833,7 +939,9 @@ async def _build_reference_sheet(
         settled_checks: tuple[Callable[[], None], ...] = ()
         if number_fit is NumberFit.SHRINK_TO_CELL:
             settled_checks = (
-                _fit_number(draw, layout=spec.layout, number=properties["Number"]),
+                _fit_number(
+                    adapter, draw, layout=spec.layout, number=properties["Number"]
+                ),
             )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)

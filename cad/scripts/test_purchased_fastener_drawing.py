@@ -413,15 +413,28 @@ def test_center_marks_lose_their_extension_lines(monkeypatch):
         purchased._center_marks_without_lines(views, cells)
 
 
-_POINT = 0.0254 / 72.0
+# The fake's CharHeightInPts <-> CharHeight step, fitted to what the
+# templates-1636 census read off the landscape template: 18 pt as
+# 0.0047625 m and 15 pt as 0.00396875 m.  A fake calibration, not a claim
+# about other templates, fonts or seats.
+_NATIVE_POINT = 0.0254 / 96.0
+# The fake's printed em per CharHeight, chosen so the template's 18 pt note
+# keeps the r3 kp08 width below; likewise only a calibration.
+_EM_PER_CHAR_HEIGHT = 4.0 / 3.0
 _NUMBER_LINK = '$PRPSHEET:"Number"'
 _LONG_NUMBER = "MHA-CH-06-TL-VN-65"
 # The r3 kp08 sheet's REV divider, x mm from the PDF.
 _REV_DIVIDER = 0.37231
+# The census's DWG. NO. box top, which the 8d9c8dbba readback kept.
+_NUMBER_TOP = 0.029136093645
 
 
 class _FitFormat:
-    """ITextFormat: writing either height makes it the authoritative one."""
+    """ITextFormat whose getters answer for either authority.
+
+    Heights convert on :data:`_NATIVE_POINT`; writing ``CharHeight`` makes
+    metres the authoritative unit.
+    """
 
     def __init__(self, *, points: int | None = None, metres: float = 0.0) -> None:
         self._points, self._metres = points, metres
@@ -432,24 +445,26 @@ class _FitFormat:
 
     @property
     def CharHeightInPts(self) -> int:
-        return self._points if self._points is not None else 0
+        if self._points is not None:
+            return self._points
+        return round(self._metres / _NATIVE_POINT)
 
     @property
     def CharHeight(self) -> float:
-        return self._metres if self._points is None else 0.0
+        if self._points is not None:
+            return self._points * _NATIVE_POINT
+        return self._metres
 
     @CharHeight.setter
     def CharHeight(self, value: float) -> None:
         self._points, self._metres = None, value
 
-    def height(self) -> float:
-        return self._points * _POINT if self._points is not None else self._metres
-
 
 class _TitleNote:
-    """A template INote/IAnnotation whose printed width follows its font.
+    """A template INote/IAnnotation whose printed box follows its font.
 
-    Calibrated to the r3 kp08 sheet: 18 characters at 18 pt end at 372.87 mm.
+    Calibrated to the r3 kp08 sheet (18 characters at 18 pt end at
+    372.87 mm) and to the census box: top-anchored, 0.976 em a row.
     """
 
     def __init__(
@@ -482,9 +497,10 @@ class _TitleNote:
         return self._text
 
     def GetExtent(self):
-        height = self._format.height()
-        width = 0.5464 * len(self._text) * height
-        return (0.31042, 0.02208, 0.0, 0.31042 + width, 0.02208 + 1.37 * height, 0.0)
+        em = self._format.CharHeight * _EM_PER_CHAR_HEIGHT
+        width = 0.5464 * len(self._text) * em
+        bottom = _NUMBER_TOP - 0.976 * em
+        return (0.31042, bottom, 0.0, 0.31042 + width, _NUMBER_TOP, 0.0)
 
 
 class _TitleSheet:
@@ -502,26 +518,37 @@ class _TitleSheet:
     def EditRebuild3(self) -> bool:
         return True
 
+    def ViewZoomTo2(self, *_box: float) -> None:
+        pass
+
+    def ViewZoomtofit2(self) -> None:
+        pass
+
+
+def _fit(sheet: _TitleSheet, *, number: str, layout=DrawingLayout.LANDSCAPE):
+    return purchased._fit_number(
+        SimpleNamespace(currentModel=sheet), sheet, layout=layout, number=number
+    )
+
 
 @pytest.mark.parametrize(
     "authored",
-    [_FitFormat(points=18), _FitFormat(metres=18 * _POINT)],
+    [_FitFormat(points=18), _FitFormat(metres=18 * _NATIVE_POINT)],
     ids=["points", "metres"],
 )
 def test_number_fit_clears_the_rev_divider(authored):
     note = _TitleNote(_LONG_NUMBER)
     note._format = authored
     other = _TitleNote("ALLOY STEEL", link='$PRPSHEET:"Material"')
-    before = authored.height()
-    settled = purchased._fit_number(
-        _TitleSheet(other, note), layout=DrawingLayout.LANDSCAPE, number=_LONG_NUMBER
-    )
+    before = authored.CharHeight
+    settled = _fit(_TitleSheet(other, note), number=_LONG_NUMBER)
     extent = note.GetExtent()
     assert extent[3] < _REV_DIVIDER - 0.001  # a visible gap before REV
-    assert 0.003 <= note._format.height() < before
+    assert extent[1] >= 0.0200  # one row, inside the cell
+    assert 0.003 <= note._format.CharHeight < before
     assert (note.PropertyLinkedText, note.GetText()) == (_NUMBER_LINK, _LONG_NUMBER)
     assert note._format.TypeFaceName == "Century Gothic"
-    assert other._format.height() == 18 * _POINT and other._use_doc is True
+    assert other._format.CharHeightInPts == 18 and other._use_doc is True
     settled()
     # A later rebuild back at the template size never reaches the export.
     note._format = _FitFormat(points=18)
@@ -529,12 +556,37 @@ def test_number_fit_clears_the_rev_divider(authored):
         settled()
 
 
+def test_number_fit_writes_the_native_height_it_measured():
+    # The landscape template's DWG. NO. as the templates-1636 census read it
+    # (DetailItem248).  8d9c8dbba scaled its 18 pt at 0.0254/72 m and wrote
+    # 0.00618 m, 1.30x the note's native height; the clamp/nut readback ran
+    # down to y = 13.41 mm, below the cell.
+    note = _TitleNote(_LONG_NUMBER)
+    assert note._format.CharHeight == pytest.approx(0.0047625, abs=1e-12)
+    _fit(_TitleSheet(note), number=_LONG_NUMBER)
+    assert note._format.IsHeightSpecifiedInPts() is False
+    assert note._format.CharHeight == pytest.approx(0.0046, abs=1e-12)
+
+
+def test_number_fit_state_refusal_cannot_mask_the_guard(monkeypatch):
+    class Escaped(_TitleNote):
+        def GetExtent(self):
+            if self._use_doc:
+                return super().GetExtent()
+            return (0.3102605752508361, 0.013409331103678923, 0.0, 0.36, 0.0291, 0.0)
+
+    def refuse(*_args, **_kwargs):
+        raise TypeError("diagnostic serialization failed")
+
+    monkeypatch.setattr(purchased, "json", SimpleNamespace(dumps=refuse))
+    with pytest.raises(RuntimeError):
+        _fit(_TitleSheet(Escaped(_LONG_NUMBER)), number=_LONG_NUMBER)
+
+
 def test_number_fit_leaves_a_fitting_number_at_the_template_size():
     number = "MHA-CH-06-TL-21"
     note = _TitleNote(number)
-    settled = purchased._fit_number(
-        _TitleSheet(note), layout=DrawingLayout.LANDSCAPE, number=number
-    )
+    settled = _fit(_TitleSheet(note), number=number)
     assert note._use_doc is True
     assert note._format.CharHeightInPts == 18
     settled()
@@ -589,6 +641,6 @@ def test_number_fit_leaves_a_fitting_number_at_the_template_size():
 )
 def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, error):
     with pytest.raises(error):
-        purchased._fit_number(_TitleSheet(*notes), layout=layout, number=number)
+        _fit(_TitleSheet(*notes), layout=layout, number=number)
     for note in notes:
         assert note._format.CharHeightInPts == 18
