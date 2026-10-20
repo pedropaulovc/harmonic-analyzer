@@ -680,6 +680,24 @@ flipping the model names.
 Assembly opening views and fitter projections have separate contracts. MG's
 standard Front faces machine −Z, matching HA; its named fitter views preserve
 the back/left inspection and exploded projections independently of that remap.
+
+Named-camera placement does not establish the source model's active
+configuration. `NameView`, `ShowNamedView2` and
+`CreateDrawViewFromModelView3` document the view/orientation, while
+`IView.ReferencedConfiguration` selects the drawing view's configuration;
+`IModelDoc2.ShowConfiguration2` separately activates the source configuration.
+MG's native drawing at `d58d05d82` reached the wheel balloons with the view in
+`Default Simplified`, zero readable explode steps and the source in `Default`.
+That proves the configuration mismatch, not that the named camera itself
+reactivated a captured configuration. Follow the pen/oblique-jig pattern at
+the balloon boundary: activate the exploded view's referenced configuration,
+read it back, let the unchanged balloon reader show/collapse its real named
+explode, then restore the source's prior configuration in `finally` and check
+that the drawing view remains exploded in its intended configuration. The MG
+recipe does this for both exploded groups; collapsed views do not switch.
+Missing explode steps still fail. Do not change geometry, fitter cameras,
+standard views or the shared zero-step guard to conceal this mismatch.
+
 MS's working pose has the thumbscrew above the stick, both standalone and
 parked in HA. Its graduated face remains against the fixed clamp wall and is
 therefore underneath; the named underside inspection view shows that scale.
