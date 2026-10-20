@@ -2416,13 +2416,14 @@ def test_shared_post_mount_interference_depth_matches_the_part():
     the cut-length rounding; a second pinned engagement could drift silently.
     """
     import dt_post_mount_stack as stack
+    import _cone_axis_constants as axis
     import dt_cone_pivot_post_spec as post
     import dt_cone_swing_platform_spec as platform
     import dt_vn_post_mount_screw_spec as screw
 
     assert stack.POST_BODY_HEIGHT_MM == post.BLOCK_HEIGHT
     assert stack.POST_MOUNT_COUNTERBORE_DEPTH_MM == post.ATTACHMENT_CBORE_DEPTH
-    assert stack.PLATFORM_THICKNESS_MM == platform.PLATE_THICKNESS
+    assert axis.PLATFORM_THICKNESS_MM == platform.PLATE_THICKNESS
     assert stack.CUT_TO_FIT_SHORT_MM == platform.POST_SCREW_CUT_TO_FIT_SHORT
     assert stack.CUT_LENGTH_PLACES == screw.DRAWING_PRECISION_BY_NAME["CutLength"]
     assert stack.GRIP_MM == screw.GRIP_MM

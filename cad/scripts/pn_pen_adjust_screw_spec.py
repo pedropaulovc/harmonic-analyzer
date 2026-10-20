@@ -39,7 +39,7 @@ from __future__ import annotations
 from _hole_spec import HoleSpec, NUMBER_DRILL_MM, THREAD_MAJOR_MM
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from pn_pen_rod_spec import STUD_ENGAGEMENT, STUD_TAP_SPEC, STUD_THREAD
-from mg_magnifying_wheel_geom import PEN_WIRE_DIA
+from _mg_wheel_rim_geometry import PEN_WIRE_DIA
 import pn_vn_pen_adjust_nut_spec as jam_nut
 
 THREAD = STUD_THREAD  # one source: the rod's top tap names the thread

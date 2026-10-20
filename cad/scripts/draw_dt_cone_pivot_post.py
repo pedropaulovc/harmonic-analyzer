@@ -42,6 +42,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _surface_finish
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as cone
+from dt_cone_post_envelope import BLOCK_DIA
 from _feature_requirements import part_metadata, requirement
 from _printed_limits import drilled_limits as _drilled_band
 from _printed_limits import limits as _band
@@ -93,7 +94,6 @@ from dt_cone_pivot_post_spec import (
     ATTACHMENT_CBORE_DIA,
     ATTACHMENT_X,
     BASIC_DIMENSIONS,
-    BLOCK_DIA,
     BLOCK_HEIGHT,
     BORE_DIA,
     BORE_HEIGHT,
@@ -327,11 +327,15 @@ CONE_AXIS_LABEL_TIP_RADIUS_MM = 16.0
 CONE_AXIS_LABEL_XY = (0.122, 0.2095)
 
 BODY = requirement(
-    "body", faces=(CylinderFace(cone.BLOCK_DIA),),
-    **_size_requirement("boss", {"dia": ("BLOCK_DIA", "MainBodyDia"), "height": ("BLOCK_HEIGHT", "MainBodyHt")}, {
+    "body", faces=(CylinderFace(BLOCK_DIA),),
+    kind="boss", requirements=("dia", "height"), fields={
+        "dia": (_band(BLOCK_DIA, _P["MainBodyDia"]), (("dt_cone_post_envelope", "BLOCK_DIA"),)),
+        "dia_nominal": (BLOCK_DIA, (("dt_cone_post_envelope", "BLOCK_DIA"),)),
+        "height": (_band(cone.BLOCK_HEIGHT, _P["MainBodyHt"]), ("BLOCK_HEIGHT",)),
+        "height_nominal": (cone.BLOCK_HEIGHT, ("BLOCK_HEIGHT",)),
         "frame": ("body_axis", (*_HEAD_SOURCES, ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
         "z_mm": ([0.0, round(cone.HEAD_BASE_Y, 12)], _HEAD_SOURCES),
-    }),
+    }, precision={"dia": _P["MainBodyDia"], "height": _P["MainBodyHt"]},
 )
 HEAD = requirement(
     "head", faces=(CylinderFace(cone.HEAD_DIA), PlanarFace((0, 1, 0), cone.BLOCK_HEIGHT)),
@@ -465,7 +469,7 @@ CONE_BOSS = requirement(
     "cone_boss", faces=(CylinderFace(cone.CONE_BOSS_DIA),),
     **_size_requirement("boss", {"dia": ("CONE_BOSS_DIA", "ConeBossDia")}, {
         "frame": ("cone_axis", ("BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES", ("draw_dt_cone_pivot_post", "_cone_source_frames"), ("draw_dt_cone_pivot_post", "build"))),
-        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", "BLOCK_DIA")),
+        "z_mm": ([round(-cone.CONE_BOSS_LENGTH / 2, 12), round(cone.CONE_BOSS_LENGTH / 2, 12)], ("CONE_BOSS_LENGTH", ("dt_cone_post_envelope", "BLOCK_DIA"))),
     }),
 )
 JOURNAL_BORE = requirement(

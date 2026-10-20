@@ -16,6 +16,7 @@ import pytest
 
 import ch_rocker_arm_notes
 import ch_rocker_arm_spec
+import _rocker_interface as rocker_interface
 import draw_ch_rocker_arm as drawing
 import build_ch_rocker_arm as arm
 import _drawing_detail_crop as detail_crop
@@ -23,7 +24,7 @@ from _drawing_layout_check import DrawableRegion
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
 from _layout_geometry import AnnotationGeometry, Box, Segment, segment_box_distance, text_overlap
 from _drawing_registry import DRAWINGS_BY_NAME
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
+from _cone_axis_constants import MECHANISM_X_SHIFT
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -83,29 +84,24 @@ def test_draw_view_math_matches_the_spec() -> None:
     # The drawing's view math reads the spec's nominal spans, not a divergent
     # copy; the spec's geometry must match the part the build actually builds.
     assert (drawing.ROD_HOLE_X, drawing.TOP_END_Y) == (
-        ch_rocker_arm_spec.ROD_HOLE_X,
+        rocker_interface.ROD_HOLE_X,
         ch_rocker_arm_spec.TOP_END_Y,
     )
-    assert ch_rocker_arm_spec.CURVE_RADIUS == arm.CURVE_RADIUS
-    assert ch_rocker_arm_spec.ARM_DEPTH == arm.ARM_DEPTH
     assert ch_rocker_arm_spec.ARM_THICKNESS == arm.ARM_THICKNESS
     assert ch_rocker_arm_spec.TOP_ARC_LEN == arm.TOP_ARC_LEN
     assert ch_rocker_arm_spec.BOT_ARC_LEN == arm.BOT_ARC_LEN
     assert ch_rocker_arm_spec.TIP_FACE == arm.TIP_FACE
-    assert ch_rocker_arm_spec.ROD_HOLE_X == arm.ROD_HOLE_X
     assert arm.ROD_HOLE_SPEC is ch_rocker_arm_spec.ROD_HOLE_SPEC
     assert drawing._ROD_HOLE_DIA == blind_cut_dia_mm(ch_rocker_arm_spec.ROD_HOLE_SPEC)
 
 
 def test_rod_pin_follows_the_recentered_cam_and_recloses_neutral_y() -> None:
     assert math.isclose(
-        ch_rocker_arm_spec.ROD_HOLE_X,
+        rocker_interface.ROD_HOLE_X,
         127.3738 - MECHANISM_X_SHIFT,
         abs_tol=1e-12,
     )
-    assert math.isclose(ch_rocker_arm_spec.ROD_HOLE_Y, 16.456064115939025, abs_tol=1e-12)
-    assert ch_rocker_arm_spec.ROD_HOLE_ABOVE_BOTTOM == arm.ROD_HOLE_ABOVE_BOTTOM
-    assert ch_rocker_arm_spec.ROD_HOLE_Y == arm.ROD_HOLE_Y
+    assert math.isclose(rocker_interface.ROD_HOLE_Y, 16.456064115939025, abs_tol=1e-12)
 
 
 def test_sheet_runs_at_1_to_2() -> None:
@@ -412,7 +408,7 @@ def test_datum_b_sits_on_the_projected_broad_face_above_the_hub_and_thickness_bl
     # inside the strap's height.
     ((_x, pick_y, pick_z),) = projected
     assert pick_z * 1000.0 == pytest.approx(ch_rocker_arm_spec.ARM_THICKNESS / 2.0)
-    hub_top = ch_rocker_arm_spec.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0
+    hub_top = rocker_interface.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0
     assert hub_top + 5.0 < pick_y * 1000.0 < ch_rocker_arm_spec.TOP_END_Y - 0.5
     assert calls[0]["edge_xy"] == _view_f_xy(pick_z * 1000.0, pick_y * 1000.0)
     # The tag box (~7 mm) hangs up-left of the pick, above the strap
@@ -621,8 +617,8 @@ def test_arc_profiles_attach_two_native_frames_to_nominal_circle_edges(
         x = (sheet_x - drawing.FRONT_CENTER[0]) / scale
         y = (sheet_y - drawing.FRONT_CENTER[1]) / scale + drawing.TOP_END_Y / 2.0
         assert x == pytest.approx(model_x)
-        assert y < ch_rocker_arm_spec.CENTER_Y
-        assert math.hypot(x, y - ch_rocker_arm_spec.CENTER_Y) == pytest.approx(radius)
+        assert y < rocker_interface.CENTER_Y
+        assert math.hypot(x, y - rocker_interface.CENTER_Y) == pytest.approx(radius)
 
 
 class _BetweenGtol:
@@ -1388,10 +1384,10 @@ def test_native_profile_guard_is_after_rebuild_and_before_export() -> None:
 def test_profile_zone_mirror_station_envelopes_and_template_aim() -> None:
     """Only at the mirror station is the arc normal vertical. These limits
     do not assert a rigid vertical offset of the curve at its ends."""
-    centre = ch_rocker_arm_spec.CENTER_Y
-    assert (ch_rocker_arm_spec.R_TOP, ch_rocker_arm_spec.R_BOTTOM) == (800.0, 816.0)
-    nominal_top = centre - ch_rocker_arm_spec.R_TOP - ch_rocker_arm_spec.PIVOT_MID_Y
-    nominal_bottom = centre - ch_rocker_arm_spec.R_BOTTOM
+    centre = rocker_interface.CENTER_Y
+    assert (ch_rocker_arm_spec.R_TOP, rocker_interface.R_BOTTOM) == (800.0, 816.0)
+    nominal_top = centre - ch_rocker_arm_spec.R_TOP - rocker_interface.PIVOT_MID_Y
+    nominal_bottom = centre - rocker_interface.R_BOTTOM
     assert nominal_top == pytest.approx(8.0)
     assert nominal_bottom == pytest.approx(0.0)
     assert drawing.TOP_EDGE_BAND is ch_rocker_arm_spec.TOP_EDGE_BAND
@@ -1538,7 +1534,7 @@ def test_view_f_size_blocks_stand_left_of_the_view_on_the_strap_and_under_it() -
     strap_left_x, _ = _view_f_xy(ch_rocker_arm_spec.ARM_THICKNESS / 2.0, 0.0)
     _, view_bottom = _view_f_xy(0.0, 0.0)
     _, view_top = _view_f_xy(0.0, ch_rocker_arm_spec.TOP_END_Y)
-    _, hub_top = _view_f_xy(0.0, ch_rocker_arm_spec.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0)
+    _, hub_top = _view_f_xy(0.0, rocker_interface.PIVOT_MID_Y + ch_rocker_arm_spec.HUB_DIA / 2.0)
     for block in (strap, hub):
         assert block.xmin - DRAWABLE.xmin >= 0.005
     # Each block clears the ink level with it: the strap's (above the hub)
@@ -1588,9 +1584,9 @@ def test_datum_g_and_its_basic_stand_right_of_the_hub_minus_z_face() -> None:
     face_x, landing_y = _view_f_xy(
         -spec.HUB_LENGTH / 2.0, drawing.HUB_FACE_DATUM_LANDING_Y_MM
     )
-    _, hub_bottom = _view_f_xy(0.0, spec.PIVOT_MID_Y - spec.HUB_DIA / 2.0)
-    _, pivot = _view_f_xy(0.0, spec.PIVOT_MID_Y)
-    _, hub_top = _view_f_xy(0.0, spec.PIVOT_MID_Y + spec.HUB_DIA / 2.0)
+    _, hub_bottom = _view_f_xy(0.0, rocker_interface.PIVOT_MID_Y - spec.HUB_DIA / 2.0)
+    _, pivot = _view_f_xy(0.0, rocker_interface.PIVOT_MID_Y)
+    _, hub_top = _view_f_xy(0.0, rocker_interface.PIVOT_MID_Y + spec.HUB_DIA / 2.0)
     assert hub_bottom < landing_y < pivot
     witness = drawing.FRONT_LEFT_WITNESS_X - drawing.ARROW_TEXT_CLEARANCE_M
     # The tag's box (~7 mm) leads straight out right from its landing.
@@ -2460,14 +2456,14 @@ def test_land_and_hub_sizes_are_marked_model_dimensions_at_normal_precision() ->
 
 def test_new_measured_quantities_follow_the_source_geometry_equations() -> None:
     spec = ch_rocker_arm_spec
-    alpha = spec.TOP_ARC_LEN / (2.0 * spec.CURVE_RADIUS)
+    alpha = spec.TOP_ARC_LEN / (2.0 * rocker_interface.CURVE_RADIUS)
     assert spec._ALPHA_TOP == pytest.approx(alpha)
     assert 2.0 * spec.ROD_TIP_X == pytest.approx(
-        2.0 * (spec.CURVE_RADIUS + spec.TIP_FACE) * math.sin(alpha),
+        2.0 * (rocker_interface.CURVE_RADIUS + spec.TIP_FACE) * math.sin(alpha),
     )
     assert spec.BOT_END_X == pytest.approx(
-        (spec.CURVE_RADIUS + spec.ARM_DEPTH)
-        * math.sin(spec.BOT_ARC_LEN / (2.0 * (spec.CURVE_RADIUS + spec.ARM_DEPTH))),
+        (rocker_interface.CURVE_RADIUS + rocker_interface.ARM_DEPTH)
+        * math.sin(spec.BOT_ARC_LEN / (2.0 * (rocker_interface.CURVE_RADIUS + rocker_interface.ARM_DEPTH))),
     )
     assert spec.TIP_FACE == pytest.approx(5.588)
     assert spec.HUB_DIA == pytest.approx(10.2)
@@ -2484,14 +2480,14 @@ def test_rod_hole_keeps_two_mm_normal_wall_to_the_real_k_taper_at_printed_bands(
     from _printed_tolerance import drilled_oversize_mm
 
     spec = ch_rocker_arm_spec
-    centre = (spec.ROD_HOLE_X, spec.ROD_HOLE_Y)
+    centre = (rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y)
     tip = (
         spec.ROD_TIP_X,
-        spec.TOP_END_Y + spec.TIP_FACE * (spec.TOP_END_Y - spec.CENTER_Y) / spec.R_TOP,
+        spec.TOP_END_Y + spec.TIP_FACE * (spec.TOP_END_Y - rocker_interface.CENTER_Y) / spec.R_TOP,
     )
     bottom = (
         spec.BOT_END_X,
-        spec.CENTER_Y - math.sqrt(spec.R_BOTTOM**2 - spec.BOT_END_X**2),
+        rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - spec.BOT_END_X**2),
     )
     direction = (bottom[0] - tip[0], bottom[1] - tip[1])
     fraction = sum(
@@ -3688,7 +3684,7 @@ def test_datum_g_lands_on_the_minus_z_face_then_basics_and_reads_back(
     assert calls == [
         (
             "circle",
-            (0.0, ch_rocker_arm_spec.PIVOT_MID_Y, face_z),
+            (0.0, rocker_interface.PIVOT_MID_Y, face_z),
             ch_rocker_arm_spec.HUB_DIA / 2.0,
             (0.0, 0.0, 1.0),
         ),

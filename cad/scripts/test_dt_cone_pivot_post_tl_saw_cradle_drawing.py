@@ -7,6 +7,7 @@ import re
 import _config
 import draw_dt_cone_pivot_post_tl_saw_cradle as drawing
 import dt_cone_pivot_post_spec as post
+from dt_cone_post_envelope import BLOCK_DIA
 import dt_cone_pivot_post_tl_saw_cradle_spec as spec
 import export_features
 from _printed_limits import limits
@@ -32,7 +33,7 @@ def test_every_body_the_post_print_allows_bottoms_on_the_seat_line() -> None:
     """The smallest printed seat is no smaller than the largest printed body,
     so every body lies on the seat bottoms; a post change that grows the body
     past the seat fails here, not at the saw."""
-    body_max = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1]
+    body_max = limits(BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1]
     for seat in ("head_seat", "foot_seat"):
         assert _features()[seat]["dia"][0] >= body_max - 1e-9
 
@@ -41,7 +42,7 @@ def test_unfitted_pad_stands_above_every_compliant_cap() -> None:
     """The pad is fitted down to the cap, never built up: its unfitted top
     clears the highest cap any compliant post presents to a seat bored at
     the top of its printed band."""
-    body = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
+    body = limits(BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
     boss = limits(post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
     seat_bottom_max = _features()["head_seat"]["height"][1]
     highest_cap = seat_bottom_max + (body[1] - boss[0]) / 2.0

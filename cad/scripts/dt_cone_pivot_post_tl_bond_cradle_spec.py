@@ -31,6 +31,7 @@ from dataclasses import dataclass
 
 import _config
 import dt_cone_pivot_post_spec as post
+from dt_cone_post_envelope import BLOCK_DIA
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, printed_band_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl, surface_finish_by_key
@@ -60,7 +61,7 @@ TAIL_SADDLE_THICK = 20.0
 # pins work from. Each seat is bored to suit its identified mate; the
 # diameter is a reference size and the callout's acceptance defines the fit.
 SEAT_AXIS_HEIGHT = -BASE_TOP_Z
-BODY_SEAT_DIA = post.BLOCK_DIA
+BODY_SEAT_DIA = BLOCK_DIA
 TAIL_SEAT_DIA = 44.45
 POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 # Callout lines stay narrow (run-15 review: wider blocks ran into the plan's

@@ -19,7 +19,7 @@ from ha_harmonic_analyzer_assembly_spec import (
     MEASURING_STICK,
     STUD_DROP_DIMENSION,
 )
-from paper_drive_geom import PEN_PAPER_CLEARANCE_MM
+from _recording_geometry import PEN_PAPER_CLEARANCE_MM
 
 DRAWING_NUMBER = steps.DRAWING_NUMBER
 

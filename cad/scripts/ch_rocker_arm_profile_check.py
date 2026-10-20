@@ -33,6 +33,7 @@ import math
 import tomllib
 
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_outline_template_spec as template
 import draw_ch_rocker_arm as drawing
 from _process_plans import PROCESS_ROOT
@@ -51,7 +52,7 @@ ZONE_MM = float(drawing.ARC_PROFILE_ZONE_MM)
 OUTSIDE_MM = {
     frame: float(value) for frame, value in drawing.ARC_PROFILE_OUTSIDE_MM.items()
 }
-_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
+_CENTRE = (0.0, rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y)
 _XY = tuple[float, float]
 
 
@@ -110,11 +111,11 @@ SEGMENTS: dict[str, dict] = {
     "bottom arc": {
         "features": ("profile_outer",),
         "frame": "BottomRadius",
-        "label": f"the R{rocker.R_BOTTOM:g} bottom arc",
+        "label": f"the R{rocker_interface.R_BOTTOM:g} bottom arc",
         "edge": lambda s: _arc(template.R_BOTTOM, s * template.BOT_END_X),
         "length": template.R_BOTTOM * template.ALPHA_BOT,
         "tau": lambda q: (
-            rocker.R_BOTTOM - _radial(q)
+            rocker_interface.R_BOTTOM - _radial(q)
         ),  # the material lies toward the centre
     },
 }
@@ -199,7 +200,7 @@ def method_steps() -> list[str]:
     return [
         f"Both printed profile zones, read against the arm outline template (gauges.arm-outline-template) "
         f"pinned in datums A and C: the top edge ({ZONE_MM:g}, all outside the R{rocker.R_TOP:g} BASIC arc) and "
-        f"the lower outline J to K ({ZONE_MM:g}, all inside the BASIC outline: the R{rocker.R_BOTTOM:g} arc, both "
+        f"the lower outline J to K ({ZONE_MM:g}, all inside the BASIC outline: the R{rocker_interface.R_BOTTOM:g} arc, both "
         f"tapers and both tip lands, so the tip_land_pos_x and tip_land_neg_x zones are read here too). Done on "
         f"the granite surface plate (gauges.granite-surface-plate), off the rest plate.",
         "Clean the arm, the template and both pins and leave them on the granite for 30 min to reach its temperature.",

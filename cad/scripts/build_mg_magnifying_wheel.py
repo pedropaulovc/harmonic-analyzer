@@ -61,13 +61,19 @@ from _drawing_tolerances import (
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
-from mg_magnifying_wheel_geom import (
-    BORE_DIA,
-    CAST_ROUND_R,
+from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
     GROOVE_R,
     GROOVE_R_BAND,
+    RIM_AXIAL,
+    RIM_INNER_DIA,
+    RIM_OUTER_DIA,
+    RIM_RING_RADIAL,
+)
+from mg_magnifying_wheel_geom import (
+    BORE_DIA,
+    CAST_ROUND_R,
     HUB_BACK_Z,
     HUB_DIA,
     HUB_DIA_BAND,
@@ -76,11 +82,7 @@ from mg_magnifying_wheel_geom import (
     HUB_LEN,
     HUB_LEN_BAND,
     HUB_STEP_Z,
-    RIM_AXIAL,
     RIM_FILLET_R,
-    RIM_INNER_DIA,
-    RIM_OUTER_DIA,
-    RIM_RING_RADIAL,
     SPIGOT_DIA,
     SPIGOT_LEN,
     SPIGOT_LEN_BAND,
@@ -109,6 +111,7 @@ from mg_magnifying_wheel_spec import (
     ISOMETRIC_VIEW_NOTE,
     SURFACE_FINISHES,
 )
+from mg_wheel_bar_geom import WHEEL_BAR_Y as _YOKE_WHEEL_Y
 
 PART_NAME = "mg-magnifying-wheel"
 MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
@@ -124,7 +127,6 @@ MATERIAL = "Gray Cast Iron"  # see _appearance.apply_material docstring
 # is layout-derived, so it is imported from mg_vn_lever_wire_geom: a layout move
 # re-tangents the wire AND re-stamps this point in one rebuild.
 from mg_vn_lever_wire_geom import (  # noqa: E402
-    WHEEL_BAR_Y as _YOKE_WHEEL_Y,
     WHEEL_X as _YOKE_WHEEL_X,
     YOKE_POINT as _YOKE_POINT,
 )

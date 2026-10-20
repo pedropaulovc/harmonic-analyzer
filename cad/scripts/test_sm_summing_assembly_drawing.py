@@ -18,7 +18,7 @@ from _assembly_contract import assembly_contract
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
-from dt_cone_pivot_post_installation import SUMMING_Z
+from _cone_axis_constants import SUMMING_Z
 
 
 def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:

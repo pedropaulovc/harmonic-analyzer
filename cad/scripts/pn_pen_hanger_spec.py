@@ -10,7 +10,7 @@ Frame: origin at the strap's top-right BACK corner -- on the wheel bar's front
 face, level with the bar top, on the rod line's x.  The part is authored
 MACHINE-handed and placed IDENTITY, so local axes are machine axes: the strap
 occupies y -170..0, z -3..0; the rod axis is local (0, ., ``ROD_AXIS_Z``).
-The rod line itself (``paper_drive_geom.PEN_ROD_X`` / ``PEN_Z_MID``) is never
+The rod line itself (``_recording_geometry.PEN_ROD_X`` / ``PEN_Z_MID``) is never
 restated here.
 """
 
@@ -21,9 +21,10 @@ import math
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from mg_vn_lever_wire_geom import WHEEL_BAR_Y
+from mg_wheel_bar_geom import WHEEL_BAR_Y
 from mg_wheel_bar_geom import BAR_FRONT_Z, BAR_SIDE, HANGER_SCREW_MACHINE_X
-from paper_drive_geom import PEN_ROD_X, PEN_Z_MID, PLATEN_BOTTOM_Y
+from _recording_geometry import PEN_ROD_X, PEN_Z_MID
+from _paper_drive_placement import PLATEN_BOTTOM_Y
 from pd_platen_spec import PLATE_HEIGHT as PLATEN_HEIGHT
 from pn_pen_rod_spec import ROD_SECTION, SECTION_BAND as ROD_SECTION_BAND
 from pn_vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA

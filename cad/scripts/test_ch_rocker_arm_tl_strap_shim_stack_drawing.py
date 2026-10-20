@@ -7,7 +7,7 @@ import re
 import pytest
 
 import _config
-import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_strap_shim_stack_spec as spec
 import draw_ch_rocker_arm_tl_strap_shim_stack as drawing
 import export_features
@@ -72,7 +72,7 @@ def test_s4_stacks_stay_inside_the_arm_strap_band() -> None:
     # The arm's depth bounds the band the stations sit in.
     for x, y in spec.S4_STATIONS:
         bottom, top = spec._strap_band(x)
-        assert top - bottom == pytest.approx(rocker.ARM_DEPTH, abs=0.5)
+        assert top - bottom == pytest.approx(rocker_interface.ARM_DEPTH, abs=0.5)
         assert bottom < y < top
 
 

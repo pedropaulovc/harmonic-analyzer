@@ -54,8 +54,6 @@ from __future__ import annotations
 import math
 import sys
 
-from dt_cone_pivot_post_installation import MECHANISM_X_SHIFT
-
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -88,6 +86,15 @@ from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE, RIGHT_VIEW_NOTE
 from ch_rocker_arm_notes import HUB_ROOT_PREFIX, HUB_ROOT_R_BAND, HUB_ROOT_R_TOL_TYPE
 from ch_rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
+from _rocker_interface import (
+    ARM_DEPTH,
+    CENTER_Y,
+    CURVE_RADIUS,
+    PIVOT_MID_Y,
+    R_BOTTOM,
+    ROD_HOLE_X,
+    ROD_HOLE_Y,
+)
 from ch_rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
     ARM_THICKNESS_BAND,
@@ -96,7 +103,6 @@ from ch_rocker_arm_spec import (
     HUB_LENGTH_BAND,
     HUB_ROOT_RADIUS_MAX,
     PIVOT_HOLE_BAND,
-    PIVOT_MID_Y,
     ROD_HOLE_SPEC,
     SURFACE_FINISHES,
     TOP_EDGE_ABOVE_PIVOT,
@@ -107,8 +113,6 @@ import _config
 PART_NAME = "ch-rocker-arm"
 MATERIAL = "Plain Carbon Steel"  # see _appearance.apply_material docstring
 
-CURVE_RADIUS = 800.0  # DIMENSIONS.md ch14: top edge R = amplitude bar length (stated)
-ARM_DEPTH = 16.0  # ch14: p.29 photo callout, perpendicular top-to-bottom depth
 ARM_THICKNESS = 2.5  # ch14: p.27 photo callout (plate thickness, Z)
 TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view, manual)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
@@ -121,8 +125,8 @@ HUB_PROUD = (HUB_LENGTH - ARM_THICKNESS) / 2.0  # 2.278 each face
 if ARM_THICKNESS != SPEC_ARM_THICKNESS:
     raise AssertionError("ch_rocker_arm_spec.ARM_THICKNESS drifted from the build")
 # The rod-pin native drill identity is part-owned by ch_rocker_arm_spec.
-ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
-# bottom-arc end (132.76): solved so the pin sits DIRECTLY ABOVE the phased cam
+# The interface's rod-pin position follows the bottom-arc end (132.76): solved
+# so the pin sits DIRECTLY ABOVE the phased cam
 # lobe (machine X is DRUM_X + ECC*sin(1.5 deg), lobe UP at the
 # cos-mode home pose) with the pivot at the seesaw mid-span (+72.9) and the arm
 # LEVEL -- the ch30 photos show every connecting rod hanging PLUMB from the arm
@@ -131,16 +135,14 @@ ROD_HOLE_X = 127.3738 - MECHANISM_X_SHIFT
 # (bottom-arc end predicts -59.9 at the level pose). Supersedes 127.49, the
 # same plumb solve at the pre-ROM-fit lobe-down phase (ring x 54.78), and
 # M6.3's 25.4 ("1 inch from the pivot", pre-ch30 arbor-47.5 layout).
-ROD_HOLE_ABOVE_BOTTOM = 5.53312035905  # preserves the old 15.302534 world/local Y
+# ROD_HOLE_ABOVE_BOTTOM preserves the old 15.302534 world/local Y
 # after the X re-anchor moves along the curved bottom edge. This keeps the
 # unchanged-length rod plumb and the neutral arm level.
 THROUGH_CUT_DEPTH = 20.0  # mid-plane total; > thickness
 
 # Arc centre sits ARM_DEPTH above the pivot's bottom edge: bottom edge is an
 # R816 arc, top edge the concentric R800 arc through (0, 16).
-CENTER_Y = CURVE_RADIUS + ARM_DEPTH
 R_TOP = CURVE_RADIUS
-R_BOTTOM = CURVE_RADIUS + ARM_DEPTH
 if abs(CENTER_Y - PIVOT_MID_Y - R_TOP - TOP_EDGE_ABOVE_PIVOT) > 1e-9:
     raise AssertionError("the CenterY equation must rebuild the modelled centre")
 
@@ -172,11 +174,6 @@ def _mid_y(x: float) -> float:
     by = _bottom_point(x)[1]
     ty = CENTER_Y - math.sqrt(R_TOP**2 - x * x)
     return (by + ty) / 2.0
-
-
-# Rod-pin hole centre: LOW in the strap (ch14 fan photo), not mid-depth like
-# the pivot. Assembly scripts import this (imported-not-copied, like _mid_y).
-ROD_HOLE_Y = _bottom_point(ROD_HOLE_X)[1] + ROD_HOLE_ABOVE_BOTTOM  # 15.303
 
 
 def _as_construction(adapter, entity_id: str) -> None:

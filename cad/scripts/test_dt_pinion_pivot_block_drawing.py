@@ -22,10 +22,10 @@ from _hole_spec import blind_cut_dia_mm
 def test_raised_pivot_follows_bank_without_changing_the_upper_envelope() -> None:
     import cone_line
     import dt_pinion_pivot_block_geometry as geometry
-    import dt_post_mount_stack
+    import _cone_axis_constants
     import pinion_rig_park_geometry as park
 
-    raise_mm = dt_post_mount_stack.AXIS_RAISE_MM
+    raise_mm = _cone_axis_constants.AXIS_RAISE_MM
     assert geometry.BORE_UP == pytest.approx(12.0 + raise_mm)
     assert geometry.BLOCK_HEIGHT == pytest.approx(20.5 + raise_mm)
     assert geometry.BLOCK_TOP_Y == pytest.approx(8.5)

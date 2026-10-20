@@ -12,6 +12,8 @@ ONE-zero transfer reporting; it never replaces total budget qualification.
 from __future__ import annotations
 
 import math
+import _paper_drive_placement as _placement
+import _recording_geometry as _recording
 
 import pd_rack_pinion_spec
 import pd_transgear_feed_pinion_spec
@@ -19,20 +21,13 @@ import pd_transgear_knob_shaft_spec
 import pd_transgear_removable_spec
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
-from pd_latch_hook_geometry import BAR_CENTRE_Y
-import pd_platen_spec as platen
 import pd_latch_hook_geometry as hook
 import pd_transgear_pivot_spacer_spec as spacer
 import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_latch_hook_spec as hook_spec
-import mg_magnifying_wheel_geom
-import mg_wheel_bar_geom
 from _printed_tolerance import angular_band_deg
 from _gear_quality import (
     rack_flank_constraint_deviation_mm,
-    rack_form_admission_controls,
-    rack_working_side_angle_deviation_deg,
-    purchased_rack_working_side_form_model_premise,
     pinion_pitch_index_deviation_mm,
     rack_face_lead_deviation_mm,
     rack_face_width_max_mm,
@@ -43,8 +38,6 @@ from _gear_quality import (
     reducer_axis_projected_zone_diameter_mm,
     reducer_position_diameter_mm,
     toothspace_runout_tir_mm,
-    wire_measurement_uncertainty_mm,
-    pitch_index_measurement_uncertainty_mm,
 )
 
 MM_PER_IN = 25.4
@@ -62,61 +55,6 @@ NET_RACK_TRAVEL_PER_CRANK_REV = CHAIN_RATIO * GEAR_RATIO * math.pi * FEED_PITCH_
 # Swapping the selected removables end for end multiplies the feed by the
 # inverse chain ratio squared.
 COARSE_FEED_RATIO = (1.0 / CHAIN_RATIO) ** 2
-
-# Keep the existing pivot/latch/stud pose. Mount the stock rack and backer at
-# the shifted feed pitch line; relocate only the reducer's knob bearing.
-PLATEN_BOTTOM_Y = 273.234
-PIVOT_XY = (bar.PIVOT_TAP_X, BAR_CENTRE_Y + bar.HANGER_TAP_Y)
-STUD_XY = (
-    arm.STUD_MACHINE_X,
-    PIVOT_XY[1] + arm.PIN_STATION * arm.ARM_U[1],
-)
-KNOB_SHAFT_XY = (
-    PIVOT_XY[0]
-    + arm.KNOB_BORE_STATION * arm.ARM_U[0]
-    + arm.KNOB_BORE_OFFSET * arm.ARM_N[0],
-    PIVOT_XY[1]
-    + arm.KNOB_BORE_STATION * arm.ARM_U[1]
-    + arm.KNOB_BORE_OFFSET * arm.ARM_N[1],
-)
-RACK_PITCH_Y = STUD_XY[1] + pd_transgear_feed_pinion_spec.RACK_AXIS_DISTANCE
-RACK_TIP_Y = RACK_PITCH_Y - pd_transgear_feed_pinion_spec.MODULE_MM
-RACK_CREST_DROP = PLATEN_BOTTOM_Y - RACK_TIP_Y
-
-
-# Actual recording geometry, shared with the paper and pen native builders.
-# These are source anchors, not a reduced paper stroke or nominal-only gate.
-RECORDING_PAPER_WIDTH_MM = 233.2386
-RECORDING_PAPER_HEIGHT_MM = 80.5
-# Machine -X edge of the platen to the paper's -X edge. The sheet sits as close
-# to centred between the brass edge clips as the finite rack allows: the pen
-# nib (PEN_NIB_X_MM, set by the CG-balanced rod line) lies 15.2 to -X of the
-# feed stud, so a centred sheet (18.2007 each side) would sweep its far edge
-# past the rack's engaged-feed window. This is the largest 0.1-grid inset that
-# keeps the full located sweep >= 1.0 inside that window
-# (test_paper_drive_rack_travel asserts both the margin and the grid optimum;
-# the window comes from pd_paper_drive_assembly_steps, which imports this module).
-RECORDING_PAPER_LEFT_INSET_MM = 14.6
-RECORDING_PAPER_RIGHT_INSET_MM = (
-    platen.PLATE_WIDTH - RECORDING_PAPER_WIDTH_MM - RECORDING_PAPER_LEFT_INSET_MM
-)
-PAPER_FRONT_Z = (
-    hook.BAR_BACK_FACE_Z - bar.BAR_DEPTH - platen.PLATE_THICKNESS - 0.5
-)
-# The pen rod line. x: plumb under the magnifying wheel's rim-tangent wire (the
-# wire hangs from the rim groove's 3 o'clock point straight onto the adjuster
-# stud eye on the rod axis). z: the paper-most 0.1-grid line on which the pen
-# stirrup's paper-side corner still stands 2 x 0.25 off the paper with the
-# v-block's pivot bore where the CG balance puts it (pn_pen_carriage_geom;
-# test_pn_pen_carriage_geom asserts both). The magnifying wheel's rim plane
-# derives from it (mg_wheel_group.WHEEL_MID_Z).
-PEN_ROD_X = round(mg_wheel_bar_geom.WHEEL_X - mg_magnifying_wheel_geom.RIM_WIRE_R, 6)
-PEN_Z_MID = -162.5
-PEN_BLOCK_YAW_DEG = 45.0
-PEN_PAPER_CLEARANCE_MM = 0.25
-PEN_NIB_X_MM = PEN_ROD_X - math.tan(math.radians(PEN_BLOCK_YAW_DEG)) * (
-    PAPER_FRONT_Z - PEN_PAPER_CLEARANCE_MM - PEN_Z_MID
-)
 
 
 def _trig_range(angle_band: tuple[float, float], function) -> tuple[float, float]:
@@ -149,7 +87,7 @@ def _loaded_hanger_bounds() -> tuple[float, float, float]:
         raise ValueError("source pivot running clearance must be positive and ordered")
     radius = clearance_high / 2.0
     hx, hy = hook.PIN_AXIS_XY
-    dx, dy = hx - PIVOT_XY[0], hy - PIVOT_XY[1]
+    dx, dy = hx - _placement.PIVOT_XY[0], hy - _placement.PIVOT_XY[1]
     distance = math.hypot(dx, dy)
     # The hook's screw float, its formed band along the run and the ear's
     # bend change incidence across assemblies, though they do not float in
@@ -274,65 +212,17 @@ def recording_paper_sweep_bands_mm() -> dict[str, tuple[float, float]]:
     pen = recording_pen_x_deviation_mm() + static_axis
     return {
         "paper_left_inset_band_mm": (
-            RECORDING_PAPER_LEFT_INSET_MM - inset,
-            RECORDING_PAPER_LEFT_INSET_MM + inset,
+            _recording.RECORDING_PAPER_LEFT_INSET_MM - inset,
+            _recording.RECORDING_PAPER_LEFT_INSET_MM + inset,
         ),
         "paper_width_band_mm": (
-            RECORDING_PAPER_WIDTH_MM - width, RECORDING_PAPER_WIDTH_MM + width,
+            _recording.RECORDING_PAPER_WIDTH_MM - width, _recording.RECORDING_PAPER_WIDTH_MM + width,
         ),
         "pen_x_from_running_axis_band_mm": (
-            PEN_NIB_X_MM - pen - axis_high,
-            PEN_NIB_X_MM + pen - axis_low,
+            _recording.PEN_NIB_X_MM - pen - axis_high,
+            _recording.PEN_NIB_X_MM + pen - axis_low,
         ),
     }
-
-
-def feed_rack_form_admission_controls() -> dict:
-    """Whole material controls plus a named bounded WORKING-SIDE model."""
-    return rack_form_admission_controls()
-
-
-def feed_rack_working_side_angle_band_rad() -> tuple[float, float]:
-    """Source PA band for straight/smooth SIDES only, not crest/root normals."""
-    purchased_rack_working_side_form_model_premise()
-    nominal = pd_transgear_feed_pinion_spec.PRESSURE_ANGLE_DEG
-    deviation = rack_working_side_angle_deviation_deg()
-    if not 0.0 < nominal - deviation <= nominal + deviation < 90.0:
-        raise ValueError("rack working-side source PA band must be acute and positive")
-    return (
-        math.nextafter(math.radians(nominal - deviation), -math.inf),
-        math.nextafter(math.radians(nominal + deviation), math.inf),
-    )
-
-
-def feed_rack_receiving_constraint_uncertainty_mm() -> float:
-    """Instrument-only signed-intercept U floor; never the complete method U.
-
-    Centre-X/over-pins and actual wire DIAMETER use the +/- mic uncertainty;
-    centre-Y uses the indicator uncertainty. The radius correction's actual
-    normal projection coefficient is at most sec(PA), not assumed equal to
-    nominal. Angle/model, datum, certification and thermal terms still need
-    independently paid method enclosures.
-    """
-    mic = wire_measurement_uncertainty_mm()
-    indicator = pitch_index_measurement_uncertainty_mm()
-    alpha = math.radians(pd_transgear_feed_pinion_spec.PRESSURE_ANGLE_DEG)
-    return math.nextafter(
-        mic + math.tan(alpha) * indicator + mic / (2.0 * math.cos(alpha)),
-        math.inf,
-    )
-
-
-def feed_rack_receiving_boundary_uncertainty_mm() -> float:
-    """Instrument-only XY point-envelope U floor; not a sampling theorem."""
-    return math.nextafter(math.hypot(
-        wire_measurement_uncertainty_mm(), pitch_index_measurement_uncertainty_mm()
-    ), math.inf)
-
-
-def feed_rack_receiving_root_uncertainty_mm() -> float:
-    """Instrument-only root-height U floor; whole root material is still needed."""
-    return pitch_index_measurement_uncertainty_mm()
 
 
 def feed_service_cocking_lateral_deviation_mm() -> float:

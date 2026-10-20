@@ -53,12 +53,12 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _sprocket_seat_geometry import PLATE
 from pd_transgear_removable_spec import (
     DEFAULT_CONFIG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_DIMENSIONS,
-    PLATE,
     TEETH,
     outside_dia,
 )

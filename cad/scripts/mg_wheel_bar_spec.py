@@ -15,7 +15,6 @@ from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
     AXLE_BORE_BAND,
     AXLE_BORE_DIA,
     AXLE_BORE_X,
-    BAR_DEPTH,
     BAR_LENGTH,
     BAR_SIDE,
     BORE_MIN_WALL,

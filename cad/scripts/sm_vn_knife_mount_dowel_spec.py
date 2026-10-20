@@ -48,7 +48,7 @@ DIA_MAX = DIA + max(DIA_BAND)  # 3.18262
 DIA_MIN = DIA + min(DIA_BAND)  # 3.17754
 # The pressed end's chamfer: the length of it that grips nothing.
 CHAMFER_LEN = ENDS.chamfer_len(DIA)  # 0.443
-# The family's length grade, +/-0.010 in (``dt_crankshaft_spec``'s
+# The family's length grade, +/-0.010 in (``_sprocket_seat_geometry``'s
 # DRIVE_PIN_LENGTH_GRADE for the same 98381A family).
 LENGTH_GRADE = 0.010 * MM_PER_IN  # 0.254
 

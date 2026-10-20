@@ -64,7 +64,8 @@ from pd_platen_guide_spec import (
     SURFACE_FINISHES,
     TAPPED_HOLE_SPEC,
 )
-from pd_support_bar_spec import BAR_DEPTH, BAR_DEPTH_BAND
+from _column_clamp_interface import BAR_DEPTH
+from pd_support_bar_spec import BAR_DEPTH_BAND
 
 PART_NAME = "pd-platen-guide"
 MATERIAL = "Plain Carbon Steel"

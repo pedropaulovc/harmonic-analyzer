@@ -233,7 +233,7 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),
-    ("pd_transgear_removable_spec", "PLATE_BAND"): (
+    ("_sprocket_seat_geometry", "PLATE_BAND"): (
         "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
         "air and the chain envelope's reach"
     ),

@@ -16,7 +16,7 @@ import pytest
 
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_knob_shaft_spec as shaft
-import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as removable
 import pd_transgear_thumbnut_spec as nut
 from _printed_tolerance import angular_band_deg, printed_band_mm
 

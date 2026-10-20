@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import build_dt_crankshaft as part
+import _sprocket_seat_geometry as seat_geometry
 import dt_crank_hub_geometry as geometry
 import dt_crankshaft_notes as notes
 import dt_crankshaft_spec as spec
@@ -124,7 +125,7 @@ def test_seat_collar_lands_the_wheel_seat_and_bears_on_the_post_boss() -> None:
     # washer), and stays short of the outboard journal land.
     import build_dt_drive_train_assembly as bdt
     import dt_cone_pivot_post_spec as post
-    import pd_transgear_removable_spec as removable
+    import _sprocket_seat_geometry as removable
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
@@ -180,11 +181,11 @@ def test_spigot_rim_is_the_shortfall_the_sheet_states() -> None:
     # the printed bands, rounded down so it never claims more rim than exists.
     hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
     nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
-    worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
+    worst = (spec.SPIGOT_DIA + seat_geometry.SPIGOT_DIA_BAND[1]) / 2.0 - (
         spec.DRIVE_PIN_CIRCLE_RADIUS
-        + spec.DRIVE_PIN_OFFSET_TOL
+        + seat_geometry.DRIVE_PIN_OFFSET_TOL
         + hole_r
-        + spec.DRIVE_PIN_HOLE_BAND[0] / 2.0
+        + seat_geometry.DRIVE_PIN_HOLE_BAND[0] / 2.0
     )
     rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
     assert rim == _floor_2(worst)

@@ -21,7 +21,7 @@ import sm_summing_explode_spec as explode
 from _assembly_patterns import ensure_global_pattern_axis
 from _com import _early_bound
 from _simplified_names import simplified_name
-from dt_cone_pivot_post_installation import SUMMING_Z
+from _cone_axis_constants import SUMMING_Z
 
 _SW_SEL_EXPLVIEWS = 43
 

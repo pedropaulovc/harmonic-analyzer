@@ -22,6 +22,7 @@ from typing import Any
 
 import _telemetry
 import dt_cone_pivot_post_spec as post
+from dt_cone_post_envelope import BLOCK_DIA
 import crank_boss_rim
 from _com import _early_bound
 
@@ -58,7 +59,7 @@ def post_features_at(point: tuple[float, float, float]) -> tuple[str, ...]:
         and off_cone_axis <= post.CONE_BOSS_DIA / 2.0 + tol,
         "head": abs(post_radial - post.HEAD_DIA / 2.0) <= tol
         and crank_boss_rim.HEAD_Y[0] - tol <= y <= crank_boss_rim.HEAD_Y[1] + tol,
-        "body": abs(post_radial - post.BLOCK_DIA / 2.0) <= tol
+        "body": abs(post_radial - BLOCK_DIA / 2.0) <= tol
         and crank_boss_rim.BODY_Y[0] - tol <= y <= crank_boss_rim.HEAD_Y[0] + tol,
     }
     return tuple(name for name, hit in features.items() if hit) or ("unclassified",)

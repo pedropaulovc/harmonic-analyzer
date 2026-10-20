@@ -21,6 +21,7 @@ from _hole_spec import blind_cut_dia_mm
 
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
+import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
 from pd_transgear_arm_geometry import (
@@ -157,7 +158,7 @@ GEOMETRIC_CONTROLS += (
 # the callout keeps the hole's own requirements only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
 LOCATOR_CALLOUT = (
     "2X REAM, FLAT BOTTOM\n"
-    f"BREAK EDGE {ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
+    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
 )
 
 # --- Printed text -------------------------------------------------------------

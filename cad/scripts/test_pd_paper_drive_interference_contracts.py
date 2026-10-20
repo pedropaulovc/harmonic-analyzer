@@ -34,7 +34,7 @@ import pd_vn_transgear_latch_pin_spec as latch_pin
 import pd_vn_transgear_pivot_screw_spec as pivot_screw
 from _mcmaster_90325a174 import NECK_FLAT_END
 import pd_transgear_pivot_spacer_spec as spacer
-import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as removable
 import pd_transgear_pin_spec as pin
 import pd_vn_transgear_retaining_ring_spec as ring
 import pd_transgear_thumbnut_spec as thumbnut
@@ -224,9 +224,10 @@ def test_locating_dowels_press_into_the_arm_and_slip_in_the_plate() -> None:
     """MHA-PD-VN-64 presses into the arm's blind reams over its insertion
     (length less proud), short of the floor, and slips in the plate."""
     import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
+    import _transgear_arm_plate_locating_interface as interface
 
     allowed = _allowed()
-    insertion = dowel.LENGTH - dowel.PROUD_MM
+    insertion = dowel.LENGTH - interface.PROUD_MM
     assert dowel.DIA > arm.LOCATOR_HOLE_DIA_MM
     assert insertion < arm.LOCATOR_BLIND_DEPTH_MM
     assert dowel.DIA <= plate.LOCATOR_HOLE_DIA_MM

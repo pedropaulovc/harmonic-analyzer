@@ -31,6 +31,7 @@ import ch_connecting_rod_notes as rod_notes
 import ch_connecting_rod_spec as rod
 import ch_rocker_arm_notes as arm_notes
 import ch_rocker_arm_spec as arm
+import _rocker_interface as rocker_interface
 import ch_rod_pivot_pin_spec as pin
 import dt_cylinder_gear_spec as gear
 import draw_ch_rocker_arm as arm_drawing
@@ -337,7 +338,7 @@ def test_printed_profile_controls_are_their_sources() -> None:
     }
     assert keywords["dimensions_by_feature"] == "DRAWING_DIMENSIONS"
     assert (arm_drawing.R_TOP, arm_drawing.R_BOTTOM, arm_drawing.CENTER_Y) == (
-        arm.R_TOP, arm.R_BOTTOM, arm.CENTER_Y
+        arm.R_TOP, rocker_interface.R_BOTTOM, rocker_interface.CENTER_Y
     )
     assert arm_drawing.TOP_EDGE_BAND is arm.TOP_EDGE_BAND
     assert arm_drawing.ARC_PROFILE_ZONE_MM == f"{arm.TOP_EDGE_BAND[0]:g}"
@@ -350,9 +351,9 @@ def test_printed_profile_controls_are_their_sources() -> None:
     assert bottom == (-arm.TOP_EDGE_BAND[0], arm.TOP_EDGE_BAND[1])
     # At the mirror station n_top=+Y and n_bottom=-Y. Height is the SAME
     # normal zone evaluated here, not another independent centre translation.
-    assert arm.CENTER_Y - arm.R_TOP - arm.PIVOT_MID_Y == arm.TOP_EDGE_ABOVE_PIVOT
+    assert rocker_interface.CENTER_Y - arm.R_TOP - rocker_interface.PIVOT_MID_Y == arm.TOP_EDGE_ABOVE_PIVOT
     assert tuple(
-        arm.CENTER_Y - (arm.R_TOP - d) - arm.PIVOT_MID_Y for d in top
+        rocker_interface.CENTER_Y - (arm.R_TOP - d) - rocker_interface.PIVOT_MID_Y for d in top
     ) == pytest.approx(tuple(arm.TOP_EDGE_ABOVE_PIVOT + d for d in top))
     assert arm_notes.DEFAULT_DRAWING_PRECISION == 2
     assert "RodTipLen" not in arm_notes.DRAWING_PRECISION.get("StrapProfile", {})
@@ -379,9 +380,9 @@ def _profile_endpoints(
     joining these endpoints, not independently profile-offset faces.
     """
     top_x = tip_x - land_length * math.sin(land_angle)
-    top_y = arm.CENTER_Y - math.sqrt((arm.R_TOP - top_outward) ** 2 - top_x**2)
-    bottom_y = arm.CENTER_Y - math.sqrt(
-        (arm.R_BOTTOM + bottom_outward) ** 2 - taper_x**2
+    top_y = rocker_interface.CENTER_Y - math.sqrt((arm.R_TOP - top_outward) ** 2 - top_x**2)
+    bottom_y = rocker_interface.CENTER_Y - math.sqrt(
+        (rocker_interface.R_BOTTOM + bottom_outward) ** 2 - taper_x**2
     )
     return np.array([
         (top_x, top_y),
@@ -398,7 +399,7 @@ def test_profile_limits_move_independently_and_bound_only_the_arcs() -> None:
     assert nominal == pytest.approx(np.array([
         (arm.TOP_END_X, arm.TOP_END_Y),
         (arm.ROD_TIP_X, arm.TOP_END_Y - arm.TIP_FACE * math.cos(angle)),
-        (arm.BOT_END_X, arm.CENTER_Y - math.sqrt(arm.R_BOTTOM**2 - arm.BOT_END_X**2)),
+        (arm.BOT_END_X, rocker_interface.CENTER_Y - math.sqrt(rocker_interface.R_BOTTOM**2 - arm.BOT_END_X**2)),
     ]))
     top_only = _profile_endpoints(top[1], 0.0, *nominal_args)
     bottom_only = _profile_endpoints(0.0, bottom[0], *nominal_args)
@@ -422,12 +423,12 @@ def test_profile_limits_move_independently_and_bound_only_the_arcs() -> None:
         (arm.BOT_END_X - two_place, arm.BOT_END_X + two_place),
     ):
         endpoints = _profile_endpoints(top_d, bottom_d, tip_x, length, land_angle, taper_x)
-        radius = arm.R_BOTTOM + bottom_d
+        radius = rocker_interface.R_BOTTOM + bottom_d
         # Triangle inequality bounds even intermediate lengths at the BASIC
         # land angle; disc convexity then bounds the whole straight taper.
         assert arm.R_TOP - top_d + length < radius
-        assert np.all(np.linalg.norm(endpoints - (0.0, arm.CENTER_Y), axis=1) <= radius + 1e-9)
-        assert np.all(endpoints[:, 1] < arm.CENTER_Y)
+        assert np.all(np.linalg.norm(endpoints - (0.0, rocker_interface.CENTER_Y), axis=1) <= radius + 1e-9)
+        assert np.all(endpoints[:, 1] < rocker_interface.CENTER_Y)
         assert endpoints[2, 0] < endpoints[0, 0] < endpoints[1, 0]
 
 
@@ -453,7 +454,7 @@ def _continued_circle_clearance(
     """Exact continuous-swing lower bound, not a sampled outline minimum."""
     loss = _joint_translation_allowance()
     half_window = width / 2.0 + loss
-    vx, vy = -arm.ROD_HOLE_X, centre_y - arm.ROD_HOLE_Y
+    vx, vy = -rocker_interface.ROD_HOLE_X, centre_y - rocker_interface.ROD_HOLE_Y
     lo, hi = map(math.radians, pin.RELATIVE_SWING_DEG)
     assert -math.pi / 2.0 < lo <= hi < math.pi / 2.0
     cy_min = vy * min(math.cos(lo), math.cos(hi)) - abs(vx) * max(
@@ -493,9 +494,9 @@ def _profile_crotch_clearance(
         (rod.FORK_WIDTH - two_place, rod.FORK_WIDTH + two_place),
         (slot_depth - two_place, slot_depth + two_place),
     ):
-        radius = arm.R_BOTTOM + bottom_d
+        radius = rocker_interface.R_BOTTOM + bottom_d
         assert arm.R_TOP - top_d + arm.TIP_FACE + two_place < radius
-        worst = min(worst, _continued_circle_clearance(radius, width, depth, arm.CENTER_Y))
+        worst = min(worst, _continued_circle_clearance(radius, width, depth, rocker_interface.CENTER_Y))
     return worst
 
 
@@ -519,10 +520,10 @@ def test_crotch_clears_the_arm_through_the_whole_swing() -> None:
     """
     top, bottom = _printed_profile_limits()
     assert bottom[1] == 0.0
-    current_radius = arm.R_BOTTOM + max(bottom)
-    legacy_centre = arm.PIVOT_MID_Y + arm.TOP_EDGE_ABOVE_PIVOT - arm.LINEAR_2PL + arm.R_TOP
-    legacy_radius = arm.R_BOTTOM + arm.LINEAR_2PL
-    assert abs(arm.CENTER_Y - legacy_centre) + current_radius <= legacy_radius + 1e-9
+    current_radius = rocker_interface.R_BOTTOM + max(bottom)
+    legacy_centre = rocker_interface.PIVOT_MID_Y + arm.TOP_EDGE_ABOVE_PIVOT - arm.LINEAR_2PL + arm.R_TOP
+    legacy_radius = rocker_interface.R_BOTTOM + arm.LINEAR_2PL
+    assert abs(rocker_interface.CENTER_Y - legacy_centre) + current_radius <= legacy_radius + 1e-9
     assert _profile_crotch_clearance(top, bottom) >= pin.CROTCH_CLEARANCE_MIN
 
 
@@ -537,10 +538,10 @@ def test_inside_zone_widening_cannot_worsen_crotch_clearance() -> None:
     # At every normal station the added permitted deviations are inward.
     # The limiting inside circle improves; nominal offset zero remains allowed.
     original_inside = _continued_circle_clearance(
-        arm.R_BOTTOM + bottom[0], width, depth, arm.CENTER_Y
+        rocker_interface.R_BOTTOM + bottom[0], width, depth, rocker_interface.CENTER_Y
     )
     wider_inside = _continued_circle_clearance(
-        arm.R_BOTTOM + wider[0], width, depth, arm.CENTER_Y
+        rocker_interface.R_BOTTOM + wider[0], width, depth, rocker_interface.CENTER_Y
     )
     assert wider_inside > original_inside
     assert _profile_crotch_clearance(top, wider) == pytest.approx(
@@ -612,7 +613,7 @@ def _arm_bottom_silhouette(
 ) -> np.ndarray:
     """Legacy lower-arc/straight-taper silhouette near the rod pin, in the
     arm frame, for the unchanged pin.BUDGET regression only."""
-    cy = arm.PIVOT_MID_Y + top_above_pivot + r_top
+    cy = rocker_interface.PIVOT_MID_Y + top_above_pivot + r_top
     a_bot = arm.BOT_ARC_LEN / 2.0 / r_bottom
     a_top = arm.TOP_ARC_LEN / 2.0 / r_top
     bot_end = np.array([r_bottom * math.sin(a_bot), cy - r_bottom * math.cos(a_bot)])
@@ -622,7 +623,7 @@ def _arm_bottom_silhouette(
             cy - (r_top + arm.TIP_FACE) * math.cos(a_top),
         ]
     )
-    x = np.arange(arm.ROD_HOLE_X - 10.0, bot_end[0], 0.005)
+    x = np.arange(rocker_interface.ROD_HOLE_X - 10.0, bot_end[0], 0.005)
     arc = np.stack([x, cy - np.sqrt(r_bottom**2 - x * x)], axis=1)
     t = np.linspace(0.0, 1.0, 2001)[:, None]
     return np.concatenate([arc, bot_end + t * (tip - bot_end)])
@@ -638,12 +639,12 @@ def test_legacy_radius_band_sweep_regresses_the_spec_budget() -> None:
     two_place = arm.LINEAR_2PL
     rad = np.radians(np.array(_relative_swing_deg()))
     cos, sin = np.cos(rad)[:, None], np.sin(rad)[:, None]
-    hole = np.array([arm.ROD_HOLE_X, arm.ROD_HOLE_Y])
+    hole = np.array([rocker_interface.ROD_HOLE_X, rocker_interface.ROD_HOLE_Y])
     slot_depth = rod.FORK_TOP_Y - rod.FORK_CROTCH_Y
     worst = math.inf
     for r_top, r_bottom, top_above_pivot in itertools.product(
         (arm.R_TOP - two_place, arm.R_TOP + two_place),
-        (arm.R_BOTTOM - two_place, arm.R_BOTTOM + two_place),
+        (rocker_interface.R_BOTTOM - two_place, rocker_interface.R_BOTTOM + two_place),
         (
             arm.TOP_EDGE_ABOVE_PIVOT + arm.TOP_EDGE_BAND[1],
             arm.TOP_EDGE_ABOVE_PIVOT + arm.TOP_EDGE_BAND[0],
@@ -696,5 +697,5 @@ def test_fork_stays_clear_of_the_amplitude_bar_foot() -> None:
     )
     assert fork_reach - foot_reach > 25.0
     # The crown also stays under the foot cheeks' hang below the top edge.
-    top_edge_above_pin = arm.ARM_DEPTH - arm.ROD_HOLE_ABOVE_BOTTOM
+    top_edge_above_pin = rocker_interface.ARM_DEPTH - rocker_interface.ROD_HOLE_ABOVE_BOTTOM
     assert top_edge_above_pin - rod.FORK_CROWN_RADIUS > bar.BOTTOM_NOTCH_HEIGHT

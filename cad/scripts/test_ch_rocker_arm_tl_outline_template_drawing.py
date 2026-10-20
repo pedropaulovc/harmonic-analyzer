@@ -11,6 +11,7 @@ import pytest
 
 import _config
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 import ch_rocker_arm_tl_outline_template_spec as spec
 import ch_rocker_arm_tl_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_outline_template as drawing
@@ -68,7 +69,10 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
         rocker.TOP_EDGE_ABOVE_PIVOT,
         rocker.TOP_EDGE_ABOVE_PIVOT + rocker.TOP_EDGE_BAND[0],
     )
-    zone_bottom = (rocker.ARM_DEPTH - zone_top[1], rocker.ARM_DEPTH - zone_top[0])
+    zone_bottom = (
+        rocker_interface.ARM_DEPTH - zone_top[1],
+        rocker_interface.ARM_DEPTH - zone_top[0],
+    )
     for (low, high), (zone_low, zone_high) in ((top, zone_top), (bottom, zone_bottom)):
         assert zone_low < low < high < zone_high
         assert math.isclose(
@@ -77,13 +81,15 @@ def test_apex_bands_sit_mid_zone_inside_the_rocker_arc_zone() -> None:
         assert high - low <= 0.25 * (zone_high - zone_low) + 1e-9
 
 
-_ROCKER_BOT_END_Y = rocker.CENTER_Y - rocker.R_BOTTOM * math.cos(rocker._ALPHA_BOT)
+_ROCKER_BOT_END_Y = rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM * math.cos(
+    rocker._ALPHA_BOT
+)
 _ROCKER_TIP_Y = rocker.TOP_END_Y - rocker.TIP_FACE * math.cos(rocker._ALPHA_TOP)
 # The rocker's BASIC +X outline corners and arc centre, in the template frame.
-_ROCKER_TOP_END = (rocker.TOP_END_X, rocker.TOP_END_Y - rocker.PIVOT_MID_Y)
-_ROCKER_TIP = (rocker.ROD_TIP_X, _ROCKER_TIP_Y - rocker.PIVOT_MID_Y)
-_ROCKER_BOT_END = (rocker.BOT_END_X, _ROCKER_BOT_END_Y - rocker.PIVOT_MID_Y)
-_ROCKER_CENTRE_Y = rocker.CENTER_Y - rocker.PIVOT_MID_Y
+_ROCKER_TOP_END = (rocker.TOP_END_X, rocker.TOP_END_Y - rocker_interface.PIVOT_MID_Y)
+_ROCKER_TIP = (rocker.ROD_TIP_X, _ROCKER_TIP_Y - rocker_interface.PIVOT_MID_Y)
+_ROCKER_BOT_END = (rocker.BOT_END_X, _ROCKER_BOT_END_Y - rocker_interface.PIVOT_MID_Y)
+_ROCKER_CENTRE_Y = rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y
 _MID_ZONE = (rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]) / 2.0
 
 
@@ -92,7 +98,7 @@ def _into_material(point, start, end) -> float:
     dx, dy = end[0] - start[0], end[1] - start[1]
     length = math.hypot(dx, dy)
     normal = (-dy / length, dx / length)
-    middle = (0.0, _ROCKER_CENTRE_Y - (rocker.R_TOP + rocker.R_BOTTOM) / 2.0)
+    middle = (0.0, _ROCKER_CENTRE_Y - (rocker.R_TOP + rocker_interface.R_BOTTOM) / 2.0)
     if (middle[0] - start[0]) * normal[0] + (middle[1] - start[1]) * normal[1] < 0.0:
         normal = (-normal[0], -normal[1])
     return (point[0] - start[0]) * normal[0] + (point[1] - start[1]) * normal[1]
@@ -235,7 +241,10 @@ def test_prechips_envelope_is_the_outline_extents_with_the_pin_voids() -> None:
 def test_rod_slot_station_is_the_rockers_rod_pin_hole() -> None:
     """The slot sits at the rocker's rod-pin hole (its datum C) in this
     frame, to the printed three places, and runs radially from the pivot."""
-    station = (rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)
+    station = (
+        rocker_interface.ROD_HOLE_X,
+        rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y,
+    )
     slot = _features()["rod_slot"]
     assert slot["at"][:2] == [spec.ROD_SLOT_X, spec.ROD_SLOT_Y]
     assert math.dist(slot["at"][:2], station) <= math.sqrt(2.0) * 0.0005

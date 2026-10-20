@@ -21,7 +21,7 @@ against its own layout anchors, so a layout move fails loud instead of
 leaving a floating wire -- while this script's drawing-contract imports stay
 out of the assembly/wheel recipe closures. The drum-end Z (DRUM_END_Z) is the
 drum's axial middle, between the boss front face and the spigot front end,
-all read off the wheel mid-plane (the pen-rod line ``paper_drive_geom.PEN_Z_MID``).
+all read off the wheel mid-plane (the pen-rod line ``_recording_geometry.PEN_Z_MID``).
 
 The wire is also the CARRIER of the WIRE-1 coupling: its own Top plane
 (perpendicular to the wire axis, through the drum end) contains the wheel's

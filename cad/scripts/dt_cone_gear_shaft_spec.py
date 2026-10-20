@@ -14,7 +14,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH, SEAT_PITCH, outside_dia_mm
 from dt_cone_gear_stack import PITCH_LOCKSTEP_TOLERANCE, face_band
-from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from _cone_axis_constants import GEAR_AXIS_SHIFT
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as POST_JOURNAL_BORE_BAND
 from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft build
     FLAT_AF_BAND,
@@ -276,8 +276,8 @@ TIP_COLLAR_START_STATION = T006_NORTH_FACE_STATION + COLLAR_FEELER
 TIP_COLLAR_END_STATION = TIP_COLLAR_START_STATION + TIP_COLLAR_WIDTH
 TIP_BLOCK_LENGTH = dt_cone_tip_block_spec.BLOCK_Z
 PIVOT_FROM_T006_NORTH_FACE = cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-TIP_BLOCK_NORTH_FACE_STATION = cone_line.TIP_BLOCK_NORTH_FACE
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+TIP_BLOCK_NORTH_FACE_STATION = dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE
 TIP_BLOCK_SOUTH_FACE_STATION = TIP_BLOCK_NORTH_FACE_STATION - TIP_BLOCK_LENGTH
 ADJUSTER_EMBED = dt_cone_tip_block_spec.ADJUSTER_EMBED
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED

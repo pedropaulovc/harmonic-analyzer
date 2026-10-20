@@ -7,12 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _interference_contracts as interference
 import build_mg_magnifier_assembly as magnifier
 import build_mg_magnifying_bracket as bracket
 import build_sm_summing_assembly as summing
 import build_sm_summing_lever as lever_build
-import dt_cone_pivot_post_installation as installation
+import _cone_axis_constants as installation
 import magnifying_bracket_joint_layout as joint
 import sm_knife_mount_spec as knife_mount
 import sm_summing_lever_spec as lever
@@ -38,6 +39,7 @@ def test_part_recipe_seat_literals_match_the_live_installation() -> None:
         names = {Path(path).stem for path in module_deps_of(SCRIPTS_DIR / script)}
         assert "magnifying_bracket_joint_layout" in names
         assert "dt_cone_pivot_post_installation" not in names
+        assert "_cone_axis_constants" not in names
         assert "build_mg_magnifier_assembly" not in names
     # Do not re-key unrelated knife mounts/anchors when the bracket changes.
     names = {Path(path).stem for path in module_deps_of(SCRIPTS_DIR / "sm_summing_lever_spec.py")}
@@ -292,7 +294,7 @@ def test_wheel_pin_press_pair_pins_the_pin_and_bar_bore() -> None:
     limit = pairs[frozenset(("mg-wheel-axle-1", "mg-wheel-bar-1"))]
     # The pin stands in the bore over its nominal 8.9 (back end 0.60 inside
     # the 9.5 bar), inside the contract's 9.0.
-    assert -pin.BACK_Y <= 9.0 < bar.BAR_DEPTH
+    assert -pin.BACK_Y <= 9.0 < BAR_DEPTH
     assert limit == pytest.approx(
         interference._smooth_annulus_limit_mm3(pin.PIN_DIA, bar.AXLE_BORE_DIA, 9.0)
     )

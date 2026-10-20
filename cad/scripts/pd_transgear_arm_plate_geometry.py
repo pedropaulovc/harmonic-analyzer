@@ -31,6 +31,7 @@ from __future__ import annotations
 import math
 
 import pd_transgear_arm_geometry as ARM
+import _transgear_arm_plate_locating_interface as LOCATING_PIN
 from _printed_tolerance import angular_band_deg, printed_band_mm, printed_deviations
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
@@ -120,9 +121,9 @@ BOSS_FACE_Z = REAR_FACE_Z + BOSS_HEIGHT
 LOCATOR_SITES_MM = tuple(
     (x - BORE_STATION, y - BORE_OFFSET) for x, y in ARM.LOCATOR_SITES_MM
 )
-LOCATOR_HOLE_DIA_MM = sum(ARM.LOCATING_PIN.SLIP_HOLE_LIMITS_MM) / 2.0
+LOCATOR_HOLE_DIA_MM = sum(LOCATING_PIN.SLIP_HOLE_LIMITS_MM) / 2.0
 LOCATOR_HOLE_BAND_MM = tuple(
-    limit - LOCATOR_HOLE_DIA_MM for limit in reversed(ARM.LOCATING_PIN.SLIP_HOLE_LIMITS_MM)
+    limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.SLIP_HOLE_LIMITS_MM)
 )
 FRONT_FACE_Z = -NOTCH_DEPTH
 
@@ -157,10 +158,10 @@ REDUCER_POSITION_DIAMETER = ARM.REDUCER_POSITION_DIAMETER
 REDUCER_POSITION_RADIUS = ARM.REDUCER_POSITION_RADIUS
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
     THICKNESS_OVER_ARM - THICKNESS_OVER_ARM_BAND
-    - 2.0 * ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
 )
 LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
-    1.0 + 2.0 * ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
     / LOCATOR_FULL_CYLINDER_SPAN_MIN_MM
 )
 DRILL_GROWTH = 0.10
@@ -234,20 +235,20 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     WALLS[f"locator {_index} to plate edge/notch"] = (
         _edge_air - LOCATOR_HOLE_DIA_MM / 2.0,
         _edge_air - BAND_X - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - ARM.LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
     )
     _csk_air = min(math.hypot(_x - x, _y - y) for x, y in SCREW_HOLES)
     WALLS[f"locator {_index} to countersink"] = (
         _csk_air - (LOCATOR_HOLE_DIA_MM + CSK_DIA) / 2.0,
         _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
-        - (ARM.LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
-        - ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - (LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
     )
     WALLS[f"locator {_index} to running bore"] = (
         math.hypot(_x, _y) - (LOCATOR_HOLE_DIA_MM + BORE_DIA) / 2.0,
         math.hypot(_x, _y) - LOCATOR_MOUTH_POSITION_RADIUS_MM
-        - ARM.LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _BORE_R_MAX
-        - ARM.LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
+        - LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] / 2.0 - _BORE_R_MAX
+        - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
     )
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:

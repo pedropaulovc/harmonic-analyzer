@@ -12,12 +12,11 @@ from __future__ import annotations
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
-from sh_column_clamp_front_geom import BAR_DEPTH as BAR_DEPTH
 
 
 # --- bar section + length (DIMENSIONS.md ch21; M6.8 ch30 8-view pass) ----------
 BAR_SIDE = 10.0  # tall (Y)
-# BAR_DEPTH (deep, Z) is the support-bar stock's (sh_column_clamp_front_geom);
+# BAR_DEPTH (deep, Z) is the support-bar stock's (_column_clamp_interface);
 # the back face seats on the clamp arc.
 # The front face in the machine frame: the front clamp arc's front face
 # (-129.4) less BAR_DEPTH, the plane the platen's back face shares
@@ -38,6 +37,7 @@ CLAMP_STATION_PLACES = 1
 # Fixed photographic registration, shared by the bar placement and hanger tap
 # (build_pn_pen_hanger places its strap tap on this machine x).
 WHEEL_BAR_X0 = 109.0
+WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 HANGER_SCREW_MACHINE_X = WHEEL_BAR_X0 + SCREW_HOLE_X
 
 # Wheel-axle bore: reamed .1865 through at the wheel station; the 3/16

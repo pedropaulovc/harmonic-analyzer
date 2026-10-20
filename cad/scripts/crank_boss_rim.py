@@ -37,6 +37,7 @@ from dataclasses import dataclass
 import _config
 import dt_cone_gear_shaft_spec as shaft
 import dt_cone_pivot_post_spec as post
+from dt_cone_post_envelope import BLOCK_DIA
 import dt_crank_drive_gear_spec as gear64
 
 Point = tuple[float, float, float]
@@ -197,7 +198,7 @@ def clearances(
     axes = CRANK_AXIS_Y_BAND if worst else (CRANK_AXIS_Y,)
     head_r = post.HEAD_DIA / 2.0 + grow * HEAD_GROWTH
     head_low = HEAD_Y[0] - grow * HEAD_EDGE_LOW
-    body_r = post.BLOCK_DIA / 2.0 + grow * BODY_GROWTH
+    body_r = BLOCK_DIA / 2.0 + grow * BODY_GROWTH
     boss_end = gear.south - (collar_thickness - grow * COLLAR_WIDTH_SHORT)
     cone_r = post.CONE_BOSS_DIA / 2.0 + grow * CONE_BOSS_GROWTH
     measures: dict[str, Callable[[Point], float]] = {

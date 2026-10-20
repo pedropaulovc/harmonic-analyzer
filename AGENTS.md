@@ -1011,9 +1011,45 @@ the spec, never in a family table or recipe module imported by unrelated specs.
 Shared parameterized geometry belongs in its own helper (for example
 `_shoulder_screw_geometry`), not in another SKU's decorated recipe module.
 Assemblies and drawings read dimensions from specs or these pure providers, not
-from part builders. `_platen_rack_geometry` owns the shared rack section;
+from part builders. `pd_platen_rack_spec` owns the rack section and receiving
+contract; `_platen_rack_receiving` supplies its source receiving controls without
+importing the feed-law and loaded-geometry checks in `paper_drive_geom`.
+`_paper_drive_placement` owns the pivot, stud, knob-axis and rack placements;
+`_recording_geometry` owns the paper and pen anchors. Pen-side consumers read the
+wheel rim/wire interface from `_mg_wheel_rim_geometry`, not the wheel's solvers.
 `_cone_gear_geometry` and `_cone_gear_readback` share cone calculations and saved
 topology checks without importing cone-part derivation.
+`_column_clamp_interface` owns the shared bar depth and column-clamp seating
+depths; bar and latch consumers import it directly, not the clamp's bore/ear
+geometry. The support-bar builder still reads `sh_column_clamp_fit` for its
+physically mating clamp-screw clearance budget.
+The transgear arm and pivot spacer read the pivot screw's catalogue shoulder
+dimensions directly from `_mcmaster_90325a174`; fitted-thread and chamfer checks
+remain in `pd_vn_transgear_pivot_screw_spec`. `_transgear_arm_plate_locating_interface`
+owns the arm/plate dowel-hole limits, proud set, blind depth and mouth breaks;
+`pd_vn_transgear_arm_plate_locating_pin_spec` retains purchased-pin data and the
+stock-to-interface fit, insertion and bottom-air calculations. Mating geometry
+imports the narrow providers directly, not either full hardware spec.
+`_rocker_interface` owns the shared rocker profile dimensions and rod-pin
+coordinates. Rod specs, rocker builders and geometry consumers import it
+directly; manufacturing limits and fit checks stay in the rocker and rod specs.
+Feature citations for these shared dimensions name `_rocker_interface`, not the
+full rocker-arm spec or a builder.
+`_sprocket_seat_geometry` owns the shared ANSI #25 plate/chain envelope and
+shaft-seat/drive-pin interface used by the crank hub, both shafts and their
+dowels. Keep sprocket tooth geometry and manufacturing checks in
+`pd_transgear_removable_spec`, and crank wall/stack checks in the crank specs;
+neither subsystem should import the other's spec merely to read seat dimensions.
+
+`_cone_axis_constants` owns shared cone/channel/frame installation datums and
+nominal raised-axis inputs. `cone_stations` owns shaft-local stations;
+`cone_line` maps them into the machine frame without importing post, mounting
+or tip-block specs. Tip-block placement belongs to `dt_cone_tip_block_spec`.
+`dt_cone_swing_platform_geometry` owns the pure outline and base-fixed hardware
+placement; `dt_cone_swing_platform_checks` owns spec-dependent mounting/web
+checks and the manufactured P1 stop enclosure. Consumers of placement must
+not acquire those part checks through a geometry-provider import.
+
 Assembly data splits by consumer: `<stem>_assembly_spec.py` (reaches the .SLDASM),
 `<stem>_explode_spec.py` (pure explode the builder authors), and drawing-only
 `<stem>_assembly_sheet.py` / `*_steps.py` (BOM, captions, sequence text).

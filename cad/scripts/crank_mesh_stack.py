@@ -22,7 +22,7 @@ import dt_crankshaft_spec as shaft
 import dt_cone_gear_shaft_spec as cone_shaft
 from cone_line import COS_I, POST_STATION, SIN_I
 from cone_stack_end_play import CONE_FLOAT_NORTH
-from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from _cone_axis_constants import GEAR_AXIS_SHIFT
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 from standard_mesh_checks import MeshCheck, check_mesh, plane_gear
 

@@ -36,7 +36,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, ensure_fully_defined
 from _sketch_chains import define_rectilinear_chain
-from paper_drive_geom import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
+from _recording_geometry import RECORDING_PAPER_HEIGHT_MM, RECORDING_PAPER_WIDTH_MM
 
 PART_NAME = "pd-platen-paper"
 MATERIAL = "Oak"  # nearest wood-fibre entry in the SW database; colour overridden

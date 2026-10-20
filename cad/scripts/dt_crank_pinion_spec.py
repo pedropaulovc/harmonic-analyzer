@@ -29,7 +29,7 @@ import math
 
 import _config
 import cone_line
-import dt_cone_pivot_post_installation
+import _cone_axis_constants
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
 from _fit_deviations import deviations
@@ -508,7 +508,7 @@ def tooth_in_gap_seed_deg(alpha64_deg: float, alpha16_deg: float) -> float:
 # the old formula (MESH_WINDOW_CENTRE_DEG -1.49).
 _GEAR64_CENTRE_STATION = (
     dt_crank_drive_gear_spec.LAYOUT_CENTRE_STATION
-    + dt_cone_pivot_post_installation.GEAR_AXIS_SHIFT
+    + _cone_axis_constants.GEAR_AXIS_SHIFT
     + dt_crank_drive_gear_spec.CENTRE_SHIFT_NORTH
 )
 _GEAR64_SEAT = cone_line.cone_station(_GEAR64_CENTRE_STATION)

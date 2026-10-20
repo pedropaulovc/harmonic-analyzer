@@ -34,7 +34,7 @@ from __future__ import annotations
 import math
 
 from _printed_tolerance import printed_band_mm, printed_deviations
-from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
+from _cone_axis_constants import MECHANISM_Z_SHIFT
 from cylinder_bank_layout import (
     G0_FRONT_SOUTH_STACK as _BANK_G0_FRONT_SOUTH_STACK,
     G19_BACK_FACE_Z,

@@ -27,7 +27,9 @@ import pd_transgear_arm_geometry as arm_geometry
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as seat_geometry
 import paper_drive_geom as paper_geometry
+import _paper_drive_placement as paper_placement
 
 DRAWING_NUMBER = "MHA-PD-00"
 
@@ -196,7 +198,7 @@ BAR_TOP_ABOVE_DECK = 266.934
 # hanger puts the pin, but a rack set off this band swings the latched hanger
 # and moves the pin along the hook's straight run, so the band is held at the
 # solder joint. The feed mesh's datum pitch-line distance sets the crest drop.
-RACK_CREST_DROP = paper_geometry.RACK_CREST_DROP
+RACK_CREST_DROP = paper_placement.RACK_CREST_DROP
 RACK_CREST_TOL = 0.05
 # The feed rack's datum setup band and its gates are the builder's too:
 # paper_drive_rack_setup owns them; this module only prints them.
@@ -216,7 +218,7 @@ OFFSET_ACCEPT_TOL = 0.10
 # crank wheel rearward: MHA-PD-VN-63 holds the arm on a spacer pressed on the
 # MHA-PD-VN-57 shoulder, so its tilt is fixed in the bar and read here as made
 # (pd_transgear_drive_collar_spec's in-service terms):
-_HALF_PLATE_SPREAD = (max(removable.PLATE_BAND) - min(removable.PLATE_BAND)) / 2.0
+_HALF_PLATE_SPREAD = (max(seat_geometry.PLATE_BAND) - min(seat_geometry.PLATE_BAND)) / 2.0
 ACCEPTED_CHAIN_OFFSET_IN_SERVICE = (
     -(collar.FIT_UP_OFFSET_TARGET + OFFSET_ACCEPT_TOL)
     - _HALF_PLATE_SPREAD

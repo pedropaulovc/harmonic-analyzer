@@ -21,6 +21,8 @@ import dt_alignment_pinion_spec as alignment
 import dt_cone_gear_spec as cone
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec as post
+from dt_cone_post_envelope import BLOCK_DIA
+import dt_cone_tip_block_spec as tip_block
 import dt_cone_swing_platform_geometry as platform_geometry
 import dt_cone_swing_platform_spec as platform
 import dt_crank_drive_gear_spec as gear64
@@ -281,7 +283,7 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
     post_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-cone-pivot-post`")
     assert post_row is not None
     for fragment in (
-        f"Current body Ø{post.BLOCK_DIA:g} ×{post.BLOCK_HEIGHT:g} high",
+        f"Current body Ø{BLOCK_DIA:g} ×{post.BLOCK_HEIGHT:g} high",
         f"head Ø{post.HEAD_DIA:g} ×{post.HEAD_HEIGHT:g}",
         f"running bore at {post.CRANK_BORE_HEIGHT:.12f} above platform",
     ):
@@ -297,10 +299,10 @@ def test_current_drive_train_record_matches_the_selected_production_specs() -> N
         assert fragment in screw_row[1], fragment
     tip_block_row = gen_dimensions.find_row(record, "Chapter 13", "`dt-cone-tip-block`")
     assert tip_block_row is not None
-    tip_block_point = cone_line.cone_station(cone_line.TIP_BLOCK_STATION)
+    tip_block_point = cone_line.cone_station(tip_block.TIP_BLOCK_STATION)
     for fragment in (
         f"current nominal centre ({_mm(tip_block_point[0], 9)}, +{tip_block_point[2]:.9f})",
-        f"cone station {cone_line.TIP_BLOCK_STATION:.12f}",
+        f"cone station {tip_block.TIP_BLOCK_STATION:.12f}",
         f"north/south faces {cone_shaft.TIP_BLOCK_NORTH_FACE_STATION:.12f}"
         f" / {cone_shaft.TIP_BLOCK_SOUTH_FACE_STATION:.12f}",
     ):

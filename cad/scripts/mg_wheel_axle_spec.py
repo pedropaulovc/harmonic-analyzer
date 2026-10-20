@@ -13,6 +13,7 @@ assembly's d = 0); the pin runs y = BACK_Y (back end) .. TIP_Y.
 
 from __future__ import annotations
 
+from _column_clamp_interface import BAR_DEPTH
 import mg_wheel_axle_spacer_spec as _spacer
 import mg_wheel_bar_geom as _bar
 from _gtol_cylinder import CylinderFace
@@ -68,9 +69,9 @@ _SHANK_TOL = printed_band_mm(SHANK_LEN_PLACES)
 BACK_END_PROUD_MAX = (
     (SHANK_LEN + _SHANK_TOL)
     - (PRESS_GAUGE - PRESS_GAUGE_TOL)
-    - (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[1])
+    - (BAR_DEPTH + _bar.BAR_DEPTH_BAND[1])
 )  # 0.35
-BACK_END_SUNK_MAX = (_bar.BAR_DEPTH + _bar.BAR_DEPTH_BAND[0]) - (
+BACK_END_SUNK_MAX = (BAR_DEPTH + _bar.BAR_DEPTH_BAND[0]) - (
     (SHANK_LEN - _SHANK_TOL) - (PRESS_GAUGE + PRESS_GAUGE_TOL)
 )  # 1.55
 

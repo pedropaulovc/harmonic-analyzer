@@ -21,6 +21,9 @@ import dt_cone_pivot_post_spec
 import dt_cone_swing_platform_drawing_spec as drawing_spec
 import dt_cone_swing_platform_geometry as geometry
 import dt_cone_swing_platform_spec as spec
+import dt_cone_swing_platform_checks as checks
+import dt_cone_tip_block_spec as block
+from dt_cone_post_envelope import BLOCK_DIA
 import draw_dt_cone_swing_platform as drawing
 import pytest
 from _gtol_planar import PlanarFace
@@ -69,8 +72,8 @@ def test_pivot_is_the_reamed_h7_bore_on_the_stock_shoulder() -> None:
 
 def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
     assert spec.POST_ATTACHMENT_SPACING == dt_cone_pivot_post_spec.ATTACHMENT_SPACING
-    assert spec.POST_BLOCK_DIA == dt_cone_pivot_post_spec.BLOCK_DIA
-    assert geometry.POST_MOUNT_HALF_PITCH == spec.POST_ATTACHMENT_SPACING / 2.0
+    assert spec.POST_BLOCK_DIA == BLOCK_DIA
+    assert checks.POST_MOUNT_HALF_PITCH == spec.POST_ATTACHMENT_SPACING / 2.0
     assert math.isclose(
         math.hypot(
             part.POST_MOUNT_WEST_XZ[0] - part.POST_MOUNT_EAST_XZ[0],
@@ -136,7 +139,7 @@ def test_geometry_cascade_and_interference_guards_stay_explicit() -> None:
         geometry.NORTH_OVERHANG - geometry.PLATE_SOUTH_Z
     )
     assert geometry.POST_MAIN_DIA == spec.POST_BLOCK_DIA
-    assert geometry.POST_FOOT_CONTAINMENT >= 0.25
+    assert checks.POST_FOOT_CONTAINMENT >= 0.25
     assert spec.PIVOT_BEARING_RELIEF_DIAMETER == pytest.approx(10.50)
     assert part.PLATE_T - spec.PIVOT_BEARING_THICKNESS == pytest.approx(
         spec.PIVOT_BEARING_RELIEF_DEPTH
@@ -154,18 +157,18 @@ def test_stepped_collar_extension_keeps_post_and_tip_attachment_laws() -> None:
     assert cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE == pytest.approx(
         23.0 + cone_line.TIP_END_EXTENSION_MM
     )
-    assert cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE == pytest.approx(
-        cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+    assert cone_line.PIVOT_STATION - block.TIP_BLOCK_NORTH_FACE == pytest.approx(
+        block.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
-    assert cone_line.TIP_BLOCK_PIVOT_OFFSET == pytest.approx(
-        cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET + cone_line.TIP_BLOCK_Z / 2.0
+    assert block.TIP_BLOCK_PIVOT_OFFSET == pytest.approx(
+        block.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET + block.BLOCK_Z / 2.0
     )
     assert CRANK_AXIS_OFF == pytest.approx(cone_line.PIVOT_XZ[0] - cone_line.X_CRANK)
-    assert geometry.POST_MOUNT_WEST_XZ[1] == pytest.approx(
-        geometry.POST_LOCAL_Z + geometry.POST_MOUNT_DZ
+    assert checks.POST_MOUNT_WEST_XZ[1] == pytest.approx(
+        geometry.POST_LOCAL_Z + checks.POST_MOUNT_DZ
     )
-    assert geometry.POST_MOUNT_EAST_XZ[1] == pytest.approx(
-        geometry.POST_LOCAL_Z - geometry.POST_MOUNT_DZ
+    assert checks.POST_MOUNT_EAST_XZ[1] == pytest.approx(
+        geometry.POST_LOCAL_Z - checks.POST_MOUNT_DZ
     )
 
 
@@ -1075,7 +1078,7 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     }
     assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
     assert spec.HOLDDOWN_LOCAL_X == -1.0
-    assert spec.HOLDDOWN_LOCAL_Z == -cone_line.TIP_BLOCK_PIVOT_OFFSET
+    assert spec.HOLDDOWN_LOCAL_Z == -block.TIP_BLOCK_PIVOT_OFFSET
     assert spec.HOLDDOWN_LOCAL_Z == pytest.approx(-10.45)
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
@@ -1128,7 +1131,7 @@ def test_holddown_print_worst_stack_keeps_its_margins() -> None:
     )
     assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
     assert ledge_min >= 2.0
-    assert min(geometry.HOLDDOWN_WEBS.values()) >= 2.0
+    assert min(checks.HOLDDOWN_WEBS.values()) >= 2.0
 
 
 def _exec_mutated(module, replacements: dict[str, str]):
@@ -1165,7 +1168,7 @@ def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
     "replacement",
     [
         (
-            "HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET",
+            "HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET",
             "HOLDDOWN_LOCAL_Z = -6.00",
         ),  # onto the pivot
         ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
@@ -1175,11 +1178,11 @@ def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
     monkeypatch: pytest.MonkeyPatch, replacement: tuple[str, str]
 ) -> None:
     """Moved toward the pivot bore or the plate's west edge, the web check fires."""
-    _exec_mutated(geometry, {})  # positive control: the shipped station passes
+    _exec_mutated(checks, {})  # positive control: the shipped station passes
     mutated = _exec_mutated(spec, dict([replacement]))
     monkeypatch.setitem(sys.modules, spec.__name__, mutated)
     with pytest.raises(AssertionError, match="hold-down leaves a web"):
-        _exec_mutated(geometry, {})
+        _exec_mutated(checks, {})
 
 
 def test_relief_width_text_sits_between_its_neighbours() -> None:

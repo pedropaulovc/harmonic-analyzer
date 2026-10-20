@@ -64,7 +64,7 @@ def test_screw_hole_and_nut_fit_all_four_tapered_strap_edges() -> None:
 
 
 def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
-    import paper_drive_geom as paper
+    import _recording_geometry as paper
     import pn_pen_rod_spec as rod
 
     # Local x 0 is the rod line; local z ROD_AXIS_Z is the rod axis.
@@ -113,7 +113,7 @@ def test_both_slot_walls_keep_the_floor_at_the_printed_worst_case() -> None:
 
 
 def test_strap_foot_stays_above_the_platen() -> None:
-    import paper_drive_geom as paper
+    import _paper_drive_placement as paper
     import pd_platen_spec as platen
 
     platen_top = paper.PLATEN_BOTTOM_Y + platen.PLATE_HEIGHT

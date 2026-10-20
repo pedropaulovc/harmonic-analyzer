@@ -201,7 +201,7 @@ finite-difference on the exact kinematics):
 | feature | nominal | sensitivity | note |
 |---|---:|---:|---|
 | cam eccentricity `dt_cylinder_gear_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
-| rocker rod-pin radius `ch_rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
+| rocker rod-pin radius `_rocker_interface.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
 | channel-lever bar-pin arm `ch_channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.76 | |
 | channel-lever spring-hook arm `ch_channel_lever_spec.LEVER_SPRING_X` | 175.05 | +0.57 \| +0.57 | set by the plumb spring axis (fulcrum 199.9 − anchor 24.85), not a round 7" |
 | summing-lever hole position `sm_summing_lever_spec.HOLE_X` | 39.85 mm | +2.667 %/mm | moving the hole changes both the arm and the force direction — and takes the lever reach with it |

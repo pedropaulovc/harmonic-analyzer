@@ -96,6 +96,7 @@ from dataclasses import dataclass
 
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 
 INCH = 25.4
 
@@ -108,7 +109,7 @@ def _inch_fraction(text: str) -> float:
 
 # --- Inputs -------------------------------------------------------------------
 R_INNER = rocker.R_TOP  # R800 top edge
-R_OUTER = rocker.R_BOTTOM  # R816 bottom edge
+R_OUTER = rocker_interface.R_BOTTOM  # R816 bottom edge
 # Aim the hub at the middle of the one-sided top-edge band (8.0 +0.50/0).
 HUB_TO_TOP_EDGE = rocker.TOP_EDGE_ABOVE_PIVOT + sum(rocker.TOP_EDGE_BAND) / 2.0
 HUB_RADIUS = R_INNER + HUB_TO_TOP_EDGE  # rho, the hub (and CL/CR) radius about C

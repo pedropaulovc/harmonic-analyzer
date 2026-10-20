@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _assembly
 from _assembly_contract import assembly_contract
 import _chain as chain
@@ -31,11 +32,13 @@ import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
 import pd_vn_transgear_knob_drive_pin_spec as drive_pin
 import pd_transgear_rear_bushing_spec as rear_bushing
 from _test_stubbed_build import stub_seat
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_vn_transgear_knob_cup_pin_spec as cup_pin
@@ -287,7 +290,7 @@ def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> No
     driving = "pd-vn-transgear-knob-drive-pin"
     assert plate_locating_pin.ASSEMBLY_QUANTITY == 2
     assert drawing.TRANSGEAR_QUANTITIES[locating] == plate_locating_pin.ASSEMBLY_QUANTITY
-    assert drawing.TRANSGEAR_QUANTITIES[driving] == len(sprocket.PIN_HOLE_ANGLES_DEG)
+    assert drawing.TRANSGEAR_QUANTITIES[driving] == len(seat_geometry.PIN_HOLE_ANGLES_DEG)
     assert _number(locating) != _number(driving)
     assert "PLATE LOCATING DOWEL" in drawing.BOM_DESCRIPTIONS[locating]
     assert "WHEEL DRIVE DOWEL" in drawing.BOM_DESCRIPTIONS[driving]
@@ -308,8 +311,8 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     ) in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
-        f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
-        f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
+        f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
+        f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
     ) in located
     assert "MATCH-MARK ARM AND PLATE" in located
     fitted = _step_body("arm-plate-fitted")
@@ -926,7 +929,7 @@ def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> Non
     assert caption_y - 2 * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
     # Both circles frame the screw from its head to the bar's front face.
     assert drawing.PIVOT_FRONT_FACE_Y == pytest.approx(
-        -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+        -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
     )
     assert drawing.PIVOT_SECTION_RADIUS == pytest.approx(
         drawing.PIVOT_FRAME_RADIUS_MM
@@ -995,7 +998,7 @@ def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() 
     """Rule 23: SECTION A-A shows where the lock is, its pointer in the bar's
     metal at the front tap mouth and its text off the section and balloons."""
     y, r = drawing.PIVOT_STAKE_TIP
-    front = -(pivot_screw.SHOULDER_LEN + assembly.BAR.BAR_DEPTH)
+    front = -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
     csk_rim = assembly.BAR.PIVOT_TAP_CSK_DIA / 2.0
     # In the bar, under 1 mm from the front face and the countersink's rim.
     assert front < y < front + 1.0
@@ -1373,9 +1376,9 @@ def _spare_world_point(monkeypatch, local):
 def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
     # The spec's plate is local Z=0..PLATE, identical in all tooth configs.
     underside = _spare_world_point(monkeypatch, [0.0, 0.0, 0.0])
-    top = _spare_world_point(monkeypatch, [0.0, 0.0, sprocket.PLATE])
+    top = _spare_world_point(monkeypatch, [0.0, 0.0, seat_geometry.PLATE])
     assert underside[1] == pytest.approx(base.STACK_HEIGHT, rel=0, abs=1e-9)
-    assert top[1] == pytest.approx(base.STACK_HEIGHT + sprocket.PLATE, rel=0, abs=1e-9)
+    assert top[1] == pytest.approx(base.STACK_HEIGHT + seat_geometry.PLATE, rel=0, abs=1e-9)
     assert (underside[0], underside[2]) == (140.0, -75.0)
     assert (top[0], top[2]) == (140.0, -75.0)
 
@@ -1384,7 +1387,7 @@ def test_spare_t18_footprint_is_on_the_flat_deck(monkeypatch):
     # The deck's flat ends at its edge break (user ruling 2026-10-09: the
     # black deck x +-167.0, z +-130.25 stands DECK_RISE above the green land).
     radius = sprocket.outside_dia(sprocket.TEETH["T18"]) / 2.0
-    for x, y, z in product((-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)):
+    for x, y, z in product((-radius, radius), (-radius, radius), (0.0, seat_geometry.PLATE)):
         world = _spare_world_point(monkeypatch, [x, y, z])
         assert abs(world[0]) < base.DECK_HALF_X - base.DECK_EDGE_BREAK
         assert abs(world[2]) < base.DECK_HALF_Z - base.DECK_EDGE_BREAK
@@ -1405,7 +1408,7 @@ def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
     spare_max_z = max(
         _spare_world_point(monkeypatch, [x, y, z])[2]
         for x, y, z in product(
-            (-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)
+            (-radius, radius), (-radius, radius), (0.0, seat_geometry.PLATE)
         )
     )
     assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0
@@ -1588,7 +1591,7 @@ def test_the_knob_wheel_is_read_held_back_on_its_seat() -> None:
     accepted = _step_body("fitup-accepted")
     assert accepted.startswith(f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}")
     low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
-    half_plate_spread = (max(sprocket.PLATE_BAND) - min(sprocket.PLATE_BAND)) / 2.0
+    half_plate_spread = (max(seat_geometry.PLATE_BAND) - min(seat_geometry.PLATE_BAND)) / 2.0
     assert (low, high) == pytest.approx(
         (
             -(collar.FIT_UP_OFFSET_TARGET + steps.OFFSET_ACCEPT_TOL)

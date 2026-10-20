@@ -45,7 +45,7 @@ from _printed_tolerance import (
     printed_band_mm,
     printed_deviations,
 )
-from dt_crankshaft_spec import (
+from _sprocket_seat_geometry import (
     DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_LENGTH_GRADE,
     DRIVE_PIN_OFFSET_PLACES,
@@ -82,18 +82,17 @@ from pd_transgear_knob_shaft_spec import (
     TIP_STATION,
     TIP_STATION_PLACES,
 )
-from pd_transgear_removable_spec import BORE_DIA as WHEEL_BORE_DIA
-from pd_transgear_removable_spec import (
-    CRANK_CONFIG,
+from _sprocket_seat_geometry import BORE_DIA as WHEEL_BORE_DIA
+from pd_transgear_removable_spec import CRANK_CONFIG, KNOB_CONFIG
+from _sprocket_seat_geometry import (
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_PROUD,
-    KNOB_CONFIG,
     PLATE,
     PLATE_BAND,
     SEAT_SPIGOT_DIA,
     SEAT_SPIGOT_RIM,
 )
-from pd_transgear_removable_spec import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
+from _sprocket_seat_geometry import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
 from pd_transgear_thumbnut_spec import CSK_DIA as NUT_CSK_DIA
 from pd_transgear_thumbnut_spec import FLANGE_DIA as NUT_FLANGE_DIA
 from pd_transgear_thumbnut_spec import FLANGE_DIA_PLACES as NUT_FLANGE_DIA_PLACES

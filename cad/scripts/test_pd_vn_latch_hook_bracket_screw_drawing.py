@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import _config
 import build_pd_vn_latch_hook_bracket_screw as part
 import pd_vn_latch_hook_bracket_screw_spec as spec
@@ -36,7 +37,7 @@ def test_engagement_in_the_bar_tap_passes_at_the_worst_case() -> None:
     #43 tap drill (R9-63): 0.4195 a mouth, not the 0.1276 counted to the
     major; under the hook's 0.8 base the bar still holds 2.54 D."""
     worst_d = spec.checked_engagement(
-        bar.BRACKET_TAP_CSK_DIA, _DRILL, bar.BAR_DEPTH, bar.BAR_DEPTH_BAND
+        bar.BRACKET_TAP_CSK_DIA, _DRILL, BAR_DEPTH, bar.BAR_DEPTH_BAND
     )
     assert worst_d == pytest.approx(7.2208 / spec.MAJOR_DIA, abs=1e-4)
     assert worst_d >= spec.ENGAGEMENT_FLOOR_D
@@ -46,7 +47,7 @@ def test_a_bigger_countersink_or_a_short_bar_is_refused() -> None:
     # Countersinks wide enough to eat the thread past 1.5 D.
     too_wide = _DRILL + (spec.ENGAGEMENT_NOMINAL - 1.4 * spec.MAJOR_DIA)
     with pytest.raises(AssertionError):
-        spec.checked_engagement(too_wide, _DRILL, bar.BAR_DEPTH, bar.BAR_DEPTH_BAND)
+        spec.checked_engagement(too_wide, _DRILL, BAR_DEPTH, bar.BAR_DEPTH_BAND)
     # A bar no thicker than the screw reaches: the tip stands proud.
     with pytest.raises(AssertionError):
         spec.checked_engagement(
@@ -55,9 +56,9 @@ def test_a_bigger_countersink_or_a_short_bar_is_refused() -> None:
 
 
 def test_tip_stays_inside_the_bar_front_face() -> None:
-    assert spec.tip_short_worst(bar.BAR_DEPTH, bar.BAR_DEPTH_BAND) > 0.0
-    assert spec.tip_short_worst(bar.BAR_DEPTH, 0.0) > spec.tip_short_worst(
-        bar.BAR_DEPTH, bar.BAR_DEPTH_BAND
+    assert spec.tip_short_worst(BAR_DEPTH, bar.BAR_DEPTH_BAND) > 0.0
+    assert spec.tip_short_worst(BAR_DEPTH, 0.0) > spec.tip_short_worst(
+        BAR_DEPTH, bar.BAR_DEPTH_BAND
     )
 
 

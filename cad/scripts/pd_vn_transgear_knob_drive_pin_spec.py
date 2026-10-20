@@ -2,7 +2,7 @@ r"""MHA-PD-VN-54 transgear-knob-drive-pin: McMaster 98381A433 stock dowel.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Two are pressed into the brass knob drive collar (MHA-PD-22) and
-stand ``pd_transgear_removable_spec.DRIVE_PIN_PROUD`` out of its front (seat)
+stand ``_sprocket_seat_geometry.DRIVE_PIN_PROUD`` out of its front (seat)
 face, where the removable sprocket's two holes drop over them.  The knob
 takes the 3/16 length of the crank's 3/32 dowel, and its holes are reamed
 THROUGH the collar body, the press depth set from the seat face by a stop.
@@ -21,7 +21,7 @@ from _mcmaster_98381a433 import (
     DOWEL_SIZE,
     MM_PER_IN,  # noqa: F401 -- re-exported with the inch band
 )
-from pd_transgear_removable_spec import DRIVE_PIN_DIA, DRIVE_PIN_PROUD, PLATE, PLATE_BAND
+from _sprocket_seat_geometry import DRIVE_PIN_DIA, DRIVE_PIN_PROUD, PLATE, PLATE_BAND
 
 SKU = "98381A433"
 DIA, LENGTH = DOWEL_SIZE  # 2.38125 x 4.7625

@@ -21,7 +21,7 @@ import math
 from fractions import Fraction
 
 import _config
-import pd_transgear_removable_spec as _removable
+import _sprocket_seat_geometry as seat_geometry
 from dt_crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
 
 
@@ -79,7 +79,7 @@ SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
 # Q4) is turned to its own size, narrower than the 1-in arm, and the hub
 # runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
 # MHA-PD-09 removable, which it keeps from walking forward (the drive train
-# asserts the air against pd_transgear_removable_spec).  It followed the seat
+# asserts the air against _sprocket_seat_geometry).  It followed the seat
 # face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.  Its front face is
 # the shoulder the arm is pressed to: R9-38 took it Ø20.6 -> Ø22.25 at .XX so
 # the shoulder keeps its land (SHOULDER_LAND_WORST_MIN) over the largest
@@ -108,11 +108,11 @@ RELIEF_LENGTH_TOL = 0.05
 # wheel and shortest relief, holds CHAIN_SHOULDER_AIR_MIN: the seated worst
 # PR1 accepted before the float was counted (Main, PR1 Codex review 2).
 CHAIN_SHOULDER_AIR_MIN = 0.2135
-_PLATE_MIN = _removable.PLATE + min(_removable.PLATE_BAND)
+_PLATE_MIN = seat_geometry.PLATE + min(seat_geometry.PLATE_BAND)
 RELIEF_LENGTH = round(
     math.ceil(
         round(
-            (CHAIN_SHOULDER_AIR_MIN + _removable.CHAIN_REACH_FRONT - _PLATE_MIN) * 100,
+            (CHAIN_SHOULDER_AIR_MIN + seat_geometry.CHAIN_REACH_FRONT - _PLATE_MIN) * 100,
             6,
         )
     )
@@ -139,9 +139,9 @@ def chain_shoulder_axial_air(
     relief_length: float,
     seat_face: float,
     seat_face_band: tuple[float, float],
-    plate: float = _removable.PLATE,
-    plate_band: tuple[float, float] = _removable.PLATE_BAND,
-    reach_front: float = _removable.CHAIN_REACH_FRONT,
+    plate: float = seat_geometry.PLATE,
+    plate_band: tuple[float, float] = seat_geometry.PLATE_BAND,
+    reach_front: float = seat_geometry.CHAIN_REACH_FRONT,
 ) -> dict[str, float]:
     """Stack A, chain envelope front to the relief shoulder, in both poses at
     nominal and at the printed worst case; local stations from the dome root

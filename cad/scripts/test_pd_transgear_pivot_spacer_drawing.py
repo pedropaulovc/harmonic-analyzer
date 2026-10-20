@@ -18,7 +18,7 @@ from _surface_finish import MACHINED_UM
 import build_pd_transgear_pivot_spacer as part
 import draw_pd_transgear_pivot_spacer as drawing
 import pd_transgear_pivot_spacer_spec as spec
-import pd_vn_transgear_pivot_screw_spec as screw
+import _mcmaster_90325a174 as screw
 
 
 def test_required_drawing_paths() -> None:

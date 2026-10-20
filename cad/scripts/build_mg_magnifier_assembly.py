@@ -129,8 +129,9 @@ from _transforms import (
     rot_z_rows,
     rows_from_euler,
 )
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z, SUMMING_Z
 from sm_summing_lever_spec import PLATE_L
+from mg_wheel_bar_geom import WHEEL_BAR_Y
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
     SCREW_POSITIONS,
@@ -142,7 +143,7 @@ BRACKET_SCREW_POSITIONS = SCREW_POSITIONS
 BRACKET_SCREW_ROWS = ROT_X_NEG90
 
 # --- machine anchors ---------------------------------------------------------
-WHEEL_BAR_Y = 575.7  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
+# ch30 p002 front-view re-anchor (2026-07-17): the wheel
 # + bar + column clamps sit 10.7 higher than the old 565.0 -- the photo shows
 # the rim clearing the platen box top, which 565.0 left overlapped
 COLUMN_X = 197.0  # the WEST column (machine +x is west; the crank side -x is east)
@@ -152,9 +153,11 @@ COLUMN_Z = FRAME_FRONT_COLUMN_Z
 # bar's back face; the bar's front face lands on the shared -138.9 plane, so
 # the wheel/axle/wire/pen line is untouched by the clamp swap.
 from _clamp_arc import EAR_HOLE_Z as CLAMP_EAR_DX  # noqa: E402
-from sh_column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
-from mg_wheel_bar_geom import (  # noqa: E402
+from _column_clamp_interface import (  # noqa: E402
+    ARC_DEPTH as ARC_FRONT_DEPTH,
     BAR_DEPTH as WHEEL_BAR_DEPTH,
+)
+from mg_wheel_bar_geom import (  # noqa: E402
     BAR_FRONT_Z as WHEEL_BAR_FRONT_Z,
     CLAMP_HOLE_X as BAR_CLAMP_HOLE_LOCAL_X,
     WHEEL_BAR_X0,
@@ -355,7 +358,7 @@ from mg_magnifying_wheel_geom import (  # noqa: E402
 )
 
 # The lever wire, the pen wire and the wheel stack all take the wheel plane
-# from paper_drive_geom.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
+# from _recording_geometry.PEN_Z_MID; mg_wheel_group asserts the stack closes on it.
 DRUM_Z = WHEEL_MID_Z + DRUM_MID_Z  # drum centre (drum frame mid-plane)
 
 # Transform the model-owned groove front tangent, rather than assuming an

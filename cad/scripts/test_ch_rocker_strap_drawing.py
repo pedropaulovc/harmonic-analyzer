@@ -13,6 +13,7 @@ import build_ch_rocker_arm as rocker_part
 import build_ch_rocker_strap as part
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 import ch_rocker_strap_notes as notes
 import ch_rocker_strap_spec as spec
 import draw_ch_rocker_strap as drawing
@@ -41,11 +42,12 @@ def test_required_drawing_paths() -> None:
 def test_outline_is_the_finished_rocker_strap() -> None:
     # Same frame and the same vertices as MHA-CH-06's strap profile.
     assert spec.HOLE_DIA == rocker.HUB_DIA
-    assert spec.PIVOT_MID_Y == rocker.PIVOT_MID_Y
+    assert spec.PIVOT_MID_Y == rocker_interface.PIVOT_MID_Y
     assert spec.ROD_TIP_X == rocker.ROD_TIP_X
     assert spec.BOT_END_X == rocker.BOT_END_X
     assert spec.BOT_END_Y == pytest.approx(
-        rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2)
+        rocker_interface.CENTER_Y
+        - math.sqrt(rocker_interface.R_BOTTOM**2 - rocker.BOT_END_X**2)
     )
     assert spec.ROD_TIP_Y < spec.TOP_END_Y
     # The tip land runs along the top arc's radius.
@@ -67,7 +69,8 @@ def test_outline_is_the_finished_rocker_strap() -> None:
     assert min(top_wall, bottom_wall) >= 2.0
     # The bottom edge sits where MHA-CH-06's R816 puts it on the axis.
     assert spec.BOTTOM_EDGE_BELOW_PIVOT == pytest.approx(
-        rocker.PIVOT_MID_Y - (rocker.CENTER_Y - rocker.R_BOTTOM)
+        rocker_interface.PIVOT_MID_Y
+        - (rocker_interface.CENTER_Y - rocker_interface.R_BOTTOM)
     )
 
 

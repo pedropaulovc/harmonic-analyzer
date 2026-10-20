@@ -1577,7 +1577,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads FOOT_HEIGHT, FOOT_WIDTH, SCREW_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_cone_pivot_post"): (
-        "dtrefactor: reads BLOCK_DIA, BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
+        "dtrefactor: reads BORE_HEIGHT, CONE_BOSS_LENGTH, CRANK_BORE_HEIGHT, CRANK_BOSS_LENGTH, CRANK_BOSS_START_Z"
     ),
     ("build_dt_drive_train_assembly.py", "build_dt_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"
@@ -1616,7 +1616,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
     ),
     ("build_pd_paper_drive_assembly.py", "build_pd_support_bar"): (
-        "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
+        "dtrefactor: reads BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
     ),
     ("build_sm_summing_assembly.py", "build_sm_knife_mount"): (
         "dtrefactor: reads CASTING_UNDERSIDE_Y, MOUNT_GAP"

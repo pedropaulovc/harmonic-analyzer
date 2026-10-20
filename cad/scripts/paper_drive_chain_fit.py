@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from functools import cache
 
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 from _printed_tolerance import printed_deviations
 
 Point = tuple[float, float]
@@ -37,8 +38,8 @@ def source_nominal_chain_centres_mm() -> tuple[Point, Point]:
     tilt and arbitrary P1 states need their own 3D proof, not this nominal one.
     """
     from dt_cone_swing_platform_crank_axis import crank_axis_nominal_xy_mm
-    from paper_drive_geom import KNOB_SHAFT_XY
-    return KNOB_SHAFT_XY, crank_axis_nominal_xy_mm(sprocket.CHAIN_MID_Z)
+    from _paper_drive_placement import KNOB_SHAFT_XY
+    return KNOB_SHAFT_XY, crank_axis_nominal_xy_mm(seat_geometry.CHAIN_MID_Z)
 
 
 def solve_source_nominal_chain_fit(*, taut_side: int = 1) -> ChainFit:
@@ -358,7 +359,7 @@ def solve_chain_fit(knob_centre: Point, crank_centre: Point, *,
     if distance <= ra + rb or count * pitch < bound:
         raise ValueError(f"selected {count} links cannot fit centres {knob_centre}, {crank_centre}; "
                          f"necessary taut-length lower bound {bound:.6f} mm, available {count * pitch:.6f} mm")
-    if sprocket.ANSI_ROLLER_WIDTH <= sprocket.PLATE:
+    if seat_geometry.ANSI_ROLLER_WIDTH <= seat_geometry.PLATE:
         raise ValueError("purchased chain inner plates cannot straddle the sprocket")
     tip_a = printed_tip_max_deviation_mm(na)
     tip_b = printed_tip_max_deviation_mm(nb)

@@ -12,7 +12,7 @@ import dt_crank_arm_notes as notes
 import dt_crank_arm_spec as spec
 import dt_crank_hub_geometry as geometry
 import draw_dt_crank_arm as drawing
-import pd_transgear_removable_spec
+import _sprocket_seat_geometry as seat_geometry
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import drill_process
@@ -142,7 +142,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     # The hub rear reaches the removable: 0.7 air to its front face.
     assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
     assert (
-        pd_transgear_removable_spec.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
+        seat_geometry.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
         == pytest.approx(0.7)
     )
     # Owner ruling D1 (2026-10-15): the shaft end stands proud of the pinion's

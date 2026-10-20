@@ -17,7 +17,7 @@ import draw_pd_transgear_drive_collar as drawing
 import pd_paper_drive_assembly_steps as steps
 import pd_transgear_drive_collar_spec as spec
 import pd_transgear_knob_shaft_spec as shaft
-import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as removable
 from _assembly_contract import assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout

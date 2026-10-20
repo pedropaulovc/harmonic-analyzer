@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import build_mg_wheel_axle as part
 import draw_mg_wheel_axle as drawing
 import mg_magnifying_wheel_geom
@@ -15,7 +16,7 @@ import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec as spec
 import mg_wheel_bar_geom
 import mg_wheel_group as group
-import paper_drive_geom
+import _recording_geometry as recording_geometry
 import mg_vn_wheel_axle_back_washer_spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -49,7 +50,7 @@ def test_spec_values_are_the_drill_rod_pin() -> None:
     # end then sits 0.60 inside the 9.5 bar's back face (ruling B grew the
     # bar 0.5 rearward; the pin keeps its 8.9 in the bore).
     assert spec.PRESS_GAUGE == spec.STEP_Y == pytest.approx(19.5 + spacer)
-    assert spec.BACK_Y == pytest.approx(-mg_wheel_bar_geom.BAR_DEPTH + 0.60)
+    assert spec.BACK_Y == pytest.approx(-BAR_DEPTH + 0.60)
     assert (spec.THREAD_END_Y, spec.TIP_Y) == pytest.approx(
         (spec.STEP_Y + 8.20, spec.STEP_Y + 9.00)
     )
@@ -188,9 +189,9 @@ def test_wheel_group_stack_fits_the_pin() -> None:
         + mg_vn_wheel_axle_back_washer_spec.MODEL_THICKNESS
         + mg_magnifying_wheel_geom.HUB_BACK_Z
     )
-    assert group.WHEEL_MID_Z == paper_drive_geom.PEN_Z_MID
+    assert group.WHEEL_MID_Z == recording_geometry.PEN_Z_MID
     assert mg_wheel_bar_geom.BAR_FRONT_Z - group.SPOKE_MID_D == pytest.approx(
-        paper_drive_geom.PEN_Z_MID
+        recording_geometry.PEN_Z_MID
     )
 
 
@@ -210,7 +211,7 @@ def test_pen_travel_literals_match_their_source_modules() -> None:
 
     assert group.MARKER_TIP_REST_Y == pytest.approx(carriage.MARKER_POS[1], abs=5e-4)
     # The 3.0 is the sheet's top margin under the plate's top edge.
-    paper_height = paper.PAPER_GEOMETRY.RECORDING_PAPER_HEIGHT_MM
+    paper_height = recording_geometry.RECORDING_PAPER_HEIGHT_MM
     assert group.PAPER_BOTTOM_Y == pytest.approx(
         paper.PLATE_Y0 + paper.PLATE_HEIGHT - paper_height - 3.0
     )

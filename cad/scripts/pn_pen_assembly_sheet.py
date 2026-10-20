@@ -24,7 +24,7 @@ import pn_vn_pen_hanger_nut_spec as hanger_nut
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 import _mcmaster_99607a213 as thumb_screw
 from _inch_fraction import inch_fraction
-from mg_wheel_bar_geom import BAR_DEPTH as WHEEL_BAR_DEPTH
+from _column_clamp_interface import BAR_DEPTH as WHEEL_BAR_DEPTH
 from pn_pen_assembly_spec import (
     BOM_ORDER,
     CARRIAGE_END_MACHINE,

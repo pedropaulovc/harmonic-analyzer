@@ -41,7 +41,7 @@ import dt_cylinder_gear_shaft_spec as arbor
 import dt_cylinder_gear_spec as drum
 import dt_vn_cone_pivot_screw_spec as pivot_screw
 from cone_pitch import SEAT_PITCH
-from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from _cone_axis_constants import GEAR_AXIS_SHIFT
 from dt_cylinder_gear_spec import BORE_DIAMETRAL_CLEARANCE_MM as DRUM_SEAT_CLEARANCE
 from dt_cylinder_gear_spec import TEETH as DRUM_TEETH
 from fr_harmonic_base_spec import PIVOT_SEAT_POSITION_BAND_MM

@@ -26,7 +26,7 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
 from __future__ import annotations
 
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
-from sh_column_clamp_front_geom import BAR_DEPTH as BAR_DEPTH
+from _column_clamp_interface import BAR_DEPTH
 
 # 28 tall (Y), the top edge carrying the hanging platen's top rail at machine
 # y 317.734 and the bottom edge 1.0 above the bottom rail (the paper-drive
@@ -44,7 +44,7 @@ BAR_HEIGHT = 28.0
 # bar spends it (build_pd_paper_drive_assembly._assert_lock_retention).
 # build_pd_support_bar authors it natively on Height@BarProfile.
 BAR_HEIGHT_BAND = 0.13
-# Deep (Z), BAR_DEPTH (sh_column_clamp_front_geom, shared with the wheel
+# Deep (Z), BAR_DEPTH (_column_clamp_interface, shared with the wheel
 # bar): the back face on the clamp arcs, the front face carrying the platen's
 # back. 9.5, not the 9.0 stock read, so the MHA-PD-VN-57 pivot screw's faced tip
 # (0.20-0.50 below the front face) keeps rule 18's 1.5D at the thinnest bar

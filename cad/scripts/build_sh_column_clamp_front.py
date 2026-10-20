@@ -26,8 +26,8 @@ from _drawing_marks import (
 )
 from _drawing_precision import apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
+from _column_clamp_interface import ARC_DEPTH
 from sh_column_clamp_front_spec import (
-    ARC_DEPTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,

@@ -91,6 +91,7 @@ from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
+from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
@@ -105,6 +106,7 @@ import pd_transgear_drive_collar_spec as collar
 import pd_transgear_knob_cup_spec as knob_cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_transgear_removable_spec as sprocket
+import _sprocket_seat_geometry as seat_geometry
 import transgear_cluster_fit as cluster_fit
 import transgear_hanger_joints as joints
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
@@ -117,6 +119,7 @@ import _gear_quality as quality
 import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
+import _transgear_arm_plate_locating_interface as plate_locating_interface
 from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
 
 
@@ -280,7 +283,7 @@ PIVOT_VIEW_INSTANCES = frozenset(
         "pd-transgear-arm-1",
     }
 )
-PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + support_bar.BAR_DEPTH)
+PIVOT_FRONT_FACE_Y = -(pivot_screw.SHOULDER_LEN + BAR_DEPTH)
 PIVOT_VIEW_CENTRE_MM = (0.0, (pivot_screw.HEAD_H + PIVOT_FRONT_FACE_Y) / 2.0, 0.0)
 if (pivot_screw.HEAD_H - PIVOT_FRONT_FACE_Y) / 2.0 + 1.0 > PIVOT_FRAME_RADIUS_MM:
     raise AssertionError("the pivot circles must frame head to front face")
@@ -333,7 +336,7 @@ PIVOT_BALLOON_TIPS = (
     (
         "pd-support-bar",
         "left",
-        -pivot_screw.SHOULDER_LEN - support_bar.BAR_DEPTH / 2.0,
+        -pivot_screw.SHOULDER_LEN - BAR_DEPTH / 2.0,
         support_bar.PIVOT_TAP_CSK_DIA / 2.0 + 2.0,
     ),
 )
@@ -675,7 +678,7 @@ TRANSGEAR_QUANTITIES = {
     "pd-vn-transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "pd-transgear-knob-shaft": 1,
     "pd-transgear-drive-collar": 1,
-    "pd-vn-transgear-knob-drive-pin": len(sprocket.PIN_HOLE_ANGLES_DEG),
+    "pd-vn-transgear-knob-drive-pin": len(seat_geometry.PIN_HOLE_ANGLES_DEG),
     "pd-transgear-removable": 3,  # two mounted wheels plus the loose T18 spare
     "pd-transgear-thumbnut": 1,
     "pd-transgear-knob-thrust-ring": 1,
@@ -1259,8 +1262,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
-            f"{plate_locating_pin.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_pin.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
+            f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
+            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
             "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (

@@ -60,8 +60,8 @@ from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
+from _column_clamp_interface import ARC_DEPTH
 from sh_column_clamp_front_spec import (
-    ARC_DEPTH,
     ARC_HEIGHT,
     BACK_ARC_MATE,
     BORE_DIAMETRAL_CLEARANCE,

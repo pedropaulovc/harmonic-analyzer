@@ -15,7 +15,7 @@ import dt_cone_gear_shaft_spec
 import dt_cone_gear_spec
 import dt_cone_gear_stack
 import cone_line
-import dt_cone_pivot_post_installation
+import _cone_axis_constants
 import dt_cone_pivot_post_spec
 import cone_shaft_land_bands
 import cone_stack_end_play
@@ -377,7 +377,7 @@ def test_gear_face_model_follows_the_drive_train() -> None:
         # BDT's seed: seat station plus half the south-side growth.
         centre = (
             drive.SHAFT_T120_STATION
-            + dt_cone_pivot_post_installation.GEAR_AXIS_SHIFT
+            + _cone_axis_constants.GEAR_AXIS_SHIFT
             + (drive.CONE_FACE_STATION_REFERENCE - drive.CONE_FACE) / 2.0
             + j * drive.SEAT_PITCH
         )
@@ -1150,18 +1150,18 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     )
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_LENGTH == dt_cone_tip_block_spec.BLOCK_Z
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        cone_line.TIP_BLOCK_NORTH_FACE
+        dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE
     )
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION + (
         dt_cone_gear_shaft_spec.TIP_BLOCK_LENGTH / 2.0
-    ) == pytest.approx(cone_line.TIP_BLOCK_STATION)
+    ) == pytest.approx(dt_cone_tip_block_spec.TIP_BLOCK_STATION)
     assert dt_cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        cone_line.PIVOT_STATION - cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+        cone_line.PIVOT_STATION - dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
     )
     # drawing-guidelines.md rule 18 (thread engagement) E11: #10-32 94025A164 at the block spec's fit-up embed.
     assert dt_cone_gear_shaft_spec.ADJUSTER_EMBED == dt_cone_tip_block_spec.ADJUSTER_EMBED
     assert dt_cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        cone_line.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
+        dt_cone_tip_block_spec.TIP_BLOCK_NORTH_FACE - dt_cone_tip_block_spec.ADJUSTER_EMBED
     )
     # Vendor Sketch2 Line7: the pure stock spec owns the actual cup, not this shaft.
     import _mcmaster_94025a164

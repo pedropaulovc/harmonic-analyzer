@@ -26,7 +26,7 @@ def test_required_drawing_paths() -> None:
 
 def test_pedestal_uses_the_common_cone_axis_height() -> None:
     from cone_line import Y_BASE_TOP, Y_DRIVE
-    from dt_post_mount_stack import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
+    from _cone_axis_constants import CONE_AXIS_HEIGHT_MM, PLATFORM_THICKNESS_MM
 
     height = CONE_AXIS_HEIGHT_MM + PLATFORM_THICKNESS_MM
     assert part.BORE_HEIGHT == drawing.BORE_HEIGHT == dt_arbor_pedestal_spec.BORE_HEIGHT == height

@@ -176,6 +176,7 @@ from _sketch import (
 )
 from _ch_channel_explode import create_channel_explode
 import ch_channel_assembly_spec as settings_spec
+from fr_top_frame_spec import BORE_DIA as SOCKET_BORE_DIA
 from _assembly import (
     activate_assembly_contract,
     author_in_drawing_configurations,
@@ -219,7 +220,7 @@ from _transforms import (
     euler_from_rows,
     rows_from_euler,
 )
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     CHANNEL_Z0,
     MECHANISM_Z_SHIFT,
 )
@@ -254,11 +255,11 @@ from ch_connecting_rod_spec import CENTER_DISTANCE as ROD_C2C  # ring centre ->
 # notes edit full-rebuild this assembly (codex #354).
 from ch_connecting_rod_spec import FORK_THICKNESS as ROD_FORK_THICKNESS
 from ch_rod_pivot_pin_spec import PIN_INSTALLED_LENGTH
-from ch_rocker_arm_spec import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
-from ch_rocker_arm_spec import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
+from _rocker_interface import ROD_HOLE_X as ARM_ROD_HOLE_X  # rod pin x in the arm
+from _rocker_interface import ROD_HOLE_Y as ARM_ROD_PIN_LOCAL_Y  # rod pin y: LOW
 
 # in the strap (bottom-arc y + 5.3, ch14 fan photo), NOT mid-depth like the pivot
-from ch_rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
+from _rocker_interface import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mid-depth
 
 # at the pivot. Same imported-not-copied rule as CAM_ECC, and for the same
 # reason: the rocker's rod-pin bore is NOT level with the pivot bore
@@ -266,7 +267,7 @@ from ch_rocker_arm_spec import PIVOT_MID_Y as ARM_PIVOT_LOCAL_Y  # 8.0: strap mi
 # the intrinsic 3.28 deg lever angle or the placed pin lands 7 mm off and the J2
 # revolute drags the ring off the cam (the 0.9 deg/0.4 mm version of this slip
 # already cost 20 x 20.27 mm^3 of cylinder-gear interference at the top level).
-from ch_rocker_arm_spec import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
+from _rocker_interface import CENTER_Y as ARM_ARC_CENTER_LOCAL_Y  # 816: arm-local arc
 
 # centre above the bottom edge (= CURVE_RADIUS + ARM_DEPTH), shared with the
 # offline error budget so the slide-arc height is never copied.
@@ -1058,7 +1059,7 @@ async def _author_settings_reference(adapter) -> None:
         ("ChKeeperSocketX", socket_x),
         ("ChKeeperSocketZ", socket_y),
         ("ChKeeperSocketLine", spec.KEEPER_PLAN_SOCKET_LINE),
-        ("ChKeeperSocketBore", spec.SOCKET_BORE_DIA),
+        ("ChKeeperSocketBore", SOCKET_BORE_DIA),
         ("ChKeeperSocketBoss", spec.SOCKET_BOSS_DIA),
         ("ChKeeperWebHalfT", spec.KEEPER_PLAN_WEB_HALF_T),
         ("ChKeeperWebFaceFromSocket", spec.KEEPER_PLAN_WEB_FACE_FROM_SOCKET),
@@ -1141,7 +1142,7 @@ async def _author_settings_reference(adapter) -> None:
             await adapter.add_circle(socket_x, socket_y, diameter / 2.0),
         )
         for label, diameter in (
-            ("bore", spec.SOCKET_BORE_DIA),
+            ("bore", SOCKET_BORE_DIA),
             ("boss", spec.SOCKET_BOSS_DIA),
         )
     ]
@@ -1213,7 +1214,7 @@ async def _author_settings_reference(adapter) -> None:
     dims.record("KeeperSocketZ", '"ChKeeperSocketZ"')
     for circle, value, name, drive in zip(
         socket_circles,
-        (spec.SOCKET_BORE_DIA, spec.SOCKET_BOSS_DIA),
+        (SOCKET_BORE_DIA, spec.SOCKET_BOSS_DIA),
         ("KeeperSocketBore", "KeeperSocketBoss"),
         ('"ChKeeperSocketBore"', '"ChKeeperSocketBoss"'),
         strict=True,

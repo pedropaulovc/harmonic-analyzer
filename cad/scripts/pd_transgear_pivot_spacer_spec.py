@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 
-import pd_vn_transgear_pivot_screw_spec as SCREW
+import _mcmaster_90325a174 as SCREW
 from _gtol_planar import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 

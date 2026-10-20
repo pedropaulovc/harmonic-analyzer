@@ -8,13 +8,14 @@ import pytest
 
 import _fit_shaft_h
 import _config
+import _sprocket_seat_geometry as seat_geometry
 import build_dt_drive_train_assembly as drive
 import cone_pitch
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
 import pinion_rig_park_geometry
 from _printed_tolerance import printed_band_mm
-from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
+from _cone_axis_constants import MECHANISM_Z_SHIFT
 from dt_pinion_pivot_block_geometry import BLOCK_EAST
 from fr_rocker_arm_support_spec import SUPPORT_WORLD_X
 
@@ -692,7 +693,7 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     # The grip keeps opening from the crank cluster.  Nominal floor re-pinned
     # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south);
     # the worst case gates it (RIG_MARGINS' grip crossrod row, 11.112 vs 0.25).
-    assert drive._GRIP_ROD_Z[0] - drive.REMOVABLE.SEAT_FACE_Z >= 12.0
+    assert drive._GRIP_ROD_Z[0] - seat_geometry.SEAT_FACE_Z >= 12.0
     assert (
         drive.RIG_MARGINS["grip crossrod to the crank chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
@@ -712,7 +713,7 @@ def test_crank_collar_bears_on_the_boss_and_the_end_stands_proud(monkeypatch) ->
     16T by the spec's stack, clear of the inclined cone stack."""
     import dt_crank_pinion_spec as pinion
     import dt_crankshaft_spec as cs
-    import pd_transgear_removable_spec as removable
+    import _sprocket_seat_geometry as removable
 
     seat_face_fwd = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR + min(cs.SEAT_COLLAR_BAND)
     assert removable.SEAT_FACE_Z - removable.PLATE - drive.CRANK_HUB_REAR_Z == (
@@ -774,7 +775,7 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     import dt_crank_hub_geometry as hub
     import dt_crankshaft_spec as cs
     import pd_transgear_drive_collar_spec as collar
-    import pd_transgear_removable_spec as removable
+    import _sprocket_seat_geometry as removable
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
     # The knob side's seat is the MHA-PD-22 drive collar's front face, set

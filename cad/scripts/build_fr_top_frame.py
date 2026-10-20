@@ -222,7 +222,7 @@ from fr_top_frame_spec import (
     SURFACE_FINISHES,
     WEB_T,
 )
-from dt_cone_pivot_post_installation import (
+from _cone_axis_constants import (
     FRAME_COLUMN_Z_CENTER,
     SUMMING_Z,
 )

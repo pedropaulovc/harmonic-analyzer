@@ -102,10 +102,6 @@ from dt_cone_swing_platform_geometry import (
     PLATE_LEN,
     PLATE_T,
     POST_LOCAL_Z,
-    POST_MOUNT_DZ,
-    POST_MOUNT_EAST_XZ,
-    POST_MOUNT_WEST_XZ,
-    POST_MOUNT_X,
     SLOT_E_X,
     SLOT_E_Z,
     SLOT_OUT_X,
@@ -115,6 +111,12 @@ from dt_cone_swing_platform_geometry import (
     SLOT_W,
     WEST_HALF_N,
     WEST_HALF_S,
+)
+from dt_cone_swing_platform_checks import (
+    POST_MOUNT_DZ,
+    POST_MOUNT_EAST_XZ,
+    POST_MOUNT_WEST_XZ,
+    POST_MOUNT_X,
 )
 from dt_cone_swing_platform_spec import (
     crank_gear_platform_clearance,

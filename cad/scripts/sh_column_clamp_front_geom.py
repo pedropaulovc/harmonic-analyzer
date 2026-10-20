@@ -1,18 +1,11 @@
-r"""Column-clamp-front nominal geometry -- the drawing-FREE constant block shared
-by the part build, its ``_spec`` (drawing contract) and the two assemblies that
-anchor off the clamp depth (``build_magnifier_assembly`` /
-``build_paper_drive_assembly``).
+r"""Column-clamp-front nominal bore and ear geometry.
 
-PURE DATA, no SolidWorks/COM and no drawing imports.  Kept SEPARATE from
-``column_clamp_front_spec`` on purpose: the assemblies depend (via
-``_buildgraph.module_deps_of``) on whatever module they import a constant from,
-so the drawing contract (notes/marked-dimension map) must NOT live here -- else a
-print-note edit would move the assemblies' recipe digest and force a needless
-full rebuild.  ``_spec`` re-exports these for its drawing-side consumers and adds
-only the drawing data.
+PURE DATA, no SolidWorks/COM and no drawing imports. Kept separate from
+``sh_column_clamp_front_spec`` so the fit checks and hole contract do not
+depend on drawing notes or marked-dimension maps.
 
 The shared builder and drawings consume the exact part-owned hole contract
-below; only the arc-envelope constants mirror ``_clamp_arc``.
+below; the shared bar and seating depths live in ``_column_clamp_interface``.
 """
 
 from __future__ import annotations
@@ -21,17 +14,6 @@ from _hole_spec import HoleSpec, blind_cut_dia_mm
 
 # --- Nominal geometry (book ch. 21/22, ch30 p005; layout memory/paper-drive-
 # rework.md E2). ---
-# The two clamped bars (MHA-PD-07 support bar, the magnifier's wheel bar)
-# are one stock section deep: the user's 2026-10-15 ruling thickened it to 9.5
-# (rule 18 engagement for the MHA-PD-VN-57 pivot screw), growing REARWARD so
-# both front faces stay on the platen-back plane.  pd_support_bar_spec and
-# mg_wheel_bar_geom read BAR_DEPTH here.
-BAR_DEPTH = 9.5
-# The column-axis plane to the bars' front faces (machine z -112.0 to the
-# shared -138.9 platen-back plane): fixed, so the arc gives up what the bar
-# gains.
-BAR_FRONT_DEPTH = 26.9
-ARC_DEPTH = BAR_FRONT_DEPTH - BAR_DEPTH  # bar back face to the column-axis plane
 ARC_WIDTH = 48.0  # lateral span, ear tip to ear tip
 ARC_HEIGHT = 16.0  # along the column (2 * _clamp_arc.ARC_HALF_H)
 COLUMN_BORE = 25.6  # half-cylinder relief: slides on the O25.4 column

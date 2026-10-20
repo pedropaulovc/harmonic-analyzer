@@ -22,14 +22,16 @@ from __future__ import annotations
 import math
 
 from _mcmaster_9666k56 import DIA_MAX as _STOCK_DIA_MAX, DIA_MIN as _STOCK_DIA_MIN
+from _mg_wheel_rim_geometry import (
+    RIM_AXIAL as _RIM_AXIAL,
+    RIM_INNER_DIA as _RIM_INNER_DIA,
+    RIM_OUTER_DIA as _RIM_OUTER_DIA,
+)
 from mg_magnifying_wheel_geom import (
     DRUM_MID_Z as _DRUM_MID_LOCAL_Z,
     HUB_DIA as _BOSS_DIA,
     HUB_FRONT_Z as _SPIGOT_FRONT_LOCAL_Z,
     HUB_STEP_Z as _BOSS_FRONT_LOCAL_Z,
-    RIM_AXIAL as _RIM_AXIAL,
-    RIM_INNER_DIA as _RIM_INNER_DIA,
-    RIM_OUTER_DIA as _RIM_OUTER_DIA,
     SPOKE_AXIAL as _SPOKE_AXIAL,
 )
 from mg_wheel_drum_geom import DRUM_OD, DRUM_WIRE_R, LEVER_WIRE_DIA
@@ -40,7 +42,8 @@ from mg_output_fixture_geom import (
     WIRE_DIA,
     WIRE_CLEARANCE as CLEARANCE,
 )
-from paper_drive_geom import PEN_Z_MID
+from _recording_geometry import PEN_Z_MID
+from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 assert math.isclose(WIRE_DIA, LEVER_WIRE_DIA, abs_tol=1e-12), (
     "fixture groove and wheel drum must carry the same lever wire diameter"
@@ -67,7 +70,6 @@ HOOK_X = CLAMP_X + HOOK_OFFSET_X
 HOOK_Y = FIXTURE_AXIS_Y
 HOOK_Z = HOOK_TARGET_Z
 WHEEL_X = 53.0  # magnifying-wheel centre
-WHEEL_BAR_Y = 575.7  # ch30 p002 re-anchor (was 565.0)
 # Wheel mid-plane = the pen-rod line (mg_wheel_group asserts the stack closes
 # on it; build_mg_magnifier_assembly places the wheel there).
 WHEEL_MID_Z = PEN_Z_MID

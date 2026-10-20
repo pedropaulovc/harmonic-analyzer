@@ -61,9 +61,9 @@ from __future__ import annotations
 
 import math
 
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from _cone_axis_constants import FRAME_FRONT_COLUMN_Z
 from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
-from sh_column_clamp_front_geom import ARC_DEPTH
+from _column_clamp_interface import ARC_DEPTH
 from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from pd_vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 

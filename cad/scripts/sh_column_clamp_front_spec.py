@@ -16,12 +16,10 @@ from __future__ import annotations
 
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
-# Nominal geometry lives in the drawing-FREE ``sh_column_clamp_front_geom`` module so
-# the assemblies can import ``ARC_DEPTH`` without pulling this file's drawing
-# contract (marked-dimension map / places) into their build-recipe closure.
-# Re-exported here unchanged for the drawing-side consumers and the lockstep test.
+# Part-owned bore and ear geometry remains separate from the shared seating
+# depths, so bar consumers need neither this drawing contract nor that geometry.
+from _column_clamp_interface import ARC_DEPTH
 from sh_column_clamp_front_geom import (  # noqa: F401
-    ARC_DEPTH,
     ARC_HEIGHT,
     ARC_WIDTH,
     BORE_RADIUS,

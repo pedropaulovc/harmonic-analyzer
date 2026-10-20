@@ -49,8 +49,8 @@ from _mcmaster_91375a106 import THREAD as _ARBOR_SET_SCREW_THREAD
 from dt_vn_swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
 from dt_vn_swing_stop_screw_spec import SHANK_DIA as _STOP_SHANK_DIA
 from dt_vn_swing_stop_screw_spec import THREAD as _STOP_THREAD
-from pd_transgear_removable_spec import DRIVE_PIN_DIA as _SEAT_PIN_DIA
-from pd_transgear_removable_spec import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
+from _sprocket_seat_geometry import DRIVE_PIN_DIA as _SEAT_PIN_DIA
+from _sprocket_seat_geometry import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from dt_vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from pd_vn_transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
 from magnifying_bracket_joint_layout import (
@@ -590,8 +590,9 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     ),
     # The two MHA-PD-VN-64 dowels (pd_vn_transgear_arm_plate_locating_pin_spec,
     # Ø2.0 model) pressed into the arm's Ø1.995 blind reams
-    # (pd_transgear_arm_geometry) over their 6.0 - 1.70 proud insertion: the
-    # press. They slip in the plate's Ø2.015 holes, so that pair has no row.
+    # (pd_transgear_arm_geometry); _transgear_arm_plate_locating_interface
+    # owns the 1.70 proud set in their 6.0 - 1.70 insertion: the press.
+    # They slip in the plate's Ø2.015 holes, so that pair has no row.
     **_numbered_pairs(
         "pd-vn-transgear-arm-plate-locating-pin",
         range(1, 3),

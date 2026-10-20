@@ -2346,7 +2346,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "build_dt_drive_train_assembly",
         "build_fr_harmonic_base",
         "dt_cone_pivot_post_spec",
-        "dt_cone_swing_platform_geometry",
+        "dt_cone_swing_platform_checks",
         "dt_cone_swing_platform_spec",
         "dt_cone_tip_block_spec",
         # Drilled-hole and angular rows size the collar-to-bank air stack.

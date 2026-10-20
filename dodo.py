@@ -3473,6 +3473,8 @@ def task_check():
     pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        # Source-only, per-hub part recipe boundaries (issue #1638).
+        SCRIPTS_DIR / "test_recipe_subsystem_isolation.py",
         SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
@@ -4011,16 +4013,18 @@ def task_check():
                     for path in recipe_tests
                 ),
             ],
-            # file_dep sees additions and edits, but a source file DELETED from
-            # the submodule just drops out of the list -- doit never compares it
-            # -- so the stamp stayed green (codex #1101). The manifest of paths
-            # makes a removal or rename re-run the adapter contract too.
+            # A deleted/renamed source drops out of file_dep without comparison.
+            # Keep inventories for both the adapter and source-scanning recipe
+            # guards so additions/removals cannot leave an old green stamp.
             "uptodate": [
                 config_changed(
                     {
                         "submodule_sources": [
                             _rel_tag(path) for path in adapter_contract_deps
-                        ]
+                        ],
+                        "recipe_scanned_sources": [
+                            _rel_tag(path) for path in sorted(scanned_by_binding_gate)
+                        ],
                     }
                 )
             ],

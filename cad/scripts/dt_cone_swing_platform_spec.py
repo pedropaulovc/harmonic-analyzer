@@ -22,7 +22,9 @@ from _gtol_planar import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
-import cone_line
+import _cone_axis_constants as cone_axis
+import dt_cone_post_envelope as post_envelope
+import dt_cone_tip_block_spec
 import dt_cone_gear_shaft_spec as cone_shaft
 import dt_cone_pivot_post_spec
 import dt_crank_drive_gear_spec as gear64
@@ -31,11 +33,11 @@ from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 POST_ATTACHMENT_SPACING = dt_cone_pivot_post_spec.ATTACHMENT_SPACING
-POST_BLOCK_DIA = dt_cone_pivot_post_spec.BLOCK_DIA
+POST_BLOCK_DIA = post_envelope.BLOCK_DIA
 POST_CONE_BORE_HEIGHT = dt_cone_pivot_post_spec.BORE_HEIGHT
 
 
-PLATE_THICKNESS = post_mount.PLATFORM_THICKNESS_MM
+PLATE_THICKNESS = cone_axis.PLATFORM_THICKNESS_MM
 # User ruling U41 (2026-09-23): the thickness is the stock's, printed as a
 # reference "(6.35)" with "1/4 PLATE AS SUPPLIED" -- no machined thickness
 # band.  drawing-guidelines.md rule 19 (absorb stacks at fit-up, not with tighter bands) stacks through the plate use the stock's mill tolerance.
@@ -196,10 +198,10 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 # plate into a blind tap in the block's bottom face.  The plate carries one
 # counterbored close-clearance hole; the counterbore is on the UNDERSIDE, which
 # slides on the base deck, so the head must sit below that face.
-# Pivot bore centre to tip-block centre, cone_line.TIP_BLOCK_PIVOT_OFFSET
+# Pivot bore centre to tip-block centre, dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 # (asserted equal by build_dt_drive_train_assembly).  Same frame and sign as the
 # pivot-origin plate: -z runs south from the pivot along the cone axis.
-HOLDDOWN_LOCAL_Z = -cone_line.TIP_BLOCK_PIVOT_OFFSET
+HOLDDOWN_LOCAL_Z = -dt_cone_tip_block_spec.TIP_BLOCK_PIVOT_OFFSET
 # 1.00 to -x of the cone-axis line, with the block's foot tap the same 1.00
 # to -x of its adjuster axis (dt_cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
 # block body still stands centred on the cone line.  The offset exists only

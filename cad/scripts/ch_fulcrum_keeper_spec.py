@@ -35,7 +35,7 @@ from math import ceil, hypot, sqrt
 
 from _fit_shaft_h import SHAFT_H
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from dt_cone_pivot_post_installation import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
+from _cone_axis_constants import CHANNEL_Z0, FRAME_FRONT_COLUMN_Z
 
 # --- Station (machine Z). The ONE source for build_ch_channel_assembly
 # (shaft, keeper, set-screw and foot-screw placement) and build_fr_top_frame

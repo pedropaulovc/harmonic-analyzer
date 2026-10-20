@@ -14,7 +14,7 @@ import channel_frame_geom
 import ch_channel_lever_spec
 import ch_connecting_rod_spec
 import dt_cylinder_gear_spec
-import ch_rocker_arm_spec
+import _rocker_interface as rocker_interface
 
 __all__ = ["ARC", "arc_geometry", "solve_state", "spring_hole_xy"]
 
@@ -30,13 +30,13 @@ _RING_CENTER = (
     * math.cos(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
 )
 _ROD_C2C = ch_connecting_rod_spec.CENTER_DISTANCE
-_LEVER_DX = ch_rocker_arm_spec.ROD_HOLE_X
-_LEVER_DY = ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y
+_LEVER_DX = rocker_interface.ROD_HOLE_X
+_LEVER_DY = rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y
 _ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)
 _ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))
-_ARM_ARC_CENTER_LOCAL_Y = ch_rocker_arm_spec.CENTER_Y
-_ARM_PIVOT_LOCAL_Y = ch_rocker_arm_spec.PIVOT_MID_Y
-_ARM_TOP_RADIUS = ch_rocker_arm_spec.CURVE_RADIUS
+_ARM_ARC_CENTER_LOCAL_Y = rocker_interface.CENTER_Y
+_ARM_PIVOT_LOCAL_Y = rocker_interface.PIVOT_MID_Y
+_ARM_TOP_RADIUS = rocker_interface.CURVE_RADIUS
 # TOP_PIN_Y is measured from the bar profile's bottom-origin foot axis.
 _BAR_TOP_TO_FOOT = ch_amplitude_bar_spec.TOP_PIN_Y
 _CONTACT_OFF_X = ch_amplitude_bar_spec.BAR_WIDTH / 2.0

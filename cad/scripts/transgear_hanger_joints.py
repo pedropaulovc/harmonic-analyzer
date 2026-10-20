@@ -38,6 +38,7 @@ from __future__ import annotations
 import itertools
 import math
 
+from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as HOOK
 import pd_latch_hook_spec as HOOK_SPEC
 import pd_support_bar_spec as BAR
@@ -60,7 +61,7 @@ if PIVOT.THREAD != BAR.PIVOT_TAP_THREAD:
 # The printed REFERENCE length is the nominal bar less the recess window's
 # middle.
 _RECESS_MID = sum(PIVOT.TIP_RECESS) / 2.0
-if not math.isclose(PIVOT.FITTED_THREAD_LEN, BAR.BAR_DEPTH - _RECESS_MID, abs_tol=1e-9):
+if not math.isclose(PIVOT.FITTED_THREAD_LEN, BAR_DEPTH - _RECESS_MID, abs_tol=1e-9):
     raise AssertionError("the pivot screw's reference length is off the bar")
 # Each countersink's loss runs to where its leg meets the tap drill (R9-63):
 # the back one stays inside the neck zone, the front one beyond the tip's
@@ -72,8 +73,8 @@ if _PIVOT_TAP_CSK_DEPTH > PIVOT.FULL_THREAD_START:
     )
 if _PIVOT_TAP_CSK_DEPTH > PIVOT.TIP_RECESS[0] + PIVOT.INCOMPLETE_TIP_LEN_MAX:
     raise AssertionError("the bar's front countersink reaches the screw's full thread")
-_BAR_THIN = BAR.BAR_DEPTH - BAR.BAR_DEPTH_BAND
-_BAR_THICK = BAR.BAR_DEPTH + BAR.BAR_DEPTH_BAND
+_BAR_THIN = BAR_DEPTH - BAR.BAR_DEPTH_BAND
+_BAR_THICK = BAR_DEPTH + BAR.BAR_DEPTH_BAND
 # Fitted thread lengths (shoulder end to faced tip) over the bar band and the
 # recess window.
 PIVOT_FITTED_LEN_MIN = _BAR_THIN - PIVOT.TIP_RECESS[1]

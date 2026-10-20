@@ -500,7 +500,7 @@ requirement("body_seat",
     fields={
         "at": ([0.0, part_spec.BODY_SADDLE_Y, 0.0], ("BODY_SADDLE_Y", "__frame__")),
         "axis": _POST_AXIS,
-        "dia_nominal": (part_spec.BODY_SEAT_DIA, ("BODY_SEAT_DIA", (_POST, "BLOCK_DIA"))),
+        "dia_nominal": (part_spec.BODY_SEAT_DIA, ("BODY_SEAT_DIA", ("dt_cone_post_envelope", "BLOCK_DIA"))),
         "note": (part_spec.BODY_SEAT_CALLOUT, ("BODY_SEAT_CALLOUT", "POST_NUMBER")),
         "height": (
             limits(part_spec.SEAT_AXIS_HEIGHT, part_spec.DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"]),

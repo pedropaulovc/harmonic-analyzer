@@ -39,7 +39,7 @@ import pn_pen_v_block_spec as vb
 import pn_vn_pen_marker_spec as marker
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
 from _hole_spec import TAP_DRILL_MM
-from paper_drive_geom import (
+from _recording_geometry import (
     PAPER_FRONT_Z,
     PEN_BLOCK_YAW_DEG,
     PEN_PAPER_CLEARANCE_MM,

@@ -18,7 +18,7 @@ import dt_pinion_arbor_spec as arbor
 import dt_pinion_handle_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
+from _cone_axis_constants import MECHANISM_Z_SHIFT
 
 
 def test_registry_slug_now_describes_the_separate_grip_crossrod() -> None:

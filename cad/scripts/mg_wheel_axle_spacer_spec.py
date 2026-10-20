@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM and no drawing imports.  A turned brass sleeve
 on the 3/16 mg-wheel-axle between the mg-wheel-bar's front face and the
 MHA-MG-VN-54 back washer.  It carries the magnifying wheel forward off the bar
 until the rim groove's mid-plane lands on the pen-rod line
-(``paper_drive_geom.PEN_Z_MID``), so the pen wire leaving the groove hangs
+(``_recording_geometry.PEN_Z_MID``), so the pen wire leaving the groove hangs
 plumb onto the pen rod (pn-pen re-derivation, user decision Option C).  Its
 length is DERIVED from that line, never a second literal: it is the one part
 of the wheel stack that moves with the pen line; the washers and the nuts are
@@ -33,7 +33,7 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import SurfaceFinishControl
 from mg_magnifying_wheel_geom import HUB_BACK_Z
 from mg_wheel_bar_geom import BAR_FRONT_Z
-from paper_drive_geom import PEN_Z_MID
+from _recording_geometry import PEN_Z_MID
 
 # Bar face -> spacer -> back washer -> hub back face -> spokes' mid-plane on
 # the pen-rod line.

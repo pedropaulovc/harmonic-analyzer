@@ -30,7 +30,7 @@ Cross-subassembly fits proven by the top-level interference check:
 * the pen-hanger (pn-pen.SLDASM) clamps the wheel-bar (mg-magnifier.SLDASM), and the
   wheel rim -> pen-rod wire couples the two;
 * chain sprockets (drive-train crankshaft + paper-drive knob shaft) share the
-  z -155.7 chain plane (pd_transgear_removable_spec.CHAIN_MID_Z);
+  z -155.7 chain plane (_sprocket_seat_geometry.CHAIN_MID_Z);
 * rocker-arm connecting-rod rings (channel) ride the cam lobes integral
   to the drive-train's cylinder gears;
 * the measuring stick (ms-measuring-stick.SLDASM, stop clamped at the 2.0

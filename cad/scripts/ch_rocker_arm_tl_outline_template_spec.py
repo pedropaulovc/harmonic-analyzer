@@ -28,11 +28,12 @@ import math
 
 import _config
 import ch_rocker_arm_spec as rocker
+import _rocker_interface as rocker_interface
 from _hole_spec import blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm, printed_deviations
 
 R_TOP = rocker.R_TOP
-R_BOTTOM = rocker.R_BOTTOM
+R_BOTTOM = rocker_interface.R_BOTTOM
 _ROCKER_ZONE = rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
 
 # The aim: the middle of the rocker's one-sided top-edge band.
@@ -43,19 +44,19 @@ CENTER_Y = TOP_ABOVE_PIVOT + R_TOP  # 808.25
 BOTTOM_BELOW_PIVOT = round(R_BOTTOM - CENTER_Y, 2)  # 7.75
 # The rocker's bottom arc rides the same concentric zone: its nominal sits
 # ARM_DEPTH under the top arc, and the band moves both arcs together.
-_ROCKER_BOTTOM_BELOW = rocker.ARM_DEPTH - rocker.TOP_EDGE_ABOVE_PIVOT  # 8.0
+_ROCKER_BOTTOM_BELOW = rocker_interface.ARM_DEPTH - rocker.TOP_EDGE_ABOVE_PIVOT  # 8.0
 _ROCKER_BOTTOM_LOW = _ROCKER_BOTTOM_BELOW - rocker.TOP_EDGE_BAND[0]
 _ROCKER_BOTTOM_HIGH = _ROCKER_BOTTOM_BELOW - rocker.TOP_EDGE_BAND[1]
-if abs(R_BOTTOM - R_TOP - rocker.ARM_DEPTH) > 1e-9:
+if abs(R_BOTTOM - R_TOP - rocker_interface.ARM_DEPTH) > 1e-9:
     raise AssertionError("rocker arcs are no longer ARM_DEPTH apart")
-if abs(TOP_ABOVE_PIVOT + BOTTOM_BELOW_PIVOT - rocker.ARM_DEPTH) > 1e-9:
+if abs(TOP_ABOVE_PIVOT + BOTTOM_BELOW_PIVOT - rocker_interface.ARM_DEPTH) > 1e-9:
     raise AssertionError(
         "template arcs are no longer ARM_DEPTH apart on the mirror line"
     )
 if (
     abs(
-        rocker.CENTER_Y
-        - rocker.PIVOT_MID_Y
+        rocker_interface.CENTER_Y
+        - rocker_interface.PIVOT_MID_Y
         + (TOP_ABOVE_PIVOT - rocker.TOP_EDGE_ABOVE_PIVOT)
         - CENTER_Y
     )
@@ -99,7 +100,7 @@ for _low, _high, _nominal in (
 # on the trammel's R800/R816 about CENTER_Y (MHA-CH-06-TL-14..19 scribe them).
 _MID_ZONE = _ROCKER_ZONE / 2.0  # 0.25 into the material on the lower outline
 END_PLACES = 3
-_ROCKER_CENTRE = (0.0, rocker.CENTER_Y - rocker.PIVOT_MID_Y)
+_ROCKER_CENTRE = (0.0, rocker_interface.CENTER_Y - rocker_interface.PIVOT_MID_Y)
 _ROCKER_MIDDLE = (0.0, _ROCKER_CENTRE[1] - (R_TOP + R_BOTTOM) / 2.0)
 
 
@@ -297,8 +298,10 @@ if LOW_POINT_BAND[0] + LOCATOR_REGISTRATION_MAX > 0.25 * _ROCKER_ZONE / 2.0 + 1e
 # and the template's profile acceptance (DTI_ACCEPTANCE) is taken about the
 # pivot hole and this slot with pins in both.
 ROD_SLOT_PLACES = 3
-ROD_SLOT_X = round(rocker.ROD_HOLE_X, ROD_SLOT_PLACES)  # 133.067 BASIC
-ROD_SLOT_Y = round(rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y, ROD_SLOT_PLACES)  # 8.456
+ROD_SLOT_X = round(rocker_interface.ROD_HOLE_X, ROD_SLOT_PLACES)  # 133.067 BASIC
+ROD_SLOT_Y = round(
+    rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y, ROD_SLOT_PLACES
+)  # 8.456
 ROD_SLOT_LEVER = math.hypot(ROD_SLOT_X, ROD_SLOT_Y)  # 133.335
 ROD_SLOT_AXIS = (ROD_SLOT_X / ROD_SLOT_LEVER, ROD_SLOT_Y / ROD_SLOT_LEVER)
 _ROD_SLOT_TANGENT = (-ROD_SLOT_AXIS[1], ROD_SLOT_AXIS[0])
@@ -359,8 +362,9 @@ if (ROD_SLOT_FLAT - printed_band_mm(ROD_SLOT_PLACES)) / 2.0 < (
 # whose top end is the worst station (top ends -X 0.159, +X 0.108; bottom
 # ends 0.148 / 0.099; tapers 0.134 / 0.106; tip lands 0.062 / 0.062; apex 0.057).
 _ROD_SLOT_ROUNDING = abs(
-    (ROD_SLOT_X - rocker.ROD_HOLE_X) * _ROD_SLOT_TANGENT[0]
-    + (ROD_SLOT_Y - (rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)) * _ROD_SLOT_TANGENT[1]
+    (ROD_SLOT_X - rocker_interface.ROD_HOLE_X) * _ROD_SLOT_TANGENT[0]
+    + (ROD_SLOT_Y - (rocker_interface.ROD_HOLE_Y - rocker_interface.PIVOT_MID_Y))
+    * _ROD_SLOT_TANGENT[1]
 )
 ROD_CLOCKING_PLAY = ROD_HOLE_PLAY + ROD_SLOT_PLAY + _ROD_SLOT_ROUNDING  # 0.0674
 # The template's share of the rocker's half-zone (0.25 either side of the

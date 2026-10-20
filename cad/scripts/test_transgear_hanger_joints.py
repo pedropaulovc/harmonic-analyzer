@@ -12,6 +12,7 @@ import math
 
 import pytest
 
+from _column_clamp_interface import BAR_DEPTH
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import pd_transgear_arm_plate_geometry as plate
@@ -37,7 +38,7 @@ def test_pivot_screw_refuses_a_bar_too_thin_for_one_and_a_half_d(monkeypatch) ->
     # Thinnest bar, deepest recess, one pitch charged at the faced tip and the
     # vendor neck: (9.37 - 0.50) - 0.794 - 1.7653 = 6.311 = 1.515 D.
     assert joints.PIVOT_ENGAGEMENT_WORST == pytest.approx(
-        bar.BAR_DEPTH
+        BAR_DEPTH
         - bar.BAR_DEPTH_BAND
         - pivot.TIP_RECESS[1]
         - pivot.INCOMPLETE_TIP_LEN_MAX

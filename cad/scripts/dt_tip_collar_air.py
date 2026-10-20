@@ -77,7 +77,7 @@ from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
 from cone_stack_end_play import COLLAR_FEELER_BAND
 from cone_shaft_land_bands import TIP_COLLAR_INSTALLED_COCK_ANGLE_RAD
-from dt_cone_swing_platform_geometry import manufactured_p1_stop_enclosure
+from dt_cone_swing_platform_checks import manufactured_p1_stop_enclosure
 
 Vector = tuple[float, float, float]
 
@@ -216,7 +216,7 @@ _BLOCK_DEPTH_MAX = tip.BLOCK_Z + printed_band_mm(tip.BLOCK_DEPTH_PLACES)
 # takes the title block's angular band, about that screw, over the cup's reach.
 _CUP_REACH = math.hypot(
     abs(tip.FOOT_TAP_OFFSET_X) + printed_band_mm(tip.PASSAGE_CENTER_PLACES),
-    abs(shaft.T006_TIP_STATION - cone_line.TIP_BLOCK_STATION) + _BLOCK_DEPTH_MAX / 2.0,
+    abs(shaft.T006_TIP_STATION - tip.TIP_BLOCK_STATION) + _BLOCK_DEPTH_MAX / 2.0,
 )
 # Step 3 seats the tip in the cup, then backs the cup off for SHAFT_END_PLAY.
 # The 94025A164 is a slotted headless cup-point set screw: ASME B18.6.2's
