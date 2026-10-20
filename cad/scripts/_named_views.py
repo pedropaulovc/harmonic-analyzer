@@ -192,6 +192,7 @@ def name_octant_views(
     return named
 
 
+@_telemetry.traced("assembly.named_views", label_param="label")
 def name_standard_views(
     adapter: Any,
     *,
