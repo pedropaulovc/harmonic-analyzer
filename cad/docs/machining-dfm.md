@@ -122,10 +122,11 @@ geometry is casting-shaped, not milling-shaped.
   and its associative full-thread and minimum-drill depth tokens are unchanged.
   The native pedestal-to-pivot X/Y dimensions locate the pivot from the actual
   near pedestal axis with the existing ±0.05 mm functional band. Both carry
-  one-line ABOVE `SEE D1` flags to the single D1-rim-attached locating note,
-  which names MHA-DT-02 and the one setup at assembly without repeating the
-  numeric offsets, and explicitly states `TABLE X/Y REFERENCE`. The generated
-  native hole-table coordinates remain unchanged.
+  one-line ABOVE `SEE NOTE 1` flags to numbered free note 1 in the B4 notes
+  lane. It names the MHA-DT-02 seat, calls for drilling and tapping at assembly
+  in one setup without repeating the numeric offsets, and states that D1
+  table X/Y are reference. The generated native hole-table coordinates remain
+  unchanged.
 
 ### Blind-thread DFM rule
 

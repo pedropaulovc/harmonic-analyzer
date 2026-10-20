@@ -46,7 +46,6 @@ from win32com.client.dynamic import Dispatch as dynamic_dispatch
 
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -79,7 +78,6 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import create_view_theoretical_datum, insert_hole_table
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_resolve import resolve_faces
-from _layout_geometry import DEFAULT_ADVANCE_RATIO, estimate_text_box
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -137,7 +135,6 @@ from fr_harmonic_base_spec import (
     PART_SURFACE_FINISHES,
     PIVOT_SEAT_DIMENSIONS,
     PIVOT_SEAT_STEP,
-    PIVOT_SEAT_TAG,
     STACK_HEIGHT,
     socket_bore_finish_key,
 )
@@ -371,14 +368,14 @@ HOLE_TOP_KEEP = {
     # D1 is held from the nearer transferred pedestal seat. The point-only
     # reference sketch supplies real centre-to-centre extension origins;
     # place X below the plan, left of both witnesses and the datum X letter.
-    "PivotSeatX": (0.2030, 0.1350),
+    "PivotSeatX": (0.2427, 0.1320),
     # Keep the short native line between the holes; offset only its text
     # onto the blank pocket floor, clear of the nearby marks and leaders.
     "PivotSeatY": (0.2616, 0.1705),
 }
 PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
-# ABOVE accepts one printable row; both native offsets flag the same D1 note.
-PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, f"SEE {PIVOT_SEAT_TAG}")
+# ABOVE accepts one printable row; both native offsets cite numbered note 1.
+PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, "SEE NOTE 1")
 # Section A-A lays machine +Y across the sheet, so the spotface depth -- a
 # machine-Z value, which the rotation lays UP the sheet -- sits off the rear
 # end it cuts.
@@ -406,9 +403,7 @@ SECTION_KEEP = {
     "SpotFaceDepth": (0.3845, 0.1186),
 }
 HOLE_SIDE_KEEP = {
-    # The native spotface block uses the left lane freed by D1's attached note;
-    # its unchanged front-hole leader passes below that note, not through it.
-    "SpotFaceDia": (0.045, 0.131),
+    "SpotFaceDia": (0.193, 0.135),
     # 4 mm above the old station: three caption lines hang below this value and
     # the lowest reached the title-block band at y 66 mm (audit keep-out).
     "CrossScrewAxisHeight": (0.196, 0.0785),
@@ -452,7 +447,7 @@ HOLE_TAG_POSITIONS = {
     "A3": (0.344, 0.176),
     "A4": (0.344, 0.215),
     "C1": (0.247, 0.216),
-    "D1": (0.2502, 0.1792),
+    "D1": (0.2456, 0.1550),
     # The transferred pinion-rig seats left the table (U28 corollary), and
     # with U34c the arbor-pedestal seats followed them, taking the last #4-40
     # rows (the former E) along. The native tags re-letter: the
@@ -661,7 +656,7 @@ def _attached_note(
     edge: Any,
     text: str,
     position: tuple[float, float],
-) -> Any:
+) -> None:
     if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
         view_name(adapter, view)
     ):
@@ -678,18 +673,6 @@ def _attached_note(
         raise RuntimeError(f"failed to position base feature note {text!r}")
     if int(annotation.GetAttachedEntityCount3()) != 1:
         raise RuntimeError(f"base feature note lost its source edge: {text!r}")
-    return annotation
-
-
-def _route_pivot_seat_note(annotation: Any) -> None:
-    """Give only the D1 locating note its right-sided native bent leader."""
-    if annotation.SetLeader3(2, 2, True, False, False, False) != 0:
-        raise RuntimeError("failed to route the pivot seat note's bent leader")
-    annotation.BentLeaderLength = 0.0755
-    if not abs(float(annotation.BentLeaderLength) - 0.0755) <= 1e-7:
-        raise RuntimeError("pivot seat note bent leader length did not persist")
-    if int(annotation.GetLeaderStyle()) != 2 or int(annotation.GetLeaderSide()) != 2:
-        raise RuntimeError("pivot seat note bent leader style or side did not persist")
 
 
 def _serial_edge(view: Any) -> Any:
@@ -881,82 +864,9 @@ TRANSFER_NAMEPLATE_LEADER_HOLE = max(
     TRANSFER_NAMEPLATE_HOLES, key=lambda hole: (round(hole[0], 1), -hole[1])
 )
 # The cone swing set is made against the arbor carried by MHA-DT-02.
-# PivotSeatReference owns D1's native banded offsets from the near pedestal
-# seat; both offsets flag the single spec-owned EDGE-attached D1 note below
-# the table. Its mate/setup facts disclose the table's reference-only X/Y;
-# the native readback checks its ink and actual leader with the hole callouts.
-PIVOT_SEAT_NOTE_XY = (0.1150, 0.1425)
-PIVOT_SEAT_NOTE_LABEL = "pivot seat note"
-PIVOT_SEAT_TAG_LABEL = "D1 tag"
-
-
-def is_pivot_seat_note(text: str) -> bool:
-    """Whether a note read back off the sheet is the D1 pivot seat note (INote
-    text reads back with CRLF line breaks)."""
-    return text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP.strip()
-
-
-def _d1_text_rows(annotation: Any, label: str) -> dict[str, Box]:
-    """Box D1 note/tag glyphs only; INote.GetExtent also includes leaders."""
-    raw = annotation.GetDisplayData()
-    if raw is None:
-        raise RuntimeError(f"{label} has no native text display data")
-    data = _early_bound(raw, "IDisplayData")
-    rows = {}
-    for index in range(int(data.GetTextCount())):
-        text = str(data.GetTextAtIndex(index) or "").replace("\r\n", "\n").rstrip()
-        position = tuple(float(value) for value in data.GetTextPositionAtIndex(index) or ())
-        height = float(data.GetTextHeightAtIndex(index))
-        reference = int(data.GetTextRefPositionAtIndex(index))
-        angle = float(data.GetTextAngleAtIndex(index))
-        width = float(data.GetTextInBoxWidthAtIndex(index))
-        if (
-            not text
-            or len(position) < 2
-            or not all(math.isfinite(value) for value in (*position, height, angle, width))
-            or height <= 0.0
-            or reference not in range(6)
-            or width < 0.0
-        ):
-            raise RuntimeError(f"{label} has malformed native text run {index}")
-        # Zero is documented for text without a text-in-box width. Retain
-        # the shared estimator then; a positive native width takes precedence.
-        advance = (
-            width / (max(map(len, text.split("\n"))) * height)
-            if width > 0.0 else DEFAULT_ADVANCE_RATIO
-        )
-        box = estimate_text_box(
-            text,
-            anchor=(position[0], position[1]),
-            height=height,
-            reference=reference,
-            angle=angle,
-            advance_ratio=advance,
-        )
-        if box is None:
-            raise RuntimeError(f"{label} has no text box for native run {index}")
-        rows[f"{index}: {text}"] = (box.xmin, box.ymin, box.xmax, box.ymax)
-    if not rows:
-        raise RuntimeError(f"{label} has no native text runs")
-    return rows
-
-
-def _native_note_leader_segments(annotation: Any, label: str) -> list[Segment]:
-    """Read the note's actual complete, live leader without inventing its tip."""
-    if int(annotation.GetLeaderCount()) != 1 or bool(annotation.IsDangling()):
-        raise RuntimeError(f"{label} does not have one live native leader")
-    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
-    if (
-        len(points) < 6
-        or len(points) % 3
-        or not all(math.isfinite(value) for value in points)
-    ):
-        raise RuntimeError(f"{label} has no complete native leader: {points!r}")
-    return [
-        (points[index], points[index + 1], points[index + 3], points[index + 4])
-        for index in range(0, len(points) - 3, 3)
-    ]
-
+# Both native banded offsets cite spec-owned numbered note 1 in the B4 notes
+# lane; the free note states the assembly setup and table-reference status.
+PIVOT_SEAT_NOTE_XY = (0.020, 0.100)
 
 # The cross-tap callout carries hole facts only, in three rows: count, drill
 # and depth; this instruction; the thread and its depth, on its own row. The
@@ -1872,7 +1782,6 @@ def _check_hole_sheet_callouts(
     callouts: dict[str, Any],
     views: dict[str, Any],
     datum_origin: Any,
-    pivot_seat_edge: Any,
 ) -> None:
     """Fail loud on any sheet-2 callout that crowds another callout, a note, a
     view label, the hole table, the table's datum origin, any view's casting
@@ -1900,6 +1809,7 @@ def _check_hole_sheet_callouts(
     obstacles.update(datum_origin_boxes(axis_points))
     obstacles.update(_section_line_obstacles(views))
     sheet_view = ddoc.GetFirstView()  # the sheet itself: its free notes and tables
+    pivot_seat_notes = 0
     for view in (sheet_view, *views.values()):
         for element, annotation in _iter_view_annotations(adapter, view):
             # Display dimensions come back as (None, annotation) (#902); only
@@ -1912,53 +1822,14 @@ def _check_hole_sheet_callouts(
             text = _note_text(adapter, annotation)
             if not note_reaches_final_sheet(text):
                 continue
-            if is_pivot_seat_note(text):
-                if PIVOT_SEAT_NOTE_LABEL in boxes:
-                    raise RuntimeError("callout check found duplicate pivot seat notes")
-                annotation = _early_bound(annotation, "IAnnotation")
-                _assert_attached_to(
-                    adapter,
-                    annotation,
-                    pivot_seat_edge,
-                    entity_type="EDGE",
-                    what="pivot seat note",
-                    label=PIVOT_SEAT_TAG,
-                )
-                leaders[PIVOT_SEAT_NOTE_LABEL] = _native_note_leader_segments(
-                    annotation, PIVOT_SEAT_NOTE_LABEL
-                )
-                note_rows = _d1_text_rows(annotation, PIVOT_SEAT_NOTE_LABEL)
-                own_rows[PIVOT_SEAT_NOTE_LABEL] = note_rows
-                boxes[PIVOT_SEAT_NOTE_LABEL] = (
-                    min(box[0] for box in note_rows.values()),
-                    min(box[1] for box in note_rows.values()),
-                    max(box[2] for box in note_rows.values()),
-                    max(box[3] for box in note_rows.values()),
-                )
-                continue
-            if text.strip() == PIVOT_SEAT_TAG:
-                obstacle_name = f"note {PIVOT_SEAT_TAG_LABEL}"
-                if obstacle_name in obstacles:
-                    raise RuntimeError("callout check found duplicate native D1 tags")
-                annotation = _early_bound(annotation, "IAnnotation")
-                tag_rows = _d1_text_rows(annotation, PIVOT_SEAT_TAG_LABEL)
-                own_rows[PIVOT_SEAT_TAG_LABEL] = tag_rows
-                obstacles[obstacle_name] = (
-                    min(box[0] for box in tag_rows.values()),
-                    min(box[1] for box in tag_rows.values()),
-                    max(box[2] for box in tag_rows.values()),
-                    max(box[3] for box in tag_rows.values()),
-                )
-                leaders[PIVOT_SEAT_TAG_LABEL] = _native_note_leader_segments(
-                    annotation, PIVOT_SEAT_TAG_LABEL
-                )
-                continue
+            if text.replace("\r\n", "\n").strip() == PIVOT_SEAT_STEP:
+                pivot_seat_notes += 1
             is_label = any(word in element.label.upper() for word in _LAYOUT_LABEL_WORDS)
             obstacles[f"{'label' if is_label else 'note'} {element.label}"] = element.box
-    if PIVOT_SEAT_NOTE_LABEL not in boxes:
-        raise RuntimeError("callout check found no pivot seat note on the holes sheet")
-    if f"note {PIVOT_SEAT_TAG_LABEL}" not in obstacles:
-        raise RuntimeError("callout check found no native D1 tag on the holes sheet")
+    if pivot_seat_notes != 1:
+        raise RuntimeError(
+            f"callout check requires exactly one numbered pivot seat note, found {pivot_seat_notes}"
+        )
     tables = [
         element
         for view in (sheet_view, *views.values())
@@ -1973,11 +1844,8 @@ def _check_hole_sheet_callouts(
     )
     texts = {f"callout {label}": box for label, box in boxes.items()}
     texts.update(
-        # Match the standard own-box key, so the tag's own inset rows—not a
-        # leader-polluted extent—check its own leader. All other leaders still
-        # check the tag glyphs, and the tag remains an obstacle, not a callout.
-        (f"callout {PIVOT_SEAT_TAG_LABEL}" if name == f"note {PIVOT_SEAT_TAG_LABEL}" else name, box)
-        for name, box in obstacles.items() if name.startswith(_TEXT_OBSTACLE_KINDS)
+        (name, box) for name, box in obstacles.items()
+        if name.startswith(_TEXT_OBSTACLE_KINDS)
     )
     findings = (
         find_callout_clashes(boxes, obstacles)
@@ -2414,13 +2282,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
-    pivot_seat_rim = hole_entities[
-        TABLE_HOLES.index((*PIVOT_SCREW_XZ, PIVOT_SCREW_HOLE_DIA))
-    ]
-    pivot_seat_annotation = _attached_note(
-        adapter, hole_top, pivot_seat_rim, PIVOT_SEAT_STEP, PIVOT_SEAT_NOTE_XY
-    )
-    _route_pivot_seat_note(pivot_seat_annotation)
+    add_note(adapter, PIVOT_SEAT_STEP, *PIVOT_SEAT_NOTE_XY)
     _attached_note(
         adapter,
         hole_top,
@@ -2688,7 +2550,6 @@ async def build(adapter: Any) -> dict[str, str]:
         callouts=hole_sheet_callouts,
         views={"holes top": hole_top, "holes front": hole_side, "section A-A": section},
         datum_origin=hole_feature.DatumOrigin,
-        pivot_seat_edge=pivot_seat_rim,
     )
     _log_tapped_hole_notes(adapter, ddoc)
     return await finalize_drawing(

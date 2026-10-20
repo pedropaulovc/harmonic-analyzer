@@ -256,10 +256,9 @@ UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
 PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
 PIVOT_SEAT_TAG = "D1"
 PIVOT_SEAT_STEP = (
-    f"{PIVOT_SEAT_TAG}: LOCATES PIVOT\n"
-    "WITH MHA-DT-02\n"
-    "TABLE X/Y REFERENCE\n"
-    "ONE SETUP AT ASSEMBLY"
+    f"1. {PIVOT_SEAT_TAG} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
+    "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
+    f"{PIVOT_SEAT_TAG} TABLE X/Y ARE REFERENCE."
 )
 
 # Both heights are baselines from the same faced underside, never a chain
