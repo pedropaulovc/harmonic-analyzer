@@ -1,18 +1,18 @@
 r"""Reproduction script: magnifying-lever clamp (MHA-MG-02; book ch. 20 p. 48).
 
-A vertical length of 7/16 in hex brass that slides along the magnifying lever
-(#1559 owner ruling): the Ø6 lever passes through it across the corners, the
-knurled #4-40 thumb screw enters the top face on the hex axis and pinches the
-lever, and the MHA-MG-04 vertical rod screws into a blind #4-40 tap in the
-bottom face, on the same axis, until its shoulder seats on that face.
+A vertical length of 1/2 in hex brass that slides along the magnifying lever
+(#1559 owner ruling): the full-body quarter-inch lever passes across the
+corners. The top #4-40 thumb screw pinches it; the bottom MHA-MG-04 rod
+shoulder seats on the opposite end. Each tap entry has an actual-flat normal
+location and a direct transverse bore-rim location, not an assumed common axis.
 
 Layout (part frame, ``mg_magnifying_clamp_geom``): origin at the bottom-face
 centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
 
-* ``HexProfile``: the 7/16 hex on the Top plane (sketch (x, y) -> model
+* ``HexProfile``: the 1/2 hex on the Top plane (sketch (x, y) -> model
   (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
-  (``Height``).  Equal flats either side of the origin centre the hex axis,
-  so neither the bore nor the taps need a location from a flat.
+  (``Height``). The regular section centres only the nominal CAD origin.
+  Five linked native dimensions own the flat and relative-axis locations.
 * ``LeverBoreProfile``: the Ø6.50 drilled lever bore, a Right-plane circle on
   the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
 * ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
@@ -36,14 +36,17 @@ from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
+from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
+from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
 from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
@@ -53,6 +56,7 @@ from _session import run_build
 from _sketch import (
     SketchDims,
     add_line_chain,
+    blank_reference_sketches,
     anchor_point_to_origin,
     dimension_between,
     ensure_fully_defined,
@@ -65,9 +69,11 @@ from mg_magnifying_clamp_geom import (
     HEX_AF,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
+    RELATIVE_AXIS_BAND,
     ROD_TAP_DRILL_DIA,
     THUMB_TAP_DRILL_DEPTH,
     THUMB_TAP_SPEC,
+    WALL_TARGET,
 )
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
@@ -110,6 +116,252 @@ V_THUMB = (
 # The rod tap: a blind drill and point, wholly in solid under the bore.
 V_ROD_TAP = blind_hole_volume_mm3(ROD_TAP_DRILL_DIA, ROD_TAP_DRILL_DEPTH)
 V_TOTAL = V_HEX - V_BORE - V_THUMB - V_ROD_TAP
+
+
+def _native_select(adapter: Any, entity: Any, interface: str, *, append: bool) -> None:
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    data = _early_bound(manager.CreateSelectData(), "ISelectData")
+    data.Mark = 0
+    if int(data.Mark) != 0 or _early_bound(entity, interface).Select4(append, data) is not True:
+        raise RuntimeError(f"clamp location: cannot select {interface}")
+
+
+def _has_conversion_source(adapter: Any, segment: Any, source: Any) -> bool:
+    """Require a native external reference, not just equal coordinates."""
+    native = _early_bound(segment, "ISketchSegment")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    for raw_relation in native.GetRelations() or ():
+        relation = _early_bound(raw_relation, "ISketchRelation")
+        for entity in relation.GetDefinitionEntities2() or ():
+            if entity is not None and int(application.IsSame(entity, source)) == 1:
+                return True
+    return False
+
+
+def _convert_location_source(adapter: Any, source: Any, interface: str) -> Any:
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    previous = tuple(sketch.GetSketchSegments() or ())
+    model.ClearSelection2(True)
+    _native_select(adapter, source, interface, append=False)
+    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    if manager.SketchUseEdge3(False, False) is not True:
+        raise RuntimeError("clamp location: native edge conversion failed")
+    model.ClearSelection2(True)
+    added = [candidate for candidate in sketch.GetSketchSegments() or () if not any(int(application.IsSame(candidate, old)) == 1 for old in previous)]
+    if len(added) != 1 or not _has_conversion_source(adapter, added[0], source):
+        raise RuntimeError("clamp location: conversion did not retain exactly one actual source entity")
+    converted = _early_bound(added[0], "ISketchSegment")
+    converted.ConstructionGeometry = True
+    if converted.ConstructionGeometry is not True:
+        raise RuntimeError("clamp location: converted geometry is not construction")
+    return converted
+
+
+def _line_endpoints_mm(edge: Any) -> tuple[tuple[float, ...], ...]:
+    native = _early_bound(edge, "IEdge")
+    points = []
+    for raw in (native.GetStartVertex(), native.GetEndVertex()):
+        if raw is None:
+            raise RuntimeError("clamp location: a straight stock edge has no vertex")
+        vertex = _early_bound(raw, "IVertex")
+        points.append(tuple(float(value) * 1000.0 for value in vertex.GetPoint()))
+    return tuple(points)
+
+
+def _stock_edge(face: Any, endpoints: tuple[tuple[float, ...], tuple[float, ...]]) -> Any:
+    matches = []
+    for raw in _early_bound(face, "IFace2").GetEdges() or ():
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsLine():
+            continue
+        actual = _line_endpoints_mm(edge)
+        if any(all(math.dist(point, wanted) <= 0.005 for point, wanted in zip(order, endpoints, strict=True)) for order in (actual, actual[::-1])):
+            matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"clamp location: stock boundary {endpoints!r} matched {len(matches)} edges")
+    return matches[0]
+
+
+def _tap_entry_circle(face: Any, end_y: float) -> Any:
+    matches = []
+    for raw in _early_bound(face, "IFace2").GetEdges() or ():
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if not curve.IsCircle():
+            continue
+        p = tuple(float(value) for value in curve.CircleParams)
+        if math.dist(p[:3], (0.0, end_y / 1000.0, 0.0)) <= 1e-7 and abs(p[6] * 1000.0 - DRILL_R) <= 0.005 and abs(abs(p[4]) - 1.0) <= 1e-6 and math.hypot(p[3], p[5]) <= 1e-6:
+            matches.append(edge)
+    if len(matches) != 1:
+        raise RuntimeError(f"clamp location: actual tap entry at Y{end_y:g} matched {len(matches)} rims")
+    return matches[0]
+
+
+def _location_sources(adapter: Any) -> dict[str, tuple[str, Any, str, tuple[tuple[str, Any], ...]]]:
+    """Sources are actual stock edges and actual cut/entry circles."""
+    faces = resolve_faces(adapter.currentModel, {
+        "top": PlanarFace((0.0, 1.0, 0.0), BLOCK_HEIGHT),
+        "bottom": PlanarFace((0.0, -1.0, 0.0), 0.0),
+        "zflat": PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0),
+    })
+    a, r = HEX_AF / 2.0, HEX_CORNER_RADIUS
+    sources = {}
+    for prefix, key, y in (("ThumbTap", "top", BLOCK_HEIGHT), ("RodTap", "bottom", 0.0)):
+        # One ordinary stock-flat location plus direct bore-rim location
+        # controls both entry coordinates without a derived stock midplane.
+        diagonal = _stock_edge(faces[key], ((r, y, 0.0), (r / 2.0, y, a)))
+        circle = _tap_entry_circle(faces[key], y)
+        sources[f"{prefix}LocationProfile"] = ("Top", circle, "IEntity", ((f"{prefix}FromDiagonalFlat", diagonal),))
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = part.FeatureByName("LeverBoreProfile")
+    if feature is None:
+        raise RuntimeError("clamp location: actual bore-producing sketch is missing")
+    sketch = _early_bound(_early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch")
+    segments = tuple(sketch.GetSketchSegments() or ())
+    if len(segments) != 1 or int(_early_bound(segments[0], "ISketchSegment").GetType()) != 1:
+        raise RuntimeError("clamp location: bore-producing sketch is not one actual circle")
+    flat = _stock_edge(faces["zflat"], ((r / 2.0, 0.0, a), (r / 2.0, BLOCK_HEIGHT, a)))
+    sources["LeverBoreLocationProfile"] = ("Right", segments[0], "ISketchSegment", (("LeverBoreFromZFlat", flat),))
+    return sources
+
+
+def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> None:
+    """Native perpendicular point-to-line measurement, never an adapter drive."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    # Entering a new sketch can reset input suppression (stock-carrier pattern).
+    for preference in (10, 372, 520):
+        application.SetUserPreferenceToggle(preference, False)
+        if application.GetUserPreferenceToggle(preference) is not False:
+            raise RuntimeError(f"clamp location: dimension input preference {preference} stayed enabled")
+    model.ClearSelection2(True)
+    _native_select(adapter, center, "ISketchPoint", append=False)
+    _native_select(adapter, flat, "ISketchSegment", append=True)
+    raw = model.AddDimension2(0.02, 0.02, 0.0)
+    model.ClearSelection2(True)
+    if raw is None:
+        raise RuntimeError(f"{name}: native point-to-flat dimension failed")
+    display = _early_bound(raw, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1
+    dimension.Name = name
+    display.ShowParenthesis = False
+    if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or display.ShowParenthesis is not False:
+        raise RuntimeError(f"{name}: native measured manufacturing dimension did not persist")
+    if not math.isclose(float(dimension.SystemValue) * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
+        raise RuntimeError(f"{name}: measurement is not the normal distance to the actual flat")
+
+
+def _tap_placement_points(adapter: Any) -> dict[str, Any]:
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    points = {}
+    for name in ("ThumbTap", "RodTap"):
+        feature = part.FeatureByName(name)
+        if feature is None:
+            raise RuntimeError(f"{name}: native Hole Wizard feature is missing")
+        child = _early_bound(feature, "IFeature").GetFirstSubFeature()
+        while child is not None:
+            native = _early_bound(child, "IFeature")
+            if str(native.GetTypeName2()) == "ProfileFeature":
+                sketch = _early_bound(native.GetSpecificFeature2(), "ISketch")
+                candidates = tuple(sketch.GetSketchPoints2() or ())
+                if len(candidates) == 1 and not tuple(sketch.GetSketchSegments() or ()):
+                    status = sketch.GetConstrainedStatus()
+                    if type(status) is not int or status != 3:
+                        raise RuntimeError(f"{name}: native placement is not fully defined: {status!r}")
+                    points[f"{name}ToBoreRim"] = _early_bound(candidates[0], "ISketchPoint")
+                    break
+            child = native.GetNextSubFeature()
+        else:
+            raise RuntimeError(f"{name}: expected one actual native placement point")
+    return points
+
+
+def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> None:
+    """Actual Wizard point to actual bore rim, transverse on the Right plane."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    _native_select(adapter, point, "ISketchPoint", append=False)
+    _native_select(adapter, circle, "ISketchSegment", append=True)
+    raw = model.AddHorizontalDimension2(0.0, 0.02, 0.02)
+    model.ClearSelection2(True)
+    if raw is None:
+        raise RuntimeError(f"{name}: native tap-point to bore-rim dimension failed")
+    display = _early_bound(raw, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1
+    dimension.Name = name
+    display.ShowParenthesis = False
+    circular = [index for index in (1, 2) if int(dimension.GetArcEndCondition(index)) != 0]
+    if len(circular) != 1:
+        raise RuntimeError(f"{name}: relative location does not have one actual circular endpoint")
+    endpoint = circular[0]
+    if int(dimension.SetArcEndCondition(endpoint, 2)) != 0 or int(dimension.GetArcEndCondition(endpoint)) != 2:
+        raise RuntimeError(f"{name}: native near bore-rim endpoint was not retained")
+    model.GraphicsRedraw2()
+    if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or bool(display.ShowParenthesis):
+        raise RuntimeError(f"{name}: measured relative-axis ownership/ink was not retained")
+    assert_dimension_measures(adapter, display, expected_mm=BORE_R, label=name, entities=(point, circle), entity_types=("SKETCHPOINT", "SKETCHSEGMENT"))
+
+async def _location_profiles(adapter: Any) -> None:
+    sources = _location_sources(adapter)
+    for feature, (plane, circle, interface, flats) in sources.items():
+        check(f"create_sketch {feature}", await adapter.create_sketch(plane))
+        converted = _convert_location_source(adapter, circle, interface)
+        arc = _early_bound(converted, "ISketchArc")
+        center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+        for name, flat in flats:
+            _measure_location(adapter, center, _convert_location_source(adapter, flat, "IEntity"), name)
+        if feature == "LeverBoreLocationProfile":
+            for name, point in _tap_placement_points(adapter).items():
+                _measure_relative_axis(adapter, point, converted, name)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+        status = sketch.GetConstrainedStatus()
+        if type(status) is not int or status != 3:
+            raise RuntimeError(f"{feature}: linked witness is not fully defined: {status!r}")
+        check(f"exit_sketch {feature}", await adapter.exit_sketch())
+        name_last_feature(adapter, feature)
+        if feature == "LeverBoreLocationProfile":
+            for name in _tap_placement_points(adapter):
+                set_dimension_bilateral_tolerance(adapter, feature, name, -RELATIVE_AXIS_BAND, RELATIVE_AXIS_BAND)
+    blank_reference_sketches(adapter, tuple(sources))
+
+
+def _assert_location_profiles(adapter: Any) -> None:
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    for feature, (_plane, source_circle, _interface, flats) in _location_sources(adapter).items():
+        native_feature = _early_bound(part.FeatureByName(feature), "IFeature")
+        sketch = _early_bound(native_feature.GetSpecificFeature2(), "ISketch")
+        segments = tuple(sketch.GetSketchSegments() or ())
+        if len(segments) != len(flats) + 1 or sketch.GetConstrainedStatus() != 3:
+            raise RuntimeError(f"{feature}: native linked witness changed after rebuild")
+        for source in (source_circle, *(edge for _name, edge in flats)):
+            if sum(_has_conversion_source(adapter, segment, source) for segment in segments) != 1:
+                raise RuntimeError(f"{feature}: native source identity did not survive rebuild")
+        for name, _edge in flats:
+            display, dimension = _named_dimension(adapter, feature, name)
+            if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis) or not math.isclose(float(dimension.SystemValue) * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
+                raise RuntimeError(f"{name}: imported location's native measurement changed")
+        if feature == "LeverBoreLocationProfile":
+            circle = next(segment for segment in segments if _has_conversion_source(adapter, segment, source_circle))
+            radius = float(_early_bound(circle, "ISketchArc").GetRadius()) * 1000.0
+            if HEX_AF / 2.0 - radius < WALL_TARGET:
+                raise RuntimeError("LeverBore: actual model has no room for its finished wall requirement")
+            for name, point in _tap_placement_points(adapter).items():
+                display, dimension = _named_dimension(adapter, feature, name)
+                if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
+                    raise RuntimeError(f"{name}: native relative-axis measurement changed")
+                assert_dimension_measures(adapter, display, expected_mm=radius, label=name, entities=(point, circle), entity_types=("SKETCHPOINT", "SKETCHSEGMENT"))
+                tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+                if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
+                    raise RuntimeError(f"{name}: native relative-axis acceptance band changed")
+                if sorted(int(dimension.GetArcEndCondition(index)) for index in (1, 2)) != [0, 2]:
+                    raise RuntimeError(f"{name}: native rim endpoint changed")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -211,11 +463,16 @@ async def build(adapter) -> dict[str, str]:
         drive_a='"LeverBoreY"', drive_jobs=drive_jobs,
     )
 
+    # Independent ordinary entry locations are measured from real stock flats;
+    # nominal origin-coincident hole placement is not a tolerance statement.
+    await _location_profiles(adapter)
+
     # Deferred drive equations, then re-check neutrality.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    _assert_location_profiles(adapter)
     await volume_check(
         adapter, "driven magnifying clamp (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
@@ -271,7 +528,7 @@ def _set_section_hatch(adapter: Any) -> None:
 
 
 async def _hex_profile(adapter: Any) -> list[tuple[str, str]]:
-    """The 7/16 hex on the Top plane, corners on the sketch's horizontal axis.
+    """The 1/2 hex on the Top plane, corners on the sketch's horizontal axis.
 
     The ``build_mg_output_fixture._hex_profile`` technique turned a quarter:
     both corners sit on the horizontal through the origin (model X), each a

@@ -981,7 +981,7 @@ def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None
 
 def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> None:
     # r14 (run 20261016T171305106Z), back view at 1:4: the picks stay 5 mm
-    # off the clamp block, the 7/16 hex whose bottom face sits LEVER_BORE_Y
+    # off the clamp block, the 1/2 hex whose bottom face sits LEVER_BORE_Y
     # under the lever axis and whose corners sit HEX_AC/2 either side of the
     # rod axis along the lever (#1559), and off the fixture's top, 5.5 mm
     # over its axis.

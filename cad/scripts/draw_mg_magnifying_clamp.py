@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying-lever clamp.
 
-A 29.50 length of 7/16 hex brass: the Ø6.50 quarter-inch lever bore drilled across
+A 29.50 length of 1/2 hex brass: the Ø6.50 quarter-inch lever bore drilled across
 the corners, a #4-40 thumb-screw tap from the top face into the bore and a
 blind #4-40 rod tap from the bottom face, both on the hex axis.
 
@@ -55,14 +55,18 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -71,18 +75,22 @@ from mg_magnifying_clamp_spec import (
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HEIGHT_CALLOUT,
     HEX_AC,
     HEX_AF,
     LEVER_BORE_CALLOUT,
+    LEVER_BORE_DIA,
     LEVER_BORE_Y,
     PREF_MATERIAL_HATCH_PATTERN,
     PREF_MATERIAL_HATCH_STYLE,
     PREF_NO_OPTION,
     REFERENCE_DIMENSIONS,
+    RELATIVE_AXIS_BAND,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_PROCESS,
     SEAT_NOTE,
     SECTION_HATCH_PATTERN,
+    STOCK_NOTE,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -102,8 +110,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 12.8 x 11.1 x 29.50 hex: 3:1 stacks the 39 mm top view, the 89 mm front
-# and the 39 mm bottom view in one column, the section and isometric beside.
+# A nominal 14.66 x 12.70 x 29.50 hex: the three views share one column,
+# with room for ordinary relative-axis dimensions between the end views.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 ISO_SCALE = (2, 1)
@@ -119,7 +127,7 @@ BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
 SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
 # Note positions are their text's top-left corners.
-NOTES_XY = (0.225, 0.082)
+STOCK_NOTE_XY = (0.305, 0.140)
 ISO_NOTE_XY = (0.335, 0.150)
 SEAT_NOTE_XY = (0.287, 0.116)
 
@@ -138,15 +146,27 @@ _RIGHT_LEFT_X = RIGHT_CENTER[0] - _HALF_AF
 
 # The front view: both heights to the left; the Ø callout up and to the right.
 RIGHT_KEEP = {
-    "Height": (_RIGHT_LEFT_X - 0.028, RIGHT_CENTER[1]),
+    "Height": (0.032, 0.155),
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
     "LeverBoreDiaDim": (0.150, _BORE_SHEET_Y + 0.037),
 }
 # The top view: the flats (Z, sheet horizontal) above it, between its upper
 # vertices.
 TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
+RIGHT_LOCATION_KEEP = {
+    "LeverBoreFromZFlat": (RIGHT_CENTER[0] - _HALF_AF / 2.0, 0.174),
+    "ThumbTapToBoreRim": (0.092, 0.185),
+    "RodTapToBoreRim": (0.092, 0.072),
+}
+TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
+BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 
-DIMENSION_CALLOUTS = {"LeverBoreDiaDim": LEVER_BORE_CALLOUT}
+DIMENSION_CALLOUTS = {
+    "Height": HEIGHT_CALLOUT,
+    "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
+    "ThumbTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
+    "RodTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
+}
 
 # The tap callouts (their text centres) out to the right of each end view,
 # low enough that each leader crosses the right-hand flat, under the flat's
@@ -387,6 +407,24 @@ def _require_one_center_mark(view: Any, label: str) -> None:
         )
 
 
+def _omit_tap_thread_class(display: Any, *, label: str) -> None:
+    omit_title_block_thread_class(display, label=label)
+    native = _early_bound(display, "IDisplayDimension")
+    if any("2B" in str(native.GetText(part) or "") for part in (1, 2, 3, 4)):
+        raise RuntimeError(f"{label}: resolved native callout repeats title-block 2B")
+
+
+def _add_stock_note(adapter: Any, view: Any) -> None:
+    """Flag an actual supplied flat, not the free-floating hex silhouette."""
+    model = _early_bound(view, "IView").ReferencedDocument
+    face = resolve_faces(model, {"supplied_hex_flat": PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)})["supplied_hex_flat"]
+    note = add_attached_note(adapter, view, text=property_link("Manufacturing Notes"), entity_type="FACE", entity=face, attached_to=face, note_xy=STOCK_NOTE_XY, label="supplied hex stock flat")
+    native = _early_bound(note, "INote")
+    resolved = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if resolved != STOCK_NOTE:
+        raise RuntimeError(f"supplied hex stock flat: model property did not resolve: {resolved!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -423,7 +461,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Magnifying Clamp Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "magnifying clamp; 7/16 hex brass; lever bore across corners; two #4-40 taps",
+            3: "magnifying clamp; 1/2 hex brass; lever bore across corners; two #4-40 taps",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -487,11 +525,36 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="bottom",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    for view, feature, keep, view_annotations in (
+        (right, "LeverBoreLocationProfile", RIGHT_LOCATION_KEEP, right_annotations),
+        (top, "ThumbTapLocationProfile", TOP_LOCATION_KEEP, top_annotations),
+    ):
+        view_annotations.extend(curate_hidden_dimensions(adapter, view, keep=keep, view_label=feature, dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature]}))
+    bottom_annotations = curate_hidden_dimensions(adapter, bottom, keep=BOTTOM_KEEP, view_label="rod tap ordinary entry locations", dimensions_by_feature={"RodTapLocationProfile": DRAWING_DIMENSIONS["RodTapLocationProfile"]})
     # Places are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(
-        adapter, [*right_annotations, *top_annotations], DRAWING_PRECISION_BY_NAME
+        adapter, [*right_annotations, *top_annotations, *bottom_annotations], DRAWING_PRECISION_BY_NAME
     )
+    locations = set(RIGHT_LOCATION_KEEP) | set(TOP_LOCATION_KEEP) | set(BOTTOM_KEEP)
+    for raw_annotation in (*right_annotations, *top_annotations, *bottom_annotations):
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in locations:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        expected = LEVER_BORE_DIA / 2.0 if name.endswith("ToBoreRim") else HEX_AF / 2.0
+        if bool(display.ShowParenthesis) or not math.isclose(float(dimension.SystemValue) * 1000.0, expected, abs_tol=0.005):
+            raise RuntimeError(f"{name}: imported ordinary location lost its native measurement/acceptance ink")
+        if name.endswith("ToBoreRim"):
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
+                raise RuntimeError(f"{name}: imported relative-axis acceptance band changed")
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    height_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "Height")
+    height_display = _early_bound(_early_bound(height_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    if str(height_display.GetText(4) or "") != HEIGHT_CALLOUT:
+        raise RuntimeError("Height: thumb-screw engagement reason did not remain attached")
     # The flats are the bar's as supplied: a stock reference.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     for name in sorted(REFERENCE_DIMENSIONS):
@@ -513,6 +576,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#4-40 thumb-screw tap",
         process=THUMB_TAP_PROCESS,
     )
+    _omit_tap_thread_class(thumb_callout, label="#4-40 thumb-screw tap")
     _reference_thread_depth(thumb_callout)
     set_hole_callout_precision(
         thumb_callout, TAP_CALLOUT_PRECISION, label="#4-40 thumb-screw tap depths"
@@ -525,6 +589,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#4-40 vertical-rod tap",
         process=ROD_TAP_PROCESS,
     )
+    _omit_tap_thread_class(rod_callout, label="#4-40 vertical-rod tap")
     set_hole_callout_precision(
         rod_callout, TAP_CALLOUT_PRECISION, label="#4-40 vertical-rod tap depths"
     )
@@ -548,7 +613,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-MG-04 shoulder seat",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    _add_stock_note(adapter, iso)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

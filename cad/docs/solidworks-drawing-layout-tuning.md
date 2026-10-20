@@ -1483,6 +1483,13 @@ on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
 the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
 lookups bind `IPartDoc`: `IModelDoc2` does not declare `FeatureByName`.
 
+For a point-only Wizard placement, retain the traversed early-bound `ISketch`
+and read `GetConstrainedStatus()` directly: only native status 3 proves fully
+defined. The named SDK status path returned `source=unavailable`, `raw_status=None`
+on the r2 bracket; that is an unavailable channel, not evidence for either
+underconstraint or permission to proceed. Existing closed-sketch native status
+readbacks are the positive control; do not fabricate a successful fallback.
+
 The through tap's ordinary locations are 5.50 ±0.05 from the physical nose tip
 and neck side. These are not zero datum dimensions and not a GD&T frame.
 Combine the R5.50 ±0.05 radius with each locating band: the relative radial
@@ -1505,20 +1512,58 @@ with no shoulder or added relief groove. Full engaged overlap excludes
 mouth chamfers, incomplete male thread at both ends, and root runout.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
-The dependent MHA-MG-02 clamp keeps its bore at 19.95 from the bottom seat and
-grows only its overall height to **29.50**; neither `.XX` ±0.51 band tightens.
-The hook stays at 919.7. Spend 0.10 + 0.3° drill run-off over maximum-stock
-half depth at the central tap/floor, and conservatively over complete maximum
-corner-to-corner depth at exit-side flats and loaded contact. The resulting
-whole-flat and rod-tap floor lower bounds are **2.023277** and **2.036697**.
-Do not mistake available female wall for installed FULL engagement. Intersect
-male and female full-profile intervals, excluding the actual stock screw's
-**0.47625** tip chamfer and the top mouth break. Bound the finite flat-tip
-contact by the bore envelope, even for a diagonal/tilted rod; the conservative
-1° general-angle + 0.3° run-off contact allowance is not a newly tightened
-manufacturing tolerance. The guaranteed modeled intersection is **4.313456**
-against 1.5D = 4.2675, with **3.373677** minimum axial collar clearance.
-The 29.20 alternative's centreline-only 0.0023 margin is not a 3D contact proof.
+Create the independent thread-witness segments with `add_line_chain` so
+`SketchManager.AddToDB` suppresses inference during creation and restores its
+previous state afterward. A bare inferred line in r2 produced a 167.30 native
+tip witness for a requested 167.50, beside the 0.20 chamfer. The final native
+equation failure said its dependent variable was driven/reference; it did not
+name the offending equation, so the edge-snap mechanism remains an inference,
+not an observed relation ID. Before applying equations, verify that all thread
+witness dimensions are driving and have the requested native values. Do not
+apply the pre-equation DrivenState check after equations take ownership.
+
+The dependent MHA-MG-02 clamp uses **1/2 in hex** brass, keeps its bore at
+**19.95** from the bottom seat and its overall height at **29.50**. The hook
+stays at **919.7**; neither `.XX` ±0.51 band tightens. Nominal AF is 12.70,
+but the attached stock property explicitly requires AF12.57–12.83 and a
+**15.00 MAX transverse envelope over the full height**. Inspect that envelope
+with straightedges/calipers; do not infer it from exact60° flats or Rule#1,
+which does not automatically control as-supplied STOCK form. The same attached
+flag requires **2.0 MIN finished net wall at bore/taps throughout their depth**.
+This is a finished-part acceptance requirement, not a claim that AF alone
+computes a guaranteed wall for arbitrarily bowed/twisted stock.
+
+Spend 15.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
+an unowned nominal half-depth. Intersect actual male/female full-profile
+intervals, excluding the stock screw's **0.47625** tip chamfer and mouth break.
+The finite flat-tip contact includes independent relative-entry error and the
+existing conservative1.3° contact envelope. Plug reach, stop window, the real
+finite118° drill cone, collar clearance and FULL≥1.5D=4.2675 must all pass.
+The rod's 8.55/12.75 depths and FULL4.605 are unchanged, conditional on its
+actual shoulder seating. This is not an alloy/temper strength certificate.
+
+Five ordinary native measurements locate the manufactured axes with no new
+FCF: the bore's normal distance from its actual flat; each tap's normal
+distance from its actual diagonal flat; and each actual Wizard entry point's
+transverse distance to the actual bore rim. The last two print **3.25±1.02**:
+the former two independent .XX bands summed, not a precision increase. Check
+these with bore/tap gage pins and a height gage/micrometer; use actual gage
+diameters when reconstructing the rim-to-axis distance. The drilled bore's
+radial+0.05 is still charged in the actual axis-error bound.
+
+The native witnesses select the real Wizard placement points and externally
+convert the actual stock edges and cut-producing bore circle. No detached
+coordinate copy counts as measurement. Native annotation attachment identity,
+the arc-end condition, actual value, driven ownership, explicit band and
+unparenthesized ordinary ink must survive equations/rebuild and per-view
+hidden-sketch import. These strict API paths still need native-seat proof.
+
+The attached stock flag must link the model's stock acceptance property and
+resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
+own an across-flats acceptance band. Attach the height precision's functional
+reason to the height dimension itself, and remove only the native hole-callout
+thread-class variable where the title block already owns 2B. Keep live
+thread/drill/depth variables and reject resolved text that still repeats 2B.
 
 Clamp travel remains a nominal setting range under the existing fit-up waiver,
 not a tolerance-safe endpoint or positive stop. Keep the entire bore clear of

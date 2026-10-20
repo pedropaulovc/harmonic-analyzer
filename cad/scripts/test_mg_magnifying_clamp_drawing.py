@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import itertools
 import math
+from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -12,6 +14,8 @@ import build_mg_magnifying_clamp as part
 import draw_mg_magnifying_clamp as drawing
 import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
+import _gtol_face_resolve
+from _gtol_face import FaceGeometry, SURFACE_PLANE
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -38,7 +42,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     assert part.DRAWING_PRECISION is spec.DRAWING_PRECISION
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    kept = set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_LOCATION_KEEP) | set(drawing.TOP_LOCATION_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     assert spec.REFERENCE_DIMENSIONS <= set(drawing.TOP_KEEP)
@@ -49,7 +53,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # geom module, so a print-note edit cannot enter the assembly recipe.
     import mg_magnifying_clamp_geom as geom
 
-    assert geom.HEX_AF == pytest.approx(7.0 / 16.0 * 25.4)
+    assert geom.HEX_AF == pytest.approx(0.5 * 25.4)
     assert geom.BLOCK_DEPTH == pytest.approx(geom.HEX_AC)
     assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, 29.50)
     for gone in ("BLOCK_WIDTH", "ROD_BORE_DIA", "ROD_BORE_X"):
@@ -68,31 +72,19 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
-    # An exit-side flat lies beyond mid-block. Bound its complete drilling
-    # depth on maximum stock while taking minimum stock for the wall.
-    bore_nominal, bore_worst = spec.WALLS["lever bore to a flat"]
-    assert bore_nominal == pytest.approx((spec.HEX_AF - spec.LEVER_BORE_DIA) / 2.0)
-    maximum_depth = (spec.HEX_AF + spec.HEX_AF_BAND) / math.cos(math.radians(30.0))
-    wander = 0.10 + maximum_depth * math.tan(math.radians(0.3))
-    assert bore_worst == pytest.approx(
-        (spec.HEX_AF - spec.HEX_AF_BAND) / 2.0 - (spec.LEVER_BORE_DIA + 0.10) / 2.0 - wander
-    )
-    assert bore_worst > 2.02
-    assert bore_worst >= spec.WALL_TARGET
-    # No printed location from a flat: the bore's only offset is its wander.
-    assert spec.BORE_FULL_WANDER == pytest.approx(wander)
-    assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER == pytest.approx(0.10 + maximum_depth / 2.0 * math.tan(math.radians(0.3)))
-    for gone in (
-        "LEVER_BORE_FROM_FLAT",
-        "LEVER_BORE_FROM_FLAT_PLACES",
-        "BORE_WALL",
-        "BORE_WALL_STATED_MIN",
-    ):
-        assert not hasattr(spec, gone), gone
-    for module in (part, drawing, spec):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "BoreFromFlat" not in source, module.__name__
-        assert "FlatWitness" not in source, module.__name__
+    # The raw-stock form is not certified by nominal CAD symmetry. The
+    # finished-wall requirement is a separate physical acceptance, while
+    # relative axes are directly measured from the bore rim.
+    import mg_magnifying_clamp_geom as geom
+
+    entry_errors = [
+        abs(geom.LEVER_BORE_DIA / 2.0 + radius_change - (geom.LEVER_BORE_DIA / 2.0 + error))
+        for radius_change, error in itertools.product((0.0, 0.05), (-1.02, 1.02))
+    ]
+    assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(max(entry_errors))
+    assert geom.BORE_FULL_ANGULAR == pytest.approx(15.0 * math.tan(math.radians(0.3)))
+    for name in ("lever bore to a flat", "rod-tap thread to a flat", "thumb-screw tap thread to a flat"):
+        assert spec.WALLS[name][1] == spec.WALL_TARGET
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
@@ -107,18 +99,21 @@ def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
 
     band = printed_band_mm(geom.HEIGHT_PLACES)
     radius_max = (geom.LEVER_BORE_DIA + 0.10) / 2.0
-    floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - geom.BORE_WANDER
-    female_wall_only = (geom.BLOCK_HEIGHT - band) - (geom.LEVER_BORE_Y + band) - radius_max - geom.BORE_WANDER - geom.EDGE_BREAK
+    slope = math.tan(math.radians(0.3))
+    # Charge the whole accepted transverse envelope even at a central tap;
+    # no ideal-hex midpoint or longitudinal stock alignment is assumed.
+    wander = 15.0 * slope
+    floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - wander
     assert floor == pytest.approx(geom.ROD_TAP_FLOOR_WALL_WORST)
-    assert geom.THUMB_ENGAGEMENT_WORST < female_wall_only
+    assert geom.BORE_FULL_ANGULAR == pytest.approx(wander)
     assert floor >= geom.WALL_TARGET
-    assert floor - 0.05 < geom.WALL_TARGET  # smallest practical 0.05 height step
+    assert geom.LEVER_BORE_Y == 19.95  # approved hook/seat interface, not re-solved
     assert geom.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
 
 
 def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> None:
     import mg_magnifying_clamp_geom as geom
-    from _mcmaster_91882a221 import SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
+    from _mcmaster_91882a221 import COLLAR_DIA, SHANK_LEN, TIP_CHAMFER, TIP_FLAT_R
     from _printed_tolerance import printed_band_mm
     from mg_lever_thread_joint import ROD_DIA, ROD_DIA_BAND
 
@@ -132,36 +127,43 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
         (geom.LEVER_BORE_Y - band, geom.LEVER_BORE_Y + band),
         (geom.LEVER_BORE_DIA, geom.LEVER_BORE_DIA + 0.10),
         (ROD_DIA + ROD_DIA_BAND[1], ROD_DIA),
-        (-geom.BORE_FULL_WANDER, geom.BORE_FULL_WANDER),
+        (-geom.BORE_FULL_ANGULAR, geom.BORE_FULL_ANGULAR),
         (-geom.THUMB_CONTACT_ANGLE_MAX, 0.0, geom.THUMB_CONTACT_ANGLE_MAX),
         (-1.0, 0.0, 1.0),
     ):
         sec, slope = 1.0 / math.cos(angle), abs(math.tan(angle))
         cy, rb, rr = bore_y + drift, bore_dia / 2.0, rod_dia / 2.0
+        # Include the worst transverse finite-flat miss, not a centreline
+        # contact. Independent bore/tap entrance errors remain present.
+        miss = max(geom.THUMB_CONTACT_Z_MAX + rb * sec - rr - TIP_FLAT_R, 0.0)
+        chord_loss = rr - math.sqrt(rr**2 - miss**2)
         contact = cy + seat * (rb - rr) * sec + rr * sec + TIP_FLAT_R * slope
         female = (cy + rb * sec + (joint.THREAD_MAJOR / 2.0 + 0.025) * slope, height - geom.EDGE_BREAK)
-        male = (contact + TIP_CHAMFER, contact + SHANK_LEN)
+        male = (contact + TIP_CHAMFER, contact - chord_loss - 2.0 * TIP_FLAT_R * slope + SHANK_LEN * math.cos(angle))
         overlaps.append(min(female[1], male[1]) - max(female[0], male[0]))
-        collar_gaps.append(male[1] - height)
-    assert min(overlaps) == pytest.approx(geom.THUMB_ENGAGEMENT_WORST)
+        collar_gaps.append(male[1] - height - COLLAR_DIA / 2.0 * abs(math.sin(angle)))
+    assert min(overlaps) >= geom.THUMB_ENGAGEMENT_WORST - 1e-9
     assert min(overlaps) >= joint.ENGAGEMENT_MIN
     assert min(collar_gaps) >= geom.THUMB_COLLAR_CLEARANCE_MIN - 1e-9
     assert geom.THUMB_COLLAR_CLEARANCE_MIN > 0.0
     # Pre-fix mutation: an accepted bottom-seated part at the old height loses
     # 1.5D once the REAL male tip chamfer is removed from the full interval.
-    contact = geom.LEVER_BORE_Y + band + geom.BORE_WANDER + ROD_DIA - geom.LEVER_BORE_DIA / 2.0
+    contact = geom.LEVER_BORE_Y + band + geom.BORE_FULL_ANGULAR + ROD_DIA - geom.LEVER_BORE_DIA / 2.0
     old_overlap = (28.95 - band - geom.EDGE_BREAK) - (contact + TIP_CHAMFER)
     assert old_overlap < joint.ENGAGEMENT_MIN
 
 
-def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
+def test_linked_notes_own_finished_acceptance_without_claiming_stock_form() -> None:
     notes = spec.DRAWING_NOTES
-    assert notes == "7/16 HEX BAR, FLATS AS SUPPLIED."
-    for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "WALL", "SEAT", "THREAD ENDS"):
+    assert float(Fraction(notes.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
+    for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "SEAT", "THREAD ENDS"):
         assert gone not in notes
+    assert f"{spec.WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS" in notes
+    assert f"TRANSVERSE ENVELOPE {spec.STOCK_WIDTH_MAX:.2f} MAX" in notes
+    assert "OVER FULL HEIGHT" in notes
     assert not hasattr(spec, "TAP_TOOL_NOTE")
     assert not hasattr(spec, "BORE_WALL_NOTE")
-    # The bore's wall to a flat holds the target: the sheet states none (rule 20).
+    # This is finished acceptance, not an AF/Rule#1 form guarantee.
     assert "WALL" not in spec.LEVER_BORE_CALLOUT
     assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
     assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
@@ -174,9 +176,6 @@ def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
     assert "X.XX" not in notes
     assert "LINEAR +/-" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "text=SEAT_NOTE" in source
 
 
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:
@@ -316,3 +315,398 @@ def test_part_stamps_make_critical_properties() -> None:
     assert config["material"] == config["material_specification"]
     assert config["finish"]
     assert int(config["quantity"]) == 1
+
+
+class _TapCallout:
+    def __init__(self, *, accepts=True, stuck=False, token=True):
+        self.definition = "<hw-threaddesc> - <hw-threadclass>" if token else "<hw-threaddesc>"
+        self.depth = "<hw-threaddepth> <hw-tapdrldepth>"
+        self.accepts, self.stuck = accepts, stuck
+
+    def IsHoleCallout(self):
+        return True
+
+    def SetText(self, part, text):
+        assert part == 1
+        if self.accepts:
+            self.definition = text
+
+    def GetText(self, part):
+        if part == 5:
+            return self.definition
+        if part == 7:
+            return self.depth
+        if part == 1:
+            return "4-40 UNC - 2B" if self.stuck else self.definition.replace("<hw-threaddesc>", "4-40 UNC").replace("<hw-threadclass>", "2B")
+        return ""
+
+
+def test_native_tap_class_omission_preserves_live_size_and_depth_variables() -> None:
+    display = _TapCallout()
+    drawing._omit_tap_thread_class(display, label="thumb or rod tap")
+    assert display.GetText(1) == "4-40 UNC"
+    assert display.definition == "<hw-threaddesc>"
+    assert display.depth == "<hw-threaddepth> <hw-tapdrldepth>"
+
+
+@pytest.mark.parametrize("options", ({"accepts": False}, {"stuck": True}, {"token": False}))
+def test_native_tap_class_omission_rejects_refused_or_stale_callouts(options) -> None:
+    with pytest.raises(RuntimeError):
+        drawing._omit_tap_thread_class(_TapCallout(**options), label="native tap")
+
+
+@pytest.mark.parametrize("stale_property", (False, True))
+@pytest.mark.parametrize("has_supplied_flat", (True, False))
+def test_stock_note_resolves_and_attaches_only_the_actual_supplied_flat(monkeypatch, has_supplied_flat, stale_property) -> None:
+    def face(normal, origin):
+        native = SimpleNamespace()
+        native.geometry = FaceGeometry(native, SURFACE_PLANE, (*normal, *origin), normal, (0.0,) * 6)
+        return native
+
+    cap = face((0.0, 1.0, 0.0), (0.0, spec.BLOCK_HEIGHT / 1000.0, 0.0))
+    opposite = face((0.0, 0.0, -1.0), (0.0, 0.0, -spec.HEX_AF / 2000.0))
+    supplied = face((0.0, 0.0, 1.0), (0.0, 0.0, spec.HEX_AF / 2000.0))
+    faces = [cap, opposite, *([supplied] if has_supplied_flat else [])]
+    for native, following in zip(faces, [*faces[1:], None], strict=True):
+        native.GetNextFace = lambda following=following: following
+    model = SimpleNamespace(GetBodies2=lambda _kind, _visible: (SimpleNamespace(GetFirstFace=lambda: faces[0]),), properties={"Manufacturing Notes": "OLD STOCK" if stale_property else spec.STOCK_NOTE})
+    view = SimpleNamespace(ReferencedDocument=model)
+    calls = []
+    monkeypatch.setattr(_gtol_face_resolve, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_gtol_face_resolve, "_bind", lambda value, _interface: value)
+    monkeypatch.setattr(_gtol_face_resolve, "_com_invoke", lambda value, _interface, member: getattr(value, member)())
+    monkeypatch.setattr(_gtol_face_resolve, "face_geometry", lambda value, *, identities: value.geometry)
+
+    def insert_note(_adapter, picked_view, **kwargs):
+        calls.append((picked_view, kwargs))
+        property_name = kwargs["text"].split('"')[1]
+        return SimpleNamespace(GetText=lambda: model.properties[property_name])
+
+    monkeypatch.setattr(drawing, "add_attached_note", insert_note)
+    if not has_supplied_flat:
+        with pytest.raises(RuntimeError, match="matched 0 faces"):
+            drawing._add_stock_note(None, view)
+        assert calls == []
+    elif stale_property:
+        with pytest.raises(RuntimeError, match="model property did not resolve"):
+            drawing._add_stock_note(None, view)
+    else:
+        drawing._add_stock_note(None, view)
+        assert len(calls) == 1 and calls[0][0] is view
+        arguments = calls[0][1]
+        assert arguments["entity_type"] == "FACE"
+        assert arguments["entity"] is arguments["attached_to"] is supplied
+        assert arguments["text"] == drawing.property_link("Manufacturing Notes")
+        assert "entity_xy" not in arguments  # no free pointer pretending to attach
+
+
+@pytest.mark.parametrize("interface", ("IEntity", "ISketchPoint", "ISketchSegment"))
+@pytest.mark.parametrize("accepts", (True, False))
+def test_location_selection_uses_actual_native_entity_and_zero_mark(monkeypatch, interface, accepts) -> None:
+    data = SimpleNamespace(Mark=99)
+    selected, bindings = [], []
+    entity = SimpleNamespace(Select4=lambda append, selection: selected.append((append, selection)) or accepts)
+    model = SimpleNamespace(SelectionManager=SimpleNamespace(CreateSelectData=lambda: data))
+
+    def bind(value, requested):
+        bindings.append((value, requested))
+        return value
+
+    monkeypatch.setattr(part, "_early_bound", bind)
+    adapter = SimpleNamespace(currentModel=model)
+    if accepts:
+        part._native_select(adapter, entity, interface, append=True)
+        assert selected == [(True, data)] and data.Mark == 0
+        assert any(value is entity and requested == interface for value, requested in bindings)
+    else:
+        with pytest.raises(RuntimeError, match="cannot select"):
+            part._native_select(adapter, entity, interface, append=False)
+
+
+@pytest.mark.parametrize("mode", ("linked", "unlinked-copy", "refused", "duplicate", "nonconstruction"))
+def test_converted_location_geometry_requires_actual_source_identity(monkeypatch, mode) -> None:
+    source, same_coordinate_copy = object(), object()
+    segments, selected = [], []
+
+    class Converted:
+        def __init__(self):
+            self.construction = False
+
+        def GetRelations(self):
+            target = same_coordinate_copy if mode == "unlinked-copy" else source
+            return (SimpleNamespace(GetDefinitionEntities2=lambda: (target,)),)
+
+        @property
+        def ConstructionGeometry(self):
+            return self.construction
+
+        @ConstructionGeometry.setter
+        def ConstructionGeometry(self, value):
+            if mode != "nonconstruction":
+                self.construction = value
+
+    sketch = SimpleNamespace(GetSketchSegments=lambda: tuple(segments))
+    model = SimpleNamespace(GetActiveSketch2=lambda: sketch, ClearSelection2=lambda _all: None)
+
+    def convert(chain, loops):
+        assert chain is False and loops is False
+        if mode == "refused":
+            return False
+        segments.extend(Converted() for _ in range(2 if mode == "duplicate" else 1))
+        return True
+
+    application = SimpleNamespace(IsSame=lambda left, right: int(left is right))
+    adapter = SimpleNamespace(currentModel=model, currentSketchManager=SimpleNamespace(SketchUseEdge3=convert), swApp=application)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selected.append((entity, interface, append)))
+    if mode == "linked":
+        converted = part._convert_location_source(adapter, source, "IEntity")
+        assert converted is segments[0] and converted.ConstructionGeometry
+        assert selected == [(source, "IEntity", False)]
+    else:
+        with pytest.raises(RuntimeError):
+            part._convert_location_source(adapter, source, "IEntity")
+
+
+@pytest.mark.parametrize("mode", ("measured", "missing", "wrong-distance", "not-driven", "name-refused", "reference-ink", "input-dialog"))
+def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mode) -> None:
+    selections = []
+    center, flat = object(), object()
+    toggles = {}
+
+    class Dimension:
+        state, name = 2, ""
+
+        @property
+        def SystemValue(self):
+            return (spec.HEX_AF / 2.0 + (0.2 if mode == "wrong-distance" else 0.0)) / 1000.0
+
+        @SystemValue.setter
+        def SystemValue(self, _value):
+            raise AssertionError("a measured location must never move geometry")
+
+        @property
+        def DrivenState(self):
+            return self.state
+
+        @DrivenState.setter
+        def DrivenState(self, value):
+            if mode != "not-driven":
+                self.state = value
+
+        @property
+        def Name(self):
+            return self.name
+
+        @Name.setter
+        def Name(self, value):
+            if mode != "name-refused":
+                self.name = value
+
+    dimension = Dimension()
+
+    class Display:
+        reference = True
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return dimension
+
+        @property
+        def ShowParenthesis(self):
+            return self.reference
+
+        @ShowParenthesis.setter
+        def ShowParenthesis(self, value):
+            if mode != "reference-ink":
+                self.reference = value
+
+    display = Display()
+
+    def add_dimension(*_position):
+        assert selections == [(center, "ISketchPoint", False), (flat, "ISketchSegment", True)]
+        return None if mode == "missing" else display
+
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddDimension2=add_dimension)
+    application = SimpleNamespace(
+        SetUserPreferenceToggle=lambda preference, value: toggles.__setitem__(preference, value),
+        GetUserPreferenceToggle=lambda preference: mode == "input-dialog" or toggles[preference],
+    )
+    adapter = SimpleNamespace(currentModel=model, swApp=application)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selections.append((entity, interface, append)))
+    if mode == "measured":
+        part._measure_location(adapter, center, flat, "ActualTapFromFlat")
+        assert dimension.DrivenState == 1 and dimension.Name == "ActualTapFromFlat"
+        assert display.ShowParenthesis is False
+        assert toggles == {10: False, 372: False, 520: False}
+    else:
+        with pytest.raises(RuntimeError):
+            part._measure_location(adapter, center, flat, "ActualTapFromFlat")
+
+
+@pytest.mark.parametrize("mode", ("actual", "wrong-station", "duplicate"))
+def test_location_sources_select_finite_stock_boundaries_and_actual_entry_rims(monkeypatch, mode) -> None:
+    a, r, y = spec.HEX_AF / 2.0, spec.HEX_AC / 2.0, spec.BLOCK_HEIGHT
+    wanted = ((-r / 2.0, y, a), (r / 2.0, y, a))
+
+    def line(points):
+        curve = SimpleNamespace(IsLine=lambda: True, IsCircle=lambda: False)
+        vertices = [SimpleNamespace(GetPoint=lambda point=point: tuple(value / 1000.0 for value in point)) for point in points]
+        return SimpleNamespace(GetCurve=lambda: curve, GetStartVertex=lambda: vertices[0], GetEndVertex=lambda: vertices[1])
+
+    def circle(station, radius=spec.ROD_TAP_DRILL_DIA / 2.0, axis=(0.0, 1.0, 0.0)):
+        curve = SimpleNamespace(IsLine=lambda: False, IsCircle=lambda: True, CircleParams=(0.0, station / 1000.0, 0.0, *axis, radius / 1000.0))
+        return SimpleNamespace(GetCurve=lambda: curve)
+
+    actual_edge, actual_rim = line(wanted[::-1]), circle(y)
+    # A shortened line has the SAME midpoint; a cosmetic major rim the SAME
+    # centre. Neither is the actual finite stock edge / drill-diameter entry.
+    edges = [
+        line(((-r / 3.0, y, a), (r / 3.0, y, a))),
+        line(((-r / 2.0, 0.0, a), (r / 2.0, 0.0, a))),
+        circle(0.0), circle(y, radius=joint.THREAD_MAJOR / 2.0),
+        circle(y, axis=(1.0, 0.0, 0.0)),
+    ]
+    if mode != "wrong-station":
+        edges.extend((actual_edge, actual_rim))
+    if mode == "duplicate":
+        edges.extend((line(wanted), circle(y)))
+    face = SimpleNamespace(GetEdges=lambda: tuple(edges))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    if mode == "actual":
+        assert part._stock_edge(face, wanted) is actual_edge
+        assert part._tap_entry_circle(face, y) is actual_rim
+    else:
+        with pytest.raises(RuntimeError, match="matched"):
+            part._stock_edge(face, wanted)
+        with pytest.raises(RuntimeError, match="matched"):
+            part._tap_entry_circle(face, y)
+
+
+def test_actual_thumb_drill_cone_clears_both_walls_over_its_finite_length() -> None:
+    import mg_magnifying_clamp_geom as geom
+
+    slope, band = math.tan(math.radians(0.3)), 0.51
+    bore_r = geom.LEVER_BORE_DIA / 2.0
+    drill_r = (geom.ROD_TAP_DRILL_DIA + 0.10) / 2.0
+    point = drill_r / math.tan(math.radians(59.0))
+    depth = geom.THUMB_TAP_DRILL_DEPTH + band + point
+    bore_wander = 15.0 * slope
+    # Direct rim/axis band includes the bore's radial +0.05 allowance.
+    relative_offset = 1.02 + 0.05 + depth * slope + bore_wander
+
+    def clearance(distance):
+        actual_radius = drill_r * (1.0 - distance / point)
+        return math.sqrt(bore_r**2 - (relative_offset + actual_radius)**2) - 3.0 * band - bore_wander - distance
+
+    endpoints = (clearance(0.0), clearance(point))
+    # The chord is concave, and the cone radius is affine: its whole
+    # continuous minimum lies at an endpoint. Interior probes catch an
+    # implementation accidentally retaining full radius at the point.
+    assert all(clearance(point * step / 200.0) >= min(endpoints) - 1e-9 for step in range(201))
+    assert spec.THUMB_DRILL_NEAR_CLEAR == pytest.approx(endpoints[0])
+    assert spec.THUMB_DRILL_FAR_CYLINDER_CLEAR == pytest.approx(endpoints[0])
+    assert spec.THUMB_DRILL_FAR_POINT_CLEAR == pytest.approx(endpoints[1])
+    assert spec.THUMB_DRILL_FAR_CLEAR == pytest.approx(min(endpoints))
+    assert min(endpoints) > 0.0
+    # Mutation control: falsely extending the full drill cylinder through
+    # the point loses >0.7 mm and must NOT define the real point clearance.
+    cylinder_to_tip = endpoints[0] - point
+    assert spec.THUMB_DRILL_FAR_CLEAR > cylinder_to_tip + 0.7
+
+
+@pytest.mark.parametrize("mode", ("retained", "lost-source", "underdefined", "extra-segment", "wrong-distance", "reference-ink"))
+def test_linked_native_locations_are_rechecked_after_equations_and_rebuild(monkeypatch, mode) -> None:
+    circle, flat = object(), object()
+
+    def converted(source):
+        return SimpleNamespace(GetRelations=lambda: (SimpleNamespace(GetDefinitionEntities2=lambda: (source,)),))
+
+    segments = [converted(circle), converted(flat if mode != "lost-source" else object())]
+    if mode == "extra-segment":
+        segments.append(converted(object()))
+    sketch = SimpleNamespace(GetSketchSegments=lambda: tuple(segments), GetConstrainedStatus=lambda: 2 if mode == "underdefined" else 3)
+    model = SimpleNamespace(FeatureByName=lambda name: SimpleNamespace(GetSpecificFeature2=lambda: sketch))
+    application = SimpleNamespace(IsSame=lambda left, right: int(left is right))
+    adapter = SimpleNamespace(currentModel=model, swApp=application)
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"ActualLocationProfile": ("Top", circle, "IEntity", (("ActualFromFlat", flat),))})
+    monkeypatch.setattr(part, "_named_dimension", lambda _adapter, feature, name: (SimpleNamespace(ShowParenthesis=mode == "reference-ink"), SimpleNamespace(DrivenState=1, SystemValue=(spec.HEX_AF / 2.0 + (0.2 if mode == "wrong-distance" else 0.0)) / 1000.0)))
+    if mode == "retained":
+        part._assert_location_profiles(adapter)
+    else:
+        with pytest.raises(RuntimeError):
+            part._assert_location_profiles(adapter)
+
+
+@pytest.mark.parametrize("mode", ("actual", "missing", "two-points", "profile-not-placement", "underdefined", "unknown"))
+def test_relative_locations_use_actual_wizard_points(monkeypatch, mode) -> None:
+    points = {"ThumbTap": object(), "RodTap": object()}
+
+    def feature(name):
+        if mode == "missing":
+            return None
+        sketch = SimpleNamespace(
+            GetSketchPoints2=lambda: (points[name], object()) if mode == "two-points" else (points[name],),
+            GetSketchSegments=lambda: (object(),) if mode == "profile-not-placement" else (),
+            GetConstrainedStatus=lambda: None if mode == "unknown" else 2 if mode == "underdefined" else 3,
+        )
+        child = SimpleNamespace(GetTypeName2=lambda: "ProfileFeature", GetSpecificFeature2=lambda: sketch, GetNextSubFeature=lambda: None)
+        return SimpleNamespace(GetFirstSubFeature=lambda: child)
+
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=feature))
+    if mode == "actual":
+        result = part._tap_placement_points(adapter)
+        assert result["ThumbTapToBoreRim"] is points["ThumbTap"]
+        assert result["RodTapToBoreRim"] is points["RodTap"]
+    else:
+        with pytest.raises(RuntimeError):
+            part._tap_placement_points(adapter)
+
+
+@pytest.mark.parametrize("mode", ("measured", "missing", "arc-refused", "no-arc", "two-arcs", "wrong-value", "coordinate-copy", "dangling"))
+def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circle(monkeypatch, mode) -> None:
+    import _drawing_edge_dimensions as measured
+
+    point, circle, copy = object(), object(), object()
+    selections = []
+    ends = {1: 1 if mode == "two-arcs" else 0, 2: 0 if mode == "no-arc" else 1}
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: (copy if mode == "coordinate-copy" else point, circle),
+        GetAttachedEntityTypes=lambda: (),
+        IsDangling=lambda: mode == "dangling",
+    )
+    dimension = SimpleNamespace(
+        DrivenState=2, Name="",
+        SystemValue=(spec.LEVER_BORE_DIA / 2.0 + (0.2 if mode == "wrong-value" else 0.0)) / 1000.0,
+        GetArcEndCondition=lambda index: ends[index],
+    )
+
+    def set_end(index, condition):
+        if mode == "arc-refused":
+            return -1
+        ends[index] = condition
+        return 0
+
+    dimension.SetArcEndCondition = set_end
+    display = SimpleNamespace(GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation, ShowParenthesis=True)
+
+    def horizontal(*_position):
+        assert selections == [(point, "ISketchPoint", False), (circle, "ISketchSegment", True)]
+        return None if mode == "missing" else display
+
+    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None)
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(measured, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(measured._sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
+    monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selections.append((entity, interface, append)))
+    if mode == "measured":
+        part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
+        assert dimension.Name == "ThumbTapToBoreRim" and dimension.DrivenState == 1
+        assert display.ShowParenthesis is False and ends == {1: 0, 2: 2}
+    else:
+        with pytest.raises(RuntimeError):
+            part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
