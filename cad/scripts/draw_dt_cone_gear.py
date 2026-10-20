@@ -493,6 +493,9 @@ DIMENSION_CALLOUTS = {
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\nCLEARS {CYLINDER_MATE}",
+    # Two rows below the value retain the reason without widening the profile
+    # callout into the isometric lane. Multiline above-callouts do not print.
+    "BlankDia": f"MESHES WITH\n{CYLINDER_MATE}",
     # The cone set is a solid stack on the shaft; each gear's width sets the
     # stations (user ruling 2026-09-28, spec FACE_WIDTH).
     "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
@@ -522,7 +525,6 @@ def callouts_below(teeth: int) -> dict[str, str]:
 # every two-line one went unmatched in the PDF; draw_ch_amplitude_bar r1).
 CALLOUTS_ABOVE = {
     "ToothThickness": f"BACKLASH WITH {CYLINDER_MATE}",
-    "BlankDia": f"MESHES WITH {CYLINDER_MATE}",
     "BoreFlatClock": f"PHASED TO {SHAFT_MATE}",
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
@@ -540,9 +542,9 @@ def rendered_half_face_width(teeth: int) -> float:
 
 
 # The native blank diameter reads linearly in the side view (rule 11), in
-# the open lane before the isometric. Even the widest 8:1 face leaves room
-# for the mesh-mate callout's measured 55.1 mm width, with air at both ends.
-BLANK_DIA_GAP_X = 0.035
+# the open lane before the isometric. Its mesh-mate reason wraps below the
+# value, following the existing bore/face-width callout pattern.
+BLANK_DIA_GAP_X = 0.022
 # The functional root-envelope stack stands right of the tip circle,
 # above the thickness witness: in the same lane as the thickness
 # dimension line, which runs DOWN from the +X tooth, and clear of the side
@@ -724,8 +726,9 @@ def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
     y = RIGHT_CENTER[1] - rendered_half_od(teeth) - FACE_WIDTH_DROP
     x = RIGHT_CENTER[0]
     if not face_width_text_inside(teeth):
-        x += (
-            rendered_half_face_width(teeth)
+        x = (
+            RIGHT_CENTER[0]
+            + rendered_half_face_width(teeth)
             + FACE_WIDTH_TEXT_CLEARANCE
             + FACE_WIDTH_TEXT_WIDTH / 2.0
         )

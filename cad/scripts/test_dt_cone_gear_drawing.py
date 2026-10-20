@@ -274,10 +274,11 @@ def test_tight_bands_name_their_mates_at_the_callout() -> None:
     assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
     assert notes.CYLINDER_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["FloorDia"]
     above = drawing.CALLOUTS_ABOVE
-    assert set(above) == {"ToothThickness", "BlankDia", "BoreFlatClock"}
+    assert set(above) == {"ToothThickness", "BoreFlatClock"}
     assert all("\n" not in text for text in above.values())
-    for key in ("ToothThickness", "BlankDia"):
-        assert notes.CYLINDER_MATE_NUMBER in above[key], key
+    assert notes.CYLINDER_MATE_NUMBER in above["ToothThickness"]
+    blank_reason = drawing.DIMENSION_CALLOUTS["BlankDia"]
+    assert " ".join(blank_reason.split()) == f"MESHES WITH {notes.CYLINDER_MATE_NUMBER}"
     assert "MHA-DT-04" in above["BoreFlatClock"]
     label = "CIRCULAR TOOTH THICKNESS"
     assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == label
@@ -1174,18 +1175,21 @@ def test_side_blank_diameter_lane_clears_preserved_dimensions_and_iso(teeth: int
     cx, cy = drawing.RIGHT_CENTER
     blank_x, blank_y = drawing.right_keep(teeth)["BlankDia"]
     face_x, face_y = drawing.right_keep(teeth)["FaceWidth"]
-    # The 35 mm lane is measured from the physical side silhouette, not the
+    # The 22 mm lane is measured from the physical side silhouette, not the
     # end-view circle. At the bore axis a vertical linear diameter spans the
     # whole OD; its text cannot be lifted back onto the end view.
-    assert blank_x == pytest.approx(cx + half_face + 0.035)
+    assert blank_x == pytest.approx(cx + half_face + 0.022)
     assert blank_y == pytest.approx(cy)
-    assert blank_x - (cx + half_face) >= 0.035 - 1e-12
-    # The retained mate callout's measured full width is 55.1 mm; do not
-    # infer its font width from the model diameter or shorten its wording.
-    blank_half_width = 0.0551 / 2.0
-    blank_half_height = 0.012
+    assert blank_x - (cx + half_face) >= 0.022 - 1e-12
+    # The same mesh reason is stacked below the value rather than shortened;
+    # bound its native multiline footprint independently of the model size.
+    blank_half_width = 0.032 / 2.0
+    blank_half_height = 0.020 / 2.0
     assert blank_x - blank_half_width > cx + half_face + 0.005
-    assert blank_x + blank_half_width < drawing.ISO_CENTER[0] - half_od - 0.005
+    # Standard isometric horizontal projection includes the axial face span,
+    # not just the end-view radius; reserve another 5 mm around that silhouette.
+    iso_half_span = (half_od + half_face) / math.sqrt(2.0)
+    assert blank_x + blank_half_width < drawing.ISO_CENTER[0] - iso_half_span - 0.005
     # Keep the existing FaceWidth position independently of the new OD lane.
     expected_face_x = cx if 2.0 * half_face >= 0.040 else cx + half_face + 0.020
     assert (face_x, face_y) == pytest.approx((expected_face_x, cy - half_od - 0.017))
@@ -1242,8 +1246,8 @@ class _ImportedBlankDisplay:
             self.linear = value
 
     def SetVertical(self) -> bool:
-        self.vertical = self.accept_vertical
-        return self.accept_vertical
+        self.vertical = self.accept_vertical and self.linear
+        return self.vertical
 
     def GetDimension2(self, index: int) -> _ImportedBlankDimension:
         assert index == 0
