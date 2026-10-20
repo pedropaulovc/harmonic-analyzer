@@ -13,7 +13,7 @@ from typing import Any
 import _telemetry
 import cone_line
 import dt_tip_collar_air as air
-from _com import _early_bound
+from _com import _bind, _com_invoke, _early_bound
 from solidworks_mcp.adapters.com_variant import double_array
 
 GEAR_COMPONENT = "dt-cylinder-gear-20"
@@ -122,16 +122,16 @@ def _swing_transform(utility, angle_deg):
 
 
 def _faces(body):
-    values = body.GetFaces()
+    values = _com_invoke(body, "IBody2", "GetFaces")
     if not isinstance(values, (tuple, list)) or not values:
         raise RuntimeError("collar clamp: actual finite faces are missing")
-    return [_early_bound(face, "IFace2") for face in values]
+    return [_early_bound(_bind(face, "IFace2"), "IFace2") for face in values]
 
 
 def _cylinders(body, radius, axis, label):
     found = []
     for face in _faces(body):
-        surface = _early_bound(face.GetSurface(), "ISurface")
+        surface = _early_bound(_bind(_com_invoke(face, "IFace2", "GetSurface"), "ISurface"), "ISurface")
         if surface is None:
             raise RuntimeError(f"{label}: native surface is missing")
         if surface.IsCylinder() is not True:

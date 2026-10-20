@@ -495,6 +495,220 @@ def test_native_air_refuses_nonfinite_trimmed_face_points(readback):
                             (0.0, 0.0, 0.0), "actual trimmed face")
 
 
+@pytest.mark.parametrize("faces", [None, (), [], 1, iter(())])
+def test_native_bore_refuses_missing_or_malformed_face_collections(faces):
+    with pytest.raises(RuntimeError, match="actual finite faces are missing"):
+        native_air._cylinders(SimpleNamespace(GetFaces=lambda: faces),
+                              1.0, (0.0, 0.0, 1.0), "bank bore")
+
+
+def test_native_bore_binds_later_faces_before_any_surface_query(monkeypatch):
+    events = []
+    failure = RuntimeError("later face cannot bind")
+    first = SimpleNamespace(_oleobj_=object(),
+                            GetSurface=lambda: events.append("surface"))
+    later = SimpleNamespace(_oleobj_=object())
+
+    def bind(value, interface):
+        assert interface == "IFace2"
+        events.append("bind later" if value is later else "bind first")
+        if value is later:
+            raise failure
+        return value
+
+    monkeypatch.setattr(native_air, "_early_bound", bind)
+    with pytest.raises(RuntimeError) as caught:
+        native_air._cylinders(SimpleNamespace(GetFaces=lambda: (first, later)),
+                              1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert caught.value is failure
+    assert events == ["bind first", "bind later"]
+
+
+def test_native_bore_strictly_binds_wrapped_surface_before_classification(monkeypatch):
+    events = []
+    failure = RuntimeError("surface cannot bind")
+    surface = SimpleNamespace(_oleobj_=object(),
+                              IsCylinder=lambda: events.append("classification"))
+    face = SimpleNamespace(GetSurface=lambda: surface)
+
+    def bind(value, interface):
+        if value is surface:
+            assert interface == "ISurface"
+            raise failure
+        return value
+
+    monkeypatch.setattr(native_air, "_early_bound", bind)
+    with pytest.raises(RuntimeError) as caught:
+        native_air._cylinders(SimpleNamespace(GetFaces=lambda: [face]),
+                              1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert caught.value is failure
+    assert events == []
+
+
+@pytest.mark.parametrize("stage", ["faces", "surface", "classification", "parameters"])
+def test_native_bore_propagates_query_failure_without_visiting_later_faces(stage):
+    events = []
+    failure = RuntimeError(f"native {stage} failure")
+
+    def query(name, value):
+        events.append(name)
+        if name == stage:
+            raise failure
+        return value
+
+    class Surface:
+        def IsCylinder(self):
+            return query("classification", True)
+
+        @property
+        def CylinderParams(self):
+            return query("parameters", (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.001))
+
+    first = SimpleNamespace(GetSurface=lambda: query("surface", Surface()))
+    later = SimpleNamespace(GetSurface=lambda: events.append("later surface"))
+    body = SimpleNamespace(GetFaces=lambda: query("faces", [first, later]))
+    with pytest.raises(RuntimeError) as caught:
+        native_air._cylinders(body, 1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert caught.value is failure
+    assert events == ["faces", "surface", "classification", "parameters"][
+        :["faces", "surface", "classification", "parameters"].index(stage)+1
+    ]
+
+
+@pytest.mark.parametrize(("params", "message"), [
+    ((0.0,)*6, "invalid actual cylinder parameters"),
+    ((math.nan, 0.0, 0.0, 0.0, 0.0, 1.0, 0.001), "invalid actual cylinder parameters"),
+    ((0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.001), "native cylinder axis is not unit"),
+    ((0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.001), "actual cylinder axis is misoriented"),
+])
+def test_native_bore_does_not_skip_bad_later_cylinder_after_valid_bore(params, message):
+    valid = SimpleNamespace(IsCylinder=lambda: True,
+                            CylinderParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.001))
+    invalid = SimpleNamespace(IsCylinder=lambda: True, CylinderParams=params)
+    body = SimpleNamespace(GetFaces=lambda: [
+        SimpleNamespace(GetSurface=lambda: valid),
+        SimpleNamespace(GetSurface=lambda: invalid),
+    ])
+    with pytest.raises(RuntimeError, match=message):
+        native_air._cylinders(body, 1.0, (0.0, 0.0, 1.0), "bank bore")
+
+
+def test_native_bore_rejects_missing_surface_after_valid_bore():
+    valid = SimpleNamespace(IsCylinder=lambda: True,
+                            CylinderParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.001))
+    body = SimpleNamespace(GetFaces=lambda: [
+        SimpleNamespace(GetSurface=lambda: valid),
+        SimpleNamespace(GetSurface=lambda: None),
+    ])
+    with pytest.raises(RuntimeError, match="bank bore: native surface is missing"):
+        native_air._cylinders(body, 1.0, (0.0, 0.0, 1.0), "bank bore")
+
+
+def test_native_bore_retains_all_matching_faces_and_normalizes_reversed_axis():
+    surfaces = [
+        SimpleNamespace(IsCylinder=lambda: False),
+        SimpleNamespace(IsCylinder=lambda: True,
+                        CylinderParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.002)),
+        SimpleNamespace(IsCylinder=lambda: True,
+                        CylinderParams=(0.001, 0.002, 0.003, 0.0, 0.0, 1.0, 0.001)),
+        SimpleNamespace(IsCylinder=lambda: True,
+                        CylinderParams=(0.004, 0.005, 0.006, 0.0, 0.0, -1.0, 0.001)),
+    ]
+    faces = [SimpleNamespace(GetSurface=lambda surface=surface: surface) for surface in surfaces]
+    found = native_air._cylinders(SimpleNamespace(GetFaces=lambda: faces),
+                                 1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert found == [
+        (faces[2], (1.0, 2.0, 3.0), (0.0, 0.0, 1.0), 1.0),
+        (faces[3], (4.0, 5.0, 6.0), (0.0, 0.0, 1.0), 1.0),
+    ]
+
+
+@pytest.fixture
+def raw_native_bore(monkeypatch):
+    """Only binding is faked; traversal uses the real raw invocation helpers."""
+    import _com
+
+    original_binding = _com._early_bound
+    events = []
+    wrappers = {}
+    failure = RuntimeError("later raw face cannot bind")
+    failing_raw = None
+
+    class RawDispatch:
+        def __init__(self, name, result=None):
+            self.name = name
+            self.result = result
+
+        def InvokeTypes(self, *_args):
+            events.append(f"query {self.name}")
+            return self.result
+
+    def bind(value, interface):
+        if isinstance(value, RawDispatch):
+            raise AssertionError("raw return reached strict binding without _bind")
+        raw = getattr(value, "_oleobj_", None)
+        if not isinstance(raw, RawDispatch):
+            # Header recording binds _RecordedInvoke, not a native dispatch.
+            return original_binding(value, interface)
+        expected_interface, wrapper = wrappers[raw]
+        assert interface == expected_interface
+        if value is wrapper:
+            return value
+        events.append(f"bind {raw.name}")
+        if raw is failing_raw:
+            raise failure
+        return wrapper
+
+    monkeypatch.setattr(_com, "_early_bound", bind)
+    monkeypatch.setattr(native_air, "_early_bound", bind)
+
+    def make(*, fail_later=False):
+        nonlocal failing_raw
+        raw_surface = RawDispatch("surface")
+        surface = SimpleNamespace(
+            _oleobj_=raw_surface, IsCylinder=lambda: True,
+            CylinderParams=(0.001, 0.002, 0.003, 0.0, 0.0, -1.0, 0.001),
+        )
+        wrappers[raw_surface] = ("ISurface", surface)
+        raw_first = RawDispatch("first face surface", raw_surface)
+        raw_later = RawDispatch("later face surface", raw_surface)
+        first = SimpleNamespace(_oleobj_=raw_first)
+        later = SimpleNamespace(_oleobj_=raw_later)
+        wrappers[raw_first] = ("IFace2", first)
+        wrappers[raw_later] = ("IFace2", later)
+        if fail_later:
+            failing_raw = raw_later
+        return SimpleNamespace(
+            body=RawDispatch("body faces", (raw_first, raw_later)),
+            faces=(first, later), events=events, failure=failure,
+        )
+
+    return make
+
+
+def test_native_bore_raw_returns_require_binding_and_preserve_geometry(raw_native_bore):
+    case = raw_native_bore()
+    found = native_air._cylinders(case.body, 1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert found == [
+        (case.faces[0], (1.0, 2.0, 3.0), (0.0, 0.0, 1.0), 1.0),
+        (case.faces[1], (1.0, 2.0, 3.0), (0.0, 0.0, 1.0), 1.0),
+    ]
+    assert case.events[:4] == [
+        "query body faces", "bind first face surface", "bind later face surface",
+        "query first face surface",
+    ]
+
+
+def test_native_bore_later_raw_binding_failure_precedes_all_surface_queries(raw_native_bore):
+    case = raw_native_bore(fail_later=True)
+    with pytest.raises(RuntimeError) as caught:
+        native_air._cylinders(case.body, 1.0, (0.0, 0.0, 1.0), "bank bore")
+    assert caught.value is case.failure
+    assert case.events == [
+        "query body faces", "bind first face surface", "bind later face surface",
+    ]
+
+
 def test_native_transform_positive_control_and_reflection_refusal():
     identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
                 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
