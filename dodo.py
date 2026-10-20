@@ -1932,22 +1932,12 @@ def _drawing_file_deps(stem: str) -> list[str]:
         )
     else:
         source_deps = (_sldprt(spec.part), _part_execution_token(spec.part))
-    # TEMPORARY issue #1636 FARM BOOTSTRAP: maintenance source/display values.
-    # Both DRWDOTs are declared by this leaf's temporary registry layouts.
-    bootstrap_deps = (
-        [
-            str(SCRIPTS_DIR / "maintain_drawing_templates.py"),
-            str(CONFIG_DIR / "title_block.yaml"),
-        ]
-        if stem == "dt_cylinder_gear" else []
-    )
     deps = sorted(
         {
             str(script),
             str(RELEASE_VERSION_FILE),
             *source_deps,
             *runtime,
-            *bootstrap_deps,
             # The cad/config rows the draw closure reads (Codex #936 T_oyK): a
             # sheet that prints another part's registry number must re-run, and
             # miss the cache, when that row changes without any geometry change.
@@ -1964,18 +1954,6 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     restored leaf still carries its findings and sheet dumps."""
     spec = DRAWINGS_BY_NAME[stem]
     outputs = [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
-    # TEMPORARY issue #1636 FARM BOOTSTRAP: cache publication returns these
-    # native artefacts from the worker; tracked cad/templates is never mutated.
-    if stem == "dt_cylinder_gear":
-        outputs.extend(
-            CAD_OUT / "templates" / name
-            for name in (
-                "harmonic-analyzer-landscape.DRWDOT",
-                "harmonic-analyzer-portrait.DRWDOT",
-                "harmonic-analyzer-landscape.census.json",
-                "harmonic-analyzer-portrait.census.json",
-            )
-        )
     return outputs
 
 

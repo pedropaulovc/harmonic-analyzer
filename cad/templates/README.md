@@ -164,7 +164,7 @@ For example, `maintain_templates(adapter, operations=("website",))` changes
 only the website from `harmonic-analyzer.vza.net` to `harmonicanalyzer.com`;
 the CLI's repeatable `--operation` selects the same operations. This keeps
 the website change separately reviewable from the line-weight change. The
-issue #1636 bootstrap runs `operations=("inside-corner",)` alone.
+issue #1636 bootstrap ran `operations=("inside-corner",)` alone.
 
 The script writes these files under `cad/out/templates` for the caller to
 declare as cache outputs:
@@ -209,6 +209,37 @@ leaf itself still renders from the checked-in templates, not from a runtime
 override. Census success is not visual approval: obtain explicit owner
 approval of both sample orientations before merging, and run the applicable
 drawing/machinist gates.
+
+#### Installed three-row note provenance (issue #1636)
+
+The installed binaries were returned by farm run
+`20261020T153714000Z-237d5a824b944d8087585c57c592b98e`, using source commit
+`3f4fdaa535d96dc44195b1d84f296c0ea008b3bf`. Both returned censuses report
+`readback-passed`: native save succeeded with zero errors and zero warnings,
+then the saved documents were closed and reopened. Reopened display-data
+readback measured a single three-row block in uniform 6 pt Century Gothic,
+with a common left edge and 2.117 mm row pitch:
+
+```text
+INSIDE CORNERS R1.0 MAX
+THREADS UNC/UNF CLASS 2A/2B
+REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX
+```
+
+The reopened census explicitly measured each cell's surface-finish symbol
+alongside the note and neighbouring content. The returned binaries were
+installed byte-for-byte with SHA-256 matching both the censuses and the
+recorded run hashes:
+
+| Template | SHA-256 |
+| --- | --- |
+| Portrait | `7d8239d6821a03b018fb8e28fcab1d274ad0934514937b6481082a196da8d325` |
+| Landscape | `8e9203bd4c419bb8b725e03e3adae72f6eca72ea45ecfc8335cb210131a97494` |
+
+The temporary cylinder-gear maintenance dispatch, extra landscape dependency,
+and generated-template/census cache outputs have been removed. This persisted
+native proof is not sample approval: explicit owner approval of both portrait
+and landscape samples remains required before merge.
 
 ### The "For Personal Use Only" watermark
 
