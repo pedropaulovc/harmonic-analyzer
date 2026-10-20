@@ -22,7 +22,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _printed_limits import drilled_limits, limits
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -54,7 +54,7 @@ requirement(
 )
 requirement(
     "journal_clearance", kind="hole", faces=(CylinderFace(part_spec.BORE_DIA),), requirements=("dia", "note"),
-    fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (drilled_limits(part_spec.BORE_DIA), ("BORE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.BORE_DIA, ("BORE_DIA",)), "note": (part_spec.DIMENSION_CALLOUTS["WasherBore"], ("DIMENSION_CALLOUTS",))},
+    fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (limits(part_spec.BORE_DIA, part_spec.DRAWING_PRECISION_BY_NAME["WasherBore"], part_spec.DRILLED_BAND), ("BORE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.BORE_DIA, ("BORE_DIA",)), "note": (part_spec.DIMENSION_CALLOUTS["WasherBore"], ("DIMENSION_CALLOUTS",))},
     precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["WasherBore"]},
 )
 requirement(

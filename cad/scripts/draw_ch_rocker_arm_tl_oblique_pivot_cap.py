@@ -30,7 +30,7 @@ from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _printed_limits import drilled_limits, limits
+from _printed_limits import limits
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
@@ -84,13 +84,13 @@ requirement(
 )
 requirement(
     "journal_aperture", kind="hole", faces=(CylinderFace(part_spec.APERTURE_DIA),), requirements=("dia", "note"),
-    fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (drilled_limits(part_spec.APERTURE_DIA), ("APERTURE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.APERTURE_DIA, ("APERTURE_DIA",)), "note": (part_spec.DIMENSION_CALLOUTS["ApertureDia"], ("DIMENSION_CALLOUTS", "APERTURE_POSITION_DIAMETER"))},
+    fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (limits(part_spec.APERTURE_DIA, part_spec.DRAWING_PRECISION_BY_NAME["ApertureDia"], part_spec.DRILLED_BAND), ("APERTURE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.APERTURE_DIA, ("APERTURE_DIA",)), "note": (part_spec.DIMENSION_CALLOUTS["ApertureDia"], ("DIMENSION_CALLOUTS", "APERTURE_POSITION_DIAMETER"))},
     precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["ApertureDia"]},
 )
 for _index, (_x, _y) in enumerate(part_spec.BOLT_POINTS, 1):
     requirement(
         f"cap_bolt_{_index}", kind="hole", faces=(CylinderFace(part_spec.HOLE_DIA, contains_x_mm=_x, contains_y_mm=_y),), requirements=("dia", "x", "y", "note"),
-        fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (drilled_limits(part_spec.HOLE_DIA), ("HOLE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.HOLE_DIA, ("HOLE_DIA",)), "x": (limits(_x, part_spec.POSITION_PLACES), ("BOLT_POINTS",)), "x_nominal": (_x, ("BOLT_POINTS",)), "y": (limits(_y, part_spec.POSITION_PLACES), ("BOLT_POINTS",)), "y_nominal": (_y, ("BOLT_POINTS",)), "note": (part_spec.DIMENSION_CALLOUTS["BoltHoleDia"], ("DIMENSION_CALLOUTS", "SCREW_MAJOR_LIMITS", "SCREW_THREAD_SOURCE_URL"))},
+        fields={"axis": ([0.0, 0.0, 1.0], ("__frame__",)), "dia": (limits(part_spec.HOLE_DIA, part_spec.DRAWING_PRECISION_BY_NAME["BoltHoleDia"], part_spec.DRILLED_BAND), ("HOLE_DIA", "DRILLED_BAND")), "dia_nominal": (part_spec.HOLE_DIA, ("HOLE_DIA",)), "x": (limits(_x, part_spec.POSITION_PLACES), ("BOLT_POINTS",)), "x_nominal": (_x, ("BOLT_POINTS",)), "y": (limits(_y, part_spec.POSITION_PLACES), ("BOLT_POINTS",)), "y_nominal": (_y, ("BOLT_POINTS",)), "note": (part_spec.DIMENSION_CALLOUTS["BoltHoleDia"], ("DIMENSION_CALLOUTS", "SCREW_MAJOR_LIMITS", "SCREW_THREAD_SOURCE_URL"))},
         precision={"dia": part_spec.DRAWING_PRECISION_BY_NAME["BoltHoleDia"], "x": part_spec.POSITION_PLACES, "y": part_spec.POSITION_PLACES},
     )
     requirement(

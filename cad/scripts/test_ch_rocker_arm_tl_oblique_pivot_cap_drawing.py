@@ -141,8 +141,10 @@ def test_one_axis_control_owns_aperture_coaxiality_to_actual_pocket() -> None:
 def test_requirement_manifest_keeps_actual_bolt_coordinates_and_fitted_acceptance() -> None:
     features = export_features.requirement_manifest(STEM)["features"]
     assert {f"cap_bolt_{i}" for i in range(1, 5)} <= features.keys()
+    assert features["journal_aperture"]["dia"] == pytest.approx([15.0, 15.1])
     for index, (x, y) in enumerate(spec.BOLT_POINTS, 1):
         feature = features[f"cap_bolt_{index}"]
+        assert feature["dia"] == pytest.approx([6.8, 6.9])
         assert feature["x_nominal"] == x and feature["y_nominal"] == y
         assert feature["x"] == pytest.approx([x - 0.13, x + 0.13])
         assert feature["y"] == pytest.approx([y - 0.13, y + 0.13])
