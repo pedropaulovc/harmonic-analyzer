@@ -1978,6 +1978,22 @@ def test_virtual_sharp_supports_use_source_lines_and_nearest_notch_segment(
         "null",
         "returned_identity",
         "multiple",
+        "multiple_sharps",
+        "extra_ordinary",
+        "single_sharp",
+        "cleanup_return_identity",
+        "cleanup_select",
+        "cleanup_count",
+        "cleanup_identity",
+        "cleanup_delete",
+        "cleanup_keeper",
+        "cleanup_old",
+        "cleanup_noop",
+        "cleanup_replaced",
+        "cleanup_type",
+        "cleanup_coordinate",
+        "cleanup_owner",
+        "cleanup_witness",
         "removed",
         "renumbered",
         "clear_lifecycle",
@@ -1994,7 +2010,14 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     monkeypatch, capsys, failure, creation_toggle
 ):
     state = {"inserted": False, "selected": [], "factory_calls": 0, "phase": "before"}
+    state.update(deleted=False, delete_calls=0)
+    has_trigger = failure not in {"single_sharp", "null"}
     creation_reads = []
+    import _drawing_detail_crop as native_crop
+
+    math_inputs = []
+    monkeypatch.setattr(native_crop, "_early_bound", lambda item, _kind: item)
+    monkeypatch.setattr(native_crop, "double_array", lambda values: values)
 
     def creation_preference(name):
         assert name == "swDisplayVirtualSharps"
@@ -2009,7 +2032,10 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     index = 2  # the 37.0 station: source SW vertex, not a saved paper coordinate
     _label, x, z, _radius = part.PLATE_CORNERS[index]
     source = (x / 1000, spec.PLATE_THICKNESS / 1000, z / 1000)
-    expected = (0.0718 + source[0] / 2, 0.1267 - source[2] / 2, 0)
+    expected = (
+        0.0718 + source[0] / 2,
+        0.1267 - source[2] / 2,
+    )  # Real projection is XY.
     inverse = object()
     forward = types.SimpleNamespace(Inverse=lambda: inverse)
     factory_coordinates = (expected[0] * 2 - 0.11, expected[1] * 3 + 0.025, 0.0)
@@ -2022,7 +2048,11 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         X=factory_coordinates[0] + (0.001 if failure == "coordinate" else 0),
         Y=factory_coordinates[1],
         Z=factory_coordinates[2],
-        GetSketch=lambda: object() if failure == "owner" else sketch,
+        GetSketch=lambda: (
+            object()
+            if failure == "owner" or (failure == "cleanup_owner" and state["deleted"])
+            else sketch
+        ),
     )
     existing = types.SimpleNamespace(
         Type=1,
@@ -2030,22 +2060,56 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
             (2, 4) if state["inserted"] and failure == "renumbered" else (2, 3)
         ),
     )
-    extra = types.SimpleNamespace(GetID=lambda: (7, 20), Type=1)
+    extra = types.SimpleNamespace(
+        GetID=lambda: (7, 20),
+        Type=4 if failure == "multiple_sharps" else 1,
+        X=point.X,
+        Y=point.Y,
+        Z=point.Z,
+    )
+    trigger = types.SimpleNamespace(GetID=lambda: (9, 10), Type=1)
+    replacement = types.SimpleNamespace(
+        GetID=point.GetID,
+        Type=4,
+        X=point.X,
+        Y=point.Y,
+        Z=point.Z,
+    )
 
     def enumerated_points():
         if not state["inserted"]:
             return [existing]
+        if state["deleted"]:
+            kept = (
+                []
+                if failure == "cleanup_keeper"
+                else [replacement if failure == "cleanup_replaced" else point]
+            )
+            old = [] if failure == "cleanup_old" else [existing]
+            remaining_trigger = [trigger] if failure == "cleanup_noop" else []
+            return old + kept + remaining_trigger
         retained = [] if failure == "removed" else [existing]
         lost = (failure == "clear_lifecycle" and state["phase"] != "immediate") or (
             failure == "rebuild_lifecycle" and state["phase"] == "rebuilt"
         )
         created = [] if failure in {"missing", "null"} or lost else [point]
-        return retained + created + ([extra] if failure == "multiple" else [])
+        return (
+            retained
+            + created
+            + ([trigger] if has_trigger else [])
+            + (
+                [extra]
+                if failure in {"multiple", "multiple_sharps", "extra_ordinary"}
+                else []
+            )
+        )
 
     sketch.GetSketchPoints2 = enumerated_points
 
     def witness_lines():
         if not state["inserted"] or failure == "witness":
+            return []
+        if state["deleted"] and failure == "cleanup_witness":
             return []
         if failure == "clear_lifecycle" and state["phase"] != "immediate":
             return []
@@ -2071,8 +2135,6 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
             0.0,
             float(len(lines)),
             *(coordinate for line in lines for coordinate in line),
-            1.0,
-            0.0,
         )
 
     def witness_count():
@@ -2090,10 +2152,19 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     manager = types.SimpleNamespace(
         CreateSelectData=lambda: types.SimpleNamespace(View=None),
         GetSelectedObjectCount2=lambda _mark: (
-            1 if failure == "count" else len(state["selected"])
+            1
+            if failure == "count"
+            else (
+                2
+                if failure == "cleanup_count" and state["selected"] == [trigger]
+                else len(state["selected"])
+            )
         ),
         GetSelectedObject6=lambda index, _mark: (
-            object() if failure == "misselected" else state["selected"][index - 1]
+            object()
+            if failure == "misselected"
+            or (failure == "cleanup_identity" and state["selected"] == [trigger])
+            else state["selected"][index - 1]
         ),
     )
 
@@ -2103,6 +2174,29 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         if failure == "select":
             return False
         state["selected"].append(edge)
+        return True
+
+    def select_trigger(append, data):
+        assert append is False and data.View is view and not state["selected"]
+        if failure == "cleanup_select":
+            return False
+        state["selected"].append(trigger)
+        return True
+
+    trigger.Select4 = select_trigger
+
+    def delete_trigger(options):
+        assert options == 0 and state["selected"] == [trigger]
+        state["delete_calls"] += 1
+        if failure == "cleanup_delete":
+            return False
+        state["deleted"] = True
+        if failure == "cleanup_type":
+            point.Type = (
+                1  # Simulate a native side effect; production never assigns Type.
+            )
+        if failure == "cleanup_coordinate":
+            point.X += 0.001
         return True
 
     def create_point(*coordinates):
@@ -2117,6 +2211,10 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
             return None
         if failure == "returned_identity":
             return types.SimpleNamespace(GetID=point.GetID, Type=point.Type)
+        if failure == "cleanup_return_identity":
+            return types.SimpleNamespace(GetID=trigger.GetID, Type=1)
+        if has_trigger:
+            return trigger
         return point
 
     def clear(_all):
@@ -2133,12 +2231,13 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         SelectionManager=manager,
         ClearSelection2=clear,
         SketchManager=types.SimpleNamespace(CreatePoint=create_point),
+        Extension=types.SimpleNamespace(DeleteSelection2=delete_trigger),
     )
     adapter = types.SimpleNamespace(
         currentModel=draw,
         swApp=types.SimpleNamespace(
             IsSame=lambda a, b: -1 if failure == "unknown" else int(a is b),
-            GetMathUtility=lambda: object(),
+            GetMathUtility=lambda: types.SimpleNamespace(CreatePoint=math_point),
             GetUserPreferenceToggle=get_creation_toggle,
         ),
     )
@@ -2155,103 +2254,93 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
     monkeypatch.setattr(drawing, "_profile_corner_edges", lambda *_args: edges)
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
 
-    def transform(_utility, xyz, actual_transform, **_kw):
-        if actual_transform is forward:
-            assert xyz == expected
-            return factory_coordinates
-        assert actual_transform is inverse
-        assert xyz == (point.X, point.Y, point.Z)
-        return ((xyz[0] + 0.11) / 2, (xyz[1] - 0.025) / 3, 0.0)
+    def math_point(values):
+        xyz = tuple(values)
+        assert len(xyz) == 3  # IMathUtility.CreatePoint requires XYZ, never bare XY.
+        math_inputs.append(xyz)
+
+        def multiply(actual_transform):
+            if actual_transform is forward:
+                assert xyz == (*expected, 0.0)
+                transformed = factory_coordinates
+            else:
+                assert actual_transform is inverse
+                assert xyz == (point.X, point.Y, point.Z)
+                transformed = ((xyz[0] + 0.11) / 2, (xyz[1] - 0.025) / 3, 0.0)
+            return types.SimpleNamespace(ArrayData=transformed)
+
+        return types.SimpleNamespace(MultiplyTransform=multiply)
 
     def project(_adapter, actual_view, xyz, **_kw):
         assert actual_view is view and xyz == source
         return expected
 
-    monkeypatch.setattr(drawing, "_transform_point", transform)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
+    early_failures = {"activate", "select", "count", "misselected", "unknown"}
     if failure:
         with pytest.raises(RuntimeError) as caught:
             drawing._insert_profile_virtual_sharp(adapter, view, index)
-        if failure == "null":
-            assert "CreatePoint returned null" in str(caught.value)
-            assert "returned=None" in str(caught.value)
-        if failure == "returned_identity":
-            assert "CreatePoint return differs from the new profile point" in str(
-                caught.value
-            )
-        if failure not in {
-            "activate",
-            "select",
-            "count",
-            "misselected",
-            "unknown",
-            "null",
-        }:
-            assert "returned={'id': (7, 19)," in str(caught.value)
-        if failure == "type":
-            assert "returned={'id': (7, 19), 'type': 1}" in str(caught.value)
-            assert "not naturally a native virtual sharp" in str(caught.value)
-        if failure in {
-            "type",
-            "owner",
-            "coordinate",
-            "witness",
-            "single_witness",
-            "witness_size",
-        }:
-            message = str(caught.value)
+        message = str(caught.value)
+        expected_error = {
+            "activate": "cannot activate profile",
+            "select": "cannot select native virtual sharp support",
+            "count": "exactly two selected edges",
+            "misselected": "failed native identity readback",
+            "unknown": "failed native identity readback",
+            "null": "CreatePoint returned null",
+            "returned_identity": "CreatePoint return differs from the new Type1 trigger",
+            "cleanup_return_identity": "not the native Type1 CreatePoint return",
+            "cleanup_select": "cannot select returned trigger point",
+            "cleanup_count": "trigger selection identity/count failed",
+            "cleanup_identity": "trigger selection identity/count failed",
+            "cleanup_delete": "cannot delete returned trigger point",
+            "cleanup_keeper": "cleanup changed unexpected profile point IDs",
+            "cleanup_old": "cleanup changed unexpected profile point IDs",
+            "cleanup_noop": "cleanup changed unexpected profile point IDs",
+            "cleanup_replaced": "cleanup replaced the native virtual sharp",
+            "cleanup_type": "not naturally a native virtual sharp",
+            "cleanup_coordinate": "misses source corner",
+            "coordinate": "misses source corner",
+            "cleanup_owner": "not owned by the profile sketch",
+            "owner": "not owned by the profile sketch",
+            "cleanup_witness": "no genuine witness lines",
+            "witness": "no genuine witness lines",
+            "single_witness": "no genuine witness lines",
+            "witness_size": "invalid size/values",
+        }.get(failure, "expected exactly one new native virtual sharp point")
+        assert expected_error in message
+        if failure not in early_failures:
             assert (
                 "before={'point_count': 1, 'point_ids_types': [((2, 3), 1)]" in message
             )
             assert "immediately_after_CreatePoint=" in message
             assert "after_rebuild=" in message
-            assert "'raw_witness':" in message
-        if failure == "witness_size":
-            assert "invalid size/values" in str(caught.value)
-            assert "'witness_count': 2, 'witness_size': 22" in str(caught.value)
+            assert "'raw_witness':" in message and "'virtual_sharp_xyz':" in message
             assert f"'display_virtual_sharps': {creation_toggle}" in message
-        if failure in {
-            "missing",
-            "multiple",
-            "removed",
-            "renumbered",
-            "clear_lifecycle",
-            "rebuild_lifecycle",
-        }:
-            message = str(caught.value)
-            assert "expected exactly one new native virtual sharp point" in message
-            assert (
-                "before={'point_count': 1, 'point_ids_types': [((2, 3), 1)]" in message
-            )
-            after_points = {
-                "missing": [((2, 3), 1)],
-                "multiple": [((2, 3), 1), ((7, 19), 4), ((7, 20), 1)],
-                "removed": [((7, 19), 4)],
-                "renumbered": [((2, 4), 1), ((7, 19), 4)],
-                "clear_lifecycle": [((2, 3), 1)],
-                "rebuild_lifecycle": [((2, 3), 1)],
-            }[failure]
-            assert (
-                f"after_rebuild={{'point_count': {len(after_points)}, "
-                f"'point_ids_types': {after_points}"
-            ) in message
-            assert "immediately_after_CreatePoint=" in message
-            assert "'witness_count': 0, 'witness_size': 0, 'raw_witness': ()" in message
-            if failure in {"clear_lifecycle", "rebuild_lifecycle"}:
-                assert (
-                    "immediately_after_CreatePoint={'point_count': 2, "
-                    "'point_ids_types': [((2, 3), 1), ((7, 19), 4)], "
-                    "'witness_count': 2, 'witness_size': 21, 'raw_witness': "
-                    "(0.0, -1.0, -1.0, -1.0, 0.0, 0.0, 2.0, "
-                    "0.0, 0.0, 0.0, 0.01, 0.0, 0.0, "
-                    "0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 1.0, 0.0)"
-                ) in message
-            assert f"'display_virtual_sharps': {creation_toggle}" in message
+            if failure == "null":
+                assert "returned=None" in message
+            else:
+                returned_id = (
+                    (9, 10)
+                    if has_trigger and failure != "returned_identity"
+                    else (7, 19)
+                )
+                assert f"returned={{'id': {returned_id}," in message
+        if state["deleted"]:
+            assert "after_trigger_cleanup=" in message
+        if failure == "single_sharp":
+            assert state["delete_calls"] == 0
     else:
         drawing._insert_profile_virtual_sharp(adapter, view, index)
         output = capsys.readouterr().out
         assert "immediately_after_CreatePoint" not in output
         assert "raw_witness" not in output
+        assert state["delete_calls"] == 1
+        assert enumerated_points() == [existing, point]
+        assert math_inputs == [(*expected, 0.0), (point.X, point.Y, point.Z)]
+    assert state["delete_calls"] == (
+        1 if state["deleted"] or failure == "cleanup_delete" else 0
+    )
     assert not state["selected"]
     assert state["factory_calls"] == (
         0 if failure in {"activate", "select", "count", "misselected", "unknown"} else 1
@@ -2261,25 +2350,125 @@ def test_native_virtual_sharp_requires_type_owner_source_and_native_geometry(
         if failure == "activate"
         else 1
         if failure in {"select", "count", "misselected", "unknown"}
+        else 4
+        if state["deleted"]
         else 3
     )
 
 
-def test_virtual_sharp_witness_parser_requires_actual_native_line_geometry():
-    raw = (0.0, -1.0, -1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 1.0, 0.0)
+@pytest.mark.parametrize("groups", [1, 2, 4])
+def test_virtual_sharp_witness_parser_reads_observed_native_line_only_groups(groups):
+    # Exact r23 native payload: header5 + tag0/count2 + two six-value lines.
+    record = (
+        4294967295,
+        -1,
+        -1,
+        -1,
+        31,
+        0,
+        2,
+        -0.013718149724612275,
+        -0.115551920153,
+        0,
+        -0.023377974695370556,
+        -0.115551920153,
+        0,
+        -0.022677567850886055,
+        -0.10689727905903555,
+        0,
+        -0.022343378943547956,
+        -0.11655132154080962,
+        0,
+    )
+    raw = record * groups
     view = types.SimpleNamespace(
-        GetWitnessEntitiesCount=lambda: (1, len(raw)),
+        GetWitnessEntitiesCount=lambda: (2 * groups, len(raw)),
         GetWitnessGeomInfo=lambda: raw,
     )
     assert drawing._virtual_sharp_witness_groups(view) == [
-        [(1.0, 2.0, 3.0, 4.0, 5.0, 6.0)]
+        [record[7:13], record[13:19]] for _ in range(groups)
     ]
-    view.GetWitnessEntitiesCount = lambda: (1, len(raw) + 1)
-    with pytest.raises(RuntimeError, match="invalid size"):
-        drawing._virtual_sharp_witness_groups(view)
-    view.GetWitnessEntitiesCount = lambda: (1, len(raw) - 1)
-    view.GetWitnessGeomInfo = lambda: raw[:-1]
-    with pytest.raises(RuntimeError, match="truncated"):
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "size",
+        "fractional_size",
+        "negative_size",
+        "infinite_size",
+        "entity_count",
+        "fractional_count",
+        "negative_count",
+        "infinite_count",
+        "line_count",
+        "negative_lines",
+        "infinite_lines",
+        "nan_coordinates",
+        "arc",
+        "arc_trailer",
+        "truncated_header",
+        "truncated_line",
+    ],
+)
+def test_virtual_sharp_witness_parser_rejects_invalid_native_line_only_records(defect):
+    raw = [
+        0.0,
+        -1.0,
+        -1.0,
+        -1.0,
+        0.0,
+        0.0,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.01,
+        0.0,
+    ]
+    count = 2
+    if defect == "line_count":
+        raw[6] = 1.5
+    elif defect == "negative_lines":
+        raw[6] = -1
+    elif defect == "infinite_lines":
+        raw[6] = math.inf
+    elif defect == "nan_coordinates":
+        raw[7] = math.nan
+    elif defect == "arc":
+        raw[5] = 1
+    elif defect == "arc_trailer":
+        raw += [1.0, 0.0]
+    elif defect == "truncated_header":
+        raw = raw[:6]
+    elif defect == "truncated_line":
+        raw = raw[:-1]
+    elif defect == "entity_count":
+        count = 1  # SDK counts line entities, not the single group.
+    elif defect == "fractional_count":
+        count = 1.5
+    elif defect == "negative_count":
+        count = -1
+    elif defect == "infinite_count":
+        count = math.inf
+    size = {
+        "size": len(raw) + 1,
+        "fractional_size": len(raw) + 0.5,
+        "negative_size": -1,
+        "infinite_size": math.inf,
+    }.get(defect, len(raw))
+    view = types.SimpleNamespace(
+        GetWitnessEntitiesCount=lambda: (count, size),
+        GetWitnessGeomInfo=lambda: raw,
+    )
+    with pytest.raises(RuntimeError):
         drawing._virtual_sharp_witness_groups(view)
 
 

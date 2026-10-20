@@ -1520,13 +1520,19 @@ def _profile_corner_edges(adapter: Any, view: Any, index: int) -> tuple[Any, Any
 
 
 def _virtual_sharp_witness_groups(view: Any) -> list[list[tuple[float, ...]]]:
-    """Parse native groups; do not guess their undocumented coordinate space.
+    """Parse style3 straight-line groups observed in r23, without assuming a frame.
 
-    Source placement is proved by the Type4 point's sketch-to-sheet transform.
-    This separately requires real, nonempty native witness-line geometry.
+    Each group is five attributes, tag0, line count and six values per line.
+    Empty arc trailers are not emitted by the native style3 path.
+    Source placement is proved separately by the native Type4 point.
     """
     count, size = view.GetWitnessEntitiesCount()
     raw = tuple(float(v) for v in (view.GetWitnessGeomInfo() or ()))
+    if not all(
+        math.isfinite(value) and value >= 0 and int(value) == value
+        for value in (count, size)
+    ):
+        raise RuntimeError("profile virtual sharp witness counts are invalid")
     if int(size) != len(raw) or not all(math.isfinite(v) for v in raw):
         raise RuntimeError("profile virtual sharp witness data has invalid size/values")
     if bool(count) != bool(raw):
@@ -1536,27 +1542,27 @@ def _virtual_sharp_witness_groups(view: Any) -> list[list[tuple[float, ...]]]:
     groups = []
     offset = 0
     while offset < len(raw):
+        if offset + 7 > len(raw):
+            raise RuntimeError("profile virtual sharp witness line header is truncated")
         offset += 5  # colour, line style/weight, layer, override
-        if offset + 2 > len(raw) or raw[offset] != 0:
-            raise RuntimeError("profile virtual sharp witness line header is missing")
+        if raw[offset] != 0:
+            raise RuntimeError(
+                "profile virtual sharp witness geometry is not straight lines"
+            )
         lines = int(raw[offset + 1])
         if lines < 0 or raw[offset + 1] != lines:
             raise RuntimeError("profile virtual sharp witness line count is invalid")
         offset += 2
         end = offset + lines * 6
-        if end + 2 > len(raw):
+        if end > len(raw):
             raise RuntimeError("profile virtual sharp witness lines are truncated")
         segments = [raw[i : i + 6] for i in range(offset, end, 6)]
         offset = end
-        if raw[offset] != 1:
-            raise RuntimeError("profile virtual sharp witness arc header is missing")
-        arcs = int(raw[offset + 1])
-        if arcs < 0 or raw[offset + 1] != arcs:
-            raise RuntimeError("profile virtual sharp witness arc count is invalid")
-        offset += 2 + arcs * 12
-        if offset > len(raw):
-            raise RuntimeError("profile virtual sharp witness arcs are truncated")
         groups.append(segments)
+    if sum(len(group) for group in groups) != int(count):
+        raise RuntimeError(
+            "profile virtual sharp witness entity count disagrees with lines"
+        )
     return groups
 
 
@@ -1581,7 +1587,10 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
         label=f"{label} original PlateProfile sharp",
     )
     factory_coordinates = _transform_point(
-        utility, expected, transform, label=f"{label} source corner sheet to sketch"
+        utility,
+        (expected[0], expected[1], 0.0),
+        transform,
+        label=f"{label} source corner sheet to sketch",
     )
 
     def points():
@@ -1604,6 +1613,11 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
             "witness_count": int(count),
             "witness_size": int(size),
             "raw_witness": tuple(float(v) for v in (native.GetWitnessGeomInfo() or ())),
+            "virtual_sharp_xyz": [
+                (key, (float(point.X), float(point.Y), float(point.Z)))
+                for key, point in sorted(native_points.items())
+                if int(point.Type) == 4
+            ],
             # SDK SO_Miscellaneous describes creation at virtual intersections.
             # Observe only: this recipe must not establish a global seat baseline.
             "display_virtual_sharps_sdk_id": creation_preference,
@@ -1665,16 +1679,63 @@ def _insert_profile_virtual_sharp(adapter: Any, view: Any, index: int) -> None:
     if returned is None:
         raise RuntimeError(f"{label}: CreatePoint returned null; {evidence}")
     new = set(after) - set(before)
-    if len(new) != 1 or not set(before) <= set(after):
+    sharp_ids = [key for key in new if int(after[key].Type) == 4]
+    if len(new) != 2 or len(sharp_ids) != 1 or not set(before) <= set(after):
         raise RuntimeError(
-            f"{label}: expected exactly one new native virtual sharp point; {evidence}"
+            f"{label}: expected exactly one new native virtual sharp point plus returned Type1 trigger; {evidence}"
         )
-    point = after[new.pop()]
-    if int(adapter.swApp.IsSame(returned, point)) != 1:
+    keeper_id = sharp_ids[0]
+    point = after[keeper_id]
+    extra = new - {keeper_id}
+    if returned_snapshot["type"] != 1 or tuple(returned_snapshot["id"]) not in extra:
         raise RuntimeError(
-            f"{label}: CreatePoint return differs from the new profile point; {evidence}"
+            f"{label}: CreatePoint return differs from the new Type1 trigger; {evidence}"
         )
-    if int(point.Type) != 4 or returned_snapshot["type"] != 4:  # Natural Type4 only.
+    trigger_id = next(iter(extra))
+    trigger = after[trigger_id]
+    if int(trigger.Type) != 1 or int(adapter.swApp.IsSame(returned, trigger)) != 1:
+        raise RuntimeError(
+            f"{label}: extra point is not the native Type1 CreatePoint return; {evidence}"
+        )
+    # r23 observed a natural Type4 plus the returned ordinary trigger point.
+    # Delete only that identity-proved return, never a type/coordinate match.
+    draw.ClearSelection2(True)
+    try:
+        data = manager.CreateSelectData()
+        data.View = native
+        if not returned.Select4(False, data):
+            raise RuntimeError(
+                f"{label}: cannot select returned trigger point; {evidence}"
+            )
+        if (
+            int(manager.GetSelectedObjectCount2(-1)) != 1
+            or int(adapter.swApp.IsSame(manager.GetSelectedObject6(1, -1), returned))
+            != 1
+        ):
+            raise RuntimeError(
+                f"{label}: trigger selection identity/count failed; {evidence}"
+            )
+        extension = _early_bound(draw.Extension, "IModelDocExtension")
+        if not extension.DeleteSelection2(0):  # No absorbed/child deletion flags.
+            raise RuntimeError(
+                f"{label}: cannot delete returned trigger point; {evidence}"
+            )
+    finally:
+        draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"{label} returned trigger cleanup")
+    native.UpdateViewDisplayGeometry()
+    cleaned = points()
+    evidence += f" after_trigger_cleanup={snapshot(cleaned)}"
+    if set(cleaned) != set(before) | {keeper_id}:
+        raise RuntimeError(
+            f"{label}: trigger cleanup changed unexpected profile point IDs; {evidence}"
+        )
+    if int(adapter.swApp.IsSame(cleaned[keeper_id], point)) != 1:
+        raise RuntimeError(
+            f"{label}: trigger cleanup replaced the native virtual sharp; {evidence}"
+        )
+    point = cleaned[keeper_id]
+    if int(point.Type) != 4:  # Natural Type4 only; never assigned.
         raise RuntimeError(
             f"{label}: CreatePoint result is not naturally a native virtual sharp; {evidence}"
         )
