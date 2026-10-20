@@ -31,6 +31,7 @@ instrumented without touching their call sites.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import contextvars
 import functools
@@ -40,10 +41,12 @@ import logging
 import os
 import socket
 import sys
+import threading
 import time
 import urllib.parse
 from collections.abc import AsyncGenerator, Generator, Mapping
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import IO, Any, cast
 
@@ -1648,6 +1651,37 @@ ADAPTER_TRACED_METHODS = frozenset(
     }
 )
 _ADAPTER_ARG_LIMIT = 120
+_INSERT_COMPONENT_MODULE = "solidworks_mcp.adapters.solidworks.assembly"
+
+
+class _InsertScopeState(Enum):
+    ACTIVE = "active"
+    CLOSED = "closed"
+
+
+def _current_async_task_id() -> int | None:
+    with contextlib.suppress(RuntimeError):
+        task = asyncio.current_task()
+        if task is not None:
+            return id(task)
+    return None
+
+
+class _ComponentInsertScope:
+    """Revocable ownership without retaining an adapter or task in copied contexts."""
+
+    __slots__ = ("adapter_id", "task_id", "thread_id", "state")
+
+    def __init__(self, adapter_id: int):
+        self.adapter_id = adapter_id
+        self.task_id = _current_async_task_id()
+        self.thread_id = threading.get_ident()
+        self.state = _InsertScopeState.ACTIVE
+
+
+_component_insert_scope: contextvars.ContextVar[_ComponentInsertScope | None] = (
+    contextvars.ContextVar("_telemetry_component_insert_scope", default=None)
+)
 
 
 def _adapter_arg(args: tuple[Any, ...]) -> str | None:
@@ -1667,28 +1701,112 @@ def _adapter_arg(args: tuple[Any, ...]) -> str | None:
     return None
 
 
+def _traced_component_insert_helper(name: str, helper: Any) -> Any:
+    @functools.wraps(helper)
+    def traced_call(adapter: Any, *args: Any, **kwargs: Any) -> Any:
+        scope = _component_insert_scope.get()
+        if (
+            scope is None
+            or scope.state is not _InsertScopeState.ACTIVE
+            or scope.adapter_id != id(adapter)
+            or scope.thread_id != threading.get_ident()
+            or scope.task_id != _current_async_task_id()
+        ):
+            return helper(adapter, *args, **kwargs)
+        with span(f"adapter.insert_component.{name}"):
+            return helper(adapter, *args, **kwargs)
+
+    traced_call._harmonic_traced = True  # type: ignore[attr-defined]
+    return traced_call
+
+
+def _instrument_component_insert_helpers() -> None:
+    """Time loaded SDK helpers only in their active adapter/task/thread scope.
+
+    These are preload/transform/activation-attempt envelopes, not isolated
+    AddComponent5, solve or rebuild costs. An activation attempt returning normally
+    does not establish activation success: the SDK swallows best-effort failures.
+    Helpers used by other transform/kinematic operations remain unspanned.
+    """
+    module = sys.modules.get(_INSERT_COMPONENT_MODULE)
+    if module is None:
+        return
+    for helper_name, phase in (
+        ("_preload_component_file", "preload"),
+        ("_apply_component_transform", "transform"),
+        ("_activate_assembly", "activate_attempt"),
+    ):
+        helper = getattr(module, helper_name, None)
+        if (
+            callable(helper)
+            and not inspect.iscoroutinefunction(helper)
+            and not getattr(helper, "_harmonic_traced", False)
+        ):
+            setattr(module, helper_name, _traced_component_insert_helper(phase, helper))
+
+
 def _traced_adapter_method(name: str, method: Any) -> Any:
     span_name = f"adapter.{name}"
 
     @functools.wraps(method)
     async def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
         async with aspan(span_name, arg=_adapter_arg(args)) as sp:
-            result = await method(self, *args, **kwargs)
-            # The adapter RETURNS its failures (``AdapterResult`` with an error
-            # status) and callers often probe with them -- ``build_dt_cone_gear`` tries
-            # several axis candidates for one pattern. The status is an attribute,
-            # not an ERROR span: the caller's ``check`` raises inside its own span
-            # when a failure matters.
-            status = getattr(result, "status", None)
-            if status is not None and not getattr(result, "is_success", True):
-                with contextlib.suppress(Exception):
-                    sp.set_attributes(
-                        {
-                            "adapter.status": str(getattr(status, "value", status)),
-                            "error.message": str(result.error)[:_ERROR_MESSAGE_LIMIT],
-                        }
-                    )
-            return result
+            inserting = name == "insert_component"
+            scope = _ComponentInsertScope(id(self)) if inserting else None
+            token = _component_insert_scope.set(scope) if scope is not None else None
+            try:
+                if inserting:
+                    with contextlib.suppress(Exception):
+                        params = args[0] if args else kwargs.get("params")
+                        source = getattr(params, "file_path", None)
+                        if isinstance(source, str):
+                            sp.set_attribute(
+                                "source_file",
+                                Path(source.replace("\\", "/")).name[
+                                    :_ADAPTER_ARG_LIMIT
+                                ],
+                            )
+                        configuration = getattr(params, "configuration", None)
+                        if isinstance(configuration, str):
+                            sp.set_attribute(
+                                "requested_configuration",
+                                configuration[:_ADAPTER_ARG_LIMIT],
+                            )
+                result = await method(self, *args, **kwargs)
+                if inserting:
+                    with contextlib.suppress(Exception):
+                        data = getattr(result, "data", None)
+                        if isinstance(data, Mapping):
+                            configuration = data.get("configuration")
+                            if isinstance(configuration, str):
+                                sp.set_attribute(
+                                    "actual_configuration",
+                                    configuration[:_ADAPTER_ARG_LIMIT],
+                                )
+                            fixed = data.get("fixed")
+                            if isinstance(fixed, bool):
+                                sp.set_attribute(
+                                    "fixed_state", "fixed" if fixed else "floating"
+                                )
+                # Returned failures are probe outcomes, not ERROR spans; callers
+                # raise inside their own spans when a failure matters.
+                status = getattr(result, "status", None)
+                if status is not None and not getattr(result, "is_success", True):
+                    with contextlib.suppress(Exception):
+                        sp.set_attributes(
+                            {
+                                "adapter.status": str(getattr(status, "value", status)),
+                                "error.message": str(result.error)[
+                                    :_ERROR_MESSAGE_LIMIT
+                                ],
+                            }
+                        )
+                return result
+            finally:
+                if scope is not None:
+                    scope.state = _InsertScopeState.CLOSED
+                if token is not None:
+                    _component_insert_scope.reset(token)
 
     traced_call._harmonic_traced = True  # type: ignore[attr-defined]
     return traced_call
@@ -1745,6 +1863,8 @@ def _instrument_loaded_adapter() -> None:
     if callable(observe):
         with contextlib.suppress(Exception):
             observe(_record_tree_path)
+    with contextlib.suppress(Exception):
+        _instrument_component_insert_helpers()
 
 
 @contextlib.contextmanager
