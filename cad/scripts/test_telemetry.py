@@ -1235,7 +1235,9 @@ def test_instrumented_adapter_calls_are_spans_and_stay_transparent(capture):
 
 
 @pytest.mark.parametrize("outcome", ["success", "returned_error", "raised_error"])
-def test_assembly_instrumentation_preserves_parameters_and_outcomes(capture, outcome):
+def test_assembly_instrumentation_preserves_parameters_and_outcomes(
+    capture, monkeypatch, outcome
+):
     from solidworks_mcp.adapters.base import (
         AdapterResult,
         AdapterResultStatus,
@@ -1256,11 +1258,35 @@ def test_assembly_instrumentation_preserves_parameters_and_outcomes(capture, out
             if outcome == "returned_error"
             else AdapterResultStatus.SUCCESS
         ),
-        data={"name": "drive-train-1"},
+        data={"name": "drive-train-1", "configuration": "installed", "fixed": False},
         error="component unavailable" if outcome == "returned_error" else None,
     )
     failure = OSError("native component insertion failed")
     calls = []
+    loaded = object()
+    component = object()
+
+    def preload(adapter, path):
+        calls.append(("preload", adapter, path))
+        return loaded
+
+    def transform(adapter, comp, name, array):
+        calls.append(("transform", adapter, comp, name, array))
+        if outcome != "success":
+            raise failure
+        return array
+
+    def activate(adapter):
+        # Like the SDK's best-effort helper, a normal return proves only that
+        # the attempt ended, not that activation succeeded.
+        calls.append(("activate", adapter))
+
+    assembly = types.SimpleNamespace(
+        _preload_component_file=preload,
+        _apply_component_transform=transform,
+        _activate_assembly=activate,
+    )
+    monkeypatch.setitem(sys.modules, _telemetry._INSERT_COMPONENT_MODULE, assembly)
 
     class AssemblyAdapter:
         async def create_assembly(self, name=None):
@@ -1269,13 +1295,33 @@ def test_assembly_instrumentation_preserves_parameters_and_outcomes(capture, out
 
         async def insert_component(self, params):
             calls.append(("insert", params))
-            if outcome == "raised_error":
-                raise failure
+            assert assembly._preload_component_file(self, params.file_path) is loaded
+            try:
+                assert (
+                    assembly._apply_component_transform(
+                        self, component, "drive-train-1", params.position
+                    )
+                    is params.position
+                )
+            except OSError:
+                if outcome == "returned_error":
+                    return inserted
+                raise
+            assembly._activate_assembly(self)
             return inserted
 
     signature = inspect.signature(AssemblyAdapter.insert_component)
     assert _telemetry.instrument_adapter(AssemblyAdapter) == 2
     assert inspect.signature(AssemblyAdapter.insert_component) == signature
+    monkeypatch.setitem(
+        sys.modules,
+        _telemetry._ADAPTER_MODULE,
+        types.SimpleNamespace(PyWin32Adapter=AssemblyAdapter),
+    )
+    _telemetry._instrument_loaded_adapter()
+    wrapped_helpers = vars(assembly).copy()
+    _telemetry._instrument_loaded_adapter()
+    assert vars(assembly) == wrapped_helpers, "loaded helpers must not double-wrap"
     adapter = AssemblyAdapter()
 
     async def drive():
@@ -1291,28 +1337,459 @@ def test_assembly_instrumentation_preserves_parameters_and_outcomes(capture, out
     asyncio.run(drive())
     assert calls[0] == ("create", "Harmonic")
     assert calls[1][0] == "insert" and calls[1][1] is params
+    assert calls[2] == ("preload", adapter, params.file_path)
+    assert calls[3] == (
+        "transform",
+        adapter,
+        component,
+        "drive-train-1",
+        params.position,
+    )
+    assert len(calls) == (5 if outcome == "success" else 4)
+    # The same helpers outside insertion keep their behavior but add no spans.
+    assert assembly._preload_component_file(adapter, "outside") is loaded
+    assembly._activate_assembly(adapter)
     finished = {span.name: span for span in spans.get_finished_spans()}
-    assert set(finished) == {
+    expected = {
         "assembly.build",
         "adapter.create_assembly",
         "adapter.insert_component",
+        "adapter.insert_component.preload",
+        "adapter.insert_component.transform",
     }
+    if outcome == "success":
+        expected.add("adapter.insert_component.activate_attempt")
+    assert set(finished) == expected
     insertion = finished["adapter.insert_component"]
     assert insertion.parent.span_id == finished["assembly.build"].context.span_id
+    assert insertion.attributes["source_file"] == "drive-train.SLDASM"
+    assert insertion.attributes["requested_configuration"] == "drawing"
+    for name in expected - {
+        "assembly.build",
+        "adapter.create_assembly",
+        "adapter.insert_component",
+    }:
+        assert finished[name].parent.span_id == insertion.context.span_id
+    transform_span = finished["adapter.insert_component.transform"]
+    assert transform_span.status.status_code.name == (
+        "OK" if outcome == "success" else "ERROR"
+    )
     if outcome == "raised_error":
         assert insertion.status.status_code.name == "ERROR"
         assert insertion.attributes["error.type"] == "OSError"
         assert insertion.attributes["error.message"] == str(failure)
     else:
         assert insertion.status.status_code.name == "OK"
+        assert insertion.attributes["actual_configuration"] == "installed"
+        assert insertion.attributes["fixed_state"] == "floating"
         if outcome == "returned_error":
             assert insertion.attributes["adapter.status"] == "error"
             assert insertion.attributes["error.message"] == inserted.error
 
 
+@pytest.mark.parametrize("failure_type", [OSError, asyncio.CancelledError])
+def test_insert_component_helper_context_is_nested_and_task_local(
+    capture, monkeypatch, failure_type
+):
+    spans, _ = capture
+    calls = []
+    failure = failure_type("inner transform failed")
+
+    class BrokenMetadata(dict):
+        def get(self, key, default=None):
+            raise RuntimeError("result metadata unavailable")
+
+    result = types.SimpleNamespace(
+        status="success", is_success=True, data=BrokenMetadata()
+    )
+
+    def preload(adapter, path):
+        calls.append((adapter.label, "preload", path))
+        return path
+
+    def transform(adapter, component, name, array):
+        calls.append((adapter.label, "transform"))
+        raise failure
+
+    def activate(adapter):
+        calls.append((adapter.label, "activate"))
+
+    assembly = types.SimpleNamespace(
+        _preload_component_file=preload,
+        _apply_component_transform=transform,
+        _activate_assembly=activate,
+    )
+
+    class Adapter:
+        def __init__(self, label):
+            self.label = label
+
+        async def insert_component(self, params):
+            if self.label == "inner":
+                assembly._apply_component_transform(self, object(), "inner-1", [])
+            self.started.set()
+            await self.release.wait()
+            assert (
+                assembly._preload_component_file(self, "outer source") == "outer source"
+            )
+            # A different adapter's unrelated work must not inherit this scope.
+            assembly._preload_component_file(self.peer, "foreign adapter")
+            with pytest.raises(failure_type) as raised:
+                await self.peer.insert_component(
+                    types.SimpleNamespace(file_path="inner.SLDASM", configuration="")
+                )
+            assert raised.value is failure
+            # The inner failure must restore the outer insertion's context.
+            assembly._activate_assembly(self)
+            return result
+
+    monkeypatch.setitem(sys.modules, _telemetry._INSERT_COMPONENT_MODULE, assembly)
+    monkeypatch.setitem(
+        sys.modules,
+        _telemetry._ADAPTER_MODULE,
+        types.SimpleNamespace(PyWin32Adapter=Adapter),
+    )
+    _telemetry._instrument_loaded_adapter()
+
+    async def drive():
+        outer = Adapter("outer")
+        outer.peer = Adapter("inner")
+        outer.started = asyncio.Event()
+        outer.release = asyncio.Event()
+        with _telemetry.span("assembly.build"):
+            pending = asyncio.create_task(
+                outer.insert_component(
+                    types.SimpleNamespace(file_path="outer.SLDASM", configuration="")
+                )
+            )
+            await outer.started.wait()
+            # This task predates the insertion context, even while it is active.
+            assert assembly._preload_component_file(outer, "concurrent") == "concurrent"
+            outer.release.set()
+            assert await pending is result
+            assembly._activate_assembly(outer)
+            assembly._activate_assembly(outer.peer)
+
+    asyncio.run(drive())
+    finished = spans.get_finished_spans()
+    insertions = {
+        item.attributes["source_file"]: item
+        for item in finished
+        if item.name == "adapter.insert_component"
+    }
+    outer_span = insertions["outer.SLDASM"]
+    inner_span = insertions["inner.SLDASM"]
+    assert inner_span.parent.span_id == outer_span.context.span_id
+    assert outer_span.status.status_code.name == "OK"
+    assert inner_span.status.status_code.name == "ERROR"
+    children = {
+        item.name: item
+        for item in finished
+        if item.name.startswith("adapter.insert_component.")
+    }
+    assert set(children) == {
+        "adapter.insert_component.preload",
+        "adapter.insert_component.transform",
+        "adapter.insert_component.activate_attempt",
+    }
+    assert len(finished) == 6, (
+        "unrelated and post-insertion helpers must stay unspanned"
+    )
+    assert children["adapter.insert_component.preload"].parent.span_id == (
+        outer_span.context.span_id
+    )
+    assert children["adapter.insert_component.transform"].parent.span_id == (
+        inner_span.context.span_id
+    )
+    assert (
+        children["adapter.insert_component.transform"].status.status_code.name
+        == "ERROR"
+    )
+    assert children["adapter.insert_component.activate_attempt"].parent.span_id == (
+        outer_span.context.span_id
+    )
+    assert calls == [
+        ("outer", "preload", "concurrent"),
+        ("outer", "preload", "outer source"),
+        ("inner", "preload", "foreign adapter"),
+        ("inner", "transform"),
+        ("outer", "activate"),
+        ("outer", "activate"),
+        ("inner", "activate"),
+    ]
+
+
+def test_insert_component_descendant_scope_is_foreign_and_revoked(capture, monkeypatch):
+    spans, _ = capture
+    calls = []
+    result = types.SimpleNamespace(
+        status="success", is_success=True, data={"fixed": "unsupported"}
+    )
+
+    def preload(adapter, path):
+        calls.append(path)
+
+    def activate(adapter):
+        calls.append("descendant after return")
+
+    assembly = types.SimpleNamespace(
+        _preload_component_file=preload, _activate_assembly=activate
+    )
+    monkeypatch.setitem(sys.modules, _telemetry._INSERT_COMPONENT_MODULE, assembly)
+
+    class Adapter:
+        async def insert_component(self, params):
+            async def descendant():
+                # This task inherits the active scope but is not its owner.
+                assembly._preload_component_file(self, "descendant during insertion")
+                self.entered.set()
+                await self.after_return.wait()
+                assembly._activate_assembly(self)
+
+            self.child = asyncio.create_task(descendant())
+            await self.entered.wait()
+            await asyncio.to_thread(
+                assembly._preload_component_file, self, "foreign thread"
+            )
+            assembly._preload_component_file(self, "owner during insertion")
+            return result
+
+    monkeypatch.setitem(
+        sys.modules,
+        _telemetry._ADAPTER_MODULE,
+        types.SimpleNamespace(PyWin32Adapter=Adapter),
+    )
+    _telemetry._instrument_loaded_adapter()
+
+    async def drive():
+        adapter = Adapter()
+        adapter.entered = asyncio.Event()
+        adapter.after_return = asyncio.Event()
+        assert (
+            await adapter.insert_component(
+                types.SimpleNamespace(file_path="component.SLDASM", configuration="")
+            )
+            is result
+        )
+        adapter.after_return.set()
+        await adapter.child
+
+    asyncio.run(drive())
+    finished = spans.get_finished_spans()
+    assert {item.name for item in finished} == {
+        "adapter.insert_component",
+        "adapter.insert_component.preload",
+    }
+    assert len(finished) == 2
+    preload_span, insertion = finished
+    assert preload_span.parent.span_id == insertion.context.span_id
+    assert insertion.start_time <= preload_span.start_time
+    assert preload_span.end_time <= insertion.end_time
+    assert "fixed_state" not in insertion.attributes
+    assert calls == [
+        "descendant during insertion",
+        "foreign thread",
+        "owner during insertion",
+        "descendant after return",
+    ]
+
+
+@pytest.mark.parametrize("outcome", ["success", "preload_error", "transform_error"])
+def test_real_sdk_insertion_helper_spans_preserve_native_boundary_results(
+    capture, monkeypatch, tmp_path, outcome
+):
+    from solidworks_mcp.adapters.base import (
+        InsertComponentParameters,
+        SolidWorksAdapter,
+    )
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+    from solidworks_mcp.adapters.solidworks import assembly
+
+    spans, _ = capture
+    events = []
+    source = tmp_path / ("source-" + "x" * 120 + ".SLDASM")
+    source.write_bytes(b"offline COM-boundary fixture")
+    requested = "requested-" + "r" * 150
+    actual = "resolved-" + "a" * 150
+    params = InsertComponentParameters(
+        file_path=str(source),
+        position=[12.5, -30.0, 4.0],
+        rotation=[0.0, 0.0, 90.0],
+        configuration=requested,
+    )
+
+    class Component:
+        Name2 = "source-1"
+        ReferencedConfiguration = actual
+        IsFixed = True
+
+        def SetTransformAndSolve3(self, transform, update_box):
+            events.append(("solve3", update_box))
+            if outcome == "transform_error":
+                return False
+            values = list(transform.ArrayData)
+            # A native solver's observed outcome need not equal the target.
+            values[9] += 0.001
+            self.Transform2 = types.SimpleNamespace(ArrayData=values)
+            return True
+
+        def SetTransformAndSolve2(self, transform):
+            events.append(("solve2",))
+            return False
+
+    component = Component()
+
+    class Model:
+        @property
+        def Extension(self):
+            return self
+
+        def SelectByID2(self, *args):
+            events.append(("select", args[0]))
+            return True
+
+        def AddComponent5(self, *args):
+            events.append(("insert", args))
+            return component
+
+        def UnfixComponent(self):
+            events.append(("float",))
+            component.IsFixed = False
+
+        def FixComponent(self):
+            events.append(("fix",))
+            component.IsFixed = True
+
+        def EditRebuild3(self):
+            events.append(("rebuild",))
+            return True
+
+        def GetTitle(self):
+            return "assembly.SLDASM"
+
+    model = Model()
+
+    class App:
+        def DocumentVisible(self, visible, doc_type):
+            events.append(("visible", visible, doc_type))
+
+        def OpenDoc6(self, *args):
+            events.append(("open", args))
+            return (None if outcome == "preload_error" else model, 0, 0)
+
+        def GetOpenDocumentByName(self, path):
+            events.append(("lookup", path))
+            return None
+
+        def GetMathUtility(self):
+            return self
+
+        def CreateTransform(self, values):
+            return types.SimpleNamespace(ArrayData=list(values))
+
+        def ActivateDoc3(self, *args):
+            events.append(("activate", args))
+            raise OSError("best-effort activation failed")
+
+    class OfflineAdapter(PyWin32Adapter):
+        # Use the real mixin entry and COM-operation/error/metrics machinery,
+        # without constructing a live COM session.
+        insert_component = assembly.SolidWorksAssemblyMixin.insert_component
+
+        def __init__(self):
+            SolidWorksAdapter.__init__(self)
+            self.currentModel = model
+            self.swApp = App()
+
+    # Only binding/marshalling and COM objects are doubled; the insertion,
+    # preload, transform, activation and readback implementations stay real.
+    monkeypatch.setattr(assembly, "_flag_feature_methods", lambda obj, *args: obj)
+    monkeypatch.setattr(assembly, "double_array", tuple)
+    monkeypatch.setattr(assembly, "null_callout", lambda: None)
+    for name in (
+        "_preload_component_file",
+        "_apply_component_transform",
+        "_activate_assembly",
+    ):
+        # Restore the module's original functions when the test ends.
+        monkeypatch.setattr(assembly, name, getattr(assembly, name))
+    monkeypatch.setitem(
+        sys.modules,
+        _telemetry._ADAPTER_MODULE,
+        types.SimpleNamespace(PyWin32Adapter=OfflineAdapter),
+    )
+    _telemetry._instrument_loaded_adapter()
+    adapter = OfflineAdapter()
+    result = asyncio.run(adapter.insert_component(params=params))
+    finished = spans.get_finished_spans()
+    insertion = next(
+        item for item in finished if item.name == "adapter.insert_component"
+    )
+    children = [
+        item for item in finished if item.name.startswith("adapter.insert_component.")
+    ]
+    phases = ["preload"]
+    if outcome != "preload_error":
+        phases.append("transform")
+    if outcome == "success":
+        phases.append("activate_attempt")
+    assert [item.name for item in children] == [
+        f"adapter.insert_component.{phase}" for phase in phases
+    ]
+    for child in children:
+        assert child.parent.span_id == insertion.context.span_id
+        assert insertion.start_time <= child.start_time <= child.end_time
+        assert child.end_time <= insertion.end_time
+    assert all(
+        first.end_time <= second.start_time
+        for first, second in zip(children, children[1:])
+    )
+    assert insertion.attributes["source_file"] == source.name[:120]
+    assert insertion.attributes["requested_configuration"] == requested[:120]
+    assert ("visible", False, 2) in events and ("visible", True, 2) in events
+    assert adapter.get_metrics()["operations_count"] == 1
+    assert insertion.status.status_code.name == "OK"
+    if outcome == "success":
+        assert result.is_success
+        assert result.data["name"] == component.Name2
+        assert result.data["file_path"] == str(source.resolve())
+        assert result.data["configuration"] == actual
+        assert result.data["position"] == pytest.approx([13.5, -30.0, 4.0])
+        assert result.data["rotation"] == params.rotation
+        assert result.data["fixed"] is True
+        assert component.Transform2.ArrayData[:9] == pytest.approx(
+            [0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+        )
+        assert insertion.attributes["actual_configuration"] == actual[:120]
+        assert insertion.attributes["fixed_state"] == "fixed"
+        assert all(child.status.status_code.name == "OK" for child in children)
+        assert ("float",) in events and ("fix",) in events and ("rebuild",) in events
+        assert any(event[0] == "activate" for event in events)
+    else:
+        assert not result.is_success
+        assert insertion.attributes["adapter.status"] == "error"
+        assert insertion.attributes["error.message"] == result.error
+        assert children[-1].status.status_code.name == "ERROR"
+        assert "actual_configuration" not in insertion.attributes
+        assert "fixed_state" not in insertion.attributes
+        assert adapter.get_metrics()["errors_count"] == 1
+        if outcome == "preload_error":
+            assert not any(event[0] == "insert" for event in events)
+        else:
+            assert ("solve2",) in events and component.IsFixed is True
+            assert not any(event[0] == "rebuild" for event in events)
+        assert not any(event[0] == "activate" for event in events)
+
+
 @pytest.mark.parametrize(
     "outcome",
-    ["success", "topology_exception", "topology_issues", "band_exception", "not_rebuilt"],
+    [
+        "success",
+        "topology_exception",
+        "topology_issues",
+        "band_exception",
+        "not_rebuilt",
+    ],
 )
 def test_saved_cone_topology_spans_preserve_audit_and_restore(
     capture, monkeypatch, outcome
@@ -1329,7 +1806,9 @@ def test_saved_cone_topology_spans_preserve_audit_and_restore(
         calls.append(("activate", configuration))
         return types.SimpleNamespace(
             is_success=True,
-            data={"rebuilt": not (outcome == "not_rebuilt" and configuration == "T012")},
+            data={
+                "rebuilt": not (outcome == "not_rebuilt" and configuration == "T012")
+            },
             error=None,
         )
 
@@ -1364,7 +1843,9 @@ def test_saved_cone_topology_spans_preserve_audit_and_restore(
         else:
             with pytest.raises(RuntimeError) as raised:
                 asyncio.run(
-                    readback.assert_saved_configuration_topology(adapter, phase="reopened")
+                    readback.assert_saved_configuration_topology(
+                        adapter, phase="reopened"
+                    )
                 )
             cause = {
                 "topology_exception": "native topology unreadable",
@@ -1562,9 +2043,26 @@ def test_build_session_instruments_only_an_already_loaded_adapter(capture, monke
     that never did must not be made to import the COM stack."""
     monkeypatch.delenv("TRACEPARENT", raising=False)
     monkeypatch.delitem(sys.modules, _telemetry._ADAPTER_MODULE, raising=False)
-    with _telemetry.build_session("offline"):
-        pass
+    monkeypatch.delitem(sys.modules, _telemetry._INSERT_COMPONENT_MODULE, raising=False)
+    monkeypatch.delitem(sys.modules, _telemetry._FEATURES_MODULE, raising=False)
+    original_import = builtins.__import__
+    attempted_sdk_imports = []
+
+    def reject_sdk_import(name, *args, **kwargs):
+        if name.startswith("solidworks_mcp"):
+            attempted_sdk_imports.append(name)
+            raise AssertionError(f"offline telemetry imported {name}")
+        return original_import(name, *args, **kwargs)
+
+    with monkeypatch.context() as offline:
+        offline.setattr(builtins, "__import__", reject_sdk_import)
+        with _telemetry.build_session("offline"):
+            pass
+    assert attempted_sdk_imports == [], (
+        "suppression must not hide an SDK import attempt"
+    )
     assert _telemetry._ADAPTER_MODULE not in sys.modules
+    assert _telemetry._INSERT_COMPONENT_MODULE not in sys.modules
 
     cls = _fake_adapter_class()
     monkeypatch.setitem(
