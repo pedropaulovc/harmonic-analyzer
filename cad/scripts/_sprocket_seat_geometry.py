@@ -64,8 +64,8 @@ BAND_FRONT_Z = SEAT_FACE_Z - PLATE  # -157.1, wheel front face
 CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 
 # Two purchased 3/32 dowels pressed into each shaft's seat face, rounded end
-# proud by DRIVE_PIN_PROUD: 1/4 long in the crank (MHA-VN-044), 3/16 in the
-# knob shaft (MHA-VN-038).  Each pin spec asserts the interface's diameter.
+# proud by DRIVE_PIN_PROUD: 1/4 long in the crank (MHA-DT-VN-67), 3/16 in the
+# knob shaft (MHA-PD-VN-54).  Each pin spec asserts the interface's diameter.
 DRIVE_PIN_DIA = 3.0 / 32.0 * _MM_PER_IN  # 2.38125
 DRIVE_PIN_PROUD = 2.4
 DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7

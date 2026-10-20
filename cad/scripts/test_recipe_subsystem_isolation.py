@@ -110,11 +110,13 @@ def test_support_bar_isolation(part_closures, contract: Contract) -> None:
     "contract",
     [
         Contract(
-            selectors=("build_dt_crank*",),
+            selectors=("build_dt_crank*", "build_dt_vn_crank*"),
             anchors=(
                 "build_dt_crank_hub",
                 "build_dt_crank_pinion",
                 "build_dt_crankshaft",
+                "build_dt_vn_crank_hub_pin",
+                "build_dt_vn_crank_seat_drive_pin",
             ),
             forbidden=("pd_transgear_*_spec", "paper_drive_*"),
         ),
