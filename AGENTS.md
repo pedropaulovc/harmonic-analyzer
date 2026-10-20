@@ -1603,6 +1603,15 @@ scripts that `from _check import log, check` are instrumented unchanged.
   `error.message` attribute, not an ERROR span (callers probe with failures). The
   wrapper lives in recipe-inert `_telemetry`, so extending the list re-keys no
   leaf; the vendored submodule would re-key them all.
+  Component insertion also exposes `adapter.insert_component.preload`,
+  `.transform` and `.activate_attempt` through already-loaded SDK helpers.
+  The scope belongs to its adapter, task and thread and is revoked on exit;
+  unrelated transform/kinematics calls do not acquire insertion spans.
+  Existing parameters/results supply bounded source basenames, requested/actual
+  configurations and `fixed_state`. These are coarse helper envelopes, not
+  isolated `AddComponent5`, solve or rebuild timings. A normally returned
+  activation attempt does not prove activation succeeded: the SDK deliberately
+  swallows that best-effort operation's failures.
 - **A log record names its caller, and a failed span names its cause.** App
   Insights maps a dark gap to code through the `code.function.name` /
   `code.file.path` of the record that ends it; `_telemetry`'s helpers pass a
