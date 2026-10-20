@@ -33,9 +33,10 @@ from mg_wheel_bar_geom import WHEEL_BAR_Y
 
 # Native saved-view contract, captured before rebasing standard Front to -Z.
 # These preserve the fitter package's physical projections, not sheet wording.
+# The ISO prefix opts the named isometric into shared pictorial display checks.
 DRAWING_BACK_VIEW = "MG BACK"
 DRAWING_LEFT_VIEW = "MG LEFT"
-DRAWING_ISOMETRIC_VIEW = "MG BACK-TOP-LEFT"
+DRAWING_ISOMETRIC_VIEW = "ISO MG BACK-TOP-LEFT"
 DRAWING_STANDARD_VIEWS = {
     DRAWING_BACK_VIEW: 1,  # swStandardViews_e.swFrontView: viewer at +Z
     DRAWING_LEFT_VIEW: 4,  # swStandardViews_e.swRightView: viewer at +X

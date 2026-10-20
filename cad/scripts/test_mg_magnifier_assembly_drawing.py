@@ -19,6 +19,7 @@ import mg_magnifier_explode_spec as explode
 import mg_wheel_axle_spacer_spec
 import mg_wheel_axle_spec
 import mg_wheel_group
+from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
@@ -43,6 +44,20 @@ def test_magnifier_keeps_registry_outputs_and_precomputed_placement() -> None:
     assert drawing.FRONT_CENTER == (0.070, 0.150)
     assert drawing.RIGHT_CENTER == (0.168, 0.150)
     assert drawing.ISO_CENTER == (0.225, 0.140)
+
+
+@pytest.mark.parametrize(
+    "orientation, pictorial",
+    [
+        (stack.DRAWING_ISOMETRIC_VIEW, True),
+        (stack.DRAWING_BACK_VIEW, False),
+        (stack.DRAWING_LEFT_VIEW, False),
+    ],
+)
+def test_magnifier_named_views_receive_the_correct_display_rules(
+    orientation, pictorial
+) -> None:
+    assert is_pictorial_orientation(orientation) is pictorial
 
 
 @pytest.mark.parametrize("detail", [drawing.PRESSED, drawing.ENDSHAKE])
