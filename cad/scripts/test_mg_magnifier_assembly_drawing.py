@@ -1086,6 +1086,11 @@ def magnifier_bom(monkeypatch):
                     ReferencedConfiguration=(
                         "LeverWire Simplified" if is_wire else "Default Simplified"
                     ),
+                    GetModelDoc2=lambda row_key=row_key: SimpleNamespace(
+                        GetCustomInfoValue=lambda _member, _property: (
+                            drawing.BOM_PART_NUMBERS[row_key]
+                        )
+                    ),
                 )
                 for _ in range(notes.QUANTITIES[stem])
             )
@@ -1098,9 +1103,151 @@ def magnifier_bom(monkeypatch):
     )
     return SimpleNamespace(
         table=table,
+        cells=cells,
         expected_items=expected_items,
         wire=native_members[native_order.index("sh-vn-music-wire")][0],
     )
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("native-column", "unique trailing native column"),
+        ("number-column", "Number column type/property changed"),
+        ("number-property", "Number property binding did not persist"),
+        ("visible-prefix", "visible columns are not a contiguous prefix"),
+        ("displayed-number", "does not match native component Numbers"),
+        ("member", "native BOM membership/quantities changed"),
+        ("quantity", "native occurrence count"),
+    ),
+)
+def test_finalization_rereads_retained_bom_after_reference_hiding(
+    monkeypatch, tmp_path, magnifier_bom, fault, message
+) -> None:
+    from unittest.mock import AsyncMock
+
+    import _com
+    from _test_stubbed_build import stub_seat
+
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    table = magnifier_bom.table
+    for row in magnifier_bom.cells:
+        row.insert(3, "VENDOR SKU" if row is magnifier_bom.cells[0] else "-")
+    table.ColumnCount = 5
+    table.TotalColumnCount = 6
+    column_types = [
+        (202, "", 0),
+        (204, "Number", 0),
+        (204, "", 0),
+        (204, "", 0),
+        (203, "", 0),
+        (201, "", 0),
+    ]
+    hidden = [False] * 5 + [True]
+    table.GetColumnType3 = lambda column, include_hidden: column_types[column]
+    table.ColumnHidden = lambda column: hidden[column]
+    table.number_property = "Number"
+    table.GetColumnCustomProperty = lambda column: table.number_property
+    native_reads = []
+    get_components = table.GetComponents2
+
+    def components(row, configuration):
+        native_reads.append((row, configuration))
+        return get_components(row, configuration)
+
+    table.GetComponents2 = components
+    source = tmp_path / "magnifier.SLDASM"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    seat = stub_seat(
+        monkeypatch,
+        drawing,
+        keep=(
+            "build", "validate_bom_number_property",
+            "component_identity", "component_reference_names",
+        ),
+    )
+    seat._early_bound.side_effect = lambda value, _interface: value
+    seat.read_required_properties.return_value = {"Number": notes.DRAWING_NUMBER}
+    seat._place_assembled_sheet.return_value = ()
+    reference = SimpleNamespace(ReferencedConfiguration="Default Simplified")
+    seat._place_collapsed_view.return_value = reference
+    seat._fit_ring.return_value = drawing.SHEET_SCALE
+    seat._view_outline.return_value = drawing.LEVER_FIELD
+    seat.insert_bom_table.return_value = table
+    seat._validate_bom.return_value = magnifier_bom.expected_items
+    seat.add_component_bom_balloons.side_effect = (
+        lambda *_args, items, **_kwargs: [
+            SimpleNamespace(stem=stem) for stem, _item in items
+        ]
+    )
+    monkeypatch.setattr(
+        drawing, "_bom_items", lambda _table: magnifier_bom.expected_items
+    )
+    monkeypatch.setattr(drawing, "lever_caption_xy", lambda *_args: (0.0, 0.0))
+    # Page geometry is independent of the real settled native-column proof.
+    monkeypatch.setattr(
+        drawing, "_assert_bom_clears_reference_field", lambda _table: None
+    )
+    seat.finalize_drawing.return_value = {"drawing": "offline.SLDDRW"}
+    identity = (
+        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+    )
+    source_components = []
+    for stem in notes.BOM_ORDER:
+        for index in range(notes.QUANTITIES[stem]):
+            source_components.append(SimpleNamespace(
+                Name2=f"{stem}-{index + 1}",
+                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
+                ReferencedConfiguration=(
+                    "LeverWire" if stem == notes.WIRE else "Default"
+                ),
+                ComponentReference="LeverWire:1" if stem == notes.WIRE else "",
+                GetTotalTransform=lambda _presentation: SimpleNamespace(
+                    ArrayData=identity
+                ),
+            ))
+    source_model = SimpleNamespace(
+        ConfigurationManager=SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Default")
+        ),
+        GetExplodedViewNames2=lambda configuration: (
+            drawing.EXPLODED_VIEW_NAMES[configuration],
+        ),
+        GetComponents=lambda _top_level: tuple(source_components),
+    )
+    adapter = SimpleNamespace(
+        open_model=AsyncMock(), currentModel=source_model
+    )
+    assert asyncio.run(drawing.build(adapter)) == {"drawing": "offline.SLDDRW"}
+    checks = seat.finalize_drawing.call_args.kwargs["settled_checks"]
+    expected_reads = [
+        (row, reference.ReferencedConfiguration) for row in range(1, table.RowCount)
+    ]
+    assert native_reads == expected_reads
+    native_reads.clear()
+    for check in checks:
+        check()
+    assert native_reads == expected_reads
+
+    if fault == "native-column":
+        column_types[-1] = (204, "", 0)
+    elif fault == "number-column":
+        column_types[1] = (201, "", 0)
+    elif fault == "number-property":
+        table.number_property = "Description"
+    elif fault == "visible-prefix":
+        hidden[3] = True
+    elif fault == "displayed-number":
+        magnifier_bom.cells[1][1] = "UNLINKED"
+    elif fault == "quantity":
+        magnifier_bom.cells[1][4] = str(int(magnifier_bom.cells[1][4]) + 1)
+    else:
+        magnifier_bom.wire.ReferencedConfiguration = "PenWire Simplified"
+    with pytest.raises(RuntimeError, match=message):
+        for check in checks:
+            check()
 
 
 @pytest.mark.parametrize("wire_member", ("LeverWire", "LeverWire Simplified"))

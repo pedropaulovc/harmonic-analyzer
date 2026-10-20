@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _com
 import _config
 import _drawing_balloons
 import _component_references
@@ -651,6 +652,7 @@ def test_steps_cite_every_screw_by_item_number() -> None:
 
 @pytest.fixture
 def native_bom_bindings(monkeypatch):
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
         _component_references, "_early_bound", lambda value, _interface: value
@@ -672,6 +674,11 @@ def _native_component(family, index=0, *, simplified=True):
         ComponentReference=f"{member}:{index + 1}" if member else "",
         ReferencedConfiguration=configuration,
         GetPathName=lambda: f"C:/native/{physical}.SLDPRT",
+        GetModelDoc2=lambda: SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property: drawing.BOM_PART_NUMBERS[
+                family
+            ]
+        ),
         GetTotalTransform=lambda _include_explode: SimpleNamespace(
             ArrayData=(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
         ),
@@ -750,6 +757,14 @@ class _Table:
             for family in native_order
         ]
         self.association_configurations = []
+        self.TotalColumnCount = 5
+        self.column_types = [
+            (202, "", 0),
+            (204, "Number", 0),
+            (204, "", 0),
+            (203, "", 0),
+            (201, "", 0),
+        ]
 
     @property
     def RowCount(self):
@@ -761,6 +776,16 @@ class _Table:
 
     def DisplayedText(self, row, column):
         return self.cells[row][column]
+
+    def GetColumnType3(self, column, include_hidden):
+        assert include_hidden is True
+        return self.column_types[column]
+
+    def ColumnHidden(self, column):
+        return column == self.ColumnCount
+
+    def GetColumnCustomProperty(self, column):
+        return "Number" if column == 1 else ""
 
     def SetText2(self, *_args):
         raise AssertionError("Number cells must stay natively property-linked")
@@ -794,6 +819,87 @@ _ADAPTER = SimpleNamespace(
         EditRebuild3=lambda: True, GraphicsRedraw2=lambda: None
     )
 )
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("native-column", "unique trailing native column"),
+        ("number-column", "Number column type/property changed"),
+        ("number-property", "Number property binding did not persist"),
+        ("visible-prefix", "visible columns are not a contiguous prefix"),
+        ("displayed-number", "does not match native component Numbers"),
+        ("member", "native BOM membership/quantities changed"),
+        ("quantity", "native occurrence count"),
+    ),
+)
+def test_package_settled_checks_reread_native_bom_without_mutating_layout(
+    monkeypatch, native_bom_bindings, fault, message
+) -> None:
+    from _test_stubbed_build import stub_seat
+
+    table = _Table(spec.BOM_ORDER)
+    column_types = table.column_types
+    hidden = [False] * 4 + [True]
+    table.ColumnHidden = lambda column: hidden[column]
+    table.number_property = "Number"
+    table.GetColumnCustomProperty = lambda column: table.number_property
+    seat = stub_seat(
+        monkeypatch,
+        drawing,
+        keep=("_place_package", "validate_bom_number_property"),
+    )
+    reference = SimpleNamespace(ReferencedConfiguration="Default Simplified")
+    seat._place_reference_view.return_value = reference
+    seat.insert_bom_table.return_value = table
+    seat._validate_bom.return_value = tuple(
+        (stem, str(item)) for item, stem in enumerate(spec.BOM_ORDER, 1)
+    )
+    seat._place_assembled_sheet.return_value = lambda: None
+    seat._place_kit_bom_note.return_value = lambda: None
+    seat._place_cluster_view.side_effect = lambda _adapter, cluster: (
+        object(),
+        drawing.SHEET_SCALES[cluster.sheet],
+    )
+    seat._balloon_cluster.side_effect = (
+        lambda _adapter, _view, cluster, _items, _bom_name: [
+            SimpleNamespace(stem=stem) for stem in cluster.stems
+        ]
+    )
+    monkeypatch.setattr(drawing, "_bom_feature_name", lambda _table: "offline BOM")
+    _scales, checks = drawing._place_package(object())
+    expected_configurations = [reference.ReferencedConfiguration] * len(spec.BOM_ORDER)
+    assert table.association_configurations == expected_configurations
+    table.association_configurations.clear()
+    for check in checks:
+        check()
+    assert table.association_configurations == expected_configurations
+
+    if fault == "native-column":
+        column_types[-1] = (204, "", 0)
+    elif fault == "number-column":
+        column_types[1] = (201, "", 0)
+    elif fault == "number-property":
+        table.number_property = "Description"
+    elif fault == "visible-prefix":
+        hidden[2] = True
+    elif fault == "displayed-number":
+        table.cells[1][1] = "UNLINKED"
+    elif fault == "quantity":
+        table.cells[1][3] = str(int(table.cells[1][3]) + 1)
+    else:
+        stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD])
+        t_nut_member = spec.COMPONENT_IDENTITIES[spec.T_NUT][1]
+        table.native_members[stud_row - 1][
+            0
+        ].ReferencedConfiguration = f"{t_nut_member} Simplified"
+    with pytest.raises(RuntimeError, match=message):
+        for check in checks:
+            check()
+    seat.insert_bom_table.assert_called_once()
+    seat._validate_bom.assert_called_once()
+    seat.assert_balloon_landings.assert_called_once()
+    assert table.widths == {} and table.heights == {}
 
 
 def test_bom_prints_registry_numbers_one_line_a_row(
@@ -861,6 +967,39 @@ def test_bom_rechecks_number_after_rebuild(native_bom_bindings) -> None:
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
     with pytest.raises(RuntimeError, match="part number for"):
         drawing._validate_bom(adapter, table)
+
+
+@pytest.mark.parametrize("fault", ("quantity", "native-count", "same-number-member"))
+def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
+    native_bom_bindings, fault
+) -> None:
+    table = _Table(spec.BOM_ORDER)
+    stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD])
+    rebuilds = []
+
+    def rebuild():
+        rebuilds.append(True)
+        if fault == "quantity":
+            table.cells[stud_row][3] = str(int(table.cells[stud_row][3]) - 1)
+        elif fault == "native-count":
+            table.native_members[stud_row - 1] = table.native_members[stud_row - 1][:-1]
+        else:
+            table.native_members[stud_row - 1][
+                0
+            ].ReferencedConfiguration = (
+                f"{spec.COMPONENT_IDENTITIES[spec.T_NUT][1]} Simplified"
+            )
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    message = (
+        "native occurrence count"
+        if fault != "same-number-member"
+        else "merged distinct members"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._validate_bom(adapter, table)
+    assert rebuilds == [True]
 
 
 @pytest.mark.parametrize("fault", ("wrong-member", "merged-members", "missing-member"))

@@ -61,7 +61,11 @@ from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import bom_row_identities, insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -1178,6 +1182,13 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             raise RuntimeError(f"pen BOM {key} column width did not persist")
     for row in range(rows):
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    before_rebuild = validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="pen",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("pen BOM rebuild failed")
     settled = _bom_cells(table)
@@ -1188,6 +1199,16 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
                 raise RuntimeError(
                     f"pen BOM {key} for {stem!r} reads {applied!r}, expected {text!r}"
                 )
+    if validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="pen",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    ) != before_rebuild:
+        raise RuntimeError(
+            "pen native BOM membership/quantities changed during rebuild"
+        )
     return tuple((stem, actual[stem][1]) for stem in BOM_COMPONENTS)
 
 
@@ -1265,7 +1286,8 @@ def _make_explode_readable(
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    row; returns the check that proves every balloon after the last rebuild."""
+    row; returns the check that proves the BOM and balloons after the last rebuild.
+    """
     label = "pen exploded"
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
@@ -1295,6 +1317,13 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="pen",
     )
     items = _validate_bom(adapter, table)
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="pen",
+        expected_rows=1 + len(BOM_COMPONENTS),
+        occurrence_quantities=True,
+    )
     restore = _make_explode_readable(exploded, configuration, label=label)
     try:
         landings = add_component_bom_balloons(
@@ -1321,7 +1350,22 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     for name, trail in notes.EXPLODE_TRAILS.items():
         _add_explode_trail(adapter, exploded, trail, label=f"pen {name} explode trail")
     _place_exploded_caption(adapter, table, scale)
-    return lambda: assert_balloon_landings(adapter, landings)
+
+    def settled() -> None:
+        retained = validate_bom_number_property(
+            table,
+            configuration=configuration,
+            label="pen",
+            expected_rows=1 + len(BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        if retained != bom_snapshot:
+            raise RuntimeError(
+                "pen native BOM membership/quantities changed after placement"
+            )
+        assert_balloon_landings(adapter, landings)
+
+    return settled
 
 
 # --- sheet 3 ----------------------------------------------------------------------

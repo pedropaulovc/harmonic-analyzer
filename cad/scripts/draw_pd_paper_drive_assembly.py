@@ -84,6 +84,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
+    BomSnapshot,
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
@@ -1868,6 +1869,7 @@ def _validate_bom(
         configuration=configuration,
         label="paper-drive",
         expected_rows=len(BOM_PART_NUMBERS) + 1,
+        occurrence_quantities=True,
     )
     return tuple((stem, actual[stem][1]) for stem in BOM_PART_NUMBERS)
 
@@ -1923,11 +1925,18 @@ def bom_split_row(row_heights: Sequence[float], header_count: int) -> int:
 
 
 def _assert_bom_pieces(
-    pieces: Sequence[Any], *, header_count: int, total_rows: int
+    pieces: Sequence[Any], *, header_count: int, total_rows: int,
+    configuration: str | None = None,
+    expected_snapshot: BomSnapshot | None = None,
 ) -> None:
     """Read split ranges and physical extents; every logical data row survives."""
     membership: Counter[int] = Counter()
     findings = []
+    if expected_snapshot is not None and (
+        configuration is None
+        or tuple(row[0] for row in expected_snapshot) != tuple(range(header_count, total_rows))
+    ):
+        raise RuntimeError("paper-drive BOM validated snapshot has invalid row coverage")
     for index, raw in enumerate(pieces):
         piece = _early_bound(raw, "ITableAnnotation")
         info = tuple(piece.GetSplitInformation(0, 0, 0, 0))
@@ -1936,7 +1945,22 @@ def _assert_bom_pieces(
         direction, _index, count, start, end = (int(value) for value in info)
         if direction != 1 or not (0 <= start <= end < total_rows):
             raise RuntimeError(f"paper-drive BOM split range invalid: {info!r}")
-        membership.update(range(max(start, header_count), end + 1))
+        data_rows = tuple(range(max(start, header_count), end + 1))
+        membership.update(data_rows)
+        if configuration is not None:
+            current = validate_bom_number_property(
+                piece,
+                configuration=configuration,
+                label=f"paper-drive split BOM piece {index + 1}",
+                row_indices=data_rows,
+                occurrence_quantities=True,
+            )
+            if expected_snapshot is not None and current != tuple(
+                row for row in expected_snapshot if row[0] in data_rows
+            ):
+                raise RuntimeError(
+                    "paper-drive split BOM native membership or quantities changed"
+                )
         rows = sorted({*range(header_count), *range(start, end + 1)})
         height = sum(float(piece.GetRowHeight(row)) for row in rows)
         width = sum(
@@ -1969,7 +1993,10 @@ def _assert_bom_pieces(
         raise RuntimeError("paper-drive BOM split: " + "; ".join(findings))
 
 
-def _split_bom(adapter: Any, table: Any) -> tuple[Any, Any]:
+def _split_bom(
+    adapter: Any, table: Any, *, configuration: str | None = None,
+    expected_snapshot: BomSnapshot | None = None,
+) -> tuple[Any, Any]:
     """Keep one native logical parts list, displayed as two complete pieces."""
     table = _early_bound(table, "ITableAnnotation")
     header_count = int(table.GetHeaderCount())
@@ -1985,7 +2012,11 @@ def _split_bom(adapter: Any, table: Any) -> tuple[Any, Any]:
         raise RuntimeError("paper-drive BOM second piece refused its position")
     rebuild_drawing(adapter, label="paper-drive BOM split")
     pieces = (table, second)
-    _assert_bom_pieces(pieces, header_count=header_count, total_rows=total_rows)
+    _assert_bom_pieces(
+        pieces, header_count=header_count, total_rows=total_rows,
+        configuration=configuration,
+        expected_snapshot=expected_snapshot,
+    )
     return pieces
 
 
@@ -2228,10 +2259,10 @@ def _balloon_collar_on_its_rear_rim(
 
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
-) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any]]:
+) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
     """BOM of the whole drive; the transgear isometric and the inner view
     between them balloon every transgear family once. Returns landings,
-    the logical table, its (stem: item) numbers and the two native pieces."""
+    the logical table, its (stem: item) numbers, pieces and validated snapshot."""
     _activate_sheet(adapter, SHEET_NAMES[5])
     reference = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_CENTER,
@@ -2297,8 +2328,18 @@ def _place_bom_sheet(
         raise RuntimeError(
             "paper-drive BOM items moved when the transgear views were isolated"
         )
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=bom_configuration,
+        label="paper-drive pre-split BOM",
+        expected_rows=len(BOM_PART_NUMBERS) + 1,
+        occurrence_quantities=True,
+    )
     _activate_sheet(adapter, SHEET_NAMES[5])
-    pieces = _split_bom(adapter, table)
+    pieces = _split_bom(
+        adapter, table, configuration=bom_configuration,
+        expected_snapshot=bom_snapshot,
+    )
     _activate_sheet(adapter, SHEET_NAMES[1])
     # Both rings fit before any balloon exists. The isometric is centred in
     # the field's height, then the inner view is fitted beside it. Every
@@ -2371,7 +2412,7 @@ def _place_bom_sheet(
         ),
         label="inner-parts caption",
     )
-    return landings, table, items, pieces
+    return landings, table, items, pieces, bom_snapshot
 
 
 def _pivot_sheet_points(
@@ -2821,7 +2862,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _validate_persisted_explode(adapter.currentModel)
     _create_sheets(adapter)
     iso = _place_assembled_sheet(adapter)
-    landings, table, items, pieces = _place_bom_sheet(adapter, counts)
+    landings, table, items, pieces, bom_snapshot = _place_bom_sheet(adapter, counts)
     _place_pivot_view(adapter, items)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
@@ -2842,6 +2883,8 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda: _assert_bom_pieces(
                 pieces, header_count=int(table.GetHeaderCount()),
                 total_rows=len(BOM_PART_NUMBERS) + 1,
+                configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+                expected_snapshot=bom_snapshot,
             ),
         ),
     )

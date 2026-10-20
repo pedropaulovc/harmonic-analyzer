@@ -154,6 +154,228 @@ def test_bom_covers_every_family_in_builder_order_with_registry_identity() -> No
 
 
 @pytest.mark.parametrize(
+    ("fault", "message"),
+    (
+        ("native-column", "unique trailing native column"),
+        ("number-column", "Number column type/property changed"),
+        ("number-property", "Number property binding did not persist"),
+        ("visible-prefix", "visible columns are not a contiguous prefix"),
+        ("displayed-number", "does not match native component Numbers"),
+        ("member", "native BOM membership/quantities changed"),
+        ("quantity", "native occurrence count"),
+    ),
+)
+def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_skus(
+    monkeypatch, fault, message
+) -> None:
+    import _com
+    import _component_references
+    import _drawing_tables
+    from _test_stubbed_build import stub_seat
+
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _component_references, "_early_bound", lambda value, _interface: value
+    )
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+    configuration = "Default Simplified"
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "VENDOR SKU", "QTY."]]
+    members = []
+    for item, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+        number = drawing.BOM_PART_NUMBERS[stem]
+        physical, member = drawing.BOM_COMPONENT_IDENTITIES[stem]
+        cells.append(
+            [
+                str(item),
+                number,
+                drawing.BOM_DESCRIPTIONS[stem],
+                "-",
+                str(drawing.BOM_QUANTITIES[stem]),
+            ]
+        )
+        document = SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property, number=number: number
+        )
+        members.append(
+            SimpleNamespace(
+                Name2=f"{stem}-1",
+                GetPathName=lambda physical=physical: f"C:/native/{physical}.SLDPRT",
+                ReferencedConfiguration=f"{member or 'Default'} Simplified",
+                GetModelDoc2=lambda document=document: document,
+            )
+        )
+    # SKU insertion shifted the retained native key from column 4 to column 5.
+    column_types = [
+        (202, "", 0),
+        (204, "Number", 0),
+        (204, "", 0),
+        (204, "", 0),
+        (203, "", 0),
+        (201, "", 0),
+    ]
+    hidden = [False] * 5 + [True]
+    native_reads = []
+
+    def components(row, owner):
+        native_reads.append((row, owner))
+        return (members[row - 1],) * drawing.BOM_QUANTITIES[
+            drawing.BOM_COMPONENTS[row - 1]
+        ]
+
+    table = SimpleNamespace(
+        RowCount=len(cells),
+        ColumnCount=5,
+        TotalColumnCount=6,
+        DisplayedText=lambda row, column: cells[row][column],
+        GetColumnType3=lambda column, include_hidden: column_types[column],
+        ColumnHidden=lambda column: hidden[column],
+        number_property="Number",
+        GetColumnCustomProperty=lambda column: table.number_property,
+        GetComponents2=components,
+    )
+    seat = stub_seat(
+        monkeypatch,
+        drawing,
+        keep=("_place_exploded_sheet", "validate_bom_number_property"),
+    )
+    seat.apply_view_configuration.return_value = configuration
+    seat._fit_exploded.return_value = drawing.SHEET_SCALE
+    seat.insert_bom_table.return_value = table
+    seat._validate_bom.return_value = tuple(
+        (stem, str(item)) for item, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+    )
+    seat._make_explode_readable.return_value = lambda: None
+    seat.add_component_bom_balloons.return_value = (
+        (object(),) * sum(drawing.BOM_QUANTITIES.values())
+    )
+    settled = drawing._place_exploded_sheet(object())
+    expected_reads = [(row, configuration) for row in range(1, len(cells))]
+    assert native_reads == expected_reads
+    native_reads.clear()
+    settled()
+    assert native_reads == expected_reads
+
+    # These changes model drift during the final rebuild, after BOM placement.
+    if fault == "native-column":
+        column_types[-1] = (204, "", 0)
+    elif fault == "number-column":
+        column_types[1] = (201, "", 0)
+    elif fault == "number-property":
+        table.number_property = "Description"
+    elif fault == "visible-prefix":
+        hidden[3] = True
+    elif fault == "displayed-number":
+        cells[1][1] = "UNLINKED"
+    elif fault == "quantity":
+        cells[1][4] = str(int(cells[1][4]) + 1)
+    else:
+        members[0].ReferencedConfiguration = "OtherMember Simplified"
+    with pytest.raises(RuntimeError, match=message):
+        settled()
+    seat.insert_bom_table.assert_called_once()
+    seat._validate_bom.assert_called_once()
+    seat.assert_balloon_landings.assert_called_once()
+
+
+@pytest.mark.parametrize("fault", ("quantity", "same-number-member"))
+def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
+    monkeypatch, fault
+) -> None:
+    import _com
+    import _component_references
+    import _drawing_tables
+
+    for module in (_com, _component_references, drawing):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info,
+        "early_bound_or_flag",
+        lambda value, *_interfaces: value,
+    )
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+    native_rows = []
+    for item, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+        number = drawing.BOM_PART_NUMBERS[stem]
+        physical, member = drawing.BOM_COMPONENT_IDENTITIES[stem]
+        quantity = drawing.BOM_QUANTITIES[stem]
+        cells.append(
+            [str(item), number, drawing.BOM_DESCRIPTIONS[stem], str(quantity)]
+        )
+        document = SimpleNamespace(
+            GetCustomInfoValue=lambda _member, _property, number=number: number
+        )
+        native_rows.append(
+            tuple(
+                SimpleNamespace(
+                    Name2=f"{stem}-{index + 1}",
+                    ReferencedConfiguration=f"{member or 'Default'} Simplified",
+                    GetPathName=lambda physical=physical: (
+                        f"C:/native/{physical}.SLDPRT"
+                    ),
+                    GetModelDoc2=lambda document=document: document,
+                )
+                for index in range(quantity)
+            )
+        )
+    column_types = [
+        (202, "", 0), (204, "Number", 0), (204, "", 0),
+        (203, "", 0), (201, "", 0),
+    ]
+
+    def insert_column(_where, after, title, _width):
+        for row, contents in enumerate(cells):
+            contents.insert(after + 1, title if row == 0 else "")
+        column_types.insert(after + 1, (204, "", 0))
+        table.ColumnCount += 1
+        table.TotalColumnCount += 1
+        return True
+
+    table = SimpleNamespace(
+        RowCount=len(cells),
+        ColumnCount=4,
+        TotalColumnCount=5,
+        DisplayedText=lambda row, column: cells[row][column],
+        GetComponents2=lambda row, _owner: native_rows[row - 1],
+        GetColumnType3=lambda column, include_hidden: column_types[column],
+        ColumnHidden=lambda column: column == table.ColumnCount,
+        GetColumnCustomProperty=lambda column: "Number" if column == 1 else "",
+        InsertColumn2=insert_column,
+        SetColumnTitle2=lambda column, title, _hidden: cells[0][column] == title,
+        IsCellTextEditable=lambda _row, column: column == 3,
+        SetText2=lambda row, column, _hidden, text: cells[row].__setitem__(column, text),
+        SetColumnWidth=lambda _column, width, _options: width,
+        SetRowHeight=lambda _row, height, _options: height,
+    )
+    rebuilds = []
+
+    def rebuild():
+        rebuilds.append(True)
+        if fault == "quantity":
+            cells[1][4] = str(int(cells[1][4]) + 1)
+        else:
+            wire_row = drawing.BOM_COMPONENTS.index(drawing.BOM_ROW_KEYS[spec.WIRE])
+            native_rows[wire_row][0].ReferencedConfiguration = "LeverWire Simplified"
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "native occurrence count"
+            if fault == "quantity"
+            else "native BOM membership/quantities changed during rebuild"
+        ),
+    ):
+        drawing._validate_bom(adapter, table)
+    assert rebuilds == [True]
+    assert cells[0].count(drawing.BOM_SKU_TITLE) == 1
+
+
+@pytest.mark.parametrize(
     "heights",
     (
         (0.006,) * 14,

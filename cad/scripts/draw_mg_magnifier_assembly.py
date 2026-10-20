@@ -85,7 +85,11 @@ from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
-from _drawing_tables import bom_row_identities, insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -1342,6 +1346,13 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
             raise RuntimeError(f"magnifier BOM {key} column width did not persist")
     for row in range(rows):
         table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    before_rebuild = validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="magnifier",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("magnifier BOM rebuild failed")
     settled = _bom_cells(table)
@@ -1353,6 +1364,16 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
                     f"magnifier BOM {key} for {stem!r} reads {applied!r}, "
                     f"expected {text!r}"
                 )
+    if validate_bom_number_property(
+        table,
+        configuration=SIMPLIFIED_VIEW_CONFIGURATION,
+        label="magnifier",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    ) != before_rebuild:
+        raise RuntimeError(
+            "magnifier native BOM membership/quantities changed during rebuild"
+        )
     return {stem: values[1] for stem, values in actual.items()}
 
 
@@ -1869,6 +1890,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     _activate_sheet(adapter, SHEET_NAMES[1])
     source_step("BOM sheet activation")
+    bom_configuration = str(reference.ReferencedConfiguration)
     table = insert_bom_table(
         adapter,
         reference,
@@ -1883,6 +1905,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     source_step("BOM insertion")
     items = _validate_bom(adapter, table)
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=bom_configuration,
+        label="magnifier",
+        expected_rows=1 + len(BOM_COMPONENTS),
+        occurrence_quantities=True,
+    )
     _assert_bom_clears_reference_field(table)
     source_step("BOM validation and layout")
     for view, label in (
@@ -1963,6 +1992,20 @@ async def build(adapter: Any) -> dict[str, str]:
     source_step("BOM sheet activation before reference hide")
     _hide_bom_reference(adapter, reference, table, items)
     source_step("hide BOM reference")
+
+    def bom_settled() -> None:
+        retained = validate_bom_number_property(
+            table,
+            configuration=bom_configuration,
+            label="magnifier",
+            expected_rows=1 + len(BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        if retained != bom_snapshot:
+            raise RuntimeError(
+                "magnifier native BOM membership/quantities changed after placement"
+            )
+
     _assert_source_identity(source_model, source_sha256, phase="before drawing SaveAs")
     try:
         artifacts = await finalize_drawing(
@@ -1983,6 +2026,7 @@ async def build(adapter: Any) -> dict[str, str]:
             },
             settled_checks=(
                 *settled_checks,
+                bom_settled,
                 lambda: assert_balloon_landings(adapter, landings),
                 lambda: _assert_instruction_clearance(adapter, sequence_note, checks_note),
                 lambda: _assert_source_identity(

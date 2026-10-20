@@ -484,32 +484,97 @@ def test_semantic_balloon_anchor_refuses_hidden_duplicate_or_missing_occurrence(
 
 
 class _NumberTable:
-    def __init__(self, components, *, displayed=NUMBER):
-        self.cells = [["ITEM NO.", "PART NUMBER", "QTY."], ["1", displayed, "1"]]
+    """Physical columns, including the native column hidden from the drawing."""
+
+    def __init__(self, components):
+        self.cells = [["ITEM NO.", "PART NUMBER", "QTY."], ["1", "native-key", "1"]]
         self.components = tuple(components)
-        self.ColumnCount = 3
+        self.columns = [
+            {"kind": 202, "property": None, "hidden": False},
+            {"kind": 201, "property": False, "hidden": False},
+            {"kind": 203, "property": None, "hidden": False},
+        ]
         self.RowCount = 2
+        self.TotalRowCount = 2
         self.type_status = 0
-        self.accept_property = True
         self.property_readback = "Number"
         self.accept_title = True
-        self.column_property = ""
+        self.accept_move = True
+        self.accept_insert = True
+        self.accept_hide = True
+        self.number_display_override = None
+
+    @property
+    def ColumnCount(self):
+        return sum(not column["hidden"] for column in self.columns)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.columns)
 
     def DisplayedText(self, row, column):
         return self.cells[row][column]
 
-    def SetColumnType3(self, column, kind, all_configurations, property_name):
-        return self.type_status
+    def MoveColumn(self, source, where, destination):
+        if not self.accept_move:
+            return False
+        target = destination + (where == 3) - (source < destination)
+        self.columns.insert(target, self.columns.pop(source))
+        for row in self.cells:
+            row.insert(target, row.pop(source))
+        return True
 
-    def SetColumnCustomProperty(self, column, property_name):
-        self.column_property = property_name
-        return self.accept_property
+    def InsertColumn2(self, where, index, title, _width):
+        if not self.accept_insert:
+            return False
+        target = index + (where == 3)
+        self.columns.insert(target, {"kind": 0, "property": None, "hidden": False})
+        for row_index, row in enumerate(self.cells):
+            row.insert(target, title if row_index == 0 else "")
+        return True
+
+    def SetColumnHidden(self, index, hidden):
+        if self.accept_hide:
+            self.columns[index]["hidden"] = hidden
+        # Generated indexed property setter returns VT_VOID, not success.
+
+    def ColumnHidden(self, index):
+        return self.columns[index]["hidden"]
+
+    def GetColumnType3(self, index, include_hidden):
+        column = self.columns[index]
+        return column["kind"], column["property"], 0
+
+    def SetColumnType3(self, column, kind, include_hidden, property_name):
+        if self.type_status:
+            return self.type_status
+        self.columns[column].update(kind=kind, property=property_name)
+        self.cells[0][column] = property_name
+        number = ""
+        if self.components:
+            component = self.components[0]
+            native = component.GetModelDoc2()
+            if native is not None:
+                number = (
+                    native.GetCustomInfoValue(
+                        component.ReferencedConfiguration, property_name
+                    )
+                    or native.GetCustomInfoValue("", property_name)
+                    or ""
+                ).strip()
+        self.cells[1][column] = (
+            number
+            if self.number_display_override is None
+            else self.number_display_override
+        )
+        return 0
 
     def GetColumnCustomProperty(self, column):
-        return self.property_readback
+        return self.property_readback if self.columns[column]["kind"] == 204 else ""
 
     def SetColumnTitle2(self, column, title, include_hidden):
-        self.cells[0][column] = title
+        if self.accept_title:
+            self.cells[0][column] = title
         return self.accept_title
 
     def GetComponents2(self, row, configuration):
@@ -549,8 +614,11 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         configuration="Default Simplified",
         label="wire",
     )
-    assert table.column_property == "Number"
+    assert table.GetColumnCustomProperty(1) == "Number"
     assert table.cells[0][1] == "PART NUMBER"
+    assert table.ColumnCount == 3 and table.TotalColumnCount == 4
+    assert table.GetColumnType3(3, True)[0] == 201
+    assert table.ColumnHidden(3) is True
 
     # Changing the actual selected member makes the displayed Number stale,
     # regardless of the view configuration or document-level property.
@@ -576,23 +644,28 @@ def test_number_column_uses_document_property_only_when_actual_member_has_none(
             ("", "Number"): NUMBER,
         },
     )
+    table = _NumberTable([component])
     tables._bind_bom_number_property(
         adapter,
-        _NumberTable([component]),
+        table,
         configuration="Default Simplified",
         label="wire",
     )
-    assert component.property_reads == [
-        ("LeverWire Simplified", "Number"),
-        ("", "Number"),
-    ]
+    assert table.DisplayedText(1, 1) == NUMBER
+    assert all(
+        member in ("LeverWire Simplified", "")
+        for member, property_name in component.property_reads
+        if property_name == "Number"
+    )
 
 
 @pytest.mark.parametrize(
     "fault, message",
     [
         ("column-type", "column type failed"),
-        ("property-write", "rejected the Number property"),
+        ("move", "native column could not be moved"),
+        ("insert", "Number column could not be inserted"),
+        ("hide", "native column is not hidden"),
         ("property-readback", "binding did not persist"),
         ("title", "header could not be restored"),
         ("header", "no PART NUMBER column"),
@@ -605,8 +678,12 @@ def test_number_column_binding_refuses_native_metadata_failures(
     table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
     if fault == "column-type":
         table.type_status = 1
-    elif fault == "property-write":
-        table.accept_property = False
+    elif fault == "move":
+        table.accept_move = False
+    elif fault == "insert":
+        table.accept_insert = False
+    elif fault == "hide":
+        table.accept_hide = False
     elif fault == "property-readback":
         table.property_readback = "Description"
     elif fault == "title":
@@ -640,9 +717,9 @@ def test_number_column_refuses_blank_wrong_or_merged_native_numbers(
     if fault == "blank-property":
         table.components = (_component(properties={("LeverWire", "Number"): "  "}),)
     elif fault == "blank-display":
-        table.cells[1][1] = ""
+        table.number_display_override = ""
     elif fault == "wrong-display":
-        table.cells[1][1] = "MHA-SH-VN-57"
+        table.number_display_override = "MHA-SH-VN-57"
     elif fault == "merged-numbers":
         table.components += (
             _component(properties={("LeverWire", "Number"): "MHA-SH-VN-57"}),

@@ -70,7 +70,11 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_reference_dimension
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_tables import bom_row_identities, insert_bom_table
+from _drawing_tables import (
+    bom_row_identities,
+    insert_bom_table,
+    validate_bom_number_property,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_MAX_SCALE,
@@ -909,6 +913,13 @@ def _validate_bom(
             raise RuntimeError(f"jig BOM {key} column width did not persist")
     for row_index in range(rows):
         table.SetRowHeight(row_index, BOM_ROW_HEIGHT, 0)
+    before_rebuild = validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="jig",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    )
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("jig BOM rebuild failed")
     settled = _bom_cells(table)
@@ -922,6 +933,16 @@ def _validate_bom(
         applied = settled[row_index][at["part"]]
         if applied != BOM_PART_NUMBERS[stem]:
             raise RuntimeError(f"jig BOM part number for {stem!r} reads {applied!r}")
+    if validate_bom_number_property(
+        table,
+        configuration=configuration,
+        label="jig",
+        expected_rows=rows,
+        occurrence_quantities=True,
+    ) != before_rebuild:
+        raise RuntimeError(
+            "jig native BOM membership/quantities changed during rebuild"
+        )
     _assert_bom_on_paper(table)
     return tuple((stem, BOM_ITEM_NUMBERS[stem]) for stem in BOM_COMPONENTS)
 
@@ -1999,7 +2020,7 @@ def _place_package(
     adapter: Any,
 ) -> tuple[dict[str, tuple[float, float]], tuple[Callable[[], None], ...]]:
     """Every sheet; returns the sheets' fitted scales and the checks that
-    prove every balloon and the CL tip reference again after the last rebuild.
+    prove the BOM, every balloon and the CL tip reference after the last rebuild.
 
     Every view is configured, then exploded or collapsed, before the BOM is
     inserted; after it only BOM links and balloons
@@ -2026,8 +2047,14 @@ def _place_package(
         part_number_property="Number",
         label="jig",
     )
-    items = _validate_bom(
-        adapter, table, configuration=str(reference.ReferencedConfiguration)
+    bom_configuration = str(reference.ReferencedConfiguration)
+    items = _validate_bom(adapter, table, configuration=bom_configuration)
+    bom_snapshot = validate_bom_number_property(
+        table,
+        configuration=bom_configuration,
+        label="jig",
+        expected_rows=1 + len(BOM_COMPONENTS),
+        occurrence_quantities=True,
     )
     kit_note_settled = _place_kit_bom_note(adapter, table, reference)
     bom_name = _bom_feature_name(table)
@@ -2050,7 +2077,22 @@ def _place_package(
     scales = package_sheet_scales(
         {cluster.sheet: scale for cluster, _view, scale in placed}
     )
+
+    def bom_settled() -> None:
+        retained = validate_bom_number_property(
+            table,
+            configuration=bom_configuration,
+            label="jig",
+            expected_rows=1 + len(BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        if retained != bom_snapshot:
+            raise RuntimeError(
+                "jig native BOM membership/quantities changed after placement"
+            )
+
     return scales, (
+        bom_settled,
         lambda: assert_balloon_landings(adapter, landings),
         cl_tip_settled,
         kit_note_settled,

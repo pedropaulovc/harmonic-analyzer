@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _com
 import _component_references
 import _drawing_tables
 import draw_mg_magnifier_assembly as magnifier
@@ -79,6 +80,7 @@ def _source(drawing, member, *, reference=None):
 
 def _unwrapped_com(monkeypatch, drawing):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
         _component_references, "_early_bound", lambda value, _interface: value
     )
@@ -229,7 +231,16 @@ def test_source_census_requires_the_wire_presentation_to_be_collapsed(
 
 class _Bom:
     def __init__(self, drawing, member):
-        self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+        self.cells = [
+            ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY.", "NATIVE PART NUMBER"]
+        ]
+        self.columns = [
+            (202, None, False),
+            (204, "Number", False),
+            (204, "Description", False),
+            (203, None, False),
+            (201, False, True),
+        ]
         self.components = {}
         self.writes = []
         for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
@@ -241,6 +252,17 @@ class _Bom:
                 _component(stem, configuration, native_index=101 + index)
                 for index in range(drawing.BOM_QUANTITIES[logical])
             )
+            properties = {
+                (configuration, "Number"): drawing.BOM_PART_NUMBERS[logical],
+                ("", "Number"): drawing.BOM_PART_NUMBERS[logical],
+            }
+            native = SimpleNamespace(
+                GetCustomInfoValue=lambda selected, name, properties=properties: (
+                    properties.get((selected, name), "")
+                )
+            )
+            for component in self.components[item]:
+                component.GetModelDoc2 = lambda native=native: native
             self.cells.append(
                 [
                     str(item),
@@ -254,6 +276,7 @@ class _Bom:
                         else drawing.BOM_DESCRIPTIONS[logical]
                     ),
                     str(drawing.BOM_QUANTITIES[logical]),
+                    logical,
                 ]
             )
 
@@ -263,7 +286,21 @@ class _Bom:
 
     @property
     def ColumnCount(self):
-        return len(self.cells[0])
+        return sum(not hidden for _kind, _property, hidden in self.columns)
+
+    @property
+    def TotalColumnCount(self):
+        return len(self.columns)
+
+    def GetColumnType3(self, index, include_hidden):
+        kind, property_data, _hidden = self.columns[index]
+        return kind, property_data, 0
+
+    def ColumnHidden(self, index):
+        return self.columns[index][2]
+
+    def GetColumnCustomProperty(self, index):
+        return self.columns[index][1]
 
     def DisplayedText(self, row, column):
         return self.cells[row][column]
@@ -279,9 +316,13 @@ class _Bom:
         self.writes.append((row, column, text))
         self.cells[row][column] = text
 
-    def InsertColumn2(self, _position, column, title, _width):
-        for index, row in enumerate(self.cells):
-            row.insert(column + 1, title if index == 0 else "")
+    def InsertColumn2(self, position, column, title, _width):
+        if position not in (2, 3):
+            raise ValueError("this fixture supports native Before/After insertion")
+        index = column + (position == 3)
+        self.columns.insert(index, (0, None, False))
+        for row_index, row in enumerate(self.cells):
+            row.insert(index, title if row_index == 0 else "")
         return True
 
     def SetColumnTitle2(self, column, title, _include_hidden):
@@ -376,6 +417,47 @@ def test_bom_rejects_an_unexpected_native_wire_description(
     with pytest.raises(RuntimeError, match="BOM description mismatch"):
         drawing._validate_bom(adapter, table)
     assert not table.writes
+
+
+@pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+@pytest.mark.parametrize("damage", ("quantity", "same-number-member", "multiplicity"))
+def test_bom_does_not_accept_rebuild_damage_as_its_settled_baseline(
+    monkeypatch, drawing, member, _assembly, damage
+):
+    _unwrapped_com(monkeypatch, drawing)
+    table = _Bom(drawing, member + " Simplified")
+    wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
+    original_number = table.cells[wire_row][1]
+
+    def rebuild_with_damage():
+        if damage == "quantity":
+            quantity_column = table.cells[0].index("QTY.")
+            table.cells[wire_row][quantity_column] = "2"
+        elif damage == "same-number-member":
+            component = table.components[wire_row][0]
+            other = "PenWire" if member == "LeverWire" else "LeverWire"
+            component.ReferencedConfiguration = other + " Simplified"
+        else:
+            component = table.components[wire_row][0]
+            duplicate = _component(
+                "sh-vn-music-wire", member + " Simplified", native_index=981
+            )
+            duplicate.GetModelDoc2 = component.GetModelDoc2
+            table.components[wire_row] += (duplicate,)
+        return True
+
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=rebuild_with_damage)
+    )
+    message = (
+        "membership.*quantities.*changed"
+        if damage == "same-number-member"
+        else "native occurrence count.*printed quantity"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._validate_bom(adapter, table)
+    assert table.cells[wire_row][1] == original_number
+    assert all(column != 1 for _row, column, _text in table.writes)
 
 
 def test_wire_application_instructions_stay_with_the_assembly_consumers():
