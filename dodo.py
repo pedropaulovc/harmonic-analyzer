@@ -1375,6 +1375,11 @@ VERIFY_PY = (SCRIPTS_DIR / "verify.py").resolve()
 # Verify/preflight gate logic that is NOT on any assembly's build closure (so it
 # does not ride a .SLDASM digest) -> a direct file_dep of verify:/preflight tasks.
 POSTBUILD_PY = (SCRIPTS_DIR / "_assembly_postbuild.py").resolve()
+# The static verify.py closure applies to every gate, despite the PD-only hook.
+VERIFY_PROBE_DEPS = (
+    str((SCRIPTS_DIR / "_verify_pd_digest_probe.py").resolve()),
+    str((SCRIPTS_DIR / "_com.py").resolve()),
+)
 # Interference-acceptance contract read by verify.py's soundness gate. Like
 # POSTBUILD_PY it decides gate OUTCOMES, so a change to it must re-run soundness
 # even when no geometry moved; the part-geometry it imports already rides each
@@ -2001,13 +2006,19 @@ def _soundness_file_deps(stem: str) -> list[str]:
     deps = [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
+        *VERIFY_PROBE_DEPS,
         str(INTERFERENCE_CONTRACTS_PY),
         assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
     ]
     if stem == "pd_paper_drive":
-        deps.append(_dof_json(stem))
+        sldasm = Path(_sldasm(stem))
+        deps += [
+            _dof_json(stem),
+            str(sldasm.with_name(f".{sldasm.stem}.massprops.sha")),
+            str(_input_ledger(stem)),
+        ]
     if stem == "ch_rocker_arm_tl_oblique_jig":
         # The pass sweep replays the recorded slide from the DOF manifest and
         # walks the sweep sidecar's poses.
@@ -2043,6 +2054,7 @@ def _kinematics_file_deps() -> list[str]:
     return [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
+        *VERIFY_PROBE_DEPS,
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
         _sldasm("mg_magnifier"),
@@ -2066,6 +2078,7 @@ def _preflight_file_deps() -> list[str]:
         str(VERIFY_PY),
         str((SCRIPTS_DIR / "_assembly.py").resolve()),
         str(POSTBUILD_PY),
+        *VERIFY_PROBE_DEPS,
         _sldasm("dt_drive_train"),
         _assembly_execution_token("dt_drive_train"),
         _sldasm("ch_channel"),
@@ -3092,10 +3105,13 @@ def task_verify_soundness():
         deps = _soundness_file_deps(stem)
         stamp = str(REPORTS / f"verify-soundness-{name}.ok")
         cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
+        outputs = [Path(stamp)]
+        if stem == "pd_paper_drive":
+            outputs.append(REPORTS / "pd-paper-drive-digest-probe.json")
         yield {
             "name": stem,
             "file_dep": deps,
-            "targets": [stamp],
+            "targets": [str(path) for path in outputs],
             "uptodate": [not _cache.forced_refresh(f"verify_soundness:{stem}")],
             "actions": [
                 (
@@ -3104,7 +3120,7 @@ def task_verify_soundness():
                         f"verify_soundness:{stem}",
                         cmd,
                         deps,
-                        [Path(stamp)],
+                        outputs,
                         f"verify-soundness-{name}",
                         stamp,
                     ],
@@ -3140,6 +3156,7 @@ def task_verify():
         "file_dep": [
             str(VERIFY_PY),
             str(POSTBUILD_PY),
+            *VERIFY_PROBE_DEPS,
             *child_stamps,
         ],
         "targets": [soundness_stamp],
