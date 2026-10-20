@@ -744,14 +744,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.725,
             ),
-            # U34c: MHA-DT-VN-62 #8-32 x 3/4 through the 5.0 pedestal ledge.
+            # The unchanged pedestal screw inserts14.05, but only13.0 of
+            # retained skin overlaps; its tip protrudes into the pocket.
             **_expected_numbered_pairs(
                 "dt-drive-train-1/dt-vn-pedestal-hold-down-screw",
                 range(1, 3),
                 "fr-frame-1/fr-harmonic-base",
                 4.1656,
                 3.454,
-                14.05,
+                13.0,
             ),
             **_expected_numbered_pairs(
                 "ch-channel-1/ch-vn-frame-side-screw",

@@ -31,6 +31,8 @@ from _mcmaster_91829a560 import (
     THREAD_LEN,
     THREAD_MAJOR,
     UNDERHEAD_LEN,
+    TIP_CHAMFER,
+    UC_SPAN as FULL_THREAD_START,
 )
 
 SOURCE = "https://www.mcmaster.com/91829A560/ (live product page, 2026-10-08)"
@@ -71,6 +73,8 @@ __all__ = [
     "THREAD_TAIL_LEN",
     "THREAD_TAP_DRILL_DIA",
     "UNDERHEAD_LEN",
+    "TIP_CHAMFER",
+    "FULL_THREAD_START",
 ]
 
 THREAD = "#10-24"

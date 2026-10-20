@@ -70,9 +70,13 @@ cannot ask for what the authors were told to leave out.
   case. A stated fit-up adjustment is the escape hatch when the stack cannot
   be held otherwise — never the design default.
 - **Thread engagement (rule 18)** is owned by the CAD: the build's seat-fit
-  and stack asserts (for example `require_blind_seat_fit`) enforce it. Today
-  they check only ≥ 1D; raising them to 1.5D at the worst case is follow-up
-  work. The 1.5D engagement minimum and the rule-17 wall targets (2.0 mm
+  and stack asserts enforce it. Through-tapped receivers use actual retained
+  material and external full-form overlap, not blind drilling depths or raw
+  screw insertion (for example `require_through_seat_fit` in the harmonic
+  base's pure fastener contract). Receiver capacity does not by itself prove
+  a purchased screw's installed engagement; existing inspected minima and
+  owner-declared shortfalls remain explicit. The 1.5D engagement minimum and
+  the rule-17 wall targets (2.0 mm
   target, 1.5 mm floor) exist to be forgiving to a first-time hobby machinist:
   they are design margins for the shop class the guidelines describe, not
   capability limits.

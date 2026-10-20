@@ -37,3 +37,6 @@ THREAD_SIZE = "1/4-20"
 THREAD_CLASS = "2A"
 THREAD_PITCH = PITCH_MM
 BEARING_OFFSET = WASHER_DEPTH_MM
+# Harvested vendor-model tip, not an unprovided supplier tolerance.
+# diagnostics/diag_mcmaster_hex_screw.py reproduces Chamfer1 = 0.75 pitch.
+TIP_CHAMFER = 0.75 * THREAD_PITCH

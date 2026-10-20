@@ -183,7 +183,7 @@ def test_support_has_no_unapproved_gdt_contract() -> None:
     assert not hasattr(placement, "GEOMETRIC_TOLERANCES_MM")
 
 
-def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
+def test_stock_hold_down_clears_support_and_engages_finite_through_base_tap() -> None:
     import fr_harmonic_base_fasteners as base
 
     assert stock_screw.SPEC.skus == ("92240A540",)
@@ -200,17 +200,17 @@ def test_stock_hold_down_clears_support_and_engages_blind_base_tap() -> None:
         screw.SHANK_LEN - support.FOOT_THICKNESS - screw.BEARING_OFFSET
     )
     assert base.HOLD_DOWN_ENGAGEMENT / screw.SHANK_DIA >= 1.5
-    # Sized at the printed .XX band's worst case (base.seat_thread_depth).
-    assert base.HOLD_DOWN_THREAD_DEPTH == pytest.approx(
-        base.seat_thread_depth(base.HOLD_DOWN_ENGAGEMENT)
-    )
-    assert (
-        base.HOLD_DOWN_THREAD_DEPTH - base.SEAT_DEPTH_BAND - base.HOLD_DOWN_ENGAGEMENT
-        >= base.HOLD_DOWN_TIP_CLEARANCE
-    )
-    assert base.HOLD_DOWN_DRILL_DEPTH - base.SEAT_DEPTH_BAND >= (
-        base.HOLD_DOWN_THREAD_DEPTH + base.SEAT_DEPTH_BAND + 5.0 * screw.THREAD_PITCH
-    )
+    assert base.HOLD_DOWN_SEAT_SPEC.end == "through_all"
+    assert len(frame.LAG_BASE_THREAD_FITS) == len(frame.LAG_SCREW_XZ) == 4
+    for xz, fit in zip(frame.LAG_SCREW_XZ, frame.LAG_BASE_THREAD_FITS, strict=True):
+        material = base.through_seat_material(base.HOLD_DOWN_SEAT_SPEC, xz)
+        assert fit.full_thread_engagement_min_mm == pytest.approx(10.10)
+        assert fit.full_thread_engagement_min_mm >= 1.5 * screw.SHANK_DIA
+        assert fit.protrusion_max_mm == pytest.approx(
+            base.HOLD_DOWN_ENGAGEMENT - frame._LAG_FOOT_LOW - material.exit_depth_min_mm,
+        )
+        assert fit.protrusion_max_mm > 0.0
+        assert fit.clearance_min_mm > 0.0
     assert frame.LAG_SCREW_TIP_Y == pytest.approx(
         frame.BASE_TOP_Y - base.HOLD_DOWN_ENGAGEMENT
     )

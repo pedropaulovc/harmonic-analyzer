@@ -1684,19 +1684,37 @@ def test_spring_leaf_clears_the_lift_rod_envelope(monkeypatch) -> None:
         _drive_with(monkeypatch, leaf, "FORMED_BAND_MM", reach)
 
 
-def test_foot_screw_bottoming_gate_reads_the_thinnest_strip(monkeypatch) -> None:
-    # Main (#859 restricted review, change 4): the bottoming gate booked the
-    # nominal strip.  A seat sized for the nominal strip passes that booking,
-    # but the thinnest strip the stock band allows runs the screw past its
-    # 0.25 tip reserve, and the gate must see it.
-    import build_fr_harmonic_base as base
+def test_foot_screw_through_fit_books_both_strip_limits_and_preserves_floor_clearance(monkeypatch) -> None:
+    from dataclasses import replace
+    import fr_harmonic_base_fasteners as fasteners
 
-    assert drive._SPR_T_LO < drive.SPRING_T
-    seat = drive.FSCREW_SHANK_LEN - drive.SPRING_T + 0.25 + 0.005
-    assert seat - (drive.FSCREW_SHANK_LEN - drive.SPRING_T) >= 0.25
-    assert seat - (drive.FSCREW_SHANK_LEN - drive._SPR_T_LO) < 0.25
-    with pytest.raises(AssertionError, match="bottoms out in the base spring seat"):
-        _drive_with(monkeypatch, base, "FOOT_SCREW_HOLE_DEPTH", seat)
+    assert drive._SPR_T_LO < drive.SPRING_T < drive._SPR_T_HI
+    assert len(drive.FOOT_SCREW_BASE_FITS) == len(drive.BASE_FOOT_XZ) == 1
+    fit = drive.FOOT_SCREW_BASE_FITS[0]
+    material = fasteners.through_seat_material(drive.BASE_FOOT_SEAT_SPEC, drive.BASE_FOOT_XZ[0])
+    external_end = drive.FSCREW_SHANK_LEN - drive.FSCREW_LENGTH_SHORT_ALLOWANCE - drive._SPR_T_HI - drive.FSCREW_TIP_INCOMPLETE
+    external_start = max(0.0, drive.FSCREW_FULL_THREAD_START_MAX - drive._SPR_T_LO)
+    assert fit.full_thread_engagement_min_mm == pytest.approx(
+        min(material.guaranteed_segments_mm[0][1], external_end)
+        - max(material.guaranteed_segments_mm[0][0], external_start),
+    )
+    assert fit.clearance_min_mm == pytest.approx(
+        material.deck_height_min_mm - (drive.FSCREW_SHANK_LEN - drive._SPR_T_LO),
+    )
+    assert fit.clearance_min_mm > 0.0
+    # A floor between the nominal and thinnest-strip tip depths must fail.
+    # This is a guard input mutation, not a changed production receiver.
+    nominal_insert = drive.FSCREW_SHANK_LEN - drive.SPRING_T
+    deepest_insert = drive.FSCREW_SHANK_LEN - drive._SPR_T_LO
+    floor_height = (nominal_insert + deepest_insert) / 2.0
+    original = fasteners.through_seat_material
+
+    def raised_floor(seat, xz, **kwargs):
+        actual = original(seat, xz, **kwargs)
+        return replace(actual, deck_height_min_mm=floor_height) if seat is drive.BASE_FOOT_SEAT_SPEC else actual
+
+    with pytest.raises(AssertionError, match="spring foot: screw tip reaches clearance floor"):
+        _drive_with(monkeypatch, fasteners, "through_seat_material", raised_floor)
 
 
 def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:

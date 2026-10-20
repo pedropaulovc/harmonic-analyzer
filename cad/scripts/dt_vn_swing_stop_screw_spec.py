@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 import _config
 from _fit_deviations import deviations
 from _mcmaster_90280a108 import FILLISTER_SIZE
+from fr_harmonic_base_fasteners import ThroughSeatMaterial, require_through_seat_fit
 
 if TYPE_CHECKING:
     from _hole_spec import HoleSpec
@@ -89,8 +90,8 @@ TIP_CHAMFER = 0.7 * THREAD_PITCH
 # Installed-joint acceptance, inspected on the real stock/receiver: the
 # shop's 1.5D full-thread rule rounded UP to 0.01 mm (machinist review of the
 # stack build: the old 1D floor printed 2.85 against 4.27 needed). The fully
-# seated 3/8 screw in its 9.8-deep thread already gives ~7 mm full form, so
-# no geometry changes; this is not a supplier tolerance on length or tip.
+# seated 3/8 screw in the through-threaded deck already gives ample full form;
+# this is not a supplier tolerance on length or tip.
 MIN_USEFUL_ENGAGEMENT_MM = ceil(1.5 * SHANK_DIA * 100.0) / 100.0
 MIN_USEFUL_ENGAGEMENT_SOURCE = (
     "Functional installation inspection: full-form stop thread engagement "
@@ -100,23 +101,36 @@ MIN_USEFUL_ENGAGEMENT_TEXT = f"{MIN_USEFUL_ENGAGEMENT_MM:.2f} MIN"
 PLATE_THICKNESS_ALLOWANCE = 25.4 * float(_config.title_block("linear_2pl")["value_in"])
 
 
-def require_seat_fit(seat: HoleSpec, plate_thickness: float) -> None:
-    """Check the nominal seated stop; actual full-form engagement is inspected.
+def require_seat_fit(
+    seat: HoleSpec,
+    plate_thickness: float,
+    *,
+    material: ThroughSeatMaterial,
+) -> None:
+    """Check the seated stop against the finite through-threaded receiver.
 
-    Passing this source-model seat check is not evidence that the installed
-    stock meets MIN_USEFUL_ENGAGEMENT_MM or that its head is fully seated.
+    Stock length and head-end runout use their qualified B18.6.3 limits.
+    The harvested tip chamfer remains nominal; the installed full-form
+    engagement and fully seated head still require the existing inspection.
     """
-    if seat.kind != "tapped" or seat.size != THREAD or seat.end != "blind":
-        raise AssertionError("swing stop requires a blind #4-40 tapped seat")
-    if EMBED_LEN - TIP_CHAMFER < MIN_USEFUL_ENGAGEMENT_MM:
-        raise AssertionError(
-            "swing stop has less than the minimum useful thread engagement"
-        )
-    thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
-    if thread_depth - EMBED_LEN < 0.25 - 1e-9:
-        raise AssertionError("swing stop bottoms in its threaded seat")
-    if seat.depth_mm - thread_depth < 5.0 * THREAD_PITCH - 1e-9:
-        raise AssertionError("swing-stop drill lacks five-pitch plug-tap lead")
+    if (
+        seat.kind != "tapped"
+        or seat.size != THREAD
+        or seat.thread_class != "2B"
+        or seat.end != "through_all"
+    ):
+        raise AssertionError("swing stop requires a through #4-40 UNC-2B seat")
+    fit = require_through_seat_fit(
+        "swing stop",
+        seat,
+        material,
+        insertion_min_mm=LENGTH_MIN_MM,
+        insertion_max_mm=LENGTH_MAX_MM,
+        tip_loss_mm=TIP_CHAMFER,
+        full_thread_start_mm=FULL_THREAD_START_MAX_MM,
+    )
+    if fit.full_thread_engagement_min_mm < MIN_USEFUL_ENGAGEMENT_MM - 1e-9:
+        raise AssertionError("swing stop has less than the minimum useful thread engagement")
     # The whole head must bear on the edge of a tolerance-low platform.
     if PROUD_LEN + HEAD_H > plate_thickness - PLATE_THICKNESS_ALLOWANCE + 1e-9:
         raise AssertionError("swing-stop head stands above the tolerance-low platform")
