@@ -1244,7 +1244,11 @@ JOINTS: tuple[Joint, ...] = (
             "this vertical screw, so it reaches the screw only as tension/shear through the foot; no member "
             "rotates on or about the screw axis"
         ),
-        axial_capture="fillister head on the pedestal's 18-long ledge through a #8 close-clearance hole; >=1.5D thread in a transfer-tapped bottoming seat",
+        axial_capture=(
+            "fillister head on the pedestal's 18-long ledge through a #8 close-clearance hole; "
+            "transferred through-tapped #8-32 UNC-2B deck seat in 13 mm nominal skin; "
+            "minimum checked source-model full-form overlap 10.10 mm (>=1.5D)"
+        ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
@@ -1273,8 +1277,10 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "fillister head on the block top through a #8 normal-clearance hole; "
             "38.1 mm stock less the 25.232 mm raised block gives 12.868 mm nominal "
-            "insertion (13.378 mm maximum) into the transfer-tapped bottoming seat, "
-            "with current base full-thread/drill references 14.15/16.8 mm"
+            "insertion (13.378 mm maximum) into the transferred through-tapped "
+            "#8-32 UNC-2B deck seat; the 13 mm nominal skin limits the minimum checked "
+            "source-model full-form overlap to 10.10 mm; any exit protrusion is into "
+            "pocket air"
         ),
         lock=Lock.NONE,
         lock_part="",
