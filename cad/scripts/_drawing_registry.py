@@ -668,8 +668,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         artifact_stem="dt-cylinder-gear",
         script_name="draw_dt_cylinder_gear.py",
         layout=DrawingLayout.PORTRAIT,
-        # TEMPORARY issue #1636 FARM BOOTSTRAP: maintenance consumes both DRWDOTs.
-        additional_layouts=(DrawingLayout.LANDSCAPE,),
     ),
     DrawingSpec(
         name="dt_cone_gear",

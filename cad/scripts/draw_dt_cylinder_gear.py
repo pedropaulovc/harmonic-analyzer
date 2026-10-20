@@ -559,11 +559,6 @@ def _pattern_notch_reference(adapter: Any, annotations: list[Any]) -> Any:
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    # TEMPORARY issue #1636 FARM BOOTSTRAP: remove this import/call after the
-    # returned DRWDOTs are installed. Reuse this run_build's seat; never nest it.
-    from maintain_drawing_templates import maintain_templates
-
-    maintain_templates(adapter)
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
