@@ -117,11 +117,11 @@ class Nominal:
     d_max: float  # amplitude-bar full-scale station
     # -- output chain: summing lever -> magnifying lever -> wheel -> pen --
     # The clamp's knife radii are where the BLOCK sits on the rod (reach and
-    # setup: collar face, as-built station, rod tip); what the pen sees is
+    # setup: plain-body thread-runout boundary, as-built station, rod tip); what the pen sees is
     # ``wire_moment_arm`` -- the knife axis's perpendicular distance to wire 1's
     # rest run -- which the fixture's hook offset and the wire's lean toward
     # the wheel move off the clamp radius.
-    lever_r_min: float  # knife -> clamp centre, clamp against the bracket collar
+    lever_r_min: float  # knife -> clamp centre, entire bore before thread runout
     lever_r_built: float  # the as-built (CLAMP_LOCAL_X) radius
     lever_r_max: float  # clamp flush with the rod tip (mechanical bound)
     hook_offset_x: float  # wire hook (fixture groove tangent) from the clamp
@@ -831,7 +831,7 @@ class NominalTrial:
         below the arm at the reachable minimum the operator instead scales
         every ordinate down (``ordinate_scale_for`` against the machine's
         ordinate CAPACITY, the peak the pen holds at minimum magnification)
-        with the clamp at the collar; above the arm at the as-built station
+        with the clamp at the plain-body limit; above the arm at the as-built station
         the reading falls short of the stroke by ``stroke_fill``."""
         nom = self.nom
         pen_per_bar = pen_gain_per_arm_mm(nom) * abs(self.f_full)  # per arm mm
@@ -1338,7 +1338,7 @@ def monte_carlo(
 
 def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     """An OFFLINE estimate -- not a CAD gate -- of wire 1's straight rest run
-    with the clamp against the bracket collar (``wire_rest_run`` at
+    with the clamp at its permitted plain-body limit (``wire_rest_run`` at
     ``lever_r_min``) versus the wheel's pen-side faces. Reported so the waiver
     in error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
@@ -1360,7 +1360,7 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
         "boss_face_gap_mm": gaps["boss"],
         "drum_back_lane_gap_mm": gaps["drum_back"],
         "drum_front_lane_gap_mm": gaps["drum_front"],
-        "note": "straight rest run only; no clamp/rod/collar/frame check, no articulation -- NOT a CAD gate",
+        "note": "straight rest run only; no clamp/rod/threaded-joint/frame check, no articulation -- NOT a CAD gate",
     }
 
 
@@ -1663,7 +1663,7 @@ def closed_form_terms(
     # input whose read ordinates sum to more than this is scaled down by the
     # operator (MagnifierSetup.ordinate_scale < 1), so setting and knife
     # errors grow by that factor. A design lever, not a part tolerance. The
-    # lever radii are the clamp's STATIONS (reach: collar face, as-built, rod
+    # lever radii are the clamp's STATIONS (reach: plain-body limit, as-built, rod
     # tip); the gain runs on the wire moment arm each station realises.
     gain_min = pen_gain(nom, nom.lever_r_min)
     magnifier = {
@@ -1685,12 +1685,12 @@ def closed_form_terms(
         * nom.d_max,
         "per_input": {n: asdict(setups[n]) for n in scored},
         # Only the as-built station is CAD-gated; every input fitted short of
-        # it runs at a pose the minimum one (clamp against the collar) bounds
+        # it runs at a pose the minimum one (complete bore before runout) bounds
         "inputs_at_ungated_pose": [
             n for n in scored if setups[n].lever_r < nom.lever_r_built
         ],
         "minimum_pose_cad_gated": False,  # build_mg_magnifier_assembly builds the
-        # as-built pose only; the clamp/rod/wire at the collar is #748's proof
+        # as-built pose only; the clamp/rod/wire at the travel limit is #748's proof
         "minimum_pose_wire_estimate": _minimum_pose_wire_estimate(nom),
         "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; lever radii are clamp stations, the gain runs on the wire moment arm (hook_offset_x, wire lean); only the as-built station is CAD-gated, the minimum pose bounds the rest (reserved.readout.waive_minimum_pose)",
     }
@@ -2352,7 +2352,7 @@ $-c$ at every odd $k$, $0$ at even $k$) is subtracted in step 4.
 **Choose the ordinate scale for the pen first.** The pen's half-stroke is
 {cf["readout"]["pen_half_stroke_mm"]:.0f} mm and the $k=0$ reading must span it
 (step 3 divides everything by it). At the magnifier's MINIMUM setting -- the
-clamp against the bracket collar, {mag["lever_radius_min_mm"]:.0f} mm from the
+clamp at the plain-body limit, {mag["lever_radius_min_mm"]:.0f} mm from the
 knife axis -- one full-scale bar moves the pen
 {mag["pen_mm_per_full_scale_bar_at_min"]:.2f} mm, so the trial's $k=0$ peak,
 $P = \\sum_i t_i\\,(1 + \\kappa_i)$ with $t_i$ the TABLE ordinate at bar $i$'s
@@ -2377,7 +2377,7 @@ clamp so the peak just fills the stroke. The pen travel per bar is NOT
 proportional to the clamp's distance from the knife: the wire hooks the
 output fixture {abs(nom.hook_offset_x):.1f} mm on the knife side of the clamp
 and leans toward the wheel, so what the pen sees is the effective wire
-moment arm -- {arm_min:.1f} mm with the clamp against the collar
+moment arm -- {arm_min:.1f} mm with the clamp at the plain-body limit
 ({mag["lever_radius_min_mm"]:.0f} mm from the knife),
 {wire_moment_arm(nom, nom.lever_r_built):.1f} mm at the as-built
 {mag["lever_radius_built_mm"]:.0f} mm. Set the clamp at the station whose
@@ -2397,7 +2397,7 @@ input UP (multiply every ordinate by a constant, up to the capacity) before
 setting the bars -- step 3 removes it like any $f$.
 
 Only the as-built pose is CAD-gated. The broad inputs run at or just above
-the minimum pose (clamp against the collar), which is not
+the minimum pose (complete clamp bore before thread runout), which is not
 (error_budget.yaml `waive_minimum_pose`, #748).
 
 $P(f)$ for 20 bars set at $f$ (from the table; check your arithmetic against it):

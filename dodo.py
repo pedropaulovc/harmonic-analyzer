@@ -3862,6 +3862,9 @@ def task_check():
         # ... and the A1 bracket arm's stiffness/joint check (the arm grew to
         # reach the plumb plane at the drum wire lane).
         SCRIPTS_DIR / "test_mg_magnifying_bracket_arm_check.py",
+        # Threaded MG cutover: all direct adapter calls bind to the pinned SDK,
+        # without importing or executing a recipe, SDK implementation or COM.
+        SCRIPTS_DIR / "test_mg_threaded_adapter_contract.py",
         # The amplitude bar's pressed MHA-CH-11 pin: its worst-case press,
         # running fit and flush-end gap budget, pinned to their sources.
         SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",

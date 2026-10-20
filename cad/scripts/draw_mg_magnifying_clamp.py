@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying-lever clamp.
 
-A 28.65 length of 7/16 hex brass (#1559): the Ø6.2 lever bore drilled across
+A 28.95 length of 7/16 hex brass: the Ø6.50 quarter-inch lever bore drilled across
 the corners, a #4-40 thumb-screw tap from the top face into the bore and a
 blind #4-40 rod tap from the bottom face, both on the hex axis.
 
@@ -102,7 +102,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 12.8 x 11.1 x 28.65 hex: 3:1 stacks the 39 mm top view, the 86 mm front
+# A 12.8 x 11.1 x 28.95 hex: 3:1 stacks the 39 mm top view, the 87 mm front
 # and the 39 mm bottom view in one column, the section and isometric beside.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)

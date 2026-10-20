@@ -363,7 +363,7 @@ def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, rep
 def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
     """Classify each reference input from its peak and the reachable wire-arm
     capacities, not from which regimes a particular drum happened to realise.
-    Scaling fills the stroke at the collar; a fitted input fills it inside the
+    Scaling fills the stroke at the plain-body limit; a fitted input fills it inside the
     band; a short input stays full scale at the built-station limit."""
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
     trial = eb.NominalTrial(nom)
@@ -738,7 +738,7 @@ def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     """Every broad input is scored at or just above the magnifier's minimum
-    pose (clamp against the collar), which build_mg_magnifier_assembly never
+    pose (complete clamp bore before thread runout), which build_mg_magnifier_assembly never
     builds -- only the as-built station is gated: the report names those
     inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver

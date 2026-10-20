@@ -119,7 +119,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         FIXTURE_SCREW_TRAVEL * math.sin(FIXTURE_YAW_RAD),
     ),
     ExplodeStep(
-        "bracket off the lever",
+        "bracket unthreaded then withdrawn from the lever",
         ("mg-magnifying-bracket", "mg-vn-magnifying-bracket-screw"),
         "x",
         -30.0,

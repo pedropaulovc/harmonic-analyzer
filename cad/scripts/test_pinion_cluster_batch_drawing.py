@@ -457,7 +457,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 4.35,
             ),
             frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
-                2.8448, 2.261, 5.9
+                2.8448, 2.261, 5.75
             ),
             # #1559: the vertical rod's #4-40 end (2.845 major) in the clamp's
             # bottom tap drill, tip to relief.
@@ -475,9 +475,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
             ): _annulus_limit(
-                # Whole-contact envelope, independent corners (see
-                # _interference_contracts._MG_LEVER_PRESS_TRIPLE_MM).
-                6.0, 5.986, 7.2078194326718075
+                # Full-neck cosmetic 1/4-20 major/tap-drill overlap.
+                6.35, 5.105, 12.5
             ),
         },
         "sm-summing": {

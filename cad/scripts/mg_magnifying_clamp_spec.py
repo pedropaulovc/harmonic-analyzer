@@ -22,6 +22,9 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from mg_magnifying_clamp_geom import (  # noqa: F401 (re-export)
     BLOCK_DEPTH,
     BLOCK_HEIGHT,
+    BORE_WANDER,
+    DRILL_WANDER_MAX,
+    DRILL_WANDER_DEG,
     EDGE_BREAK,
     HEIGHT_PLACES,
     HEX_AC,
@@ -53,19 +56,12 @@ from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
     THREAD_PITCH,
 )
 
-# Drill wander, restated (the sh_column_clamp_fit precedent) so this recipe
-# does not import those parts' closures: linear start wander
-# (sm_gooseneck_spring_joint.DRILL_WANDER_MAX) and angular run-off
-# (fr_top_frame_spec.KEEPER_TAP_DRILL_WANDER_DEG).
-DRILL_WANDER_MAX = 0.10
-DRILL_WANDER_DEG = 0.3
 
 # --- Places each printed dimension carries ----------------------------------
 # The flats: the exact 7/16 in, printed as a stock reference (11.113).
 HEX_AF_PLACES = 3
-# The drilled lever bore prints at one place; its band is the title block's
-# DRILLED HOLES row (+0.10/0), its fit the callout's named mate.
-LEVER_BORE_DIA_PLACES = 1
+# The drilled lever bore uses .XX and the DRILLED HOLES +0.10/0 row.
+LEVER_BORE_DIA_PLACES = 2
 REFERENCE_DIMENSIONS = frozenset({"HexAf"})
 
 # --- Printed limits ----------------------------------------------------------
@@ -90,7 +86,6 @@ def _wander(depth_mm: float) -> float:
 # The lever bore is centred between the flats by symmetry, so its axis stands
 # off the hex axis only by the drill's run-off over its half-length to the
 # middle of the block.
-BORE_WANDER = _wander(HEX_AC / 2.0)
 BORE_OFFSET_MAX = BORE_WANDER
 # (nominal, worst).  The bore to a flat: its largest drilled Ø on the thinnest
 # stock, off centre by its wander.  The taps run on the hex axis: their thread
@@ -134,9 +129,9 @@ PLUG_TAP_USABLE_LENGTH = 9.0 / 16.0 * 25.4
 PLUG_TAP_CHAMFER_THREADS = (3, 5)
 if abs(PLUG_TAP_CHAMFER_THREADS[1] * THREAD_PITCH - PLUG_TAP_LEAD) > 1e-9:
     raise AssertionError("MHA-MG-02 plug-tap lead disagrees with the rod joint's")
-# Top face to the bore axis: both heights at their .XX limits.
-_TOP_TO_AXIS_MAX = TOP_TO_BORE + 2.0 * _HEIGHT_BAND
-_TOP_TO_AXIS_MIN = TOP_TO_BORE - 2.0 * _HEIGHT_BAND
+# Top face to the bore axis: both heights at their .XX limits plus drill wander.
+_TOP_TO_AXIS_MAX = TOP_TO_BORE + 2.0 * _HEIGHT_BAND + BORE_WANDER
+_TOP_TO_AXIS_MIN = TOP_TO_BORE - 2.0 * _HEIGHT_BAND - BORE_WANDER
 # The bore's half-chord at the thread's widest reach off the bore axis: the
 # major envelope, with the bore off centre by its wander.
 _THREAD_HALF_CHORD = math.sqrt(
@@ -183,7 +178,7 @@ if not THUMB_DRILL_FAR_CLEAR > 0.0:
 # The rod tap's drill and thread both fit the plug tap's reach from the face.
 if not ROD_TAP_THREAD_DEPTH_MAX + PLUG_TAP_LEAD <= PLUG_TAP_USABLE_LENGTH + 1e-9:
     raise AssertionError("MHA-MG-02 rod tap is deeper than the plug tap reaches")
-if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX:
+if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX - BORE_WANDER:
     raise AssertionError("MHA-MG-02 rod tap drill reaches the lever bore")
 
 # --- Squareness ----------------------------------------------------------------
@@ -226,7 +221,7 @@ if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
 # --- Sheet text ----------------------------------------------------------------
 # The lever bore's Ø: drilled and the mate it slides on (rule 4), one row each
 # under the Ø.  Its wall to a flat holds the target, so the sheet states none.
-LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON Ø6 LEVER MHA-MG-03"))
+LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03"))
 # Ahead of each native thread row.
 THUMB_TAP_PROCESS = "TAP INTO BORE"
 ROD_TAP_PROCESS = "TAP"

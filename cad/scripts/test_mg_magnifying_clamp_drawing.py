@@ -50,7 +50,7 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
     assert geom.HEX_AF == pytest.approx(7.0 / 16.0 * 25.4)
     assert geom.BLOCK_DEPTH == pytest.approx(geom.HEX_AC)
-    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.65, 28.65)
+    assert (geom.LEVER_BORE_Y, geom.BLOCK_HEIGHT) == (19.95, 28.95)
     for gone in ("BLOCK_WIDTH", "ROD_BORE_DIA", "ROD_BORE_X"):
         assert not hasattr(geom, gone)
     assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
@@ -70,12 +70,12 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     # The bore centred between the flats by symmetry: its largest drilled Ø
     # on the thinnest stock, off centre by the drill's run-off to mid-block.
     bore_nominal, bore_worst = spec.WALLS["lever bore to a flat"]
-    assert bore_nominal == pytest.approx((spec.HEX_AF - 6.2) / 2.0)
+    assert bore_nominal == pytest.approx((spec.HEX_AF - spec.LEVER_BORE_DIA) / 2.0)
     wander = 0.10 + spec.HEX_AC / 2.0 * math.tan(math.radians(0.3))
     assert bore_worst == pytest.approx(
-        (spec.HEX_AF - spec.HEX_AF_BAND) / 2.0 - (6.2 + 0.10) / 2.0 - wander
+        (spec.HEX_AF - spec.HEX_AF_BAND) / 2.0 - (spec.LEVER_BORE_DIA + 0.10) / 2.0 - wander
     )
-    assert bore_worst == pytest.approx(2.2077, abs=1e-4)
+    assert bore_worst == pytest.approx(2.0577, abs=1e-4)
     assert bore_worst >= spec.WALL_TARGET
     # No printed location from a flat: the bore's only offset is its wander.
     assert spec.BORE_OFFSET_MAX == spec.BORE_WANDER == pytest.approx(wander)
@@ -98,6 +98,21 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     assert spec.ROD_TAP_SPEC is joint.ROD_TAP_SPEC
 
 
+def test_vertical_bore_wander_is_spent_in_both_dependent_stacks() -> None:
+    import mg_magnifying_clamp_geom as geom
+    from _printed_tolerance import printed_band_mm
+
+    band = printed_band_mm(geom.HEIGHT_PLACES)
+    radius_max = (geom.LEVER_BORE_DIA + 0.10) / 2.0
+    floor = geom.LEVER_BORE_Y - band - radius_max - joint.ROD_TAP_DRILL_DEPTH_MAX - geom.ROD_TAP_DRILL_POINT - geom.BORE_WANDER
+    full_thumb = (geom.BLOCK_HEIGHT - band) - (geom.LEVER_BORE_Y + band) - radius_max - geom.BORE_WANDER - geom.EDGE_BREAK
+    assert floor == pytest.approx(geom.ROD_TAP_FLOOR_WALL_WORST)
+    assert full_thumb == pytest.approx(geom.THUMB_ENGAGEMENT_WORST)
+    assert floor >= geom.WALL_TARGET
+    assert floor - 0.05 < geom.WALL_TARGET  # smallest practical 0.05 height step
+    assert full_thumb >= joint.ENGAGEMENT_MIN
+
+
 def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
     notes = spec.DRAWING_NOTES
     assert notes == "7/16 HEX BAR, FLATS AS SUPPLIED."
@@ -107,7 +122,7 @@ def test_linked_notes_state_stock_only_and_the_bore_states_no_wall() -> None:
     assert not hasattr(spec, "BORE_WALL_NOTE")
     # The bore's wall to a flat holds the target: the sheet states none (rule 20).
     assert "WALL" not in spec.LEVER_BORE_CALLOUT
-    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON Ø6 LEVER MHA-MG-03"
+    assert spec.LEVER_BORE_CALLOUT == "DRILL THRU CORNERS\nSLIP ON 1/4 IN LEVER MHA-MG-03"
     assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
     assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE

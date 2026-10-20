@@ -102,7 +102,7 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
-from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
+from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
 from mg_wheel_axle_spec import TIP_Y
@@ -195,6 +195,11 @@ _PAD = 0.004
 CLAMP_STATION_RISE = 0.012
 FIXTURE_DROP_RUN = 0.018
 FIXTURE_DROP_BELOW = 0.006
+LEVER_CALLOUT_LOCATION = {
+    stack.CLAMP_STATION_DIMENSION: "above",
+    stack.FIXTURE_DROP_DIMENSION: "below",
+    stack.THREAD_PROJECTION_DIMENSION: "below",
+}
 LEVER_VIEW_LABEL = "lever settings (back)"
 
 # Sheet 2: the wheel group's exploded view in the field left of the BOM with
@@ -858,20 +863,27 @@ def _lever_settings(
         names=("lever tip", "clamp centre", "fixture axis"),
     )
     _add_setting_axes(adapter, view)
-    _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
+    _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE, stack.THREAD_FEATURE), label=LEVER_VIEW_LABEL)
+    projection = model_points_in_view(
+        adapter, view,
+        ((stack.THREADED_TIP_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0), (stack.THREAD_FAR_FACE_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0)),
+        label="threaded lever projection", names=("flat threaded tip", "far bracket face"),
+    )
+    keep = lever_keep(tip, clamp, fixture)
+    keep[stack.THREAD_PROJECTION_DIMENSION] = (projection[0][0] - 0.025, projection[0][1] - 0.020)
     annotations = curate_view_dimensions(
         adapter,
         view,
-        keep=lever_keep(tip, clamp, fixture),
+        keep=keep,
         view_label=LEVER_VIEW_LABEL,
-        dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
+        dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS | stack.THREAD_DRAWING_DIMENSIONS,
     )
     assert_imported_precision(
         adapter,
         annotations,
         {
             name: places
-            for names in stack.LEVER_DRAWING_PRECISION.values()
+            for names in (stack.LEVER_DRAWING_PRECISION | stack.THREAD_DRAWING_PRECISION).values()
             for name, places in names.items()
         },
     )
