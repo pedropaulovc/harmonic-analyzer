@@ -1060,18 +1060,31 @@ class _MagnifierBomTable:
         self.native_members = native_members
         self.column_types = [
             (202, "", 0),
-            (204, "Number", 0),
+            (204, '$PRP:"Number"', 0),
             (204, "", 0),
             (203, "", 0),
             (201, "", 0),
         ]
         self.hidden = [False] * 4 + [True]
         self.widths = [0.02] * 4 + [0.0]
+        self.heights = {}
+        self.row_hidden = {}
+        self.text_writes = []
+        self.title_writes = []
         self.number_property = "Number"
 
     @property
     def RowCount(self):
         return len(self.cells)
+
+    @property
+    def TotalRowCount(self):
+        return self.RowCount
+
+    def RowHidden(self, row):
+        if not 0 <= row < self.TotalRowCount:
+            raise IndexError(row)
+        return self.row_hidden.get(row, False)
 
     @property
     def ColumnCount(self):
@@ -1086,6 +1099,14 @@ class _MagnifierBomTable:
             index for index, hidden in enumerate(self.hidden)
             if include_hidden or not hidden
         ]
+        # Native 2310 projected the retained hidden key at the legacy Qty index.
+        if not include_hidden and columns and self.column_types[columns[-1]][0] == 203:
+            retained = [
+                index for index, hidden in enumerate(self.hidden)
+                if hidden and self.column_types[index][0] == 201
+            ]
+            if retained:
+                columns[-1] = retained[-1]
         return columns[column] if 0 <= column < len(columns) else None
 
     def GetColumnType3(self, column, include_hidden):
@@ -1122,12 +1143,75 @@ class _MagnifierBomTable:
     def GetComponents2(self, row, _configuration):
         return self.native_members[row - 1]
 
+    def InsertColumn2(self, where, after, title, _width):
+        if where != 3 or not 0 <= after < len(self.column_types):
+            return False
+        column = after + 1
+        for row, contents in enumerate(self.cells):
+            contents.insert(column, title if row == 0 else "")
+        self.column_types.insert(column, (204, "", 0))
+        self.hidden.insert(column, False)
+        self.widths.insert(column, 0.02)
+        return True
+
+    def SetColumnTitle2(self, column, title, include_hidden):
+        self.title_writes.append((column, title, include_hidden))
+        physical = self._physical_column(column, include_hidden)
+        if physical is None or physical >= len(self.cells[0]):
+            return False
+        self.cells[0][physical] = title
+        return True
+
+    def IsCellTextEditable(self, row, column):
+        return 0 < row < self.RowCount and (
+            self.GetColumnTitle2(column, True) == drawing.BOM_SKU_TITLE
+        )
+
+    def SetText2(self, row, column, include_hidden, text):
+        self.text_writes.append((row, column, include_hidden, text))
+        physical = self._physical_column(column, include_hidden)
+        if physical is None:
+            raise IndexError(column)
+        if not self.IsCellTextEditable(row, column):
+            raise AssertionError("Number cells must stay natively property-linked")
+        self.cells[row][physical] = text
+
+    def SetColumnWidth(self, column, width, options):
+        assert options == 0
+        if not 0 <= column < len(self.widths):
+            raise IndexError(column)
+        self.widths[column] = width
+        return width
+
+    def SetRowHeight(self, row, height, options):
+        assert options == 0
+        self.heights[row] = height
+        return height
+
+
+@pytest.mark.parametrize("hidden", (True, None, 0, 1, ""))
+@pytest.mark.parametrize("row", (0, 1))
+def test_bom_cells_requires_exact_visible_row_before_physical_text(hidden, row) -> None:
+    reads = []
+    table = SimpleNamespace(
+        RowCount=2,
+        ColumnCount=1,
+        RowHidden=lambda index: hidden if index == row else False,
+        DisplayedText2=lambda *args: reads.append(args) or "TEXT",
+    )
+    with pytest.raises(RuntimeError):
+        drawing._bom_cells(table)
+    assert reads == ([(0, 0, True)] if row == 1 else [])
+
 
 @pytest.fixture
 def magnifier_bom(monkeypatch):
+    import _com
     import _component_references as references
     import _drawing_tables as tables
 
+    monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
         tables._sw_type_info, "early_bound_or_flag", lambda value, *_members: value
@@ -1153,6 +1237,7 @@ def magnifier_bom(monkeypatch):
         native_members.append(
             tuple(
                 SimpleNamespace(
+                    Name2=f"{stem}-{index + 1}",
                     GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
                     ReferencedConfiguration=(
                         "LeverWire Simplified" if is_wire else "Default Simplified"
@@ -1163,7 +1248,7 @@ def magnifier_bom(monkeypatch):
                         )
                     ),
                 )
-                for _ in range(notes.QUANTITIES[stem])
+                for index in range(notes.QUANTITIES[stem])
             )
         )
     table = _MagnifierBomTable(cells, native_members)
@@ -1176,6 +1261,62 @@ def magnifier_bom(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    "fault", (None, "quantity", "native-count", "same-number-member", "number-property")
+)
+def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
+    magnifier_bom, fault
+) -> None:
+    table = magnifier_bom.table
+    if fault == "number-property":
+        table.number_property = "Description"
+    rebuilds = []
+
+    def rebuild():
+        rebuilds.append(True)
+        if fault == "quantity":
+            table.cells[1][4] = str(int(table.cells[1][4]) + 1)
+        elif fault == "native-count":
+            row = int(magnifier_bom.expected_items["sh-vn-thumb-screw"]) - 1
+            table.native_members[row] = table.native_members[row][:-1]
+        elif fault == "same-number-member":
+            magnifier_bom.wire.ReferencedConfiguration = "PenWire Simplified"
+        return True
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
+    if fault is None:
+        assert drawing._validate_bom(adapter, table) == magnifier_bom.expected_items
+        assert table.DisplayedText2(0, 4, True) == "QTY."
+        assert table.DisplayedText(0, 4) == "PART NUMBER"
+        assert table.GetColumnType3(4, True)[0] == 203
+        assert table.GetColumnType3(4, False)[0] == 201
+        proof = drawing.validate_bom_number_property(
+            table,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            label="magnifier",
+            expected_rows=1 + len(drawing.BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        assert [(row, number, quantity) for row, _members, number, quantity in proof] == [
+            (int(item), drawing.BOM_PART_NUMBERS[stem], str(drawing.BOM_QUANTITIES[stem]))
+            for stem, item in magnifier_bom.expected_items.items()
+        ]
+        for stem, item in magnifier_bom.expected_items.items():
+            row = int(item)
+            assert table.DisplayedText2(row, 4, True) == str(drawing.BOM_QUANTITIES[stem])
+            assert table.DisplayedText2(row, 3, True) == drawing.BOM_SKUS[stem]
+        assert table.title_writes == [(3, drawing.BOM_SKU_TITLE, True)]
+        assert table.text_writes == [
+            (int(item), 3, True, drawing.BOM_SKUS[stem])
+            for stem, item in magnifier_bom.expected_items.items()
+        ]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._validate_bom(adapter, table)
+    assert rebuilds == ([] if fault == "number-property" else [True])
+    assert table.cells[0].count(drawing.BOM_SKU_TITLE) == 1
+
+
+@pytest.mark.parametrize(
     "fault",
     (
         "native-column",
@@ -1185,6 +1326,8 @@ def magnifier_bom(monkeypatch):
         "displayed-number",
         "member",
         "quantity",
+        "hidden-row",
+        "unreadable-row",
     ),
 )
 def test_finalization_rereads_retained_bom_after_reference_hiding(
@@ -1299,6 +1442,10 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         magnifier_bom.cells[1][1] = "UNLINKED"
     elif fault == "quantity":
         magnifier_bom.cells[1][4] = str(int(magnifier_bom.cells[1][4]) + 1)
+    elif fault == "hidden-row":
+        table.row_hidden[1] = True
+    elif fault == "unreadable-row":
+        table.row_hidden[1] = None
     else:
         magnifier_bom.wire.ReferencedConfiguration = "PenWire Simplified"
     with pytest.raises(RuntimeError):

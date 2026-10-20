@@ -497,6 +497,7 @@ class _NumberTable:
         ]
         self.RowCount = 2
         self.TotalRowCount = 2
+        self.hidden_rows = set()
         self.type_status = 0
         self.property_readback = "Number"
         self.accept_title = True
@@ -504,6 +505,7 @@ class _NumberTable:
         self.accept_insert = True
         self.accept_hide = True
         self.number_display_override = None
+        self.title_writes = []
 
     @property
     def ColumnCount(self):
@@ -519,6 +521,16 @@ class _NumberTable:
             for physical, column in enumerate(self.columns)
             if include_hidden or not column["hidden"]
         ]
+        if not include_hidden and indices and self.columns[indices[-1]]["kind"] == 203:
+            hidden_native = [
+                physical
+                for physical, column in enumerate(self.columns)
+                if column["hidden"] and column["kind"] == 201
+            ]
+            if hidden_native:
+                # Native2310 projects the retained native column into the last
+                # visible Qty slot; it is not the physical column at that index.
+                indices[-1] = hidden_native[-1]
         return indices[index] if 0 <= index < len(indices) else None
 
     def DisplayedText(self, row, column):
@@ -530,6 +542,11 @@ class _NumberTable:
 
     def GetColumnTitle2(self, index, include_hidden):
         return self.DisplayedText2(0, index, include_hidden)
+
+    def RowHidden(self, row):
+        if not 0 <= row < len(self.cells):
+            raise IndexError("invalid physical row")
+        return row in self.hidden_rows
 
     def MoveColumn(self, source, where, destination):
         if (
@@ -589,7 +606,7 @@ class _NumberTable:
             raise IndexError("invalid physical column binding")
         if self.type_status:
             return self.type_status
-        self.columns[column].update(kind=kind, property=property_name)
+        self.columns[column].update(kind=kind, property=f'$PRP:"{property_name}"')
         self.cells[0][column] = property_name
         number = ""
         if self.components:
@@ -620,6 +637,7 @@ class _NumberTable:
         column = self._column_index(column, include_hidden)
         if column is None:
             raise IndexError("invalid physical column title")
+        self.title_writes.append((column, title, include_hidden))
         if self.accept_title:
             self.cells[0][column] = title
         return self.accept_title
@@ -663,6 +681,11 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         label="wire",
     )
     assert table.GetColumnCustomProperty(1) == "Number"
+    assert table.GetColumnType3(1, True) == (204, '$PRP:"Number"', 0)
+    assert table.title_writes
+    assert all(
+        include_hidden is True for _column, _title, include_hidden in table.title_writes
+    )
     assert table.cells[0][1] == "PART NUMBER"
     assert table.ColumnCount == 3
     assert len(table.columns) == 4
@@ -670,6 +693,41 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
     assert table.GetColumnType3(3, True)[0] == 201
     assert table.ColumnHidden(3) is True
     assert table.GetColumnWidth(3) == 0.0
+    assert table.GetColumnType3(2, True)[0] == 203
+    assert table.GetColumnType3(2, False)[0] == 201
+    assert table.DisplayedText2(0, 2, True) == "QTY."
+    assert table.DisplayedText(0, 2).strip().upper() == "PART NUMBER"
+    assert table.DisplayedText2(1, 2, True) == "1"
+    assert table.DisplayedText2(1, 2, False) == "native-key"
+    assert table.DisplayedText(1, 2) == "native-key"
+    snapshot = tables.validate_bom_number_property(
+        table,
+        configuration="Default Simplified",
+        label="physical wire quantity",
+        expected_rows=2,
+        occurrence_quantities=True,
+    )
+    assert snapshot[0][2:] == (NUMBER, "1")
+    table.cells[1][3] = "999"
+    assert table.DisplayedText(1, 2) == "999"
+    assert (
+        tables.validate_bom_number_property(
+            table,
+            configuration="Default Simplified",
+            label="changed legacy projection",
+            expected_rows=2,
+            occurrence_quantities=True,
+        )
+        == snapshot
+    )
+    for index in range(len(table.columns), table.TotalColumnCount + 2):
+        for include_hidden in (False, True):
+            assert table.GetColumnType3(index, include_hidden) == (-1, None, 0)
+            assert table.GetColumnTitle2(index, include_hidden) == ""
+            assert table.DisplayedText2(0, index, include_hidden) == ""
+        assert table.GetColumnWidth(index) == 0.0
+        assert table.ColumnHidden(index) is False
+        assert table.GetColumnCustomProperty(index) == ""
 
     # Changing the actual selected member makes the displayed Number stale,
     # regardless of the view configuration or document-level property.
@@ -702,7 +760,7 @@ def test_number_column_uses_document_property_only_when_actual_member_has_none(
         configuration="Default Simplified",
         label="wire",
     )
-    assert table.DisplayedText(1, 1) == NUMBER
+    assert table.DisplayedText2(1, 1, True) == NUMBER
     assert all(
         member in ("LeverWire Simplified", "")
         for member, property_name in component.property_reads
@@ -744,6 +802,58 @@ def test_number_column_binding_refuses_native_metadata_failures(number_binding, 
             adapter, table, configuration="Default", label="wire"
         )
     assert rebuilds == []
+
+
+@pytest.mark.parametrize("row", [0, 1])
+def test_number_column_binding_refuses_hidden_physical_rows_before_mutation(
+    number_binding, row
+):
+    adapter, rebuilds = number_binding
+    table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
+    table.hidden_rows.add(row)
+    with pytest.raises(RuntimeError):
+        tables._bind_bom_number_property(
+            adapter, table, configuration="Default", label="hidden wire row"
+        )
+    assert len(table.columns) == 3
+    assert table.columns[1]["kind"] == 201
+    assert table.title_writes == []
+    assert rebuilds == []
+
+
+@pytest.mark.parametrize("raw_property_data", ["Number", '$PRP:"Number"'])
+@pytest.mark.parametrize("fault", ["wrong", "blank", "unreadable"])
+def test_number_proof_requires_dedicated_getter_despite_raw_property_data(
+    number_binding, monkeypatch, raw_property_data, fault
+):
+    adapter, _rebuilds = number_binding
+    table = _NumberTable([_component(properties={("LeverWire", "Number"): NUMBER})])
+    tables._bind_bom_number_property(
+        adapter, table, configuration="Default", label="wire"
+    )
+    table.columns[1]["property"] = raw_property_data
+    if fault == "unreadable":
+        native_getter = table.GetColumnCustomProperty
+
+        def unreadable_property(column):
+            physical = table._column_index(column, True)
+            if physical is not None and table.columns[physical]["kind"] == 204:
+                raise RuntimeError("native custom-property getter failed")
+            return native_getter(column)
+
+        monkeypatch.setattr(table, "GetColumnCustomProperty", unreadable_property)
+    else:
+        table.property_readback = "Description" if fault == "wrong" else ""
+    message = (
+        "native custom-property getter failed"
+        if fault == "unreadable"
+        else "Number property binding did not persist"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        tables.validate_bom_number_property(
+            table, configuration="Default", label="wire getter proof"
+        )
+    assert table.cells[1][1] == NUMBER
 
 
 @pytest.mark.parametrize(

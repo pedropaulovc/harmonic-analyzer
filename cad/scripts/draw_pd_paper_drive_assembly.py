@@ -1764,9 +1764,13 @@ def _validate_bom(
         raise RuntimeError(
             f"paper-drive BOM is {rows}x{columns}; expected {len(BOM_PART_NUMBERS) + 1} rows"
         )
+    if int(table.TotalRowCount) != rows or any(
+        table.RowHidden(row) is not False for row in range(rows)
+    ):
+        raise RuntimeError("paper-drive BOM has hidden or unreadable physical rows")
     contents = tuple(
         tuple(
-            str(table.DisplayedText(row, column) or "").strip()
+            str(table.DisplayedText2(row, column, True) or "").strip()
             for column in range(columns)
         )
         for row in range(rows)
@@ -1830,6 +1834,10 @@ def _validate_bom(
         raise RuntimeError("paper-drive BOM rebuild failed")
     if int(table.RowCount) != rows or int(table.ColumnCount) != columns:
         raise RuntimeError("paper-drive BOM dimensions changed during its final rebuild")
+    if int(table.TotalRowCount) != rows or any(
+        table.RowHidden(row) is not False for row in range(rows)
+    ):
+        raise RuntimeError("paper-drive BOM physical row visibility changed during its final rebuild")
     bom_feature = _early_bound(table, "IBomTableAnnotation").BomFeature
     if bom_feature is None:
         raise RuntimeError("paper-drive BOM lost its native feature")
@@ -1850,13 +1858,13 @@ def _validate_bom(
             f"{native_rows!r} -> {final_native_rows!r}"
         )
     for stem, (row_index, *_rest) in actual.items():
-        applied = str(table.DisplayedText(row_index, part_column) or "").strip()
+        applied = str(table.DisplayedText2(row_index, part_column, True) or "").strip()
         if applied != BOM_PART_NUMBERS[stem]:
             raise RuntimeError(
                 f"paper-drive BOM part number for {stem!r} reads {applied!r}"
             )
         final_row = tuple(
-            str(table.DisplayedText(row_index, column) or "").strip()
+            str(table.DisplayedText2(row_index, column, True) or "").strip()
             for column in range(columns)
         )
         if final_row != contents[row_index]:
@@ -1932,12 +1940,13 @@ def _assert_bom_pieces(
     """Read split ranges and physical extents; every logical data row survives."""
     membership: Counter[int] = Counter()
     findings = []
+    validated_pieces = []
     if expected_snapshot is not None and (
         configuration is None
         or tuple(row[0] for row in expected_snapshot) != tuple(range(header_count, total_rows))
     ):
         raise RuntimeError("paper-drive BOM validated snapshot has invalid row coverage")
-    for index, raw in enumerate(pieces):
+    for raw in pieces:
         piece = _early_bound(raw, "ITableAnnotation")
         info = tuple(piece.GetSplitInformation(0, 0, 0, 0))
         if len(info) != 5:
@@ -1947,6 +1956,15 @@ def _assert_bom_pieces(
             raise RuntimeError(f"paper-drive BOM split range invalid: {info!r}")
         data_rows = tuple(range(max(start, header_count), end + 1))
         membership.update(data_rows)
+        validated_pieces.append((piece, (direction, _index, count, start, end), data_rows))
+    if membership != Counter(range(header_count, total_rows)):
+        raise RuntimeError("paper-drive BOM split: split pieces omit or repeat logical data rows")
+    for index, (piece, info, data_rows) in enumerate(validated_pieces):
+        _direction, _native_index, count, start, end = info
+        _telemetry.event(
+            "drawing.bom_piece_row_range", piece=index + 1,
+            split_information=info, configuration=configuration,
+        )
         if configuration is not None:
             current = validate_bom_number_property(
                 piece,
@@ -1987,8 +2005,6 @@ def _assert_bom_pieces(
             violations=tuple(violations),
         )
         findings.extend(violations)
-    if membership != Counter(range(header_count, total_rows)):
-        findings.append("split pieces omit or repeat logical data rows")
     if findings:
         raise RuntimeError("paper-drive BOM split: " + "; ".join(findings))
 

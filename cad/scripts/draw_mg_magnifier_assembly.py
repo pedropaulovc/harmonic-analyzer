@@ -1222,14 +1222,18 @@ _INSERT_COLUMN_DEFAULT_WIDTH = 0  # swInsertColumn_DefaultWidth
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
-    """Every displayed BOM cell, header row first."""
-    return tuple(
-        tuple(
-            str(table.DisplayedText(row, column) or "").strip()
-            for column in range(int(table.ColumnCount))
+    """Every physical BOM cell, header row first, with visible native rows."""
+    contents = []
+    for row in range(int(table.RowCount)):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"magnifier BOM physical row {row} is not proven visible")
+        contents.append(
+            tuple(
+                str(table.DisplayedText2(row, column, True) or "").strip()
+                for column in range(int(table.ColumnCount))
+            )
         )
-        for row in range(int(table.RowCount))
-    )
+    return tuple(contents)
 
 
 def _bom_column(
@@ -1321,12 +1325,12 @@ def _validate_bom(adapter: Any, table: Any) -> dict[str, str]:
     ):
         raise RuntimeError("magnifier BOM refused the VENDOR SKU column")
     column = description_column + 1
-    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, False):
+    if not table.SetColumnTitle2(column, BOM_SKU_TITLE, True):
         raise RuntimeError("magnifier BOM VENDOR SKU column title did not set")
     for stem, (row_index, *_rest) in actual.items():
         if not table.IsCellTextEditable(row_index, column):
             raise RuntimeError(f"magnifier BOM VENDOR SKU cell for {stem!r} is locked")
-        table.SetText2(row_index, column, False, BOM_SKUS[stem])
+        table.SetText2(row_index, column, True, BOM_SKUS[stem])
 
     header = _bom_cells(table)[0]
     widths = {

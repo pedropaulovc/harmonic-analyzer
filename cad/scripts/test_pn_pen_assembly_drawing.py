@@ -162,12 +162,24 @@ class _PenBomTable:
         self.hidden = [False] * (len(column_types) - 1) + [True]
         self.widths = [0.02] * (len(column_types) - 1) + [0.0]
         self.heights = {}
+        self.row_hidden = {}
+        self.text_writes = []
+        self.title_writes = []
         self.number_property = "Number"
         self.GetComponents2 = components
 
     @property
     def RowCount(self):
         return len(self.cells)
+
+    @property
+    def TotalRowCount(self):
+        return self.RowCount
+
+    def RowHidden(self, row):
+        if not 0 <= row < self.TotalRowCount:
+            raise IndexError(row)
+        return self.row_hidden.get(row, False)
 
     @property
     def ColumnCount(self):
@@ -182,6 +194,14 @@ class _PenBomTable:
             index for index, hidden in enumerate(self.hidden)
             if include_hidden or not hidden
         ]
+        # Native 2310 projected the retained hidden key at the legacy Qty index.
+        if not include_hidden and columns and self.column_types[columns[-1]][0] == 203:
+            retained = [
+                index for index, hidden in enumerate(self.hidden)
+                if hidden and self.column_types[index][0] == 201
+            ]
+            if retained:
+                columns[-1] = retained[-1]
         return columns[column] if 0 <= column < len(columns) else None
 
     def GetColumnType3(self, column, include_hidden):
@@ -227,6 +247,7 @@ class _PenBomTable:
         return True
 
     def SetColumnTitle2(self, column, title, include_hidden):
+        self.title_writes.append((column, title, include_hidden))
         physical = self._physical_column(column, include_hidden)
         if physical is None or physical >= len(self.cells[0]):
             return False
@@ -235,10 +256,11 @@ class _PenBomTable:
 
     def IsCellTextEditable(self, row, column):
         return 0 < row < self.RowCount and (
-            self.GetColumnTitle2(column, False) == drawing.BOM_SKU_TITLE
+            self.GetColumnTitle2(column, True) == drawing.BOM_SKU_TITLE
         )
 
     def SetText2(self, row, column, include_hidden, text):
+        self.text_writes.append((row, column, include_hidden, text))
         physical = self._physical_column(column, include_hidden)
         if physical is None:
             raise IndexError(column)
@@ -257,6 +279,21 @@ class _PenBomTable:
         return height
 
 
+@pytest.mark.parametrize("hidden", (True, None, 0, 1, ""))
+@pytest.mark.parametrize("row", (0, 1))
+def test_bom_cells_requires_exact_visible_row_before_physical_text(hidden, row) -> None:
+    reads = []
+    table = SimpleNamespace(
+        RowCount=2,
+        ColumnCount=1,
+        RowHidden=lambda index: hidden if index == row else False,
+        DisplayedText2=lambda *args: reads.append(args) or "TEXT",
+    )
+    with pytest.raises(RuntimeError):
+        drawing._bom_cells(table)
+    assert reads == ([(0, 0, True)] if row == 1 else [])
+
+
 @pytest.mark.parametrize(
     "fault",
     (
@@ -267,6 +304,8 @@ class _PenBomTable:
         "displayed-number",
         "member",
         "quantity",
+        "hidden-row",
+        "unreadable-row",
     ),
 )
 def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_skus(
@@ -315,7 +354,7 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
     # SKU insertion shifted the retained native key from column 4 to column 5.
     column_types = [
         (202, "", 0),
-        (204, "Number", 0),
+        (204, '$PRP:"Number"', 0),
         (204, "", 0),
         (204, "", 0),
         (203, "", 0),
@@ -366,6 +405,10 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
         cells[1][1] = "UNLINKED"
     elif fault == "quantity":
         cells[1][4] = str(int(cells[1][4]) + 1)
+    elif fault == "hidden-row":
+        table.row_hidden[1] = True
+    elif fault == "unreadable-row":
+        table.row_hidden[1] = None
     else:
         members[0].ReferencedConfiguration = "OtherMember Simplified"
     with pytest.raises(RuntimeError):
@@ -375,8 +418,10 @@ def test_exploded_sheet_settled_check_rereads_native_bom_without_reinserting_sku
     seat.assert_balloon_landings.assert_called_once()
 
 
-@pytest.mark.parametrize("fault", ("quantity", "same-number-member"))
-def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
+@pytest.mark.parametrize(
+    "fault", (None, "quantity", "native-count", "same-number-member", "number-property")
+)
+def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
     monkeypatch, fault
 ) -> None:
     import _com
@@ -416,35 +461,60 @@ def test_bom_refuses_rebuild_drift_before_capturing_settled_baseline(
             )
         )
     column_types = [
-        (202, "", 0), (204, "Number", 0), (204, "", 0),
+        (202, "", 0), (204, '$PRP:"Number"', 0), (204, "", 0),
         (203, "", 0), (201, "", 0),
     ]
 
     table = _PenBomTable(
         cells, column_types, lambda row, _owner: native_rows[row - 1]
     )
+    if fault == "number-property":
+        table.number_property = "Description"
     rebuilds = []
 
     def rebuild():
         rebuilds.append(True)
         if fault == "quantity":
             cells[1][4] = str(int(cells[1][4]) + 1)
-        else:
+        elif fault == "native-count":
+            native_rows[0] = native_rows[0][:-1]
+        elif fault == "same-number-member":
             wire_row = drawing.BOM_COMPONENTS.index(drawing.BOM_ROW_KEYS[spec.WIRE])
             native_rows[wire_row][0].ReferencedConfiguration = "LeverWire Simplified"
         return True
 
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
-    with pytest.raises(
-        RuntimeError,
-        match=(
-            "native occurrence count"
-            if fault == "quantity"
-            else "native BOM membership/quantities changed during rebuild"
-        ),
-    ):
-        drawing._validate_bom(adapter, table)
-    assert rebuilds == [True]
+    if fault is None:
+        assert drawing._validate_bom(adapter, table) == tuple(
+            (stem, str(item)) for item, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        )
+        assert table.DisplayedText2(0, 4, True) == "QTY."
+        assert table.DisplayedText(0, 4) == "PART NUMBER"
+        assert table.GetColumnType3(4, True)[0] == 203
+        assert table.GetColumnType3(4, False)[0] == 201
+        proof = drawing.validate_bom_number_property(
+            table,
+            configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+            label="pen",
+            expected_rows=1 + len(drawing.BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        assert [(row, number, quantity) for row, _members, number, quantity in proof] == [
+            (row, drawing.BOM_PART_NUMBERS[stem], str(drawing.BOM_QUANTITIES[stem]))
+            for row, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        ]
+        for row, stem in enumerate(drawing.BOM_COMPONENTS, 1):
+            assert table.DisplayedText2(row, 4, True) == str(drawing.BOM_QUANTITIES[stem])
+            assert table.DisplayedText2(row, 3, True) == drawing.BOM_SKUS[stem]
+        assert table.title_writes == [(3, drawing.BOM_SKU_TITLE, True)]
+        assert table.text_writes == [
+            (row, 3, True, drawing.BOM_SKUS[stem])
+            for row, stem in enumerate(drawing.BOM_COMPONENTS, 1)
+        ]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._validate_bom(adapter, table)
+    assert rebuilds == ([] if fault == "number-property" else [True])
     assert cells[0].count(drawing.BOM_SKU_TITLE) == 1
 
 

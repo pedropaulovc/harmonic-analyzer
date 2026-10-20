@@ -748,6 +748,7 @@ class _Table:
         ]
         self.widths: dict[int, float] = {}
         self.heights: dict[int, float] = {}
+        self.row_hidden = {}
         self.position = (*drawing.BOM_ANCHOR, 0.0)
         self.native_members = [
             tuple(
@@ -759,7 +760,7 @@ class _Table:
         self.association_configurations = []
         self.column_types = [
             (202, "", 0),
-            (204, "Number", 0),
+            (204, '$PRP:"Number"', 0),
             (204, "", 0),
             (203, "", 0),
             (201, "", 0),
@@ -770,6 +771,15 @@ class _Table:
     @property
     def RowCount(self):
         return len(self.cells)
+
+    @property
+    def TotalRowCount(self):
+        return self.RowCount
+
+    def RowHidden(self, row):
+        if not 0 <= row < self.TotalRowCount:
+            raise IndexError(row)
+        return self.row_hidden.get(row, False)
 
     @property
     def ColumnCount(self):
@@ -785,6 +795,15 @@ class _Table:
             for index, hidden in enumerate(self.hidden)
             if include_hidden or not hidden
         ]
+        # Native 2310 projected the retained hidden key at the legacy Qty index.
+        if not include_hidden and columns and self.column_types[columns[-1]][0] == 203:
+            retained = [
+                index
+                for index, hidden in enumerate(self.hidden)
+                if hidden and self.column_types[index][0] == 201
+            ]
+            if retained:
+                columns[-1] = retained[-1]
         return columns[column] if 0 <= column < len(columns) else None
 
     def DisplayedText(self, row, column):
@@ -846,6 +865,21 @@ class _Table:
         return SimpleNamespace(GetPosition=lambda: self.position)
 
 
+@pytest.mark.parametrize("hidden", (True, None, 0, 1, ""))
+@pytest.mark.parametrize("row", (0, 1))
+def test_bom_cells_requires_exact_visible_row_before_physical_text(hidden, row) -> None:
+    reads = []
+    table = SimpleNamespace(
+        RowCount=2,
+        ColumnCount=1,
+        RowHidden=lambda index: hidden if index == row else False,
+        DisplayedText2=lambda *args: reads.append(args) or "TEXT",
+    )
+    with pytest.raises(RuntimeError):
+        drawing._bom_cells(table)
+    assert reads == ([(0, 0, True)] if row == 1 else [])
+
+
 _ADAPTER = SimpleNamespace(
     currentModel=SimpleNamespace(
         EditRebuild3=lambda: True, GraphicsRedraw2=lambda: None
@@ -863,6 +897,8 @@ _ADAPTER = SimpleNamespace(
         "displayed-number",
         "member",
         "quantity",
+        "hidden-row",
+        "unreadable-row",
     ),
 )
 def test_package_settled_checks_reread_native_bom_without_mutating_layout(
@@ -916,6 +952,10 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
         table.cells[1][1] = "UNLINKED"
     elif fault == "quantity":
         table.cells[1][3] = str(int(table.cells[1][3]) + 1)
+    elif fault == "hidden-row":
+        table.row_hidden[1] = True
+    elif fault == "unreadable-row":
+        table.row_hidden[1] = None
     else:
         stud_row = int(spec.ITEM_NUMBERS[spec.HOLD_DOWN_STUD])
         t_nut_member = spec.COMPONENT_IDENTITIES[spec.T_NUT][1]
@@ -944,6 +984,21 @@ def test_bom_prints_registry_numbers_one_line_a_row(
         (stem, str(item)) for item, stem in enumerate(spec.BOM_ORDER, 1)
     )
     assert table.cells[0] == ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]
+    assert table.DisplayedText2(0, 3, True) == "QTY."
+    assert table.DisplayedText(0, 3) == "PART NUMBER"
+    assert table.GetColumnType3(3, True)[0] == 203
+    assert table.GetColumnType3(3, False)[0] == 201
+    proof = drawing.validate_bom_number_property(
+        table,
+        configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        label="jig",
+        expected_rows=1 + len(spec.BOM_ORDER),
+        occurrence_quantities=True,
+    )
+    assert [(row, number, quantity) for row, _members, number, quantity in proof] == [
+        (row, drawing.BOM_PART_NUMBERS[stem], str(spec.QUANTITIES[stem]))
+        for row, stem in enumerate(spec.BOM_ORDER, 1)
+    ]
     for row, stem in zip(table.cells[1:], spec.BOM_ORDER, strict=True):
         assert row[1:] == [
             drawing.BOM_PART_NUMBERS[stem],
@@ -996,6 +1051,16 @@ def test_bom_rechecks_number_after_rebuild(native_bom_bindings) -> None:
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=rebuild))
     with pytest.raises(RuntimeError, match="part number for"):
         drawing._validate_bom(adapter, table)
+
+
+def test_bom_refuses_wrong_dedicated_number_binding_despite_raw_expression(
+    native_bom_bindings,
+) -> None:
+    table = _Table(spec.BOM_ORDER)
+    assert table.column_types[1][1] == '$PRP:"Number"'
+    table.number_property = "Description"
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(_ADAPTER, table)
 
 
 @pytest.mark.parametrize("fault", ("quantity", "native-count", "same-number-member"))

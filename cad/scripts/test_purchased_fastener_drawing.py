@@ -1120,6 +1120,15 @@ def test_number_fit_refuses_rather_than_hide_a_collision(notes, number, layout, 
         "create-fresh-wrapper",
         "create-replaced-thread",
         "none",
+        "cross-context-feature",
+        "source-active-config-different",
+        "rim-source-mapping-missing",
+        "rim-roundtrip-missing",
+        "rim-roundtrip-wrong",
+        "rim-source-edge-wrong",
+        "rim-source-fresh-wrapper",
+        "rim-roundtrip-fresh-wrapper",
+        "rim-source-feature-fresh-wrapper",
         "face",
         "create-face",
         "edge",
@@ -1231,20 +1240,71 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     # Native83's vendor STEP bore is 0.21095 in, not nominal TAP_DRILL_DIA / 2.
     native_bore_radius = 0.00535813
     bore_definition = SimpleNamespace(ThruTapDrillDiameter=0.01071626)
-    source_bore = SimpleNamespace(
-        Name=bore_feature,
-        GetTypeName2=lambda: "HoleWzd",
-        GetDefinition=lambda: bore_definition,
-    )
+
+    class SourceFeature:
+        feature_context = "source"
+
+        def __init__(self, name, kind="HoleWzd", definition=None):
+            self.Name = name
+            self.kind = kind
+            self.definition = definition
+            self.native_identity = object()
+
+        def GetTypeName2(self):
+            return self.kind
+
+        def GetDefinition(self):
+            return self.definition
+
+    class DrawingFeature:
+        feature_context = "drawing"
+
+        def __init__(self, name, kind="HoleWzd"):
+            self.Name = name
+            self.kind = kind
+            self.native_identity = object()
+
+        def GetTypeName2(self):
+            return self.kind
+
+    class EntityWrapper:
+        def __init__(self, entity):
+            self.entity = entity
+
+        def __getattr__(self, name):
+            return getattr(self.entity, name)
+
+    def native_equal(first, second):
+        return int(
+            getattr(first, "native_identity", first)
+            is getattr(second, "native_identity", second)
+        )
+
+    source_bore = SourceFeature(bore_feature, definition=bore_definition)
     feature_readback = source_bore
-    native_features = {
+    source_features = {
         bore_feature: source_bore,
-        other_feature: SimpleNamespace(Name=other_feature),
-        "Body": SimpleNamespace(Name="Body"),
+        other_feature: SourceFeature(other_feature),
+        "Body": SourceFeature("Body", kind="Boss"),
     }
+    drawing_features = {
+        bore_feature: DrawingFeature(bore_feature),
+        other_feature: DrawingFeature(other_feature),
+        "Body": DrawingFeature("Body", kind="Boss"),
+    }
+    # Reproduce the old filter's false refusal without teaching IsSame that
+    # equal spellings imply equal native objects across document contexts.
+    assert drawing_features[bore_feature].Name == source_bore.Name
+    assert (
+        drawing_features[bore_feature].native_identity
+        is not source_bore.native_identity
+    )
+    assert native_equal(drawing_features[bore_feature], source_bore) == 0
+    source_mapping_calls, roundtrip_calls = [], []
+    source_face_features, identity_comparisons, early_binding_calls = [], [], []
 
     def face(feature=bore_feature):
-        native = native_features[feature] if isinstance(feature, str) else feature
+        native = drawing_features[feature] if isinstance(feature, str) else feature
         return SimpleNamespace(GetFeature=lambda: native)
 
     def edge(feature=bore_feature):
@@ -1252,9 +1312,35 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             GetTwoAdjacentFaces2=lambda: (face("Body"), face(feature))
         )
 
+    class SourceFace:
+        def __init__(self, feature):
+            self.feature = feature
+
+        def GetFeature(self):
+            source_face_features.append(self.feature)
+            return self.feature
+
+    class SourceEdge:
+        def __init__(self, drawing_edge, feature=bore_feature):
+            self.drawing_edge = drawing_edge
+            self.feature = feature
+            self.native_identity = object()
+
+        def GetTwoAdjacentFaces2(self):
+            feature = (
+                source_features[self.feature]
+                if isinstance(self.feature, str)
+                else self.feature
+            )
+            if drift == "rim-source-feature-fresh-wrapper":
+                feature = EntityWrapper(feature)
+            return (SourceFace(source_features["Body"]), SourceFace(feature))
+
     class BoreRim:
         def __init__(self):
             self.feature = bore_feature
+            self.native_identity = object()
+            self.source_edge = SourceEdge(self)
             self.parameter_range = (0.0, 2 * math.pi)
             self.curve_read = False
             self.closest_queries = []
@@ -1313,6 +1399,17 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             return (face("Body"), face(self.feature))
 
     rim = BoreRim()
+    if drift == "cross-context-feature":
+        old_context_features = tuple(
+            attached.GetFeature() for attached in rim.GetTwoAdjacentFaces2()
+        )
+        assert tuple(feature.Name for feature in old_context_features) == (
+            "Body",
+            bore_feature,
+        )
+        assert not any(
+            native_equal(feature, source_bore) == 1 for feature in old_context_features
+        )
     outer_rim, bottom_rim = BoreRim(), BoreRim()
     outer_rim.feature = "Body"
     outer_rim.CircleParams = (*rim.CircleParams[:6], 0.02)
@@ -1505,8 +1602,17 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         (0.23, 0.13, 0.26, 0.17),
         (0.2271081, 0.1978993, 0.2722252, 0.2401007),
     )
+
+    class MemberView(SimpleNamespace):
+        @property
+        def ReferencedConfiguration(self):
+            return configuration
+
+        def GetReferencedModelName(self):
+            return source_model_path
+
     views = [
-        SimpleNamespace(
+        MemberView(
             GetOutline=lambda box=box: (
                 box[0] + offset,
                 box[1],
@@ -1657,7 +1763,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         if name == bore_feature:
             events.append("bore-definition")
             if drift == "bore-fresh-wrapper":
-                return AnnotationReadback(feature_readback, feature_readback)
+                return EntityWrapper(feature_readback)
             return feature_readback
         assert name == "CosmeticThread1"
         events.append("source-definition")
@@ -1672,6 +1778,89 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             ),
         )
 
+    source_model_path = r"C:\fixture\clamping_kit.SLDPRT"
+    source_active_name = (
+        f"{configuration}-source-active"
+        if drift == "source-active-config-different"
+        else configuration
+    )
+    wrong_source_edge = SourceEdge(
+        rim, SourceFeature(bore_feature, definition=bore_definition)
+    )
+    wrong_roundtrip_rim = BoreRim()
+
+    class SourceExtension:
+        def GetCorrespondingEntity2(self, drawing_edge):
+            assert isinstance(drawing_edge, BoreRim)
+            assert drawing_edge.curve_read
+            canonical = drawing_edge.source_edge
+            if drawing_edge is rim:
+                if drift == "rim-source-mapping-missing":
+                    canonical = None
+                elif drift == "rim-source-edge-wrong":
+                    canonical = wrong_source_edge
+                elif drift == "rim-source-fresh-wrapper":
+                    canonical = EntityWrapper(canonical)
+            source_mapping_calls.append((drawing_edge, canonical))
+            return canonical
+
+    class SourceConfiguration:
+        __slots__ = ()
+
+        @property
+        def Name(self):
+            return source_active_name
+
+    class SourceConfigurationManager:
+        __slots__ = ()
+
+        @property
+        def ActiveConfiguration(self):
+            return source_configuration
+
+    class SourceModel:
+        __slots__ = ()
+
+        def FeatureByName(self, name):
+            return source_feature(name)
+
+        @property
+        def Extension(self):
+            # ReferencedDocument is an IModelDoc2, not an IPartDoc shortcut.
+            assert (self, "IModelDoc2") in early_binding_calls
+            return source_extension
+
+        @property
+        def ConfigurationManager(self):
+            return source_configuration_manager
+
+        def GetPathName(self):
+            return source_model_path
+
+        def GetType(self):
+            return 1
+
+    source_extension = SourceExtension()
+    source_configuration = SourceConfiguration()
+    source_configuration_manager = SourceConfigurationManager()
+    source_model = SourceModel()
+
+    def view_corresponding_entity(canonical):
+        unwrapped = (
+            canonical.entity if isinstance(canonical, EntityWrapper) else canonical
+        )
+        assert isinstance(unwrapped, SourceEdge)
+        roundtrip = unwrapped.drawing_edge
+        if roundtrip is rim:
+            if drift == "rim-roundtrip-missing":
+                roundtrip = None
+            elif drift == "rim-roundtrip-wrong":
+                roundtrip = wrong_roundtrip_rim
+            elif drift == "rim-roundtrip-fresh-wrapper":
+                roundtrip = EntityWrapper(roundtrip)
+        roundtrip_calls.append((canonical, roundtrip))
+        return roundtrip
+
     def read_annotations():
         assert events[0] == "final-display-mode"
         assert events[-1] == "refresh"
@@ -1684,7 +1873,8 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     views[3].GetAnnotations = read_annotations
     views[3].UpdateViewDisplayGeometry = lambda: events.append("refresh")
     views[3].GetName2 = lambda: iso_name
-    views[3].ReferencedDocument = SimpleNamespace(FeatureByName=source_feature)
+    views[3].ReferencedDocument = source_model
+    views[3].GetCorrespondingEntity = view_corresponding_entity
 
     def right_annotations():
         assert events[-1] == "refresh-right"
@@ -1711,14 +1901,25 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         "set_high_quality_shaded_with_edges",
         lambda *_args, **_kwargs: events.append("final-display-mode"),
     )
-    monkeypatch.setattr(kit, "_early_bound", lambda value, _kind: value)
+
+    def early_bound(value, kind):
+        early_binding_calls.append((value, kind))
+        return value
+
+    def is_same(first, second):
+        first_context = getattr(first, "feature_context", None)
+        second_context = getattr(second, "feature_context", None)
+        if first_context is not None or second_context is not None:
+            assert first_context == second_context == "source", (
+                "drawing-context feature identity must not prove source ownership"
+            )
+        identity_comparisons.append((first, second))
+        return native_equal(first, second)
+
+    monkeypatch.setattr(kit, "_early_bound", early_bound)
     adapter = SimpleNamespace(
         currentModel=Drawing(),
-        swApp=SimpleNamespace(
-            IsSame=lambda a, b: int(
-                getattr(a, "native_identity", a) is getattr(b, "native_identity", b)
-            )
-        ),
+        swApp=SimpleNamespace(IsSame=is_same),
     )
     cells = configured.configuration_view_cells(1 if configuration == "TNut" else 2, 3)
     if drift in {"face", "create-face"}:
@@ -1775,7 +1976,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     elif drift == "retire-owner-neighbour":
         old_note.Owner = views[0]
     elif drift == "rim-wrong-feature":
-        rim.feature = other_feature
+        rim.source_edge.feature = other_feature
     elif drift in {"rim-wrong-height", "rim-wrong-radius"}:
         circle = list(rim.CircleParams)
         circle[1 if drift == "rim-wrong-height" else 6] += 0.001
@@ -1785,7 +1986,9 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     elif drift == "rim-missing":
         visible_rims.remove(rim)
     elif drift == "rim-feature-identity":
-        rim.feature = SimpleNamespace(Name=bore_feature)
+        rim.source_edge.feature = SourceFeature(
+            bore_feature, definition=bore_definition
+        )
     elif drift == "rim-split":
         rim.parameter_range = (0.0, math.pi)
         other_arc = BoreRim()
@@ -1843,6 +2046,51 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         assert drawing_state.selected is None
         assert drawing_state.active == previous_active
         return
+
+    def assert_source_correspondence():
+        expected_rims = [rim, other_arc] if drift == "rim-split" else [rim]
+        assert source_mapping_calls
+        assert len(source_mapping_calls) % len(expected_rims) == 0
+        assert len(roundtrip_calls) == len(source_mapping_calls)
+        for index, ((drawing_edge, canonical), (mapped, roundtrip)) in enumerate(
+            zip(source_mapping_calls, roundtrip_calls)
+        ):
+            assert drawing_edge is expected_rims[index % len(expected_rims)]
+            assert canonical is mapped
+            assert canonical is not drawing_edge
+            assert native_equal(canonical, drawing_edge.source_edge) == 1
+            assert native_equal(roundtrip, drawing_edge) == 1
+        assert any(
+            first is feature and native_equal(second, source_bore) == 1
+            for feature in source_face_features
+            if native_equal(feature, source_bore) == 1
+            for first, second in identity_comparisons
+        )
+        assert (source_model, "IModelDoc2") in early_binding_calls
+        assert (source_extension, "IModelDocExtension") in early_binding_calls
+        assert source_configuration.Name == source_active_name
+        assert views[3].ReferencedConfiguration == configuration
+        if drift == "source-active-config-different":
+            assert source_configuration.Name != views[3].ReferencedConfiguration
+        elif drift == "rim-source-fresh-wrapper":
+            assert all(
+                isinstance(canonical, EntityWrapper)
+                and canonical is not drawing_edge.source_edge
+                for drawing_edge, canonical in source_mapping_calls
+            )
+        elif drift == "rim-roundtrip-fresh-wrapper":
+            assert all(
+                isinstance(roundtrip, EntityWrapper) and roundtrip is not rim
+                for _canonical, roundtrip in roundtrip_calls
+            )
+        elif drift == "rim-source-feature-fresh-wrapper":
+            assert any(
+                isinstance(feature, EntityWrapper)
+                and feature is not source_bore
+                and native_equal(feature, source_bore) == 1
+                for feature in source_face_features
+            )
+
     initial_refusals = {
         "setter-refused": "placement refused",
         "setter-ignored": "leader attachment moved",
@@ -1850,6 +2098,12 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         "setter-geometry-detached": "expected one automatic",
         "setter-note-identity": "lost identity, attachment or clearance",
         "setter-owner-detached": "lost identity, attachment or clearance",
+        "rim-source-mapping-missing": (
+            "native bore-rim source/view correspondence failed"
+        ),
+        "rim-roundtrip-missing": "native bore-rim source/view correspondence failed",
+        "rim-roundtrip-wrong": "native bore-rim source/view correspondence failed",
+        "rim-source-edge-wrong": "visible top bore rim",
         "rim-wrong-feature": "visible top bore rim",
         "rim-feature-identity": "visible top bore rim",
         "rim-wrong-height": "visible top bore rim",
@@ -1872,9 +2126,56 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         "projection-nan": "no readable projection",
     }
     if drift in initial_refusals:
-        with pytest.raises(RuntimeError, match=initial_refusals[drift]):
+        with pytest.raises(RuntimeError, match=initial_refusals[drift]) as refused:
             kit.annotate_member(adapter, configuration, cells, views)
         assert "insert" not in events and "delete-note" not in events
+        if drift in {
+            "rim-source-mapping-missing",
+            "rim-roundtrip-missing",
+            "rim-roundtrip-wrong",
+            "rim-source-edge-wrong",
+            "rim-wrong-feature",
+            "rim-feature-identity",
+        }:
+            assert not note.setter_calls
+            assert len(source_mapping_calls) == 1
+            drawing_edge, canonical = source_mapping_calls[0]
+            assert drawing_edge is rim
+            assert rim.feature == bore_feature
+            if drift == "rim-source-mapping-missing":
+                assert canonical is None and not roundtrip_calls
+            else:
+                assert len(roundtrip_calls) == 1
+                assert roundtrip_calls[0][0] is canonical
+                roundtrip = roundtrip_calls[0][1]
+                if drift == "rim-roundtrip-missing":
+                    assert roundtrip is None
+                elif drift == "rim-roundtrip-wrong":
+                    assert roundtrip is wrong_roundtrip_rim
+                    assert native_equal(roundtrip, rim) == 0
+                else:
+                    assert roundtrip is rim
+                    if drift == "rim-source-edge-wrong":
+                        assert canonical is wrong_source_edge
+                        assert native_equal(canonical, rim.source_edge) == 0
+                    owner = (
+                        source_features[canonical.feature]
+                        if isinstance(canonical.feature, str)
+                        else canonical.feature
+                    )
+                    if drift != "rim-wrong-feature":
+                        assert owner.Name == source_bore.Name
+                    assert native_equal(owner, source_bore) == 0
+                    assert any(
+                        first is owner and native_equal(second, source_bore) == 1
+                        for first, second in identity_comparisons
+                    )
+            message = str(refused.value)
+            assert iso_name in message and source_model_path in message.replace(
+                "\\\\", "\\"
+            )
+            assert "'source_active_configuration':" in message
+            assert "'view_configuration':" in message
         return
     original_geometry = native_threads[0].entity if native_threads else None
     if drift in {
@@ -1980,6 +2281,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
             kit.annotate_member(adapter, configuration, cells, views)
         return
     checks = kit.annotate_member(adapter, configuration, cells, views)
+    assert_source_correspondence()
     created = drift in {
         "create",
         "create-face",
@@ -2077,11 +2379,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
     elif drift == "rim-identity":
         visible_rims[:] = [BoreRim()]
     elif drift == "bore-feature-drift":
-        feature_readback = SimpleNamespace(
-            Name=bore_feature,
-            GetTypeName2=lambda: "HoleWzd",
-            GetDefinition=lambda: bore_definition,
-        )
+        feature_readback = SourceFeature(bore_feature, definition=bore_definition)
     elif drift == "bore-diameter-drift":
         bore_definition.ThruTapDrillDiameter += 0.000001
     elif drift in {"leader-drift", "leader-within-tolerance"}:
@@ -2105,6 +2403,11 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         drift
         in {
             "none",
+            "cross-context-feature",
+            "source-active-config-different",
+            "rim-source-fresh-wrapper",
+            "rim-roundtrip-fresh-wrapper",
+            "rim-source-feature-fresh-wrapper",
             "face",
             "edge",
             "leader-within-tolerance",
@@ -2115,6 +2418,7 @@ def test_kit_native_member_note_relocation_and_settled_refusals(
         or created
     ):
         checks[0]()
+        assert_source_correspondence()
     else:
         expected_error = {
             "noniso-reappears": "survived/returned",

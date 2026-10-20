@@ -703,6 +703,28 @@ def _member_thread_note(
                 f"{label}: native bore feature/diameter changed; "
                 f"expected_diameter_m={native_diameter!r}, actual_diameter_m={diameter!r}"
             )
+        source = _early_bound(iso.ReferencedDocument, "IModelDoc2")
+        extension = _early_bound(source.Extension, "IModelDocExtension")
+        manager = _early_bound(source.ConfigurationManager, "IConfigurationManager")
+        active = manager.ActiveConfiguration
+        context = {
+            "view": str(iso.GetName2())[:80],
+            "view_configuration": str(iso.ReferencedConfiguration)[:80],
+            "view_model": str(iso.GetReferencedModelName())[:200],
+            "source_model": str(source.GetPathName())[:200],
+            "source_type": int(source.GetType()),
+            "source_active_configuration": (
+                str(_early_bound(active, "IConfiguration").Name)[:80]
+                if active is not None
+                else None
+            ),
+            "source_bore": str(native_bore.Name)[:80],
+            "source_bore_type": str(native_bore.GetTypeName2())[:80],
+            "source_bore_self_equality": int(
+                adapter.swApp.IsSame(native_bore, native_bore)
+            ),
+        }
+        _telemetry.info(f"{label}: native bore-rim source context; {context!r}")
         rims = []
         circles_seen, observed, matching_features = 0, [], []
         for raw in visible_view_entities(iso, 1, label=f"{label} visible bore rim"):
@@ -728,26 +750,75 @@ def _member_thread_note(
                 or not math.isclose(circle[6] * 2, diameter, rel_tol=0.0, abs_tol=1e-8)
             ):
                 continue
-            features = []
-            bore_owned = False
-            for face in edge.GetTwoAdjacentFaces2() or ():
-                if face is not None:
-                    feature = _early_bound(face, "IFace2").GetFeature()
-                    if feature is not None:
+            view_features = []
+            for raw_face in edge.GetTwoAdjacentFaces2() or ():
+                if raw_face is not None:
+                    feature = _early_bound(raw_face, "IFace2").GetFeature()
+                    if feature is not None and len(view_features) < 4:
                         feature = _early_bound(feature, "IFeature")
-                        features.append(str(feature.Name))
-                        bore_owned |= (
-                            int(adapter.swApp.IsSame(feature, native_bore)) == 1
+                        view_features.append(
+                            (
+                                str(feature.Name)[:64],
+                                str(feature.GetTypeName2())[:64],
+                            )
                         )
+            # Follow _native_axis_datum's native-proven namespace boundary:
+            # map the visible IEdge into the referenced source part and require
+            # its exact view roundtrip. Features reached through the original
+            # drawing edge are NOT compared with source-part features.
+            canonical = extension.GetCorrespondingEntity2(edge)
+            roundtrip = (
+                iso.GetCorrespondingEntity(canonical) if canonical is not None else None
+            )
+            roundtrip_equality = (
+                int(adapter.swApp.IsSame(roundtrip, edge))
+                if roundtrip is not None
+                else None
+            )
+            source_features, bore_owned = [], False
+            if canonical is not None:
+                source_edge = _early_bound(canonical, "IEdge")
+                for raw_face in source_edge.GetTwoAdjacentFaces2() or ():
+                    if raw_face is not None:
+                        feature = _early_bound(raw_face, "IFace2").GetFeature()
+                        if feature is not None:
+                            feature = _early_bound(feature, "IFeature")
+                            equality = int(adapter.swApp.IsSame(feature, native_bore))
+                            bore_owned |= equality == 1
+                            if len(source_features) < 4:
+                                source_features.append(
+                                    (
+                                        str(feature.Name)[:64],
+                                        str(feature.GetTypeName2())[:64],
+                                        equality,
+                                        int(adapter.swApp.IsSame(feature, feature)),
+                                    )
+                                )
+            correspondence = {
+                "view_features": tuple(view_features),
+                "mapped_source_edge": canonical is not None,
+                "view_roundtrip_equality": roundtrip_equality,
+                # (name, type, same source bore, self equality), all source-context.
+                "source_features": tuple(source_features),
+            }
             if len(matching_features) < 4:
-                matching_features.append(tuple(name[:64] for name in features[:4]))
+                matching_features.append(correspondence)
+            _telemetry.info(
+                f"{label}: native bore-rim source correspondence; {correspondence!r}"
+            )
+            if canonical is None or roundtrip_equality != 1:
+                raise RuntimeError(
+                    f"{label}: native bore-rim source/view correspondence failed; "
+                    f"context={context!r}, correspondence={correspondence!r}"
+                )
             if bore_owned:
                 rims.append((edge, circle))
         if not rims:
             raise RuntimeError(
                 f"{label}: expected one visible top bore rim owned by {bore_feature}; "
                 f"found={len(rims)}, visible_circles={circles_seen}, "
-                f"circle_params={observed!r}, matching_geometry_features={matching_features!r}"
+                f"circle_params={observed!r}, matching_geometry_features={matching_features!r}, "
+                f"context={context!r}"
             )
         edge, circle = rims[0]
         x, y, z, _ax, _ay, _az, radius = circle

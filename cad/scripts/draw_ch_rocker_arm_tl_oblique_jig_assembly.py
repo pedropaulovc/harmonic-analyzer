@@ -752,14 +752,18 @@ def _validate_source(source_model: Any) -> None:
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
-    """Every displayed BOM cell, header row first."""
-    return tuple(
-        tuple(
-            str(table.DisplayedText(row, column) or "").strip()
-            for column in range(int(table.ColumnCount))
+    """Every physical BOM cell, header row first, with visible native rows."""
+    contents = []
+    for row in range(int(table.RowCount)):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"jig BOM physical row {row} is not proven visible")
+        contents.append(
+            tuple(
+                str(table.DisplayedText2(row, column, True) or "").strip()
+                for column in range(int(table.ColumnCount))
+            )
         )
-        for row in range(int(table.RowCount))
-    )
+    return tuple(contents)
 
 
 def _bom_column(

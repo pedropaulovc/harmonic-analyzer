@@ -550,7 +550,7 @@ def _annotate_bom_number_binding(
         attributes[f"{prefix}_visible_column_count"] = columns
         caps.update(rows=rows > 65, columns=columns > 8)
         headers = [
-            str(table.DisplayedText(0, index) or "")[:56]
+            str(table.DisplayedText2(0, index, True) or "")[:56]
             for index in range(min(columns, 8))
         ]
         quantity_columns = [
@@ -562,8 +562,8 @@ def _annotate_bom_number_binding(
         printed_rows = [
             [
                 row,
-                str(table.DisplayedText(row, column) or "")[:56],
-                str(table.DisplayedText(row, quantity_column) or "")[:8]
+                str(table.DisplayedText2(row, column, True) or "")[:56],
+                str(table.DisplayedText2(row, quantity_column, True) or "")[:8]
                 if quantity_column is not None
                 else None,
             ]
@@ -920,8 +920,14 @@ def _bind_bom_number_property(
     label: str,
 ) -> None:
     """Display associative Numbers without replacing the native grouping column."""
+    rows = int(table.RowCount)
+    if int(table.TotalRowCount) != rows:
+        raise RuntimeError(f"{label} BOM has hidden rows before Number binding")
+    for row in range(rows):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
     headers = [
-        str(table.DisplayedText(0, column) or "").strip().upper()
+        str(table.DisplayedText2(0, column, True) or "").strip().upper()
         for column in range(int(table.ColumnCount))
     ]
     if "PART NUMBER" not in headers:
@@ -1027,7 +1033,7 @@ def _bom_number_column(table: Any, *, label: str) -> int:
             native_columns.append(index)
         if (
             index < visible
-            and str(table.DisplayedText(0, index) or "").strip().upper()
+            and str(table.DisplayedText2(0, index, True) or "").strip().upper()
             == "PART NUMBER"
         ):
             # The BOM property getter proves the binding, not this raw variant.
@@ -1065,6 +1071,45 @@ def validate_bom_number_property(
             f"{label} BOM Number proof has {row_count} rows; "
             f"expected {expected_rows if expected_rows is not None else 'at least 2'}"
         )
+    data_rows = tuple(range(1, row_count) if row_indices is None else row_indices)
+    if (
+        not data_rows
+        or len(set(data_rows)) != len(data_rows)
+        or any(type(row) is not int or row < 1 for row in data_rows)
+    ):
+        raise RuntimeError(f"{label} BOM Number proof has invalid data row indices")
+    if row_indices is None and int(table.TotalRowCount) != row_count:
+        raise RuntimeError(f"{label} BOM Number proof has hidden rows")
+    hidden_rows: list[list[Any]] = []
+    try:
+        for row in (0, *data_rows):
+            try:
+                hidden = table.RowHidden(row)
+            except Exception as error:
+                hidden_rows.append([row, f"{type(error).__name__}: {error}"[:160]])
+                raise
+            hidden_rows.append([row, hidden])
+            if hidden is not False:
+                raise RuntimeError(f"{label} BOM row {row} is not proven visible")
+    finally:
+        if row_indices is not None:
+            # The caller has already proved these global rows belong to this
+            # split piece. Record native visibility evidence, never infer it
+            # from a false result on an unchecked row index.
+            try:
+                proof = {
+                    "configuration": configuration,
+                    "rows": row_count,
+                    "total_rows": int(table.TotalRowCount),
+                    "global_rows": list(data_rows[:64]),
+                    "hidden": hidden_rows[:65],
+                    "truncated": len(data_rows) > 64,
+                }
+                payload = json.dumps(proof, separators=(",", ":"))
+                _telemetry.annotate(bom_split_row_visibility=payload)
+                _telemetry.info("drawing.bom_split_row_visibility " + payload)
+            except Exception:
+                pass  # Visibility diagnostics cannot replace the strict proof.
     column = _bom_number_column(table, label=label)
     annotation = _sw_type_info.early_bound_or_flag(
         table, "IBomTableAnnotation", "GetColumnCustomProperty", "GetComponents2"
@@ -1074,17 +1119,13 @@ def validate_bom_number_property(
     quantity_columns = [
         index
         for index in range(int(table.ColumnCount))
-        if str(table.DisplayedText(0, index) or "").strip().upper().startswith("QTY")
+        if str(table.DisplayedText2(0, index, True) or "")
+        .strip()
+        .upper()
+        .startswith("QTY")
     ]
     if len(quantity_columns) != 1:
         raise RuntimeError(f"{label} BOM has no unique quantity column")
-    data_rows = tuple(range(1, row_count) if row_indices is None else row_indices)
-    if (
-        not data_rows
-        or len(set(data_rows)) != len(data_rows)
-        or any(type(row) is not int or row < 1 for row in data_rows)
-    ):
-        raise RuntimeError(f"{label} BOM Number proof has invalid data row indices")
     snapshot: list[tuple[int, tuple[tuple[str, str, int], ...], str, str]] = []
     for row in data_rows:
         components = tuple(annotation.GetComponents2(row, configuration) or ())
@@ -1116,13 +1157,15 @@ def validate_bom_number_property(
                     f"configuration {member!r} has no Number property"
                 )
             numbers.add(number)
-        displayed = str(table.DisplayedText(row, column) or "").strip()
+        displayed = str(table.DisplayedText2(row, column, True) or "").strip()
         if len(numbers) != 1 or displayed not in numbers:
             raise RuntimeError(
                 f"{label} BOM row {row}: associative Number {displayed!r} "
                 f"does not match native component Numbers {sorted(numbers)!r}"
             )
-        quantity = str(table.DisplayedText(row, quantity_columns[0]) or "").strip()
+        quantity = str(
+            table.DisplayedText2(row, quantity_columns[0], True) or ""
+        ).strip()
         if occurrence_quantities:
             # Only the four count-based assembly consumers opt in. Bulk/length
             # quantities must not be inferred from the number of native objects.
@@ -1283,11 +1326,18 @@ def insert_bom_table(
         )
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
+    if int(table.TotalRowCount) != rows:
+        raise RuntimeError(f"{label} BOM has hidden rows before cell readback")
+    for row in range(rows):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
     contents = tuple(
         tuple(
             str(
                 adapter._attempt(
-                    lambda row=row, column=column: table.DisplayedText(row, column)
+                    lambda row=row, column=column: table.DisplayedText2(
+                        row, column, True
+                    )
                 )
                 or ""
             )
@@ -1353,7 +1403,9 @@ def insert_bom_table(
         for row in range(1, rows):
             part = (
                 str(
-                    adapter._attempt(lambda r=row: table.DisplayedText(r, part_column))
+                    adapter._attempt(
+                        lambda r=row: table.DisplayedText2(r, part_column, True)
+                    )
                     or ""
                 )
                 .strip()
@@ -1434,8 +1486,8 @@ def _set_bom_cell_text(
     *,
     label: str,
 ) -> None:
-    """Write and verify one visible BOM cell."""
-    table.SetText2(row, column, False, text)
-    applied = str(table.DisplayedText2(row, column, False) or "")
+    """Write and verify one physical BOM cell."""
+    table.SetText2(row, column, True, text)
+    applied = str(table.DisplayedText2(row, column, True) or "")
     if applied != text:
         raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")

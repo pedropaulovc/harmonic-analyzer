@@ -231,19 +231,26 @@ def test_source_census_requires_the_wire_presentation_to_be_collapsed(
 
 class _Bom:
     def __init__(self, drawing, member, *, advertised_excess=0):
-        self.cells = [
-            ["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY.", "NATIVE PART NUMBER"]
-        ]
+        self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY.", "PART NUMBER"]]
         self.advertised_excess = advertised_excess
         self.columns = [
             {"kind": 202, "property": None, "hidden": False, "width": 0.02},
-            {"kind": 204, "property": "Number", "hidden": False, "width": 0.02},
+            {
+                "kind": 204,
+                "property": '$PRP:"Number"',
+                "binding": "Number",
+                "hidden": False,
+                "width": 0.02,
+            },
             {"kind": 204, "property": "Description", "hidden": False, "width": 0.02},
             {"kind": 203, "property": None, "hidden": False, "width": 0.02},
             {"kind": 201, "property": False, "hidden": True, "width": 0.0},
         ]
+        self.number_property_readback = "Number"
+        self.hidden_rows = set()
         self.components = {}
         self.writes = []
+        self.title_writes = []
         for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
             stem, configuration = drawing.BOM_COMPONENT_IDENTITIES[logical]
             configuration = (
@@ -286,6 +293,15 @@ class _Bom:
         return len(self.cells)
 
     @property
+    def TotalRowCount(self):
+        return len(self.cells)
+
+    def RowHidden(self, row):
+        if not 0 <= row < len(self.cells):
+            raise IndexError("invalid physical row")
+        return row in self.hidden_rows
+
+    @property
     def ColumnCount(self):
         return sum(not column["hidden"] for column in self.columns)
 
@@ -299,6 +315,16 @@ class _Bom:
             for physical, column in enumerate(self.columns)
             if include_hidden or not column["hidden"]
         ]
+        if not include_hidden and indices and self.columns[indices[-1]]["kind"] == 203:
+            hidden_native = [
+                physical
+                for physical, column in enumerate(self.columns)
+                if column["hidden"] and column["kind"] == 201
+            ]
+            if hidden_native:
+                # Native2310's legacy projection replaces the last visible Qty
+                # slot with the hidden native PART NUMBER, not physical Qty.
+                indices[-1] = hidden_native[-1]
         return indices[index] if 0 <= index < len(indices) else None
 
     def GetColumnType3(self, index, include_hidden):
@@ -323,7 +349,10 @@ class _Bom:
         physical = self._column_index(index, True)
         if physical is None or self.columns[physical]["kind"] != 204:
             return ""
-        return self.columns[physical]["property"]
+        column = self.columns[physical]
+        if column.get("binding") == "Number":
+            return self.number_property_readback
+        return column["property"]
 
     def DisplayedText(self, row, column):
         return self.DisplayedText2(row, column, False)
@@ -336,19 +365,19 @@ class _Bom:
         return self.components[row] if configuration == "Default Simplified" else ()
 
     def IsCellTextEditable(self, _row, column):
-        physical = self._column_index(column, False)
+        physical = self._column_index(column, True)
         if physical is None:
-            raise IndexError("invalid displayed column")
-        return self.columns[physical]["property"] != "Number"
+            raise IndexError("invalid physical column")
+        return self.columns[physical].get("binding") != "Number"
 
     def SetText2(self, row, column, include_hidden, text):
         physical = self._column_index(column, include_hidden)
         if physical is None:
             raise IndexError("invalid displayed column write")
-        assert self.columns[physical]["property"] != "Number", (
+        assert self.columns[physical].get("binding") != "Number", (
             "the associative Number column must never be overwritten"
         )
-        self.writes.append((row, column, text))
+        self.writes.append((row, column, include_hidden, text))
         self.cells[row][physical] = text
 
     def InsertColumn2(self, position, column, title, _width):
@@ -369,6 +398,7 @@ class _Bom:
         physical = self._column_index(column, include_hidden)
         if physical is None:
             raise IndexError("invalid physical column title")
+        self.title_writes.append((column, title, include_hidden))
         self.cells[0][physical] = title
         return True
 
@@ -396,13 +426,128 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
         logical: str(item) for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)
     }
     assert table.cells[int(items[drawing.WIRE_ROW])][1] == "MHA-SH-VN-56"
-    assert all(column != 1 for _row, column, _text in table.writes)
+    assert all(
+        column != 1 and include_hidden is True
+        for _row, column, include_hidden, _text in table.writes
+    )
     assert len(table.columns) == table.ColumnCount + 1
     assert table.TotalColumnCount == len(table.columns) + advertised_excess
     native_column = len(table.columns) - 1
     assert table.GetColumnType3(native_column, True)[0] == 201
     assert table.ColumnHidden(native_column) is True
     assert table.GetColumnWidth(native_column) == 0.0
+    assert table.GetColumnType3(1, True) == (204, '$PRP:"Number"', 0)
+    assert table.GetColumnCustomProperty(1) == "Number"
+    quantity_column = table.cells[0].index("QTY.")
+    sku_column = table.cells[0].index(drawing.BOM_SKU_TITLE)
+    assert table.title_writes
+    assert all(
+        include_hidden is True for _column, _title, include_hidden in table.title_writes
+    )
+    assert table.GetColumnType3(quantity_column, True)[0] == 203
+    assert table.GetColumnType3(quantity_column, False)[0] == 201
+    assert table.DisplayedText2(0, quantity_column, True) == "QTY."
+    assert table.DisplayedText2(0, quantity_column, False) == "PART NUMBER"
+    assert table.DisplayedText(0, quantity_column) == "PART NUMBER"
+    wire_row = int(items[drawing.WIRE_ROW])
+    assert table.DisplayedText2(wire_row, quantity_column, False) == drawing.WIRE_ROW
+    assert table.DisplayedText(wire_row, quantity_column) == drawing.WIRE_ROW
+    snapshot = _drawing_tables.validate_bom_number_property(
+        table,
+        configuration="Default Simplified",
+        label="physical shared wire quantities",
+        expected_rows=1 + len(drawing.BOM_COMPONENTS),
+        occurrence_quantities=True,
+    )
+    assert [
+        (row, number, quantity) for row, _members, number, quantity in snapshot
+    ] == [
+        (item, drawing.BOM_PART_NUMBERS[logical], str(drawing.BOM_QUANTITIES[logical]))
+        for item, logical in enumerate(drawing.BOM_COMPONENTS, 1)
+    ]
+    for item, logical in enumerate(drawing.BOM_COMPONENTS, 1):
+        assert table.DisplayedText2(item, quantity_column, True) == str(
+            drawing.BOM_QUANTITIES[logical]
+        )
+        assert table.cells[item][quantity_column] == str(
+            drawing.BOM_QUANTITIES[logical]
+        )
+        assert table.DisplayedText2(item, sku_column, True) == drawing.BOM_SKUS[logical]
+    table.cells[wire_row][native_column] = "999"
+    assert table.DisplayedText(wire_row, quantity_column) == "999"
+    assert (
+        _drawing_tables.validate_bom_number_property(
+            table,
+            configuration="Default Simplified",
+            label="changed legacy wire projection",
+            expected_rows=1 + len(drawing.BOM_COMPONENTS),
+            occurrence_quantities=True,
+        )
+        == snapshot
+    )
+    for index in range(len(table.columns), table.TotalColumnCount + 2):
+        for include_hidden in (False, True):
+            assert table.GetColumnType3(index, include_hidden) == (-1, None, 0)
+            assert table.GetColumnTitle2(index, include_hidden) == ""
+            assert table.DisplayedText2(0, index, include_hidden) == ""
+        assert table.GetColumnWidth(index) == 0.0
+        assert table.ColumnHidden(index) is False
+        assert table.GetColumnCustomProperty(index) == ""
+
+
+@pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+@pytest.mark.parametrize("hidden", ["header", "wire"])
+def test_bom_refuses_hidden_physical_rows_before_writing_vendor_skus(
+    monkeypatch, drawing, member, _assembly, hidden
+):
+    _unwrapped_com(monkeypatch, drawing)
+    table = _Bom(drawing, member)
+    wire_row = drawing.BOM_COMPONENTS.index(drawing.WIRE_ROW) + 1
+    table.hidden_rows.add(0 if hidden == "header" else wire_row)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(adapter, table)
+    assert not table.writes
+    assert not table.title_writes
+    assert len(table.columns) == 5
+
+
+@pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
+@pytest.mark.parametrize("raw_property_data", ["Number", '$PRP:"Number"'])
+@pytest.mark.parametrize("fault", ["wrong", "blank", "unreadable"])
+def test_bom_requires_native_number_getter_even_when_raw_metadata_looks_bound(
+    monkeypatch, drawing, member, _assembly, raw_property_data, fault
+):
+    _unwrapped_com(monkeypatch, drawing)
+    table = _Bom(drawing, member)
+    table.columns[1]["property"] = raw_property_data
+    if fault == "unreadable":
+        native_getter = table.GetColumnCustomProperty
+
+        def unreadable_property(column):
+            physical = table._column_index(column, True)
+            if (
+                physical is not None
+                and table.columns[physical].get("binding") == "Number"
+            ):
+                raise RuntimeError("native custom-property getter failed")
+            return native_getter(column)
+
+        monkeypatch.setattr(table, "GetColumnCustomProperty", unreadable_property)
+    else:
+        table.number_property_readback = "Description" if fault == "wrong" else ""
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    message = (
+        "native custom-property getter failed"
+        if fault == "unreadable"
+        else "Number property binding did not persist"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._validate_bom(adapter, table)
+    assert [row[1] for row in table.cells[1:]] == [
+        drawing.BOM_PART_NUMBERS[logical] for logical in drawing.BOM_COMPONENTS
+    ]
+    assert all(column != 1 for _row, column, _include_hidden, _text in table.writes)
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
@@ -511,7 +656,7 @@ def test_bom_does_not_accept_rebuild_damage_as_its_settled_baseline(
     with pytest.raises(RuntimeError, match=message):
         drawing._validate_bom(adapter, table)
     assert table.cells[wire_row][1] == original_number
-    assert all(column != 1 for _row, column, _text in table.writes)
+    assert all(column != 1 for _row, column, _include_hidden, _text in table.writes)
 
 
 def test_wire_application_instructions_stay_with_the_assembly_consumers():
