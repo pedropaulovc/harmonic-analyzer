@@ -1159,8 +1159,9 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    # Both drawing configurations own the explode: the exploded sheets'
-    # views at 1:2 reference Default Simplified.
+    # Both drawing configurations own the explode and its native-verified
+    # offset metadata. The drawing's simplified views consume those file-level
+    # readbacks without activating a configuration on the released source.
     author_in_drawing_configurations(
         adapter,
         ASM_NAME,
