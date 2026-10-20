@@ -21,9 +21,10 @@ from __future__ import annotations
 from _mcmaster_9666k56 import SKU
 from sh_vn_music_wire_lever_geom import WIRE_DIA  # noqa: F401 (re-export, import-pure)
 
-# Note-based: the un-pickable Ø0.8 wire carries no marked model dimension, so the
-# marked set is empty and the drawing keeps nothing (the lockstep test asserts
-# union(marks) == union(keeps) == {}).
+BOM_DESCRIPTION = f"LEVER WIRE, DIA {WIRE_DIA:.1f}"
+
+# This sheet imports no model dimensions. The shared native marks Wire/Depth
+# for PenWire, but the LeverWire sheet deliberately keeps an empty mark set.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {}
 
 # The balloon ring's station, as a fraction of the run from the drum end

@@ -26,6 +26,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     visible_component_entities,
 )
 
+import _config
+
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
@@ -220,7 +222,7 @@ BOM_PART_NUMBERS = {
     "fr-vn-lag-screw": "MHA-FR-VN-51",
     "fr-top-frame": "MHA-FR-02",
     "fr-nameplate": "MHA-FR-04",
-    "sh-vn-brass-fillister-screw": "MHA-SH-VN-51",
+    "sh-vn-brass-fillister-screw": str(_config.parts("sh-vn-brass-fillister-screw")["number"]),
     "fr-vn-frame-cross-screw": "MHA-FR-VN-53",
     "fr-vn-gooseneck-set-screw": "MHA-FR-VN-52",
 }

@@ -133,3 +133,85 @@ def test_shared_purchase_number_alone_cannot_disambiguate_configured_rows():
                 " mha-sh-vn-50 ": "sh-vn-chain-link--OuterLink",
             },
         )
+
+
+@pytest.mark.parametrize(
+    ("stem", "number", "members"),
+    [
+        (
+            "sh-vn-chain-link", "MHA-SH-VN-50",
+            (("InnerLink", 34), ("OuterLink", 33)),
+        ),
+        (
+            "sh-vn-music-wire", "MHA-SH-VN-56",
+            (("LeverWire", 1), ("PenWire", 1)),
+        ),
+        (
+            "sh-vn-clamping-kit-hardware", "MHA-SH-VN-57",
+            (("HoldDownStud", 4), ("TNut", 4), ("FlangeNut", 4)),
+        ),
+    ],
+)
+def test_native_bom_rows_preserve_repeated_purchase_numbers_and_member_quantities(
+    monkeypatch, stem, number, members,
+):
+    import _component_references as references
+    import _drawing_tables as tables
+
+    monkeypatch.setattr(references, "_early_bound", lambda raw, _interface: raw)
+    monkeypatch.setattr(
+        tables._sw_type_info, "early_bound_or_flag",
+        lambda raw, _interface, *_methods: raw,
+    )
+
+    def component(native_stem, member):
+        return SimpleNamespace(
+            GetPathName=lambda: f"C:/cad/{native_stem}.SLDPRT",
+            ReferencedConfiguration=f"{member} Simplified",
+        )
+
+    contents = [("ITEM", "NUMBER", "QTY")]
+    components = {}
+    identities = {}
+    expected_rows = {}
+    # Native row order need not follow the logical member declaration order.
+    for member, quantity in reversed(members):
+        logical = f"{stem}--{member}"
+        row = len(contents)
+        contents.append((str(row), number, str(quantity)))
+        components[row] = tuple(component(stem, member) for _ in range(quantity))
+        identities[logical] = (stem, member)
+        expected_rows[logical] = row
+    transgear = "pd-transgear-removable"
+    row = len(contents)
+    contents.append((str(row), "MHA-PD-04", "3"))
+    components[row] = tuple(
+        component(transgear, member) for member in ("T12", "T24", "T18")
+    )
+    identities[transgear] = (transgear, None)
+    expected_rows[transgear] = row
+    calls = []
+
+    def native_components(row, configuration):
+        calls.append((row, configuration))
+        return components[row]
+
+    table = SimpleNamespace(
+        RowCount=len(contents),
+        GetComponents2=native_components,
+        Text2=lambda row, column: contents[row][column],
+    )
+    actual = tables.bom_row_identities(
+        table, configuration="Default", component_identities=identities,
+    )
+
+    assert actual == expected_rows
+    assert calls == [(row, "Default") for row in range(1, len(contents))]
+    assert {
+        table.Text2(actual[f"{stem}--{member}"], 1) for member, _quantity in members
+    } == {number}
+    assert {
+        member: int(table.Text2(actual[f"{stem}--{member}"], 2))
+        for member, _quantity in members
+    } == dict(members)
+    assert int(table.Text2(actual[transgear], 2)) == 3

@@ -84,6 +84,21 @@ def _archive_occurrence(component):
     }
 
 
+def _archive_member_key(stem, configuration, reference):
+    """Project an exact current member/role into the sealed archive namespace."""
+    role, separator, ordinal = reference.partition(":")
+    if not separator or not ordinal.isdecimal() or int(ordinal) < 1:
+        raise ValueError(f"invalid semantic reference: {reference!r}")
+    matches = [
+        archived_stem
+        for archived_stem, identity in _ARCHIVE_MEMBERS.items()
+        if identity == (stem, configuration, role)
+    ]
+    if len(matches) != 1:
+        raise ValueError(f"ambiguous or missing archived member: {(stem, configuration, reference)!r}")
+    return f"{matches[0]}-{int(ordinal)}"
+
+
 def expect(asm, comp, pos, rows, label, pos_tol=1e-3, row_tol=1e-6):
     archived = _archive_occurrence(comp)
     _telemetry.debug(f"archived pose selector {archived!r}; no rebuilt Name2 claim")
@@ -157,7 +172,12 @@ import build_pn_pen_assembly as p
 expect("pn-pen", "pn-pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pn-pen-hanger")
 expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 for _stem, _pos, _rows in p.RIDERS:
-    expect("pn-pen", f"{_stem}-1", list(_pos), _rows, _stem)
+    archived_key = (
+        _archive_member_key(_stem, "PenWire", "PenWire:1")
+        if _stem == "sh-vn-music-wire"
+        else f"{_stem}-1"
+    )
+    expect("pn-pen", archived_key, list(_pos), _rows, _stem)
 expect("pn-pen", "pn-vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "pn-vn-hanger-screw")
 expect("pn-pen", "pn-vn-pen-hanger-nut-1", list(p.HANGER_NUT_POS), IDENTITY, "pn-vn-pen-hanger-nut")
 expect(

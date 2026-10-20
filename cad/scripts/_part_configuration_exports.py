@@ -10,11 +10,28 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 _SCHEMA = "harmonic-analyzer/part-member-neutral@1"
+
+
+def step_export_preferences():
+    """Create the shared AP214 baseline without loading seat dependencies on import."""
+    from _preferences import PreferenceSpec
+
+    # AP214 carries colours. Face/edge properties preserve feature-face names;
+    # split periodic faces retain the representation used by feature bundles.
+    return PreferenceSpec(
+        label="step-export",
+        integers={75: 214},  # swStepAP
+        toggles={
+            396: True,  # swStepExportSplitPeriodic
+            397: True,  # swStepExportFaceEdgeProps
+        },
+    )
 
 
 def mesh_key(stem: str, cfg: str) -> str:
@@ -57,7 +74,8 @@ def member_configurations(stem: str) -> tuple[str, ...]:
     if quantities is None:
         return ()
     default = row.get("default_configuration")
-    if (not isinstance(quantities, dict) or not quantities or default not in quantities
+    if (not isinstance(quantities, dict) or not quantities
+            or not isinstance(default, str) or default not in quantities
             or any(not isinstance(name, str)
                    or re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name) is None
                    or not isinstance(quantity, int) or isinstance(quantity, bool)
@@ -125,11 +143,12 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
         identity = (root / "sldprt" / f".{dashed}.execution").read_text(encoding="utf-8").strip()
     except (OSError, ValueError) as exc:
         raise RuntimeError(
-            f"{dashed}: member export certificate/execution identity missing; rebuild part:{stem}"
+            f"{dashed}: member export certificate/execution identity missing; "
+            f"request an explicit reasoned cache refresh of part:{stem}"
         ) from exc
     expected_source = f"sldprt/{dashed}.SLDPRT"
     native = root / expected_source
-    if (certificate.get("schema") != _SCHEMA
+    if (not isinstance(certificate, dict) or certificate.get("schema") != _SCHEMA
             or certificate.get("source") != expected_source
             or not re.fullmatch(r"[0-9a-f]{64}", identity)
             or certificate.get("execution_identity") != identity
@@ -137,7 +156,10 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
             or certificate.get("default_configuration") != next(iter(members))
             or not isinstance(certificate.get("configurations"), dict)
             or set(certificate["configurations"]) != set(members)):
-        raise RuntimeError(f"{dashed}: stale member export identity/inventory; rebuild part:{stem}")
+        raise RuntimeError(
+            f"{dashed}: stale member export identity/inventory; "
+            f"request an explicit reasoned cache refresh of part:{stem}"
+        )
     outputs: set[Path] = set()
     for configuration, paths in members.items():
         records = certificate["configurations"][configuration]
@@ -147,7 +169,8 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
             path = paths[kind]
             if records[kind] != _file_record(path, root):
                 raise RuntimeError(
-                    f"{dashed}/{configuration}: stale member {kind} bytes; rebuild part:{stem}"
+                    f"{dashed}/{configuration}: stale member {kind} bytes; "
+                    f"request an explicit reasoned cache refresh of part:{stem}"
                 )
             outputs.add(path)
     return outputs
@@ -162,8 +185,9 @@ def _active_configuration(doc: Any) -> str:
 
 
 def _show_member(doc: Any, stem: str, configuration: str) -> None:
-    if not doc.ShowConfiguration2(configuration) or _active_configuration(doc) != configuration:
-        raise RuntimeError(f"{stem}: could not activate export member {configuration!r}")
+    if _active_configuration(doc) != configuration:
+        if not doc.ShowConfiguration2(configuration) or _active_configuration(doc) != configuration:
+            raise RuntimeError(f"{stem}: could not activate export member {configuration!r}")
     if not doc.ForceRebuild3(False) or not doc.EditRebuild3():
         raise RuntimeError(f"{stem}/{configuration}: member export rebuild failed")
     if _active_configuration(doc) != configuration:
@@ -178,12 +202,20 @@ async def export_member_configurations(
     Only the changed part task invokes this producer. No native save is allowed
     after this hook; dodo's existing post-build execution stamp must hash the same
     bytes certified here. A partial export has no certificate and cannot release.
+    Export failures remain primary if default restoration or the native SHA guard
+    also fails; cleanup errors are attached as notes. Cleanup-only failures raise
+    and likewise prevent certification.
     """
     from _check import check
     from _part_save import set_isometric_view
-    from _preferences import STEP_EXPORT_PREFERENCES, enforce_preferences
+    from _preferences import enforce_preferences
 
+    part_name = part_name.replace("_", "-")
     members = configuration_export_paths(part_name)
+    root = (next(iter(members.values()))["step"].parent.parent if members
+            else Path(__file__).resolve().parents[1] / "out")
+    manifest = configuration_manifest_path(part_name, root)
+    manifest.unlink(missing_ok=True)
     names = tuple(members)
     if not names or tuple(configurations) != names:
         raise RuntimeError(f"{part_name}: native and registry export members differ")
@@ -191,14 +223,11 @@ async def export_member_configurations(
     default = names[0]
     if _active_configuration(doc) != default:
         raise RuntimeError(f"{part_name}: saved active export member must be {default!r}")
-    root = members[default]["step"].parent.parent
     native = root / "sldprt" / f"{part_name}.SLDPRT"
     if Path(doc.GetPathName()).resolve() != native.resolve():
         raise RuntimeError(f"{part_name}: export document is not the saved native part")
     before = _sha256(native)
-    manifest = configuration_manifest_path(part_name, root)
-    manifest.unlink(missing_ok=True)
-    enforce_preferences(adapter, STEP_EXPORT_PREFERENCES)
+    enforce_preferences(adapter, step_export_preferences())
     records: dict[str, dict[str, Any]] = {}
     try:
         for configuration, paths in members.items():
@@ -206,6 +235,8 @@ async def export_member_configurations(
             step, png = paths["step"], paths["png"]
             step.parent.mkdir(parents=True, exist_ok=True)
             step.unlink(missing_ok=True)
+            # Neutral SaveAs can otherwise export a reader's selected body subset.
+            doc.ClearSelection2(True)
             rc = doc.SaveAs3(str(step.resolve()), 0, 1 | 8)  # Silent | AvoidRebuildOnSave
             if not step.is_file() or step.stat().st_size == 0:
                 step.unlink(missing_ok=True)
@@ -220,9 +251,33 @@ async def export_member_configurations(
             records[configuration] = {kind: _file_record(paths[kind], root)
                                       for kind in ("step", "png")}
     finally:
-        _show_member(doc, part_name, default)
-        if _sha256(native) != before:
-            raise RuntimeError(f"{part_name}: native bytes changed during member export")
+        primary_error = sys.exception()
+        restoration_error = None
+        try:
+            _show_member(doc, part_name, default)
+        except Exception as cleanup_error:
+            if primary_error is None:
+                restoration_error = cleanup_error
+            else:
+                primary_error.add_note(
+                    f"Default member restoration failed: {type(cleanup_error).__name__}: {cleanup_error}"
+                )
+        try:
+            if _sha256(native) != before:
+                raise RuntimeError(f"{part_name}: native bytes changed during member export")
+        except Exception as cleanup_error:
+            pending_error = primary_error if primary_error is not None else restoration_error
+            if pending_error is None:
+                raise
+            pending_error.add_note(
+                f"Native SHA guard failed: {type(cleanup_error).__name__}: {cleanup_error}"
+            )
+        if primary_error is None and restoration_error is not None:
+            raise restoration_error
+    for configuration, paths in members.items():
+        for kind in ("step", "png"):
+            if records[configuration][kind] != _file_record(paths[kind], root):
+                raise RuntimeError(f"{part_name}/{configuration}: member {kind} changed during export")
     certificate = {
         "schema": _SCHEMA, "source": native.relative_to(root).as_posix(),
         "execution_identity": before, "default_configuration": default,

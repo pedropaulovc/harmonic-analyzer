@@ -76,6 +76,7 @@ from _assembly import (
 from _assembly_patterns import ensure_global_pattern_axis
 from _check import check
 from _com import _early_bound
+from _component_references import component_identity, component_reference_names
 from _custom_properties import apply_custom_properties
 from _drawing_marks import DRAWN_BY, mark_dimensions_for_drawing
 from _drawing_precision import apply_drawing_precision
@@ -97,43 +98,44 @@ from _visibility import blank_reference_geometry
 
 ASM_NAME = "ch-rocker-arm-tl-oblique-jig"
 assert ASM_NAME == spec.ASM_NAME, (ASM_NAME, spec.ASM_NAME)
-# Every inserted part in BOM order, literal: the build graph reads this
-# script's insertion sources syntactically (_buildgraph._AssemblySources),
-# never the spec, so the stems are spelled here and proven to be the spec's.
+# Literal (physical filename, logical family) rows: the build graph reads the
+# first field syntactically, never through a spec-derived or generated filename.
+# Repeated kit files are one producer and three separately configured BOM rows.
 _PARTS = (
-    "ch-rocker-arm-tl-oblique-base-bar",
-    "ch-rocker-arm-tl-oblique-carrier",
-    "ch-rocker-arm-tl-oblique-pivot-block",
-    "ch-rocker-arm-tl-oblique-pivot-pin",
-    "ch-rocker-arm-tl-oblique-riser",
-    "ch-rocker-arm-tl-oblique-hub-pin",
-    "ch-rocker-arm-tl-oblique-feed-lever",
-    "ch-rocker-arm-tl-oblique-end-bracket",
-    "ch-rocker-arm-tl-oblique-nut-bracket",
-    "ch-rocker-arm-tl-vn-oblique-rail",
-    "ch-rocker-arm-tl-vn-oblique-carriage",
-    "ch-rocker-arm-tl-vn-oblique-bearing",
-    "ch-rocker-arm-tl-vn-oblique-cl-dowel",
-    "ch-rocker-arm-tl-vn-oblique-leadscrew",
-    "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-    "ch-rocker-arm-tl-vn-oblique-pillow-block",
-    "ch-rocker-arm-tl-vn-oblique-handwheel",
-    "ch-rocker-arm-tl-vn-oblique-hold-down-stud",
-    "ch-rocker-arm-tl-vn-oblique-t-nut",
-    "ch-rocker-arm-tl-vn-oblique-flange-nut",
-    "ch-rocker-arm-tl-vn-oblique-rail-screw",
-    "ch-rocker-arm-tl-vn-oblique-bracket-screw",
-    "ch-rocker-arm-tl-vn-oblique-block-screw",
-    "ch-rocker-arm-tl-vn-oblique-carriage-screw",
-    "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-    "ch-rocker-arm-tl-vn-oblique-nut-screw",
-    "ch-rocker-arm-tl-vn-oblique-riser-screw",
-    "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-    "ch-rocker-arm-tl-vn-oblique-lever-screw",
-    "ch-rocker-arm-tl-vn-oblique-block-washer",
-    "ch-rocker-arm-tl-vn-oblique-lever-washer",
+    ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
+    ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
+    ("ch-rocker-arm-tl-oblique-pivot-block", "ch-rocker-arm-tl-oblique-pivot-block"),
+    ("ch-rocker-arm-tl-oblique-pivot-pin", "ch-rocker-arm-tl-oblique-pivot-pin"),
+    ("ch-rocker-arm-tl-oblique-riser", "ch-rocker-arm-tl-oblique-riser"),
+    ("ch-rocker-arm-tl-oblique-hub-pin", "ch-rocker-arm-tl-oblique-hub-pin"),
+    ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
+    ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
+    ("ch-rocker-arm-tl-oblique-nut-bracket", "ch-rocker-arm-tl-oblique-nut-bracket"),
+    ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
+    ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
+    ("ch-rocker-arm-tl-vn-oblique-bearing", "ch-rocker-arm-tl-vn-oblique-bearing"),
+    ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-nut", "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"),
+    ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
+    ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
+    ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
+    ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--TNut"),
+    ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--FlangeNut"),
+    ("ch-rocker-arm-tl-vn-oblique-rail-screw", "ch-rocker-arm-tl-vn-oblique-rail-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-block-screw", "ch-rocker-arm-tl-vn-oblique-block-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-block-washer", "ch-rocker-arm-tl-vn-oblique-block-washer"),
+    ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
 )
-assert _PARTS == spec.BOM_ORDER, (_PARTS, spec.BOM_ORDER)
+assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
+assert all(spec.COMPONENT_IDENTITIES[family][0] == physical for physical, family in _PARTS)
 # A family of this many instances or more goes in one AddComponents3 (one
 # family per batch: the batch matches components by origin, and no two
 # instances of one family share an origin).
@@ -150,42 +152,77 @@ def sweep_sidecar_path() -> Path:
     return dof_manifest_path(ASM_NAME).with_name(f".{ASM_NAME}.sweep.json")
 
 
-async def _place_family(adapter: Any, stem: str) -> None:
-    """Every instance of ``stem`` at its spec pose, in instance order: the
-    moving families free for their mates, the rest fixed. SolidWorks numbers
-    a part's instances in insertion order, and the mates name them so."""
-    ground = stem not in spec.MOVING
-    placements = spec.PLACEMENTS[stem]
-    expected = [spec.instance_name(stem, index) for index in range(len(placements))]
+async def _place_family(adapter: Any, physical: str, family: str) -> dict[str, str]:
+    """Insert a logical family in one batch where possible; retain actual names.
+
+    Kit references are role-local ordinals. SOLIDWORKS allocates the native
+    Name2 suffix across the shared file, so it is never inferred from that ordinal.
+    """
+    native_stem, configuration = spec.COMPONENT_IDENTITIES[family]
+    if physical != native_stem:
+        raise ValueError(f"{family}: manifest file {physical!r} != {native_stem!r}")
+    ground = family not in spec.MOVING
+    placements = spec.PLACEMENTS[family]
+    selectors = [spec.instance_name(family, index) for index in range(len(placements))]
     if len(placements) >= _BATCH_MIN:
+        # Keep the batch's source rows in the bounded append-loop form the
+        # build graph enumerates; placement metadata is not a filename source.
         rows_spec = []
-        for origin, rows in placements:
+        for index, (origin, rows) in enumerate(placements):
+            selector = selectors[index]
             rows_spec.append(
                 {
-                    "part": stem,
+                    "part": physical,
                     "position": list(origin),
                     "rows": _rows(rows),
                     "ground": ground,
+                    "configuration": configuration or "",
+                    "component_reference": selector[1:] if configuration else "",
+                    "occurrence_basename": family if configuration else "",
                 }
             )
-        names = await place_components_batch(adapter, rows_spec, label=stem)
+        names = await place_components_batch(adapter, rows_spec, label=family)
     else:
         names = []
-        for name, (origin, rows) in zip(expected, placements, strict=True):
+        for selector, (origin, rows) in zip(selectors, placements, strict=True):
             matrix = _rows(rows)
             names.append(
                 await place_component(
                     adapter,
-                    stem,
+                    physical,
                     list(origin),
                     euler_from_rows(matrix),
                     matrix,
                     ground=ground,
-                    label=name,
+                    configuration=configuration or "",
+                    component_reference=selector[1:] if configuration else "",
+                    occurrence_basename=family if configuration else "",
+                    label=selector,
                 )
             )
-    if names != expected:
-        raise RuntimeError(f"{stem}: inserted {names!r}, expected {expected!r}")
+    if len(names) != len(selectors) or len(set(names)) != len(names):
+        raise RuntimeError(f"{family}: incomplete or repeated inserted names {names!r}")
+    observed = dict(zip(selectors, names, strict=True))
+    if configuration:
+        resolved = component_reference_names(
+            adapter.currentModel,
+            {selector: (physical, configuration) for selector in selectors},
+        )
+        if resolved != observed:
+            raise RuntimeError(f"{family}: inserted references {observed!r} != {resolved!r}")
+    elif names != selectors:
+        raise RuntimeError(f"{family}: inserted {names!r}, expected {selectors!r}")
+    return observed
+
+
+def _verify_kit_references(adapter: Any, placed_names: dict[str, str]) -> None:
+    """Read every kit role/file/member again after the final solve before save."""
+    actual = component_reference_names(
+        adapter.currentModel, spec.KIT_COMPONENT_REFERENCES
+    )
+    expected = {selector: placed_names[selector] for selector in actual}
+    if actual != expected:
+        raise RuntimeError(f"jig final kit references {actual!r} != inserted {expected!r}")
 
 
 async def _mate_carriages(adapter: Any) -> None:
@@ -400,14 +437,17 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
         _early_bound(component, "IComponent2")
         for component in (assembly.GetComponents(True) or ())
     )
-    groups: dict[str, list[Any]] = {stem: [] for stem in spec.QUANTITIES}
+    component_reference_names(model, spec.KIT_COMPONENT_REFERENCES)
+    groups: dict[str, list[Any]] = {family: [] for family in spec.QUANTITIES}
     for component in components:
-        stem = Path(str(component.GetPathName() or "")).stem.casefold()
-        if stem not in groups:
+        identity = component_identity(component)
+        try:
+            family = spec.component_family(*identity)
+        except ValueError as error:
             raise RuntimeError(
-                f"{view_name}: unexpected component {component.Name2}: {stem}"
-            )
-        groups[stem].append(component)
+                f"{view_name}: unexpected component {component.Name2}: {identity!r}"
+            ) from error
+        groups[family].append(component)
     counts = {stem: len(group) for stem, group in groups.items()}
     if counts != spec.QUANTITIES:
         raise RuntimeError(
@@ -746,8 +786,9 @@ async def build(adapter) -> dict[str, str]:
     # FeatureManager order; the base bars come first and SolidWorks fixes the
     # first insert), each instance at its spec pose: the structure fixed, the
     # moving families free at the inner pass's symmetric pose.
-    for part in _PARTS:
-        await _place_family(adapter, part)
+    placed_names: dict[str, str] = {}
+    for physical, family in _PARTS:
+        placed_names.update(await _place_family(adapter, physical, family))
     # The carriages on their rails; what rides a carriage, a pivot block or
     # the nut bracket locked to it; the carrier on the pins; its riders
     # locked to it.
@@ -820,7 +861,11 @@ async def build(adapter) -> dict[str, str]:
         lambda configuration: _create_jig_explode(adapter, configuration),
     )
     name_machine_views(adapter)
-    return await save_assembly_and_images(adapter, ASM_NAME)
+    return await save_assembly_and_images(
+        adapter,
+        ASM_NAME,
+        solved_gates=lambda current: _verify_kit_references(current, placed_names),
+    )
 
 
 if __name__ == "__main__":

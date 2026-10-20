@@ -1,10 +1,11 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-00)."""
 
+import asyncio
 from itertools import product
 import math
 import re
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,7 +14,9 @@ import _assembly
 from _assembly_contract import assembly_contract
 import _chain as chain
 import _config
+import _component_references
 import _drawing_balloons
+import _drawing_tables
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 import build_pd_paper_drive_assembly as assembly
@@ -2039,3 +2042,217 @@ def test_spare_is_hidden_edge_on_and_shown_on_the_ballooned_isometric(
     # The returned isometric is the ballooned one, its instances untouched.
     assert iso is views["*Isometric"][0]
     assert all(drawn.Visible is None for drawn in views["*Isometric"][1])
+
+
+def _native_pd_component(name, stem, configuration, *, origin=None):
+    transform = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    transform.extend(value / 1000.0 for value in (origin or (0.0, 0.0, 0.0)))
+    return SimpleNamespace(
+        Name2=name,
+        GetPathName=lambda: f"C:/native/{stem}.SLDPRT",
+        ReferencedConfiguration=configuration,
+        ComponentReference="",
+        Transform2=SimpleNamespace(ArrayData=transform),
+    )
+
+
+def _native_chain_fixture(monkeypatch):
+    monkeypatch.setattr(assembly, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
+    components = []
+    for station in range(chain.LINK_COUNT):
+        stem = assembly.CHAIN_LINK_STEM
+        configuration = (
+            assembly.INNER_LINK_CONFIGURATION if station % 2 == 0
+            else assembly.OUTER_LINK_CONFIGURATION
+        )
+        if station == chain.LINK_COUNT - 1:
+            stem, configuration = assembly.CONNECTING_LINK_STEM, "Default"
+        # Native suffixes deliberately run opposite to semantic loop ordinals.
+        component = _native_pd_component(
+            f"{stem}--{configuration}-{901 - station * 7}",
+            stem,
+            configuration,
+            origin=assembly._chain_station_point(station),
+        )
+        # Pattern copies may initially inherit one seed reference.
+        component.ComponentReference = f"{configuration}:1"
+        components.append(component)
+    model = MagicMock()
+    model.GetComponents.side_effect = lambda _top_only: tuple(reversed(components))
+    return model, components
+
+
+def test_chain_roles_follow_validated_loop_stations_not_native_indices(monkeypatch):
+    model, components = _native_chain_fixture(monkeypatch)
+    names = assembly._assign_chain_references(model)
+    assert len(names) == 67
+    assert names["@InnerLink:1"] == components[0].Name2
+    assert names["@InnerLink:34"] == components[66].Name2
+    assert names["@OuterLink:33"] == components[65].Name2
+    assert len({component.ComponentReference for component in components[:-1]}) == 67
+    model.ForceRebuild3.assert_called_once_with(False)
+    # Drawing simplification may change only the derived suffix.
+    for component in components:
+        component.ReferencedConfiguration += " Simplified"
+    assert assembly._chain_reference_names(model) == names
+
+
+@pytest.mark.parametrize("fault", ("wrong-member", "duplicate-station", "off-plane", "missing"))
+def test_chain_station_census_rejects_wrong_or_duplicate_members(monkeypatch, fault):
+    model, components = _native_chain_fixture(monkeypatch)
+    if fault == "wrong-member":
+        components[3].ReferencedConfiguration = assembly.INNER_LINK_CONFIGURATION
+    elif fault == "duplicate-station":
+        components[3].Transform2.ArrayData = components[1].Transform2.ArrayData[:]
+    elif fault == "off-plane":
+        components[3].Transform2.ArrayData[11] += 0.001
+    else:
+        components.pop(3)
+    with pytest.raises(RuntimeError):
+        assembly._assign_chain_references(model)
+
+
+def test_chain_roles_are_read_back_after_pattern_rebuild(monkeypatch):
+    model, components = _native_chain_fixture(monkeypatch)
+
+    def overwrite_inherited_references(_top_only):
+        for component in components[0:-1:2]:
+            component.ComponentReference = "InnerLink:1"
+        return True
+
+    model.ForceRebuild3.side_effect = overwrite_inherited_references
+    with pytest.raises(RuntimeError, match="duplicated"):
+        assembly._assign_chain_references(model)
+
+
+
+
+def _pd_bom_fixture(monkeypatch):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
+    monkeypatch.setattr(
+        _drawing_tables._sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj
+    )
+    quantities = {
+        key: 1 for key in drawing.BOM_COMPONENT_IDENTITIES
+    } | drawing.TRANSGEAR_QUANTITIES | drawing.CHAIN_QUANTITIES
+    quantities["sh-vn-brass-fillister-screw"] = len(assembly.GUIDE_SCREW_XY)
+    quantities["sh-vn-clamp-screw"] = len(assembly.CLAMP_HOLE_X)
+    components_by_key = {}
+    for key, (stem, member) in drawing.BOM_COMPONENT_IDENTITIES.items():
+        configurations = (
+            (sprocket.KNOB_CONFIG, sprocket.CRANK_CONFIG, "T18")
+            if key == "pd-transgear-removable" else
+            (member or "Default",) * quantities[key]
+        )
+        components_by_key[key] = [
+            _native_pd_component(
+                f"native-{key}-{index + 100}", stem, f"{configuration} Simplified"
+            )
+            for index, configuration in enumerate(configurations)
+        ]
+    components = [
+        component for group in components_by_key.values() for component in group
+    ]
+    model = SimpleNamespace(GetComponents=lambda _top_only: tuple(components))
+    keys = tuple(reversed(drawing.BOM_PART_NUMBERS))
+    cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]]
+    cells.extend(
+        [str(row), drawing.BOM_PART_NUMBERS[key], drawing.BOM_DESCRIPTIONS[key], str(quantities[key])]
+        for row, key in enumerate(keys, 1)
+    )
+    table = MagicMock()
+    table.RowCount, table.ColumnCount = len(cells), 4
+    table.DisplayedText.side_effect = lambda row, column: cells[row][column]
+    table.SetColumnWidth.side_effect = lambda _column, width, _options: width
+    table.GetComponents2.side_effect = lambda row, _configuration: components_by_key[keys[row - 1]]
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
+    return model, components, table, adapter, cells, keys
+
+
+def test_source_census_distinguishes_chain_members_and_preserves_transgear_aggregation(monkeypatch):
+    model, _components, table, adapter, _cells, keys = _pd_bom_fixture(monkeypatch)
+    counts = drawing._source_family_counts(model)
+    assert counts["sh-vn-chain-link--InnerLink"] == 34
+    assert counts["sh-vn-chain-link--OuterLink"] == 33
+    assert counts["pd-vn-chain-connecting-link"] == 1
+    assert counts["pd-transgear-removable"] == 3
+    items = dict(
+        drawing._validate_bom(
+            adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        )
+    )
+    for key in ("sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink", "pd-transgear-removable"):
+        assert items[key] == str(keys.index(key) + 1)
+    assert items["sh-vn-chain-link--InnerLink"] != items["sh-vn-chain-link--OuterLink"]
+    table.SetText2.assert_not_called()
+
+
+@pytest.mark.parametrize("fault", ("wrong-member", "duplicate-total", "duplicate-native-name"))
+def test_source_census_rejects_member_substitution_and_duplicate_occurrences(monkeypatch, fault):
+    model, components, _table, _adapter, _cells, _keys = _pd_bom_fixture(monkeypatch)
+    inner = next(c for c in components if c.ReferencedConfiguration == "InnerLink Simplified")
+    if fault == "wrong-member":
+        inner.ReferencedConfiguration = "OuterLink Simplified"
+    elif fault == "duplicate-total":
+        components.append(_native_pd_component("extra-native-707", "sh-vn-chain-link", "InnerLink"))
+    else:
+        components.append(inner)
+    with pytest.raises(RuntimeError):
+        drawing._source_family_counts(model)
+
+
+@pytest.mark.parametrize("fault", ("merged-members", "wrong-quantity", "internal-number", "blank-number"))
+def test_bom_refuses_merged_chain_rows_or_noncanonical_numbers(monkeypatch, fault):
+    model, _components, table, adapter, cells, keys = _pd_bom_fixture(monkeypatch)
+    counts = drawing._source_family_counts(model)
+    inner_row = keys.index("sh-vn-chain-link--InnerLink") + 1
+    outer_row = keys.index("sh-vn-chain-link--OuterLink") + 1
+    if fault == "merged-members":
+        original = table.GetComponents2.side_effect
+        table.GetComponents2.side_effect = lambda row, configuration: (
+            original(inner_row, configuration) + original(outer_row, configuration)
+            if row == inner_row else original(row, configuration)
+        )
+    elif fault == "wrong-quantity":
+        cells[inner_row][3] = "67"
+    else:
+        cells[inner_row][1] = "" if fault == "blank-number" else "sh-vn-chain-link--InnerLink"
+    with pytest.raises(RuntimeError):
+        drawing._validate_bom(
+            adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        )
+    table.SetText2.assert_not_called()
+
+
+@pytest.mark.parametrize("configuration", ("Default", "", "InnerLink Simplified", "innerlink"))
+def test_chain_insertion_refuses_an_implicit_or_inexact_member(monkeypatch, configuration):
+    place = AsyncMock()
+    monkeypatch.setattr(assembly, "place_component", place)
+    with pytest.raises(ValueError, match="requires a named member"):
+        asyncio.run(
+            assembly._place_chain_seed(
+                object(), assembly.CHAIN_LINK_STEM, 0, configuration=configuration
+            )
+        )
+    place.assert_not_awaited()
+
+
+def test_bom_canonical_numbers_are_read_again_after_the_last_rebuild(monkeypatch):
+    model, _components, table, adapter, cells, keys = _pd_bom_fixture(monkeypatch)
+    counts = drawing._source_family_counts(model)
+    inner_row = keys.index("sh-vn-chain-link--InnerLink") + 1
+
+    def rebuild_with_stale_number():
+        cells[inner_row][1] = "sh-vn-chain-link--InnerLink"
+        return True
+
+    adapter.currentModel.EditRebuild3 = rebuild_with_stale_number
+    with pytest.raises(RuntimeError, match="BOM part number"):
+        drawing._validate_bom(
+            adapter, table, counts, configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        )
+    table.SetText2.assert_not_called()
+
+

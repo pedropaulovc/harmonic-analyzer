@@ -420,6 +420,42 @@ def test_reference_source_call_shapes(tmp_path, monkeypatch, source):
     assert _source_references(tmp_path, monkeypatch, source) == {"ch_rocker_arm"}
 
 
+@pytest.mark.parametrize(
+    "placement",
+    [
+        "await place_component(adapter, physical, p, r, q, label=logical)",
+        "await place_components_batch(adapter, [{'part': physical, 'label': logical}])",
+    ],
+)
+def test_tuple_member_manifests_track_physical_sources_not_logical_row_keys(
+    tmp_path, monkeypatch, placement,
+):
+    source = (
+        "_PARTS = (\n"
+        "    ('sh-vn-clamping-kit-hardware', "
+        "'sh-vn-clamping-kit-hardware--HoldDownStud'),\n"
+        "    ('sh-vn-clamping-kit-hardware', "
+        "'sh-vn-clamping-kit-hardware--TNut'),\n"
+        "    ('sh-vn-clamping-kit-hardware', "
+        "'sh-vn-clamping-kit-hardware--FlangeNut'),\n"
+        "    ('ch-rocker-arm-tl-vn-oblique-rail', "
+        "'ch-rocker-arm-tl-vn-oblique-rail'),\n"
+        ")\n"
+        "async def _place_family(adapter, physical, logical):\n"
+        f"    {placement}\n"
+        "for physical, logical in _PARTS:\n"
+        "    await _place_family(adapter, physical, logical)\n"
+    )
+    assert _source_references(
+        tmp_path, monkeypatch, source,
+        (
+            "sh_vn_clamping_kit_hardware",
+            "ch_rocker_arm_tl_vn_oblique_rail",
+            "pd_vn_chain_connecting_link",
+        ),
+    ) == {"sh_vn_clamping_kit_hardware", "ch_rocker_arm_tl_vn_oblique_rail"}
+
+
 def test_ambiguous_dynamic_source_family_keeps_every_possible_producer(
     tmp_path, monkeypatch
 ):

@@ -207,17 +207,15 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
             anchors=(
                 "build_mg_magnifying_wheel",
                 "build_pn_pen_hanger",
-                "build_pd_vn_chain_inner_link",
-                # Copies for different parent assemblies must stay in inventory.
-                "build_mg_vn_thumb_screw",
-                "build_ms_vn_thumb_screw",
-                "build_dt_vn_fillister_screw",
-                "build_fr_vn_fillister_screw",
-                "build_pd_vn_fillister_screw",
-                "build_mg_vn_clamp_screw",
-                "build_pd_vn_clamp_screw",
-                "build_ch_vn_arbor_set_screw",
-                "build_dt_vn_arbor_set_screw",
+                "build_sh_vn_chain_link",
+                # Each distinct supplier SKU retains its canonical producer.
+                "build_sh_vn_thumb_screw",
+                "build_sh_vn_brass_fillister_screw",
+                "build_sh_vn_clamp_screw",
+                "build_sh_vn_arbor_set_screw",
+                "build_sh_vn_fillister_screw_90280a108",
+                "build_sh_vn_music_wire",
+                "build_sh_vn_clamping_kit_hardware",
                 "build_pd_platen_rack",
             ),
             forbidden=("paper_drive_geom", "mg_magnifying_wheel_geom"),
@@ -231,7 +229,7 @@ def test_transgear_pivot_isolation(part_closures, contract: Contract) -> None:
                 # The drum press-fits the wheel spigot.
                 ("build_mg_wheel_drum", "mg_magnifying_wheel_geom"),
                 # The wire wraps/ties the wheel and clears its hub, spokes and rim.
-                ("build_mg_vn_lever_wire", "mg_magnifying_wheel_geom"),
+                ("build_sh_vn_music_wire", "mg_magnifying_wheel_geom"),
             ),
         )
     ],

@@ -485,6 +485,82 @@ def bom_row_identities(
     return result
 
 
+def _bind_bom_number_property(
+    adapter: Any,
+    table: Any,
+    *,
+    configuration: str,
+    label: str,
+) -> None:
+    """Link the visible Number cells while retaining native member grouping."""
+    from _com import _early_bound
+
+    headers = [
+        str(table.DisplayedText(0, column) or "").strip().upper()
+        for column in range(int(table.ColumnCount))
+    ]
+    if "PART NUMBER" not in headers:
+        raise RuntimeError(f"{label} BOM has no PART NUMBER column")
+    column = headers.index("PART NUMBER")
+    status = int(
+        table.SetColumnType3(
+            column,
+            204,  # swBomTableColumnType_CustomProperty
+            True,
+            "Number",
+        )
+    )
+    if status != 0:  # swColumnTypeStatus_Success
+        raise RuntimeError(f"{label} BOM Number column type failed: {status}")
+    annotation = _sw_type_info.early_bound_or_flag(
+        table,
+        "IBomTableAnnotation",
+        "SetColumnCustomProperty",
+        "GetColumnCustomProperty",
+        "GetComponents2",
+    )
+    if not annotation.SetColumnCustomProperty(column, "Number"):
+        raise RuntimeError(f"{label} BOM rejected the Number property binding")
+    if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
+        raise RuntimeError(f"{label} BOM Number property binding did not persist")
+    if not table.SetColumnTitle2(column, "PART NUMBER", True):
+        raise RuntimeError(f"{label} BOM PART NUMBER header could not be restored")
+    rebuild_drawing(adapter, label="bind_bom_number_property")
+    for row in range(1, int(table.RowCount)):
+        components = tuple(annotation.GetComponents2(row, configuration) or ())
+        if not components:
+            raise RuntimeError(f"{label} BOM row {row} has no native components")
+        numbers: set[str] = set()
+        for raw_component in components:
+            component = _early_bound(raw_component, "IComponent2")
+            native = component.GetModelDoc2()
+            if native is None:
+                raise RuntimeError(
+                    f"{label} BOM row {row}: component document is not resolved"
+                )
+            native = _early_bound(native, "IModelDoc2")
+            member = str(component.ReferencedConfiguration or "")
+            # SOLIDWORKS uses a configuration property before its document
+            # property. Read the actual member, including Simplified children.
+            number = str(
+                native.GetCustomInfoValue(member, "Number")
+                or native.GetCustomInfoValue("", "Number")
+                or ""
+            ).strip()
+            if not number:
+                raise RuntimeError(
+                    f"{label} BOM row {row}: {component.Name2!r} "
+                    f"configuration {member!r} has no Number property"
+                )
+            numbers.add(number)
+        displayed = str(table.DisplayedText(row, column) or "").strip()
+        if len(numbers) != 1 or displayed not in numbers:
+            raise RuntimeError(
+                f"{label} BOM row {row}: associative Number {displayed!r} "
+                f"does not match native component Numbers {sorted(numbers)!r}"
+            )
+
+
 @_telemetry.traced("drawing.bom_table", label_param="label")
 def insert_bom_table(
     adapter: Any,
@@ -495,6 +571,7 @@ def insert_bom_table(
     descriptions: dict[str, str] | None = None,
     identity_aliases: dict[str, str] | None = None,
     component_identities: dict[str, tuple[str, str | None]] | None = None,
+    part_number_property: Literal["Number"] | None = None,
     configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
     label: str,
 ) -> Any:
@@ -511,6 +588,8 @@ def insert_bom_table(
     (file stem, configuration) identities; use it when Numbers repeat across
     configured members. ``same-name`` groups by the model's BOM part-number key,
     retaining distinct member keys while combining the transgear variants.
+    ``part_number_property="Number"`` makes the PART NUMBER column associative
+    to the model custom property without changing the internal BOM grouping key.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. Returns the
@@ -523,6 +602,10 @@ def insert_bom_table(
         expected_components
     ):
         raise ValueError("BOM native identities must cover exactly the expected rows")
+    if part_number_property not in (None, "Number"):
+        raise ValueError("only the released Number custom property is supported")
+    if part_number_property is not None and component_identities is None:
+        raise ValueError("an associative Number column requires native row identities")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
     configuration = str(
@@ -589,6 +672,13 @@ def insert_bom_table(
         raise RuntimeError("ITableAnnotation early-bound wrapper is unavailable")
     rows = int(adapter._get_attr_or_call(table, "RowCount") or 0)
     columns = int(adapter._get_attr_or_call(table, "ColumnCount") or 0)
+    if part_number_property is not None:
+        _bind_bom_number_property(
+            adapter,
+            table,
+            configuration=configuration,
+            label=label,
+        )
     contents = tuple(
         tuple(
             str(

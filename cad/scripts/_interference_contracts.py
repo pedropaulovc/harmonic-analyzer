@@ -3,7 +3,8 @@
 Most nominal CAD solids must never overlap. A small set of manufactured
 interference fits intentionally do; keeping those exceptions here lets both
 the assembly build and the reopened soundness gate apply the same exact pair
-and maximum-volume contract.
+and maximum-volume contract. Explicit ``@Role:N`` selectors are resolved to
+observed native names only after file, selected member and reference readback.
 """
 
 from __future__ import annotations
@@ -582,7 +583,7 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(
         ("pd-vn-transgear-pivot-screw-1", "pd-support-bar-1")
     ): _smooth_annulus_limit_mm3(4.1656, 3.454, 9.15 - 1.1938),
-    # MHA-PD-VN-59 #4-40 x 3/8 (pd_vn_latch_hook_bracket_screw_spec) through the
+    # MHA-SH-VN-52 #4-40 x 3/8 (pd_latch_hook_bracket_screw_spec) through the
     # MHA-PD-14 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
     # support bar's #43 taps.
     **_numbered_pairs(
@@ -668,9 +669,9 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # Chain-mesh contact at the closing station: the MHA-PD-VN-66 connecting
     # link closes the chain at station 67, whose forward pin is pin 0 on the
     # T24's pitch circle, the same seated-chain mesh the gate allows every
-    # MHA-PD-VN-50/51 link on a mounted removable. Its family is deliberately
-    # not in _paths._CHAIN_LINK_PREFIXES, which would re-key all 373 leaves;
-    # follow-up harmonic-analyzer#1457 moves it there and deletes this row.
+    # MHA-SH-VN-50 InnerLink/OuterLink member on a mounted removable. The
+    # separate connecting-link SKU remains excluded from the generic shared
+    # native-member exemption: only this exact bounded pair is intentional.
     # Two bodies, 3.512 + 2.105 = 5.617 mm^3 on run 20261015T010201208Z
     # (assembly:pd_paper_drive); the reading plus ten percent, so a deeper
     # seat or a clash with any other part still fails.

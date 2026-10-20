@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the thumb screw."""
+"""Create the shared purchased reference sheet for McMaster 91882A221."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["mg_vn_thumb_screw"]
+SPEC = DRAWINGS_BY_NAME["sh_vn_thumb_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#4-40 x 7/16 RAISED KNURLED-HEAD THUMB SCREW"
 

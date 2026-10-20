@@ -7,6 +7,8 @@ These are physical members of one cut chain, not separately purchased SKUs.
 
 from __future__ import annotations
 
+import _config
+
 from _chain import (
     BUSH_BORE_R,
     BUSH_HALF_LEN,
@@ -22,6 +24,9 @@ from _chain import (
 INNER_LINK_CONFIGURATION = "InnerLink"
 OUTER_LINK_CONFIGURATION = "OuterLink"
 CONFIGURATIONS = (INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION)
+(CHAIN_SKU,) = _config.parts("sh-vn-chain-link")["supplier_skus"]
+INNER_LINK_BOM_DESCRIPTION = f"ANSI #25 INNER LINK, MCMASTER {CHAIN_SKU}"
+OUTER_LINK_BOM_DESCRIPTION = f"ANSI #25 OUTER LINK, MCMASTER {CHAIN_SKU}"
 
 INNER_LINK = dict(
     plate_z=INNER_PLATE_Z,

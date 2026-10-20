@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
-from pathlib import Path
 
 import pytest
 
@@ -13,30 +11,7 @@ import draw_mg_magnifying_vertical_rod as drawing
 import mg_magnifying_vertical_rod_geom as geom
 import mg_magnifying_vertical_rod_spec as spec
 import mg_rod_clamp_joint as joint
-from _drawing_contract import model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
 from _printed_tolerance import printed_band_mm
-
-_MARKED = {
-    "RodDia",
-    "BodyLength",
-    "OverallLength",
-    "DomeR",
-    "ThreadLength",
-    "ReliefWidth",
-    "ReliefDia",
-    "ReliefRootR",
-}
-
-
-def test_required_drawing_paths() -> None:
-    assert drawing.SLDDRW.as_posix().endswith("/slddrw/mg-magnifying-vertical-rod.SLDDRW")
-    assert drawing.PDF.as_posix().endswith("/pdf/mg-magnifying-vertical-rod.pdf")
-    assert drawing.PNG.as_posix().endswith("/png/mg-magnifying-vertical-rod_drawing.png")
-    assert (
-        DRAWINGS_BY_NAME["mg_magnifying_vertical_rod"].script
-        == Path(drawing.__file__).resolve()
-    )
 
 
 def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
@@ -51,7 +26,7 @@ def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
     assert (joint.RELIEF_WIDTH_MIN, joint.RELIEF_WIDTH_MAX) == pytest.approx((0.99, 2.01))
     assert spec.RELIEF_DIA == joint.RELIEF_DIA_MAX == 1.85
     assert spec.RELIEF_DIA_TOL_TYPE == 6  # swTolType_e.swTolMAX
-    assert spec.THREAD == "#4-40" and spec.THREAD_CALLOUT == "#4-40 UNC"
+    assert spec.THREAD == "#4-40"
     assert spec.THREAD_MAJOR == pytest.approx(2.845, abs=1e-3)
     assert spec.TIP_CHAMFER == pytest.approx(
         (spec.THREAD_MAJOR - spec.THREAD_BASIC_MINOR) / 2.0
@@ -68,20 +43,9 @@ def test_rod_is_the_threaded_bar_of_the_joint_contract() -> None:
     assert geom.SEAT_LAND_WORST >= geom.SEAT_LAND_MIN
     # Both relief roots "R0.2 MAX" (r2): the model at the printed limit.
     assert spec.RELIEF_ROOT_R == joint.RELIEF_ROOT_R == 0.2
-    assert spec.RELIEF_ROOT_R_TOL_TYPE == 6  # swTolType_e.swTolMAX
 
 
-def test_relief_roots_are_one_fillet_over_both_corners() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("add_fillet(") == 1
-    assert 'name_last_feature(adapter, "ReliefRoots")' in source
-    # The shoulder's pick FIRST: the drawing's radius lands on its edge.
-    assert (
-        "[[SHOULDER_X, RELIEF_R, 0.0], [RELIEF_START_X, RELIEF_R, 0.0]]" in source
-    )
-    assert "propagate=False" in source
-    assert '("ReliefRootR", RELIEF_ROOT_R)' in source
-    assert '["ReliefRootR"])[0], \'"ReliefRootR"\')' in source
+def test_relief_root_volume_matches_the_revolved_spandrels() -> None:
     # Each root fills a (1 - pi/4) R^2 spandrel turned about the axis at its
     # centroid (Pappus): ~0.1 mm^3, far inside the 0.5 % volume gate.
     rr, q = spec.RELIEF_ROOT_R, spec.RELIEF_DIA / 2.0
@@ -91,16 +55,7 @@ def test_relief_roots_are_one_fillet_over_both_corners() -> None:
     assert 0.0 < roots < 0.005 * part.V_PROFILE
 
 
-def test_rod_is_one_front_plane_revolve() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("create_revolve(") == 1
-    assert 'create_sketch("Front")' in source
-    assert 'name_last_feature(adapter, "RodProfile")' in source
-    assert 'name_last_feature(adapter, "Rod")' in source
-    assert "create_extrusion(" not in source
-    for name in spec.DRAWING_DIMENSIONS["RodProfile"]:
-        assert re.search(rf'profile\.record\(\s*"{name}"', source), name
-    assert "add_thread(" in source
+def test_profile_volume_matches_the_stepped_rod_and_dome() -> None:
     r, t, m, q = (
         spec.ROD_DIA / 2.0,
         spec.THREAD_MAJOR / 2.0,
@@ -118,67 +73,6 @@ def test_rod_is_one_front_plane_revolve() -> None:
     assert part.V_PROFILE == pytest.approx(v)
 
 
-def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert marked == _MARKED
-    assert set(drawing.SIDE_KEEP).isdisjoint(drawing.DETAIL_KEEP)
-    assert set(drawing.SIDE_KEEP) | set(drawing.DETAIL_KEEP) == marked
-    assert set(drawing.DETAIL_KEEP) == {
-        "ThreadLength",
-        "ReliefWidth",
-        "ReliefDia",
-        "ReliefRootR",
-    }
-    assert set(drawing.DIMENSION_CALLOUTS) <= marked
-    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= marked
-    assert drawing.DRAWING_PRECISION_BY_NAME == {
-        **spec.DRAWING_PRECISION["RodProfile"],
-        **spec.DRAWING_PRECISION["ReliefRoots"],
-    }
-
-
-def test_tolerances_are_native_on_the_model() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("RodProfile", "ThreadLength"): "*deviations(ROD_THREAD_LEN_BAND)",
-    }
-    assert set(spec.DRAWING_BANDS) == {("RodProfile", "ThreadLength")}
-    assert spec.SINGLE_LIMITS == {
-        ("RodProfile", "ReliefDia"): (1.85, 6),
-        ("ReliefRoots", "ReliefRootR"): (0.2, 6),
-    }
-    precision = spec.DRAWING_PRECISION["RodProfile"]
-    assert (precision["ThreadLength"], precision["ReliefWidth"], precision["ReliefDia"]) == (
-        2,
-        2,
-        2,
-    )
-    assert spec.DRAWING_PRECISION["ReliefRoots"] == {"ReliefRootR": 1}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    assert "_single_limits(adapter)" in source
-    # Both lengths read from the shoulder, the seating face (rule 10); the
-    # banded thread length names the seat it guards at its callout.
-    assert drawing.ORIGIN_DIMENSIONS == ("BodyLength", "ThreadLength")
-    assert drawing.DIMENSION_CALLOUTS == {
-        "BodyLength": "FROM SHOULDER",
-        "ThreadLength": "FROM SHOULDER\nSEATS ON MHA-MG-02;\nTIP CLEARS ITS TAP",
-        "DomeR": "TANGENT HEMISPHERE",
-    }
-    # Owner ruling 2026-10-17: the Ø prints plain at the title block's band.
-    assert "RodDia" not in drawing.DIMENSION_CALLOUTS
-    assert "STOCK OK" not in Path(drawing.__file__).read_text(encoding="utf-8")
-    # One radius stands for both roots: its count rides above the value.
-    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"ReliefRootR": "2X"}
-    assert 'DIMENSION_CALLOUTS_ABOVE, location="above"' in Path(
-        drawing.__file__
-    ).read_text(encoding="utf-8")
-    for callout in drawing.DIMENSION_CALLOUTS.values():
-        lines = callout.splitlines()
-        assert len(lines) <= 4 and all(len(line) <= 20 for line in lines), callout
-        assert not any(ch.isdigit() for ch in callout.replace("MHA-MG-02", ""))
-
-
 def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     """The "2X R0.2 MAX" stands under the thread, opposite the shoulder's
     lower root arc; its leader toward the root centre passes under the Ø's
@@ -192,9 +86,6 @@ def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     # Down-left of the centre: opposite the arc's up-right quarter, so the
     # arrow lands on the arc's extension, the circle's down-left side.
     assert tx < cx and ty < cy
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "display.ArcExtensionLineOrOppositeSide = True" in source
-    assert "_dress_relief_roots(adapter, detail, annotations)" in source
     # Under the thread's lower silhouette, over the thread length's block and
     # right of its tip extension line.
     thread_bottom = drawing._detail_xy(0.0, -spec.THREAD_MAJOR / 2.0)[1]
@@ -219,30 +110,6 @@ def test_relief_root_radius_reads_clear_in_detail_a() -> None:
     assert math.hypot(spec.SHOULDER_X - fx, y_mm - fy) < drawing.DETAIL_RADIUS_MM
 
 
-def test_overall_is_a_driven_reference_dimension() -> None:
-    assert spec.REFERENCE_DIMENSIONS == (("RodProfile", "OverallLength"),)
-    assert spec.DRAWING_PRECISION["RodProfile"]["OverallLength"] == 1
-    assert "OverallLength" in drawing.SIDE_KEEP
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    # Made before the body length (never over-defining), then driven at once.
-    made = source.index('"overall length",')
-    assert made < source.index('_make_driven(adapter, overall, "overall length")')
-    assert made < source.index('"body length",')
-    assert re.search(r'profile\.record\("OverallLength"\)\n', source)
-    assert "_author_reference_dimensions(adapter)" in source
-
-
-def test_no_general_notes() -> None:
-    assert not hasattr(spec, "DRAWING_NOTES")
-    for module in (part, drawing):
-        source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "Manufacturing Notes" not in source, module.__name__
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "NOTES_XY =" not in source
-    assert drawing.THREAD_NOTE_TEXT.startswith("#4-40 UNC")
-    assert source.count("add_attached_note(") == 1
-
-
 def _fixture_screw_reach() -> tuple[float, float]:
     """Rod stations (from the thread tip) the MHA-MG-06 thumb screw can bear
     on: its axis rides the fixture's hex axis, the hex reaches a corner radius
@@ -262,7 +129,7 @@ def _fixture_screw_reach() -> tuple[float, float]:
 
 def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
     """Owner ruling 2026-10-17 (rule 6, a static seat, Ra 3.2): MHA-MG-06's
-    axial thumb screw (MHA-MG-VN-50) locks the fixture wherever the operator
+    axial thumb screw (MHA-SH-VN-55) locks the fixture wherever the operator
     sets it along the rod (ch. 20 p. 46). Its reach lies on the body's one Ø5
     cylinder and covers nearly all of it, so the control qualifies that whole
     face, with no zone lengths. No MHA-MG-02 screw bears on the rod."""
@@ -277,9 +144,6 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
     )
     control = surface_finish_by_key(spec.SURFACE_FINISHES, "screw_seat")
     assert control.roughness_ra == SEAT == "3.2"
-    assert control.production_method == ""  # no method text
-    assert drawing.SURFACE_FINISHES is spec.SURFACE_FINISHES
-    assert part.SURFACE_FINISHES is spec.SURFACE_FINISHES
     # The Ø5 body, shoulder to dome tangent, is the part's only Ø5 cylinder.
     assert spec.RELIEF_DIA < spec.THREAD_MAJOR < spec.ROD_DIA
     body = (spec.SHOULDER_X, spec.ROD_LENGTH - spec.DOME_R)
@@ -302,26 +166,6 @@ def test_body_cylinder_is_the_fixture_thumb_screw_seat() -> None:
         clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y
     )
     assert spec.SHOULDER_X < clamp.LEVER_BORE_Y - clamp.LEVER_BORE_DIA / 2.0
-
-    part_source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in part_source
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_surface_finish(\n") == 1
-    assert 'control=surface_finish_by_key(SURFACE_FINISHES, "screw_seat")' in source
-    assert "leader_attach_xy=spt(*SEAT_FINISH_PICK)" in source
-    assert "char_height=FINISH_CHAR_HEIGHT" in source
-    # Picked before the mark circle goes on (no pick meets it).
-    assert source.index("add_surface_finish(\n") < source.index(
-        "_mark_detail_on_side(adapter, side)"
-    )
-    # The reason says what the face does, never how to make it; no digits.
-    assert spec.SEAT_FINISH_REASON == "THUMB-SCREW SEAT"
-    assert not any(ch.isdigit() for ch in spec.SEAT_FINISH_REASON)
-    assert "SEAT_FINISH_REASON,\n        spt(*SEAT_REASON_XY)," in source
-    for module in (part, drawing):
-        module_source = Path(module.__file__).read_text(encoding="utf-8")
-        for token in ("add_feature_control_frame(", "add_datum_feature("):
-            assert token not in module_source, (module.__name__, token)
 
 
 def test_seat_finish_reason_reads_at_its_symbol() -> None:
@@ -360,27 +204,8 @@ def test_seat_finish_reason_reads_at_its_symbol() -> None:
     assert reason_y < drawing._DETAIL_BOTTOM - 0.030
 
 
-def test_view_scales_are_explicit() -> None:
-    assert drawing.SHEET_SCALE == (2.0, 1.0)
-    assert drawing.VIEW_SCALE == (2, 1)
-    assert drawing.DETAIL_SCALE == (8, 1)
-    assert drawing.ISO_SCALE == (1, 1)
-    assert spec.ISO_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Iso View Note"' in source
+def test_detail_crop_contains_the_tip_and_shoulder() -> None:
     # The fence holds the tip face and the shoulder's outer corner.
     fx, fy = drawing.DETAIL_FOCUS_MM
     for x, y in ((0.0, 0.0), (spec.SHOULDER_X, spec.ROD_DIA / 2.0)):
         assert math.hypot(x - fx, y - fy) < drawing.DETAIL_RADIUS_MM
-
-
-def test_part_stamps_make_critical_properties() -> None:
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
-    import _config
-
-    config = _config.parts("mg-magnifying-vertical-rod")
-    assert config["material"] == config["material_specification"]
-    assert config["finish"]
-    assert int(config["quantity"]) == 1

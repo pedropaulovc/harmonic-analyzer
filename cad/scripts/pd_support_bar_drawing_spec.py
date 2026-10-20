@@ -119,7 +119,7 @@ _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK"
 _HOOK_TAPS = "MHA-PD-14 HOOK TAPS"
 DIMENSION_CALLOUTS = {
     "Height": "MHA-PD-11\nHANGS ON IT",
-    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-PD-VN-59 SCREW TIPS",
+    "Depth": "MHA-PD-VN-57 TIP RECESS AND\nMHA-SH-VN-52 SCREW TIPS",
     # The two rows print on one line at 1:2 though they are separate rows
     # (the hanger row from the machine layout, the clamp row at mid-height).
     "HangerRowHeight": f"MHA-PD-VN-57 PIVOT AND\n{_HOOK_TAPS},\nNOT ON THE CLAMP ROW",
@@ -142,11 +142,11 @@ DIMENSION_CALLOUTS = {
     # screws land in (build_pd_support_bar.clamp_slot_closure_margin), so
     # their limits and stations set how much they take up (the r6 machinist
     # read "take up" as licence to loosen them); the counterbore's width and
-    # run hold the MHA-PD-VN-53 head (clamp_slot_head_clearance). Short lines:
+    # run hold the MHA-SH-VN-53 head (clamp_slot_head_clearance). Short lines:
     # detail C is 2:1 in a corner.
     "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-02 TAKE-UP",
-    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-PD-VN-53",
-    "ClampSlotCboreDepth": "MHA-PD-VN-53\nHEADS BELOW\nSLIDE FACE",
+    "ClampSlotCboreWidth": "C'BORE FOR\nMHA-SH-VN-53",
+    "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
 # The slot widths' count: both west slots share one detail.
 DIMENSION_PREFIXES = {
@@ -158,7 +158,7 @@ DIMENSION_PREFIXES = {
 # the latch hook's SCREW_HOLE_MATE does), then the screws whose heads they
 # sink, and why the depth has a floor (the heads' worst case stays sub-flush).
 CLAMP_TAP_MATE = "LOCATE TO MHA-SH-02 TAPS"
-CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-PD-VN-53 HEADS BELOW SLIDE FACE"
+CLAMP_CBORE_CALLOUT = f"{CLAMP_TAP_MATE}\nMHA-SH-VN-53 HEADS BELOW SLIDE FACE"
 
 # The platen hangs by its top rail's underside on the top face and slides
 # across the front face (build_pd_support_bar; pd_platen_guide_spec's own

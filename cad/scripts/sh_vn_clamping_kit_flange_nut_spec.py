@@ -74,6 +74,9 @@ THREAD = fasteners.HOLD_DOWN_STUD_THREAD  # 1/2-13
 FLANGE_DIA = 28.0  # C4 estimate
 HEIGHT = 13.0  # C4 estimate; TCMAI-class is 17.5 (UNVERIFIED)
 
+# Preserve the installed jig's member description under the shared SKU.
+BOM_DESCRIPTION = f"{THREAD} FLANGE NUT"
+
 # --- Estimated (TE-CO 41605 proportions; verify on receipt) ----------------------
 ACROSS_FLATS = 7.0 / 8.0 * INCH
 FLANGE_THICK = 3.0 / 16.0 * INCH

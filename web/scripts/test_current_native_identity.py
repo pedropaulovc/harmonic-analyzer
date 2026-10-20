@@ -299,6 +299,23 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
         self.assertEqual(project_current_native_path(PREFIX + "pd-paper-drive/vn-latch-hook-rivet-1"),
                          PREFIX + "pd-paper-drive/pd-vn-latch-hook-rivet-1")
 
+    def test_all_five_default_shared_groups_keep_native_variants_idempotently(self):
+        default_numbers = {"MHA-SH-VN-51", "MHA-SH-VN-52", "MHA-SH-VN-53",
+                           "MHA-SH-VN-54", "MHA-SH-VN-55"}
+        defaults = [row for row in SHARED_CASES if row[-1] in default_numbers]
+        self.assertEqual({row[-1] for row in defaults}, default_numbers)
+        identity = CurrentNativeIdentity()
+        for parent, source, _, prior, _, occurrence, _ in defaults:
+            for variant in ("T006", "Installed"):
+                expected = PREFIX + parent + "/" + occurrence + "--" + variant + "-7@upper"
+                for stem in (source, prior):
+                    with self.subTest(parent=parent, source=stem, variant=variant):
+                        old = PREFIX + parent + "/" + stem + "--" + variant + "-7@upper"
+                        current = identity.project_path(old)
+                        self.assertEqual(current, expected)
+                        self.assertEqual(identity.project_path(current), expected)
+                        self.assertEqual(identity.project_path(expected), expected)
+
     def test_js_and_python_execute_the_same_explicit_shared_behaviors_in_subprocesses(self):
         payload = {"paths": [], "numbers": [], "failures": []}
         expected_paths, expected_numbers = [], []
@@ -318,6 +335,16 @@ assert identity.source_file(root / "cad", "config/identity-migration-map.json").
             ["MHA-VN-032", "vn-pedestal-hold-down-screw", "ch-channel"],
         ]
         expected_numbers += ["MHA-DT-03-T006", None]
+        default_numbers = {"MHA-SH-VN-51", "MHA-SH-VN-52", "MHA-SH-VN-53",
+                           "MHA-SH-VN-54", "MHA-SH-VN-55"}
+        for parent, source, _, prior, _, occurrence, number in SHARED_CASES:
+            if number not in default_numbers:
+                continue
+            for variant in ("T006", "Installed"):
+                current = PREFIX + parent + "/" + occurrence + "--" + variant + "-7@upper"
+                for stem in (source, prior, occurrence):
+                    payload["paths"].append(PREFIX + parent + "/" + stem + "--" + variant + "-7@upper")
+                    expected_paths.append(current)
         payload["failures"] = [
             ["path", [PREFIX + "pn-pen/vn-fillister-screw-1"]],
             ["path", [PREFIX + "pd-paper-drive/vn-unknown-1"]],
@@ -426,6 +453,21 @@ console.log(JSON.stringify({
                         project_current_native_path(path, occurrence_namespace=namespace)
         with self.assertRaisesRegex(ValueError, "namespace"):
             current_inventory_parts({"occurrenceNamespace": "rebuilt-native", "inventory": []})
+
+    def test_anchor_declared_rebuilt_native_namespace_refuses_without_changing_source(self):
+        point = [-0.0, 0.125, 1.0]
+        anchor = {
+            "occurrenceNamespace": "rebuilt-native",
+            "partPath": PREFIX + "dt-drive-train/vn-foot-screw-1",
+            "sourcePath": "harmonic-analyzer/drive-train/foot-screw-1",
+            "partLocalMetres": point,
+            "sha256": "a" * 64,
+        }
+        before = dict(anchor)
+        with self.assertRaisesRegex(ValueError, "namespace"):
+            project_current_anchor(anchor)
+        self.assertEqual(anchor, before)
+        self.assertIs(anchor["partLocalMetres"], point)
 
     def test_all_457_archive_occurrences_keep_exact_measurements_and_source_metadata(self):
         inventory = json.loads((ROOT / "web/content/v39-source/native-inventory.json").read_text())

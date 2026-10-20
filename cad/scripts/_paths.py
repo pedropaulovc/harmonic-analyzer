@@ -41,12 +41,4 @@ PART_TEMPLATE = CAD_ROOT / "templates" / "harmonic-analyzer.PRTDOT"
 IN = 25.4  # inch -> mm
 
 
-# Exact native member identities; Name2 basenames are allocator-controlled and
-# cannot prove that an occurrence is a chain link.
-_CHAIN_LINK_IDENTITIES = {
-    ("sh-vn-chain-link", "InnerLink"): "InnerLink",
-    ("sh-vn-chain-link", "OuterLink"): "OuterLink",
-}
-
-
 DEFAULT_VIEWS = ("isometric",)

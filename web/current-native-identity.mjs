@@ -82,7 +82,7 @@ function resolveIdentity(stem, parent, suffix = '') {
     const role = /^__([A-Za-z][A-Za-z0-9]*)/.exec(suffix)?.[1]
     const configuration = /^--([A-Za-z][A-Za-z0-9_.]*)/.exec(suffix)?.[1]
     if (role) records = records.filter(record => record.identity.role === role)
-    if (configuration && shared.has(stem)) records = records.filter(record => record.identity.configuration === configuration)
+    if (configuration && shared.has(stem) && !shared.get(stem).configurations.includes('Default')) records = records.filter(record => record.identity.configuration === configuration)
   }
   const identities = new Map(records.map(record => [contextKey(record.identity), record.identity]))
   if (identities.size !== 1) fail(`native identity ${stem} has no unique immediate parent/member ${parent ?? '<root>'}`)
@@ -186,6 +186,9 @@ export function projectCurrentNativeDocument(document, occurrenceNamespace = CUR
   for (const extras of [document.extras, document.asset?.extras]) {
     if (extras && Object.hasOwn(extras, 'occurrenceNamespace')) requireCurrentNativeOccurrenceNamespace(extras.occurrenceNamespace)
   }
+  for (const node of document.nodes) for (const extras of [node.extras, node.extras?.nativeIdentity]) {
+    if (extras && Object.hasOwn(extras, 'occurrenceNamespace')) requireCurrentNativeOccurrenceNamespace(extras.occurrenceNamespace)
+  }
   const parents = new Map()
   for (const [index, node] of document.nodes.entries()) for (const child of node.children ?? []) {
     if (!Number.isSafeInteger(child) || child < 0 || child >= document.nodes.length || parents.has(child)) fail('invalid native hierarchy')
@@ -218,7 +221,6 @@ export function projectCurrentNativeDocument(document, occurrenceNamespace = CUR
     const parent = token(parentName)?.stem ?? parentName
     const resolved = resolveIdentity(found.stem, parent || null, found.suffix)
     const result = { ...identity }
-    if (Object.hasOwn(result, 'occurrenceNamespace')) requireCurrentNativeOccurrenceNamespace(result.occurrenceNamespace)
     if (shared.has(resolved.identity.stem)) {
       result.configuration = resolved.identity.configuration
       result.role = resolved.identity.role

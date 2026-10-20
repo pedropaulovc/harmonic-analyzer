@@ -91,20 +91,34 @@ def test_fixed8_exact_members_and_all19_prior_current_aliases(stem, number, neut
         }
 
 
-def test_all_current_and_archived_artifact_aliases_compose_without_mutating_maps():
+@pytest.mark.parametrize("extension", [".step", ".STL", ".pdf", ".SLDPRT", ".SLDDRW"])
+def test_all_current_and_archived_artifact_aliases_compose_without_mutating_maps(extension):
     current_bytes, historical_bytes = IDENTITY_MAP.read_bytes(), HISTORICAL_IDENTITY_MAP.read_bytes()
     payload, sealed = json.loads(current_bytes), json.loads(historical_bytes)
     mapping = load_identity_map()
+    old_keys, candidates = [], {}
     for row in payload["parts_and_assemblies"]:
         expected = tuple(dict.fromkeys(
             mesh_key(identity["stem"], identity["configuration"])
             if "configuration" in identity else identity["stem"]
             for identity in row["new_identities"]
         ))
-        assert canonical_keys(row["old_stem"], mapping) == expected
+        source = Path(row["old_stem"] + extension).stem
+        assert canonical_keys(source, mapping) == expected
+        old_keys.append(source)
+        for target in expected:
+            candidates.setdefault(target, set()).add(source)
+    assert paired_keys(old_keys, candidates, mapping) == {
+        target: tuple(sorted(sources)) for target, sources in candidates.items()
+    }
+    assert paired_keys(candidates, candidates, mapping) == {
+        target: (target,) for target in candidates
+    }
     for row in sealed["identities"]:
         if row["old_stem"] is not None:
-            assert canonical_keys(row["old_stem"], mapping) == canonical_keys(row["new_stem"], mapping)
+            assert canonical_keys(Path(row["old_stem"] + extension).stem, mapping) == canonical_keys(
+                Path(row["new_stem"] + extension).stem, mapping,
+            )
     assert IDENTITY_MAP.read_bytes() == current_bytes
     assert HISTORICAL_IDENTITY_MAP.read_bytes() == historical_bytes
 
@@ -239,12 +253,10 @@ def test_historical_member_context_is_not_lost(source, expected):
 
 
 @pytest.mark.parametrize("stem,number,neutral,prior_members", GROUPS)
-def test_all_historical_clones_are_retained_even_with_mixed_archive_spellings(stem, number, neutral, prior_members):
+def test_all_same_generation_historical_clones_are_retained(stem, number, neutral, prior_members):
     mapping = load_identity_map()
     sources = set(prior_members)
     logicals = {mesh_key(stem, member) for member in prior_members.values()}
-    sources.update(alias for alias in mapping.aliases
-                   if set(canonical_keys(alias, mapping)) & logicals)
     inventory = identity_inventory(sorted(sources), mapping)
     pairs = paired_keys(sorted(sources), sorted(logicals), mapping)
     assert set().union(*(set(candidates) for candidates in pairs.values())) == sources
@@ -322,15 +334,15 @@ def test_actual_conflicting_map_identities_are_rejected(tmp_path, mutation):
         load_identity_map(current)
 
 
-@pytest.mark.parametrize("request", [
+@pytest.mark.parametrize("requested_key", [
     "ha-harmonic-analyzer-1/sh-vn-chain-link--InnerLink-1",
     "sh-vn-chain-link--InnerLink-1", "sh-vn-music-wire--PenWire-1",
     "sh-vn-clamping-kit-hardware--TNut-4",
     "sh-vn-fillister-screw-90280a108__FootScrew-1", "dt-vn-foot-screw-1",
 ])
-def test_occurrence_namespaces_are_not_geometry_mesh_keys(request):
+def test_occurrence_namespaces_are_not_geometry_mesh_keys(requested_key):
     with pytest.raises(ValueError, match="occurrence request"):
-        canonical_keys(request, load_identity_map())
+        canonical_keys(requested_key, load_identity_map())
 
 
 def test_member_rejects_case_insensitive_duplicate_matches():
@@ -541,13 +553,13 @@ def test_declared_neutral_and_explicit_first_member_candidates_both_survive(
     }
 
 
-@pytest.mark.parametrize("request", [
+@pytest.mark.parametrize("requested_key", [
     "ha-harmonic-analyzer/sh-vn-chain-link--innerlink-1",
     r"ha-harmonic-analyzer\sh-vn-chain-link--innerlink-1",
 ])
-def test_geometry_pairing_rejects_identical_cross_namespace_paths(request):
+def test_geometry_pairing_rejects_identical_cross_namespace_paths(requested_key):
     with pytest.raises(ValueError, match="occurrence request"):
-        paired_keys([request], [request], load_identity_map())
+        paired_keys([requested_key], [requested_key], load_identity_map())
 
 
 def test_render_entrypoint_rejects_scene_occurrence_as_mesh_key(tmp_path, monkeypatch, render_diff):
@@ -638,3 +650,493 @@ def test_pose_source_resolver_rejects_ambiguous_extracted_cache_without_fetch(tm
     monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("ambiguous cache fetched"))
     with pytest.raises(ValueError, match="ambiguous prior identity"):
         pose_to_meshprobe.release_member(f"gltf/{GROUPS[1][0]}.glb", "v50")
+
+
+@pytest.mark.parametrize("stem,configuration,neutral", [
+    (stem, configuration, neutral)
+    for stem, _, neutral, members in GROUPS if neutral != "Default"
+    for configuration in members.values()
+])
+def test_all7_members_use_the_same21_format_paths_as_producer_and_registry(
+    tmp_path, stem, configuration, neutral,
+):
+    from _part_configuration_exports import configuration_export_paths, member_export_paths
+
+    key = mesh_key(stem, configuration)
+    neutral_key = stem if configuration == neutral else key
+    expected = {
+        "step": tmp_path / "step" / f"{neutral_key}.STEP",
+        "stl": tmp_path / "stl" / f"{key}.STL",
+        "png": tmp_path / "png" / neutral_key / f"{neutral_key}_isometric.png",
+    }
+    mapping = load_identity_map()
+    group = mapping.shared_groups[stem]
+    assert group["neutral_export_configuration"] == neutral
+    assert member_export_paths(stem, configuration, neutral, tmp_path) == expected
+    assert configuration_export_paths(stem, tmp_path)[configuration] == expected
+
+
+@pytest.mark.parametrize("stem,configuration,neutral", [
+    (stem, configuration, neutral)
+    for stem, _, neutral, members in GROUPS if neutral != "Default"
+    for configuration in members.values()
+])
+def test_comparison_member_resolution_uses_declared_format_specific_paths(
+    stem, configuration, neutral,
+):
+    from release_diff import artifact_member
+    from _part_configuration_exports import member_export_paths
+
+    paths = member_export_paths(stem, configuration, neutral, Path("."))
+    entries = {paths[kind].as_posix(): {"kind": kind} for kind in ("step", "stl")}
+    key = mesh_key(stem, configuration)
+    for kind in ("step", "stl"):
+        assert artifact_member(entries, kind, key, f".{kind}", load_identity_map()) == (
+            {"kind": kind}, paths[kind].stem,
+        )
+    if configuration == neutral:
+        assert artifact_member(entries, "stl", stem, ".stl", load_identity_map()) == (
+            {"kind": "stl"}, key,
+        )
+
+
+@pytest.mark.parametrize("suffix", ["--outerlink", "--default", "--innerlink-simplified"])
+def test_exact_missing_member_step_never_uses_another_or_derived_member(suffix):
+    from release_diff import artifact_member
+
+    cd = {"step/sh-vn-chain-link.STEP": {"crc": 1}}
+    assert artifact_member(cd, "step", "sh-vn-chain-link" + suffix,
+                           ".step", load_identity_map()) is None
+
+
+def test_derived_simplified_variant_keeps_its_own_actual_file_only():
+    from release_diff import artifact_member
+
+    key = "sh-vn-chain-link--innerlink-simplified"
+    entry = {"crc": 2}
+    cd = {f"step/{key}.STEP": entry, "step/sh-vn-chain-link.STEP": {"crc": 1}}
+    assert artifact_member(cd, "step", key, ".step", load_identity_map()) == (entry, key)
+    assert paired_keys([key], ["sh-vn-chain-link--innerlink"], load_identity_map()) == {}
+
+
+def test_release_cli_associates_first_member_step_and_stl_without_fabricating_a_filename(
+    tmp_path, monkeypatch, capsys,
+):
+    import release_diff
+
+    old_key, new_key, neutral = "pd-vn-chain-inner-link", "sh-vn-chain-link--innerlink", "sh-vn-chain-link"
+    old = {f"{kind}/{old_key}.{kind}": {"crc": 1, "uncomp": 10} for kind in ("step", "stl")}
+    new = {f"step/{neutral}.STEP": {"crc": 2, "uncomp": 10},
+           f"stl/{new_key}.STL": {"crc": 2, "uncomp": 10}}
+    monkeypatch.setattr(release_diff, "central_dir", lambda url: old if "before/" in url else new)
+    monkeypatch.setattr(release_diff, "CACHE", tmp_path)
+    extracted, mesh_calls, step_calls = [], [], []
+    monkeypatch.setattr(release_diff, "extract", lambda url, entry, dest: extracted.append(dest))
+    mesh_result = dict(hausdorff_mm=0, mean_dev_mm=0, vol_a_mm3=1, vol_b_mm3=1,
+                       tris_a=12, tris_b=12, bbox_a=[1, 1, 1], bbox_b=[1, 1, 1])
+    monkeypatch.setattr(release_diff, "mesh_deviation", lambda *args: mesh_calls.append(args) or mesh_result)
+    monkeypatch.setattr(release_diff, "boolean_cut", lambda *args: step_calls.append(args) or
+                        dict(removed=0, added=0, net=0, vol_a=1, vol_b=1))
+    monkeypatch.setattr(sys, "argv", ["release_diff.py", "before", "after", "--parts", new_key])
+    release_diff.main()
+    assert len(mesh_calls) == len(step_calls) == 1
+    assert set(mesh_calls) == {("before", "after", old_key, new_key)}
+    assert set(step_calls) == {("before", "after", old_key, neutral)}
+    assert tmp_path / "after" / f"{new_key}.step" not in extracted
+    assert "SKIPPED" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("requested_key", [
+    "archive-role-local:sh-vn-chain-link--InnerLink-1",
+    "archive-role-local--sh-vn-chain-link--InnerLink-1",
+    {"occurrenceNamespace": "archive-role-local", "key": "sh-vn-chain-link--InnerLink-1"},
+])
+def test_actual_geometry_loader_boundaries_reject_archive_namespace(
+    tmp_path, monkeypatch, render_diff, requested_key,
+):
+    import pose_to_meshprobe
+    import release_diff
+
+    with pytest.raises(ValueError, match="occurrence request"):
+        member({}, "stl", requested_key, ".stl")
+    with pytest.raises(ValueError, match="occurrence request"):
+        release_diff.mesh_deviation("before", "after", requested_key, "sh-vn-chain-link--innerlink")
+    with pytest.raises(ValueError, match="occurrence request"):
+        release_diff.boolean_cut("before", "after", requested_key, "sh-vn-chain-link--innerlink")
+    local = render_diff.LocalSource(tmp_path)
+    with pytest.raises(ValueError, match="occurrence request"):
+        local.stl(requested_key)
+    monkeypatch.setattr(render_diff.ReleaseSource, "_central_dir", lambda self: {})
+    remote = render_diff.ReleaseSource("v50")
+    with pytest.raises(ValueError, match="occurrence request"):
+        remote.stl(requested_key)
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("invalid namespace fetched"))
+    with pytest.raises(ValueError, match="occurrence request"):
+        pose_to_meshprobe.release_member(requested_key, "v50")
+
+
+@pytest.mark.parametrize("framing_consumer", ["blender_worker"], indirect=True)
+@pytest.mark.parametrize("key", [
+    "archive-role-local:sh-vn-chain-link--InnerLink-1",
+    {"occurrenceNamespace": "archive-role-local", "key": "sh-vn-chain-link--InnerLink-1"},
+    "ha-harmonic-analyzer/sh-vn-chain-link--InnerLink-1",
+])
+def test_blender_stl_loader_refuses_namespaced_occurrence_input_before_loading(
+    tmp_path, framing_consumer, key,
+):
+    scene = tmp_path / "scene.json"
+    scene.write_text(json.dumps({"components": [{"mesh": key, "part": "sh-vn-chain-link"}]}),
+                     encoding="utf-8")
+    with pytest.raises(ValueError, match="occurrence request"):
+        framing_consumer.build_assembly({"scene": str(scene), "parts_dir": str(tmp_path)})
+
+
+@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] == "Default"])
+@pytest.mark.parametrize("directory,extension", [("gltf", ".glb"), ("boxes", ".json"), ("pdf", ".pdf")])
+@pytest.mark.parametrize("qualifier", ["", "--installed"])
+def test_pose_explicit_prior_artifact_selects_exact_source_but_shared_alias_stays_ambiguous(
+    tmp_path, monkeypatch, stem, number, neutral, prior_members, directory, extension, qualifier,
+):
+    import pose_to_meshprobe
+
+    monkeypatch.setattr(pose_to_meshprobe, "CAD_OUT", tmp_path)
+    cache = tmp_path / "release-cache" / "v50"
+    cache.mkdir(parents=True)
+    with ZipFile(cache / "harmonic-analyzer-v50.zip", "w") as archive:
+        for prior in prior_members:
+            for suffix in ("", "--installed"):
+                name = f"{directory}/{prior}{suffix}{extension}"
+                archive.writestr(name, name.encode("ascii"))
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("complete bundle fetched"))
+    for prior in prior_members:
+        name = f"{directory}/{prior}{qualifier}{extension}"
+        actual = pose_to_meshprobe.release_member(name, "v50")
+        assert actual == cache / name
+        assert actual.read_bytes() == name.encode("ascii")
+    # Earlier exact extractions must not bias canonical shared resolution.
+    with pytest.raises(ValueError, match="ambiguous prior identity"):
+        pose_to_meshprobe.release_member(f"{directory}/{stem}{qualifier}{extension}", "v50")
+
+
+def test_pose_explicit_actual_source_still_rejects_case_insensitive_duplicate_inventory(
+    tmp_path, monkeypatch,
+):
+    import pose_to_meshprobe
+
+    monkeypatch.setattr(pose_to_meshprobe, "CAD_OUT", tmp_path)
+    cache = tmp_path / "release-cache" / "v50"
+    cache.mkdir(parents=True)
+    with ZipFile(cache / "harmonic-analyzer-v50.zip", "w") as archive:
+        archive.writestr("gltf/dt-vn-fillister-screw.glb", b"one")
+        archive.writestr("gltf/DT-VN-FILLISTER-SCREW.glb", b"two")
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("complete bundle fetched"))
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        pose_to_meshprobe.release_member("gltf/dt-vn-fillister-screw.glb", "v50")
+
+
+@pytest.mark.parametrize("sources", [
+    ["vn-foot-screw", "vn-swing-stop-screw", "vn-latch-hook-bracket-screw"],
+    ["foot-screw", "swing-stop-screw", "latch-hook-bracket-screw"],
+])
+def test_distinct_category_and_archive_siblings_retain_all_candidates_in_their_own_bundle(sources):
+    target = "sh-vn-fillister-screw-90280a108"
+    assert paired_keys(sources, [target], load_identity_map()) == {target: tuple(sorted(sources))}
+
+
+@pytest.mark.parametrize("sources", [
+    ["vn-fillister-screw", "dt-vn-fillister-screw"],
+    ["fillister-screw", "vn-fillister-screw"],
+    ["dt-vn-fillister-screw", "sh-vn-brass-fillister-screw"],
+    ["vn-fillister-screw", "dt-vn-fillister-screw", "sh-vn-brass-fillister-screw"],
+    ["pd-vn-chain-outer-link", "sh-vn-chain-link--outerlink"],
+    ["lever-wire", "vn-lever-wire"],
+    ["mg-lever-wire", "vn-lever-wire"],
+    ["vn-foot-screw", "dt-vn-swing-stop-screw"],
+])
+def test_mixed_generations_and_overlapping_shared_aliases_are_rejected(sources):
+    mapping = load_identity_map()
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        identity_inventory(sources, mapping)
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        paired_keys(sources, sources[-1:], mapping)
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        paired_keys(sources[:1], sources, mapping)
+
+
+def test_render_local_inventory_rejects_stale_prior_member_beside_current_member(tmp_path, render_diff):
+    old_root, new_root = tmp_path / "old", tmp_path / "new"
+    write_mesh(old_root, "pd-vn-chain-outer-link")
+    write_mesh(new_root, "pd-vn-chain-outer-link")
+    write_mesh(new_root, "sh-vn-chain-link--outerlink")
+    old, new = render_diff.LocalSource(old_root), render_diff.LocalSource(new_root)
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        paired_keys(old.mesh_keys(), new.mesh_keys(), load_identity_map())
+
+
+def test_pose_explicit_source_does_not_hide_a_mixed_generation_bundle(tmp_path, monkeypatch):
+    import pose_to_meshprobe
+
+    monkeypatch.setattr(pose_to_meshprobe, "CAD_OUT", tmp_path)
+    cache = tmp_path / "release-cache" / "v50"
+    cache.mkdir(parents=True)
+    with ZipFile(cache / "harmonic-analyzer-v50.zip", "w") as archive:
+        archive.writestr("gltf/vn-fillister-screw.glb", b"category source")
+        archive.writestr("gltf/dt-vn-fillister-screw.glb", b"prior-current source")
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("complete bundle fetched"))
+    with pytest.raises(ValueError, match="duplicate logical identity"):
+        pose_to_meshprobe.release_member("gltf/dt-vn-fillister-screw.glb", "v50")
+
+
+@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+def test_identical_current_member_layouts_have_no_crc_changes_or_renames(
+    tmp_path, monkeypatch, capsys, stem, number, neutral, prior_members,
+):
+    import release_diff
+    from _part_configuration_exports import member_export_paths
+
+    cd = {}
+    expected = {}
+    for index, configuration in enumerate(prior_members.values()):
+        key = mesh_key(stem, configuration)
+        paths = member_export_paths(stem, configuration, neutral, Path("."))
+        expected[key] = {}
+        for kind, crc in (("step", 100 + index), ("stl", 200 + index)):
+            entry = {"crc": crc, "uncomp": 1000 if kind == "step" else 10}
+            cd[paths[kind].as_posix()] = entry
+            expected[key][kind] = entry
+    mapping = load_identity_map()
+    inventory = release_diff.release_inventory(cd, mapping)
+    assert inventory == expected
+    pairs = paired_keys(inventory, inventory, mapping)
+    assert pairs == {key: (key,) for key in expected}
+    changed, same = release_diff.crc_changes(inventory, inventory, pairs)
+    assert changed == []
+    assert same == sorted(expected)
+    assert {new: old for new, old in pairs.items() if old != (new,)} == {}
+    monkeypatch.setattr(release_diff, "central_dir", lambda url: cd)
+    monkeypatch.setattr(release_diff, "CACHE", tmp_path)
+    monkeypatch.setattr(release_diff, "mesh_deviation",
+                        lambda *args: pytest.fail("identical layout was marked CRC-changed"))
+    monkeypatch.setattr(release_diff, "boolean_cut",
+                        lambda *args: pytest.fail("identical layout was marked CRC-changed"))
+    monkeypatch.setattr(sys, "argv", ["release_diff.py", "before", "after", "--top", "1"])
+    release_diff.main()
+    output = capsys.readouterr().out
+    assert "renamed parts: {}" in output
+    assert "new parts: (none)" in output
+    assert "deleted parts: (none)" in output
+    assert f"{len(expected)} common parts; analyzing 0:" in output
+
+
+@pytest.mark.parametrize("stem,number,neutral,prior_members", [g for g in GROUPS if g[2] != "Default"])
+def test_bare_shared_parts_selector_compares_every_member_once(
+    tmp_path, monkeypatch, capsys, stem, number, neutral, prior_members,
+):
+    import release_diff
+    from _part_configuration_exports import member_export_paths
+
+    old = {f"{kind}/{prior}.{kind}": {"crc": 1, "uncomp": 10}
+           for prior in prior_members for kind in ("step", "stl")}
+    new = {}
+    for configuration in prior_members.values():
+        paths = member_export_paths(stem, configuration, neutral, Path("."))
+        new.update({paths[kind].as_posix(): {"crc": 2, "uncomp": 10} for kind in ("step", "stl")})
+    monkeypatch.setattr(release_diff, "central_dir", lambda url: old if "before/" in url else new)
+    monkeypatch.setattr(release_diff, "CACHE", tmp_path)
+    monkeypatch.setattr(release_diff, "extract", lambda *args: None)
+    calls = []
+    result = dict(hausdorff_mm=0, mean_dev_mm=0, vol_a_mm3=1, vol_b_mm3=1,
+                  tris_a=12, tris_b=12, bbox_a=[1, 1, 1], bbox_b=[1, 1, 1])
+    monkeypatch.setattr(release_diff, "mesh_deviation", lambda *args: calls.append(args) or result)
+    monkeypatch.setattr(sys, "argv", ["release_diff.py", "before", "after", "--no-boolean", "--parts", stem])
+    release_diff.main()
+    assert len(calls) == len(prior_members)
+    assert {args[2:] for args in calls} == {
+        (prior, mesh_key(stem, configuration)) for prior, configuration in prior_members.items()
+    }
+    output = capsys.readouterr().out
+    assert sum(line.startswith("### ") for line in output.splitlines()) == len(prior_members)
+
+
+def test_bare_shared_parts_selector_reports_unpaired_members_instead_of_using_only_neutral(
+    monkeypatch, capsys,
+):
+    import release_diff
+
+    old = {"stl/pd-vn-chain-inner-link.STL": {"crc": 1, "uncomp": 10}}
+    new = {f"stl/sh-vn-chain-link--{member}.STL": {"crc": 1, "uncomp": 10}
+           for member in ("innerlink", "outerlink")}
+    monkeypatch.setattr(release_diff, "central_dir", lambda url: old if "before/" in url else new)
+    monkeypatch.setattr(sys, "argv", [
+        "release_diff.py", "before", "after", "--no-boolean", "--parts", "sh-vn-chain-link",
+    ])
+    with pytest.raises(SystemExit) as error:
+        release_diff.main()
+    assert error.value.code == 2
+    assert "sh-vn-chain-link--outerlink" in capsys.readouterr().err
+
+
+def test_pairs_preserve_released_configurations_and_missing_variants():
+    mapping = load_identity_map()
+    old = [
+        "transgear-removable--t12", "transgear-removable--t18", "transgear-removable--t24",
+        "crank-handle-ferrule--installed", "crank-handle-pivot-screw--installed",
+        "pinion-lever-pin--installed", "cone-gear--t006", "cone-gear--t024",
+        "channel-spring-installed-stretch07", "deleted",
+    ]
+    new = [
+        "pd-transgear-removable--t12", "pd-transgear-removable--t18", "pd-transgear-removable--t24",
+        "dt-crank-handle-ferrule--installed", "dt-crank-handle-pivot-screw--installed",
+        "dt-pinion-lever-pin--installed", "dt-cone-gear--t006", "dt-cone-gear--t048",
+        "ch-vn-channel-spring-installed-stretch07", "added",
+    ]
+    pairs = paired_keys(old, new, mapping)
+    assert pairs == {
+        "pd-transgear-removable--t12": ("transgear-removable--t12",),
+        "pd-transgear-removable--t18": ("transgear-removable--t18",),
+        "pd-transgear-removable--t24": ("transgear-removable--t24",),
+        "dt-crank-handle-ferrule--installed": ("crank-handle-ferrule--installed",),
+        "dt-crank-handle-pivot-screw--installed": ("crank-handle-pivot-screw--installed",),
+        "dt-pinion-lever-pin--installed": ("pinion-lever-pin--installed",),
+        "dt-cone-gear--t006": ("cone-gear--t006",),
+        "ch-vn-channel-spring-installed-stretch07": ("channel-spring-installed-stretch07",),
+    }
+    assert set(new) - set(pairs) == {"added", "dt-cone-gear--t048"}
+    assert set(old) - {source for sources in pairs.values() for source in sources} == {
+        "deleted", "cone-gear--t024",
+    }
+
+
+def test_configuration_separator_takes_precedence_over_stretch_suffix():
+    old = [
+        "channel-spring-installed-stretch07",
+        "channel-spring-installed--installed--stretch07",
+    ]
+    new = [
+        "ch-vn-channel-spring-installed-stretch07",
+        "ch-vn-channel-spring-installed--installed--stretch07",
+    ]
+    assert paired_keys(old, new, load_identity_map()) == {
+        new[0]: (old[0],), new[1]: (old[1],),
+    }
+
+
+def test_renamed_variants_keep_independent_geometry_verdicts_and_grouping(tmp_path, render_diff):
+    old_root, new_root = tmp_path / "old", tmp_path / "new"
+    unchanged = [
+        ("transgear-removable--t12", "pd-transgear-removable--t12"),
+        ("crank-handle-pivot-screw--installed", "dt-crank-handle-pivot-screw--installed"),
+        ("pinion-lever-pin--installed", "dt-pinion-lever-pin--installed"),
+        ("channel-spring-installed-stretch07", "ch-vn-channel-spring-installed-stretch07"),
+    ]
+    for before, after in unchanged:
+        write_mesh(old_root, before)
+        write_mesh(new_root, after)
+    # Default and INSTALLED have deliberately different shapes; neither may
+    # replace the other while comparing or while grouping the summary.
+    default = trimesh.creation.box(extents=(4, 4, 4))
+    default.export(old_root / "stl" / "crank-handle-ferrule.STL")
+    default.export(new_root / "stl" / "dt-crank-handle-ferrule.STL")
+    variants = [
+        ("transgear-removable--t18", "pd-transgear-removable--t18", 2),
+        ("transgear-removable--t24", "pd-transgear-removable--t24", 3),
+        ("crank-handle-ferrule--installed", "dt-crank-handle-ferrule--installed", 1),
+    ]
+    for before, after, distance in variants:
+        write_mesh(old_root, before)
+        write_mesh(new_root, after, distance)
+    write_mesh(old_root, "cone-gear--t006")
+    write_mesh(new_root, "dt-cone-gear--t006", ascii_stl=True)
+    write_mesh(old_root, "cone-gear--t048")
+    write_mesh(new_root, "dt-cone-gear--t024")
+    old, new = render_diff.LocalSource(old_root), render_diff.LocalSource(new_root)
+    pairs = paired_keys(old.mesh_keys(), new.mesh_keys(), load_identity_map())
+    assert set(new.mesh_keys()) - set(pairs) == {"dt-cone-gear--t024"}
+    assert set(old.mesh_keys()) - {source for sources in pairs.values() for source in sources} == {
+        "cone-gear--t048",
+    }
+    changed, deviations = render_diff.classify(old, new, set(new.mesh_keys()), pairs, jobs=1)
+    assert changed == {
+        "pd-transgear-removable--t18", "pd-transgear-removable--t24",
+        "dt-crank-handle-ferrule--installed", "dt-cone-gear--t024",
+    }
+    assert {render_diff.base_part(key) for key in changed} == {
+        "pd-transgear-removable", "dt-crank-handle-ferrule--installed", "dt-cone-gear",
+    }
+    for before, after, distance in variants:
+        assert deviations[after][before] == pytest.approx(distance)
+    assert deviations["dt-cone-gear--t006"]["cone-gear--t006"] < 0.01
+    assert deviations["dt-cone-gear--t024"] == {}
+    assert deviations["dt-crank-handle-ferrule"]["crank-handle-ferrule"] == 0
+
+
+def test_pose_projected_request_requires_complete_zip_when_only_one_alias_is_extracted(
+    tmp_path, monkeypatch,
+):
+    import pose_to_meshprobe
+
+    monkeypatch.setattr(pose_to_meshprobe, "CAD_OUT", tmp_path)
+    cache = tmp_path / "release-cache" / "v50"
+    (cache / "gltf").mkdir(parents=True)
+    (cache / "gltf" / "dt-vn-fillister-screw.glb").write_bytes(b"one extracted clone")
+    calls = []
+    asset = "harmonic-analyzer-v50.zip"
+
+    def gh(args):
+        calls.append(args)
+        if args[:2] == ["release", "view"]:
+            return asset
+        assert args[:2] == ["release", "download"]
+        with ZipFile(cache / asset, "w") as archive:
+            for prior in GROUPS[1][3]:
+                archive.writestr(f"gltf/{prior}.glb", prior.encode("ascii"))
+        return ""
+
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", gh)
+    with pytest.raises(ValueError, match="ambiguous prior identity"):
+        pose_to_meshprobe.release_member("gltf/sh-vn-brass-fillister-screw.glb", "v50")
+    assert len(calls) == 2
+
+
+def test_pose_explicit_actual_cached_source_does_not_require_alias_resolution_or_zip(
+    tmp_path, monkeypatch,
+):
+    import pose_to_meshprobe
+
+    monkeypatch.setattr(pose_to_meshprobe, "CAD_OUT", tmp_path)
+    actual = tmp_path / "release-cache" / "v50" / "gltf" / "dt-vn-fillister-screw.glb"
+    actual.parent.mkdir(parents=True)
+    actual.write_bytes(b"explicit physical identity")
+    monkeypatch.setattr(pose_to_meshprobe, "_gh", lambda args: pytest.fail("explicit actual cache fetched"))
+    assert pose_to_meshprobe.release_member("gltf/dt-vn-fillister-screw.glb", "v50") == actual
+
+
+def test_release_inventory_rejects_undeclared_duplicate_first_member_step_spelling():
+    from release_diff import release_inventory
+
+    with pytest.raises(ValueError, match="conflicting shared step export"):
+        release_inventory({
+            "step/sh-vn-chain-link.STEP": {"crc": 1, "uncomp": 10},
+            "step/sh-vn-chain-link--innerlink.STEP": {"crc": 2, "uncomp": 10},
+            "stl/sh-vn-chain-link--innerlink.STL": {"crc": 3, "uncomp": 10},
+        }, load_identity_map())
+
+
+def test_release_inventory_keeps_derived_configuration_as_an_independent_source():
+    from release_diff import release_inventory
+
+    cd = {
+        "step/sh-vn-chain-link.STEP": {"crc": 1, "uncomp": 10},
+        "stl/sh-vn-chain-link--innerlink.STL": {"crc": 2, "uncomp": 10},
+        "stl/sh-vn-chain-link--innerlink-simplified.STL": {"crc": 3, "uncomp": 10},
+    }
+    inventory = release_inventory(cd, load_identity_map())
+    assert inventory == {
+        "sh-vn-chain-link--innerlink": {
+            "step": cd["step/sh-vn-chain-link.STEP"],
+            "stl": cd["stl/sh-vn-chain-link--innerlink.STL"],
+        },
+        "sh-vn-chain-link--innerlink-simplified": {
+            "stl": cd["stl/sh-vn-chain-link--innerlink-simplified.STL"],
+        },
+    }

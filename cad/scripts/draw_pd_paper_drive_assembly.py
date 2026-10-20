@@ -45,7 +45,12 @@ import _chain as chain
 from _check import check
 from _com import _com_invoke, _early_bound
 from _component_references import component_identity
-from sh_vn_chain_link_spec import INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
+from sh_vn_chain_link_spec import (
+    INNER_LINK_BOM_DESCRIPTION,
+    INNER_LINK_CONFIGURATION,
+    OUTER_LINK_BOM_DESCRIPTION,
+    OUTER_LINK_CONFIGURATION,
+)
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
@@ -536,8 +541,6 @@ _SKU = {
     "sh-vn-brass-fillister-screw": _config.parts("sh-vn-brass-fillister-screw")["supplier_skus"][0],
     "pd-vn-platen-clip-screw": _config.parts("pd-vn-platen-clip-screw")["supplier_skus"][0],
     "pd-vn-guide-lock-screw": _config.parts("pd-vn-guide-lock-screw")["supplier_skus"][0],
-    "sh-vn-chain-link--InnerLink": _config.parts("sh-vn-chain-link")["supplier_skus"][0],
-    "sh-vn-chain-link--OuterLink": _config.parts("sh-vn-chain-link")["supplier_skus"][0],
     "pd-vn-chain-connecting-link": _config.parts("pd-vn-chain-connecting-link")[
         "supplier_skus"
     ][0],
@@ -569,7 +572,8 @@ _SKU = {
         0
     ],
 }
-# The description column is drawing wording; a purchased part names its SKU.
+# Assembly-specific wording stays here. Shared chain descriptions follow the
+# native member spec, whose model-owned BOM text can override a written cell.
 BOM_DESCRIPTIONS = {
     "pd-support-bar": "PAPER-DRIVE SUPPORT BAR",
     "sh-column-clamp-front": "COLUMN CLAMP, FRONT",
@@ -589,8 +593,8 @@ BOM_DESCRIPTIONS = {
         f"BRASS PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-platen-clip-screw']}"
     ),
     "pd-vn-guide-lock-screw": f"PAN HEAD SCREW, MCMASTER {_SKU['pd-vn-guide-lock-screw']}",
-    "sh-vn-chain-link--InnerLink": f"ANSI #25 INNER LINK, MCMASTER {_SKU['sh-vn-chain-link--InnerLink']}",
-    "sh-vn-chain-link--OuterLink": f"ANSI #25 OUTER LINK, MCMASTER {_SKU['sh-vn-chain-link--OuterLink']}",
+    "sh-vn-chain-link--InnerLink": INNER_LINK_BOM_DESCRIPTION,
+    "sh-vn-chain-link--OuterLink": OUTER_LINK_BOM_DESCRIPTION,
     "pd-vn-chain-connecting-link": (
         f"ANSI #25 CONN. LINK, MCMASTER {_SKU['pd-vn-chain-connecting-link']}"
     ),

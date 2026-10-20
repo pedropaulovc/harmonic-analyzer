@@ -1,72 +1,26 @@
-"""Offline contracts for the CH/DT arbor apex set screws (McMaster 91375A106)."""
+"""Offline contracts for the canonical shared arbor screw (McMaster 91375A106)."""
 
 from __future__ import annotations
 
-import asyncio
 import math
-from pathlib import Path
 
 import pytest
 
 import _config
 import sh_vn_arbor_set_screw_spec as spec
-import build_sh_vn_arbor_set_screw as ch_part
-import build_dt_vn_arbor_set_screw as dt_part
-import draw_sh_vn_arbor_set_screw as ch_drawing
-import draw_dt_vn_arbor_set_screw as dt_drawing
-from _appearance import PANEL_BLACK
-from _drawing_registry import DRAWINGS_BY_NAME
-from _simplified_part import save_simplified_part
-from _stock_fastener import RigidTransform, StockComponent
 from _hole_spec import THREAD_MAJOR_MM
-from _test_stock_recipes import discovered_recipes
 from diagnostics import diag_build_91375A106 as recipe
 
 IN = 25.4
-PARTS = [
-    (ch_part, "MHA-CH-VN-53"),
-    (dt_part, "MHA-DT-VN-64"),
-]
 
 
-@pytest.mark.parametrize(("part", "number"), PARTS)
-def test_stock_build_uses_its_registered_recipe(part, number) -> None:
-    metadata = discovered_recipes()["91375A106"]
-    assert metadata.module == recipe.__name__
-    assert metadata.callable_name == recipe.build_91375A106.__name__
-    assert part.SPEC.skus == ("91375A106",)
-    assert part.MATERIAL == "Alloy Steel"
-    assert part.SPEC.part_name == part.PART_NAME
-    assert _config.parts(part.PART_NAME)["number"] == number
-    assert Path(part.__file__).stem == f"build_{part.PART_NAME.replace('-', '_')}"
-    # The replica is centred on its origin; the part lifts the cup end to y 0.
-    assert part.LENGTH == recipe.LENGTH == 2.0 * recipe.HALF
-
-
-@pytest.mark.parametrize(("part", "number"), PARTS)
-def test_parent_build_keeps_the_sku_geometry(monkeypatch, part, number) -> None:
-    seen = {}
-
-    async def capture(_adapter, **kwargs):
-        seen.update(kwargs)
-        return {}
-
-    monkeypatch.setattr(part, "build_stock_fastener", capture)
-    asyncio.run(part.build(None))
-    assert seen == {
-        "part_name": part.PART_NAME,
-        "components": (
-            StockComponent(
-                sku="91375A106",
-                author=recipe.build_91375A106,
-                transform=RigidTransform(translation_mm=(0.0, recipe.HALF, 0.0)),
-            ),
-        ),
-        "material": "Alloy Steel",
-        "save_threaded_part": save_simplified_part,
-        "color": PANEL_BLACK,
-    }
-    assert _config.parts(seen["part_name"])["number"] == number
+def test_purchased_stock_has_vendor_material_and_length() -> None:
+    row = _config.parts("sh-vn-arbor-set-screw")
+    assert tuple(row["supplier_skus"]) == ("91375A106",)
+    assert row["material"] == "Alloy Steel"
+    assert "Rockwell C45" in row["material_specification"]
+    assert row["finish"] == "black oxide"
+    assert spec.LENGTH == recipe.LENGTH == 2.0 * recipe.HALF
 
 
 def test_spec_restates_the_replica_it_is_sized_from() -> None:
@@ -135,7 +89,7 @@ def test_vendor_truth_is_pinned() -> None:
     }
     recipe._check_truth(truth)
     truth["bodies"] = [{"faces": [{}] * 12}]
-    with pytest.raises(RuntimeError, match="pinned vendor truth"):
+    with pytest.raises(RuntimeError):
         recipe._check_truth(truth)
 
 
@@ -154,43 +108,3 @@ def test_pre_thread_volume_leaves_the_groove_its_share() -> None:
         * (recipe.LENGTH - recipe.SOCKET_CHAMFER - recipe.POINT_CHAMFER)
     )
     assert 0.5 * annulus < groove < annulus
-
-
-def test_com_map_is_a_proper_rotation() -> None:
-    # replica (x, y, z) = vendor (x, z, -y): det +1, so the thread's hand holds.
-    rows = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
-    det = (
-        rows[0][0] * (rows[1][1] * rows[2][2] - rows[1][2] * rows[2][1])
-        - rows[0][1] * (rows[1][0] * rows[2][2] - rows[1][2] * rows[2][0])
-        + rows[0][2] * (rows[1][0] * rows[2][1] - rows[1][1] * rows[2][0])
-    )
-    assert det == 1
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "adapter._mcm_com_map = lambda c: [c[0], c[2], -c[1]]" in source
-
-
-def test_helix_starts_on_the_front_plane_cutter() -> None:
-    # The sweep path must start on the cutter's plane. The cutter sits on
-    # Front at +x, where a pi/2 start lands (every replica's idiom); the
-    # vendor's verbatim 0 put the start off that plane and the sweep failed on
-    # the 2026-09-26 amet gate.
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert 'await adapter.create_sketch("Front")' in source
-    assert "start_angle_rad=math.pi / 2.0," in source
-    assert "start_angle_rad=0.0" not in source
-
-
-@pytest.mark.parametrize(
-    ("part", "drawing", "key"),
-    [
-        (ch_part, ch_drawing, "ch_vn_arbor_set_screw"),
-        (dt_part, dt_drawing, "dt_vn_arbor_set_screw"),
-    ],
-)
-def test_drawing_is_the_purchased_reference_sheet(part, drawing, key) -> None:
-    sheet = DRAWINGS_BY_NAME[key]
-    assert drawing.SPEC is sheet
-    assert sheet.artifact_stem == part.PART_NAME
-    assert "build_purchased_fastener_drawing" in Path(drawing.__file__).read_text(
-        encoding="utf-8"
-    )

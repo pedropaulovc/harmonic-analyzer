@@ -76,6 +76,9 @@ FOOT_HEIGHT = 8.0  # C4 estimate (kit T-nut foot 24 x 24 x 8)
 THROAT_DEPTH = 14.0  # C4 estimate: PM-30MV throat depth to the undercut
 SLOT_WIDTH = trammel.TSLOT_WIDTH  # the PM-30MV slot throat; fit check only
 
+# Preserve the installed jig's member description under the shared SKU.
+BOM_DESCRIPTION = f"T-NUT, {SLOT_WIDTH:.0f} SLOT, {THREAD}"
+
 # --- Estimated (verify on receipt) ---------------------------------------------
 FOOT_WIDTH = 24.0  # across the slot
 LENGTH = 24.0  # along the slot

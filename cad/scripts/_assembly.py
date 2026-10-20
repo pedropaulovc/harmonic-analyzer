@@ -21,11 +21,16 @@ from _assembly_contract import AssemblyContract, assembly_contract
 from _bore_axis import _MATE_TOL_MM
 from _check import check, log
 from _com import FULLY_CONSTRAINED, UNDER_CONSTRAINED, _early_bound, _read_member
+from _component_references import (
+    bind_component_selectors,
+    component_identity,
+    semantic_reference_identity,
+)
 from _custom_properties import apply_custom_properties
 from _part_properties import _SUMMARY_TITLE, apply_summary_info, title_block_properties
 from _part_save import set_isometric_view
 from _source_identity import _git_commit_year, _git_sha
-from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT, _CHAIN_LINK_PREFIXES
+from _paths import DEFAULT_VIEWS, OUT_PNG, OUT_SLDASM, OUT_SLDPRT
 from _rebuild import _FEATURE_ERROR, active_configuration_name, whats_wrong
 from _saved_display_data import assert_saved_display_data
 from _simplified_identity import components_identity
@@ -115,6 +120,14 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # (``_chain_mounts.mounted_wheels()``); importing it here would put the cone
 # line and channel table on every assembly's recipe.
 _CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
+# Exact native member identities; Name2 basenames are allocator-controlled and
+# cannot prove that an occurrence is a chain link.
+_CHAIN_LINK_IDENTITIES = {
+    ("sh-vn-chain-link", "InnerLink"): "InnerLink",
+    ("sh-vn-chain-link", "OuterLink"): "OuterLink",
+}
+
+
 # COM readback tolerances, NOT manufacturing allowances: 0.00001 mm for the
 # authored centre/band, 0.00000001 for a rigid unit-scale rotation.
 _CHAIN_MOUNT_READBACK_MM = 1e-5
@@ -129,6 +142,19 @@ def _chain_component_family(name: str, families: tuple[str, ...]) -> bool:
         and stem in families
         and re.fullmatch(r"[1-9][0-9]*", instance) is not None
     )
+
+
+def _is_chain_link(component: Any) -> bool:
+    """Prove an installed link by its native file, member and semantic role."""
+    try:
+        component = _early_bound(component, "IComponent2")
+        role = _CHAIN_LINK_IDENTITIES.get(component_identity(component))
+        reference = str(component.ComponentReference or "")
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return False
+    return role is not None and re.fullmatch(
+        rf"{role}:[1-9][0-9]*", reference
+    ) is not None
 
 
 def _mounted_chain_sprocket(component: Any, configuration: str, mounts: Any) -> bool:
@@ -1205,7 +1231,6 @@ def _set_component_reference(
     reference: str,
     occurrence_basename: str,
 ) -> str:
-    from _component_references import component_identity, semantic_reference_identity
     from _preferences import _preference_id
 
     component = _early_bound(component, "IComponent2")
@@ -1259,11 +1284,15 @@ def _set_component_reference(
             )
         return renamed
     finally:
-        adapter.currentModel.ClearSelection2(True)
-        if not adapter.swApp.SetUserPreferenceToggle(preference, previous):
-            raise RuntimeError("could not restore component-name replacement updates")
-        if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
-            raise RuntimeError("component-name replacement preference did not restore")
+        try:
+            adapter.currentModel.ClearSelection2(True)
+        finally:
+            if not adapter.swApp.SetUserPreferenceToggle(preference, previous):
+                raise RuntimeError("could not restore component-name replacement updates")
+            if bool(adapter.swApp.GetUserPreferenceToggle(preference)) != previous:
+                raise RuntimeError(
+                    "component-name replacement preference did not restore"
+                )
 
 
 @_telemetry.traced("assembly.set_component_reference", label_param="reference")
@@ -1288,13 +1317,26 @@ def set_component_reference(
     result = _set_component_reference(
         adapter, component, reference, occurrence_basename
     )
+    if result != name and name in _POSE_LEDGER:
+        if result in _POSE_LEDGER:
+            raise RuntimeError(f"component rename collides with pose ledger {result!r}")
+        _POSE_LEDGER[result] = _POSE_LEDGER.pop(name)
     if rebuild:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if not model.ForceRebuild3(False):
             raise RuntimeError(f"rebuilding component reference {reference!r} failed")
         if str(component.ComponentReference or "") != reference:
             raise RuntimeError(f"rebuild lost component reference {reference!r}")
+        if component_identity(component) != semantic_reference_identity(f"@{reference}"):
+            raise RuntimeError(
+                f"rebuild changed component reference {reference!r}'s member"
+            )
     return result
+
+
+def _inserted_configuration(part: str, configuration: str) -> str:
+    """An omitted shared selection permits only a uniform Default part."""
+    return configuration or ("Default" if part.casefold().startswith("sh-vn-") else "")
 
 
 async def place_component(
@@ -1323,6 +1365,9 @@ async def place_component(
     cone-gear tooth counts, the transgear-removable wheels). Either way the
     part is inserted on-solution so mate flip-recovery has a clean reference
     and the read-back assert holds.
+
+    Omitting a shared vendor configuration permits only native ``Default``;
+    a heterogeneous file's active member is never an implicit selection.
     """
     from solidworks_mcp.adapters.base import (
         ComponentRefParameters,
@@ -1330,6 +1375,7 @@ async def place_component(
     )
 
     label = label or part
+    expected_configuration = _inserted_configuration(part, configuration)
     # One span per part: insert + (fix) + placement assert for THIS component, so
     # the full-build waterfall shows where each part's time went and a failed
     # insert/mate is attributed to the part by name.
@@ -1356,17 +1402,19 @@ async def place_component(
             ),
         )
         name = data["name"]
-        if configuration or component_reference or occurrence_basename:
-            component = _early_bound(adapter.currentModel, "IAssemblyDoc").GetComponentByName(
-                name
-            )
+        if expected_configuration or component_reference or occurrence_basename:
+            assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+            component = assembly.GetComponentByName(name)
             if component is None:
                 raise RuntimeError(f"inserted component not found: {name!r}")
             actual_configuration = str(component.ReferencedConfiguration or "")
-            if configuration and actual_configuration != configuration:
+            if (
+                expected_configuration
+                and actual_configuration != expected_configuration
+            ):
                 raise RuntimeError(
                     f"{label}: selected configuration {actual_configuration!r}, "
-                    f"expected {configuration!r}"
+                    f"expected {expected_configuration!r}"
                 )
             if occurrence_basename and not component_reference:
                 raise ValueError("an occurrence basename requires a semantic reference")
@@ -1377,11 +1425,23 @@ async def place_component(
                     component_reference,
                     occurrence_basename=occurrence_basename,
                 )
+            elif configuration:
+                model = _early_bound(adapter.currentModel, "IModelDoc2")
+                if not model.EditRebuild3():
+                    raise RuntimeError(f"{label}: configuration rebuild failed")
         psp.set_attribute("component", name)
         if ground and not data.get("fixed"):
             check(
                 f"fix {label}",
                 await adapter.fix_component(ComponentRefParameters(name=name)),
+            )
+        if (
+            expected_configuration
+            and str(component.ReferencedConfiguration or "") != expected_configuration
+        ):
+            raise RuntimeError(
+                f"{label}: rebuild changed the selected member; "
+                f"expected {expected_configuration!r}"
             )
         assert_component_placed(adapter, name, position, rows)
         _ledger_record(name, position, rows)
@@ -1436,6 +1496,10 @@ async def place_components_batch(
       * ``component_reference`` -- stable shared role and local ordinal,
       * ``occurrence_basename`` -- optional display-only member/role name,
       * ``label`` -- log label (optional).
+
+    An omitted shared vendor configuration is valid only when the native
+    component actually references ``Default``. Every explicit selection and
+    every shared Default is read back again after the batch rebuild.
 
     Why this is safe to batch where :func:`place_component` is not: these parts
     are GROUND (no mates) and inserted at an exact transform, so there is no mate
@@ -1575,6 +1639,18 @@ async def place_components_batch(
                         raise RuntimeError(
                             f"{label}: component refused configuration {configuration!r}"
                         )
+                expected_configuration = _inserted_configuration(
+                    str(specs[best_i]["part"]), configuration
+                )
+                if (
+                    expected_configuration
+                    and str(comp.ReferencedConfiguration or "") != expected_configuration
+                ):
+                    raise RuntimeError(
+                        f"{label}: selected configuration "
+                        f"{str(comp.ReferencedConfiguration or '')!r}, "
+                        f"expected {expected_configuration!r}"
+                    )
                 reference = str(specs[best_i].get("component_reference", ""))
                 basename = str(specs[best_i].get("occurrence_basename", ""))
                 if basename and not reference:
@@ -1592,22 +1668,41 @@ async def place_components_batch(
                 if grounds[best_i]:
                     grounded_comps.append(comp)
 
-        if any(spec.get("configuration") or spec.get("component_reference") for spec in specs):
+        if any(
+            _inserted_configuration(
+                str(spec["part"]), str(spec.get("configuration", ""))
+            )
+            or spec.get("component_reference")
+            for spec in specs
+        ):
             with _telemetry.span("batch.member_rebuild", count=len(specs)):
                 if not model_doc.ForceRebuild3(False):
                     raise RuntimeError(f"{label}: configured member rebuild failed")
                 for spec, name in zip(specs, out_names, strict=True):
                     component = asm.GetComponentByName(name)
                     if component is None:
-                        raise RuntimeError(f"{label}: configured member disappeared: {name!r}")
-                    configuration = str(spec.get("configuration", ""))
-                    if configuration and str(component.ReferencedConfiguration or "") != configuration:
+                        raise RuntimeError(
+                            f"{label}: configured member disappeared: {name!r}"
+                        )
+                    configuration = _inserted_configuration(
+                        str(spec["part"]), str(spec.get("configuration", ""))
+                    )
+                    if (
+                        configuration
+                        and str(component.ReferencedConfiguration or "") != configuration
+                    ):
                         raise RuntimeError(f"{label}: rebuild changed {name!r}'s member")
                     reference = str(spec.get("component_reference", ""))
-                    if reference and str(component.ComponentReference or "") != reference:
+                    if (
+                        reference
+                        and str(component.ComponentReference or "") != reference
+                    ):
                         raise RuntimeError(f"{label}: rebuild lost {reference!r}")
                     assert_component_placed(
-                        adapter, name, list(spec["position"]), [list(row) for row in spec["rows"]]
+                        adapter,
+                        name,
+                        list(spec["position"]),
+                        [list(row) for row in spec["rows"]],
                     )
 
         # Append every grounded component to the selection (IComponent2::Select2,
@@ -2155,6 +2250,19 @@ def check_no_interference(
     can have chain mesh at all.
     """
     asm = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    selector_names = bind_component_selectors(
+        adapter.currentModel,
+        (name for pair in (allowed_pairs or {}) for name in pair),
+    )
+    native_allowed_pairs: dict[frozenset[str], float] = {}
+    for selectors, limit in (allowed_pairs or {}).items():
+        pair = frozenset(selector_names[name].replace("\\", "/") for name in selectors)
+        if len(pair) != 2 or pair in native_allowed_pairs:
+            raise RuntimeError(
+                f"interference selectors {sorted(selectors)!r} do not identify "
+                "one distinct native component pair"
+            )
+        native_allowed_pairs[pair] = limit
     with _telemetry.span("gate.interference") as isp:
         log("interference detection: starting ...")
         adapter._attempt(lambda: asm.ToolsCheckInterference(), default=None)
@@ -2177,27 +2285,24 @@ def check_no_interference(
             components = list(_read_member(interference, "Components") or [])
             for comp in components:
                 # No flag: Name2 / ReferencedConfiguration are property reads (issue #87).
-                names.append(str(_read_member(comp, "Name2")))
+                names.append(str(_read_member(comp, "Name2")).replace("\\", "/"))
                 configs.append(str(_read_member(comp, "ReferencedConfiguration") or ""))
             volume_mm3 = float(_read_member(interference, "Volume") or 0.0) * 1e9
             pair = frozenset(names)
-            if len(names) == 2 and pair in (allowed_pairs or {}):
+            if len(names) == 2 and pair in native_allowed_pairs:
                 allowed_bodies.setdefault(pair, (names, []))[1].append(volume_mm3)
                 continue
-            if (
-                all(n.startswith(_CHAIN_LINK_PREFIXES) for n in names)
-                and len(names) == 2
-            ):
+            links = [
+                index
+                for index, component in enumerate(components)
+                if _is_chain_link(component)
+            ]
+            if len(links) == 2 and len(names) == 2:
                 chain_contacts.append(volume_mm3)
                 continue
             # Tooth selection alone cannot distinguish an active wheel from a
             # loose spare. Match the real leaf families, then prove exactly one
             # authored mounted role from the raw component's root-world pose.
-            links = [
-                i
-                for i, name in enumerate(names)
-                if _chain_component_family(name, _CHAIN_LINK_PREFIXES)
-            ]
             sprockets = [
                 i
                 for i, name in enumerate(names)
@@ -2223,7 +2328,7 @@ def check_no_interference(
         adapter._attempt(lambda: mgr.Done(), default=None)
         for pair, (names, bodies) in allowed_bodies.items():
             total_mm3 = sum(bodies)
-            allowed_volume = allowed_pairs[pair]
+            allowed_volume = native_allowed_pairs[pair]
             if total_mm3 <= allowed_volume:
                 bounded_contacts.append((names, total_mm3, len(bodies), allowed_volume))
                 continue

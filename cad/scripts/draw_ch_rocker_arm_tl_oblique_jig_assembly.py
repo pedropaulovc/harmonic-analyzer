@@ -6,13 +6,13 @@ the plan tagging the carrier's pass holes A1-B2, both rails and the spindle
 origin, beside the pose caption and the rail-alignment targets the fitter
 indicates the pivot pins to; the elevation carries the one native dimension,
 the CL dowel's round tip above the riser top as a reference (the builder's
-hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated TL family
-and purchased TL-VN family from the part registry, numbered in the spec's BOM order
-with its full description and total quantity, one line a row, beside its
-parent view, the jig collapsed. Full parent-scoped vendor Numbers have their
-own 56 mm column; the descriptive column gives it 8 mm without changing the
-table's sheet footprint or the reference view's room. Sheets 3 to 5 each show
-the builder-owned
+hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated and purchased
+family from the part registry, numbered in the spec's BOM order with its full
+description and total quantity, one line a row, beside its collapsed parent
+view. Shared kit members retain three native configuration rows with the same
+associative SH-VN-57 Number. Vendor Numbers have their own 56 mm column without
+changing the table's sheet footprint or the reference view's room. Sheets 3 to 5
+each show the builder-owned
 ``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail
 bars, leadscrew feed, carrier), at the largest scale whose balloon ring fits
 the sheet, each family ballooned once on one ring, on no other sheet. Sheet 6
@@ -36,7 +36,6 @@ import textwrap
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
-from pathlib import Path
 from typing import Any, Callable
 
 import _config
@@ -45,6 +44,7 @@ import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 from _check import check
 from _com import _early_bound
+from _component_references import component_identity, component_reference_names
 from _session import run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -67,7 +67,7 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, set_reference_dimension
 from _drawing_hidden_sketches import _show_base_view_sketches
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_tables import insert_bom_table
+from _drawing_tables import bom_row_identities, insert_bom_table
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_MAX_SCALE,
@@ -118,7 +118,7 @@ class Cluster:
     context: tuple[str, ...] = ()
 
 
-# All 29 families on one exploded view at 1:10 read as a crowd whose leaders
+# All 31 logical families on one exploded view at 1:10 read as a crowd whose leaders
 # converged and crossed, and the small screws could not be told apart (blind
 # review r4). So each sub-assembly explodes on its own sheet: what stands on
 # the table and rides its rails, the feed bolted along rail 1 and onto pivot
@@ -303,7 +303,7 @@ CL_TIP_TEXT_MODEL_MM = (
     spec.CL_TIP_LINE[1][1] + 10.0,
 )
 
-# Sheet 2: the BOM right, four columns to the inner border. All 32 families
+# Sheet 2: the BOM right, four columns to the inner border. All 31 families
 # fit above the title block at one line a row. Reallocate 8 mm of the former
 # 118 mm description column to the Number column: full 18-character vendor
 # Numbers need 52.2 mm at the unchanged default format. Both text columns
@@ -384,6 +384,7 @@ if STEPS_XY[0] + STEPS_LINE_WIDTH * NOTE_CHAR_M >= min(
 
 BOM_QUANTITIES = {stem: spec.QUANTITIES[stem] for stem in spec.BOM_ORDER}
 BOM_COMPONENTS = tuple(BOM_QUANTITIES)
+BOM_COMPONENT_IDENTITIES = dict(spec.COMPONENT_IDENTITIES)
 _CLUSTERED = [stem for cluster in CLUSTERS for stem in cluster.stems]
 if sorted(_CLUSTERED) != sorted(BOM_COMPONENTS):
     raise AssertionError("the clusters must partition the BOM's families")
@@ -436,12 +437,14 @@ PART_ROWS = {
     "ch-rocker-arm-tl-vn-oblique-handwheel": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-handwheel"
     ),
-    "ch-rocker-arm-tl-vn-oblique-hold-down-stud": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-hold-down-stud"
+    "sh-vn-clamping-kit-hardware--HoldDownStud": _config.parts(
+        "sh-vn-clamping-kit-hardware"
     ),
-    "ch-rocker-arm-tl-vn-oblique-t-nut": _config.parts("ch-rocker-arm-tl-vn-oblique-t-nut"),
-    "ch-rocker-arm-tl-vn-oblique-flange-nut": _config.parts(
-        "ch-rocker-arm-tl-vn-oblique-flange-nut"
+    "sh-vn-clamping-kit-hardware--TNut": _config.parts(
+        "sh-vn-clamping-kit-hardware"
+    ),
+    "sh-vn-clamping-kit-hardware--FlangeNut": _config.parts(
+        "sh-vn-clamping-kit-hardware"
     ),
     "ch-rocker-arm-tl-vn-oblique-rail-screw": _config.parts(
         "ch-rocker-arm-tl-vn-oblique-rail-screw"
@@ -483,10 +486,6 @@ BOM_PART_NUMBERS = {stem: str(row["number"]) for stem, row in PART_ROWS.items()}
 BOM_DESCRIPTIONS = dict(spec.BOM_DESCRIPTIONS)
 if max(map(len, BOM_DESCRIPTIONS.values())) > BOM_DESCRIPTION_MAX_CHARS:
     raise AssertionError("every BOM description must print on one line")
-BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
-BOM_NORMALIZED_ALIASES = {
-    alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
-}
 # The steps cite items by number, so the BOM must number its rows exactly as
 # the spec does (BOM_ORDER); the recipe refuses any other numbering.
 BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
@@ -495,6 +494,8 @@ BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 # on the one cluster sheet that shows the family; each sheet's balloons
 # share one ring (_ring_balloons).
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+for _family in spec.KIT_IDENTITIES:
+    BALLOON_ANCHORS[_family] = BalloonAnchor(instance=spec.instance_name(_family, 0))
 # The base bar's walk landed on rail 2's carriage end seal (review r5): its
 # balloon lands on bar 1's long top edge on the operator's side (part +Y,
 # ``HIGH_SIDE_Y``, z ``BAR_THICK``), the edge nearest the viewer, 200 from the
@@ -701,11 +702,15 @@ def _center_view_outline(
 
 
 def _component_stem(component: Any) -> str:
+    """Logical family from the native file AND member, never its shared Number."""
     component = _early_bound(component, "IComponent2")
-    path = str(component.GetPathName() or "")
-    if not path:
-        raise RuntimeError(f"component {component.Name2!r} has no referenced path")
-    return Path(path).stem.casefold()
+    identity = component_identity(component)
+    try:
+        return spec.component_family(*identity)
+    except ValueError as error:
+        raise RuntimeError(
+            f"component {component.Name2!r} selects unexpected jig identity {identity!r}"
+        ) from error
 
 
 def _validate_source(source_model: Any) -> None:
@@ -736,6 +741,7 @@ def _validate_source(source_model: Any) -> None:
             )
     if counts != BOM_QUANTITIES:
         raise RuntimeError(f"jig families {counts!r} != contract {BOM_QUANTITIES!r}")
+    component_reference_names(source_model, spec.KIT_COMPONENT_REFERENCES)
 
 
 def _bom_cells(table: Any) -> tuple[tuple[str, ...], ...]:
@@ -769,12 +775,6 @@ def _bom_columns(header: tuple[str, ...]) -> dict[str, int]:
         ),
         "quantity": _bom_column(header, lambda cell: cell.startswith("QTY"), "QTY."),
     }
-
-
-def _set_cell(table: Any, row: int, column: int, text: str, *, label: str) -> None:
-    if not table.IsCellTextEditable(row, column):
-        raise RuntimeError(f"jig BOM {label} cell is locked")
-    table.SetText2(row, column, False, text)
 
 
 def bom_extent_violations(
@@ -833,10 +833,17 @@ def _assert_bom_on_paper(table: Any) -> None:
         )
 
 
-def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers; prove identities, item numbers, descriptions and
-    quantities; set the column widths and the one-line row height; measure the
-    rebuilt table on its paper. Return (stem, item number) in BOM order."""
+def _validate_bom(
+    adapter: Any,
+    table: Any,
+    *,
+    configuration: str = SIMPLIFIED_VIEW_CONFIGURATION,
+) -> tuple[tuple[str, str], ...]:
+    """Prove native rows, associative Numbers, item order, descriptions and counts.
+
+    The visible Number is not a row key: all three kit members print SH-VN-57.
+    No cell text override may replace the native Number-property association.
+    """
     table = _early_bound(table, "ITableAnnotation")
     contents = _bom_cells(table)
     rows = len(contents)
@@ -851,20 +858,17 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
         raise RuntimeError("jig BOM template already has 'MATERIAL'")
     at = _bom_columns(header)
 
-    actual: dict[str, int] = {}
-    for row_index, row in enumerate(contents[1:], start=1):
-        text = row[at["part"]].casefold()
-        stem = BOM_NORMALIZED_ALIASES.get(text, text)
-        if stem in actual:
-            raise RuntimeError(f"jig BOM repeats component family {stem!r}")
-        actual[stem] = row_index
-    if set(actual) != set(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"jig BOM identities {sorted(actual)!r} != {sorted(BOM_COMPONENTS)!r}"
-        )
+    actual = bom_row_identities(
+        table,
+        configuration=configuration,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    )
     for stem, row_index in actual.items():
         row = contents[row_index]
-        if row[at["item"]] != BOM_ITEM_NUMBERS[stem]:
+        if (
+            row_index != int(BOM_ITEM_NUMBERS[stem])
+            or row[at["item"]] != BOM_ITEM_NUMBERS[stem]
+        ):
             raise RuntimeError(
                 f"jig BOM numbers {stem!r} item {row[at['item']]!r}, but the steps "
                 f"cite item {BOM_ITEM_NUMBERS[stem]}: the assembly must insert its "
@@ -872,7 +876,10 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
             )
         number = BOM_PART_NUMBERS[stem]
         if row[at["part"]] != number:
-            _set_cell(table, row_index, at["part"], number, label=f"{stem} part-number")
+            raise RuntimeError(
+                f"jig BOM associative part number for {stem!r} reads "
+                f"{row[at['part']]!r}, expected {number!r}"
+            )
         if row[at["description"]] != BOM_DESCRIPTIONS[stem]:
             raise RuntimeError(f"jig BOM description mismatch for {stem!r}")
         if row[at["quantity"]] != str(BOM_QUANTITIES[stem]):
@@ -890,6 +897,12 @@ def _validate_bom(adapter: Any, table: Any) -> tuple[tuple[str, str], ...]:
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("jig BOM rebuild failed")
     settled = _bom_cells(table)
+    if bom_row_identities(
+        table,
+        configuration=configuration,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+    ) != actual:
+        raise RuntimeError("jig BOM native member rows changed after rebuild")
     for stem, row_index in actual.items():
         applied = settled[row_index][at["part"]]
         if applied != BOM_PART_NUMBERS[stem]:
@@ -1880,10 +1893,14 @@ def _place_package(
         anchor_xy=BOM_ANCHOR,
         expected_components=BOM_COMPONENTS,
         descriptions=BOM_DESCRIPTIONS,
-        identity_aliases=BOM_IDENTITY_ALIASES,
+        component_identities=BOM_COMPONENT_IDENTITIES,
+        configuration_grouping="same-name",
+        part_number_property="Number",
         label="jig",
     )
-    items = _validate_bom(adapter, table)
+    items = _validate_bom(
+        adapter, table, configuration=str(reference.ReferencedConfiguration)
+    )
     bom_name = _bom_feature_name(table)
     landings: list[BalloonLanding] = []
     for cluster, view, scale in placed:

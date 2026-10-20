@@ -17,8 +17,10 @@ is checked against the build's own component enumeration
 until it is classified, and a threaded part fails until a row names it.
 ``REQUIRED_JOINTS`` registers every joint with its source occurrence, and the
 table must match it exactly, so a row deleted while other rows still name its
-parts is still caught. A threaded joint replaced by a pinned one keeps a row,
-its lock the pin (paper-drive/knob-cup-on-journal, R9-70).
+parts is still caught. Shared purchase stock does not merge operational joints:
+the drive-train foot and swing stop retain independent IDs and quantities even
+though both use the same Default member. A threaded joint replaced by a pinned
+one keeps a row, its lock the pin (paper-drive/knob-cup-on-journal, R9-70).
 
 ``audit`` is pure. ``main`` writes ``cad/out/reports/joint-retention.json``
 and a readable summary beside it; under ``ENFORCEMENT = Enforcement.AUDIT`` it
@@ -570,9 +572,9 @@ def main() -> int:
 # Every referenced part that carries a thread (member or receiver).
 THREADED_PARTS: frozenset[str] = frozenset(
     {
-        "dt_arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-DT-VN-64); its #8 ledge hole is clearance only
+        "dt_arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-SH-VN-54); its #8 ledge hole is clearance only
         "sh_vn_arbor_set_screw",  # #4-40 x 1/4 cup point (91375A106), channel brackets and drive-train pedestals
-        "ch_pivot_bracket",  # #4-40 UNC-2B apex tap through the ear's arch into the bore (receiver of MHA-CH-VN-53); #8 foot hole is clearance only
+        "ch_pivot_bracket",  # #4-40 UNC-2B apex tap through the ear's arch into the bore (receiver of MHA-SH-VN-54); #8 foot hole is clearance only
         "sm_vn_boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
         "sh_vn_clamp_screw",  # #8-32 UNC (90280A201), magnifier and paper-drive column clamps
         "sh_column_clamp_back",  # #8-32 UNC tapped ear holes, receiver of clamp_screw (magnifier and paper_drive)
@@ -585,7 +587,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "dt_vn_cone_tip_block_screw",  # #4-40 SHCS (91251A108), member into cone_tip_block foot
         "dt_vn_cone_tip_collar",  # custom collar + stock #2-56 94355A213 flat-point screw on the shaft D-flat
         "dt_vn_cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
-        "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-DT-VN-50)
+        "dt_crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and MHA-SH-VN-51
         "dt_crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-DT-32), member into crank_arm
         "sh_vn_brass_fillister_screw",  # #4-40 brass (90114A511), keeper eye, nameplate and paper guides
         "sh_vn_fillister_screw_90280a108",  # #4-40 (90280A108), spring foot, swing stop and latch-hook bracket
@@ -675,7 +677,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_crankshaft",  # journals in MHA-DT-05; pinned (MHA-DT-29), taper-pinned (MHA-DT-09); paper-drive T12 wheel has no thread
         "dt_cylinder_end_disc",  # plain thrust washer on the arbor
         "dt_cylinder_gear",  # runs free on the arbor, no set screw
-        "dt_cylinder_gear_shaft",  # plain 3/8 arbor; MHA-DT-VN-64 cups bear in drilled spots, no thread ("NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY")
+        "dt_cylinder_gear_shaft",  # plain 3/8 arbor; MHA-SH-VN-54 cups bear in drilled spots, no thread ("NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY")
         "ch_fulcrum_shaft",  # plain Ø6.35 shaft with two set-screw flats, no threads
         "pd_guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "dt_vn_keeper_chain",  # bead chain
@@ -703,7 +705,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "dt_pinion_lift_rod",  # plain Ø6.35 rod; gripped by the MHA-DT-23 set screws (appears as receiver of the cam row, carries no thread)
         "dt_pinion_pivot_block",  # #8 normal-clearance holes only; clamped by MHA-DT-VN-57 (row harmonic-analyzer/pinion-block-hold-down)
         "dt_pinion_pivot_shaft",  # plain shaft, cross-pinned to the straps by MHA-DT-VN-63
-        "dt_pinion_spring",  # #4 clearance foot hole; clamped by foot_screw MHA-DT-VN-58 (top-level row)
+        "dt_pinion_spring",  # #4 clearance foot hole; clamped by foot-screw MHA-SH-VN-52 (top-level row)
         "dt_vn_pinion_strap_pin",  # 1/16 spring pin
         "ch_pivot_shaft",  # plain Ø6.35 rod, domed both ends, two set-screw flats; no thread
         "pd_platen_clip",  # #2 clearance holes only (build_pd_platen_clip); clamped by platen_clip_screw
@@ -1039,7 +1041,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "MHA-DT-20, carrying the whole cone set and crank, swings on the oiled shoulder out to "
-            "the MHA-DT-VN-53 stop and back at every zeroing (CHECKS 4/5), dragging the shoulder "
+            "the MHA-SH-VN-52 stop and back at every zeroing (CHECKS 4/5), dragging the shoulder "
             "about the screw axis one way then the other; in running, the crank and mesh "
             "reaction on the knob-clamped platform also bears on the shoulder"
         ),
@@ -1052,7 +1054,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_dt_drive_train_assembly.py pivot_screw placement ('base-threaded STATIC ... "
             "shoulder bottoms on the base top') and PSCREW_* asserts; dt_vn_cone_pivot_screw_spec.THREAD; "
             "draw_dt_drive_train_assembly.py INTERFACE_NOTES ('BASE MHA-FR-01 ... RECEIVES MHA-DT-VN-52'), "
-            "CHECKS 4 ('SWING THE CONE SET ON MHA-DT-VN-52 TO THE MHA-DT-VN-53 STOP'), rig_steps "
+            "CHECKS 4 ('SWING THE CONE SET ON MHA-DT-VN-52 TO THE MHA-SH-VN-52 STOP'), rig_steps "
             "other-base-mounting"
         ),
     ),
@@ -1154,7 +1156,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=(),
         lock_step="",
         evidence=(
-            "draw_dt_drive_train_assembly.py BANK_STEPS 9E ('RUN THE BACK MHA-DT-VN-64 IN TIGHT, THEN THE FRONT ONE'); "
+            "draw_dt_drive_train_assembly.py BANK_STEPS 9E ('RUN THE BACK MHA-SH-VN-54 IN TIGHT, THEN THE FRONT ONE'); "
             "build_dt_drive_train_assembly.py arbor set screw placement (_lock_static, ~L3819-3831); "
             "dt_arbor_pedestal_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next); arbor_set_screw_spec docstring; "
             "dt_cylinder_gear_shaft_spec.DRAWING_NOTES; CONSUMABLES_NOTES ('#4-40 ... SCREWS: SNUG', no threadlocker)"
@@ -1213,7 +1215,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=(),
         lock_step="",
         evidence=(
-            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('CLAMP MHA-DT-28 UNDER MHA-DT-VN-50'); "
+            "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 6 ('CLAMP MHA-DT-28 UNDER MHA-SH-VN-51'); "
             "build_dt_drive_train_assembly.py anchor block (~L722-766: ANCHOR_THREAD_ENGAGEMENT, through tap) and "
             "placement (~L4400-4414); crank_pin_eye_spec docstring (tail clamped under the screw); CONSUMABLES_NOTES"
         ),
@@ -1229,7 +1231,7 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "Clamps each cast MHA-DT-02 pedestal's ledge to base MHA-FR-01; neither moves in operation (the arbor is "
-            "fixed by MHA-DT-VN-64). The gears' journal drag acts about the horizontal arbor axis, perpendicular to "
+            "fixed by MHA-SH-VN-54). The gears' journal drag acts about the horizontal arbor axis, perpendicular to "
             "this vertical screw, so it reaches the screw only as tension/shear through the foot; no member "
             "rotates on or about the screw axis"
         ),
@@ -1306,7 +1308,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_binds=("sh_vn_arbor_set_screw", "ch_pivot_bracket"),
         lock_step="set-screws-driven",
         evidence=(
-            "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-CH-VN-53 DOWN EACH APEX TAP "
+            "draw_ch_channel_assembly.py _fitup_steps 'set-screws-driven' ('RUN ONE MHA-SH-VN-54 DOWN EACH APEX TAP "
             "ONTO ITS FLAT, NORTH FIRST; SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS.'); build_ch_channel_assembly.py apex set screw "
             "placement (SET_SCREW_TIP_Y); ch_pivot_bracket_spec.SET_SCREW_HOLE_SPEC (#4-40 tapped, through_next) "
             "and SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT; ch_pivot_shaft_spec flats (FLAT_DEPTH, FLAT_LENGTH)"
@@ -1958,7 +1960,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_mg_magnifier_assembly.py:build ('thumb-screw (clamp)', lock_mate 'thumb-screw locked to clamp'; "
             "docstring 'Documented simplifications'); build_mg_magnifying_clamp.py ThumbTap from "
             "mg_magnifying_clamp_geom.py THUMB_TAP_SPEC + THUMB_ENGAGEMENT_WORST; "
-            "mg_magnifying_clamp_spec.py DRAWING_NOTES; _mcmaster_91882a221.py THUMB_SPEC"
+            "mg_magnifying_clamp_spec.py DRAWING_NOTES; sh_vn_thumb_screw_spec.py THUMB_SPEC"
         ),
     ),
     Joint(
@@ -1986,7 +1988,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_mg_magnifier_assembly.py:build (lock_mate 'vertical-rod locked to clamp'; VROD_TOP_Y = clamp bottom face + SHOULDER_X); "
             "build_mg_magnifying_clamp.py RodTap from mg_rod_clamp_joint.py ROD_TAP_SPEC + ENGAGEMENT_WORST; "
             "mg_magnifying_vertical_rod_geom.py SHOULDER_X + SEAT_LAND_WORST; "
-            "mg_vn_lever_wire_geom.py HOOK_Z == DRUM_END_Z"
+            "sh_vn_music_wire_lever_geom.py HOOK_Z == DRUM_END_Z"
         ),
     ),
     Joint(
@@ -2014,7 +2016,7 @@ JOINTS: tuple[Joint, ...] = (
             "build_mg_magnifier_assembly.py:build ('thumb-screw (output fixture)', lock_mate 'output-fixture thumb-screw locked to fixture'; "
             "FIXTURE_SCREW_TIP_X = rod radius, FIXTURE_SCREW_STANDOFF > 0; docstring 'both thumb screws are modeled backed-out'); "
             "mg_output_fixture_geom.py TAP_SPEC + SPIGOT_FACE_X (axial tap from the spigot face into the rod bore); "
-            "mg_output_fixture_spec.py TAP_SPEC + DRAWING_NOTES; config parts/mg-vn-thumb-screw.yaml quantity 2; "
+            "mg_output_fixture_spec.py TAP_SPEC + DRAWING_NOTES; config parts/sh-vn-thumb-screw.yaml aggregate quantity 3 (MG x2 + MS x1); "
             "dimensions.yaml ch20 thumb screw x2 (sliding clamp + output fixture)"
         ),
     ),
@@ -2248,7 +2250,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_pd_paper_drive_assembly._step_text 'latch-hook-fitted' and 'hook-pin-hole-match-drilled'; "
             "build_pd_paper_drive_assembly.py 'latch-hook-bracket-screw (x' placements; "
-            "pd_support_bar_spec.BRACKET_TAP_X/BRACKET_TAP_SPEC; pd_vn_latch_hook_bracket_screw_spec."
+            "pd_support_bar_spec.BRACKET_TAP_X/BRACKET_TAP_SPEC; pd_latch_hook_bracket_screw_spec."
             "ENGAGEMENT_NOMINAL"
         ),
     ),

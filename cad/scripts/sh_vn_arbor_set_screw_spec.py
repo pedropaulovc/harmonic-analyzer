@@ -9,7 +9,7 @@ bank's end-play leaf is set (#743, Q3: "set screw located at apex of straps").
 The same SKU, one per MHA-CH-08 ear, drops through the ear's arch apex onto
 a flat on the rocker pivot shaft (user, 2026-10-10).
 
-The native parts retain separate parent identities. These layout nominals
+The native part has the shared Number MHA-SH-VN-54. These layout nominals
 come from the vendor replica (diagnostics/diag_build_91375A106), without
 importing its SolidWorks recipe or either parent's mechanical specs. The
 thread-table major diameter is the existing fit nominal, not the replica's

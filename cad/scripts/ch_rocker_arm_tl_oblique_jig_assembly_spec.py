@@ -9,7 +9,7 @@ read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
 Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-VN-50 to TL-VN-71). Overall envelope at the modelled pose,
+bought items' (TL-VN drawings and shared SH-VN-57). Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
@@ -37,13 +37,13 @@ underside carry the KP08 blocks; the TL-29 nut bracket bolts to pivot block
 1. The Tr8x2 nut does not back-drive: the TL-26 lever feeds (roughing) only
 with the nut bracket's block screws out; the handwheel feeds the finish pass.
 
-Every bought item is modelled and inserted, each family its own TL part
-(TL-VN-50 to TL-VN-71, ``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
+Every bought member is modelled and inserted, each family its own BOM row
+(``BOM_ORDER``): the two HGR15R rails and HGH15CA carriages,
 the four 6200-2RS bearings, the CL dowel, the leadscrew, its flanged nut, the
 two KP08 blocks and the handwheel, the four hold-down studs with their
-T-nuts and flange nuts, every screw, and the wedge-lock washer pair under each
-block screw's and each feed lever screw's head.
-Each instance's pose is
+T-nuts and flange nuts (three configurations of shared SH-VN-57), every screw,
+and the wedge-lock washer pair under each block screw's and each feed lever
+screw's head. Each instance's pose is
 ``PLACEMENTS`` (from the part frames each part spec documents), and the BOM
 rows, item numbers and descriptions are ``QUANTITIES``, ``ITEM_NUMBERS`` and
 ``BOM_DESCRIPTIONS``. No skid (user ruling).
@@ -126,7 +126,7 @@ HUB_PIN = "ch-rocker-arm-tl-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 NUT_BRACKET = leadscrew.NUT_BRACKET
-# Bought hardware (TL-VN-50..72), every item modelled and mated.
+# Bought hardware (parent-scoped TL-VN and shared SH-VN-57), every member modelled.
 RAIL = "ch-rocker-arm-tl-vn-oblique-rail"
 CARRIAGE = "ch-rocker-arm-tl-vn-oblique-carriage"
 BEARING = "ch-rocker-arm-tl-vn-oblique-bearing"
@@ -135,9 +135,10 @@ LEADSCREW = "ch-rocker-arm-tl-vn-oblique-leadscrew"
 LEADSCREW_NUT = "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"
 PILLOW_BLOCK = "ch-rocker-arm-tl-vn-oblique-pillow-block"
 HANDWHEEL = "ch-rocker-arm-tl-vn-oblique-handwheel"
-HOLD_DOWN_STUD = "ch-rocker-arm-tl-vn-oblique-hold-down-stud"
-T_NUT = "ch-rocker-arm-tl-vn-oblique-t-nut"
-FLANGE_NUT = "ch-rocker-arm-tl-vn-oblique-flange-nut"
+CLAMPING_KIT = "sh-vn-clamping-kit-hardware"
+HOLD_DOWN_STUD = "sh-vn-clamping-kit-hardware--HoldDownStud"
+T_NUT = "sh-vn-clamping-kit-hardware--TNut"
+FLANGE_NUT = "sh-vn-clamping-kit-hardware--FlangeNut"
 RAIL_SCREW = "ch-rocker-arm-tl-vn-oblique-rail-screw"
 BRACKET_SCREW = "ch-rocker-arm-tl-vn-oblique-bracket-screw"
 BLOCK_SCREW = "ch-rocker-arm-tl-vn-oblique-block-screw"
@@ -150,9 +151,9 @@ LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
 BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-block-washer"
 LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
 
-# Every component family and its count: the builder places, the explode moves
-# and the drawing's BOM proves exactly this inventory, in registry order
-# TL-20..29 and TL-VN-50..72. The bought counts are the part specs' own.
+# Every logical component family and its count: the builder places, the explode
+# moves and the drawing proves this inventory in its established item order.
+# The bought counts are each member's own, never the number of purchased kits.
 QUANTITIES = {
     BASE_BAR: base_bar.QUANTITY,
     CARRIER: 1,
@@ -222,6 +223,38 @@ BOM_ORDER = (
     BLOCK_LOCK_WASHER,
     LEVER_LOCK_WASHER,
 )
+
+# Logical BOM families are not filenames. The heterogeneous kit members share
+# one physical producer but retain their own placement, count and native row.
+KIT_IDENTITIES = {
+    HOLD_DOWN_STUD: (CLAMPING_KIT, "HoldDownStud"),
+    T_NUT: (CLAMPING_KIT, "TNut"),
+    FLANGE_NUT: (CLAMPING_KIT, "FlangeNut"),
+}
+COMPONENT_IDENTITIES: dict[str, tuple[str, str | None]] = {
+    family: (family, None) for family in BOM_ORDER
+}
+COMPONENT_IDENTITIES.update(KIT_IDENTITIES)
+
+
+def component_family(native_stem: str, configuration: str) -> str:
+    """Resolve a native file/member to its logical placement and BOM family.
+
+    Callers remove only the drawing's Simplified suffix before passing the
+    configuration. An unknown kit configuration must never count as a member.
+    """
+    matches = [
+        family
+        for family, (stem, member) in COMPONENT_IDENTITIES.items()
+        if native_stem.casefold() == stem.casefold()
+        and member in (None, configuration)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"jig component {(native_stem, configuration)!r} has no unique family"
+        )
+    return matches[0]
+
 
 Rows = tuple[tuple[float, float, float], ...]
 Point3 = tuple[float, float, float]
@@ -646,8 +679,8 @@ LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in carrier.LEVER_HOLES
 )
 
-# Every instance of every family, in insertion order: instance n of a family
-# is SolidWorks' ``<stem>-n`` (the interference contracts name instances).
+# Every instance of every logical family, in insertion order. Ordinary families
+# keep native <stem>-N names; kit instances use persisted role-local references.
 PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     BASE_BAR: BASE_BAR_PLACEMENTS,
     CARRIER: ((CARRIER_ORIGIN, CARRIER_ROWS),),
@@ -684,8 +717,17 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
 
 
 def instance_name(stem: str, index: int) -> str:
-    """SolidWorks' name for ``stem``'s instance ``index`` (0-based)."""
+    """Selector for family instance ``index`` (0-based), not a guessed kit Name2."""
+    if stem in KIT_IDENTITIES:
+        return f"@{KIT_IDENTITIES[stem][1]}:{index + 1}"
     return f"{stem}-{index + 1}"
+
+
+KIT_COMPONENT_REFERENCES = {
+    instance_name(family, index): identity
+    for family, identity in KIT_IDENTITIES.items()
+    for index in range(QUANTITIES[family])
+}
 
 
 # --- Mates ⚙ -------------------------------------------------------------------------
@@ -759,8 +801,8 @@ TABLE_Y = (
 COVER_Y = trammel.THROAT_TO_COVER  # the column's pleated cover, 7.5 in from the spindle
 
 # --- BOM ------------------------------------------------------------------------------
-# DESCRIPTION cells (the parts carry no Description property), one printed
-# line each; no vendor or brand (each bought part's yaml owns its source).
+# DESCRIPTION cells, one printed line each; no vendor or brand (the yaml owns
+# each source). Shared kit members use the producer's native Description authority.
 # The rail is a cut-to-440 special order whose E = 40 symmetric end distance
 # is an unverified vendor quote. Screws by their fastener-table callout.
 BOM_DESCRIPTIONS = {
@@ -787,11 +829,9 @@ BOM_DESCRIPTIONS = {
     LEADSCREW_NUT: "TR8X2 FLANGED NUT, BRASS",
     PILLOW_BLOCK: f"PILLOW BLOCK, {leadscrew.KP08_BORE:.0f} BORE, SET SCREWS",
     HANDWHEEL: f"HANDWHEEL {leadscrew.HANDWHEEL_WHEEL_DIA:.0f} DIA, 8 BORE",
-    HOLD_DOWN_STUD: (
-        f"{hold_down_stud.THREAD} X {fasteners.HOLD_DOWN_STUD_LENGTH} IN HOLD-DOWN STUD"
-    ),
-    T_NUT: f"T-NUT, {t_nut.SLOT_WIDTH:.0f} SLOT, {t_nut.THREAD}",
-    FLANGE_NUT: f"{flange_nut.THREAD} FLANGE NUT",
+    HOLD_DOWN_STUD: hold_down_stud.BOM_DESCRIPTION,
+    T_NUT: t_nut.BOM_DESCRIPTION,
+    FLANGE_NUT: flange_nut.BOM_DESCRIPTION,
     RAIL_SCREW: rail_screw.CALLOUT,
     BRACKET_SCREW: bracket_screw.CALLOUT,
     BLOCK_SCREW: block_screw.CALLOUT,

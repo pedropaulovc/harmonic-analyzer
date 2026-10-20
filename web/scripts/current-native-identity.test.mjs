@@ -122,6 +122,20 @@ test('all eight shared targets retain each of the nineteen exact member and role
     /no unique immediate parent/)
 })
 
+test('all five Default shared groups preserve native variant suffixes on repeated projection', () => {
+  const defaults = sharedCases.filter(row => row.configuration === 'Default')
+  assert.equal(new Set(defaults.map(row => row.stem)).size, 5)
+  for (const row of defaults) for (const variant of ['T006', 'Installed']) {
+    const expected = path(row.parent, `${row.occurrenceStem}--${variant}-7@upper`)
+    for (const source of [row.sourceStem, row.priorStem]) {
+      const current = projectCurrentNativePath(path(row.parent, `${source}--${variant}-7@upper`))
+      assert.equal(current, expected)
+      assert.equal(projectCurrentNativePath(current), expected)
+      assert.equal(projectCurrentNativePath(expected), expected)
+    }
+  }
+})
+
 test('logical member selectors remain case-sensitive rather than accepting physical filename spelling', () => {
   const exact = path('pd-paper-drive', 'sh-vn-chain-link--InnerLink-1')
   assert.equal(projectCurrentNativePath(exact), exact)
@@ -142,6 +156,29 @@ test('role-local archive paths cannot be used as rebuilt native occurrence addre
       assert.throws(() => projectCurrentNativePath(archived, namespace), /namespace/i)
       assert.throws(() => projectCurrentNativePath('Camera', namespace), /namespace/i)
     }
+  }
+})
+
+test('node namespace preflight rejects rebuilt-native extras before changing any source node', () => {
+  for (const boundary of ['extras', 'nativeIdentity']) {
+    const matrix = [-0, 1, 0, 1]
+    const sourceExtras = { nativePath: path('dt-drive-train', 'vn-foot-screw-1') }
+    const rejectedExtras = boundary === 'extras'
+      ? { occurrenceNamespace: 'rebuilt-native' }
+      : { nativeIdentity: { stem: 'vn-swing-stop-screw', occurrenceNamespace: 'rebuilt-native' } }
+    const document = { nodes: [
+      { name: 'ha-harmonic-analyzer', children: [1] },
+      { name: 'dt-drive-train', children: [2, 3] },
+      { name: 'vn-foot-screw-1', matrix, extras: sourceExtras },
+      { name: 'vn-swing-stop-screw-1', extras: rejectedExtras },
+    ] }
+    const before = structuredClone(document)
+    assert.throws(() => projectCurrentNativeDocument(document), /namespace/i)
+    assert.deepEqual(document, before)
+    assert.equal(document.nodes[2].name, 'vn-foot-screw-1')
+    assert.strictEqual(document.nodes[2].extras, sourceExtras)
+    assert.strictEqual(document.nodes[2].matrix, matrix)
+    assert.ok(Object.is(matrix[0], -0))
   }
 })
 

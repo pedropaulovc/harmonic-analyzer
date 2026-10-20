@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the arbor set screw (MHA-CH-VN-53, McMaster 91375A106)."""
+"""Create the shared MHA-SH-VN-54 reference sheet for McMaster 91375A106."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["ch_vn_arbor_set_screw"]
+SPEC = DRAWINGS_BY_NAME["sh_vn_arbor_set_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#4-40 x 1/4 SOCKET SET SCREW, CUP POINT"
 

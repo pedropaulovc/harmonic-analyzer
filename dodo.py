@@ -1756,10 +1756,40 @@ def _channel_spring_variants() -> list[Path]:
     return sorted((CAD_OUT / "sldprt").glob("ch-vn-channel-spring-installed-stretch*.SLDPRT"))
 
 
+def _part_configuration_outputs(stem: str) -> list[Path]:
+    """Exact member STEP/PNG/certificate outputs owned only by this part task."""
+    from _part_configuration_exports import part_configuration_outputs
+
+    return part_configuration_outputs(stem, CAD_OUT)
+
+
+def _validate_part_configuration_outputs(stem: str, key: str) -> None:
+    """Reject an incomplete or mismatched native/member set without retrying it.
+
+    Validate after stamping every built/restored set, including a canonical
+    publication winner adopted in place of a locally validated losing build.
+    """
+    from _part_configuration_exports import validate_member_exports
+
+    try:
+        validate_member_exports(stem, CAD_OUT)
+    except (RuntimeError, ValueError) as exc:
+        label = f"part:{stem}"
+        raise RuntimeError(
+            f"{label}: invalid member exports for cache key {key}: {exc}. "
+            f"Investigate this cached set, then request an explicit forced cache "
+            f"refresh of {label} with a reason; an ordinary retry restores the same key."
+        ) from exc
+
+
+
 def _part_cache_outputs(stem: str) -> list[Path]:
-    """Everything a part build emits that downstream tasks read: the .SLDPRT, its STL
-    sidecar, and the render dir. Non-existent entries are skipped at pack time."""
-    return [Path(_sldprt(stem)), _stl(stem), _png_dir(stem)]
+    """Native/STL/render outputs plus authoritative member STEP/PNG certificates."""
+    png_dir = _png_dir(stem)
+    return [
+        Path(_sldprt(stem)), _stl(stem), png_dir,
+        *(path for path in _part_configuration_outputs(stem) if png_dir not in path.parents),
+    ]
 
 
 def _assembly_cache_outputs(stem: str) -> list[Path]:
@@ -2105,6 +2135,8 @@ def _export_file_deps() -> list[str]:
     return sorted({
         *_export_requirement_deps(),
         *(str(path) for path in _feature_bundle_outputs()),
+        *(str(path.resolve()) for stem in part_stems()
+          for path in _part_configuration_outputs(stem)),
         *_cad_identity_deps(),
     })
 
@@ -2203,6 +2235,9 @@ def _export_cache_outputs() -> list[Path]:
             (_png_dir(stem) / f"{stem.replace('_', '-')}_isometric.png").resolve()
             for stem in (*part_stems(), *ASSEMBLY_ORDER)
         ),
+        *(path.resolve() for stem in part_stems()
+          for path in _part_configuration_outputs(stem)
+          if path.suffix == ".png" and path.parent != _png_dir(stem)),
         (REPORTS / "release-neutral.json").resolve(),
     ]
 
@@ -2536,16 +2571,19 @@ def _cached_part_action(stem: str, script: Path) -> None:
         probed = _probe_cache(key, outputs, label, probe)
         if probed == "hit":
             _stamp_part_execution(stem)
+            _validate_part_configuration_outputs(stem, key)
             return
 
     if _farm.enabled():
         _farm_build(label, key, outputs)
         _stamp_part_execution(stem)
+        _validate_part_configuration_outputs(stem, key)
         return
 
     with _com_seat(label) as waited:
         if _reprobe_under_seat(key, outputs, label, probed):
             _stamp_part_execution(stem)
+            _validate_part_configuration_outputs(stem, key)
             return
 
         _sw_ensure_once()  # top-level sibling of the task span (once/worker)
@@ -2567,6 +2605,7 @@ def _cached_part_action(stem: str, script: Path) -> None:
                 )
             _exec_com([sys.executable, str(script)], label, log_stem=f"part-{stem}")
             _stamp_part_execution(stem)
+            _validate_part_configuration_outputs(stem, key)
 
     # Publish OUTSIDE the seat -- an Azure upload is network, not COM, so it must
     # not hold the seat the next task is waiting for.
@@ -2574,12 +2613,14 @@ def _cached_part_action(stem: str, script: Path) -> None:
         f"cache.store {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as store:
         _tag_cache_key(store, key)
+        _validate_part_configuration_outputs(stem, key)
         outcome = _cache.store(key, outputs, label)
         store.set_attribute("cache", outcome)
         _cache.require_refresh_store(label, outcome)
     if outcome == "lost":
         _adopt_canonical(key, outputs, label)
         _stamp_part_execution(stem)
+        _validate_part_configuration_outputs(stem, key)
 
 
 def _recipe_files(stem: str) -> list[str]:
@@ -2789,7 +2830,10 @@ def task_part():
         yield {
             "name": stem,
             "file_dep": _part_file_deps(script, stem),
-            "targets": [_sldprt(stem), _part_execution_token(stem)],
+            "targets": [
+                _sldprt(stem), _part_execution_token(stem),
+                *(str(path.resolve()) for path in _part_configuration_outputs(stem)),
+            ],
             "uptodate": [
                 _ExecutionIdentityTracker(_part_execution_token(stem)),
                 not _cache.forced_refresh(f"part:{stem}"),
@@ -3560,6 +3604,11 @@ def task_check():
         SCRIPTS_DIR / "test_release_drawing_diff.py",
         SCRIPTS_DIR / "test_trim_renders.py",
         SCRIPTS_DIR / "test_export_models.py",
+        SCRIPTS_DIR / "test_part_configuration_exports.py",
+        SCRIPTS_DIR / "test_purchased_part_variants.py",
+        SCRIPTS_DIR / "test_shared_vendor_consumers.py",
+        SCRIPTS_DIR / "test_shared_wire_assembly_consumers.py",
+        SCRIPTS_DIR / "test_shared_vendor_selector_consumers.py",
         SCRIPTS_DIR / "test_export_features.py",
         SCRIPTS_DIR / "test_export_feature_faces.py",
         SCRIPTS_DIR / "test_features_bound.py",
@@ -3709,11 +3758,6 @@ def task_check():
         SCRIPTS_DIR / "test_sm_summing_lever_adapter_contract.py",
         # Cross-sheet ownership checks whose filenames intentionally do not match
         # the one-file-per-drawing discovery pattern above.
-        SCRIPTS_DIR / "test_pen_summing_drawing_batch_contract.py",
-        # Was omitted while its two siblings above were enrolled, so NO gate ran
-        # it: converting channel to a three-view diagram left it reading
-        # attributes the sheet no longer defines, and every check:* gate stayed
-        # green (codex #416). Enrolled so the cross-sheet contracts are covered.
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
         # Exact native and rigidly transformed assembly inspection cameras.
         SCRIPTS_DIR / "test_assembly_named_views.py",
@@ -3777,7 +3821,7 @@ def task_check():
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
-        # ... and #937: cylinder-bank bands and the CH/DT parent-specific apex screws.
+        # Shared supplier models retain the role-specific fit checks.
         SCRIPTS_DIR / "test_ch_vn_arbor_set_screw.py",
         SCRIPTS_DIR / "test_dt_vn_fillister_screw.py",
         SCRIPTS_DIR / "test_mg_vn_clamp_screw.py",

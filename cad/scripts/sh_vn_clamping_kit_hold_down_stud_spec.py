@@ -67,6 +67,9 @@ THREAD = fasteners.HOLD_DOWN_STUD_THREAD  # 1/2-13
 LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM  # the kit's 3 in stud
 MAJOR_DIA = base_bar.HOLD_DOWN_STUD_DIA
 
+# Preserve the installed jig's member description under the shared SKU.
+BOM_DESCRIPTION = f"{THREAD} X {fasteners.HOLD_DOWN_STUD_LENGTH} IN HOLD-DOWN STUD"
+
 # --- Estimated ---------------------------------------------------------------------
 END_CHAMFER = 1.0  # ESTIMATED, 45 deg, both ends
 

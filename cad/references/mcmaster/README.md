@@ -102,8 +102,8 @@ recipes:
 | 98381A474 | `pd-vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `pn-vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
-The cone-lock and swing-stop selections follow `cad/scripts/build_dt_vn_cone_lock_knob.py`
-and `cad/scripts/build_sh_vn_fillister_screw_90280a108.py` (the shared 90280A108 screw; the swing-stop's placement is applied in its `dt-drive-train` occurrence).
+The cone-lock selection follows `cad/scripts/build_dt_vn_cone_lock_knob.py`; the
+swing-stop selection rationale lives in `cad/scripts/dt_swing_stop_screw_spec.py`, and the shared 90280A108 screw it selects is built by `cad/scripts/build_sh_vn_fillister_screw_90280a108.py` (the swing-stop's placement is applied in its `dt-drive-train` occurrence).
 
 Oblique trammel jig shop-fixture hardware (MHA-CH-06-TL-VN-52/53 and
 TL-VN-61 to TL-VN-69), modelled as purchased parts so the jig assembly can run
@@ -423,7 +423,7 @@ Live catalog verification on October 11, 2026:
   states no dimensional tolerances. Brass matches the book photograph's
   brass clip screws, so the same-size 18-8 stainless 91794A077 (then MHA-MG-VN-53's
   stock) is rejected for appearance; no brass #2-56 shorter than 1/4 in was
-  found live. The #4-40 brass fillister 90114A511 of MHA-DT-VN-50, MHA-FR-VN-50 and MHA-PD-VN-52 is
+  found live. The #4-40 brass fillister 90114A511 of MHA-SH-VN-51 (then MHA-DT-VN-50, MHA-FR-VN-50 and MHA-PD-VN-52) is
   rejected for the clip: its 4.65 mm head overhangs the clip's 4.23 mm rail,
   and it stays selected for the other fleet deployments. Through the 0.8 mm
   clip sheet the 6.35 mm shank leaves 5.55 mm of engagement in the platen's
@@ -621,7 +621,7 @@ Catalog specifications checked on September 10, 2026:
   (`cad/out/reference/92240A540-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `0257bc44e4273a32536e58829d52ec552e04b631a472ae080a067f29b38eac39`.
-- [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-DT-VN-64 and MHA-CH-VN-53
+- [91375A106](https://www.mcmaster.com/91375A106/), selected for MHA-SH-VN-54 (then MHA-DT-VN-64 and MHA-CH-VN-53)
   (#743; since 2026-10-10 also one in each MHA-CH-08 pivot-bracket ear's
   apex, on the rocker pivot shaft's flat), is a black-oxide alloy steel hex
   socket cup-point set screw:
@@ -947,7 +947,7 @@ Catalog specifications checked on September 10, 2026:
   native proof and sheet review before they are reported verified.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`pd-vn-guide-lock-screw`,
   MHA-PD-VN-60, eight) holds the four guide locks to the platen guides per ruling
-  R9-31 (September 30, 2026): these screws ride the platen, and the MHA-PD-VN-52
+  R9-31 (September 30, 2026): these screws ride the platen, and the MHA-SH-VN-51 (then MHA-PD-VN-52)
   fillister head there sweeps into the transgear hanger arm, so they alone
   take a button head with the same 1/4 in shank. The product page was read
   in a headless browser on September 30, 2026: black-oxide alloy steel button
@@ -1280,7 +1280,7 @@ Catalog specifications checked on September 10, 2026:
   MHA-PN-04 pen rod's top. Both pages were read live in a browser on
   October 13, 2026. 91375A105 is an alloy steel cup-tip set screw, black
   oxide, 4-40 UNC Class 3A, 3/16 in long, 0.050 in hex drive, Rockwell C45,
-  ASME B18.3 / ASTM F912; it is the MHA-CH-VN-53 and MHA-DT-VN-64 91375A106 cut 1/16 in shorter,
+  ASME B18.3 / ASTM F912; it is the MHA-SH-VN-54 (then MHA-CH-VN-53 and MHA-DT-VN-64) 91375A106 cut 1/16 in shorter,
   so `diag_build_91375A105.py` imports every length-independent law from the
   vendor-verified `diag_build_91375A106.py` and changes only the length and
   helix height. 92671A115 is a brass hex nut, standard profile, 0-80 UNF

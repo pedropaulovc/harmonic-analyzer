@@ -273,7 +273,7 @@ GUIDE_CALLOUT_XY = (0.128, 0.248)
 # Four rows at most (r4 tall-block): the drill, the far-side counterbore and
 # the screw whose heads it sinks share one (r5 asked for the process word).
 GUIDE_CALLOUT_PROCESS = (
-    "PATTERN MATCHES MHA-PD-11\nDRILL, C'BORE FAR SIDE FOR MHA-PD-VN-52\n"
+    "PATTERN MATCHES MHA-PD-11\nDRILL, C'BORE FAR SIDE FOR MHA-SH-VN-51\n"
 )
 SOCKET_DRILL_DIA = blind_cut_dia_mm(SOCKET_SPEC)
 SOCKET_DRILL_R_SHEET = SOCKET_DRILL_DIA / 2.0 * _S

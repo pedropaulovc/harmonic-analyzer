@@ -116,7 +116,8 @@ class CurrentNativeIdentity:
             if role:
                 records = [(source, identity) for source, identity in records
                            if identity.get("role") == role[1]]
-            if configuration and stem in self.shared:
+            if (configuration and stem in self.shared
+                    and "Default" not in self.shared[stem]["configurations"]):
                 records = [(source, identity) for source, identity in records
                            if identity.get("configuration") == configuration[1]]
         identities = {_context(identity): identity for _, identity in records}
@@ -243,5 +244,7 @@ def current_inventory_parts(inventory):
 
 def project_current_anchor(anchor):
     """Copy only runtime selectors; keep source association and numeric values."""
+    if "occurrenceNamespace" in anchor:
+        require_current_native_occurrence_namespace(anchor["occurrenceNamespace"])
     return {key: project_current_native_path(value) if key in
             ("partPath", "runtimeTemplatePartPath") else value for key, value in anchor.items()}

@@ -195,7 +195,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": f"REAM THRU\nSLIDING FIT ON\nARBOR {ARBOR_NUMBER}",
 }
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
-# The apex tap runs down to the arbor bore and stops there; the MHA-DT-VN-64 cup
+# The apex tap runs down to the arbor bore and stops there; the MHA-SH-VN-54 cup
 # point's spot is drilled into the arbor at fit-up through this hole. Both
 # native extents (the tap drill's and the thread's ``<hw-thru>``) say TO BORE,
 # so neither can read as a drill carried on past the bore into the strap

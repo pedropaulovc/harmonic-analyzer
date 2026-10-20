@@ -255,17 +255,38 @@ configuration and `ComponentReference` (`Role:1`, with a 1-based semantic index)
 readback. That gate must establish the actual bridge before a rebuilt-native
 binding refresh; this archive projection supplies no such mapping.
 
+Logical occurrence qualifiers are case-sensitive: `--InnerLink-1` is not the
+physical mesh key `--innerlink`. The lowercased logical selector is rejected.
+Configuration export paths come from the CAD member-export inventory: the first
+member uses bare STEP/PNG filenames, other members use sanitized lowercase
+configuration suffixes, and STL keys remain configuration-qualified. Each of
+the seven distinct members retains STEP, STL and PNG coverage.
+
+Archived source lookup selects identity before checking file availability.
+`CadIdentityMap.source_file(..., parent='pn-pen', configuration='PenWire',
+role='PenWire')` resolves the declared historical wire member; an unqualified
+shared source with multiple candidates is ambiguous even if only one file is
+present. Explicit current member-module paths compose through `sourceFiles`.
+These are exact archived-source lookups, not compatibility modules or claims
+that a merged producer has one arbitrary historical implementation.
+
 ```sh
 npm --prefix web run verify:identity-evidence
 # From web/: read-only seals and deterministic byte replay
-uv run --isolated --no-project python scripts/canonical-native-evidence.py validate
-uv run --isolated --no-project python scripts/canonical-native-evidence.py check
-# Explicit authoring only, after an intentional mapping/input change:
-uv run --isolated --no-project --python 3.13 python scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py validate
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py check
+# Historical derivative authoring only, not for current-name/table-only updates:
+uv run --isolated --no-project --python 3.13.9 python scripts/canonical-native-evidence.py generate
 ```
 
-Use stock-zlib Python 3.13 for authoring: a different gzip implementation can
-change stored compressed evidence bytes even when decoded measurements agree.
+For a current identity-only update, refresh only the affected
+`canonicalConsumerInputs` seals (CRLF-to-LF normalization); do not regenerate
+historical derivatives, snapshots, source hashes or mapping provenance.
+
+Pin Python 3.13.9 with stock zlib 1.3.1 for replay and authoring: deterministic
+gzip bytes must match the recorded compression toolchain. A different compressor
+(such as Python 3.14's zlib-ng) can change stored bytes even when decoded
+measurements agree.
 
 `verify:sync` runs the identity evidence check first. Both read-only commands
 check exact original, derivative and historical-snapshot SHA-256 seals,
@@ -745,7 +766,7 @@ their old projection/GPU proof; they do not qualify current geometry.
 From the repository root, store an authored input without reserializing JSON:
 
 ```sh
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
 ```
 
 The command retains the source file and writes exact-byte deterministic gzip
@@ -753,17 +774,17 @@ The command retains the source file and writes exact-byte deterministic gzip
 namespace is accepted. Compression preserves numeric spelling and supplies no
 geometry or fidelity qualification.
 
-After authoring stops, regenerate in this order using the pinned source-fit
-requirements for the four producers:
+After authoring stops, regenerate in this order using Python 3.13.9 and the
+pinned source-fit requirements for the four producers:
 
 ```sh
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
-uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
-uv run --isolated --no-project python web/scripts/canonical-native-evidence.py check
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
+uv run --isolated --no-project --python 3.13.9 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13.9 python web/scripts/canonical-native-evidence.py check
 ```
 
 The first canonical generation refreshes input seals; the final generate/check

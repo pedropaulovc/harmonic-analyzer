@@ -10,8 +10,8 @@ import _telemetry
 from _com import _early_bound
 
 
-# Purchased numbers belong to their machine or tooling parent; their own serial
-# starts at 50. Configuration qualifiers (for example T006) are not family IDs.
+# Purchased numbers belong to a machine/tooling parent or the shared-SKU (SH)
+# group; their serial starts at 50. Configuration qualifiers are not family IDs.
 _PART_NUMBER = re.compile(
     r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?"
     r"|VN-[5-9][0-9])\Z"

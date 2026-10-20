@@ -58,7 +58,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
-from release_diff import IDENTITY_MAP, canonical_keys, identity_inventory, load_identity_map, paired_keys
+from release_diff import IDENTITY_MAP, canonical_keys, geometry_key, identity_inventory, load_identity_map, paired_keys
 
 enable_offscreen_gl()
 
@@ -151,6 +151,8 @@ class ReleaseSource:
                         lho = struct.unpack("<Q", blk[bp:bp + 8])[0]
                         bp += 8
                 ep += 4 + hsz
+            if name in out:
+                raise ValueError(f"duplicate release ZIP member: {name!r}")
             out[name] = dict(method=method, comp=comp, uncomp=uncomp,
                              lho=lho, crc=crc)
             p += 46 + n + m + k
@@ -160,7 +162,7 @@ class ReleaseSource:
         return self._ci.get(rel.lower())
 
     def _stl_entry(self, key):
-        return self._entry(f"stl/{key}.stl")
+        return self._entry(f"stl/{geometry_key(key)}.stl")
 
     def mesh_keys(self):
         return [Path(name).stem.lower() for name in self.cd
@@ -222,7 +224,7 @@ class LocalSource:
         self._crc = {}
 
     def _path(self, key):
-        return self._stls.get(key.lower())
+        return self._stls.get(geometry_key(key))
 
     def mesh_keys(self):
         return list(self._stls)
@@ -395,7 +397,7 @@ def main():
     mapping = load_identity_map(args.identity_map)
     scene = new.scene(mapping)
     comps = scene["components"]
-    keys = {(c.get("mesh") or c["part"]).lower() for c in comps}
+    keys = {geometry_key(c.get("mesh") or c["part"]) for c in comps}
     for key in keys:
         canonical_keys(key, mapping)  # Scene mesh IDs are not occurrence paths.
     old_keys, new_keys = old.mesh_keys(), new.mesh_keys()

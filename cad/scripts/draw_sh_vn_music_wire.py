@@ -1,17 +1,9 @@
-r"""Create the curated machinist drawing for the lever wire (WIRE 1).
+r"""Create the two-sheet reference package for shared McMaster 9666K56 wire.
 
-The lever wire is a purchased Ø0.8 (0.031 in) music-wire run ~353 long -- a hair-thin
-silhouette with no flat face, no pickable end and no selectable silhouette edge,
-so the print is note-based: nothing is a marked dimension, and the diameter +
-straight rest-run length ride the notes (the build stamps the computed length).
-That chord is not represented as a developed cut length because the source model
-does not define the formed hook or drum-wrap allowance.
-The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
-(1:5) and the isometric confirms it is a plain straight rod.
-
-Run with SolidWorks open::
-
-    uv run python cad\scripts\draw_mg_vn_lever_wire.py mg-vn-lever-wire
+LeverWire retains the note-based straight rest-run sheet at 1:5. PenWire retains
+its associative Depth dimension and 2:1 views. Neither straight rest run is a
+developed cut length: the source does not define the formed hook or drum wrap,
+and both member notes retain the DO NOT RELEASE limitation.
 """
 
 from __future__ import annotations
@@ -20,54 +12,75 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
 
+import _telemetry
 from _check import check
+from _com import _early_bound
+from _config import parts
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-import _telemetry
 
-
-SPEC = DRAWINGS_BY_NAME["mg_vn_lever_wire"]
+SPEC = DRAWINGS_BY_NAME["sh_vn_music_wire"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
-OUTPUTS = DrawingOutputs(
-    slddrw=SPEC.outputs["slddrw"],
-    pdf=SPEC.outputs["pdf"],
-    png=SPEC.outputs["png"],
-)
+OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 1.0)
-WIRE_SCALE = (1, 5)  # ~353 long reduced to ~71 mm on the sheet
-FRONT_CENTER = (0.135, 0.150)
-ISO_CENTER = (0.320, 0.160)
-
-# Note-based: the wire carries no marked model dimension, so every view keeps
-# nothing (the front view is curated with an empty keep to delete any stray
-# auto-import; the offline test asserts union(marks) == union(keeps) == {}).
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+SHEET_NAMES = ("LeverWire", "PenWire")
+SHEET_SCALES = {"LeverWire": (1, 1), "PenWire": (2, 1)}
+WIRE_SCALES = {"LeverWire": (1, 5), "PenWire": (2, 1)}
+FRONT_CENTERS = {"LeverWire": (0.135, 0.150), "PenWire": (0.110, 0.155)}
+ISO_CENTERS = {"LeverWire": (0.320, 0.160), "PenWire": (0.300, 0.170)}
+FRONT_KEEPS = {"LeverWire": {}, "PenWire": {"Depth": (0.078, 0.155)}}
+_MEMBER_LABELS = {"LeverWire": "LEVER WIRE", "PenWire": "PEN WIRE"}
+_NOTE_POSITIONS = {
+    "LeverWire": (
+        ("Manufacturing Notes", 0.020, 0.075),
+        ("Front View Note", 0.100, 0.100),
+        ("Isometric View Note", 0.300, 0.100),
+    ),
+    "PenWire": (
+        ("Manufacturing Notes", 0.016, 0.086),
+        ("Elevation View Note", 0.040, 0.036),
+        ("Isometric View Note", 0.270, 0.100),
+    ),
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
-
-    check("open lever-wire source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    row = parts(PART_STEM)
+    quantities = row["configuration_quantities"]
+    if set(quantities) != set(SHEET_NAMES):
+        raise RuntimeError("music-wire sheets do not match the registry members")
+    total = sum(int(quantity) for quantity in quantities.values())
+    if total != int(row["quantity"]):
+        raise RuntimeError("music-wire installed quantities do not match the family")
+    note_keys = tuple(
+        f"{configuration} {property_name}"
+        for configuration in SHEET_NAMES
+        for property_name, _, _ in _NOTE_POSITIONS[configuration]
+    )
+    check("open shared music-wire source", await adapter.open_model(str(SOURCE)))
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -75,53 +88,127 @@ async def build(adapter: Any) -> dict[str, str]:
             "Title",
             "Material Specification",
             "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Front View Note",
-            "Isometric View Note",
+            *note_keys,
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
-            "Quantity",
-            "Manufacturing Notes",
-            "Front View Note",
-            "Isometric View Note",
+            *note_keys,
         ),
     )
-    drawing_model, _sheet = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    drawing_model, _ = new_project_drawing(
+        adapter,
+        property_view=PART_STEM,
+        scale=SHEET_SCALES[SHEET_NAMES[0]],
+        layout=SPEC.layout,
     )
     stamp_drawing_summary(
         adapter,
         drawing_model,
         {
-            0: "Lever Wire (WIRE 1) Manufacturing Drawing",
+            0: "Shared Music Wire Reference Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "lever wire; purchased music wire; amplification chain",
+            3: "music wire; lever wire; pen wire; straight rest runs",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="shared music-wire members"
+    )
+    draw = _early_bound(drawing_model, "IDrawingDoc")
+    configured_views = []
+    linked_notes = []
+    for configuration in SHEET_NAMES:
+        if not draw.ActivateSheet(configuration):
+            raise RuntimeError(f"cannot activate music-wire sheet {configuration!r}")
+        front = _early_bound(
+            place_view(
+                adapter,
+                str(SOURCE),
+                "*Front",
+                *FRONT_CENTERS[configuration],
+                scale=WIRE_SCALES[configuration],
+            ),
+            "IView",
+        )
+        iso = _early_bound(
+            place_view(
+                adapter,
+                str(SOURCE),
+                "*Isometric",
+                *ISO_CENTERS[configuration],
+                scale=WIRE_SCALES[configuration],
+            ),
+            "IView",
+        )
+        for view in (front, iso):
+            view.ReferencedConfiguration = configuration
+        rebuild_drawing(adapter, label=f"{configuration} wire views")
+        for view in (front, iso):
+            if str(view.ReferencedConfiguration) != configuration:
+                raise RuntimeError(
+                    f"{configuration}: view configuration did not persist"
+                )
+            view.UseSheetScale = 0
+            view.ScaleRatio = double_array(WIRE_SCALES[configuration])
+            set_hidden_lines_removed(adapter, view)
+            configured_views.append((configuration, view))
+        property_view = view_name(adapter, front)
+        if not property_view:
+            raise RuntimeError(f"{configuration}: missing property-source view")
+        draw.GetCurrentSheet().CustomPropertyView = property_view
+        curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEPS[configuration],
+            view_label=f"{configuration} front",
+        )
+        for property_name, x, y in _NOTE_POSITIONS[configuration]:
+            key = f"{configuration} {property_name}"
+            note = add_property_linked_note(adapter, key, x, y)
+            linked_notes.append((configuration, note, str(properties[key])))
+        caption = (
+            f"{_MEMBER_LABELS[configuration]}  "
+            f"QTY {int(quantities[configuration])} INSTALLED RUN; "
+            f"SHARED FAMILY: {total} RUNS, NOT COILS"
+        )
+        note = add_note(adapter, caption, 0.020, 0.255)
+        if note is None:
+            raise RuntimeError(f"{configuration}: cannot add installed-quantity note")
+        linked_notes.append((configuration, note, caption))
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=WIRE_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=WIRE_SCALE)
-    for view in (front, iso):
-        set_hidden_lines_removed(adapter, view)
-
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Front View Note", 0.100, 0.100)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.100)
+    def assert_configured_sheets() -> None:
+        for configuration, view in configured_views:
+            if not draw.ActivateSheet(configuration):
+                raise RuntimeError(f"cannot read back sheet {configuration!r}")
+            if str(view.ReferencedConfiguration) != configuration:
+                raise RuntimeError(
+                    f"{configuration}: final view configuration changed"
+                )
+            source = str(view.GetReferencedModelName()).replace("\\", "/").casefold()
+            if source != str(SOURCE).replace("\\", "/").casefold():
+                raise RuntimeError(f"{configuration}: final view source changed")
+        for configuration, note, expected in linked_notes:
+            if not draw.ActivateSheet(configuration):
+                raise RuntimeError(f"cannot read back notes on {configuration!r}")
+            text = str(adapter._get_attr_or_call(note, "GetText") or "")
+            if text.replace("\r\n", "\n") != expected.replace("\r\n", "\n"):
+                raise RuntimeError(
+                    f"{configuration}: native linked note resolved to {text!r}, "
+                    f"expected {expected!r}"
+                )
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Lever Wire (WIRE 1) Manufacturing Drawing",
-        scale=SHEET_SCALE,
+        pdf_title="Shared Music Wire Reference Drawing",
+        scale=SHEET_SCALES[SHEET_NAMES[0]],
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
+        sheet_scales=SHEET_SCALES,
+        settled_checks=(assert_configured_sheets,),
     )
 
 

@@ -10,8 +10,8 @@ changes, gaps/bridges up to two pixels and dense-ink pattern changes can be
 omitted. This is a bounded visual comparison, not semantic CAD equivalence.
 
 PDFs pair by the current identity map composed with sealed historical identities,
-within their original relative directory. Each parent-specific vendor clone gets
-its own comparison against the same prior purchased drawing where applicable.
+within their original relative directory. Every historical clone/member PDF gets
+its own comparison against the converged shared reference drawing.
 Renames are reported separately; drawing ink, including changed identity labels,
 is still compared normally.
 
@@ -449,7 +449,7 @@ def create_drawing_diff(
     pairs = _drawing_pairs(old_files, new_files)
     removed = sorted(old_files.keys() - {old for sources in pairs.values() for old in sources})
     summary: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "old_label": old_label,
         "new_label": new_label,
         "dpi": DPI,

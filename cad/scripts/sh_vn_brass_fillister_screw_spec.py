@@ -1,7 +1,7 @@
-"""Pure McMaster 90114A511 brass fillister dimensions for DT, FR and PD.
+"""Pure dimensions for shared McMaster 90114A511 (MHA-SH-VN-51).
 
-Native parts retain their parent-specific identities and recipes. Mechanical
-specs, layouts and assemblies read these dimensions without importing a recipe.
+Mechanical specs, layouts and assemblies read these stock dimensions without
+importing the native recipe. DT, FR and PD all use the same purchased part.
 """
 
 BF_MAJOR_R = 2.8448 / 2.0

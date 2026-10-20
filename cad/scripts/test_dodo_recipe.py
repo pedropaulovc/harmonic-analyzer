@@ -821,6 +821,7 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
         ),
         ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         ("_assembly", None),
+        ("_component_references", None),
     ],
 )
 def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
@@ -861,6 +862,32 @@ def test_assembly_depends_on_exact_child_execution_identities():
                 else dodo._part_execution_token(ref)
             )
             assert token in deps, f"assembly:{stem} lacks exact identity for {ref}"
+
+
+@pytest.mark.parametrize(
+    ("assembly", "producers"),
+    [
+        (
+            "dt_drive_train",
+            ("sh_vn_brass_fillister_screw", "sh_vn_fillister_screw_90280a108"),
+        ),
+        (
+            "pd_paper_drive",
+            ("sh_vn_chain_link", "sh_vn_fillister_screw_90280a108"),
+        ),
+        ("ch_rocker_arm_tl_oblique_jig", ("sh_vn_clamping_kit_hardware",)),
+    ],
+)
+def test_repeated_roles_and_configured_members_share_exact_producer_dependencies(
+    assembly, producers,
+):
+    dodo = _load_dodo()
+    dependencies = dodo._assembly_file_deps(assembly)
+    references = dodo.references_of(assembly)
+    for producer in producers:
+        assert references.count(producer) == 1
+        assert dependencies.count(dodo._sldprt(producer)) == 1
+        assert dependencies.count(dodo._part_execution_token(producer)) == 1
 
 
 def test_assembly_file_deps_drop_only_non_inserted_source_targets():
@@ -4403,6 +4430,7 @@ def canonical_publication(tmp_path, monkeypatch):
     monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
     dodo = _load_dodo()
     cache_module = dodo._cache
+    complete_part_cache_outputs = dodo._part_cache_outputs
     service = _BlockBlobService()
     seats, probes, publications = {}, [], []
     references = {}
@@ -4564,6 +4592,7 @@ def canonical_publication(tmp_path, monkeypatch):
         dodo=dodo, cache=cache_module, backend=backend, service=service,
         at=at, run=run, emit=emit, identity=identity, outputs=outputs,
         references=references, probes=probes, publications=publications, seats=seats,
+        complete_part_cache_outputs=complete_part_cache_outputs,
     )
 
 
@@ -5065,3 +5094,423 @@ def test_ordinary_assembly_shortcut_does_not_walk_explode_closure(
     with f.at("B"):
         f.run("assembly")
         f.identity("assembly")
+
+
+_SHARED_MEMBER_STEMS = (
+    "sh_vn_chain_link",
+    "sh_vn_clamping_kit_hardware",
+    "sh_vn_music_wire",
+)
+
+
+@pytest.fixture
+def part_member_cache_action(tmp_path, monkeypatch):
+    """Exercise the action with real inventory, stamps and neutral validation.
+
+    Only host/cache boundaries are faked. The archive contains bytes selected by
+    the production output list, including recursive render directories, rather
+    than a restore mock that regenerates whatever the consumer expects.
+    """
+    import hashlib
+    import json
+    from types import SimpleNamespace
+
+    import _artifact_cache
+    import _part_configuration_exports as exports
+
+    monkeypatch.setattr(_artifact_cache, "prewarm", lambda: None)
+    monkeypatch.delenv("HARMONIC_CACHE_REFRESH", raising=False)
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    dodo = _load_dodo()
+    state = SimpleNamespace(
+        dodo=dodo, exports=exports, archive={}, restores=[], events=[],
+        farm=False, build=None,
+    )
+
+    def use_root(root):
+        monkeypatch.setattr(dodo, "CAD_OUT", root)
+
+    use_root(tmp_path / "producer")
+    # artefact_for normally resolves through the repository build graph; only
+    # redirect its native location, leaving the cache inventory itself untouched.
+    monkeypatch.setattr(
+        dodo, "_sldprt",
+        lambda stem: str(dodo.CAD_OUT / "sldprt" / f"{stem.replace('_', '-')}.SLDPRT"),
+    )
+    monkeypatch.setattr(dodo, "_part_file_deps", lambda *_args: [])
+    monkeypatch.setattr(dodo, "_cache_key", lambda *_args: "a" * 64)
+    monkeypatch.setattr(dodo._farm, "enabled", lambda: state.farm)
+
+    def write(path, data):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def seed(stem):
+        root = dodo.CAD_OUT
+        native = Path(dodo._sldprt(stem))
+        write(native, f"saved native for {stem}".encode())
+        members = exports.configuration_export_paths(stem, root)
+        records = {}
+        for configuration, paths in members.items():
+            records[configuration] = {}
+            for kind in ("step", "png"):
+                path = paths[kind]
+                data = f"{stem}/{configuration}/{kind} producer bytes".encode()
+                write(path, data)
+                records[configuration][kind] = {
+                    "path": path.relative_to(root).as_posix(),
+                    "bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                }
+        certificate = {
+            "schema": "harmonic-analyzer/part-member-neutral@1",
+            "source": native.relative_to(root).as_posix(),
+            "execution_identity": hashlib.sha256(native.read_bytes()).hexdigest(),
+            "default_configuration": next(iter(members)),
+            "configurations": records,
+        }
+        write(
+            exports.configuration_manifest_path(stem, root),
+            json.dumps(certificate).encode(),
+        )
+
+    def pack(outputs):
+        archive = {}
+        for output in outputs:
+            files = output.rglob("*") if output.is_dir() else (output,)
+            for path in files:
+                if path.is_file():
+                    archive[path.relative_to(dodo.CAD_OUT).as_posix()] = path.read_bytes()
+        return archive
+
+    def unpack():
+        for name, data in state.archive.items():
+            write(dodo.CAD_OUT / name, data)
+
+    def restore(*_args):
+        state.events.append("restore")
+        hit = state.restores.pop(0)
+        if hit:
+            unpack()
+        return hit
+
+    def store(_key, outputs, _label):
+        state.events.append("store")
+        state.archive = pack(outputs)
+        return "stored"
+
+    def execute(*_args, **_kwargs):
+        state.events.append("build")
+        assert state.build is not None, "restored member set must not trigger COM"
+        state.build()
+
+    def farm_build(*_args):
+        state.events.append("farm")
+        unpack()
+
+    monkeypatch.setattr(dodo._cache, "restore", restore)
+    monkeypatch.setattr(dodo._cache, "store", store)
+    monkeypatch.setattr(dodo, "_exec_com", execute)
+    monkeypatch.setattr(dodo, "_farm_build", farm_build)
+    monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
+    monkeypatch.setattr(
+        dodo, "_sw_ensure_once", lambda: state.events.append("ensure"),
+    )
+
+    def corrupt(stem, defect):
+        members = exports.configuration_export_paths(stem, dodo.CAD_OUT)
+        # Non-default members are not inside the default render directory: losing
+        # their inventory entries must actually lose their bytes from the archive.
+        paths = list(members.values())[-1]
+        if defect == "missing-certificate":
+            exports.configuration_manifest_path(stem, dodo.CAD_OUT).unlink()
+        elif defect == "native-mismatch":
+            Path(dodo._sldprt(stem)).write_bytes(b"another saved native identity")
+        else:
+            operation, kind = defect.split("-")
+            if operation == "missing":
+                paths[kind].unlink()
+            else:
+                data = paths[kind].read_bytes()
+                paths[kind].write_bytes(bytes([data[0] ^ 1]) + data[1:])
+
+    def prepare_restore(stem, route, defect=None):
+        seed(stem)
+        if defect:
+            corrupt(stem, defect)
+        state.archive = pack(dodo._part_cache_outputs(stem))
+        use_root(tmp_path / "consumer")
+        state.farm = route == "farm"
+        state.restores = [False, True] if route == "reprobe" else [route == "probe"]
+
+    state.use_root = use_root
+    state.seed = seed
+    state.corrupt = corrupt
+    state.prepare_restore = prepare_restore
+    state.run = lambda stem: dodo._cached_part_action(
+        stem, tmp_path / f"build_{stem}.py",
+    )
+    return state
+
+
+@pytest.mark.parametrize("stem", _SHARED_MEMBER_STEMS)
+@pytest.mark.parametrize("route", ["probe", "reprobe", "farm"])
+def test_part_member_cache_restores_complete_set_without_com(
+    part_member_cache_action, stem, route,
+):
+    action = part_member_cache_action
+    action.prepare_restore(stem, route)
+
+    action.run(stem)
+
+    root = action.dodo.CAD_OUT
+    assert all(
+        path.is_file()
+        for path in action.exports.part_configuration_outputs(stem, root)
+    )
+    validated = action.exports.validate_member_exports(stem, root)
+    assert validated
+    assert "build" not in action.events
+    assert "ensure" not in action.events
+    assert "store" not in action.events
+    assert action.events == {
+        "probe": ["restore"],
+        "reprobe": ["restore", "restore"],
+        "farm": ["restore", "farm"],
+    }[route]
+
+
+@pytest.mark.parametrize("stem", _SHARED_MEMBER_STEMS)
+@pytest.mark.parametrize("route", ["probe", "reprobe", "farm"])
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "missing-certificate", "missing-step", "missing-png",
+        "stale-step", "stale-png", "native-mismatch",
+    ],
+)
+def test_part_member_cache_invalid_restored_set_fails_closed(
+    part_member_cache_action, stem, route, defect,
+):
+    action = part_member_cache_action
+    action.prepare_restore(stem, route, defect)
+
+    with pytest.raises(RuntimeError, match=stem.replace("_", "-")):
+        action.run(stem)
+
+    # A claimed hit must not fork the cached native identity by rebuilding it.
+    assert action.events == {
+        "probe": ["restore"],
+        "reprobe": ["restore", "restore"],
+        "farm": ["restore", "farm"],
+    }[route]
+
+
+@pytest.mark.parametrize("stem", _SHARED_MEMBER_STEMS)
+@pytest.mark.parametrize(
+    "defect", ["missing-certificate", "missing-step", "missing-png", "native-mismatch"],
+)
+def test_part_member_incomplete_local_build_never_publishes(
+    part_member_cache_action, stem, defect,
+):
+    action = part_member_cache_action
+    action.restores = [False, False]
+
+    def build():
+        action.seed(stem)
+        action.corrupt(stem, defect)
+
+    action.build = build
+    with pytest.raises(RuntimeError, match=stem.replace("_", "-")):
+        action.run(stem)
+
+    assert action.events == ["restore", "restore", "ensure", "build"]
+    assert action.archive == {}
+
+
+@pytest.mark.parametrize("stem", _SHARED_MEMBER_STEMS)
+def test_part_member_local_publish_reconstructs_validated_set_on_new_root(
+    part_member_cache_action, tmp_path, stem,
+):
+    action = part_member_cache_action
+    action.restores = [False, False]
+    action.build = lambda: action.seed(stem)
+
+    action.run(stem)
+
+    assert action.events == ["restore", "restore", "ensure", "build", "store"]
+    producer_root = action.dodo.CAD_OUT
+    expected = {
+        path.relative_to(producer_root): path.read_bytes()
+        for path in action.exports.part_configuration_outputs(stem, producer_root)
+    }
+    action.use_root(tmp_path / "fresh-submit")
+    action.events.clear()
+    action.restores = [True]
+    action.build = None
+
+    action.run(stem)
+
+    root = action.dodo.CAD_OUT
+    assert action.events == ["restore"]
+    assert {path: (root / path).read_bytes() for path in expected} == expected
+    assert action.exports.validate_member_exports(stem, root)
+
+
+@pytest.mark.parametrize("stem", _SHARED_MEMBER_STEMS)
+@pytest.mark.parametrize(
+    "defect",
+    [
+        None, "missing-certificate", "certificate-identity",
+        "missing-step", "missing-png", "stale-step", "stale-png",
+    ],
+)
+def test_part_member_publication_loser_adopts_and_validates_winner_whole_set(
+    canonical_publication, monkeypatch, stem, defect,
+):
+    """Real create-only publication must adopt member authority, not repair it."""
+    import hashlib
+    import json
+    import _part_configuration_exports as exports
+
+    f = canonical_publication
+    dodo = f.dodo
+    loser_identity = hashlib.sha256(b"B-native").hexdigest()
+    winner_identity = hashlib.sha256(b"A-native").hexdigest()
+    winner_bundle, observations, builds = {}, [], []
+    monkeypatch.setattr(
+        dodo, "_sldprt",
+        lambda selected: str(
+            dodo.CAD_OUT / "sldprt" / f"{selected.replace('_', '-')}.SLDPRT"
+        ),
+    )
+    monkeypatch.setattr(dodo, "_part_cache_outputs", f.complete_part_cache_outputs)
+
+    def script():
+        # Both checkouts have this identical recipe; the member registry and real
+        # production cache inventory still select the configured part's outputs.
+        return dodo.REPO_ROOT / "cad" / "scripts" / "build_leaf.py"
+
+    def write(path, data):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def emit(producer):
+        root = dodo.CAD_OUT
+        native = Path(dodo._sldprt(stem))
+        write(native, producer.encode() + b"-native")
+        members = exports.configuration_export_paths(stem, root)
+        records = {}
+        for configuration, paths in members.items():
+            records[configuration] = {}
+            for kind in ("step", "png"):
+                path = paths[kind]
+                data = f"{producer}/{configuration}/{kind} member bytes".encode()
+                write(path, data)
+                records[configuration][kind] = {
+                    "path": path.relative_to(root).as_posix(),
+                    "bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                }
+        certificate = {
+            "schema": "harmonic-analyzer/part-member-neutral@1",
+            "source": native.relative_to(root).as_posix(),
+            "execution_identity": hashlib.sha256(native.read_bytes()).hexdigest(),
+            "default_configuration": next(iter(members)),
+            "configurations": records,
+        }
+        write(
+            exports.configuration_manifest_path(stem, root),
+            json.dumps(certificate).encode(),
+        )
+        if producer == "B":
+            write(dodo._stl(stem), b"loser-only STL")
+            write(dodo._png_dir(stem) / "loser-only" / "stale.png", b"loser render")
+
+    def snapshot():
+        return {
+            path.relative_to(dodo.CAD_OUT): path.read_bytes()
+            for output in dodo._part_cache_outputs(stem)
+            for path in (output.rglob("*") if output.is_dir() else (output,))
+            if path.is_file()
+        }
+
+    def execute(*_args, **_kwargs):
+        assert dodo.REPO_ROOT.name == "B"
+        builds.append("B")
+        # B has already missed both probes. Publish A's different native and
+        # member bytes now, before B finishes its own otherwise valid build.
+        with f.at("A"):
+            emit("A")
+            manifest = exports.configuration_manifest_path(stem, dodo.CAD_OUT)
+            if defect == "missing-certificate":
+                manifest.unlink()
+            elif defect == "certificate-identity":
+                certificate = json.loads(manifest.read_text(encoding="utf-8"))
+                certificate["execution_identity"] = loser_identity
+                manifest.write_text(json.dumps(certificate), encoding="utf-8")
+            elif defect is not None:
+                members = exports.configuration_export_paths(stem, dodo.CAD_OUT)
+                paths = list(members.values())[-1]
+                operation, kind = defect.split("-")
+                if operation == "missing":
+                    paths[kind].unlink()
+                else:
+                    paths[kind].write_bytes(b"corrupt winner member")
+            winner_bundle.update(snapshot())
+            key = dodo._cache_key(dodo._part_file_deps(script(), stem), f"part:{stem}")
+            # Transport integrity is valid even for a defective member bundle.
+            # Its independent certificate must still fail closed on adoption.
+            f.backend.put(key, f.cache._pack(dodo._part_cache_outputs(stem)))
+        emit("B")
+
+    stamp = dodo._stamp_part_execution
+    validate = dodo._validate_part_configuration_outputs
+
+    def record_stamp(selected):
+        stamp(selected)
+        observations.append(("stamp", f.identity("part", selected)))
+
+    def record_validation(selected, key):
+        observations.append(("validate", f.identity("part", selected)))
+        validate(selected, key)
+
+    monkeypatch.setattr(dodo, "_exec_com", execute)
+    monkeypatch.setattr(dodo, "_stamp_part_execution", record_stamp)
+    monkeypatch.setattr(dodo, "_validate_part_configuration_outputs", record_validation)
+    with f.at("B"):
+        sibling = dodo.CAD_OUT / "png" / "unrelated" / "keep.png"
+        write(sibling, b"unrelated")
+        if defect is None:
+            dodo._cached_part_action(stem, script())
+            assert exports.validate_member_exports(stem, dodo.CAD_OUT)
+        else:
+            with pytest.raises(RuntimeError, match="invalid member exports for cache key") as caught:
+                dodo._cached_part_action(stem, script())
+            assert "explicit forced cache refresh" in str(caught.value)
+        assert f.identity("part", stem) == winner_identity != loser_identity
+        assert snapshot() == winner_bundle
+        # Check the full registry inventory independently of the packing helper:
+        # absent canonical members/certificates must remove valid loser leftovers.
+        for path in exports.part_configuration_outputs(stem, dodo.CAD_OUT):
+            relative = path.relative_to(dodo.CAD_OUT)
+            if relative in winner_bundle:
+                assert path.read_bytes() == winner_bundle[relative]
+            else:
+                assert not path.exists()
+        assert not dodo._stl(stem).exists()
+        assert not (dodo._png_dir(stem) / "loser-only").exists()
+        assert sibling.read_bytes() == b"unrelated"
+    assert builds == ["B"]
+    assert observations == [
+        ("stamp", loser_identity),
+        ("validate", loser_identity),
+        ("validate", loser_identity),
+        ("stamp", winner_identity),
+        ("validate", winner_identity),
+    ]
+    assert [hit for name, _label, hit in f.probes if name == "B"] == [False, False, True]
+    assert [(name, etag) for name, _key, etag in f.publications] == [
+        ("A", None), ("B", None),
+    ]
+    assert not any(f.seats.values())

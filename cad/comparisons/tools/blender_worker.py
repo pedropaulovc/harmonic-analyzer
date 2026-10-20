@@ -148,7 +148,8 @@ def build_assembly(job):
     objs = []
     for comp in components:
         key = comp.get("mesh") or comp["part"]
-        if re.search(r"[/\\]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", key):
+        if (not isinstance(key, str) or "archive-role-local" in key.lower()
+                or re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", key)):
             raise ValueError(f"occurrence request is not an assembly mesh key: {key!r}")
         if key not in meshes:
             seed = import_stl(parts_dir / f"{key}.STL")
@@ -170,12 +171,15 @@ def build_assembly(job):
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     focus = cam.get("frame_components") or []
     namespace = cam.get("occurrenceNamespace")
-    if focus and (namespace not in (None, "native-name2") or (
-        namespace is None and any(
-            re.search(r"[/\\]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
+    if focus and (
+        namespace not in (None, "native-name2")
+        or any(not isinstance(selector, str) or "archive-role-local" in selector.lower()
+               for selector in focus)
+        or (namespace is None and any(
+            re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
             for selector in focus
-        )
-    )):
+        ))
+    ):
         raise ValueError("cross-namespace occurrence request cannot frame raw native Name2 boxes")
     target = None
     zoom = float(cam.get("zoom") or 1.0)

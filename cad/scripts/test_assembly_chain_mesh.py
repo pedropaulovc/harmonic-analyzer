@@ -69,9 +69,9 @@ class _Component:
     def ReferencedConfiguration(self) -> str:
         return self._configuration
 
-
     def GetPathName(self) -> str:
         return self._path
+
     def GetTotalTransform(self, include_presentation: bool):
         assert include_presentation is False
         self.total_requests.append(include_presentation)

@@ -286,3 +286,45 @@ def test_signed_spin_reads_alike_whatever_the_insertion_frame(
         after = _sw_rotation(_matmul(_rz(40.0 + spin), frame))
         # The identity frame keeps the sign the probe's constants were set on.
         assert _rel_z_angle_deg(after, before) == pytest.approx(-spin)
+
+
+def test_chain_advance_targets_reference_bound_seed_and_probe(monkeypatch):
+    from types import SimpleNamespace
+
+    model = SimpleNamespace(ForceRebuild3=lambda _top_only: True)
+    bound = {"@InnerLink:1": "renamed-link-904", "@InnerLink:18": "renamed-link-52"}
+    seen = []
+
+    def bind(current, selectors):
+        assert current is model
+        assert tuple(selectors) == ("@InnerLink:1", "@InnerLink:18")
+        return bound
+
+    async def move(parameters):
+        seen.append(parameters.name)
+
+    origins = iter(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0)))
+
+    def origin(_adapter, native_name):
+        assert native_name == "renamed-link-52"
+        return next(origins)
+
+    monkeypatch.setattr(probe, "bind_component_selectors", bind)
+    monkeypatch.setattr(probe, "component_origin", origin)
+    adapter = SimpleNamespace(
+        currentModel=model, move_component=move,
+        _attempt=lambda fn, default=None: fn(),
+    )
+    assert asyncio.run(probe._attempt_chain_advance(adapter, 30.0)) is True
+    assert seen == ["renamed-link-904"]
+
+
+def test_chain_reference_corruption_is_not_hidden_as_motion_limitation(monkeypatch):
+    from types import SimpleNamespace
+
+    def refused(_model, _selectors):
+        raise RuntimeError("missing native component references")
+
+    monkeypatch.setattr(probe, "bind_component_selectors", refused)
+    with pytest.raises(RuntimeError, match="missing native component references"):
+        asyncio.run(probe._attempt_chain_advance(SimpleNamespace(currentModel=object()), 30.0))

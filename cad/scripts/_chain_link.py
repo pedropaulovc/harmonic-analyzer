@@ -1,4 +1,4 @@
-r"""Shared builder for the three roller-chain link parts (book ch. 23/30).
+r"""Shared authoring for configured chain members and the connecting link.
 
 A roller chain is alternating INNER links (2 inner plates + 2 bushings) and
 OUTER links (2 outer plates + 2 pins). Both are an obround side-plate pair
@@ -12,11 +12,11 @@ Axis2 at the x=P station -- are the chain pattern's PathLink1/PathLink2 (their
 spacing IS the pattern pitch). See _chain.py for the clearance rationale (all
 gaps >= 0.25 mm; the links float as disconnected multibody solids).
 
-All three links are bought: McMaster-Carr ANSI #25 roller chain cut to the
-loop's pitch count with an inner link at each end, closed by one connecting
-link (the OUTER-link stand-in; its spring clip is not modelled). Each part
-stamps its registry stock identity and a one-line note for its
-purchased-part reference sheet (``_purchased_part_drawing``).
+InnerLink and OuterLink are configurations of one McMaster-Carr ANSI #25
+chain part, cut to the loop's pitch count with an inner link at each end.
+A separately purchased connecting link closes it (the OUTER-link stand-in;
+its spring clip is not modelled). The two native purchase identities carry
+their registry stock data and member-specific reference-sheet notes.
 """
 
 from __future__ import annotations
@@ -250,7 +250,10 @@ async def build_link(
 
 async def _volume(adapter: Any) -> float:
     res = await adapter.get_mass_properties()
-    return float(res.data.volume) if res.is_success else float("nan")
+    volume = float(check("chain member mass properties", res).volume)
+    if not math.isfinite(volume):
+        raise RuntimeError(f"chain member volume is not finite: {volume!r}")
+    return volume
 
 
 def _gate_volume(

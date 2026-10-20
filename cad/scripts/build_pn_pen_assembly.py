@@ -462,10 +462,10 @@ async def build(adapter) -> dict[str, str]:
             euler_from_rows(rows),
             rows,
             ground=False,
-            configuration=PEN_WIRE_CONFIGURATION if part == spec.WIRE else None,
-            component_reference="PenWire:1" if part == spec.WIRE else None,
+            configuration=PEN_WIRE_CONFIGURATION if part == spec.WIRE else "",
+            component_reference="PenWire:1" if part == spec.WIRE else "",
             occurrence_basename=(
-                f"{spec.WIRE}--{PEN_WIRE_CONFIGURATION}" if part == spec.WIRE else None
+                f"{spec.WIRE}--{PEN_WIRE_CONFIGURATION}" if part == spec.WIRE else ""
             ),
         )
         await lock_mate(

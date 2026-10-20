@@ -4,6 +4,10 @@ LeverWire retains the drum-origin frame, midpoint balloon edge, hook/hub
 reference points and wire axis. PenWire retains the eye-origin frame and its
 independent length. Neither member defines wraps, tie-offs or a developed cut
 length; both drawings remain DO NOT RELEASE. Geometry is not supplier redesign.
+
+The lever endpoint/yoke solver lives in ``sh_vn_music_wire_lever_geom``. Its
+wheel mid-plane is the pen-rod line ``_recording_geometry.PEN_Z_MID``; recording
+anchors do not bring the paper-feed checks into the wire's geometry closure.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from _purchased_part_variants import (
     assert_member_suppression,
     create_member_configurations,
     require_member_bodies,
+    require_member_configurations,
     save_member_part,
     select_member_features,
 )
@@ -56,8 +61,8 @@ MEMBER_FEATURES = {
     pen.CONFIGURATION: (),
 }
 DESCRIPTIONS = {
-    lever.CONFIGURATION: "Music wire, lever straight rest run",
-    pen.CONFIGURATION: "Music wire, pen straight rest run",
+    lever.CONFIGURATION: lever_spec.BOM_DESCRIPTION,
+    pen.CONFIGURATION: pen_spec.BOM_DESCRIPTION,
 }
 MEMBER_PROPERTIES = {
     lever.CONFIGURATION: {
@@ -242,6 +247,7 @@ async def _readback(adapter, configuration: str) -> None:
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import SetGlobalVariableParameters
 
+    require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
     await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
     await activate_member(adapter, lever.CONFIGURATION)

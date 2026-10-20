@@ -37,7 +37,7 @@ These need a decision before a module can be written for them:
 | `sm-summing-lever` knife edge | Machine into the parent, or make a hardened tool-steel insert? |
 | `fr-rocker-arm-support`, `ch-connecting-rod` | Cast or cut from bar? (Both benign as bar.) |
 | `sm-vn-counter-spring`, `ch-vn-channel-spring-installed` ×20 | Wind your own (a module) or specify to a spring house (a procurement task)? |
-| `pd-vn-chain-inner-link` / `pd-vn-chain-outer-link` | Make the roller chain or buy it? |
+| `sh-vn-chain-link` (`InnerLink` / `OuterLink`) | Make the roller chain or buy it? |
 | `ms-stick` | Hand stamping — a small module of its own, or a paragraph? |
 
 ## Coverage check

@@ -144,6 +144,17 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     assert ch_vn_spring_hook_spec.ANCHOR_INSTALL_CHECK in printed
 
 
+def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
+    import _config
+
+    clamp = notes.ASSEMBLY_STEPS[steps.step_number("magnifier-bar-clamped") - 1]
+    pen_wire = notes.ASSEMBLY_STEPS[steps.step_number("pen-wire-tied") - 1]
+    assert f"BOTH {_config.parts('sh-vn-clamp-screw')['number']} CLAMP SCREWS" in clamp
+    assert _config.parts("sh-vn-music-wire")["number"] in pen_wire
+    assert "PEN WIRE" in pen_wire
+    assert "RIM GROOVE" in pen_wire
+
+
 def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     """Code review C08: the model and the feeler step park the nib
     PEN_PAPER_CLEARANCE_MM off the paper, and nothing on the plumb, guided

@@ -225,6 +225,80 @@ def test_exploded_caption_refuses_unreadable_bom_geometry(
         drawing._place_exploded_caption(None, table, (1.0, 2.0))
 
 
+def test_builder_inserts_all_ordinary_riders_through_real_parameter_validation(
+    monkeypatch, tmp_path
+) -> None:
+    """Keep build + place_component real; stub only the native seat operations."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from pydantic import ValidationError
+
+    import _assembly
+    from _test_stubbed_build import stub_seat
+
+    seat = stub_seat(
+        monkeypatch, builder, keep=("build", "place_component", "euler_from_rows")
+    )
+    seat.component_origin.return_value = list(builder.PEN_ROD_POS)
+    seat.assembly_title_properties.return_value = {}
+    seat.save_assembly_and_images.return_value = {"sldasm": "offline-pen.SLDASM"}
+    for stem in spec.BOM_ORDER:
+        (tmp_path / f"{stem}.SLDPRT").touch()
+    monkeypatch.setattr(_assembly, "OUT_SLDPRT", tmp_path)
+    monkeypatch.setattr(_assembly, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_assembly, "assert_component_placed", lambda *_args: None)
+    monkeypatch.setattr(_assembly, "_ledger_record", lambda *_args: None)
+    monkeypatch.setattr(
+        _assembly, "set_component_reference", lambda _adapter, name, *_args, **_kwargs: name
+    )
+
+    class Adapter:
+        def __init__(self):
+            self.components = {}
+            self.currentModel = SimpleNamespace(GetComponentByName=self.components.get)
+
+        async def create_assembly(self):
+            return SimpleNamespace(is_success=True, data={}, error=None)
+
+        async def insert_component(self, parameters):
+            # The REAL place_component constructs InsertComponentParameters
+            # before this backend is entered. Invalid configuration=None must
+            # never create a native occurrence here.
+            stem = Path(parameters.file_path).stem
+            name = f"{stem}-{len(self.components) + 1}"
+            self.components[name] = SimpleNamespace(
+                stem=stem,
+                Name2=name,
+                ReferencedConfiguration=parameters.configuration or "Default",
+                position=tuple(parameters.position),
+            )
+            return SimpleNamespace(
+                is_success=True, data={"name": name, "fixed": True}, error=None
+            )
+
+    adapter = Adapter()
+    result = asyncio.run(builder.build(adapter))
+    assert result == {"sldasm": "offline-pen.SLDASM"}
+    ordinary_riders = {stem: tuple(position) for stem, position, _rows in builder.RIDERS if stem != spec.WIRE}
+    accepted = [component for component in adapter.components.values() if component.stem in ordinary_riders]
+    assert len(accepted) == len(ordinary_riders) == 7
+    assert {component.stem: component.position for component in accepted} == ordinary_riders
+    assert {component.ReferencedConfiguration for component in accepted} == {"Default"}
+    assert len(adapter.components) == sum(spec.QUANTITIES.values()) == 13
+
+    before = set(adapter.components)
+    stem, position, rows = next(rider for rider in builder.RIDERS if rider[0] != spec.WIRE)
+    with pytest.raises(ValidationError, match="configuration"):
+        asyncio.run(
+            _assembly.place_component(
+                adapter, stem, list(position), builder.euler_from_rows(rows), rows,
+                ground=False, configuration=None,
+            )
+        )
+    assert set(adapter.components) == before
+
+
 def test_explode_names_match_the_builder() -> None:
     assert drawing.EXPLODED_VIEW_NAMES == {
         "Default": explode.EXPLODED_VIEW_NAME,

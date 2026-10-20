@@ -202,10 +202,12 @@ const FRAME_GROUP = Object.freeze([FRAME, `${PEN}pn-vn-pen-set-screw-1`])
 const NATIVE_LINKS = [...MECHANISM_DATA.paperDrive.chain.nativeLinks].sort((a, b) => a.restStationMm - b.restStationMm)
 export const SOURCE_CHAIN_PART_PATHS = Object.freeze(NATIVE_LINKS.map(link => link.partPath))
 if (NATIVE_LINKS.length !== 68) throw new Error('Source assembly requires exactly 68 native chain links.')
+const CHAIN_MEMBER = new RegExp(`^${PAPER}sh-vn-chain-link--(InnerLink|OuterLink)-[1-9]\\d*$`)
 for (let i = 0; i < 68; i++) {
   const link = NATIVE_LINKS[i]!, next = NATIVE_LINKS[(i + 1) % 68]!
+  const member = CHAIN_MEMBER.exec(link.partPath)?.[1], nextMember = CHAIN_MEMBER.exec(next.partPath)?.[1]
   if (link.nextPartPath !== next.partPath || !REST.has(link.partPath)
-    || link.partPath.includes('outer') === next.partPath.includes('outer')) throw new Error('Source assembly native chain connectivity/alternation is incompatible.')
+    || !member || !nextMember || member === nextMember) throw new Error('Source assembly native chain connectivity/alternation is incompatible.')
 }
 export const SOURCE_ASSEMBLY_GROUPS = Object.freeze({ crankCarrier: CRANK_CARRIER, crankPin: CRANK_PIN, keeper: KEEPER, hanger: HANGER, penFrame: FRAME_GROUP })
 export const OPERATING_SOURCE_ASSEMBLY: CompiledSourceAssembly = Object.freeze({ state: Object.freeze({ kind: 'operating' }), requiredPartPaths: Object.freeze([]), physicalKey: '{"kind":"operating"}' })

@@ -20,7 +20,7 @@ two counterbored slots on the west one (owner ruling 2026-10-15, option A).
   roughness symbol has its reason beside it; the sheet has no general note.
 * Detail C looks face-on at the outer slot: the slot's and its
   counterbore's widths and travels, the slot's width naming the MHA-SH-02
-  taps it takes up and the counterbore's the MHA-PD-VN-53 head it holds.
+  taps it takes up and the counterbore's the MHA-SH-VN-53 head it holds.
   Section B-B cuts the inner slot across the bar for the counterbore's depth.
 * Each face view carries its caption; section A-A cuts the pivot tap across
   the bar: the banded thickness and the tap's countersunk mouths on both

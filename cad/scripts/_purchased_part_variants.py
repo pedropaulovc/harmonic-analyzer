@@ -14,10 +14,10 @@ import _config
 from _check import check
 from _com import _early_bound, _read_member
 from _configuration_material import require_material_in_every_configuration
-from _part_configuration_exports import export_member_configurations
+from _part_configuration_exports import export_member_configurations, member_configurations
 from _part_save import save_part_and_images
 from _rebuild import active_configuration_name, assert_saved_configurations_regenerate
-from _simplified_part import persist_configurations_in_place
+from _simplified_part import _bom_identity, _close_part, persist_configurations_in_place
 
 
 async def activate_member(adapter: Any, configuration: str) -> None:
@@ -39,18 +39,17 @@ def require_active_member(adapter: Any, configuration: str) -> None:
         raise RuntimeError(f"native member {configuration!r} requested, active member is {active!r}")
 
 
-def _registry_members(part_name: str, configurations: Sequence[str]) -> tuple[str, ...]:
+def require_member_configurations(
+    part_name: str, configurations: Sequence[str]
+) -> tuple[str, ...]:
+    """Refuse registry/member order drift before authoring or saving a native."""
     names = tuple(configurations)
-    if not names or len(set(names)) != len(names) or any(not name.strip() for name in names):
-        raise ValueError(f"invalid native member names {names!r}")
-    row = _config.parts(part_name)
-    quantities = row["configuration_quantities"]
-    if set(quantities) != set(names):
-        raise ValueError(f"{part_name}: native members {names!r} differ from registry {tuple(quantities)!r}")
-    default = str(row["default_configuration"])
-    if default not in names:
-        raise ValueError(f"{part_name}: default member {default!r} is not placeable")
-    return (default, *(name for name in names if name != default))
+    expected = member_configurations(part_name)
+    if not expected or names != expected:
+        raise ValueError(
+            f"{part_name}: native members {names!r} differ from registry order {expected!r}"
+        )
+    return expected
 
 
 async def create_member_configurations(
@@ -59,7 +58,7 @@ async def create_member_configurations(
     """Replace the fresh part's Default with the registry's real named members."""
     from solidworks_mcp.adapters.base import CreateConfigurationParameters
 
-    names = _registry_members(part_name, configurations)
+    names = require_member_configurations(part_name, configurations)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     initial = tuple(str(name) for name in (model.GetConfigurationNames() or ()))
     if len(initial) != 1:
@@ -91,9 +90,13 @@ def _suppressed(feature: Any) -> bool:
     from solidworks_mcp.adapters.com_variant import null_variant
 
     states = feature.IsSuppressed2(1, null_variant())  # swThisConfiguration
-    if not isinstance(states, (tuple, list)) or len(states) != 1:
+    if (
+        not isinstance(states, (tuple, list))
+        or len(states) != 1
+        or not isinstance(states[0], bool)
+    ):
         raise RuntimeError(f"{feature.Name}: invalid native suppression state {states!r}")
-    return bool(states[0])
+    return states[0]
 
 
 def set_member_suppression(adapter: Any, names: Sequence[str], *, suppressed: bool) -> None:
@@ -198,11 +201,7 @@ def assert_member_properties(
         if observed != str(value).replace("\r\n", "\n"):
             raise RuntimeError(f"{configuration}: property {name!r} reads {observed!r}, expected {value!r}")
     native = _early_bound(model.GetConfigurationByName(configuration), "IConfiguration")
-    observed_bom = (
-        int(native.BOMPartNoSource), str(native.AlternateName or ""),
-        bool(native.UseAlternateNameInBOM), str(native.Description or ""),
-        bool(native.UseDescriptionInBOM),
-    )
+    observed_bom = _bom_identity(native)
     expected_bom = (8, f"{part_name}--{configuration}", True, description, True)
     if observed_bom != expected_bom:
         raise RuntimeError(f"{configuration}: native BOM identity {observed_bom!r} != {expected_bom!r}")
@@ -221,10 +220,19 @@ def require_member_bodies(
             raise RuntimeError(f"{configuration}: required reference {name!r} is suppressed")
 
 
-def _close_part(adapter: Any) -> None:
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    adapter.swApp.CloseDoc(str(model.GetTitle()))
-    adapter.currentModel = None
+def require_member_colour(
+    adapter: Any, configuration: str, rgb: tuple[float, float, float]
+) -> None:
+    """Read the selected member's persisted native appearance, without repair."""
+    require_active_member(adapter, configuration)
+    observed = tuple(float(value) for value in (adapter.currentModel.MaterialPropertyValues or ())[:3])
+    if len(observed) != 3 or any(
+        not abs(got - expected) <= 1.0 / 255.0
+        for got, expected in zip(observed, rgb, strict=True)
+    ):
+        raise RuntimeError(
+            f"{configuration}: native colour {observed!r} differs from {rgb!r}"
+        )
 
 
 async def save_member_part(
@@ -236,7 +244,7 @@ async def save_member_part(
     readback: Callable[[Any, str], Awaitable[None]],
 ) -> dict[str, str]:
     """Publish only a saved part whose actual member caches and metadata read clean."""
-    names = _registry_members(part_name, configurations)
+    names = require_member_configurations(part_name, configurations)
     for name in names:
         await activate_member(adapter, name)
         await readback(adapter, name)

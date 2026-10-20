@@ -3032,6 +3032,8 @@ class _FakeDrawingComponent:
         self.Component = SimpleNamespace(
             GetPathName=lambda p=path: p,
             Name2="/".join(segments[1:] or segments),
+            ReferencedConfiguration="Default",
+            ComponentReference="",
             Transform2=SimpleNamespace(
                 ArrayData=transform or (1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
             ),

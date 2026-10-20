@@ -126,6 +126,45 @@ uv run python -m doit list --all
 uv run python -m doit clean
 ```
 
+The heterogeneous shared vendor parts preserve **every member's STEP and
+isometric PNG** in their own `part:<stem>` task, alongside their one native
+SLDPRT. The registry's `configuration_quantities` and `default_configuration`
+are the sole member inventory:
+
+| Part | Bare STEP/PNG member | Other members |
+| --- | --- | --- |
+| `sh-vn-chain-link` | `InnerLink` | `OuterLink` |
+| `sh-vn-music-wire` | `LeverWire` | `PenWire` |
+| `sh-vn-clamping-kit-hardware` | `HoldDownStud` | `TNut`, `FlangeNut` |
+
+For example, `step/sh-vn-chain-link.STEP` and
+`png/sh-vn-chain-link/sh-vn-chain-link_isometric.png` depict **InnerLink only**.
+OuterLink uses `step/sh-vn-chain-link--outerlink.STEP` and
+`png/sh-vn-chain-link--outerlink/sh-vn-chain-link--outerlink_isometric.png`.
+All suffixes use the existing lowercase configuration mesh-key convention.
+Scene-generated STLs remain qualified for every named member, including
+`sh-vn-chain-link--innerlink.STL`; the bare build STL remains a placement sidecar,
+not another released member identity.
+
+Each part task declares and caches all member STEP/PNG files together with its
+`reports/part-neutral/<stem>.json` certificate. The certificate records the
+configuration for each file, its exact bytes, and the native `.execution`
+identity. Subsequent parent-assembly saves may change raw native bytes without
+changing that execution identity. The part action validates the complete member
+set after execution stamping on every cache/worker return and before publishing.
+An invalid restored set fails closed with its part name, cache key, and explicit
+refresh recovery instruction; it never silently rebuilds or retries for success.
+Full neutral export validates and consumes the part-owned files unchanged, even
+with `--force`; missing or stale member outputs fail closed and require an
+explicit refresh of their owning part task. The release manifest records the
+explicit member-to-format mapping and requires all seven configured scene STLs
+rather than silently dropping a member.
+
+Native qualification of these member STEP/PNG outputs needs only the changed
+shared-part targets; it does **not** require submitting the aggregate `export`
+closure. Select affected assemblies and drawings separately when qualifying
+their configuration usage.
+
 `cad/config/release.yaml` reserves the Revision stamped into every native CAD
 file and linked drawing title block. Migrated and enrolled process plans in
 `_process_plans.revision_stems()` keep their tracked `[drawing].revision` equal

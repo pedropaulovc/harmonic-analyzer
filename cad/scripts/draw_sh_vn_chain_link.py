@@ -1,7 +1,7 @@
-"""Create the four-view purchased-reference sheet for McMaster-Carr 6261K171, ANSI #25 roller-chain inner link.
+"""Draw both installed link forms of shared McMaster-Carr 6261K171.
 
-Identification only: the part as installed, its stock and ordering SKU, and
-its cut-length or fitting note; no fabrication dimensions.
+Two explicitly configured four-view panels retain the purchased identification
+content. Installed member counts are distinct from chain ordered by the foot.
 """
 
 from __future__ import annotations
@@ -13,18 +13,25 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_part_drawing import build_purchased_part_drawing
+from _purchased_variant_drawing import build_purchased_variant_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["pd_vn_chain_inner_link"]
+SPEC = DRAWINGS_BY_NAME["sh_vn_chain_link"]
 PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
-ITEM = "ANSI #25 ROLLER CHAIN, INNER LINK (1/4 PITCH)"
+ITEM = "ANSI #25 ROLLER CHAIN (1/4 PITCH)"
+VARIANTS = (("InnerLink", "INNER LINK"), ("OuterLink", "OUTER LINK"))
+PURCHASE_UNIT = "CHAIN BY THE FOOT"
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_part_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=True
+    return await build_purchased_variant_drawing(
+        adapter,
+        SPEC,
+        variants=VARIANTS,
+        item=ITEM,
+        purchase_unit=PURCHASE_UNIT,
+        cut_to_suit=True,
     )
 
 

@@ -8,6 +8,9 @@ keeps exactly ``DRAWING_DIMENSIONS`` for its PenWire sheet.
 from __future__ import annotations
 
 from _mcmaster_9666k56 import SKU
+from sh_vn_music_wire_pen_geom import WIRE_DIA
+
+BOM_DESCRIPTION = f"PEN WIRE 2, {WIRE_DIA / 25.4:.3f} MUSIC WIRE"
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Only the straight rest-run LENGTH (the Wire extrude depth) is

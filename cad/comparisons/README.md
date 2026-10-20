@@ -39,8 +39,12 @@ with the sealed schema-2
 [`identity-migration-map.json`](../config/identity-migration-map.json).
 The current map retains each prior stem/Number, semantic role and exact member
 configuration. Repeated shared target stems/Numbers are legitimate convergence,
-not duplicate physical files. Conflicting identities and case-insensitive
-duplicate archive members remain errors.
+not duplicate physical files. Within one inventory, only declared distinct
+same-generation prior sources may converge. Mixed archive generations, stale
+prior/current aliases, overlapping aliases for the same prior source and
+case-insensitive duplicate members remain errors. The declared current
+bare-STEP/qualified-STL first-member pair is a per-format association, not
+multiple geometry candidates.
 
 The chain, wire and clamping-kit members stay distinct: `InnerLink`/`OuterLink`,
 `LeverWire`/`PenWire`, and `HoldDownStud`/`TNut`/`FlangeNut`. Exporter mesh keys
@@ -50,9 +54,12 @@ neutral artifact represents **only** its declared active member: `InnerLink`,
 `LeverWire` or `HoldDownStud`, respectively. There is no heterogeneous `Default`
 alias. Ordinary shared screws retain `Default` and bare geometry names, without
 invented role configurations. Every distinct member must ship its STEP and PNG:
-the first member uses the bare export, while nonfirst STEP/PNG exports use the
-exact configuration spelling (for example `--OuterLink`); STL mesh keys remain
-lowercase. Geometry lookup is case-insensitive but never first-match ambiguous.
+the first member uses the bare STEP/PNG export, while all member STLs and
+nonfirst STEP/PNG exports use the same existing lowercase mesh-key sanitizer
+(for example `--outerlink`). Comparison format association imports the pure
+`member_export_paths` producer helper, with the map's declared neutral member;
+it never guesses one common basename for STEP and STL. Geometry lookup is
+case-insensitive but never first-match ambiguous.
 
 For unrelated configurations the entire suffix from the first `--` remains
 intact. Thus `transgear-removable--t12` pairs with
@@ -70,17 +77,27 @@ parent-specific clones and archive spellings. Release geometry output compares
 each actual source; render summaries preserve every source deviation in
 `candidate_mesh_deviations_mm`, and any changed candidate highlights the target.
 `renamed_meshes` and drawing-overlay `renamed_drawings` contain lists of actual
-prior names. Drawing overlays compare every prior PDF with the shared reference
+prior names; drawing summaries use schema 2 for this many-candidate contract.
+Drawing overlays compare every prior PDF with the shared reference
 drawing, which depicts all its member configurations, and source-qualify image
 paths when multiple historical PDFs converge. One equal candidate cannot hide a
 different clone.
 
-The release CLI inventories STEP **and** STL. A configured STL with a missing
-exact STEP still receives mesh comparison, while its exact STEP boolean is
-explicitly skipped; a bare STEP is never substituted for another member. This
+The release CLI inventories STEP **and** STL once per logical member and compares
+CRCs by format, never STEP against STL. A first member's declared bare STEP and
+qualified STL form one source, so identical current bundles do not become
+changed/renamed and OCP/mesh comparisons run once per source pair. A configured
+STL whose declared STEP is missing still receives mesh comparison, while its
+exact STEP boolean is explicitly skipped; a bare STEP is never used for another member. This
 honest diagnostic is not permission to omit required member STEP/PNG exports.
-Single-file pose/GLB/boxes/PDF resolution rejects multiple candidate sources
-rather than selecting a clone. With an explicit release tag it reuses a cached
+For the human-typed `--parts` selector, a bare shared SKU expands **all** declared
+members; use `<stem>--membername` to select one. Missing requested members are reported,
+not silently replaced by the neutral member. This selector expansion does not
+change the meaning of any actual bare neutral artifact.
+Single-file pose/GLB/boxes/PDF resolution accepts a literal actual artifact key
+as explicit source identity context, after validating its variant and inventory.
+A canonical shared alias against multiple prior candidates remains ambiguous;
+no clone is selected by sort order. With an explicit release tag it reuses a cached
 complete bundle without GitHub access and checks that bundle's full inventory
 even if one candidate was previously extracted.
 
@@ -90,6 +107,10 @@ Geometry selectors are artifact mesh keys, not occurrence paths. Projected
 not native `Component2.Name2` ordinals and are rejected here, never silently
 joined to raw native paths. Native linkage requires independently checked
 file/configuration plus a semantic `ComponentReference` such as `Role:1`.
+Pose Studio and meshprobe framing also reject projected archive occurrence
+selectors. An explicit camera `occurrenceNamespace: "native-name2"` may select
+only an exact raw name already present in its supplied native boxes evidence;
+no stem/leaf rewrite or projected ordinal bridge is performed.
 
 Historical curation catalogs likewise remain immutable provenance.
 `seed_manifest.py` normalizes catalog components only when their

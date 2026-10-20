@@ -105,12 +105,15 @@ def camera_axes(az_deg, el_deg, roll_deg=0.0):
 def resolve_framing(cam, boxes, mesh_lo, mesh_hi):
     focus = cam.get("frame_components") or []
     namespace = cam.get("occurrenceNamespace")
-    if focus and (namespace not in (None, "native-name2") or (
-        namespace is None and any(
-            re.search(r"[/\\]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
+    if focus and (
+        namespace not in (None, "native-name2")
+        or any(not isinstance(selector, str) or "archive-role-local" in selector.lower()
+               for selector in focus)
+        or (namespace is None and any(
+            re.search(r"[/\\:]|__|--[A-Za-z][A-Za-z0-9]*-\d+$", selector)
             for selector in focus
-        )
-    )):
+        ))
+    ):
         raise ValueError("cross-namespace occurrence request cannot frame raw native Name2 boxes")
     target = None
     zoom = float(cam.get("zoom") or 1.0)
@@ -408,9 +411,11 @@ def resolve_glb(model: str, explicit: str | None, fetch: bool, tag: str | None) 
 
 
 def release_member(member: str, tag: str | None) -> Path:
-    """Extract the unique actual source; converged historical clones are ambiguous."""
+    """Resolve an explicit actual artifact, or a uniquely projected source."""
     from release_diff import canonical_keys, load_identity_map, paired_keys
 
+    if not isinstance(member, str) or "archive-role-local" in member.lower():
+        raise ValueError(f"cross-namespace occurrence request is not a release artifact: {member!r}")
     requested = Path(member)
     if len(requested.parts) != 2 or requested.is_absolute() or ".." in requested.parts:
         raise ValueError(f"cross-namespace occurrence request is not a release artifact: {member!r}")
@@ -422,6 +427,13 @@ def release_member(member: str, tag: str | None) -> Path:
         pairs = paired_keys((Path(name).stem for name in names), [requested.stem],
                             mapping, drawing=drawing)
         sources = pairs.get(requested.stem, ())
+        # A literal physical source key is caller-supplied identity context,
+        # not a preference among converged aliases. The complete inventory has
+        # already been validated, including case-insensitive duplicate rejection.
+        exact = next((name for name in names
+                      if Path(name).stem.lower() == requested.stem.lower()), None)
+        if exact is not None:
+            return exact
         if len(sources) > 1:
             raise ValueError(f"ambiguous prior identity for {member!r}: {sources!r}")
         return next((name for name in names if sources and Path(name).stem == sources[0]), None)
@@ -439,8 +451,10 @@ def release_member(member: str, tag: str | None) -> Path:
         cached = [path for path in (cache / requested.parent).glob("*")
                   if path.is_file() and path.suffix.lower() == requested.suffix.lower()]
         actual = unique_source(cached)
-        if actual is not None:
+        if actual is not None and Path(actual).stem.lower() == requested.stem.lower():
             return actual
+        # An extracted alias is not a complete inventory. Fetch the bundle
+        # before deciding whether a projected request has a unique source.
         cache.mkdir(parents=True, exist_ok=True)
         asset = _gh(["release", "view", tag, "--json", "assets",
                      "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()

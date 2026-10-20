@@ -773,7 +773,7 @@ for _label, _end, _outer in (
 ):
     if abs(_end - _outer) > 1e-9:
         raise AssertionError(f"arbor {_label} end is not flush with its strap face")
-# The apex set screws (MHA-DT-VN-64), one per crown at the strap's mid-depth, cup
+# The apex set screws (MHA-SH-VN-54), one per crown at the strap's mid-depth, cup
 # point down on the arbor's top.
 from sh_vn_arbor_set_screw_spec import LENGTH as SET_SCREW_LEN  # noqa: E402
 
@@ -1258,7 +1258,7 @@ from dt_vn_slotted_screw_spec import (  # noqa: E402
     TIP_CHAMFER as BSCREW_TIP_INCOMPLETE,
 )
 
-from dt_vn_foot_screw_spec import (  # noqa: E402
+from sh_vn_fillister_screw_90280a108_spec import (  # noqa: E402
     HEAD_DIA as FSCREW_HEAD_DIA,
     SHANK_LEN as FSCREW_SHANK_LEN,
     THREAD as FSCREW_THREAD,
@@ -4293,7 +4293,7 @@ _PEDESTAL_SCREW_XZ = (
 
 # Both machine-handed: the base holes agree directly.
 for _label, _derived, _base in (
-    ("dt-vn-foot-screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
+    ("spring foot screw", _FOOT_SCREW_XZ, BASE_FOOT_XZ),
     ("pedestal hold-down", _PEDESTAL_SCREW_XZ, BASE_PEDESTAL_XZ),
 ):
     for _want, _have in zip(_derived, _base, strict=True):
@@ -4771,12 +4771,12 @@ async def build(adapter) -> dict[str, str]:
         label=f"cylinder bank spring z0={BANK_SPRING_Z0:.3f}",
     )
     await _lock_static(adapter, bank_spring, arbor)
-    # Apex set screws (MHA-DT-VN-64, #743 Q3): point down through each crown onto
+    # Apex set screws (MHA-SH-VN-54, #743 Q3): point down through each crown onto
     # the arbor's top at the strap's mid-depth; static like their pedestals.
     for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):
         set_screw = await place_component(
             adapter,
-            "dt-vn-arbor-set-screw",
+            "sh-vn-arbor-set-screw",
             [X_DRUM, SET_SCREW_TIP_Y, _screw_z],
             [0.0, 0.0, 0.0],
             IDENTITY,
@@ -4927,16 +4927,18 @@ async def build(adapter) -> dict[str, str]:
         label="cone-pivot-screw (p1 pivot pin)",
     )
     await _lock_static(adapter, pivot_screw, arbor)
-    # The base-threaded swing stop remains a static at the base-top production
-    # frame. Screwed fully home, its head meets the disengaged platform's east edge
-    # at the one shared contact station exported with the base hole.
+    # The canonical screw uses the foot's stock frame. Preserve the stop's
+    # former local (0, PROUD_LEN, 0) body translation at this identity-rotation
+    # occurrence; its head still meets the same disengaged platform edge.
     stop_screw = await place_component(
         adapter,
-        "dt-vn-swing-stop-screw",
-        [STOP_X, Y_BASE_TOP, STOP_Z],
+        "sh-vn-fillister-screw-90280a108",
+        [STOP_X, Y_BASE_TOP + STOP_PROUD_LEN, STOP_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
+        component_reference="SwingStopScrew:1",
+        occurrence_basename="sh-vn-fillister-screw-90280a108__SwingStopScrew",
         label="swing-stop-screw (p1 travel limit)",
     )
     await _lock_static(adapter, stop_screw, arbor)
@@ -5139,13 +5141,16 @@ async def build(adapter) -> dict[str, str]:
     sx, sz = _FOOT_SCREW_XZ[0]
     spring_foot_screw = await place_component(
         adapter,
-        "dt-vn-foot-screw",
+        "sh-vn-fillister-screw-90280a108",
         [sx, Y_BASE_TOP + SPRING_T, sz],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
+        component_reference="FootScrew:1",
+        occurrence_basename="sh-vn-fillister-screw-90280a108__FootScrew",
         label="foot-screw (spring foot)",
     )
+    await apply_component_color(adapter, spring_foot_screw, _config.palette("panel_black"))
     # U34c: the south pedestal's MHA-DT-VN-62 is the seed; the north one is its
     # linear pattern instance below (dt-vn-pedestal-hold-down-screw-1 / -2).
     sx, sz = _PEDESTAL_SCREW_XZ[0]
@@ -5372,7 +5377,7 @@ async def build(adapter) -> dict[str, str]:
     )
     anchor = await place_component(
         adapter,
-        "dt-vn-fillister-screw",
+        "sh-vn-brass-fillister-screw",
         [ANCHOR_SCREW_XY[0], ANCHOR_SCREW_XY[1], ANCHOR_HEAD_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -7088,7 +7093,13 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         ASM_NAME,
         lambda configuration: create_drive_train_explode(
-            adapter, {collar_pin: COLLAR_PIN_ROLE}, configuration
+            adapter,
+            {
+                collar_pin: COLLAR_PIN_ROLE,
+                stop_screw: "SwingStopScrew:1",
+                spring_foot_screw: "FootScrew:1",
+            },
+            configuration,
         ),
     )
     return await save_assembly_and_images(

@@ -22,11 +22,12 @@ from typing import Any
 
 import _chain_link
 import _config
+from _chain import LINK_PITCH, PLATE_HALF_H, PLATE_THICK
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _check import check
 from _custom_properties import apply_custom_properties
 from _drawing_marks import apply_drawing_properties
-from _part_checks import report_mass_properties
+from _part_checks import bbox_extent_check, report_mass_properties
 from _purchased_part_variants import (
     activate_member,
     apply_member_properties,
@@ -34,6 +35,8 @@ from _purchased_part_variants import (
     assert_member_suppression,
     create_member_configurations,
     require_member_bodies,
+    require_member_colour,
+    require_member_configurations,
     save_member_part,
     select_member_features,
     set_member_suppression,
@@ -44,8 +47,10 @@ from _visibility import assert_reference_geometry_hidden
 from sh_vn_chain_link_spec import (
     CONFIGURATIONS,
     INNER_LINK,
+    INNER_LINK_BOM_DESCRIPTION,
     INNER_LINK_CONFIGURATION,
     OUTER_LINK,
+    OUTER_LINK_BOM_DESCRIPTION,
     OUTER_LINK_CONFIGURATION,
 )
 
@@ -57,13 +62,14 @@ _MEMBER_DELTAS = {
     OUTER_LINK_CONFIGURATION: OUTER_LINK,
 }
 _MEMBER_DESCRIPTIONS = {
-    INNER_LINK_CONFIGURATION: "ANSI #25 roller-chain inner link",
-    OUTER_LINK_CONFIGURATION: "ANSI #25 roller-chain outer link",
+    INNER_LINK_CONFIGURATION: INNER_LINK_BOM_DESCRIPTION,
+    OUTER_LINK_CONFIGURATION: OUTER_LINK_BOM_DESCRIPTION,
 }
 _MEMBER_REFERENCES = ("Axis1", "Axis2")
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
     # Author before cloning configurations so every member inherits the same
     # station plane and the same two hidden, unsuppressed path-link axes.
@@ -109,6 +115,7 @@ async def build(adapter: Any) -> dict[str, str]:
         """Check native member state without repairing or saving the document."""
         assert_member_suppression(current_adapter, configuration, member_features)
         require_member_bodies(current_adapter, configuration, 4, _MEMBER_REFERENCES)
+        require_member_colour(current_adapter, configuration, BAR_STEEL)
         delta = _MEMBER_DELTAS[configuration]
         _chain_link._gate_volume(
             await _chain_link._volume(current_adapter),
@@ -116,6 +123,14 @@ async def build(adapter: Any) -> dict[str, str]:
             delta["body_outer_r"],
             delta["body_bore_r"],
             delta["body_half_len"],
+        )
+        await bbox_extent_check(
+            current_adapter, f"{configuration} pitch envelope", "x",
+            LINK_PITCH + 2.0 * PLATE_HALF_H,
+        )
+        await bbox_extent_check(
+            current_adapter, f"{configuration} axial envelope", "z",
+            2.0 * max(delta["plate_z"] + PLATE_THICK / 2.0, delta["body_half_len"]),
         )
         assert_member_properties(
             current_adapter,

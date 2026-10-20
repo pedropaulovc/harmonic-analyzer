@@ -2130,7 +2130,7 @@ def _assign_chain_references(model) -> dict[str, str]:
 
 
 async def _place_chain_seed(
-    adapter, part: str, station: int, *, configuration: str = "Default"
+    adapter, part: str, station: int, *, configuration: str
 ) -> str:
     """Seat ONE chain link at path ``station``, oriented along the forward CHORD
     (pin0->pin1) so both pin axes sit ~on the loop: the two pattern seeds, and
@@ -2141,6 +2141,10 @@ async def _place_chain_seed(
     exact machine pose place_component now inserts directly (no mirror layer). The
     achiral link's local-z symmetry keeps that a pure-Z rotation, so the plates
     stay flat in the chain plane. Returns the instance name."""
+    if part == CHAIN_LINK_STEM and configuration not in (
+        INNER_LINK_CONFIGURATION, OUTER_LINK_CONFIGURATION
+    ):
+        raise ValueError(f"shared chain insertion requires a named member, not {configuration!r}")
     x0, y0, _ = loop_point_tangent(
         station * LINK_PITCH,
         dx=CHAIN_KNOB_CENTRE[0],
@@ -2161,8 +2165,11 @@ async def _place_chain_seed(
         [0.0, 0.0, ang],
         rot_z_rows(ang),
         configuration=configuration,
+        component_reference=(
+            f"{configuration}:{station // 2 + 1}" if part == CHAIN_LINK_STEM else ""
+        ),
         occurrence_basename=(
-            f"{CHAIN_LINK_STEM}--{configuration}" if part == CHAIN_LINK_STEM else None
+            f"{CHAIN_LINK_STEM}--{configuration}" if part == CHAIN_LINK_STEM else ""
         ),
         ground=True,
         label=f"{part} seed @ station {station}",
@@ -2305,7 +2312,9 @@ async def _insert_roller_chain(adapter) -> None:
     await _place_chain_seed(
         adapter, CHAIN_LINK_STEM, LINK_COUNT - 2, configuration=INNER_LINK_CONFIGURATION
     )
-    await _place_chain_seed(adapter, CONNECTING_LINK_STEM, LINK_COUNT - 1)
+    await _place_chain_seed(
+        adapter, CONNECTING_LINK_STEM, LINK_COUNT - 1, configuration="Default"
+    )
 
     # Hide the path spline: it is construction scaffolding for the pattern, not a
     # rendered feature.
@@ -2543,20 +2552,6 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
             raise RuntimeError("actual paired locating cylinder centres/seat do not agree")
         if abs(abs(sum(a * b for a, b in zip(arm_axis, plate_axis, strict=True))) - 1.0) > 1e-8:
             raise RuntimeError("actual paired locating cylinder axes are not parallel")
-
-
-async def _place_latch_hook_bracket_screws(adapter) -> None:
-    """Install unchanged stock at the latch seats with the latch's appearance."""
-    for x, y, z in HOOK_BRACKET_SCREW_POS:
-        screw = await place_component(
-            adapter,
-            "sh-vn-fillister-screw-90280a108",
-            [x, y, z],
-            [90.0, 0.0, 0.0],
-            ROT_X_POS90,
-            label=f"latch-hook-bracket-screw (x{x:.1f})",
-        )
-        await apply_component_color(adapter, screw, POLISHED_STEEL)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -3048,7 +3043,16 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         label="latch-hook (spring latch of the swing cluster)",
     )
-    await _place_latch_hook_bracket_screws(adapter)
+    for x, y, z in HOOK_BRACKET_SCREW_POS:
+        screw = await place_component(
+            adapter,
+            "sh-vn-fillister-screw-90280a108",
+            [x, y, z],
+            [90.0, 0.0, 0.0],
+            ROT_X_POS90,
+            label=f"latch-hook-bracket-screw (x{x:.1f})",
+        )
+        await apply_component_color(adapter, screw, POLISHED_STEEL)
     log(
         f"latch hook x {HOOK.BBOX_X[0]:.2f}..{HOOK.BBOX_X[1]:.2f},"
         f" y {HOOK.BBOX_Y[0]:.2f}..{HOOK.BBOX_Y[1]:.2f},"

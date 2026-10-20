@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import (
+    iter_views,
+    place_view,
+    view_name,
+)
 
 from _check import check
 from _com import _early_bound
@@ -29,6 +33,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
+    _CAPTION_BELOW,
+    _CAPTION_TO_CELL,
     _PROPERTIES,
     _box,
     _cell,
@@ -55,6 +61,20 @@ def configuration_view_cells(index: int, count: int) -> tuple:
         _cell("*Right", middle + 0.004, 0.127, right, 0.179),
         _cell("*Isometric", middle + 0.004, 0.194, right, 0.244),
     )
+
+
+def configure_reference_views(
+    adapter: Any, configuration: str, views: list[Any]
+) -> None:
+    """Select the exact member before fitting or annotating its drawing views."""
+    for view in views:
+        view.ReferencedConfiguration = configuration
+    rebuild_drawing(adapter, label=f"{configuration} reference views")
+    for view in views:
+        if str(view.ReferencedConfiguration) != configuration:
+            raise RuntimeError(
+                f"{configuration}: native view configuration did not persist"
+            )
 
 
 async def build_purchased_variant_drawing(
@@ -88,7 +108,9 @@ async def build_purchased_variant_drawing(
         raise ValueError("purchased sheet must depict every registered configuration")
     total = sum(int(quantities[name]) for name in configurations)
     if total != int(row["quantity"]):
-        raise ValueError("configured installed quantities do not sum to the family quantity")
+        raise ValueError(
+            "configured installed quantities do not sum to the family quantity"
+        )
     note_properties = tuple(f"{name} Manufacturing Notes" for name in configurations)
     names = (*_PROPERTIES, "Material Specification", "Finish", *note_properties)
     check(f"open {spec.artifact_stem} source", await adapter.open_model(str(source)))
@@ -107,7 +129,10 @@ async def build_purchased_variant_drawing(
     }
     for name, value in expected.items():
         if properties[name] != value:
-            raise RuntimeError(f"{spec.artifact_stem}: stale {name} {properties[name]!r} != {value!r}")
+            raise RuntimeError(
+                f"{spec.artifact_stem}: stale {name} "
+                f"{properties[name]!r} != {value!r}"
+            )
 
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_notes = _purchased_title_block(
@@ -125,7 +150,10 @@ async def build_purchased_variant_drawing(
             0: title,
             1: "Harmonic Analyzer purchased-part identification; reference only",
             2: "Harmonic Analyzer Project",
-            3: f"{spec.artifact_stem}; {properties['Supplier']}; {properties['Supplier SKUs']}",
+            3: (
+                f"{spec.artifact_stem}; {properties['Supplier']}; "
+                f"{properties['Supplier SKUs']}"
+            ),
             4: "; ".join(configurations),
         },
     )
@@ -139,12 +167,8 @@ async def build_purchased_variant_drawing(
             )
             for orientation, center, _ in cells
         ]
+        configure_reference_views(adapter, configuration, views)
         for view in views:
-            view.ReferencedConfiguration = configuration
-        rebuild_drawing(adapter, label=f"{configuration} reference views")
-        for view in views:
-            if str(view.ReferencedConfiguration) != configuration:
-                raise RuntimeError(f"{configuration}: native view configuration did not persist")
             set_hidden_lines_removed(adapter, view)
         groups.append((configuration, label, cells, views))
     # Insertion can drift the sheet scale; pin all views before native fitting.
@@ -162,20 +186,38 @@ async def build_purchased_variant_drawing(
     sheet_scale = (1, 1)
     for index, (configuration, label, cells, views) in enumerate(groups):
         scales = _fit_views(draw, views, cells)
-        _center_marks_without_lines(views, cells)
+        center_marks = _center_marks_without_lines(views, cells)
         if index == 0:
             sheet_scale = scales["*Front"]
         left, right = cells[0][2][0], cells[2][2][2]
         caption = f"{label}  QTY {int(quantities[configuration])} INSTALLED"
         note = _literal_note(adapter, caption, left, 0.262)
         placed.append((note, caption, caption, (left, 0.255, right, 0.264)))
-        for view, (orientation, _, cell) in zip(views, cells, strict=True):
+        for view, (orientation, center, cell) in zip(views, cells, strict=True):
             scale = scales[orientation]
             caption = f"{orientation[1:].upper()}  {scale[0]}:{scale[1]}"
-            caption_y = cell[1] - 0.004
-            note = _literal_note(adapter, caption, cell[0], caption_y)
+            floor = cell[1]
+            if not center_marks[orientation]:
+                floor = max(_box(view.GetOutline(), label=orientation)[1], floor)
+            caption_y = floor - _CAPTION_TO_CELL
+            note = _literal_note(adapter, caption, center[0], caption_y)
+            bounds = _box(note.GetExtent(), label=caption, kind="note")
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            x = 2 * center[0] - (bounds[0] + bounds[2]) / 2
+            if not annotation.SetPosition(x, caption_y, 0.0):
+                raise RuntimeError(f"{caption}: failed to center view caption")
             placed.append(
-                (note, caption, caption, (cell[0], caption_y - 0.006, cell[2], caption_y + 0.001))
+                (
+                    note,
+                    caption,
+                    caption,
+                    (
+                        cell[0],
+                        caption_y - _CAPTION_BELOW,
+                        cell[2],
+                        caption_y + 0.001,
+                    ),
+                )
             )
             configured_views.append((view, configuration, scale, cell))
         property_name = f"{configuration} Manufacturing Notes"
@@ -183,20 +225,73 @@ async def build_purchased_variant_drawing(
         resolved = f"{label}: {properties[property_name]}"
         note_y = 0.106 - index * 0.007
         note = _literal_note(adapter, linked, 0.018, note_y)
-        placed.append((note, linked, resolved, (0.015, note_y - 0.006, 0.415, note_y + 0.001)))
+        placed.append(
+            (
+                note,
+                linked,
+                resolved,
+                (0.015, note_y - 0.006, 0.415, note_y + 0.001),
+            )
+        )
+    purchase_note = (
+        f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}."
+    )
+    note = _literal_note(adapter, purchase_note, 0.018, 0.113)
+    placed.append(
+        (note, purchase_note, purchase_note, (0.015, 0.107, 0.415, 0.114))
+    )
     placed.extend(
         add_purchased_footer(
             adapter,
             draw,
             properties,
             item=item,
-            notes=f"QTY {total} INSTALLED MEMBERS; PURCHASE UNIT: {purchase_unit}.",
             cut_to_suit=cut_to_suit,
             label=spec.artifact_stem,
         )
     )
+    values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
+    if len(values) != 8:
+        raise RuntimeError(
+            f"configured purchased sheet properties are incomplete: {values!r}"
+        )
+    sheet.SetProperties2(
+        int(values[0]),
+        int(values[1]),
+        float(sheet_scale[0]),
+        float(sheet_scale[1]),
+        False,
+        float(values[5]),
+        float(values[6]),
+        False,
+    )
+    sheet.CustomPropertyView = first_view_name
 
     def assert_reference_sheet() -> None:
+        values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
+        if (
+            len(values) != 8
+            or bool(values[4])
+            or bool(values[7])
+            or sheet.CustomPropertyView != first_view_name
+        ):
+            raise RuntimeError(
+                "configured purchased third-angle/property-source settings changed"
+            )
+        actual = tuple(iter_views(adapter))
+        expected_members = {
+            (configuration, orientation)
+            for configuration, cells in cells_by_configuration.items()
+            for orientation, _, _ in cells
+        }
+        actual_members = {
+            (str(view.ReferencedConfiguration), view.GetOrientationName())
+            for view in actual
+        }
+        if len(actual) != len(expected_members) or actual_members != expected_members:
+            raise RuntimeError(
+                "configured purchased sheet has missing or extra member views"
+            )
         template = DRAWING_TEMPLATES[spec.layout]
         region = sheet_drawable_region(
             adapter, sheet, width=template.width_m, height=template.height_m
@@ -211,16 +306,31 @@ async def build_purchased_variant_drawing(
                 raise RuntimeError(f"{configuration}: configured source/scale changed")
             box = _box(view.GetOutline(), label=configuration)
             if not _inside(box, cell) or not _inside(box, border):
-                raise RuntimeError(f"{configuration}: reference view leaves its cell/border")
+                raise RuntimeError(
+                    f"{configuration}: reference view leaves its cell/border"
+                )
         for note, linked, resolved in title_notes:
-            if note.PropertyLinkedText != linked or note.GetText().replace("\r\n", "\n") != resolved:
-                raise RuntimeError("configured purchased title-block link did not resolve")
+            if (
+                note.PropertyLinkedText != linked
+                or note.GetText().replace("\r\n", "\n") != resolved
+            ):
+                raise RuntimeError(
+                    "configured purchased title-block link did not resolve"
+                )
         for note, linked, resolved, cell in placed:
-            if note.PropertyLinkedText != linked or note.GetText().replace("\r\n", "\n") != resolved:
-                raise RuntimeError(f"configured purchased note did not resolve: {linked!r}")
+            if (
+                note.PropertyLinkedText != linked
+                or note.GetText().replace("\r\n", "\n") != resolved
+            ):
+                raise RuntimeError(
+                    f"configured purchased note did not resolve: {linked!r}"
+                )
             box = _box(note.GetExtent(), label=linked, kind="note")
             if not _inside(box, cell) or not _inside(box, border):
-                raise RuntimeError(f"configured purchased note leaves its reserved space: {linked!r}")
+                raise RuntimeError(
+                    "configured purchased note leaves its reserved space: "
+                    f"{linked!r}"
+                )
 
     return await finalize_drawing(
         adapter,

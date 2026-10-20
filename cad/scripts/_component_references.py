@@ -76,11 +76,18 @@ def component_reference_names(
     normalized: dict[str, tuple[str, str]] = {}
     for selector, (stem, configuration) in expected.items():
         canonical = selector.replace("\\", "/")
-        if semantic_reference_identity(canonical) is None:
+        required = semantic_reference_identity(canonical)
+        if required is None:
             raise ValueError(f"not an explicit component-reference selector: {selector!r}")
         if canonical in normalized:
             raise ValueError(f"duplicate component-reference selector {canonical!r}")
-        normalized[canonical] = (stem.casefold(), member_configuration(configuration))
+        identity = (stem.casefold(), member_configuration(configuration))
+        if identity != required:
+            raise ValueError(
+                f"component reference {canonical!r} requires {required!r}, "
+                f"not declared identity {identity!r}"
+            )
+        normalized[canonical] = identity
     found: dict[str, str] = {}
     assembly = _early_bound(model, "IAssemblyDoc")
     for raw in assembly.GetComponents(False) or ():

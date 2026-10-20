@@ -196,6 +196,7 @@ def test_shared_drawings_compare_every_historical_clone_and_member(
     facts = _compare(tmp_path)
 
     expected = {new_name: sorted(source_bytes)}
+    assert facts["schema_version"] == 2
     assert facts["renamed_drawings"] == expected
     assert facts["unchanged_drawings"] == [new_name]
     assert facts["added_drawings"] == facts["removed_drawings"] == facts["changed_drawings"] == []

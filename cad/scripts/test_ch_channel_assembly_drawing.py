@@ -1192,3 +1192,14 @@ def test_the_set_screw_interference_allowance_is_the_ear_tap() -> None:
     for n in (1, 2):
         pair = frozenset((f"sh-vn-arbor-set-screw-{n}", f"ch-pivot-bracket-{n}"))
         assert pairs[pair] == ic.PIVOT_EAR_SET_SCREW_LIMIT
+
+
+def test_shared_arbor_set_screws_keep_their_two_ear_seats_and_learned_sides() -> None:
+    stem = "sh-vn-arbor-set-screw"
+    assert explode.BRACKET_SET_SCREW == stem
+    assert drawing.BOM_QUANTITIES[stem] == 2
+    assert drawing.BOM_PART_NUMBERS[stem] == "MHA-SH-VN-54"
+    assert drawing.BOM_SKUS[stem] == "91375A106"
+    seeds = assembly_contract("ch-channel").flip_invert
+    assert {f"sh vn arbor set screw datum {axis}" for axis in "xyz"} <= seeds
+    assert not any(seed.startswith("ch vn arbor set screw datum ") for seed in seeds)

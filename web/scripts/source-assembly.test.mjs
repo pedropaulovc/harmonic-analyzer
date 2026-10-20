@@ -52,6 +52,26 @@ const MARKER = `${PEN}pn-vn-pen-marker-1`
 const WIRE = `${PEN}sh-vn-music-wire--PenWire-1`
 const GEAR_IDS = Object.keys(SOURCE_GEAR_PART_PATHS)
 const EPS = 2e-8
+
+test('the projected archive chain retains 68 connected alternating exact shared members', () => {
+  const links = [...MECHANISM_DATA.paperDrive.chain.nativeLinks].sort((a, b) => a.restStationMm - b.restStationMm)
+  assert.equal(links.length, 68)
+  assert.deepEqual(SOURCE_CHAIN_PART_PATHS, links.map(link => link.partPath))
+  const members = links.map(link => {
+    assert.ok(released.has(link.partPath), link.partPath)
+    const match = link.partPath.match(/^ha-harmonic-analyzer\/pd-paper-drive\/sh-vn-chain-link--(InnerLink|OuterLink)-[1-9]\d*$/)
+    assert.ok(match, link.partPath)
+    return match[1]
+  })
+  assert.equal(members.filter(member => member === 'InnerLink').length, 34)
+  assert.equal(members.filter(member => member === 'OuterLink').length, 34)
+  links.forEach((link, index) => {
+    const next = (index + 1) % links.length
+    assert.equal(link.nextPartPath, links[next].partPath)
+    assert.notEqual(members[index], members[next])
+  })
+})
+
 const provenance = {
   kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 1300,
   evidence: 'Synthetic native constraint control, not a measured source trajectory.',

@@ -41,6 +41,8 @@ from _purchased_part_variants import (
     assert_member_suppression,
     create_member_configurations,
     require_member_bodies,
+    require_member_colour,
+    require_member_configurations,
     save_member_part,
     select_member_features,
     set_member_suppression,
@@ -87,9 +89,9 @@ MEMBER_FEATURES = {
     ),
 }
 MEMBER_DESCRIPTIONS = {
-    HOLD_DOWN_STUD_CONFIGURATION: "Hold-down stud (Precision Matthews clamping kit)",
-    T_NUT_CONFIGURATION: "T-nut (Precision Matthews clamping kit)",
-    FLANGE_NUT_CONFIGURATION: "Flange nut (Precision Matthews clamping kit)",
+    HOLD_DOWN_STUD_CONFIGURATION: hold_down_stud.BOM_DESCRIPTION,
+    T_NUT_CONFIGURATION: t_nut.BOM_DESCRIPTION,
+    FLANGE_NUT_CONFIGURATION: flange_nut.BOM_DESCRIPTION,
 }
 MEMBER_PROPERTIES = {
     configuration: {
@@ -282,10 +284,12 @@ async def _readback(adapter, configuration: str) -> None:
         MEMBER_DESCRIPTIONS[configuration],
         MEMBER_PROPERTIES[configuration],
     )
+    require_member_colour(adapter, configuration, PANEL_BLACK)
     assert_reference_geometry_hidden(adapter, f"{PART_NAME} [{configuration}]")
 
 
 async def build(adapter) -> dict[str, str]:
+    require_member_configurations(PART_NAME, CONFIGURATIONS)
     check("create_part", await adapter.create_part())
     await create_member_configurations(adapter, PART_NAME, CONFIGURATIONS)
 
