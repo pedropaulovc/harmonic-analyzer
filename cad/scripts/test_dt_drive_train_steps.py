@@ -142,12 +142,18 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
     import dt_crank_pinion_spec as pinion
 
     fitup = _step_body("crank-mesh-checked")
-    shared_check = " ".join(pinion.T120_FITUP_ASSEMBLY_CHECK.split())
-    assert shared_check in fitup
     order = (
         "SLIDE MHA-DT-010 ON UNPINNED",
         f"SET MHA-DT-010 {pinion.SEAT_FEELER_MM:.2f} OFF",
-        shared_check,
+        "PUSH MHA-DT-010 AND T120 TOWARD EACH OTHER",
+        f"READING A {pinion.T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND",
+        "MHA-DT-010 BAND TO T120 TIPS: IF THE FEELER STOPS",
+        "TURN THE MHA-DT-010 BAND DOWN",
+        f"Ø{pinion.TURNED_DIA_FITUP_MIN:.{pinion.TURNED_DIA_PLACES}f} MIN",
+        "MHA-DT-010 SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS",
+        "FACE THE MHA-DT-010 SHOULDER BACK",
+        f"{pinion.SHOULDER_LENGTH_FITUP_MIN:.{pinion.SHOULDER_LENGTH_PLACES}f} MIN",
+        "RESET, RECHECK",
         "TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND",
         "THEN MATCH-DRILL THROUGH THE MHA-DT-010",
         "RE-CHECK NO BINDING",
@@ -156,6 +162,7 @@ def test_crank_fit_reads_t120_before_the_full_turn_and_retention_drilling() -> N
     assert positions == sorted(positions)
     assert "FLUSH BOTH SIDES" in fitup
     assert "BACKLASH" not in fitup
+    assert "WORST-CASE" not in fitup
 
 
 def test_full_turn_checks_use_the_spec_ratio_and_clear_the_unrelieved_platform() -> None:

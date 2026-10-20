@@ -36,9 +36,10 @@ slotted-screw-1, found its own ink, and the listed-edge leader SolidWorks
 placed ended on the front MHA-DT-014 strap (machinist review of 53a7c4266,
 balloon 31, two runs).
 
-The cone gear is pinned mid-stack, dt-cone-gear-10: dt-cone-gear-1 sits
-against MHA-DT-007, and its walked leader ended 1.9 mm from the 64T gear's
-(machinist review of 82158b1bb, balloons 35 and 36).
+The cone gear is pinned mid-stack, dt-cone-gear-10: dt-cone-gear-1 sat
+against MHA-DT-007 before the gears slid toward the tip, and its walked
+leader ended 1.9 mm from the 64T gear's (machinist review of 82158b1bb,
+balloons 35 and 36).
 """
 
 from __future__ import annotations

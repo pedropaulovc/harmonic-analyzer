@@ -304,6 +304,17 @@ def test_bom_descriptions_keep_one_line() -> None:
         assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
+def test_same_catalogue_screws_keep_distinct_assembly_roles() -> None:
+    stop = drawing.BOM_DESCRIPTIONS["vn-swing-stop-screw"]
+    foot = drawing.BOM_DESCRIPTIONS["vn-foot-screw"]
+    assert "90280A108" in stop and "90280A108" in foot
+    assert "SWING STOP" in stop and "SPRING FOOT" in foot
+    assert (
+        drawing.BOM_PART_NUMBERS["vn-swing-stop-screw"]
+        != drawing.BOM_PART_NUMBERS["vn-foot-screw"]
+    )
+
+
 def test_changed_gear_bom_counts_come_from_their_specs() -> None:
     import dt_crank_drive_gear_spec as gear64
     import dt_crank_pinion_spec as pinion
@@ -317,12 +328,11 @@ def test_changed_gear_bom_counts_come_from_their_specs() -> None:
         assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
 
 
-def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
+def test_t120_fitup_envelope_matches_the_actual_model() -> None:
     import build_dt_drive_train_assembly as assembly
     import dt_crank_pinion_spec as pinion
 
     actual_shoulder = assembly.T120_SHOULDER_AIR
-    check = _flat(pinion.T120_FITUP_ASSEMBLY_CHECK)
     assert not math.isnan(actual_shoulder)
     if math.isinf(actual_shoulder):
         assert actual_shoulder == math.inf
@@ -340,7 +350,6 @@ def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
             + assembly.T120_POSE_RADIAL,
         )
         assert all(float(value) == math.inf for value in section.flat)
-        assert "NO AXIAL OVERLAP" in check
     else:
         assert (
             pinion.T120_SHOULDER_AIR_WORST
@@ -351,8 +360,6 @@ def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
     assert (
         pinion.T120_TURNED_BAND_RADIAL_WORST == math.floor(actual_band * 100.0) / 100.0
     )
-    assert not re.search(r"\b(?:INF|NAN)\b|∞", check, re.IGNORECASE)
-    assert check in _flat(drawing.CONE_CRANK_STEPS)
 
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
@@ -389,10 +396,55 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
         check.index("SWING OUT AND REMOVE THE SHIMS"),
         check.index(f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT"),
         check.index("TIGHTEN MHA-VN-013"),
-        check.index("DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; IF YOU DO, REDO BOTH STEPS"),
+        check.index(
+            "DO NOT LOOSEN MHA-DT-002 AFTER THIS SET; "
+            "IF YOU DO, REPEAT CHECKS 4, 5 AND 7"
+        ),
     ]
     assert order == sorted(order), check
     assert "RETURN IT TO THE MHA-VN-015" not in check
+
+
+def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> None:
+    """#1691 review r4: the shims move the pedestals after step 9 set them
+    and after the north bracket and the rig were set from them.  Check 4
+    bounds that move to the step 9 bands, read against the recorded X and
+    back inner-face Y, names the steps that stand, and check 7 re-sets the rig."""
+    import dt_drive_train_steps as steps
+
+    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
+    order = [
+        check.index("ZERO AN INDICATOR ON EACH MHA-DT-002 IN X"),
+        check.index("(MHA-VN-032) TO SNUG-LOOSE"),
+        check.index("TIGHTEN MHA-VN-032"),
+        check.index(
+            f"RECORDED X (9A, 9C) PLUS ITS X READING IS {drawing.BANK_X_LIMITS}"
+        ),
+        check.index("BACK INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING"),
+        check.index("THE 9A Y LIMITS, USING THE SAME W"),
+        check.index("RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN"),
+        check.index("SWING OUT AND REMOVE THE SHIMS"),
+    ]
+    assert order == sorted(order), check
+    assert (
+        f"STEPS {steps.step_number(drawing.NORTH_BRACKET_SET_KEY)} AND "
+        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')}"
+        " STAND; CHECK 7 RE-PROVES THE RIG"
+    ) in check
+    assert "BACK THE SWING OFF" not in check
+    bank = _flat(drawing.BANK_STEPS)
+    assert bank.count("RECHECK AND RECORD X") == 2
+    assert "RECHECK AND RECORD X AND Y" in bank
+    assert "THE Y READING IS ZERO" not in check
+    assert "MHA-DT-013 BAR" not in bank
+    located = steps.step_number("rig-located")
+    check7 = _flat(drawing.CHECKS.split("\n7. ")[1])
+    assert (
+        "IF A STATION IS OUT, EASE THE MHA-VN-019 SCREWS, RE-SET THE RIG ON THE "
+        f"FEELER AT BOTH STATIONS AS STEP {located}, TIGHTEN THEM AND RECHECK."
+    ) in check7
+    check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
+    assert check5.endswith("TIGHTEN MHA-VN-013: THE CHECK 4 SETTING.")
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
@@ -495,6 +547,20 @@ def test_the_rig_steps_print_the_fitup_sequence_once_in_order() -> None:
     ):
         assert steps.step_ref(key) in _flat(sheet.DIMENSION_CALLOUTS["PinHoleDia"])
         assert name in _rig_step_body(key)
+
+
+def test_lever_pin_step_states_existing_drill_size_and_slip_fit() -> None:
+    """r8: name the hole and acceptance without inventing a pilot or press fit."""
+    import dt_pinion_lever_pin_spec as pin
+
+    assert pin.PIN_DIA == 25.4 / 16.0
+    assert "SLIP FIT" in _flat(pin.PIN_DIA_CALLOUT)
+    step = _rig_step_body(pin.LEVER_PIN_SET_STEP_KEY)
+    assert step.endswith(_flat(drawing.LEVER_PIN_HOLE_FIT))
+    assert "MHA-DT-016'S PRINTED STATION: 1/16 IN DRILL THRU" in step
+    assert "MHA-DT-030 SLIP FIT" in step
+    assert "LIGHT HAMMER" not in step
+    assert "REAM" not in step
 
 
 def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
@@ -622,6 +688,7 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
     assert bank_anchors["dt-cylinder-end-disc"].instance == "dt-cylinder-end-disc-2"
     assert moved["spring foot screw lifts"] == ("vn-foot-screw-1",)
+    assert moved["spring steps east"] == ("dt-pinion-spring-1", "vn-foot-screw-1")
     assert moved["block screws lift"] == tuple(f"vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-VN-019 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
@@ -1173,6 +1240,30 @@ def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
     assert tip.distance_mm - rotor.distance_mm > tip_in_block
     # The adjuster and pinch screw are threaded into the block: they go with it.
     assert {"vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw"} <= set(tip.stems)
+
+
+def test_the_cone_gears_slide_off_the_64t_gear_and_stay_on_the_stub() -> None:
+    """Unexploded, MHA-DT-007 read as the stack's first disc and balloons 35
+    and 36 met there (r15).  The gears and MHA-VN-016 slide on toward the tip
+    without it; the tip gear stays on the stub, the collar short of the block."""
+    import dt_cone_gear_shaft_spec as shaft
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    gears = steps["cone gears slide toward the tip"]
+    assert (gears.stems, gears.axis) == (("dt-cone-gear", "vn-cone-tip-collar"), "cone")
+    stub = shaft.T006_TIP_STATION - shaft.T006_NORTH_FACE_STATION
+    assert 0.0 < gears.distance_mm < stub
+    collar_end = (
+        shaft.TIP_COLLAR_END_STATION
+        + steps["tip collar slips off"].distance_mm
+        + gears.distance_mm
+    )
+    block_face = (
+        shaft.TIP_BLOCK_SOUTH_FACE_STATION
+        + steps["tip block slides off"].distance_mm
+        - steps["cone rotor withdraws"].distance_mm
+    )
+    assert collar_end < block_face
 
 
 def test_bank_fitup_limits_are_the_layout_bands() -> None:

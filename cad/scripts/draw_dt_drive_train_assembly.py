@@ -1,4 +1,4 @@
-r"""Create the native eleven-sheet drive-train assembly drawing package (MHA-DT-000).
+r"""Create the native twelve-sheet drive-train assembly drawing package (MHA-DT-000).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -6,9 +6,10 @@ presentation (``_drive_train_explode``) and reads every count, identity and
 position it prints from the opened model; nothing pending on a sibling branch
 (crank hub, lever pin, pinion tooth count, bracket placement) is typed here.
 
-Sheet numbers are fixed: cross-references on the sheets cite them, so a sheet
-whose content is still pending keeps its slot with a placeholder. Every cited
-number is generated from the ``*_SHEET`` constants, never typed.
+Sheet numbers are fixed; cross-references come from the ``*_SHEET`` constants.
+Separate BOM identities retain the swing-stop and spring-foot roles even when
+they use the same catalogue screw. Fit-up steps give the measured acceptance
+and the cut that answers it, not the design's worst-case clearance narration.
 """
 
 from __future__ import annotations
@@ -93,13 +94,14 @@ import dt_crank_drive_gear_spec as gear64
 import dt_crank_handle_pivot_screw_spec as handle_screw
 from dt_crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 import dt_crank_pinion_spec as pinion
-from dt_crank_pinion_spec import (
-    SEAT_FEELER_MM as PINION_SEAT_FEELER,
-    T120_FITUP_ASSEMBLY_CHECK,
-)
+from dt_crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
+from dt_drive_train_assembly_notes import (
+    LEVER_PIN_HOLE_FIT,
+    T120_FITUP_ASSEMBLY_CHECK,
+)
 from dt_drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -472,7 +474,7 @@ BOM_DESCRIPTIONS = {
     "dt-cylinder-gear": f"CYLINDER GEAR WITH CAM, {drum.TEETH}T",
     "vn-pedestal-hold-down-screw": "#8-32 FILLISTER SCREW, MCMASTER 90280A197",
     "vn-arbor-set-screw": "#4-40 X 1/4 SET SCREW, MCMASTER 91375A106",
-    "vn-foot-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
+    "vn-foot-screw": "#4-40 SPRING FOOT, MCMASTER 90280A108",
     "dt-cone-gear-shaft": "CONE GEAR SHAFT",
     "dt-cone-gear": "CONE GEAR, T006-T120 BY 6; 1 EACH",
     "dt-crank-drive-gear": f"CRANK DRIVE GEAR, {gear64.TEETH}T",
@@ -486,7 +488,7 @@ BOM_DESCRIPTIONS = {
     "vn-post-mount-screw": f"{post_screw.THREAD} FILLISTER SCREW, MSC {post_screw.SKU}",
     "vn-cone-lock-knob": f"{lock_knob.THREAD} THUMB SCREW, MCMASTER 93585A190",
     "vn-cone-pivot-screw": f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER 91829A560",
-    "vn-swing-stop-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
+    "vn-swing-stop-screw": "#4-40 SWING STOP, MCMASTER 90280A108",
     "dt-crankshaft": "CRANKSHAFT",
     "dt-crank-pinion": f"CRANK PINION, {pinion.TEETH}T",
     "dt-crank-pinion-pin": "CRANK PINION RETENTION PIN",
@@ -826,7 +828,8 @@ CONE_CRANK_STEPS = _note_text(
         "   BOSS AT ITS MID-LENGTH INTO MHA-DT-011; "
         + _PINION_PIN_FIT
         + "; RE-CHECK NO BINDING.",
-        f"5. {CRANK_CHAIN_WHEEL} T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
+        f"5. SLIDE {CRANK_CHAIN_WHEEL} T12 ONTO MHA-DT-011 BEFORE THE ARM, ITS HOLES OVER",
+        "   THE 2X MHA-VN-044.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-031 pressed into the arm and
         # seam-pinned by MHA-VN-029 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-DT-009 cross-hole runs behind the arm through the hub barrel. The
@@ -917,10 +920,12 @@ BANK_STEPS = _note_text(
         "   MIC ONE MHA-DT-026, W, FOR THE BACK. SET THE MHA-DT-002 INNER",
         f"   FACE TO Y {BACK_STRAP_Y_LIMITS} LESS (W - {BANK_WASHER_THICK:.3f}) AND THE MANDREL",
         f"   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X {BANK_X_LIMITS}.",
-        "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
+        "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE (11/64 TRANSFER PUNCH);",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
-        "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
-        "   MHA-VN-032 AND RECHECK.",
+        "   BOTTOMING); CLEAR CHIPS. REFIT AT X AND Y; TIGHTEN",
+        # Check 4 re-reads both coordinates against the step 9 setting bands
+        # after the cone swing's radial shims move the pedestals.
+        "   MHA-VN-032, RECHECK AND RECORD X AND Y.",
         # dtrefactor's #937 review: the loaded mandrel hangs from the back
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
@@ -929,7 +934,7 @@ BANK_STEPS = _note_text(
         # round: loaded from the front, the first gear on goes to the back.
         "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-026, THE STACK FROM GEAR 19",
         "   TO GEAR 0, CAM SIDE FRONT, ITS PAIRS HANGING FREE, THEN THE OTHER",
-        "   MHA-DT-026, THEN MHA-VN-052; IT SLIDES FREE ON THE MHA-DT-013 BAR",
+        "   MHA-DT-026, THEN MHA-VN-052; IT SLIDES FREE ON THE MANDREL",
         "   (ELSE STONE THE BURR OFF ITS BORE). PUSH THE BANK BACK, CLOSED UP ON",
         "   THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
@@ -943,8 +948,8 @@ BANK_STEPS = _note_text(
         "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
         "   BACK THROUGH THE BACK MHA-DT-002, PUSH THE BANK BACK AND",
         "   PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET THE BLADE AND X, TIGHTEN",
-        "   MHA-VN-032, REMOVE THE BLADE AND RECHECK. DRO STILL ZEROED, DRILL AND",
-        "   TAP THE MHA-FR-001 PIVOT SEAT PER ITS PRINT NOTE.",
+        "   MHA-VN-032, REMOVE THE BLADE, RECHECK AND RECORD X. DRO STILL ZEROED,",
+        "   DRILL AND TAP THE MHA-FR-001 PIVOT SEAT PER ITS PRINT NOTE.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
         f"   CYLINDER IS THAT SPAN, PLUS A {bank.ARBOR_DOME_HEIGHT:.1f} DOME EACH END (SEE ITS PRINT).",
         "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
@@ -1081,7 +1086,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "cam-collars-set",
             f"MHA-DT-016 AT PARK, EACH CAM ECCENTRIC DOWN;\n{_COLLAR_SET_STEP}",
         ),
-        ("lever-pin-set", _LEVER_PIN_STEP),
+        ("lever-pin-set", f"{_LEVER_PIN_STEP}\n{LEVER_PIN_HOLE_FIT}"),
         # The cone set goes on last, into the pivot seat drilled at 9C; the
         # stop and lock seats are MHA-FR-001 print holes.  Check 4 then sets
         # the swing and clamps it with MHA-VN-013.
@@ -1122,21 +1127,34 @@ CHECKS = _note_text(
         # it. The engaged mesh is SET here with MHA-VN-013, not by the stop:
         # cone_set_stack (user ruling 2026-10-10). The shims line MHA-DT-013
         # up with the cone line before the pedestals tighten (Main ruling:
-        # pedestal term booked at zero), then T120 is set on its feeler.
+        # pedestal term booked at zero), then T120 is set on its feeler.  The
+        # shims may move each pedestal only inside its step 9 bands, so step
+        # 10 (set from the DRO zero) and the rig (re-proved by check 7) stand
+        # (#1691 review r4).  Stoning is T012's only remedy: backing the swing
+        # off would undo the T120 set (#1691 review r2).
         "4. CONE SWING SET (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014",
-        "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. EASE THE MHA-DT-002",
-        "   SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS, TIP TO",
-        f"   MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
-        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032. SWING OUT AND",
-        "   REMOVE THE SHIMS. SWING IN UNTIL A "
+        "   TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. ZERO AN INDICATOR ON",
+        "   EACH MHA-DT-002 IN X AND ONE ON THE BACK MHA-DT-002 IN Y. EASE THE",
+        "   MHA-DT-002 SCREWS (MHA-VN-032) TO SNUG-LOOSE. SWING IN ON RADIAL SHIMS,",
+        f"   TIP TO MHA-DT-012 ROOT: {set_stack.feeler_gap_mm(12):.2f} AT T012, "
+        f"{set_stack.feeler_gap_mm(120):.2f} AT T120; TIGHTEN MHA-VN-032.",
+        "   EACH RECORDED X (9A, 9C) PLUS ITS X READING IS "
+        f"{BANK_X_LIMITS};",
+        "   BACK INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING IS WITHIN",
+        "   THE 9A Y LIMITS, USING THE SAME W. IF OUT, EASE THAT PEDESTAL,",
+        "   RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN. STEPS "
+        f"{steps.step_number(NORTH_BRACKET_SET_KEY)}",
+        f"   AND {steps.step_number('rig-located')}-"
+        f"{steps.step_number('rig-seats-transferred')} STAND; CHECK 7 RE-PROVES THE RIG.",
+        "   SWING OUT AND REMOVE THE SHIMS. SWING IN UNTIL A "
         f"{set_stack.feeler_gap_mm(120):.2f} FEELER IS SNUG T120 TIP TO ROOT; HOLD",
         "   IT THERE AND TIGHTEN MHA-VN-013. DO NOT LOOSEN MHA-DT-002 AFTER",
-        "   THIS SET; IF YOU DO, REDO BOTH STEPS.",
+        "   THIS SET; IF YOU DO, REPEAT CHECKS 4, 5 AND 7.",
         # User ruling 2026-10-10: T012's arithmetic worst-corner overlap is a
         # REF fit-up note, never a gate (dt_mesh_checks; the RSS corner is gated).
         "   IF T012 BINDS AFTER THE SET (WORST-CORNER OVERLAP "
-        f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), BACK",
-        "   THE SWING OFF OR STONE THE T012 TIP.",
+        f"{-mesh_checks.cone_check(12).interference_margin_worst_mm:.2f} REF), STONE",
+        "   THE T012 TIP UNTIL IT TURNS FREE; THE T120 SET STANDS.",
         "   VERIFY MHA-VN-014 FULL-FORM THREAD ENGAGEMENT "
         f"{pivot_screw.MIN_USEFUL_ENGAGEMENT_TEXT}; SHOULDER FULLY SEATED.",
         "   VERIFY MHA-VN-015 FULL-FORM THREAD ENGAGEMENT "
@@ -1150,11 +1168,13 @@ CHECKS = _note_text(
         # ends by re-setting the swing as check 4 does.
         "   RETURN MHA-DT-016 TO PARK. SWING THE CONE SET IN UNTIL THE "
         f"{set_stack.feeler_gap_mm(120):.2f} FEELER",
-        "   IS SNUG T120 TIP TO ROOT AND TIGHTEN MHA-VN-013, AS CHECK 4.",
+        "   IS SNUG T120 TIP TO ROOT AND TIGHTEN MHA-VN-013: THE CHECK 4 SETTING.",
         "6. PARKED, MHA-DT-024 HOLDS MHA-DT-001 CLEAR OF EVERY MHA-DT-012.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
-        f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}).",
+        f"   (SHEET {FIT_SHEET}, STEP {steps.step_number('rig-located')}). IF A STATION IS OUT,",
+        "   EASE THE MHA-VN-019 SCREWS, RE-SET THE RIG ON THE FEELER AT BOTH STATIONS",
+        f"   AS STEP {steps.step_number('rig-located')}, TIGHTEN THEM AND RECHECK.",
     )
 )
 
@@ -2706,6 +2726,7 @@ def _reference_iso(
 ) -> Any:
     """A small collapsed isometric: every sheet needs a view for its title block."""
     view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=REFERENCE_ISO_SCALE)
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=False, label=label)
     _caption_under(adapter, view, caption, label=f"{label} caption")
@@ -2720,7 +2741,7 @@ def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLED_ISO_CENTER, scale=ASSEMBLED_ISO_SCALE
     )
-    for view in (front, top, right):
+    for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, iso, label="drive-train assembled isometric")
     # Every 1:3 view prints the teeth/thread-free configuration; the last
@@ -2798,6 +2819,7 @@ def _place_bom_view(adapter: Any) -> Any:
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_ISO_CENTER, scale=REFERENCE_ISO_SCALE
     )
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
     _configure_view(adapter, view, exploded=False, label="BOM reference isometric")
     violations = bom_reference_iso_violations(_view_outline(view))
@@ -2841,6 +2863,7 @@ def _place_cluster_view(adapter: Any, cluster: Cluster) -> Any:
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *CLUSTER_VIEW_CENTER, scale=CLUSTER_SCALES[cluster]
     )
+    set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _configure_view(adapter, view, exploded=False, label=label)
     return view
