@@ -592,34 +592,60 @@ class OfflineModel:
         self.open_error = None
         self.unsupported_identity = False
         self.hidden = False
+        self.live = True
+        self.disconnected_accesses = []
+
+    def assert_live(self, operation):
+        if not self.live:
+            self.disconnected_accesses.append(operation)
+            raise RuntimeError(f"disconnected document handle: {operation}")
 
     def GetTitle(self):
+        self.assert_live("GetTitle")
         if self.title_error is not None:
             error, self.title_error = self.title_error, None
             raise error
         return self.title
 
     def GetType(self):
+        self.assert_live("GetType")
         return self.kind
 
     def GetPathName(self):
+        self.assert_live("GetPathName")
         return self.path
 
     def IsOpenedReadOnly(self):
+        self.assert_live("IsOpenedReadOnly")
         return self.readonly
 
     def GetSaveFlag(self):
+        self.assert_live("GetSaveFlag")
         return False
 
     def GetConfigurationNames(self):
+        self.assert_live("GetConfigurationNames")
         return ("Default",)
 
     def GetActiveConfiguration(self):
+        self.assert_live("GetActiveConfiguration")
         return OfflineConfiguration()
 
     def GetConfigurationByName(self, name):
+        self.assert_live("GetConfigurationByName")
         assert name == "Default"
         return OfflineConfiguration()
+
+
+class OfflineModelHandle:
+    """Wrapper generation tracks refresh; only its document controls liveness."""
+
+    def __init__(self, document, generation):
+        self.document, self.generation = document, generation
+
+    def __getattr__(self, name):
+        self.document.assert_live(name)
+        return getattr(self.document, name)
 
 
 class OfflineApplication:
@@ -632,27 +658,59 @@ class OfflineApplication:
         self.closed = []
         self.close_calls = []
         self.close_error = None
+        self.inventory_generation = 0
+        self.identity_calls = []
+        self.lookup_calls = []
+        self.preference_calls = []
+        self.new_calls = []
+        self.preference_error = None
         self.ActiveDoc = None
         self.template = root / "assembly.asmdot"
         self.template.write_bytes(b"offline template admission fixture")
+        self.preference_result = str(self.template)
+
+    @staticmethod
+    def document(handle):
+        return handle.document if isinstance(handle, OfflineModelHandle) else handle
+
+    def fresh_handle(self, document):
+        return (
+            OfflineModelHandle(document, self.inventory_generation)
+            if self.inventory_generation
+            else document
+        )
+
+    @property
+    def ActiveDoc(self):
+        return self.fresh_handle(self._active) if self._active is not None else None
+
+    @ActiveDoc.setter
+    def ActiveDoc(self, handle):
+        self._active = self.document(handle)
 
     def IsSame(self, left, right):
+        self.identity_calls.append((left, right))
+        left, right = self.document(left), self.document(right)
+        left.assert_live("IsSame")
+        right.assert_live("IsSame")
         if left.unsupported_identity or right.unsupported_identity:
             return 2
         return int(left is right)
 
     def GetDocuments(self):
-        return tuple(self.models)
+        return tuple(self.fresh_handle(model) for model in self.models)
 
     def GetOpenDocumentByName(self, path):
-        return next(
+        self.lookup_calls.append(path)
+        found = next(
             (
                 model
                 for model in self.models
-                if probe.normalized(model.path) == probe.normalized(path)
+                if probe.normalized(model.GetPathName()) == probe.normalized(path)
             ),
             None,
         )
+        return self.fresh_handle(found) if found is not None else None
 
     def OpenDoc6(self, path, kind, options, configuration, errors, warnings):
         assert options in (1, 3, 67)
@@ -666,10 +724,14 @@ class OfflineApplication:
         return model, errors, warnings
 
     def GetUserPreferenceStringValue(self, preference):
+        self.preference_calls.append(preference)
         assert preference == 9
-        return str(self.template)
+        if self.preference_error is not None:
+            raise self.preference_error
+        return self.preference_result
 
     def NewDocument(self, template, paper, width, height):
+        self.new_calls.append((template, paper, width, height))
         assert Path(template).is_file()
         model = self.new_results.pop(0)
         self.models.append(model)
@@ -694,14 +756,18 @@ class OfflineApplication:
             candidate
             for candidate in self.models
             if candidate is not model
-            and candidate is not self.ActiveDoc
+            and candidate is not self._active
             and candidate.hidden
         ]
         self.models.remove(model)
+        model.live = False
         for candidate in collateral:
             self.closed.append(candidate)
             self.models.remove(candidate)
+            candidate.live = False
         self.ActiveDoc = self.models[-1] if self.models else None
+        # Refreshing wrappers must not disconnect handles of surviving models.
+        self.inventory_generation += 1
 
     def RevisionNumber(self):
         return "offline-boundary-not-a-native-version"
@@ -752,6 +818,278 @@ class OfflineProbe(probe.NativeProbe):
         self.receipt.observe(
             probe.SnapshotKind.FULL, label, {"offline_boundary_only": True}
         )
+
+
+class TemplateString(str):
+    pass
+
+
+@pytest.fixture
+def assembly_template(tmp_path, monkeypatch):
+    template = tmp_path / "explicit.ASMDOT"
+    content = b"the worker-visible explicit assembly template"
+    template.write_bytes(content)
+    identity = {
+        "path": str(template),
+        "size": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+    monkeypatch.setattr(probe, "ASSEMBLY_TEMPLATE_PATH", template)
+    monkeypatch.setattr(probe, "ASSEMBLY_TEMPLATE_SIZE", identity["size"])
+    monkeypatch.setattr(probe, "ASSEMBLY_TEMPLATE_SHA256", identity["sha256"])
+    return identity
+
+
+def assert_template_evidence(evidence, value, *, explicit=False):
+    expected_value = (
+        value
+        if type(value) in (str, int, float, bool, type(None))
+        and not (type(value) is float and not math.isfinite(value))
+        else repr(value)
+    )
+    assert evidence["value"] == expected_value
+    assert evidence["type"] == type(value).__name__
+    assert evidence["repr"] == repr(value)
+    predicates = {
+        "is_string",
+        "nonempty",
+        "fully_qualified",
+        "exists",
+        "is_file",
+        "assembly_suffix",
+    }
+    if explicit:
+        predicates.update(("size_matches", "sha256_matches"))
+    assert set(evidence["predicates"]) == predicates
+
+
+@pytest.mark.parametrize("label", (probe.Document.N_AUTHOR, probe.Document.R_AUTHOR))
+def test_explicit_assembly_template_records_identity_before_new_document(
+    tmp_path, monkeypatch, assembly_template, label
+):
+    subject = OfflineProbe(tmp_path)
+    template = assembly_template["path"]
+    subject.app.preference_result = template
+    model = OfflineModel("Authoring", 2, "", readonly=False)
+    subject.app.new_results.append(model)
+    new_document = subject.app.NewDocument
+
+    def recorded_new_document(*arguments):
+        recorded = json.loads((subject.receipt.root / "report.json").read_text())
+        row = recorded["assembly_templates"][0]
+        assert row["chosen"] == row["expected_identity"] == assembly_template
+        assert all(
+            value is True for value in row["explicit_input"]["predicates"].values()
+        )
+        return new_document(*arguments)
+
+    monkeypatch.setattr(subject.app, "NewDocument", recorded_new_document)
+    assert subject.new_assembly(label) is model
+
+    assert subject.app.preference_calls == [9]
+    assert subject.app.new_calls == [(template, 0, 0.0, 0.0)]
+    assert tuple(type(value) for value in subject.app.new_calls[0]) == (
+        str,
+        int,
+        float,
+        float,
+    )
+    (row,) = subject.receipt.data["assembly_templates"]
+    assert row["document"] is label
+    assert_template_evidence(row["preference"], template)
+    assert_template_evidence(row["explicit_input"], template, explicit=True)
+    assert all(value is True for value in row["preference"]["predicates"].values())
+    assert row["file_identity"] == row["chosen"] == assembly_template
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        None,
+        False,
+        2,
+        math.inf,
+        -math.inf,
+        math.nan,
+        Path("assembly.asmdot"),
+        TemplateString("x"),
+    ),
+)
+def test_nonexact_string_template_preference_is_diagnostic_not_creation_input(
+    tmp_path, assembly_template, value
+):
+    subject = OfflineProbe(tmp_path)
+    subject.app.preference_result = value
+    model = OfflineModel("Authoring", 2, "", readonly=False)
+    subject.app.new_results.append(model)
+    assert subject.new_assembly(probe.Document.N_AUTHOR) is model
+    (row,) = subject.receipt.data["assembly_templates"]
+    assert_template_evidence(row["preference"], value)
+    assert row["preference"]["predicates"] == {
+        "is_string": False,
+        "nonempty": None,
+        "fully_qualified": None,
+        "exists": None,
+        "is_file": None,
+        "assembly_suffix": None,
+    }
+    assert (
+        row["expected_identity"]
+        == row["file_identity"]
+        == row["chosen"]
+        == (assembly_template)
+    )
+    assert all(value is True for value in row["explicit_input"]["predicates"].values())
+    assert subject.app.new_calls == [(assembly_template["path"], 0, 0.0, 0.0)]
+    assert subject.app.preference_calls == [9]
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["assembly_templates"][0]["preference"] == row["preference"]
+
+
+@pytest.mark.parametrize("origin", ("preference", "explicit_input"))
+@pytest.mark.parametrize(
+    ("fault", "failed"),
+    (
+        ("empty", {"nonempty"}),
+        ("relative", {"fully_qualified"}),
+        ("missing", {"exists", "is_file"}),
+        ("directory", {"is_file"}),
+        ("suffix", {"assembly_suffix"}),
+    ),
+)
+def test_template_path_predicates_gate_only_explicit_creation_input(
+    tmp_path, monkeypatch, assembly_template, origin, fault, failed
+):
+    subject = OfflineProbe(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    directory = tmp_path / "directory.asmdot"
+    directory.mkdir()
+    wrong_suffix = tmp_path / "existing.prtdot"
+    wrong_suffix.write_bytes(Path(assembly_template["path"]).read_bytes())
+    value = {
+        "empty": "",
+        "relative": subject.app.template.name,
+        "missing": str(tmp_path / "missing.asmdot"),
+        "directory": str(directory),
+        "suffix": str(wrong_suffix),
+    }[fault]
+    if origin == "preference":
+        subject.app.preference_result = value
+        model = OfflineModel("Authoring", 2, "", readonly=False)
+        subject.app.new_results.append(model)
+        assert subject.new_assembly(probe.Document.N_AUTHOR) is model
+    else:
+        monkeypatch.setattr(probe, "ASSEMBLY_TEMPLATE_PATH", value)
+        with pytest.raises(probe.ProbeFailure) as caught:
+            subject.new_assembly(probe.Document.N_AUTHOR)
+        assert caught.value.verdict is probe.Verdict.CONSTRUCTION
+
+    (row,) = subject.receipt.data["assembly_templates"]
+    assert_template_evidence(row[origin], value, explicit=origin == "explicit_input")
+    predicates = row[origin]["predicates"]
+    assert {name for name, passed in predicates.items() if passed is False} == failed
+    if fault in ("relative", "directory", "suffix"):
+        assert predicates["exists"] is True
+    if fault in ("relative", "suffix"):
+        assert predicates["is_file"] is True
+    if origin == "preference":
+        assert (
+            row["expected_identity"]
+            == row["file_identity"]
+            == row["chosen"]
+            == (assembly_template)
+        )
+        assert all(
+            passed is True for passed in row["explicit_input"]["predicates"].values()
+        )
+        assert subject.app.new_calls == [(assembly_template["path"], 0, 0.0, 0.0)]
+    else:
+        assert_template_evidence(row["preference"], subject.app.preference_result)
+        assert row["expected_identity"] == dict(assembly_template, path=value)
+        message = str(caught.value)
+        refused = {
+            name.strip()
+            for name in message.removeprefix(
+                "explicit assembly template refused: "
+            ).split(",")
+        }
+        assert failed <= refused <= set(predicates)
+        assert not refused.intersection(
+            name for name, passed in predicates.items() if passed is True
+        )
+        assert "missing" not in message.lower()
+        if fault == "suffix":
+            assert row["file_identity"] == dict(
+                assembly_template, path=str(wrong_suffix)
+            )
+        else:
+            assert "file_identity" not in row
+        assert "chosen" not in row
+        assert not subject.app.new_calls
+        assert not subject.acquisitions and not subject.documents
+    assert subject.app.preference_calls == [9]
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["assembly_templates"] == [row]
+
+
+@pytest.mark.parametrize(
+    ("predicate", "constant", "field", "wrong"),
+    (
+        ("size_matches", "ASSEMBLY_TEMPLATE_SIZE", "size", 0),
+        ("sha256_matches", "ASSEMBLY_TEMPLATE_SHA256", "sha256", "0" * 64),
+    ),
+)
+def test_explicit_template_identity_mismatch_is_recorded_before_refusal(
+    tmp_path, monkeypatch, assembly_template, predicate, constant, field, wrong
+):
+    subject = OfflineProbe(tmp_path)
+    monkeypatch.setattr(probe, constant, wrong)
+
+    with pytest.raises(probe.ProbeFailure, match=predicate) as caught:
+        subject.new_assembly(probe.Document.N_AUTHOR)
+
+    assert caught.value.verdict is probe.Verdict.CONSTRUCTION
+    (row,) = subject.receipt.data["assembly_templates"]
+    assert_template_evidence(
+        row["explicit_input"], assembly_template["path"], explicit=True
+    )
+    assert {
+        name
+        for name, passed in row["explicit_input"]["predicates"].items()
+        if passed is not True
+    } == {predicate}
+    assert row["expected_identity"] == {**assembly_template, field: wrong}
+    assert row["file_identity"] == assembly_template
+    assert "chosen" not in row
+    assert not subject.app.new_calls
+    assert not subject.acquisitions and not subject.documents
+    assert subject.app.preference_calls == [9]
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["assembly_templates"] == [row]
+
+
+def test_template_preference_exception_preserves_primary_without_acquisition(
+    tmp_path, assembly_template
+):
+    subject = OfflineProbe(tmp_path)
+    original = OSError("native template preference read failed")
+    subject.app.preference_error = original
+    with pytest.raises(OSError) as caught:
+        subject.new_assembly(probe.Document.N_AUTHOR)
+    assert caught.value is original
+    assert subject.receipt.primary is original
+    assert subject.app.preference_calls == [9]
+    assert not subject.app.new_calls and not subject.acquisitions
+    assert not subject.receipt.data.get("unresolved_acquisitions")
+    (row,) = subject.receipt.data["assembly_templates"]
+    assert row["preference"]["status"] == "error"
+    assert row["preference"]["error"]["type"] == "OSError"
+    assert row["preference"]["error"]["message"] == str(original)
+    assert row["expected_identity"] == assembly_template
+    assert "chosen" not in row and "file_identity" not in row
+    persisted = json.loads((subject.receipt.root / "report.json").read_text())
+    assert persisted["assembly_templates"] == [row]
+    assert persisted["primary_error"]["message"] == str(original)
 
 
 def capture_and_cleanup_failure(subject, action):
@@ -848,7 +1186,7 @@ def test_known_p_and_rejected_q_both_close_without_write_admitting_q(tmp_path, f
 
 @pytest.mark.parametrize("failure", ["kind", "path"])
 def test_new_document_admission_failure_retains_owned_unadmitted_model(
-    tmp_path, failure
+    tmp_path, assembly_template, failure
 ):
     subject = OfflineProbe(tmp_path)
     model = OfflineModel(
@@ -1105,22 +1443,37 @@ def test_case_final_reporting_failure_is_primary_when_no_earlier_failure(
     assert not subject.receipt.data["secondary_errors"]
 
 
-def test_owned_discard_failure_is_not_automatically_retried_or_write_admitted(tmp_path):
+@pytest.mark.parametrize("removed", (False, True))
+def test_owned_discard_failure_is_not_automatically_retried_or_write_admitted(
+    tmp_path, monkeypatch, removed
+):
     subject = OfflineProbe(tmp_path)
     model = OfflineModel("P", 1, subject.paths[probe.Document.P])
     subject.app.open_results.append((model, 0, 0))
     subject.open_source(probe.Document.P)
     original = OSError("native discard failed")
-    subject.app.close_error = original
+    if removed:
+        close = subject.app.CloseDoc
+
+        def close_then_raise(title):
+            close(title)
+            raise original
+
+        monkeypatch.setattr(subject.app, "CloseDoc", close_then_raise)
+    else:
+        subject.app.close_error = original
     with pytest.raises(OSError) as first:
         subject.close(probe.Document.P)
     assert first.value is original
-    with pytest.raises(probe.ProbeFailure, match="already attempted"):
+    with pytest.raises(probe.ProbeFailure):
         subject.close(probe.Document.P)
     with pytest.raises(probe.ProbeFailure, match="not admitted"):
         subject.model(probe.Document.P)
     assert subject.app.closed == [model]
-    assert subject.app.models == [model]
+    assert subject.app.models == ([] if removed else [model])
+    assert not model.disconnected_accesses
+    assert subject.app.close_calls == ["P"]
+    assert subject.acquisitions[probe.Document.P].native is None
     assert (
         subject.acquisitions[probe.Document.P].state
         is probe.AcquisitionState.DISCARD_ATTEMPTED
@@ -1128,21 +1481,472 @@ def test_owned_discard_failure_is_not_automatically_retried_or_write_admitted(tm
     assert subject.receipt.data["handoff_allowed"] is False
 
 
-def test_changed_admitted_metadata_does_not_prevent_positive_owned_discard(tmp_path):
+@pytest.mark.parametrize("changed", ("title", "path", "kind"))
+def test_changed_admitted_metadata_refuses_discard_without_losing_ownership(
+    tmp_path, changed
+):
     subject = OfflineProbe(tmp_path)
     model = OfflineModel("P", 1, subject.paths[probe.Document.P])
     subject.app.open_results.append((model, 0, 0))
+    subject.open_source(probe.Document.P)
+    setattr(
+        model,
+        changed,
+        {
+            "title": "Changed-but-still-owned",
+            "path": str(tmp_path / "changed.sldprt"),
+            "kind": 2,
+        }[changed],
+    )
+
+    with pytest.raises(probe.ProbeFailure) as caught:
+        subject.close(probe.Document.P)
+
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert not subject.app.close_calls
+    assert subject.app.models == [model]
+    assert subject.acquisitions[probe.Document.P].native is model
+    assert probe.Document.P in subject.documents
+    assert any(row["event"] == "discard_held" for row in subject.receipt.data["ledger"])
+
+
+def test_offline_closed_handles_raise_instead_of_simulating_native_liveness(tmp_path):
+    application = OfflineApplication(tmp_path)
+    removed = OfflineModel("Removed", 1, tmp_path / "removed.sldprt")
+    live = OfflineModel("Live", 1, tmp_path / "live.sldprt")
+    application.models.extend((removed, live))
+    application.ActiveDoc = live
+    survivor_witness = OfflineModelHandle(live, 0)
+    application.CloseDoc("Removed")
+    for method in (
+        removed.GetTitle,
+        removed.GetType,
+        removed.GetPathName,
+        removed.IsOpenedReadOnly,
+        removed.GetSaveFlag,
+        removed.GetConfigurationNames,
+        removed.GetActiveConfiguration,
+        lambda: removed.GetConfigurationByName("Default"),
+        lambda: application.IsSame(removed, live),
+        lambda: application.IsSame(live, removed),
+        lambda: OfflineModelHandle(removed, 0).GetTitle(),
+    ):
+        with pytest.raises(RuntimeError, match="disconnected document handle"):
+            method()
+    fresh = application.GetDocuments()[0]
+    lookup = application.GetOpenDocumentByName(live.path)
+    assert isinstance(fresh, OfflineModelHandle) and fresh.generation == 1
+    assert isinstance(lookup, OfflineModelHandle) and lookup.generation == 1
+    assert fresh is not lookup
+    for handle in (live, survivor_witness, fresh, lookup, application.ActiveDoc):
+        assert handle.GetTitle() == "Live"
+        assert application.IsSame(handle, survivor_witness) == 1
+        assert application.IsSame(survivor_witness, handle) == 1
+    assert not live.disconnected_accesses
+
+
+def test_direct_q_then_p_close_reacquires_saved_survivor_with_preclose_owner_witness(
+    tmp_path, monkeypatch
+):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.extend(((p, 0, 0), (q, 0, 0)))
+    subject.open_source(probe.Document.P)
+    subject.open_source(probe.Document.Q)
+    subject.adapter.currentModel = q
+    subject.view_handles[probe.ViewId.A] = object()
+    subject.node_handles[probe.ViewId.A, probe.NodeId.P1] = object()
+    close = subject.app.CloseDoc
+    identity_boundaries = []
+
+    def invalidated_close(title):
+        assert subject.adapter.currentModel is None
+        assert all(owned.native is None for owned in subject.acquisitions.values())
+        assert all(owned.native is None for owned in subject.documents.values())
+        assert not subject.view_handles and not subject.node_handles
+        close(title)
+        identity_boundaries.append(len(subject.app.identity_calls))
+
+    monkeypatch.setattr(subject.app, "CloseDoc", invalidated_close)
+    subject.close(probe.Document.Q)
+
+    assert subject.app.close_calls == ["Q"]
+    assert subject.app.closed == [q] and subject.app.models == [p]
+    assert set(subject.acquisitions) == {probe.Document.P}
+    survivor = subject.model(probe.Document.P)
+    assert isinstance(survivor, OfflineModelHandle)
+    assert survivor.document is p and survivor.generation == 1
+    assert str(subject.paths[probe.Document.P]) in subject.app.lookup_calls
+    postclose_identity = subject.app.identity_calls[identity_boundaries[0] :]
+    assert any(p is left or p is right for left, right in postclose_identity)
+    for operands in postclose_identity:
+        assert all(subject.app.document(handle) is p for handle in operands)
+        assert all(
+            handle is p
+            or isinstance(handle, OfflineModelHandle)
+            and handle.generation == 1
+            for handle in operands
+        )
+    attempt = next(
+        row
+        for row in subject.receipt.data["ledger"]
+        if row["event"] == "discard_attempt"
+    )
+    frozen = attempt["preclose_inventory"]
+    assert set(frozen) == {probe.Document.P, probe.Document.Q}
+    assert frozen[probe.Document.P]["path"] == str(subject.paths[probe.Document.P])
+    assert frozen[probe.Document.Q]["title"] == "Q"
+    assert frozen[probe.Document.Q]["kind"] == 1
+
+    subject.close(probe.Document.P)
+
+    assert subject.app.close_calls == ["Q", "P"]
+    assert subject.app.closed == [q, p] and not subject.app.models
+    assert not subject.acquisitions and not subject.documents
+    assert not p.disconnected_accesses and not q.disconnected_accesses
+    discarded = [
+        row for row in subject.receipt.data["ledger"] if row["event"] == "discard"
+    ]
+    assert [row["document"] for row in discarded] == [
+        probe.Document.Q,
+        probe.Document.P,
+    ]
+    assert all(row["implicit"] is False for row in discarded)
+
+
+@pytest.mark.parametrize("witness", ("mismatched", "unsupported", "disconnected"))
+@pytest.mark.parametrize("earlier_failure", (False, True))
+def test_same_metadata_replacement_refuses_preclose_owner_adoption_atomically(
+    tmp_path, monkeypatch, witness, earlier_failure
+):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    replacement = OfflineModel(p.title, p.kind, p.path)
+    subject.app.open_results.extend(((p, 0, 0), (q, 0, int(earlier_failure))))
+    close = subject.app.CloseDoc
+    held, admitted, primary, identity_boundaries = {}, {}, [], []
+
+    def replacing_close(title):
+        assert title == "Q"
+        assert all(owned.native is None for owned in subject.acquisitions.values())
+        assert all(owned.native is None for owned in subject.documents.values())
+        assert subject.adapter.currentModel is None
+        assert not subject.view_handles and not subject.node_handles
+        close(title)
+        assert subject.app.models == [p]
+        subject.app.models[0] = replacement
+        subject.app.ActiveDoc = replacement
+        if witness == "disconnected":
+            p.live = False
+            subject.app.closed.append(p)
+        elif witness == "unsupported":
+            p.unsupported_identity = True
+        identity_boundaries.append(len(subject.app.identity_calls))
 
     def action():
         subject.open_source(probe.Document.P)
-        model.title = "Changed-but-still-owned"
-        model.path = str(tmp_path / "changed.sldprt")
-        subject.inventory()
+        subject.adapter.currentModel = p
+        subject.view_handles[probe.ViewId.A] = object()
+        subject.node_handles[probe.ViewId.A, probe.NodeId.P1] = object()
+        try:
+            subject.open_source(probe.Document.Q)
+        except BaseException as error:
+            primary.append(error)
+            held.update(subject.acquisitions)
+            admitted.update(subject.documents)
+            raise
+        held.update(subject.acquisitions)
+        admitted.update(subject.documents)
+        subject.close(probe.Document.Q)
+
+    monkeypatch.setattr(subject.app, "CloseDoc", replacing_close)
+    expected = {
+        "mismatched": "post-close survivor changed pre-close owner identity",
+        "unsupported": "unsupported native identity result 2",
+        "disconnected": "disconnected document handle: IsSame",
+    }[witness]
+    if earlier_failure:
+        original = capture_and_cleanup_failure(subject, action)
+        assert original is primary[0]
+        assert original.verdict is probe.Verdict.CONSTRUCTION
+        assert subject.receipt.primary is original
+        assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.RESTORATION
+        assert any(
+            expected in row["message"]
+            for row in subject.receipt.data["cleanup"]["errors"]
+        )
+        assert subject.receipt.data["cases"][probe.Case.CONSTRUCTION]["status"] is (
+            probe.Verdict.CONSTRUCTION
+        )
+    else:
+        with pytest.raises(
+            (probe.ProbeFailure, RuntimeError), match=expected
+        ) as caught:
+            action()
+        if witness != "disconnected":
+            assert caught.value.verdict is (
+                probe.Verdict.IDENTITY
+                if witness == "unsupported"
+                else probe.Verdict.RESTORATION
+            )
+    assert subject.app.close_calls == ["Q"]
+    assert subject.app.closed == ([q, p] if witness == "disconnected" else [q])
+    assert subject.app.models == [replacement]
+    assert set(subject.acquisitions) == set(held)
+    assert set(subject.documents) == set(admitted)
+    assert all(subject.acquisitions[key] is owned for key, owned in held.items())
+    assert all(subject.documents[key] is owned for key, owned in admitted.items())
+    assert all(owned.native is None for owned in subject.acquisitions.values())
+    assert all(owned.native is None for owned in subject.documents.values())
+    assert subject.adapter.currentModel is None
+    assert not subject.view_handles and not subject.node_handles
+    assert not any(row["event"] == "discard" for row in subject.receipt.data["ledger"])
+    assert len(identity_boundaries) == 1
+    postclose_identity = subject.app.identity_calls[identity_boundaries[0] :]
+    assert any(
+        left.document is replacement
+        and right.document is replacement
+        and left.generation == right.generation == 1
+        for left, right in postclose_identity
+        if isinstance(left, OfflineModelHandle)
+        and isinstance(right, OfflineModelHandle)
+    )
+    assert any(
+        isinstance(left, OfflineModelHandle)
+        and left.document is replacement
+        and left.generation == 1
+        and right is p
+        for left, right in postclose_identity
+    )
+    assert all(
+        subject.app.document(handle) is not q
+        for operands in postclose_identity
+        for handle in operands
+    )
+    assert p.disconnected_accesses == (["IsSame"] if witness == "disconnected" else [])
+    assert not q.disconnected_accesses
+    assert not replacement.disconnected_accesses
+    assert subject.model(probe.Document.P) is None
+    for label in (probe.Document.Q, probe.Document.P):
+        with pytest.raises(probe.ProbeFailure):
+            subject.close(label)
+    assert subject.app.close_calls == ["Q"]
+    assert subject.receipt.data["handoff_allowed"] is False
+
+
+def test_implicit_drawing_dependency_close_invalidates_all_references_first(
+    tmp_path, monkeypatch
+):
+    subject = OfflineProbe(tmp_path)
+    drawing_path = subject.paths[probe.Document.DRAWING]
+    drawing_path.write_bytes(b"offline saved drawing")
+    drawing = OfflineModel("Drawing", 3, drawing_path, readonly=False)
+    drawing.hidden = True
+    subject.app.open_results.append((drawing, 0, 0))
+    with subject.acquiring(probe.Document.DRAWING) as before:
+        result = subject.app.OpenDoc6(str(drawing_path), 3, 1, "", 0, 0)
+        subject.acquired(probe.Document.DRAWING, result[0], before)
+        probe.checked_tuple(result, "offline drawing admission", save=False)
+        subject.claim(probe.Document.DRAWING, 3, drawing_path)
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.append((q, 0, 0))
+    subject.open_source(probe.Document.Q)
+    subject.view_handles[probe.ViewId.A] = object()
+    subject.node_handles[probe.ViewId.A, probe.NodeId.P1] = object()
+    subject.adapter.currentModel = drawing
+    close = subject.app.CloseDoc
+
+    def invalidated_close(title):
+        assert not subject.view_handles and not subject.node_handles
+        assert subject.adapter.currentModel is None
+        assert all(owned.native is None for owned in subject.acquisitions.values())
+        close(title)
+
+    monkeypatch.setattr(subject.app, "CloseDoc", invalidated_close)
+    subject.close(probe.Document.Q)
+
+    assert subject.app.close_calls == ["Q"]
+    assert subject.app.closed == [q, drawing]
+    assert not subject.acquisitions and not subject.documents
+    assert not drawing.disconnected_accesses and not q.disconnected_accesses
+    discarded = {
+        row["document"]: row["implicit"]
+        for row in subject.receipt.data["ledger"]
+        if row["event"] == "discard"
+    }
+    assert discarded == {probe.Document.Q: False, probe.Document.DRAWING: True}
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ("absent_acquisition", "lost_acquisition", "duplicate_live", "duplicate_owner"),
+)
+def test_preclose_inventory_requires_bijection_with_every_acquisition(tmp_path, fault):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.extend(((p, 0, 0), (q, 0, 0)))
+    subject.open_source(probe.Document.P)
+    subject.open_source(probe.Document.Q)
+    if fault == "absent_acquisition":
+        subject.app.models.remove(p)
+    elif fault == "lost_acquisition":
+        subject.acquisitions.pop(probe.Document.P)
+    elif fault == "duplicate_live":
+        subject.app.models.append(p)
+    else:
+        subject.acquisitions[probe.Document.N] = subject.acquisitions[probe.Document.P]
+    retained = dict(subject.acquisitions)
+
+    with pytest.raises(probe.ProbeFailure) as caught:
+        subject.close(probe.Document.Q)
+
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert subject.acquisitions == retained
+    assert not subject.app.close_calls and not subject.app.closed
+    assert any(row["event"] == "discard_held" for row in subject.receipt.data["ledger"])
+
+
+def test_duplicate_owned_titles_refuse_before_any_close(tmp_path):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("Same", 1, subject.paths[probe.Document.P])
+    q = OfflineModel("same", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.extend(((p, 0, 0), (q, 0, 1)))
+
+    def action():
+        subject.open_source(probe.Document.P)
+        subject.open_source(probe.Document.Q)
 
     original = capture_and_cleanup_failure(subject, action)
-    assert isinstance(original, probe.ProbeFailure)
-    assert subject.app.closed == [model]
-    assert not subject.acquisitions and not subject.documents
+
+    assert "errors/warnings" in str(original)
+    assert not subject.app.close_calls
+    assert subject.app.models == [p, q]
+    assert set(subject.acquisitions) == {probe.Document.P, probe.Document.Q}
+    assert subject.receipt.data["cleanup"]["status"] is probe.Verdict.RESTORATION
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "foreign",
+        "title",
+        "path",
+        "kind",
+        "duplicate_survivor",
+        "retained_target",
+        "missing_lookup",
+        "different_lookup",
+        "lookup_error",
+        "identity_error",
+    ),
+)
+def test_postclose_reconciliation_is_atomic_and_refuses_every_retry(
+    tmp_path, monkeypatch, fault
+):
+    subject = OfflineProbe(tmp_path)
+    p = OfflineModel("P", 1, subject.paths[probe.Document.P])
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.extend(((p, 0, 0), (q, 0, 0)))
+    subject.open_source(probe.Document.P)
+    subject.open_source(probe.Document.Q)
+    subject.adapter.currentModel = p
+    subject.view_handles[probe.ViewId.A] = object()
+    subject.node_handles[probe.ViewId.A, probe.NodeId.P1] = object()
+    original = OSError(f"fresh reconciliation {fault}")
+    close = subject.app.CloseDoc
+    lookup = subject.app.GetOpenDocumentByName
+    same = subject.app.IsSame
+
+    def changed_close(title):
+        close(title)
+        if fault == "foreign":
+            subject.app.models.append(
+                OfflineModel("Intruder", 1, tmp_path / "intruder.sldprt")
+            )
+        elif fault in ("title", "path", "kind"):
+            setattr(
+                p,
+                fault,
+                {
+                    "title": "Changed",
+                    "path": str(tmp_path / "changed.sldprt"),
+                    "kind": 2,
+                }[fault],
+            )
+        elif fault == "duplicate_survivor":
+            subject.app.models.append(p)
+        elif fault == "retained_target":
+            subject.app.models.append(
+                OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+            )
+
+    def failed_lookup(path):
+        if subject.app.inventory_generation and probe.normalized(
+            path
+        ) == probe.normalized(p.path):
+            if fault == "missing_lookup":
+                return None
+            if fault == "different_lookup":
+                return OfflineModel("Other", 1, p.path)
+            if fault == "lookup_error":
+                raise original
+        return lookup(path)
+
+    def failed_identity(left, right):
+        if fault == "identity_error" and subject.app.inventory_generation:
+            raise original
+        return same(left, right)
+
+    monkeypatch.setattr(subject.app, "CloseDoc", changed_close)
+    monkeypatch.setattr(subject.app, "GetOpenDocumentByName", failed_lookup)
+    monkeypatch.setattr(subject.app, "IsSame", failed_identity)
+    with pytest.raises((probe.ProbeFailure, OSError)) as caught:
+        subject.close(probe.Document.Q)
+
+    if fault in ("lookup_error", "identity_error"):
+        assert caught.value is original
+    else:
+        assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert subject.app.close_calls == ["Q"]
+    assert set(subject.acquisitions) == {probe.Document.P, probe.Document.Q}
+    assert set(subject.documents) == {probe.Document.P, probe.Document.Q}
+    assert all(owned.native is None for owned in subject.acquisitions.values())
+    assert not subject.view_handles and not subject.node_handles
+    assert subject.adapter.currentModel is None
+    assert not any(row["event"] == "discard" for row in subject.receipt.data["ledger"])
+    assert not p.disconnected_accesses and not q.disconnected_accesses
+    for label in (probe.Document.Q, probe.Document.P):
+        with pytest.raises(probe.ProbeFailure):
+            subject.close(label)
+    assert subject.app.close_calls == ["Q"]
+
+
+def test_pathless_nontarget_survivor_is_not_adopted_from_metadata(
+    tmp_path, assembly_template
+):
+    subject = OfflineProbe(tmp_path)
+    authoring = OfflineModel("Authoring", 2, "", readonly=False)
+    subject.app.new_results.append(authoring)
+    subject.new_assembly(probe.Document.N_AUTHOR)
+    q = OfflineModel("Q", 1, subject.paths[probe.Document.Q])
+    subject.app.open_results.append((q, 0, 0))
+    subject.open_source(probe.Document.Q)
+
+    with pytest.raises(probe.ProbeFailure, match="pathless") as caught:
+        subject.close(probe.Document.Q)
+
+    assert caught.value.verdict is probe.Verdict.RESTORATION
+    assert subject.app.close_calls == ["Q"]
+    assert subject.app.models == [authoring]
+    assert set(subject.acquisitions) == {probe.Document.N_AUTHOR, probe.Document.Q}
+    assert all(owned.native is None for owned in subject.acquisitions.values())
+    assert not authoring.disconnected_accesses and not q.disconnected_accesses
+    with pytest.raises(probe.ProbeFailure):
+        subject.close(probe.Document.N_AUTHOR)
+    assert subject.app.close_calls == ["Q"]
 
 
 def test_case_restore_failure_remains_primary_when_final_reporting_also_fails(
