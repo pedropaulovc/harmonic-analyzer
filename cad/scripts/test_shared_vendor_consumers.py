@@ -610,16 +610,8 @@ class _NumberTable:
         column = self._column_index(column, include_hidden)
         if column is None:
             raise IndexError("invalid physical column binding")
-        was_custom = self.columns[column]["kind"] == 204
         self.columns[column].update(kind=kind, property=f'$PRP:"{property_name}"')
         self._fill_custom_property(column, property_name)
-        if was_custom and kind == 204 and property_name == "Number":
-            # Native2352: redundant custom-to-custom typing clears grouped Qty
-            # without removing the row's native component associations.
-            if len(self.components) > 1:
-                for index, state in enumerate(self.columns):
-                    if state["kind"] == 203:
-                        self.cells[1][index] = ""
         return 0
 
     def SetColumnCustomProperty(self, column, property_name):
@@ -652,6 +644,21 @@ class _NumberTable:
             if self.number_display_override is None
             else self.number_display_override
         )
+        # Native2375/2417: Number binding with retained native 201 already
+        # hidden clears grouped Qty without losing component associations.
+        # All-visible binding followed by hiding preserves Qty; this is
+        # not evidence of a retype-specific cause.
+        if (
+            property_name == "Number"
+            and len(self.components) > 1
+            and any(
+                state["kind"] == 201 and state["hidden"]
+                for state in self.columns
+            )
+        ):
+            for index, state in enumerate(self.columns):
+                if state["kind"] == 203:
+                    self.cells[1][index] = ""
 
     def GetColumnCustomProperty(self, column):
         physical = self._column_index(column, True)
@@ -745,7 +752,13 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         expected_rows=2,
         occurrence_quantities=True,
     )
-    assert snapshot[0][2:] == (NUMBER, str(occurrences))
+    # The snapshot identifies the logical member; property resolution above
+    # still uses each occurrence's actual native (possibly derived) config.
+    assert snapshot == (
+        (1, ((WIRE, "LeverWire", occurrences),), NUMBER, str(occurrences)),
+    )
+    assert all(component.ReferencedConfiguration == member for component in components)
+    assert all((member, "Number") in component.property_reads for component in components)
     assert table.GetComponents2(1, "Default Simplified") == tuple(components)
     table.cells[1][3] = "999"
     assert table.DisplayedText(1, 2) == "999"

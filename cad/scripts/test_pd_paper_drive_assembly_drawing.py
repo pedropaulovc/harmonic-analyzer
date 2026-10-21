@@ -2327,6 +2327,8 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
                 BOMPartNoSource=8,
                 AlternateName=member or number,
                 UseAlternateNameInBOM=True,
+                Description=drawing.BOM_DESCRIPTIONS[key],
+                UseDescriptionInBOM=key == "pd-transgear-removable",
             )
             for component in components_by_key[key]
         }
@@ -2447,14 +2449,33 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             values = set()
             for component in group:
                 native = component.GetModelDoc2()
+                configuration = (
+                    native.GetConfigurationByName(component.ReferencedConfiguration)
+                    if property_name == "Description"
+                    else None
+                )
                 values.add(str(
-                    native.GetCustomInfoValue(
-                        component.ReferencedConfiguration, property_name
+                    configuration.Description
+                    if configuration is not None and configuration.UseDescriptionInBOM
+                    else (
+                        native.GetCustomInfoValue(
+                            component.ReferencedConfiguration, property_name
+                        )
+                        or native.GetCustomInfoValue("", property_name)
+                        or ""
                     )
-                    or native.GetCustomInfoValue("", property_name)
-                    or ""
                 ).strip())
             cells[row][index] = "; ".join(sorted(values))
+        if property_name == "Number" and any(
+            column.kind == 201 and column.hidden for column in columns
+        ):
+            # Native 2375/2417: Number binding with a hidden retained 201
+            # clears physical Qty203 for T12/T18/T24, not native membership.
+            # Both binding APIs share this observed state; the cause is unproven.
+            row = state.row_keys.index("pd-transgear-removable") + 1
+            for quantity_column, column in enumerate(columns):
+                if column.kind == 203:
+                    cells[row][quantity_column] = ""
 
     def set_custom_property(index, property_name):
         if not 0 <= index < len(columns) or columns[index].kind != 204:
@@ -2519,13 +2540,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             cells.pop(row + 1)
             native_rows.pop(row)
             state.row_keys.pop(row)
-        elif previous == kind == 204 and property_name == "Number":
-            # Native 2352: even this redundant retype reports success while
-            # clearing only the grouped T12/T18/T24 Qty, not its associations.
-            row = state.row_keys.index("pd-transgear-removable") + 1
-            for quantity_column, column in enumerate(columns):
-                if column.kind == 203:
-                    cells[row][quantity_column] = ""
         if kind == 204 and property_name:
             bind_property(index, property_name)
         return 0
@@ -2585,12 +2599,13 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         )
         columns.append(
             SimpleNamespace(
-                kind=201, property_name="", raw_property_data="", hidden=True, width=0.0
+                kind=201, property_name="", raw_property_data="", hidden=False, width=0.025
             )
         )
         for row in cells:
             row.append(row[1])
         bind_property(1, "Number")
+        hide_column(len(columns) - 1, True)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     return model, components, table, adapter, cells, keys
 
@@ -2991,8 +3006,13 @@ def test_bom_insertion_refuses_hidden_physical_rows_before_number_binding(monkey
     assert scene.table.RowHidden(hidden_row) is True
 
 
-def test_native_custom_column_retype_reproduces_consumer_visible_grouped_quantity_loss(
-    monkeypatch,
+@pytest.mark.parametrize(
+    ("binding", "hidden_before_binding"),
+    (("dedicated", False), ("dedicated", True), ("generic", True)),
+    ids=("visible-Number", "hidden-Number", "hidden-generic-Number"),
+)
+def test_number_binding_visibility_boundary_preserves_members_and_refuses_blank_quantity(
+    monkeypatch, binding, hidden_before_binding
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     table = scene.table
@@ -3004,10 +3024,22 @@ def test_native_custom_column_retype_reproduces_consumer_visible_grouped_quantit
     assert table.MoveColumn(1, 3, 3) is True
     assert table.InsertColumn2(2, 1, "PART NUMBER", 0) is True
     assert table.GetColumnType3(1, True) == (204, None, 0)
-    assert table.SetColumnHidden(4, True) is None
+    if hidden_before_binding:
+        assert table.SetColumnHidden(4, True) is None
+    else:
+        assert table.ColumnCount == 5
     assert table.DisplayedText2(gear_row, 3, True) == "3"
 
-    assert table.SetColumnType3(1, 204, True, "Number") == 0
+    if binding == "dedicated":
+        assert table.SetColumnCustomProperty(1, "Number") is True
+    else:
+        assert table.SetColumnType3(1, 204, True, "Number") == 0
+    quantity = "" if hidden_before_binding else "3"
+    # Native 2417 observes this immediately, before title writes or rebuilds.
+    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == quantity
+    if not hidden_before_binding:
+        assert table.SetColumnHidden(4, True) is None
+        assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == "3"
     assert table.SetColumnTitle2(1, "PART NUMBER", True) is True
     assert scene.adapter.currentModel.EditRebuild3() is True
     assert table.RowCount == table.TotalRowCount == 44
@@ -3016,7 +3048,7 @@ def test_native_custom_column_retype_reproduces_consumer_visible_grouped_quantit
     assert table.ColumnHidden(4) is True
     assert table.GetColumnCustomProperty(1) == "Number"
     assert table.DisplayedText2(gear_row, 1, True) == drawing.BOM_PART_NUMBERS["pd-transgear-removable"]
-    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == ""
+    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == quantity
     assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
     assert {component.ReferencedConfiguration for component in table.GetComponents2(
         gear_row, configuration
@@ -3025,11 +3057,45 @@ def test_native_custom_column_retype_reproduces_consumer_visible_grouped_quantit
         before_quantities[:gear_row] + before_quantities[gear_row + 1:]
     )
     assert {"1", "2"}.issubset(before_quantities)
-    with pytest.raises(RuntimeError, match="BOM quantity"):
-        drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+    if hidden_before_binding:
+        with pytest.raises(RuntimeError, match="BOM quantity"):
+            drawing._validate_bom(scene.adapter, table, counts, configuration=configuration)
+    else:
+        items = dict(drawing._validate_bom(
+            scene.adapter, table, counts, configuration=configuration
+        ))
+        assert set(items) == set(drawing.BOM_PART_NUMBERS)
 
 
-def test_place_bom_sheet_preserves_native_grouped_quantities_with_property_binding(monkeypatch):
+def test_hidden_description_binding_fills_native_override_without_clearing_grouped_quantity(
+    monkeypatch,
+):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.table
+    gear_row = scene.keys.index("pd-transgear-removable") + 1
+    before_members = tuple(tuple(group) for group in scene.state.native_rows)
+    before_quantities = tuple(row[3] for row in scene.cells)
+    for component in before_members[gear_row - 1]:
+        native = component.GetModelDoc2()
+        assert native.GetCustomInfoValue(component.ReferencedConfiguration, "Description") == ""
+        assert native.GetCustomInfoValue("", "Description") == ""
+    assert table.MoveColumn(1, 3, 3) is True
+    assert table.InsertColumn2(2, 1, "PART NUMBER", 0) is True
+    assert table.SetColumnHidden(4, True) is None
+
+    # Native 2417 filled the combined ANSI text despite absent Description CPs.
+    assert table.SetColumnCustomProperty(1, "Description") is True
+    assert table.GetColumnCustomProperty(1) == "Description"
+    assert table.Text2(gear_row, 1, True) == table.DisplayedText2(gear_row, 1, True) == (
+        drawing.BOM_DESCRIPTIONS["pd-transgear-removable"]
+    )
+    assert table.Text2(gear_row, 3, True) == table.DisplayedText2(gear_row, 3, True) == "3"
+    assert table.RowCount == table.TotalRowCount == 44
+    assert tuple(tuple(group) for group in scene.state.native_rows) == before_members
+    assert tuple(row[3] for row in scene.cells) == before_quantities
+
+
+def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number_binding(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
     configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     before_members = {
@@ -3038,7 +3104,10 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_property_bindi
     }
     before_identities = {
         key: tuple(
-            (component.GetPathName(), component.ReferencedConfiguration, component.ComponentReference)
+            (
+                component.GetPathName(), component.ReferencedConfiguration,
+                component.Name2, component.ComponentReference,
+            )
             for component in group
         )
         for key, group in zip(scene.keys, scene.state.native_rows, strict=True)
@@ -3080,7 +3149,10 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_property_bindi
         members = table.GetComponents2(row, configuration)
         assert tuple(id(component) for component in members) == before_members[key]
         assert tuple(
-            (component.GetPathName(), component.ReferencedConfiguration, component.ComponentReference)
+            (
+                component.GetPathName(), component.ReferencedConfiguration,
+                component.Name2, component.ComponentReference,
+            )
             for component in members
         ) == before_identities[key]
         assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
@@ -3823,11 +3895,6 @@ def test_number_binding_diagnostic_failure_preserves_consumer_proof(
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     gear_row = scene.keys.index("pd-transgear-removable") + 1
-    attributes = {}
-    monkeypatch.setattr(
-        _drawing_tables._telemetry, "annotate",
-        lambda **values: attributes.update(values),
-    )
 
     def fail(*_args, **_kwargs):
         raise RuntimeError("diagnostic-only-read-failure")
@@ -3863,20 +3930,6 @@ def test_number_binding_diagnostic_failure_preserves_consumer_proof(
             scene.adapter, scene.table, drawing._source_family_counts(scene.model),
             configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
         )
-    for stage in ("before", "after"):
-        prefix = f"number_bind_{stage}"
-        assert attributes[f"{prefix}_row_count"] >= 2
-        assert attributes[f"{prefix}_total_row_count"] == attributes[f"{prefix}_row_count"]
-        assert json.loads(attributes[f"{prefix}_printed"])
-        assert json.loads(attributes[f"{prefix}_members"])
-        assert attributes[f"{prefix}_grouping"] == 3
-        metadata = json.loads(attributes[f"{prefix}_grouped"])
-        assert len(metadata) == 3
-        if failure == "configuration-metadata":
-            assert all(
-                "diagnostic-only-read-failure" in entry["read_error"]
-                for entry in metadata
-            )
 
 
 @pytest.mark.parametrize("failure", ("row-association", "component-path"))

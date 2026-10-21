@@ -1192,18 +1192,12 @@ def _bind_bom_number_property(
         ):
             raise RuntimeError(f"{label} BOM column sequence changed during insertion")
         native_column = len(inserted) - 1
-        with observe_mutation("after_hide_native") as outcome:
-            result = table.SetColumnHidden(native_column, True)  # VT_VOID.
-            outcome["return"] = repr(result)[:160]
-        retained = inserted[:-1] + ((201, True),)
-        if _bom_physical_columns(table, label=label) != retained:
-            raise RuntimeError(f"{label} BOM retained native column is not hidden")
         annotation = _sw_type_info.early_bound_or_flag(
             table, "IBomTableAnnotation", "SetColumnCustomProperty"
         )
-        # The inserted column is already custom-property typed. Retyping it
-        # cleared a grouped paper-drive quantity despite reporting success.
-        # Bind its property without changing either native column's type.
+        # Bind while every real column is visible: native paper-drive evidence
+        # showed binding after hiding its grouping column clears grouped Qty.
+        # Hiding only after Number binding preserved the native Qty3 row.
         with observe_mutation("after_bind_Number") as outcome:
             outcome["method"] = "SetColumnCustomProperty"
             result = annotation.SetColumnCustomProperty(column, "Number")
@@ -1214,6 +1208,14 @@ def _bind_bom_number_property(
             )
         if str(annotation.GetColumnCustomProperty(column) or "") != "Number":
             raise RuntimeError(f"{label} BOM Number property binding did not persist")
+        if _bom_physical_columns(table, label=label) != inserted:
+            raise RuntimeError(f"{label} BOM column sequence changed during Number binding")
+        with observe_mutation("after_hide_native") as outcome:
+            result = table.SetColumnHidden(native_column, True)  # VT_VOID.
+            outcome["return"] = repr(result)[:160]
+        retained = inserted[:-1] + ((201, True),)
+        if _bom_physical_columns(table, label=label) != retained:
+            raise RuntimeError(f"{label} BOM retained native column is not hidden")
         with observe_mutation("after_set_Number_title") as outcome:
             result = table.SetColumnTitle2(column, "PART NUMBER", True)
             outcome["return"] = repr(result)[:160]

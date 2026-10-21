@@ -98,7 +98,6 @@ from _drawing_view_configuration import (
     view_configuration,
 )
 from _drawing_view_display import set_hidden_lines_removed
-from _pd_bom_binding_probe import run_bom_binding_matrix
 from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
@@ -2296,16 +2295,6 @@ def _place_bom_sheet(
     _place_sheet_note(
         adapter, SHEET_NAMES[5], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
-    )
-    # Temporary native-only matrix: it closes this unsaved drawing and fails
-    # deliberately after collecting evidence; it cannot qualify or save a sheet.
-    run_bom_binding_matrix(
-        adapter,
-        reference,
-        anchor_xy=BOM_ANCHOR,
-        expected_components=tuple(BOM_PART_NUMBERS),
-        component_identities=BOM_COMPONENT_IDENTITIES,
-        source=SOURCE,
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
     # on sheet 2 cannot alter this reference or the logical parts list.
