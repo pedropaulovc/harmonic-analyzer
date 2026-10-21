@@ -1761,6 +1761,10 @@ then exact selection/context/flags are verified. No inner `SuspendSelectionList`
 fallback or production helper change is introduced. Failed drain/restoration
 refuses; captured entries are never appended onto an unverified residual list.
 Reporting cannot precede mandatory cleanup in a way that suppresses it.
+If final restoration readback must record a primary error, it retains the pending
+body error ahead of later source/context/report failures. This uses the existing
+failure path only after mandatory cleanup/readback; a clean expected injection
+is not promoted to an aggregate failure.
 
 Selection-only C29 remains after C25 and before C26/C27, preserving all original
 controls and their relative order. Exact marked L0 is B/P1 mark16 followed by

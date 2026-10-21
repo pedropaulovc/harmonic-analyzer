@@ -2933,6 +2933,7 @@ class NativeProbe:
         *,
         changed: tuple[NodeId, ...] = (),
         effect_verdict: Verdict = Verdict.PRESERVATION,
+        pending_error: BaseException | None = None,
     ) -> dict[str, Any]:
         with self.timed("readback"):
             views = self.views()
@@ -2988,7 +2989,9 @@ class NativeProbe:
             )
             if source_error is not None and context_error is not None:
                 if self.receipt.primary is None:
-                    self.receipt.failure(source_error)
+                    self.receipt.failure(
+                        pending_error if pending_error is not None else source_error
+                    )
                 source_error.add_note(
                     f"context readback also failed: {context_error!r}"
                 )
@@ -3012,7 +3015,9 @@ class NativeProbe:
                 if primary is None:
                     raise
                 if self.receipt.primary is None:
-                    self.receipt.failure(primary)
+                    self.receipt.failure(
+                        pending_error if pending_error is not None else primary
+                    )
                 primary.add_note(f"readback checkpoint also failed: {report_error!r}")
                 self.receipt.failure(report_error, secondary=True)
                 raise primary
@@ -3368,7 +3373,7 @@ class NativeProbe:
                     }
                 )
                 try:
-                    self.checkpoint("selection-guard-restored")
+                    self.checkpoint("selection-guard-restored", pending_error=primary)
                 except BaseException as error:
                     restoration_errors.append(error)
             finally:

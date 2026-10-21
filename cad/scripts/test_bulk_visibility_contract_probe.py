@@ -2397,6 +2397,168 @@ def test_active_guard_body_primary_survives_restore_failure_and_owned_disposal(
     assert subject.receipt.data["handoff_allowed"] is False
 
 
+@pytest.mark.parametrize("injected", [False, True])
+@pytest.mark.parametrize(
+    ("context_failure", "report_failure"),
+    [(True, False), (True, True), (False, True)],
+)
+def test_active_guard_body_primary_precedes_late_full_readback_and_report_errors(
+    nested_selection_contract, monkeypatch, injected, context_failure, report_failure,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    manager = fixture.drawing.SelectionManager
+    case = probe.Case.EXCEPTION_ENABLED
+    point = probe.Injection.AFTER_SELECTION
+    original = (
+        probe.InjectedFailure(case, point)
+        if injected
+        else OSError("original guard body error before FULL readback")
+    )
+    source_error = OSError("later FULL source lookup failed")
+    context_error = OSError("later FULL current sheet read failed")
+    reporting = OSError("persistent owned report writer failure")
+    armed = []
+    readback_started = []
+    report_attempts = []
+    original_rows = []
+    lookup = subject.app.GetOpenDocumentByName
+    current_sheet = fixture.drawing.GetCurrentSheet
+    path_open = Path.open
+    report_temporary = subject.receipt.root / "report.json.tmp"
+
+    def assert_visible_restoration():
+        assert manager.selected == original_rows
+        assert all(
+            actual[0] is expected[0] and actual[1] is expected[1]
+            for actual, expected in zip(manager.selected, original_rows)
+        )
+        assert fixture.drawing.current is probe.ViewId.B
+        assert fixture.drawing.ActiveDrawingView is fixture.views[probe.ViewId.B]
+        assert fixture.views[probe.ViewId.A].DisableAutoUpdate is False
+        events = fixture.selection_events
+        assert [event[1] for event in events if event[0] == "deselect"] == [2, 1, 1]
+        assert [event[1:] for event in events if event[0] == "restore_add"] == original_rows
+        assert manager.pop_count == 0 and not manager.suspended
+
+    def fail_late_source(path):
+        if (
+            armed
+            and subject.mode is probe.RunMode.RESTORING
+            and path == str(subject.paths[probe.Document.R])
+        ):
+            assert_visible_restoration()
+            readback_started.append(True)
+            raise source_error
+        return lookup(path)
+
+    def fail_late_context():
+        if context_failure and readback_started and subject.mode is probe.RunMode.RESTORING:
+            assert_visible_restoration()
+            raise context_error
+        return current_sheet()
+
+    def fail_owned_report(path, *args, **kwargs):
+        if report_failure and readback_started and path == report_temporary:
+            if not report_attempts:
+                assert_visible_restoration()
+            report_attempts.append(True)
+            raise reporting
+        return path_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(subject.app, "GetOpenDocumentByName", fail_late_source)
+    monkeypatch.setattr(fixture.drawing, "GetCurrentSheet", fail_late_context)
+    monkeypatch.setattr(Path, "open", fail_owned_report)
+
+    def action():
+        original_rows[:] = manager.selected
+        fixture.selection_events.clear()
+        with subject.selection_guard():
+            fixture.views[probe.ViewId.A].DisableAutoUpdate = True
+            manager.selected = [
+                (fixture.components[probe.ViewId.A][probe.NodeId.Q2], fixture.views[probe.ViewId.A], 0)
+            ]
+            armed.append(True)
+            raise original
+
+    with pytest.raises(type(original)) as caught:
+        subject.run_case(
+            case, action, marked=True,
+            expected_injection=point if injected else probe.Injection.NONE,
+        )
+    assert caught.value is subject.receipt.primary is original
+    assert readback_started
+    assert_visible_restoration()
+    assert subject.receipt.data["primary_error"]["message"] == str(original)
+    messages = [row["message"] for row in subject.receipt.data["secondary_errors"]]
+    assert str(source_error) in messages
+    assert (str(context_error) in messages) is context_failure
+    assert (str(reporting) in messages) is report_failure
+    assert not any(event[0] in ("suspend", "resume") for event in fixture.selection_events)
+    assert subject.receipt.data["handoff_allowed"] is False
+    if report_failure:
+        assert len(report_attempts) > 1
+        emergency = json.loads((subject.receipt.root / "emergency.json").read_text())
+        assert emergency["primary"]["message"] == str(original)
+        assert emergency["primary"]["type"] == type(original).__name__
+        assert emergency["report_error"] == repr(reporting)
+    else:
+        persisted = json.loads((subject.receipt.root / "report.json").read_text())
+        assert persisted["primary_error"]["message"] == str(original)
+    # A persistent writer must not gate the owned-disposal attempt.
+    subject.mode = probe.RunMode.CLEANUP
+    try:
+        subject.cleanup()
+    except OSError as cleanup_error:
+        assert report_failure and cleanup_error is reporting
+        subject.receipt.failure(cleanup_error, secondary=True)
+    assert subject.app.closed == [fixture.drawing, fixture.source]
+    assert subject.receipt.data["cleanup"]["attempted"] is True
+    assert subject.receipt.data["cleanup"]["remaining_owned"] == []
+    assert subject.receipt.primary is original
+    assert subject.receipt.data["handoff_allowed"] is False
+    assert manager.pop_count == 0
+
+
+def test_active_guard_clean_matching_injection_does_not_create_aggregate_primary(
+    nested_selection_contract,
+):
+    fixture = nested_selection_contract
+    subject = fixture.subject
+    manager = fixture.drawing.SelectionManager
+    case = probe.Case.EXCEPTION_ENABLED
+    point = probe.Injection.AFTER_SELECTION
+    original = probe.InjectedFailure(case, point)
+    original_rows = []
+
+    def action():
+        original_rows[:] = manager.selected
+        subject.apply(
+            ((False, (probe.NodeId.P1, probe.NodeId.P2)),),
+            injection=point,
+        )
+
+    subject.run_case(case, action, marked=True, expected_injection=point)
+    row = subject.receipt.data["cases"][case]
+    assert row["status"] is probe.Verdict.INJECTED
+    assert row["expected_error"]["message"] == str(original)
+    assert row["selections"][0]["count"] == 2
+    assert row["candidate_operation_counts"]["bulk_add"] == 1
+    assert row["candidate_operation_counts"]["hide"] == 0
+    assert row["candidate_operation_counts"]["show"] == 0
+    assert subject.receipt.primary is None
+    assert subject.receipt.data["secondary_errors"] == []
+    assert manager.selected == original_rows
+    assert manager.pop_count == 0 and not manager.suspended
+    assert fixture.views[probe.ViewId.A].DisableAutoUpdate is False
+    subject.mode = probe.RunMode.CLEANUP
+    subject.cleanup()
+    assert subject.app.closed == [fixture.drawing, fixture.source]
+    assert subject.receipt.data["cleanup"]["inventory_empty"] is True
+    assert subject.receipt.primary is None
+    assert subject.receipt.data["handoff_allowed"] is False
+
+
 def sheet_mode_record(subject):
     (record,) = [
         row
