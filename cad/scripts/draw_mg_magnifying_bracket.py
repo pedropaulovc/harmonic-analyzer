@@ -608,16 +608,25 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
             raise RuntimeError("native through-thread has malformed straight-polyline points")
         points = [row[offset:offset + 3] for offset in range(7, len(row), 3)]
         segments.extend((a[0], a[1], b[0], b[1]) for a, b in zip(points, points[1:]))
-    # A native polyline may subdivide a straight flank. Join only touching,
-    # collinear segments; never bridge a gap or take a curved path's endpoints.
+    # Bin by a fixed Y anchor before sorting intervals by X. Sorting by raw Y
+    # alone reverses touching intervals when native roundoff slopes down in X.
+    # Each band's total Y spread is bounded; adjacent tolerances cannot chain.
     horizontal = sorted(((y0 + y1) / 2.0, min(x0, x1), max(x0, x1))
                         for x0, y0, x1, y1 in segments if abs(y0 - y1) < 1e-7)
-    runs = []
+    bands = []
     for y, xmin, xmax in horizontal:
-        if runs and abs(y - runs[-1][0]) < 1e-7 and xmin <= runs[-1][2] + 1e-7:
-            runs[-1] = (runs[-1][0], runs[-1][1], max(runs[-1][2], xmax))
-        else:
-            runs.append((y, xmin, xmax))
+        if not bands or y - bands[-1][0] >= 1e-7:
+            bands.append((y, []))
+        bands[-1][1].append((xmin, xmax))
+    runs = []
+    for y, intervals in bands:
+        merged = []
+        for xmin, xmax in sorted(intervals):
+            if merged and xmin <= merged[-1][1] + 1e-7 and xmax >= merged[-1][0] - 1e-7:
+                merged[-1] = (min(merged[-1][0], xmin), max(merged[-1][1], xmax))
+            else:
+                merged.append((xmin, xmax))
+        runs.extend((y, xmin, xmax) for xmin, xmax in merged)
     longitudinal = [run for run in runs if run[2] - run[1] > (profile[2] - profile[0]) / 2.0]
     _telemetry.info(f"thread-mouth native ink: profile={profile}, longitudinal_runs={longitudinal}")
     centre_y = (profile[1] + profile[3]) / 2.0
