@@ -77,13 +77,16 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
-ISO_SCALE = (1, 2)
+# Give the full-length tooth flanks twice the printed separation of the
+# unreadable 1:2 pictorial. Keep every tooth and the finalizer's precise
+# Shaded With Edges mode; do not mutate the source part's appearance.
+ISO_SCALE = (1, 1)
 # The side view is the lathe view at the sheet scale; the end view projects
 # to its left (third angle) at 2:1 so the teeth and bore read, and says so
 # under itself (machinist review r1: an unlabelled 2:1 projected view).
 FRONT_CENTER = (0.085, 0.150)
 RIGHT_CENTER = (0.255, 0.150)
-ISO_CENTER = (0.350, 0.215)
+ISO_CENTER = (0.350, 0.230)
 GEAR_DATA_POS = (0.018, 0.262)
 ISOMETRIC_NOTE_POS = (0.330, 0.262)
 END_VIEW_NOTE_POS = (0.066, 0.124)

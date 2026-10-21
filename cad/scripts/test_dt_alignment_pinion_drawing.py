@@ -15,6 +15,17 @@ import dt_pinion_arbor_spec as arbor
 from _gear_fit_limits import gear_tip_band_mm
 
 
+def test_isometric_scale_matches_the_saved_caption() -> None:
+    import draw_dt_alignment_pinion as drawing
+
+    assert drawing.ISO_SCALE == (1, 1)
+    numerator, denominator = drawing.ISO_SCALE
+    assert spec.ISOMETRIC_VIEW_NOTE == (
+        f"ISOMETRIC VIEW SCALE {numerator}:{denominator}"
+    )
+
+
+
 def test_gear_data_block_preserves_the_actual_finite_stock_profile() -> None:
     data = spec.GEAR_DATA
     assert spec.TEETH == int(_config.machine("alignment_pinion", "teeth"))
