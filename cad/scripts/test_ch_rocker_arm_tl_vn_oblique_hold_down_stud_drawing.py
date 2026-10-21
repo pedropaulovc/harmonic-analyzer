@@ -920,6 +920,7 @@ def test_drawing_keeps_native_chamfer_end_view_and_part_only_rework_sheet(monkey
         (draw.END_KEEP, spec.DRAWING_DIMENSIONS),
     ]
     assert control_calls == [["FinishedLength", "CutEndChamfer"]]
+
     assert callouts == [(["FinishedLength", "CutEndChamfer"], math.pi / 4)]
     assert saved_angle_calls == [source_model]
     assert adapter.currentModel is document
