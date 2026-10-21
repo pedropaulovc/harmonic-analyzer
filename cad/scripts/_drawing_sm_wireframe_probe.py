@@ -733,6 +733,18 @@ def _quality_interpret(rows: list[dict[str, Any]]) -> str:
         return "unproven: incomplete terminal restoration observations"
     controls = [row for row in rows if row["arm"] == "control"]
     treated = [row for row in rows if row["arm"] == "wireframe"]
+    if any(
+        "display_restore_error" in row
+        or "post_restore_observation_error" in row
+        or "restored_capture_error" in row
+        or not _authored_display(row.get("restored_display", {}))
+        or not row.get("restored_inventory_unchanged", False)
+        for row in treated
+    ):
+        return (
+            "rejected: treated restoration changed/broke balloons or display; "
+            "precision is a separate observation"
+        )
     if all(row.get("restoration_quality_verified", False) for row in rows):
         return (
             "restored precision/text/owners/attachment verified in these arms; "
@@ -743,7 +755,16 @@ def _quality_interpret(rows: list[dict[str, Any]]) -> str:
     ):
         return "rejected: treated-only restoration quality failure"
     if all(
-        row["terminal_quality"].get("export", {}).get("sheet_pdf")
+        "display_restore_error" not in row
+        and "post_restore_observation_error" not in row
+        and "restored_capture_error" not in row
+        and _authored_display(row.get("restored_display", {}))
+        and row.get("restored_inventory_unchanged", False)
+        and row["terminal_quality"].get("export", {}).get("sheet_pdf")
+        and _authored_display(row["terminal_quality"].get("display", {}))
+        and row["terminal_quality"].get("inventory_unchanged", False)
+        and row["terminal_quality"].get("live_path") == ""
+        and bool(row["terminal_quality"].get("render_png"))
         and not row["terminal_quality"]["precision_verified"]
         for row in rows
     ):
@@ -808,7 +829,12 @@ def _interpret(rows: list[dict[str, Any]]) -> str:
             for kind in kinds
         )
         for row in controls
-    ) and all(all(row[kind]["correct_ten"] for kind in kinds) for row in treated):
+    ) and all(
+        all(row[kind]["correct_ten"] for kind in kinds)
+        and row.get("restored_coverage", {}).get("correct_ten", False)
+        and row.get("restored_inventory_unchanged", False)
+        for row in treated
+    ):
         return (
             "supports candidate Wireframe coverage effect in these arms only; "
             "not proof of restored quality, visible landing or layout; "
