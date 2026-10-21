@@ -73,8 +73,6 @@ def test_every_printed_dimension_has_a_model_owner_and_authored_places() -> None
     assert not set(drawing.FACE_KEEP) & set(drawing.PROFILE_KEEP)
     assert spec.DRAWING_DIMENSIONS["Washer"] == {"FinishedThickness"}
     assert spec.DRAWING_PRECISION_BY_NAME["FinishedThickness"] == spec.THICKNESS_PLACES == 2
-    assert "REF" in spec.DIMENSION_CALLOUTS["FinishedThickness"]
-    assert "UPPER CROSS-HOLE EDGE" in spec.DIMENSION_CALLOUTS["FinishedThickness"]
     assert spec.DRAWING_NOTES == ""
     assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
 

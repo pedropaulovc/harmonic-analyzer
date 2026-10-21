@@ -6,9 +6,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
@@ -51,8 +52,21 @@ OD_ON_PROFILE = (0.210, 0.175)
 NEAR_SIDE_DIAMETERS = ("WasherBore",)
 # The actual fitted thickness is REF; its attached callout also owns the
 # supply allowance. No dimension reaches out to an undrawn supply blank.
-# Its text stays right of the real faces and below the Ra symbol.
-PROFILE_KEEP = {"FinishedThickness": (0.303, 0.115)}
+# Its four-line mate-identification block stays right of the real faces and
+# below the Ra symbol at the existing height, without reducing text size.
+PROFILE_KEEP = {"FinishedThickness": (0.324, 0.115)}
+
+# The template already marks the concentric bore/OD as the face view is
+# placed. The b9e4 native audit recorded two marks with identical eight-line
+# display ink after our extra auto-insert pass. Keep the template's one,
+# as the filing-button drawing does, rather than overprinting it.
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _prove_one_concentric_mark(view: Any) -> None:
+    marks = _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one concentric retainer centre mark, found {len(marks)}")
 
 part_metadata(precision_sources=("DRAWING_PRECISION_BY_NAME",))
 requirement(
@@ -105,8 +119,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
         set_near_side_diameter(matches[0], f"retainer {name}")
     rebuild_drawing(adapter, label="retainer bore's near-side leader")
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
-        raise RuntimeError("failed to mark the retainer bore centre")
+    _prove_one_concentric_mark(face)
     def projected(point, label):
         return model_point_in_view(adapter, profile, tuple(value / 1000.0 for value in point), label=label)
     add_surface_finish(adapter, profile, edge_xy=projected((0.0, 0.0, 0.0), "carrier-side face"), symbol_xy=projected((0.0, -17.0, -5.0), "carrier-face finish symbol"), control=surface_finish_by_key(part_spec.SURFACE_FINISHES, "carrier_running_face"), label="retainer running face")

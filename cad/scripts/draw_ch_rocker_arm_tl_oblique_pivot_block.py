@@ -3,6 +3,7 @@ r"""Create the drawing for the oblique-trammel jig's pivot block (MHA-CH-06-TL-2
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import sys
@@ -1110,48 +1111,187 @@ def _position_register_depth(
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     expected_x = sorted(point[0] for point in witnesses)
-    if abs(witnesses[0][1] - witnesses[1][1]) > 1e-7:
-        raise RuntimeError("straight register section has skewed depth witnesses")
+    tolerance_m = 1e-6
+    axis_tolerance_m = 1e-7
+    text_xy = text_positions["CapRegisterDepth"]
 
-    def arrows() -> list[tuple[float, float]]:
-        data = _early_bound(display.GetDisplayData(), "IDisplayData")
-        if int(data.GetArrowHeadCount()) != 2:
-            raise RuntimeError("register depth lost its two native dimension arrows")
-        points = sorted(
-            tuple(float(value) for value in data.GetArrowHeadAtIndex2(index)[:2])
-            for index in range(2)
+    def error_text(exc: Exception) -> str:
+        try:
+            return str(exc)
+        except Exception:
+            return f"{type(exc).__name__} (message unavailable)"
+
+    def emit(state: dict[str, Any]) -> str:
+        serialized = f"register-depth placement stage={state['stage']} reason={state['reason']}"
+        try:
+            serialized = json.dumps(state, sort_keys=True)
+        except Exception as exc:
+            state["serialization_error"] = f"{type(exc).__name__}: {error_text(exc)}"
+            serialized += f" serialization_error={state['serialization_error']}"
+        try:
+            _telemetry.event(
+                "drawing.pivot_block.register_depth_placement",
+                stage=state["stage"],
+                reason=state["reason"],
+                diagnostics_json=serialized,
+            )
+        except Exception as exc:
+            state["telemetry_event_error"] = f"{type(exc).__name__}: {error_text(exc)}"
+        try:
+            _telemetry.info(f"register-depth placement {serialized}")
+        except Exception as exc:
+            state["telemetry_log_error"] = f"{type(exc).__name__}: {error_text(exc)}"
+        try:
+            return json.dumps(state, sort_keys=True)
+        except Exception:
+            return serialized
+
+    def observe(
+        stage: str, *, attempt: int | None = None, tolerate_read_errors: bool = False
+    ) -> dict[str, Any]:
+        read_errors = []
+        exceptions = []
+
+        def capture(getter: str, operation: Any) -> Any:
+            try:
+                return operation()
+            except Exception as exc:
+                read_errors.append({
+                    "getter": getter, "error_type": type(exc).__name__, "error": error_text(exc),
+                })
+                exceptions.append(exc)
+                return None
+
+        position = capture(
+            "IAnnotation.GetPosition",
+            lambda: tuple(float(value) for value in annotation.GetPosition()),
         )
-        if (
-            any(abs(point[0] - x) > 1e-6 for point, x in zip(points, expected_x, strict=True))
-            or abs(points[0][1] - points[1][1]) > 1e-7
-        ):
-            raise RuntimeError(f"register depth arrows left the actual section witnesses: {points}")
-        return points
+        data = capture(
+            "IDisplayDimension.GetDisplayData",
+            lambda: _early_bound(display.GetDisplayData(), "IDisplayData"),
+        )
+        count = (
+            capture("IDisplayData.GetArrowHeadCount", lambda: int(data.GetArrowHeadCount()))
+            if data is not None else None
+        )
+        points = []
+        for index in range(count or 0):
+            point = capture(
+                f"IDisplayData.GetArrowHeadAtIndex2[{index}]",
+                lambda index=index: tuple(
+                    float(value) for value in data.GetArrowHeadAtIndex2(index)[:3]
+                ),
+            )
+            if point is not None:
+                points.append(point)
+        points.sort()
+        offset_text = capture("IDisplayDimension.OffsetText", lambda: bool(display.OffsetText))
+        text_miss = (
+            (position[0] - text_xy[0], position[1] - text_xy[1])
+            if position is not None else None
+        )
+        state = {
+            "operation": "position_register_depth",
+            "stage": stage,
+            "reason": "observed",
+            "attempt": attempt,
+            "requested_line_xy_m": line_xy,
+            "requested_text_xyz_m": (*text_xy, 0.0),
+            "actual_annotation_xyz_m": position,
+            "actual_arrow_tips_m": points,
+            "expected_witnesses_xy_m": witnesses,
+            "offset_text": offset_text,
+            "arrow_count": count,
+            "tolerance_m": tolerance_m,
+            "axis_tolerance_m": axis_tolerance_m,
+            "line_y_misses_m": [point[1] - line_xy[1] for point in points],
+            "witness_x_misses_m": (
+                [point[0] - x for point, x in zip(points, expected_x, strict=True)]
+                if count == len(points) == 2 else None
+            ),
+            "arrow_y_spread_m": (
+                max(point[1] for point in points) - min(point[1] for point in points)
+                if points else None
+            ),
+            "section_witness_y_spread_m": abs(witnesses[0][1] - witnesses[1][1]),
+            "text_xy_miss_m": text_miss,
+            "text_distance_m": math.dist(position[:2], text_xy) if position is not None else None,
+            "read_errors": read_errors,
+        }
+        emit(state)
+        if exceptions and not tolerate_read_errors:
+            refuse(state, "native_readback_failed", cause=exceptions[0])
+        return state
 
-    display.OffsetText = False
-    if bool(display.OffsetText):
-        raise RuntimeError("register depth cannot move its native dimension line")
+    def refuse(
+        state: dict[str, Any], reason: str, *, cause: Exception | None = None
+    ) -> None:
+        failure = state | {"reason": reason}
+        if cause is not None:
+            failure |= {"cause_type": type(cause).__name__, "cause": error_text(cause)}
+        raise RuntimeError(emit(failure)) from cause
+
+    def require_arrows(state: dict[str, Any]) -> None:
+        if state["arrow_count"] != 2:
+            refuse(state, "arrow_count_mismatch")
+        if any(abs(miss) > tolerance_m for miss in state["witness_x_misses_m"]):
+            refuse(state, "arrow_witness_mismatch")
+        if state["arrow_y_spread_m"] > axis_tolerance_m:
+            refuse(state, "dimension_arrows_skewed")
+
+    state = observe("pre_line")
+    if state["section_witness_y_spread_m"] > axis_tolerance_m:
+        refuse(state, "section_witnesses_skewed")
+    try:
+        display.OffsetText = False
+    except Exception as exc:
+        refuse(
+            observe("line_offset_reset_exception", tolerate_read_errors=True),
+            "offset_text_reset_failed", cause=exc,
+        )
+    state = observe("line_offset_reset")
+    if state["offset_text"]:
+        refuse(state, "offset_text_disable_refused")
     rebuild_drawing(adapter, label="register-depth dimension line")
-    for _attempt in range(3):
-        points = arrows()
-        miss = line_xy[1] - points[0][1]
-        if abs(miss) <= 1e-6:
+    for attempt in range(3):
+        state = observe("line_move", attempt=attempt)
+        require_arrows(state)
+        miss = -state["line_y_misses_m"][0]
+        if abs(miss) <= tolerance_m:
             break
-        position = tuple(float(value) for value in annotation.GetPosition())
-        if not annotation.SetPosition2(position[0], position[1] + miss, 0.0):
-            raise RuntimeError("failed to place register-depth dimension line")
+        position = state["actual_annotation_xyz_m"]
+        try:
+            moved = annotation.SetPosition2(position[0], position[1] + miss, 0.0)
+        except Exception as exc:
+            refuse(
+                observe("line_move_exception", attempt=attempt, tolerate_read_errors=True),
+                "line_position_setter_failed", cause=exc,
+            )
+        if not moved:
+            refuse(
+                observe("line_move_setter", attempt=attempt, tolerate_read_errors=True),
+                "line_position_setter_rejected",
+            )
         rebuild_drawing(adapter, label="register-depth dimension line placed")
-    if any(abs(point[1] - line_xy[1]) > 1e-6 for point in arrows()):
-        raise RuntimeError("register-depth dimension line did not reach its paper lane")
-    offset_dimension_text(adapter, annotations, text_positions)
-    points = arrows()
-    position = tuple(float(value) for value in annotation.GetPosition())
-    if (
-        not bool(display.OffsetText)
-        or any(abs(point[1] - line_xy[1]) > 1e-6 for point in points)
-        or math.dist(position[:2], text_positions["CapRegisterDepth"]) > 1e-6
-    ):
-        raise RuntimeError("register-depth text move changed its native line or missed its shelf")
+    state = observe("post_line")
+    require_arrows(state)
+    if any(abs(miss) > tolerance_m for miss in state["line_y_misses_m"]):
+        refuse(state, "dimension_line_missed_lane")
+    try:
+        offset_dimension_text(adapter, annotations, text_positions)
+    except Exception as exc:
+        refuse(
+            observe("text_move_exception", tolerate_read_errors=True),
+            "offset_text_helper_failed", cause=exc,
+        )
+    state = observe("post_text")
+    require_arrows(state)
+    if not state["offset_text"]:
+        refuse(state, "offset_text_not_enabled")
+    if any(abs(miss) > tolerance_m for miss in state["line_y_misses_m"]):
+        refuse(state, "text_move_changed_dimension_line")
+    if state["text_distance_m"] > tolerance_m:
+        refuse(state, "text_origin_missed_shelf")
 
 
 def _register_section_sheet(adapter: Any) -> Any:

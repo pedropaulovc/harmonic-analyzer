@@ -174,6 +174,20 @@ arrow tips to remain at the projected model endpoints on the near-tip line
 both immediately and after finalization; retain the native model value,
 reference brackets, precision and no-tolerance contract.
 
+Apply that separation to the complete native annotation, not just its leader.
+The `b9e4d6b45` carrier cleared the enforced leader crossings while its 45.00
+dimension still struck the REAM tolerance stack and callout rows. Retain every
+captured text row, arrow edge and neighboring annotation in layout regressions;
+an arrow tip alone can miss a clearance violation by the arrow's flank.
+These replays budget a proposed placement; the regenerated PDF remains the
+evidence of the actual layout.
+
+When a placement guard refuses, report the stage, requested and actual
+annotation origins, native arrow tips, `OffsetText`, tolerances and differences.
+Keep unavailable probes as explicit read errors and preserve the original
+exception. A combined “line moved or text missed” error cannot distinguish a
+setter refusal from a clamped position, and does not justify loosening a guard.
+
 The second cartridge uses the same capture-part families on the other
 support, so its identification does not need duplicate BOM balloons. Explain
 that the capture parts are identical at both supports in the existing

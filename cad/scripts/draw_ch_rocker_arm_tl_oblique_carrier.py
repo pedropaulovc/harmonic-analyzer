@@ -9,8 +9,9 @@ outside the outline in its own lane: X stations above and below, Y stations
 left and right, so no extension line crosses a text.
 Section A-A at 3:1 cuts along the pin line, is cropped to A1, and carries
 the finished thickness and underside chamfer. A native reference dimension
-measures the actual straight bore wall; its own callout requires 10.50 MIN.
-The real underside edge is identified in the section. The complete resultant
+measures the actual straight bore wall; its complete 10.50 MIN callout stands
+outside the section on independently offset text, not over the bore or hatch.
+The real underside edge is identified below the section. The complete resultant
 axis-shift acceptance belongs to the native 4X REAM callout, not a separate
 leader. Native geometry readbacks use that underside plane's normal for all
 four bore-axis vectors. The shaded isometric stands above the title block.
@@ -52,6 +53,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_dimension_callouts,
     set_reference_dimension,
 )
@@ -150,14 +152,15 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # Carrier r11: A2DY's text crossed the top border; it stands ~17 under it.
     "A2DY": _xy(_LEFT[1], 139.0),
     "B2DY": _xy(_RIGHT[1], 70.7),
-    # DRAW7f measured the complete REAM shoulder at sheet x 20.6..93.0,
-    # y 111.1: it crossed both genuine stock witnesses at x 92. Move only
-    # the native text 3.5 mm left; the intended shoulder is 17.1..89.5,
-    # clear of the border and witnesses. The diagonal intentionally crosses
-    # both genuine witness extensions (conventional under rule 14), not the
-    # 520/260 dimension lines or station text. The next native run must
-    # confirm the regenerated elbow and full text bounds.
-    "PinHoleDia": _xy(-339.0, -74.3),
+    # B9e4's complete native/PDF glyph block reaches y 164.57, not merely
+    # the shoulder at 111.10: the 45.00 text/arrow and its y 152.5 witness
+    # strike the size/limits and first REAM row. Lower the WHOLE block 16
+    # sheet mm, retaining the previous 3.5 mm left move. Its conditional
+    # upper ink is now y 148.57 and its shoulder x 17.13..89.46, y 95.10.
+    # The diameter approach may cross genuine witness extensions (rule 14),
+    # but never a dimension line, another text row or the shoulder's text.
+    # The next native export must confirm the regenerated route and glyphs.
+    "PinHoleDia": _xy(-339.0, -106.3),
     # The spots: each its own diameter callout; HUB by Y right, CL by X
     # below and Y left.
     "SpotDia": _xy(50.0, 98.0),
@@ -228,6 +231,17 @@ _SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
 # thickness text (lane x 79), the slab (91..145 x 27..63) and the chamfer
 # text (~150..209, left of the title block at x 216).
 SECTION_CENTER = (0.118, 0.045)
+# B9e4's full REF/land block overprinted the top edge and arrow. Keep its
+# actual dimension line 3 sheet mm outside the slab's right edge (145).
+# Captured-ink replay at x149 left its lower arrow only 1.897 mm from the
+# complete chamfer glyph box; x148 predicts 2.897 mm. Offset ALL four rows.
+# Captured glyphs predict x 162..190, y 51..72, below the 520.0 lane at 75.
+PIN_LAND_LINE_XY = (0.148, 0.045)
+PIN_LAND_TEXT_XY = (0.176, 0.061)
+# The native straight leader must approach the right end of UNDERSIDE from
+# the right, not turn back through its E. This also clears the chamfer's
+# left-running dimension line; the actual underside attachment is unchanged.
+UNDERSIDE_LABEL_OFFSET = (-0.035, -0.007)
 _STOCK_TEXT_DX = 13.0  # A1's axis to the thickness lane, model mm (-X side)
 SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
     "StockThick": (_A1[0] - _STOCK_TEXT_DX, -part_spec.THICKNESS / 2.0, 0.0),
@@ -632,6 +646,59 @@ def _assert_land_control(adapter: Any, display: Any, vertices: tuple[Any, Any]) 
         raise RuntimeError("straight land lost its native reference or 4X minimum acceptance")
 
 
+def _assert_land_layout(display: Any, projected: list[tuple[float, float]]) -> None:
+    """Offset all land text without dragging the actual line or arrow tips."""
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    offset = bool(display.OffsetText)
+    error_m = (
+        math.dist(position[:2], PIN_LAND_TEXT_XY)
+        if len(position) >= 2 and all(math.isfinite(value) for value in position[:2])
+        else math.inf
+    )
+    if (
+        not offset
+        or len(position) != 3
+        or not all(math.isfinite(value) for value in position)
+        or error_m > 0.00005
+    ):
+        raise RuntimeError(
+            "straight-land native offset text did not retain its exterior lane: "
+            f"OffsetText={offset!r}, actual={position!r}, "
+            f"requested={PIN_LAND_TEXT_XY!r}, error_m={error_m!r}"
+        )
+    _assert_land_line(display, projected, phase="after-text-offset")
+
+
+def _assert_land_line(
+    display: Any, projected: list[tuple[float, float]], *, phase: str
+) -> None:
+    """Read the same physical dimension-end arrows before and after offsetting."""
+    requested = tuple((PIN_LAND_LINE_XY[0], y) for _x, y in projected)
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    tips = []
+    for index in range(int(data.GetArrowHeadCount())):
+        raw = tuple(float(value) for value in (data.GetArrowHeadAtIndex2(index) or ()))
+        if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
+            raise RuntimeError(
+                f"straight-land native dimension line phase={phase}: "
+                f"unreadable arrow index={index}, actual={raw!r}, requested={requested!r}"
+            )
+        tips.append(raw[:2])
+    actual = tuple(tips)
+    for expected in requested:
+        match = next(
+            (index for index, tip in enumerate(tips) if math.dist(tip, expected) <= 0.00005),
+            None,
+        )
+        if match is None:
+            raise RuntimeError(
+                f"straight-land native dimension line phase={phase}: "
+                f"requested={requested!r}, actual={actual!r}, missing={expected!r}"
+            )
+        tips.pop(match)
+
+
 def _add_pin_land_control(adapter: Any, section: Any):
     """Dimension the actual straight wall and identify the physical underside."""
     edges = scan_view_edges(section, label="carrier straight land and underside")
@@ -646,12 +713,10 @@ def _add_pin_land_control(adapter: Any, section: Any):
     projected = model_points_in_view(
         adapter, section, [_metres(point) for point in points], label="A1 straight land"
     )
-    text_xy = model_point_in_view(
-        adapter, section, _metres((_A1[0], -2.5, 0.0)), label="straight-land text"
-    )
+    line_xy = PIN_LAND_LINE_XY
     display = _early_bound(
         add_edge_dimension(
-            adapter, section, p0=projected[0], p1=projected[1], text_xy=text_xy,
+            adapter, section, p0=projected[0], p1=projected[1], text_xy=line_xy,
             label="pin straight land", orientation="vertical",
             entities=vertices, entity_types=("VERTEX", "VERTEX"),
         ),
@@ -663,6 +728,21 @@ def _add_pin_land_control(adapter: Any, section: Any):
     display.SetPrecision3(part_spec.DRAWING_REFERENCE_PRECISION["PinStraightLand"], -1, -1, -1)
     display.SetText(4, part_spec.PIN_LAND_CALLOUT)
     _assert_land_control(adapter, display, vertices)
+    land_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (land_annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError("straight-land native dimension-line anchor is unreadable")
+    # Reset any inherited offset before moving the line. As on the jig's
+    # CL-tip reference, OffsetText then moves only the complete text block.
+    display.OffsetText = False
+    if bool(display.OffsetText) or not land_annotation.SetPosition2(*line_xy, position[2]):
+        raise RuntimeError("failed to position straight-land native dimension line")
+    rebuild_drawing(adapter, label="carrier straight-land dimension-line anchor")
+    _assert_land_line(display, projected, phase="before-text-offset")
+    offset_dimension_text(
+        adapter, [land_annotation], {dimension_name(adapter, land_annotation): PIN_LAND_TEXT_XY}
+    )
+    _assert_land_layout(display, projected)
 
     x_axis, _y_axis = _section_axes(adapter, section)
     underside_point = (
@@ -676,7 +756,7 @@ def _add_pin_land_control(adapter: Any, section: Any):
     )
     note = add_attached_note(
         adapter, section, text="UNDERSIDE", entity_xy=under_xy, attached_to=underside,
-        note_xy=(under_xy[0] - 0.020, under_xy[1] - 0.007),
+        note_xy=tuple(a + b for a, b in zip(under_xy, UNDERSIDE_LABEL_OFFSET, strict=True)),
         label="carrier underside plane",
     )
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -685,6 +765,7 @@ def _add_pin_land_control(adapter: Any, section: Any):
         if str(note.GetText() or "") != "UNDERSIDE" or int(annotation.Visible) != 1:
             raise RuntimeError("carrier underside plane lost its visible native label")
         _assert_land_control(adapter, display, vertices)
+        _assert_land_layout(display, projected)
         _assert_attached_to(
             adapter, annotation, underside, entity_type="EDGE",
             what="underside-plane label", label="carrier underside plane",

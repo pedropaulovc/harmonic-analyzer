@@ -21,11 +21,17 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_pivot_pin as drawing
 import export_features
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_leaders import segments_cross
 from _fit_deviations import deviations
 from _feature_requirements import requirements_for
 from _gtol_controls import validate_part_pmi
 from _gtol_frame import gtol_frame_signature, gtol_frame_xml
-from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
+from _layout_audit import arrowhead_segments
+from _layout_geometry import (
+    Box, Segment, clip_segment_to_box, point_segment_distance,
+    segment_box_distance, segment_box_overlap_length,
+)
 from _printed_limits import drilled_limits, limits
 from prechips.model import TOLERANCE_REQUIREMENTS
 
@@ -705,6 +711,67 @@ def test_lower_boss_witnesses_stop_above_both_native_radius_leader_runs() -> Non
             assert segment_box_distance(stroke, witness.box()) >= 0.002
 
 
+# Complete nearby native display lines from the 20261021T125148010Z pin
+# audit. These annotation positions are unchanged; CrossHoleDia's relocated
+# full chain is reconstructed separately from its native circle and shelf.
+_PIN_NATIVE_NEIGHBOUR_LINES = (
+    (0.2145, 0.1489985, 0.2475, 0.1489985),
+    (0.2145, 0.1790015, 0.2475, 0.1790015),
+    (0.2978139, 0.0911399, 0.2465, 0.0911399),
+    (0.2465, 0.0911399, 0.2465, 0.1489985),
+    (0.2465, 0.1489985, 0.2465, 0.1790015),
+    (0.2795, 0.1765015, 0.2795, 0.1234438),
+    (0.278, 0.1780015, 0.278, 0.1234438),
+    (0.2795, 0.1244438, 0.3338292, 0.1244438),
+    (0.2795, 0.1244438, 0.278, 0.1244438),
+    (0.278, 0.1244438, 0.27165, 0.1244438),
+    (0.2140693, 0.1790023, 0.2117743, 0.1342219),
+    (0.2141, 0.1796015, 0.2140693, 0.1790023),
+    (0.2117743, 0.1342219, 0.2376382, 0.1342219),
+    (0.20205, 0.11, 0.20655, 0.11),
+    (0.20205, 0.218, 0.20655, 0.218),
+    (0.2865896, 0.0716962, 0.20555, 0.0716962),
+    (0.20555, 0.0716962, 0.20555, 0.11),
+    (0.20555, 0.11, 0.20555, 0.218),
+    (0.093, 0.149, 0.0955, 0.149),
+    (0.093, 0.179, 0.0955, 0.179),
+    (0.1571743, 0.0691399, 0.0945, 0.0691399),
+    (0.0945, 0.0691399, 0.0945, 0.149),
+    (0.0945, 0.149, 0.0945, 0.179),
+    (0.165, 0.14495, 0.18, 0.14495),
+    (0.165, 0.18305, 0.18, 0.18305),
+    (0.198502, 0.1241951, 0.179, 0.1241951),
+    (0.179, 0.1241951, 0.179, 0.14495),
+    (0.179, 0.14495, 0.179, 0.18305),
+    (0.1634971, 0.1478079, 0.1657257, 0.1342219),
+    (0.1634, 0.1484, 0.1634971, 0.1478079),
+    (0.1657257, 0.1342219, 0.1398618, 0.1342219),
+)
+_PIN_NATIVE_NEIGHBOUR_ARROWS = (
+    (0.2465, 0.1489985, 0.0, 1.0),
+    (0.2465, 0.1790015, 0.0, -1.0),
+    (0.2795, 0.1244438, 1.0, 0.0),
+    (0.278, 0.1244438, -1.0, 0.0),
+    (0.2140693, 0.1790023, -0.0511826, -0.9986893),
+    (0.20555, 0.11, 0.0, 1.0),
+    (0.20555, 0.218, 0.0, -1.0),
+    (0.0945, 0.149, 0.0, 1.0),
+    (0.0945, 0.179, 0.0, -1.0),
+    (0.179, 0.14495, 0.0, 1.0),
+    (0.179, 0.18305, 0.0, -1.0),
+    (0.1634971, 0.1478079, 0.1618708, -0.986812),
+)
+# Measured PDF ink plus native stroke-glyph extents, not GetPosition points.
+_PIN_NATIVE_NEIGHBOUR_GLYPHS = (
+    Box(0.2150795, 0.1351558, 0.2360372, 0.1387211),
+    Box(0.1415795, 0.1351558, 0.1625372, 0.1387211),
+    Box(0.0945, 0.0691399, 0.1571743, 0.0948336),
+    Box(0.179, 0.1241951, 0.198502, 0.1287479),
+    Box(0.20555, 0.0716962, 0.2865896, 0.0862774),
+    Box(0.3253594, 0.2484082, 0.3837131, 0.2519736),
+)
+
+
 def test_normal_datum_footprint_clears_complete_known_native_dimension_ink() -> None:
     # Native display data from the 20261021T125148010Z pin layout-audit JSON,
     # not just dimension text boxes. The 12 x 9 mm box allowance is deliberately
@@ -724,36 +791,262 @@ def test_normal_datum_footprint_clears_complete_known_native_dimension_ink() -> 
     assert 0.0127 < footprint.ymin < footprint.ymax < 0.2667
     for name in ("BearingDia", "BottomChamfer", "LowerBossHeight"):
         assert footprint.gap(_d349_box_at(name, _D349_BLOCKS[name])) >= 0.0035
-    # Complete BearingDia lines, including the flank witnesses, arrow line
-    # and its continuation down to the text; then both chamfer witnesses
-    # and their lower line; then the full SeatFilletR leader and underline.
-    for line in (
-        (0.2145, 0.1489985, 0.2475, 0.1489985),
-        (0.2145, 0.1790015, 0.2475, 0.1790015),
-        (0.2978139, 0.0911399, 0.2465, 0.0911399),
-        (0.2465, 0.0911399, 0.2465, 0.1489985),
-        (0.2465, 0.1489985, 0.2465, 0.1790015),
-        (0.2795, 0.1765015, 0.2795, 0.1234438),
-        (0.278, 0.1780015, 0.278, 0.1234438),
-        (0.2795, 0.1244438, 0.3338292, 0.1244438),
-        (0.2795, 0.1244438, 0.278, 0.1244438),
-        (0.278, 0.1244438, 0.27165, 0.1244438),
-        (0.2140693, 0.1790023, 0.2117743, 0.1342219),
-        (0.2141, 0.1796015, 0.2140693, 0.1790023),
-        (0.2117743, 0.1342219, 0.2376382, 0.1342219),
-    ):
+    for line in _PIN_NATIVE_NEIGHBOUR_LINES:
         assert segment_box_distance(Segment(*line), footprint) >= 0.0035
-    # The five native arrow records have length 3.556 mm and width 0.762 mm.
-    # A square of radius equal to the larger extent covers either direction.
-    for x, y in (
-        (0.2465, 0.1489985), (0.2465, 0.1790015),
-        (0.2795, 0.1244438), (0.278, 0.1244438),
-        (0.2140693, 0.1790023),
-    ):
+    # A square of radius equal to the larger native arrow extent covers
+    # either size/direction reading (the FCF regression also checks wings).
+    for x, y, _dx, _dy in _PIN_NATIVE_NEIGHBOUR_ARROWS:
         arrow_allowance = Box(x - 0.003556, y - 0.003556, x + 0.003556, y + 0.003556)
         assert footprint.gap(arrow_allowance) >= 0.0035
     fillet_text_allowance = Box(0.2133618, 0.1307219, 0.2376382, 0.1377219)
     assert footprint.gap(fillet_text_allowance) >= 0.0035
+
+
+def test_b9e4_actual_native_stop_leaders_reproduce_the_enforced_crossing() -> None:
+    # Actual failing COM primitives from artifact://1284, not idealized
+    # tip-to-frame-origin lines. The omitted shoulders cannot erase this.
+    crossings = find_leader_leader_crossings([
+        LeaderSegment("flange_lower_stop", "gtol", 0.2077, 0.1005, 0.2100, 0.1115),
+        LeaderSegment("flange_upper_stop", "gtol", 0.2110, 0.1005, 0.2011, 0.1115),
+    ])
+    assert len(crossings) == 1
+    # The diagnostic rounds its source coordinates and crossing to 0.1 mm.
+    assert (crossings[0].x, crossings[0].y) == pytest.approx((0.2083, 0.1035), abs=0.0001)
+
+
+# The captured knob-shaft 0.050 A frame supplies native 7 mm height,
+# 6.35 mm shoulders and font/cell data, NOT the current pin's frame width.
+_NATIVE_TRUN_0050_WIDTH = 0.0312764
+_ESTIMATED_TRUN_005_WIDTH = _NATIVE_TRUN_0050_WIDTH - 0.0116375 + 0.0090514
+# b9e4's rounded elbow plus requested-origin/6.35-shoulder assumptions imply
+# about 28.65 +/- 0.05 mm; the native-font estimate is 28.6903 mm. Budget both
+# with margin. This is derived, never a measured current pin rectangle.
+_PIN_STOP_FRAME_WIDTH_BUDGET = (0.02855, 0.0288)
+_PIN_NATIVE_BEARING_GLYPHS = (
+    Box(0.2545, 0.1087, 0.2599, 0.1124),  # native stroked diameter glyph
+    Box(0.2604673, 0.1087961, 0.2729638, 0.1123614),
+    Box(0.2755826, 0.1138796, 0.2778889, 0.1162083),
+    Box(0.2782997, 0.1132683, 0.2895825, 0.1168336),
+    Box(0.2782997, 0.1087426, 0.2896385, 0.1123079),
+    Box(0.2466494, 0.1031864, 0.2976926, 0.1067517),
+    Box(0.252277, 0.0976301, 0.2919855, 0.1011954),
+    Box(0.2484193, 0.0920739, 0.2960393, 0.0956392),
+)
+
+
+def _projected_pin_body():
+    """Full turned-body envelope from the native builder's PinProfile.
+
+    Keep the uncut lead-chamfer envelope and extend each narrow boss over
+    its concave R0.2 blend: conservative material, not only annotation ink.
+    """
+    sections = (
+        ("bearing", 0.0, spec.COLLAR_STATION, spec.BEARING_DIA),
+        ("lower_boss", spec.COLLAR_STATION - spec.SHOULDER_FILLET_RADIUS,
+         spec.FLANGE_BOTTOM_STATION, spec.COLLAR_DIA),
+        ("flange", spec.FLANGE_BOTTOM_STATION, spec.FLANGE_TOP_STATION, spec.FLANGE_DIA),
+        ("upper_boss", spec.FLANGE_TOP_STATION,
+         spec.CARRIER_STATION + spec.SHOULDER_FILLET_RADIUS, spec.COLLAR_DIA),
+        ("carrier", spec.CARRIER_STATION, spec.OVERALL_LENGTH, spec.FIT_DIA),
+    )
+    return {
+        name: Box(
+            min(drawing._x(lo), drawing._x(hi)),
+            drawing.PROFILE_CENTER[1] - dia * drawing._S / 2.0,
+            max(drawing._x(lo), drawing._x(hi)),
+            drawing.PROFILE_CENTER[1] + dia * drawing._S / 2.0,
+        )
+        for name, lo, hi, dia in sections
+    }
+
+
+def _stop_control_tip(key):
+    row = next(row for row in spec.GEOMETRIC_CONTROLS if row.key == key)
+    return (
+        drawing._x(row.face.offset_mm / row.face.normal[2]),
+        drawing.PROFILE_CENTER[1] - spec.STOP_FACE_MEASUREMENT_DIAMETER * drawing._S / 2.0,
+    )
+
+
+def _body_intrusions(strokes, allowed_tip):
+    """Only a zero-length contact at the intended flange-face tip is legal."""
+    intrusions = []
+    for name, body in _projected_pin_body().items():
+        for stroke in strokes:
+            span = clip_segment_to_box(stroke, body)
+            if span is None:
+                continue
+            contacts = (stroke.point_at(span[0]), stroke.point_at(span[1]))
+            if name == "flange" and all(
+                hypot(x - allowed_tip[0], y - allowed_tip[1]) <= 1e-12
+                for x, y in contacts
+            ):
+                continue
+            intrusions.append((name, stroke, span))
+    return intrusions
+
+
+def _native_stop_frame_corridors(width, anchors=None):
+    """Derived paper envelope, not a simulated native placement response."""
+    if anchors is None:
+        anchors = drawing.STOP_FACE_FRAME_XY
+    frames, leaders, heads = {}, [], {}
+    for row in spec.GEOMETRIC_CONTROLS:
+        x, y = anchors[row.key]
+        frame = Box(x, y - 0.007, x + width, y)
+        tip = _stop_control_tip(row.key)
+        if tip[0] < frame.xmin:
+            start = (frame.xmin, y - 0.0035)
+            elbow = (start[0] - 0.00635, start[1])
+        else:
+            assert tip[0] > frame.xmax
+            start = (frame.xmax, y - 0.0035)
+            elbow = (start[0] + 0.00635, start[1])
+        frames[row.key] = frame
+        leaders.extend((
+            LeaderSegment(row.key, "gtol", *start, *elbow),
+            LeaderSegment(row.key, "gtol", *elbow, *tip),
+        ))
+        # SDK GetArrowHeadAtIndex2: width ALONG dir; calibrated dir points
+        # back toward the shaft. Reuse the actual native/PDF audit decoder,
+        # not the older helper's unsupported swapped-axis interpretation.
+        heads[row.key] = arrowhead_segments((
+            *tip, 0.0, elbow[0] - tip[0], elbow[1] - tip[1], 0.0,
+            0.003556, 0.000762, 3.0, 0.0, 0.0, 1.0,
+        ))
+    return frames, leaders, heads
+
+
+def _stop_frame_glyphs(frame, width):
+    """Native same-font glyph offsets, with 0.15 mm placement/font allowance."""
+    x, y = frame.xmin, frame.ymax
+    shift = width - _ESTIMATED_TRUN_005_WIDTH
+    # Captured PDF 0.050/A spans, native ThreadBlankDia's exact 0.05 span,
+    # and native TRUN cell extents. Removing one zero shifts only the A cell.
+    return (
+        Box(x + 0.0005, y - 0.0065, x + 0.0100, y - 0.0005),
+        Box(x + 0.0120712 - 0.00015, y - 0.0053442 - 0.00015,
+            x + 0.0207678 + 0.00015, y - 0.0017789 + 0.00015),
+        Box(x + 0.0239289 + shift - 0.00015, y - 0.0052649 - 0.00015,
+            x + 0.0271564 + shift + 0.00015, y - 0.0018629 + 0.00015),
+    )
+
+
+@pytest.mark.parametrize("bad_lower", ((0.213, 0.129), (0.2145, 0.1045)))
+def test_projected_body_gate_rejects_lower_routes_entering_before_the_tip(bad_lower) -> None:
+    # Both the previously proposed shoulder-through-body lane and the
+    # review's below-body shortcut fail; the latter enters the bottom edge
+    # before arriving at the right face despite its elbow being below it.
+    anchors = {**drawing.STOP_FACE_FRAME_XY, "flange_lower_stop": bad_lower}
+    _frames, leaders, _heads = _native_stop_frame_corridors(0.0288, anchors)
+    lower = [
+        Segment(row.x0, row.y0, row.x1, row.y1)
+        for row in leaders if row.label == "flange_lower_stop"
+    ]
+    assert _body_intrusions(lower, _stop_control_tip("flange_lower_stop"))
+
+
+@pytest.mark.parametrize("width", _PIN_STOP_FRAME_WIDTH_BUDGET)
+def test_full_stop_routes_touch_the_complete_projected_body_only_at_their_tips(width) -> None:
+    frames, leaders, heads = _native_stop_frame_corridors(width)
+    assert find_leader_leader_crossings(leaders) == []
+    for frame in frames.values():
+        for body in _projected_pin_body().values():
+            assert frame.gap(body) >= 0.0035
+    for key in frames:
+        tip = _stop_control_tip(key)
+        route = [
+            Segment(row.x0, row.y0, row.x1, row.y1)
+            for row in leaders if row.label == key
+        ]
+        # Explicit face halfspaces supplement full-profile clipping: neither
+        # a below-flange elbow nor a correct final point alone proves a route.
+        xs = [x for stroke in route for x in (stroke.x0, stroke.x1)]
+        if key == "flange_lower_stop":
+            assert min(xs) >= tip[0]
+            assert route[-1].x0 - tip[0] >= 0.00015
+        else:
+            assert max(xs) <= tip[0]
+        assert _body_intrusions(route, tip) == []
+        assert _body_intrusions(heads[key], tip) == []
+
+
+@pytest.mark.parametrize("width", _PIN_STOP_FRAME_WIDTH_BUDGET)
+def test_full_native_sized_stop_frames_and_bent_leaders_fit_separate_corridors(width) -> None:
+    frames, leaders, heads = _native_stop_frame_corridors(width)
+    assert find_leader_leader_crossings(leaders) == []
+    glyphs = [
+        *_PIN_NATIVE_NEIGHBOUR_GLYPHS, *_PIN_NATIVE_BEARING_GLYPHS,
+        *(_d349_box_at(name, bounds) for name, bounds in _D349_BLOCKS.items() if name != "BearingDia"),
+    ]
+    datum_axis = (drawing._x(drawing.BEARING_DATUM_STATION_MM), drawing.PROFILE_CENTER[1])
+    datum_landing = (datum_axis[0], datum_axis[1] - spec.BEARING_DIA * drawing._S / 2.0)
+    datum_symbol = drawing._bearing_datum_symbol_xy(datum_axis, datum_landing)
+    glyphs.append(Box(
+        datum_symbol[0] - 0.006, datum_symbol[1] - 0.009,
+        datum_symbol[0] + 0.006, datum_landing[1] + 0.0005,
+    ))
+    lines = [Segment(*line) for line in _PIN_NATIVE_NEIGHBOUR_LINES]
+    callout = _cross_hole_leader_at(drawing.PROFILE_KEEP["CrossHoleDia"])
+    cx, cy = drawing._x(spec.CROSS_HOLE_STATION), drawing.PROFILE_CENTER[1]
+    shelf_direction = 1.0 if drawing.PROFILE_KEEP["CrossHoleDia"][0] > cx else -1.0
+    lines.extend((
+        callout,
+        Segment(2 * cx - callout.x0, 2 * cy - callout.y0, callout.x0, callout.y0),
+        Segment(callout.x1, callout.y1, callout.x1 + shelf_direction * 0.0451333, callout.y1),
+    ))
+    near = (callout.x0, callout.y0)
+    arrow_records = (
+        *_PIN_NATIVE_NEIGHBOUR_ARROWS,
+        (*near, callout.x1 - near[0], callout.y1 - near[1]),
+    )
+    for x, y, dx, dy in arrow_records:
+        lines.extend(arrowhead_segments((
+            x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0,
+        )))
+    title_block = Box(0.216, 0.0, 0.4318, 0.066)
+    for key, frame in frames.items():
+        assert 0.0127 < frame.xmin < frame.xmax < 0.4191
+        assert 0.0127 < frame.ymin < frame.ymax < 0.2667
+        assert frame.gap(title_block) >= 0.0035
+        # A full border must not strike foreign ink. Glyph spacing is a
+        # separate, stricter constraint; white cell padding is not printed
+        # lettering. No native audit threshold or landing guard is changed.
+        for glyph in glyphs:
+            assert frame.gap(glyph) >= 0.001
+        for line in lines:
+            assert segment_box_distance(line, frame) >= 0.001
+        for ink in _stop_frame_glyphs(frame, width):
+            for glyph in glyphs:
+                assert ink.gap(glyph) >= 0.0035
+            for line in lines:
+                assert segment_box_distance(line, ink) >= 0.002
+        for other_key, other in frames.items():
+            if other_key != key:
+                assert frame.gap(other) >= 0.0035
+    for leader in leaders:
+        stroke = Segment(leader.x0, leader.y0, leader.x1, leader.y1)
+        for key, frame in frames.items():
+            if key != leader.label:
+                assert segment_box_distance(stroke, frame) >= 0.0035
+        for glyph in glyphs:
+            assert segment_box_distance(stroke, glyph) >= 0.002
+        bend = (leader.x1, leader.y1)
+        if bend != _stop_control_tip(leader.label):
+            for line in lines:
+                assert point_segment_distance(bend, line) >= 0.0035
+    all_heads = [head for group in heads.values() for head in group]
+    for head in all_heads:
+        for frame in frames.values():
+            assert segment_box_distance(head, frame) >= 0.002
+    for stroke in (*all_heads, *(Segment(row.x0, row.y0, row.x1, row.y1) for row in leaders)):
+        for glyph in glyphs:
+            assert segment_box_distance(stroke, glyph) >= 0.002
+        for line in lines:
+            assert not segments_cross(
+                ((stroke.x0, stroke.y0), (stroke.x1, stroke.y1)),
+                ((line.x0, line.y0), (line.x1, line.y1)),
+            )
 
 
 def test_end_callouts_and_cross_hole_route_have_clear_paper_not_padded_view_boxes() -> None:

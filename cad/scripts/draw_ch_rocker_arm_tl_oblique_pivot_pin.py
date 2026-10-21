@@ -106,11 +106,15 @@ PROFILE_CENTER = (0.185, 0.164)
 ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (2, 1)
 ISO_NOTE_XY = (0.325, 0.252)
-# Native FCF corners below their respective flange faces. These are placement
-# requests, not after-fix paper evidence; the final native audit must pass.
+# b9e4d6b45bbb passed attachment/landing checks but its two native bent
+# leaders crossed. Keep the upper route left of its face, and put the
+# lower frame's mid-height on its literal landing: its 6.35 mm shoulder
+# then ends outside the right face and the final run approaches normally.
+# The 28.8 mm width budget is derived from rounded b9e4/native-font evidence,
+# not a measured current frame. Keep the full native ink/attachment audit.
 STOP_FACE_FRAME_XY = {
-    "flange_upper_stop": (0.176, 0.104),
-    "flange_lower_stop": (0.214, 0.104),
+    "flange_upper_stop": (0.1625, 0.097),
+    "flange_lower_stop": (0.2166, 0.115),
 }
 # Native BearingDia ink occupies X246.5 mm, not just its lower text block.
 # z=6 mm gives X261.5 between that line/arrow and the X278/279.5 chamfer

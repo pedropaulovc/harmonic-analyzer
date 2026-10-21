@@ -174,7 +174,7 @@ def test_native_dimension_maps_cover_every_manufacturing_control_once() -> None:
 def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> None:
     # Stud audit 20261021T125148010Z: the old 29-character row occupied
     # X24.6..95.7 mm about X60, approximately 2.45 mm per character.
-    # Round UP to 2.50 for this offline heuristic, not an exact glyph proof.
+    # Use 2.50 as an APPROXIMATE offline heuristic, not a glyph-width upper bound.
     # The same native sheet had inner border X12.7 and Front outline X101.7.
     # Fresh PDF/layout inspection still owns the actual wrapped glyph bounds.
     advance_mm = 2.50
@@ -186,11 +186,15 @@ def test_length_callout_screen_uses_captured_native_font_and_paper_lane() -> Non
 
 
 def test_thread_callout_screen_fits_between_native_length_line_and_left_barrel() -> None:
-    # Approximate offline screen only: native ink/leader routing remains required.
+    # Same APPROXIMATE offline screen as above, not a conservative upper bound.
+    # b9e4d6b45bbb's actual barrel silhouette is X107.3; the length line is
+    # X60. This screen suggests a lane outside the stud and dimension line,
+    # but actual glyph bounds and leader routing require native ink proof.
     left_mm = draw.THREAD_NOTE_XY[0] * 1000.0
     width_mm = max(map(len, draw.THREAD_CALLOUT.splitlines())) * 2.50
     assert draw.FRONT_KEEP["FinishedLength"][0] * 1000.0 < left_mm
     assert left_mm + width_mm < 107.3
+
 
 def test_feature_selector_distinguishes_actual_cut_end_from_factory_chamfer() -> None:
     selector = requirements_for(draw)["cut_end_chamfer"].faces[0]
@@ -563,7 +567,12 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
         assert cylinder.contains_y_mm == pytest.approx(
             (spec.LOWER_FACTORY_CHAMFER + spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 2.0
         )
-        assert xy == pytest.approx((0.120 + 2.0 * spec.RADIUS / 1000, 0.093 + 2.0 * cylinder.contains_y_mm / 1000))
+        # Replay b9e4d6b45bbb's one matching native silhouette: the opposite
+        # contour was NOT returned as a silhouette of the selected cylinder.
+        from _drawing_edges import _segment_distance
+
+        if _segment_distance(xy, (0.1073, 0.2052), (0.1073, 0.0948)) > 1e-5:
+            raise RuntimeError("no native barrel silhouette passes through the requested point")
         return {"thread": flank}
 
     def attached(owner, view, **kwargs):
@@ -608,7 +617,7 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
     rim_radius = (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
     assert lower[1] == 0.0 and 0.0 < lower[0] < rim_radius
     assert math.hypot(lower[0], lower[2]) == pytest.approx(rim_radius)
-    assert thread[0] == spec.RADIUS / 1000 and thread[2] == 0.0
+    assert thread[0] == -spec.RADIUS / 1000 and thread[2] == 0.0
     assert spec.LOWER_FACTORY_CHAMFER / 1000 < thread[1] < (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
     assert [row["text"] for row in inserted] == [draw.property_link("Lower End Note"), draw.THREAD_CALLOUT]
     assert spec.THREAD in inserted[1]["text"]
