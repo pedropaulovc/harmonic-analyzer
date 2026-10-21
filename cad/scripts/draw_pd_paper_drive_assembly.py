@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import json
 import math
 import sys
 import textwrap
@@ -1753,6 +1754,85 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
 
 
+def _annotate_bom_width_boundary(
+    table: Any, *, configuration: str, stage: str, target_column: int | None = None,
+    requested_width: float | None = None, outcome: dict[str, Any] | None = None,
+    text_rows: Sequence[int] = (),
+) -> None:
+    """Bound read-only width evidence; never repair or replace the native proof."""
+    def read(call: Callable[[], Any]) -> dict[str, Any]:
+        try:
+            value = repr(call())
+            return {"value": value[:192], "truncated": len(value) > 192}
+        except Exception as error:
+            return {"error": f"{type(error).__name__}: {error}"[:192]}
+
+    try:
+        rows = int(table.RowCount)
+        visible_columns = int(table.ColumnCount)
+        declared_columns = int(table.TotalColumnCount)
+        column_indices = range(max(0, min(declared_columns, 8)))
+        columns = [
+            {
+                "index": column,
+                "type_include_hidden_true": read(lambda: table.GetColumnType3(column, True)),
+                "type_include_hidden_false": read(lambda: table.GetColumnType3(column, False)),
+                "title_include_hidden_true": read(lambda: table.GetColumnTitle2(column, True)),
+                "title_include_hidden_false": read(lambda: table.GetColumnTitle2(column, False)),
+                "header_include_hidden_true": read(lambda: table.DisplayedText2(0, column, True)),
+                "header_include_hidden_false": read(lambda: table.DisplayedText2(0, column, False)),
+                "column_hidden": read(lambda: table.ColumnHidden(column)),
+                "width_no_include_hidden_parameter": read(lambda: table.GetColumnWidth(column)),
+            }
+            for column in column_indices
+        ]
+        formats = []
+        for row in tuple(text_rows)[:4]:
+            if not 0 <= row < rows:
+                continue
+            for column in range(max(0, min(visible_columns + 1, declared_columns, 8))):
+                cell = {
+                    "row": row,
+                    "column": column,
+                    "index_space": "legacy_getter_without_IncludeHidden",
+                    "use_doc": read(lambda: table.GetCellUseDocTextFormat(row, column)),
+                    "text_include_hidden_true": read(lambda: table.DisplayedText2(row, column, True)),
+                    "text_include_hidden_false": read(lambda: table.DisplayedText2(row, column, False)),
+                }
+                try:
+                    text_format = _early_bound(table.GetCellTextFormat(row, column), "ITextFormat")
+                    cell.update(
+                        height_m=read(lambda: text_format.CharHeight),
+                        width_factor=read(lambda: text_format.WidthFactor),
+                        typeface=read(lambda: text_format.TypeFaceName),
+                    )
+                except Exception as error:
+                    cell["format_error"] = f"{type(error).__name__}: {error}"[:192]
+                formats.append(cell)
+        summary = {
+            "stage": stage,
+            "configuration": configuration,
+            "target_column": target_column,
+            "requested_width_m": requested_width,
+            "outcome": outcome or {},
+            "visible_columns": visible_columns,
+            "declared_columns": declared_columns,
+            "rows": rows,
+            "columns": columns,
+            "row_heights_m": [
+                [row, read(lambda: table.GetRowHeight(row))]
+                for row in range(max(0, min(rows, 64)))
+            ],
+            "legacy_cell_formats": formats,
+            "caps": {"columns": declared_columns > 8, "rows": rows > 64, "text_rows": len(text_rows) > 4},
+        }
+        _telemetry.info(
+            "drawing.pd_bom_width_boundary " + json.dumps(summary, separators=(",", ":"))
+        )
+    except Exception:
+        pass  # Observational evidence cannot mask a setter failure or weaken a guard.
+
+
 def _validate_bom(
     adapter: Any, table: Any, counts: Counter[str], *, configuration: str
 ) -> tuple[tuple[str, str], ...]:
@@ -1789,13 +1869,37 @@ def _validate_bom(
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
+    text_rows = tuple(dict.fromkeys((
+        0, 1, 2,
+        *(row for row in range(1, rows)
+          if contents[row][part_column] == BOM_PART_NUMBERS["pd-transgear-removable"]),
+    )))[:4]
     for column, width in (
         (item_column, BOM_COLUMN_WIDTHS["item"]),
         (part_column, BOM_COLUMN_WIDTHS["part"]),
         (description_column, BOM_COLUMN_WIDTHS["description"]),
         (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
     ):
-        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
+        _annotate_bom_width_boundary(
+            table, configuration=configuration, stage="before_set_column_width",
+            target_column=column, requested_width=width,
+            text_rows=text_rows if column == item_column else (),
+        )
+        try:
+            actual_width = table.SetColumnWidth(column, width, 0)
+        except Exception as error:
+            _annotate_bom_width_boundary(
+                table, configuration=configuration, stage="after_set_column_width",
+                target_column=column, requested_width=width,
+                outcome={"error": f"{type(error).__name__}: {error}"[:192]},
+            )
+            raise
+        _annotate_bom_width_boundary(
+            table, configuration=configuration, stage="after_set_column_width",
+            target_column=column, requested_width=width,
+            outcome={"return": repr(actual_width)[:192]},
+        )
+        if abs(float(actual_width) - width) > 1e-6:
             raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
 
     actual: dict[str, tuple[int, str, str, str]] = {}
@@ -1828,9 +1932,18 @@ def _validate_bom(
                 f"paper-drive BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {counts[stem]}"
             )
+    height_returns = []
     for row in range(rows):
-        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
-    if not adapter.currentModel.EditRebuild3():
+        height = table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+        if row < 64:
+            height_returns.append([row, repr(height)[:192]])
+    rebuilt = adapter.currentModel.EditRebuild3()
+    _annotate_bom_width_boundary(
+        table, configuration=configuration, stage="after_rebuild",
+        outcome={"rebuild_return": repr(rebuilt)[:192], "row_height_returns": height_returns},
+        text_rows=text_rows,
+    )
+    if not rebuilt:
         raise RuntimeError("paper-drive BOM rebuild failed")
     if int(table.RowCount) != rows or int(table.ColumnCount) != columns:
         raise RuntimeError("paper-drive BOM dimensions changed during its final rebuild")
