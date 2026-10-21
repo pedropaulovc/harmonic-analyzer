@@ -86,15 +86,15 @@ KNIFE_SHOULDER_DROP_MIN = KNIFE_SHOULDER_X_MAX / math.tan(
 # Between the stubs: both are one prism through the body
 # (``build_sm_summing_lever._hex_knife``, read back by
 # ``_assert_knife_sides_coplanar``), so each side face of one stub lies in the
-# same plane as the other's, and the print says so ("SIDES IN ONE PLANE").
-# Each ridge then stands RIDGE_FROM_SIDE +/-RIDGE_FROM_SIDE_TOL from the SAME
-# side plane, which puts the two ridges within KNIFE_STUB_RIDGE_OFFSET_MAX of
-# each other.  This bound rests on the shared planes: with each stub's sides
-# free, the symmetry would tie each ridge only to its own stub, and nothing
-# would tie the -Z ridge to datum A.  The two ridges rest on the knife mounts
-# at the stubs' mid-lengths, KNIFE_RIDGE_CONTACT_SPAN apart, so that offset
-# skews the knife axis and spreads the 20 spring holes' hook arms by up to
-# KNIFE_HOOK_ARM_SPREAD_MAX over the column.
+# same plane as the other's. The print retains the C09 symmetry-to-sides
+# wording for both stubs, not a separate coplanarity requirement.
+# Each ridge stands RIDGE_FROM_SIDE +/-RIDGE_FROM_SIDE_TOL from the SAME
+# side plane, putting the ridges within KNIFE_STUB_RIDGE_OFFSET_MAX of each
+# other. This bound rests on the shared model planes: with independent
+# stub sides, symmetry alone would not tie the +Z ridge to datum A on -Z.
+# The ridges rest on the knife mounts at the stubs' mid-lengths,
+# KNIFE_RIDGE_CONTACT_SPAN apart; their relative offset skews the knife axis
+# and spreads the spring hook arms by up to KNIFE_HOOK_ARM_SPREAD_MAX.
 KNIFE_STUB_RIDGE_OFFSET_MAX = 2.0 * RIDGE_FROM_SIDE_TOL  # 0.10
 KNIFE_RIDGE_CONTACT_SPAN = PLATE_L + HEX_DEPTH  # 174.117 stub mid to stub mid
 

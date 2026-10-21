@@ -561,21 +561,26 @@ def _ridge_datum(adapter: Any, detail: Any) -> Any:
     )
 
 
-# The ridge centreline runs the +Z stub's length and 2 model mm past its
-# outboard face: 1 sheet mm, ending 1.5 mm above 44.45's dimension line.
+# The plan's theoretical-sharp reference belongs to the -Z stub tagged A in
+# Detail D. Its overrun extends 2 model mm past that stub's outboard face.
 RIDGE_AXIS_OVERRUN_MM = 2.0
 
 
 def _ridge_centerline(adapter: Any, top: Any) -> Any:
-    """An owned centreline on the +Z knife ridge's theoretical sharp in the
-    plan (draw_sm_knife_mount._add_section_axes's idiom): the round leaves
-    no edge on the ridge itself, and rule 16 dimensions to the sharp."""
+    """Theoretical-sharp centreline on datum A's -Z knife ridge in the plan.
+
+    Both stubs share this nominal axis, but only the -Z ridge carries A.
+    The round leaves no sharp edge; rule 16 dimensions to the sharp.
+    """
     return _owned_centerline(
         adapter,
         top,
         tuple(
             (0.0, HEX_H / 2.0, z)
-            for z in (PLATE_L / 2.0, PLATE_L / 2.0 + HEX_DEPTH + RIDGE_AXIS_OVERRUN_MM)
+            for z in (
+                -PLATE_L / 2.0,
+                -PLATE_L / 2.0 - HEX_DEPTH - RIDGE_AXIS_OVERRUN_MM,
+            )
         ),
         label="ridge centreline",
     )
@@ -1522,9 +1527,8 @@ VIEW_G_ARROW = (
     (_VIEW_G_TIP[0] - 0.0004, _VIEW_G_TIP[1] - 0.005),
     _VIEW_G_TIP,
 )
-# VIEW G's label, under the end profile, right of Detail D's letter and
-# leader (x 0.2452), 1 cm over the 20X frame's leader.  The point is its top
-# left.
+# VIEW G's label stands under the end profile, right of Detail D's identifier
+# and above the spring-pattern frame's leader. The point is its upper-left.
 FRONT_VIEW_NOTE_XY = (0.258, 0.2120)
 
 
@@ -1815,14 +1819,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="-Z knife-edge ridge finish",
         char_height=0.0025,
     )
-    # X location of the anchor tap from the knife-edge pivot axis (the +Z
-    # trunnion ridge, the finish's): a plain title-block dimension, both
-    # endpoints named -- the ridge's theoretical sharp (rule 16), an owned
-    # centreline down the +Z stub, and the tap's rim on the boss top (centre
-    # (TIP_X, ANCHOR_H/2, 0), the hole wizard's placement in
-    # build_sm_summing_lever._counter_anchor_tap).  The mid rib's apex shares
-    # this station (its 76.20 in the front profile).
-    ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
+    # X location of the anchor tap from datum A's -Z knife-edge pivot ridge:
+    # a plain title-block dimension. The owned centreline depicts its
+    # theoretical sharp (rule 16); nominally the +Z ridge shares that axis,
+    # but the opposite manufactured ridge is not the datum feature. Both
+    # this dimension and the spring row's BASIC X use the same -Z reference.
+    # The other endpoint is the tap rim on the boss top, centre
+    # (TIP_X, ANCHOR_H/2, 0), placed by _counter_anchor_tap. The mid rib's
+    # apex shares the anchor tap's X station.
+    ridge_dim_edge = _top_xy(0.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH)
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     ridge_axis = _ridge_centerline(adapter, top)
     anchor_rim = top_edges.circle_at(
@@ -1956,11 +1961,11 @@ async def build(adapter: Any) -> dict[str, str]:
     seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
     # The start Z (12.75) spans 6.4 mm of sheet (0.0919..0.0983); text between
     # the arrows would sit on its own line (3.35 there stood on 7.06's extension
-    # line and 152.40's), so it hangs above the span.  Each of these vertical
+    # line and the body-span line), so it hangs above the span. Each of these vertical
     # dimensions draws its line at its text's right end (farm r1 2026-10-16:
     # the 19X 7.06 text 0.275..0.2958 with its line there), so the 12.75 text
     # starts 4 mm right of that line -- at 0.292 its shoulder crossed it -- and
-    # stays left of the 152.40 line (0.396).
+    # stays left of the 152.4 body-span line (0.396).
     start_z = add_edge_dimension(
         adapter,
         top,

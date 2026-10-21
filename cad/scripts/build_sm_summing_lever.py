@@ -1164,6 +1164,43 @@ def _assert_receiver_profile_walls(adapter) -> None:
     )
 
 
+def coefficient_underside_root_geometry() -> tuple[
+    float, tuple[float, float], tuple[float, float], tuple[tuple[float, float], ...]
+]:
+    """Nominal lower junction, tangent R1 cylinder and two inboard edge runs.
+
+    The fillet circle is externally tangent to the pivot cylinder and tangent
+    to the plate underside. Its centre is R below the underside, at distance
+    CylR + R from the pivot axis. Cap-root corner patches get a one-radius
+    neighbourhood in the native audit; neither outside body end is selected.
+    """
+    bottom, radius = COEFFICIENT_BOTTOM_Y, RIB_BLEND_R
+    runs = (
+        (-RECEIVER_RIB_OFFSET, -RIB_T / 2.0),
+        (RIB_T / 2.0, RIB_OFFSET),
+    )
+    if (
+        not all(math.isfinite(value) for value in (bottom, radius, CYL_R, PLATE_L))
+        or not -CYL_R < bottom < 0.0
+        or radius <= 0.0
+        or any(
+            not all(math.isfinite(value) for value in (start, end))
+            or not -PLATE_L / 2.0 < start - radius < end + radius < PLATE_L / 2.0
+            or end - start <= 4.0 * radius
+            for start, end in runs
+        )
+    ):
+        raise ValueError("lower plate/cylinder blend violates inboard tangent-run premises")
+    edge_x = math.sqrt(CYL_R**2 - bottom**2)
+    center_y = bottom - radius
+    center_x = math.sqrt((CYL_R + radius)**2 - center_y**2)
+    tangent = (
+        center_x * CYL_R / (CYL_R + radius),
+        center_y * CYL_R / (CYL_R + radius),
+    )
+    return edge_x, (center_x, center_y), tangent, runs
+
+
 def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]:
     """Explicit reentrant roots only; never the outside receiver/knife caps.
 
@@ -1186,10 +1223,23 @@ def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]
         [-30.0, sign * COUNTER_WEB_T / 2.0, z]
         for z in middle_caps for sign in (-1.0, 1.0)
     ]
+    edge_x, _, _, longitudinal_runs = coefficient_underside_root_geometry()
+    longitudinal_picks = [
+        [edge_x, COEFFICIENT_BOTTOM_Y, (start + end) / 2.0]
+        for start, end in longitudinal_runs
+    ]
     return (
         ("RibCylinderRootFillets", cylinder_picks, 4.0 * math.tau * CYL_R),
         ("RibCounterRootFillets", counter_picks, 4.0 * SUM_H),
         ("RibRootFillets", plate_picks, 8.0 * RIB_REACH),
+        # Keep the established cap-root operations and their bounds unchanged.
+        # Mid-run longitudinal edges survive those rounds; the last operation
+        # joins their corner patches without tangent propagation.
+        (
+            "CoefficientUndersideRootFillets",
+            longitudinal_picks,
+            sum(end - start for start, end in longitudinal_runs) + 4.0 * RIB_BLEND_R,
+        ),
     )
 
 
@@ -1198,6 +1248,37 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(name)
     feature = _early_bound(raw, "IFeature")
     count = 0
+    underside = name == "CoefficientUndersideRootFillets"
+    if underside:
+        _, center, tangent, runs = coefficient_underside_root_geometry()
+        # A finite one-radius cap-corner neighbourhood surrounds the exact
+        # straight-run tangent section. This is not an allowance for the old
+        # families, whose reach/entry/radius bounds below remain unchanged.
+        lower_bounds = (tangent[0] - RIB_BLEND_R, tangent[1] - RIB_BLEND_R)
+        upper_bounds = (center[0] + RIB_BLEND_R, COEFFICIENT_BOTTOM_Y + RIB_BLEND_R)
+        covered_runs = set()
+        from magnifying_bracket_joint_layout import (
+            DRILLED_DIAMETER_PLUS, DRILL_WANDER_MAX, LINEAR_BAND, POSITION_BAND,
+            THREAD_CUTTING_PROOF_RESERVE,
+        )
+
+        tool_radius = max(
+            THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + THREAD_CUTTING_PROOF_RESERVE,
+            (TAP_DRILL_DIA + DRILLED_DIAMETER_PLUS) / 2.0 + DRILL_WANDER_MAX,
+        )
+        # This stronger X-disjointness proof covers the complete finite
+        # cutting cylinder and separate pilot, with ordinary free-edge motion
+        # and the actual-axis position band. No wall credit is taken for the
+        # material added by the concave blend.
+        receiver_inner_x = (
+            min(point[0] for point in LEVER_HOLE_POINTS)
+            - LINEAR_BAND - POSITION_BAND - tool_radius
+        )
+        if (
+            upper_bounds[0] >= min(receiver_inner_x, PLATE_W, RIB_REACH)
+            or upper_bounds[1] >= COEFFICIENT_TOP_Y
+        ):
+            raise RuntimeError(f"{name}: lower-junction envelope reaches a retained interface")
     for raw_face in feature.GetFaces() or ():
         face = _early_bound(raw_face, "IFace2")
         surface = _early_bound(face.GetSurface(), "ISurface")
@@ -1216,20 +1297,51 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             raise RuntimeError(f"{name}: cannot extract native root face for exact bounds")
         sheet = _early_bound(sheet_raw, "IBody2")
         extrema = []
-        for direction, axis in (((1.0, 0.0, 0.0), 0), ((0.0, 0.0, -1.0), 2), ((0.0, 0.0, 1.0), 2)):
+        directions = [
+            ((1.0, 0.0, 0.0), 0), ((0.0, 0.0, -1.0), 2), ((0.0, 0.0, 1.0), 2),
+        ]
+        if underside:
+            directions += [
+                ((-1.0, 0.0, 0.0), 0), ((0.0, -1.0, 0.0), 1), ((0.0, 1.0, 0.0), 1),
+            ]
+        for direction, axis in directions:
             result = sheet.GetExtremePoint(direction[0], direction[1], direction[2])
             if result is None or len(result) != 4 or not result[0] or not all(
                 math.isfinite(float(value)) for value in result[1:]
             ):
                 raise RuntimeError(f"{name}: invalid exact native root extreme {result}")
             extrema.append(float(result[axis + 1]) * 1000.0)
-        x_max, z_min, z_max = extrema
+        x_max, z_min, z_max = extrema[:3]
         if x_max > RIB_REACH + 1e-5:
             raise RuntimeError(
                 f"{name}: R{RIB_BLEND_R} root face grows beyond X{RIB_REACH}: {extrema}"
             )
         if z_min <= -PLATE_L / 2.0 + 1e-5 or z_max >= PLATE_L / 2.0 - 1e-5:
             raise RuntimeError(f"{name}: root blend reaches an outside entry/knife cap: {extrema}")
+        if underside:
+            x_min, y_min, y_max = extrema[3:]
+            if (
+                x_min < lower_bounds[0] - 1e-5 or x_max > upper_bounds[0] + 1e-5
+                or y_min < lower_bounds[1] - 1e-5 or y_max > upper_bounds[1] + 1e-5
+                or not any(
+                    start - RIB_BLEND_R - 1e-5 <= z_min <= z_max <= end + RIB_BLEND_R + 1e-5
+                    for start, end in runs
+                )
+            ):
+                raise RuntimeError(f"{name}: native face escapes the lower-junction envelope: {extrema}")
+            if surface.IsCylinder() and z_max - z_min > 4.0 * RIB_BLEND_R:
+                parameters = tuple(float(value) for value in surface.CylinderParams)
+                if (
+                    len(parameters) != 7 or not all(math.isfinite(value) for value in parameters)
+                    or not math.isclose(parameters[0] * 1000.0, center[0], abs_tol=1e-5)
+                    or not math.isclose(parameters[1] * 1000.0, center[1], abs_tol=1e-5)
+                    or abs(parameters[3]) > 1e-6 or abs(parameters[4]) > 1e-6
+                    or not math.isclose(abs(parameters[5]), 1.0, abs_tol=1e-6)
+                ):
+                    raise RuntimeError(f"{name}: native cylinder is not the lower tangent blend: {parameters}")
+                for index, (start, end) in enumerate(runs):
+                    if z_min <= start + 2.0 * RIB_BLEND_R and z_max >= end - 2.0 * RIB_BLEND_R:
+                        covered_runs.add(index)
         if radius is not None:
             if not math.isfinite(radius) or not math.isclose(
                 radius, RIB_BLEND_R, abs_tol=1e-5
@@ -1243,6 +1355,8 @@ def _assert_root_feature_bounds(adapter, name: str, minimum_faces: int) -> None:
             f"{name}: only {count} native R{RIB_BLEND_R} root surfaces "
             f"for {minimum_faces} selected reentrant roots"
         )
+    if underside and covered_runs != set(range(len(runs))):
+        raise RuntimeError(f"{name}: missing native longitudinal blend run: {sorted(covered_runs)}")
 
 
 async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
@@ -1274,9 +1388,9 @@ async def _rib_root_fillets(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 def _rib_radius_max_limits(adapter) -> None:
     """Band every modeled rib blend under the title-block R1 MAX ceiling.
 
-    Profile blends and perpendicular rib-side roots remain native controls,
-    without a duplicate drawing callout. This does not impose a modeled
-    fillet on unchanged body junctions.
+    Profile blends, perpendicular rib-side roots and the changed longitudinal
+    coefficient underside remain native controls without a duplicate drawing
+    callout. Unchanged body junctions are not given a modeled-fillet claim.
     """
     owners = [
         (f"{stem}Profile", f"{stem}{side}BlendR")
@@ -2060,8 +2174,8 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
     # built, so the geometry must not move; the neutrality re-check is the proof.
-    # No analytic volume gate exists for this part (organic arcs), so capture the
-    # as-built volume and assert it is unchanged after driving.
+    # Component increments have analytic gates; the complete organic solid
+    # including native corner patches uses measured as-built neutrality.
     await force_rebuild(adapter)
     _mass = await adapter.get_mass_properties()
     if not _mass.is_success:
@@ -2124,6 +2238,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     _assert_edge_rib_end_planes(adapter)
+    for name, picks, _ in rib_root_edge_families():
+        _assert_root_feature_bounds(adapter, name, len(picks))
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,

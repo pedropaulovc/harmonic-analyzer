@@ -4,7 +4,7 @@ The installed top face, spring row and receiver axes do not move. Each positive-
 rib flank is the common tangent of the origin-centred wrap and a concave R1
 runout into its coefficient-plate face. No tangent coordinate is a design knob.
 Line/circle boundary integrals give exact areas and first moments: these are
-ideal prismatic unions, not allowances for the native out-of-plane root fillets.
+ideal prismatic unions, excluding native cap-root and longitudinal body fillets.
 """
 
 from __future__ import annotations
@@ -14,9 +14,19 @@ from functools import cached_property
 from itertools import product
 import math
 
+import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_spec as spec
 
 Point = tuple[float, float]
+
+# PlateProfile.PlateTopY independently drives CoefficientTopY: unlike the old
+# centred slab, it takes the WHOLE ordinary .XX band, not half the thickness
+# band. joint.LINEAR_BAND is the printed title_block.yaml +/-0.51 mm, which
+# conservatively covers the native 0.02 in (0.508 mm). Also enclose .XX nominal
+# rounding; the current 2.54 mm native/printed top needs no extra allowance.
+PLATE_TOP_Y_ALLOWANCE = joint.LINEAR_BAND + abs(
+    round(spec.COEFFICIENT_TOP_Y, 2) - spec.COEFFICIENT_TOP_Y
+)
 
 
 @dataclass(frozen=True)
@@ -315,9 +325,10 @@ def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
     """Bounded manufacturing walls with ordinary bands and datum correlations.
 
     Width, wrap and reach each take +/-0.51. The R1 MAX runout independently
-    spans 0..1. Top takes +/-0.255 and thickness independently +/-0.51. A hole
-    is +/-0.05 from the ACTUAL free edge and top, so a top/edge shift is shared,
-    not charged a second time as independent axis motion. The radius contains
+    spans 0..1. The independent PlateTopY takes PLATE_TOP_Y_ALLOWANCE and
+    thickness independently +/-0.51. ReceiverY0 is +/-0.05 from the ACTUAL
+    top, just as each X station is from the ACTUAL free edge: their shifts
+    are shared, not charged again as independent axis motion. The radius contains
     both the entire required thread-cutting cylinder (runout/deflection already
     included, plus a separate conservative proof reserve) and the printed
     pilot plus deepest drill wander. Never add pilot wander to the cutting
@@ -325,8 +336,6 @@ def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
     integration or physical-tool qualification. Native pilot/cosmetic threads
     do not establish that an unqualified process meets the requirement.
     """
-    import magnifying_bracket_joint_layout as joint
-
     pilot_radius = (
         max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
         + joint.DRILLED_DIAMETER_PLUS
@@ -342,7 +351,7 @@ def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
     values = [[math.inf, math.inf, math.inf] for _ in points]
     witnesses = [[(), (), ()] for _ in points]
     for dr, dx, db, dw, dt, dh in product((-1.0, 1.0), repeat=6):
-        top = spec.COEFFICIENT_TOP_Y + dt * 0.255
+        top = spec.COEFFICIENT_TOP_Y + dt * PLATE_TOP_Y_ALLOWANCE
         thickness = spec.COEFFICIENT_T + dh * joint.LINEAR_BAND
         profile = RibProfile(
             wrap_radius=spec.RIB_WRAP_R + dr * joint.LINEAR_BAND,

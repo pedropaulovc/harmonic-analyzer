@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+import _config
 import magnifying_bracket_joint_layout as joint
 import sm_summing_lever_profile as profile
 import sm_summing_lever_spec as spec
@@ -113,6 +114,20 @@ def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -
     assert profile.receiver_wall_margin(spec.RIB_REACH - 0.01, 0.0, 0.0) > 2.5
 
 
+def _receiver_envelope_radius() -> float:
+    pilot_radius = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
+        + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
+        joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
+    )
+    return max(
+        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE,
+        pilot_radius + pilot_wander,
+    )
+
+
 def _witness_clearance(
     nominal_x: float, witness: tuple[float, ...], side: str
 ) -> float:
@@ -123,25 +138,28 @@ def _witness_clearance(
     )
     x = width - (spec.PLATE_W - nominal_x) + ex
     y = top - spec.COEFFICIENT_TOP_Y + ey
-    pilot_radius = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
-        + joint.DRILLED_DIAMETER_PLUS
-    ) / 2.0
-    pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
-        joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
-    )
-    radius = max(
-        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE,
-        pilot_radius + pilot_wander,
-    )
+    radius = _receiver_envelope_radius()
     if side == "minimum":
         return section.receiver_wall_margin(x, y, radius)
     boundary = section.upper_boundary if side == "upper" else section.lower_boundary
     return min(segment.distance(x, y) for segment in boundary) - radius
 
 
+def _plate_top_y_limits() -> tuple[float, float]:
+    """Independent union of native .XX and printed title-block limits."""
+    row = _config.title_block("linear_2pl")
+    native_band = float(row["value_in"]) * spec.MM_PER_IN
+    printed_band = float(str(row["display"]).removeprefix("±"))
+    printed_top = round(spec.COEFFICIENT_TOP_Y, 2)
+    return (
+        min(spec.COEFFICIENT_TOP_Y - native_band, printed_top - printed_band),
+        max(spec.COEFFICIENT_TOP_Y + native_band, printed_top + printed_band),
+    )
+
+
 def test_required_envelope_ordinary_bands_have_replayable_correlated_wall_witnesses() -> None:
     budgets = profile.receiver_wall_budget()
+    top_limits = _plate_top_y_limits()
     assert len(budgets) == len(joint.LEVER_HOLE_POINTS) == 2
     for budget, point in zip(budgets, joint.LEVER_HOLE_POINTS):
         assert budget.x_mm == point[0]
@@ -151,7 +169,7 @@ def test_required_envelope_ordinary_bands_have_replayable_correlated_wall_witnes
             assert clearance == pytest.approx(_witness_clearance(point[0], witness, side))
             assert clearance > 2.0
             assert witness[2] in (0.0, 1.0)  # R1 MAX, never R1 +/-0.51.
-            assert abs(witness[4] - spec.COEFFICIENT_TOP_Y) == pytest.approx(0.255)
+            assert any(witness[4] == pytest.approx(limit) for limit in top_limits)
             assert abs(witness[5] - spec.COEFFICIENT_T) == pytest.approx(0.51)
         assert budget.minimum_mm <= min(budget.upper_mm, budget.lower_mm) + 1e-12
     assert budgets[1].minimum_mm < budgets[0].minimum_mm
@@ -160,10 +178,59 @@ def test_required_envelope_ordinary_bands_have_replayable_correlated_wall_witnes
     worst = budgets[1]
     for radius, reach, blend, top, thickness in product(
         (14.73, 15.24, 15.75), (35.24, 35.75, 36.26), (0.0, 0.5, 1.0),
-        (2.285, 2.54, 2.795), (6.49, 7.0, 7.51),
+        (top_limits[0], spec.COEFFICIENT_TOP_Y, top_limits[1]), (6.49, 7.0, 7.51),
     ):
         witness = (radius, reach, blend, 44.96, top, thickness, 0.05, 0.05)
         assert _witness_clearance(29.7, witness, "upper") >= worst.upper_mm - 1e-10
+
+
+def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) -> None:
+    # Construct the permitted outer receiver's upper-wall corner from the
+    # title block, independently of the production top allowance/enumerator.
+    top = _plate_top_y_limits()[1]
+    wrap = spec.RIB_WRAP_R - joint.LINEAR_BAND
+    reach = spec.RIB_REACH - joint.LINEAR_BAND
+    blend = spec.RIB_BLEND_R
+    width = spec.PLATE_W + joint.LINEAR_BAND
+    thickness = spec.COEFFICIENT_T - joint.LINEAR_BAND
+    nominal_x, nominal_y, _ = joint.LEVER_HOLE_POINTS[-1]
+    witness = (
+        wrap, reach, blend, width, top, thickness,
+        joint.POSITION_BAND, joint.POSITION_BAND,
+    )
+    x = width - (spec.PLATE_W - nominal_x) + joint.POSITION_BAND
+    y = top - (spec.COEFFICIENT_TOP_Y - nominal_y) + joint.POSITION_BAND
+
+    # Independent angular construction of the common tangent. Prove its
+    # perpendicular foot lies on the finite flank before using line distance;
+    # no RibProfile boundary/distance implementation supplies this oracle.
+    cy = top + blend
+    angle = math.atan2(cy, reach) + math.acos((wrap + blend) / math.hypot(reach, cy))
+    nx, ny = math.cos(angle), math.sin(angle)
+    distance = wrap - nx * x - ny * y
+    foot_x = x + distance * nx
+    assert wrap * nx < foot_x < reach - blend * nx
+    permitted_wall = distance - _receiver_envelope_radius()
+    assert permitted_wall > joint.RECEIVER_WALL_MIN == 2.0
+
+    budget = profile.receiver_wall_budget()[-1]
+    assert budget.upper_mm == pytest.approx(permitted_wall, abs=1e-12)
+    assert budget.minimum_mm == pytest.approx(permitted_wall, abs=1e-12)
+    assert budget.upper_witness == pytest.approx(witness, abs=1e-12)
+    assert _witness_clearance(nominal_x, witness, "upper") == pytest.approx(
+        permitted_wall, abs=1e-12
+    )
+
+    # Both a missing top band and the former symmetric-5.08 half-band miss
+    # this allowed configuration, reporting more wall than it actually has.
+    row = _config.title_block("linear_2pl")
+    printed_band = float(str(row["display"]).removeprefix("±"))
+    for too_small in (0.0, printed_band / 2.0):
+        with monkeypatch.context() as patch:
+            patch.setattr(profile, "PLATE_TOP_Y_ALLOWANCE", too_small)
+            incomplete = profile.receiver_wall_budget()[-1]
+        assert incomplete.upper_mm > permitted_wall + 1e-6
+        assert incomplete.minimum_mm > permitted_wall + 1e-6
 
 
 def _axial_margins(rib_depth: float, thread_depth: float, drill_depth: float) -> tuple[float, ...]:

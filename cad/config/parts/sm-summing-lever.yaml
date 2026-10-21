@@ -9,9 +9,11 @@ sm-summing-lever:
   # 7.00 thick downward from the unchanged spring top; counter web stays
   # 5.08 centred. Shared positive rib: R15.24 wrap, tangent flanks and R1
   # blends into both coefficient faces at X35.75. The title block owns the
-  # R1 MAX ceiling; bounded native profile-blend and rib inner-cap-root proofs
-  # against plate, cylinder and counter web remain, without tangent propagation
-  # onto receiver entry caps or knife shoulders. Not a general body-fillet claim.
+  # R1 MAX ceiling; bounded native profile-blend and rib inner-cap-root guards
+  # against plate, cylinder and counter web remain. A separate lower longitudinal
+  # plate/cylinder family joins the inboard rib caps without tangent propagation.
+  # Its source contract is implemented; fresh native corner/interface proof is pending.
+  # No blend may reach receiver entry caps or knife shoulders. Not general body fillets.
   # Spring/nut seats, Ø0.15 pattern and #1769 footprint stay put.
   # The 9.00 receiver extends inward only; entry face and axes stay fixed.
   # Pad/ledge exceptions are eliminated; unchanged-junction RV-02 remains.
@@ -25,12 +27,12 @@ sm-summing-lever:
       finding: "pattern position frame over-specified (rule 5)"
       reason: "one pattern control keeps the 20 channels spring geometry consistent; its Ø0.15 zone, tightened from Ø0.30 by owner ruling on code review C06, keeps neighbouring MHA-CH-14 jam nuts 0.25 apart with both taps at their worst (owner-accepted)"
     # Carry forward b2c8d954 RV-02 only at the unchanged junctions below.
-    # The eliminated pad step and changed, proved R1 rib-side roots are excluded.
+    # The moved coefficient underside, eliminated pad step and proved R1 roots are excluded.
     - id: "RV-02"
       kind: "accept"
-      where: "the unchanged longitudinal coefficient-plate-to-pivot-cylinder and counter-web-to-pivot-cylinder junctions between rib caps; boss-to-counter-web and boss-to-negative-X-middle-rib-flank junctions; negative-X middle-rib-flank-to-counter-web face creases; and knife-stub-to-end-rib shoulders"
-      finding: "sharp internal corners with no stated fillet or maximum radius (rules 11, 16)"
-      reason: "owner ruling 2026-10-18, already authorized in b2c8d954 RV-02: machined from solid with an R1.0 MAX inside-corner ceiling; carry that authorization forward only for the listed unchanged junctions while the shop-wide default remains under #1625. The eliminated pad step, modeled profile blends and now-filleted rib inner-cap side roots against plate, cylinder and counter web are excluded. Unchanged knife-stub roots retain the separate #1625 local R0.5 MAX debt; knife material/hardness remains separate under #1611 (owner-accepted)"
+      where: "the unchanged longitudinal coefficient-plate-top-to-pivot-cylinder and counter-web-to-pivot-cylinder junctions between rib caps; boss-to-counter-web and boss-to-negative-X-middle-rib-flank junctions; negative-X middle-rib-flank-to-counter-web face creases; and knife-stub-to-end-rib shoulders"
+      finding: "sharp internal corners retained without modelled blends (rules 11, 16)"
+      reason: "owner ruling 2026-10-18, already authorized in b2c8d954 RV-02: machined from solid with an R1.0 MAX inside-corner ceiling, now carried by the shop-wide title-block row. Carry that authorization forward only for the listed unchanged junctions. The moved coefficient-plate-underside-to-cylinder junction is excluded: its separate bounded R1 MAX longitudinal fillet family is implemented under the owner's 2026-10-21 model-the-blend decision, with fresh native verification pending, not an extended sharp-corner exception. The eliminated pad step, modeled profile blends and now-filleted rib inner-cap side roots against plate, cylinder and counter web are also excluded. Unchanged knife-stub roots retain the separate #1625 local R0.5 MAX debt; knife material/hardness remains separate under #1611 (owner-accepted)"
     - id: "RV-03"
       kind: "accept"
       where: "front view, 2X R138.85 web arcs; words added to the Ø19.05 callout: 'WEB ARCS RUN FROM QUADRANTS TO AXIS A AT ENDS'"

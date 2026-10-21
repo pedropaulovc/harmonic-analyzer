@@ -185,16 +185,6 @@ def test_receiver_upper_stop_keeps_drill_inside_the_proven_rib() -> None:
     assert upper_plate_wall < 1.5
 
 
-def test_body_end_span_does_not_read_as_the_overall() -> None:
-    """The unchanged stubs extend beyond the dimensioned body end faces."""
-    plate_length = notes.DIMENSION_CALLOUTS_BELOW["PlateLength"]
-    assert " ".join(plate_length.split()) == "BODY END FACES"
-    assert "PlateLength" in drawing.TOP_KEEP
-    x, _ = drawing.TOP_KEEP["PlateLength"]
-    widest = max(len("152.40"), *map(len, plate_length.split("\n")))
-    assert x + _CHAR_M * widest / 2.0 < 0.4191 - 0.002  # under the right border
-
-
 def test_receiver_rim_scan_uses_back_entry_face() -> None:
     import magnifying_bracket_joint_layout as joint
     calls = []
@@ -867,6 +857,26 @@ def test_knife_detail_is_cut_from_the_existing_receiver_view(monkeypatch) -> Non
     assert definition["radius_m"] == pytest.approx(0.006)
     assert definition["scale"] == (10.0, 1.0)
     assert definition["letter"] == "D"
+
+
+def test_plan_ridge_reference_follows_datum_a_negative_z_stub(monkeypatch) -> None:
+    adapter, top, segment = object(), object(), object()
+    endpoints = []
+
+    def owned_reference(actual_adapter, actual_view, ends_mm, **_kwargs):
+        assert actual_adapter is adapter
+        assert actual_view is top
+        endpoints.extend(ends_mm)
+        return segment
+
+    monkeypatch.setattr(drawing, "_owned_centerline", owned_reference)
+    assert drawing._ridge_centerline(adapter, top) is segment
+    inner_z = -drawing.PLATE_L / 2.0
+    assert endpoints[0] == pytest.approx((0.0, drawing.HEX_H / 2.0, inner_z))
+    assert endpoints[1] == pytest.approx((
+        0.0, drawing.HEX_H / 2.0,
+        inner_z - drawing.HEX_DEPTH - drawing.RIDGE_AXIS_OVERRUN_MM,
+    ))
 
 
 def test_datum_a_attaches_the_actual_visible_back_knife_round(monkeypatch) -> None:

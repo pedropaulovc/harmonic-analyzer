@@ -104,8 +104,9 @@ BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 # Each names that seat, as the vertex height does. Detail D carries the whole
 # knife envelope, its ridge round and datum A together at 10:1.
 # Both stubs are one prism, so their side faces share two planes
-# (``build_sm_summing_lever._hex_knife``), which ties the -Z ridge to datum A
-# within ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``.  The model
+# (``build_sm_summing_lever._hex_knife``), which ties the +Z ridge to datum A
+# on the -Z ridge within
+# ``sm_summing_lever_spec.KNIFE_STUB_RIDGE_OFFSET_MAX``. The model
 # carries that; the print carries the owner's C09 wording, KNIFE EDGE
 # SYMMETRIC TO SIDES, BOTH STUBS, split across the pair, and no coplanarity
 # requirement of its own (machinist review bdc033f13: "SIDES IN ONE PLANE"
@@ -130,7 +131,7 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "AnchorHeight": "CENTRED ON 5.08 WEB",
     "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
     "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
-    # The plan's 152.40 is the body's end-face span, not the part's overall:
+    # The plan's 152.4 is the body's end-face span, not the part's overall:
     # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
     # as the overall; drawing-guidelines: nothing reads like an overall that
     # is not one).  Short lines: the block stands 14 mm from the border.
