@@ -1116,6 +1116,11 @@ inventory but was not directly identity-tested in R13. This is not evidence
 that all cross-sketch point relations are unsupported; the same run successfully
 used26 with an external origin. Correct the creation collision without changing
 the four intended constraints, sources, dimensional bands or final geometry.
+R14 proved independent provisional endpoints and actual creation of26 with
+two point definitions, unsuppressed and correctly aligned. Raw definition-point
+dispatches nevertheless compared as `(0,0)` against the retained start. Its
+expected-start ID was not recorded, so equality of the documented native point
+keys still requires direct readback rather than a pointer-normalization claim.
 R11 regressed the already-passed HORIZONTAL4 check because mandatory runtime
 type information returned `Invalid index`; that optional metadata is not an
 interface-capability contract. Classify each actual definition with native
@@ -1151,13 +1156,22 @@ matching owner, and read `Name` only from that actual tree `IFeature`.
 Reject unavailable or ambiguous ownership; do not cache across rebuilds.
 IDs alone are not unique across owners or segment types. Require valid native
 identity fields and exact equality wherever actual segments are compared.
+For points, [`ISketchPoint.GetID`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISketchPoint~GetID.html)
+explicitly defines **point type + owning sketch name + ordered ID pair**:
+the pair is unique only within that sketch and can overlap other element types.
+Use this as the primary native point association and independence contract for
+selection, relation definitions and annotation attachments—not a fallback
+selected only when raw pointer comparison fails. Require unambiguous point
+capability, valid native fields and the same strict self/owner controls.
+Read the keys afresh in each validation phase: these are not persistent IDs
+and must not be carried across rename or rebuild as cached identities.
 For the local construction line, verify its owner/type/IDs and distinct endpoint
 identities; dimension attachment identity must match those endpoints, while
 constraint definition entities must match the real Wizard point and converted
 circle/centre. Keep exact native types/counts, non-null attachments, not-dangling,
 measured value, driven ownership and acceptance-band checks after final rebuild.
-Raw dispatch `IsSame` results remain diagnostic, not the segment-identity
-oracle; unavailable native keys never pass. Log operation stage, count, types,
+Raw cross-proxy `IsSame` results remain diagnostic, not the point/segment
+identity oracle; unavailable native keys never pass. Log operation stage, count, types,
 availability, raw codes and actual/expected keys. Do not substitute coordinate
 equality or a fixed number for actual constrained geometry.
 

@@ -527,6 +527,18 @@ class _WitnessDispatch:
         return object()
 
 
+def _install_witness_interfaces(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "pythoncom", SimpleNamespace(
+        IID_IUnknown="fixture-IUnknown", com_error=_WitnessComError,
+    ))
+    monkeypatch.setitem(sys.modules, "solidworks_mcp.adapters._generated.sldworks_2026", SimpleNamespace(
+        ISketchPoint=SimpleNamespace(CLSID=_WitnessDispatch.point_iid),
+        ISketchSegment=SimpleNamespace(CLSID=_WitnessDispatch.segment_iid),
+    ))
+
+
 def _native_sketch_segment(*, owner="ActualLocationProfile", kind=0, identifiers=(1, 2)):
     sketch = _NativeSketch(owner, owner)
     return SimpleNamespace(
@@ -554,7 +566,9 @@ def _native_inventory(*segments):
 @pytest.mark.parametrize("mode", ("measured", "missing", "wrong-distance", "not-driven", "name-refused", "reference-ink", "input-dialog"))
 def test_flat_location_is_measured_without_writing_hole_geometry(monkeypatch, mode) -> None:
     selections = []
-    center, flat = object(), _native_sketch_segment()
+    _install_witness_interfaces(monkeypatch)
+    flat = _native_sketch_segment()
+    center = _WitnessPoint(flat.GetSketch(), 0.0, 0.0)
     toggles = {}
 
     class Dimension:
@@ -764,19 +778,34 @@ class _WitnessTransform:
 
 
 class _WitnessPoint:
+    _next_id = 1
+
     def __init__(self, owner, x, y, z=0.0):
         self.owner, self.X, self.Y, self.Z = owner, x, y, z
         self.relations = []
         self._oleobj_ = _WitnessDispatch("ISketchPoint")
+        self.identifiers = _WitnessPoint._next_id, 0
+        _WitnessPoint._next_id += 1
+
+    @property
+    def owner_sketch(self):
+        return self.owner
 
     def GetID(self):
-        return id(self), 0
+        return self.identifiers
 
     def GetSketch(self):
         return self.owner
 
     def GetRelations(self):
         return tuple(self.relations)
+
+
+def _point_proxy(point):
+    proxy = _WitnessPoint(point.GetSketch(), point.X, point.Y, point.Z)
+    proxy.identifiers = point.GetID()
+    proxy.relations = point.relations
+    return proxy
 
 
 class _WitnessRelation:
@@ -805,15 +834,7 @@ class _RelativeWitnessFixture:
     def __init__(self, monkeypatch, *, mode="retained"):
         from solidworks_mcp.adapters import com_variant
         import _telemetry
-        import sys
-
-        monkeypatch.setitem(sys.modules, "pythoncom", SimpleNamespace(
-            IID_IUnknown="fixture-IUnknown", com_error=_WitnessComError,
-        ))
-        monkeypatch.setitem(sys.modules, "solidworks_mcp.adapters._generated.sldworks_2026", SimpleNamespace(
-            ISketchPoint=SimpleNamespace(CLSID=_WitnessDispatch.point_iid),
-            ISketchSegment=SimpleNamespace(CLSID=_WitnessDispatch.segment_iid),
-        ))
+        _install_witness_interfaces(monkeypatch)
 
         self.mode = mode
         self.events, self.selections, self.lines, self.relations, self.displays = [], [], [], [], []
@@ -850,7 +871,7 @@ class _RelativeWitnessFixture:
             GetActiveSketch2=lambda: None if mode == "no-active-sketch" else self.sketch,
             ClearSelection2=lambda _all: self.selections.clear(),
             SelectionManager=selection,
-            FeatureManager=SimpleNamespace(GetFeatures=lambda top: _native_inventory(self.circle).GetFeatures(top)),
+            FeatureManager=SimpleNamespace(GetFeatures=lambda top: _native_inventory(self.circle, self.tap).GetFeatures(top)),
             AddHorizontalDimension2=self.dimension,
             GraphicsRedraw2=lambda: None,
             FeatureByName=lambda _name: _NativeFeature(self.sketch),
@@ -1037,8 +1058,10 @@ def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -
 def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch, mode, point_type) -> None:
     import _telemetry
 
-    point, circle = object(), _native_sketch_segment(kind=1)
-    selected_point = object() if mode in ("wrong-point", "unknown-point") else point
+    _install_witness_interfaces(monkeypatch)
+    circle = _native_sketch_segment(kind=1)
+    point = _WitnessPoint(circle.GetSketch(), 0.0, 0.0)
+    selected_point = _WitnessPoint(circle.GetSketch(), 0.0, 0.0) if mode in ("wrong-point", "unknown-point") else point
     returned_circle = _native_sketch_segment(
         owner="OtherProfile" if mode == "wrong-owner" else "ActualLocationProfile",
         kind=0 if mode == "wrong-kind" else 1,
@@ -1086,8 +1109,8 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
             "wrong-owner": "segment owner/type/ID",
             "wrong-kind": "segment owner/type/ID",
             "wrong-id": "segment owner/type/ID",
-            "unknown-owner": "segment identity unavailable",
-            "invalid-id": "segment identity unavailable",
+            "unknown-owner": "segment identity readback failed",
+            "invalid-id": "segment identity readback failed",
         }[mode]
         with pytest.raises(RuntimeError, match=reason):
             part._require_location_selection(adapter, circle, point=point, stage="native-positive-control")
@@ -1098,15 +1121,10 @@ def test_selection_diagnostics_discriminate_native_segment_identity(monkeypatch,
     assert fields["selection_count"] == len(selected)
     assert fields["selected_types"] == selected_types
     assert fields["selected_available"] == tuple(entity is not None for entity in selected)
-    assert f"count={len(selected)}" in message and "IsSame=" in message
+    assert f"count={len(selected)}" in message and "point_keys=" in message
     if mode in accepted:
         assert fields["selected_segment_identity"] == fields["expected_segment_identity"] == repr(("ActualLocationProfile", 1, 1, 2))
-    if mode == "different-segment-dispatch":
-        assert fields["identity_codes"] == (1, 0)
-    if mode == "unknown-segment-dispatch":
-        assert fields["identity_codes"] == (1, -1)
-    if mode == "unknown-segment-self":
-        assert fields["self_identity_codes"] == (1, -1)
+        assert fields["selected_and_expected_point_identities"] == repr((("ActualLocationProfile", "ISketchPoint", *point.GetID()),) * 2)
 
 
 @pytest.mark.parametrize("mode", ("valid", "missing-owner", "empty-owner", "nonstring-owner", "negative-type", "bool-type", "short-id", "float-id", "bool-id"))
@@ -1177,6 +1195,7 @@ def test_rebuilt_relative_witness_retains_actual_constraints_identity_value_and_
     "null-inventory", "null-feature", "bad-feature-type", "matrix-name", "readback-error",
 ))
 def test_segment_owner_is_resolved_only_through_actual_feature_inventory(monkeypatch, mode) -> None:
+    import ast
     import _telemetry
 
     segment = _native_sketch_segment(kind=1)
@@ -1255,17 +1274,31 @@ def test_segment_owner_is_resolved_only_through_actual_feature_inventory(monkeyp
             "null-inventory": "inventory unavailable",
             "null-feature": "inventory contains null",
             "bad-feature-type": "feature type unavailable",
-            "matrix-name": "invalid native segment owner feature name",
+            "matrix-name": "invalid native sketch owner feature name",
             "readback-error": "specific sketch readback unavailable",
         }[mode]
         with pytest.raises(RuntimeError, match=reason):
             part._segment_identity(adapter, segment, stage="owner-control", role="selected")
     assert len(events) == 1
-    message, fields = events[0]
+    _message, fields = events[0]
     assert fields["operation_stage"] == "owner-control"
     assert fields["identity_role"] == "selected"
     assert fields["segment_type"] == 1 and fields["segment_ids"] == (1, 2)
-    assert "candidates=" in message and "owner_self=" in message
+    assert fields["owner_self_identity_code"] == (-1 if mode == "bad-owner-self" else 1)
+    candidates = ast.literal_eval(fields["owner_candidates"])
+    expected_names = [] if mode in ("bad-owner-self", "null-inventory", "null-feature") else ["OtherProfile"]
+    if mode not in ("bad-owner-self", "null-inventory", "null-feature", "bad-feature-type"):
+        expected_names.append(feature.Name)
+    if mode == "ambiguous":
+        expected_names.append("SecondClaimedOwner")
+    assert [candidate["name"] for candidate in candidates] == expected_names
+    if mode in ("child-owner", "3d-owner"):
+        assert candidates[-1]["self_code"] == 1
+        assert candidates[-1]["owner_match_code"] == 1
+        assert fields["owner_matches"] == ("ActualLocationProfile",)
+        assert fields["segment_identity_readback_error"] == "None"
+    else:
+        assert fields["segment_identity_readback_error"] != "None"
     if mode == "ambiguous":
         assert fields["owner_matches"] == ("ActualLocationProfile", "SecondClaimedOwner")
     if mode == "no-match":
@@ -1425,14 +1458,14 @@ def test_dimension_text_does_not_guess_between_model_and_sketch_frames(monkeypat
     assert fixture.displays == []
 
 
-@pytest.mark.parametrize("count, missing, expected_types, expected_codes", (
-    (0, False, (), ()),
-    (1, False, (11,), (1,)),
-    (3, False, (11, 11), (1, 1)),
-    (None, False, (), ()),
-    (2, True, (11, 11), (None, 1)),
+@pytest.mark.parametrize("count, missing, expected_types", (
+    (0, False, ()),
+    (1, False, (11,)),
+    (3, False, (11, 11)),
+    (None, False, ()),
+    (2, True, (11, 11)),
 ))
-def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refusal(monkeypatch, count, missing, expected_types, expected_codes) -> None:
+def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refusal(monkeypatch, count, missing, expected_types) -> None:
     fixture = _RelativeWitnessFixture(monkeypatch)
     manager = fixture.model.SelectionManager
     reads = []
@@ -1455,7 +1488,11 @@ def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refu
     assert fields["operation_stage"] == "TapToBoreRim.point-pair-selection"
     assert fields["selection_count"] == count
     assert fields["selected_types"] == expected_types
-    assert fields["selected_identity_codes"] == expected_codes
+    endpoints = (fixture.lines[0].GetStartPoint2(), fixture.lines[0].GetEndPoint2())
+    expected_keys = tuple(("LeverBoreLocationProfile", "ISketchPoint", *point.GetID()) for point in endpoints)
+    selected_keys = tuple(None if missing and index == 0 else expected_keys[index] for index in range(len(expected_types)))
+    assert fields["selected_point_identities"] == repr(selected_keys)
+    assert fields["expected_point_identities"] == repr(expected_keys)
     assert f"count={count!r}" in message
     if missing:
         assert fields["selected_objects_present"] == (False, True)
@@ -1480,7 +1517,7 @@ def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch
 
 
 @pytest.mark.parametrize("actual_kind", (5, 17, 32, 0, 999, None, True))
-def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without_alias(monkeypatch, actual_kind) -> None:
+def test_relation_kind_mismatch_records_actual_definitions_without_kind_alias(monkeypatch, actual_kind) -> None:
     import ast
 
     fixture = _RelativeWitnessFixture(monkeypatch)
@@ -1500,9 +1537,9 @@ def test_relation_kind_mismatch_records_actual_definitions_and_alignment_without
     assert row["kind"] == actual_kind and row["count"] == 2
     assert row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
     assert all(len(entity["id"]) == 2 for entity in row["definition_fields"])
-    assert row["identity_matches"] is True
-    assert row["alignment"]["aligned"] is True
-    assert row["alignment"]["delta_m"] == 0.0
+    assert all(len(entity["coordinates"]) == 3 for entity in row["definition_fields"])
+    assert row["identity_matches"] is False
+    assert row["alignment"] is None and row["point_keys"] == ()
     assert "requested_kind=26" in message and "actual_kinds=" in message
 
 
@@ -1519,7 +1556,7 @@ def test_all_owner_relation_kinds_are_captured_before_any_rejection(monkeypatch)
     assert fields["actual_relation_kinds"] == (5, 26)
     rows = ast.literal_eval(fields["relation_definitions"])
     assert len(rows) == 2
-    assert rows[0]["identity_matches"] is True
+    assert rows[0]["identity_matches"] is False and rows[0]["alignment"] is None
     assert rows[1]["definition_fields"][0]["present"] is False
 
 
@@ -1587,7 +1624,7 @@ def test_unknown_definition_capability_is_logged_and_never_cast_or_accepted(monk
     original_bind = part._early_bound
 
     def bind(entity, interface):
-        if entity is fixture.tap:
+        if entity is fixture.tap and mode != "unavailable-definitions":
             pytest.fail("unclassified native definition must never be speculatively bound")
         return original_bind(entity, interface)
 
@@ -1601,12 +1638,15 @@ def test_unknown_definition_capability_is_logged_and_never_cast_or_accepted(monk
     assert row["readback_errors"]
     assert row["mandatory_readback_errors"]
     if mode == "unavailable-definitions":
-        assert dispatch.calls == []
+        assert dispatch.calls == [
+            (dispatch.point_iid, "fixture-IUnknown"),
+            (dispatch.segment_iid, "fixture-IUnknown"),
+        ]  # Expected source still needs its own positive capability control.
     else:
         assert dispatch.calls == [
             (dispatch.point_iid, "fixture-IUnknown"),
             (dispatch.segment_iid, "fixture-IUnknown"),
-        ]
+        ] * 2  # Actual definition and retained source are independently classified.
         definition = row["definition_fields"][0]  # Fixture returns definitions reversed.
         assert definition["interface"] is None
         queries = definition["query_interfaces"]
@@ -1677,22 +1717,23 @@ def test_optional_internal_metadata_failure_does_not_invalidate_native_horizonta
     assert row["segment_key"] == ("LeverBoreLocationProfile", 0, 2, 1)
 
 
-def test_optional_point_id_failure_preserves_actual_identity_and_alignment_contract(monkeypatch) -> None:
+def test_point_id_failure_refuses_relation_despite_matching_dispatch_and_alignment(monkeypatch) -> None:
     import ast
 
     fixture = _RelativeWitnessFixture(monkeypatch)
     line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
 
     def unavailable():
-        raise RuntimeError("optional point ID unavailable")
+        raise RuntimeError("authoritative point ID unavailable")
 
     fixture.tap.GetID = unavailable
-    part._require_witness_relation(fixture.adapter, (fixture.relations[1],), 26, (line.GetStartPoint2(), fixture.tap), stage="point-id-unavailable")
+    with pytest.raises(RuntimeError, match="authoritative point ID unavailable"):
+        part._require_witness_relation(fixture.adapter, (fixture.relations[1],), 26, (line.GetStartPoint2(), fixture.tap), stage="point-id-unavailable")
     fields = fixture.events[-1][1]
-    assert fields["relation_matches"] == 1
+    assert fields["relation_matches"] == 0
     row, = ast.literal_eval(fields["relation_definitions"])
-    assert row["readback_errors"] and row["mandatory_readback_errors"] == []
-    assert row["identity_matches"] is True and row["alignment"]["aligned"] is True
+    assert row["mandatory_readback_errors"]
+    assert row["identity_matches"] is False
 
 
 @pytest.mark.parametrize("mode", ("null-handle", "binding-failure", "missing-members"))
@@ -1718,7 +1759,13 @@ def test_bad_relation_handle_does_not_hide_later_actual_kinds(monkeypatch, mode)
     assert first["readback_errors"] and first["mandatory_readback_errors"]
     assert {"kind", "definitions", "suppressed", "internal_types", "internal_entities"} <= set(first["unavailable_fields"])
     assert first["definitions_available"] is False
-    assert second["identity_matches"] is True and second["alignment"]["aligned"] is True
+    assert second["kind"] == 5 and second["count"] == 2
+    assert second["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
+    assert {tuple(entity["id"]) for entity in second["definition_fields"]} == {fixture.tap.GetID(), line.GetStartPoint2().GetID()}
+    assert all([query["supported"] for query in entity["query_interfaces"]] == [True, False] for entity in second["definition_fields"])
+    assert second["readback_errors"] == [] and second["mandatory_readback_errors"] == []
+    assert second["definitions_available"] is True
+    assert second["identity_matches"] is False and second["alignment"] is None
 
 
 @pytest.mark.parametrize("effect", (
@@ -1901,7 +1948,7 @@ def test_native_shaped_database_reuses_exact_points_despite_add_to_db(monkeypatc
         part._require_independent_witness_endpoints(fixture.adapter, first, fixture.center, stage="nominal-seed-control")
 
 
-@pytest.mark.parametrize("failure", ("center-reuse", "null-start", "foreign-owner", "source-swap", "unknown-self", "unknown-distinctness"))
+@pytest.mark.parametrize("failure", ("center-reuse", "null-start", "foreign-owner", "source-swap", "unknown-self", "invalid-id"))
 def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypatch, failure) -> None:
     import ast
 
@@ -1919,11 +1966,11 @@ def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypa
             start.owner = _NativeSketch("foreign", "WrongSketch")
         elif failure == "source-swap":
             line.GetStartPoint2, line.GetEndPoint2 = lambda: end, lambda: start
+        elif failure == "invalid-id":
+            start.identifiers = (True, 0)
         else:
             def same(left, right):
                 if failure == "unknown-self" and left is start and right is start:
-                    return -1
-                if failure == "unknown-distinctness" and left is start and right is fixture.center:
                     return -1
                 return _native_same(left, right)
             fixture.adapter.swApp.IsSame = same
@@ -1944,7 +1991,7 @@ def test_provisional_witness_requires_independent_native_seed_endpoints(monkeypa
         assert rows[0]["role"] == "start"
 
 
-@pytest.mark.parametrize("failure", ("center-merge", "previous-start-merge", "previous-end-merge", "source-swap", "unknown"))
+@pytest.mark.parametrize("failure", ("center-merge", "previous-start-merge", "previous-end-merge", "source-swap", "invalid-id"))
 def test_solved_overlaid_witnesses_keep_independent_endpoint_authority(monkeypatch, failure) -> None:
     fixture = _RelativeWitnessFixture(monkeypatch)
     other = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
@@ -1960,11 +2007,7 @@ def test_solved_overlaid_witnesses_keep_independent_endpoint_authority(monkeypat
     elif failure == "source-swap":
         second.GetStartPoint2, second.GetEndPoint2 = lambda: end, lambda: start
     else:
-        def same(left, right):
-            if left is start and right is first.GetStartPoint2():
-                return -1
-            return _native_same(left, right)
-        fixture.adapter.swApp.IsSame = same
+        start.identifiers = None
     with pytest.raises(RuntimeError):
         part._assert_relative_witness(fixture.adapter, second, other, fixture.circle, stage="after-rebuild")
 
@@ -1974,3 +2017,186 @@ def test_provisional_seed_is_not_a_substitute_for_actual_constraint_motion(monke
     with pytest.raises(RuntimeError, match="point alignment differs"):
         part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
     assert [relation.kind for relation in fixture.relations] == [4, 26]
+
+
+@pytest.mark.parametrize("cross_proxy_result", (0, -1, "exception"))
+def test_all_point_guards_use_documented_keys_not_cross_proxy_dispatch_equality(monkeypatch, cross_proxy_result) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    proxies = []
+
+    def proxy(entity):
+        if not isinstance(entity, _WitnessPoint):
+            return entity
+        result = _point_proxy(entity)
+        assert result is not entity and _native_same(result, entity) == 0
+        proxies.append((result, entity))
+        return result
+
+    def same(left, right):
+        if isinstance(left, _WitnessPoint) and isinstance(right, _WitnessPoint) and left is not right:
+            if cross_proxy_result == "exception":
+                raise RuntimeError("cross-proxy IsSame unavailable")
+            return cross_proxy_result
+        return _native_same(left, right)
+
+    fixture.adapter.swApp.IsSame = same
+    monkeypatch.setattr(_WitnessRelation, "GetDefinitionEntities2", lambda relation: tuple(proxy(entity) for entity in relation.entities[::-1]))
+    manager = fixture.model.SelectionManager
+    manager.GetSelectedObject6 = lambda index, _mark: proxy(fixture.selections[index - 1])
+    manager.GetSelectedObjectType3 = lambda index, _mark: (25, 10)[index - 1]
+    fixture.selections[:] = [fixture.tap, fixture.circle]
+    part._require_location_selection(fixture.adapter, fixture.circle, point=fixture.tap, stage="point-flat-proxy")
+    manager.GetSelectedObjectType3 = lambda _index, _mark: 11
+    original_dimension = fixture.model.AddHorizontalDimension2
+
+    def dimension(*position):
+        display = original_dimension(*position)
+        annotation = display.GetAnnotation()
+        original_entities = annotation.GetAttachedEntities3
+        annotation.GetAttachedEntities3 = lambda: tuple(proxy(entity) for entity in original_entities())
+        return display
+
+    fixture.model.AddHorizontalDimension2 = dimension
+    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    line = fixture.lines[0]
+    part._assert_relative_witness(fixture.adapter, line, fixture.tap, fixture.circle, stage="after-rebuild-proxy")
+    part._assert_relative_attachment(fixture.adapter, fixture.displays[0], fixture.tap, fixture.circle, name="ThumbTapToBoreRim", stage="attachment-after-rebuild-proxy")
+    assert proxies and len(fixture.displays) == 1
+    assert fixture.displays[0].GetDimension2(0).SystemValue == pytest.approx(fixture.circle.GetRadius())
+
+
+@pytest.mark.parametrize("failure", (
+    "short-id", "long-id", "bool-id", "float-id", "null-id", "wrong-type",
+    "both-types", "neither-type", "qi-unavailable", "null-qi", "self-unavailable",
+    "bool-self", "owner-unavailable", "owner-self-unavailable", "unknown-owner", "ambiguous-owner",
+))
+def test_point_identity_requires_native_type_ordered_integer_pair_and_unique_actual_owner(monkeypatch, failure) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    point = _point_proxy(fixture.tap)
+    if failure in ("short-id", "long-id", "bool-id", "float-id", "null-id"):
+        point.identifiers = {"short-id": (1,), "long-id": (1, 2, 3), "bool-id": (True, 2), "float-id": (1, 2.0), "null-id": None}[failure]
+    elif failure == "wrong-type":
+        point._oleobj_ = _WitnessDispatch("ISketchSegment")
+    elif failure == "both-types":
+        point._oleobj_.capabilities[_WitnessDispatch.segment_iid] = True
+    elif failure == "neither-type":
+        point._oleobj_.capabilities[_WitnessDispatch.point_iid] = False
+    elif failure == "qi-unavailable":
+        point._oleobj_.capabilities[_WitnessDispatch.segment_iid] = _WitnessComError(-2147467259)
+    elif failure == "null-qi":
+        point._oleobj_.capabilities[_WitnessDispatch.point_iid] = None
+    elif failure in ("self-unavailable", "bool-self"):
+        fixture.adapter.swApp.IsSame = lambda left, right: (True if failure == "bool-self" else -1) if left is point and right is point else _native_same(left, right)
+    elif failure == "owner-unavailable":
+        point.owner = None
+    elif failure == "owner-self-unavailable":
+        fixture.adapter.swApp.IsSame = lambda left, right: -1 if left is point.owner and right is point.owner else _native_same(left, right)
+    elif failure == "unknown-owner":
+        point.owner = _NativeSketch("unlisted", "NotInFeatureInventory")
+    elif failure == "ambiguous-owner":
+        original_features = fixture.model.FeatureManager.GetFeatures
+        fixture.model.FeatureManager.GetFeatures = lambda top: (*original_features(top), _NativeFeature(_NativeSketch(point.owner.token, "SecondClaimedOwner")))
+    with pytest.raises(RuntimeError, match="native point identity readback failed"):
+        part._point_identity(fixture.adapter, point, stage="invalid-point-key", role="actual")
+    fields = fixture.events[-1][1]
+    assert fields["operation_stage"] == "invalid-point-key"
+    assert fields["point_identity"] == "None"
+    queries = ast.literal_eval(fields["point_interface_queries"])
+    assert [row["interface"] for row in queries] == ["ISketchPoint", "ISketchSegment"]
+    assert fields["point_identity_readback_error"] != "None"
+
+
+@pytest.mark.parametrize("mutation", ("different-id", "reversed-id", "different-owner", "duplicate-definition"))
+def test_relation_point_keys_refuse_coordinate_copies_owner_collisions_and_aliases(monkeypatch, mutation) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    start = line.GetStartPoint2()
+    actual = _point_proxy(fixture.tap)
+    if mutation == "different-id":
+        actual.identifiers = (fixture.tap.GetID()[0] + 1, 0)
+    elif mutation == "reversed-id":
+        actual.identifiers = fixture.tap.GetID()[::-1]
+    elif mutation == "different-owner":
+        actual.owner = fixture.sketch
+    else:
+        actual = _point_proxy(start)
+    relation = _WitnessRelation((start, actual), 26)
+    with pytest.raises(RuntimeError, match="expected exactly one native constraint"):
+        part._require_witness_relation(fixture.adapter, (relation,), 26, (start, fixture.tap), stage="wrong-native-point-key")
+    row, = ast.literal_eval(fixture.events[-1][1]["relation_definitions"])
+    assert row["alignment"]["aligned"] is True
+    assert row["identity_matches"] is False
+    assert row["point_keys"] and row["expected_point_keys"]
+
+
+def test_point_keys_are_refreshed_after_rename_and_native_id_change(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    first = part._point_identity(fixture.adapter, fixture.tap, stage="before", role="source")
+    fixture.tap.owner.feature_name = "RenamedPlacement"
+    fixture.tap.identifiers = (7, 19)
+    after = part._point_identity(fixture.adapter, _point_proxy(fixture.tap), stage="after-rebuild", role="source")
+    assert first[0] == "ThumbPlacement"
+    assert after == ("RenamedPlacement", "ISketchPoint", 7, 19)
+    assert first != after
+
+
+@pytest.mark.parametrize("alias", ("center", "previous-start", "previous-end"))
+def test_independence_refuses_native_point_key_aliases_even_for_different_dispatches(monkeypatch, alias) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    first = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    other_tap = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
+    second = part._create_relative_witness(fixture.adapter, other_tap, fixture.circle, "RodTapToBoreRim")
+    target = {"center": fixture.center, "previous-start": first.GetStartPoint2(), "previous-end": first.GetEndPoint2()}[alias]
+    proxy = _point_proxy(target)
+    assert _native_same(proxy, target) == 0
+    second.GetStartPoint2 = lambda: proxy
+    with pytest.raises(RuntimeError, match="endpoints merged"):
+        part._require_independent_witness_endpoints(fixture.adapter, second, fixture.center, stage="after-rebuild")
+
+
+def test_point_and_segment_ids_can_collide_without_colliding_typed_identity(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture.center.identifiers = fixture.circle.GetID()
+    point_key = part._point_identity(fixture.adapter, fixture.center, stage="typed-collision", role="point")
+    segment_key = part._segment_identity(fixture.adapter, fixture.circle, stage="typed-collision", role="segment")
+    assert point_key[0] == segment_key[0] and point_key[2:] == segment_key[2:]
+    assert point_key[1] == "ISketchPoint" and segment_key[1] == 1
+    assert point_key != segment_key
+
+
+@pytest.mark.parametrize("requested_kind", (25, 26))
+@pytest.mark.parametrize("inventory", ("other-first", "other-last", "other-only"))
+def test_unrelated_suppressed_distance_cannot_veto_or_replace_requested_constraint(monkeypatch, requested_kind, inventory) -> None:
+    import ast
+
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    requested = fixture.relations[1 if requested_kind == 26 else 2]
+    points = (line.GetStartPoint2(), fixture.tap) if requested_kind == 26 else (line.GetEndPoint2(), fixture.center)
+    unrelated = _WitnessRelation(requested.entities, 1)
+    unrelated.Suppressed = True
+    relations = (unrelated,) if inventory == "other-only" else (unrelated, requested) if inventory == "other-first" else (requested, unrelated)
+    if inventory == "other-only":
+        with pytest.raises(RuntimeError, match=f"expected exactly one native constraint {requested_kind}, found 0"):
+            part._require_witness_relation(fixture.adapter, relations, requested_kind, points, stage="requested-kind-authority")
+    else:
+        part._require_witness_relation(fixture.adapter, relations, requested_kind, points, stage="requested-kind-authority")
+    fields = fixture.events[-1][1]
+    assert fields["actual_relation_kinds"] == tuple(relation.kind for relation in relations)
+    assert fields["relation_matches"] == (0 if inventory == "other-only" else 1)
+    rows = ast.literal_eval(fields["relation_definitions"])
+    assert len(rows) == len(relations)
+    other_row = next(row for row in rows if row["kind"] == 1)
+    assert other_row["suppressed"] is True
+    assert other_row["definition_interfaces"] == ["ISketchPoint", "ISketchPoint"]
+    assert all(len(entity["id"]) == 2 for entity in other_row["definition_fields"])
+    assert other_row["identity_matches"] is False and other_row["alignment"] is None
+    if inventory != "other-only":
+        requested_row = next(row for row in rows if row["kind"] == requested_kind)
+        assert requested_row["identity_matches"] is True
+        assert requested_row["alignment"]["aligned"] is True
+        assert fields["relation_readback_error"] == "None"
