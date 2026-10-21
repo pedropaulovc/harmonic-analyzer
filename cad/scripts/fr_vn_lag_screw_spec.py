@@ -37,3 +37,10 @@ THREAD_SIZE = "1/4-20"
 THREAD_CLASS = "2A"
 THREAD_PITCH = PITCH_MM
 BEARING_OFFSET = WASHER_DEPTH_MM
+# Harvested vendor-model tip, not an unprovided supplier tolerance.
+# diagnostics/diag_mcmaster_hex_screw.py reproduces Chamfer1 = 0.75 pitch.
+TIP_CHAMFER = 0.75 * THREAD_PITCH
+# ASME B18.2.1 pointed hex cap screws, 1/4–3/8 size, length <=1 in:
+# +0/-0.03 in. Keep the exact inch conversion; this is not a print band.
+# https://www.portlandbolt.com/technical/faqs/bolt-length-tolerance/
+LENGTH_SHORT_ALLOWANCE_MM = 0.03 * 25.4

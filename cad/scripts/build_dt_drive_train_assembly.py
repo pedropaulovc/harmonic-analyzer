@@ -1053,40 +1053,50 @@ from dt_vn_cone_lock_knob_spec import (  # noqa: E402
     require_seat_fit as require_lock_seat_fit,
 )
 from dt_vn_cone_pivot_screw_spec import (  # noqa: E402
+    FULL_THREAD_START as PSCREW_FULL_THREAD_START,
+    MIN_USEFUL_ENGAGEMENT_MM as PSCREW_MIN_USEFUL_ENGAGEMENT,
     HEAD_DIA as PSCREW_HEAD_DIA,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_DIA_BAND as PSCREW_SHOULDER_DIA_BAND,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
+    THREAD_SOLID_DIA as PSCREW_THREAD_DIA,
     THREAD_TAIL_LEN as PSCREW_THREAD_TAIL_LEN,
+    TIP_CHAMFER as PSCREW_TIP_INCOMPLETE,
 )
 from dt_vn_swing_stop_screw_spec import (  # noqa: E402
     EMBED_LEN as STOP_EMBED_LEN,
+    FULL_THREAD_START_MAX_MM as FSCREW_FULL_THREAD_START_MAX,
+    LENGTH_SHORT_ALLOWANCE_MM as FSCREW_LENGTH_SHORT_ALLOWANCE,
     HEAD_DIA as STOP_HEAD_DIA,
     PROUD_LEN as STOP_PROUD_LEN,
     SHANK_LEN as STOP_SHANK_LEN,
     THREAD as STOP_THREAD,
-    require_seat_fit as require_stop_seat_fit,
+    TIP_CHAMFER as FSCREW_TIP_INCOMPLETE,
 )
 from build_fr_harmonic_base import (  # noqa: E402
-    BLOCK_SCREW_HOLE_DEPTH as BASE_BLOCK_HOLE_DEPTH,
     BLOCK_SEAT_SPEC as BASE_BLOCK_SEAT_SPEC,
     BLOCK_SCREW_XZ as BASE_BLOCK_XZ,
-    FOOT_SCREW_HOLE_DEPTH as BASE_FOOT_HOLE_DEPTH,
     FOOT_SEAT_SPEC as BASE_FOOT_SEAT_SPEC,
     FOOT_SCREW_XZ as BASE_FOOT_XZ,
     LOCK_KNOB_XZ as BASE_LOCK_XZ,
     LOCK_SEAT_SPEC as BASE_LOCK_SEAT_SPEC,
     LOCK_STUD_ENGAGEMENT as BASE_LOCK_ENGAGEMENT,
-    PEDESTAL_SCREW_HOLE_DEPTH as BASE_PEDESTAL_HOLE_DEPTH,
     PEDESTAL_SCREW_XZ as BASE_PEDESTAL_XZ,
     PEDESTAL_SEAT_SPEC as BASE_PEDESTAL_SEAT_SPEC,
+    PEDESTAL_TRANSFER_XZ as BASE_PEDESTAL_TRANSFER_XZ,
     PIVOT_SEAT_SPEC as BASE_PIVOT_SEAT_SPEC,
     PIVOT_SCREW_XZ as BASE_PIVOT_XZ,
     STOP_SEAT_SPEC as BASE_STOP_SEAT_SPEC,
     STOP_SCREW_XZ as BASE_STOP_XZ,
     SWING_HARDWARE_GEOMETRY as BASE_SWING_HARDWARE,
-    require_blind_seat_fit as require_base_seat_fit,
+)
+from fr_harmonic_base_fasteners import (  # noqa: E402
+    PEDESTAL_INSERTION_MAX_MM,
+    PEDESTAL_INSERTION_MIN_MM,
+    require_stop_seat_fit,
+    require_through_seat_fit,
+    through_seat_material,
 )
 from build_fr_harmonic_base import (  # noqa: E402
     HOLE_XZ as BASE_HOLE_XZ,
@@ -1162,6 +1172,7 @@ from dt_pinion_pivot_block_geometry import (  # noqa: E402
     BLOCK_DEPTH,
     BLOCK_EAST,
     BLOCK_HEIGHT,
+    BLOCK_HEIGHT_BAND,
     BLOCK_WIDTH,
     BORE_UP as BLOCK_BORE_UP,
     SCREW_HALF_SPACING as BLOCK_SCREW_HALF,
@@ -1231,9 +1242,11 @@ from dt_pinion_spring_section import (  # noqa: E402
     WIDTH_PLACES as SPRING_W_PLACES,
 )
 from dt_vn_slotted_screw_spec import (  # noqa: E402
+    FULL_THREAD_START as BSCREW_FULL_THREAD_START,
     HEAD_DIA as BSCREW_HEAD_DIA,
     SHANK_LEN as BSCREW_SHANK_LEN,
     THREAD as BSCREW_THREAD,
+    TIP_CHAMFER as BSCREW_TIP_INCOMPLETE,
 )
 
 from dt_vn_foot_screw_spec import (  # noqa: E402
@@ -1242,10 +1255,11 @@ from dt_vn_foot_screw_spec import (  # noqa: E402
     THREAD as FSCREW_THREAD,
 )
 from dt_vn_pedestal_hold_down_screw_spec import (  # noqa: E402
+    FULL_THREAD_START as HDSCREW_FULL_THREAD_START,
     HEAD_DIA as HDSCREW_HEAD_DIA,
-    SHANK_DIA as HDSCREW_SHANK_DIA,
     SHANK_LEN as HDSCREW_SHANK_LEN,
     THREAD as HDSCREW_THREAD,
+    TIP_CHAMFER as HDSCREW_TIP_INCOMPLETE,
 )
 from dt_cone_post_envelope import BLOCK_DIA as POST_BLOCK_DIA  # noqa: E402
 from build_dt_cone_pivot_post import (  # noqa: E402
@@ -2500,7 +2514,18 @@ if (
 _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
-require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
+# Nominal source-model tail; supplier tail/tip limits remain unprovided and
+# the pivot's existing installed full-form inspection remains independent.
+PIVOT_BASE_THREAD_FIT = require_through_seat_fit(
+    "cone pivot",
+    BASE_PIVOT_SEAT_SPEC,
+    through_seat_material(BASE_PIVOT_SEAT_SPEC, BASE_PIVOT_XZ),
+    insertion_min_mm=PSCREW_THREAD_TAIL_LEN,
+    insertion_max_mm=PSCREW_THREAD_TAIL_LEN,
+    tip_loss_mm=PSCREW_TIP_INCOMPLETE,
+    full_thread_start_mm=PSCREW_FULL_THREAD_START,
+    minimum_engagement_diameters=PSCREW_MIN_USEFUL_ENGAGEMENT / PSCREW_THREAD_DIA,
+)
 # --- tip-block print-worst stacks (user ruling 2026-09-29) -------------------
 # With no shim, no flange slot and no platform slot, the block's station comes
 # from the hold-down (TIP_NORTH_FACE_BAND_MM / TIP_TAP_LATERAL_BAND_MM above)
@@ -2682,7 +2707,12 @@ if PLAT_SLOT_W - KNOB_STUD_DIA < 0.5:
     raise AssertionError("lock stud has <0.5 clearance in the platform notch")
 if abs(BASE_LOCK_ENGAGEMENT - (KNOB_STUD_LEN - PLAT_T)) > 1e-9:
     raise AssertionError("base lock engagement does not use the stock stud excess")
-require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
+require_lock_seat_fit(
+    BASE_LOCK_SEAT_SPEC,
+    PLAT_T,
+    KNOB_STUD_LEN,
+    material=through_seat_material(BASE_LOCK_SEAT_SPEC, BASE_LOCK_XZ),
+)
 
 # Keep the stock knurled head's base seat outside a conservative plan-envelope
 # of every adjacent gear; the real solids must therefore have clearance at
@@ -2730,7 +2760,11 @@ if math.dist((STOP_X, STOP_Z), BASE_STOP_XZ) > 1e-9:
 _require_tapped_thread("swing stop", STOP_THREAD, BASE_STOP_SEAT_SPEC)
 if abs(STOP_PROUD_LEN - (STOP_SHANK_LEN - STOP_EMBED_LEN)) > 1e-9:
     raise AssertionError("swing-stop proud length is not stock length minus embed")
-require_stop_seat_fit(BASE_STOP_SEAT_SPEC, PLAT_T)
+require_stop_seat_fit(
+    BASE_STOP_SEAT_SPEC,
+    PLAT_T,
+    material=through_seat_material(BASE_STOP_SEAT_SPEC, BASE_STOP_XZ),
+)
 if _STOP_ENGAGED_GAP < 2.0:
     raise AssertionError(
         f"stop screw within {_STOP_ENGAGED_GAP:.2f} of the engaged plate edge "
@@ -3985,7 +4019,7 @@ if abs(STRAP_PIVOT_BORE - 6.35) > 1e-9:
     raise AssertionError("strap pivot bore no longer rides the O6.35 shaft")
 # Block screws: the catalog-owned #8-32 fully threaded stock screws pass
 # through normal #8 clearance holes. Engagement follows the current raised
-# block height and the matching blind base seat, not the retired stock length.
+# block height and the finite through-threaded base receiver.
 BLOCK_TOP_Y = PIVOT_Y + (BLOCK_HEIGHT - BLOCK_BORE_UP)
 _require_clearance_size("pinion block", BSCREW_THREAD, BLOCK_SCREW_HOLE_SPEC)
 _require_tapped_thread(
@@ -3994,11 +4028,23 @@ _require_tapped_thread(
     BASE_BLOCK_SEAT_SPEC,
     kind="tapped_bottoming",
 )
+# Keep the original purchased nominal; its unprovided supplier length/tip
+# limits are not replaced by a manufactured title-block grade.
 _BLOCK_SCREW_ENGAGEMENT = BSCREW_SHANK_LEN - BLOCK_HEIGHT
-if _BLOCK_SCREW_ENGAGEMENT < 1.0:
-    raise AssertionError("block screw barely engages the base")
-if _BLOCK_SCREW_ENGAGEMENT > BASE_BLOCK_HOLE_DEPTH - 0.25:
-    raise AssertionError("block screw bottoms out in the base tapped seat")
+BLOCK_SCREW_BASE_FITS = tuple(
+    require_through_seat_fit(
+        "pinion block",
+        BASE_BLOCK_SEAT_SPEC,
+        through_seat_material(BASE_BLOCK_SEAT_SPEC, xz),
+        insertion_min_mm=BSCREW_SHANK_LEN - BLOCK_HEIGHT - BLOCK_HEIGHT_BAND,
+        insertion_max_mm=BSCREW_SHANK_LEN - BLOCK_HEIGHT + BLOCK_HEIGHT_BAND,
+        tip_loss_mm=BSCREW_TIP_INCOMPLETE,
+        full_thread_start_mm=max(
+            0.0, BSCREW_FULL_THREAD_START - (BLOCK_HEIGHT - BLOCK_HEIGHT_BAND),
+        ),
+    )
+    for xz in BASE_BLOCK_XZ
+)
 if (
     BLOCK_SCREW_HALF + BSCREW_HEAD_DIA / 2.0
     > min(BLOCK_EAST, BLOCK_WIDTH - BLOCK_EAST) - 0.25
@@ -4196,10 +4242,20 @@ _require_clearance_size("pinion spring foot", FSCREW_THREAD, SPR_HOLE_SPEC)
 _require_tapped_thread(
     "foot-screw base seat", FSCREW_THREAD, BASE_FOOT_SEAT_SPEC, kind="tapped_bottoming"
 )
-# The thinnest strip lets the screw deepest.  The base sizes the seat from
-# the same stock band, so its 0.25 tip reserve holds line to line.
-if BASE_FOOT_HOLE_DEPTH - (FSCREW_SHANK_LEN - _SPR_T_LO) < 0.25 - 1e-9:
-    raise AssertionError("foot screw bottoms out in the base spring seat")
+# The stop and foot use the same 90280A108 stock. Charge its qualified length
+# and head-end runout, the nominal modeled tip and both spring-strip limits.
+FOOT_SCREW_BASE_FITS = tuple(
+    require_through_seat_fit(
+        "spring foot",
+        BASE_FOOT_SEAT_SPEC,
+        through_seat_material(BASE_FOOT_SEAT_SPEC, xz),
+        insertion_min_mm=FSCREW_SHANK_LEN - FSCREW_LENGTH_SHORT_ALLOWANCE - _SPR_T_HI,
+        insertion_max_mm=FSCREW_SHANK_LEN - _SPR_T_LO,
+        tip_loss_mm=FSCREW_TIP_INCOMPLETE,
+        full_thread_start_mm=max(0.0, FSCREW_FULL_THREAD_START_MAX - _SPR_T_LO),
+    )
+    for xz in BASE_FOOT_XZ
+)
 _FOOT_SCREW_XZ = ((SPRING_HOLE_X, RIG.SPRING_PAD_Z),)
 # U34c: one MHA-DT-VN-62 (90280A197 #8-32 x 3/4) per pedestal, through the ledge's
 # #8 close clearance into a base seat transferred from the fitted pedestal.
@@ -4210,15 +4266,27 @@ _require_tapped_thread(
     BASE_PEDESTAL_SEAT_SPEC,
     kind="tapped_bottoming",
 )
-# drawing-guidelines.md rule 18 (thread engagement) (audit E15): at the printed worst case (flange 5.0 +-0.8, screw
-# 19.05 +0/-0.76, seat depths +-0.8) the screw keeps >= 1.5D of thread and
-# never reaches the incomplete threads at the bottom of the seat.
-_HDSCREW_MIN_ENGAGEMENT = (HDSCREW_SHANK_LEN - 0.76) - (ARBOR_PED_FLANGE_T + 0.8)
-_HDSCREW_MAX_REACH = HDSCREW_SHANK_LEN - (ARBOR_PED_FLANGE_T - 0.8)
-if _HDSCREW_MIN_ENGAGEMENT < 1.5 * HDSCREW_SHANK_DIA:
-    raise AssertionError("pedestal hold-down keeps under 1.5D of thread at worst case")
-if _HDSCREW_MAX_REACH + 0.25 > BASE_PEDESTAL_HOLE_DEPTH - 0.8:
-    raise AssertionError("pedestal hold-down reaches the seat's incomplete threads")
+# Keep the original stock/flange limits, now intersected with the real finite
+# through-threaded casting and its transfer envelope. Excess reach is pocket
+# protrusion, not bottoming in an invented blind full-thread depth.
+PEDESTAL_SCREW_BASE_FITS = tuple(
+    require_through_seat_fit(
+        "pedestal hold-down",
+        BASE_PEDESTAL_SEAT_SPEC,
+        through_seat_material(
+            BASE_PEDESTAL_SEAT_SPEC, xz, envelope_xz=BASE_PEDESTAL_TRANSFER_XZ,
+        ),
+        insertion_min_mm=PEDESTAL_INSERTION_MIN_MM,
+        insertion_max_mm=PEDESTAL_INSERTION_MAX_MM,
+        tip_loss_mm=HDSCREW_TIP_INCOMPLETE,
+        full_thread_start_mm=max(
+            0.0,
+            HDSCREW_FULL_THREAD_START
+            - (HDSCREW_SHANK_LEN - PEDESTAL_INSERTION_MAX_MM),
+        ),
+    )
+    for xz in BASE_PEDESTAL_XZ
+)
 # The head sits on the 18 ledge, clear of the strap root and the ledge end.
 if HDSCREW_HEAD_DIA / 2.0 > min(
     ARBOR_PED_SCREW_Z - ARBOR_PED_FOOT_NEAR_Z,
@@ -4809,7 +4877,7 @@ async def build(adapter) -> dict[str, str]:
     # The platform pivot screw (item 2, p.18 "pivot"): a base-threaded STATIC.
     # Its shoulder bottoms on the base top, placing the head 0.25 above the
     # plate and leaving the plate free to swing; the threaded tail enters the
-    # matching blind #10-24 UNC-2B seat.
+    # matching through #10-24 UNC-2B deck seat.
     pivot_screw = await place_component(
         adapter,
         "dt-vn-cone-pivot-screw",

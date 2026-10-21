@@ -21,6 +21,28 @@ Markdown are named `<stem>.aggregate.{json,md}`; per-run JSON and retained attem
 evidence remain alongside them. A cache hit evaluates the same verdict without
 calling a model.
 
+Set `HARMONIC_MACHINIST_REVIEWER=claude|codex` in the submitter's environment
+**before launching the build** to select both the blind reviewers and their judge.
+Unset selects Claude; each backend uses the standalone CLI's existing model/effort
+defaults (Claude: `claude-opus-5-5` / `medium`; Codex: `gpt-6-astra` / `low`).
+For example, in PowerShell:
+
+```powershell
+$env:HARMONIC_MACHINIST_REVIEWER = "codex"
+uv run --frozen python build.py --verbosity warning
+```
+
+Other values, including an empty value, fail at review-task generation before
+cache probing or report/stamp changes. The graph freezes the effective backend,
+model and effort for task freshness, cache identity and explicit CLI arguments
+for both roles. Changing that profile invalidates freshness and selects a separate
+cache entry; reverting can reuse only that profile's verdict. Cache provenance
+retains the real `machinist_review_config.py` source path: its contextual digest
+combines the file's content digest with canonical effective-profile JSON.
+No native CAD recipe imports that configuration. This variable applies only to
+registered review leaves; standalone `machinist_review.py` keeps its independent
+reviewer/judge flags and defaults.
+
 Draw scripts default to `MachinistReviewMode.OFF`: no review task exists, so
 `build` and `release` spend no model tokens on the sheet. To opt in, import
 `MachinistReviewMode` from `_machinist_review_mode` and declare
@@ -103,6 +125,26 @@ Reuse source facts only within an unchanged-source scan, or immutable baseline
 bytes for private mutation fixtures. Keep each case's writable checkout, task
 state and invalidation checks isolated. Error-budget timings must retain the
 configured draws, seeds, reference cases and numerical acceptance checks.
+
+The startup-retry cases in `test_machinist_review.py` use a test-local MCP
+poll clock and a fixed number of pending responses. A proxy of only that test's
+`machinist_review.asyncio` binding arms a real startup `Timeout` when polling
+consumes the unchanged 0.75-second budget; neither global asyncio nor the event
+loop's clock is modified. Windows launch/pipe scheduling stays under the real,
+unchanged overall timeout instead of consuming the synthetic startup budget.
+Real cancellation/reaping, the local Python protocol child, 131-KB pipe draining,
+no prompt before connection and two attempts remain exercised. Separate slow-start
+and shared-overall-timeout tests still use real time.
+
+The refresh-carrier regression in `tests/test_farm_mode.py` runs a real nested
+pytest against the cache test with a private `--basetemp`, plugin autoload and
+ambient pytest arguments disabled, and global/signal OTLP endpoints explicitly
+empty before collection imports telemetry. It preserves the inherited child
+SolidWorks guard and deliberately retains the build refresh carrier: root
+conftest must remove that carrier itself. Synthetic stale sibling runs must
+survive, so the child cannot prune other sessions' evidence. Child stdout/stderr
+are retained under the outer test's temporary directory even on timeout; the
+30-second deadline is unchanged.
 
 ### Finite stock-envelope endpoint reuse
 

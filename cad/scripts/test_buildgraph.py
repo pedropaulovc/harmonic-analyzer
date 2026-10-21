@@ -1586,7 +1586,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads DISC_DIA, DISC_THICK"
     ),
     ("build_dt_drive_train_assembly.py", "build_fr_harmonic_base"): (
-        "dtrefactor: reads BLOCK_SCREW_HOLE_DEPTH, BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_HOLE_DEPTH, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_HOLE_DEPTH, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY, require_blind_seat_fit"
+        "dtrefactor: reads BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY; finite through-seat material and engagement from fr_harmonic_base_fasteners"
     ),
     ("build_fr_frame_assembly.py", "build_fr_top_frame"): (
         "dtrefactor: reads SIDE_TAP_SPEC"
@@ -1721,6 +1721,19 @@ def test_module_deps_are_transitive():
     assert "_config" in _helper_names("build_dt_vn_cone_tip_collar.py"), (
         "lazy _config edge lost"
     )
+
+
+def test_swing_stop_stock_builder_does_not_reach_receiver_validation():
+    """Track stock authority without re-keying the native screw for base edits."""
+    stock_authorities = {"dt_vn_swing_stop_screw_spec", "_mcmaster_90280a108"}
+    receiver_geometry = {"fr_harmonic_base_fasteners", "fr_harmonic_base_spec"}
+    native = _helper_names("build_dt_vn_swing_stop_screw.py")
+    assert stock_authorities <= native, native
+    assert native.isdisjoint(receiver_geometry), native & receiver_geometry
+
+    # Receiver validation remains a real assembly input, not a graph exclusion.
+    assembly = _helper_names("build_dt_drive_train_assembly.py")
+    assert stock_authorities | receiver_geometry <= assembly, assembly
 
 
 def test_specialized_helper_blast_radius_is_narrow():
@@ -2738,12 +2751,13 @@ def test_interference_contracts_do_not_depend_on_magnifier_fit_or_pose() -> None
         # Listed themselves: the root script is not in its own import closure
         # (Codex #1035, PRRT_kwDOPHDy386mV11b).
         ("build_mg_wheel_bar.py", True),
-        ("build_dt_vn_swing_stop_screw.py", True),
         # Reads through an imported listed module.
         ("build_sm_vn_boss_hook.py", True),
         ("build_ch_vn_spring_hook.py", True),
         # R9-48: judges its lock taps at the printed worst case.
         ("build_pd_platen_guide.py", True),
+        # Stock limits do not read a manufactured receiver's platform allowance.
+        ("build_dt_vn_swing_stop_screw.py", False),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):
@@ -2796,7 +2810,10 @@ def test_requirement_declarations_do_not_read_title_block_geometry():
     assert "title_block" not in config_files_of(script)
 
 
-@pytest.mark.parametrize("module", ["_printed_limits", "_printed_tolerance"])
+@pytest.mark.parametrize(
+    "module",
+    ["_printed_limits", "_printed_tolerance", "dt_vn_cone_lock_knob_spec"],
+)
 def test_numeric_tolerance_title_block_readers_are_classified(module):
     script = SCRIPTS_DIR / f"{module}.py"
     assert script.stem in bg.TITLE_BLOCK_GEOMETRY_MODULES

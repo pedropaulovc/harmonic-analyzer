@@ -14,6 +14,7 @@ import pytest
 from doit.loader import load_tasks
 
 from _buildgraph import RECIPE_SKIP_MODULES
+import machinist_review_config as review_config
 from _machinist_review_mode import MachinistReviewMode, mode_for_drawing
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +33,7 @@ def loaded_dodo():
 @pytest.fixture
 def dodo(loaded_dodo, monkeypatch):
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
+    monkeypatch.delenv("HARMONIC_MACHINIST_REVIEWER", raising=False)
     loaded_dodo._reviewed_drawings.cache_clear()
     yield loaded_dodo
     loaded_dodo._reviewed_drawings.cache_clear()
@@ -116,7 +118,7 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
 
 def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
     stem = "pd_platen_guide"
-    command = dodo._machinist_review_command(stem)
+    command = dodo._machinist_review_command(stem, dodo._machinist_review_profile())
     assert command[0] == dodo.sys.executable
     assert command[2:] == [
         "--pdf",
@@ -129,6 +131,18 @@ def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
         "3",
         "--report-dir",
         str(dodo._machinist_review_dir(stem)),
+        "--reviewer",
+        "claude",
+        "--model",
+        "claude-opus-5-5",
+        "--effort",
+        "medium",
+        "--judge-reviewer",
+        "claude",
+        "--judge-model",
+        "claude-opus-5-5",
+        "--judge-effort",
+        "medium",
     ]
 
 
@@ -189,20 +203,21 @@ def inputs(dodo, tmp_path, monkeypatch):
     )
 
 
+def _review_key(dodo, stem="probe", label=None):
+    return dodo._machinist_review_cache_key(
+        stem, dodo._machinist_review_profile(), label
+    )
+
+
 def test_key_changes_only_with_review_inputs(inputs):
     dodo = inputs.module
 
     def key():
-        return dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+        return _review_key(dodo)
 
     initial = key()
     changed_inputs = [
-        inputs.pdf,
-        inputs.exception,
-        inputs.scripts / "machinist_review.py",
-        inputs.prompts / "machinist_review_part.md",
-        inputs.prompts / "machinist_review_judge.md",
-        inputs.prompts / "machinist_review_judge_schema.json",
+        Path(path) for path in dodo._machinist_review_file_deps("probe")
     ]
     for path in changed_inputs:
         before = path.read_bytes()
@@ -222,7 +237,7 @@ def test_key_tracks_only_selected_kind_severity_contract(inputs):
     dodo = inputs.module
 
     def key():
-        return dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+        return _review_key(dodo)
 
     for selected, opposite in (("part", "assembly"), ("assembly", "part")):
         inputs.spec.source_kind = selected
@@ -245,7 +260,7 @@ def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):
         (inputs.scripts / name).write_text("# observation-only infrastructure\n")
     deps = dodo._machinist_review_file_deps("probe")
     assert {Path(path).name for path in deps}.isdisjoint(RECIPE_SKIP_MODULES)
-    initial = dodo._cache_key(deps)
+    initial = _review_key(dodo)
     # An inert import entering the explicit manifest must still follow the
     # recipe policy, rather than accidentally charging for another review.
     monkeypatch.setattr(
@@ -256,7 +271,7 @@ def test_review_keys_exclude_the_shared_recipe_skip_set(inputs, monkeypatch):
     assert dodo._machinist_review_file_deps("probe") == deps
     for name in RECIPE_SKIP_MODULES:
         (inputs.scripts / name).write_text("# logging-only edit must not re-review\n")
-        assert dodo._cache_key(dodo._machinist_review_file_deps("probe")) == initial
+        assert _review_key(dodo) == initial
 
 
 def test_assembly_exception_uses_bare_dashed_config_stem(inputs):
@@ -284,10 +299,10 @@ def test_mode_and_input_set_changes_invalidate_doit_but_not_the_verdict_key(
     assert not first(None, {})
     saved = {"_config_changed": first.config_digest}
     assert tracker()(None, saved)
-    key = dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+    key = _review_key(dodo)
     inputs.draw.write_text("MACHINIST_REVIEW = MachinistReviewMode.ENFORCE\n")
     assert not tracker()(None, saved)
-    assert dodo._cache_key(dodo._machinist_review_file_deps("probe")) == key
+    assert _review_key(dodo) == key
     enforced = tracker()
     saved = {"_config_changed": enforced.config_digest}
     inputs.exception.unlink()
@@ -303,10 +318,12 @@ def action(inputs, monkeypatch):
     dodo = inputs.module
     original_probe = dodo._probe_cache
     original_store = dodo._cache.store
+    original_key = dodo._machinist_review_cache_key
+    profile = dodo._machinist_review_profile()
     calls = {"run": 0, "store": 0, "warnings": [], "probe": []}
     state = {"verdict": "SHIP", "error": None, "hit": False, "code": 0}
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
-    monkeypatch.setattr(dodo, "_cache_key", lambda *_args: "a" * 64)
+    monkeypatch.setattr(dodo, "_machinist_review_cache_key", lambda *_args: "a" * 64)
     monkeypatch.setattr(
         dodo._telemetry,
         "span",
@@ -364,8 +381,282 @@ def action(inputs, monkeypatch):
         calls=calls,
         state=state,
         original_probe=original_probe,
+        original_key=original_key,
+        profile=profile,
         original_store=original_store,
     )
+
+
+@pytest.fixture
+def review_sessions(monkeypatch):
+    """Replace only the model-session boundary, not CLI/aggregate consumers."""
+    import machinist_review as mr
+
+    seen = []
+
+    def session(package, **kwargs):
+        findings = kwargs.get("judge_findings")
+        role = "judge" if findings is not None else "reviewer"
+        seen.append((role, kwargs["reviewer"], kwargs["model"], kwargs["effort"]))
+        claim = {
+            "where": "front view", "issue": "hermetic claim", "fix": "check the sheet",
+        }
+        if findings is None:
+            verdict = {
+                "verdict": "FIX", "summary": "requires adjudication",
+                "blockers": [claim], "over_specification": [], "clarity": [], "minor": [],
+            }
+        else:
+            verdict = {"clusters": [{
+                **claim, "category": "blockers", "decision": "rejected",
+                "member_ids": [finding["id"] for finding in findings],
+                "reason": "The hermetic judge rejects this synthetic claim.",
+            }]}
+        return replace(
+            mr._failed_review(
+                package, kwargs["reviewer"], kwargs["model"], kwargs["effort"],
+                [mr._sha256(source) for source in package.sources], "unused",
+            ),
+            verdict=verdict, error=None, passed=findings is not None, sheet_count=1,
+            prompt_sha256="hermetic-session", extra={"inspection_proven": True},
+        )
+
+    monkeypatch.setattr(mr, "_review_session", session)
+    return SimpleNamespace(module=mr, seen=seen)
+
+
+@pytest.mark.parametrize(
+    ("selector", "expected"),
+    [
+        (None, ("claude", "claude-opus-5-5", "medium")),
+        ("claude", ("claude", "claude-opus-5-5", "medium")),
+        ("codex", ("codex", "gpt-6-astra", "low")),
+    ],
+)
+def test_registered_selection_reaches_real_cli_reviewers_and_judge(
+    action, review_sessions, monkeypatch, selector, expected
+):
+    dodo = action.dodo
+    if selector is not None:
+        monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    monkeypatch.setattr(
+        dodo, "mode_for_drawing", lambda _script: MachinistReviewMode.ENFORCE
+    )
+    task = next(dodo._machinist_review_tasks())
+    # The task's frozen profile must own command AND key even if the ambient
+    # selector changes after graph generation (including becoming invalid).
+    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-after-snapshot")
+    keyed_profiles = []
+    monkeypatch.setattr(
+        dodo, "_machinist_review_cache_key",
+        lambda stem, profile, label: keyed_profiles.append(profile) or "a" * 64,
+    )
+
+    def run(command, *_args, **_kwargs):
+        return review_sessions.module.main(command[2:])
+
+    monkeypatch.setattr(dodo, "_run_subprocess", run)
+    execute, arguments = task["actions"][0]
+    execute(*arguments)
+    assert keyed_profiles == [review_config.ReviewProfile(*expected)]
+    assert sorted(review_sessions.seen) == sorted([
+        ("reviewer", *expected), ("reviewer", *expected), ("reviewer", *expected),
+        ("judge", *expected),
+    ])
+    aggregate = dodo._read_machinist_aggregate("probe")
+    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == expected
+    assert tuple(aggregate["judge"][name] for name in ("reviewer", "model", "effort")) == expected
+    assert aggregate["judge"]["skipped"] is False
+    assert aggregate["verdict"] == "SHIP"
+    assert dodo._machinist_review_stamp("probe").is_file()
+
+
+@pytest.mark.parametrize(
+    ("flags", "reviewer", "judge"),
+    [
+        ([], ("claude", "claude-opus-5-5", "medium"),
+         ("claude", "claude-opus-5-5", "medium")),
+        (["--reviewer", "codex"], ("codex", "gpt-6-astra", "low"),
+         ("claude", "claude-opus-5-5", "medium")),
+        (["--reviewer", "codex", "--model", "explicit-review", "--effort", "high",
+          "--judge-reviewer", "claude", "--judge-model", "explicit-judge",
+          "--judge-effort", "low"],
+         ("codex", "explicit-review", "high"), ("claude", "explicit-judge", "low")),
+    ],
+)
+def test_standalone_cli_ignores_registered_selector(
+    inputs, review_sessions, monkeypatch, tmp_path, flags, reviewer, judge
+):
+    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-for-registered-gate")
+    assert review_sessions.module.main([
+        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part",
+        "--report-dir", str(tmp_path / "standalone"), *flags,
+    ]) == 0
+    assert sorted(review_sessions.seen) == sorted([
+        ("reviewer", *reviewer), ("reviewer", *reviewer), ("reviewer", *reviewer),
+        ("judge", *judge),
+    ])
+
+
+@pytest.mark.parametrize("selector", ["", "Claude", "codex ", "other"])
+def test_invalid_selector_fails_before_graph_inputs_cache_or_output_changes(
+    action, monkeypatch, selector
+):
+    dodo = action.dodo
+    stamp = dodo._machinist_review_stamp("probe")
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text("prior success")
+    directory = dodo._machinist_review_dir("probe")
+    directory.mkdir(parents=True)
+    evidence = directory / "prior-evidence.json"
+    evidence.write_text("prior evidence")
+    monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", selector)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("invalid selector performed review work")
+
+    monkeypatch.setattr(dodo, "_drawing_order", forbidden)
+    monkeypatch.setattr(dodo, "_machinist_review_file_deps", forbidden)
+    monkeypatch.setattr(dodo, "_probe_cache", forbidden)
+    monkeypatch.setattr(dodo, "_run_subprocess", forbidden)
+    monkeypatch.setattr(dodo._cache, "store", forbidden)
+    with pytest.raises(ValueError, match="HARMONIC_MACHINIST_REVIEWER must be"):
+        list(dodo._machinist_review_tasks())
+    assert stamp.read_text() == "prior success"
+    assert evidence.read_text() == "prior evidence"
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        {"backend": "codex", "model": "gpt-6-astra", "effort": "low"},
+        review_config.ReviewProfile("invalid", "ignored", "ignored"),
+    ],
+)
+def test_direct_action_rejects_unresolved_or_invalid_profile_before_work(
+    action, monkeypatch, profile
+):
+    dodo = action.dodo
+    stamp = dodo._machinist_review_stamp("probe")
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text("prior success")
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("invalid action profile performed review work")
+
+    monkeypatch.setattr(dodo, "_machinist_review_dir", forbidden)
+    monkeypatch.setattr(dodo, "_probe_cache", forbidden)
+    monkeypatch.setattr(dodo, "_run_subprocess", forbidden)
+    monkeypatch.setattr(dodo._cache, "store", forbidden)
+    with pytest.raises(ValueError, match="ReviewProfile|HARMONIC_MACHINIST_REVIEWER"):
+        dodo._cached_machinist_review_action(
+            "probe", MachinistReviewMode.ENFORCE, profile
+        )
+    assert stamp.read_text() == "prior success"
+
+
+@pytest.mark.parametrize("changed", ["backend", "model", "effort"])
+def test_effective_profile_invalidates_real_freshness_and_cached_action(
+    action, review_sessions, monkeypatch, changed
+):
+    from doit.task import Stream, dict_to_task
+
+    from test_artifact_cache import _BlockBlobService
+
+    dodo = action.dodo
+    cache = dodo._cache
+    root = dodo.REPO_ROOT
+    label = "check:machinist_review:probe"
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setattr(cache, "_CACHE_OUTPUT_ROOT", root / "cad" / "out")
+    monkeypatch.setattr(cache, "_REPORTS", dodo.REPORTS)
+    monkeypatch.setattr(cache, "_EVENTS_LOG", dodo.REPORTS / "cache.jsonl")
+    monkeypatch.setattr(cache, "_KEYDIR", dodo.REPORTS / "cache-keys")
+    monkeypatch.setattr(cache, "_BACKEND", cache._BlobBackend(_BlockBlobService()))
+    monkeypatch.setattr(dodo, "_machinist_review_cache_key", action.original_key)
+    monkeypatch.setattr(dodo, "_probe_cache", action.original_probe)
+    monkeypatch.setattr(cache, "store", action.original_store)
+    monkeypatch.setattr(dodo, "_drawing_order", lambda: ["probe"])
+    monkeypatch.setattr(
+        dodo, "mode_for_drawing", lambda _script: MachinistReviewMode.ENFORCE
+    )
+    commands = []
+
+    def run(command, *_args, **_kwargs):
+        commands.append(command)
+        return review_sessions.module.main(command[2:])
+
+    monkeypatch.setattr(dodo, "_run_subprocess", run)
+
+    def registered_task():
+        return dict_to_task(next(dodo._machinist_review_tasks()))
+
+    def freshness(task, values):
+        check, args, kwargs = task.uptodate[0]
+        return check(task, values, *args, **kwargs)
+
+    def execute(previous):
+        task = registered_task()
+        # Task construction registers config_changed's saver; doit evaluates
+        # freshness before execution and saves values only after success.
+        assert not freshness(task, previous)
+        assert task.execute(Stream(0)) is None
+        task.save_extra_values()
+        key = _review_key(dodo, label=label)
+        return dict(task.values), key, dict(cache._KEY_INPUTS[(label, key)])
+
+    saved, first_key, first_inputs = execute({})
+    assert freshness(registered_task(), saved)
+    assert len(commands) == 1 and len(review_sessions.seen) == 4
+    with monkeypatch.context() as change:
+        if changed == "backend":
+            change.setenv("HARMONIC_MACHINIST_REVIEWER", "codex")
+            # Isolate backend identity: different models/efforts must not hide
+            # a cache-key mutant that silently drops the backend field.
+            change.setitem(
+                review_config.DEFAULT_MODELS, "codex", action.profile.model
+            )
+            change.setitem(
+                review_config.DEFAULT_EFFORTS, "codex", action.profile.effort
+            )
+        elif changed == "model":
+            change.setitem(review_config.DEFAULT_MODELS, "claude", "other-model")
+        else:
+            change.setitem(review_config.DEFAULT_EFFORTS, "claude", "high")
+        assert not freshness(registered_task(), saved)
+        second_saved, second_key, second_inputs = execute(saved)
+        assert first_key != second_key
+        assert len(commands) == 2 and len(review_sessions.seen) == 8
+        field = "reviewer" if changed == "backend" else changed
+        assert dodo._read_machinist_aggregate("probe")[field] != {
+            "backend": "claude", "model": "claude-opus-5-5", "effort": "medium",
+        }[changed]
+
+    reverted = registered_task()
+    assert freshness(reverted, saved)
+    assert not freshness(reverted, second_saved)
+    _, restored_key, _ = execute(second_saved)
+    assert restored_key == first_key
+    assert len(commands) == 2 and len(review_sessions.seen) == 8
+    aggregate = dodo._read_machinist_aggregate("probe")
+    assert (aggregate["reviewer"], aggregate["model"], aggregate["effort"]) == (
+        "claude", "claude-opus-5-5", "medium",
+    )
+    config_tag = "cad/scripts/machinist_review_config.py"
+    assert {path for path in first_inputs if first_inputs[path] != second_inputs[path]} == {
+        config_tag,
+    }
+    assert all((root / path).is_file() for path in first_inputs)
+    config_path = str(root / config_tag)
+    effective = json.dumps(
+        action.profile._asdict(), sort_keys=True, separators=(",", ":")
+    )
+    source = dodo.ContentChecker._digest(config_path)
+    assert first_inputs[config_tag] == dodo.hashlib.sha256(
+        f"{source}\0{effective}".encode()
+    ).hexdigest()
+    assert cache.key_input_paths(label, first_key) == sorted(first_inputs)
 
 
 @pytest.mark.parametrize("verdict", ["SHIP", "FIX", "ERROR"])
@@ -375,9 +666,9 @@ def test_cached_verdict_policy_and_error_publication(action, verdict, mode, hit)
     action.state.update(verdict=verdict, hit=hit, code=0 if verdict == "SHIP" else 1)
     if mode is MachinistReviewMode.ENFORCE and verdict != "SHIP":
         with pytest.raises(RuntimeError, match=f"{verdict}, gating_count=2"):
-            action.dodo._cached_machinist_review_action("probe", mode)
+            action.dodo._cached_machinist_review_action("probe", mode, action.profile)
     else:
-        action.dodo._cached_machinist_review_action("probe", mode)
+        action.dodo._cached_machinist_review_action("probe", mode, action.profile)
     assert action.calls["run"] == int(not hit)
     assert action.calls["store"] == int(not hit and verdict != "ERROR")
     assert len(action.calls["warnings"]) == int(
@@ -471,10 +762,12 @@ def test_provider_error_is_not_cached_and_forced_refresh_overrides_learning(
         )
         with pytest.raises(RuntimeError, match=f"{verdict}, gating_count="):
             action.dodo._cached_machinist_review_action(
-                "probe", MachinistReviewMode.LEARN
+                "probe", MachinistReviewMode.LEARN, action.profile
             )
     else:
-        action.dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+        action.dodo._cached_machinist_review_action(
+            "probe", MachinistReviewMode.LEARN, action.profile
+        )
         assert f"{verdict}, gating_count=" in action.calls["warnings"][0]
     assert action.calls["store"] == 0
     assert not action.dodo._machinist_review_stamp("probe").exists()
@@ -486,7 +779,9 @@ def test_failed_runner_cannot_reuse_a_previous_aggregate(action, monkeypatch):
     directory.mkdir(parents=True)
     (directory / "probe.aggregate.json").write_text('{"verdict": "SHIP"}')
     monkeypatch.setattr(action.dodo, "_run_subprocess", lambda *_args, **_kwargs: 2)
-    action.dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
     assert action.calls["store"] == 0
     assert "ERROR" in action.calls["warnings"][0]
 
@@ -497,7 +792,9 @@ def test_cache_hit_replaces_instead_of_mixing_previous_evidence(action):
     old_attempt = directory / "unrelated-old-attempt.json"
     old_attempt.write_text("{}")
     action.state["hit"] = True
-    action.dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+    action.dodo._cached_machinist_review_action(
+        "probe", MachinistReviewMode.LEARN, action.profile
+    )
     assert not old_attempt.exists()
     assert action.calls["run"] == 0
     assert action.calls["store"] == 0
@@ -513,9 +810,9 @@ def test_farm_restore_lock_uses_the_drawing_error_policy(action, monkeypatch, mo
     monkeypatch.setattr(action.dodo, "_probe_cache", locked)
     if mode is MachinistReviewMode.ENFORCE:
         with pytest.raises(RuntimeError, match="ERROR"):
-            action.dodo._cached_machinist_review_action("probe", mode)
+            action.dodo._cached_machinist_review_action("probe", mode, action.profile)
     else:
-        action.dodo._cached_machinist_review_action("probe", mode)
+        action.dodo._cached_machinist_review_action("probe", mode, action.profile)
         assert "ERROR" in action.calls["warnings"][0]
     assert action.calls["run"] == action.calls["store"] == 0
     assert not action.dodo._machinist_review_stamp("probe").exists()
@@ -529,7 +826,9 @@ def test_invalid_refresh_carrier_is_not_demoted_to_a_learning_warning(
 
     monkeypatch.setattr(action.dodo, "_probe_cache", malformed)
     with pytest.raises(ValueError, match="HARMONIC_CACHE_REFRESH"):
-        action.dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+        action.dodo._cached_machinist_review_action(
+            "probe", MachinistReviewMode.LEARN, action.profile
+        )
     assert not action.calls["warnings"]
 
 
@@ -551,11 +850,8 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     monkeypatch.setattr(cache, "_KEYDIR", dodo.REPORTS / "cache-keys")
     backend = cache._BlobBackend(_BlockBlobService())
     monkeypatch.setattr(cache, "_BACKEND", backend)
-    monkeypatch.setattr(
-        dodo, "_cache_key",
-        lambda deps, label=None: cache.cache_key(deps, dodo.ContentChecker._digest, label),
-    )
-    key = dodo._cache_key(dodo._machinist_review_file_deps("probe"))
+    monkeypatch.setattr(dodo, "_machinist_review_cache_key", action.original_key)
+    key = _review_key(dodo)
     directory.mkdir(parents=True)
     (directory / "probe.aggregate.json").write_text(json.dumps({
         "name": "probe", "kind": "part", "verdict": winner,
@@ -579,9 +875,9 @@ def test_losing_review_restores_full_winner_and_rereads_verdict(
     monkeypatch.setattr(cache, "store", action.original_store)
     if mode is MachinistReviewMode.ENFORCE and winner == "FIX":
         with pytest.raises(RuntimeError, match="FIX, gating_count=2"):
-            dodo._cached_machinist_review_action("probe", mode)
+            dodo._cached_machinist_review_action("probe", mode, action.profile)
     else:
-        dodo._cached_machinist_review_action("probe", mode)
+        dodo._cached_machinist_review_action("probe", mode, action.profile)
     assert dodo._read_machinist_aggregate("probe")["verdict"] == winner
     assert (directory / "winner-evidence.json").is_file()
     assert not (directory / "loser-only-attempt.json").exists()
@@ -615,7 +911,9 @@ def test_failed_review_adoption_is_fatal_even_in_learn(action, monkeypatch, fail
 
         monkeypatch.setattr(dodo.shutil, "rmtree", locked_cleanup)
     with pytest.raises(RuntimeError, match="canonical|share-locked"):
-        dodo._cached_machinist_review_action("probe", MachinistReviewMode.LEARN)
+        dodo._cached_machinist_review_action(
+            "probe", MachinistReviewMode.LEARN, action.profile
+        )
     assert not dodo._machinist_review_stamp("probe").exists()
     assert not action.calls["warnings"]
 

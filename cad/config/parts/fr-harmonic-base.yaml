@@ -12,3 +12,8 @@ fr-harmonic-base:
       where: "the 4X nameplate tap callout TRANSFER FROM MHA-FR-04 AT ASSEMBLY; on the four #4-40 MHA-FR-04 seats, which print no station"
       finding: "fit-up at assembly (rule 19)"
       reason: "the #4 close holes in MHA-FR-04 float only 0.203 diametral over the #4-40 major, against about 3.7 demanded by the plate's .X hole stations and a .XX tap station here (2 x sqrt 2 x (0.8 + 0.51)); the four taps are spotted and tapped through the actual plate's holes at assembly, so that stack never forms (owner-accepted)"
+    - id: "RV-02"
+      kind: "accept"
+      where: "MHA-FR-01 fr-harmonic-base, sheet 2 HOLES-SOCKETS, generated native hole-table SIZE cells only"
+      finding: "the native hole-table SIZE rows repeat default thread class 2B from the title block (rule 2)"
+      reason: "Owner explicitly accepted this presentation-only departure on 2026-10-20 to preserve the model-linked generated hole table without rewriting its noneditable SIZE cells. All physical Hole Wizard threads remain class 2B. The five separate native tap callouts must still omit the duplicate class token. This accepts no other repeated specification, callout, package, geometry, tolerance, engagement or clearance departure."

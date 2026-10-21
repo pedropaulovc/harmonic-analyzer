@@ -648,8 +648,8 @@ def test_screw_full_thread_is_the_accepted_rule_20_shortfall() -> None:
     # plate at 1.500 + 0.13, less 0.75 of the 40 TPI (0.635) pitch at its tip.
     worst = 6.35 - 0.508 - (1.500 + 0.13) - 0.75 * 0.635
     assert worst == pytest.approx(3.736, abs=5e-4)
-    assert print_spec.SCREW_FULL_THREAD_MIN == pytest.approx(worst, abs=1e-9)
-    assert 0.0 < print_spec.SCREW_FULL_THREAD_ACCEPTED <= round(worst, 3)
+    assert spec.SCREW_FULL_THREAD_MIN == pytest.approx(worst, abs=1e-9)
+    assert 0.0 < spec.SCREW_FULL_THREAD_ACCEPTED <= round(worst, 3)
     # Still short of 1.5D of the 2.8448 major (4.267): the ruling is live.
     assert worst < 1.5 * 2.8448
     assert worst / 2.8448 == pytest.approx(1.31, abs=5e-3)
@@ -682,7 +682,7 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
     assert float(floor.split()[-2]) == pytest.approx(print_spec.ENGRAVING_FLOOR_MIN)
     assert (
         float(screws.split()[2])
-        == math.floor(print_spec.SCREW_FULL_THREAD_MIN * 100.0) / 100.0
+        == math.floor(spec.SCREW_FULL_THREAD_MIN * 100.0) / 100.0
     )
     for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
         assert note in declared["RV-01"].where
