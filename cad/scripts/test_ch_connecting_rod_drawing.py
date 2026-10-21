@@ -991,55 +991,108 @@ def test_native_relief_refuses_wrong_geometry_or_lost_controls(monkeypatch, defe
 @pytest.mark.parametrize(
     "defect",
     [
-        None, "dangling", "detached", "wrong-feature",
-        "angle-dangling", "angle-detached", "angle-wrong-feature",
-        "wrong-angle-type", "duplicate-angle",
+        None, "native-width-residual", "view-wrapper", "dangling", "wrong-owner",
+        "wrong-feature", "view-wrong-source",
+        "angle-dangling", "angle-wrong-owner", "angle-wrong-feature",
+        "wrong-width-type", "wrong-angle-type", "wrong-width", "wrong-angle",
+        "width-band", "angle-band", "width-precision", "angle-precision",
+        "missing-view-width", "missing-view-angle", "duplicate-width", "duplicate-angle",
+        "uncropped",
     ],
 )
-def test_relief_print_requires_both_scalar_drivers_attached_to_the_correct_feature(
+def test_relief_print_requires_unique_view_owned_native_scalar_drivers(
     monkeypatch, defect,
 ):
+    import _drawing_dimensions
+
     native = _native_relief_boundary(monkeypatch)
+    native.adapter._attempt = lambda operation: operation()
     annotations = [
         SimpleNamespace(
             GetSpecificAnnotation=lambda: native.display,
             IsDangling=lambda: defect == "dangling",
-            GetAttachedEntities3=lambda: [] if defect == "detached" else [object()],
+            OwnerType=1 if defect == "wrong-owner" else 0,
+            GetAttachedEntities3=lambda: [],
         ),
         SimpleNamespace(
             GetSpecificAnnotation=lambda: native.angle_display,
             IsDangling=lambda: defect == "angle-dangling",
-            GetAttachedEntities3=lambda: [] if defect == "angle-detached" else [object()],
+            OwnerType=1 if defect == "angle-wrong-owner" else 0,
+            GetAttachedEntities3=lambda: [],
         ),
     ]
     if defect == "wrong-feature":
         native.size.FullName = "RootReliefSize@OtherChamfer@ch-connecting-rod"
+    elif defect == "native-width-residual":
+        native.size.SystemValue = 1.199999886 / 1000.0
     elif defect == "angle-wrong-feature":
         native.angle.FullName = "RootReliefAngle@OtherChamfer@ch-connecting-rod"
+    elif defect == "wrong-width-type":
+        native.display.Type2 = 3
     elif defect == "wrong-angle-type":
         native.angle_display.Type2 = 2
+    elif defect == "wrong-width":
+        native.size.SystemValue = 0.0011
+    elif defect == "wrong-angle":
+        native.angle.SystemValue = math.radians(44.0)
+    elif defect == "width-band":
+        native.size.Tolerance.GetMinValue = lambda: -0.0002
+    elif defect == "angle-band":
+        native.angle.Tolerance.Type = 4
+    elif defect == "width-precision":
+        native.display.GetPrimaryPrecision2 = lambda: 2
+    elif defect == "angle-precision":
+        native.angle_display.GetPrimaryPrecision2 = lambda: 1
+    view_annotations = list(annotations)
+    if defect == "missing-view-width":
+        view_annotations.pop(0)
+    elif defect == "missing-view-angle":
+        view_annotations.pop(1)
+    elif defect == "duplicate-width":
+        view_annotations.append(annotations[0])
     elif defect == "duplicate-angle":
-        annotations.append(annotations[1])
+        view_annotations.append(annotations[1])
+    elif defect in {"view-wrapper", "view-wrong-source"}:
+        view_size = SimpleNamespace(**vars(native.size))
+        if defect == "view-wrong-source":
+            view_size.FullName = "RootReliefSize@CamRootRelief@other-part"
+        view_display = SimpleNamespace(
+            **{**vars(native.display), "GetDimension2": lambda index: view_size},
+        )
+        view_annotations[0] = SimpleNamespace(
+            **{**vars(annotations[0]), "GetSpecificAnnotation": lambda: view_display},
+        )
     cut = SimpleNamespace(
-        GetPartialSection=lambda: True, GetDisplayOnlySurfaceCut=lambda: True,
+        GetPartialSection=lambda: False, GetDisplayOnlySurfaceCut=lambda: True,
     )
     view = SimpleNamespace(
         GetSection=lambda: cut, GetDisplayMode2=lambda: 2,
         GetUseParentDisplayMode=lambda: False, ScaleRatio=(3.0, 1.0),
+        IsCropped=lambda: defect != "uncropped",
+        GetAnnotations=lambda: view_annotations,
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda value, name: value)
     monkeypatch.setattr(
-        drawing, "_root_section_frame", lambda *args: ((0.003, 0.0), (0.0, 0.003))
+        drawing, "model_point_in_view",
+        lambda adapter, view, point, **kwargs: (
+            0.250 + 3.0 * point[0], 0.080 + 3.0 * point[2],
+        ),
     )
+    def dimension_name(adapter, annotation):
+        return annotation.GetSpecificAnnotation().GetDimension2(0).Name
+
+    monkeypatch.setattr(drawing, "dimension_name", dimension_name)
+    monkeypatch.setattr(_drawing_dimensions, "dimension_name", dimension_name)
     monkeypatch.setattr(
-        drawing, "dimension_name",
-        lambda adapter, annotation: annotation.GetSpecificAnnotation().GetDimension2(0).Name,
+        _drawing_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, *args: value,
     )
-    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: None)
-    if defect is None:
+    if defect in {None, "native-width-residual", "view-wrapper"}:
+        # Native SOLIDWORKS v15 supplies no attached-entity array for either
+        # valid scalar. View membership and complete model identity prove it.
         drawing._assert_root_section(native.adapter, view, annotations)
     else:
-        with pytest.raises(RuntimeError, match="strap section"):
+        with pytest.raises(RuntimeError):
             drawing._assert_root_section(native.adapter, view, annotations)
 
 
@@ -1108,21 +1161,183 @@ def test_measured_section_refuses_a_band_that_requires_clipping_or_shrinking(ban
         drawing._root_section_shift(_measured_root_section_boxes(), band)
 
 
-def test_partial_strap_section_spans_the_whole_wall_and_one_chamfer() -> None:
+def test_full_strap_section_spans_the_whole_plate_and_one_chamfer() -> None:
     spec = ch_connecting_rod_spec
-    start, end = drawing.ROOT_SECTION_START, drawing.ROOT_SECTION_END
-    wall = [
-        drawing._sheet_xy(0.0, y)
-        for y in (
-            spec.RING_BOTTOM_Y,
-            -spec.RING_BORE_DIA / 2.0 - spec.ROOT_RELIEF_SIZE,
-            -spec.RING_BORE_DIA / 2.0,
+    start, end = drawing._ROOT_CUT_MODEL_POINTS
+    half = spec.RING_THICKNESS / 2000.0
+    assert start[:2] == end[:2] == (0.0, 0.0)
+    assert sorted((start[2], end[2])) == pytest.approx((-half - 0.001, half + 0.001))
+    corners = drawing._root_cut_profile_points()
+    inner = spec.RING_BORE_DIA / 2000.0
+    outer = spec.RING_OUTER_RADIUS / 1000.0
+    relief = spec.ROOT_RELIEF_SIZE / 1000.0
+    expected = (
+        (inner, 0.0, half), (outer, 0.0, half), (outer, 0.0, -half),
+        (inner + relief, 0.0, -half), (inner, 0.0, -half + relief),
+    )
+    assert len(corners) == len(expected)
+    for actual, target in zip(corners, expected, strict=True):
+        assert actual == pytest.approx(target)
+        assert actual[0] > 0.0  # Crop only the positive-X wall, never both walls.
+        assert min(start[2], end[2]) < actual[2] < max(start[2], end[2])
+
+
+def _root_sheet_profile(xshift: float, zshift: float) -> tuple[tuple[float, float], ...]:
+    """Independent physical XZ wall, in millimetres, projected at paper scale 3:1."""
+    spec = ch_connecting_rod_spec
+    inner = spec.RING_BORE_DIA / 2.0
+    outer = inner + spec.RING_WALL
+    half = spec.RING_THICKNESS / 2.0
+    relief = spec.ROOT_RELIEF_SIZE
+    return tuple(
+        (xshift + 0.003 * x, zshift + 0.003 * z)
+        for x, z in (
+            (inner, half), (outer, half), (outer, -half),
+            (inner + relief, -half), (inner, -half + relief),
         )
+    )
+
+
+def _closed_profile_lines(corners) -> tuple[Segment, ...]:
+    return tuple(
+        Segment(*start, *end)
+        for start, end in zip(corners, (*corners[1:], corners[0]), strict=True)
+    )
+
+
+@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
+def test_root_frame_projects_positive_X_right_and_positive_Z_up(monkeypatch, shift):
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda adapter, view, point, **kwargs: (
+            shift[0] + 3.0 * point[0], shift[1] + 3.0 * point[2],
+        ),
+    )
+    horizontal, vertical = drawing._root_section_frame(object(), object())
+    assert horizontal == pytest.approx((0.003, 0.0))
+    assert vertical == pytest.approx((0.0, 0.003))
+
+
+@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
+@pytest.mark.parametrize("subdivided", [False, True])
+def test_root_crop_accepts_the_whole_positive_X_wall_at_paper_scale(shift, subdivided):
+    corners = _root_sheet_profile(*shift)
+    lines = _closed_profile_lines(corners)
+    if subdivided:
+        samples = []
+        for start, end in zip(corners, (*corners[1:], corners[0]), strict=True):
+            # The tessellator may split a real edge at arbitrary locations.
+            points = [
+                tuple(a + fraction * (b - a) for a, b in zip(start, end, strict=True))
+                for fraction in (0.0, 0.2, 0.65, 1.0)
+            ]
+            samples.extend(Segment(*a, *b) for a, b in zip(points, points[1:]))
+        lines = tuple(samples)
+    drawing._assert_root_profile_lines(lines, corners)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    ["clipped-chamfer", "missing-edge", "missing-midpoint", "off-midpoint-gaps",
+     "wrong-wall", "off-profile", "shifted-mouth"],
+)
+@pytest.mark.parametrize("shift", [(0.250, 0.080), (0.123, -0.040)])
+def test_root_crop_refuses_incomplete_or_wrong_native_cut_edges(defect, shift):
+    corners = _root_sheet_profile(*shift)
+    actual = list(corners)
+    if defect == "clipped-chamfer":
+        a, b = corners[3:]
+        actual[3] = tuple(x + 0.2 * (y - x) for x, y in zip(a, b, strict=True))
+        actual[4] = tuple(x + 0.8 * (y - x) for x, y in zip(a, b, strict=True))
+    elif defect == "wrong-wall":
+        actual = [(2.0 * shift[0] - x, z) for x, z in corners]
+    elif defect == "shifted-mouth":
+        # Same relief size and wall envelope, but cut into the opposite face.
+        actual = [(x, 2.0 * shift[1] - z) for x, z in corners]
+    lines = list(_closed_profile_lines(actual))
+    if defect == "missing-edge":
+        lines.pop()
+    elif defect == "missing-midpoint":
+        start, end = corners[:2]
+        left = tuple(a + 0.4 * (b - a) for a, b in zip(start, end, strict=True))
+        right = tuple(a + 0.6 * (b - a) for a, b in zip(start, end, strict=True))
+        lines[:1] = [Segment(*start, *left), Segment(*right, *end)]
+    elif defect == "off-midpoint-gaps":
+        # Endpoints and midpoint all survive, but most of the edge is absent.
+        start, end = corners[:2]
+        points = [
+            tuple(a + fraction * (b - a) for a, b in zip(start, end, strict=True))
+            for fraction in (0.0, 0.1, 0.45, 0.55, 0.9, 1.0)
+        ]
+        lines[:1] = [
+            Segment(*points[index], *points[index + 1]) for index in (0, 2, 4)
+        ]
+    elif defect == "off-profile":
+        # All required corners/edges still exist; the extra chord is not a cut edge.
+        lines.append(Segment(*corners[0], *corners[2]))
+    with pytest.raises(RuntimeError):
+        drawing._assert_root_profile_lines(tuple(lines), corners)
+
+
+def _root_polyline_buffer(points) -> list[float]:
+    # Official GetPolylines7 record: Type, GeomDataSize, six display/layer
+    # fields, NumPolyPoints at index 8, then complete XYZ triples.
+    return [
+        0, 0, 0x102030, -1, 2, 1, 7, 3, len(points),
+        *(coordinate for point in points for coordinate in point),
     ]
-    assert all(point[0] == pytest.approx(start[0]) for point in (*wall, end))
-    assert all(start[1] < point[1] < end[1] for point in wall)
-    # The span stops in the bore; it does not add the opposite strap wall.
-    assert end[1] < drawing._sheet_xy(0.0, spec.RING_BORE_DIA / 2.0)[1]
+
+
+def test_root_polyline_parser_reads_multiple_native_XYZ_records_and_skips_zero_length():
+    raw = _root_polyline_buffer(
+        [(0.250, 0.080, 0.0), (0.251, 0.082, 0.0), (0.251, 0.082, 0.0)],
+    )
+    raw += _root_polyline_buffer([(0.260, 0.090, 0.0), (0.263, 0.094, 0.0)])
+    assert drawing._root_polyline_segments(raw) == (
+        Segment(0.250, 0.080, 0.251, 0.082),
+        Segment(0.260, 0.090, 0.263, 0.094),
+    )
+
+
+def test_root_native_polybuffer_preserves_every_true_crop_edge():
+    corners = _root_sheet_profile(0.250, 0.080)
+    raw = _root_polyline_buffer(
+        [(x, z, 0.0) for x, z in (*corners, corners[0])],
+    )
+    drawing._assert_root_profile_lines(drawing._root_polyline_segments(raw), corners)
+
+
+@pytest.mark.parametrize("length", [1, 8, 9, 10, 14])
+def test_root_polyline_parser_refuses_truncated_header_or_XYZ_strip(length):
+    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
+    with pytest.raises(RuntimeError):
+        drawing._root_polyline_segments(raw[:length])
+
+
+@pytest.mark.parametrize("index", [9, 10, 11, 12, 13, 14])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_root_polyline_parser_refuses_nonfinite_coordinates_including_depth(index, value):
+    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
+    raw[index] = value
+    with pytest.raises(RuntimeError):
+        drawing._root_polyline_segments(raw)
+
+
+@pytest.mark.parametrize("index", [1, 8])
+@pytest.mark.parametrize("value", [-1, 0.5, float("nan"), float("inf")])
+def test_root_polyline_parser_refuses_invalid_geometry_or_point_counts(index, value):
+    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
+    raw[index] = value
+    with pytest.raises(RuntimeError):
+        drawing._root_polyline_segments(raw)
+
+
+@pytest.mark.parametrize("index,value", [(0, 1), (0, 0.5), (1, 1)])
+def test_root_polyline_parser_refuses_nonpolyline_or_nonempty_geometry(index, value):
+    raw = _root_polyline_buffer([(0.250, 0.080, 0.0), (0.251, 0.082, 0.0)])
+    raw[index] = value
+    with pytest.raises(RuntimeError):
+        drawing._root_polyline_segments(raw)
 
 
 def test_scalar_dimension_lane_clears_the_other_dimensions_native_line() -> None:

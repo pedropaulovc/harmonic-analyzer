@@ -1272,6 +1272,10 @@ class _LockAnnotation:
         self.dangling = False
         self.count = 1
         self.leaders = 1
+        self.position = (0.0, 0.0, 0.0)
+        self.start = (0.1, 0.1)
+        self.ignore_move = False
+        self.note = None
 
     def GetAttachedEntities3(self):
         return (self.edge,) if self.count else ()
@@ -1290,18 +1294,33 @@ class _LockAnnotation:
 
     def GetLeaderPointsAtIndex(self, index):
         assert index == 0
-        return (0.1, 0.1, 0.0, *self.tip, 0.0)
+        return (*self.start, 0.0, *self.tip, 0.0)
+
+    def GetPosition(self):
+        return self.position
+
+    def SetPosition2(self, x, y, z):
+        if self.ignore_move:
+            return True
+        dx, dy = x - self.position[0], y - self.position[1]
+        self.position = (x, y, z)
+        if self.note is not None:
+            x0, y0, z0, x1, y1, z1 = self.note.extent
+            self.note.extent = (x0 + dx, y0 + dy, z0, x1 + dx, y1 + dy, z1)
+        return True
 
 
 class _LockNote:
     def __init__(self, text, xy, annotation):
         self.text = text.replace("\n", "\r\n")
         self.annotation = annotation
+        annotation.position = (*xy, 0.0)
+        annotation.note = self
         self.extent = (
             xy[0],
             xy[1] - len(text.splitlines()) * NOTE_LINE_PITCH,
             0.0,
-            xy[0] + 0.064,
+            xy[0] + max(map(len, text.splitlines())) * NOTE_CHAR_WIDTH,
             xy[1],
             0.0,
         )
@@ -1404,6 +1423,15 @@ def installed_lock_scene(request, monkeypatch):
     annotation = _LockAnnotation(mouth, tip)
     note = _LockNote(lock.note_text, lock.note_xy, annotation)
     caption = _LockNote(lock.bank.label_text, lock.caption_xy, _LockAnnotation(None, tip))
+    neighbour = (
+        _LockNote(
+            drawing.SOUTH_END.label_text,
+            drawing.SOUTH_END.crop_label_xy,
+            _LockAnnotation(None, tip),
+        )
+        if lock.receiver == drawing.explode.BRACKET
+        else None
+    )
     return SimpleNamespace(
         lock=lock,
         adapter=adapter,
@@ -1420,10 +1448,11 @@ def installed_lock_scene(request, monkeypatch):
         tip=tip,
         note=note,
         caption=caption,
+        neighbour=neighbour,
     )
 
 
-def test_installed_lock_consumer_accepts_real_topology_and_registered_operation(
+def test_installed_lock_synthetic_native_fixture_keeps_registered_operation(
     installed_lock_scene,
 ):
     scene = installed_lock_scene
@@ -1487,6 +1516,32 @@ def test_native_mouth_selection_refuses_ambiguous_or_unreadable_geometry(
         drawing._lock_mouth_edge(
             scene.adapter, scene.view, scene.lock, scene.receiver_leaf
         )
+
+
+def test_installed_lock_ignores_unused_transform_slots(installed_lock_scene):
+    scene = installed_lock_scene
+    base = list(scene.receiver.Transform2.ArrayData)
+    total = list(base)
+    base[13:] = (math.nan, math.inf, -123.0)
+    total[13:] = (456.0, -math.inf, math.nan)
+    scene.receiver.Transform2 = SimpleNamespace(ArrayData=base)
+    scene.receiver.total = SimpleNamespace(ArrayData=total)
+    drawing._assert_installed_lock(
+        scene.adapter, scene.lock, scene.view, scene.note, scene.caption
+    )
+
+
+@pytest.mark.parametrize("index", range(13))
+@pytest.mark.parametrize("value", (math.nan, math.inf, 0.125))
+def test_installed_lock_refuses_changed_semantic_transform_entries(
+    installed_lock_scene, index, value
+):
+    scene = installed_lock_scene
+    total = list(scene.receiver.Transform2.ArrayData)
+    total[index] = value
+    scene.receiver.total = SimpleNamespace(ArrayData=total)
+    with pytest.raises(RuntimeError, match="collapsed transform"):
+        drawing._lock_components(scene.adapter, scene.view, scene.lock)
 
 
 @pytest.mark.parametrize(
@@ -1590,7 +1645,7 @@ def test_installed_lock_placement_rechecks_actual_attachment_at_finalize(
         return _LockNote(text, note_xy, _LockAnnotation(attached_to, entity_xy))
 
     monkeypatch.setattr(drawing, "add_attached_note", attach)
-    settled = drawing._place_installed_lock(scene.adapter, scene.lock)
+    settled = drawing._place_installed_lock(scene.adapter, scene.lock, scene.neighbour)
     settled()
     # Changing the installed source geometry after insertion must not export a
     # stale note that still happens to have a plausible string and leader.
@@ -1600,6 +1655,116 @@ def test_installed_lock_placement_rechecks_actual_attachment_at_finalize(
     scene.screw.total = scene.screw.Transform2
     with pytest.raises(RuntimeError, match="shaft flat"):
         settled()
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_caption_clearance_includes_retained_native_detail_caption(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    drawing._assert_lock_caption_clearance(
+        scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+    )
+    # Replay the former overlapping allocation using both actual-note extent
+    # consumers, not a source coordinate/string assertion.
+    scene.caption.annotation.SetPosition2(0.018, 0.061, 0.0)
+    with pytest.raises(RuntimeError, match="caption clearance"):
+        drawing._assert_lock_caption_clearance(
+            scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+        )
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_reflow_follows_actual_neighbour_extent_without_moving_it(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    x0, _y0, z0, x1, _y1, z1 = scene.neighbour.extent
+    scene.neighbour.extent = (x0, 0.043, z0, x1, 0.0565, z1)
+    original = (scene.neighbour.extent, scene.neighbour.GetText())
+    before = scene.note.annotation.GetPosition()
+    scene.adapter.currentModel = SimpleNamespace(EditRebuild3=lambda: True)
+    drawing._reflow_bracket_lock_text(
+        scene.adapter, scene.lock, scene.note, scene.caption, scene.neighbour
+    )
+    assert scene.note.annotation.GetPosition()[1] < before[1]
+    assert (scene.neighbour.extent, scene.neighbour.GetText()) == original
+    drawing._assert_lock_caption_clearance(
+        scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+    )
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_reflow_refuses_successful_but_ignored_native_position_write(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    scene.neighbour.extent = (0.056, 0.043, 0.0, 0.123, 0.0565, 0.0)
+    scene.note.annotation.ignore_move = True
+    scene.adapter.currentModel = SimpleNamespace(EditRebuild3=lambda: True)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._reflow_bracket_lock_text(
+            scene.adapter, scene.lock, scene.note, scene.caption, scene.neighbour
+        )
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_reflow_refuses_insufficient_space_without_shrinking_text(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    scene.neighbour.extent = (0.056, 0.030, 0.0, 0.123, 0.0435, 0.0)
+    original_size = (
+        scene.caption.extent[3] - scene.caption.extent[0],
+        scene.caption.extent[4] - scene.caption.extent[1],
+    )
+    scene.adapter.currentModel = SimpleNamespace(EditRebuild3=lambda: True)
+    with pytest.raises(RuntimeError, match="leaves the inner border"):
+        drawing._reflow_bracket_lock_text(
+            scene.adapter, scene.lock, scene.note, scene.caption, scene.neighbour
+        )
+    assert (
+        scene.caption.extent[3] - scene.caption.extent[0],
+        scene.caption.extent[4] - scene.caption.extent[1],
+    ) == pytest.approx(original_size)
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_refuses_foreign_caption_touching_native_view_or_leader(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    saved = scene.neighbour.extent
+    x0, y0, x1, y1 = scene.view.outline
+    scene.neighbour.extent = (x0, y0, 0.0, x1, y1, 0.0)
+    with pytest.raises(RuntimeError, match="caption clearance"):
+        drawing._assert_lock_caption_clearance(
+            scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+        )
+    scene.neighbour.extent = saved
+    scene.note.annotation.start = (
+        (saved[0] + saved[3]) / 2.0, (saved[1] + saved[4]) / 2.0
+    )
+    with pytest.raises(RuntimeError, match="leader crosses"):
+        drawing._assert_lock_caption_clearance(
+            scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+        )
+
+
+@pytest.mark.parametrize("installed_lock_scene", (drawing._BRACKET_LOCK,), indirect=True)
+def test_bracket_lock_clearance_refuses_missing_or_unreadable_neighbour_caption(
+    installed_lock_scene,
+):
+    scene = installed_lock_scene
+    with pytest.raises(RuntimeError, match="missing retained"):
+        drawing._assert_lock_caption_clearance(
+            scene.lock, scene.view, scene.note, scene.caption, None
+        )
+    scene.neighbour.extent = (math.nan, 0.043, 0.0, 0.123, 0.0565, 0.0)
+    with pytest.raises(RuntimeError, match="unreadable native note extent"):
+        drawing._assert_lock_caption_clearance(
+            scene.lock, scene.view, scene.note, scene.caption, scene.neighbour
+        )
 
 
 def test_installed_lock_item_labels_refuse_changed_native_bom_numbering():

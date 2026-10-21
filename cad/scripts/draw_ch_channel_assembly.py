@@ -91,6 +91,7 @@ from _drawing_view_configuration import (
     set_view_exploded_state,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
@@ -742,8 +743,8 @@ _BRACKET_LOCK = _InstalledLock(
         pivot_shaft_spec.SHAFT_DIA / 2.0 - pivot_shaft_spec.FLAT_DEPTH,
         -pivot_shaft_spec.NORTH_FLAT_STATION,
     ),
-    caption_xy=(0.018, 0.061),
-    note_xy=(0.018, 0.044),
+    caption_xy=(0.018, 0.043),
+    note_xy=(0.082, 0.045),
 )
 _KEEPER_LOCK = _InstalledLock(
     bank=BankView(
@@ -1744,7 +1745,7 @@ def _assert_lock_bom_items(items: tuple[tuple[str, str], ...]) -> None:
             )
 
 
-def _lock_components(adapter: Any, view: Any, lock: _InstalledLock) -> tuple[Any, Any]:
+def _lock_components(adapter: Any, view: Any, lock: _InstalledLock) -> Any:
     """Prove the existing receiver, seated screw and shaft share this joint."""
     label = lock.bank.title
     leaves = _view_component_leaves(adapter, view, label=label)
@@ -1771,8 +1772,14 @@ def _lock_components(adapter: Any, view: Any, lock: _InstalledLock) -> tuple[Any
         if (
             len(base_values) != 16
             or len(total_values) != 16
-            or not all(math.isfinite(value) for value in (*base_values, *total_values))
-            or any(abs(a - b) > 1e-9 for a, b in zip(base_values, total_values))
+            or not all(
+                math.isfinite(value)
+                for value in (*base_values[:13], *total_values[:13])
+            )
+            or any(
+                abs(a - b) > 1e-9
+                for a, b in zip(base_values[:13], total_values[:13])
+            )
         ):
             raise RuntimeError(f"{label}: {stem} has no finite collapsed transform")
         if int(_early_bound(view, "IView").GetVisibleEntityCount2(component, 1)) <= 0:
@@ -1809,7 +1816,7 @@ def _lock_components(adapter: Any, view: Any, lock: _InstalledLock) -> tuple[Any
         tuple(b - a for a, b in zip(cup, above)), (0.0, 0.001, 0.0)
     ) > 1e-9:
         raise RuntimeError(f"{label}: set screw is not cup-down on the native shaft flat")
-    return receiver, chosen[lock.screw]
+    return receiver
 
 
 def _lock_crown_face(face: Any, lock: _InstalledLock) -> bool:
@@ -1889,7 +1896,7 @@ def _lock_mouth_edge(
     return edge, (tip[0], tip[1])
 
 
-def _lock_note_box(note: Any, *, label: str) -> None:
+def _lock_note_box(note: Any, *, label: str) -> Box:
     extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
     if (
         len(extent) != 6
@@ -1899,6 +1906,91 @@ def _lock_note_box(note: Any, *, label: str) -> None:
     ):
         raise RuntimeError(f"{label}: unreadable native note extent {extent!r}")
     _assert_box_on_sheet((extent[0], extent[1], extent[3], extent[4]), label=label)
+    return Box(extent[0], extent[1], extent[3], extent[4])
+
+
+_LOCK_CAPTION_GAP_M = 0.003
+
+
+def _assert_lock_caption_clearance(
+    lock: _InstalledLock, view: Any, note: Any, caption: Any, neighbour_caption: Any
+) -> None:
+    """Keep installed text and its native leader clear of the retained caption."""
+    label = lock.bank.title
+    text_boxes = (
+        _lock_note_box(note, label=f"{label} staking note"),
+        _lock_note_box(caption, label=f"{label} caption"),
+    )
+    view_box = Box(*_view_outline(view, label=label))
+    if text_boxes[0].gap(text_boxes[1]) <= 0.0 or any(
+        box.gap(view_box) <= 0.0 for box in text_boxes
+    ):
+        raise RuntimeError(f"{label}: installed text touches text or view geometry")
+    if neighbour_caption is None:
+        if lock.receiver == explode.BRACKET:
+            raise RuntimeError(f"{label}: missing retained Detail A caption")
+        return
+    neighbour = _lock_note_box(neighbour_caption, label="retained Detail A caption")
+    for box in (*text_boxes, view_box):
+        if box.gap(neighbour) < _LOCK_CAPTION_GAP_M:
+            raise RuntimeError(
+                f"{label}: installed ink {box.format_mm()} lacks caption clearance "
+                f"from Detail A {neighbour.format_mm()}"
+            )
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    points = tuple(float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ()))
+    if len(points) < 6 or len(points) % 3 or not all(math.isfinite(v) for v in points):
+        raise RuntimeError(f"{label}: unreadable native staking leader")
+    vertices = [(points[i], points[i + 1]) for i in range(0, len(points), 3)]
+    for start, end in zip(vertices, vertices[1:]):
+        segment = Segment(*start, *end)
+        if any(
+            segment_box_distance(segment, box) == 0.0
+            for box in (neighbour, text_boxes[1])
+        ):
+            raise RuntimeError(f"{label}: staking leader crosses a caption")
+
+
+def _reflow_bracket_lock_text(
+    adapter: Any, lock: _InstalledLock, note: Any, caption: Any, neighbour_caption: Any
+) -> None:
+    """Move only the two new text blocks below Detail A's actual native extent."""
+    if lock.receiver != explode.BRACKET:
+        return
+    if neighbour_caption is None:
+        raise RuntimeError(f"{lock.bank.title}: missing retained Detail A caption")
+    neighbour = _lock_note_box(neighbour_caption, label="retained Detail A caption")
+    top = max(
+        _lock_note_box(native, label=lock.bank.title).ymax for native in (note, caption)
+    )
+    if neighbour.ymin - top >= _LOCK_CAPTION_GAP_M:
+        return
+    # Aim for 4 mm when reflow is needed; the final native guard requires 3 mm.
+    dy = neighbour.ymin - 0.004 - top
+    moved = []
+    for native in (note, caption):
+        annotation = _early_bound(
+            _early_bound(native, "INote").GetAnnotation(), "IAnnotation"
+        )
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if len(position) != 3 or not all(math.isfinite(value) for value in position):
+            raise RuntimeError(f"{lock.bank.title}: unreadable installed text position")
+        target = (position[0], position[1] + dy, position[2])
+        if not annotation.SetPosition2(*target):
+            raise RuntimeError(f"{lock.bank.title}: failed to reflow installed text")
+        moved.append((annotation, target))
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{lock.bank.title}: installed-text reflow rebuild failed")
+    for annotation, target in moved:
+        actual = tuple(float(value) for value in annotation.GetPosition())
+        if (
+            len(actual) != 3
+            or not all(math.isfinite(value) for value in actual)
+            or math.dist(actual, target) > 1e-7
+        ):
+            raise RuntimeError(f"{lock.bank.title}: installed-text reflow did not persist")
+    for native in (note, caption):
+        _lock_note_box(native, label=lock.bank.title)
 
 
 def _assert_installed_lock(
@@ -1926,7 +2018,7 @@ def _assert_installed_lock(
         or math.dist(centre, lock.bank.centre) > VIEW_POSITION_TOL_M
     ):
         raise RuntimeError(f"{label}: installed crop centre moved")
-    receiver, _screw = _lock_components(adapter, view, lock)
+    receiver = _lock_components(adapter, view, lock)
     edge, tip = _lock_mouth_edge(adapter, view, lock, receiver)
     for native, text in ((note, lock.note_text), (caption, lock.bank.label_text)):
         native = _early_bound(native, "INote")
@@ -1946,11 +2038,13 @@ def _assert_installed_lock(
     _assert_leader_lands(annotation, tip, what="staking note", label=label)
 
 
-def _place_installed_lock(adapter: Any, lock: _InstalledLock) -> Callable[[], None]:
+def _place_installed_lock(
+    adapter: Any, lock: _InstalledLock, neighbour_caption: Any
+) -> Callable[[], None]:
     _activate_sheet(adapter, lock.sheet)
     view = _placed_bank_view(adapter, lock.bank)
     _crop(adapter, view, lock.bank)
-    receiver, _screw = _lock_components(adapter, view, lock)
+    receiver = _lock_components(adapter, view, lock)
     edge, tip = _lock_mouth_edge(adapter, view, lock, receiver)
     note = add_attached_note(
         adapter,
@@ -1965,11 +2059,13 @@ def _place_installed_lock(adapter: Any, lock: _InstalledLock) -> Callable[[], No
     caption = add_note(adapter, lock.bank.label_text, *lock.caption_xy)
     if caption is None:
         raise RuntimeError(f"{lock.bank.title}: failed to label the installed view")
+    _reflow_bracket_lock_text(adapter, lock, note, caption, neighbour_caption)
+    _assert_lock_caption_clearance(lock, view, note, caption, neighbour_caption)
 
     def settled() -> None:
         _assert_installed_lock(adapter, lock, view, note, caption)
+        _assert_lock_caption_clearance(lock, view, note, caption, neighbour_caption)
 
-    settled()
     return settled
 
 
@@ -2013,13 +2109,14 @@ def _dimensioned_bank(
     pointers: tuple[
         tuple[str, tuple[float, float], tuple[float, float]], ...
     ] = (),
+    caption_notes: dict[str, Any] | None = None,
 ) -> list[Any]:
     """Place ``bank``, show its own settings sketch in it (the other bank's
     lies off the sheet), import ``keep``, crop it if it is a detail, prove the
     kept dimensions survived, and label it. ``detail``, a detail taken from
     ``bank``, gets its boundary circle and letter drawn in ``bank``; each of
     ``pointers`` (text, text point, tip) names a body with a view-owned
-    leader."""
+    leader. ``caption_notes`` retains native note handles for focused clearance."""
     view = _placed_bank_view(adapter, bank)
     features = tuple(dict.fromkeys(asm.DIMENSION_FEATURE[name] for name in keep))
     _show_base_view_sketches(adapter, view, features, label=bank.title)
@@ -2052,8 +2149,11 @@ def _dimensioned_bank(
             _view_outline(view, label=bank.title)[1] - 0.004,
         )
     _activate_view(adapter, view, label=bank.title)
-    if add_note(adapter, bank.label_text, x0, y0) is None:
+    caption = add_note(adapter, bank.label_text, x0, y0)
+    if caption is None:
         raise RuntimeError(f"failed to label {bank.title}")
+    if caption_notes is not None:
+        caption_notes[bank.title] = caption
     for text, text_xy, tip in pointers:
         add_leader_note(
             adapter,
@@ -2117,10 +2217,15 @@ def _place_steps(adapter: Any, sheet: str, text: str, *, label: str) -> None:
 
 def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     """Sheets 3 and 4: the isolated banks with their settings, the steps."""
+    caption_notes: dict[str, Any] = {}
     _activate_sheet(adapter, SHEET_NAMES[2])
     annotations = _dimensioned_bank(adapter, ROCKER_BANK, STACK_KEEP, detail=SOUTH_END)
     annotations += _dimensioned_bank(
-        adapter, SOUTH_END, SPRING_KEEP, pointers=DETAIL_POINTERS
+        adapter,
+        SOUTH_END,
+        SPRING_KEEP,
+        pointers=DETAIL_POINTERS,
+        caption_notes=caption_notes,
     )
     _place_labels(adapter, SHEET_NAMES[2], ROCKER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[2], FITUP_NOTES[0], label="rocker-bank steps")
@@ -2132,7 +2237,14 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     )
     _place_labels(adapter, SHEET_NAMES[3], LEVER_END_LABELS)
     _place_steps(adapter, SHEET_NAMES[3], FITUP_NOTES[1], label="lever-bank steps")
-    locks_settled = tuple(_place_installed_lock(adapter, lock) for lock in _INSTALLED_LOCKS)
+    locks_settled = tuple(
+        _place_installed_lock(
+            adapter,
+            lock,
+            caption_notes[SOUTH_END.title] if lock.receiver == explode.BRACKET else None,
+        )
+        for lock in _INSTALLED_LOCKS
+    )
 
     for name, text in notes.DIMENSION_CALLOUTS.items():
         set_dimension_callouts(adapter, annotations, {name: text}, location="above")
