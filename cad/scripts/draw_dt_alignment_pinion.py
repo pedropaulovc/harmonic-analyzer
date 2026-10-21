@@ -259,7 +259,7 @@ def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
         )
 
 
-def _set_isometric_edge_weight(view: Any) -> None:
+def _set_isometric_edge_weight(adapter: Any, view: Any) -> float:
     """Use fine visible edges only on this dense, full-tooth pictorial.
 
     The failed PDF overlaid 994 0.35 mm strokes on readable brass shading.
@@ -272,13 +272,35 @@ def _set_isometric_edge_weight(view: Any) -> None:
         raise RuntimeError("alignment isometric has no drawing component")
     component = _early_bound(raw_component, "IDrawingComponent")
     component.UseDocumentDefaults = False
-    # swDrawingComponentLineFontVisible=1; swLW_CUSTOM=10. The documented
-    # thickness unit is metres (the SDK example uses 0.0003 for 0.3 mm).
-    component.SetLineThickness(1, 10, 0.0001)
-    _assert_isometric_edge_weight(view)
+    # The native custom-width attempt read back 0.18 mm rather than the
+    # requested 0.10 mm. Select the supported document Thin slot explicitly;
+    # do not accept that custom-width mismatch or change any document default.
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"), 0
+        )
+    )
+    thick_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThickLineWeight"), 0
+        )
+    )
+    if not 0.0 < thin_width < thick_width:
+        raise RuntimeError(
+            f"alignment template has no fine edge slot: {thin_width=}, {thick_width=}"
+        )
+    # swDrawingComponentLineFontVisible=1; swLW_THIN=0. Thickness is ignored
+    # for a standard slot (only swLW_CUSTOM uses that argument).
+    component.SetLineThickness(1, 0, 0.0)
+    _assert_isometric_edge_weight(adapter, view, thin_width)
+    _telemetry.event("alignment.isometric_thin_edges", thickness_m=thin_width)
+    return thin_width
 
 
-def _assert_isometric_edge_weight(view: Any) -> None:
+def _assert_isometric_edge_weight(
+    adapter: Any, view: Any, expected_width: float
+) -> None:
     # Reacquire after settling: rebuilding/display regeneration may replace the
     # drawing component that was present when the override was authored.
     bound = _early_bound(view, "IView")
@@ -286,16 +308,22 @@ def _assert_isometric_edge_weight(view: Any) -> None:
     if raw_component is None:
         raise RuntimeError("alignment isometric lost its drawing component")
     component = _early_bound(raw_component, "IDrawingComponent")
-    weight, thickness = component.GetLineThickness(1)
+    weight, _custom_thickness = component.GetLineThickness(1)
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"), 0
+        )
+    )
     if (
         bool(component.UseDocumentDefaults)
-        or int(weight) != 10
-        or abs(float(thickness) - 0.0001) > 1e-9
+        or int(weight) != 0
+        or abs(thin_width - expected_width) > 1e-9
     ):
         raise RuntimeError(
             "alignment isometric fine edges did not persist: "
             f"default={component.UseDocumentDefaults}, "
-            f"weight={weight}, thickness={thickness}"
+            f"weight={weight}, thin_width={thin_width}, expected={expected_width}"
         )
 
 
@@ -423,7 +451,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
-    _set_isometric_edge_weight(iso)
+    iso_edge_width = _set_isometric_edge_weight(adapter, iso)
 
     return await finalize_drawing(
         adapter,
@@ -431,7 +459,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(lambda: _assert_isometric_edge_weight(iso),),
+        settled_checks=(
+            lambda: _assert_isometric_edge_weight(adapter, iso, iso_edge_width),
+        ),
     )
 
 
