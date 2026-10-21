@@ -1,5 +1,9 @@
 r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
 
+Diagnostic branch only: one held seat builds fresh current-template drawings with
+visible-edge weight slots THICK/NORMAL/NORMAL/THICK, discards each, and STOPs.
+No arm or paired run can save/export a drawing; no production fix is selected.
+
 Sheet 1, ASSEMBLED + SETTINGS: the Front, Right and Isometric views at 1:4,
 and every assembly setting printed as the assembly's own model dimension
 (mg_magnifier_assembly_spec). The Front view prints the lever group's two
@@ -36,10 +40,12 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 import math
 from pathlib import Path
 import sys
 import textwrap
+import time
 from typing import Any, Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -51,6 +57,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 import _config
+import _seat_forensics
 import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
@@ -63,16 +70,12 @@ from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
-    add_auto_balloons,
-    add_component_bom_balloons,
-    assert_balloon_landings,
     isolate_drawing_view_components,
 )
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     _SW_SHADED_EDGES,
     DrawingOutputs,
-    finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -85,6 +88,11 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import insert_bom_table
+from _drawing_template_probe import (
+    TemplateProbeStop,
+    apply_visible_edge_weight,
+    stop_after_template_probe,
+)
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -96,7 +104,12 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
-from _session import run_build
+from _session import (
+    _resident_output_documents,
+    _visible_document_paths,
+    discard_open_documents,
+    run_build,
+)
 from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import SHOULDER_X as VROD_SHOULDER_X
@@ -1637,6 +1650,103 @@ def _show_tangent_edges(adapter: Any, view: Any, *, label: str) -> None:
 
 @_telemetry.traced("drawing.mg_magnifier_assembly")
 async def build(adapter: Any) -> dict[str, str]:
+    """Run visible-edge weight ABBA on one seat; never return export outputs."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    sequence = ("THICK", "NORMAL", "NORMAL", "THICK")
+    out_dir = _seat_forensics._capture_dir("1667-visible-edge-weight-probe")
+    seat_pid = int(adapter.swApp.GetProcessID())
+    paired: dict[str, Any] = {
+        "diagnostic_only": True,
+        "intentional_stop_before_save_export": True,
+        "proof": "aborted",
+        "sequence": list(sequence),
+        "changed_document_preference": "swLineFontVisibleEdgesThickness",
+        "template_source": "current_registry",
+        "seat_pid": seat_pid,
+        "seat_provenance": _seat_forensics.seat_provenance(adapter),
+        "report_path": str(out_dir / "capture.json"),
+        "arms": [],
+    }
+    started = time.perf_counter()
+    try:
+        for order, slot in enumerate(sequence, start=1):
+            arm_dir = out_dir / f"{order:02d}-{slot}"
+            report: dict[str, Any] = {
+                "arm_name": slot,
+                "weight_slot": slot,
+                "arm_order": order,
+                "template_path": str(template.path.resolve()),
+                "report_path": str(arm_dir / "capture.json"),
+                "proof": "not_reached",
+            }
+            paired["arms"].append(report)
+            arm_started = time.perf_counter()
+            try:
+                report["template_sha256"] = hashlib.sha256(
+                    template.path.read_bytes()
+                ).hexdigest()
+                # Every fresh drawing uses the unchanged current registry template.
+                report["seat_pid_before"] = int(adapter.swApp.GetProcessID())
+                if report["seat_pid_before"] != seat_pid:
+                    raise RuntimeError(f"weight arm {order}: SolidWorks seat changed")
+                await _build_weight_probe_arm(
+                    adapter, slot=slot, out_dir=arm_dir, report=report
+                )
+                raise RuntimeError(f"weight arm {order}: probe returned without STOP")
+            except TemplateProbeStop:
+                report["diagnostic_stop"] = True
+            finally:
+                failure = sys.exception()
+                if failure is not None:
+                    report.update(
+                        proof="unexpected_error",
+                        error=f"{type(failure).__name__}: {failure}",
+                    )
+                report["recipe_to_probe_elapsed_ms"] = (
+                    time.perf_counter() - arm_started
+                ) * 1000.0
+                try:
+                    # Same discard/readback as run_build; do not disconnect/restart.
+                    discard_open_documents(adapter)
+                    adapter.currentModel = None
+                    visible = _visible_document_paths(adapter)
+                    resident = _resident_output_documents(adapter)
+                    report["cleanup"] = {
+                        "visible_document_paths": visible,
+                        "resident_output_documents": resident,
+                    }
+                    if visible or resident:
+                        raise RuntimeError(
+                            f"weight arm {order}: documents survived discard: "
+                            f"visible={visible!r}, resident={resident!r}"
+                        )
+                    report["seat_pid_after"] = int(adapter.swApp.GetProcessID())
+                    if report["seat_pid_after"] != seat_pid:
+                        raise RuntimeError(f"weight arm {order}: SolidWorks seat changed")
+                finally:
+                    cleanup_error = sys.exception()
+                    if cleanup_error is not None and cleanup_error is not failure:
+                        report.update(
+                            proof="unexpected_error",
+                            cleanup_error=f"{type(cleanup_error).__name__}: {cleanup_error}",
+                        )
+                    report["arm_elapsed_ms"] = (
+                        time.perf_counter() - arm_started
+                    ) * 1000.0
+                    _seat_forensics._write_failure_report(arm_dir, report)
+        paired["proof"] = "completed"
+    finally:
+        paired["elapsed_ms"] = (time.perf_counter() - started) * 1000.0
+        failure = sys.exception()
+        if failure is not None:
+            paired["error"] = f"{type(failure).__name__}: {failure}"
+        _seat_forensics._write_failure_report(out_dir, paired)
+    raise TemplateProbeStop(paired)
+
+
+async def _build_weight_probe_arm(
+    adapter: Any, *, slot: str, out_dir: Path, report: dict[str, Any]
+) -> None:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source assembly is missing: {SOURCE}")
     check("open assembly drawing source", await adapter.open_model(str(SOURCE)))
@@ -1653,7 +1763,8 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     _validate_source(source_model)
     _create_sheets(adapter)
-    settled_checks = _place_assembled_sheet(adapter)
+    apply_visible_edge_weight(adapter.currentModel, slot=slot, report=report)
+    _place_assembled_sheet(adapter)
     # Every view's configuration and exploded state is final before the BOM
     # binds: a configuration switch after it re-dirties the source.
     wheel = _place_exploded_view(adapter, SHEET_NAMES[1], WHEEL_FIELD, label=WHEEL_LABEL)
@@ -1709,106 +1820,15 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
 
     _activate_sheet(adapter, SHEET_NAMES[1])
-    scales = {
-        WHEEL_LABEL: _fit_ring(
-            adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
-        )
-    }
-    wheel_landings = add_auto_balloons(
+    _fit_ring(adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL)
+    stop_after_template_probe(
         adapter,
         wheel,
         items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
         label=f"magnifier {WHEEL_LABEL} BOM coverage",
-    )
-    landings = list(wheel_landings)
-    for sheet_name, view, ladder, field, stems, label in (
-        (
-            SHEET_NAMES[2],
-            lever,
-            LEVER_SCALE_LADDER,
-            LEVER_FIELD,
-            explode.LEVER_GROUP_STEMS,
-            LEVER_LABEL,
-        ),
-        (
-            SHEET_NAMES[3],
-            finished,
-            FINISHED_SCALE_LADDER,
-            FINISHED_FIELD,
-            frozenset({explode.WIRE_STEM}),
-            FINISHED_LABEL,
-        ),
-    ):
-        _activate_sheet(adapter, sheet_name)
-        scales[label] = _fit_ring(adapter, view, ladder, field, label=label)
-        landings += add_component_bom_balloons(
-            adapter,
-            view,
-            items=balloon_items(items, stems),
-            anchors=BALLOON_ANCHORS,
-            label=f"magnifier {label} BOM coverage",
-            margin=BALLOON_MARGIN,
-        )
-    if len(landings) != len(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"magnifier package carries {len(landings)} balloons, expected one per "
-            f"BOM row ({len(BOM_COMPONENTS)})"
-        )
-    (wire_landing,) = (landing for landing in landings if landing.stem == explode.WIRE_STEM)
-    _move_wire_balloon(adapter, finished, wire_landing, label=FINISHED_LABEL)
-
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[1],
-        exploded_caption(WHEEL_GROUP, scales[WHEEL_LABEL]),
-        WHEEL_CAPTION_XY,
-        label="wheel caption",
-    )
-    lever_caption = exploded_caption(LEVER_GROUP, scales[LEVER_LABEL])
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[2],
-        lever_caption,
-        lever_caption_xy(_view_outline(lever, label=LEVER_LABEL), lever_caption),
-        label="lever caption",
-    )
-    finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[3],
-        finished_caption,
-        caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
-        label="finished caption",
-    )
-    _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-    )
-    _activate_sheet(adapter, SHEET_NAMES[1])
-    _hide_bom_reference(adapter, reference, table, items)
-    return await finalize_drawing(
-        adapter,
-        OUTPUTS,
-        layout=SPEC.layout,
-        pdf_title=PDF_TITLE,
-        scale=SHEET_SCALE,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_layouts=SHEET_LAYOUTS,
-        # Each sheet's title-block scale is its main view's: the ladder's
-        # rung the exploded and finished views settled on.
-        sheet_scales={
-            SHEET_NAMES[0]: SHEET_SCALE,
-            SHEET_NAMES[1]: scales[WHEEL_LABEL],
-            SHEET_NAMES[2]: scales[LEVER_LABEL],
-            SHEET_NAMES[3]: scales[FINISHED_LABEL],
-        },
-        settled_checks=(
-            *settled_checks,
-            lambda: assert_balloon_landings(adapter, landings),
-            lambda: _assert_wheel_balloon_bounds(adapter, wheel_landings),
-        ),
+        template=DRAWING_TEMPLATES[SPEC.layout].path,
+        out_dir=out_dir,
+        report=report,
     )
 
 
