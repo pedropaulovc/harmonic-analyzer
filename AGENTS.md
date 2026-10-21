@@ -1493,6 +1493,17 @@ scripts that `from _check import log, check` are instrumented unchanged.
   `assembly-build`, a drawing reads `drawing-export` — instead of the task reading
   the umbrella name while its own children read the stage. `harmonic-analyzer` is
   now a namespace and a fallback for an unmapped label, not a span label.
+    - **Farm execution identity is queryable record metadata.** The worker supplies
+      `farm.workflow_id`, `farm.run_id`, `farm.attempt`, `farm.execution`, and
+      `farm.worker` through `OTEL_RESOURCE_ATTRIBUTES`. `_telemetry` snapshots only
+      these keys from each provider's resolved resource and adds missing keys to
+      span/log attributes before export, including auxiliary stages and span-less
+      logs. Caller attributes win; values retain their resource types (`farm.attempt`
+      is normally a string). Other resource fields, including ingestion routing,
+      stay resource-only. Cached providers keep their snapshot until forced
+      reconfiguration rebuilds them. In App Insights query
+      `customDimensions['farm.workflow_id']` (and siblings), not target names or
+      source paths, to attribute execution; no standalone BuildId is synthesized.
     - **`build-infra` owns the seat + cache spans.** Queueing for the COM seat and
       pulling/publishing artefacts belong to no pipeline stage, so `com.seat.wait`,
       `cache.probe` and `cache.store` are attributed to a `build-infra` resource
