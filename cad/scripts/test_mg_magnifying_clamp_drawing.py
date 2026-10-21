@@ -323,6 +323,38 @@ def test_common_flat_witness_station_clears_the_frozen_native_A_stroke(monkeypat
     assert arrow_gap(y) >= ARROW_TEXT_CLEARANCE_M
 
 
+def test_r27_group_text_moves_clear_of_actual_neighbor_ink_without_raising_witness(monkeypatch) -> None:
+    state = _front_drawing_layout(monkeypatch)
+    # R27 563f494, a7481abc leaf: actual three-row native boxes, rounded by
+    # the audit to 0.1 mm. This predicts text translation, not a native rerender.
+    before = (
+        Box(0.0423, 0.1792, 0.0577, 0.1828),
+        Box(0.0319, 0.1737, 0.0681, 0.1772),
+        Box(0.0324, 0.1681, 0.0674, 0.1717),
+    )
+    section_a = Box(0.0652137, 0.1761622, 0.0710726, 0.1823344)
+    diagonal_value = Box(0.0388, 0.1842, 0.0473, 0.1877)
+    height_witness = Segment(0.084, 0.17145, 0.035, 0.17145, "ext-line")
+    front_edge = Segment(0.06595, 0.17145, 0.06595, 0.08295, "geometry")
+    assert before[0].gap(diagonal_value) < 0.00178
+    assert before[1].gap(section_a) == 0.0
+    assert segment_box_overlap_length(height_witness, before[2]) > 0.032
+    assert segment_box_overlap_length(front_edge, before[2]) > 0.003
+    x, y, _z = state.annotations["LeverBoreFromZFlat"].GetPosition()
+    dx, dy = x - 0.050, y - 0.1755
+    assert dy == 0.0  # Preserve R21's already-cleared flat witness/A station.
+    moved = tuple(Box(b.xmin + dx, b.ymin + dy, b.xmax + dx, b.ymax + dy) for b in before)
+    neighbors = (
+        section_a, diagonal_value,
+        Box(0.060362, 0.077362, 0.109638, 0.177038),  # actual front outline
+        Box(0.1083, 0.1338, 0.1917, 0.1541),  # complete four-row bore callout
+        Box(0.0137, 0.1471, 0.0583, 0.1619),  # height value and both function rows
+    )
+    assert min(box.gap(neighbor) for box in moved for neighbor in neighbors) > 0.004
+    assert all(segment_box_distance(line, box) > 0.004 for line in (height_witness, front_edge) for box in moved)
+    assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
+
+
 def test_no_gdt_one_section_and_native_tap_callouts() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
@@ -523,6 +555,7 @@ class _StockNoteAnnotation:
         self.document = document
         self.entity = document.wrong if document.fault in ("wrong_attachment", "inventory_unavailable") else document.selected
         self.leaders, self.position = 0, None
+        self.leader_calls = []
         self.OwnerType = 0
         self.Owner = document.view
 
@@ -541,7 +574,13 @@ class _StockNoteAnnotation:
     def IsDangling(self):
         return self.document.fault == "dangling"
 
-    def SetLeader3(self, *_args):
+    def SetLeader3(self, *args):
+        self.leader_calls.append(args)
+        if args[:2] == (2, 2):
+            if self.document.fault == "bent_leader_refused":
+                return -1
+            if self.document.fault == "bent_leader_boolean":
+                return False
         self.leaders = 1
         return 0
 
@@ -553,6 +592,7 @@ class _StockNoteAnnotation:
 class _StockNoteDocument:
     def __init__(self, fault):
         self.fault, self.selected, self.active, self.notes = fault, None, None, []
+        self.rebuilds = 0
         self.SelectionManager = SimpleNamespace(
             CreateSelectData=lambda: SimpleNamespace(View=None),
             GetSelectedObjectCount2=lambda _mark: int(self.selected is not None),
@@ -570,6 +610,12 @@ class _StockNoteDocument:
 
     def ClearSelection2(self, _all):
         self.selected = None
+
+    def EditRebuild3(self):
+        self.rebuilds += 1
+        if self.fault == "bent_leader_wrong_attachment":
+            self.notes[-1].GetAnnotation().entity = self.wrong
+        return True
 
     def InsertNote(self, text):
         assert text == drawing.property_link("Manufacturing Notes")
@@ -703,6 +749,58 @@ def test_stock_note_uses_the_exact_view_face_and_native_source_correspondence(mo
     audit = json.loads(state.records[-1][1]["auditJSON"])
     assert audit["source_self"] == audit["view_self"] == audit["canonical_self"] == audit["source_same"] == 1
     assert audit["raw_source_vs_view"] == cross_context_code and audit["stage"] == "stock.complete"
+    assert annotation.leader_calls == [
+        (1, 0, True, False, False, False),
+        (2, 2, True, False, False, False),
+    ]
+    assert state.document.rebuilds == 1 and audit["leader_status"] == 0
+
+
+@pytest.mark.parametrize("fault, message", (
+    ("bent_leader_refused", "bent/right leader refused"),
+    ("bent_leader_boolean", "bent/right leader refused"),
+    ("bent_leader_wrong_attachment", "lost its face attachment"),
+))
+def test_stock_note_bent_leader_must_succeed_and_keep_the_actual_face_after_rebuild(monkeypatch, fault, message) -> None:
+    state = _stock_context_fixture(monkeypatch, fault=fault)
+    with pytest.raises(RuntimeError, match=message):
+        drawing._add_stock_note(state.adapter, state.view)
+    assert state.document.notes[0].GetText() == spec.STOCK_NOTE
+    audit = json.loads(state.records[-1][1]["auditJSON"])
+    assert audit["stage"] == "stock.leader_style"
+    assert audit["failure"]["type"] == "RuntimeError"
+
+
+def test_r27_complete_stock_and_seat_rows_fit_the_native_inner_border(monkeypatch) -> None:
+    state = _stock_context_fixture(monkeypatch)
+    drawing._add_stock_note(state.adapter, state.view)
+    stock = state.document.notes[0].GetAnnotation()
+    # R27 native text-only extents; do not translate attached leader tips or
+    # claim synthetic bent segments prove the next native layout audit.
+    stock_before = Box(0.3057, 0.1319, 0.4239, 0.1400)
+    seat_before = Box(0.2870, 0.1124, 0.4333, 0.1160)
+    inner_right, paper_right = 0.4191, 0.4318
+    assert stock_before.xmax > inner_right and seat_before.xmax > paper_right
+    original_leader = Segment(0.3040418, 0.1384266, 0.3508350, 0.1637209, "leader")
+    assert segment_box_overlap_length(
+        original_leader, Box(0.3057, 0.1360, 0.4105, 0.1400)
+    ) > 0.0005
+    moved = []
+    for box, old, actual in (
+        (stock_before, (0.305, 0.140), stock.position[:2]),
+        (seat_before, (0.287, 0.116), drawing.SEAT_NOTE_XY),
+    ):
+        dx, dy = actual[0] - old[0], actual[1] - old[1]
+        translated = Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+        assert translated.xmax < inner_right - 0.012
+        moved.append(translated)
+    section_outline = Box(0.222415, 0.120162, 0.277585, 0.219838)
+    section_caption = Box(0.225, 0.099, 0.275, 0.108)
+    assert moved[0].gap(section_outline) > 0.008
+    assert moved[1].gap(section_caption) > 0.004
+    assert moved[0].gap(moved[1]) > 0.015
+    assert stock.leader_calls[-1] == (2, 2, True, False, False, False)
+    assert stock.GetAttachedEntities3() == (state.alias,)
 
 
 def test_stock_flat_leader_clears_linked_scale_caption_with_r17_actual_ink(monkeypatch) -> None:

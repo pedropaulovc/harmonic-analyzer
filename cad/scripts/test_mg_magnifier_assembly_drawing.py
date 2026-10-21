@@ -1007,6 +1007,274 @@ def lever_tip_native(monkeypatch, projection_native):
     return native
 
 
+@pytest.fixture
+def projection_context_native(lever_tip_native, monkeypatch):
+    """Synthetic contexts, not missing R27 G7 observations or native proof."""
+    import sys
+
+    native = lever_tip_native
+    native.qi_calls = []
+    native.pid_calls = []
+    native.contexts = {}
+    native.g7_calls = []
+    monkeypatch.setitem(sys.modules, "pythoncom", SimpleNamespace(IID_IUnknown="IUnknown"))
+    monkeypatch.setitem(sys.modules, "solidworks_mcp.adapters._generated.sldworks_2026", SimpleNamespace(
+        IEdge=SimpleNamespace(CLSID="IEdge"), IEntity=SimpleNamespace(CLSID="IEntity"),
+    ))
+
+    class Dispatch:
+        def QueryInterface(self, iid, fallback):
+            native.qi_calls.append((iid, fallback))
+            assert iid in ("IEdge", "IEntity") and fallback == "IUnknown"
+            return object()
+
+    class Extension:
+        def __init__(self, stem, index):
+            self.stem, self.index, self.serial = stem, index, 0
+
+        def GetCorrespondingEntity2(self, edge):
+            if edge.stem != self.stem or edge.context == "part":
+                return None
+            return native.contexts[self.stem, edge.role, "part"]
+
+        def GetPersistReference3(self, edge):
+            assert edge.stem == self.stem and edge.context == "part"
+            self.serial += 1
+            return (self.index, edge.role, self.serial)
+
+        def IsSamePersistentID(self, left, right):
+            assert left[0] == right[0] == self.index
+            native.pid_calls.append((left, right))
+            # Different returned bytes can refer to the same native object.
+            return int(left[:2] == right[:2])
+
+        def GetObjectByPersistReference3(self, reference):
+            assert reference[0] == self.index
+            return native.contexts[self.stem, reference[1], "part"], 0
+
+    native.extensions = []
+    g7 = []
+    for index, (drawing_component, target) in enumerate(zip(native.drawing_components, native.edges, strict=True)):
+        component = drawing_component.Component
+        stem = component.Name2.rsplit("-", 1)[0]
+        target_params = target.GetCurve().CircleParams
+        control_params = (
+            (drawing.NECK_HALF_X / 1000, 0, 0, 1, 0, 0, drawing.NOSE_R / 1000)
+            if stem == "mg-magnifying-bracket" else
+            ((drawing.ROD_LENGTH - drawing.TIP_CHAMFER) / 1000, 0, 0, -1, 0, 0, drawing.LEVER_ROD_DIA / 2000)
+        )
+        for role, params in enumerate((target_params, control_params)):
+            curve = SimpleNamespace(IsCircle=lambda: True, CircleParams=params)
+            for context in ("visible", "g7", "part", "component", "view"):
+                edge = target if role == 0 and context == "visible" else SimpleNamespace()
+                edge.stem, edge.role, edge.context = stem, role, context
+                edge._oleobj_ = Dispatch()
+                edge.GetCurve = lambda curve=curve: curve
+                edge.GetBody = lambda: SimpleNamespace(IsTemporaryBody=lambda: False)
+                edge.GetComponent = lambda component=component, context=context: None if context == "part" else component
+                native.contexts[stem, role, context] = edge
+            g7.append(native.contexts[stem, role, "g7"])
+        native.component_edges[component.Name2].append(native.contexts[stem, 1, "visible"])
+        extension = Extension(stem, index)
+        native.extensions.append(extension)
+        source = SimpleNamespace(Extension=extension, GetPathName=component.GetPathName)
+        component.GetModelDoc2 = lambda source=source: source
+        component.ReferencedConfiguration = "Default"
+        # Preserve the existing callable component transform while exposing its
+        # independent, synthetic native matrix readback to the diagnostic.
+        component.Transform2.ArrayData = tuple(float(index) for index in range(16))
+        component.GetCorrespondingEntity = lambda edge, stem=stem: (
+            native.contexts[stem, edge.role, "component"]
+            if edge.stem == stem and edge.context == "part" else None
+        )
+    native.view.GetCorrespondingEntity = lambda edge: (
+        native.contexts[edge.stem, edge.role, "view"]
+        if edge.context in ("part", "component") else None
+    )
+
+    def same(left, right):
+        if left is right:
+            return 1
+        # One synthetic supported context route is positive; raw visible/G7
+        # identity still fails and MUST remain the production refusal.
+        return int(
+            {getattr(left, "context", None), getattr(right, "context", None)} == {"component", "g7"}
+            and (left.stem, left.role) == (right.stem, right.role)
+        )
+
+    native.adapter.swApp.IsSame = same
+    # Deliberately 37 original slots, 36 decoded entries, one null. R27's
+    # original slot count/data were NOT captured and are not fabricated here.
+    native.raw_slots = (g7[0], None, *g7[1:], *(g7[-1] for _ in range(32)))
+    native.raw_result = native.raw_slots, native.polyline * len(native.raw_slots)
+
+    def polylines(cross):
+        native.g7_calls.append(cross)
+        return native.raw_result
+
+    native.view.GetPolylines7 = polylines
+    return native
+
+
+def test_identity_refusal_captures_all_contexts_without_accepting_mapped_positive(projection_context_native):
+    import json
+
+    native = projection_context_native
+    with pytest.raises(RuntimeError, match="physical model proof failed") as raised:
+        drawing._thread_projection_detail(native.adapter, (), ())
+    assert native.g7_calls == [1]
+    assert len(native.failure_captures) == 1
+    label, _message, capture = native.failure_captures[0]
+    assert label == "mg-magnifier-thread-projection-identity"
+    assert capture["exception"] is raised.value and capture["sheet_png"] is True
+    probe = capture["native_identity_probe"]
+    assert probe["rendered_status"] == "DECODED"
+    assert probe["decoded_model_edge_count"] == 36
+    assert probe["source_import_and_crop"] == "NOT_REACHED"
+    readers = probe["readers"]
+    assert readers["original_slot_count"]["value"]["value"] == 37
+    assert readers["original_return"]["value"]["items"][0]["length"] == 37
+    assert readers["g7[1].raw"]["status"] == "RETURNED_NULL"
+    assert readers["g7[36].qi.IEdge"]["status"] == "OBSERVED"
+    assert readers["g7[36].owner"]["status"] == "OBSERVED"
+    assert readers["view.transform"]["status"] == "OBSERVED"
+    for component_index, component in enumerate(native.drawing_components):
+        prefix = f"component[{component.Component.Name2}]"
+        assert readers[f"{prefix}.control_candidates"]["value"]["length"] == 1
+        assert readers[f"{prefix}.distinct_negative"]["value"]["value"] == 0
+        assert readers[f"{prefix}.negative.part.part"]["value"]["value"] == 0
+        slot = (0, 3)[component_index]
+        assert readers[f"{prefix}.target.raw.g7[{slot}].same"]["value"]["value"] == 0
+        assert readers[f"{prefix}.target.part.g7[{slot}].part.pid_same"]["value"]["value"] == 1
+        assert readers[f"{prefix}.g7[{slot}].owner_same"]["value"]["value"] == 1
+        control_slot = (2, 4)[component_index]
+        assert readers[f"{prefix}.control.part.g7[{control_slot}].part.pid_same"]["value"]["value"] == 1
+        assert readers[f"{prefix}.g7[{control_slot}].owner_same"]["value"]["value"] == 1
+        for seed in ("target", "control"):
+            roundtrip = f"{prefix}.{seed}.part.roundtrip"
+            for field in ("owner_same", "same", "pid_same", "resolved_same", "resolved_pid_same"):
+                assert readers[f"{roundtrip}.{field}"]["value"]["value"] == 1
+            assert readers[f"{roundtrip}.state"]["value"]["value"] == 0
+            matching_slot = slot if seed == "target" else control_slot
+            assert readers[f"{roundtrip}.component.g7[{matching_slot}].same"]["value"]["value"] == 1
+        assert readers[f"{prefix}.paper_points"]["status"] == "OBSERVED"
+    assert any(left != right and left[:2] == right[:2] for left, right in native.pid_calls)
+    assert set(native.qi_calls) == {("IEdge", "IUnknown"), ("IEntity", "IUnknown")}
+    json.dumps(probe, allow_nan=False)
+    assert native.imports == [] and not native.cropped
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0
+    assert native.annotation.endpoints is native.endpoints
+
+
+@pytest.mark.parametrize("fault", ["curve", "edge_qi", "part_route", "source", "view_state", "persistent_id", "resolution"])
+def test_identity_diagnostic_readers_fail_independently(projection_context_native, fault):
+    native = projection_context_native
+
+    class DiagnosticFailure(BaseException):
+        hresult = -2147467262
+
+    def fail(*_args):
+        raise DiagnosticFailure(fault)
+
+    if fault == "curve":
+        native.raw_slots[0].GetCurve = fail
+    elif fault == "edge_qi":
+        query = native.raw_slots[0]._oleobj_.QueryInterface
+        native.raw_slots[0]._oleobj_.QueryInterface = lambda iid, fallback: fail() if iid == "IEdge" else query(iid, fallback)
+    elif fault == "part_route":
+        native.extensions[0].GetCorrespondingEntity2 = fail
+    elif fault == "source":
+        native.drawing_components[0].Component.GetModelDoc2 = fail
+    elif fault == "persistent_id":
+        native.extensions[0].GetPersistReference3 = fail
+    elif fault == "resolution":
+        native.extensions[0].GetObjectByPersistReference3 = fail
+    else:
+        native.view.GetDisplayMode2 = fail
+    with pytest.raises(RuntimeError, match="physical model proof failed"):
+        drawing._thread_projection_detail(native.adapter, (), ())
+    probe = native.failure_captures[0][2]["native_identity_probe"]
+    readers = probe["readers"]
+    assert "collector_error" not in probe
+    assert readers["g7[0].owner"]["status"] == "OBSERVED"
+    assert readers["g7[36].curve"]["status"] == "OBSERVED"
+    assert readers["view.facetted_hlr"]["status"] == "OBSERVED"
+    assert any(row["status"] == "ERROR" and row["error"] == f"DiagnosticFailure: {fault}" for row in readers.values())
+    second = f"component[{native.drawing_components[1].Component.Name2}]"
+    assert readers[f"{second}.control.part.roundtrip.pid_same"]["value"]["value"] == 1
+    if fault in ("persistent_id", "resolution"):
+        first = f"component[{native.drawing_components[0].Component.Name2}]"
+        assert readers[f"{first}.control.part.roundtrip.same"]["value"]["value"] == 1
+        assert readers[f"{first}.control.part.roundtrip.component.g7[2].same"]["status"] == "OBSERVED"
+    if fault == "curve":
+        assert readers["g7[0].body"]["status"] == "OBSERVED"
+    if fault == "edge_qi":
+        assert readers["g7[0].qi.IEdge"]["hresult"] == -2147467262
+        assert readers["g7[0].qi.IEntity"]["status"] == "OBSERVED"
+    assert native.g7_calls == [1]
+    assert native.imports == [] and not native.cropped
+
+
+@pytest.mark.parametrize("fault", ["snapshot", "formatter", "logging", "capture", "collector"])
+def test_identity_capture_retains_original_baseexception_and_traceback(lever_tip_native, monkeypatch, fault):
+    native = lever_tip_native
+    captures = []
+
+    class SecondaryFailure(BaseException):
+        pass
+
+    class OriginalFailure(BaseException):
+        def __str__(self):
+            raise SecondaryFailure("original formatter")
+
+    def fail(*_args, **_kwargs):
+        raise SecondaryFailure(fault)
+
+    def capture(_adapter, _label, _message, **kwargs):
+        captures.append(kwargs)
+        if fault == "capture":
+            fail()
+        raise kwargs["exception"]
+
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    if fault == "snapshot":
+        monkeypatch.setattr(drawing, "_projection_polyline_snapshot", fail)
+    elif fault == "formatter":
+        monkeypatch.setattr(drawing, "_projection_error_text", fail)
+    elif fault == "logging":
+        monkeypatch.setattr(drawing._telemetry, "info", fail)
+    try:
+        raise OriginalFailure()
+    except BaseException as original:
+        traceback = original.__traceback__
+        with pytest.raises(OriginalFailure) as raised:
+            drawing._capture_projection_identity_failure(
+                native.adapter, native.view, stage="uncropped physical boundaries",
+                result=((), (0.0, -0.0, float("nan"))), exception=original,
+                evidence={"rendered_model_edges": 0},
+                components=SimpleNamespace(items=fail) if fault == "collector" else {},
+                inventory={},
+            )
+        assert raised.value is original
+        actual_traceback = raised.value.__traceback__
+        while actual_traceback.tb_next is not None:
+            actual_traceback = actual_traceback.tb_next
+        assert actual_traceback is traceback
+        assert len(captures) == 1 and captures[0]["exception"] is original
+    probe = captures[0]["native_identity_probe"]
+    assert probe["rendered_status"] == "DECODED"
+    if fault == "collector":
+        assert probe["collector_error"] == "SecondaryFailure: collector"
+    if fault != "snapshot":
+        import struct
+
+        values = probe["readers"]["original_return"]["value"]["items"][1]["items"]
+        assert [row["ieee754_le"] for row in values] == [
+            struct.pack("<d", value).hex() for value in (0.0, -0.0, float("nan"))
+        ]
+
+
 def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lever_tip_native):
     native = lever_tip_native
     settled = drawing._thread_projection_detail(
@@ -1580,7 +1848,11 @@ def test_real_numeric_payload_cannot_replace_native_physical_edge_identity(
     with pytest.raises(RuntimeError, match="physical model proof failed"):
         drawing._thread_projection_detail(native.adapter, (), ())
     assert calls == [1]
-    assert native.failure_captures == []  # Valid G7 decode, not a decoder failure.
+    assert len(native.failure_captures) == 1
+    probe = native.failure_captures[0][2]["native_identity_probe"]
+    assert probe["rendered_status"] == "DECODED"
+    assert probe["decoded_model_edge_count"] == 36
+    assert probe["source_import_and_crop"] == "NOT_REACHED"
     assert native.imports == [] and not native.cropped
     assert native.source.SystemValue == pytest.approx(0.00125)
     assert native.source.Tolerance.Type == 0
@@ -1866,7 +2138,10 @@ def test_actual_empty_polyline_arrays_remain_measured_empty(lever_tip_native, mo
     assert drawing._projection_rendered_edges(([], [])) == ()
     with pytest.raises(RuntimeError, match="physical model proof failed"):
         drawing._thread_projection_detail(native.adapter, (), ())
-    assert native.failure_captures == []
+    assert len(native.failure_captures) == 1
+    probe = native.failure_captures[0][2]["native_identity_probe"]
+    assert probe["rendered_status"] == "DECODED"
+    assert probe["decoded_model_edge_count"] == 0
     assert "'rendered_model_edges': 0" in messages[-1]
     assert native.imports == [] and not native.cropped
 
