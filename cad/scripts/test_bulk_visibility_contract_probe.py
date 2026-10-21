@@ -3104,14 +3104,16 @@ def test_sheet_mode_e5_consumes_current_admitted_generation_not_disposed_origin(
     )
     assert old.disconnected_accesses == []
     assert fixture.edit_calls == [old]
-    assert [event for event in fixture.mode_events if event[0] == "GetEditSheet"] == [
-        ("GetEditSheet", probe.ViewId.A, True)
-    ]
+    assert [
+        event[:2] for event in fixture.mode_events if event[0] == "GetEditSheet"
+    ] == [("GetEditSheet", probe.ViewId.A)]
     record = sheet_mode_record(fixture.subject)
     assert record["generation"] == 1
     assert record["post"]["generation"] == 1
     row = record["exports"][probe.Export.REOPENED]
     assert row["generation"] == 2 and row["document"] is probe.Document.DRAWING
+    assert row["raw_type"] == "bool"
+    assert row["raw_repr"] == repr(replacement_mode)
     assert row["mode"] is (
         probe.DrawingEditMode.SHEET
         if replacement_mode
