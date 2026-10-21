@@ -339,13 +339,32 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
 
 
-@pytest.mark.parametrize("interface", ("ISketchPoint", "ISketchSegment", "ISketchLine", "ISketchArc"))
-def test_definition_dispatch_classification_names_exist_in_pinned_typelib(interface) -> None:
-    # IDispatch.GetTypeInfo/GetDocumentation are core COM, not sldworks methods.
-    # Their returned names may only enable a binding to an actual SDK interface;
-    # this census does not claim those names were observed on the farm.
+@pytest.mark.parametrize(("interface", "iid"), (
+    ("ISketchPoint", "{83A33DBD-27C5-11CE-BFD4-00400513BB57}"),
+    ("ISketchSegment", "{83A33DBF-27C5-11CE-BFD4-00400513BB57}"),
+))
+def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interface, iid) -> None:
+    # Parse only: importing the generated module here would load pywin32.
+    # Native QI remains unproven by this import-free declaration census.
+    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
+    assert any(isinstance(base, ast.Name) and base.id == "DispatchBaseClass" for base in declaration.bases)
+    identifiers = {}
+    for node in declaration.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and node.value.func.id == "IID":
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    identifiers[target.id] = ast.literal_eval(node.value.args[0])
+    assert identifiers["CLSID"] == iid
+    assert identifiers["coclass_clsid"] != iid
+    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == "_require_witness_relation")
+    imported_interfaces = {
+        alias.name
+        for node in ast.walk(classifier)
+        if isinstance(node, ast.ImportFrom) and node.module == "solidworks_mcp.adapters._generated.sldworks_2026"
+        for alias in node.names
+    }
+    assert interface in imported_interfaces
     methods, _maps = _native_declaration(interface)
-    assert methods
-    if interface in ("ISketchPoint", "ISketchSegment"):
-        assert _native_return_type(methods["GetID"]) == (12, 0)
-        assert _native_return_type(methods["GetSketch"]) == (9, 0)
+    assert _native_return_type(methods["GetID"]) == (12, 0)
+    assert _native_return_type(methods["GetSketch"]) == (9, 0)
