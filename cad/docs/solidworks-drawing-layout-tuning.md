@@ -1573,6 +1573,23 @@ reason remains unknown; the prior zero-span hypothesis is not established.
 Do not spend another round on pick variants or present successful selection as
 successful dimension creation.
 
+Relation creation and readback are separate native contracts. Record every
+returned relation kind and its actual definition entities before filtering for
+the requested kind; a non-null AddRelation result is not sufficient identity or
+semantic proof. R10 validated HORIZONTAL4 but omitted the different integer kind
+returned after the VERTPOINTS26 request, so no canonicalization is established.
+The official references name `swConstraintType_e` for both APIs: do not invent
+a25/26-to4/5 mapping from the unrecorded value. Classify actual definition
+entities before point identity or segment-key comparisons; an unrelated
+GetEntities/GetEntitiesType inventory is not the definition-entity inventory.
+Classify each definition dispatch using native
+[`IDispatch.GetTypeInfo`](https://learn.microsoft.com/en-us/windows/win32/api/oaidl/nf-oaidl-idispatch-gettypeinfo)
+and `ITypeInfo.GetDocumentation(-1)`, not the Python wrapper class or a
+speculative cast. Unknown interface/type information remains unavailable.
+Keep optional internal inventories and point-ID diagnostics separate from
+mandatory definition/type/identity evidence; telemetry failure must not create
+an unrelated constraint-acceptance requirement.
+
 The r5 attempt failed earlier, at the combined selected-count/circle-identity
 guard, before setting or reading a native pick. The r6 positive control then
 stopped on the previously working point/flat path: count2, native types
