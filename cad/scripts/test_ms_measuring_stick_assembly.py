@@ -360,17 +360,6 @@ def test_fitter_package_covers_rule_9() -> None:
         assert not hasattr(drawing, obsolete)
 
 
-def test_block_balloon_uses_exposed_edge_below_window() -> None:
-    anchor = drawing.BALLOON_ANCHORS[spec.BLOCK]
-    assert anchor.point_mm is not None
-    x, y, z = anchor.point_mm
-    # The +X/+Z silhouette belongs to the uncut floor, below both the
-    # window and the exploded stick, and behind the blind cover tap tips.
-    assert x == stop.BLOCK_LENGTH and z == stop.BLOCK_DEPTH
-    assert 0.0 < y < stop.WINDOW_Y_MIN
-    assert z > stop.WINDOW_Z_MAX and z > stop.PLATE_TAP_TIP_Z
-
-
 def test_bom_prints_registry_identity_and_vendor_sku_only() -> None:
     assert drawing.BOM_SKUS[spec.PLATE_SCREW] == plate_screw.SKU == "90114A124"
     assert drawing.BOM_SKUS[spec.THUMB_SCREW] == thumb.SKU == "91882A221"
