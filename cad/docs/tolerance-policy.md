@@ -580,11 +580,14 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   boss-through trim and top jam nut; neither counter anchor nor boss pose
   changes. Existing upper lever holes are retained, with no upper pins.
   The gooseneck head remains Ø12 mm to retain the counter's double loop.
-  Option A's source-union estimate is **+6.769 cm³**, approximately **49–53 g**
+  Option A's historical source-union estimate at the prior **8.20 mm** receiver
+  depth is **+6.769 cm³**, approximately **49–53 g**,
   only at illustrative density 7.2–7.85 g/cm³; its signed-change centroid is
   **(22.744, −3.517, −0.0777) mm**, not the final part CG. The corresponding
   level-pose gravity moment is **10.87–11.85 N·mm**, excluding out-of-plane
-  root-blend changes (derivation and limits in [machining DFM](machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface)).
+  root-blend changes and the subsequently approved **0.80 mm** inward-only
+  receiver extension to **9.00 mm**. These are not current-depth mass/CG
+  acceptance values (derivation and limits in [machining DFM](machining-dfm.md#summing-lever--knife-edge-t1--least-forgiving-interface)).
   Added +X gravity reduces required counter tension: the installed margin
   that matters is force above the measured initial-tension floor, not catalog
   maximum-minus-force or full catalog span. The default static balance/error

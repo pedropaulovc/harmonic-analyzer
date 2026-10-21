@@ -544,12 +544,18 @@ Live catalog verification on October 8, 2026:
   Its worst-case engagement was 3.2975 mm, above 1.5D (3.2766 mm); maximum
   reach 4.825 mm stays below the 4.90 mm minimum full-thread depth. (Superseded
   by 91794A078 above, October 16, 2026.)
-  The current 5.00 mm maximum full-thread envelope stays within the 7.69 mm
-  minimum receiver rib depth. Only the -Z entry rib, `EdgeRibBack`, was extended
-  inward to 8.20 deep; `EdgeRibFront` remains 5.08. The 6.50 ±0.51 cylindrical
-  drill now takes an ordinary-width bounded band. Its point and conservative
-  wander charge remain inside the rib with 0.076133 mm minimum axial containment,
-  not a bottom-wall thickness. The minimum 0.122 mm
+  The current 5.00 mm maximum full-thread envelope stays within the 8.49 mm
+  minimum receiver rib depth. Only the -Z entry rib, `EdgeRibBack`, extends
+  inward to the owner-approved **9.00 mm** depth (inner cap -67.20, unchanged
+  entry -76.20); `EdgeRibFront` remains 5.08. `RibDepth` keeps two decimals
+  and the ordinary ±0.51 band. The 6.50 ±0.51 cylindrical drill and
+  4.95 ±0.05 full thread are unchanged. The retained native-pilot point and
+  conservative wander charge remain inside the rib with 0.876133 mm minimum
+  axial containment, not a bottom-wall thickness. The separate worst printed
+  sharp-step budget uses Ø1.78 +0.10/0 and charges the whole deepest wander:
+  about 2.103 mm at 9.00, versus only 1.653 mm at the superseded 8.20 depth.
+  This is independent of the longitudinal rib-face wall and does not claim
+  native full-interference acceptance of the deeper rib. The minimum 0.122 mm
   head-to-counterbore radial float exceeds the 0.10 mm maximum station
   pitch mismatch at the printed ±0.05 position bands. The minimum end wall
   is 2.00 mm from the real end-face station datum, without double-counting

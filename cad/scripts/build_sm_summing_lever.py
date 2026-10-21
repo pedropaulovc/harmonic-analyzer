@@ -111,7 +111,11 @@ from _drawing_tolerances import (
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _drawing_precision import _named_dimension, set_dimension_display_precision
+from _drawing_precision import (
+    _named_dimension,
+    apply_drawing_precision,
+    set_dimension_display_precision,
+)
 from _fit_deviations import deviations
 from _drawing_prefix import set_dimension_prefix
 from _part_pmi import author_part_pmi
@@ -133,6 +137,7 @@ from sm_summing_lever_spec import (
     CHANNEL_PITCH,
     CHANNEL_Z0,
     COUNTER_HOLE_SPEC,
+    DRAWING_PRECISION,
     HOLE_COUNT,
     HOLE_SPEC,
     HOLE_X,
@@ -211,12 +216,14 @@ RIB_OFFSET = PLATE_L / 2.0 - RIB_T  # edge-rib start offset along Z 71.12
 # Only the -Z edge rib is the magnifier bracket's receiver: its inward
 # extension gives the #2-56 drill an ordinary depth band without moving the
 # entry face. The independent +Z rib retains RIB_T.
-RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 68.00
+RECEIVER_RIB_OFFSET = PLATE_L / 2.0 - RECEIVER_RIB_T  # 67.20; outer -Z face fixed
 # No plain anchor bore: the counter anchor's seat is the native COUNTER_HOLE_SPEC
 # tap through the boss, authored after the ribs (see _counter_anchor_tap).
-# All ribs stop before the unchanged channel-spring row and worst jam-nut
-# footprint. Their shared positive-X branch meets the two plate faces with
-# R1 tangent transitions, with no separate pad, ledge or vertical tip face.
+# In X, all ribs stop at 35.75 before the unchanged spring-hole column and
+# worst jam-nut footprint at 36.45. The 9.00 receiver already overlaps the
+# first spring station in Z; clearance is NOT an axial-separation claim.
+# The shared positive-X branch meets both plate faces with R1 tangent
+# transitions, with no separate pad, ledge or vertical tip face.
 if RIB_REACH > HOLE_X - blind_cut_dia_mm(HOLE_SPEC) / 2.0 - 2.0:
     raise AssertionError("a rib's +X end reaches the spring-hole column")
 
@@ -729,8 +736,8 @@ def _assert_edge_rib_end_planes(adapter) -> None:
                 f"{name}: native end planes {planes} mm do not establish {(inner, outer)} mm"
             )
         _telemetry.success(
-            f"{name}: native depth {depth_mm} mm; end planes {sorted(planes)} mm; "
-            f"outer boundary {outer} mm"
+            f"{name}: native depth {depth_mm:.2f} mm; end planes {sorted(planes)} mm; "
+            f"inner cap {inner:.2f} mm; outer boundary {outer:.2f} mm"
         )
 
 
@@ -1058,13 +1065,16 @@ async def _middle_rib(adapter, drive_jobs: list[tuple[str, str]]) -> None:
 
 
 def _assert_receiver_profile_walls(adapter) -> None:
-    """Actual trimmed-face distances before taps; independent worst-band budget.
+    """Independent longitudinal-profile and sharp-step wall gates before taps.
 
-    The source profile is a prism through the entire receiver depth. Native
-    end-plane/depth and drill-volume gates separately prove axial containment.
-    Later concave root fillets only add material; the taps are cut after them.
+    Native end-plane/depth and drill-volume gates separately prove axial
+    containment. A longitudinal face distance is NOT the inward cap-to-plate
+    step wall: the pure joint budget below proves that separately. Later
+    concave root fillets only add material; the taps are cut after them.
     """
-    from magnifying_bracket_joint_layout import RECEIVER_WALL_MIN, SCREW_MAJOR_DIA
+    from magnifying_bracket_joint_layout import (
+        RECEIVER_WALL_MIN, SCREW_MAJOR_DIA, receiver_step_wall_budget,
+    )
 
     raw = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EdgeRibBack")
     feature = _early_bound(raw, "IFeature")
@@ -1109,6 +1119,16 @@ def _assert_receiver_profile_walls(adapter) -> None:
             f"receiver X{budget.x_mm}: worst signed wall {budget.minimum_mm:.6f} mm "
             f"(upper {budget.upper_mm:.6f}, lower {budget.lower_mm:.6f})"
         )
+    step_wall = receiver_step_wall_budget()
+    if not math.isfinite(step_wall) or step_wall < RECEIVER_WALL_MIN:
+        raise RuntimeError(
+            f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
+            f"below {RECEIVER_WALL_MIN:g} mm"
+        )
+    _telemetry.success(
+        f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
+        f">= {RECEIVER_WALL_MIN:g} mm; RibDepth {RECEIVER_RIB_T:.2f} mm"
+    )
 
 
 def rib_root_edge_families() -> tuple[tuple[str, list[list[float]], float], ...]:
@@ -1686,6 +1706,7 @@ def _hex_width_reference(adapter) -> None:
 
 def _drawing_dimension_contract(adapter) -> None:
     """Size and mark every dimension the print imports (DRAWING_DIMENSIONS)."""
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     # The knife-edge controls the free-rock check assumes (code review C09):
     # the ridge from each side face and the flank-to-side angle carry their
     # own tolerances; the vertex height three places, the title block's .XXX.

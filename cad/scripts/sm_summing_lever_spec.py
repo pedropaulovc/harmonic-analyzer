@@ -169,6 +169,12 @@ KNIFE_HOOK_ARM_SPREAD_MAX = (
     / KNIFE_RIDGE_CONTACT_SPAN
 )
 
+# Noncritical body-end length uses the ordinary .X ±0.8 mm title-block band.
+# Author its places on the part; the drawing must import them unchanged.
+# This changes no nominal geometry or entry-relative receiver depth/location.
+DRAWING_PRECISION = {"CoefficientsPlate": {"PlateLength": 1}}
+
+
 # Drawing prose + marked-dimension contract (DRAWING_DIMENSIONS /
 # ISOMETRIC_VIEW_NOTE) live in ``sm_summing_lever_notes`` --
 # ``build_sm_summing_assembly`` / ``build_sm_knife_mount`` import this module, so

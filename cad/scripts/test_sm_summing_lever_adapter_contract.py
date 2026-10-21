@@ -329,7 +329,7 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         "RIB_T": spec.COUNTER_WEB_T, "SUM_H": spec.SUM_H,
         "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.COUNTER_WEB_T,
     }
-    # Receiver depth has one authority; never duplicate 8.20 as an input knob.
+    # Receiver depth has one authority; never duplicate 9.00 as an input knob.
     import magnifying_bracket_joint_layout as joint
 
     namespace["RECEIVER_RIB_OFFSET"] = spec.PLATE_L / 2.0 - joint.RIB_DEPTH
@@ -338,6 +338,7 @@ def _source_helpers(names: tuple[str, ...], **bindings):
         RECEIVER_WALL_MIN=joint.RECEIVER_WALL_MIN, LEVER_HOLE_POINTS=joint.LEVER_HOLE_POINTS,
         receiver_wall_margin=profile.receiver_wall_margin,
         receiver_wall_budget=profile.receiver_wall_budget,
+        receiver_step_wall_budget=joint.receiver_step_wall_budget,
     )
     namespace.update(bindings)
     module = ast.Module(body=[
@@ -586,6 +587,72 @@ def test_extracted_receiver_readback_uses_trimmed_longitudinal_faces_at_actual_m
     )
     with pytest.raises(RuntimeError, match="worst signed wall"):
         namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+
+
+@pytest.mark.parametrize("step_wall", [2.0, 2.103])
+def test_extracted_receiver_calls_and_logs_independent_step_budget_after_native_proof(
+    step_wall: float,
+) -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    faces, queries = _receiver_faces()
+    events = []
+
+    def step_budget():
+        events.append(("step-budget", len(queries)))
+        return step_wall
+
+    namespace = _source_helpers(
+        ("_assert_receiver_profile_walls",),
+        receiver_step_wall_budget=step_budget,
+        _telemetry=SimpleNamespace(success=lambda message: events.append(("log", message))),
+    )
+    namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    assert len(queries) == len(joint.LEVER_HOLE_POINTS)
+    assert [event for event in events if event[0] == "step-budget"] == [
+        ("step-budget", len(joint.LEVER_HOLE_POINTS)),
+    ]
+    assert sum("actual native profile wall" in value for kind, value in events if kind == "log") == len(
+        joint.LEVER_HOLE_POINTS
+    )
+    assert sum("worst signed wall" in value for kind, value in events if kind == "log") == len(
+        profile.receiver_wall_budget()
+    )
+    assert events[-1] == (
+        "log",
+        f"receiver: worst printed sharp-step wall {step_wall:.6f} mm "
+        f">= {joint.RECEIVER_WALL_MIN:g} mm; RibDepth {joint.RIB_DEPTH:.2f} mm",
+    )
+
+
+@pytest.mark.parametrize("step_wall", [1.99, 0.0, math.nan, math.inf, -math.inf])
+def test_extracted_receiver_rejects_failed_step_budget_despite_valid_longitudinal_walls(
+    step_wall: float,
+) -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    faces, queries = _receiver_faces()
+    messages = []
+    calls = []
+
+    def step_budget():
+        calls.append(len(queries))
+        return step_wall
+
+    namespace = _source_helpers(
+        ("_assert_receiver_profile_walls",),
+        receiver_step_wall_budget=step_budget,
+        _telemetry=SimpleNamespace(success=messages.append),
+    )
+    with pytest.raises(RuntimeError, match="sharp-step wall"):
+        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    assert calls == [len(joint.LEVER_HOLE_POINTS)]
+    assert len(queries) == len(joint.LEVER_HOLE_POINTS)
+    assert sum("actual native profile wall" in message for message in messages) == len(
+        joint.LEVER_HOLE_POINTS
+    )
+    assert sum("worst signed wall" in message for message in messages) == len(profile.receiver_wall_budget())
+    assert not any("sharp-step wall" in message for message in messages)
 
 
 @pytest.mark.parametrize("invalid", [(0.0, 0.0, 0.0), (math.nan, 0.0, 0.0, 0.0, 0.0)])

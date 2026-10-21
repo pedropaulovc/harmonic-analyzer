@@ -51,6 +51,8 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
     set_basic_dimension,
     set_dimension_callouts,
 )
@@ -102,6 +104,7 @@ from sm_summing_lever_spec import (
     COEFFICIENT_T,
     COEFFICIENT_TOP_Y,
     COUNTER_HOLE_SPEC,
+    DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
@@ -154,9 +157,10 @@ _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 FRONT_CENTER = (0.225, 0.235)
 TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
 ISO_CENTER = (0.350, 0.225)
-# The receiver end profile occupies sheet 2's lower-right field, leaving
-# the complete knife detail its own generous field on the left.
-BACK_CENTER = (0.300, 0.100)
+# R7's receiver callout entered the title block (top Y66 mm), while its
+# left-hand stations entered D. Translate the complete 1:1 field +35/+50 mm:
+# the native view outline becomes X264.3..405.7, Y129.2..170.8 mm.
+BACK_CENTER = (0.335, 0.150)
 SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
 
 # One complete 10:1 knife detail in sheet 2's open left field. A 6 mm model
@@ -674,6 +678,168 @@ def _owned_centerline(
 
 def _metres(point_mm: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(value / 1000.0 for value in point_mm)
+
+
+def _set_witness_gap(display: Any, index: int, gap: float, *, label: str) -> None:
+    """A local native gap, never a document-wide setting or a hidden witness."""
+    if display.SetWitnessLineGap(index, False, gap) is not True:
+        raise RuntimeError(f"{label}: native witness gap {index} was refused")
+    ok, use_doc, actual = display.GetWitnessLineGap(index, False, 0.0)
+    if (
+        ok is not True or use_doc is not False
+        or type(actual) not in (int, float) or not math.isfinite(actual)
+        or not math.isclose(actual, gap, rel_tol=0.0, abs_tol=1e-8)
+    ):
+        raise RuntimeError(
+            f"{label}: native witness gap {index} did not persist; "
+            f"expected=(True, False, {gap!r}), actual={(ok, use_doc, actual)!r}"
+        )
+
+
+def _clear_plate_width_witnesses(
+    adapter: Any, top: Any, annotations: list[Any],
+) -> None:
+    """Start width witnesses beyond the visible body end, not at middle Z.
+
+    The dimension still owns its original model endpoints. Only the local
+    blank part of each extension changes; both visible tails remain below
+    the actual projected +Z end. No sheet-coordinate substitute for that end.
+    """
+    matches = [
+        raw for raw in annotations
+        if dimension_name(adapter, raw) == "PlateWidth"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("expected one native PlateWidth in the top plan")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    middle, end, far_end = model_points_in_view(
+        adapter, top,
+        [
+            _metres((0.0, COEFFICIENT_TOP_Y, 0.0)),
+            _metres((0.0, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
+            _metres((PLATE_W, COEFFICIENT_TOP_Y, PLATE_L / 2.0)),
+        ],
+        label="plate width witness origins",
+        names=("middle", "end", "far end"),
+    )
+    if (
+        not all(math.isfinite(value) for point in (middle, end, far_end) for value in point)
+        or middle[1] <= end[1] or abs(end[1] - far_end[1]) > 1e-8
+    ):
+        raise RuntimeError(
+            "PlateWidth: unexpected projected body-end direction; "
+            f"middle_m={middle!r}, end_m={end!r}, far_end_m={far_end!r}"
+        )
+    gap = middle[1] - end[1] + 0.001
+    for index in (0, 1):
+        _set_witness_gap(display, index, gap, label="PlateWidth")
+    rebuild_drawing(adapter, label="clear plan width witnesses")
+    segments = dimension_segments(annotation)
+    for point in (end, far_end):
+        witnesses = [
+            stroke for stroke in segments
+            if all(abs(vertex[0] - point[0]) <= 1e-8 for vertex in stroke)
+            and abs(stroke[1][1] - stroke[0][1]) > 1e-8
+        ]
+        if len(witnesses) != 1:
+            raise RuntimeError(
+                "PlateWidth: expected one visible witness at each width end; "
+                f"expected_x_m={point[0]!r}, expected_high_m={point[1] - 0.001!r}, "
+                f"matched_witnesses_m={witnesses!r}, native_segments_m={segments!r}"
+            )
+        low, high = sorted(vertex[1] for vertex in witnesses[0])
+        if abs(high - (point[1] - 0.001)) > 1e-8 or high - low <= 0.0035:
+            raise RuntimeError(
+                "PlateWidth: witness did not start beyond its projected end; "
+                f"projected_end_m={point!r}, expected_high_m={point[1] - 0.001!r}, "
+                f"minimum_visible_length_m=0.0035, actual_low_high_m={(low, high)!r}, "
+                f"native_segments_m={segments!r}"
+            )
+
+
+def _clear_ridge_witnesses(
+    adapter: Any, detail: Any, annotations: list[Any],
+) -> None:
+    """Leave A's actual ridge attachment alone; start both witnesses above it."""
+    vertex = model_point_in_view(
+        adapter, detail,
+        _metres((0.0, HEX_H / 2.0, -PLATE_L / 2.0 - HEX_DEPTH)),
+        label="knife ridge witness origin",
+    )
+    wanted = {"RidgeFromLeft", "RidgeFromRight"}
+    found = {}
+    for raw in annotations:
+        name = dimension_name(adapter, raw)
+        if name not in wanted:
+            continue
+        if name in found:
+            raise RuntimeError(f"knife detail: duplicate {name}")
+        annotation = _early_bound(raw, "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        # Both model dimensions start at height.end, the theoretical ridge
+        # sharp, before their respective shoulder endpoint (not screen order).
+        _set_witness_gap(display, 0, RIDGE_WITNESS_GAP, label=name)
+        found[name] = annotation
+    if found.keys() != wanted:
+        raise RuntimeError("knife detail: missing ridge-to-side dimension")
+    rebuild_drawing(adapter, label="clear ridge witnesses above datum A")
+    for name, annotation in found.items():
+        segments = dimension_segments(annotation)
+        witnesses = [
+            stroke for stroke in segments
+            if all(abs(point[0] - vertex[0]) <= 1e-8 for point in stroke)
+            and abs(stroke[1][1] - stroke[0][1]) > 1e-8
+        ]
+        if len(witnesses) != 1:
+            raise RuntimeError(
+                f"{name}: expected one visible ridge-side witness; "
+                f"projected_vertex_m={vertex!r}, "
+                f"expected_low_m={vertex[1] + RIDGE_WITNESS_GAP!r}, "
+                f"matched_witnesses_m={witnesses!r}, native_segments_m={segments!r}"
+            )
+        low, high = sorted(point[1] for point in witnesses[0])
+        if (
+            abs(low - (vertex[1] + RIDGE_WITNESS_GAP)) > 1e-8
+            or high - low <= 0.0035
+        ):
+            raise RuntimeError(
+                f"{name}: native witness did not clear datum A; "
+                f"projected_vertex_m={vertex!r}, "
+                f"expected_low_m={vertex[1] + RIDGE_WITNESS_GAP!r}, "
+                f"minimum_visible_length_m=0.0035, actual_low_high_m={(low, high)!r}, "
+                f"native_segments_m={segments!r}"
+            )
+
+
+def _place_flank_text(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the model-owned exterior angle arc; move its whole block off it.
+
+    Use the trammel-point recipe's native angular shelf pattern. Merely
+    translating the two-row text on the arc leaves its qualifier struck.
+    """
+    name = "FlankToSide"
+    matches = [raw for raw in annotations if dimension_name(adapter, raw) == name]
+    if len(matches) != 1:
+        raise RuntimeError("knife detail needs one native FlankToSide")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    display.OffsetText = False
+    if display.OffsetText is not False:
+        raise RuntimeError("FlankToSide: inherited text offset could not be reset")
+    arc_xy = DETAIL_KEEP[name]
+    if annotation.SetPosition2(*arc_xy, 0.0) is not True:
+        raise RuntimeError("FlankToSide: native exterior arc placement was refused")
+    position = annotation.GetPosition()
+    if not position or math.dist(tuple(position[:2]), arc_xy) > 1e-5:
+        raise RuntimeError("FlankToSide: native exterior arc placement did not persist")
+    offset_dimension_text(adapter, [annotation], {name: FLANK_TEXT_XY})
+    position = annotation.GetPosition()
+    if (
+        display.OffsetText is not True or not position
+        or math.dist(tuple(position[:2]), FLANK_TEXT_XY) > 1e-5
+    ):
+        raise RuntimeError("FlankToSide: complete angular text did not stay on its shelf")
 
 
 def _plate_thickness_check(
@@ -1276,22 +1442,25 @@ FRONT_KEEP = {
 # The ridge pair shares one line above the crop, with each whole callout
 # outside its own model-side span. Back reverses X: RidgeFromLeft prints
 # right, RidgeFromRight left, and the +X flank's exterior wedge is left.
-# Datum A and R0.1 MAX stay above the ridge; height is left and width below.
+# Keep that native angle arc; its complete text moves to a separate shelf.
+# R0.1 MAX stands right of the X155.4 mm witness, with a shallow arrow
+# clear of A. Only the two ridge-side witnesses get a local gap above A.
 DETAIL_KEEP = {
     "HexWidth": (0.203, 0.083),
     "HexHeight": (0.0342, DETAIL_CENTER[1]),
     "RidgeFromLeft": (0.201, 0.2483),
     "RidgeFromRight": (0.044, 0.25105),
     "FlankToSide": (0.058, 0.184),
-    "KnifeRidgeRadius": (0.150, 0.224),
+    "KnifeRidgeRadius": (0.181, 0.219),
 }
+FLANK_TEXT_XY = (0.053, 0.218)
+RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
-    # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
-    # from the end up past every hole, boxing the column's right side (the
-    # 20X callout's leader had to cross one). The line prints 2.8 mm under
-    # the keep, at 0.0785: 2.9 mm under datum B's box, 2.3 mm over the 39.85
-    # text (whose line, with 76.20's, dropped to 0.0695 for that), and the
-    # text sits right of the span, clear of B.
+    # The model width is authored at the plan's middle Z. Its native
+    # witnesses therefore start at Y130 mm, not at the end face: R7 crossed
+    # the spring callout and diameter. _clear_plate_width_witnesses starts
+    # both 1 mm beyond the actual projected +Z end, preserving visible tails.
+    # Keep the existing bottom dimension line and full width value.
     "PlateWidth": (0.266, 0.0813),
     # Right of the -Z rib's three lines (they end at x 0.4007; at 0.395 its
     # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
@@ -1340,17 +1509,20 @@ TOP_KEEP = {
     # text and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }
-# VIEW F at 1:1, model X reversed, in the lower-right field of sheet 2.
-# The receiver stations are above the end profile; its uniform thickness
-# stands left of the free end, below the separately controlled row height.
+# VIEW F at 1:1, model X reversed. All stations, thickness and caption ride
+# with the view; their ink clears D's native X192.6 mm outer extent.
 BACK_KEEP = {
-    "PlateThickness": (0.228, 0.083),
-    "ReceiverX0": (0.295, 0.1315),
-    "ReceiverX1": (0.205, 0.1245),
-    "ReceiverY0": (0.218, 0.1085),
+    "PlateThickness": (BACK_CENTER[0] - 0.072, BACK_CENTER[1] - 0.017),
+    "ReceiverX0": (BACK_CENTER[0] - 0.005, BACK_CENTER[1] + 0.0315),
+    "ReceiverX1": (BACK_CENTER[0] - 0.095, BACK_CENTER[1] + 0.0245),
+    "ReceiverY0": (BACK_CENTER[0] - 0.082, BACK_CENTER[1] + 0.0085),
 }
-# The view label is below the receiver profile, outside the thickness witnesses.
-BACK_VIEW_NOTE_XY = (0.225, 0.050)
+# The complete R7 receiver block is 109.9 mm wide. Moving it farther right
+# than the view puts the diagonal LEFT of every process row, not through
+# its own text; its expected right edge is X414.1, inside X419.1 mm.
+MOUNTING_CALLOUT_XY = (BACK_CENTER[0] + 0.025, BACK_CENTER[1] - 0.035)
+# The caption's printed bottom is Y96.4, over 30 mm above the title rule.
+BACK_VIEW_NOTE_XY = (BACK_CENTER[0] - 0.075, BACK_CENTER[1] - 0.050)
 # Sheet 1's plan names sheet 2's view: a letter arrow onto the -Z end, the
 # face VIEW F looks at (fr_rocker_arm_support's VIEW B arrow).  Its tip is
 # on the receiver rib's outer edge at model x 21.4 (sheet x 0.246), between
@@ -1517,6 +1689,9 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="top",
         dimensions_by_feature=DIMENSIONS_BY_FEATURE,
     )
+    assert_imported_precision(
+        adapter, top_annotations, DRAWING_PRECISION["CoefficientsPlate"],
+    )
     _attach_radial_leaders(
         adapter, front_annotations, ("EdgeRibFrontArcR", "EdgeRibFrontUpperBlendR"),
         label="front",
@@ -1529,6 +1704,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _apply_callouts(
         adapter, [*front_annotations, *top_annotations], label="lever geometry",
     )
+    _clear_plate_width_witnesses(adapter, top, top_annotations)
     # The boss's Ø19.05 takes one arrow on its near rim, no line through the
     # centre: there it crossed the anchor tap callout's leader, which runs
     # through the tap's centre (machinist review r13, rule 14).
@@ -1888,12 +2064,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _assert_knife_ridge_radius(adapter, detail_annotations)
     _ridge_datum(adapter, detail)
     _apply_callouts(adapter, detail_annotations, label="knife detail")
+    _clear_ridge_witnesses(adapter, detail, detail_annotations)
+    _place_flank_text(adapter, detail_annotations)
     back_edges = scan_view_edges(back, label="bracket receiver face")
     mounting_rims = _mounting_rims(back_edges)
     # Below VIEW F, clear of the receiver stations and the detail's width.
     mounting_callout = add_native_hole_callout(
         adapter, back, edge=mounting_rims[0].edge,
-        callout_xy=(0.292, 0.065), label="two blind bracket mounting taps",
+        callout_xy=MOUNTING_CALLOUT_XY, label="two blind bracket mounting taps",
         process=BRACKET_TAP_CALLOUT_PROCESS,
     )
     _dress_bracket_depth_callout(mounting_callout)

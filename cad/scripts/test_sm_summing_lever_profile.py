@@ -73,14 +73,15 @@ def test_defining_dimensions_derive_the_approved_g1_profile() -> None:
         profile.rib_bounds(spec.RIB_REACH + 0.01)
 
 
-def test_installed_interfaces_and_extended_receiver_are_unchanged() -> None:
+def test_receiver_deepens_only_inward_without_moving_installed_interfaces() -> None:
     assert (spec.PLATE_W, spec.PLATE_L, spec.CYL_R) == pytest.approx((44.45, 152.4, 12.7))
     assert (spec.HOLE_X, spec.HOLE_COUNT, spec.HOLE_Z_OFFSET) == pytest.approx((39.85, 20, -3.52825))
     assert (spec.CHANNEL_Z0, spec.CHANNEL_PITCH) == pytest.approx((-67.1, 7.0565))
     assert (spec.HEX_W, spec.HEX_H, spec.HEX_DEPTH) == pytest.approx((8.080, 10.268, 21.717))
     assert (spec.TIP_X, spec.ANCHOR_H) == pytest.approx((-76.2, 19.05))
     assert joint.LEVER_HOLE_POINTS == ((16.0, 0.0, -76.2), (29.7, 0.0, -76.2))
-    assert (joint.RIB_DEPTH, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (8.2, 6.5, 4.95)
+    assert (joint.RIB_DEPTH, joint.DRILL_DEPTH, joint.THREAD_DEPTH) == (9.0, 6.5, 4.95)
+    assert joint.LEVER_FRONT_LOCAL_Z + joint.RIB_DEPTH == pytest.approx(-67.20)
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
     assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
     assert spec.HOLE_X - (joint.SCREW_MAJOR_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
@@ -175,11 +176,12 @@ def test_full_cylindrical_threads_and_drill_points_fit_axially_and_laterally() -
         joint.TAP_LEAD_MARGIN_MIN, joint.DRILL_POINT_RIB_MARGIN_MIN,
     ))
     assert min(margins) > 0.0
-    # The section is invariant through the rib depth. The max-major cylindrical
-    # envelope, expanded by the deepest wander, encloses both full thread and
-    # the smaller drill cylinder/cone at EVERY depth, not just a tip sample.
+    # The longitudinal section is invariant through the rib depth. The
+    # max-major envelope expanded by deepest wander bounds those side walls,
+    # not the separate inward cap-to-plate step beyond the finite drill.
     assert joint.SCREW_MAJOR_DIA >= joint.TAP_DRILL_DIA
     assert all(wall.minimum_mm > 2.0 for wall in profile.receiver_wall_budget())
+    assert joint.receiver_step_wall_budget() >= joint.RECEIVER_WALL_MIN == 2.0
     assert min(_axial_margins(7.0, joint.THREAD_DEPTH, joint.DRILL_DEPTH)) < 0.0
     assert _axial_margins(joint.RIB_DEPTH, 4.0, joint.DRILL_DEPTH)[1] < 0.0
     assert _axial_margins(joint.RIB_DEPTH, joint.THREAD_DEPTH, 5.5)[2] < 0.0
@@ -345,13 +347,30 @@ def _legacy_section(middle: bool) -> profile.SectionMoments:
     ))
 
 
-def _ideal_prism_change() -> _IdealPrismChange:
-    """Source-only +6.769 cm³ basis for the material/gravity estimate in cad/docs.
+def _positive_rib_added_section(section: profile.RibProfile) -> profile.SectionMoments:
+    """R1 rib union minus existing cylinder/slab, only on the receiver's +X arm.
+
+    The closed profile also contains the -X wrap semicircle. Its annulus outside
+    the cylinder belongs to the unchanged counter web, not the receiver strip.
+    Subtract its exact area and signed X moment; symmetry gives zero Y moment.
+    """
+    wrap, cylinder = section.wrap_radius, section.cylinder_radius
+    negative_web = profile.SectionMoments(
+        math.pi * (wrap**2 - cylinder**2) / 2.0,
+        -2.0 * (wrap**3 - cylinder**3) / 3.0,
+        0.0,
+    )
+    return section.section_moments() - section.base_section_moments() - negative_web
+
+
+def _ideal_prism_change(receiver_depth: float = joint.RIB_DEPTH) -> _IdealPrismChange:
+    """Source-only material/gravity delta with the frozen 8.20 legacy receiver.
 
     This nominal changed prism union excludes out-of-plane root fillets.
     The old plate was 5.08 with a 10 mm-wide, 7 mm-deep spring seat; its
     clipped edge slants and pointed positive middle profile are removed.
-    The receiver stays 8.20 deep and the opposite/middle ribs stay 5.08.
+    The approved receiver adds an inward-only 0.80 strip beyond the historical
+    8.20 cutover; the opposite/middle ribs stay 5.08 in both geometries.
     Negative-X web, boss, knives and unchanged holes cancel. The spring
     catalog span supplies no reserve and is deliberately absent here.
     """
@@ -368,19 +387,25 @@ def _ideal_prism_change() -> _IdealPrismChange:
     base_delta = section.base_section_moments() - old_plate
     edge_delta = section.section_moments() - _legacy_section(middle=False)
     middle_delta = section.section_moments() - _legacy_section(middle=True)
-    back, front, middle = joint.RIB_DEPTH, spec.COUNTER_WEB_T, spec.COUNTER_WEB_T
-    ordinary_length = spec.PLATE_L - back - front - middle
+    old_back, front, middle = 8.20, spec.COUNTER_WEB_T, spec.COUNTER_WEB_T
+    ordinary_length = spec.PLATE_L - old_back - front - middle
+    receiver_extension = receiver_depth - old_back
+    extra_section = _positive_rib_added_section(section)
     total = (
         base_delta.scaled(ordinary_length)
-        + edge_delta.scaled(back + front)
+        + edge_delta.scaled(old_back + front)
         + middle_delta.scaled(middle)
+        + extra_section.scaled(receiver_extension)
     )
-    # The base and middle changes are Z-symmetric; equal base sections removed
-    # at unequal end depths leave an opposite first moment to those edge spans.
-    back_center = -spec.PLATE_L / 2.0 + back / 2.0
+    # Retain the historical asymmetric end-span moment and then add only the
+    # new inward receiver strip at its actual negative-Z centroid.
+    back_center = -spec.PLATE_L / 2.0 + old_back / 2.0
     front_center = spec.PLATE_L / 2.0 - front / 2.0
-    z_moment = (edge_delta.area_mm2 - base_delta.area_mm2) * (
-        back * back_center + front * front_center
+    extension_center = -spec.PLATE_L / 2.0 + old_back + receiver_extension / 2.0
+    z_moment = (
+        (edge_delta.area_mm2 - base_delta.area_mm2)
+        * (old_back * back_center + front * front_center)
+        + extra_section.area_mm2 * receiver_extension * extension_center
     )
     return _IdealPrismChange(total.area_mm2, total.x_mm3, total.y_mm3, z_moment)
 
@@ -397,32 +422,91 @@ def test_new_minus_old_prism_union_and_gravity_increment_do_not_count_catalog_re
         section.upper.flank_xy[0], section.lower.flank_xy[0],
         spec.PLATE_W - 10.0, section.reach, spec.PLATE_W,
     ]
-    depths = (spec.PLATE_L - joint.RIB_DEPTH - 2.0 * spec.COUNTER_WEB_T,
-              joint.RIB_DEPTH + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
+    old_receiver_depth = 8.20
+    new_depths = (spec.PLATE_L - joint.RIB_DEPTH - 2.0 * spec.COUNTER_WEB_T,
+                  joint.RIB_DEPTH + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
+    old_depths = (spec.PLATE_L - old_receiver_depth - 2.0 * spec.COUNTER_WEB_T,
+                  old_receiver_depth + spec.COUNTER_WEB_T, spec.COUNTER_WEB_T)
 
     def change(x: float, kind: str) -> float:
         new_base = _base_bounds(x, 2.54, -4.46)
         old_base = _base_bounds(x, 2.54, -2.54, old_pad=True)
         new_rib = section.rib_bounds(x) if x <= section.reach else (-4.46, 2.54)
+        new_sections = (new_base, new_rib, new_rib)
+        old_sections = (old_base, _legacy_rib_bounds(x, False), _legacy_rib_bounds(x, True))
+        if kind == "z":
+            front = spec.COUNTER_WEB_T
+            front_moment = front * (spec.PLATE_L / 2.0 - front / 2.0)
+            new_end_moment = joint.RIB_DEPTH * (
+                -spec.PLATE_L / 2.0 + joint.RIB_DEPTH / 2.0
+            ) + front_moment
+            old_end_moment = old_receiver_depth * (
+                -spec.PLATE_L / 2.0 + old_receiver_depth / 2.0
+            ) + front_moment
+            return (
+                ((new_rib[1] - new_rib[0]) - (new_base[1] - new_base[0])) * new_end_moment
+                - ((old_sections[1][1] - old_sections[1][0]) - (old_base[1] - old_base[0]))
+                * old_end_moment
+            )
         value = 0.0
-        for new, old, length in zip(
-            (new_base, new_rib, new_rib),
-            (old_base, _legacy_rib_bounds(x, False), _legacy_rib_bounds(x, True)), depths,
+        for new, old, new_length, old_length in zip(
+            new_sections, old_sections, new_depths, old_depths,
         ):
             if kind == "y":
-                delta = (new[1] ** 2 - new[0] ** 2 - old[1] ** 2 + old[0] ** 2) / 2.0
+                delta = (
+                    (new[1] ** 2 - new[0] ** 2) * new_length
+                    - (old[1] ** 2 - old[0] ** 2) * old_length
+                ) / 2.0
             else:
-                delta = new[1] - new[0] - old[1] + old[0]
+                delta = (new[1] - new[0]) * new_length - (old[1] - old[0]) * old_length
                 if kind == "x":
                     delta *= x
-            value += delta * length
+            value += delta
         return value
 
     delta = _ideal_prism_change()
     assert delta.volume_mm3 == pytest.approx(_integral(lambda x: change(x, "area"), breaks), abs=0.03)
     assert delta.x_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "x"), breaks), abs=0.2)
     assert delta.y_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "y"), breaks), abs=0.03)
-    assert delta.volume_mm3 / 1000.0 == pytest.approx(6.768846, abs=0.01)
+    assert delta.z_moment_mm4 == pytest.approx(_integral(lambda x: change(x, "z"), breaks), abs=2.0)
+    historical = _ideal_prism_change(old_receiver_depth)
+    assert historical.volume_mm3 / 1000.0 == pytest.approx(6.768846, abs=0.01)
+    extension = joint.RIB_DEPTH - old_receiver_depth
+    assert extension == pytest.approx(0.80)
+
+    def extension_slice(x: float, kind: str) -> float:
+        # Independent +X union slices retain the R1 boundary while excluding
+        # material already present in the cylinder and the uniform plate.
+        lo, hi = section.rib_bounds(x) if x <= section.reach else (-4.46, 2.54)
+        blo, bhi = _base_bounds(x, 2.54, -4.46)
+        if kind == "y":
+            return (hi**2 - lo**2 - bhi**2 + blo**2) / 2.0
+        area = hi - lo - bhi + blo
+        return x * area if kind == "x" else area
+
+    extra_section = profile.SectionMoments(*(
+        extension * _integral(lambda x: extension_slice(x, kind), breaks)
+        for kind in ("area", "x", "y")
+    ))
+    assert delta.volume_mm3 - historical.volume_mm3 == pytest.approx(extra_section.area_mm2)
+    assert delta.x_moment_mm4 - historical.x_moment_mm4 == pytest.approx(extra_section.x_mm3)
+    assert delta.y_moment_mm4 - historical.y_moment_mm4 == pytest.approx(extra_section.y_mm3)
+    # A full closed-section extrusion would incorrectly add the existing -X
+    # web outside the cylinder: precisely the half-annulus below.
+    full_extension = (section.section_moments() - section.base_section_moments()).scaled(extension)
+    assert full_extension.area_mm2 - extra_section.area_mm2 == pytest.approx(
+        extension * math.pi * (section.wrap_radius**2 - section.cylinder_radius**2) / 2.0,
+        abs=0.003,
+    )
+    assert full_extension.x_mm3 - extra_section.x_mm3 == pytest.approx(
+        -extension * 2.0 * (section.wrap_radius**3 - section.cylinder_radius**3) / 3.0,
+        abs=0.02,
+    )
+    extension_center = -spec.PLATE_L / 2.0 + old_receiver_depth + extension / 2.0
+    assert delta.z_moment_mm4 - historical.z_moment_mm4 == pytest.approx(
+        extra_section.area_mm2 * extension_center
+    )
+    assert delta.volume_mm3 > historical.volume_mm3
     assert delta.centroid_mm[0] > 0.0
     assert delta.centroid_mm[1] < 0.0
     assert delta.gravity_moment_increment_n_mm(7200.0) == pytest.approx(

@@ -327,6 +327,7 @@ def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) ->
 
     calls = []
     for name in (
+        "apply_drawing_precision",
         "set_dimension_display_precision",
         "set_dimension_symmetric_tolerance",
         "set_dimension_symmetric_angular_tolerance",
@@ -379,6 +380,239 @@ def _calls_in_order(node: ast.AST) -> list[ast.Call]:
 def _call_name(call: ast.Call) -> str:
     func = call.func
     return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+
+
+
+def test_body_length_precision_is_part_owned() -> None:
+    """The owner changes only body-end length to the one-place decimal band."""
+    assert sm_summing_lever_spec.DRAWING_PRECISION == {"CoefficientsPlate": {"PlateLength": 1}}
+
+
+@pytest.mark.parametrize("digits", [1, 2, -1, None])
+def test_body_length_import_refuses_lost_part_authored_precision(monkeypatch, digits) -> None:
+    import _drawing_dimensions as dimensions
+
+    adapter = SimpleNamespace(_attempt=lambda action: action())
+    display = SimpleNamespace(GetPrimaryPrecision2=lambda: digits)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    monkeypatch.setattr(
+        dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_args: value,
+    )
+    monkeypatch.setattr(dimensions, "dimension_name", lambda *_args: "PlateLength")
+    precision = sm_summing_lever_spec.DRAWING_PRECISION["CoefficientsPlate"]
+    if digits == 1:
+        dimensions.assert_imported_precision(adapter, [annotation], precision)
+    else:
+        with pytest.raises(RuntimeError, match="part authored 1"):
+            dimensions.assert_imported_precision(adapter, [annotation], precision)
+    with pytest.raises(RuntimeError, match="never reached the sheet"):
+        dimensions.assert_imported_precision(adapter, [], precision)
+
+
+def _drawing_function(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    return next(
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+    )
+
+
+def test_layout_retains_six_views_on_two_sheets_without_a_section() -> None:
+    """Pin the approved topology, not helper spelling or projection wiring."""
+    calls = _calls_in_order(_drawing_function("build"))
+    assert sum(_call_name(call) == "place_view" for call in calls) == 5
+    assert sum(_call_name(call) == "_knife_detail" for call in calls) == 1
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    assert not any(
+        "section" in _call_name(call).lower()
+        for call in _calls_in_order(tree)
+    )
+    assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES)) == 2
+
+
+def test_view_f_r7_translation_and_complete_text_have_analytical_air() -> None:
+    """R7 measured-box replay plus source offsets, NOT regenerated native proof."""
+    dx, dy = drawing.BACK_CENTER[0] - 0.300, drawing.BACK_CENTER[1] - 0.100
+
+    def translated(box):
+        left, bottom, right, top = box
+        return left + dx, bottom + dy, right + dx, top + dy
+
+    # Captured r7 coordinates remain independent of the recipe constants.
+    receiver = translated((0.2293245, 0.079172, 0.3706755, 0.120828))
+    y0 = translated((0.1693, 0.1094, 0.2169, 0.1130))
+    x1 = translated((0.1808, 0.1199, 0.2285, 0.1234))
+    detail_right = 0.1925879  # full native detail outline, not ideal crop alone
+    assert min(receiver[0], y0[0], x1[0]) > detail_right + 0.002
+    assert receiver[2] < 0.4318 - 0.0127 - 0.002
+    # Source-budget envelopes at the approved (360,115)/(260,100) mm anchors.
+    # Replay their offsets from the actual requested positions so a placement
+    # change can exhaust the budget. These are predictions, not native bounds.
+    callout_x, callout_y = drawing.MOUNTING_CALLOUT_XY
+    callout = (
+        callout_x - 0.0621, callout_y - 0.011166,
+        callout_x + 0.0541, callout_y + 0.035767,
+    )
+    caption_x, caption_y = drawing.BACK_VIEW_NOTE_XY
+    caption = (
+        caption_x + 0.0002, caption_y - 0.0036,
+        caption_x + 0.0705, caption_y,
+    )
+    for left, bottom, right, top in (callout, caption):
+        assert left > detail_right + 0.002
+        assert right < 0.4318 - 0.0127 - 0.002
+        assert bottom > 0.066 + 0.004  # title block x216..431.8, y0..66 mm
+        assert top < _BORDER_TOP_M - 0.004
+    assert caption[3] + 0.003 < callout[1]
+    assert caption[3] + 0.004 < receiver[1]
+    # Conservative source reservation around the unchanged 1:4 isometric,
+    # not a measured native outline (which still needs parent acceptance).
+    iso_field_bottom = drawing.ISO_CENTER[1] - 0.040
+    assert max(receiver[3], callout[3], caption[3]) + 0.004 < iso_field_bottom
+
+
+@pytest.mark.parametrize("index,gap", [(0, 0.010), (1, 0.0391)])
+def test_local_witness_gap_persists_native_override(index, gap) -> None:
+    state = SimpleNamespace(use_document=True, gap=0.0)
+
+    def write(actual_index, use_document, value):
+        assert actual_index == index
+        state.use_document, state.gap = use_document, value
+        return True
+
+    display = SimpleNamespace(
+        SetWitnessLineGap=write,
+        GetWitnessLineGap=lambda *_args: (True, state.use_document, state.gap),
+    )
+    drawing._set_witness_gap(display, index, gap, label="local test")
+    assert state.use_document is False
+    assert state.gap == pytest.approx(gap)
+
+
+@pytest.mark.parametrize("result", [False, None, 0, 1])
+def test_local_witness_gap_refuses_nonboolean_native_write(result) -> None:
+    def unexpected_read(*_args):
+        raise AssertionError("must refuse the failed write before readback")
+
+    display = SimpleNamespace(
+        SetWitnessLineGap=lambda *_args: result, GetWitnessLineGap=unexpected_read,
+    )
+    with pytest.raises(RuntimeError, match="refused"):
+        drawing._set_witness_gap(display, 0, 0.010, label="local test")
+
+
+@pytest.mark.parametrize("answer", [
+    (False, False, 0.010), (1, False, 0.010), (True, True, 0.010),
+    (True, 0, 0.010), (True, False, True), (True, False, "0.010"),
+    (True, False, math.nan), (True, False, math.inf), (True, False, 0.011),
+])
+def test_local_witness_gap_refuses_ineffective_native_override(answer) -> None:
+    display = SimpleNamespace(
+        SetWitnessLineGap=lambda *_args: True,
+        GetWitnessLineGap=lambda *_args: answer,
+    )
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._set_witness_gap(display, 0, 0.010, label="local test")
+
+
+@pytest.mark.parametrize("damage", [None, "seed_write", "seed_read", "offset_flag", "shelf_read"])
+def test_flank_text_refuses_failed_arc_or_shelf_placement(monkeypatch, damage) -> None:
+    display = SimpleNamespace(OffsetText=True)
+    state = SimpleNamespace(position=None)
+
+    def seed(x, y, z):
+        assert display.OffsetText is False
+        state.position = (x + (0.001 if damage == "seed_read" else 0.0), y, z)
+        return False if damage == "seed_write" else True
+
+    annotation = SimpleNamespace(
+        GetSpecificAnnotation=lambda: display, SetPosition2=seed,
+        GetPosition=lambda: state.position,
+    )
+    adapter = object()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, _raw: "FlankToSide")
+
+    def offset(owner, annotations, positions):
+        display.OffsetText = damage != "offset_flag"
+        x, y = positions["FlankToSide"]
+        state.position = (x, y + (0.001 if damage == "shelf_read" else 0.0), 0.0)
+
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    if damage is None:
+        drawing._place_flank_text(adapter, [annotation])
+    else:
+        with pytest.raises(RuntimeError, match="FlankToSide"):
+            drawing._place_flank_text(adapter, [annotation])
+
+
+@pytest.mark.parametrize("kind", ["width", "ridge"])
+@pytest.mark.parametrize("damage", [None, "missing", "duplicate", "wrong_start", "short_tail"])
+def test_local_witness_placement_rebuilds_and_checks_projected_ink(
+    monkeypatch, kind, damage,
+) -> None:
+    """Fake-native controls; projected points are independent of recipe keeps."""
+    adapter, view = object(), object()
+    names = ["PlateWidth"] if kind == "width" else ["RidgeFromLeft", "RidgeFromRight"]
+    annotations = [SimpleNamespace(name=name, GetSpecificAnnotation=lambda: object()) for name in names]
+    events = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, raw: raw.name)
+    monkeypatch.setattr(
+        drawing, "_set_witness_gap",
+        lambda _display, index, gap, *, label: events.append(("gap", label, index, gap)),
+    )
+    monkeypatch.setattr(
+        drawing, "rebuild_drawing",
+        lambda _adapter, **_kwargs: events.append(("rebuild",)),
+    )
+
+    def project_width(owner, target, points, **_kwargs):
+        assert owner is adapter and target is view
+        return [(0.210, 0.140), (0.210, 0.100), (0.250, 0.100)]
+
+    def project_ridge(owner, target, point, **_kwargs):
+        assert owner is adapter and target is view
+        return (0.120, 0.200)
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project_width)
+    monkeypatch.setattr(drawing, "model_point_in_view", project_ridge)
+
+    def segments(_annotation):
+        assert events[-1] == ("rebuild",)
+        if kind == "width":
+            strokes = [((x, 0.090), (x, 0.099)) for x in (0.210, 0.250)]
+        else:
+            strokes = [((0.120, 0.210), (0.120, 0.225))]
+        if damage == "missing":
+            return strokes[1:]
+        if damage == "duplicate":
+            return [*strokes, strokes[0]]
+        if damage in ("wrong_start", "short_tail"):
+            x = strokes[0][0][0]
+            strokes[0] = (
+                ((x, 0.097), (x, 0.099)) if damage == "short_tail" and kind == "width"
+                else ((x, 0.210), (x, 0.212)) if damage == "short_tail"
+                else ((x, 0.090), (x, 0.100)) if kind == "width"
+                else ((x, 0.209), (x, 0.225))
+            )
+        return strokes
+
+    monkeypatch.setattr(drawing, "dimension_segments", segments)
+    helper = drawing._clear_plate_width_witnesses if kind == "width" else drawing._clear_ridge_witnesses
+    if damage is None:
+        helper(adapter, view, annotations)
+        writes = [event for event in events if event[0] == "gap"]
+        assert [(event[1], event[2]) for event in writes] == (
+            [("PlateWidth", 0), ("PlateWidth", 1)] if kind == "width"
+            else [("RidgeFromLeft", 0), ("RidgeFromRight", 0)]
+        )
+        assert [event[3] for event in writes] == pytest.approx(
+            [0.041, 0.041] if kind == "width" else [0.010, 0.010]
+        )
+    else:
+        with pytest.raises(RuntimeError, match="witness"):
+            helper(adapter, view, annotations)
 
 
 def test_both_knife_stubs_are_one_prism_read_back_coplanar() -> None:
@@ -512,7 +746,8 @@ def _detail_block(name: str, value: str) -> tuple[float, float, float, float, in
     """(left, right, bottom, top, lines) of a Detail D dimension's text."""
     lines = [value, *notes.DIMENSION_CALLOUTS_BELOW.get(name, "").split("\n")]
     lines = [line for line in lines if line]
-    x, y = drawing.DETAIL_KEEP[name]
+    # The angular arc keeps its native exterior seed; only its text is offset.
+    x, y = drawing.FLANK_TEXT_XY if name == "FlankToSide" else drawing.DETAIL_KEEP[name]
     half_w = _CHAR_M * max(map(len, lines)) / 2.0
     half_h = _LINE_M * len(lines) / 2.0
     return x - half_w, x + half_w, y - half_h, y + half_h, len(lines)
@@ -630,23 +865,32 @@ def test_back_projected_knife_detail_uses_model_owned_spans_and_exterior_angle()
     # would miss the long arc's collision with the height text.
     assert shoulder[0] - angle_radius > blocks["HexHeight"][1] + 0.002
     assert shoulder[1] + angle_radius < pair_line - 0.002
-    # Its complete text rectangle stays outside the actual sloping flank,
-    # even though its right edge can lie to the right of the shoulder itself.
+    # OffsetText moves the complete angular value/seat block onto the shelf,
+    # not the exterior arc. It is above the sharp, below the ridge-pair ink,
+    # and clear of the neighbouring radius block in both dimensions.
     angle_left, angle_right, angle_bottom, angle_top, _ = blocks["FlankToSide"]
-    assert shoulder[1] < angle_bottom < angle_top < vertex[1]
-    for y in (angle_bottom, angle_top):
-        flank_x = shoulder[0] + (y - shoulder[1]) * (
-            vertex[0] - shoulder[0]
-        ) / (vertex[1] - shoulder[1])
-        assert angle_right + 0.002 < flank_x
+    assert (angle_x, angle_y) == (0.058, 0.184)
+    assert drawing.FLANK_TEXT_XY == (0.053, 0.218)
+    assert angle_bottom > vertex[1] + 0.002
+    assert angle_top < min(blocks[name][2] for name in spans) - 0.002
     assert angle_left > _BORDER_LEFT_M + 0.002
+    for name, block in blocks.items():
+        if name == "FlankToSide":
+            continue
+        left, right, bottom, top, _ = block
+        assert (
+            angle_right + 0.002 < left or right + 0.002 < angle_left
+            or angle_top + 0.002 < bottom or top + 0.002 < angle_bottom
+        ), name
     assert blocks["HexHeight"][1] < cx - fence - 0.0015
     width_line = _dimension_line_y("HexWidth", blocks["HexWidth"][4])
     assert drawing.DETAIL_LABEL_XY[1] + 0.005 < width_line < cy - fence - 0.001
     assert blocks["HexWidth"][0] > cx + hw + 0.002
     datum_foot = vertex[1] + drawing.RIDGE_DATUM_RISE
     assert datum_foot + 0.007 < cy + fence
-    assert blocks["KnifeRidgeRadius"][0] > cx + 0.010
+    # R7's complete R0.1 text must clear the x155.4 width witness, not
+    # merely sit to the right of the ridge centre.
+    assert blocks["KnifeRidgeRadius"][0] > 0.1554 + 0.002
     assert blocks["KnifeRidgeRadius"][2] > datum_foot + 0.007 + 0.004
     assert blocks["KnifeRidgeRadius"][3] < pair_line - 0.004
 
@@ -859,7 +1103,10 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         part, "set_dimension_symmetric_tolerance",
         lambda adapter, feature, name, band: bands.append((feature, name, band)),
     )
-    monkeypatch.setattr(part, "set_dimension_display_precision", lambda *args: None)
+    precisions = []
+    monkeypatch.setattr(
+        part, "set_dimension_display_precision", lambda *args: precisions.append(args),
+    )
     held = []
     monkeypatch.setattr(
         part, "_band_held_dimension",
@@ -872,6 +1119,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
     assert bands == []
+    assert (adapter, "EdgeRibBack", "RibDepth", 2) in precisions
     assert rib_depth.Name == "RibDepth"
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
@@ -1097,10 +1345,10 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
         )
         return SimpleNamespace(GetSurface=lambda: surface)
 
-    planes = {"EdgeRibBack": [-76.2, -68.0], "EdgeRibFront": [71.12, 76.2]}
-    depths = {"EdgeRibBack": 8.2, "EdgeRibFront": 5.08}
+    planes = {"EdgeRibBack": [-76.2, -67.2], "EdgeRibFront": [71.12, 76.2]}
+    depths = {"EdgeRibBack": 9.0, "EdgeRibFront": 5.08}
     if damage == "outer-caps-absent":
-        planes = {"EdgeRibBack": [-68.0], "EdgeRibFront": [71.12]}
+        planes = {"EdgeRibBack": [-67.2], "EdgeRibFront": [71.12]}
     elif damage == "receiver-depth":
         depths["EdgeRibBack"] = 7.3
     elif damage == "opposite-depth":
@@ -1567,7 +1815,7 @@ def test_plate_thickness_accepts_recorded_native_layout(monkeypatch) -> None:
     assert state.geometry_failures == []
 
 
-@pytest.mark.parametrize("offset", [(0.0, 0.0), (0.017, -0.009)])
+@pytest.mark.parametrize("offset", [(0.0, 0.0), (0.017, -0.009), (0.035, 0.050)])
 @pytest.mark.parametrize("reverse", [False, True])
 def test_recorded_plate_thickness_is_independent_of_sheet_position_and_row_order(
     monkeypatch, offset, reverse,

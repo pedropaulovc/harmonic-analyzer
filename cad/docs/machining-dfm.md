@@ -310,16 +310,45 @@ MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
 cylindrical tap-drill depth, explicitly symmetric in the native dimension.
 The native hole callout prints **6.50** at two places, inheriting the same
 ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
-accepted tolerance exception. Only the **−Z receiver rib** grows inward by **0.90 mm**
-to **8.20 mm**: its entry remains **−76.20 mm**, its inner boundary is
-**−68.00 mm**, and the opposite end rib remains **5.08 mm**. The axes and
-13.7 mm pitch, MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged.
+accepted tolerance exception. The owner-approved **−Z receiver rib** is now
+**9.00 mm**, extending **0.80 mm** farther inward than the prior 8.20 design:
+its entry remains **−76.20 mm**, its inner boundary is **−67.20 mm**, and the
+opposite end rib remains **5.08 mm**. The axes and 13.7 mm pitch,
+MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
+**two decimal places**, hence the ordinary **±0.51 mm** band; printing 9.0
+would widen that band to ±0.8 mm and fail the step-wall requirement below.
 Native usable full thread remains **4.95 ±0.05 mm**, printed **4.95 MIN**.
-At the printed limits the full-thread containment margin is **2.69 mm**,
-bottoming-tap lead exceeds two pitches by **0.082857 mm**, and the entire
-118° point plus conservative 0.3° wander stays inside the shortest rib by
-**0.076133 mm**. This last value is point containment, not a bottom-wall
+The retained native-pilot stack has **3.49 mm** full-thread containment,
+**0.082857 mm** reserve beyond two pitches of bottoming-tap lead, and
+**0.876133 mm** containment of the entire 118° point plus conservative
+0.3° wander in the shortest rib. Point containment is not a bottom-wall
 thickness or a reduced rule-17 wall floor.
+
+The independent **worst printed sharp-step wall** must remain **≥2.0 mm**.
+The actual-top-referenced receiver row cancels the top-face position shift:
+its nearest top floor is **2.54−0.05 = 2.49 mm**; the independent 7.00±0.51
+slab thickness leaves a lower floor of **3.90 mm**. The printed pilot is
+**Ø1.78 +0.10/0**, conservatively above the native 1.778 diameter, so its
+largest radius is **0.94 mm**. At the shortest 9.00±0.51 rib and deepest
+6.50±0.51 drill, the sharp-step corner is axially **a=1.48 mm** beyond the
+full-cylinder shoulder and radially **b=1.55 mm** beyond its rim.
+For the finite 118° cone, with **k=cot(59°)** and radial contraction
+**0≤u≤0.94**, minimize **hypot(a−ku,b+u)** using the clamped projection
+**u=clamp((ka−b)/(1+k²),0,0.94)**. The shoulder controls these dimensions,
+but the calculation re-solves the finite minimum when inputs change.
+Charge the entire deepest **0.03966 mm** wander once, giving approximately
+**2.103 mm**. The old 8.20 design gives only **1.653 mm**, despite positive
+point containment; 9.0±0.8 would give only **1.914 mm**. The full-thread
+major cylinder is budgeted independently too.
+
+`magnifying_bracket_joint_layout` enforces that printed step budget separately
+from the existing longitudinal-profile wall proof. Extending the step's
+excluded quadrant infinitely in X and ignoring the material-adding concave
+root fillet gives a conservative bound; it does not credit a helpful blend.
+The builder logs both budgets and reads back the **9.00 mm** native depth
+and **−67.20 mm** inner cap. Neither the prior native longitudinal wall
+(about 2.813 mm) nor an axial tip reserve proves this step wall. These are
+source acceptance gates, not claims that the new native build has run.
 
 The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
 and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,
@@ -329,6 +358,11 @@ the **Ø0.15 RFS** pattern, the spring-neck top seat and the **MHA-CH-14 nut
 underside seats** are unchanged, as are all #1769 mounting/joint installation
 coordinates. World spring top remains **982.24 mm** and nut seat **975.24 mm**.
 The full-width lower face eliminates the integral underside pad and its step.
+
+The receiver's new Z span already overlaps the first spring station; the
+source-neighbour intent is **X reach 35.75 mm before the worst nut footprint
+at X36.45 mm**, not a claim of axial separation. Native full-interference
+validation must still qualify the rib/nut and installed-neighbour clearances.
 
 All three positive-X ribs now share the **R15.24** wrap, tangent flanks and
 **R1** transitions into the coefficient top/bottom faces at **X=35.75 mm**;
@@ -360,14 +394,15 @@ material/hardness remains #1611. Neither the retained RV-02 authorization
 nor the changed-rib proof claims that those unchanged junctions are modeled
 with fillets or that the knife roots are manufacturable.
 
-The #1761 receiver proof above is retained, not relaxed by the thicker slab:
-the bounded **6.50 ±0.51 mm** drill and **4.95 ±0.05 mm** full thread stay
-inside the **8.20 mm** receiver rib. An unbounded MIN drill remains
-unacceptable. `magnifying_bracket_joint_layout` owns that physical stack and
-point/wander proof. Receiver-row location remains top-referenced
-**2.54 ±0.05 mm**, placing both axes on unchanged local Y=0; increasing the
-plate downward must not move the axes. No receiver, screw, flange or mount
-pose is changed to buy material.
+The #1761 screw/grip, lead and point-containment contracts are retained, not
+relaxed by the thicker slab: the bounded **6.50 ±0.51 mm** drill and
+**4.95 ±0.05 mm** full thread stay inside the **9.00 mm** receiver rib.
+An unbounded MIN drill remains unacceptable.
+`magnifying_bracket_joint_layout` owns that physical stack and the separate
+worst printed step-wall budget above. Receiver-row location remains
+top-referenced **2.54 ±0.05 mm**, placing both axes on unchanged local Y=0;
+increasing the plate downward must not move the axes. No receiver, screw,
+flange or mount pose is changed to buy material.
 
 The intended drawing reduction is **9 → 6 views**, pending native
 regeneration/inspection: remove C-C and H-H entirely, combine knife detail
@@ -400,9 +435,57 @@ dimension line. Duplicate face-level candidates are refused. Recorded r6
 tuples cover initial and settled checks without implying a regenerated
 drawing has passed.
 
-**Source-only material/gravity estimate (against #1761, b2c8d954).** The gross
-downward box is 10.080 cm³, but it overlaps the existing cylinder and ribs.
-Integrating the source prism unions gives **+5.808 cm³** for the plate
+Native r7 (431.8 × 279.4 mm, 12.7 mm inner border) exposed actual
+collisions, not a need to remove dimensions or weaken the audit. Its VIEW F
+outline was **x229.3245..370.6755, y79.172..120.828 mm**; ReceiverY0's
+complete text occupied **x169.3..216.9, y109.4..113 mm**, and ReceiverX1
+**x180.8..228.5, y119.9..123.4 mm**, intruding into Detail D's field
+(native outline xmax **192.5879 mm**). The requested coherent VIEW F move is
+**+35/+50 mm**, to centre **(335,150) mm**, keeping all receiver dimension
+offsets, the projected source-detail circle and receiver centreline.
+Its caption moves to **(260,100) mm**; the mounting callout moves to
+**(360,115) mm**, an extra 33 mm right of a simple translation so its
+diagonal routes left of the full process line. The predicted complete
+callout box is **x297.9..414.1, y103.834..150.767 mm**, and caption box
+**x260.2..330.5, y96.4..100 mm**, above the title-block keep-out
+**x216..431.8, y0..66 mm**.
+
+Detail D stays centred at **(115,150) mm**, 10:1: retain the native exterior
+angular arc seed **(58,184) mm**, but offset the complete two-row flank
+text to **(53,218) mm**. Move R0.1 MAX to **(181,219) mm**, right of the
+**x155.4 mm** width witness and clear of datum A. Give each central ridge
+witness a local **10 mm** gap without moving A or the theoretical sharp.
+Sheet 1's PlateWidth text remains **(266,81.3) mm**; projection-derived
+local gaps must start both witnesses **1 mm below the actual +Z body end**.
+The independent recorded-native PlateThickness replay adds +35/+50 mm;
+its geometry, identity and gap mutation proofs remain unchanged.
+
+These are **analytical source budgets and requested native placements**,
+not an after-fix acceptance claim. Native rebuild/readbacks, audit and
+enlarged-sheet inspection must still prove the whole text, leaders,
+witnesses, source circle and isometric clearance on both sheets, with all
+dimensions, five ordinary views, one Detail D and zero sections retained.
+The r7 `19X7.06` BASIC-box left-border strike lies in whitespace
+(prefix ends **284.309 mm**, border **284.6645 mm**, value begins
+**285.731 mm**); the enlarged PDF is visibly unstruck, so it is unchanged.
+Known edge-missing collector artifacts remain reported, not demoted.
+
+The body-end **PlateLength alone** now requests one decimal place, authored
+on `CoefficientsPlate` in the part and read back immediately after its top-view
+import. This changes the printed nominal **152.40 → 152.4** and ordinary
+title-block band **±0.51 → ±0.8 mm**; nominal geometry, receiver entry-relative
+depths, poses and every other dimension's precision/band remain unchanged.
+The receiver-depth/body-length coupling cancels for the entry-relative stack;
+this does **not** establish complete worst-case axial acceptance under the
+wider manufactured overall-length band. Native precision/ink acceptance
+remains pending with the layout changes above.
+
+**Historical source-only material/gravity estimate (against #1761, b2c8d954,
+at the prior 8.20 receiver depth).** The following numbers exclude the
+new 0.80 mm receiver-only inward strip and are not current 9.00-depth mass
+acceptance values. The gross downward box is 10.080 cm³, but it overlaps the
+existing cylinder and ribs. Integrating the source prism unions gives
+**+5.808 cm³** for the plate
 extension with the old ribs plus **+0.961 cm³** for the shared-rib reprofile:
 **+6.769 cm³ net**. The signed-delta centroid is approximately
 **(22.744, −3.517, −0.0777) mm**, not the final part CG or the centroid of
