@@ -40,7 +40,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 import _config
-from _com import _early_bound, _read_member
+from _com import _bind, _early_bound, _read_member
 from _dimensions import _feature_display_dimensions
 from _drawing_common import (
     DrawingOutputs,
@@ -1589,7 +1589,7 @@ def _bracket_thread_cutting_requirement(source_model: Any) -> str:
     }
     found = []
     for raw_display in _feature_display_dimensions(feature):
-        display = _early_bound(raw_display, "IDisplayDimension")
+        display = _bind(raw_display, "IDisplayDimension")
         raw_dimension = display.GetDimension2(0)
         if raw_dimension is None:
             raise RuntimeError("bracket thread-cutting envelope has an unowned native dimension")

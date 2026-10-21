@@ -1398,6 +1398,87 @@ def test_cutting_requirement_reads_the_saved_model_and_both_native_maxima(monkey
     assert case.read() == value
 
 
+@pytest.mark.parametrize("damaged_limit", [False, True], ids=["valid", "lost-max"])
+def test_cutting_requirement_binds_raw_enumerated_dispatches(
+    monkeypatch, damaged_limit,
+) -> None:
+    """Keep the real raw walker and binding contract at this consumer boundary."""
+    import _com as actual_com
+    import _dimensions
+    from solidworks_mcp.adapters import sw_type_info
+
+    case = _native_thread_cutting_envelope(monkeypatch)
+    wrappers = {}
+    bindings = []
+
+    class PyIDispatchLike:
+        # Like a raw PyIDispatch: no _oleobj_ and no named API members.
+        def InvokeTypes(self, *_args):
+            raise AssertionError("the consumer must bind before calling named members")
+
+    def wrapped(interface, members):
+        raw = PyIDispatchLike()
+        members._oleobj_ = raw
+        wrappers[raw, interface] = members
+        return members
+
+    raw_displays = []
+    for display in case.displays:
+        dimension = display.dimension
+        # Generated GetDimension2 and IDimension.Tolerance return Dispatch
+        # wrappers, unlike _com_invoke's raw feature-walk results.
+        wrapped("IDimensionTolerance", dimension.Tolerance)
+        wrapped("IDimension", dimension)
+        wrapped("IDisplayDimension", display)
+        raw_displays.append(display._oleobj_)
+    if damaged_limit:
+        case.displays[1].dimension.Tolerance.Type = 2
+
+    walked = []
+
+    def next_display(raw):
+        walked.append(raw)
+        index = raw_displays.index(raw) + 1
+        return raw_displays[index] if index < len(raw_displays) else None
+
+    feature = SimpleNamespace(
+        GetFirstDisplayDimension=lambda: raw_displays[0],
+        GetNextDisplayDimension=next_display,
+    )
+    case.source.FeatureByName = lambda name: (
+        feature if name == "BracketThreadCuttingEnvelope" else None
+    )
+
+    def early_bound(value, interface):
+        # Stand in only for makepy construction, not _com's passthrough rules.
+        raw = value._oleobj_
+        bindings.append((raw, interface))
+        return wrappers[raw, interface]
+
+    monkeypatch.setattr(sw_type_info, "early_bound", early_bound)
+    monkeypatch.setattr(
+        sw_type_info, "is_early_bound",
+        lambda value, interface: wrappers.get((value._oleobj_, interface)) is value,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", actual_com._early_bound)
+    monkeypatch.setattr(drawing, "_feature_display_dimensions", _dimensions._feature_display_dimensions)
+    if damaged_limit:
+        with pytest.raises(RuntimeError, match="MAX envelope limit"):
+            case.read()
+    else:
+        assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
+        assert walked == raw_displays
+    assert bindings == [
+        (owner._oleobj_, interface)
+        for display in case.displays
+        for owner, interface in (
+            (display, "IDisplayDimension"),
+            (display.dimension, "IDimension"),
+            (display.dimension.Tolerance, "IDimensionTolerance"),
+        )
+    ]
+
+
 @pytest.mark.parametrize(
     ("original", "replacement"),
     [

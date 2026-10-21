@@ -381,6 +381,8 @@ MAX-only native dimensions `BracketThreadCuttingEnvelopeDiameter` and
 `BracketThreadCuttingEnvelopeDepth`, with two-place display. They share joint
 authority with the model-owned **Bracket Thread-Cutting Requirement** drawing
 property; the drawing validates their native limits before consuming it.
+Feature enumeration yields raw COM dispatches, so each display dimension is
+bound through `_bind` before reading its dimension and tolerance interfaces.
 The sketch is not cut into the solid and stays hidden in part images.
 
 **Process choice and inspection remain required before machining.** ASME B1.1
