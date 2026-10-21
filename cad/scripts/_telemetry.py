@@ -1836,6 +1836,12 @@ def instrument_adapter(cls: type) -> int:
 
 
 _FEATURES_MODULE = "solidworks_mcp.adapters.solidworks.features"
+_DRAWING_MODULE = "solidworks_mcp.adapters.solidworks.drawing"
+
+
+def _place_view_span(name: str, attributes: dict[str, Any]) -> Any:
+    """Supply ordinary current-context spans without importing the COM stack."""
+    return span(name, **attributes)
 
 
 def _record_tree_path(lookup: str, path: str) -> None:
@@ -1863,6 +1869,11 @@ def _instrument_loaded_adapter() -> None:
     if callable(observe):
         with contextlib.suppress(Exception):
             observe(_record_tree_path)
+    drawing = sys.modules.get(_DRAWING_MODULE)
+    set_place_view_context = getattr(drawing, "set_place_view_context", None)
+    if callable(set_place_view_context):
+        with contextlib.suppress(Exception):
+            set_place_view_context(_place_view_span)
     with contextlib.suppress(Exception):
         _instrument_component_insert_helpers()
 

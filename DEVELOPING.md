@@ -1734,6 +1734,27 @@ changed/unchanged leaf counts and verified effective visibility; its automatic
 view updates are suspended only during changed visibility writes and restored
 before the existing drawing rebuild.
 
+View placement emits `drawing.place_view` with `.create`, `.bind` and optional
+`.scale` children. Creation includes document access and native argument
+marshalling; binding measures wrapper construction separately. Scale measures
+the existing write **attempt**, not persisted-scale readback. The SDK's existing
+`_attempt` behavior is unchanged: a failed creation reports the existing
+false-result error, not an original COM exception already swallowed by `_attempt`.
+The dependency-free SDK context factory is installed when the drawing module is
+already loaded; aliases imported before build startup still use it.
+
+Finalization separates setup, grouped sheet-property checks, requested note
+cleanup, display updates, optional settled checks, precision readback and close
+verification under `drawing.finalize.*`. `drawing.sanitize_pdf_metadata` is local
+PDF I/O, not COM. Existing native drawing/PDF SaveAs, rebuild, raster and layout
+audit spans retain their boundaries. No new per-sheet or per-entity spans are
+added. These spans expose previously unattributed work; they do not establish
+a speedup.
+
+An SDK `drawing.py` edit changes the drawing digest tier only. Changes to the
+shared `_drawing_common.py` also invalidate affected `package:features` draw-module
+closures; the SDK tier exclusion does not remove those local dependencies.
+
 The native collar-air check keeps its sweep span
 `verify.tip_collar_j19_air` and attributes preparation to `.full_sweep_proof`,
 `.native_read`, `.collar_partition` and `.bank_material`. The bank span records
