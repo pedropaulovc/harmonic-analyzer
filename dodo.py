@@ -3218,14 +3218,13 @@ def task_verify():
 
 # Review inputs are independent of the draw recipe and registry. The CLI
 # receives its PDF, package name and kind explicitly and forces a full review.
-# Track the review/diff implementation and identity maps as well as its rubric.
-# Keep the non-inert local and dynamic import closure pinned in the leaf tests.
+# The lazy PDF diff and identity pairing are unreachable under --force.
+# Keep the non-inert forced-review import closure pinned in the leaf tests.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
-    "_drawing_diff.py",
 )
 
 
@@ -3258,11 +3257,6 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
                 for name in _MACHINIST_REVIEW_MODULES
                 if name not in RECIPE_SKIP_MODULES
             ),
-            # _drawing_diff loads this sibling tool dynamically; its pairing
-            # composes both current and sealed historical identity maps.
-            SCRIPTS_DIR.parent / "comparisons" / "tools" / "release_diff.py",
-            CONFIG_DIR / "current-identity-map.json",
-            CONFIG_DIR / "identity-migration-map.json",
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),

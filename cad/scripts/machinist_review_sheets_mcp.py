@@ -835,15 +835,19 @@ def create_server(store: SheetStore) -> FastMCP:
     annotations = ToolAnnotations(
         readOnlyHint=True, destructiveHint=False, idempotentHint=False, openWorldHint=False
     )
+    image_mode = "color-preserving overlay" if store._preserve_color else "grayscale"
+    color_note = (
+        " Overlay mode retains red/blue/gray in views and crops."
+        if store._preserve_color
+        else ""
+    )
 
     @server.tool(
         description=(
-            "View a 1-based sheet as a PNG fitted within 1976×1280 pixels. "
-            "Images are grayscale except in color-preserving overlay mode, "
-            "which retains red/blue/gray in views and crops. "
+            f"View a 1-based sheet as a {image_mode} PNG fitted within 1976×1280 pixels. "
             "Sheets follow input order, expanding each PDF in page order. "
             "Call for every sheet in order before judging. The returned image's "
-            "top-left pixel coordinates define crop rectangles."
+            "top-left pixel coordinates define crop rectangles." + color_note
         ),
         annotations=ToolAnnotations(
             readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -858,13 +862,12 @@ def create_server(store: SheetStore) -> FastMCP:
         description=(
             "Zoom a 1-based sheet using integer top-left-origin view_sheet pixels: "
             "0 <= x1 < x2 <= view width and 0 <= y1 < y2 <= view height; "
-            "right/bottom edges are exclusive. Output fits 1976×1280 pixels, "
-            "grayscale except in color-preserving overlay mode, at most 8× the "
-            "view scale. PDF crops render vectors; PNG crops use the "
+            f"right/bottom edges are exclusive. Output fits 1976×1280 {image_mode} pixels, "
+            "at most 8× the view scale. PDF crops render vectors; PNG crops use the "
             "original image (valid source DPI metadata, otherwise 300 dpi assumed); "
             "PNG effective dpi never exceeds source dpi, as upsampling adds no detail. "
             "Budget: 40 attempted crop calls per process, including invalid calls "
-            "and repeats; repeated valid crops reuse a memoized rendering."
+            "and repeats; repeated valid crops reuse a memoized rendering." + color_note
         ),
         annotations=annotations,
         structured_output=False,

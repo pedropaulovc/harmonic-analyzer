@@ -166,15 +166,38 @@ def test_pdf_color_rendering_and_owned_native_handles_close(
         store.view_sheet(1)
 
 
-def test_tool_schemas_and_descriptions_are_static_across_color_modes(tmp_path: Path) -> None:
+def test_default_descriptions_are_unchanged_and_color_mode_preserves_schemas(tmp_path: Path) -> None:
     path = _overlay_png(tmp_path / "overlay.png")
     with sheets.SheetStore([path]) as gray, sheets.SheetStore([path], preserve_color=True) as color:
         gray_tools = asyncio.run(sheets.create_server(gray).list_tools())
         color_tools = asyncio.run(sheets.create_server(color).list_tools())
-    assert gray_tools == color_tools
+    expected_descriptions = {
+        "view_sheet": (
+            "View a 1-based sheet as a grayscale PNG fitted within 1976×1280 pixels. "
+            "Sheets follow input order, expanding each PDF in page order. "
+            "Call for every sheet in order before judging. The returned image's "
+            "top-left pixel coordinates define crop rectangles."
+        ),
+        "crop": (
+            "Zoom a 1-based sheet using integer top-left-origin view_sheet pixels: "
+            "0 <= x1 < x2 <= view width and 0 <= y1 < y2 <= view height; "
+            "right/bottom edges are exclusive. Output fits 1976×1280 grayscale pixels, "
+            "at most 8× the view scale. PDF crops render vectors; PNG crops use the "
+            "original image (valid source DPI metadata, otherwise 300 dpi assumed); "
+            "PNG effective dpi never exceeds source dpi, as upsampling adds no detail. "
+            "Budget: 40 attempted crop calls per process, including invalid calls "
+            "and repeats; repeated valid crops reuse a memoized rendering."
+        ),
+    }
+    assert {tool.name: tool.description for tool in gray_tools} == expected_descriptions
+    gray_by_name = {tool.name: tool for tool in gray_tools}
     assert {tool.name for tool in color_tools} == {"view_sheet", "crop"}
     for tool in color_tools:
-        assert "grayscale except in color-preserving overlay mode" in tool.description
+        assert tool.description != expected_descriptions[tool.name]
+        assert "color-preserving overlay" in tool.description
+        assert "retains red/blue/gray in views and crops" in tool.description
+        assert tool.inputSchema == gray_by_name[tool.name].inputSchema
+        assert tool.annotations == gray_by_name[tool.name].annotations
         expected = {"sheet"} if tool.name == "view_sheet" else {"sheet", "x1", "y1", "x2", "y2"}
         assert set(tool.inputSchema["properties"]) == expected
         assert set(tool.inputSchema["required"]) == expected

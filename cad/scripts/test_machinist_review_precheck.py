@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 from PIL import Image
 
+import _drawing_diff as drawing_diff
 import machinist_review as mr
 from test_machinist_review import (
     _claude_stdout,
@@ -24,6 +25,7 @@ from test_machinist_review import (
     _pdf_source,
     _png_source,
     _rollout_message,
+    _rollout_row,
     _text_pdf,
     _write_rollout,
     isolated_codex,  # noqa: F401 -- imports the hermetic, autouse fixture
@@ -289,7 +291,7 @@ def test_both_inputs_are_frozen_before_diff_and_never_reread_from_live_paths(
     package = _package(tmp_path)
     expected_after = [mr._sha256(path) for path in package.sources]
     expected_before = [mr._sha256(path) for path in package.before_sources]
-    real_diff = mr.create_drawing_diff
+    real_diff = drawing_diff.create_drawing_diff
     diffs = []
 
     def diff(old_pdf_dir: Path, new_pdf_dir: Path, zip_path: Path, **kwargs: Any) -> dict[str, Any]:
@@ -306,7 +308,7 @@ def test_both_inputs_are_frozen_before_diff_and_never_reread_from_live_paths(
 
     harness = _Reviewer()
     harness.findings = True
-    monkeypatch.setattr(mr, "create_drawing_diff", diff)
+    monkeypatch.setattr(drawing_diff, "create_drawing_diff", diff)
     monkeypatch.setattr(mr, "_run_reviewer", harness)
     aggregate = _aggregate(package, tmp_path, runs=1)
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
@@ -541,3 +543,49 @@ def test_reordered_dimension_characters_still_receive_full_review_when_precheck_
         colors = image.get_flattened_data()
         assert any(red > blue and red > green for red, green, blue in colors)
         assert any(blue > red and blue > green for red, green, blue in colors)
+
+
+@pytest.mark.parametrize("prior_usage_kind", ["record", "fallback"])
+@pytest.mark.parametrize("judge_usage_kind", ["record", "fallback", "absent"])
+def test_resumed_codex_usage_is_scoped_to_final_authorized_turn(
+    tmp_path: Path, prior_usage_kind: str, judge_usage_kind: str,
+) -> None:
+    session_id = str(uuid.uuid4())
+    before_prompt = "Inspect the PDF difference and decide whether to review."
+    judge_prompt = "Inspect the sheets afresh and adjudicate these findings."
+    precheck_usage = {"input_tokens": 22000, "cached_input_tokens": 21000, "output_tokens": 80}
+    judge_usage = {"input_tokens": 31000, "cached_input_tokens": 29000, "output_tokens": 120}
+    later_judge_usage = {"input_tokens": 35000, "cached_input_tokens": 31000, "output_tokens": 200}
+
+    def usage_rows(kind: str, usage: dict[str, int]) -> list[dict[str, Any]]:
+        if kind == "record":
+            return [_rollout_row("token_usage_record", {
+                "session_id": session_id, "usage": usage,
+            })]
+        if kind == "fallback":
+            return [_rollout_row("event_msg", {
+                "type": "token_count", "info": {"last_token_usage": usage},
+            })]
+        return []
+
+    def turn(prompt: str, kind: str, usage: dict[str, int]) -> list[dict[str, Any]]:
+        rows = _codex_rollout(prompt, thread_id=session_id, cwd=str(tmp_path), views=())
+        replaced = []
+        for row in rows:
+            if row["type"] == "token_usage_record":
+                replaced.extend(usage_rows(kind, usage))
+                if prompt == judge_prompt:
+                    replaced.extend(usage_rows(kind, later_judge_usage))
+            else:
+                replaced.append(row)
+        return replaced
+
+    prior = turn(before_prompt, prior_usage_kind, precheck_usage)
+    current = turn(judge_prompt, judge_usage_kind, judge_usage)
+    # One authoritative session, with two separately authorized user turns.
+    current = json.loads(json.dumps(current[1:]).replace("turn_1", "turn_2"))
+    evidence = mr.codex_rollout_evidence(
+        [*prior, *current], judge_prompt, prior_prompts=[before_prompt],
+    )
+    assert evidence["context_errors"] == []
+    assert evidence["first_turn_usage"] == ({} if judge_usage_kind == "absent" else judge_usage)

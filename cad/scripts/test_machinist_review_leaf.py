@@ -103,9 +103,10 @@ def _local_import_closure(entry: Path) -> set[str]:
                 names = [node.module.split(".")[0]]
             for name in names:
                 local = scripts / f"{name}.py"
-                # Registry is only used by the interactive name/--all selectors.
-                # The leaf supplies PDF/kind/name and never calls those paths.
-                if local.is_file() and name != "_drawing_registry":
+                # Registry is only used by interactive name/--all selectors.
+                # The leaf supplies PDF/kind/name and always passes --force,
+                # so the lazy _drawing_diff precheck import is unreachable too.
+                if local.is_file() and name not in {"_drawing_registry", "_drawing_diff"}:
                     pending.append(local)
     return found
 
@@ -116,44 +117,55 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     )
 
 
-def test_review_dependencies_cover_runtime_pairing_code_and_data(dodo, monkeypatch):
-    import _drawing_diff
+def test_forced_leaf_never_imports_or_calls_diff(inputs, monkeypatch):
+    import builtins
+    import sys
 
-    loaded = set()
-    read = set()
-    spec_from_file_location = importlib.util.spec_from_file_location
-    read_text = Path.read_text
+    original_import = builtins.__import__
 
-    def load_spec(name, location=None, *args, **kwargs):
-        if location is not None and Path(location).resolve().is_relative_to(REPO_ROOT):
-            loaded.add(Path(location).resolve())
-        return spec_from_file_location(name, location, *args, **kwargs)
+    def no_diff_import(name, *args, **kwargs):
+        assert name != "_drawing_diff", "forced leaf imported PDF diff implementation"
+        return original_import(name, *args, **kwargs)
 
-    def read_input(path, *args, **kwargs):
-        if path.resolve().is_relative_to(REPO_ROOT):
-            read.add(path.resolve())
-        return read_text(path, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", no_diff_import)
+    spec = importlib.util.spec_from_file_location(
+        "_forced_leaf_review", REPO_ROOT / "cad" / "scripts" / "machinist_review.py"
+    )
+    review = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, review)
+    spec.loader.exec_module(review)
+    calls = []
 
-    with monkeypatch.context() as patch:
-        patch.setattr(importlib.util, "spec_from_file_location", load_spec)
-        patch.setattr(Path, "read_text", read_input)
-        assert _drawing_diff._drawing_pairs({}, {}) == {}
-    pairing = (
-        dodo.SCRIPTS_DIR.parent / "comparisons" / "tools" / "release_diff.py"
-    ).resolve()
-    assert pairing in loaded
-    assert {
-        (dodo.CONFIG_DIR / "current-identity-map.json").resolve(),
-        (dodo.CONFIG_DIR / "identity-migration-map.json").resolve(),
-    } <= read
-    dependencies = {
-        Path(path) for path in dodo._machinist_review_file_deps("pd_platen_guide")
-    }
-    for path in loaded:
-        assert {
-            path.parent / name for name in _local_import_closure(path)
-        } <= dependencies
-    assert read <= dependencies
+    def clean_review(package, **kwargs):
+        calls.append(package)
+        return SimpleNamespace(
+            verdict={
+                "verdict": "SHIP",
+                "summary": "No findings.",
+                **{category: [] for category in review.FINDING_KEYS},
+            },
+            error=None,
+            blind=True,
+            passed=True,
+            sheet_count=1,
+            extra={"inspection_proven": True},
+        )
+
+    def no_precheck(*args, **kwargs):
+        pytest.fail("forced leaf invoked precheck despite --force")
+
+    monkeypatch.setattr(review, "review_package", clean_review)
+    monkeypatch.setattr(review, "_review_session", no_precheck)
+    command = inputs.module._machinist_review_command(
+        "probe", inputs.module._machinist_review_profile()
+    )
+    assert review.main(command[2:]) == 0
+    assert len(calls) == 3
+    assert all(package.before_sources == () for package in calls)
+    aggregate = inputs.module._read_machinist_aggregate("probe")
+    assert aggregate["precheck"]["forced"] is True
+    assert aggregate["precheck"]["skipped"] is False
+    assert aggregate["error"] is None
 
 
 def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
@@ -195,6 +207,7 @@ def inputs(dodo, tmp_path, monkeypatch):
     prompts.mkdir(parents=True)
     for name in dodo._MACHINIST_REVIEW_MODULES:
         (scripts / name).write_text("# review code\n", encoding="utf-8")
+    (scripts / "_drawing_diff.py").write_text("# unused PDF diff\n", encoding="utf-8")
     pairing = root / "cad" / "comparisons" / "tools" / "release_diff.py"
     pairing.parent.mkdir(parents=True)
     pairing.write_text("# release identity pairing\n", encoding="utf-8")
@@ -290,13 +303,13 @@ def test_key_changes_only_with_review_inputs(inputs):
         "cad/config/identity-migration-map.json",
     ],
 )
-def test_diff_pairing_dependencies_invalidate_review_cache(inputs, relative_path):
+def test_diff_pairing_changes_do_not_invalidate_forced_review_cache(inputs, relative_path):
     dodo = inputs.module
     path = inputs.root / relative_path
-    assert str(path.resolve()) in dodo._machinist_review_file_deps("probe")
+    assert str(path.resolve()) not in dodo._machinist_review_file_deps("probe")
     initial = _review_key(dodo)
     path.write_bytes(path.read_bytes() + b"\nchanged diff dependency\n")
-    assert _review_key(dodo) != initial
+    assert _review_key(dodo) == initial
 
 
 def test_key_tracks_only_selected_kind_severity_contract(inputs):

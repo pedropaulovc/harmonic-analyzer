@@ -112,7 +112,6 @@ import _telemetry  # noqa: E402
 from _drawing_registry import DRAWINGS, DRAWINGS_BY_NAME, CAD_ROOT  # noqa: E402
 from machinist_exceptions import load_exceptions as _load_exceptions  # noqa: E402
 import machinist_review_config as review_config  # noqa: E402
-from _drawing_diff import create_drawing_diff  # noqa: E402
 from machinist_review_sheets_mcp import (  # noqa: E402
     SheetStore,
     create_server as _create_sheet_server,
@@ -1111,16 +1110,7 @@ def codex_rollout_evidence(
         payload = row["payload"]
         if row.get("type") == "session_meta":
             metadata.append(payload)
-        elif row.get("type") == "token_usage_record" and not first_usage:
-            usage = payload.get("usage")
-            if isinstance(usage, dict):
-                first_usage = dict(usage)
         elif row.get("type") == "event_msg":
-            if payload.get("type") == "token_count" and not fallback_usage:
-                info = payload.get("info")
-                usage = info.get("last_token_usage") if isinstance(info, dict) else None
-                if isinstance(usage, dict):
-                    fallback_usage = dict(usage)
             item = payload.get("item")
             if isinstance(item, dict) and item.get("type") in {"McpToolCall", "mcp_tool_call"}:
                 completed[str(item.get("id", ""))] = {
@@ -1143,7 +1133,11 @@ def codex_rollout_evidence(
         for key in ("session_id", "thread_id"):
             if session_id and payload.get(key, session_id) != session_id:
                 errors.append(f"rollout row {index + 1} belongs to another session")
-        if kind == "world_state":
+        if kind == "token_usage_record" and prompt_seen and not first_usage:
+            usage = payload.get("usage")
+            if isinstance(usage, dict):
+                first_usage = dict(usage)
+        elif kind == "world_state":
             state = payload.get("state")
             if not isinstance(state, dict):
                 errors.append("malformed Codex model-visible world state")
@@ -1178,6 +1172,8 @@ def codex_rollout_evidence(
                     prompt_count += 1
                     prompt_seen = True
                     turn_start = len(normalized)
+                    first_usage = {}
+                    fallback_usage = {}
                 else:
                     position = "after" if prompt_seen else "before"
                     errors.append(f"unexpected {role!r} input {position} the harness prompt")
@@ -1237,6 +1233,11 @@ def codex_rollout_evidence(
                 calls[call_id] = item
                 normalized.append({"type": "item.completed", "item": item})
         elif kind == "event_msg":
+            if prompt_seen and payload.get("type") == "token_count" and not fallback_usage:
+                info = payload.get("info")
+                usage = info.get("last_token_usage") if isinstance(info, dict) else None
+                if isinstance(usage, dict):
+                    fallback_usage = dict(usage)
             item = payload.get("item")
             if isinstance(item, dict):
                 if item.get("type") in {"UserMessage", "user_message"}:
@@ -2313,6 +2314,10 @@ def aggregate_package(
                     frozen.append(target)
         except OSError as exc:
             snapshot_error = f"source snapshot failed: {type(exc).__name__}: {exc}"
+            if label == "before" and not force:
+                snapshot_error += (
+                    "; BEFORE baseline is required; use --force for an unconditional after-only review"
+                )
         snapshot = ReviewPackage(package.name, package.kind, tuple(sources))
         source_sha = [_sha256(source) for source in sources]
         before_sha = [_sha256(source) for source in before_sources]
@@ -2326,6 +2331,9 @@ def aggregate_package(
         after_sheet_count = 0
         if not force:
             try:
+                # Forced build/benchmark gates do not execute or depend on diff
+                # tooling; keep its dynamic identity-map closure out of them.
+                from _drawing_diff import create_drawing_diff
                 if snapshot_error:
                     raise RuntimeError(snapshot_error)
                 if not package.sources or len(package.before_sources) != len(package.sources):
