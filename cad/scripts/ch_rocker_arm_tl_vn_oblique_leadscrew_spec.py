@@ -329,13 +329,14 @@ NUT_BRACKET_X = (
 )
 BLOCK_SIDE_LATERAL = pivot_block.BLOCK_WIDTH / 2.0  # ⚙ 20
 NUT_FLANGE_MARGIN = 2.0  # bracket edge past the nut flange's rim
-NUT_BRACKET_CARRIER_GAP = 5.0  # the bracket's top under the carrier's underside
+# Fixed finished height: raising the carrier must not grow unused material
+# into the cartridge cap or its lock-wire tail. Nut seat/bottom stay fixed.
+NUT_BRACKET_HEIGHT = 33.3
 NUT_BRACKET_BOTTOM_Z = SCREW_AXIS_Z - NUT_FLANGE_DIA / 2.0 - NUT_FLANGE_MARGIN
-NUT_BRACKET_TOP_Z = trammel.CARRIER_UNDERSIDE_Z - NUT_BRACKET_CARRIER_GAP
+NUT_BRACKET_TOP_Z = NUT_BRACKET_BOTTOM_Z + NUT_BRACKET_HEIGHT
 NUT_BRACKET_DEPTH = (
     SCREW_LATERAL + NUT_FLANGE_DIA / 2.0 + NUT_FLANGE_MARGIN - BLOCK_SIDE_LATERAL
 )  # 48
-NUT_BRACKET_HEIGHT = NUT_BRACKET_TOP_Z - NUT_BRACKET_BOTTOM_Z
 # The nut is flipped (the tap-to-bore wall): its spigot sits in a NUT_BORE_DIA
 # counterbore in the -X face and the screw passes TL-29 THRU; the flange
 # screws to the -X face with 4 x #4-40 tapped on the nut's NUT_HOLE_PCD and the

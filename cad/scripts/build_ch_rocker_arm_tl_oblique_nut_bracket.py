@@ -1,9 +1,10 @@
 r"""Build the oblique-trammel jig's nut bracket (MHA-CH-06-TL-29; shop fixture).
 
-An 18.5 x 48 x 35.3 block from 6061-T6 3/4 x 2 in flat, screwed to pivot
-block 1's -Y face by two #8-32 SHCS; the leadscrew's flanged nut screws to
-its -X face
-(``ch_rocker_arm_tl_oblique_nut_bracket_spec``).
+A milled block from 6061-T6 3/4 x 2 in flat, screwed to pivot block 1's -Y
+face by two #8-32 SHCS; the leadscrew's flanged nut screws to its -X face
+(``ch_rocker_arm_tl_oblique_nut_bracket_spec``). The shared leadscrew spec
+sets its finished height independently of the carrier; the bottom, seat
+and hole stations do not move with a top cut.
 
 Layout (the spec's model frame, +Z up, the origin on the Y = 0 face at the
 carriage centre): the block is a Top-plane rectangle (the Y = 0 face)

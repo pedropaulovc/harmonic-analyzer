@@ -219,6 +219,18 @@ replica-gated and no copy is kept here:
   bands (ASME B18.3's -0.04 in length tolerance, TL-22's width and counterbore
   bands, the pair's 0.080-0.100 in stack) it engages TL-29 7.83 to 10.63, over
   1.5 D and inside the 12 full thread and its own 7/8 in thread.
+  TL-29's unused upper material is cut to 33.3 mm height at the ordinary
+  .X ±0.8 mm band, independent of the raised carrier: nominal bottom/top
+  Z = 27.4/60.7 mm. Its XY placement, nut axis Z = 40.4 mm, side holes,
+  3/4 × 2 in stock and leadline are unchanged, as are this screw and washer
+  pair. F1/F2 on TL-00's cartridge sheet require the actual TL-22 side-hole axes at least
+  5.0 mm below the actual TL-29 top before transfer punching, and the
+  entire actual bracket top, including high corners, at least 2.35 mm below
+  the actual TL-22 cap mounting plane after free-feed alignment and final
+  tightening throughout travel. Do not force nut/screw alignment to obtain
+  this gap or substitute invented HGH/KP08/end-bracket STOCK height bands.
+  See the [captured-pivot fit-up acceptance](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling);
+  this material cut is not a new native certificate or a cap relief.
   The page gives no socket depth, so the model takes ASME B18.3's minimum key
   engagement for #8, 0.077 in (the 91251A108 convention).
   `diag_build_91251A188.py` builds it from those catalogue values on the 91251A

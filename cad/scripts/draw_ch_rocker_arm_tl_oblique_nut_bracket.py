@@ -97,18 +97,17 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 ISO_SCALE = (1, 1)
-# Outlines at 2:1 (sheet mm): the nut face (*Left) x 66..158, y 50..146,
-# the seat's Z station and the #4-40 Z offsets in three lanes over it, its Y
-# station and the #4-40 Y offsets left of it (lines x 24 and 58), the seat's
-# callout under it and the #4-40 taps' above its upper-right corner; the block
-# face (*Top, turned so +X runs up) in projection over it, x 66..158, y
-# 198..235, its height hanging under it, its length right of it, its #8
-# callout over it; the plan (*Front) right of the nut face, x 176..214, y
-# 50..146. The title block is x >= 216, y <= 70.
+# The nut face (*Left) and block face (*Top, turned so +X runs up) share
+# their bottom-face edge at sheet x 66. Their widths follow BRACKET_HEIGHT
+# at 2:1. The nut face spans y 50..146; the block face is in projection
+# above it, with height under it, length right of it and #8 callout over it.
+# The seat's and #4-40 Z stations occupy three lanes above the nut face,
+# their Y stations two lanes to its left; the seat callout sits below it.
+# The plan (*Front) is right of the nut face. The title block is x >= 216,
+# y <= 70 (sheet mm).
 FRONT_CENTER = (0.195, 0.098)
-# Keep the real bottom-face edge at sheet x 66: a taller bracket extends
-# right, rather than pulling its unchanged seat and station lanes into the
-# left border when place_view centres the larger model outline.
+# Pin the real bottom-face edge rather than moving the unchanged seat and
+# station lanes when place_view centres a different-height outline.
 LEFT_CENTER = (
     0.066 + BRACKET_HEIGHT * VIEW_SCALE[0] / VIEW_SCALE[1] / 2000.0,
     0.098,
@@ -129,9 +128,8 @@ _H = BRACKET_HEIGHT
 _PLAN_LEFT_X = FRONT_CENTER[0] + FACE_X * VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 _NUT_FACE_RIGHT_X = LEFT_CENTER[0] + _H * VIEW_SCALE[0] / VIEW_SCALE[1] / 2000.0
 FRONT_KEEP: dict[str, tuple[float, float, float]] = {
-    # Centre the depth text in the actual gap between the nut face and plan.
-    # At 2:1 the 9.2 mm text has 2.85 mm clearance on each side; a fixed
-    # 5 model-mm offset from the plan crowds the taller nut face.
+    # Centre the depth text in the actual gap between the nut face and plan,
+    # retaining air on both sides as the height changes.
     "BracketDepth": (
         ((_NUT_FACE_RIGHT_X + _PLAN_LEFT_X) / 2.0 - FRONT_CENTER[0])
         * 1000.0
@@ -147,7 +145,7 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # The height from the bottom face, hung under the view, over the nut
     # face's Z station (text y ~192).
     "BracketHeight": (FACE_X - 3.0, 0.0, _H / 2.0),
-    # The length from the -X face right of the view (line x ~168), its text
+    # The length from the -X face right of the view, its text
     # between its extension lines.
     "BracketLength": (0.0, 0.0, _H + 5.0),
 }
@@ -197,21 +195,18 @@ BLOCK_TAP_EDGE_MODEL = (
     SCREW_Z + 0.8 * _BLOCK_R,
 )
 BLOCK_TAP_CALLOUT_XY = (0.0720, 0.2492)
-# The #4-40 block's widest row is the mate's inventory id (c4-r9, rule 4), about
-# 71 wide. Above the nut face's upper-right corner (x ~138..209, y ~152..180),
-# it clears the plan below and the block face's hung height above. The
-# taller bracket leaves too little room for the complete block beside its
-# right edge. Keep the shelf left of the title-block boundary and right of
-# every Z-dimension text/extension line; its leader drops down-left through
-# the nut face's top edge to the upper-right tap's upper-right rim. It stays
-# right of the +Z offset's extension line and crosses no dimension ink.
+# The #4-40 block's widest row is the mate's inventory id (c4-r9, rule 4).
+# It sits above the nut face/plan, below the block face's hung height and
+# right of every Z-dimension text/extension line. Its leader drops down-left
+# through the nut face's top edge to the upper-right tap's upper-right rim,
+# clear of both that corner and the +Z offset's extension line.
 _NUT_R = NUT_TAP_DRILL / 2.0
 NUT_TAP_EDGE_MODEL = (
     FACE_X,
     -NUT_HOLE_Y[0] + 0.8 * _NUT_R,
     NUT_HOLE_Z[1] + 0.6 * _NUT_R,
 )
-NUT_TAP_CALLOUT_XY = (0.1735, 0.1663)
+NUT_TAP_CALLOUT_XY = (0.1695, 0.1710)
 # The seat's five rows run x ~120..198, y ~15..45; its leader rises from the
 # shelf's left end (x ~120, y ~15) to the bore (x 92, y 76), crossing y 64.7
 # at x ~97: left of the lower-right #4-40 tap (x 103.3).

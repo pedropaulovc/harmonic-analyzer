@@ -7,7 +7,7 @@ ch-rocker-arm-tl-oblique-nut-bracket:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "saw and face to height; mill the +X end to length and the -Y side to depth; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-06-TL-22, and the four #4-40 holes through the seated nut's flange holes, drilled and tapped at assembly"
+  process: "saw and face to the drawing height, independent of the carrier underside; mill the +X end to length and the -Y side to depth; drill the screw clearance and counterbore the nut seat; break edges; the two #8-32 holes are spotted from MHA-CH-06-TL-22, and the four #4-40 holes through the seated nut's flange holes, drilled and tapped at assembly; follow F1/F2 on the MHA-CH-06-TL-00 cartridge sheet for actual fit-up acceptance before transfer punching and after free-feed alignment/final tightening"
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"

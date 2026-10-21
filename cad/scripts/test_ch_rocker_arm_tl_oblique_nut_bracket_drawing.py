@@ -29,6 +29,49 @@ def _features() -> dict:
     return export_features.requirement_manifest(STEM)["features"]
 
 
+def test_finished_height_reaches_native_dimensions_stock_and_feature_metadata() -> None:
+    assert spec.BRACKET_HEIGHT == leadscrew.NUT_BRACKET_HEIGHT == 33.3
+    assert (
+        part.BRACKET_HEIGHT == spec.DRAWING_VALUES["BracketHeight"] == spec.BRACKET_HEIGHT
+    )
+    assert (
+        spec.DRAWING_PRECISION["BracketProfile"]["BracketHeight"] == spec.SIZE_PLACES == 1
+    )
+    assert printed_band_mm(spec.SIZE_PLACES) == pytest.approx(0.8)
+    bottom = _features()["bottom_face"]
+    assert bottom["height_nominal"] == spec.BRACKET_HEIGHT
+    assert bottom["height"] == pytest.approx([32.5, 34.1])
+    assert bottom["precision"]["height"] == spec.SIZE_PLACES
+    assert "BracketHeight" not in spec.REFERENCE_DIMENSIONS
+    blank = next(solid for solid in spec.PRECHIPS_SOLIDS if not solid.get("void"))
+    assert blank["at_mm"] == pytest.approx([-9.25, -48.0, 0.0])
+    assert blank["size_mm"] == pytest.approx([18.5, 48.0, spec.BRACKET_HEIGHT])
+    assert part.V_BRACKET == pytest.approx(math.prod(blank["size_mm"]))
+    assert leadscrew.NUT_BRACKET_STOCK_THICK == pytest.approx(0.75 * 25.4)
+    row = _config.parts("ch-rocker-arm-tl-oblique-nut-bracket")
+    assert row["material_specification"] == "6061-T6 aluminum flat bar, 3/4 x 2 in"
+    assert row["tolerance_class"] == "machined_block"
+
+
+def test_top_cut_keeps_the_bottom_seat_and_block_screw_interfaces() -> None:
+    assert leadscrew.NUT_BRACKET_BOTTOM_Z == pytest.approx(27.4)
+    assert leadscrew.SCREW_AXIS_Z == pytest.approx(40.4)
+    assert leadscrew.NUT_BRACKET_TOP_Z == pytest.approx(
+        leadscrew.NUT_BRACKET_BOTTOM_Z + spec.BRACKET_HEIGHT
+    )
+    assert spec.NUT_SEAT_POINT == pytest.approx((-9.25, -35.0, 13.0))
+    assert spec.SCREW_Z == pytest.approx(22.3)
+    assert spec.BLOCK_SCREW_POINTS == (
+        (-5.0, 0.0, spec.SCREW_Z),
+        (5.0, 0.0, spec.SCREW_Z),
+    )
+    assert leadscrew.NUT_BRACKET_BOTTOM_Z + spec.BORE_Z == pytest.approx(
+        leadscrew.SCREW_AXIS_Z
+    )
+    for point in spec.BLOCK_SCREW_POINTS:
+        assert leadscrew.NUT_BRACKET_BOTTOM_Z + point[2] == pytest.approx(49.7)
+
+
 def test_block_taps_sit_on_the_pivot_block_screws() -> None:
     features = _features()
     for index, x in enumerate(leadscrew.BLOCK_SCREW_X, start=1):
@@ -199,6 +242,31 @@ def test_x_set_centres_the_bracket_on_the_pivot_block_side_holes() -> None:
     ) == pytest.approx(leadscrew.BLOCK_SCREW_X)
     # A 3/16 transfer punch floats in TL-22's #8 clearance hole.
     assert 0.0 < spec.SPOT_FLOAT < spec.X_SET_BAND + printed_band_mm(3)
+
+
+def test_top_wall_uses_the_actual_transfer_axis_minimum_not_the_nominal_row() -> None:
+    assert spec.BLOCK_PLANE_TOP_GAP_MIN == 2.35
+    assert spec.TRANSFER_AXIS_TOP_MIN == 5.0
+    thread_r = spec.THREAD_MAJOR_MM[spec.BLOCK_THREAD] / 2.0
+    assert thread_r == pytest.approx(2.0828)
+    assert spec.SPOT_FLOAT == pytest.approx(0.10775)
+    actual_wall = spec.TRANSFER_AXIS_TOP_MIN - spec.SPOT_FLOAT - thread_r
+    assert spec.WORST_WALLS["#8 tap to top face"] == pytest.approx(actual_wall)
+    assert actual_wall == pytest.approx(2.80945)
+    assert actual_wall >= spec.WALL_TARGET == 2.0
+    # Source-cutting check only: its nominal row is not the actual aligned
+    # hole row. Do not spend TL-22/height bands again after measuring 5 mm.
+    source_wall = (
+        spec.BRACKET_HEIGHT
+        - printed_band_mm(spec.SIZE_PLACES)
+        - spec.SCREW_Z
+        - printed_band_mm(pivot_block.SIDE_STATION_PLACES)
+        - spec.SPOT_FLOAT
+        - thread_r
+    )
+    assert spec.NOMINAL_ROW_TOP_WALL_MIN == pytest.approx(source_wall)
+    assert source_wall == pytest.approx(7.87945)
+    assert source_wall > actual_wall
 
 
 def test_walls_hold_rule_17_but_the_owner_accepted_one() -> None:
@@ -663,6 +731,49 @@ def respec(monkeypatch: pytest.MonkeyPatch) -> Iterator:
     finally:
         monkeypatch.undo()
         importlib.reload(spec)
+
+
+def test_shared_height_changes_only_the_top_not_the_functional_interfaces(respec) -> None:
+    original_height = spec.BRACKET_HEIGHT
+    original_row_wall = spec.NOMINAL_ROW_TOP_WALL_MIN
+    original_walls = dict(spec.WORST_WALLS)
+    original_voids = [solid for solid in spec.PRECHIPS_SOLIDS if solid.get("void")]
+    original_seat = spec.NUT_SEAT_POINT
+    original_block_taps = spec.BLOCK_SCREW_POINTS
+    original_nut_taps = spec.NUT_HOLE_POINTS
+    changed_height = original_height + 1.0
+    reloaded = respec(NUT_BRACKET_HEIGHT=changed_height)
+    assert reloaded.BRACKET_HEIGHT == changed_height
+    assert reloaded.DRAWING_VALUES["BracketHeight"] == changed_height
+    blank = next(solid for solid in reloaded.PRECHIPS_SOLIDS if not solid.get("void"))
+    assert blank["size_mm"][2] == changed_height
+    assert reloaded.NUT_SEAT_POINT == original_seat
+    assert reloaded.BLOCK_SCREW_POINTS == original_block_taps
+    assert reloaded.NUT_HOLE_POINTS == original_nut_taps
+    assert [
+        solid for solid in reloaded.PRECHIPS_SOLIDS if solid.get("void")
+    ] == original_voids
+    assert reloaded.WORST_WALLS == original_walls
+    assert reloaded.NOMINAL_ROW_TOP_WALL_MIN == pytest.approx(
+        original_row_wall + changed_height - original_height
+    )
+
+
+def test_source_cutting_guard_keeps_the_two_mm_top_wall_target(respec) -> None:
+    minimum_source_height = (
+        spec.SCREW_Z
+        + printed_band_mm(pivot_block.SIDE_STATION_PLACES)
+        + spec.SPOT_FLOAT
+        + spec.THREAD_MAJOR_MM[spec.BLOCK_THREAD] / 2.0
+        + printed_band_mm(spec.SIZE_PLACES)
+        + spec.WALL_TARGET
+    )
+    # A one-place height just under the target still clears the 1.5 floor;
+    # source cutting must refuse it rather than quietly weaken the target.
+    short_height = math.floor(minimum_source_height * 10.0) / 10.0
+    assert minimum_source_height - short_height < spec.WALL_TARGET - spec.WALL_FLOOR
+    with pytest.raises(AssertionError, match="source cut.*2 mm"):
+        respec(NUT_BRACKET_HEIGHT=short_height)
 
 
 def test_spec_follows_the_nut_bolt_circle(respec) -> None:

@@ -125,6 +125,27 @@ minimum, while preserving the 2 mm body-wall targets and the existing
 two-rectangle block topology. Existing anchors, rails, leadline and
 nut-bracket placement are unchanged.
 
+TL-29's height is **33.3 mm**, with the existing ordinary .X ±0.8 mm
+band, independent of the raised carrier. This cuts unused upper bracket
+material only: nominal bottom Z = 27.4 mm and top Z = 60.7 mm; XY placement,
+nut/leadscrew axis Z = 40.4 mm, side-hole positions, 3/4 × 2 in stock and
+leadline remain unchanged. No cap relief or capture-hardware change is part
+of this repair.
+
+Follow F1/F2 on TL-00's cartridge sheet for the single fit-up procedure. **Before transfer
+punching**, check that the actual TL-22 side-hole axes are at least **5.0 mm
+below the actual TL-29 top**. After the 0.10775 mm punch float and 2.0828 mm
+#8 major radius, this leaves at least 2.80945 mm top wall, above the 2 mm
+target. **After free-feed alignment and final tightening, throughout travel**,
+the entire actual TL-29 top footprint, including every high corner, must
+remain at least **2.35 mm below the actual TL-22 cap mounting plane**.
+Inspect from that plane before final cap installation; do not force the nut
+or screw out of alignment to obtain the gap. These are actual fit-up
+acceptance checks, not tighter bracket-height tolerances or invented HGH,
+KP08 or end-bracket STOCK height bands. Existing formed-wire/cotter
+envelope inspections remain required; the top cut alone does not certify
+all hardware clearances.
+
 The fitter package separates cartridge manufacture, pressing, joint acceptance
 and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) from operation, pass changes and machine
 acceptance (C4–C7, **CAPTUREANDOPERATION**). The operation sheet retains the finished

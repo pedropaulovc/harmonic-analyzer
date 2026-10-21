@@ -47,6 +47,7 @@ import ch_rocker_arm_tl_vn_oblique_lever_washer_spec as lever_washer
 import ch_rocker_arm_tl_oblique_nut_bracket_spec as nut_bracket
 import ch_rocker_arm_tl_vn_oblique_nut_screw_spec as nut_screw
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
+import ch_rocker_arm_tl_oblique_pivot_cap_spec as pivot_cap
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
 import ch_rocker_arm_tl_oblique_pivot_retainer_spec as pivot_retainer
 import ch_rocker_arm_tl_oblique_retention_spec as retention
@@ -74,6 +75,8 @@ CAPTURE_FAMILIES = {
     spec.PIVOT_COTTER: 2,
     spec.PIVOT_LOCK_WIRE: 4,
 }
+CAPTURE_FEED_FAMILIES = (spec.PIVOT_BLOCK, spec.PIVOT_PIN, *CAPTURE_FAMILIES)
+FEED_TARGETS = ("nut bracket", "leadscrew nut", "leadscrew")
 # Each screw family and its fastener-table row (count, callout, engagement).
 SCREW_ROWS = {
     spec.RAIL_SCREW: fasteners.RAIL_TO_BAR,
@@ -341,6 +344,25 @@ def test_nut_bracket_hangs_on_pivot_block_1_round_the_screw() -> None:
     along = _image(spec.NUT_BRACKET_ROWS, (0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
     assert along[:2] == pytest.approx(spec.rail_rows(leadscrew.RAIL)[0][:2])
     assert spec.NUT_BRACKET_ORIGIN[2] == leadscrew.NUT_BRACKET_BOTTOM_Z
+    # Lowering only the finished top must preserve the original functional
+    # bottom, seat and transfer-hole axes, each against its owning source.
+    assert leadscrew.NUT_BRACKET_BOTTOM_Z == pytest.approx(
+        leadscrew.SCREW_AXIS_Z - leadscrew.NUT_FLANGE_DIA / 2.0
+        - leadscrew.NUT_FLANGE_MARGIN
+    )
+    assert nut_bracket.NUT_SEAT_POINT == pytest.approx(
+        (nut_bracket.FACE_X, *leadscrew.NUT_BORE_YZ)
+    )
+    assert nut_bracket.BORE_Z + spec.NUT_BRACKET_ORIGIN[2] == pytest.approx(
+        leadscrew.SCREW_AXIS_Z
+    )
+    assert leadscrew.PIVOT_BLOCK_HOLES == pivot_block.SIDE_SCREW_HOLES
+    for point, (x, z) in zip(
+        nut_bracket.BLOCK_SCREW_POINTS, pivot_block.SIDE_SCREW_HOLES, strict=True,
+    ):
+        assert point == pytest.approx((
+            x, 0.0, block_origin[2] + z - spec.NUT_BRACKET_ORIGIN[2],
+        ))
     # The wider spindle-end wing changes the real -X datum, not the original
     # side-hole axes or nut-bracket location. Step 7C must follow that datum.
     centre = pivot_block.DATUM_X + nut_bracket.X_SET_MID
@@ -890,6 +912,54 @@ def test_caps_screws_and_safety_wire_close_on_each_block_receiver_pattern() -> N
                 assert actual == pytest.approx(expected)
 
 
+def _historic_bracket_top_z() -> float:
+    # Before the independent height cut, TL-29 grew to 5 mm below the carrier
+    # underside. Reconstruct that retired rule ONLY in this negative control;
+    # neither today's finished height nor today's fit-up gap is its authority.
+    return trammel.CARRIER_UNDERSIDE_Z - 5.0
+
+
+def _in_frame(rows, origin, point):
+    return tuple(
+        sum((point[a] - origin[a]) * rows[k][a] for a in range(3))
+        for k in range(3)
+    )
+
+
+def _circle_prism_gap(prism, point, radius, axes):
+    """Distance from a complete projected prism to a cylindrical cut."""
+    return math.hypot(*(
+        max(prism[axis][0] - value, value - prism[axis][1], 0.0)
+        for axis, value in zip(axes, point, strict=True)
+    )) - radius
+
+
+def _assert_bracket_prism_misses_native_cuts(prism) -> None:
+    """Bracket-local material witness, overbounding every native hole radius.
+
+    Infinite cylinders overbound the blind drills, drill points and tapped
+    thread envelopes, so a positive radial gap also proves depth separation.
+    """
+    for x, _y, z in nut_bracket.BLOCK_SCREW_POINTS:
+        assert _circle_prism_gap(
+            prism, (x, z),
+            max(nut_bracket.BLOCK_TAP_DRILL, fasteners.NUT_BRACKET_TO_BLOCK.major_mm) / 2.0,
+            (0, 2),
+        ) > 0.0
+    _x, y, z = nut_bracket.NUT_SEAT_POINT
+    assert _circle_prism_gap(
+        prism, (y, z),
+        max(nut_bracket.CBORE_DIA, nut_bracket.SCREW_CLEARANCE_DIA) / 2.0,
+        (1, 2),
+    ) > 0.0
+    for _x, y, z in nut_bracket.NUT_HOLE_POINTS:
+        assert _circle_prism_gap(
+            prism, (y, z),
+            max(nut_bracket.NUT_TAP_DRILL, fasteners.NUT_TO_NUT_BRACKET.major_mm) / 2.0,
+            (1, 2),
+        ) > 0.0
+
+
 def test_wing_bracket_repair_removes_real_solid_overlap_without_moving_the_bracket() -> None:
     block_origin, rows = spec.PIVOT_BLOCK_PLACEMENTS[0]
     assert spec.NUT_BRACKET_ROWS == rows
@@ -906,12 +976,14 @@ def test_wing_bracket_repair_removes_real_solid_overlap_without_moving_the_brack
         (offset[0] + nut_bracket.FACE_X, old_end),
         (max(-pivot_block.WING_WIDTH / 2.0, offset[1] - nut_bracket.BRACKET_DEPTH),
          min(-pivot_block.BLOCK_WIDTH / 2.0, offset[1])),
-        (max(0.0, offset[2]), min(pivot_block.BLOCK_HEIGHT, offset[2] + nut_bracket.BRACKET_HEIGHT)),
+        (max(0.0, offset[2]),
+         min(pivot_block.BLOCK_HEIGHT, _historic_bracket_top_z() - block_origin[2])),
     )
     # Use the old 66 mm wing, not the enlarged repair width, for the historic
     # negative control's exact material volume.
     old_prism = (prism[0], (max(-33.0, prism[1][0]), prism[1][1]), prism[2])
     assert math.prod(hi - lo for lo, hi in old_prism) == pytest.approx(78.0)
+    assert _historic_bracket_top_z() > leadscrew.NUT_BRACKET_TOP_Z
 
     def circle_gap(point, radius, axes):
         return math.hypot(*(
@@ -931,13 +1003,11 @@ def test_wing_bracket_repair_removes_real_solid_overlap_without_moving_the_brack
         assert circle_gap(point, retention_hardware.SCREW_MAJOR_DIA_MAX / 2.0, (0, 1)) > 0.0
     for point in pivot_block.REGISTER_POINTS:
         assert circle_gap(point, pivot_block.REGISTER_DIA / 2.0, (0, 1)) > 0.0
-    for x, _y, z in nut_bracket.BLOCK_SCREW_POINTS:
-        assert circle_gap((offset[0] + x, offset[2] + z),
-                          pivot_block.SIDE_SCREW_MAJOR / 2.0, (0, 2)) > 0.0
-    # The nut's transverse seat and #4 taps are all beyond the prism in Y,
-    # even when their largest cut radius is used for every member.
-    for y in (-nut_bracket.BORE_Y, *(point[1] for point in nut_bracket.NUT_HOLE_POINTS)):
-        assert offset[1] + y + nut_bracket.CBORE_DIA / 2.0 < old_prism[1][0]
+    bracket_prism = tuple(
+        (lo - offset[axis], hi - offset[axis])
+        for axis, (lo, hi) in enumerate(old_prism)
+    )
+    _assert_bracket_prism_misses_native_cuts(bracket_prism)
 
     assert pivot_block.WING_X1 < offset[0] + nut_bracket.FACE_X
     assert spec.require_wing_bracket_clearance() >= retention.WING_BRACKET_CLEARANCE_MIN
@@ -955,6 +1025,275 @@ def test_wing_bracket_gap_rejects_the_actual_printed_boundary(fraction: float) -
     else:
         with pytest.raises(ValueError, match="wing/nut bracket"):
             spec.require_wing_bracket_clearance(wing_axis_reach=reach)
+
+
+def test_lower_bracket_separates_an_actual_cut_free_cap_prism() -> None:
+    block_origin, block_rows = spec.PIVOT_BLOCK_PLACEMENTS[leadscrew.RAIL - 1]
+    cap_origin, cap_rows = spec.PLACEMENTS[spec.PIVOT_CAP][leadscrew.RAIL - 1]
+    assert cap_rows == block_rows == spec.NUT_BRACKET_ROWS
+    head_floor = pivot_cap.HEIGHT - pivot_cap.COUNTERBORE_DEPTH
+    # A 2 mm-wide strip immediately outside the block face. Its X extent is
+    # the actual bracket face to the actual cap edge, not an AABB intersection
+    # with a fictitious full-height mouth removed.
+    block_prism = (
+        (nut_bracket.FACE_X, pivot_block.BORE_X + pivot_cap.WIDTH / 2.0),
+        (-pivot_block.BLOCK_WIDTH / 2.0 - 2.0, -pivot_block.BLOCK_WIDTH / 2.0),
+        (pivot_block.BLOCK_HEIGHT, pivot_block.BLOCK_HEIGHT + head_floor),
+    )
+    assert math.prod(hi - lo for lo, hi in block_prism) == pytest.approx(13.5)
+    cap_offset = _in_frame(block_rows, block_origin, cap_origin)
+    cap_prism = tuple(
+        (lo - cap_offset[axis], hi - cap_offset[axis])
+        for axis, (lo, hi) in enumerate(block_prism)
+    )
+    assert -pivot_cap.WIDTH / 2.0 - 1e-9 <= cap_prism[0][0] < cap_prism[0][1] <= pivot_cap.WIDTH / 2.0 + 1e-9
+    assert -pivot_cap.LENGTH / 2.0 <= cap_prism[1][0] < cap_prism[1][1] <= pivot_cap.LENGTH / 2.0
+    assert 0.0 <= cap_prism[2][0] < cap_prism[2][1] <= pivot_cap.HEIGHT
+    # Aperture and underside flange pocket both miss the entire strip in XY,
+    # including the pocket's actual depth, rather than only its corner points.
+    for diameter in (pivot_cap.APERTURE_DIA, pivot_cap.POCKET_DIA):
+        assert _circle_prism_gap(cap_prism, (0.0, 0.0), diameter / 2.0, (0, 1)) > 0.0
+    assert pivot_cap.POCKET_DEPTH > cap_prism[2][0]
+    for point in pivot_cap.BOLT_POINTS:
+        # The through holes and localized underhead entry reliefs can extend
+        # below the head floor, but their complete radial envelopes miss it.
+        for diameter in (pivot_cap.HOLE_DIA, pivot_cap.ENTRY_RELIEF_DIA):
+            assert _circle_prism_gap(cap_prism, point, diameter / 2.0, (0, 1)) > 0.0
+        assert head_floor - pivot_cap.ENTRY_RELIEF_DEPTH < cap_prism[2][1]
+        # Circular head recesses AND their full-width outward mouths begin
+        # only at this floor; a mouth is not a through slot. The negative-Y,
+        # positive-X mouth overlaps this strip in plan, so depth is essential.
+        assert cap_prism[2][1] <= head_floor
+    mouth_x, mouth_y = max(pivot_cap.BOLT_POINTS, key=lambda p: (p[0], -p[1]))
+    assert mouth_x < cap_prism[0][0] < pivot_cap.WIDTH / 2.0
+    assert mouth_y - pivot_cap.COUNTERBORE_DIA / 2.0 < cap_prism[1][0]
+    assert cap_prism[1][1] < mouth_y + pivot_cap.COUNTERBORE_DIA / 2.0
+    # Separate wire channels are shallower still. Register end chamfers are
+    # wholly below the cap's Z=0 seating plane, not cuts through this strip.
+    assert cap_prism[2][1] < pivot_cap.HEIGHT - pivot_cap.CHANNEL_DEPTH
+    assert pivot_cap.REGISTER_PROJECTION > pivot_cap.REGISTER_END_CHAMFER_MAX > 0.0
+    assert cap_prism[2][0] >= 0.0
+
+    bracket_offset = _in_frame(block_rows, block_origin, spec.NUT_BRACKET_ORIGIN)
+    bracket_prism = tuple(
+        (lo - bracket_offset[axis], hi - bracket_offset[axis])
+        for axis, (lo, hi) in enumerate(block_prism)
+    )
+    assert nut_bracket.FACE_X - 1e-9 <= bracket_prism[0][0] < bracket_prism[0][1] <= nut_bracket.FACE_X + nut_bracket.BRACKET_LENGTH + 1e-9
+    assert -nut_bracket.BRACKET_DEPTH <= bracket_prism[1][0] < bracket_prism[1][1] <= 0.0
+    assert 0.0 < bracket_prism[2][0] < bracket_prism[2][1]
+    assert spec.NUT_BRACKET_ORIGIN[2] + bracket_prism[2][1] < _historic_bracket_top_z()
+    _assert_bracket_prism_misses_native_cuts(bracket_prism)
+    # Both installed copies of that real cap material are now above the whole
+    # bracket. This is nominal geometry; the separate fit-up bound covers upset.
+    for origin, rows in spec.PLACEMENTS[spec.PIVOT_CAP]:
+        assert min(_image(rows, origin, point)[2] for point in product(*cap_prism)) > (
+            leadscrew.NUT_BRACKET_TOP_Z
+        )
+
+
+def test_actual_wire_tail_endpoints_hit_old_bracket_but_clear_the_lower_top() -> None:
+    segments = pivot_wire.installed_wire_segments()
+    # Cubic endpoints are attained curve points, unlike interior controls.
+    # Identify the outer tail station geometrically, never by segment index.
+    endpoints = {point for segment in segments for point in (segment[0], segment[-1])}
+    outer_x = max(point[0] for point in endpoints)
+    tail_points = {
+        point for point in endpoints
+        if math.isclose(point[0], outer_x, abs_tol=1e-9)
+        and math.isclose(point[1], 0.0, abs_tol=1e-9)
+    }
+    assert len(tail_points) == 2
+    assert max(p[2] for p in tail_points) - min(p[2] for p in tail_points) == pytest.approx(
+        2.0 * pivot_wire.TWIST_RADIUS
+    )
+    radius = pivot_wire.WIRE_DIA / 2.0
+    old_top = _historic_bracket_top_z() - spec.NUT_BRACKET_ORIGIN[2]
+    collisions = []
+    negative_row_instances = set()
+    for index, (origin, rows) in enumerate(spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE]):
+        _root, support = spec._motion_root(spec.PIVOT_LOCK_WIRE, index)
+        block_origin, block_rows = spec.PIVOT_BLOCK_PLACEMENTS[support]
+        row_origin = _in_frame(block_rows, block_origin, origin)
+        name = spec.instance_name(spec.PIVOT_LOCK_WIRE, index)
+        if support == leadscrew.RAIL - 1 and row_origin[1] < 0.0:
+            negative_row_instances.add(name)
+        for tail in tail_points:
+            point = _image(rows, origin, tail)
+            local = _in_frame(block_rows, block_origin, point)
+            assert local == pytest.approx(tuple(row_origin[a] + tail[a] for a in range(3)))
+            bracket_point = _in_frame(spec.NUT_BRACKET_ROWS, spec.NUT_BRACKET_ORIGIN, point)
+            witness = tuple((value - radius, value + radius) for value in bracket_point)
+            old_box = (
+                (nut_bracket.FACE_X, nut_bracket.FACE_X + nut_bracket.BRACKET_LENGTH),
+                (-nut_bracket.BRACKET_DEPTH, 0.0), (0.0, old_top),
+            )
+            if all(
+                outer[0] < inner[0] < inner[1] < outer[1]
+                for inner, outer in zip(witness, old_box, strict=True)
+            ):
+                # A whole radius-neighbourhood is inside the old stock and
+                # outside EVERY bracket cut: actual tube interference, not
+                # control-hull overlap or an invented collision waiver.
+                _assert_bracket_prism_misses_native_cuts(witness)
+                collisions.append(name)
+            assert point[2] - radius > leadscrew.NUT_BRACKET_TOP_Z
+        # All four full native tubes, not just the two collision witnesses,
+        # clear the lowered top. Keep both rows on both physical supports.
+        low, _high = pivot_wire.swept_wire_z_bounds(segments)
+        assert rows[2] == pytest.approx((0.0, 0.0, 1.0))
+        assert origin[2] + low > leadscrew.NUT_BRACKET_TOP_Z
+    assert len(negative_row_instances) == 1
+    assert set(collisions) == negative_row_instances
+    assert len(collisions) == len(tail_points)
+
+
+def test_capture_feed_bounds_cover_every_instance_pass_rail_and_target() -> None:
+    assert nut_bracket.BLOCK_PLANE_TOP_GAP_MIN == pytest.approx(2.35)
+    assert nut_bracket.TRANSFER_AXIS_TOP_MIN == pytest.approx(5.0)
+    assert len(CAPTURE_FEED_FAMILIES) == 8
+    expected = {
+        (pass_name, spec.instance_name(stem, index), target)
+        for pass_name in trammel.PASS_RADIUS
+        for stem in CAPTURE_FEED_FAMILIES
+        for index in range(spec.QUANTITIES[stem])
+        for target in FEED_TARGETS
+    }
+    for stem in CAPTURE_FEED_FAMILIES:
+        assert len(spec.PLACEMENTS[stem]) == spec.QUANTITIES[stem]
+        per_rail, remainder = divmod(spec.QUANTITIES[stem], len(spec.RAILS))
+        assert per_rail > 0 and remainder == 0
+        for support in range(len(spec.RAILS)):
+            assert sum(
+                spec._motion_root(stem, index) == (spec.CARRIAGE, support)
+                for index in range(spec.QUANTITIES[stem])
+            ) == per_rail
+    margins = spec.capture_feed_clearance_bounds()
+    assert set(margins) == expected
+    assert all(math.isfinite(gap) and gap > 0.0 for gap in margins.values())
+    # Defaults are conditional on the accepted actual fit-up minima, not
+    # claims that those gaps have already been measured in the real assembly.
+    assert margins == spec.capture_feed_clearance_bounds(
+        actual_top_gap=nut_bracket.BLOCK_PLANE_TOP_GAP_MIN,
+        transfer_axis_to_top=nut_bracket.TRANSFER_AXIS_TOP_MIN,
+    )
+
+
+@pytest.mark.parametrize(
+    ("parameter", "minimum"),
+    (("actual_top_gap", 2.35), ("transfer_axis_to_top", 5.0)),
+)
+@pytest.mark.parametrize("delta", (-0.01, 0.0, 0.01))
+def test_capture_feed_fit_up_rejects_below_and_accepts_at_each_actual_boundary(
+    parameter: str, minimum: float, delta: float,
+) -> None:
+    actual = {
+        "actual_top_gap": nut_bracket.BLOCK_PLANE_TOP_GAP_MIN,
+        "transfer_axis_to_top": nut_bracket.TRANSFER_AXIS_TOP_MIN,
+    }
+    assert actual[parameter] == pytest.approx(minimum)
+    actual[parameter] = minimum + delta
+    if delta < 0.0:
+        with pytest.raises(ValueError):
+            spec.capture_feed_clearance_bounds(**actual)
+    else:
+        margins = spec.capture_feed_clearance_bounds(**actual)
+        assert all(math.isfinite(gap) and gap > 0.0 for gap in margins.values())
+
+
+def test_capture_feed_bounds_refuse_a_lost_source_separator(monkeypatch) -> None:
+    # A genuinely enlarged source flange, not a negative tolerance or an
+    # allowance override, overlaps cap material in the provider's source
+    # bounds. A valid fit-up gap cannot silently waive this different pair.
+    monkeypatch.setattr(
+        leadscrew_nut, "FLANGE_DIA",
+        2.0 * (leadscrew.SCREW_LATERAL + pivot_cap.WIDTH + pivot_cap.HEIGHT),
+    )
+    with pytest.raises(ValueError):
+        spec.capture_feed_clearance_bounds()
+
+
+@pytest.mark.parametrize("pass_name", ("inner", "outer"))
+def test_rail_2_feed_bounds_are_continuous_station_separators(pass_name: str) -> None:
+    margins = spec.capture_feed_clearance_bounds()
+    boxes = spec._component_local_boxes()
+    placement_band, part_bands = spec._printed_fixture_allowances()
+    upset = retention.capture_bounds()
+    direction = spec.rail_direction(1)
+    c = sum(a * b for a, b in zip(direction, spec.rail_direction(2), strict=True))
+    assert c < 0.0
+    sweep = trammel.SWEEP[pass_name]
+    # Both half-angle sine arguments stay in the monotone quadrant over the
+    # ENTIRE closed interval: the endpoint station minimum is continuous,
+    # not inferred from the nominal pose or from our interstitial spot checks.
+    assert 0.0 < (trammel.ALPHA - sweep) / 2.0 < (trammel.ALPHA + sweep) / 2.0 < math.pi / 2.0
+    pin_min, _pin_max = trammel.PIN_TRAVEL[pass_name]
+    assert pin_min == pytest.approx(
+        2.0 * trammel.PASS_RADIUS[pass_name] * math.sin((trammel.ALPHA - sweep) / 2.0)
+    )
+    block_origin, block_rows = spec.PIVOT_BLOCK_PLACEMENTS[0]
+    set_band = nut_bracket.X_SET_BAND + spec.printed_band_mm(nut_bracket.LENGTH_PLACES) / 2.0
+    nut_left = min(
+        _in_frame(
+            block_rows, block_origin,
+            spec.frame_point(spec.PLACEMENTS[spec.LEADSCREW_NUT][0], point),
+        )[0]
+        for point in spec._box_corners(boxes[spec.LEADSCREW_NUT])
+    ) - set_band
+    target_left = {
+        "nut bracket": nut_bracket.FACE_X - set_band,
+        "leadscrew nut": nut_left,
+    }
+    screw_pad = placement_band + part_bands.get(spec.LEADSCREW, 0.0)
+    for stem in CAPTURE_FEED_FAMILIES:
+        for index in range(spec.QUANTITIES[stem]):
+            if spec._motion_root(stem, index) != (spec.CARRIAGE, 1):
+                continue
+            local_points = spec._box_corners(boxes[stem])
+            nominal = [
+                spec.frame_point(spec.PLACEMENTS[stem][index], point)
+                for point in local_points
+            ]
+            xy, _drop, _rise = spec._upset_fixture_padding(
+                stem, index, nominal, pass_name, upset,
+            )
+            source_pad = placement_band + part_bands.get(stem, 0.0) + xy
+            pin_origin = spec.PIVOT_PIN_ORIGINS[1]
+            radius = max(
+                math.hypot(point[0] - pin_origin[0], point[1] - pin_origin[1])
+                for point in nominal
+            ) + source_pad
+            # c < 0 and p1,p2 >= pin_min give this global rail-1 projection
+            # bound independently of how many poses the provider evaluates.
+            right = c * pin_min - pin_min + trammel.PIN_OFFSET + radius
+            name = spec.instance_name(stem, index)
+            for target, left in target_left.items():
+                assert margins[pass_name, name, target] == pytest.approx(left - right)
+            fixed_right = c * pin_min + radius
+            assert margins[pass_name, name, "leadscrew"] == pytest.approx(
+                leadscrew.SCREW_NEAR_END_S - fixed_right - screw_pad
+            )
+            if stem == spec.PIVOT_LOCK_WIRE:
+                # In addition to the conservative native box, exercise
+                # attained cubic points on BOTH physical row pieces.
+                local_points += [
+                    point for segment in pivot_wire.installed_wire_segments()
+                    for point in (segment[0], segment[-1])
+                ]
+            # These poses lie between the existing three-pose sweep samples.
+            # They test the native local frames and placements against the
+            # analytic bound above; they are not the continuity proof.
+            for theta in spec.sweep_thetas(pass_name, samples=18):
+                moving = spec._swept_placement(stem, index, pass_name, theta)
+                support_origin, support_rows = spec._swept_placement(
+                    spec.PIVOT_BLOCK, 0, pass_name, theta,
+                )
+                for local in local_points:
+                    point = spec.frame_point(moving, local)
+                    projection = _in_frame(support_rows, support_origin, point)[0]
+                    assert projection + source_pad <= right + 1e-9
+                    station_projection = sum(point[a] * direction[a] for a in range(2))
+                    assert station_projection + source_pad <= fixed_right + 1e-9
 
 
 

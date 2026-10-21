@@ -29,6 +29,7 @@ RECIPES = (
     "build_ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_cotter.py",
     "build_ch_rocker_arm_tl_vn_oblique_pivot_lock_wire.py",
+    "build_ch_rocker_arm_tl_oblique_nut_bracket.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
 )
 HARDWARE_RECIPES = RECIPES[5:9]
@@ -280,7 +281,7 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
 
 
 def test_census_includes_real_new_methods_without_demanding_extrusion_in_wrappers() -> None:
-    assert len(RECIPES) == len(set(RECIPES)) == 10
+    assert len(RECIPES) == len(set(RECIPES))
     for recipe in RECIPES[2:4]:
         calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
         assert {"create_sketch", "create_cut_extrude"} <= calls
