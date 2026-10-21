@@ -6,8 +6,11 @@ imports this DXF onto a plane at the deck top (build_fr_harmonic_base.SERIAL_*)
 and cuts it SERIAL_DEPTH deep, the same closed-region import the nameplate
 engraving and the measuring-stick numerals use. Coordinates are ABSOLUTE part
 mm converted into the deck-top Top-sketch frame (sketch x = part X, sketch y =
--part Z; the Makers seat ignores
-SetPosition), so the file is regenerated whenever a SERIAL_* constant moves::
+-part Z; the Makers seat ignores SetPosition). Native *Top paper coordinates
+also run right along +X and up along -Z: glyph +Y must therefore map to sketch
++Y, not part +Z. SERIAL_MIRROR_Y=True cancels the part-Z sign in ``rings``;
+the former False setting produced a vertically reflected "2" in the native R7
+PDF. Regenerate the file whenever a SERIAL_* constant moves::
 
     uv run python cad/scripts/gen_base_serial_dxf.py
 
@@ -29,7 +32,7 @@ from build_fr_harmonic_base import (
 
 
 def rings() -> list[dxf.Ring]:
-    """Glyph rings centred on SERIAL_XZ after the part-Z to sketch-Y mapping."""
+    """Glyph rings centred in the Top sketch, readable in the native *Top view."""
     raw = dxf.glyph_polylines(SERIAL_TEXT, SERIAL_HEIGHT_MM)
     x0, y0, x1, y1 = dxf.bbox(raw)
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0

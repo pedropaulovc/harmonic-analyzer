@@ -78,7 +78,6 @@ from dt_pinion_lever_spec import (
     BORE_BAND,
     CAP_SAG,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     HUB_LEN,
     HUB_OD,
@@ -100,7 +99,6 @@ _SAVED_DRAWING_PROPERTIES = (
     "Material Specification",
     "Finish",
     "Quantity",
-    "Manufacturing Notes",
     "Isometric View Note",
 )
 
@@ -571,7 +569,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )

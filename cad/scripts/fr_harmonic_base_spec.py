@@ -65,34 +65,35 @@ DECK_EDGE_BREAK = MM_PER_IN / 32.0  # 0.79375 legs
 # Underside lightening (same ruling): one cored pocket from the underside
 # inside a POCKET_WALL perimeter wall, its ceiling POCKET_SKIN under the deck
 # top (so GREEN_SKIN under the green ends), crossed by two ribs that stop
-# RIB_RELIEF above the underside and hung with bosses under every blind deck
-# seat. Each column socket stands in a full-height SOCKET_BOSS_DIA boss merged
-# into the walls; the casting fillets round the pocket's reentrant edges.
+# RIB_RELIEF above the underside. All 18 deck seats are through-tapped through
+# the retained skin and exit into pocket air; no deck-seat islands remain.
+# Each column socket retains its full-height boss merged into the walls.
 POCKET_WALL = 12.0
 POCKET_HALF_X = TOP_LENGTH / 2.0 - POCKET_WALL  # 210.25
 POCKET_HALF_Z = TOP_WIDTH / 2.0 - POCKET_WALL  # 125.25
-POCKET_SKIN = 12.0
-POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 38.8: also the pocket depth
-GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 9.0
+# Owner-selected through-tap section: lower the pocket ceiling1mm, keeping
+# the existing .X height chain. Worst full form is13−3×0.8−2×0.25=10.10mm,
+# above the largest seat's1.5D=9.525 without changing hardware or tolerances.
+POCKET_SKIN = 13.0
+POCKET_CEILING_Y = STACK_HEIGHT - POCKET_SKIN  # 37.8: also the pocket depth
+GREEN_SKIN = GREEN_TOP - POCKET_CEILING_Y  # 10.0
 RIB_THICKNESS = 10.0
+# Whole-rib relocation, not local seat notches: the 10 mm cross rib spans
+# X=6..16, still joins both end walls and the long rib at Z=0. Its native
+# CrossRibX dimension locates the west face from the common table origin.
+CROSS_RIB_CENTER_X = 11.0
 RIB_RELIEF = 3.0  # rib bottoms clear the bench by this much
 SOCKET_BOSS_DIA = 41.5
-HANGING_BOSS_MIN_DIA = 16.0  # max(this, 2.5 x tap drill) per seat
-# Hanging bosses and lugs end on one of two cast levels above the underside:
-# each seat takes the higher level that still leaves its drill tip 1.5D of
-# metal (build_fr_harmonic_base proves it), so the pattern carries two boss
-# lengths instead of one per seat.
-# The shallow level backs the raised pinion block's seat: its #8-32 x 1-1/2
-# screw runs 13.38 deep at the shortest printed block, so the 16.8 drill's
-# tip stands 32.96 up and needs 1.5D (6.25) under it: 26.71 at most.
-DEEP_BOSS_BOTTOM_Y = 12.0
-SHALLOW_BOSS_BOTTOM_Y = 26.5
+CROSS_TAP_LUG_BOTTOM_Y = 26.5
+CROSS_TAP_LUG_WIDTH = 27.0
+CROSS_TAP_LUG_LENGTH = 37.0
+# The cross-tap lugs retain their original inner X face (189.0), independently
+# of the removed deck-seat boss diameter.
+CROSS_TAP_LUG_INNER_X = COLUMN_X - 8.0
 # ONE radius for every vertical reentrant pocket corner: the socket-boss
-# junctions (PocketFillets) and the rib, pad, lug and boss corners
-# (PocketCornerFillets) print as one "R6.0 MAX" (machinist review rule 16).
-# R6 is the largest standard value that keeps rule 17's 1.5 wall from every
-# seat, socket and cross tap at the worst case
-# (test_fr_harmonic_base_pocket_fillets_drawing).
+# junctions (PocketFillets) and the rib/lug corners (PocketCornerFillets)
+# print as one "R6.0 MAX". Smaller radii, down to sharp, are permissible;
+# through-seat engagement therefore never relies on fillet-added metal.
 POCKET_CORNER_FILLET_R = 6.0
 # swTolMAX prints the nominal then "MAX", so the model sits at the max: any
 # smaller fillet, down to sharp, keeps every wall the proof checked.
@@ -104,46 +105,13 @@ if abs(BOTTOM_CENTER_Z) > 1e-12 or abs(TOP_CENTER_Z) > 1e-12:
 # The deck is black in the source photographs. "deck" is the raised deck top
 # alone; the green land around it is as-cast. "underside" is the perimeter
 # foot the casting stands on (the socket bosses merge into it); the pocket and
-# the hanging bosses inside it stay as-cast. Machining and black coating of
-# the foot is the user's reconstruction choice, not photo evidence.
+# retained ribs and lugs inside it stay as-cast. Machining and black coating
+# of the foot is the user's reconstruction choice, not photo evidence.
 # The registry Finish field owns the paint and its masking, so each roughness
 # symbol carries the grade alone; there are no locally masked feet.
-#
-# The flange perimeter carries the same seat grade because it is the drawing's
-# hole-table origin: every mounting coordinate is measured from the virtual
-# sharp corner of two of these faces, so they LOCATE the part (simplicity
-# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) and cannot be left as-cast under the title block's
-# CAST/MACHINED surface row. All four sides are required equally -- the corner
-# arcs between them are skimmed with the sides -- and the flange keeps the
-# RAL6000 body colour (only the deck and underside are blacked by the Finish
-# field). The part authors one native symbol per qualified face; the sheet
-# states the requirement once, as this target on the plan profile. The target
-# NAMES the surface, so the one sheet symbol cannot be misread as the pad side
-# face or the deck (2026-09 review clarity item: three nested plan outlines
-# share the plan view). "(TABLE ORIGIN)" states the
-# function: the 2026-09-25 Codex machinist review read the edges as neither
-# running nor locating and asked for the symbol's removal (Main: rebutted,
-# and made legible on the sheet).
-FLANGE_PERIMETER_TARGET = "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
 SURFACE_FINISHES = (
     SurfaceFinishControl("deck", SEAT_UM, PlanarFace((0, 1, 0), STACK_HEIGHT)),
     SurfaceFinishControl("underside", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
-    SurfaceFinishControl(
-        "flange_west", SEAT_UM, PlanarFace((-1, 0, 0), BOTTOM_LENGTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_east", SEAT_UM, PlanarFace((1, 0, 0), BOTTOM_LENGTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_rear", SEAT_UM, PlanarFace((0, 0, 1), BOTTOM_WIDTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
-    SurfaceFinishControl(
-        "flange_front", SEAT_UM, PlanarFace((0, 0, -1), BOTTOM_WIDTH / 2.0),
-        production_method=FLANGE_PERIMETER_TARGET,
-    ),
 )
 
 # --- Column sockets: the frame interface this casting owns -----------------
@@ -188,78 +156,34 @@ SOCKET_BORE_FINISHES = tuple(
 )
 PART_SURFACE_FINISHES = (*SURFACE_FINISHES, *SOCKET_BORE_FINISHES)
 
-# The underside's rect pads, cross-tap lugs, ribs, MHA-DT-24 foot boss and
-# MHA-FR-04 nameplate bosses stand under seats the hole table does not
-# locate (transfer seats, cross taps, nameplate taps) or under none, so their
-# sizes and their places from the table's X0 Y0
-# are model dims too (Codex P2 on #1310; machinist review of the ribs and the
-# foot boss). Each pair shares its size and one coordinate, so one pad of the
-# pair carries the shared dim (UNDERSIDE_PAD_PREFIXES prints it 2X) and each
-# pad its own other one. Not marked: what the casting cannot show -- the lock
-# pad's and the lugs' outer ends and the lugs' widths run into the wall and
-# the socket bosses, the block pads' east ends into the cross rib, and the
-# ribs' ends into the wall (a rib's other coordinate is its centring, shown by
-# its thickness about the pocket's centre line).
-#
-# The four nameplate taps stand on a rectangle, so each boss X and each boss Y
-# is shared by two bosses and prints 2X. build_fr_harmonic_base names boss
-# ``k`` of fr_nameplate_spec.MOUNT_HOLE_XZ ``NameplateBoss{k}X``/``Y``: k 0
-# east-rear, 1 east-front, 2 west-rear, 3 west-front (pinned by
-# test_fr_harmonic_base_drawing). Sheet 4 hangs the X rows above the rear and
-# the Y columns west of the view, so the X stations come off the two REAR
-# bosses and the Y stations off the two WEST ones: no witness line crosses
-# its twin boss.
-NAMEPLATE_BOSS_LOCATION_DIMENSIONS = (
-    "NameplateBoss2X",
-    "NameplateBoss2Y",
-    "NameplateBoss0X",
-    "NameplateBoss3Y",
-)
-UNDERSIDE_PAD_DIMENSIONS: dict[str, tuple[str, ...]] = {
-    "DeepBossProfile": (
-        "LockPadWidth",
-        "LockPadX",
-        "LockPadY",
-        "PedestalPad0Width",
-        "PedestalPadLength",
-        "PedestalPad1X",
-        "PedestalPad0Y",
-        "PedestalPad1Y",
-        "FootBossX",
-        "FootBossY",
-    ),
-    "ShallowBossProfile": (
-        "BlockPad0Width",
-        "BlockPad1X",
-        "BlockPad0Y",
-        "BlockPad1Y",
-        *NAMEPLATE_BOSS_LOCATION_DIMENSIONS,
-    ),
+# Only retained ribs and cross-tap lugs need underside location marks.
+# Their ends merge into walls/socket bosses; the hidden overlapping extents
+# remain model geometry, not redundant drawing dimensions.
+UNDERSIDE_LOCATION_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "CrossTapLugProfile": ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y"),
     "LongRibProfile": ("LongRibY",),
     "CrossRibProfile": ("CrossRibX",),
 }
-UNDERSIDE_PAD_PREFIXES: dict[tuple[str, str], str] = {
+UNDERSIDE_LOCATION_PREFIXES: dict[tuple[str, str], str] = {
     (feature, name): "2X "
     for feature, names in (
-        ("DeepBossProfile", ("PedestalPad0Width", "PedestalPadLength", "PedestalPad1X")),
-        (
-            "ShallowBossProfile",
-            ("BlockPad0Width", "BlockPad1X", *NAMEPLATE_BOSS_LOCATION_DIMENSIONS),
-        ),
+        # Each lug station is shared by its opposite-side partner.
         ("CrossTapLugProfile", ("Lug1X", "Lug3X", "Lug1Y", "Lug0Y")),
     )
     for name in names
 }
-# D1 is located from the nearer transferred MHA-DT-02 seat, not the table
-# origin. The model's point-only PivotSeatReference sketch owns these offsets.
+# The pivot is located from the nearer transferred MHA-DT-02 seat, not the
+# table origin. The model's point-only PivotSeatReference sketch owns the offsets.
 PIVOT_SEAT_DIMENSIONS = ("PivotSeatX", "PivotSeatY")
-PIVOT_SEAT_TAG = "D1"
-PIVOT_SEAT_STEP = (
-    f"1. {PIVOT_SEAT_TAG} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
-    "DRILL AND TAP AT ASSEMBLY IN ONE SETUP.\n"
-    f"{PIVOT_SEAT_TAG} TABLE X/Y ARE REFERENCE."
-)
+
+
+def pivot_seat_step(tag: str) -> str:
+    """Identify the physical pivot using its current native hole-table tag."""
+    return (
+        f"1. {tag} IS LOCATED TO THE MHA-DT-02 SEAT;\n"
+        "DRILL AND TAP AT ASSEMBLY.\n"
+        f"{tag} TABLE X/Y ARE REFERENCE."
+    )
 
 # Both heights are baselines from the same faced underside, never a chain
 # through the flange thickness and deck rise (#1321). Their ordinary .X
@@ -292,8 +216,8 @@ def cross_screw_top_land_worst_case_mm(
 # whose decimal places state a tolerance is a MODEL dimension, so the deck
 # extent and rise, the underside-based green-land height, the edge breaks, the
 # cross-screw axis height, the spotface size and depth and the underside
-# pocket's wall, depth, ribs and bosses are authored on the part and imported
-# -- not drawn on the sheet from picked geometry. Only the hole table and the
+# pocket's wall, depth, ribs and cross-tap lugs are authored on the part and
+# imported, not reconstructed in drawing notes. Only the hole table and the
 # parenthesised reference heights stay sheet-side.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BottomProfile": {"BottomLen", "BottomWid"},
@@ -318,26 +242,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SocketBossProfile": {"SocketBossDia"},
     "LongRibProfile": {
         "LongRibThickness",
-        *UNDERSIDE_PAD_DIMENSIONS["LongRibProfile"],
+        *UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"],
     },
     "CrossRibProfile": {
         "CrossRibThickness",
-        *UNDERSIDE_PAD_DIMENSIONS["CrossRibProfile"],
+        *UNDERSIDE_LOCATION_DIMENSIONS["CrossRibProfile"],
     },
     "LongRib": {"RibRelief"},
-    "DeepBossProfile": {
-        "HangingBossDia",
-        *UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"],
-    },
-    # The shallow level's round-boss diameter, on the rear-west nameplate
-    # tap's boss (sheet 3 calls the level out at each diameter).
-    "ShallowBossProfile": {
-        "ShallowBoss4Dia",
-        *UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"],
-    },
-    "CrossTapLugProfile": set(UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"]),
-    "DeepBosses": {"DeepBossBottom"},
-    "ShallowBosses": {"ShallowBossBottom"},
+    "CrossTapLugProfile": set(UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"]),
+    "CrossTapLugs": {"LugBottom"},
     "PocketFillets": {"PocketFilletRadius"},
 }
 
@@ -381,26 +294,17 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "SocketBossProfile": {"SocketBossDia": 1},
     "LongRibProfile": {
         "LongRibThickness": 1,
-        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["LongRibProfile"], 1),
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["LongRibProfile"], 1),
     },
     "CrossRibProfile": {
         "CrossRibThickness": 1,
-        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["CrossRibProfile"], 1),
+        **dict.fromkeys(UNDERSIDE_LOCATION_DIMENSIONS["CrossRibProfile"], 1),
     },
     "LongRib": {"RibRelief": 1},
-    "DeepBossProfile": {
-        "HangingBossDia": 1,
-        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["DeepBossProfile"], 1),
-    },
-    "ShallowBossProfile": {
-        "ShallowBoss4Dia": 1,
-        **dict.fromkeys(UNDERSIDE_PAD_DIMENSIONS["ShallowBossProfile"], 1),
-    },
     "CrossTapLugProfile": dict.fromkeys(
-        UNDERSIDE_PAD_DIMENSIONS["CrossTapLugProfile"], 1
+        UNDERSIDE_LOCATION_DIMENSIONS["CrossTapLugProfile"], 1
     ),
-    "DeepBosses": {"DeepBossBottom": 1},
-    "ShallowBosses": {"ShallowBossBottom": 1},
+    "CrossTapLugs": {"LugBottom": 1},
     "PocketFillets": {"PocketFilletRadius": 1},
 }
 

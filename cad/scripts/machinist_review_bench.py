@@ -1077,6 +1077,7 @@ def run_iteration(
             case["package"],
             "--pdf-dir",
             str(review_pdf_dirs[case["name"]]),
+            "--force",
             "--reviewer",
             args.reviewer,
             "--jobs",

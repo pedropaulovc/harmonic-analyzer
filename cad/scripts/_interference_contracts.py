@@ -18,6 +18,7 @@ from fr_harmonic_base_fasteners import (
     HOLD_DOWN_THREAD as _HOLD_DOWN_THREAD,
     PEDESTAL_SCREW_ENGAGEMENT as _PEDESTAL_SCREW_ENGAGEMENT,
 )
+from fr_harmonic_base_spec import POCKET_SKIN as _BASE_DECK_SKIN
 from _hole_spec import THREAD_MAJOR_MM
 from dt_crank_hub_spec import (
     HUB_BARREL_DIA as _HUB_W,
@@ -755,14 +756,14 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "fr-frame-1/fr-harmonic-base",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 8.725),
     ),
-    # U34c: the #8-32 x 3/4 (19.05) MHA-DT-VN-62 hold-downs pass the 5.0 pedestal
-    # ledge and engage 14.05 of the transferred base seats.
+    # The unchanged #8-32 x 3/4 stock inserts 14.05 through the pedestal ledge.
+    # Only the retained skin can overlap: the protruding tip is in pocket air.
     **_numbered_pairs(
         "dt-drive-train-1/dt-vn-pedestal-hold-down-screw",
         range(1, 3),
         "fr-frame-1/fr-harmonic-base",
         _smooth_annulus_limit_mm3(
-            4.1656, 3.454, _PEDESTAL_SCREW_ENGAGEMENT
+            4.1656, 3.454, min(_PEDESTAL_SCREW_ENGAGEMENT, _BASE_DECK_SKIN)
         ),
     ),
     # The two #2-56 x 7/16 (11.1125) MHA-CH-VN-52 keeper foot screws: the head

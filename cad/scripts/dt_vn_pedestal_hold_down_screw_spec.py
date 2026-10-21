@@ -14,3 +14,9 @@ from _mcmaster_90280a197 import FILLISTER_SIZE
 
 THREAD = "#8-32"
 SHANK_DIA, SHANK_LEN, HEAD_H, HEAD_DIA, _PITCH = FILLISTER_SIZE
+# Native source-model end losses (diag_mcmaster_fillister), not stock limits.
+TIP_CHAMFER = 0.7 * _PITCH
+FULL_THREAD_START = 1.625 * _PITCH
+# Existing installed-joint lower length allowance, formerly duplicated in
+# build_dt_drive_train_assembly. Do not replace it with a title-block band.
+LENGTH_SHORT_ALLOWANCE_MM = 0.76

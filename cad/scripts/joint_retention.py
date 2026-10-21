@@ -821,7 +821,7 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-00 STEP 8",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps the rocker_arm_support foot to the base deck; the support never moves on the base, and the rocker pivot it carries turns about machine Z (horizontal), so the rocker's reaction reaches these vertical (Y-axis) screws as cyclic tension/shear, not as torque about their own axis",
-        axial_capture="hex head's under-head washer face bears on the 6.35 support foot (5/16 clearance drill); 12.42 mm (1.956D) engagement in the blind 13.2-deep 1/4-20 UNC-2B base seat",
+        axial_capture="hex head's under-head washer face bears on the 6.35 support foot (5/16 clearance drill); unchanged 12.42 mm stock insertion into the through-tapped 1/4-20 UNC-2B deck seat, with useful engagement limited by retained casting",
         lock=Lock.NONE,
         evidence="build_fr_frame_assembly.py:build (lag-screw seed + grid) and LAG_* asserts; fr_harmonic_base_fasteners.py:HOLD_DOWN_SEAT_SPEC/HOLD_DOWN_ENGAGEMENT; fr_rocker_arm_support_spec.py:HOLE_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 8 ('DRAW DOWN EVENLY UNTIL ALL HEADS SEAT')",
     ),
@@ -835,9 +835,9 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="MHA-FR-00 STEP 9",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="holds the cosmetic nameplate flat on the base deck; plate and base never move relative to each other and nothing in operation touches or turns the plate",
-        axial_capture="fillister head seated flush on the plate's decorated face; 4.85 of shank engaged in the 6.0-deep #4-40 bottoming-tapped base seat",
+        axial_capture="fillister head seated flush on the plate's decorated face; unchanged 4.85 mm nominal stock insertion into the through-tapped #4-40 UNC-2B deck seat",
         lock=Lock.NONE,
-        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SCREW_HOLE_DEPTH; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 9",
+        evidence="build_fr_frame_assembly.py:build (nameplate corner screws, NAMEPLATE_SCREW_* asserts); fr_harmonic_base_fasteners.py:NAMEPLATE_SEAT_SPEC; build_fr_harmonic_base.py:NAMEPLATE_SEAT_SPEC; draw_fr_frame_assembly.py ASSEMBLY_STEPS 9",
     ),
     Joint(
         id="ha-harmonic-analyzer/gooseneck-set-screw-in-top-frame",
@@ -1055,7 +1055,7 @@ JOINTS: tuple[Joint, ...] = (
             "reaction on the knob-clamped platform also bears on the shoulder"
         ),
         axial_capture=(
-            "shoulder bottomed on the base top, thread tail in the blind #10-24 UNC-2B base seat; "
+            "shoulder bottomed on the base top, thread tail in the through #10-24 UNC-2B base seat; "
             "head stands 0.25 above the plate (no head clamp on the platform)"
         ),
         lock=Lock.NONE,
@@ -1084,7 +1084,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "collarless knurled head bears on the MHA-DT-20 top; stud through the platform notch "
-            "into the blind 1/4-20 UNC-2B base seat"
+            "into the through 1/4-20 UNC-2B base seat"
         ),
         lock=Lock.NONE,
         evidence=(
@@ -1108,7 +1108,7 @@ JOINTS: tuple[Joint, ...] = (
             "engaged, the platform edge stands >= 2.0 clear of it; at zeroing the swung "
             "platform's edge only bears on the side of the head, across the screw axis"
         ),
-        axial_capture="head seated on the base top; thread in the blind #4-40 base seat",
+        axial_capture="head seated on the base top; thread in the through #4-40 base seat",
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py stop_screw placement, _STOP_ENGAGED_GAP >= 2.0 assert, "
@@ -1134,7 +1134,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         axial_capture=(
             "narrow fillister head on the spring foot pad through its #4 clearance hole into "
-            "the transferred blind #4-40 UNC-2B base seat (tapped_bottoming)"
+            "the transferred through #4-40 UNC-2B base seat"
         ),
         lock=Lock.NONE,
         evidence=(
@@ -1244,7 +1244,11 @@ JOINTS: tuple[Joint, ...] = (
             "this vertical screw, so it reaches the screw only as tension/shear through the foot; no member "
             "rotates on or about the screw axis"
         ),
-        axial_capture="fillister head on the pedestal's 18-long ledge through a #8 close-clearance hole; >=1.5D thread in a transfer-tapped bottoming seat",
+        axial_capture=(
+            "fillister head on the pedestal's 18-long ledge through a #8 close-clearance hole; "
+            "transferred through-tapped #8-32 UNC-2B deck seat in 13 mm nominal skin; "
+            "minimum checked source-model full-form overlap 10.10 mm (>=1.5D)"
+        ),
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
@@ -1273,8 +1277,10 @@ JOINTS: tuple[Joint, ...] = (
         axial_capture=(
             "fillister head on the block top through a #8 normal-clearance hole; "
             "38.1 mm stock less the 25.232 mm raised block gives 12.868 mm nominal "
-            "insertion (13.378 mm maximum) into the transfer-tapped bottoming seat, "
-            "with current base full-thread/drill references 14.15/16.8 mm"
+            "insertion (13.378 mm maximum) into the transferred through-tapped "
+            "#8-32 UNC-2B deck seat; the 13 mm nominal skin limits the minimum checked "
+            "source-model full-form overlap to 10.10 mm; any exit protrusion is into "
+            "pocket air"
         ),
         lock=Lock.NONE,
         lock_part="",

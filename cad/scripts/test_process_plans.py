@@ -601,33 +601,36 @@ def test_verification_requires_the_provisional_stamp(synthetic, tamper):
         plans.verify_traveler(STEM, out)
 
 
-def test_enrolled_plan_revisions_match_configured_release():
+def test_migrated_and_enrolled_plan_revisions_match_configured_release():
     import yaml
 
     release = Path(__file__).resolve().parents[1] / "config" / "release.yaml"
     revision = yaml.safe_load(release.read_text())["next_revision"]
-    for stem in plans.TRAVELER_STEMS:
+    for stem in plans.revision_stems():
         assert (
             tomllib.loads(plans.plan_path(stem).read_text())["drawing"]["revision"]
             == revision
         )
 
 
-# Plans migrated to the pinned prechips, enrolled or still held from enrollment
-# (the rocker until its traveler reaches exit 0, cad/process/README.md).
-MIGRATED_PLANS = ("ch_rocker_arm",)
+def test_revision_stems_deduplicate_migrated_and_enrolled_without_enrolling(monkeypatch):
+    migrated = ("synthetic_held", "synthetic_shared", "synthetic_held")
+    enrolled = ("synthetic_shared", "synthetic_enrolled", "synthetic_enrolled")
+    monkeypatch.setattr(plans, "MIGRATED_PLANS", migrated)
+    monkeypatch.setattr(plans, "TRAVELER_STEMS", enrolled)
+
+    assert plans.revision_stems() == (
+        "synthetic_held", "synthetic_shared", "synthetic_enrolled"
+    )
+    assert plans.MIGRATED_PLANS == migrated
+    assert plans.TRAVELER_STEMS == enrolled
 
 
 def test_migrated_plans_name_faces_by_bare_labels_their_op_owns():
-    import yaml
-
-    release = Path(__file__).resolve().parents[1] / "config" / "release.yaml"
-    revision = yaml.safe_load(release.read_text())["next_revision"]
-    for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
+    for stem in plans.revision_stems():
         text = plans.plan_path(stem).read_text(encoding="utf-8")
         plan = tomllib.loads(text)
         assert plan["part"] == stem.replace("_", "-")
-        assert plan["drawing"]["revision"] == revision
         # The wrapper passes the shop files; exact STEP refs exist only once bound.
         assert "paths" not in plan
         assert plans._REF.search(text) is None
@@ -649,7 +652,7 @@ def test_chain_drilled_features_are_broken_out_before_they_are_filed():
     # break-out text is the drilling op's own "after drilling" sentence (prechips#213).
     # Where the webs wait for the bench, the plan must carry that step itself (#1548): a
     # noted bench step on the feature before its file_to_line.
-    for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS)):
+    for stem in plans.revision_stems():
         plan = tomllib.loads(plans.plan_path(stem).read_text(encoding="utf-8"))
         ops = [(setup["id"], op) for setup in plan["setups"] for op in setup["ops"]]
         for index, (sid, op) in enumerate(ops):
@@ -800,7 +803,7 @@ def test_posed_unknown_primitive_names_the_solid():
                 else ()
             ),
         )
-        for stem in dict.fromkeys((*MIGRATED_PLANS, *plans.TRAVELER_STEMS))
+        for stem in plans.revision_stems()
     ],
 )
 def test_every_touch_spot_clears_the_hold_by_the_tool_radius_plus_1mm(stem):
@@ -944,6 +947,20 @@ def test_revision_validation_names_authored_revision_line(synthetic, configured)
     if configured is None:
         with pytest.raises(plans.PlanBindError, match="line 4:.*drawing.revision"):
             plans.bind_plan(STEM, out)
+
+
+@pytest.mark.parametrize("revision", ['"v40"', '"unknown"', '""', "41"])
+def test_authored_only_revision_validation_names_stale_or_invalid_line(
+    synthetic, revision
+):
+    source, _out, manifest, _shop = synthetic
+    manifest.unlink()
+    source.write_text(f'[drawing]\nrevision = {revision}\n', encoding="utf-8")
+
+    with pytest.raises(
+        plans.PlanBindError, match="line 2:.*configured revision 'v41'"
+    ):
+        plans.check_authored_plan_revision(STEM, "v41")
 
 
 def test_inline_table_scalar_in_array_is_not_spliced_as_list(synthetic):

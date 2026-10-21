@@ -23,6 +23,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from PIL import Image, ImageDraw
 
 import machinist_review as mr
+import machinist_review_config as review_config
 import machinist_review_sheets_mcp as sheets
 
 SHEET_TOOLS = {"mcp__sheets__view_sheet", "mcp__sheets__crop"}
@@ -673,10 +674,12 @@ import sys
 import time
 from pathlib import Path
 
-mode, reply_path, delay = sys.argv[1:]
+mode, reply_path, delay, pending_polls = sys.argv[1:]
+pending_polls = int(pending_polls)
 started = time.monotonic()
 last_status = None
 status_started = None
+status_count = 0
 
 def record(event):
     event = {**event, "at": time.monotonic() - started}
@@ -706,9 +709,14 @@ for line in sys.stdin:
         if request == "initialize":
             respond(event, {}, "error" if mode == "control_error" else "success")
         elif request == "mcp_status":
+            status_count += 1
             if status_started is None:
                 status_started = time.monotonic()
-            if mode == "pending" or time.monotonic() - status_started < float(delay):
+            waiting = (
+                status_count <= pending_polls if pending_polls >= 0
+                else time.monotonic() - status_started < float(delay)
+            )
+            if mode == "pending" or waiting:
                 state = "pending"
             else:
                 state = "failed" if mode == "failed" else "connected"
@@ -746,10 +754,15 @@ for line in sys.stdin:
         state.processes.append(process)
         return process
 
-    def command(mode: str, reply: str, delay_s: float = 0.0) -> list[str]:
+    def command(
+        mode: str, reply: str, delay_s: float = 0.0, *, pending_polls: int = -1,
+    ) -> list[str]:
         reply_path = tmp_path / f"reply-{len(state.commands)}.jsonl"
         reply_path.write_text(reply, encoding="utf-8")
-        argv = [sys.executable, str(script), mode, str(reply_path), str(delay_s)]
+        argv = [
+            sys.executable, str(script), mode, str(reply_path), str(delay_s),
+            str(pending_polls),
+        ]
         state.commands.append(argv)
         return argv
 
@@ -757,6 +770,49 @@ for line in sys.stdin:
     monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
     return state
+
+
+@pytest.fixture
+def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
+    """Advance retry deadlines by protocol polls, never mutate the loop's clock."""
+    real_run = mr._run_claude
+    transport_asyncio = mr.asyncio
+    clocks = []
+
+    async def run(*args: Any, **kwargs: Any):
+        clock = SimpleNamespace(elapsed=0.0, outer=None, startup=None, budget=None)
+        clocks.append(clock)
+
+        class ProtocolAsyncio:
+            def __getattr__(self, name: str):
+                return getattr(transport_asyncio, name)
+
+            def timeout(self, delay: float):
+                if clock.outer is None:
+                    # The overall wall-time timeout remains unmodified.
+                    clock.outer = asyncio.timeout(delay)
+                    return clock.outer
+                assert clock.startup is None
+                clock.budget = delay
+                clock.startup = asyncio.timeout(None)
+                return clock.startup
+
+            async def sleep(self, delay: float) -> None:
+                clock.elapsed += delay
+                if clock.elapsed >= clock.budget:
+                    # Deliver real Timeout cancellation at the synthetic startup
+                    # deadline, including the production kill/drain/reap path.
+                    clock.startup.reschedule(asyncio.get_running_loop().time())
+                await asyncio.sleep(0)
+
+        with monkeypatch.context() as scoped:
+            # Only this module binding is replaced; asyncio and loop.time stay
+            # untouched for subprocess machinery and the real outer timeout.
+            scoped.setattr(mr, "asyncio", ProtocolAsyncio())
+            return await real_run(*args, **kwargs)
+
+    monkeypatch.setattr(mr, "_run_claude", run)
+    return clocks
 
 
 @pytest.mark.parametrize("judge", [False, True])
@@ -847,13 +903,14 @@ def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
 @pytest.mark.parametrize("failure", ["failed", "pending", "missing_tools"])
 def test_claude_startup_infrastructure_failure_retries_without_reviewing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, judge: bool, failure: str,
+    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
+    judge: bool, failure: str,
 ) -> None:
     value = {"clusters": []} if judge else _clean_verdict()
     reply = _claude_stdout(1, value)
     commands = [
         claude_transport.command(failure, reply),
-        claude_transport.command("slow", reply, delay_s=0.1),
+        claude_transport.command("slow", reply, pending_polls=2),
     ]
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
     monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
@@ -862,9 +919,35 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
         reviewer="claude", claude="fake", report_dir=tmp_path / "reports", retries=1,
         timeout_s=10, judge_findings=[] if judge else None,
     )
-    assert review.passed and review.attempts == 2 and review.error is None
-    first, second = review.extra["evidence"]["attempts"]
-    assert first["outcome"] != "succeeded" and second["outcome"] == "succeeded"
+    attempts = review.extra["evidence"]["attempts"]
+    diagnostics = {
+        "error": (review.error or "")[-800:],
+        "attempts": [
+            {
+                "attempt": attempt["attempt"], "outcome": attempt["outcome"],
+                "error": (attempt["error"] or "")[-800:],
+                "retained_dir": attempt["retained_dir"],
+            }
+            for attempt in attempts
+        ],
+    }
+    assert review.passed and review.attempts == 2 and review.error is None, diagnostics
+    first, second = attempts
+    assert first["outcome"] == ("timed_out" if failure == "pending" else "failed"), diagnostics
+    expected_error = {
+        "failed": "synthetic sheets startup failure",
+        "pending": "TimeoutExpired",
+        "missing_tools": "without its sheet tools",
+    }[failure]
+    assert expected_error in first["error"], diagnostics
+    assert second["outcome"] == "succeeded", diagnostics
+    assert len(claude_startup_clock) == 2
+    assert all(clock.budget == 0.75 and not clock.outer.expired() for clock in claude_startup_clock)
+    assert claude_startup_clock[0].startup.expired() is (failure == "pending")
+    assert not claude_startup_clock[1].startup.expired()
+    if failure == "pending":
+        assert 0.75 <= claude_startup_clock[0].elapsed < 0.8
+    assert claude_startup_clock[1].elapsed == pytest.approx(0.04)
     assert first["cwd"] != second["cwd"]
     for index, attempt in enumerate((first, second)):
         records = [
@@ -872,6 +955,9 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
             (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
         ]
         assert sum(row["type"] == "user" for row in records) == index
+        statuses = [row["value"] for row in records if row["type"] == "status"]
+        if index == 1:
+            assert statuses == ["pending", "pending", "connected"]
     assert all(process.returncode is not None for process in claude_transport.processes)
     assert "synthetic CLI startup diagnostic" in Path(first["stdout_file"]).read_text()
 
@@ -3043,17 +3129,17 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
 
 
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
-    assert mr.main([]) == 2
+    assert mr.main(["--force"]) == 2
     assert capsys.readouterr().err == (
-        "no drawing names given; use --all, --png or a name\n"
+        "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex"]) == 2
+    assert mr.main(["--reviewer", "codex", "--force"]) == 2
     assert capsys.readouterr().err == (
-        "no drawing names given; use --all, --png or a name\n"
+        "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex", "not-a-drawing"]) == 2
+    assert mr.main(["--reviewer", "codex", "not-a-drawing", "--force"]) == 2
     assert capsys.readouterr().err == "unknown drawing names: ['not-a-drawing']\n"
 
 
@@ -3912,7 +3998,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=reviewer, report_dir=directory, retries=0,
+        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True,
         claude="claude-test", codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
@@ -3934,7 +4020,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     assert saved == aggregate
     assert (directory / "sample.aggregate.md").is_file()
     assert "sample.aggregate.md" in mr.write_index(directory).read_text(encoding="utf-8")
-    assert aggregate["judge"]["model"] == mr.DEFAULT_MODELS[reviewer]
+    assert aggregate["judge"]["model"] == review_config.DEFAULT_MODELS[reviewer]
     assert aggregate["judge"]["prompt_sha256"]
 
 
@@ -3982,7 +4068,7 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
         retries=1, claude="claude-test", codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
@@ -4012,7 +4098,7 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=2,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
@@ -4042,7 +4128,7 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=3,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
@@ -4071,7 +4157,7 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
@@ -4098,7 +4184,7 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, claude="claude-test",
+        retries=0, claude="claude-test", force=True,
     )
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
@@ -4127,7 +4213,7 @@ def test_aggregate_error_is_retained_and_never_passes(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=directory, retries=1, claude="claude-test",
+        report_dir=directory, retries=1, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
@@ -4160,7 +4246,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
@@ -4170,23 +4256,19 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     assert "Return one verdict for the package as a whole." not in prompts[0]
 
 
-@pytest.mark.parametrize("mode", ["png", "pdf", "pdf_dir"])
+@pytest.mark.parametrize("mode", ["pdf", "pdf_dir"])
 def test_main_uses_aggregate_contract_for_each_input_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
 ) -> None:
-    source = _png_source(tmp_path / "sheet.png")
     name = "sample"
-    args = ["--png", str(source)]
     if mode == "pdf":
         source = _pdf_source(tmp_path / "sheet.pdf", [(100, 100)])
         args = ["--pdf", str(source), "--name", name, "--kind", "assembly"]
-    elif mode == "pdf_dir":
+    else:
         name = next(iter(mr.DRAWINGS_BY_NAME))
         expected = mr.DRAWINGS_BY_NAME[name].outputs["pdf"]
         source = _pdf_source(tmp_path / expected.name, [(100, 100)])
         args = [name, "--pdf-dir", str(tmp_path)]
-    else:
-        name = mr._package_for_pngs([source], "part").name
 
     def reply(command: list[str], **kwargs: Any):
         return _session_reply(command, kwargs, _clean_verdict())
@@ -4194,7 +4276,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
     directory = tmp_path / "reports"
-    assert mr.main([*args, "--report-dir", str(directory)]) == 0
+    assert mr.main([*args, "--force", "--report-dir", str(directory)]) == 0
     data = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "SHIP" and len(data["runs"]) == 3
     assert data["judge"]["skipped"]
@@ -4204,6 +4286,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     ["--runs", "0"], ["--pdf", "sheet.pdf"], ["--name", "sample"],
     ["--pdf", "sheet.pdf", "--name", "../sample"],
     ["--pdf", "sheet.pdf", "--name", "sample", "--png", "sheet.png"],
+    ["--png", "sheet.png"], ["--png", "sheet.png", "--force"],
 ])
 def test_cli_rejects_invalid_ensemble_inputs(args: list[str]) -> None:
     with pytest.raises(SystemExit) as exc:
@@ -4221,7 +4304,7 @@ def test_missing_source_still_writes_an_error_aggregate(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("missing", "part", (tmp_path / "missing.pdf",)),
-        report_dir=directory, runs=1,
+        report_dir=directory, runs=1, force=True,
     )
     assert aggregate["verdict"] == "ERROR"
     assert "source snapshot failed" in aggregate["error"]
