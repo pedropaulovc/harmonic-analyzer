@@ -1862,6 +1862,10 @@ require continuous longitudinal flanks on both sides of the real section
 profile. Join touching collinear straight segments, never bridge a gap or
 replace an arc/circle by its endpoint chord. Annotation display data, a
 callout or a visible plain bore cannot rescue absent or unreadable thread ink.
+For numerical collinearity, bound each Y band's total spread rather than
+chaining successive tolerances, then sort its X intervals before union and
+check overlap on both sides. Raw Y sorting can reverse X order under native
+floating-point roundoff. This is ink processing, not a manufacturing tolerance.
 Log primitive coordinates and per-reader errors before refusal; an unmeasured
 display is not evidence that the native thread contains zero geometry.
 
