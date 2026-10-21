@@ -7,6 +7,8 @@ It cannot prove that QI supplied the requested interface or that a DISPID applie
 to a live dispatch. Selection/attachment integer results use swSelectType_e:
 the 11/25 ISketchPoint distinction needs SDK semantics and behavioral coverage,
 not a different method signature. Dynamic callout metadata needs its own gates.
+Relation effects require actual owner-inventory readback: a constructor's returned
+handle and this declaration census cannot prove which constraint was applied.
 Starred adapter arguments remain symbolic: geometry tests/native gates own data.
 """
 
@@ -357,7 +359,7 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
                     identifiers[target.id] = ast.literal_eval(node.value.args[0])
     assert identifiers["CLSID"] == iid
     assert identifiers["coclass_clsid"] != iid
-    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == "_require_witness_relation")
+    classifier = next(node for node in _tree(SCRIPTS / "build_mg_magnifying_clamp.py").body if isinstance(node, ast.FunctionDef) and node.name == "_witness_relation_records")
     imported_interfaces = {
         alias.name
         for node in ast.walk(classifier)
