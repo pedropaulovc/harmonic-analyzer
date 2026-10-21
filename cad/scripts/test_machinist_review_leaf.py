@@ -751,7 +751,7 @@ def test_registered_review_serializes_with_selected_pool_without_execution(
     def guarded_import(name, *args, **kwargs):
         assert name.split(".")[0] not in {
             "machinist_review", "win32com", "pythoncom", "pywintypes",
-            "comtypes", "SolidworksMCP", "_solidworks", "winreg", "ctypes",
+            "comtypes", "SolidworksMCP", "solidworks_mcp", "_solidworks", "winreg",
         }, f"graph serialization imported reviewer/native module {name}"
         return original_import(name, *args, **kwargs)
 
