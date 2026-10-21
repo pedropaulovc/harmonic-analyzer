@@ -10,12 +10,14 @@ side-view details of the wheel axle print one stack setting each:
   step once it is fitted.
 - WHEEL ENDSHAKE (4:1) shows the stack. It prints the endshake between the
   wheel's spigot face and the front washer.
+- LEVER TIP DETAIL (4:1) shows the flat threaded tip beyond the far bracket
+  face, with the single imported ThreadProjection setting.
 
-Each detail is a cropped MG LEFT model view, dimensioned while uncropped and
-cropped after. On a native detail, the targeted import delivered nothing
-(the ch-amplitude-bar finding). The dimensions belong to construction chains
-the assembly saves blanked. Each view shows its chain in that view only
-before importing (the ms-measuring-stick ClampedSetting pattern).
+Each detail is an ordinary model view at its own physical orientation,
+dimensioned while uncropped and cropped after. On a native detail, the
+targeted import delivered nothing (the ch-amplitude-bar finding). The
+dimensions belong to construction chains the assembly saves blanked. Each
+view shows its own chain before importing (the ms-measuring-stick pattern).
 
 Sheet 2, WHEEL GROUP + BOM: the builder-owned MG_MAGNIFIER_EXPLODED
 presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
@@ -64,6 +66,7 @@ from _component_references import component_identity, component_reference_names
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
     callout_ink,
+    boxes_clear,
     move_annotation,
     require_inside,
     sheet_region,
@@ -109,6 +112,7 @@ from _drawing_view_configuration import (
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _layout_geometry import estimate_text_box
+from _layout_audit import arrowhead_segments
 from _session import run_build
 from mg_lever_thread_joint import ROD_DIA as LEVER_ROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
@@ -566,6 +570,7 @@ class StackDetail:
     # The parts the detail sets, named under its title (a blind reviewer of
     # run 20261012T192552713Z could not tell what the gauge presses).
     parts: str = ""
+    orientation: str = "*Right"
 
     @property
     def mm(self) -> float:
@@ -602,6 +607,38 @@ class StackDetail:
             self.centre[0] - LABEL_INSET,
             self.centre[1] - self.ink_drop_mm * self.mm - LABEL_GAP,
         )
+
+
+@dataclass(frozen=True)
+class LeverTipDetail:
+    """The real tip/far-face interface in a cropped Front view, not a section."""
+
+    title: str = notes.THREAD_PROJECTION_DETAIL_TITLE
+    orientation: str = "*Front"
+    scale: tuple[int, int] = (4, 1)
+    centre: tuple[float, float] = (0.100, 0.053)
+    crop_radius: float = 0.020  # 5 mm of model radius at 4:1
+    stems: frozenset[str] = frozenset({"mg-magnifying-lever", "mg-magnifying-bracket"})
+    label_xy: tuple[float, float] = (0.084, 0.029)
+
+    @property
+    def model_centre_m(self) -> tuple[float, float, float]:
+        return (
+            (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000.0,
+            stack.LEVER_AXIS_Y / 1000.0,
+            0.0,
+        )
+
+    @property
+    def label_text(self) -> str:
+        return f"{self.title}\nVIEW FROM THE BACK\nSCALE {self.scale[0]} : {self.scale[1]}"
+
+
+LEVER_TIP = LeverTipDetail()
+# R23's back caption starts at y=76.7929 mm; the isometric starts at
+# x=188.3131 mm. Native neighbour readbacks below, not these observations,
+# decide whether the new detail fits. No existing view or caption is moved.
+LEVER_TIP_FIELD = (0.025, 0.014, 0.180, 0.075)
 
 
 # The free field right of the isometric, above the title block. The gauge
@@ -685,12 +722,11 @@ def _activate(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
-def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
-    """``detail`` uncropped: an MG LEFT model view at its scale, moved so its
-    circle's centre lands on ``detail.centre``."""
+def _placed_detail(adapter: Any, detail: StackDetail | LeverTipDetail) -> Any:
+    """Place an uncropped model view by its transformed physical centre."""
     view = _early_bound(
         place_view(
-            adapter, str(SOURCE), stack.DRAWING_LEFT_VIEW, *detail.centre, scale=detail.scale
+            adapter, str(SOURCE), detail.orientation, *detail.centre, scale=detail.scale
         ),
         "IView",
     )
@@ -714,7 +750,7 @@ def _placed_detail(adapter: Any, detail: StackDetail) -> Any:
     return view
 
 
-def _crop(adapter: Any, view: Any, detail: StackDetail) -> None:
+def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None:
     """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
     in the active view's own sketch and Crop2 while it is still selected."""
     view = _early_bound(view, "IView")
@@ -858,7 +894,9 @@ def lever_keep(
     }
 
 
-def _thread_projection_text_box(adapter: Any, annotation: Any) -> tuple[float, float, float, float]:
+def _thread_projection_text_box(
+    adapter: Any, annotation: Any, *, include_shoulder: bool = True
+) -> tuple[float, float, float, float]:
     """Box the *whole* imported dimension, not just its primary value.
 
     Use the native shoulder extent plus every displayed text fragment, as in
@@ -910,7 +948,8 @@ def _thread_projection_text_box(adapter: Any, annotation: Any) -> tuple[float, f
     qualifier = " ".join(notes.LEVER_CALLOUTS[label].split())
     if qualifier not in " ".join(" ".join(texts).split()):
         raise RuntimeError(f"{label}: missing rendered qualifier ink: {texts!r}")
-    boxes.append(callout_ink(adapter, annotation, label=label).text)
+    if include_shoulder:
+        boxes.append(callout_ink(adapter, annotation, label=label).text)
     if any(
         not all(math.isfinite(value) for value in box)
         or box[0] >= box[2] or box[1] >= box[3]
@@ -937,6 +976,287 @@ def _fit_thread_projection(adapter: Any, annotation: Any) -> None:
     require_inside(label, box, region)
 
 
+def _projection_source(
+    adapter: Any, view: Any, annotation: Any, *, stage: str,
+    original: tuple[Any, ...] | None = None,
+) -> tuple[Any, ...]:
+    """Prove the imported source and its two original sketch-point attachments."""
+    name = stack.THREAD_PROJECTION_DIMENSION
+    _telemetry.info(f"{name} {stage}: collecting native source/attachment readers")
+    values: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    unavailable: dict[str, str] = {}
+
+    def read_field(field: str, reader: Callable[[], Any]) -> Any:
+        # As in the lever callout inventory: a failed reader must not hide
+        # the other native results. None is recorded, never invented on success.
+        try:
+            result = reader()
+        except Exception as exc:
+            errors[field] = f"{type(exc).__name__}: {exc}"
+            return None
+        values[field] = result
+        if result is None:
+            errors[field] = "native reader returned None"
+        return result
+
+    annotation = read_field("annotation", lambda: _early_bound(annotation, "IAnnotation"))
+    expected_owner = read_field("expected_owner", lambda: view_name(adapter, view))
+    display = dimension = tolerance = owner = None
+    if annotation is not None:
+        display = read_field(
+            "display", lambda: _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        )
+        read_field("entities", lambda: tuple(annotation.GetAttachedEntities3() or ()))
+        if "entities" in values:
+            values["entity_count"] = len(values["entities"])
+        else:
+            unavailable["entity_count"] = "entities"
+        read_field("types", lambda: tuple(annotation.GetAttachedEntityTypes() or ()))
+        read_field("dangling", lambda: annotation.IsDangling())
+        read_field("owner_type", lambda: annotation.OwnerType)
+        owner = read_field("owner", lambda: annotation.Owner)
+    else:
+        unavailable.update(dict.fromkeys(
+            ("display", "entities", "types", "dangling", "owner_type", "owner"), "annotation"
+        ))
+    if display is not None:
+        dimension = read_field("dimension", lambda: _early_bound(display.GetDimension2(0), "IDimension"))
+    else:
+        unavailable["dimension"] = "display"
+    if dimension is not None:
+        read_field("full_name", lambda: dimension.FullName)
+        read_field("value", lambda: dimension.SystemValue)
+        tolerance = read_field("tolerance", lambda: _early_bound(dimension.Tolerance, "IDimensionTolerance"))
+    else:
+        unavailable.update(dict.fromkeys(("full_name", "value", "tolerance"), "dimension"))
+    if tolerance is not None:
+        read_field("tolerance_type", lambda: tolerance.Type)
+    else:
+        unavailable["tolerance_type"] = "tolerance"
+    if owner is not None and values.get("owner_type") == 0:
+        read_field("owner_name", lambda: view_name(adapter, _early_bound(owner, "IView")))
+    else:
+        unavailable["owner_name"] = "owner handle or drawing-view owner type"
+    diagnostic = (
+        f"{name} {stage}: readers={values!r}; read_errors={errors!r}; "
+        f"unavailable={unavailable!r}"
+    )
+    _telemetry.info(diagnostic)
+    if errors or unavailable:
+        raise RuntimeError(f"{diagnostic}; native source/attachment inventory incomplete")
+    full_name = str(values["full_name"])
+    value = float(values["value"])
+    tolerance_type = int(values["tolerance_type"])
+    entities = values["entities"]
+    types = tuple(int(kind) for kind in values["types"])
+    dangling = bool(values["dangling"])
+    owner_type = int(values["owner_type"])
+    owner_name = values["owner_name"]
+    source_parts = full_name.split("@")
+    if (
+        len(source_parts) != 3
+        or source_parts[:2] != [name, stack.THREAD_FEATURE]
+        or source_parts[2].split(".")[0].casefold() != SOURCE.stem.casefold()
+        or not math.isfinite(value)
+        or abs(value - stack.THREAD_PROJECTION / 1000.0) > 1e-9
+        or tolerance_type != 0  # swTolNONE: the unchanged two-place template band
+    ):
+        raise RuntimeError(f"{diagnostic}; imported source/value/general band changed")
+    assert_imported_precision(
+        adapter, [annotation], stack.THREAD_DRAWING_PRECISION[stack.THREAD_FEATURE]
+    )
+    # build_mg_magnifier_assembly authors this dimension between leg.start
+    # and leg.end via _sketch.dimension_between. The adapter resolves both
+    # refs as ISketchPoint and selects both before AddHorizontalDimension2.
+    if (
+        dangling or len(entities) != 2 or len(types) != 2
+        or any(entity is None for entity in entities)
+        or any(kind not in (11, 25) for kind in types)  # sketch/external sketch points
+        or owner_type != 0 or owner_name != expected_owner
+    ):
+        raise RuntimeError(f"{diagnostic}; projection lost its view or sketch endpoints")
+    # GetAttachedEntityTypes establishes ISketchPoint before binding. Compare
+    # like interfaces, never an untyped dispatch against a typed native object.
+    points = tuple(_early_bound(entity, "ISketchPoint") for entity in entities)
+    if original is not None:
+        application = read_field("application", lambda: _early_bound(adapter.swApp, "ISldWorks"))
+        if application is None:
+            raise RuntimeError(f"{name} {stage}: endpoint identity unavailable; read_errors={errors!r}")
+        codes = tuple(
+            tuple(
+                read_field(
+                    f"endpoint[{i}][{j}]",
+                    lambda point=point, old=old: application.IsSame(point, old),
+                )
+                for j, old in enumerate(original)
+            )
+            for i, point in enumerate(points)
+        )
+        _telemetry.info(f"{diagnostic}; endpoint IsSame codes={codes}; read_errors={errors!r}")
+        if errors:
+            raise RuntimeError(
+                f"{name} {stage}: endpoint identity readers failed; codes={codes}; read_errors={errors!r}"
+            )
+        if not (
+            all(type(codes[i][i]) is int and codes[i][i] == 1 for i in range(2))
+            or all(type(codes[i][1 - i]) is int and codes[i][1 - i] == 1 for i in range(2))
+        ):
+            raise RuntimeError(f"{diagnostic}; endpoint identity changed: IsSame={codes}")
+    return points
+
+
+def _unique_projection(adapter: Any, view: Any, *, stage: str) -> Any:
+    """Re-resolve the single control across all sheets, including after Crop2."""
+    matches = []
+    for sheet_views in _early_bound(adapter.currentModel, "IDrawingDoc").GetViews() or ():
+        for candidate in sheet_views:
+            candidate = _early_bound(candidate, "IView")
+            for annotation in candidate.GetAnnotations() or ():
+                annotation = _early_bound(annotation, "IAnnotation")
+                if dimension_name(adapter, annotation) == stack.THREAD_PROJECTION_DIMENSION:
+                    matches.append((view_name(adapter, candidate), annotation))
+    expected = view_name(adapter, view)
+    if len(matches) != 1 or matches[0][0] != expected:
+        raise RuntimeError(
+            f"ThreadProjection {stage}: expected one control in {expected!r}, "
+            f"found {[name for name, _ in matches]!r}"
+        )
+    return matches[0][1]
+
+
+def _projection_note_box(note: Any) -> tuple[float, float, float, float]:
+    extent = tuple(float(value) for value in _early_bound(note, "INote").GetExtent())
+    if (
+        len(extent) != 6 or not all(math.isfinite(value) for value in extent)
+        or extent[0] >= extent[3] or extent[1] >= extent[4]
+    ):
+        raise RuntimeError(f"lever tip detail: invalid native note extent {extent!r}")
+    return extent[0], extent[1], extent[3], extent[4]
+
+
+def _projection_layout(
+    adapter: Any, view: Any, annotation: Any, caption: Any,
+    neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
+) -> None:
+    """Full dimension ink, actual note extents and the physical crop fence."""
+    label = LEVER_TIP.title
+    view = _early_bound(view, "IView")
+    view.UpdateViewDisplayGeometry()
+    if not view.IsCropped() or tuple(view.ScaleRatio) != LEVER_TIP.scale:
+        raise RuntimeError(f"{label}: crop or 4:1 scale changed")
+    x, y = model_point_in_view(adapter, view, LEVER_TIP.model_centre_m, label=label)
+    if max(abs(x - LEVER_TIP.centre[0]), abs(y - LEVER_TIP.centre[1])) > DETAIL_POSITION_TOL_M:
+        raise RuntimeError(f"{label}: physical crop centre moved to {(x, y)!r}")
+    r = LEVER_TIP.crop_radius
+    crop_box = (x - r, y - r, x + r, y + r)
+    text_box = _thread_projection_text_box(adapter, annotation, include_shoulder=False)
+    full_box = _thread_projection_text_box(adapter, annotation)
+    ink = callout_ink(adapter, annotation, label=stack.THREAD_PROJECTION_DIMENSION)
+    boxes = [full_box]
+    for line in ink.leader:
+        if not all(math.isfinite(value) for value in (line.x0, line.y0, line.x1, line.y1)):
+            raise RuntimeError(f"ThreadProjection: invalid native witness/leader {line!r}")
+        boxes.append((
+            min(line.x0, line.x1), min(line.y0, line.y1),
+            max(line.x0, line.x1), max(line.y0, line.y1),
+        ))
+    display = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
+    )
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    count = data.GetArrowHeadCount()
+    if type(count) is not int or count != 2:
+        raise RuntimeError(f"ThreadProjection: expected two native arrowheads, got {count!r}")
+    for index in range(count):
+        raw = tuple(float(value) for value in data.GetArrowHeadAtIndex2(index))
+        segments = arrowhead_segments(raw)
+        if len(raw) != 12 or not all(math.isfinite(value) for value in raw) or not segments:
+            raise RuntimeError(f"ThreadProjection: invalid native arrowhead {index}: {raw!r}")
+        boxes.extend(
+            (min(line.x0, line.x1), min(line.y0, line.y1),
+             max(line.x0, line.x1), max(line.y0, line.y1))
+            for line in segments
+        )
+    dimension_box = (
+        min(box[0] for box in boxes), min(box[1] for box in boxes),
+        max(box[2] for box in boxes), max(box[3] for box in boxes),
+    )
+    caption_box = _projection_note_box(caption)
+    region = sheet_region(adapter)
+    neighbours = [
+        TITLE_BLOCK,
+        *(_view_outline(other, label="lever-tip neighbour") for other in neighbour_views),
+        *(_projection_note_box(note) for note in neighbour_notes),
+    ]
+    for kind, box in (("crop", crop_box), ("dimension", dimension_box), ("caption", caption_box)):
+        require_inside(f"{label} {kind}", box, region)
+        if (
+            box[0] < LEVER_TIP_FIELD[0] or box[1] < LEVER_TIP_FIELD[1]
+            or box[2] > LEVER_TIP_FIELD[2] or box[3] > LEVER_TIP_FIELD[3]
+        ):
+            raise RuntimeError(f"{label} {kind} {box!r} leaves its reserved field")
+        if any(not boxes_clear(box, other) for other in neighbours):
+            raise RuntimeError(f"{label} {kind} {box!r} crowds a neighbouring view or note")
+    if not boxes_clear(text_box, crop_box):
+        raise RuntimeError(f"{label}: qualifier/value text overlaps the cropped geometry")
+    if not boxes_clear(caption_box, crop_box) or not boxes_clear(caption_box, dimension_box):
+        raise RuntimeError(f"{label}: caption crowds the crop or dimension ink")
+    _telemetry.info(
+        f"{label}: crop={crop_box}, full dimension ink={dimension_box}, caption={caption_box}"
+    )
+
+
+def _thread_projection_detail(
+    adapter: Any, neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
+) -> Callable[[], None]:
+    """Import the existing control once on the enlarged, isolated Front view."""
+    detail = LEVER_TIP
+    view = _placed_detail(adapter, detail)
+    _show_base_view_sketches(adapter, view, (stack.THREAD_FEATURE,), label=detail.title)
+    tip, face = model_points_in_view(
+        adapter, view,
+        ((stack.THREADED_TIP_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0),
+         (stack.THREAD_FAR_FACE_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0)),
+        label=detail.title, names=("flat threaded tip", "far bracket face"),
+    )
+    name = stack.THREAD_PROJECTION_DIMENSION
+    annotations = curate_view_dimensions(
+        adapter, view,
+        keep={name: (min(tip[0], face[0]) - 0.040, tip[1] - 0.004)},
+        view_label=detail.title, dimensions_by_feature=stack.THREAD_DRAWING_DIMENSIONS,
+    )
+    if len(annotations) != 1 or dimension_name(adapter, annotations[0]) != name:
+        raise RuntimeError(f"{detail.title}: targeted import did not return one {name}")
+    original = _projection_source(adapter, view, annotations[0], stage="uncropped import")
+    _crop(adapter, view, detail)
+    annotation = _unique_projection(adapter, view, stage="after crop")
+    _projection_source(adapter, view, annotation, stage="after crop", original=original)
+    set_dimension_callouts(
+        adapter, [annotation], {name: notes.LEVER_CALLOUTS[name]}, location="below"
+    )
+    _fit_thread_projection(adapter, annotation)
+    _activate(adapter, view, label=detail.title)
+    caption = add_note(adapter, detail.label_text, *detail.label_xy)
+    if caption is None:
+        raise RuntimeError(f"failed to label {detail.title}")
+    caption = _early_bound(caption, "INote")
+    if str(caption.GetText() or "").replace("\r\n", "\n") != detail.label_text:
+        raise RuntimeError(f"{detail.title}: native caption text changed")
+    rebuild_drawing(adapter, label=f"settle {detail.title} caption")
+
+    def settled() -> None:
+        _activate_sheet(adapter, SHEET_NAMES[0])
+        current = _unique_projection(adapter, view, stage="settled drawing")
+        _projection_source(adapter, view, current, stage="settled drawing", original=original)
+        display = _early_bound(current.GetSpecificAnnotation(), "IDisplayDimension")
+        _assert_lever_callouts([(name, display)], _printable_lever_callouts())
+        _projection_layout(adapter, view, current, caption, neighbour_views, neighbour_notes)
+
+    settled()
+    return settled
+
+
 def _lever_settings(
     adapter: Any, view: Any, source_step: Callable[[str], None]
 ) -> Callable[[], None]:
@@ -955,27 +1275,21 @@ def _lever_settings(
         names=("lever tip", "clamp centre", "fixture axis"),
     )
     _add_setting_axes(adapter, view)
-    _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE, stack.THREAD_FEATURE), label=LEVER_VIEW_LABEL)
-    projection = model_points_in_view(
-        adapter, view,
-        ((stack.THREADED_TIP_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0), (stack.THREAD_FAR_FACE_X / 1000.0, stack.LEVER_AXIS_Y / 1000.0, 0.0)),
-        label="threaded lever projection", names=("flat threaded tip", "far bracket face"),
-    )
+    _show_base_view_sketches(adapter, view, (stack.LEVER_FEATURE,), label=LEVER_VIEW_LABEL)
     keep = lever_keep(tip, clamp, fixture)
-    keep[stack.THREAD_PROJECTION_DIMENSION] = (projection[0][0] - 0.025, projection[0][1] - 0.020)
     annotations = curate_view_dimensions(
         adapter,
         view,
         keep=keep,
         view_label=LEVER_VIEW_LABEL,
-        dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS | stack.THREAD_DRAWING_DIMENSIONS,
+        dimensions_by_feature=stack.LEVER_DRAWING_DIMENSIONS,
     )
     assert_imported_precision(
         adapter,
         annotations,
         {
             name: places
-            for names in (stack.LEVER_DRAWING_PRECISION | stack.THREAD_DRAWING_PRECISION).values()
+            for names in stack.LEVER_DRAWING_PRECISION.values()
             for name, places in names.items()
         },
     )
@@ -989,29 +1303,17 @@ def _lever_settings(
         )
         for annotation in annotations
     ]
-    if sorted(name for name, _ in displays) != sorted(callouts):
+    if sorted(name for name, _ in displays) != sorted(keep):
         raise RuntimeError(
             f"{LEVER_VIEW_LABEL} imported {sorted(n for n, _ in displays)}"
         )
     _assert_callouts(displays, callouts)
     source_step("lever settings import and readback")
-    projection_annotation = next(
-        annotation for annotation in annotations
-        if dimension_name(adapter, annotation) == stack.THREAD_PROJECTION_DIMENSION
-    )
-    _fit_thread_projection(adapter, projection_annotation)
 
     def settled() -> None:
-        # finalize_drawing runs this after its last rebuild. The last active
-        # sheet may be the BOM; query the actual sheet-1 template border.
         _activate_sheet(adapter, SHEET_NAMES[0])
         _assert_callouts(displays, callouts)
         source_step("lever settings settled readback")
-        require_inside(
-            stack.THREAD_PROJECTION_DIMENSION,
-            _thread_projection_text_box(adapter, projection_annotation),
-            sheet_region(adapter),
-        )
 
     return settled
 
@@ -1743,8 +2045,7 @@ def _view_source_explode_offsets(
 def _place_assembled_sheet(
     adapter: Any, source_step: Callable[[str], None]
 ) -> tuple[Callable[[], None], ...]:
-    """Preserved back, left and isometric at 1:4, the lever settings on the
-    back view and the two axle-stack details."""
+    """Preserved assembled views, two base settings and three enlarged settings."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     source_step("assembled sheet activation")
     front = None
@@ -1767,16 +2068,30 @@ def _place_assembled_sheet(
             captioned.append((view, name))
     lever_settled = _lever_settings(adapter, front, source_step)
     stack_settled = _stack_dimensions(adapter, source_step)
+    captions = []
     for view, name in captioned:
-        _add_note_block(
+        captions.append(_add_note_block(
             adapter,
             SHEET_NAMES[0],
             ASSEMBLED_VIEW_CAPTIONS[name],
             caption_under(_view_outline(view, label=name), ASSEMBLED_VIEW_CAPTIONS[name]),
             label=f"{name} caption",
-        )
+        ))
         source_step(f"assembled {name} caption")
-    return lever_settled, stack_settled
+    # Only sheet 1 has model views at this point. Include the two existing
+    # axle crops and their native labels, not only the three principal views.
+    neighbours = tuple(
+        _early_bound(view, "IView")
+        for sheet_views in _early_bound(adapter.currentModel, "IDrawingDoc").GetViews()
+        for view in sheet_views[1:]
+    )
+    for view in neighbours:
+        for annotation in view.GetAnnotations() or ():
+            annotation = _early_bound(annotation, "IAnnotation")
+            if int(annotation.GetType()) == 6:  # swNote
+                captions.append(_early_bound(annotation.GetSpecificAnnotation(), "INote"))
+    projection_settled = _thread_projection_detail(adapter, neighbours, tuple(captions))
+    return lever_settled, stack_settled, projection_settled
 
 
 def _place_exploded_view(

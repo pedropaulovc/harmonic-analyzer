@@ -720,64 +720,515 @@ def test_thread_projection_checks_multiline_fragment_height(projection_native) -
         drawing._thread_projection_text_box(native.adapter, native.annotation)
 
 
-def test_lever_import_retains_source_and_checks_qualifier_after_final_rebuild(
-    monkeypatch, projection_native,
-) -> None:
-    native = projection_native
-    name = stack.THREAD_PROJECTION_DIMENSION
-    others = {
+def test_base_lever_import_excludes_projection_and_preserves_other_settings(monkeypatch) -> None:
+    annotations = {
         key: SimpleNamespace(GetSpecificAnnotation=lambda d=_Display({}): d)
-        for key in drawing.LEVER_CALLOUT_LOCATION if key != name
+        for key in (stack.CLAMP_STATION_DIMENSION, stack.FIXTURE_DROP_DIMENSION)
     }
-    annotations = {**others, name: native.annotation}
     by_id = {id(annotation): key for key, annotation in annotations.items()}
-    imports = []
-    precision = []
-    activated = []
-    point_reads = iter([
-        ((0.04, 0.21), (0.06, 0.21), (0.06, 0.19)),
-        ((0.042, 0.21), (0.0423125, 0.21)),
-    ])
-    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: next(point_reads))
+    imports, precision, shown = [], [], []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: (
+        (0.04, 0.21), (0.06, 0.21), (0.06, 0.19),
+    ))
     monkeypatch.setattr(drawing, "_add_setting_axes", lambda *_a: None)
-    monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches",
+        lambda _a, _v, features, **_k: shown.append(features),
+    )
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: by_id[id(annotation)])
-    monkeypatch.setattr(drawing, "_activate_sheet", lambda _a, sheet: activated.append(sheet))
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
 
     def curate(_adapter, view, **kwargs):
         imports.append((view, kwargs))
-        native.annotation.position = (*kwargs["keep"][name], 0.0)
         return list(annotations.values())
 
     def callouts(_adapter, imported, values, *, location):
         assert imported == list(annotations.values())
         for key, value in values.items():
-            display = annotations[key].GetSpecificAnnotation()
-            display.parts[drawing.CALLOUT_TEXT_PART[location]] = value
+            annotations[key].GetSpecificAnnotation().parts[drawing.CALLOUT_TEXT_PART[location]] = value
 
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
     monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: precision.append(args))
     view = object()
-    settled = drawing._lever_settings(native.adapter, view)
-    assert len(imports) == 1 and imports[0][0] is view
-    assert imports[0][1]["dimensions_by_feature"] == (
-        stack.LEVER_DRAWING_DIMENSIONS | stack.THREAD_DRAWING_DIMENSIONS
+    settled = drawing._lever_settings(object(), view)
+    assert imports == [(view, {
+        "keep": drawing.lever_keep((0.04, 0.21), (0.06, 0.21), (0.06, 0.19)),
+        "view_label": drawing.LEVER_VIEW_LABEL,
+        "dimensions_by_feature": stack.LEVER_DRAWING_DIMENSIONS,
+    })]
+    assert shown == [(stack.LEVER_FEATURE,)]
+    assert stack.THREAD_PROJECTION_DIMENSION not in imports[0][1]["keep"]
+    assert precision[0][2] == stack.LEVER_DRAWING_PRECISION[stack.LEVER_FEATURE]
+    settled()
+    annotations[stack.FIXTURE_DROP_DIMENSION].GetSpecificAnnotation().parts[4] = ""
+    with pytest.raises(RuntimeError, match="below callout"):
+        settled()
+
+
+@pytest.fixture
+def lever_tip_native(monkeypatch, projection_native):
+    """Execute the real detail construction and guards with native boundary doubles."""
+    import _drawing_dimensions as dimensions
+
+    native = projection_native
+    native.annotations = []
+    native.imports = []
+    native.shown = []
+    native.precision = 2
+    native.cropped = False
+    native.drop_on_crop = False
+    native.arrow_x = None
+    native.line_x = None
+    native.caption_extent = [0.0836475, 0.0151, 0.0, 0.132, 0.0293289, 0.0]
+    native.view = SimpleNamespace(
+        name="lever tip detail", GetAnnotations=lambda: native.annotations,
+        ScaleRatio=(4, 1), IsCropped=lambda: native.cropped,
+        UpdateViewDisplayGeometry=lambda: None,
     )
-    assert imports[0][1]["keep"][name] == pytest.approx((0.017, 0.190))
-    assert precision[0][2][name] == stack.THREAD_DRAWING_PRECISION[stack.THREAD_FEATURE][name]
+    native.base = SimpleNamespace(name="base", GetAnnotations=lambda: [])
+    native.sheet_view = SimpleNamespace(name="sheet", GetAnnotations=lambda: [])
+    native.sheets = [[native.sheet_view, native.base, native.view]]
+    native.adapter.currentModel.GetViews = lambda: native.sheets
+    native.adapter.swApp = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    native.annotation.Owner = native.view
+    native.annotation.OwnerType = 0
+    native.annotation.GetAttachedEntities3 = lambda: native.annotation.endpoints
+    native.annotation.GetAttachedEntityTypes = lambda: (11, 11)
+    native.annotation.IsDangling = lambda: False
+    native.display.GetPrimaryPrecision2 = lambda: native.precision
+    native.caption = SimpleNamespace(
+        GetText=lambda: drawing.LEVER_TIP.label_text,
+        GetExtent=lambda: native.caption_extent,
+    )
+    native.neighbour = SimpleNamespace(GetOutline=lambda: (0.035, 0.085, 0.105, 0.215))
+    native.back_caption = SimpleNamespace(
+        GetExtent=lambda: (0.0486244, 0.0767929, 0.0, 0.0972344, 0.0815586, 0.0)
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda _a, view: view.name)
+    name = stack.THREAD_PROJECTION_DIMENSION
+    def identify(_a, ann):
+        return name if ann is native.annotation else ""
+
+    monkeypatch.setattr(drawing, "dimension_name", identify)
+    monkeypatch.setattr(dimensions, "dimension_name", identify)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: native.events.append(("activate",)))
+    monkeypatch.setattr(drawing, "_placed_detail", lambda _a, detail: native.view)
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches",
+        lambda _a, _v, features, **_k: native.shown.append(features),
+    )
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda *_a, **_k: drawing.LEVER_TIP.centre
+    )
+
+    def projected(_adapter, view, points, **_kwargs):
+        assert view is native.view
+        assert points == (
+            (stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+            (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+        )
+        x, y = drawing.LEVER_TIP.centre
+        half_gap = stack.THREAD_PROJECTION / 1000 * 4 / 2
+        return (x - half_gap, y), (x + half_gap, y)
+
+    monkeypatch.setattr(drawing, "model_points_in_view", projected)
+
+    def curate(_adapter, view, **kwargs):
+        assert not native.cropped
+        native.imports.append((view, kwargs))
+        native.annotation.position = (*kwargs["keep"][name], 0.0)
+        native.annotations.append(native.annotation)
+        return [native.annotation]
+
+    def crop(_adapter, view, detail):
+        assert view is native.view and detail is drawing.LEVER_TIP
+        assert native.annotations == [native.annotation]
+        native.events.append(("crop",))
+        native.cropped = True
+        if native.drop_on_crop:
+            native.annotations.clear()
+
+    def callouts(_adapter, annotations, texts, *, location):
+        assert native.cropped and annotations == [native.annotation]
+        native.display.parts[drawing.CALLOUT_TEXT_PART[location]] = texts[name]
+
+    def label(_adapter, text, x, y):
+        assert text == drawing.LEVER_TIP.label_text
+        assert (x, y) == drawing.LEVER_TIP.label_xy
+        native.events.append(("caption", text))
+        return native.caption
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop", crop)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", callouts)
+    monkeypatch.setattr(drawing, "add_note", label)
+    native.data.GetLineCount = lambda: 3
+
+    def line(index):
+        x, y, _ = native.annotation.position
+        tip, face = projected(native.adapter, native.view, (
+            (stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+            (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+        ))
+        segments = [
+            (x - 0.010, y - 0.012, face[0], y - 0.012),
+            (tip[0], tip[1], tip[0], y - 0.014),
+            (face[0], face[1], face[0], y - 0.014),
+        ]
+        x0, y0, x1, y1 = segments[index]
+        if native.line_x is not None and index == 1:
+            x0 = native.line_x
+        return (0, 0, 0, 0, x0, y0, 0, x1, y1, 0)
+
+    native.data.GetLineAtIndex2 = line
+    native.data.GetArrowHeadCount = lambda: 2
+    native.data.GetArrowHeadAtIndex2 = lambda index: (
+        native.arrow_x if native.arrow_x is not None else (0.0975, 0.1025)[index],
+        native.annotation.position[1] - 0.012, 0.0,
+        (-1.0, 1.0)[index], 0.0, 0.0, 0.0035, 0.0007, 0.0, 0.0, 0.0, 1.0,
+    )
+    return native
+
+
+def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lever_tip_native):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,)
+    )
+    assert len(native.imports) == 1
+    view, args = native.imports[0]
+    assert view is native.view
+    assert args["dimensions_by_feature"] == stack.THREAD_DRAWING_DIMENSIONS
+    assert set(args["keep"]) == {stack.THREAD_PROJECTION_DIMENSION}
+    assert native.shown == [(stack.THREAD_FEATURE,)]
     assert native.annotation.source is native.source
     assert native.annotation.endpoints is native.endpoints
-    assert native.annotation.owner is native.owner
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0
+    assert "VIEW FROM THE BACK" in native.caption.GetText()
+    assert native.caption.GetText().count("\n") == 2
     settled()
-    assert activated[-1] == drawing.SHEET_NAMES[0]
-    # Simulate a later native rebuild moving only the qualifier outside the
-    # live sheet border; value/shoulder and stored GetText remain unchanged.
     native.rows[1]["position"] = (-0.100, -0.003, 0.0)
     moves = sum(event[0] == "move" for event in native.events)
     with pytest.raises(RuntimeError, match="crosses the zone frame"):
         settled()
     assert sum(event[0] == "move" for event in native.events) == moves
+
+
+@pytest.mark.parametrize("failure", [
+    "source", "value", "nonfinite-value", "band", "precision", "owner",
+    "dangling", "null-point", "entity-type", "replacement", "bool-identity",
+    "missing", "duplicate",
+])
+def test_projection_detail_refuses_lost_authority_after_rebuild(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    if failure == "source":
+        native.source.FullName = f"ThreadProjection@OtherChain@{drawing.SOURCE.stem}"
+    elif failure == "value":
+        native.source.SystemValue += 0.0001
+    elif failure == "nonfinite-value":
+        native.source.SystemValue = float("nan")
+    elif failure == "band":
+        native.source.Tolerance.Type = 4
+    elif failure == "precision":
+        native.precision = 1
+    elif failure == "owner":
+        native.annotation.Owner = native.base
+    elif failure == "dangling":
+        native.annotation.IsDangling = lambda: True
+    elif failure == "null-point":
+        native.annotation.endpoints = (None, native.endpoints[1])
+    elif failure == "entity-type":
+        native.annotation.GetAttachedEntityTypes = lambda: (0, 11)
+    elif failure == "replacement":
+        native.annotation.endpoints = (object(), native.endpoints[1])
+    elif failure == "bool-identity":
+        native.adapter.swApp.IsSame = lambda a, b: a is b
+    elif failure == "missing":
+        native.annotations.clear()
+    else:
+        native.base.GetAnnotations = lambda: [native.annotation]
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_projection_detail_refuses_import_lost_to_crop(lever_tip_native):
+    native = lever_tip_native
+    native.drop_on_crop = True
+    with pytest.raises(RuntimeError, match="after crop.*expected one control"):
+        drawing._thread_projection_detail(native.adapter, (), ())
+
+
+@pytest.mark.parametrize("failed_reader", ["entities", "types", "owner", "display", "all"])
+def test_projection_source_inventories_independent_reader_failures(
+    monkeypatch, lever_tip_native, failed_reader,
+):
+    native = lever_tip_native
+    events = []
+    messages = []
+    failed = {"entities", "types", "owner"} if failed_reader == "all" else {failed_reader}
+
+    def reader(field, value):
+        events.append(field)
+        if field in failed:
+            raise RuntimeError(f"{field} native failure")
+        return value
+
+    def log(message, **_kwargs):
+        messages.append(message)
+        events.append("log")
+
+    monkeypatch.setattr(drawing._telemetry, "info", log)
+    native.annotation.GetSpecificAnnotation = lambda: reader("display", native.display)
+    native.annotation.GetAttachedEntities3 = lambda: reader("entities", native.endpoints)
+    native.annotation.GetAttachedEntityTypes = lambda: reader("types", (11, 11))
+    native.annotation.IsDangling = lambda: reader("dangling", False)
+    monkeypatch.setattr(
+        type(native.annotation), "Owner",
+        property(lambda _self: reader("owner", native.view)), raising=False,
+    )
+    with pytest.raises(RuntimeError, match="inventory incomplete"):
+        drawing._projection_source(
+            native.adapter, native.view, native.annotation, stage="after crop diagnostic",
+        )
+    assert events[0] == "log"
+    assert "after crop diagnostic" in messages[0]
+    assert all(field in events for field in ("display", "entities", "types", "dangling", "owner"))
+    inventory = messages[-1]
+    assert "'dangling': False" in inventory
+    assert "'owner_type': 0" in inventory
+    for field in failed:
+        assert f"{field} native failure" in inventory
+    if failed_reader == "display":
+        assert "'dimension': 'display'" in inventory
+        assert "'types': (11, 11)" in inventory
+        assert "'entity_count': 2" in inventory
+    else:
+        assert native.source.FullName in inventory
+        assert f"'value': {native.source.SystemValue!r}" in inventory
+        assert "'tolerance_type': 0" in inventory
+
+
+def test_projection_source_collects_all_identity_codes_before_reader_failure(
+    monkeypatch, lever_tip_native,
+):
+    native = lever_tip_native
+    calls, messages = [], []
+
+    def same(point, old):
+        calls.append((point, old))
+        if point is native.endpoints[0] and old is native.endpoints[0]:
+            raise RuntimeError("first endpoint reader failed")
+        return int(point is old)
+
+    native.adapter.swApp.IsSame = same
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **_kw: messages.append(message))
+    with pytest.raises(RuntimeError, match="endpoint identity readers failed"):
+        drawing._projection_source(
+            native.adapter, native.view, native.annotation,
+            stage="settled diagnostic", original=native.endpoints,
+        )
+    assert calls == [(point, old) for point in native.endpoints for old in native.endpoints]
+    assert "codes=((None, 0), (0, 1))" in messages[-1]
+    assert "first endpoint reader failed" in messages[-1]
+
+
+@pytest.mark.parametrize("failure", [
+    "arrow-border", "witness-border", "caption-border", "caption-crop",
+    "neighbour-caption", "neighbour-view", "scale", "uncropped", "missing-arrows",
+    "nonfinite-witness",
+])
+def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,)
+    )
+    if failure == "arrow-border":
+        native.arrow_x = 0.012
+    elif failure == "witness-border":
+        native.line_x = 0.012
+    elif failure == "nonfinite-witness":
+        native.line_x = float("nan")
+    elif failure == "caption-border":
+        native.caption_extent[1] = 0.012
+    elif failure == "caption-crop":
+        native.caption_extent[4] = 0.036
+    elif failure == "neighbour-caption":
+        native.back_caption.GetExtent = lambda: (0.080, 0.070, 0, 0.130, 0.080, 0)
+    elif failure == "neighbour-view":
+        native.neighbour.GetOutline = lambda: (0.090, 0.070, 0.150, 0.120)
+    elif failure == "scale":
+        native.view.ScaleRatio = (1, 4)
+    elif failure == "uncropped":
+        native.cropped = False
+    else:
+        native.data.GetArrowHeadCount = lambda: 0
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_step_seven_uses_the_actual_detail_and_attached_qualifier():
+    step = notes.STEP_TEXT[steps.LEVER_THREADED_KEY]
+    qualifier = " ".join(notes.LEVER_CALLOUTS[stack.THREAD_PROJECTION_DIMENSION].split())
+    assert qualifier in step
+    assert drawing.LEVER_TIP.title in step
+    assert "THREAD PROJECTION" not in step
+    assert "NO LOCKNUT, SET SCREW OR ADHESIVE" in step
+    assert "THE PLAIN ROD HAS NO SHOULDER" in step
+    assert "1.25" not in step
+
+
+def test_lever_tip_placement_uses_physical_front_transform_and_native_isolation(monkeypatch):
+    events = []
+    detail = drawing.LEVER_TIP
+    view = SimpleNamespace(Position=detail.centre)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        EditRebuild3=lambda: events.append(("rebuild",)) or True,
+    ))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        events.append(("place", source, orientation, (x, y), scale))
+        return view
+
+    def projected(_adapter, actual_view, point, *, label):
+        assert actual_view is view
+        assert point == (
+            (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000,
+            stack.LEVER_AXIS_Y / 1000, 0.0,
+        )
+        return view.Position[0] + 0.040, view.Position[1] - 0.017
+
+    def move(target, move_relative):
+        assert move_relative is False
+        view.Position = target
+        events.append(("move", target))
+        return True
+
+    view.SetViewPosition = move
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", projected)
+    monkeypatch.setattr(
+        drawing, "apply_view_configuration",
+        lambda _a, _v, **kwargs: events.append(("configuration", kwargs["role"])),
+    )
+    monkeypatch.setattr(
+        drawing, "set_hidden_lines_removed", lambda _a, _v: events.append(("HLR",))
+    )
+    monkeypatch.setattr(
+        drawing, "isolate_drawing_view_components",
+        lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])),
+    )
+    assert drawing._placed_detail(adapter, detail) is view
+    assert events[0] == ("place", str(drawing.SOURCE), "*Front", detail.centre, (4, 1))
+    assert view.Position == pytest.approx((0.060, 0.070))
+    assert events[-2:] == [
+        ("HLR",), ("isolate", frozenset({"mg-magnifying-lever", "mg-magnifying-bracket"})),
+    ]
+    assert drawing.PRESSED.orientation == drawing.ENDSHAKE.orientation == "*Right"
+    half_span_m = stack.THREAD_PROJECTION / 1000 * detail.scale[0] / detail.scale[1] / 2
+    assert half_span_m < detail.crop_radius
+    assert math.hypot(half_span_m, drawing._LEVER_R * 0.004) < detail.crop_radius
+
+
+@pytest.mark.parametrize("status,cropped", [(drawing.CROP_NO_ERROR, True), (0, False)])
+def test_lever_tip_reuses_native_crop_sketch_transform(monkeypatch, status, cropped):
+    events = []
+    transform = object()
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = values
+
+        def MultiplyTransform(self, actual):
+            assert actual is transform
+            x, y, z = self.ArrayData
+            return Point((x / 4, y / 4, z))
+
+    manager = SimpleNamespace(AddToDB=True)
+    manager.CreateCircle = lambda *points: events.append(("circle", points)) or object()
+    view = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=transform),
+        Crop2=lambda *args: events.append(("Crop2", args)) or status,
+        IsCropped=lambda: cropped,
+        UpdateViewDisplayGeometry=lambda: events.append(("refresh",)),
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            SketchManager=manager,
+            ClearSelection2=lambda value: events.append(("clear", value)),
+            EditRebuild3=lambda: events.append(("rebuild",)) or True,
+        ),
+        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point)),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    if cropped:
+        drawing._crop(adapter, view, drawing.LEVER_TIP)
+    else:
+        with pytest.raises(RuntimeError, match="not cropped"):
+            drawing._crop(adapter, view, drawing.LEVER_TIP)
+    cx, cy = drawing.LEVER_TIP.centre
+    radius = drawing.LEVER_TIP.crop_radius
+    assert events[0] == ("circle", (cx / 4, cy / 4, 0.0, (cx + radius) / 4, cy / 4, 0.0))
+    assert events[1] == ("Crop2", (False, False, 1))
+    assert events[-1] == ("refresh",)
+    assert manager.AddToDB is True
+
+
+def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(monkeypatch):
+    views, captions, projection_calls = [], [], []
+    base_check, stack_check, projection_check = (lambda: None), (lambda: None), (lambda: None)
+    sheet_view = object()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        GetViews=lambda: [(sheet_view, *views), (object(),)],
+    ))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
+    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *_a, **_k: None)
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        assert source == str(drawing.SOURCE) and scale == drawing.SHEET_SCALE
+        view = SimpleNamespace(
+            orientation=orientation, GetAnnotations=lambda: [],
+            GetOutline=lambda: (x - 0.01, y - 0.02, x + 0.01, y + 0.02),
+        )
+        views.append(view)
+        return view
+
+    def stacks(_adapter):
+        for _ in range(2):
+            label = object()
+            annotation = SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda n=label: n)
+            views.append(SimpleNamespace(GetAnnotations=lambda a=annotation: [a]))
+        return stack_check
+
+    def caption(*args, **kwargs):
+        note = object()
+        captions.append(note)
+        return note
+
+    def detail(_adapter, neighbours, notes):
+        projection_calls.append((neighbours, notes))
+        return projection_check
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "_lever_settings", lambda _a, view: base_check)
+    monkeypatch.setattr(drawing, "_stack_dimensions", stacks)
+    monkeypatch.setattr(drawing, "_add_note_block", caption)
+    monkeypatch.setattr(drawing, "_thread_projection_detail", detail)
+    assert drawing._place_assembled_sheet(adapter) == (base_check, stack_check, projection_check)
+    assert [view.orientation for view in views[:3]] == ["*Front", "*Right", "*Isometric"]
+    assert len(projection_calls) == 1
+    neighbours, notes = projection_calls[0]
+    assert neighbours == tuple(views) and len(neighbours) == 5
+    assert notes[:2] == tuple(captions) and len(notes) == 4
 
 
 @pytest.mark.parametrize(
@@ -1284,8 +1735,8 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     printed_rows = note.GetText().splitlines()
     assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
     assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
-    # Keep all five rows (one/two/two per check), the same insertion point,
-    # and the original steps column. No new pressure above or below the note.
+    # Keep all five CHECK rows and the original steps column. A changed step
+    # may move the check block only through the existing line-count formula.
     assert len(printed_rows) == len(old_rows) == 5
     assert [i for i, row in enumerate(printed_rows) if row.startswith("CHECK:")] == [0, 1, 3]
     assert drawing.ASSEMBLY_STEPS == drawing._wrapped(
@@ -1300,10 +1751,11 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     points_per_m = 72 / 0.0254
     old_width = max(sum(advances[c] for c in row) for row in old_rows)
     new_width = max(sum(advances[c] for c in row) for row in printed_rows)
+    vertical_shift = drawing.CHECKS_XY[1] - 0.0798  # R22 native insertion y
     predicted_extent = (
-        native_extent[0], native_extent[1],
+        native_extent[0], native_extent[1] + vertical_shift,
         native_extent[2] + (new_width - old_width) / points_per_m,
-        native_extent[3],
+        native_extent[3] + vertical_shift,
     )
     drawing.require_inside(
         "assembly checks", predicted_extent, DrawableRegion(*drawing.INNER_BORDER)

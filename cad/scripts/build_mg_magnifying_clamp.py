@@ -3,8 +3,8 @@ r"""Reproduction script: magnifying-lever clamp (MHA-MG-02; book ch. 20 p. 48).
 A vertical length of 1/2 in hex brass that slides along the magnifying lever
 (#1559 owner ruling): the full-body quarter-inch lever passes across the
 corners. The top #4-40 thumb screw pinches it; the bottom MHA-MG-04 rod
-shoulder seats on the opposite end. Each tap entry has an actual-flat normal
-location and a direct transverse bore-rim location, not an assumed common axis.
+shoulder seats on the opposite end. Each tap entry has actual diagonal-flat
+and common Z-flat locations; nominal common axes are not manufactured authority.
 
 Layout (part frame, ``mg_magnifying_clamp_geom``): origin at the bottom-face
 centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
@@ -12,7 +12,7 @@ centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
 * ``HexProfile``: the 1/2 hex on the Top plane (sketch (x, y) -> model
   (X, -Z)), corners on the sketch's horizontal axis, extruded +Y as ``Block``
   (``Height``). The regular section centres only the nominal CAD origin.
-  Five linked native dimensions own the flat and relative-axis locations.
+  Five linked native dimensions own the two diagonal and three common-flat locations.
 * ``LeverBoreProfile``: the Ø6.50 drilled lever bore, a Right-plane circle on
   the hex axis at ``LeverBoreYDim``, cut mid-plane through both corners.
 * ``ThumbTap``: blind Hole Wizard #4-40 from the top face on the hex axis,
@@ -45,14 +45,12 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
 from _holes import blind_hole_volume_mm3, cross_hole_volume_mm3, wizard_holes
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
-from _printed_tolerance import drilled_oversize_mm
 from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
@@ -71,7 +69,6 @@ from mg_magnifying_clamp_geom import (
     HEX_AF,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
-    RELATIVE_AXIS_BAND,
     ROD_TAP_DRILL_DIA,
     THUMB_TAP_DRILL_DEPTH,
     THUMB_TAP_SPEC,
@@ -269,21 +266,27 @@ def _require_location_selection(
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    count = int(manager.GetSelectedObjectCount2(-1))
-    selected = tuple(manager.GetSelectedObject6(index, -1) for index in range(1, count + 1))
-    types = tuple(int(manager.GetSelectedObjectType3(index, -1)) for index in range(1, count + 1))
-    actual_key = expected_key = None
+    count = actual_key = expected_key = None
+    selected_list, type_list = [], []
     point_keys = ()
     readback_error = None
     error = ""
-    if count != 2:
-        error = "expected two selected objects"
-    elif any(entity is None for entity in selected):
-        error = "selected object unavailable"
-    elif types[0] not in _SKETCH_POINT_SELECTION_TYPES or types[1] != 10:  # swSelSKETCHSEGS
-        error = "expected native sketch point and sketch segment selection types"
-    else:
-        try:
+    try:
+        count = manager.GetSelectedObjectCount2(-1)
+        if type(count) is not int or count < 0:
+            error = "native selection count unavailable"
+        else:
+            for index in range(1, count + 1):
+                type_list.append(manager.GetSelectedObjectType3(index, -1))
+                selected_list.append(manager.GetSelectedObject6(index, -1))
+        if not error and count != 2:
+            error = "expected two selected objects"
+        elif not error and any(entity is None for entity in selected_list):
+            error = "selected object unavailable"
+        elif not error and (any(type(kind) is not int for kind in type_list) or type_list[0] not in _SKETCH_POINT_SELECTION_TYPES or type_list[1] != 10):
+            error = "expected native sketch point and sketch segment selection types"
+        if not error:
+            selected = tuple(selected_list)
             if point is not None:
                 point_keys = tuple(_point_identity(adapter, entity, stage=stage, role=role) for role, entity in (("selected-point", selected[0]), ("expected-point", point)))
                 if point_keys[0] != point_keys[1]:
@@ -292,9 +295,10 @@ def _require_location_selection(
             expected_key = _segment_identity(adapter, segment, stage=stage, role="expected")
             if actual_key != expected_key:
                 error = "actual selected segment owner/type/ID differs"
-        except Exception as exc:
-            readback_error = exc
-            error = str(exc)
+    except Exception as exc:
+        readback_error = exc
+        error = str(exc)
+    selected, types = tuple(selected_list), tuple(type_list)
     detail = f"stage={stage}, count={count}, types={types}, point_keys={point_keys!r}, segment={actual_key!r}, expected_segment={expected_key!r}, readback_error={readback_error!r}"
     _telemetry.info(
         f"clamp native selection: {detail}",
@@ -408,8 +412,8 @@ def _location_sources(adapter: Any) -> dict[str, tuple[str, Any, str, tuple[tupl
         (thumb_profile, "ThumbTap", "top", BLOCK_HEIGHT),
         (rod_profile, "RodTap", "bottom", 0.0),
     ):
-        # One ordinary stock-flat location plus direct bore-rim location
-        # controls both entry coordinates without a derived stock midplane.
+        # The diagonal normal plus the common Z-flat baseline controls both
+        # entry coordinates without deriving a stock midplane.
         diagonal = _stock_edge(faces[key], ((r, y, 0.0), (r / 2.0, y, a)))
         circle = _tap_entry_circle(faces[key], y)
         sources[profile] = ("Top", circle, "IEntity", ((f"{prefix}FromDiagonalFlat", diagonal),))
@@ -426,8 +430,10 @@ def _location_sources(adapter: Any) -> dict[str, tuple[str, Any, str, tuple[tupl
     return sources
 
 
-def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> None:
+def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> Any:
     """Native perpendicular point-to-line measurement, never an adapter drive."""
+    import _telemetry
+
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     application = _early_bound(adapter.swApp, "ISldWorks")
     # Entering a new sketch can reset input suppression (stock-carrier pattern).
@@ -439,19 +445,44 @@ def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> None:
     _native_select(adapter, center, "ISketchPoint", append=False)
     _native_select(adapter, flat, "ISketchSegment", append=True)
     _require_location_selection(adapter, flat, point=center, stage=f"{name}.point-flat.before-create")
-    raw = model.AddDimension2(0.02, 0.02, 0.0)
+    raw, constructor_error = None, None
+    try:
+        raw = model.AddDimension2(0.02, 0.02, 0.0)
+    except Exception as exc:
+        constructor_error = exc
+    _telemetry.info(
+        f"clamp native point-flat constructor: name={name}, created={raw is not None}, error={constructor_error!r}",
+        operation_stage=f"{name}.point-flat-constructor", native_created=raw is not None,
+        native_method="IModelDoc2.AddDimension2", placement_m=(0.02, 0.02, 0.0),
+        constructor_error=repr(constructor_error),
+    )
     model.ClearSelection2(True)
     if raw is None:
-        raise RuntimeError(f"{name}: native point-to-flat dimension failed")
+        raise RuntimeError(f"{name}: native point-to-flat dimension failed: {constructor_error!r}") from constructor_error
     display = _early_bound(raw, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     dimension.DrivenState = 1
     dimension.Name = name
     display.ShowParenthesis = False
-    if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or display.ShowParenthesis is not False:
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 0  # swTolNONE: ordinary .XX location, not an explicit rim band.
+    retained_type, retained_state, retained_name = tolerance.Type, dimension.DrivenState, dimension.Name
+    retained_reference, retained_value = display.ShowParenthesis, dimension.SystemValue
+    _telemetry.info(
+        f"clamp native location readback: name={name}, actual_name={retained_name!r}, state={retained_state!r}, reference={retained_reference!r}, value_m={retained_value!r}, tolerance={retained_type!r}",
+        operation_stage=f"{name}.point-flat-readback", actual_dimension_name=repr(retained_name),
+        native_driven_state=repr(retained_state), native_reference=repr(retained_reference),
+        native_value_m=repr(retained_value), native_tolerance_type=repr(retained_type),
+    )
+    if type(retained_type) is not int or retained_type != 0:
+        raise RuntimeError(f"{name}: ordinary location tolerance did not persist")
+    if type(retained_state) is not int or retained_state != 1 or retained_name != name or retained_reference is not False:
         raise RuntimeError(f"{name}: native measured manufacturing dimension did not persist")
-    if not math.isclose(float(dimension.SystemValue) * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
-        raise RuntimeError(f"{name}: measurement is not the normal distance to the actual flat")
+    if type(retained_value) not in (int, float) or not math.isclose(retained_value * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
+        raise RuntimeError(f"{name}: measurement is not the normal distance to the actual flat: {retained_value!r} m")
+    if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-create") != _point_identity(adapter, center, stage=f"{name}.after-create", role="expected-location"):
+        raise RuntimeError(f"{name}: native dimension is not attached to its actual point")
+    return display
 
 
 def _tap_placement_points(adapter: Any) -> dict[str, Any]:
@@ -471,7 +502,7 @@ def _tap_placement_points(adapter: Any) -> dict[str, Any]:
                     status = sketch.GetConstrainedStatus()
                     if type(status) is not int or status != 3:
                         raise RuntimeError(f"{name}: native placement is not fully defined: {status!r}")
-                    points[f"{name}ToBoreRim"] = _early_bound(candidates[0], "ISketchPoint")
+                    points[f"{name}FromZFlat"] = _early_bound(candidates[0], "ISketchPoint")
                     break
             child = native.GetNextSubFeature()
         else:
@@ -712,8 +743,8 @@ def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any,
     return _early_bound(points[0][1], "ISketchPoint"), _early_bound(points[1][1], "ISketchPoint")
 
 
-def _assert_relative_witness(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str) -> tuple[Any, Any]:
-    """A constrained transverse line measures the actual tap axis to actual rim."""
+def _assert_tap_projection(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str) -> tuple[Any, Any]:
+    """Prove the actual tap's transverse projection; the rim only anchors construction."""
     import _telemetry
 
     native = _early_bound(line, "ISketchSegment")
@@ -744,7 +775,7 @@ def _assert_relative_witness(adapter: Any, line: Any, point: Any, circle: Any, *
     return start, end
 
 
-def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -> Any:
+def _create_tap_projection(adapter: Any, point: Any, circle: Any, name: str) -> Any:
     from solidworks_mcp.adapters.com_variant import dispatch_array
     import _telemetry
 
@@ -850,110 +881,76 @@ def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -
         if after_error is not None:
             raise RuntimeError(f"{name}: native post-constraint relation inventory unavailable") from after_error
         _require_witness_relation(adapter, after, kind, points, segment, stage=f"{name}.created-constraint")
-    _assert_relative_witness(adapter, line, point, circle, stage=f"{name}.before-dimension")
+    _assert_tap_projection(adapter, line, point, circle, stage=f"{name}.before-dimension")
     return line
 
 
-def _assert_relative_attachment(adapter: Any, display: Any, point: Any, circle: Any, *, name: str, stage: str) -> tuple[Any, ...]:
-    """Recover the unique measured line from real endpoint attachments, then prove its sources."""
+def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str) -> tuple[str, str, int, int]:
+    """Read actual point/flat attachments and prove the exact common datum segment."""
     import _telemetry
 
-    attached = types = attached_keys = ()
+    attached = types = ()
+    point_key = flat_key = expected_flat = error = None
     dangling = None
-    matches, error = [], None
     try:
-        native_display = _early_bound(display, "IDisplayDimension")
-        annotation = _early_bound(native_display.GetAnnotation(), "IAnnotation")
+        annotation = _early_bound(_early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
         attached = tuple(annotation.GetAttachedEntities3() or ())
         types = tuple(annotation.GetAttachedEntityTypes() or ())
         dangling = annotation.IsDangling()
-        if len(attached) != 2 or len(types) != 2 or any(type(kind) is not int or kind not in _SKETCH_POINT_SELECTION_TYPES for kind in types) or any(value is None for value in attached) or dangling is not False:
-            raise RuntimeError("invalid native measurement endpoint attachments")
-        native_circle = _early_bound(circle, "ISketchSegment")
-        sketch = _early_bound(native_circle.GetSketch(), "ISketch")
-        attached_keys = tuple(_point_identity(adapter, entity, stage=stage, role=f"attached-point-{index}") for index, entity in enumerate(attached))
-        if attached_keys[0] == attached_keys[1]:
-            raise RuntimeError("native annotation endpoint identities are not distinct")
-        for raw in sketch.GetSketchSegments() or ():
-            segment = _early_bound(raw, "ISketchSegment")
-            if segment.GetType() != 0:
-                continue
-            line = _early_bound(segment, "ISketchLine")
-            endpoints = (line.GetStartPoint2(), line.GetEndPoint2())
-            endpoint_keys = tuple(_point_identity(adapter, entity, stage=stage, role=f"attachment-line-endpoint-{index}") for index, entity in enumerate(endpoints))
-            if endpoint_keys[0] == endpoint_keys[1] or set(attached_keys) != set(endpoint_keys):
-                continue
-            _assert_relative_witness(adapter, segment, point, circle, stage=stage)
-            matches.append(_segment_identity(adapter, segment, stage=stage, role="attached-measurement-line"))
-        if len(matches) != 1:
-            raise RuntimeError("native attachments do not identify exactly one constrained measurement line")
+        if len(attached) != 2 or len(types) != 2 or any(value is None for value in attached) or dangling is not False or any(type(kind) is not int for kind in types):
+            raise RuntimeError("invalid native point/flat attachments")
+        points = [entity for entity, kind in zip(attached, types, strict=True) if kind in _SKETCH_POINT_SELECTION_TYPES]
+        segments = [entity for entity, kind in zip(attached, types, strict=True) if kind == 10]
+        if len(points) != 1 or len(segments) != 1:
+            raise RuntimeError("invalid native point/flat attachment types")
+        point_key = _point_identity(adapter, points[0], stage=stage, role="attached-location-point")
+        flat_key = _segment_identity(adapter, segments[0], stage=stage, role="attached-flat")
+        expected_flat = _segment_identity(adapter, flat, stage=stage, role="expected-common-flat")
+        if flat_key != expected_flat or flat_key[1] != 0:
+            raise RuntimeError("native location is not attached to the exact common flat")
     except Exception as exc:
         error = exc
     _telemetry.info(
-        f"clamp native attachment: stage={stage}, types={types!r}, point_keys={attached_keys!r}, dangling={dangling!r}, lines={matches!r}, error={error!r}",
+        f"clamp native point/flat attachment: stage={stage}, types={types!r}, point={point_key!r}, flat={flat_key!r}, expected_flat={expected_flat!r}, dangling={dangling!r}, error={error!r}",
         operation_stage=stage, attachment_count=len(attached), attached_types=types,
-        attached_point_identities=repr(attached_keys),
-        dangling=dangling, attached_line_identities=repr(matches), attachment_readback_error=repr(error),
+        attached_point_identity=repr(point_key), attached_flat_identity=repr(flat_key),
+        expected_flat_identity=repr(expected_flat), dangling=dangling, attachment_readback_error=repr(error),
     )
     if error is not None:
-        raise RuntimeError(f"{name}: {error}") from error
+        raise RuntimeError(f"{stage}: {error}") from error
+    return point_key
+
+
+def _assert_tap_flat_attachment(adapter: Any, display: Any, point: Any, circle: Any, flat: Any, *, name: str, stage: str) -> tuple[Any, ...]:
+    """Recover the independently source-proven tap projection from its measured point."""
+    point_key = _point_flat_attachment(adapter, display, flat, stage=stage)
+    flat_key = _segment_identity(adapter, flat, stage=stage, role="common-flat")
+    native_circle = _early_bound(circle, "ISketchSegment")
+    sketch = _early_bound(native_circle.GetSketch(), "ISketch")
+    matches = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if segment.GetType() != 0:
+            continue
+        key = _segment_identity(adapter, segment, stage=stage, role="projection-candidate")
+        if key == flat_key:
+            continue
+        line = _early_bound(segment, "ISketchLine")
+        if _point_identity(adapter, line.GetStartPoint2(), stage=stage, role="projection-start") != point_key:
+            continue
+        _assert_tap_projection(adapter, segment, point, circle, stage=stage)
+        matches.append(key)
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native attachments do not identify exactly one actual tap projection")
     return matches[0]
 
 
-def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> None:
-    """Ordinary native point-pair dimension on a source-constrained measuring line."""
-    import _telemetry
-
-    line = _create_relative_witness(adapter, point, circle, name)
-    straight = _early_bound(line, "ISketchLine")
-    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
-    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
-    segment = _early_bound(line, "ISketchSegment")
-    sketch = _early_bound(segment.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    # On this Right plane (0, y, 0) is the SAME text point in sketch and model
-    # frames. Do not infer the constructor's frame from a selection-point API.
-    text = (0.0, float(end.Y) + 0.01, 0.0)
-    model_text = _transform_location(adapter, text, transform.Inverse())
-    if any(abs(actual - wanted) > 1e-10 for actual, wanted in zip(model_text, text, strict=True)):
-        raise RuntimeError(f"{name}: text placement is not common to model and Right sketch frames")
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    model.ClearSelection2(True)
-    _native_select(adapter, start, "ISketchPoint", append=False)
-    _native_select(adapter, end, "ISketchPoint", append=True)
-    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    count, readback_error = None, None
-    types, selected, selected_keys, expected_keys = (), (), (), ()
-    try:
-        count = manager.GetSelectedObjectCount2(-1)
-        indices = range(1, min(count, 2) + 1) if type(count) is int and count >= 0 else ()
-        types = tuple(manager.GetSelectedObjectType3(index, -1) for index in indices)
-        selected = tuple(manager.GetSelectedObject6(index, -1) for index in indices)
-        selected_keys = tuple(None if actual is None else _point_identity(adapter, actual, stage=f"{name}.point-pair-selection", role=f"selected-endpoint-{index}") for index, actual in enumerate(selected))
-        expected_keys = tuple(_point_identity(adapter, expected, stage=f"{name}.point-pair-selection", role=f"expected-endpoint-{index}") for index, expected in enumerate((start, end)))
-    except Exception as exc:
-        readback_error = exc
-    detail = f"stage={name}.point-pair-selection, count={count!r}, types={types!r}, present={tuple(value is not None for value in selected)!r}, selected_keys={selected_keys!r}, expected_keys={expected_keys!r}, error={readback_error!r}"
-    _telemetry.info(f"clamp native local endpoint selection: {detail}", operation_stage=f"{name}.point-pair-selection", selection_count=count, selected_types=types, selected_objects_present=tuple(value is not None for value in selected), selected_point_identities=repr(selected_keys), expected_point_identities=repr(expected_keys), selection_readback_error=repr(readback_error))
-    if readback_error is not None or type(count) is not int or count != 2 or types != (11, 11) or len(selected_keys) != 2 or selected_keys != expected_keys or expected_keys[0] == expected_keys[1]:
-        raise RuntimeError(f"{name}: actual local measurement endpoints were not selected: {detail}") from readback_error
-    _telemetry.info(f"clamp native point-pair request: name={name}, text={text!r}, model_text={model_text!r}", operation_stage=f"{name}.point-pair-request", text_sketch_m=text, text_model_m=model_text)
-    raw = model.AddHorizontalDimension2(*text)
-    _telemetry.info(f"clamp native point-pair constructor: name={name}, count={count!r}, types={types!r}, identities={selected_keys!r}, text={text!r}, model_text={model_text!r}, created={raw is not None}", operation_stage=f"{name}.point-pair-constructor", selection_count=count, selected_types=types, selected_point_identities=repr(selected_keys), text_sketch_m=text, text_model_m=model_text, native_created=raw is not None)
-    model.ClearSelection2(True)
-    if raw is None:
-        raise RuntimeError(f"{name}: native local point-pair dimension failed")
-    display = _early_bound(raw, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    dimension.DrivenState = 1
-    dimension.Name = name
-    display.ShowParenthesis = False
-    model.GraphicsRedraw2()
-    if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or bool(display.ShowParenthesis):
-        raise RuntimeError(f"{name}: measured relative-axis ownership/ink was not retained")
-    _assert_relative_attachment(adapter, display, point, circle, name=name, stage=f"{name}.after-create")
-    if not math.isclose(float(dimension.SystemValue) * 1000.0, BORE_R, abs_tol=1e-5):
-        raise RuntimeError(f"{name}: native attached endpoint dimension does not measure the bore radius")
+def _measure_tap_from_flat(adapter: Any, point: Any, circle: Any, flat: Any, name: str) -> None:
+    """Measure the proven local tap projection from the same physical Z flat as the bore."""
+    line = _create_tap_projection(adapter, point, circle, name)
+    start = _early_bound(line, "ISketchLine").GetStartPoint2()
+    display = _measure_location(adapter, start, flat, name)
+    _assert_tap_flat_attachment(adapter, display, point, circle, flat, name=name, stage=f"{name}.after-create")
 
 
 async def _location_profiles(adapter: Any) -> None:
@@ -963,11 +960,13 @@ async def _location_profiles(adapter: Any) -> None:
         converted = _convert_location_source(adapter, circle, interface)
         arc = _early_bound(converted, "ISketchArc")
         center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+        converted_flats = {}
         for name, flat in flats:
-            _measure_location(adapter, center, _convert_location_source(adapter, flat, "IEntity"), name)
+            converted_flats[name] = _convert_location_source(adapter, flat, "IEntity")
+            _measure_location(adapter, center, converted_flats[name], name)
         if feature == "LeverBoreLocationProfile":
             for name, point in _tap_placement_points(adapter).items():
-                _measure_relative_axis(adapter, point, converted, name)
+                _measure_tap_from_flat(adapter, point, converted, converted_flats["LeverBoreFromZFlat"], name)
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
         status = sketch.GetConstrainedStatus()
@@ -975,9 +974,6 @@ async def _location_profiles(adapter: Any) -> None:
             raise RuntimeError(f"{feature}: linked witness is not fully defined: {status!r}")
         check(f"exit_sketch {feature}", await adapter.exit_sketch())
         name_last_feature(adapter, feature)
-        if feature == "LeverBoreLocationProfile":
-            for name in _tap_placement_points(adapter):
-                set_dimension_bilateral_tolerance(adapter, feature, name, -RELATIVE_AXIS_BAND, RELATIVE_AXIS_BAND)
     blank_reference_sketches(adapter, tuple(sources))
 
 
@@ -993,29 +989,56 @@ def _assert_location_profiles(adapter: Any) -> None:
         for source in (source_circle, *(edge for _name, edge in flats)):
             if sum(_has_conversion_source(adapter, segment, source) for segment in segments) != 1:
                 raise RuntimeError(f"{feature}: native source identity did not survive rebuild")
-        for name, _edge in flats:
+        circle = next(segment for segment in segments if _has_conversion_source(adapter, segment, source_circle))
+        center = _early_bound(circle, "ISketchArc").GetCenterPoint2()
+        converted_flats = {}
+        for name, edge in flats:
+            flat = next(segment for segment in segments if _has_conversion_source(adapter, segment, edge))
+            converted_flats[name] = flat
             display, dimension = _named_dimension(adapter, feature, name)
-            if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis) or not math.isclose(float(dimension.SystemValue) * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
-                raise RuntimeError(f"{name}: imported location's native measurement changed")
+            _assert_ordinary_location(display, dimension, name)
+            if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-rebuild") != _point_identity(adapter, center, stage=f"{name}.after-rebuild", role="expected-center"):
+                raise RuntimeError(f"{name}: actual center attachment changed")
         if feature == "LeverBoreLocationProfile":
-            circle = next(segment for segment in segments if _has_conversion_source(adapter, segment, source_circle))
+            flat = converted_flats["LeverBoreFromZFlat"]
             radius = float(_early_bound(circle, "ISketchArc").GetRadius()) * 1000.0
             if HEX_AF / 2.0 - radius < WALL_TARGET:
                 raise RuntimeError("LeverBore: actual model has no room for its finished wall requirement")
             measured_lines = set()
             for name, point in _tap_placement_points(adapter).items():
                 display, dimension = _named_dimension(adapter, feature, name)
-                if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
-                    raise RuntimeError(f"{name}: native relative-axis measurement changed")
-                key = _assert_relative_attachment(adapter, display, point, circle, name=name, stage=f"{name}.after-rebuild")
+                _assert_ordinary_location(display, dimension, name)
+                key = _assert_tap_flat_attachment(adapter, display, point, circle, flat, name=name, stage=f"{name}.after-rebuild")
                 if key in measured_lines:
                     raise RuntimeError(f"{name}: distinct tap witnesses merged into one native line")
                 measured_lines.add(key)
-                if not math.isclose(float(dimension.SystemValue) * 1000.0, radius, abs_tol=1e-5):
-                    raise RuntimeError(f"{name}: attached relative-axis measurement changed")
-                tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-                if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
-                    raise RuntimeError(f"{name}: native relative-axis acceptance band changed")
+
+
+def _assert_ordinary_location(display: Any, dimension: Any, name: str) -> None:
+    import _telemetry
+
+    actual, error = {}, None
+    try:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(dimension, "IDimension")
+        actual["driven_state"] = dimension.DrivenState
+        actual["reference"] = display.ShowParenthesis
+        actual["value_m"] = dimension.SystemValue
+        actual["tolerance_type"] = _early_bound(dimension.Tolerance, "IDimensionTolerance").Type
+        actual["places"] = display.GetPrimaryPrecision2()
+    except Exception as exc:
+        error = exc
+    _telemetry.info(
+        f"clamp ordinary location readback: name={name}, actual={actual!r}, error={error!r}",
+        operation_stage=f"{name}.ordinary-location-readback",
+        native_measurement=repr(actual), measurement_readback_error=repr(error),
+    )
+    if error is not None:
+        raise RuntimeError(f"{name}: native ordinary location readback unavailable: {actual!r}") from error
+    if type(actual["driven_state"]) is not int or actual["driven_state"] != 1 or actual["reference"] is not False or type(actual["value_m"]) not in (int, float) or not math.isclose(actual["value_m"] * 1000.0, HEX_AF / 2.0, abs_tol=1e-5):
+        raise RuntimeError(f"{name}: ordinary native location measurement/ink changed: {actual!r}")
+    if type(actual["tolerance_type"]) is not int or actual["tolerance_type"] != 0 or type(actual["places"]) is not int or actual["places"] != 2:
+        raise RuntimeError(f"{name}: ordinary .XX default location acceptance changed: {actual!r}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -1126,7 +1149,6 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    _assert_location_profiles(adapter)
     await volume_check(
         adapter, "driven magnifying clamp (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
     )
@@ -1140,8 +1162,15 @@ async def build(adapter) -> dict[str, str]:
 
     # Places are the tolerance statement (drawing-guidelines.md rule 3): the
     # part carries them, the drawing reads them back.
-    set_dimension_bilateral_tolerance(adapter, "LeverBoreProfile", "LeverBoreDiaDim", 0.0, drilled_oversize_mm())
+    # The verified drawing title block owns DRILLED HOLES +0.10/0.
+    # Do not print a duplicate explicit band on the native diameter.
+    _bore_display, bore_dimension = _named_dimension(adapter, "LeverBoreProfile", "LeverBoreDiaDim")
+    bore_tolerance = _early_bound(bore_dimension.Tolerance, "IDimensionTolerance")
+    bore_tolerance.Type = 0
+    if int(bore_tolerance.Type) != 0:
+        raise RuntimeError("LeverBoreDiaDim: duplicate explicit drilled-hole tolerance remained")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _assert_location_profiles(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

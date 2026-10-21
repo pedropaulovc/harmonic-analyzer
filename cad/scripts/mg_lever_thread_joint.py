@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import angular_band_deg
 
 THREAD = "1/4-20"
 THREAD_MAJOR = 6.35
@@ -26,8 +28,13 @@ NOSE_R_TOL = 0.05
 HOLE_LOCATION_TOL = 0.05  # locations from a real neck side and nose tip
 THREAD_ROOT_ENVELOPE = 6.45  # native MAX requirement; NOT the tap-drill diameter
 MOUTH_CHAMFER = 0.20
-MOUTH_CHAMFER_BAND = (0.05, -0.05)  # axial and radial, 45 degrees
-MOUTH_CHAMFER_MAX = MOUTH_CHAMFER + MOUTH_CHAMFER_BAND[0]
+# The title-block ceiling owns the native primary distance, not both legs.
+# Keep the modeled 0.20; remove only the unsupported positive lower limit.
+MOUTH_CHAMFER_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+MOUTH_CHAMFER_BAND = (MOUTH_CHAMFER_MAX - MOUTH_CHAMFER, -MOUTH_CHAMFER)
+# The feature callouts retain 45 degrees; the ordinary angular band is not
+# tightened. Either projected leg may govern axial loss or radial wall.
+CHAMFER_LEG_MAX = MOUTH_CHAMFER_MAX * math.tan(math.radians(45.0 + angular_band_deg()))
 INCOMPLETE_THREAD_MAX = 1.5 * PITCH
 REQUIRED_FULL_ENGAGEMENT = 1.5 * THREAD_MAJOR
 TAP_SPEC = HoleSpec("tapped", THREAD, end="through_all", thread_class="2B")
@@ -39,7 +46,8 @@ ROD_LENGTH_TOL = 0.8  # printed title-block .X band
 THREAD_LENGTH = 18.00  # flat tip to the end of incomplete root runout
 THREAD_LENGTH_TOL = 0.51  # printed title-block .XX band
 TIP_CHAMFER = 0.20
-TIP_CHAMFER_BAND = (0.05, -0.05)
+TIP_CHAMFER_MAX = MOUTH_CHAMFER_MAX
+TIP_CHAMFER_BAND = (TIP_CHAMFER_MAX - TIP_CHAMFER, -TIP_CHAMFER)
 THREAD_ROOT_X = ROD_LENGTH - THREAD_LENGTH
 FULL_THREAD_START_MAX = ROD_LENGTH + ROD_LENGTH_TOL - (THREAD_LENGTH - THREAD_LENGTH_TOL) + INCOMPLETE_THREAD_MAX
 
@@ -54,18 +62,20 @@ def full_thread_overlap(
     thread_length: float = THREAD_LENGTH,
     thread_length_tol: float = THREAD_LENGTH_TOL,
     incomplete: float = INCOMPLETE_THREAD_MAX,
-    mouth: float = MOUTH_CHAMFER_MAX,
+    mouth: float = CHAMFER_LEG_MAX,
+    tip_chamfer: float = CHAMFER_LEG_MAX,
 ) -> float:
     """Worst installed intersection of full male and female thread intervals.
 
-    Both ends' die lead is excluded.  The root lead is outside the receiver;
-    the tip lead is conservatively deducted even though the tip is proud.
-    A through tap runs completely through, so its lead exits the far face.
+    Both ends' die lead is excluded. The root lead is outside the receiver.
+    Charge the tip chamfer additionally: the printed incomplete-thread limit
+    does not explicitly define a chamfer/die-lead union. A through tap runs
+    completely through, so its lead exits the far face.
     """
     female_start = bracket_station - (thickness - thickness_tol) / 2.0 + mouth
     female_end = bracket_station + (thickness - thickness_tol) / 2.0 - mouth
     male_start = rod_length + rod_length_tol - (thread_length - thread_length_tol) + incomplete
-    male_end = rod_length - rod_length_tol - incomplete
+    male_end = rod_length - rod_length_tol - incomplete - tip_chamfer
     return max(0.0, min(female_end, male_end) - max(female_start, male_start))
 
 
@@ -78,14 +88,16 @@ def installation_full_overlap(
     thread_length: float = THREAD_LENGTH,
     thread_length_tol: float = THREAD_LENGTH_TOL,
     incomplete: float = INCOMPLETE_THREAD_MAX,
-    mouth: float = MOUTH_CHAMFER_MAX,
+    mouth: float = CHAMFER_LEG_MAX,
+    tip_chamfer: float = CHAMFER_LEG_MAX,
 ) -> float:
     """Full-thread intersection when the fitter sets native tip projection.
 
     Coordinates start at the near receiver face. Independent interval bounds
-    include both thread leads; no shoulder seating or preload is assumed.
+    include both thread leads and an additive tip chamfer; no shoulder seating
+    or preload is assumed. Overall rod length cancels from this fitted setting.
     """
-    earliest_end = min(thickness - thickness_tol - mouth, thickness - thickness_tol + projection - projection_tol - incomplete)
+    earliest_end = min(thickness - thickness_tol - mouth, thickness - thickness_tol + projection - projection_tol - incomplete - tip_chamfer)
     latest_start = max(mouth, thickness + thickness_tol + projection + projection_tol - (thread_length - thread_length_tol) + incomplete)
     return max(0.0, earliest_end - latest_start)
 
@@ -96,6 +108,6 @@ DRILL_WANDER_START = 0.10
 DRILL_WANDER_DEG = 0.3
 THREAD_BORE_WANDER = DRILL_WANDER_START + (NECK_THICKNESS + NECK_THICKNESS_TOL) * math.tan(math.radians(DRILL_WANDER_DEG))
 AXIS_OFFSET_MAX = math.hypot(NOSE_R_TOL + HOLE_LOCATION_TOL, NOSE_R_TOL + HOLE_LOCATION_TOL)
-WALL_MIN = NOSE_R - NOSE_R_TOL - AXIS_OFFSET_MAX - THREAD_BORE_WANDER - THREAD_ROOT_ENVELOPE / 2.0 - MOUTH_CHAMFER_MAX
+WALL_MIN = NOSE_R - NOSE_R_TOL - AXIS_OFFSET_MAX - THREAD_BORE_WANDER - THREAD_ROOT_ENVELOPE / 2.0 - CHAMFER_LEG_MAX
 if WALL_MIN < 1.5:
     raise AssertionError("MG threaded nose loses the worst-case 1.5 mm wall")

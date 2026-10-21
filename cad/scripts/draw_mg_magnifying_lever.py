@@ -38,7 +38,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
-from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT, TIP_CALLOUT
+from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
 PART_STEM = SPEC.artifact_stem
@@ -53,9 +53,13 @@ DETAIL_CENTER = (0.310, 0.190)
 DETAIL_SCALE = (3, 1)
 DETAIL_FOCUS = (0.156, 0.0, 0.0)
 DETAIL_RADIUS_MM = 12.5
-DETAIL_KEEP = {"ThreadLength": (0.323, 0.220), "TipChamfer": (0.377, 0.198), "IncompleteLength": (0.377, 0.165)}
+# Four thread/shape rows fit between the native length witnesses. The upper
+# lane keeps the descending leader outside the mate text and below the 18 line.
+DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165)}
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.118, 0.150)}
-CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "TipChamfer": TIP_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
+DETAIL_THREAD_NOTE_XY = (0.2926, 0.245)
+DETAIL_THREAD_CALLOUT = PRINT_THREAD_CALLOUT.replace(" BRACKET", "\nBRACKET")
+CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
 
 
 def _activate(adapter: Any, view: Any) -> None:
@@ -474,7 +478,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()})
     set_dimension_callouts(adapter, annotations, CALLOUTS)
     thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
-    add_attached_note(adapter, detail, text=PRINT_THREAD_CALLOUT, entity_xy=thread_pick, note_xy=(0.273, 0.213), label="native quarter-inch external thread", entity_type="SILHOUETTE")
+    add_attached_note(adapter, detail, text=DETAIL_THREAD_CALLOUT, entity_xy=thread_pick, note_xy=DETAIL_THREAD_NOTE_XY, label="native quarter-inch external thread", entity_type="SILHOUETTE")
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
