@@ -83,6 +83,32 @@ zero real findings in those classes. Do not switch the whole fleet to `GATE`,
 demote a genuine collision, loosen thresholds, or add a runtime allowance to
 get one drawing through.
 
+### Magnifier CHECK block placement (combined 0fb89)
+
+The retained report
+`C:/farm-runs/com-perf-combined-mg-inspection-20261021/reports/layout-audit/mg-magnifier-assembly.json`
+measures ASSEMBLY STEPS sequence `DetailItem376` at native extent
+[17.6178, 95.3983]–[227.9432, 258.4113] mm and CHECK `DetailItem377` at
+[17.6178, 61.8495]–[224.9324, 84.6455] mm, insertion (18, 84.4) mm.
+The title-block keep-out is [216, 0]–[431.8, 66] mm. Move CHECK's insertion
+to (18, 92.6) mm (+8.2 mm up), not the audit's downward hint, and sequence
+insertion from (18, 258) to (18, 259.5) mm (+1.5 mm up).
+Rigid translation predicts CHECK extent [17.6178, 70.0495]–[224.9324,
+92.8455] mm: 4.0495 mm above the title block and 4.0528 mm below the
+sequence's translated extent [17.6178, 96.8983]–[227.9432, 259.9113] mm.
+Sequence top inner-border clearance is 6.7887 mm. Matched PDF ink gives
+baseline sequence bottom 96.0089 mm and CHECK top 84.3736 mm; the predicted
+printed gap is 4.9353 mm. Actual median printed heights are 3.8733/3.8734 mm,
+so the existing near-contact/separation thresholds are 1.93665/3.8733 mm,
+not the nominal-font 1.75/3.5 mm. The predicted printed gap clears both.
+The finished-view outline starts at x=276.6802 mm, leaving CHECK/sequence
+horizontal air of 51.7478/48.7370 mm; its caption and wire balloon are farther
+right. CHECK left/bottom inner-border clearances are 4.9178/57.3495 mm.
+Text, wrapping, font, scales, geometry and native guards stay unchanged.
+A fresh native audit and printed-sheet inspection remain necessary:
+these are measured-baseline predictions, not native after-fix proof or a
+clean-layout claim.
+
 ### Rocker R19 regression and local placement contract
 
 R19 at `81ac56b26598b63c0c9a11a467208ac4176ce646`, farm run
