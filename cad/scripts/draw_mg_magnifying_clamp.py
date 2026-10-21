@@ -620,7 +620,7 @@ def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> 
         if len(flats) != 1:
             raise RuntimeError(f"{name}: source common flat unavailable: types={source_types!r}")
         source_point = _point_flat_attachment(source_adapter, source_display, flats[0], stage=f"{name}.drawing-source")
-        imported_point = _point_flat_attachment(source_adapter, display, flats[0], stage=f"{name}.drawing-import")
+        imported_point = _point_flat_attachment(source_adapter, display, flats[0], stage=f"{name}.drawing-import", drawing_view=native_view)
         if imported_point != source_point:
             raise RuntimeError(f"{name}: imported native point identity differs: actual={imported_point!r}, source={source_point!r}")
         result[name] = annotation

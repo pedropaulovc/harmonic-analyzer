@@ -966,8 +966,13 @@ def test_section_mark_removal_requires_actual_out_of_cut_mounting_source(monkeyp
     assert len(bottom_marks) == 2
 
 
-@pytest.mark.parametrize("fault", (None, "empty", "one_flank", "duplicate_flank", "outside", "hidden", "no_import"))
-def test_section_thread_requires_real_native_longitudinal_ink(monkeypatch, fault):
+@pytest.mark.parametrize("representation", ("lines", "polylines", "subdivided_polylines"))
+@pytest.mark.parametrize("fault", (
+    None, "empty", "null_data", "one_flank", "duplicate_flank", "outside", "hidden",
+    "dangling", "no_import", "short_ticks", "broken_flank", "arc_chords", "bent_polyline",
+    "malformed", "read_error",
+))
+def test_section_thread_requires_real_native_longitudinal_ink(monkeypatch, representation, fault):
     lines = [
         _native_line(0.300, 0.176, 0.3375, 0.176),
         _native_line(0.300, 0.197, 0.3375, 0.197),
@@ -980,19 +985,165 @@ def test_section_thread_requires_real_native_longitudinal_ink(monkeypatch, fault
         lines[1] = lines[0]
     elif fault == "outside":
         lines[1] = _native_line(0.300, 0.207, 0.3375, 0.207)
-    data = SimpleNamespace(GetLineCount=lambda: len(lines), GetLineAtIndex2=lambda i: lines[i])
-    thread = SimpleNamespace(GetDisplayData=lambda: data, GetAnnotation=lambda: SimpleNamespace(Visible=3 if fault == "hidden" else 1, IsDangling=lambda: False))
-    section = SimpleNamespace(GetCThreads=lambda: (thread,))
+    elif fault == "short_ticks":
+        lines = [_native_line(0.300, y, 0.305, y) for y in (0.176, 0.197)]
+    elif fault == "broken_flank":
+        lines = [_native_line(a, y, b, y) for y in (0.176, 0.197)
+                 for a, b in ((0.300, 0.310), (0.3275, 0.3375))]
+    polylines = []
+    if representation != "lines" or fault in ("arc_chords", "bent_polyline"):
+        for line in lines:
+            start, end = line[4:7], line[7:10]
+            if representation == "subdivided_polylines":
+                points = [tuple(a + fraction * (b - a) for a, b in zip(start, end))
+                          for fraction in (0.0, 0.25, 0.5, 0.75, 1.0)]
+            else:
+                points = [start, end]
+            if fault == "bent_polyline":
+                points = [start, ((start[0] + end[0]) / 2.0, start[1] + 0.001, start[2]), end]
+            # SDK record: type, DataSize, colour, font, unused, unused,
+            # point count, then XYZ triples. Geometry is native fixture ink.
+            polylines.append((1 if fault == "arc_chords" else 0, 0, 0, 0, 0, 0, len(points),
+                              *(value for point in points for value in point)))
+        lines = []
+    if fault == "malformed":
+        if polylines:
+            polylines[0] = polylines[0][:-1]
+        else:
+            lines[0] = lines[0][:-1]
+
+    def polyline_count():
+        if fault == "read_error":
+            raise RuntimeError("native polyline count unavailable")
+        return len(polylines)
+
+    data = SimpleNamespace(
+        GetLineCount=lambda: len(lines), GetLineAtIndex2=lambda i: lines[i],
+        GetPolyLineCount=polyline_count, GetPolylineAtIndex2=lambda i: polylines[i],
+        GetArcCount=lambda: 0,
+    )
+    # A readable annotation counterpart is diagnostic evidence, not permission
+    # to rescue missing primary ICThread ink.
+    counterpart = SimpleNamespace(
+        GetLineCount=lambda: 2,
+        GetLineAtIndex2=lambda i: _native_line(0.300, (0.176, 0.197)[i], 0.3375, (0.176, 0.197)[i]),
+        GetPolyLineCount=lambda: 0, GetArcCount=lambda: 0,
+    )
+    thread = SimpleNamespace(
+        GetDisplayData=lambda: None if fault == "null_data" else data,
+        GetAnnotation=lambda: SimpleNamespace(
+            Visible=3 if fault == "hidden" else 1, IsDangling=lambda: fault == "dangling",
+            GetDisplayData=lambda: counterpart,
+        ),
+    )
+    section = SimpleNamespace(GetCThreads=lambda: (thread,), GetDisplayMode2=lambda: 2, GetCThreadQuality=lambda: True)
+    messages = []
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (0, 0) if fault == "no_import" else (1, 1))
     monkeypatch.setattr(drawing, "_mouth_profile_box", lambda *_a: (0.300, 0.170, 0.3375, 0.203))
     for name in ("set_hidden_lines_removed", "rebuild_drawing"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
     if fault:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as failure:
             drawing._show_mouth_thread(object(), section)
+        if fault == "null_data":
+            assert "no display-data object" in str(failure.value)
+            assert any("dataPresent=False" in message for message in messages)
+            assert not any("native ink: GetLineCount=" in message for message in messages)
+            assert any("annotation diagnostic: GetLineCount=2" in message for message in messages)
+        elif fault == "empty":
+            assert any("dataPresent=True" in message for message in messages)
+            assert any("GetLineCount=0" in message for message in messages)
+            assert any("GetPolyLineCount=0" in message for message in messages)
+            assert "both longitudinal flanks" in str(failure.value)
+            assert any("annotation diagnostic: GetLineCount=2" in message for message in messages)
+        elif fault == "read_error":
+            assert "IDisplayData.GetPolyLineCount" in str(failure.value)
+            assert any("native polyline count unavailable" in message for message in messages)
     else:
         drawing._show_mouth_thread(object(), section)
+        assert any("longitudinal_runs=" in message for message in messages)
+        if representation != "lines":
+            assert any("GetLineCount=0" in message for message in messages)
+            assert any("GetPolyLineCount=2" in message for message in messages)
+            assert any("native ink: GetPolylineAtIndex2(0)=" in message for message in messages)
+
+
+@pytest.mark.parametrize("faults", (
+    (), ("view.mode",), ("view.quality",), ("primary.data",), ("primary.line_count",),
+    ("primary.line[0]",), ("primary.polyline[0]",), ("primary.arc[0]",),
+    ("annotation.data",), ("annotation.line_count",), ("annotation.line[0]",),
+    ("annotation.polyline[0]",),
+    ("view.mode", "primary.line_count", "annotation.line[0]"),
+))
+def test_thread_diagnostics_collect_independent_readers_before_failure(monkeypatch, faults):
+    calls = []
+    messages = []
+    lines = [_native_line(0.300, y, 0.3375, y) for y in (0.176, 0.197)]
+    polylines = [(0, 0, 0, 0, 0, 0, 2, *line[4:]) for line in lines]
+    arc = (*lines[0], 0.31875, 0.1865, 0.0, 0.0, 0.0, 1.0, 1.0)
+
+    def probe(key, value):
+        calls.append(key)
+        if key in faults:
+            raise RuntimeError(f"injected {key}")
+        return value
+
+    def display(scope):
+        return SimpleNamespace(
+            GetLineCount=lambda: probe(f"{scope}.line_count", 2),
+            GetLineAtIndex2=lambda i: probe(f"{scope}.line[{i}]", lines[i]),
+            GetPolyLineCount=lambda: probe(f"{scope}.polyline_count", 2),
+            GetPolylineAtIndex2=lambda i: probe(f"{scope}.polyline[{i}]", polylines[i]),
+            GetArcCount=lambda: probe(f"{scope}.arc_count", 1),
+            GetArcAtIndex2=lambda i: probe(f"{scope}.arc[{i}]", arc),
+        )
+
+    primary, counterpart = display("primary"), display("annotation")
+    annotation = SimpleNamespace(
+        Visible=1, IsDangling=lambda: False,
+        GetDisplayData=lambda: probe("annotation.data", counterpart),
+    )
+    thread = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetDisplayData=lambda: probe("primary.data", primary),
+    )
+    section = SimpleNamespace(
+        GetCThreads=lambda: (thread,),
+        GetDisplayMode2=lambda: probe("view.mode", 2),
+        GetCThreadQuality=lambda: probe("view.quality", True),
+    )
+    monkeypatch.setattr(drawing._telemetry, "info", messages.append)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "import_cosmetic_threads", lambda *_a: (1, 1))
+    monkeypatch.setattr(drawing, "_mouth_profile_box", lambda *_a: (0.300, 0.170, 0.3375, 0.203))
+    for name in ("set_hidden_lines_removed", "rebuild_drawing"):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
+    required_errors = [key for key in faults if not key.startswith("annotation.")]
+    if required_errors:
+        with pytest.raises(RuntimeError, match="native ink read failed") as failure:
+            drawing._show_mouth_thread(object(), section)
+        assert all(key in str(failure.value) for key in required_errors)
+    else:
+        # Diagnostic counterpart errors do not change primary acceptance.
+        drawing._show_mouth_thread(object(), section)
+    assert "view.mode" in calls and "view.quality" in calls
+    assert "primary.data" in calls and "annotation.data" in calls
+    for scope in ("primary", "annotation"):
+        if f"{scope}.data" in faults:
+            assert not any(f"{scope}.{family}_count" in calls for family in ("line", "polyline", "arc"))
+            continue
+        for family, count in (("line", 2), ("polyline", 2), ("arc", 1)):
+            assert f"{scope}.{family}_count" in calls
+            for index in range(count):
+                if f"{scope}.{family}_count" in faults:
+                    assert f"{scope}.{family}[{index}]" not in calls
+                else:
+                    assert f"{scope}.{family}[{index}]" in calls
+    assert all(any(f"injected {key}" in message for message in messages) for key in faults)
+    if "view.quality" not in faults:
+        assert any("GetCThreadQuality=True" in message for message in messages)
 
 
 @pytest.mark.parametrize("tapped", (False, True))

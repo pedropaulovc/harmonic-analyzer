@@ -1778,6 +1778,20 @@ Wizard-point identity and the circle's owner/type/ID guard. Annotation
 attachment types use the same `swSelectType_e` enum; do not assume every actual
 sketch-point attachment is type11. Type25 alone does not prove the right point.
 
+Imported drawing sketch points and segments belong to the drawing-view context,
+not necessarily the referenced part's sketch inventory. First map each actual
+attachment through the **referenced part's**
+`IModelDocExtension.GetCorresponding2`; `GetCorrespondingEntity2` is the
+face/edge/vertex route, not a substitute for sketch objects. Establish native
+point/segment capability before binding in both contexts. Prove the requested
+view separately: map the model `ISketch` owner through `IView.GetCorresponding`
+and compare it with the actual drawing attachment's owner using same-interface,
+same-context native self and identity controls. Only then apply the unchanged
+model owner/type/ordered-ID checks. Drawing IDs need not equal model IDs.
+Null, ambiguous or wrong-view correspondence remains a refusal; coordinate or
+name similarity cannot repair it. Reuse a proven shared owner only within the
+current annotation, never across rebuilds.
+
 The attached stock flag must link the model's stock acceptance property and
 resolve it natively; a REF AF dimension or “FLATS AS SUPPLIED” alone does not
 own an across-flats acceptance band. Attach the height precision's functional
@@ -1838,6 +1852,33 @@ inspect the exact final PNG/PDF before calling the sheet SHIP.
 Check dimension-line/centre-mark crossings as actual segments: horizontal and
 vertical marks have zero-area bounding boxes, which area-overlap helpers can
 correctly ignore even when the native ink crosses.
+
+A cosmetic-thread display can expose straight native polylines as well as line
+items. Read `ICThread.GetDisplayData` independently of the same annotation's
+diagnostic `IAnnotation.GetDisplayData`, recording availability, view mode,
+quality and each available primitive family even if another reader fails.
+Use only the unique thread's actual primary display ink for acceptance:
+require continuous longitudinal flanks on both sides of the real section
+profile. Join touching collinear straight segments, never bridge a gap or
+replace an arc/circle by its endpoint chord. Annotation display data, a
+callout or a visible plain bore cannot rescue absent or unreadable thread ink.
+Log primitive coordinates and per-reader errors before refusal; an unmeasured
+display is not evidence that the native thread contains zero geometry.
+
+An enlarged assembly crop can show a valid imported construction dimension
+while showing none of the intended solid interface. A nearer flange may cover
+the rod and receiver in that viewing direction. Prove the actual component
+transforms and model-edge correspondence before and after cropping, choose the
+unoccluded standard view and label its real direction. Sketch points and a
+dimension's witnesses alone are not a solid-visibility positive control.
+`IView.GetPolylines7` excludes user sketch segments; use its edge correspondence
+for this distinction, not a hand-mapped PDF-coordinate approximation.
+Suppress sketch inference while creating the crop boundary, restore the prior
+`AddToDB` state, and read the persisted native circle with
+`IView.GetDetailCircleInfo2`. Requested centre/radius are not measured bounds.
+Keep neighbouring captions outside the complete actual `IView.GetOutline`,
+even when the printed circle itself leaves glyph clearance. Final native
+model-edge readback, audit and whole-sheet render remain separate requirements.
 
 The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel.
 R22 wrapping of only that CHECK cleared the actual glyphs but left a gating

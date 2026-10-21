@@ -26,6 +26,8 @@ from _layout_audit import (
     find_leader_across_lines,
     find_leader_through_text,
     find_lines_through_own_text,
+    find_text_clearance,
+    find_text_separation,
 )
 from _printed_tolerance import drilled_oversize_mm
 from _layout_geometry import (
@@ -648,7 +650,11 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
                 drawing.DETAIL_CENTER[0] + (point[0] - drawing.DETAIL_FOCUS[0]) * scale,
                 drawing.DETAIL_CENTER[1] + point[1] * scale,
             )
-        return point[:2]
+        scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1]
+        return (
+            drawing.FRONT_CENTER[0] + (point[0] - dimensions["OverallLength"].SystemValue / 2.0) * scale,
+            drawing.FRONT_CENTER[1] + point[1] * scale,
+        )
 
     monkeypatch.setattr(drawing, "curate_hidden_dimensions", curate_detail)
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate_front)
@@ -694,6 +700,16 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["finish"][0] is front
         assert captured["finish"][1]["control"] is spec.SURFACE_FINISHES[0]
         assert captured["notes"][0][1] == "MHA-MG-02 SCREW SEAT"
+        finish = captured["finish"][1]
+        assert finish["entity_type"] == "FACE" and finish["char_height"] == 0.0025
+        assert finish["edge_xy"] == finish["leader_attach_xy"]
+        controlled = drawing.face_geometry(front.faces[0])
+        assert finish["control"].face.matches(controlled)
+        assert not finish["control"].face.matches(drawing.face_geometry(hemisphere))
+        left = project(None, front, (controlled.box[0], 0.0, 0.0))[0]
+        right = project(None, front, (controlled.box[3], 0.0, 0.0))[0]
+        assert left < finish["edge_xy"][0] < right
+        _assert_finish_ink_routes(annotations, finish, captured["notes"][0][2], project, front)
         thread = captured["thread"]
         assert thread["entity_xy"] == pytest.approx(project(None, detail, (0.158, joint.ROD_DIA / 2000.0, 0.0)))
         assert " ".join(thread["text"].split()) == " ".join(spec.PRINT_THREAD_CALLOUT.split())
@@ -720,6 +736,112 @@ def test_real_recipe_selects_and_verifies_the_visible_free_hemisphere_face(monke
         assert captured["finalize"]["layout"] is drawing.SPEC.layout
     assert hemisphere.selection_attempts == 1
     assert front.entity_kinds == [3, 4]
+
+
+def _assert_finish_ink_routes(annotations, finish, seat_note_xy, project, front):
+    """R24/779's actual crossing, then real curation's shorter diameter witness.
+
+    Frozen PDF 5248c090... / native audit bd245427... supply symbol strokes
+    and glyph ink. The finish stays fixed; only the imported dimension moves.
+    New native witness routing and printed clearance remain a seat gate.
+    """
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    region = DrawableRegion.from_margins(
+        template.width_m, template.height_m,
+        left=0.0127, right=0.0127, top=0.0127, bottom=0.0127,
+    )
+
+    def sheet(*items):
+        return SheetGeometry(
+            "Sheet1", template.width_m, template.height_m, region, annotations=items,
+        )
+
+    diameter = annotations["RodDia"].GetSpecificAnnotation().GetDimension().SystemValue
+    body_y = project(None, front, (0.0, 0.0, 0.0))[1]
+    witness_x = project(None, front, (diameter / 2.0, 0.0, 0.0))[0] + 0.001
+    upper, lower = body_y + diameter / 2.0, body_y - diameter / 2.0
+
+    def diameter_ink(x, y):
+        underline = y - 0.0100819
+        return AnnotationGeometry(
+            label="RodDia", kind="dim", owner="front",
+            text_boxes=(Box(x + 0.0002566, y - 0.009148,
+                            x + 0.0868955, y + 0.0100555),),
+            segments=(
+                Segment(witness_x, lower, x + 0.001, lower, "ext-line"),
+                Segment(witness_x, upper, x + 0.001, upper, "ext-line"),
+                Segment(x + 0.0869701, underline, x, underline, "dim-line"),
+                Segment(x, underline, x, upper, "dim-line"),
+                Segment(x, lower, x, lower - diameter, "dim-line"),
+            ),
+            exact=True,
+        )
+
+    # These are native GetDisplayData strokes, not the view's padded outline.
+    finish_strokes = (
+        (0.060, 0.140, 0.0676, 0.140, "shoulder"),
+        (0.0676, 0.140, 0.0709518, 0.1216352, "leader"),
+        (0.06125, 0.140, 0.059085, 0.14375, "line"),
+        (0.063415, 0.14375, 0.059085, 0.14375, "line"),
+        (0.06125, 0.140, 0.0654635, 0.1471425, "line"),
+        (0.0627805, 0.1456118, 0.0597195, 0.1456118, "line"),
+        (0.0654635, 0.1471425, 0.0757125, 0.1471425, "line"),
+    )
+    old_finish = AnnotationGeometry(
+        label="seat finish", kind="surface-finish", owner="front",
+        text_boxes=(Box(0.0665535, 0.1442383, 0.0759737, 0.146785),),
+        segments=tuple(Segment(*stroke) for stroke in finish_strokes), exact=True,
+    )
+    before_dia = diameter_ink(0.118, 0.150)
+    before = find_leader_across_lines(sheet(before_dia, old_finish))
+    crossing = next(item for item in before if item.a == old_finish.label and item.b == before_dia.label)
+    assert crossing.kind == "leader-crosses-line"
+    assert crossing.at_mm == pytest.approx((70.67076771867922, 123.175))
+
+    # Keep the proven native finish station, physical landing and mate label.
+    assert finish["symbol_xy"] == pytest.approx((0.06125, 0.140))
+    assert finish["leader_attach_xy"] == pytest.approx(
+        project(None, front, (0.040, diameter / 4.0, 0.0))
+    )
+    assert seat_note_xy == pytest.approx((0.05875, 0.153))
+    dx, dy, _z = annotations["RodDia"].GetPosition()
+    rod_dia = diameter_ink(dx, dy)
+    nx, ny = seat_note_xy
+    seat_label = AnnotationGeometry(
+        label="seat mate", kind="note", owner="front",
+        text_boxes=(Box(nx + 0.0002567, ny - 0.0035918,
+                        nx + 0.0562705, ny - 0.0000264),), exact=True,
+    )
+    # Actual neighboring R24 ink: the front native thread note and parent A.
+    thread_note = AnnotationGeometry(
+        label="front thread", kind="note", owner="front",
+        text_boxes=(Box(0.203237, 0.1176522, 0.2677471, 0.130269),), exact=True,
+    )
+    parent_a = AnnotationGeometry(
+        label="parent A", kind="note", owner="front",
+        text_boxes=(Box(0.203362, 0.1324876, 0.2065895, 0.1358896),), exact=True,
+    )
+    free_end = AnnotationGeometry(
+        label="free hemisphere", kind="note", owner="front",
+        text_boxes=(Box(0.030406, 0.1814082, 0.1025834, 0.1849736),),
+        segments=(Segment(0.0291609, 0.183542, 0.0335495, 0.1169481, "leader"),),
+        exact=True,
+    )
+    after = sheet(rod_dia, old_finish, seat_label, thread_note, parent_a, free_end)
+    assert find_leader_across_lines(after) == []
+    assert find_text_on_line(after) == []
+    assert find_text_on_text(after) == []
+    assert find_leader_through_text(after) == []
+    assert find_border_breaches(after) == []
+    moved = {rod_dia.label}
+    for check in (find_text_clearance, find_text_separation):
+        assert not [
+            item for item in check(after) if item.a in moved or item.b in moved
+        ]
+    assert min(min(line.x0, line.x1) for line in old_finish.segments) - (dx + 0.001) > 0.003
+    assert dy - 0.0100819 - seat_label.text_boxes[0].ymax > 0.0029
+    assert rod_dia.text_boxes[0].ymin - seat_label.text_boxes[0].ymax > 0.0038
+    assert free_end.text_boxes[0].ymin - rod_dia.text_boxes[0].ymax > 0.0053
 
 
 def _assert_detail_ink_routes(annotations, thread, project, detail):

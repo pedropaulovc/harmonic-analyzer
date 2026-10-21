@@ -284,6 +284,12 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
         ("ICalloutVariable", "VariableName"),
         ("ICalloutVariable", "Type"),
         ("ICalloutStringVariable", "String"),
+        ("IDrawingComponent", "Component"),
+        ("IDrawingComponent", "Visible"),
+        ("IComponent2", "Name2"),
+        ("IComponent2", "Transform2"),
+        ("ICurve", "CircleParams"),
+        ("IMathPoint", "ArrayData"),
     ):
         assert property_name in _native_declaration(interface)[1]["_prop_map_get_"]
     # This drawing property returns INote; it is not the model feature's
@@ -320,12 +326,14 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IView", "GetCorresponding", 1, 9),
     ("IFeature", "GetFaces", 0, 12),
     ("IModelDocExtension", "GetCorrespondingEntity2", 1, 9),
+    ("IModelDocExtension", "GetCorresponding2", 1, 9),
     ("INote", "GetText", 0, 8),
     ("IAnnotation", "GetAttachedEntities3", 0, 12),
     ("IAnnotation", "GetAttachedEntityCount3", 0, 3),
     ("IAnnotation", "GetAttachedEntityTypes", 0, 12),
     ("IAnnotation", "GetLeaderCount", 0, 3),
     ("IAnnotation", "IsDangling", 0, 11),
+    ("IAnnotation", "GetDisplayData", 0, 9),
     ("IDisplayData", "GetTextCount", 0, 3),
     ("IDisplayData", "GetTextAtIndex", 1, 8),
     ("IDisplayData", "GetTextPositionAtIndex", 1, 12),
@@ -343,14 +351,33 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IAnnotation", "Select2", 2, 11),
     ("IEdge", "GetCurve", 0, 9),
     ("ICurve", "IsCircle", 0, 11),
+    ("IEdge", "GetClosestPointOn", 3, 12),
+    ("IComponent2", "GetPathName", 0, 8),
+    ("IView", "GetVisibleDrawingComponents", 0, 12),
+    ("IView", "GetVisibleComponents", 0, 12),
+    ("IView", "GetVisibleEntities2", 2, 12),
+    ("IView", "GetPolylines7", 2, 12),
+    ("IView", "GetDetailCircleInfo2", 0, 12),
+    ("IView", "UpdateViewDisplayGeometry", 0, 24),
+    ("ISketchSegment", "Select4", 2, 11),
+    ("ISldWorks", "GetMathUtility", 0, 9),
+    ("IMathUtility", "CreatePoint", 1, 9),
+    ("IMathPoint", "MultiplyTransform", 1, 9),
     ("IView", "GetCThreads", 0, 12),
+    ("IView", "GetDisplayMode2", 0, 3),
+    ("IView", "GetCThreadQuality", 0, 11),
     ("ICThread", "GetAnnotation", 0, 9),
     ("ICThread", "GetDisplayData", 0, 9),
     ("IDisplayData", "GetLineCount", 0, 3),
     ("IDisplayData", "GetLineAtIndex2", 1, 12),
+    ("IDisplayData", "GetPolyLineCount", 0, 3),
+    ("IDisplayData", "GetPolylineAtIndex2", 1, 12),
+    ("IDisplayData", "GetArcCount", 0, 3),
+    ("IDisplayData", "GetArcAtIndex2", 1, 12),
     ("IView", "GetBaseView", 0, 9),
     ("IModelDoc2", "GetPathName", 0, 8),
     ("IModelDoc2", "GetType", 0, 3),
+    ("IModelDoc2", "ViewZoomtofit2", 0, 24),
     ("IFace2", "GetEdges", 0, 12),
     ("IModelDocExtension", "GetPersistReference3", 1, 12),
     ("IModelDocExtension", "IsSamePersistentID", 2, 3),
@@ -398,7 +425,7 @@ def test_witness_native_mutators_are_declared_read_write_properties(interface, m
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
 
 
-@pytest.mark.parametrize("classifier_name", ("_witness_relation_records", "_point_identity"))
+@pytest.mark.parametrize("classifier_name", ("_witness_relation_records", "_point_identity", "_point_flat_attachment"))
 @pytest.mark.parametrize(("interface", "iid"), (
     ("ISketchPoint", "{83A33DBD-27C5-11CE-BFD4-00400513BB57}"),
     ("ISketchSegment", "{83A33DBF-27C5-11CE-BFD4-00400513BB57}"),
@@ -428,3 +455,43 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
     methods, _maps = _native_declaration(interface)
     assert _native_return_type(methods["GetID"]) == (12, 0)
     assert _native_return_type(methods["GetSketch"]) == (9, 0)
+
+
+def test_native_polyline_census_retains_optional_variant_out_parameter() -> None:
+    method = _native_declaration("IView")[0]["GetPolylines7"]
+    invocation = next(
+        node for node in ast.walk(method)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr in ("InvokeTypes", "_ApplyTypes_")
+    )
+    argument_index = 4 if invocation.func.attr == "InvokeTypes" else 3
+    assert ast.literal_eval(invocation.args[argument_index]) == ((2, 1), (16396, 2))
+    # Native SHORT input, optional BYREF VARIANT output. The one-argument
+    # recipe call is valid; the full two-argument signature is checked above.
+    call = ast.parse("native.GetPolylines7(1)").body[0].value
+    assert _can_bind(call, method)
+
+
+@pytest.mark.parametrize("interface, member, retval, writable", (
+    ("IDrawingComponent", "Component", 9, False),
+    ("IDrawingComponent", "Visible", 11, True),
+    ("IComponent2", "Name2", 8, True),
+    ("IComponent2", "Visible", 3, True),
+    ("IComponent2", "Transform2", 9, True),
+    ("ICurve", "CircleParams", 12, False),
+    ("IMathPoint", "ArrayData", 12, True),
+    ("ISketchManager", "AddToDB", 11, True),
+))
+def test_thread_detail_geometry_properties_have_native_result_shapes(interface, member, retval, writable) -> None:
+    methods, maps = _native_declaration(interface)
+    assert member not in methods
+    assert member in maps["_prop_map_get_"]
+    assert (member in maps["_prop_map_put_"]) is writable
+    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
+    getter_map = next(
+        node.value for node in declaration.body
+        if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_prop_map_get_" for target in node.targets)
+    )
+    entry = next(value for key, value in zip(getter_map.keys, getter_map.values, strict=True) if ast.literal_eval(key) == member)
+    assert ast.literal_eval(entry)[2] == (retval, 0)
