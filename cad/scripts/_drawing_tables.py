@@ -1100,6 +1100,7 @@ def _bind_bom_number_property(
     *,
     configuration: str,
     label: str,
+    _before_native_hide: Callable[[Any, str], None] | None = None,
 ) -> None:
     """Display associative Numbers without replacing the native grouping column."""
     rows = int(table.RowCount)
@@ -1210,6 +1211,9 @@ def _bind_bom_number_property(
             raise RuntimeError(f"{label} BOM Number property binding did not persist")
         if _bom_physical_columns(table, label=label) != inserted:
             raise RuntimeError(f"{label} BOM column sequence changed during Number binding")
+        if _before_native_hide is not None:
+            _before_native_hide(table, configuration)
+            raise RuntimeError(f"{label} temporary native-hide diagnostic unexpectedly returned")
         with observe_mutation("after_hide_native") as outcome:
             result = table.SetColumnHidden(native_column, True)  # VT_VOID.
             outcome["return"] = repr(result)[:160]
@@ -1432,6 +1436,7 @@ def insert_bom_table(
     part_number_property: Literal["Number"] | None = None,
     configuration_grouping: Literal["separate", "same-part", "same-name"] = "separate",
     label: str,
+    _before_native_hide: Callable[[Any, str], None] | None = None,
 ) -> Any:
     """Insert a top-level parts BOM for an ASSEMBLY drawing view and validate it.
 
@@ -1530,6 +1535,7 @@ def insert_bom_table(
             table,
             configuration=configuration,
             label=label,
+            _before_native_hide=_before_native_hide,
         )
     _telemetry.annotate(rows_after_number_binding=int(table.RowCount))
     actual_grouping = int(
