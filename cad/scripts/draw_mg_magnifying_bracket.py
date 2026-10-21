@@ -33,7 +33,7 @@ from _drawing_layout_check import DrawableRegion, LeaderSegment
 from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sections import create_section_view
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -374,6 +374,28 @@ def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
     return len(notes)
 
 
+def _add_mounting_callout(adapter: Any, bottom: Any, edge: Any) -> Any:
+    # A trailing process newline leaves the associative native quantity/size/
+    # extent on its own row. R9's joined row ended at X226.2288, in the block.
+    display = add_native_hole_callout(
+        adapter, bottom, edge=edge, callout_xy=(0.166, 0.054),
+        label="two mounting clearance holes", process=MOUNTING_HOLE_PROCESS + "\n",
+    )
+    annotation = _early_bound(display, "IDisplayDimension").GetAnnotation()
+    ink = _dimension_layout_ink(adapter, annotation, label="mounting-hole callout")
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keep_out = {"title block": (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m)}
+    region = sheet_region(adapter)
+    require_inside("mounting-hole callout", ink.text, region)
+    require_clear("mounting-hole callout", ink.text, keep_out)
+    for line in ink.leader:
+        box = (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1))
+        require_inside("mounting-hole line/leader", box, region)
+        require_clear("mounting-hole line/leader", box, keep_out)
+    _telemetry.info(f"mounting-hole layout: text={ink.text}, title_block={keep_out['title block']}")
+    return display
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
@@ -403,7 +425,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations and root limit", dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature] for feature in ("TapCoordinates", "ThreadEnvelope")})
     set_dimension_callouts(adapter, annotations, {"ThreadRootEnvelope": THREAD_ENVELOPE_CALLOUT})
     rim = _mounting_rims(bottom)[1]
-    add_native_hole_callout(adapter, bottom, edge=rim.edge, callout_xy=(0.166, 0.054), label="two mounting clearance holes", process=MOUNTING_HOLE_PROCESS)
+    _add_mounting_callout(adapter, bottom, rim.edge)
     edges = scan_view_edges(side, label="bracket through thread")
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")
     tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap", process=TAP_PROCESS)

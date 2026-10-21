@@ -853,6 +853,85 @@ def test_tap_name_cleanup_requires_native_selection_and_actual_deletion(monkeypa
     assert not state.deleted
 
 
+@pytest.mark.parametrize("fault", (None, "ignored_wrap", "leader_overshoot", "changed_template"))
+def test_mounting_callout_reflows_native_size_clear_of_the_current_title_block(monkeypatch, fault):
+    from dataclasses import replace
+    from _drawing_hole_callout import compose_hole_callout_prefix
+
+    edge, view = object(), object()
+    native_definition = "2X <MOD-DIAM><hw-diam> <hw-thru>"
+    state = SimpleNamespace(definition=None, edge=None, view=None, value=mounting.CLEARANCE_DIA / 1000.0)
+    display = SimpleNamespace(GetAnnotation=lambda: state)
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    if fault == "changed_template":
+        template = replace(template, title_block_left_m=0.205)
+        monkeypatch.setitem(drawing.DRAWING_TEMPLATES, drawing.SPEC.layout, template)
+
+    def insert(_adapter, actual_view, *, edge, callout_xy, label, process):
+        state.edge, state.view = edge, actual_view
+        state.definition = compose_hole_callout_prefix(process, native_definition)
+        state.position = callout_xy
+        state.wrapped = process.endswith("\n") and fault != "ignored_wrap"
+        return display
+
+    def native_ink(_adapter, annotation):
+        assert annotation is state
+        if not state.wrapped:
+            # Exact R9 text runs and shoulder: the last native size row
+            # reaches X226.2288 into the title block. No rerun needed.
+            texts = [
+                _native_text("2 HOLES THRU", 0.1507677, 0.0540267, 0.0304646),
+                _native_text("MATES MHA-SM-03 TAPPED HOLES 2X ", 0.1057712, 0.0484705, 0.0834215),
+                _native_text("<MOD-DIAM>", 0.1891927, 0.048417, 0.0052784),
+                _native_text(" 2.59 THRU ALL", 0.1944712, 0.0484705, 0.0317576),
+            ]
+            left, right, shoulder = 0.1041837, 0.2262288, 0.048417
+        else:
+            # Simulated three-row native reflow, using the old mate+2X width
+            # conservatively for the now shorter mate-only row. This is not
+            # claimed as new native glyph evidence.
+            x, y = state.position
+            header, mate = spec.MOUNTING_HOLE_PROCESS.splitlines()
+            texts = [
+                _native_text(header, x - 0.0304646 / 2.0, y + 0.0000267, 0.0304646),
+                _native_text(mate, x - 0.0834215 / 2.0, y - 0.0055295, 0.0834215),
+                _native_text("2X <MOD-DIAM> 2.59 THRU ALL", x - 0.048 / 2.0, y - 0.0110858, 0.048),
+            ]
+            left = x - 0.0834215 / 2.0 - 0.0015875
+            right = x + 0.0834215 / 2.0
+            shoulder = y - 0.0111393
+            if fault == "leader_overshoot":
+                right = 0.2262288
+        return {"texts": texts, "lines": [
+            _native_line(0.0729985, 0.0790916, left, shoulder),
+            _native_line(0.0711515, 0.0809084, 0.0729985, 0.0790916),
+            _native_line(left, shoulder, right, shoulder),
+        ]}, {}
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "add_native_hole_callout", insert)
+    monkeypatch.setattr(drawing, "annotation_display", native_ink)
+    monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
+    if fault is None:
+        assert drawing._add_mounting_callout(object(), view, edge) is display
+        ink = drawing._dimension_layout_ink(object(), state, label="mounting")
+        assert ink.text[2] + 0.002 <= template.title_block_left_m
+        assert all(max(line.x0, line.x1) + 0.002 <= template.title_block_left_m for line in ink.leader)
+    else:
+        target = "mounting-hole line/leader" if fault == "leader_overshoot" else "mounting-hole callout"
+        with pytest.raises(RuntimeError, match=target + ".*crowds.*title block"):
+            drawing._add_mounting_callout(object(), view, edge)
+    # Reflow changes only the separator, not the selected mounting edge,
+    # original native format variables, hole value, words or insertion point.
+    assert state.edge is edge and state.view is view
+    assert state.value == mounting.CLEARANCE_DIA / 1000.0
+    assert state.position == (0.166, 0.054)
+    assert state.definition.splitlines()[-1] == native_definition
+    assert " ".join(state.definition.split()) == " ".join(
+        compose_hole_callout_prefix(spec.MOUNTING_HOLE_PROCESS, native_definition).split()
+    )
+
+
 def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_moving_its_tip(monkeypatch, tmp_path) -> None:
     """Replay observed collisions; relocated native ink still needs seat proof."""
     adapter, side, callout, state, required = _tap_name_adapter(monkeypatch)
@@ -880,7 +959,7 @@ def test_real_recipe_routes_wall_clear_of_frozen_r6_thread_leaders_without_movin
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_a, **_kw: (adapter.currentModel, object()))
     monkeypatch.setattr(drawing, "place_view", lambda _a, _source, orientation, *_xy, **_kw: side if orientation == "*Right" else object())
     monkeypatch.setattr(drawing, "_mouth_section", lambda *_a: object())
-    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note", "_require_root_callout_inside", "_layout_mouth_annotations"):
+    for name in ("read_required_properties", "stamp_drawing_summary", "set_hidden_lines_removed", "_project_side_view", "set_dimension_callouts", "rebuild_drawing", "add_property_linked_note", "_require_root_callout_inside", "_layout_mouth_annotations", "_add_mounting_callout"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: None)
     for name in ("curate_view_dimensions", "curate_hidden_dimensions"):
         monkeypatch.setattr(drawing, name, lambda *_a, **_kw: [])
