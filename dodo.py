@@ -2013,6 +2013,19 @@ def _soundness_file_deps(stem: str) -> list[str]:
         # The pass sweep replays the recorded slide from the DOF manifest and
         # walks the sweep sidecar's poses.
         deps += [_dof_json(stem), _sweep_json(stem)]
+        # This source revision is a diagnostic, not a production cutover. Its
+        # paired trajectories hash the complete flat native closure and retain
+        # structured evidence as additional outputs of this EXISTING leaf.
+        deps += sorted(_executed_closure([str(SCRIPTS_DIR / "_jig_dirty_edit.py")]))
+        deps.append(_submodule_dep())
+        deps += [
+            path
+            for ref in references_of(stem)
+            for path in (_sldprt(ref), _part_execution_token(ref))
+        ]
+        deps += [
+            str(path.resolve()) for path in CONFIG_DIR.rglob("*") if path.is_file()
+        ]
     return deps
 
 
@@ -3126,10 +3139,16 @@ def task_verify_soundness():
         deps = _soundness_file_deps(stem)
         stamp = str(REPORTS / f"verify-soundness-{name}.ok")
         cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
+        outputs = [Path(stamp)]
+        if stem == "ch_rocker_arm_tl_oblique_jig":
+            outputs += [
+                REPORTS / "jig-dirty-edit.json",
+                REPORTS / "jig-dirty-edit-budget.json",
+            ]
         yield {
             "name": stem,
             "file_dep": deps,
-            "targets": [stamp],
+            "targets": [str(path) for path in outputs],
             "uptodate": [not _cache.forced_refresh(f"verify_soundness:{stem}")],
             "actions": [
                 (
@@ -3138,7 +3157,7 @@ def task_verify_soundness():
                         f"verify_soundness:{stem}",
                         cmd,
                         deps,
-                        [Path(stamp)],
+                        outputs,
                         f"verify-soundness-{name}",
                         stamp,
                     ],
@@ -3728,6 +3747,7 @@ def task_check():
         # tree): poses closing on the calculator, the shop-fixture rule, and
         # the pinned sweep clearances of both passes.
         SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_jig_assembly.py",
+        SCRIPTS_DIR / "test_jig_dirty_edit.py",
         # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
         # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
         SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",

@@ -59,6 +59,7 @@ NOT YET WIRED (tracked, not silently skipped):
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import json
 import math
@@ -930,8 +931,15 @@ def _run_soundness_battery(
 
 
 async def _verify_static_one(
-    adapter: Any, name: str, report: Report, *, auto_repair: bool = False
+    adapter: Any,
+    name: str,
+    report: Report,
+    *,
+    auto_repair: bool = False,
+    diagnostic: Any = None,
 ) -> None:
+    if diagnostic is not None:
+        diagnostic.check("open/setup")
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"{name}:open", f"not built: {sldasm}"))
@@ -972,7 +980,14 @@ async def _verify_static_one(
     # ForceRebuild3-returned-False check is preserved.
     with _telemetry.span("verify.rebuild", name=name):
         rebuilt = adapter._attempt(
-            lambda: adapter.currentModel.ForceRebuild3(False), default=None
+            lambda: (
+                diagnostic.native(
+                    "initial_force", lambda: adapter.currentModel.ForceRebuild3(False)
+                )
+                if diagnostic is not None
+                else adapter.currentModel.ForceRebuild3(False)
+            ),
+            default=None,
         )
 
     repaired = False
@@ -1211,7 +1226,7 @@ async def _verify_static_one(
             return
 
     if name == SWEEP_OWNER:
-        await _verify_pass_sweep(adapter, name, report)
+        await _verify_pass_sweep(adapter, name, report, diagnostic=diagnostic)
 
 
 def _rebuild(adapter: Any, *, timings: dict[str, int] | None = None) -> None:
@@ -1241,7 +1256,9 @@ def _sweep_sidecar_path(name: str) -> Path:
     return OUT_SLDASM / f".{name}.sweep.json"
 
 
-async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
+async def _walk_pass_sweep(
+    adapter: Any, name: str, *, diagnostic: Any = None
+) -> list[str]:
     """Walk every pass of the recorded sweep and return each failure.
 
     The slide is authored transiently from the DOF manifest (DRIVE_<key>) and
@@ -1265,6 +1282,8 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
     }
     try:
         with _telemetry.span("verify.pass_sweep.prepare") as sp:
+            if diagnostic is not None:
+                diagnostic.check("prepare")
             path = _sweep_sidecar_path(name)
             if not path.exists():
                 sp.set_status(
@@ -1285,7 +1304,12 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                     )
                 )
                 return [f"expected exactly 1 recorded {key} drive spec, found {len(specs)}"]
-            (mate,) = await author_dof_drives(adapter, specs)
+            with (
+                diagnostic.preparing()
+                if diagnostic is not None
+                else contextlib.nullcontext()
+            ):
+                (mate,) = await author_dof_drives(adapter, specs)
             param = adapter._attempt(
                 lambda: adapter.currentModel.Parameter(f"D1@{mate}"), default=None
             )
@@ -1298,38 +1322,61 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                 )
                 return [f"cannot read D1@{mate} on the transient {key} drive"]
             tolerance = float(sweep["pose_tolerance_mm"])
+            if diagnostic is not None:
+                diagnostic.prepare(sweep, mate)
 
-        def _drive(drive_mm: float) -> None:
+        def _solve(boundary: str) -> None:
+            if diagnostic is None:
+                _rebuild(adapter, timings=timings)
+            else:
+                diagnostic.solve(boundary, timings)
+
+        def _drive(drive_mm: float, boundary: str) -> None:
+            if diagnostic is not None:
+                diagnostic.before_drive(boundary)
             timings["jig.drive_write_attempts"] += 1
             started = time.perf_counter_ns()
             try:
                 param.SystemValue = drive_mm / 1000.0
             finally:
                 timings["jig.drive_write_elapsed_ns"] += time.perf_counter_ns() - started
-            _rebuild(adapter, timings=timings)
+            _solve(boundary)
 
         failures: list[str] = []
         for walk in sweep["passes"]:
             remate = walk["remate"]
             if remate:
-                _drive(walk["poses"][0]["drive_mm"])
+                _drive(walk["poses"][0]["drive_mm"], f"{walk['pass']}:0:pre-remate")
                 for old in remate["suppress"]:
-                    check(
-                        f"suppress {old}",
-                        await adapter.suppress_mate(
-                            SuppressMateParameters(name=old, suppress=True)
-                        ),
-                    )
+                    with (
+                        diagnostic.remating(f"suppress:{old}")
+                        if diagnostic is not None
+                        else contextlib.nullcontext()
+                    ):
+                        check(
+                            f"suppress {old}",
+                            await adapter.suppress_mate(
+                                SuppressMateParameters(name=old, suppress=True)
+                            ),
+                        )
                 for pair in remate["coaxial"]:
-                    await coincident_mate(
-                        adapter,
-                        named_ref(pair["hole"], "AXIS"),
-                        named_ref(pair["pin"], "AXIS"),
-                        label=pair["label"],
-                    )
-                _rebuild(adapter, timings=timings)
-            for pose in walk["poses"]:
-                _drive(pose["drive_mm"])
+                    with (
+                        diagnostic.remating(f"coincident:{pair['label']}")
+                        if diagnostic is not None
+                        else contextlib.nullcontext()
+                    ):
+                        await coincident_mate(
+                            adapter,
+                            named_ref(pair["hole"], "AXIS"),
+                            named_ref(pair["pin"], "AXIS"),
+                            label=pair["label"],
+                        )
+                _solve(f"{walk['pass']}:0:post-remate")
+            for visit_index, pose in enumerate(walk["poses"]):
+                boundary = f"{walk['pass']}:{visit_index}:visit"
+                _drive(pose["drive_mm"], boundary)
+                if diagnostic is not None:
+                    diagnostic.visit(boundary)
                 where = (
                     f"{walk['pass']} pass, theta {math.degrees(pose['theta_rad']):+.3f} deg "
                     f"(slide {pose['drive_mm']:.3f} mm)"
@@ -1338,7 +1385,14 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
                     timings["jig.transform_readback_attempts"] += 1
                     started = time.perf_counter_ns()
                     try:
-                        at = [v * 1000.0 for v in component_transform(adapter, carriage)[9:12]]
+                        transform = (
+                            diagnostic.carriage_read(
+                                carriage, lambda: component_transform(adapter, carriage)
+                            )
+                            if diagnostic is not None
+                            else component_transform(adapter, carriage)
+                        )
+                        at = [v * 1000.0 for v in transform[9:12]]
                     finally:
                         timings["jig.transform_readback_elapsed_ns"] += (
                             time.perf_counter_ns() - started
@@ -1364,7 +1418,9 @@ async def _walk_pass_sweep(adapter: Any, name: str) -> list[str]:
         _telemetry.annotate(**timings)
 
 
-async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
+async def _verify_pass_sweep(
+    adapter: Any, name: str, report: Report, *, diagnostic: Any = None
+) -> None:
     """``<name>:pass-sweep-interference-free``: the static battery's open
     model, swept through both passes (``_walk_pass_sweep``). The walk mutates
     the document in memory only; it is discarded unsaved on every exit."""
@@ -1372,7 +1428,7 @@ async def _verify_pass_sweep(adapter: Any, name: str, report: Report) -> None:
     try:
         try:
             with _telemetry.span("verify.pass_sweep.walk") as sp:
-                failures = await _walk_pass_sweep(adapter, name)
+                failures = await _walk_pass_sweep(adapter, name, diagnostic=diagnostic)
                 if failures:
                     sp.set_status(
                         _telemetry.Status(_telemetry.StatusCode.ERROR, "; ".join(failures))
@@ -2402,9 +2458,16 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if suite == "soundness":
         for name in names:
-            await _verify_static_one(
-                adapter, name, report, auto_repair=_ARGS.auto_repair
-            )
+            if name == SWEEP_OWNER:
+                if _ARGS.auto_repair:
+                    raise RuntimeError("dirty-Edit diagnostic forbids --auto-repair")
+                from _jig_dirty_edit import run
+
+                await run(adapter, name, report)
+            else:
+                await _verify_static_one(
+                    adapter, name, report, auto_repair=_ARGS.auto_repair
+                )
     if suite == "kinematics":
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
