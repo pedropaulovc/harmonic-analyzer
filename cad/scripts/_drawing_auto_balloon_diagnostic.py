@@ -30,8 +30,8 @@ FAILURES = Path(__file__).resolve().parents[1] / "out" / "reports" / "failures"
 # Explicit recipe inputs: arm B changes attachment only from arm A (face/square).
 # Arm C restores "face" and changes layout to 2 (Circle); keep spread unchanged.
 # Offline API bundle v3.12.1: IAutoBalloonOptions + swBalloonLayoutType_e.
-_EXPERIMENT_ATTACHMENT: Literal["face", "edge"] = "edge"
-_EXPERIMENT_LAYOUT = 1  # swDetailingBalloonLayout_Square; Circle = 2.
+_EXPERIMENT_ATTACHMENT: Literal["face", "edge"] = "face"
+_EXPERIMENT_LAYOUT = 2  # swDetailingBalloonLayout_Circle; Square = 1.
 _LAYOUT_ENUM_NAMES = {
     1: "swDetailingBalloonLayout_Square",
     2: "swDetailingBalloonLayout_Circle",
