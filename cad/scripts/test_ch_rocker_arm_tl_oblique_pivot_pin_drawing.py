@@ -332,3 +332,55 @@ def test_inspection_note_stays_on_clear_paper_above_the_title_block() -> None:
     assert right < 0.4191 - 0.003
     assert bottom > 0.065 + 0.003
     assert y + height < drawing.PROFILE_KEEP["LowerBossHeight"][1] - 0.003
+
+
+@pytest.fixture
+def native_cross_hole_dimensions(monkeypatch):
+    dimensions = {
+        name: SimpleNamespace(SystemValue=value / 1000.0, DrivenState=1)
+        for name, value in (
+            ("CrossEndStation", spec.OVERALL_LENGTH),
+            ("CrossHoleFromEnd", spec.CROSS_HOLE_FROM_END),
+            ("CrossHoleDia", spec.CROSS_HOLE_DIA),
+        )
+    }
+    monkeypatch.setattr(
+        part,
+        "_named_dimension",
+        lambda _adapter, _feature, name: (None, dimensions[name]),
+    )
+    return dimensions
+
+
+def test_cross_hole_geometry_accepts_a_measured_end_and_neutral_drivers(
+    native_cross_hole_dimensions,
+) -> None:
+    part._require_cross_hole_geometry(object())
+    # Equation-manager document-unit conversion changes only numerical noise.
+    for dimension in native_cross_hole_dimensions.values():
+        dimension.SystemValue += 2e-10
+    part._require_cross_hole_geometry(object())
+
+
+@pytest.mark.parametrize("state", (0, 2))
+def test_cross_end_must_be_a_reference_without_coercing_native_state(
+    native_cross_hole_dimensions, state,
+) -> None:
+    end = native_cross_hole_dimensions["CrossEndStation"]
+    end.DrivenState = state
+    with pytest.raises(RuntimeError, match="CrossEndStation@CrossHoleProfile"):
+        part._require_cross_hole_geometry(object())
+    assert end.DrivenState == state
+
+
+@pytest.mark.parametrize(
+    "name", ("CrossEndStation", "CrossHoleFromEnd", "CrossHoleDia")
+)
+def test_cross_hole_geometry_rejects_changed_end_offset_or_diameter(
+    native_cross_hole_dimensions, name,
+) -> None:
+    native_cross_hole_dimensions[name].SystemValue += 0.25 / 1000.0
+    with pytest.raises(
+        RuntimeError, match=re.escape(f"{name}@CrossHoleProfile")
+    ):
+        part._require_cross_hole_geometry(object())

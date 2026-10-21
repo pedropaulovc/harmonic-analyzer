@@ -17,7 +17,6 @@ from types import SimpleNamespace
 import pytest
 
 import _config
-import _drawing_dimensions as dimension_tools
 import build_ch_rocker_arm_tl_oblique_pivot_cap as part
 import ch_rocker_arm_tl_oblique_pivot_cap_spec as spec
 import ch_rocker_arm_tl_oblique_retention_spec as retention
@@ -67,106 +66,97 @@ def test_integral_register_geometry_has_one_shared_owner() -> None:
     assert spec.REGISTER_END_CHAMFER_MAX == retention.CAP_REGISTER_END_CHAMFER_MAX == 0.20
 
 
-@pytest.mark.parametrize("failure", (None, "depth", "missing", "duplicate", "move", "delete"))
-def test_side_view_transfers_the_source_chamfer_and_removes_its_profile_donor(monkeypatch, failure) -> None:
-    right = SimpleNamespace(name="MouthSide", annotations=[])
-    donor = SimpleNamespace(name="ChamferDonor", annotations=[])
-    for view in (right, donor):
-        view.GetAnnotations = lambda current=view: list(current.annotations)
-    views, events, imports = [right], [], []
+@pytest.mark.parametrize("missing_chamfer", (False, True))
+def test_native_chamfer_stays_on_its_visible_profile_through_finalization(monkeypatch, tmp_path, missing_chamfer) -> None:
+    source = tmp_path / "cap.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    views, imports, precision_checks, callouts, finalized = [], [], [], [], []
     native = SimpleNamespace(
         FullName="RegisterEndChamfer@RegisterEndChamfers@cap",
         SystemValue=spec.REGISTER_END_CHAMFER_MAX / 1000.0,
         Tolerance=SimpleNamespace(Type=6, lower=-spec.REGISTER_END_CHAMFER_MAX / 1000.0, upper=0.0),
     )
-    display = SimpleNamespace(GetNameForSelection=lambda: native.FullName, GetDimension2=lambda _index: native)
-    chamfer = SimpleNamespace(name="RegisterEndChamfer", GetSpecificAnnotation=lambda: display)
+    chamfer = SimpleNamespace(name="RegisterEndChamfer", dimension=native)
 
-    def select(name, kind, *_args):
-        assert (name, kind) == (native.FullName, "DIMENSION")
-        events.append("select native")
-        return True
+    async def open_model(path):
+        assert path == str(source)
+        return SimpleNamespace(is_success=True, data=None, error=None)
 
-    def drag(target, effect, x, y, z):
-        assert (target, effect, (x, y), z) == (right.name, 2, drawing.RIGHT_KEEP[chamfer.name], 0.0)
-        events.append("move native")
-        if failure != "move":
-            donor.annotations.remove(chamfer)
-            right.annotations.append(chamfer)
+    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
 
-    model = SimpleNamespace(
-        ActivateView=lambda name: name == donor.name,
-        ClearSelection2=lambda _all: None,
-        Extension=SimpleNamespace(SelectByID2=select),
-        DragModelDimension=drag,
-        EditRebuild3=lambda: None,
-    )
-    adapter = SimpleNamespace(currentModel=model)
+    def place(current, path, orientation, x, y, *, scale):
+        assert current is adapter and path == str(source)
+        view = SimpleNamespace(orientation=orientation, center=(x, y), scale=scale, annotations=[])
+        views.append(view)
+        return view
 
-    def place(current, source, orientation, x, y, *, scale):
-        assert current is adapter and source == str(drawing.SOURCE)
-        assert (orientation, (x, y), scale) == ("*Top", drawing.RIGHT_CENTER, drawing.VIEW_SCALE)
-        views.append(donor)
-        events.append("place donor")
-        return donor
+    def section(_adapter, _parent, **kwargs):
+        view = SimpleNamespace(orientation=kwargs["section_label"], annotations=[])
+        views.append(view)
+        return view
 
     def curate(current, view, *, keep, view_label, dimensions_by_feature):
         assert current is adapter and dimensions_by_feature is spec.DRAWING_DIMENSIONS
         imports.append((view, keep))
-        if view is right:
-            assert keep == {name: xy for name, xy in drawing.RIGHT_KEEP.items() if name != chamfer.name}
-            if failure == "depth":
-                raise RuntimeError("missing model dimensions: ['CounterboreDepth']")
-            right.annotations[:] = [SimpleNamespace(name=name) for name in keep]
-            return list(right.annotations)
-        assert view is donor and keep == {chamfer.name: drawing.RIGHT_KEEP[chamfer.name]}
-        if failure == "missing":
-            raise RuntimeError("missing model dimensions: ['RegisterEndChamfer']")
-        donor.annotations[:] = [chamfer] * (2 if failure == "duplicate" else 1)
-        return list(donor.annotations)
+        if "RegisterEndChamfer" in keep:
+            assert view.orientation == "*Top"
+            assert view.center == drawing.REGISTER_END_CENTER
+            assert keep == drawing.REGISTER_END_KEEP
+            if missing_chamfer:
+                raise RuntimeError("missing model dimensions: ['RegisterEndChamfer']")
+            view.annotations[:] = [chamfer]
+        else:
+            view.annotations[:] = [SimpleNamespace(name=name) for name in keep]
+        return list(view.annotations)
 
-    def delete(current, view):
-        assert current is adapter and view is donor
-        assert not donor.annotations
-        events.append("delete donor")
-        if failure != "delete":
-            views.remove(donor)
-        return False  # EditDelete is void; the live view census proves deletion.
+    def precision(_adapter, annotations, expected):
+        assert expected is spec.DRAWING_PRECISION_BY_NAME
+        precision_checks.extend(annotations)
 
-    name_of_view = lambda _adapter, view: view.name
+    def set_callouts(_adapter, annotations, expected, *, location):
+        assert expected is spec.DIMENSION_CALLOUTS and location == "below"
+        callouts.extend(annotations)
+
+    async def finalize(_adapter, outputs, **_kwargs):
+        finalized.append(outputs)
+        return {"slddrw": "cap.SLDDRW"}
+
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (adapter.currentModel, object()))
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "create_section_view", section)
+    monkeypatch.setattr(drawing, "_project", lambda *_args: (0.0, 0.0))
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda _adapter, view: setattr(view, "hidden_removed", True))
     monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
-    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda _adapter, view: events.append(("hidden removed", view)))
-    monkeypatch.setattr(drawing, "delete_view", delete)
-    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: iter(views))
-    monkeypatch.setattr(drawing, "view_name", name_of_view)
-    monkeypatch.setattr(dimension_tools, "view_name", name_of_view)
-    monkeypatch.setattr(dimension_tools, "dimension_name", lambda _adapter, annotation: annotation.name)
-    monkeypatch.setattr(dimension_tools, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "assert_imported_precision", precision)
+    monkeypatch.setattr(drawing, "set_dimension_callouts", set_callouts)
+    monkeypatch.setattr(drawing, "_assert_pocket_corner_callout", lambda *_args: None)
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(drawing, "add_surface_finish", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "add_property_linked_note", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
 
-    if failure is None:
-        annotations = drawing._curate_right_dimensions(adapter, right)
-        assert {annotation.name for annotation in annotations} == set(drawing.RIGHT_KEEP)
-        assert len(annotations) == len(drawing.RIGHT_KEEP)
-        assert annotations[-1] is chamfer and chamfer in right.annotations
-        assert annotations[-1].GetSpecificAnnotation().GetDimension2(0) is native
-        assert views == [right] and not donor.annotations
-        assert events.index("move native") < events.index("delete donor")
-        assert len(imports) == 2
+    if missing_chamfer:
+        with pytest.raises(RuntimeError, match="RegisterEndChamfer"):
+            asyncio.run(drawing.build(adapter))
+        assert not finalized and not precision_checks and not callouts
     else:
-        message = {
-            "depth": "CounterboreDepth", "missing": "RegisterEndChamfer",
-            "duplicate": "expected one native register end chamfer",
-            "move": "native dimension did not move", "delete": "failed to delete",
-        }[failure]
-        with pytest.raises(RuntimeError, match=message):
-            drawing._curate_right_dimensions(adapter, right)
-        if failure in {"depth", "missing", "duplicate"}:
-            assert "move native" not in events
-        if failure in {"depth", "missing", "duplicate", "move"}:
-            assert "delete donor" not in events
-        if failure == "depth":
-            assert "place donor" not in events
+        assert asyncio.run(drawing.build(adapter)) == {"slddrw": "cap.SLDDRW"}
+        profile, = [view for view in views if view.orientation == "*Top"]
+        assert profile.annotations == [chamfer] and profile.hidden_removed
+        assert profile.scale == drawing.VIEW_SCALE
+        assert sum(item is chamfer for item in precision_checks) == 1
+        assert sum(item is chamfer for item in callouts) == 1
+        assert {annotation.name for annotation in precision_checks} == set(spec.DRAWING_PRECISION_BY_NAME)
+        assert len(precision_checks) == len(spec.DRAWING_PRECISION_BY_NAME)
+        assert finalized == [drawing.OUTPUTS]
+        assert len(views) == 7
+    side, = [view for view in views if view.orientation == "*Right"]
+    assert next(keep for view, keep in imports if view is side) == drawing.RIGHT_KEEP
+    assert "RegisterEndChamfer" not in drawing.RIGHT_KEEP
+    assert chamfer.dimension is native
     assert native.SystemValue == spec.REGISTER_END_CHAMFER_MAX / 1000.0
     assert (native.Tolerance.Type, native.Tolerance.lower, native.Tolerance.upper) == (
         6, -spec.REGISTER_END_CHAMFER_MAX / 1000.0, 0.0,
@@ -493,7 +483,7 @@ def test_pocket_depth_is_fitted_to_actual_flange_not_a_loose_fixed_band() -> Non
 
 
 def test_each_model_dimension_is_printed_once_with_authored_precision() -> None:
-    keep_maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
+    keep_maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.REGISTER_END_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert sum(map(len, keep_maps)) == len(marked)
     assert set().union(*keep_maps) == marked == set(spec.DRAWING_PRECISION_BY_NAME)
@@ -508,7 +498,8 @@ def test_each_model_dimension_is_printed_once_with_authored_precision() -> None:
     register_locations = {f"Register{i}{axis}" for i in range(1, 3) for axis in ("X", "Y")}
     assert register_locations <= drawing.BOTTOM_KEEP.keys()
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == spec.REGISTER_LOCATION_PLACES for name in register_locations)
-    assert {"RegisterProjection", "RegisterEndChamfer"} <= drawing.RIGHT_KEEP.keys()
+    assert "RegisterProjection" in drawing.RIGHT_KEEP
+    assert "RegisterEndChamfer" in drawing.REGISTER_END_KEEP
     assert spec.DRAWING_PRECISION_BY_NAME["RegisterProjection"] == spec.REGISTER_PROJECTION_PLACES
     assert "EntryReliefDia" in drawing.TOP_KEEP
     assert "EntryReliefDepth" in drawing.BOLT_SECTION_KEEP
@@ -881,7 +872,7 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     # Landscape ASME B template's inner border and title-block keep-out.
     left, bottom, right, top = 0.0124, 0.0124, 0.4194, 0.267
     title_left, title_top = 0.216, 0.0652
-    maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
+    maps = (drawing.TOP_KEEP, drawing.BOTTOM_KEEP, drawing.RIGHT_KEEP, drawing.REGISTER_END_KEEP, drawing.SECTION_KEEP, drawing.BOLT_SECTION_KEEP)
     for keep in maps:
         for x, y in keep.values():
             assert left + 0.004 < x < right - 0.004
@@ -897,6 +888,16 @@ def test_ordinary_center_dimensions_have_clear_lanes_within_the_paper_boundaries
     section_top = drawing.SECTION_CENTER[1] + spec.HEIGHT / 2000.0
     assert section_top + 0.008 < drawing.BOTTOM_KEEP["PocketCenterX"][1]
     assert drawing.BOTTOM_KEEP["PocketCenterX"][1] + 0.006 < drawing.BOTTOM_KEEP["Bolt3X"][1]
+    # The permanent XZ projection is third-angle aligned above the face view.
+    profile_half_width = spec.WIDTH / 2000.0
+    profile_half_height = spec.TOTAL_HEIGHT / 2000.0
+    profile_x, profile_y = drawing.REGISTER_END_CENTER
+    assert profile_x == drawing.TOP_CENTER[0]
+    assert profile_y - profile_half_height > drawing.TOP_KEEP["ApertureDia"][1] + 0.006
+    # Leave the counterbore's two-line note above the added profile, while
+    # the chamfer text sits wholly beyond its right-hand stock edge.
+    assert drawing.TOP_KEEP["CounterboreDia"][1] - 0.010 > profile_y + profile_half_height
+    assert drawing.REGISTER_END_KEEP["RegisterEndChamfer"][0] > profile_x + profile_half_width + 0.006
 
 
 def test_native_recipe_adapter_calls_bind_to_the_real_interface() -> None:

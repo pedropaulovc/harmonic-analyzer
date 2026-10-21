@@ -2,12 +2,11 @@
 
 Top face shows actual open head pockets and wire channels; underside shows
 the flange pocket and integral registers in solid lines. A-A shows the fitted
-pocket, B-B the head-seat entry reliefs, and the side view the register ends.
+pocket and B-B the head-seat entry reliefs. The side view shows mouth depths.
+The aligned XZ (*Top) projection retains the register free-end chamfer's
+native dimension, which is not transferable into the YZ side view.
 Pocket/aperture centres share the real -X/-Y stock corner; bolt and register
 coordinates are ordinary native dimensions from the actual pocket axis.
-The circular-edge chamfer imports through its XZ (*Top) profile, then moves
-as the same native model dimension onto the mouth-depth side view; the empty
-donor view is deleted before export.
 """
 
 from __future__ import annotations
@@ -16,12 +15,12 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, delete_view, dimension_name, iter_views, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, dimension_name, place_view
 
 from _check import check
 from _com import _early_bound
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, stamp_drawing_summary
-from _drawing_dimensions import assert_imported_precision, move_model_dimension, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
@@ -53,6 +52,9 @@ VIEW_SCALE = (1, 1)
 TOP_CENTER = (0.090, 0.170)
 BOTTOM_CENTER = (0.260, 0.170)
 RIGHT_CENTER = (0.365, 0.170)
+# The native circular-rim chamfer imports in XZ, not the mouth-depth YZ view.
+# Keep this *Top projection above and aligned with the cap's *Front view.
+REGISTER_END_CENTER = (TOP_CENTER[0], 0.240)
 SECTION_CENTER = (0.265, 0.085)
 BOLT_SECTION_CENTER = (0.360, 0.095)
 ISO_CENTER = (0.095, 0.052)
@@ -62,7 +64,7 @@ ISO_NOTE_XY = (0.052, 0.095)
 # with positive clearance beyond the 6 mm annotation keep-out on both sides.
 TOP_KEEP = {
     "CapWidth": (0.090, 0.114), "CapLength": (0.145, 0.170),
-    "CounterboreDia": (0.035, 0.250), "ApertureDia": (0.055, 0.225),
+    "CounterboreDia": (0.035, 0.260), "ApertureDia": (0.055, 0.225),
     "ApertureCenterX": (0.078, 0.124), "ApertureCenterY": (0.052, 0.151),
     "WireWidth": (0.137, 0.092),
     "EntryReliefDia": (0.170, 0.115),
@@ -83,8 +85,10 @@ BOTTOM_KEEP = {
 }
 RIGHT_KEEP = {
     "CounterboreDepth": (0.342, 0.245), "WireDepth": (0.355, 0.122),
-    "RegisterProjection": (0.390, 0.145), "RegisterEndChamfer": (0.390, 0.198),
+    "RegisterProjection": (0.390, 0.145),
 }
+# Right of the XZ outline, above the underside register-size annotation lane.
+REGISTER_END_KEEP = {"RegisterEndChamfer": (0.135, 0.241)}
 SECTION_KEEP = {"CapHeight": (0.315, 0.085), "PocketDepth": (0.215, 0.107)}
 BOLT_SECTION_KEEP = {"EntryReliefDepth": (0.405, 0.100)}
 SECTION_LINE_MODEL = ((-part_spec.WIDTH / 2.0 - 4.0, 0.0, 0.0), (part_spec.WIDTH / 2.0 + 4.0, 0.0, 0.0))
@@ -237,41 +241,6 @@ def _assert_pocket_corner_callout(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("native chamber floor/wall corner instruction did not persist")
 
 
-def _curate_right_dimensions(adapter: Any, right: Any) -> list[Any]:
-    """Keep the open-mouth projection and transfer its native chamfer size.
-
-    The angle-distance chamfer on a Z-axis circular rim has its native size
-    in the XZ profile, as on the transgear front bushing. It does not import
-    directly into *Right. Keep that YZ view for the genuinely open X mouths;
-    import the chamfer in *Top, then move it, not a replacement dimension.
-    Both imports retain the strict required-name check.
-    """
-    chamfer_name = "RegisterEndChamfer"
-    annotations = curate_view_dimensions(
-        adapter, right,
-        keep={name: xy for name, xy in RIGHT_KEEP.items() if name != chamfer_name},
-        view_label="open-mouth depths and register projection",
-        dimensions_by_feature=part_spec.DRAWING_DIMENSIONS,
-    )
-    donor = place_view(adapter, str(SOURCE), "*Top", *RIGHT_CENTER, scale=VIEW_SCALE)
-    set_hidden_lines_removed(adapter, donor)
-    chamfers = curate_view_dimensions(
-        adapter, donor, keep={chamfer_name: RIGHT_KEEP[chamfer_name]},
-        view_label="register free-end chamfer donor",
-        dimensions_by_feature=part_spec.DRAWING_DIMENSIONS,
-    )
-    if len(chamfers) != 1:
-        raise RuntimeError(f"expected one native register end chamfer dimension, found {len(chamfers)}")
-    chamfer = move_model_dimension(
-        adapter, chamfers[0], right, RIGHT_KEEP[chamfer_name], source_view=donor,
-    )
-    donor_name = view_name(adapter, donor)
-    delete_view(adapter, donor)
-    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-        raise RuntimeError("failed to delete the empty register chamfer donor view")
-    return [*annotations, chamfer]
-
-
 def _project(adapter, view, point, label):
     return model_point_in_view(adapter, view, tuple(value / 1000.0 for value in point), label=label)
 
@@ -287,17 +256,17 @@ async def build(adapter: Any) -> dict[str, str]:
     top = place_view(adapter, str(SOURCE), "*Front", *TOP_CENTER, scale=VIEW_SCALE)
     bottom = place_view(adapter, str(SOURCE), "*Back", *BOTTOM_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    register_ends = place_view(adapter, str(SOURCE), "*Top", *REGISTER_END_CENTER, scale=VIEW_SCALE)
     line = [_project(adapter, bottom, point, "cap section line") for point in SECTION_LINE_MODEL]
     section = create_section_view(adapter, bottom, line_start=line[0], line_end=line[1], view_xy=SECTION_CENTER, section_label="A", scale=VIEW_SCALE, label="cap central pocket section")
     bolt_line = [_project(adapter, bottom, point, "cap bolt-row section line") for point in BOLT_SECTION_LINE_MODEL]
     bolt_section = create_section_view(adapter, bottom, line_start=bolt_line[0], line_end=bolt_line[1], view_xy=BOLT_SECTION_CENTER, section_label="B", scale=VIEW_SCALE, label="cap flat-bottom underhead entry relief section")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (top, bottom, right, section, bolt_section, iso):
+    for view in (top, bottom, right, register_ends, section, bolt_section, iso):
         set_hidden_lines_removed(adapter, view)
     annotations = []
-    for view, keep, label in ((top, TOP_KEEP, "top head and wire access"), (bottom, BOTTOM_KEEP, "underside flange chamber and integral registers"), (section, SECTION_KEEP, "A-A fitted flange chamber"), (bolt_section, BOLT_SECTION_KEEP, "B-B flat-bottom underhead entry relief")):
+    for view, keep, label in ((top, TOP_KEEP, "top head and wire access"), (bottom, BOTTOM_KEEP, "underside flange chamber and integral registers"), (right, RIGHT_KEEP, "open-mouth depths and register projection"), (register_ends, REGISTER_END_KEEP, "register free-end XZ profile"), (section, SECTION_KEEP, "A-A fitted flange chamber"), (bolt_section, BOLT_SECTION_KEEP, "B-B flat-bottom underhead entry relief")):
         annotations.extend(curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=part_spec.DRAWING_DIMENSIONS))
-    annotations.extend(_curate_right_dimensions(adapter, right))
     assert_imported_precision(adapter, annotations, part_spec.DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, part_spec.DIMENSION_CALLOUTS, location="below")
     _assert_pocket_corner_callout(adapter, annotations)

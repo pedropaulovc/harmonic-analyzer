@@ -5,7 +5,9 @@ A stepped turned pin (``ch_rocker_arm_tl_oblique_pivot_pin_spec``). Layout:
 * ``PinProfile`` is a single native Right-plane half-profile revolved about
   +Z: unchanged bearing fit, narrow lower boss, integral captive flange,
   raised carrier seat and the extended h6 carrier journal.
-* ``CrossHole`` is a real transverse through cut, not a cosmetic hole.
+* ``CrossHole`` is a real transverse through cut, located from the retained
+  native top-face endpoint. ``CrossEndStation`` measures that physical span;
+  only the end offset and diameter are equation drivers.
 * ``SeatFillet`` / ``CarrierFillet`` retain R0.2 MAX seating corners.
 * Hidden ``PinAxis``, ``CrossPinAxis``, ``CarrierSeat`` and
   ``FlangeLowerFace`` provide stable assembly mate references.
@@ -20,7 +22,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -132,18 +133,89 @@ def _max_limit(adapter, feature: str, dimension_name: str) -> None:
         )
 
 
-def _log_equation_targets(
-    adapter, drive_jobs: list[tuple[str, str]], phase: str
-) -> None:
-    """Identify an unintended reference driver without changing native state."""
-    for target, _ in drive_jobs:
-        name, feature = target.split("@", 1)
-        _, dimension = _named_dimension(adapter, feature, name)
-        _telemetry.info(
-            f"pin equation target {phase}: {target}; "
-            f"DrivenState={int(dimension.DrivenState)}; "
-            f"SystemValue_mm={float(dimension.SystemValue) * 1000.0:.12g}"
-        )
+def _require_cross_hole_geometry(adapter) -> None:
+    """The actual-end reference and both drivers must remain equation-neutral."""
+    for name, expected in (
+        ("CrossEndStation", OVERALL_LENGTH),
+        ("CrossHoleFromEnd", CROSS_HOLE_FROM_END),
+        ("CrossHoleDia", CROSS_HOLE_DIA),
+    ):
+        _, dimension = _named_dimension(adapter, "CrossHoleProfile", name)
+        if name == "CrossEndStation" and int(dimension.DrivenState) != 1:
+            raise RuntimeError(
+                "CrossEndStation@CrossHoleProfile must measure the physical "
+                "pin end as a driven reference, not an independent driver"
+            )
+        actual = float(dimension.SystemValue) * 1000.0
+        # Numerical neutrality across equation-manager units, not a shop band.
+        if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{name}@CrossHoleProfile measures {actual:.12g} mm, "
+                f"expected unchanged {expected:.12g} mm"
+            )
+
+
+async def _cross_hole_profile(adapter, pin_top_face) -> list[tuple[str, str]]:
+    """Locate the clevis hole from the actual turned end, not a second driver."""
+    cross = SketchDims()
+    check("create_sketch cross hole", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    end_line = check(
+        "cross hole top end reference",
+        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+    )
+    circle = check(
+        "cross hole circle",
+        await adapter.add_circle(
+            -CROSS_HOLE_STATION, 0.0, CROSS_HOLE_DIA / 2.0
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    # Retain/re-register the native PinProfile line, as WingAxisReference does
+    # for TL-22. Two coincident endpoints fully define this construction line;
+    # an additional horizontal relation would duplicate the physical axis.
+    physical_end = adapter._register_sketch_entity("Line", pin_top_face)
+    check(
+        "cross end reference origin",
+        await adapter.add_sketch_constraint(
+            f"{end_line}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "cross end reference actual turned face",
+        await adapter.add_sketch_constraint(
+            f"{end_line}.end", f"{physical_end}.end", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{end_line}.start", f"{end_line}.end", "horizontal_distance",
+        OVERALL_LENGTH, "cross hole top end station",
+    )
+    cross.record("CrossEndStation")  # Already-defined physical span: no equation.
+    check(
+        "cross hole on pin centre",
+        await adapter.add_sketch_constraint(
+            f"{circle}.center", f"{end_line}.end", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{circle}.center", f"{end_line}.end", "horizontal_distance",
+        CROSS_HOLE_FROM_END, "cross hole from end",
+    )
+    cross.record("CrossHoleFromEnd", '"CrossHoleFromEnd"')
+    check(
+        "cross hole diameter",
+        await adapter.add_sketch_dimension(
+            circle, None, "diameter", CROSS_HOLE_DIA
+        ),
+    )
+    cross.record("CrossHoleDia", '"CrossHoleDia"')
+    await ensure_fully_defined(adapter, "clevis cross hole")
+    check("exit_sketch cross hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleProfile")
+    jobs = cross.apply(adapter, "CrossHoleProfile")
+    _require_cross_hole_geometry(adapter)
+    return jobs
 
 
 async def build(adapter) -> dict[str, str]:
@@ -346,6 +418,7 @@ async def build(adapter) -> dict[str, str]:
         )
         pin.record(f"{name}ChamferDepth", '"LeadChamfer"')
     await ensure_fully_defined(adapter, "pin profile")
+    pin_top_face = adapter._sketch_entities[top_face]
     check("exit_sketch pin profile", await adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += pin.apply(adapter, "PinProfile")
@@ -404,39 +477,8 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, CROSS_PIN_AXIS_NAME)
 
-    # Right-plane circle normal to X; the end datum is the actual top-end
-    # station, so the printed six-mm ligament does not stack from the bottom.
-    cross = SketchDims()
-    check("create_sketch cross hole", await adapter.create_sketch("Right"))
-    end_line = check(
-        "cross hole top end reference",
-        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
-    )
-    check("cross end reference horizontal", await adapter.add_sketch_constraint(end_line, None, "horizontal"))
-    check("cross end reference origin", await adapter.add_sketch_constraint(f"{end_line}.start", "origin", "coincident"))
-    await dimension_between(
-        adapter, f"{end_line}.start", f"{end_line}.end", "horizontal_distance",
-        OVERALL_LENGTH, "cross hole top end station",
-    )
-    cross.record("CrossEndStation", '"BearingLength" + "LowerBossHeight" + "FlangeThick" + "UpperBossHeight" + "CarrierLength"')
-    circle = check(
-        "cross hole circle", await adapter.add_circle(-CROSS_HOLE_STATION, 0.0, CROSS_HOLE_DIA / 2.0)
-    )
-    check(
-        "cross hole on pin centre",
-        await adapter.add_sketch_constraint(f"{circle}.center", f"{end_line}.end", "horizontal_points"),
-    )
-    await dimension_between(
-        adapter, f"{circle}.center", f"{end_line}.end", "horizontal_distance",
-        CROSS_HOLE_FROM_END, "cross hole from end",
-    )
-    cross.record("CrossHoleFromEnd", '"CrossHoleFromEnd"')
-    check("cross hole diameter", await adapter.add_sketch_dimension(circle, None, "diameter", CROSS_HOLE_DIA))
-    cross.record("CrossHoleDia", '"CrossHoleDia"')
-    await ensure_fully_defined(adapter, "clevis cross hole")
-    check("exit_sketch cross hole", await adapter.exit_sketch())
-    name_last_feature(adapter, "CrossHoleProfile")
-    drive_jobs += cross.apply(adapter, "CrossHoleProfile")
+    # Right-plane circle normal to X, located from the retained turned end.
+    drive_jobs += await _cross_hole_profile(adapter, pin_top_face)
     check(
         "cut cross hole through pin",
         await adapter.create_cut_extrude(
@@ -456,11 +498,10 @@ async def build(adapter) -> dict[str, str]:
         removed += weight * area
     finished_volume = V_TOTAL - removed * step / 3.0
     await force_rebuild(adapter)
-    _log_equation_targets(adapter, drive_jobs, "before")
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
-    _log_equation_targets(adapter, drive_jobs, "after")
     await force_rebuild(adapter)
+    _require_cross_hole_geometry(adapter)
     await volume_check(
         adapter, "driven pivot pin (equations neutral)", finished_volume, 0.005 * V_TOTAL
     )

@@ -103,6 +103,13 @@ integral full flange → opposing cap and block-floor stops → block → carria
 registers retain each cap in XY without reliance on clamp friction. Both ends
 remain positively captured against uplift in both pass pairs; there is no skid.
 
+The pin's clevis-hole construction references the actual retained `PinProfile`
+top-face endpoint. `CrossEndStation` is a measured reference, never an
+equation's dependent variable; only the end offset and hole diameter are
+independent drivers. Native readback checks the reference state and unchanged
+overall/end-offset/diameter values before the cut and after the driven rebuild.
+Its numerical equation-neutrality check is not a manufacturing tolerance.
+
 For a pass change, isolate the machine and support the carrier before removing
 **both** top retainers; only then lift the carrier. Refit both retainers and
 install two fresh cotters before either pass can run. Replace disturbed safety
