@@ -91,6 +91,22 @@ the Number column has its own room for `MHA-MG-VN-50` through `MHA-MG-VN-56`.
 The native table font, complete cell contents, 6 mm requested data-row height
 and three-line heading budget are unchanged.
 
+The wheel and lever exploded views use native `AutoBalloon5` EDGE/Square
+placement against their existing linked BOM: eleven wheel families and seven
+lever families. The finished wire keeps its proven ring anchor, completing
+nineteen families without custom item text or quantity overrides. Exact native
+item coverage and full shown-component edge ownership are mandatory; native
+positions are not re-spread. Final rebuild checks reread the attachments and
+rendered circles, including the lever caption's actual note extent.
+
+The native EDGE call borrows the document's Normal visible-edge weight slot,
+checks its readback, and restores and rereads the original slot in `finally`
+before rebuilding or exporting. It never changes physical line widths or the
+template. This reuses the MG-specific positive control from #1776/#1783, not a
+general fix for every #1667 omission. The shared balloon helper is a drawing
+recipe input, so this change rekeys drawing consumers without changing model
+geometry; other assemblies retain their manual path and the default face mode.
+
 The naming migration lengthened those seven purchased Numbers from ten to
 twelve characters but left the Number column at 32 mm. The native failure at
 `5c5d3e3b3672` measured a 153.3 mm table, from Y109.4 to Y262.7, against a
