@@ -722,132 +722,221 @@ def test_relative_locations_use_actual_wizard_points(monkeypatch, mode) -> None:
             part._tap_placement_points(adapter)
 
 
-@pytest.mark.parametrize("point_type", (11, 25))
-@pytest.mark.parametrize("attached_point_type", (11, 25))
-@pytest.mark.parametrize("mode", ("measured", "reversed-attachments", "segment-dispatch-proxy", "missing", "arc-refused", "no-arc", "two-arcs", "wrong-value", "coordinate-copy", "dangling", "unknown-dangling", "wrong-circle-owner", "wrong-circle-type", "wrong-circle-id", "wrong-attachment-types", "extra-attachment"))
-def test_direct_relative_axis_dimension_measures_real_wizard_point_and_cut_circle(monkeypatch, mode, point_type, attached_point_type) -> None:
-    point, circle, copy = object(), _native_sketch_segment(kind=1), object()
-    selections = []
-    picks = []
-    ends = {1: 1 if mode == "two-arcs" else 0, 2: 0 if mode == "no-arc" else 1}
-    attached_circle = _native_sketch_segment(
-        owner="OtherProfile" if mode == "wrong-circle-owner" else "ActualLocationProfile",
-        kind=0 if mode == "wrong-circle-type" else 1,
-        identifiers=(2, 1) if mode == "wrong-circle-id" else (1, 2),
-    ) if mode in ("segment-dispatch-proxy", "wrong-circle-owner", "wrong-circle-type", "wrong-circle-id") else circle
-    attached = (copy if mode == "coordinate-copy" else point, attached_circle)
-    types = (11, 11) if mode == "wrong-attachment-types" else (attached_point_type, 10)
-    if mode == "reversed-attachments":
-        attached, types = attached[::-1], types[::-1]
-    if mode == "extra-attachment":
-        attached, types = (*attached, object()), (*types, 11)
-    annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: attached,
-        GetAttachedEntityTypes=lambda: types,
-        IsDangling=lambda: None if mode == "unknown-dangling" else mode == "dangling",
-    )
-    dimension = SimpleNamespace(
-        DrivenState=2, Name="",
-        SystemValue=(spec.LEVER_BORE_DIA / 2.0 + (0.2 if mode == "wrong-value" else 0.0)) / 1000.0,
-        GetArcEndCondition=lambda index: ends[index],
-    )
+class _WitnessTransform:
+    def __init__(self, forward, inverse):
+        self.forward, self.inverse = forward, inverse
 
-    def set_end(index, condition):
-        if mode == "arc-refused":
-            return -1
-        ends[index] = condition
-        return 0
+    def Inverse(self):
+        return _WitnessTransform(self.inverse, self.forward)
 
-    dimension.SetArcEndCondition = set_end
-    display = SimpleNamespace(GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation, ShowParenthesis=True)
 
-    def horizontal(*_position):
-        assert selections == [(point, "ISketchPoint", False), (circle, "ISketchSegment", True)]
-        assert picks == [circle], "the actual rim must be picked before creating the dimension"
-        return None if mode == "missing" else display
+class _WitnessPoint:
+    def __init__(self, owner, x, y, z=0.0):
+        self.owner, self.X, self.Y, self.Z = owner, x, y, z
+        self.relations = []
 
-    manager = SimpleNamespace(
-        GetSelectedObjectCount2=lambda _mark: len(selections),
-        GetSelectedObject6=lambda index, _mark: selections[index - 1][0],
-        GetSelectedObjectType3=lambda index, _mark: (point_type, 10)[index - 1],
-    )
-    model = SimpleNamespace(ClearSelection2=lambda _all: selections.clear(), AddHorizontalDimension2=horizontal, GraphicsRedraw2=lambda: None, SelectionManager=manager, FeatureManager=_native_inventory(circle, attached_circle))
-    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=_native_same))
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, interface, *, append: selections.append((entity, interface, append)))
-    monkeypatch.setattr(part, "_select_bore_rim", lambda _adapter, actual: picks.append(actual))
-    if mode in ("measured", "reversed-attachments", "segment-dispatch-proxy"):
-        part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
+    def GetSketch(self):
+        return self.owner
+
+    def GetRelations(self):
+        return tuple(self.relations)
+
+
+class _WitnessRelation:
+    def __init__(self, entities, kind):
+        self.entities, self.kind = tuple(entities), kind
+        self.Suppressed = False
+
+    def GetRelationType(self):
+        return self.kind
+
+    def GetDefinitionEntities2(self):
+        # Native definition order is not part of the relation contract.
+        return self.entities[::-1]
+
+
+class _RelativeWitnessFixture:
+    """Native-shaped state, distinct sketch frames, and read-only measured value."""
+
+    def __init__(self, monkeypatch, *, mode="retained"):
+        from solidworks_mcp.adapters import com_variant
+        import _telemetry
+
+        self.mode = mode
+        self.events, self.selections, self.lines, self.relations, self.displays = [], [], [], [], []
+        self.status = 3
+        self.sketch = _NativeSketch("right", "LeverBoreLocationProfile")
+        self.sketch.ModelToSketchTransform = _WitnessTransform(
+            lambda p: (-p[2], p[1], p[0]), lambda p: (p[2], p[1], -p[0]),
+        )
+        self.sketch.GetConstrainedStatus = lambda: self.status
+        self.sketch.GetSketchSegments = lambda: (self.circle, *self.lines)
+        source = _NativeSketch("top", "ThumbPlacement")
+        source.ModelToSketchTransform = _WitnessTransform(
+            lambda p: (p[0], -p[2], p[1] - 0.0295),
+            lambda p: (p[0], p[2] + 0.0295, -p[1]),
+        )
+        self.tap = _WitnessPoint(source, 0.0, 0.0)
+        self.center = _WitnessPoint(self.sketch, 0.0, 0.01995)
+        self.circle = _native_sketch_segment(owner=self.sketch.feature_name, kind=1)
+        self.circle.owner_sketch = self.sketch
+        self.circle.GetSketch = lambda: self.sketch
+        self.circle.GetCenterPoint2 = lambda: self.center
+        self.circle.GetRadius = lambda: 0.00325
+        self.source_circle = object()
+        self.circle.relations = [_WitnessRelation((self.source_circle,), 32)]
+        self.circle.GetRelations = lambda: tuple(self.circle.relations)
+        self.manager = SimpleNamespace(AddToDB=False, CreateLine=self.create_line)
+        self.sketch.RelationManager = SimpleNamespace(AddRelation=self.add_relation)
+        selection = SimpleNamespace(
+            GetSelectedObjectCount2=lambda _mark: len(self.selections),
+            GetSelectedObjectType3=lambda _index, _mark: 25 if mode == "external-selection" else 11,
+            GetSelectedObject6=lambda index, _mark: self.selections[index - 1],
+        )
+        self.model = SimpleNamespace(
+            GetActiveSketch2=lambda: None if mode == "no-active-sketch" else self.sketch,
+            ClearSelection2=lambda _all: self.selections.clear(),
+            SelectionManager=selection,
+            FeatureManager=SimpleNamespace(GetFeatures=lambda top: _native_inventory(self.circle).GetFeatures(top)),
+            AddHorizontalDimension2=self.dimension,
+            GraphicsRedraw2=lambda: None,
+            FeatureByName=lambda _name: _NativeFeature(self.sketch),
+        )
+
+        def math_point(coordinates):
+            return SimpleNamespace(
+                ArrayData=tuple(coordinates),
+                MultiplyTransform=lambda transform: math_point(transform.forward(tuple(coordinates))),
+            )
+
+        self.adapter = SimpleNamespace(
+            currentModel=self.model, currentSketchManager=self.manager,
+            swApp=SimpleNamespace(IsSame=_native_same, GetMathUtility=lambda: SimpleNamespace(CreatePoint=math_point)),
+        )
+        monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+        monkeypatch.setattr(part, "_native_select", lambda _adapter, entity, _interface, *, append: self.selections.append(entity))
+        monkeypatch.setattr(com_variant, "double_array", lambda values: values)
+        monkeypatch.setattr(com_variant, "dispatch_array", lambda values: values)
+        monkeypatch.setattr(_telemetry, "info", lambda message, **fields: self.events.append((message, fields)))
+
+    def create_line(self, x1, y1, z1, x2, y2, z2):
+        assert self.manager.AddToDB is True, "nominally coincident lines must not infer or merge"
+        if self.mode == "missing-line":
+            return None
+        start, end = _WitnessPoint(self.sketch, x1, y1, z1), _WitnessPoint(self.sketch, x2, y2, z2)
+        line = _native_sketch_segment(owner=self.sketch.feature_name, identifiers=(len(self.lines) + 2, 1))
+        line.owner_sketch = self.sketch
+        line.GetSketch = lambda: self.sketch
+        line.GetStartPoint2, line.GetEndPoint2 = lambda: start, lambda: end
+        line.relations = []
+        line.GetRelations = lambda: tuple(line.relations)
+        line.ConstructionGeometry = False
+        self.lines.append(line)
+        return line
+
+    def add_relation(self, entities, kind):
+        assert self.manager.AddToDB is False, "restore inference isolation before constraints solve"
+        if self.mode == "missing-relation":
+            return None
+        relation = _WitnessRelation(entities, kind)
+        if self.mode == "wrong-definition" and kind == 26:
+            relation.entities = (entities[0], _WitnessPoint(self.tap.owner, self.tap.X, self.tap.Y))
+        if self.mode == "wrong-relation-kind":
+            relation.kind = 17
+        if self.mode == "segment-dispatch-proxy" and kind in (4, 9):
+            segment = entities[-1]
+            proxy = _native_sketch_segment(
+                owner=segment.owner_sketch.feature_name,
+                kind=segment.GetType(), identifiers=segment.GetID(),
+            )
+            proxy.owner_sketch = segment.owner_sketch
+            proxy.GetSketch = lambda: segment.owner_sketch
+            assert _native_same(proxy, segment) == 0
+            relation.entities = (*entities[:-1], proxy)
+        for entity in entities:
+            entity.relations.append(relation)
+        self.relations.append(relation)
+        if self.mode == "underdefined":
+            self.status = 2
+        return relation
+
+    def dimension(self, *position):
+        assert len(self.selections) == 2
+        line = self.lines[-1]
+        assert self.selections == [line.GetStartPoint2(), line.GetEndPoint2()]
+        assert position == pytest.approx((0.0, self.center.Y + 0.01, 0.0))
+        assert [relation.kind for relation in self.relations[-4:]] == [4, 26, 25, 9]
+        if self.mode == "missing-dimension":
+            return None
+        state = self
+
+        class MeasuredDimension:
+            DrivenState, Name = 2, ""
+            Tolerance = SimpleNamespace(
+                Type=2, GetMinValue=lambda: -part.RELATIVE_AXIS_BAND / 1000.0,
+                GetMaxValue=lambda: part.RELATIVE_AXIS_BAND / 1000.0,
+            )
+
+            @property
+            def SystemValue(self):
+                return abs(line.GetEndPoint2().X - line.GetStartPoint2().X) + (0.0002 if state.mode == "wrong-value" else 0.0)
+
+        attached = list(self.selections)
+        if self.mode == "coordinate-copy":
+            attached[0] = _WitnessPoint(self.sketch, attached[0].X, attached[0].Y)
+        annotation = SimpleNamespace(
+            GetAttachedEntities3=lambda: tuple(attached[::-1]),
+            GetAttachedEntityTypes=lambda: (11, 11),
+            IsDangling=lambda: None if self.mode == "unknown-dangling" else self.mode == "dangling",
+        )
+        measured = MeasuredDimension()
+        display = SimpleNamespace(GetDimension2=lambda _index: measured, GetAnnotation=lambda: annotation, ShowParenthesis=True)
+        self.displays.append(display)
+        return display
+
+
+@pytest.mark.parametrize("mode", (
+    "retained", "no-active-sketch", "missing-line", "missing-relation", "wrong-definition",
+    "segment-dispatch-proxy",
+    "wrong-relation-kind", "underdefined", "external-selection", "missing-dimension",
+    "wrong-value", "coordinate-copy", "dangling", "unknown-dangling",
+))
+def test_relative_dimension_uses_local_endpoints_with_actual_source_constraints(monkeypatch, mode) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch, mode=mode)
+    if mode in ("retained", "segment-dispatch-proxy"):
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+        dimension = fixture.displays[0].GetDimension2(0)
         assert dimension.Name == "ThumbTapToBoreRim" and dimension.DrivenState == 1
-        assert display.ShowParenthesis is False and ends == {1: 0, 2: 2}
+        assert fixture.displays[0].ShowParenthesis is False
+        assert dimension.SystemValue == pytest.approx(0.00325)
+        assert fixture.relations[1].entities[1] is fixture.tap
+        assert fixture.relations[3].entities[1].GetID() == fixture.circle.GetID()
+        assert fixture.lines[0].ConstructionGeometry is True
     else:
         with pytest.raises(RuntimeError):
-            part._measure_relative_axis(adapter, point, circle, "ThumbTapToBoreRim")
+            part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    assert fixture.manager.AddToDB is False
+    if mode in ("retained", "segment-dispatch-proxy", "missing-dimension"):
+        constructor = [fields for _message, fields in fixture.events if fields.get("operation_stage") == "ThumbTapToBoreRim.point-pair-constructor"]
+        assert len(constructor) == 1
+        assert constructor[0]["native_created"] is (mode != "missing-dimension")
+        assert constructor[0]["text_sketch_m"] == constructor[0]["text_model_m"]
 
 
-@pytest.mark.parametrize("point_type", (11, 25))
-@pytest.mark.parametrize("mode", ("retained", "bad-radius", "wrong-count", "wrong-circle", "set-refused", "stale-pick", "unavailable-pick", "bad-transform"))
-def test_native_rim_pick_uses_actual_circle_and_sketch_to_model_transform(monkeypatch, mode, point_type) -> None:
-    from solidworks_mcp.adapters import com_variant
-    import _telemetry
-
-    events = []
-    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
-
-    local = (0.00425, 0.01995, 0.0)
-    inverse = object()
-    calls = []
-    retained = [None]
-    point = object()
-    circle = _native_sketch_segment(kind=1)
-    circle.GetCenterPoint2 = lambda: SimpleNamespace(X=0.001, Y=0.01995)
-    circle.GetRadius = lambda: -1.0 if mode == "bad-radius" else 0.00325
-
-    def create_point(coordinates):
-        assert tuple(coordinates) == pytest.approx(local)
-
-        def multiply(actual_transform):
-            assert actual_transform is inverse, "a model-to-sketch transform is not its inverse"
-            x, y, z = coordinates
-            return SimpleNamespace(ArrayData=(float("nan"),) if mode == "bad-transform" else (z + 0.4, y + 0.2, -x + 0.3))
-
-        return SimpleNamespace(MultiplyTransform=multiply)
-
-    def set_point(index, mark, x, y, z):
-        assert (index, mark) == (2, -1)
-        calls.append((x, y, z))
-        retained[0] = (0.3 - z, y - 0.2, x - 0.4)
-        return mode != "set-refused"
-
-    manager = SimpleNamespace(
-        GetSelectedObjectCount2=lambda _mark: 1 if mode == "wrong-count" else 2,
-        GetSelectedObject6=lambda index, _mark: point if index == 1 else object() if mode == "wrong-circle" else circle,
-        GetSelectedObjectType3=lambda index, _mark: (point_type, 10)[index - 1],
-        SetSelectionPoint2=set_point,
-        GetSelectionPointInSketchSpace2=lambda _index, _mark: None if mode == "unavailable-pick" else (0.0, 0.0, 0.0) if mode == "stale-pick" else retained[0],
-    )
-    sketch = SimpleNamespace(ModelToSketchTransform=SimpleNamespace(Inverse=lambda: inverse))
-    model = SimpleNamespace(GetActiveSketch2=lambda: sketch, SelectionManager=manager, FeatureManager=_native_inventory(circle))
-    application = SimpleNamespace(
-        GetMathUtility=lambda: SimpleNamespace(CreatePoint=create_point),
-        IsSame=_native_same,
-    )
-    adapter = SimpleNamespace(currentModel=model, swApp=application)
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(com_variant, "double_array", lambda values: values)
-    if mode == "retained":
-        part._select_bore_rim(adapter, circle)
-        assert calls == [pytest.approx((0.4, 0.21995, 0.29575))]
-    else:
-        with pytest.raises(RuntimeError):
-            part._select_bore_rim(adapter, circle)
-    if mode in ("retained", "set-refused", "stale-pick", "unavailable-pick"):
-        message, fields = events[-1]
-        assert fields["operation_stage"] == "bore-rim.selection-point-readback"
-        assert fields["rim_sketch_m"] == pytest.approx(local)
-        assert fields["requested_model_m"] == pytest.approx((0.4, 0.21995, 0.29575))
-        assert fields["selection_point_accepted"] is (mode != "set-refused")
-        assert "retained_sketch=" in message
+def test_witness_source_transform_and_distinct_overlaid_tap_lines(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    other = _WitnessPoint(fixture.tap.owner, 0.0, 0.0)
+    for name, tap in (("ThumbTapToBoreRim", fixture.tap), ("RodTapToBoreRim", other)):
+        part._measure_relative_axis(fixture.adapter, tap, fixture.circle, name)
+    first, second = fixture.lines
+    assert first.GetID() != second.GetID()
+    assert first.GetStartPoint2() is not second.GetStartPoint2()
+    assert first.GetEndPoint2() is not second.GetEndPoint2()
+    assert first.GetStartPoint2().X == second.GetStartPoint2().X == 0.0
+    fixture.tap.Y = 0.0004  # Top sketch local Y becomes Right sketch X, not Y.
+    assert part._point_in_location_sketch(fixture.adapter, fixture.tap, fixture.sketch) == pytest.approx((0.0004, 0.0295, 0.0))
+    with pytest.raises(RuntimeError, match="axis-to-positive-rim witness changed"):
+        part._assert_relative_witness(fixture.adapter, first, fixture.tap, fixture.circle, stage="moved-source")
 
 
 @pytest.mark.parametrize("point_type", (11, 25))
@@ -945,51 +1034,48 @@ def test_native_segment_identity_requires_complete_documented_key(monkeypatch, m
             part._segment_identity(adapter, segment, stage="key-control", role="selected")
 
 
-@pytest.mark.parametrize("point_type", (11, 25))
-@pytest.mark.parametrize("mode", ("native-proxy", "wrong-point", "wrong-circle-id", "dangling", "unknown-dangling", "missing-attachment", "wrong-value", "wrong-band", "wrong-end"))
-def test_rebuilt_relative_witness_retains_native_identity_value_band_and_arc_end(monkeypatch, mode, point_type) -> None:
-    source_circle, point = object(), object()
-    circle = _native_sketch_segment(owner="LeverBoreLocationProfile", kind=1)
-    circle.GetRadius = lambda: spec.LEVER_BORE_DIA / 2000.0
-    circle.GetRelations = lambda: (SimpleNamespace(GetDefinitionEntities2=lambda: (source_circle,)),)
-    attached_circle = _native_sketch_segment(
-        owner="LeverBoreLocationProfile", kind=1,
-        identifiers=(2, 1) if mode == "wrong-circle-id" else (1, 2),
-    )
-    attached = (object() if mode == "wrong-point" else point, attached_circle)
-    if mode == "missing-attachment":
-        attached = (point,)
-    annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: attached,
-        GetAttachedEntityTypes=lambda: (point_type, 10)[:len(attached)],
-        IsDangling=lambda: None if mode == "unknown-dangling" else mode == "dangling",
-    )
-    display = SimpleNamespace(ShowParenthesis=False, GetAnnotation=lambda: annotation)
-    dimension = SimpleNamespace(
-        DrivenState=1,
-        SystemValue=(spec.LEVER_BORE_DIA / 2.0 + (0.2 if mode == "wrong-value" else 0.0)) / 1000.0,
-        Tolerance=SimpleNamespace(
-            Type=2,
-            GetMinValue=lambda: -(part.RELATIVE_AXIS_BAND + (0.1 if mode == "wrong-band" else 0.0)) / 1000.0,
-            GetMaxValue=lambda: part.RELATIVE_AXIS_BAND / 1000.0,
-        ),
-        GetArcEndCondition=lambda index: 0 if index == 1 else 1 if mode == "wrong-end" else 2,
-    )
-    sketch = SimpleNamespace(GetSketchSegments=lambda: (circle,), GetConstrainedStatus=lambda: 3)
-    model = SimpleNamespace(FeatureByName=lambda _name: SimpleNamespace(GetSpecificFeature2=lambda: sketch), FeatureManager=_native_inventory(circle, attached_circle))
-    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=_native_same))
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", source_circle, "ISketchSegment", ())})
-    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": point})
+@pytest.mark.parametrize("mode", (
+    "retained", "wrong-tap", "wrong-circle-id", "missing-constraint", "duplicate-constraint",
+    "suppressed-constraint", "unknown-suppression",
+    "wrong-branch", "underdefined", "wrong-value", "wrong-band", "nonconstruction",
+))
+def test_rebuilt_relative_witness_retains_actual_constraints_identity_value_and_band(monkeypatch, mode) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "ThumbTapToBoreRim")
+    line = fixture.lines[0]
+    display = fixture.displays[0]
+    dimension = display.GetDimension2(0)
+    if mode == "wrong-tap":
+        fixture.tap = _WitnessPoint(fixture.tap.owner, fixture.tap.X, fixture.tap.Y)
+    elif mode == "wrong-circle-id":
+        copied = _native_sketch_segment(owner="LeverBoreLocationProfile", kind=1, identifiers=(99, 99))
+        copied.owner_sketch = fixture.sketch
+        copied.GetSketch = lambda: fixture.sketch
+        fixture.relations[3].entities = (line.GetEndPoint2(), copied)
+    elif mode == "missing-constraint":
+        line.GetStartPoint2().relations.clear()
+    elif mode == "duplicate-constraint":
+        line.GetEndPoint2().relations.append(fixture.relations[3])
+    elif mode in ("suppressed-constraint", "unknown-suppression"):
+        fixture.relations[3].Suppressed = True if mode == "suppressed-constraint" else None
+    elif mode == "wrong-branch":
+        line.GetEndPoint2().X *= -1.0
+    elif mode == "underdefined":
+        fixture.status = 2
+    elif mode == "wrong-value":
+        fixture.mode = mode
+    elif mode == "wrong-band":
+        dimension.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.002, GetMaxValue=lambda: 0.002)
+    elif mode == "nonconstruction":
+        line.ConstructionGeometry = False
+    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", fixture.source_circle, "ISketchSegment", ())})
+    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": fixture.tap})
     monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, _name: (display, dimension))
-    if mode == "native-proxy":
-        # The annotation's native proxy is deliberately not the selected Python
-        # object; only its documented owning sketch/type/ID identifies it.
-        assert attached_circle is not circle
-        part._assert_location_profiles(adapter)
+    if mode == "retained":
+        part._assert_location_profiles(fixture.adapter)
     else:
         with pytest.raises(RuntimeError):
-            part._assert_location_profiles(adapter)
+            part._assert_location_profiles(fixture.adapter)
 
 
 @pytest.mark.parametrize("mode", (
@@ -1117,51 +1203,32 @@ def test_segment_owner_inventory_is_refreshed_after_rename_and_rebuild(monkeypat
     assert calls == [False, False, False]
 
 
-@pytest.mark.parametrize("point_type", (11, 25))
-@pytest.mark.parametrize("mode", ("retained", "wrong-point", "bad-point-self", "wrong-owner", "unavailable-readback"))
-def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode, point_type) -> None:
-    import _telemetry
-
-    point = object()
-    circle = _native_sketch_segment(kind=1)
-    attached_circle = _native_sketch_segment(owner="OtherProfile" if mode == "wrong-owner" else "ActualLocationProfile", kind=1)
-    attached_point = object() if mode == "wrong-point" else point
-
-    def entities():
-        if mode == "unavailable-readback":
+@pytest.mark.parametrize("mode", ("retained", "wrong-point", "bad-point-self", "unavailable-readback"))
+def test_attachment_failures_report_actual_native_state_before_raising(monkeypatch, mode) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    display = fixture.displays[0]
+    annotation = display.GetAnnotation()
+    start, end = fixture.lines[0].GetStartPoint2(), fixture.lines[0].GetEndPoint2()
+    if mode == "wrong-point":
+        annotation.GetAttachedEntities3 = lambda: (object(), end)
+    elif mode == "unavailable-readback":
+        def unavailable():
             raise RuntimeError("native attachment readback unavailable")
-        return attached_circle, attached_point
-
-    def same(left, right):
-        if mode == "bad-point-self" and left is point and right is point:
-            return -1
-        return _native_same(left, right)
-
-    annotation = SimpleNamespace(GetAttachedEntities3=entities, GetAttachedEntityTypes=lambda: (10, point_type), IsDangling=lambda: False)
-    display = SimpleNamespace(GetAnnotation=lambda: annotation)
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(FeatureManager=_native_inventory(circle, attached_circle)),
-        swApp=SimpleNamespace(IsSame=same),
-    )
-    events = []
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_telemetry, "info", lambda message, **fields: events.append((message, fields)))
+        annotation.GetAttachedEntities3 = unavailable
+    elif mode == "bad-point-self":
+        fixture.adapter.swApp.IsSame = lambda left, right: -1 if left is start and right is start else _native_same(left, right)
     if mode == "retained":
-        part._assert_relative_attachment(adapter, display, point, circle, name="TapToBoreRim", stage="after-rebuild")
+        part._assert_relative_attachment(fixture.adapter, display, fixture.tap, fixture.circle, name="TapToBoreRim", stage="after-rebuild")
     else:
-        with pytest.raises(RuntimeError, match="readback unavailable" if mode == "unavailable-readback" else "attachment identity differs"):
-            part._assert_relative_attachment(adapter, display, point, circle, name="TapToBoreRim", stage="after-rebuild")
-    message, fields = events[-1]
+        with pytest.raises(RuntimeError):
+            part._assert_relative_attachment(fixture.adapter, display, fixture.tap, fixture.circle, name="TapToBoreRim", stage="after-rebuild")
+    _message, fields = fixture.events[-1]
     assert fields["operation_stage"] == "after-rebuild"
-    assert "point_self=" in message and "segment=" in message
-    if mode == "unavailable-readback":
-        assert "readback unavailable" in fields["attachment_readback_error"]
-    else:
+    assert (fields["attachment_readback_error"] == "None") is (mode == "retained")
+    if mode != "unavailable-readback":
         assert fields["attachment_count"] == 2
-        assert fields["attached_types"] == (10, point_type)
-        assert fields["expected_segment_identity"] == repr(("ActualLocationProfile", 1, 1, 2))
-    if mode == "wrong-owner":
-        assert fields["attached_segment_identity"] == repr(("OtherProfile", 1, 1, 2))
+        assert fields["attached_types"] == (11, 11)
 
 
 @pytest.mark.parametrize("types", (
@@ -1186,23 +1253,134 @@ def test_location_selection_rejects_other_entity_kinds_even_when_identity_matche
 
 
 @pytest.mark.parametrize("types", (
-    (), (25,), (25, 10, 11), (0, 10), (3, 10), (6, 10), (9, 10),
-    (24, 10), (-1, 10), (11, 24), (25, 24), (11, 25), (25, 25), (10, 10),
+    (), (25,), (11, 11, 11), (0, 11), (3, 11), (6, 11), (9, 11),
+    (24, 11), (-1, 11), (11, 24), (25, 24), (11, 10), (10, 10),
 ))
-def test_attachment_types_require_exactly_one_documented_point_and_converted_segment(monkeypatch, types) -> None:
-    point, circle = object(), _native_sketch_segment(kind=1)
-    annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: (point, circle),
-        GetAttachedEntityTypes=lambda: types,
-        IsDangling=lambda: False,
-    )
-    adapter = SimpleNamespace(
-        currentModel=SimpleNamespace(FeatureManager=_native_inventory(circle)),
-        swApp=SimpleNamespace(IsSame=_native_same),
-    )
-    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
-    with pytest.raises(RuntimeError, match="invalid native point/circle attachments"):
+def test_attachment_types_require_exactly_two_documented_endpoint_points(monkeypatch, types) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    display = fixture.displays[0]
+    display.GetAnnotation().GetAttachedEntityTypes = lambda: types
+    with pytest.raises(RuntimeError, match="invalid native measurement endpoint attachments"):
         part._assert_relative_attachment(
-            adapter, SimpleNamespace(GetAnnotation=lambda: annotation), point, circle,
+            fixture.adapter, display, fixture.tap, fixture.circle,
             name="TapToBoreRim", stage="wrong-native-kinds",
         )
+
+
+@pytest.mark.parametrize("mode", (
+    "unknown-point-self", "unknown-segment-self", "bool-segment-self",
+    "null-definition", "extra-definition", "unknown-kind", "wrong-owner",
+    "nonfinite-center", "nonfinite-endpoint", "unknown-status",
+))
+def test_native_witness_constraints_fail_closed_on_unavailable_identity_or_geometry(monkeypatch, mode) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    line = fixture.lines[0]
+    if mode in ("unknown-point-self", "unknown-segment-self", "bool-segment-self"):
+        target = fixture.tap if mode == "unknown-point-self" else fixture.circle
+        result = True if mode == "bool-segment-self" else -1
+        fixture.adapter.swApp.IsSame = lambda left, right: result if left is target and right is target else _native_same(left, right)
+    elif mode == "null-definition":
+        fixture.relations[3].entities = (line.GetEndPoint2(), None)
+    elif mode == "extra-definition":
+        fixture.relations[3].entities += (fixture.center,)
+    elif mode == "unknown-kind":
+        fixture.relations[3].kind = None
+    elif mode == "wrong-owner":
+        line.GetStartPoint2().owner = _NativeSketch("other", "Other")
+    elif mode == "nonfinite-center":
+        fixture.center.Y = float("nan")
+    elif mode == "nonfinite-endpoint":
+        line.GetEndPoint2().X = float("nan")
+    elif mode == "unknown-status":
+        fixture.status = None
+    with pytest.raises(RuntimeError):
+        part._assert_relative_witness(fixture.adapter, line, fixture.tap, fixture.circle, stage="native-unavailable")
+
+
+def test_distinct_tap_names_cannot_share_one_attached_measurement_line(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    for name in ("ThumbTapToBoreRim", "RodTapToBoreRim"):
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, name)
+    monkeypatch.setattr(part, "_location_sources", lambda _adapter: {"LeverBoreLocationProfile": ("Right", fixture.source_circle, "ISketchSegment", ())})
+    monkeypatch.setattr(part, "_tap_placement_points", lambda _adapter: {"ThumbTapToBoreRim": fixture.tap, "RodTapToBoreRim": fixture.tap})
+    first_display = fixture.displays[0]
+    monkeypatch.setattr(part, "_named_dimension", lambda _adapter, _feature, _name: (first_display, first_display.GetDimension2(0)))
+    with pytest.raises(RuntimeError, match="distinct tap witnesses merged"):
+        part._assert_location_profiles(fixture.adapter)
+
+
+def test_wrong_active_sketch_is_rejected_before_constructing_witness(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    fixture.model.GetActiveSketch2 = lambda: _NativeSketch("wrong-active", "Other")
+    with pytest.raises(RuntimeError, match="not owned by the active sketch"):
+        part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    assert fixture.lines == []
+    assert fixture.events[-1][1]["operation_stage"] == "TapToBoreRim.active-sketch"
+
+
+def test_dimension_text_does_not_guess_between_model_and_sketch_frames(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    line = part._create_relative_witness(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    monkeypatch.setattr(part, "_create_relative_witness", lambda *_args: line)
+    fixture.sketch.ModelToSketchTransform = _WitnessTransform(
+        lambda p: (p[0] - 0.1, p[1], p[2]), lambda p: (p[0] + 0.1, p[1], p[2]),
+    )
+    with pytest.raises(RuntimeError, match="not common to model and Right sketch frames"):
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    assert fixture.displays == []
+
+
+@pytest.mark.parametrize("count, missing, expected_types, expected_codes", (
+    (0, False, (), ()),
+    (1, False, (11,), (1,)),
+    (3, False, (11, 11), (1, 1)),
+    (None, False, (), ()),
+    (2, True, (11, 11), (None, 1)),
+))
+def test_local_endpoint_selection_logs_actual_count_and_null_handles_before_refusal(monkeypatch, count, missing, expected_types, expected_codes) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+    manager = fixture.model.SelectionManager
+    reads = []
+
+    def actual_count(mark):
+        reads.append(mark)
+        return count
+
+    def same(left, right):
+        assert left is not None and right is not None, "never call native IsSame on an absent selection"
+        return _native_same(left, right)
+
+    manager.GetSelectedObjectCount2 = actual_count
+    manager.GetSelectedObject6 = lambda index, _mark: None if missing and index == 1 else fixture.selections[index - 1]
+    fixture.adapter.swApp.IsSame = same
+    with pytest.raises(RuntimeError, match=f"count={count!r}"):
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    assert reads == [-1]
+    message, fields = fixture.events[-1]
+    assert fields["operation_stage"] == "TapToBoreRim.point-pair-selection"
+    assert fields["selection_count"] == count
+    assert fields["selected_types"] == expected_types
+    assert fields["selected_identity_codes"] == expected_codes
+    assert f"count={count!r}" in message
+    if missing:
+        assert fields["selected_objects_present"] == (False, True)
+    assert fixture.displays == []
+
+
+def test_selection_readback_exception_keeps_stage_and_count_evidence(monkeypatch) -> None:
+    fixture = _RelativeWitnessFixture(monkeypatch)
+
+    def unavailable(_index, _mark):
+        raise RuntimeError("native selected handle unavailable")
+
+    fixture.model.SelectionManager.GetSelectedObject6 = unavailable
+    with pytest.raises(RuntimeError, match="native selected handle unavailable"):
+        part._measure_relative_axis(fixture.adapter, fixture.tap, fixture.circle, "TapToBoreRim")
+    fields = fixture.events[-1][1]
+    assert fields["operation_stage"] == "TapToBoreRim.point-pair-selection"
+    assert fields["selection_count"] == 2
+    assert fields["selected_types"] == (11, 11)
+    assert "native selected handle unavailable" in fields["selection_readback_error"]
+    assert fixture.displays == []

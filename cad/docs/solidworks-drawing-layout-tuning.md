@@ -1070,20 +1070,25 @@ radial+0.05 is still charged in the actual axis-error bound.
 
 The native witnesses select the real Wizard placement points and externally
 convert the actual stock edges and cut-producing bore circle. No detached
-coordinate copy counts as measurement. Native annotation attachment identity,
-the arc-end condition, actual value, driven ownership, explicit band and
-unparenthesized ordinary ink must survive equations/rebuild and per-view
-hidden-sketch import. These strict API paths still need native-seat proof.
+coordinate copy counts as measurement. Each relative-axis measurement uses a
+local construction line: its start is vertically aligned with the actual
+Wizard point, its end is horizontally aligned with the actual bore centre
+and coincident with the actual circle, and the line itself is horizontal.
+These four native constraints define the projected tap-axis-to-positive-rim
+span. Seed coordinates choose the positive branch, not measurement authority.
+Require fully defined status, actual relation definition entities, unchanged
+source identities and the positive-rim readback before and after rebuild.
+The native dimension attaches to both local line endpoints, carrying the
+actual value, driven ownership, explicit band and unparenthesized ordinary ink
+through equations/rebuild and per-view hidden-sketch import. This replacement
+construction still needs native-seat proof.
 
-Before creating a transverse point-to-circle dimension, give the exact selected
-circle a native rim selection point. Derive it from the actual circle's centre
-and radius, invert the active sketch's native transform to model space, and
-require the sketch-space pick readback to agree. The nominal entry points share
-the bore centre's transverse coordinate: an unspecified centre pick can request
-a zero span before a later near-arc setting is reachable. Keep the same real
-entity attachments and strict near-arc/value checks; this changes selection
-semantics, not geometry. The r4 null creation is observed, but the zero-span
-mechanism remains an inference until the corrected native path is exercised.
+The former direct point-to-circle constructor is removed, not retained as a
+fallback. R9 proved exact circle identity and accepted/read-back rim selection,
+then the same native horizontal constructor returnedNone. Its original failure
+reason remains unknown; the prior zero-span hypothesis is not established.
+Do not spend another round on pick variants or present successful selection as
+successful dimension creation.
 
 The r5 attempt failed earlier, at the combined selected-count/circle-identity
 guard, before setting or reading a native pick. The r6 positive control then
@@ -1106,17 +1111,17 @@ owner through the actual part feature inventory, including child sketches:
 and native sketch identity with positive self controls. Require exactly one
 matching owner, and read `Name` only from that actual tree `IFeature`.
 Reject unavailable or ambiguous ownership; do not cache across rebuilds.
-IDs alone are not unique across owners
-or segment types. Require valid native identity fields and exact equality at
-selection readback and at the dimension's actual annotation attachments, both
-before and after final rebuild. Keep the Wizard point's `IsSame==1` guard,
-native point/segment types, exactly two non-null attachments, not dangling,
-near-arc condition, measured value, ownership and acceptance-band checks.
+IDs alone are not unique across owners or segment types. Require valid native
+identity fields and exact equality wherever actual segments are compared.
+For the local construction line, verify its owner/type/IDs and distinct endpoint
+identities; dimension attachment identity must match those endpoints, while
+constraint definition entities must match the real Wizard point and converted
+circle/centre. Keep exact native types/counts, non-null attachments, not-dangling,
+measured value, driven ownership and acceptance-band checks after final rebuild.
 Raw dispatch `IsSame` results remain diagnostic, not the segment-identity
-oracle; unavailable native keys never pass. Log count, types, availability,
-raw codes, actual/expected keys and retained native pick coordinates by stage.
-Do not substitute coordinate equality, a new witness copy, or a fixed number.
-The original null dimension creation still requires native proof.
+oracle; unavailable native keys never pass. Log operation stage, count, types,
+availability, raw codes and actual/expected keys. Do not substitute coordinate
+equality or a fixed number for actual constrained geometry.
 
 The actual Wizard entry point is external to the active bore witness sketch:
 native selection reports `swSelEXTSKETCHPOINTS=25`, still an `ISketchPoint`.
@@ -1157,6 +1162,12 @@ inspect the exact final PNG/PDF before calling the sheet SHIP.
 Check dimension-line/centre-mark crossings as actual segments: horizontal and
 vertical marks have zero-area bounding boxes, which area-overlap helpers can
 correctly ignore even when the native ink crosses.
+
+For a long native mounting-hole callout, the existing process-prefix trailing
+newline puts the associative quantity/diameter/extent on its own row; do not
+replace native variables with literal copied text. Check the complete native
+text and line/arrow envelopes against the selected shared template's current
+title-block keep-out, including a shoulder that outlasts the text after reflow.
 
 Keep nominal model travel separate from published operating capacity. The
 accepted shortest rod and longest thread move nominal runout X149.50 to
