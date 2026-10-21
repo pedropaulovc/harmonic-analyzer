@@ -1,11 +1,13 @@
 r"""Create the three-sheet measuring-stick fitter package (MHA-MS-00).
 
-Sheet 1 shows the stick clamped at its stop mark (front and top at full size)
-with a reference overall and controlled near-face setting dimension, a section through
-the thumbscrew axis, and the clamp setup note; sheet 2 the
-builder-owned ``MS_EXPLODED`` presentation with the BOM (numbers, descriptions,
-vendor SKU, quantity) and a balloon on every component, both plate screws
-included; sheet 3 the finished isometric beside the assembly order and
+Sheet 1 shows the stick clamped at its stop mark (upright elevation and an
+aligned third-angle graduated-underside view below it, both at full size), a
+reference overall and controlled near-face setting dimension, an upright clamp
+section, and the clamp setup note; sheet 2 the builder-owned ``MS_EXPLODED``
+presentation with
+the BOM (numbers, descriptions, vendor SKU, quantity) and a balloon on every
+component, both plate screws included; sheet 3 the finished isometric beside
+the assembly order and
 checks. Every text, pose and reference value comes from
 ``ms_measuring_stick_assembly_spec``, ``ms_measuring_stick_assembly_sheet``,
 ``ms_measuring_stick_explode_spec`` or the part registry; this recipe only
@@ -26,7 +28,6 @@ import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
-import ms_stop_spec as stop
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -111,21 +112,24 @@ TITLE_BLOCK = (
     _TEMPLATE.title_block_top_m,
 )
 
-# Sheet 1: the 200-long stick at full size, top view above the front
-# (third-angle), and the clamp section beside them, magnified so the window,
-# roof and thumbscrew tip read. The overall reference and near-face acceptance
-# run in the gap between front and top; the setup note repeats that criterion.
+# Sheet 1: the 200-long stick at full size, working elevation screw-up.
+# The graduated underside sits below Front in aligned third-angle projection.
+# Section A-A uses native end-only cutting-line style: its upper arrow sits
+# above the setting witnesses, below the overall reference dimension.
 FRONT_CENTER = (0.135, 0.190)
-TOP_CENTER = (0.135, 0.248)
+UNDERSIDE_CENTER = (FRONT_CENTER[0], 0.130)
+UNDERSIDE_CAPTION_XY = (0.035, 0.145)
 CLAMP_SECTION_CENTER = (0.340, 0.165)
 CLAMP_SECTION_SCALE = (4.0, 1.0)
 CLAMP_SECTION_LABEL = "A"
+CLAMP_SECTION_TOP_CLEARANCE = 0.018
+CLAMP_SECTION_BOTTOM_CLEARANCE = 0.004
 STOP_POSITION_TEXT_Y = 0.220
 # Fraction of the setting span from the stick end: left of centre, so the
 # callout clears the section-A label standing over the block's near face.
 STOP_POSITION_TEXT_FRACTION = 0.42
-OVERALL_LENGTH_TEXT_Y = 0.237
-SETUP_NOTE_XY = (0.030, 0.160)
+OVERALL_LENGTH_TEXT_Y = 0.257
+SETUP_NOTE_XY = (0.030, 0.100)
 SETUP_NOTE_WIDTH = 52  # characters; default-format note text
 
 # Sheet 2 alone is portrait: the native full-size exploded outline plus its
@@ -608,8 +612,8 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
     The assembly poses own the nominal. The saved drawing dimension owns the
     assembly acceptance band, not an alternate component manufacturing size.
     """
-    # Mid-height on each stick end; below the window floor on the block's
-    # near end edge, clear of the stick. Front views drop Z.
+    # Mid-height on each stick end. The upright Front sees part y=0,
+    # opposite the original graduation-up inspection orientation.
     stick_mid_y = (spec.STICK_TOP_Y + spec.STICK_BOTTOM_Y) / 2.0
     names = ("stick scale-start end", "stick far end", "stop near face")
     stick_start, stick_end, stop_face = model_points_in_view(
@@ -618,33 +622,25 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
         [
             (spec.STICK_X_MIN / 1000.0, stick_mid_y / 1000.0, 0.0),
             (spec.STICK_X_MAX / 1000.0, stick_mid_y / 1000.0, 0.0),
-            (spec.BLOCK_ORIGIN[0] / 1000.0, spec.STICK_BOTTOM_Y / 2.0 / 1000.0, 0.0),
+            (spec.BLOCK_ORIGIN[0] / 1000.0, spec.STICK_TOP_Y / 2.0 / 1000.0, 0.0),
         ],
         label="measuring-stick reference-dimension picks",
         names=names,
     )
-    start_edge, end_edge, stop_edge = (
+    start_edge, end_edge = (
         _reference_end_edge(
             adapter, front, component_stem=component_stem, point_mm=point, label=name
         )
         for component_stem, point, name in (
-            (spec.STICK, (0.0, stick.BODY_WIDTH, stick.BODY_THICKNESS / 2.0), names[0]),
+            (spec.STICK, (0.0, 0.0, stick.BODY_THICKNESS / 2.0), names[0]),
             (
                 spec.STICK,
-                (stick.BODY_LENGTH, stick.BODY_WIDTH, stick.BODY_THICKNESS / 2.0),
+                (stick.BODY_LENGTH, 0.0, stick.BODY_THICKNESS / 2.0),
                 names[1],
-            ),
-            (
-                spec.BLOCK,
-                (0.0, spec.STICK_BOTTOM_Y / 2.0, stop.BLOCK_DEPTH),
-                names[2],
             ),
         )
     )
-    entities = {
-        "overall length": (start_edge, end_edge),
-        "stop position": (start_edge, stop_edge),
-    }
+    overall_entities = (start_edge, end_edge)
     picks = {
         "overall length": (
             stick_start,
@@ -669,7 +665,7 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
                 add_edge_dimension(
                     adapter, front, p0=p0, p1=p1, text_xy=text_xy,
                     label=f"measuring-stick {label}", orientation="horizontal",
-                    entities=entities[label],
+                    entities=overall_entities,
                 ),
                 "IDisplayDimension",
             )
@@ -750,29 +746,45 @@ def _add_assembly_dimensions(adapter: Any, front: Any) -> Callable[[], None]:
 
 
 def _place_clamped_sheet(adapter: Any) -> Callable[[], None]:
-    """Front and top with reference overall and controlled near-face setting,
-    section A-A through the thumbscrew axis (the stick against the roof,
-    the tip on its underside), and the clamp setup note."""
+    """Upright working elevation and clamp section, with the labelled
+    graduated-underside inspection and the controlled near-face setting."""
     _activate_sheet(adapter, SHEET_NAMES[0])
+    # Native StandardWithoutConnector, as in draw_fr_rocker_arm_support:
+    # retain the full cutting plane and both arrows, not a hidden section line.
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    if not extension.SetUserPreferenceInteger(542, 0, 1):
+        raise RuntimeError("failed to set end-only section cutting line")
+    if extension.GetUserPreferenceInteger(542, 0) != 1:
+        raise RuntimeError("section cutting-line style did not persist")
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=SHEET_SCALE)
-    for view, label in ((front, "clamped front"), (top, "clamped top")):
+    underside = place_view(
+        adapter, str(SOURCE), spec.DRAWING_UNDERSIDE_VIEW,
+        *UNDERSIDE_CENTER, scale=SHEET_SCALE,
+    )
+    for view, label in ((front, "clamped elevation"), (underside, "graduated underside")):
         set_hidden_lines_removed(adapter, view)
         apply_view_configuration(adapter, view, label=label)
         _assert_view_on_sheet(view, label=label)
+    _add_note_block(
+        adapter, SHEET_NAMES[0], sheet.UNDERSIDE_CAPTION,
+        UNDERSIDE_CAPTION_XY, label="graduated-underside caption",
+    )
 
     _left, y0, _right, y1 = _view_outline(front, label="clamped front")
+    axis_point = tuple(value / 1000.0 for value in spec.THUMB_ORIGIN)
     station_x = model_point_in_view(
-        adapter,
-        front,
-        (spec.THUMB_ORIGIN[0] / 1000.0, 0.0, 0.0),
-        label="thumbscrew-axis cutting-plane station",
+        adapter, front, axis_point, label="thumbscrew-axis cutting-plane station",
     )[0]
+    underside_station_x = model_point_in_view(
+        adapter, underside, axis_point, label="underside thumbscrew-axis alignment",
+    )[0]
+    if abs(station_x - underside_station_x) > 1e-6:
+        raise RuntimeError("Front and underside thumbscrew axes are not aligned")
     section = create_section_view(
         adapter,
         front,
-        line_start=(station_x, y1 + 0.004),
-        line_end=(station_x, y0 - 0.004),
+        line_start=(station_x, y1 + CLAMP_SECTION_TOP_CLEARANCE),
+        line_end=(station_x, y0 - CLAMP_SECTION_BOTTOM_CLEARANCE),
         view_xy=CLAMP_SECTION_CENTER,
         section_label=CLAMP_SECTION_LABEL,
         scale=CLAMP_SECTION_SCALE,
@@ -794,7 +806,8 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     that proves every balloon again after the last rebuild."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
-        adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
+        adapter, str(SOURCE), spec.DRAWING_EXPLODED_VIEW,
+        *EXPLODED_ISO_CENTER, scale=SHEET_SCALE,
     )
     set_high_quality_shaded_with_edges(adapter, exploded, label="measuring-stick exploded")
     # Configuration, then its own explode, then the BOM and balloons bind.
