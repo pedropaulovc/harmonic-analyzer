@@ -16,6 +16,7 @@ import math
 import re
 import types
 from fractions import Fraction
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -52,6 +53,7 @@ import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
 import ch_rocker_arm_tl_oblique_tooling_clearance_spec as tooling
 import ch_rocker_arm_tl_vn_oblique_pivot_cotter_spec as pivot_cotter
+import ch_rocker_arm_tl_vn_oblique_pivot_lock_wire_spec as pivot_wire
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import sh_vn_clamping_kit_t_nut_spec as t_nut
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
@@ -886,6 +888,74 @@ def test_caps_screws_and_safety_wire_close_on_each_block_receiver_pattern() -> N
             ))
             for actual, expected in zip(wire_rows, cap_rows, strict=True):
                 assert actual == pytest.approx(expected)
+
+
+def test_wing_bracket_repair_removes_real_solid_overlap_without_moving_the_bracket() -> None:
+    block_origin, rows = spec.PIVOT_BLOCK_PLACEMENTS[0]
+    assert spec.NUT_BRACKET_ROWS == rows
+    offset = tuple(
+        sum((spec.NUT_BRACKET_ORIGIN[a] - block_origin[a]) * rows[k][a] for a in range(3))
+        for k in range(3)
+    )
+    assert offset[:2] == pytest.approx((0.0, -pivot_block.BLOCK_WIDTH / 2.0))
+    # Reconstruct the OLD intersection in the actual common rail frame.
+    # The core's Y=-20 face is intentional mounting contact; only the wing
+    # extended into this positive-volume bracket region.
+    old_end = -9.0
+    prism = (
+        (offset[0] + nut_bracket.FACE_X, old_end),
+        (max(-pivot_block.WING_WIDTH / 2.0, offset[1] - nut_bracket.BRACKET_DEPTH),
+         min(-pivot_block.BLOCK_WIDTH / 2.0, offset[1])),
+        (max(0.0, offset[2]), min(pivot_block.BLOCK_HEIGHT, offset[2] + nut_bracket.BRACKET_HEIGHT)),
+    )
+    # Use the old 66 mm wing, not the enlarged repair width, for the historic
+    # negative control's exact material volume.
+    old_prism = (prism[0], (max(-33.0, prism[1][0]), prism[1][1]), prism[2])
+    assert math.prod(hi - lo for lo, hi in old_prism) == pytest.approx(78.0)
+
+    def circle_gap(point, radius, axes):
+        return math.hypot(*(
+            max(old_prism[axis][0] - value, value - old_prism[axis][1], 0.0)
+            for axis, value in zip(axes, point, strict=True)
+        )) - radius
+
+    # Every native cut misses the ENTIRE old prism, not only its corners:
+    # hence 78 mm³ was actual solid/solid interference, not an AABB alarm.
+    assert circle_gap((pivot_block.BORE_X, 0.0), pivot_block.BEARING_OD / 2.0, (0, 1)) > 0.0
+    for point in pivot_block.BOLT_POINTS:
+        assert circle_gap(point, pivot_block.CBORE_DIA / 2.0, (0, 1)) > 0.0
+    for x in pivot_block.SIDE_SCREW_X:
+        assert circle_gap((x, pivot_block.SIDE_SCREW_Z),
+                          pivot_block.SIDE_CBORE_DIA / 2.0, (0, 2)) > 0.0
+    for point in pivot_block.CAP_TAP_POINTS:
+        assert circle_gap(point, retention_hardware.SCREW_MAJOR_DIA_MAX / 2.0, (0, 1)) > 0.0
+    for point in pivot_block.REGISTER_POINTS:
+        assert circle_gap(point, pivot_block.REGISTER_DIA / 2.0, (0, 1)) > 0.0
+    for x, _y, z in nut_bracket.BLOCK_SCREW_POINTS:
+        assert circle_gap((offset[0] + x, offset[2] + z),
+                          pivot_block.SIDE_SCREW_MAJOR / 2.0, (0, 2)) > 0.0
+    # The nut's transverse seat and #4 taps are all beyond the prism in Y,
+    # even when their largest cut radius is used for every member.
+    for y in (-nut_bracket.BORE_Y, *(point[1] for point in nut_bracket.NUT_HOLE_POINTS)):
+        assert offset[1] + y + nut_bracket.CBORE_DIA / 2.0 < old_prism[1][0]
+
+    assert pivot_block.WING_X1 < offset[0] + nut_bracket.FACE_X
+    assert spec.require_wing_bracket_clearance() >= retention.WING_BRACKET_CLEARANCE_MIN
+    with pytest.raises(ValueError, match="wing/nut bracket"):
+        spec.require_wing_bracket_clearance(wing_axis_reach=old_end - pivot_block.BORE_X)
+
+
+@pytest.mark.parametrize("fraction", (0.99, 1.01))
+def test_wing_bracket_gap_rejects_the_actual_printed_boundary(fraction: float) -> None:
+    margin = spec.require_wing_bracket_clearance() - retention.WING_BRACKET_CLEARANCE_MIN
+    assert margin > 0.0
+    reach = pivot_block.WING_AXIS_REACH + fraction * margin
+    if fraction < 1.0:
+        assert spec.require_wing_bracket_clearance(wing_axis_reach=reach) > retention.WING_BRACKET_CLEARANCE_MIN
+    else:
+        with pytest.raises(ValueError, match="wing/nut bracket"):
+            spec.require_wing_bracket_clearance(wing_axis_reach=reach)
+
 
 
 def test_one_free_dof_slides_the_carriages_and_what_rides_them() -> None:
@@ -1877,6 +1947,13 @@ def test_full_sweep_fixture_prisms_cover_interstitial_poses_and_rigid_upset(
             f"{pass_name}: {family} {index}" for index in range(1, count + 1)
         )
     assert required <= set(fixtures)
+    controls = [point for segment in pivot_wire.installed_wire_segments() for point in segment]
+    wire_radius = pivot_wire.WIRE_DIA / 2.0
+    wire_limits = tuple(
+        (min(point[axis] for point in controls) - wire_radius,
+         max(point[axis] for point in controls) + wire_radius)
+        for axis in range(3)
+    )
     # Three provider samples are intentionally coarse. This independent grid
     # includes points BETWEEN them, so a sampled-only, unexpanded box fails.
     for theta in spec.sweep_thetas(pass_name, samples=21):
@@ -1885,6 +1962,19 @@ def test_full_sweep_fixture_prisms_cover_interstitial_poses_and_rigid_upset(
             assert all(_inside_xy(fixture.xy, point) for point in outline), (
                 pass_name, theta, label
             )
+        for index, (origin, rows) in enumerate(spec.PLACEMENTS[spec.PIVOT_LOCK_WIRE]):
+            rail = spec.RAILS[index // 2]
+            fixture = fixtures[f"{pass_name}: pivot lock wire {rail}"]
+            travel = spec.carriage_stations(pass_name, theta)[rail] - spec.CARRIAGE_STATION
+            dx, dy = spec.rail_direction(rail)
+            shifted = (origin[0] + travel * dx, origin[1] + travel * dy, origin[2])
+            # Bézier paths stay in their control hull; the explicit wire
+            # radius expands it. Check both physical rows on both supports
+            # between provider samples, not a nominal bridge centreline.
+            for corner in product(*wire_limits):
+                point = _image(rows, shifted, corner)
+                assert _inside_xy(fixture.xy, point[:2])
+                assert fixture.z_min <= point[2] <= fixture.z_max
     normal_z = {
         "carrier": (trammel.CARRIER_UNDERSIDE_Z, trammel.CARRIER_TOP_Z),
         "riser": (

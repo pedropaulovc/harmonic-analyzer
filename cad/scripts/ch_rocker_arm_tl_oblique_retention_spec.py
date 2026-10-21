@@ -54,11 +54,14 @@ CARRIER_ENGAGEMENT_MIN = 10.5  # 12-.8-.4 lower chamfer-.3 top edge allowance
 CARRIER_DIAMETRAL_CLEARANCE_MAX = 0.024  # existing H7/h6, unchanged
 
 BLOCK_SPINDLE_END = -54.5
-BLOCK_WING_END = -9.0
-BLOCK_WING_HALF_WIDTH = 33.0
+BLOCK_WING_AXIS_REACH = 21.200
+BLOCK_WING_AXIS_REACH_PLACES = 3
+BLOCK_WING_END = trammel.PIN_OFFSET + BLOCK_WING_AXIS_REACH
+BLOCK_WING_HALF_WIDTH = 33.5
+WING_BRACKET_CLEARANCE_MIN = 0.50
 BLOCK_STOP_EDGE_BREAK_MAX = 0.25
 CAP_WIDTH = 50.0  # X
-CAP_LENGTH = 74.0
+CAP_LENGTH = 75.0
 CAP_HEIGHT = 11.50
 CAP_HEIGHT_PLACES = 2
 CAP_OUTLINE_PLACES = 1
@@ -70,8 +73,8 @@ CAP_POCKET_DEPTH = 3.30  # REF; face to actual flange and chamber-excess require
 CAP_CHAMBER_EXCESS = (0.20, 0.30)
 CAP_APERTURE_DIAMETER = 19.0
 CAP_APERTURE_BAND = (0.10, 0.0)
-CAP_BOLT_X_OFFSETS = (-15.0, 15.0)
-CAP_BOLT_Y_OFFSETS = (-25.0, 25.0)
+CAP_BOLT_X_OFFSETS = (-14.5, 14.5)
+CAP_BOLT_Y_OFFSETS = (-25.5, 25.5)
 CAP_BOLT_CENTERS = tuple((x, y) for x in CAP_BOLT_X_OFFSETS for y in CAP_BOLT_Y_OFFSETS)
 CAP_BOLT_LOCATION_PLACES = 3
 CAP_BOLT_CLEARANCE_DIAMETER = 9.20
@@ -87,7 +90,7 @@ CAP_ENTRY_RELIEF_DEPTH_PLACES = 3
 CAP_WIRE_CHANNEL_WIDTH = 2.50
 CAP_WIRE_CHANNEL_DEPTH = 6.50
 CAP_WIRE_CHANNEL_PLACES = 2
-CAP_REGISTER_CENTERS = ((-5.0, -24.0), (5.0, 24.0))
+CAP_REGISTER_CENTERS = ((-4.5, -24.0), (4.5, 24.0))
 CAP_REGISTER_LOCATION_PLACES = 3
 CAP_REGISTER_DIAMETER = 6.0
 CAP_REGISTER_DIAMETER_BAND = (0.10, -0.10)
@@ -237,14 +240,14 @@ def _cap_motion(
     floor_support = min(
         fx - pocket_diameter_max / 2.0 - shift,
         trammel.PIN_OFFSET - BLOCK_SPINDLE_END - fx - printed_band_mm(1) - printed_band_mm(2),
-        BLOCK_WING_END - trammel.PIN_OFFSET - fx - printed_band_mm(1) - printed_band_mm(2),
+        BLOCK_WING_AXIS_REACH - fx - printed_band_mm(BLOCK_WING_AXIS_REACH_PLACES),
         BLOCK_WING_HALF_WIDTH - fy - printed_band_mm(1) - printed_band_mm(2),
         # Initial base-gap QA extends affinely across the mounting footprint;
         # every guaranteed head-circle point must remain within its outer hull.
         trammel.PIN_OFFSET - BLOCK_SPINDLE_END - max_x - flat_radius
         - printed_band_mm(1) - printed_band_mm(2),
-        BLOCK_WING_END - trammel.PIN_OFFSET - max_x - flat_radius
-        - printed_band_mm(1) - printed_band_mm(2),
+        BLOCK_WING_AXIS_REACH - max_x - flat_radius
+        - printed_band_mm(BLOCK_WING_AXIS_REACH_PLACES),
         BLOCK_WING_HALF_WIDTH - max_y - flat_radius - printed_band_mm(1) - printed_band_mm(2),
         min(
             math.dist(witness, point) for witness in ((fx, 0.0), (-fx, 0.0), (0.0, fy), (0.0, -fy))

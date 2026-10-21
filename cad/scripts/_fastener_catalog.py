@@ -509,7 +509,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
         "Headed Clevis Pin",
         "CLPS6-0187-1250D",
-        material="AISI 316",
+        material="AISI 316 Annealed Stainless Steel Bar (SS)",  # native entry; purchased condition remains supplier authority
         supplier="Huyett",
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-cotter": _stock(

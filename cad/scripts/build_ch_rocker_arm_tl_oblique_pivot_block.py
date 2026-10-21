@@ -18,6 +18,9 @@ to X = -13), which section B-B cuts (``_cbore_floor_reference``).
 The two nut-bracket screw counterbores (PR C4) are a second, drilled along Y
 from the +Y face; their printed stations, from the -X end and the bottom
 face, live on the hidden Top-plane sketch ``SideScrewReference``.
+The hidden ``WingAxisReference`` measures the actual bearing-profile centre
+to the wing-profile step; its ordinary three-place span is the wing's +X
+manufacturing authority. The internal wing length derives from that reach.
 
 Run (SolidWorks already open)::
 
@@ -108,6 +111,8 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     CAP_REGISTER_FEATURE,
     CAP_REGISTER_POINTS,
     CAP_REGISTER_PROFILE,
+    WING_AXIS_REACH,
+    WING_AXIS_REFERENCE,
     WING_LENGTH,
     WING_WIDTH,
     WING_X1,
@@ -312,12 +317,12 @@ async def _side_screw_reference(adapter: Any) -> SketchDims:
 
 async def _bore_sketch(
     adapter: Any, plane: str, z: float, names: tuple[str, str], label: str
-) -> SketchDims:
-    """One bearing-seat circle at the bore axis; returns its sketch dims."""
+) -> tuple[SketchDims, Any]:
+    """One bearing-seat circle at the bore axis; returns dims and native circle."""
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane))
     at = _xy_mapper(adapter, z, label)
-    await define_circle(
+    circle = await define_circle(
         adapter,
         *at(BORE_X, 0.0),
         _R_BORE,
@@ -326,9 +331,10 @@ async def _bore_sketch(
         names=(names[0], None, names[1]),
         drives=('"BoreX"', None, '"BoreDia"'),
     )
+    bearing_circle = adapter._sketch_entities[circle]
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
-    return dims
+    return dims, bearing_circle
 
 
 async def _top_seat_sketch(adapter: Any) -> tuple[SketchDims, Any]:
@@ -493,6 +499,83 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     return jobs + dims.apply(adapter, feature)
 
 
+async def _wing_axis_reference(
+    adapter: Any, bearing_circle: Any, wing_step: Any
+) -> tuple[SketchDims, tuple[Any, Any]]:
+    """Measure physical, already-defined geometry without a redundant driver.
+
+    Both construction points are coincident to retained native profile points,
+    not independently located copies. The bottom seat and wing share Front;
+    the bottom seat is the bearing datum. The body itself uses WingAxisReach
+    in its internal length equation, while this measured span owns shop ink.
+    """
+    label = WING_AXIS_REFERENCE
+    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    at = _xy_mapper(adapter, 0.0, label)
+    bearing_ref = adapter._register_sketch_entity("Circle", bearing_circle)
+    step_ref = adapter._register_sketch_entity("Line", wing_step)
+    centre = _add_reference_point(adapter, at(BORE_X, 0.0), "wing bearing axis")
+    edge = _add_reference_point(adapter, at(WING_X1, WING_WIDTH / 2.0), "wing step")
+    for point, physical in ((centre, f"{bearing_ref}.center"), (edge, f"{step_ref}.end")):
+        check(
+            f"{label} association to {physical}",
+            await adapter.add_sketch_constraint(point, physical, "coincident"),
+        )
+    await ensure_fully_defined(adapter, label)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    data = _early_bound(manager.CreateSelectData(), "ISelectData")
+    points = tuple(
+        _early_bound(adapter._sketch_entities[ref], "ISketchPoint")
+        for ref in (centre, edge)
+    )
+    for index, point in enumerate(points):
+        if not point.Select4(index > 0, data):
+            raise RuntimeError(f"{label}: cannot select associated point {index}")
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    display, status = extension.AddSpecificDimension(
+        (BORE_X + WING_X1) / 2000.0, (WING_WIDTH / 2.0 + 7.0) / 1000.0, 0.0,
+        11,  # swDimensionType_e.swHorLinearDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1  # swDimensionDriven: geometry is already constrained.
+    display.ShowParenthesis = False  # Manufacturing control, not a REF dimension.
+    await ensure_fully_defined(adapter, label)
+    dims = SketchDims()
+    dims.record("WingAxisReach")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims, points
+
+
+def _require_wing_axis_reach(adapter: Any, points: tuple[Any, Any]) -> None:
+    """Read back the rebuilt native span, ink state and exact attachments."""
+    display, dimension = _named_dimension(adapter, WING_AXIS_REFERENCE, "WingAxisReach")
+    measured = float(dimension.SystemValue) * 1000.0
+    if not math.isclose(measured, WING_AXIS_REACH, rel_tol=0.0, abs_tol=1e-6):
+        raise RuntimeError(f"wing axis reach measures {measured:g}, expected {WING_AXIS_REACH:g}")
+    if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
+        raise RuntimeError("wing axis reach lost its measured manufacturing control")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = list(annotation.GetAttachedEntities3() or ())
+    if bool(annotation.IsDangling()) or len(attached) != 2:
+        raise RuntimeError("wing axis reach lost its native point associations")
+    for point in points:
+        match = next(
+            (index for index, entity in enumerate(attached)
+             if entity is not None and int(adapter.swApp.IsSame(entity, point)) == 1),
+            None,
+        )
+        if match is None:
+            raise RuntimeError("wing axis reach attached to the wrong native point")
+        attached.pop(match)
+
+
 async def _cap_tap_reference(adapter: Any) -> SketchDims:
     """Locate all four tap axes directly from the actual bearing-axis knobs.
 
@@ -645,9 +728,10 @@ async def build(adapter) -> dict[str, str]:
     await define_rectilinear_chain(
         adapter, lines, points, label="integral wing", dims=wing,
         names=["WingLength", "WingWidth", "WingEndX", "WingSideY"],
-        drives=['"WingLength"', '"WingWidth"', '"BlockEndX"', '"WingSideY"'],
+        drives=['"BlockEndX" - "BoreX" + "WingAxisReach"', '"WingWidth"', '"BlockEndX"', '"WingSideY"'],
     )
     await ensure_fully_defined(adapter, "integral wing")
+    wing_step = adapter._sketch_entities[lines[1]]
     check("exit_sketch wing", await adapter.exit_sketch())
     name_last_feature(adapter, "WingProfile")
     drive_jobs += wing.apply(adapter, "WingProfile")
@@ -686,7 +770,7 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "top seat", volume - V_BORE, 0.01 * V_BORE)
 
-    bottom = await _bore_sketch(
+    bottom, bottom_bearing_circle = await _bore_sketch(
         adapter, "Front", 0.0, ("BottomBoreX", "BoreDia2"), "bottom seat"
     )
     name_last_feature(adapter, "BottomBoreProfile")
@@ -828,6 +912,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += cap_taps.placement_drive_jobs
     removed = len(CAP_TAP_POINTS) * math.pi * (cap_taps.hole_dia_mm / 2.0) ** 2 * BLOCK_HEIGHT
     volume = await volume_check(adapter, "cap receiver taps", volume - removed, 0.01 * removed)
+    reference, wing_reference_points = await _wing_axis_reference(
+        adapter, bottom_bearing_circle, wing_step
+    )
+    name_last_feature(adapter, WING_AXIS_REFERENCE)
+    drive_jobs += reference.apply(adapter, WING_AXIS_REFERENCE)
     reference = await _cap_tap_reference(adapter)
     name_last_feature(adapter, CAP_TAP_REFERENCE)
     drive_jobs += reference.apply(adapter, CAP_TAP_REFERENCE)
@@ -868,6 +957,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven pivot block (equations neutral)", volume, 0.002 * V_BLOCK
     )
     _require_one_solid_body(adapter, label="driven pivot block")
+    _require_wing_axis_reach(adapter, wing_reference_points)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

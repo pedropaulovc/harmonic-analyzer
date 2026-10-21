@@ -305,6 +305,34 @@ def test_head_release_uses_finite_coupled_register_motion(monkeypatch: pytest.Mo
     assert 0.0 < bounds.cap_top_rise < retention.CAP_VERTICAL_MOTION_ENCLOSURE
 
 
+def test_direct_wing_reach_bounds_the_whole_head_support_without_an_old_end_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    head_z = (
+        cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
+        - cap.COUNTERBORE_DEPTH + printed_band_mm(cap.COUNTERBORE_DEPTH_PLACES)
+        + retention.CAP_BASE_SEATING_GAP_MAX + retention.CAP_HEAD_SEATING_GAP_MAX
+    )
+    head_error = (
+        printed_band_mm(cap.POSITION_PLACES) + retention.CAP_BOLT_HEAD_ECCENTRICITY_MAX
+        + head_z * math.tan(gamma)
+    )
+    support_limit = (
+        max(abs(x) for x, _y in cap.BOLT_POINTS) + head_error
+        + cap.HEAD_BEARING_DIAMETER_MIN / 2.0
+        + printed_band_mm(retention.BLOCK_WING_AXIS_REACH_PLACES)
+    )
+    # A directly dimensioned edge has one ordinary three-place band. The
+    # former .X overall wing length plus bearing-station chain would reject
+    # this genuinely supported boundary pose and must not survive cutover.
+    monkeypatch.setattr(retention, "BLOCK_WING_AXIS_REACH", support_limit + 0.01)
+    assert retention.capture_bounds().cap_running_clearance > 0.0
+    monkeypatch.setattr(retention, "BLOCK_WING_AXIS_REACH", support_limit - 0.01)
+    with pytest.raises(ValueError, match="floor witness"):
+        retention.capture_bounds()
+
+
 def test_excessive_head_release_cannot_escape_connected_motion_enclosure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(retention, "CAP_HEAD_SEATING_GAP_MAX", cap.HEIGHT)
     with pytest.raises(ValueError):

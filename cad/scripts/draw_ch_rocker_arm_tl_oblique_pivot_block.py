@@ -44,6 +44,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _printed_limits import limits
 from _section_axis import position_section_caption
@@ -83,8 +84,8 @@ OUTPUTS = DrawingOutputs(
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 # The bearing/carriage sheet retains the original interfaces at 3:2.
-# A separate 2:1 plan owns the wing and all four tightly located cap taps.
-# Its tap stations reference the bearing axis directly, never a loose edge.
+# A separate 2:1 plan owns the wing's direct bearing-axis reach and four cap
+# taps. Both reference the bearing axis directly, never a loose edge chain.
 # Section A-A is on the bearing axis; full section B-B shows the remaining
 # carriage-counterbore floor from the carriage seat. Removed view C looks at
 # the original tail's +Y face and carries the nut-bracket hole stations.
@@ -138,7 +139,7 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BoreDia": (BLOCK_X0 - 11.5, 15.5, _H),
 }
 CAPTURE_KEEP = {
-    "WingLength": (-32.0, 40.0, _H),
+    "WingAxisReach": ((BORE_X + part_spec.WING_X1) / 2.0, 41.0, _H),
     "WingWidth": (59.0, 0.0, _H),
     "CapTapLeftX": (-39.5, -43.0, _H),
     "CapTapRightX": (-24.5, -51.0, _H),
@@ -601,14 +602,37 @@ requirement(
         PlanarFace((0.0, 1.0, 0.0), part_spec.WING_WIDTH / 2.0),
         PlanarFace((0.0, -1.0, 0.0), part_spec.WING_WIDTH / 2.0),
     ),
-    requirements=("length", "width"),
+    requirements=("width",),
     fields={
-        "length": (limits(part_spec.WING_LENGTH, 1), ("WING_LENGTH",)),
-        "length_nominal": (part_spec.WING_LENGTH, ("WING_LENGTH",)),
         "width": (limits(part_spec.WING_WIDTH, 2), ("WING_WIDTH",)),
         "width_nominal": (part_spec.WING_WIDTH, ("WING_WIDTH",)),
     },
-    precision={"length": 1, "width": 2},
+    precision={"width": 2},
+)
+
+requirement(
+    "capture_wing_step",
+    kind="face",
+    # One selector names both coplanar +X steps outside the original tail.
+    faces=(PlanarFace((1.0, 0.0, 0.0), part_spec.WING_X1),),
+    requirements=("station", "note"),
+    fields={
+        "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+        "plane": (
+            {"frame": "model", "axis": "x", "value": part_spec.WING_X1},
+            ("WING_X1",),
+        ),
+        "station": (
+            limits(part_spec.WING_AXIS_REACH, part_spec.WING_AXIS_REACH_PLACES),
+            ("WING_AXIS_REACH", "WING_AXIS_REACH_PLACES"),
+        ),
+        "station_nominal": (part_spec.WING_AXIS_REACH, ("WING_AXIS_REACH",)),
+        "note": (
+            " ".join(part_spec.WING_AXIS_REACH_CALLOUT.splitlines()),
+            ("WING_AXIS_REACH_CALLOUT",),
+        ),
+    },
+    precision={"station": part_spec.WING_AXIS_REACH_PLACES},
 )
 
 for _index, (_x, _y) in enumerate(part_spec.CAP_TAP_POINTS, start=1):
@@ -1045,6 +1069,36 @@ def _register_recess_sheet(adapter: Any) -> None:
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
 
 
+def _wing_axis_manufacturing_dimension(adapter: Any, annotations: list[Any]) -> None:
+    """Keep the imported measured reach as ordinary manufacturing ink, not REF."""
+    matches = [
+        annotation for annotation in annotations
+        if dimension_name(adapter, annotation) == "WingAxisReach"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("capture wing needs exactly one native WingAxisReach")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    owner = str(dimension.FullName).split("@")
+    measured = float(dimension.SystemValue) * 1000.0
+    if (
+        len(owner) < 2 or owner[1] != part_spec.WING_AXIS_REFERENCE
+        or int(dimension.DrivenState) != 1
+        or not math.isclose(measured, part_spec.WING_AXIS_REACH, rel_tol=0.0, abs_tol=1e-6)
+        or bool(annotation.IsDangling())
+    ):
+        raise RuntimeError("capture wing reach lost its native measured authority")
+    display.ShowParenthesis = False
+    if (
+        bool(display.ShowParenthesis)
+        or str(display.GetText(1) or "")
+        or str(display.GetText(2) or "")
+        or int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type) != 0
+    ):
+        raise RuntimeError("capture wing reach is not ordinary title-block manufacturing ink")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -1180,13 +1234,16 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, capture_annotations,
         {name: text for name, text in CALLOUTS_BELOW.items() if name in CAPTURE_KEEP},
     )
+    _wing_axis_manufacturing_dimension(adapter, capture_annotations)
     tap_x, tap_y = part_spec.CAP_TAP_POINTS[1]
-    add_native_hole_callout(
+    cap_tap_callout = add_native_hole_callout(
         adapter, capture,
         edge_xy=on_capture((tap_x, tap_y + part_spec.CAP_TAP_DRILL_DIA / 2.0, _H)),
         callout_xy=(0.069, 0.246),
         label="four cap receiver taps",
     )
+    # The title block's THREADS row owns the general thread class.
+    omit_title_block_thread_class(cap_tap_callout, label="four cap receiver taps")
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("cannot activate register-recess sheet")

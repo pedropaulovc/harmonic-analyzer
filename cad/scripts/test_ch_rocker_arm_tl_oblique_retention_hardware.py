@@ -344,6 +344,32 @@ def _nonadjacent_strands_clear(segments):
     return True
 
 
+def test_wire_drilled_legs_and_bridge_follow_the_shared_cap_pair():
+    assert wire.CAP_BOLT_X_OFFSETS == cartridge.CAP_BOLT_X_OFFSETS
+    segments = wire.installed_wire_segments()
+    # Inspect the actual native sweep controls, not a separately moved mask
+    # or envelope. Each new head axis must have a straight diametral leg.
+    head_radius = hardware.SCREW_HEAD_DIA_MAX / 2
+    for center in cartridge.CAP_BOLT_X_OFFSETS:
+        assert any(
+            all(abs(p[1]) < 1e-12 and abs(p[2] - wire.WIRE_AXIS_Z) < 1e-12
+                for p in segment)
+            and min(p[0] for p in segment) < center - head_radius
+            and max(p[0] for p in segment) > center + head_radius
+            for segment in segments
+        )
+    # The twisted bridge must leave the same physical approach length at
+    # both heads when their shared X span changes.
+    for center in cartridge.CAP_BOLT_X_OFFSETS:
+        bridge_end = math.copysign(wire.BRIDGE_HALF_LENGTH, center)
+        assert abs(center - bridge_end) == pytest.approx(wire.OUTER_BEND_RADIUS + 1.0)
+        for side in (-1, 1):
+            assert any(
+                endpoint == pytest.approx((bridge_end, side * wire.TWIST_RADIUS, wire.WIRE_AXIS_Z))
+                for segment in segments for endpoint in (segment[0], segment[-1])
+            )
+
+
 def test_wire_crosses_heads_only_through_the_real_diametral_drills():
     segments = wire.installed_wire_segments()
     assert _wire_clears_drilled_heads(segments)

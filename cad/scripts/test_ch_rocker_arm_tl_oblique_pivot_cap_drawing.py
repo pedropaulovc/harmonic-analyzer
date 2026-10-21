@@ -38,7 +38,7 @@ def test_dimensions_and_assembly_references_have_one_shared_owner() -> None:
         retention.CAP_POCKET_DIAMETER, retention.CAP_POCKET_DEPTH, retention.CAP_APERTURE_DIAMETER,
     )
     assert spec.BOLT_POINTS == retention.CAP_BOLT_CENTERS
-    assert set(spec.BOLT_POINTS) == {(-15.0, -25.0), (-15.0, 25.0), (15.0, -25.0), (15.0, 25.0)}
+    assert set(spec.BOLT_POINTS) == set(product(retention.CAP_BOLT_X_OFFSETS, retention.CAP_BOLT_Y_OFFSETS))
     assert spec.BOTTOM_PLANE == "Front Plane"
     assert spec.AXIS_NAME == "CaptureAxis"
     assert spec.BOLT_AXES == tuple(f"CapBoltAxis{i}" for i in range(1, 5))
@@ -57,7 +57,7 @@ def test_dimensions_and_assembly_references_have_one_shared_owner() -> None:
 
 
 def test_integral_register_geometry_has_one_shared_owner() -> None:
-    assert spec.REGISTER_POINTS == retention.CAP_REGISTER_CENTERS == ((-5.0, -24.0), (5.0, 24.0))
+    assert spec.REGISTER_POINTS == retention.CAP_REGISTER_CENTERS
     assert spec.REGISTER_DIA == retention.CAP_REGISTER_DIAMETER == 6.0
     assert spec.REGISTER_BAND == retention.CAP_REGISTER_DIAMETER_BAND == (0.10, -0.10)
     assert spec.REGISTER_PROJECTION == retention.CAP_REGISTER_PROJECTION == 1.0

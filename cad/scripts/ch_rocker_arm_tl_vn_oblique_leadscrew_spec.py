@@ -312,7 +312,7 @@ BAR_SCREW_ENGAGEMENT_RANGE = base_bar.bracket_screw_under_head(BAR_SCREW_LENGTH_
 # away from the spindle, origin X at the carriage centre; +Y the block's +Y,
 # which is rail 1's -lateral; +Z up), the origin on the block's -Y face (the
 # column side) at the bracket's bottom face. The bracket lies at -Y.
-# Envelope X NUT_BRACKET_X, Y -48 .. 0, Z 0 .. 35.3.
+# Envelope X NUT_BRACKET_X, Y -48 .. 0, Z 0 .. NUT_BRACKET_HEIGHT.
 NUT_BRACKET_STOCK = "6061-T6 flat 3/4 x 2 in"
 NUT_BRACKET_STOCK_THICK = 0.75 * INCH
 NUT_BRACKET_LENGTH = 18.5  # +X end milled to length (TL-29 #8 end wall)

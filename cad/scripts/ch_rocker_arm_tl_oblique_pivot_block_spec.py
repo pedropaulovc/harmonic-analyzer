@@ -12,9 +12,9 @@ footprint; the original tail stays 40 wide. The original bearing axis,
 carriage pattern, nut-bracket pattern and bracket grip stay put.
 Frame origin is the carriage-pattern centre on its top mating plane, +X
 away from the spindle, +Z up. Existing hole stations still read from the
-real -X end and tail -Y side; the four cap receiver taps instead read
-DIRECTLY from the actual bearing axis at three places (+/-0.13), never
-through a loose outside-edge stack.
+-X end and tail -Y side; the four cap receiver taps and the wing's +X step
+instead read DIRECTLY from the actual bearing axis at three places (+/-0.13),
+never through a loose outside-edge stack.
 
 Bearing seats (rule 4, rule 16). The bore axis stands at X = ``PIN_OFFSET`` ⚙
 (-32), Y = 0. From the top, a Ø30 N6 seat (29.976/29.989) ``BEARING_RECESS``
@@ -156,6 +156,10 @@ BLOCK_HEIGHT = trammel.PIVOT_BLOCK_HEIGHT  # ⚙ 24
 # -Y side face (rule 10). The model's knobs stay origin-relative.
 DATUM_X = BLOCK_X0
 DATUM_Y = -BLOCK_WIDTH / 2.0
+WING_AXIS_REACH = retention.BLOCK_WING_AXIS_REACH
+WING_AXIS_REACH_PLACES = retention.BLOCK_WING_AXIS_REACH_PLACES
+WING_AXIS_REFERENCE = "WingAxisReference"
+WING_AXIS_REACH_CALLOUT = "2X WING STEP\nFROM BEARING AXIS"
 WING_X1 = retention.BLOCK_WING_END
 WING_WIDTH = 2.0 * retention.BLOCK_WING_HALF_WIDTH
 WING_LENGTH = WING_X1 - BLOCK_X0
@@ -198,13 +202,13 @@ def cap_receiver_walls(
     *,
     location_band: float = printed_band_mm(CAP_TAP_LOCATION_PLACES),
     wing_width: float = WING_WIDTH,
-    wing_length: float = WING_LENGTH,
+    wing_axis_reach: float = WING_AXIS_REACH,
     depth: float = BLOCK_HEIGHT,
 ) -> dict[str, float]:
-    """Thread-envelope walls, including the loose bearing-axis edge location.
+    """Thread-envelope walls at each edge's actual manufacturing authority.
 
-    Direct tap-to-axis bands govern screw clearance; the integral registers,
-    not these threads, bound cap translation. Edge bands govern material walls.
+    Direct tap-to-axis and wing-step-to-axis bands govern the +X wall; the
+    original spindle-end and wing-side chains retain their existing bands.
     The general angular band sweeps each thread axis over the largest block
     height; a through tap cannot discard its lower-end wall.
     """
@@ -217,7 +221,7 @@ def cap_receiver_walls(
     )
     return {
         "cap thread to spindle end": x_from_end - dx - edge_band - location_band - radius - sweep,
-        "cap thread to wing step": wing_length - printed_band_mm(1) - x_from_end - dx - edge_band - location_band - radius - sweep,
+        "cap thread to wing step": wing_axis_reach - printed_band_mm(WING_AXIS_REACH_PLACES) - dx - location_band - radius - sweep,
         "cap thread to wing side": (wing_width - edge_band) / 2.0 - dy - edge_band - location_band - radius - sweep,
     }
 
@@ -385,7 +389,10 @@ SIDE_CALLOUT_PRECISION = {
     "hw-cbdia": SIDE_CBORE_PLACES,
     "hw-cbdepth": SIDE_CBORE_PLACES,
 }
-REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, SIDE_SCREW_REFERENCE, CAP_TAP_REFERENCE)
+REFERENCE_SKETCHES = (
+    CBORE_FLOOR_REFERENCE, SIDE_SCREW_REFERENCE, CAP_TAP_REFERENCE,
+    WING_AXIS_REFERENCE,
+)
 
 # --- Seat corner (rule 16) ---------------------------------------------------
 BEARING_OD_CHAMFER_MIN = 0.6  # 6200 outer ring r1,2 min
@@ -470,7 +477,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "SideScrewRowZ": SIDE_STATION_PLACES,
     },
 }
-DRAWING_PRECISION["WingProfile"] = {"WingLength": 1, "WingWidth": 2}
+DRAWING_PRECISION["WingProfile"] = {"WingWidth": 2}
+DRAWING_PRECISION[WING_AXIS_REFERENCE] = {"WingAxisReach": WING_AXIS_REACH_PLACES}
 DRAWING_PRECISION[CAP_TAP_REFERENCE] = {
     name: CAP_TAP_LOCATION_PLACES
     for name in ("CapTapLeftX", "CapTapRightX", "CapTapLowerY", "CapTapUpperY")
@@ -513,7 +521,7 @@ DRAWING_VALUES: dict[str, float] = {
     "SideScrew1X": SIDE_STATIONS_X[0],
     "SideScrew2X": SIDE_STATIONS_X[1],
     "SideScrewRowZ": SIDE_ROW_Z,
-    "WingLength": WING_LENGTH,
+    "WingAxisReach": WING_AXIS_REACH,
     "WingWidth": WING_WIDTH,
     "CapTapLeftX": abs(retention.CAP_BOLT_X_OFFSETS[0]),
     "CapTapRightX": abs(retention.CAP_BOLT_X_OFFSETS[1]),
@@ -732,13 +740,13 @@ def cap_register_margins(
     diameter: float = CAP_REGISTER_DIA,
     depth: float = CAP_REGISTER_DEPTH,
     wing_width: float = WING_WIDTH,
-    wing_length: float = WING_LENGTH,
+    wing_axis_reach: float = WING_AXIS_REACH,
 ) -> dict[str, float]:
     """Conservative material gaps at the *printed* source bands.
 
-    Direct receiver XY uses .XXX, while the bearing axis to the original
-    edges stays .XX and wing length stays .X. Receiver diameter carries its
-    explicit +.10/0 band; depth is .XXX. Tap walls use the thread major
+    Direct receiver XY and wing-step reach use .XXX from the bearing axis.
+    The bearing axis to the original edges stays .XX. Receiver diameter
+    carries its explicit +.10/0 band; depth is .XXX. Tap walls use the thread major
     envelope, carriage counterbores their .XX band, and side counterbores
     their existing .XXX band. Independent source locations add, never RSS.
     The general angular band sweeps both top-entered axes through the deepest
@@ -763,8 +771,8 @@ def cap_register_margins(
             station_x - axis_x - location - radius - drift
         )
         margins[f"{prefix} to wing step"] = (
-            wing_length - _band("WingLength") - station_x
-            - axis_x - location - radius - drift
+            wing_axis_reach - _band("WingAxisReach") - dx
+            - location - radius - drift
         )
         margins[f"{prefix} to wing side"] = (
             (wing_width - _band("WingWidth")) / 2.0
@@ -878,6 +886,7 @@ CALLOUTS_BELOW.update({
     name: CAP_TAP_CALLOUT
     for name in DRAWING_PRECISION[CAP_TAP_REFERENCE]
 })
+CALLOUTS_BELOW["WingAxisReach"] = WING_AXIS_REACH_CALLOUT
 CALLOUTS_BELOW["WingWidth"] = "SYMMETRIC ABOUT\nBEARING AXIS"
 CALLOUTS_BELOW["CapRegister1Dia"] = CAP_REGISTER_CALLOUT
 CALLOUTS_BELOW["CapRegister2Dia"] = CAP_REGISTER_CALLOUT

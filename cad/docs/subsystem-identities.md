@@ -14,7 +14,7 @@ SH means Shared: one native model per supplier-qualified SKU (supplier plus SKU)
 
 Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules and in the shared part's own `sh_vn_<name>_spec.py` (or per-member `sh_vn_<name>_<member>_spec.py`) modules, not in a helper named after one consuming parent.
 
-Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the only current fixture kit is the oblique trammel jig, whose 31 TL and TL-VN families below are the only current tooling parts. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; where a shop route still describes one, its geometry lives in `cad/process/shop/inventory.toml` without a CAD owner. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-72` (VN-72 retired, never reissued).
+Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the only current fixture kit is the oblique trammel jig, whose 37 logical families use the 35 current tooling part identities below, including three configurations of shared SH-VN-57. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; where a shop route still describes one, its geometry lives in `cad/process/shop/inventory.toml` without a CAD owner. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but apart from shared supplier SKUs their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-76` (VN-58 through VN-60 and VN-72 retired, never reissued).
 
 The 2026-10-21 standalone-tooling retirement removes CAD ownership, while retaining analytic shop-process checks for the held reference route; those checks do not qualify a physical fixture or machining route. `test_process_shop.py` checks the inline rocker risers, shim stacks, filing stand and hub filing kit against `cad/process/ch_rocker_arm/plan.toml` and the current rocker geometry, retaining the former acceptance bands. The plan remains unenrolled, and its S5/S7 physical outline-template dependency must be requalified before machining; an inventory collision envelope is not replacement tooling CAD. Their historical source is revision `fcfc947c4`, under `cad/scripts/ch_rocker_arm_tl_{riser_block,strap_shim_stack,filing_stand,filing_button,filing_stud}_spec.py` and the corresponding drawing/tests; those are provenance references, not current imports.
 
@@ -112,11 +112,18 @@ not reuse after a through-ball extraction load.
 
 The capture stack raises the carrier/work setup by **12.5 mm**, including the
 1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
-end is nominally **4 mm above the finished work**. The cap is 50 × 74 ×
+end is nominally **4 mm above the finished work**. The cap is 50 × 75 ×
 11.50 mm, with the ordinary ±0.51 mm thickness band, not a new precision
-control, machined from 5/8 in stock. The block wing is 66 mm wide, spans
-−54.5 to −9 mm, and is machined from 1 × 3 in flat bar; the physical
-nut-bracket location is unchanged.
+control, machined from 5/8 in stock. Its bolt coordinates are X = ±14.5 mm,
+Y = ±25.5 mm; the two register centres are (−4.5, −24) and (4.5, 24) mm.
+The block wing is 67 mm wide and starts at −54.5 mm, machined from
+1 × 3 in flat bar. Its nominal −10.8 mm end is controlled directly by
+the **21.200 mm bearing-axis-to-wing-edge reach**, using the ordinary
+three-place ±0.13 mm band, not a competing wing-length/end chain.
+The worst-case nut-bracket clearance is 0.525 mm, above the 0.50 mm
+minimum, while preserving the 2 mm body-wall targets and the existing
+two-rectangle block topology. Existing anchors, rails, leadline and
+nut-bracket placement are unchanged.
 
 The fitter package separates cartridge manufacture, pressing, joint acceptance
 and wiring (C1–C3C, **CARTRIDGEASSEMBLY**) from operation, pass changes and machine
@@ -156,8 +163,9 @@ certification, generic shop-qualified torque, or new approval claim.
 
 The source-derived intact-rigid bound includes both end uplift and tipping
 across the full carrier/handle width, not just small support-pin travel.
-Captured geometry supplies no strength, bump-force or deflection
-certification. Installed toolholder/spindle clearance remains **UNVERIFIED**
+The retained cap run/FIFO is immutable old-source API proof only, not
+current-geometry native validation. Captured geometry supplies no strength,
+bump-force or deflection certification. Installed toolholder/spindle clearance remains **UNVERIFIED**
 without real measurement authority: accept actual installed-tool clearance
 before cutting over both complete sweeps, the calculated upset, actual formed
 locks and measurement/runout uncertainty. Retained-pin dimensions alone do
@@ -642,3 +650,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | shared | `sh-vn-thumb-screw` | MHA-SH-VN-55 | 2026-10-20: McMaster 91882A221 consolidated from `mg-vn-thumb-screw` MHA-MG-VN-50 and `ms-vn-thumb-screw` MHA-MS-VN-50 (`Default`); those Numbers reserved |
 | shared | `sh-vn-music-wire` | MHA-SH-VN-56 | 2026-10-20: McMaster 9666K56 wire forms consolidated from `mg-vn-lever-wire` MHA-MG-VN-56 (`LeverWire`) and `pn-vn-pen-wire` MHA-PN-VN-57 (`PenWire`); one two-sheet reference package, still DO NOT RELEASE with developed cut lengths unmodelled; those Numbers reserved |
 | shared | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | 2026-10-20: Precision Matthews 52PCCK-9/16-14mm kit members consolidated from `ch-rocker-arm-tl-vn-oblique-hold-down-stud` MHA-CH-06-TL-VN-58 (`HoldDownStud` x4), `ch-rocker-arm-tl-vn-oblique-t-nut` MHA-CH-06-TL-VN-59 (`TNut` x4) and `ch-rocker-arm-tl-vn-oblique-flange-nut` MHA-CH-06-TL-VN-60 (`FlangeNut` x4); `usage_scope: tooling`, jig only, never a machine BOM row; TL-VN-58 to TL-VN-60 reserved |
+| added | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | low-carbon steel capture cap x2, machined from 5/8 x 2-1/2 in flat with integral underside registers; retains the pivot-pin flange in the oblique trammel jig |
+| added | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | low-carbon steel top retainer x2, turned from 3/8 x 1 in flat and faced to the actual loaded running gap on the carrier and pivot pin |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-cap-screw` | MHA-CH-06-TL-VN-73 | CBS Fasteners NAS1352N5H12 5/16-18 X 3/4 predrilled socket head cap screw x8, A286 heat-resistant steel, passivated; safety-wired in pairs to secure the pivot capture caps |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin` | MHA-CH-06-TL-VN-74 | Huyett CLPS6-0187-1250D 3/16 x 1-1/4 in headed clevis pin x2, 316 stainless steel; installed with fresh split cotters for the pivot top retainers |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 | Huyett CP-062-0500 split cotter pin x2, carbon steel, zinc clear, ASME B18.8.1; spread both prongs and replace after every removal |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 | Aircraft Spruce 05-02685 MS20995 soft-temper 302/304 stainless safety wire, four cut lengths, one per X screw pair; formed in the tightening sense with ends below the cap top and replaced after opening |

@@ -1084,7 +1084,7 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
         second_number=2,
     ),
-    # Eight NAS1352N4H12 cap screws, four per block. Only the smooth 1/4-20
+    # Eight NAS1352N5H12 cap screws, four per block. Only the smooth 5/16-18
     # major envelope inside the tap-drill bore is material overlap. The
     # flange/cap/floor, clevis/pin, retainer/clevis, cotter/hole and routed
     # safety wire are clear or nominal tangencies, not blanket exceptions.

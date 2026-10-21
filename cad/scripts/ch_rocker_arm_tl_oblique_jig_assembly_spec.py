@@ -8,13 +8,14 @@ enters the harmonic-analyzer assembly tree or a machine BOM
 read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
-Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-VN drawings and shared SH-VN-57). Overall envelope at the modelled pose,
+Material: see the component drawings (TL-20 to TL-26, TL-28 to TL-31) and the
+bought items' (TL-VN drawings through TL-VN-76 and shared SH-VN-57).
+Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
 TL-28 brackets end flush with bar 1's column-side edge), Z -22.0 (the
-T-nuts' feet in the table slots) to 102.6 (the feed lever screws' heads); see
+T-nuts' feet in the table slots) to the raised feed lever screws' heads; see
 ``MODEL_EXTENT``.
 
 Frame: the MACHINE frame. Origin on the spindle axis at the table top; +X along
@@ -27,7 +28,7 @@ pivot block stands at carriage station
 ``SYMMETRIC_PIN_STATION["inner"] - PIN_OFFSET`` ⚙ on its rail
 (``trammel.rail_point``). Heights are the calculator's stack ⚙: base bars on
 the table, carriage tops at ``CARRIAGE_TOP_Z`` 40.7, pivot blocks to 64.7, the
-carrier from ``CARRIER_UNDERSIDE_Z`` 67.7 to ``CARRIER_TOP_Z`` 79.7; riser and
+carrier from ``CARRIER_UNDERSIDE_Z`` 80.2 to ``CARRIER_TOP_Z`` 92.2; riser and
 feed lever on the carrier top; the HUB pin's head under the carrier.
 
 Leadscrew feed (``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as
@@ -2125,6 +2126,7 @@ def _update_min(store: dict, key, value: float) -> None:
 def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
     """Sweep both passes over ±SWEEP ⚙ and measure every clearance to the
     machine's unmodelled features."""
+    require_wing_bracket_clearance()
     bars = fixed_outlines()
     feed = feed_outlines()
     cover: dict[str, float] = {}
@@ -2333,6 +2335,33 @@ def _upset_fixture_padding(
     return 0.0, 0.0, 0.0
 
 
+def require_wing_bracket_clearance(*, wing_axis_reach: float | None = None) -> float:
+    """Worst X gap between the solid wing and TL-29, in their common rail frame.
+
+    Both the bracket centre set and bearing station start at TL-22's -X
+    datum, so its absolute position cancels. The bracket's near face takes
+    half its finished-length band; the wing end takes ONLY its direct
+    bearing-axis reach band, not a second overall-length/end-location chain.
+    The core's -Y face is the intended bracket mounting contact. Outside
+    that face the positive X gap separates the entire wing, at every slide
+    position, without subtracting holes or claiming an interference waiver.
+    """
+    reach = pivot_block.WING_AXIS_REACH if wing_axis_reach is None else wing_axis_reach
+    nominal = (
+        nut_bracket.X_SET_MID - nut_bracket.BRACKET_LENGTH / 2.0
+        - pivot_block.BORE_STATION_X - reach
+    )
+    gap = nominal - (
+        nut_bracket.X_SET_BAND
+        + printed_band_mm(nut_bracket.LENGTH_PLACES) / 2.0
+        + printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["BoreStationX"])
+        + printed_band_mm(pivot_block.WING_AXIS_REACH_PLACES)
+    )
+    if gap < retention.WING_BRACKET_CLEARANCE_MIN:
+        raise ValueError("pivot wing/nut bracket worst-case clearance is below the required gap")
+    return gap
+
+
 def captured_fixture_envelopes(samples: int = SWEEP_SAMPLES) -> tuple[tooling.FixtureEnvelope, ...]:
     """Conservative continuous full-sweep AABBs, BOTH passes and all native parts.
 
@@ -2342,6 +2371,7 @@ def captured_fixture_envelopes(samples: int = SWEEP_SAMPLES) -> tuple[tooling.Fi
     machine alignment, deflection and as-installed wire/cotter forms still need
     measured uncertainty in the caller's installed tooling authority.
     """
+    require_wing_bracket_clearance()
     boxes = _component_local_boxes()
     nominal = _component_records(boxes=boxes)
     placement_band, part_bands = _printed_fixture_allowances()

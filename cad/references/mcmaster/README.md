@@ -416,9 +416,12 @@ independent allowances separately; then pair-wire in the tightening direction.
 This engineering seating torque establishes neither minimum preload
 nor force/strength certification.
 
-The clevis pin's actual diameter limits, not the listing's rounded 0.188 in nominal, control
-the fitted top-washer stack. The wire quantity counts installed formed
-pieces, not four spools. TL-VN-72 remains retired. See
+The clevis pin's native material entry is exactly
+`AISI 316 Annealed Stainless Steel Bar (SS)`; the purchased supplier's
+316 grade and condition remain authoritative, not the library entry's
+bar/annealed designation. Its actual diameter limits, not the listing's
+rounded 0.188 in nominal, control the fitted top-washer stack. The wire
+quantity counts installed formed pieces, not four spools. TL-VN-72 remains retired. See
 [captured-pivot authority and service instructions](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling)
 for the two-retainer pass change and destructive upward-extraction replacement.
 

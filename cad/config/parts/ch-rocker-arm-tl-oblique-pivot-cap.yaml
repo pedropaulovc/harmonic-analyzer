@@ -12,7 +12,7 @@ ch-rocker-arm-tl-oblique-pivot-cap:
     11.50 mm, with nominal overall height 12.50 mm including the bosses.
     Mill the underside block-seating plane
     around the two bosses rather than facing them away. Locate their native
-    signed X/Y coordinates (-5.000,-24.000) and (+5.000,+24.000) mm from the
+    signed X/Y coordinates (-4.500,-24.000) and (+4.500,+24.000) mm from the
     actual flange-pocket axis. Finish each boss to diameter 6.00 +/-0.10 mm
     and projection 1.000 mm below the seating plane at the printed ordinary
     three-place tolerance. Chamfer only each free-end edge 0.20 mm MAX;

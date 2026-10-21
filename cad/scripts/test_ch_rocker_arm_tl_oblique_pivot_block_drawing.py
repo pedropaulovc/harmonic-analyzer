@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import inspect
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -341,6 +343,7 @@ def test_floor_reference_lies_in_section_b_and_is_saved_hidden() -> None:
         spec.CBORE_FLOOR_REFERENCE,
         spec.SIDE_SCREW_REFERENCE,
         spec.CAP_TAP_REFERENCE,
+        spec.WING_AXIS_REFERENCE,
     )
     assert spec.DRAWING_PRECISION[spec.CBORE_FLOOR_REFERENCE] == {"CboreFloor": 3}
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -400,6 +403,56 @@ def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
     # Every printed station is driven from the origin knobs, not a global.
     assert set(part._STATION_DRIVES) <= set(spec.DRAWING_VALUES)
     assert set(part._STATION_DRIVES).isdisjoint(spec.MODEL_KNOBS)
+
+
+@pytest.mark.parametrize("stale_readback", [False, True])
+def test_cap_tap_thread_class_omission_preserves_native_rows(
+    monkeypatch, stale_readback: bool
+) -> None:
+    import _hole_callout_thread_class as thread_class
+
+    original = {
+        5: "<NUM_INST>X <hw-threaddesc> - <hw-threadclass> <hw-thru>",
+        6: "",
+        7: "DRILL <MOD-DIAM><hw-diameter> <hw-thru>",
+        8: "",
+    }
+
+    class NativeCallout:
+        def __init__(self) -> None:
+            self.rows = dict(original)
+            self.writes = []
+
+        def IsHoleCallout(self):
+            return True
+
+        def GetText(self, part):
+            return self.rows[part]
+
+        def SetText(self, part, text):
+            self.writes.append((part, text))
+            if not stale_readback:
+                self.rows[part + 4] = text
+
+    native = NativeCallout()
+    display = object()
+
+    def early_bound(value, interface):
+        assert value is display
+        assert interface == "IDisplayDimension"
+        return native
+
+    monkeypatch.setattr(thread_class, "_early_bound", early_bound)
+    if stale_readback:
+        with pytest.raises(RuntimeError, match="four cap receiver taps: tap callout kept"):
+            drawing.omit_title_block_thread_class(display, label="four cap receiver taps")
+    else:
+        drawing.omit_title_block_thread_class(display, label="four cap receiver taps")
+        assert native.rows[5] == "<NUM_INST>X <hw-threaddesc> <hw-thru>"
+    assert native.writes == [(1, "<NUM_INST>X <hw-threaddesc> <hw-thru>")]
+    assert {part: native.rows[part] for part in (6, 7, 8)} == {
+        part: original[part] for part in (6, 7, 8)
+    }
 
 
 def test_screw_callout_puts_drill_in_the_thru_row_and_the_mate_below() -> None:
@@ -479,6 +532,9 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
 
 def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
     assert spec.WING_LENGTH == spec.WING_X1 - spec.BLOCK_X0
+    assert spec.WING_X1 == spec.BORE_X + spec.WING_AXIS_REACH
+    assert spec.WING_AXIS_REACH == retention.BLOCK_WING_AXIS_REACH
+    assert spec.WING_AXIS_REACH_PLACES == retention.BLOCK_WING_AXIS_REACH_PLACES == 3
     assert spec.WING_WIDTH == 2.0 * retention.BLOCK_WING_HALF_WIDTH
     assert spec.SIDE_UNDER_HEAD == 35.6
     assert spec.BORE_X == -32.0
@@ -490,18 +546,212 @@ def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
     assert spec.BEARING_AXIS_NAME == "BearingAxis"
 
 
+def test_wing_step_has_one_direct_manufacturing_authority() -> None:
+    assert spec.WING_LENGTH == spec.BORE_STATION_X + spec.WING_AXIS_REACH
+    assert "WingLength" not in spec.DRAWING_VALUES
+    assert "WingLength" not in spec.MODEL_KNOBS
+    assert "WingLength" not in spec.DRAWING_PRECISION_BY_NAME
+    assert spec.DRAWING_VALUES["WingAxisReach"] == spec.WING_AXIS_REACH
+    assert spec.DRAWING_PRECISION[spec.WING_AXIS_REFERENCE] == {
+        "WingAxisReach": spec.WING_AXIS_REACH_PLACES,
+    }
+    assert "WingAxisReach" in drawing.CAPTURE_KEEP
+    features = _features()
+    assert "length" not in features["capture_wing"]
+    step = features["capture_wing_step"]
+    band = printed_band_mm(spec.WING_AXIS_REACH_PLACES)
+    assert step["station"] == pytest.approx([
+        spec.WING_AXIS_REACH - band, spec.WING_AXIS_REACH + band,
+    ])
+    assert step["station_nominal"] == spec.WING_AXIS_REACH
+    assert step["precision"] == {"station": spec.WING_AXIS_REACH_PLACES}
+    assert "BEARING AXIS" in step["note"]
+    selector, = export_features.feature_selectors(STEM)["capture_wing_step"]
+    assert isinstance(selector, PlanarFace)
+    assert selector.normal == (1.0, 0.0, 0.0)
+    assert selector.offset_mm == spec.WING_X1
+
+
+def test_wing_reference_is_associated_to_the_actual_profiles(monkeypatch) -> None:
+    native = SimpleNamespace(DrivenState=2)
+    display = SimpleNamespace(GetDimension2=lambda _index: native, ShowParenthesis=True)
+    selected = []
+    registered = []
+    relations = []
+    authored = []
+    definitions = []
+    success = SimpleNamespace(is_success=True, data=None)
+
+    def create_point(x, y, z):
+        assert manager.AddToDB
+        point = SimpleNamespace(x=x, y=y, z=z)
+        point.Select4 = lambda append, _data: selected.append((point, append)) or True
+        return point
+
+    def register(kind, entity):
+        ref = f"{kind}{len(registered)}"
+        registered.append((kind, entity, ref))
+        adapter._sketch_entities[ref] = entity
+        return ref
+
+    def add_dimension(x, y, z, kind, status):
+        assert len(selected) == 2
+        assert [append for _point, append in selected] == [False, True]
+        assert (kind, status) == (11, 0)
+        authored.append((x, y, z))
+        return display, 0
+
+    async def create_sketch(plane):
+        assert plane == "Front"
+        return success
+
+    async def add_relation(first, second, relation):
+        relations.append((first, second, relation))
+        return success
+
+    async def fully_defined(_adapter, label):
+        assert _adapter is adapter and label == spec.WING_AXIS_REFERENCE
+        assert len(relations) == 2
+        definitions.append(bool(authored))
+        if authored:
+            assert native.DrivenState == 1
+
+    async def exit_sketch():
+        return success
+
+    manager = SimpleNamespace(AddToDB=False, CreatePoint=create_point)
+    model = SimpleNamespace(
+        ClearSelection2=lambda _all: selected.clear(),
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: object()),
+        Extension=SimpleNamespace(AddSpecificDimension=add_dimension),
+    )
+    adapter = SimpleNamespace(
+        currentSketchManager=manager, currentModel=model, _sketch_entities={},
+        _register_sketch_entity=register, create_sketch=create_sketch,
+        add_sketch_constraint=add_relation, exit_sketch=exit_sketch,
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_xy_mapper", lambda *_args: lambda x, y: (x, y))
+    monkeypatch.setattr(part, "ensure_fully_defined", fully_defined)
+    bearing_circle, wing_step = object(), object()
+    dims, points = asyncio.run(part._wing_axis_reference(adapter, bearing_circle, wing_step))
+    assert [item[:2] for item in registered[:2]] == [
+        ("Circle", bearing_circle), ("Line", wing_step),
+    ]
+    assert relations == [
+        (registered[2][2], f"{registered[0][2]}.center", "coincident"),
+        (registered[3][2], f"{registered[1][2]}.end", "coincident"),
+    ]
+    assert points == tuple(item[1] for item in registered[2:])
+    assert definitions == [False, True]
+    assert dims._rows == [("WingAxisReach", None)]
+    assert display.ShowParenthesis is False
+    assert manager.AddToDB is False
+
+
+def _wing_native_control(monkeypatch):
+    points = (object(), object())
+    case = SimpleNamespace(points=points, attached=list(reversed(points)), dangling=False)
+    case.dimension = SimpleNamespace(
+        SystemValue=spec.WING_AXIS_REACH / 1000.0, DrivenState=1,
+        FullName=f"WingAxisReach@{spec.WING_AXIS_REFERENCE}@Block",
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    case.display = SimpleNamespace(
+        ShowParenthesis=False, GetDimension2=lambda _index: case.dimension,
+        GetAnnotation=lambda: case.annotation, GetText=lambda index: case.text[index],
+    )
+    case.text = {1: "", 2: ""}
+    case.annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: case.attached,
+        IsDangling=lambda: case.dangling,
+        GetSpecificAnnotation=lambda: case.display,
+    )
+    case.adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        part, "_named_dimension",
+        lambda _adapter, feature, name: (case.display, case.dimension)
+        if (feature, name) == (spec.WING_AXIS_REFERENCE, "WingAxisReach") else None,
+    )
+    monkeypatch.setattr(
+        drawing, "dimension_name",
+        lambda _adapter, annotation: "WingAxisReach" if annotation is case.annotation else "",
+    )
+    return case
+
+
+@pytest.mark.parametrize("failure", [None, "value", "driver", "reference", "dangling", "wrong", "extra", "duplicate"])
+def test_wing_native_readback_requires_measured_associated_authority(monkeypatch, failure) -> None:
+    case = _wing_native_control(monkeypatch)
+    if failure == "value":
+        case.dimension.SystemValue += 0.001
+    elif failure == "driver":
+        case.dimension.DrivenState = 2
+    elif failure == "reference":
+        case.display.ShowParenthesis = True
+    elif failure == "dangling":
+        case.dangling = True
+    elif failure == "wrong":
+        case.attached[0] = object()
+    elif failure == "extra":
+        case.attached.append(object())
+    elif failure == "duplicate":
+        case.attached[:] = [case.points[0], case.points[0]]
+    if failure is None:
+        part._require_wing_axis_reach(case.adapter, case.points)
+    else:
+        with pytest.raises(RuntimeError):
+            part._require_wing_axis_reach(case.adapter, case.points)
+
+
+@pytest.mark.parametrize("failure", [None, "value", "owner", "driver", "dangling", "prefix", "suffix", "band", "missing", "duplicate"])
+def test_drawing_reach_remains_ordinary_native_manufacturing_ink(monkeypatch, failure) -> None:
+    case = _wing_native_control(monkeypatch)
+    case.display.ShowParenthesis = True
+    annotations = [case.annotation]
+    if failure == "value":
+        case.dimension.SystemValue += 0.001
+    elif failure == "owner":
+        case.dimension.FullName = "WingAxisReach@UnassociatedCopy@Block"
+    elif failure == "driver":
+        case.dimension.DrivenState = 2
+    elif failure == "dangling":
+        case.dangling = True
+    elif failure == "prefix":
+        case.text[1] = "("
+    elif failure == "suffix":
+        case.text[2] = " REF"
+    elif failure == "band":
+        case.dimension.Tolerance.Type = 2
+    elif failure == "missing":
+        annotations.clear()
+    elif failure == "duplicate":
+        annotations.append(case.annotation)
+    if failure is None:
+        drawing._wing_axis_manufacturing_dimension(case.adapter, annotations)
+        assert case.display.ShowParenthesis is False
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._wing_axis_manufacturing_dimension(case.adapter, annotations)
+
+
 def test_cap_receiver_taps_are_located_from_the_actual_bearing_axis() -> None:
-    assert spec.CAP_TAP_POINTS == ((-47.0, -25.0), (-47.0, 25.0), (-17.0, -25.0), (-17.0, 25.0))
+    assert tuple(
+        (x - spec.BORE_X, y) for x, y in spec.CAP_TAP_POINTS
+    ) == retention.CAP_BOLT_CENTERS
     assert spec.CAP_TAP_HOLE_SPEC.kind == "tapped"
     assert spec.CAP_TAP_HOLE_SPEC.size == "5/16-18"
     assert spec.CAP_TAP_HOLE_SPEC.end == "through_all"
     assert spec.CAP_TAP_LOCATION_PLACES == 3
     assert set(spec.DRAWING_PRECISION[spec.CAP_TAP_REFERENCE].values()) == {3}
     features = _features()
-    for index in range(1, 5):
+    for index, (x, y) in enumerate(spec.CAP_TAP_POINTS, start=1):
         tap = features[f"cap_receiver_tap_{index}"]
-        assert tap["station"] == [14.87, 15.13]
-        assert tap["width"] == [24.87, 25.13]
+        band = printed_band_mm(spec.CAP_TAP_LOCATION_PLACES)
+        assert tap["station"] == pytest.approx([abs(x - spec.BORE_X) - band, abs(x - spec.BORE_X) + band])
+        assert tap["width"] == pytest.approx([abs(y) - band, abs(y) + band])
         assert tap["thru"] is True
         assert tap["precision"] == {"station": 3, "width": 3}
         assert spec.CAP_TAP_HOLE_SPEC.size in tap["note"]
@@ -509,8 +759,18 @@ def test_cap_receiver_taps_are_located_from_the_actual_bearing_axis() -> None:
 
 def test_thread_envelope_walls_reject_an_undersized_wing() -> None:
     assert min(spec.cap_receiver_walls().values()) >= spec.WALL_TARGET
+    walls = spec.cap_receiver_walls()
+    dx = max(abs(x) for x in retention.CAP_BOLT_X_OFFSETS)
+    radius = spec.THREAD_MAJOR_MM[spec.CAP_TAP_HOLE_SPEC.size] / 2.0
+    sweep = (spec.BLOCK_HEIGHT + printed_band_mm(2)) * math.tan(
+        math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES)
+    )
+    assert walls["cap thread to wing step"] == pytest.approx(
+        spec.WING_AXIS_REACH - printed_band_mm(spec.WING_AXIS_REACH_PLACES)
+        - dx - printed_band_mm(spec.CAP_TAP_LOCATION_PLACES) - radius - sweep
+    )
     assert min(spec.cap_receiver_walls(wing_width=56.0).values()) < spec.WALL_FLOOR
-    assert min(spec.cap_receiver_walls(wing_length=40.0).values()) < spec.WALL_FLOOR
+    assert min(spec.cap_receiver_walls(wing_axis_reach=20.0).values()) < spec.WALL_FLOOR
     mouth = spec.cap_receiver_walls(depth=0.0)
     sweep = spec.BLOCK_HEIGHT * math.tan(
         math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES)
@@ -557,7 +817,9 @@ def test_register_recesses_bind_cylinders_and_actual_flat_floors() -> None:
         recess = features[name]
         assert recess["at"] == [x, y, spec.BLOCK_HEIGHT]
         assert recess["axis"] == [0.0, 0.0, -1.0]
-        assert recess["station"] == pytest.approx([4.87, 5.13])
+        dx = abs(x - spec.BORE_X)
+        band = printed_band_mm(spec.REGISTER_LOCATION_PLACES)
+        assert recess["station"] == pytest.approx([dx - band, dx + band])
         assert recess["width"] == pytest.approx([23.87, 24.13])
         assert recess["dia"] == pytest.approx([7.20, 7.30])
         assert recess["depth"] == pytest.approx([1.87, 2.13])
@@ -641,7 +903,6 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
             "cap threads", "carriage holes", "nut-bracket holes",
         ):
             assert margins[f"register {index} to {feature}"] >= spec.WALL_TARGET
-    assert spec.DRAWING_PRECISION_BY_NAME["WingLength"] == 1
     for name in ("WingWidth", "BlockHeight", "BoreStationX", "BoreStationY"):
         assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
     shallow = spec.cap_register_margins(depth=0.0)
@@ -650,6 +911,11 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
     radius = (spec.REGISTER_DIA + spec.REGISTER_DIA_BAND[0]) / 2.0
     deepest = spec.REGISTER_DEPTH + printed_band_mm(spec.REGISTER_DEPTH_PLACES)
     drift = deepest * math.tan(math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES))
+    for index, (dx, _dy) in enumerate(spec.CAP_REGISTER_CENTERS, start=1):
+        assert margins[f"register {index} to wing step"] == pytest.approx(
+            spec.WING_AXIS_REACH - printed_band_mm(spec.WING_AXIS_REACH_PLACES)
+            - dx - location - radius - drift
+        )
     expected_side = (
         (spec.WING_WIDTH - printed_band_mm(2)) / 2.0
         - abs(retention.CAP_REGISTER_CENTERS[0][1]) - printed_band_mm(2)
@@ -666,7 +932,7 @@ def test_register_material_gaps_charge_source_bands_without_tightening_body() ->
     "changes,key",
     [
         ({"wing_width": 58.0}, "register 1 to wing side"),
-        ({"wing_length": 30.0}, "register 2 to wing step"),
+        ({"wing_axis_reach": 7.0}, "register 2 to wing step"),
         ({"diameter": 15.0}, "register 1 to cap threads"),
         ({"depth": spec.BLOCK_HEIGHT}, "receiver floor to bottom face"),
         ({"centres": ((0.0, 18.0), (5.0, 24.0))}, "register 1 to bearing pockets"),
