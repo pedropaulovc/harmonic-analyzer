@@ -439,133 +439,282 @@ def _tap_placement_points(adapter: Any) -> dict[str, Any]:
     return points
 
 
-def _select_bore_rim(adapter: Any, circle: Any) -> None:
-    """Give the exact selected circle a real rim pick before dimension creation.
-
-    The Wizard points share the circle's transverse centre coordinate. An
-    unspecified centre pick can request a zero horizontal span before the later
-    near-arc endpoint setting can run. Native selection points distinguish the
-    rim without replacing either attached entity or adding witness geometry.
-    """
+def _transform_location(adapter: Any, coordinates: tuple[float, ...], transform: Any) -> tuple[float, ...]:
     from solidworks_mcp.adapters.com_variant import double_array
+
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    utility = _early_bound(application.GetMathUtility(), "IMathUtility")
+    point = _early_bound(utility.CreatePoint(double_array(list(coordinates))), "IMathPoint")
+    projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+    result = tuple(float(value) for value in (projected.ArrayData or ()))
+    if len(result) != 3 or not all(math.isfinite(value) for value in result):
+        raise RuntimeError("clamp location: invalid native transformed point")
+    return result
+
+
+def _point_in_location_sketch(adapter: Any, point: Any, sketch: Any) -> tuple[float, ...]:
+    """Use the actual point's owning frame, never its XYZ as model coordinates."""
+    native = _early_bound(point, "ISketchPoint")
+    owner = _early_bound(native.GetSketch(), "ISketch")
+    source = _early_bound(owner.ModelToSketchTransform, "IMathTransform")
+    target = _early_bound(sketch, "ISketch")
+    model_point = _transform_location(adapter, (float(native.X), float(native.Y), float(native.Z)), source.Inverse())
+    return _transform_location(adapter, model_point, target.ModelToSketchTransform)
+
+
+def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str) -> None:
+    """Match actual definition entities, not solver-created auxiliary entities."""
+    import _telemetry
+
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    matches, rows = 0, []
+    error = None
+    try:
+        for point in points:
+            code = application.IsSame(point, point)
+            if type(code) is not int or code != 1:
+                raise RuntimeError("native relation point self-identity unavailable")
+        expected_key = _segment_identity(adapter, segment, stage=stage, role="relation-source") if segment is not None else None
+        for raw in relations or ():
+            relation = _early_bound(raw, "ISketchRelation")
+            actual_kind = relation.GetRelationType()
+            if type(actual_kind) is not int:
+                raise RuntimeError("native relation type unavailable")
+            if actual_kind != kind:
+                continue
+            entities = list(relation.GetDefinitionEntities2() or ())
+            row = {"kind": actual_kind, "count": len(entities), "point_codes": [], "segment_key": None}
+            rows.append(row)
+            if len(entities) != len(points) + (segment is not None) or any(value is None for value in entities):
+                continue
+            for point in points:
+                codes = tuple(application.IsSame(entity, point) for entity in entities)
+                row["point_codes"].append(codes)
+                if any(type(code) is not int or code not in (0, 1) for code in codes):
+                    raise RuntimeError("native relation point identity unavailable")
+                if codes.count(1) != 1:
+                    break
+                entities.pop(codes.index(1))
+            else:
+                if relation.Suppressed is not False:
+                    raise RuntimeError("native defining constraint is suppressed or unavailable")
+                if segment is not None:
+                    self_codes = (application.IsSame(segment, segment), application.IsSame(entities[0], entities[0]))
+                    row["segment_self_codes"] = self_codes
+                    if any(type(code) is not int or code != 1 for code in self_codes):
+                        raise RuntimeError("native relation segment self-identity unavailable")
+                    actual_key = _segment_identity(adapter, entities[0], stage=stage, role="relation-definition")
+                    row["segment_key"] = actual_key
+                    if actual_key != expected_key:
+                        continue
+                matches += 1
+        if matches != 1:
+            raise RuntimeError(f"expected exactly one native constraint {kind}, found {matches}")
+    except Exception as exc:
+        error = exc
+    _telemetry.info(
+        f"clamp native witness relation: stage={stage}, kind={kind}, matches={matches}, definitions={rows!r}, error={error!r}",
+        operation_stage=stage, relation_kind=kind, relation_matches=matches,
+        relation_definitions=repr(rows), relation_readback_error=repr(error),
+    )
+    if error is not None:
+        raise RuntimeError(f"{stage}: {error}") from error
+
+
+def _assert_relative_witness(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str) -> tuple[Any, Any]:
+    """A constrained transverse line measures the actual tap axis to actual rim."""
+    import _telemetry
+
+    native = _early_bound(line, "ISketchSegment")
+    key = _segment_identity(adapter, native, stage=stage, role="measurement-line")
+    circle_key = _segment_identity(adapter, circle, stage=stage, role="bore-circle")
+    if key[1] != 0 or circle_key[1] != 1 or key[0] != circle_key[0] or native.ConstructionGeometry is not True:
+        raise RuntimeError(f"{stage}: measurement line is not construction in the actual bore witness")
+    owner = _early_bound(native.GetSketch(), "ISketch")
+    straight = _early_bound(native, "ISketchLine")
+    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
+    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
+    arc = _early_bound(circle, "ISketchArc")
+    center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    for endpoint in (start, end):
+        codes = (application.IsSame(endpoint, endpoint), application.IsSame(endpoint.GetSketch(), owner))
+        if any(type(code) is not int or code != 1 for code in codes):
+            raise RuntimeError(f"{stage}: measurement endpoint owner/identity unavailable")
+    _require_witness_relation(adapter, native.GetRelations(), 4, (), native, stage=f"{stage}.horizontal-line")
+    _require_witness_relation(adapter, start.GetRelations(), 26, (start, point), stage=f"{stage}.actual-tap-axis")
+    _require_witness_relation(adapter, end.GetRelations(), 25, (end, center), stage=f"{stage}.bore-station")
+    _require_witness_relation(adapter, end.GetRelations(), 9, (end,), circle, stage=f"{stage}.actual-bore-rim")
+    tap = _point_in_location_sketch(adapter, point, owner)
+    actual = (float(start.X), float(start.Y), float(start.Z), float(end.X), float(end.Y), float(end.Z))
+    radius = float(arc.GetRadius())
+    expected = (tap[0], float(center.Y), 0.0, float(center.X) + radius, float(center.Y), 0.0)
+    status = owner.GetConstrainedStatus()
+    _telemetry.info(
+        f"clamp native witness geometry: stage={stage}, line={key!r}, tap={tap!r}, endpoints={actual!r}, expected={expected!r}, status={status!r}",
+        operation_stage=stage, witness_line_identity=repr(key), actual_tap_sketch_m=tap,
+        witness_endpoints_m=actual, expected_endpoints_m=expected, constrained_status=status,
+    )
+    if type(status) is not int or status != 3 or not math.isfinite(radius) or radius <= 0.0 or any(not math.isfinite(value) or not math.isfinite(wanted) or abs(value - wanted) > 1e-9 for value, wanted in zip(actual, expected, strict=True)):
+        raise RuntimeError(f"{stage}: native constrained axis-to-positive-rim witness changed")
+    return start, end
+
+
+def _create_relative_witness(adapter: Any, point: Any, circle: Any, name: str) -> Any:
+    from solidworks_mcp.adapters.com_variant import dispatch_array
     import _telemetry
 
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    sketch = _early_bound(model.GetActiveSketch2(), "ISketch")
+    raw_sketch = model.GetActiveSketch2()
+    if raw_sketch is None:
+        raise RuntimeError(f"{name}: no active native witness sketch")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    native_circle = _early_bound(circle, "ISketchSegment")
+    owner = native_circle.GetSketch()
+    codes = (application.IsSame(sketch, sketch), application.IsSame(owner, owner), application.IsSame(owner, sketch))
+    _telemetry.info(f"clamp native active witness: name={name}, sketch_identity_codes={codes!r}", operation_stage=f"{name}.active-sketch", sketch_identity_codes=codes)
+    if any(type(code) is not int or code != 1 for code in codes):
+        raise RuntimeError(f"{name}: converted bore circle is not owned by the active sketch")
     arc = _early_bound(circle, "ISketchArc")
     center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    tap = _point_in_location_sketch(adapter, point, sketch)
     radius = float(arc.GetRadius())
     if not math.isfinite(radius) or radius <= 0.0:
-        raise RuntimeError("clamp location: invalid native bore radius")
-    rim = (float(center.X) + radius, float(center.Y), 0.0)
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    inverse = _early_bound(transform.Inverse(), "IMathTransform")
-    application = _early_bound(adapter.swApp, "ISldWorks")
-    utility = _early_bound(application.GetMathUtility(), "IMathUtility")
-    point = _early_bound(utility.CreatePoint(double_array(list(rim))), "IMathPoint")
-    projected = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
-    coordinates = tuple(float(value) for value in (projected.ArrayData or ()))
-    if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
-        raise RuntimeError("clamp location: native bore-rim transform failed")
-    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
-    _require_location_selection(adapter, circle, stage="bore-rim.before-set-selection-point")
-    accepted = retained = readback_error = None
+        raise RuntimeError(f"{name}: invalid native bore radius")
+    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = manager.AddToDB
+    if type(previous) is not bool:
+        raise RuntimeError(f"{name}: native AddToDB state unavailable")
+    model.ClearSelection2(True)
     try:
-        accepted = manager.SetSelectionPoint2(2, -1, coordinates[0], coordinates[1], coordinates[2])
-        raw_pick = manager.GetSelectionPointInSketchSpace2(2, -1)
-        if raw_pick is None:
-            raise RuntimeError("native sketch-space selection point unavailable")
-        retained = tuple(float(value) for value in raw_pick)
-    except Exception as exc:
-        readback_error = exc
-    _telemetry.info(
-        f"clamp native rim selection: sketch={rim!r}, model={coordinates!r}, accepted={accepted!r}, retained_sketch={retained!r}, readback_error={readback_error!r}",
-        operation_stage="bore-rim.selection-point-readback",
-        rim_sketch_m=rim,
-        requested_model_m=coordinates,
-        selection_point_accepted=accepted,
-        retained_sketch_m=retained,
-        selection_point_readback_error=repr(readback_error),
-    )
-    if readback_error is not None:
-        raise RuntimeError("clamp location: native bore-rim selection point readback unavailable") from readback_error
-    if accepted is not True:
-        raise RuntimeError("clamp location: native bore-rim selection point failed")
-    if len(retained) != 3 or any(not math.isfinite(actual) or abs(actual - expected) > 1e-10 for actual, expected in zip(retained, rim, strict=True)):
-        raise RuntimeError("clamp location: native bore-rim selection point was not retained")
+        manager.AddToDB = True  # Coincident nominal tap witnesses must not infer/merge.
+        if manager.AddToDB is not True:
+            raise RuntimeError(f"{name}: native inference isolation failed")
+        _telemetry.info(f"clamp native measurement line request: name={name}, tap={tap!r}", operation_stage=f"{name}.create-line-request", actual_tap_sketch_m=tap)
+        raw = manager.CreateLine(tap[0], float(center.Y), 0.0, float(center.X) + radius, float(center.Y), 0.0)
+        _telemetry.info(f"clamp native measurement line: name={name}, created={raw is not None}", operation_stage=f"{name}.create-line", native_created=raw is not None)
+        if raw is None:
+            raise RuntimeError(f"{name}: native measurement line creation failed")
+    finally:
+        manager.AddToDB = previous
+    if manager.AddToDB is not previous:
+        raise RuntimeError(f"{name}: native inference state was not restored")
+    line = _early_bound(raw, "ISketchSegment")
+    line.ConstructionGeometry = True
+    straight = _early_bound(line, "ISketchLine")
+    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
+    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
+    relations = _early_bound(sketch.RelationManager, "ISketchRelationManager")
+    for kind, points, segment in ((4, (), line), (26, (start, point), None), (25, (end, center), None), (9, (end,), circle)):
+        entities = [*points, *(() if segment is None else (segment,))]
+        _telemetry.info(f"clamp native constraint request: name={name}, kind={kind}", operation_stage=f"{name}.add-relation-request", relation_kind=kind)
+        relation = relations.AddRelation(dispatch_array(entities), kind)
+        _telemetry.info(f"clamp native constraint creation: name={name}, kind={kind}, created={relation is not None}", operation_stage=f"{name}.add-relation", relation_kind=kind, native_created=relation is not None)
+        if relation is None:
+            raise RuntimeError(f"{name}: native constraint {kind} creation failed")
+        _require_witness_relation(adapter, (relation,), kind, points, segment, stage=f"{name}.created-constraint")
+    _assert_relative_witness(adapter, line, point, circle, stage=f"{name}.before-dimension")
+    return line
 
 
-def _assert_relative_attachment(adapter: Any, display: Any, point: Any, circle: Any, *, name: str, stage: str) -> None:
-    """Verify actual part-sketch attachments before and after the final rebuild."""
+def _assert_relative_attachment(adapter: Any, display: Any, point: Any, circle: Any, *, name: str, stage: str) -> tuple[Any, ...]:
+    """Recover the unique measured line from real endpoint attachments, then prove its sources."""
     import _telemetry
 
     attached = types = ()
-    dangling = point_code = point_self = actual_key = expected_key = None
-    readback_error = None
+    dangling = None
+    matches, error = [], None
     try:
-        display = _early_bound(display, "IDisplayDimension")
-        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        native_display = _early_bound(display, "IDisplayDimension")
+        annotation = _early_bound(native_display.GetAnnotation(), "IAnnotation")
         attached = tuple(annotation.GetAttachedEntities3() or ())
-        types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+        types = tuple(annotation.GetAttachedEntityTypes() or ())
         dangling = annotation.IsDangling()
-        point_indices = tuple(index for index, kind in enumerate(types) if kind in _SKETCH_POINT_SELECTION_TYPES)
-        if len(attached) != 2 or len(types) != 2 or len(point_indices) != 1 or types.count(10) != 1 or dangling is not False or any(entity is None for entity in attached):
-            raise RuntimeError("invalid native point/circle attachments")
+        if len(attached) != 2 or len(types) != 2 or any(type(kind) is not int or kind not in _SKETCH_POINT_SELECTION_TYPES for kind in types) or any(value is None for value in attached) or dangling is not False:
+            raise RuntimeError("invalid native measurement endpoint attachments")
+        native_circle = _early_bound(circle, "ISketchSegment")
+        sketch = _early_bound(native_circle.GetSketch(), "ISketch")
         application = _early_bound(adapter.swApp, "ISldWorks")
-        point_self = application.IsSame(point, point)
-        point_code = application.IsSame(attached[point_indices[0]], point)
-        expected_key = _segment_identity(adapter, circle, stage=stage, role="expected-attachment")
-        actual_key = _segment_identity(adapter, attached[types.index(10)], stage=stage, role="actual-attachment")
-        if type(point_self) is not int or point_self != 1 or type(point_code) is not int or point_code != 1 or actual_key != expected_key:
-            raise RuntimeError("native attachment identity differs")
+        for raw in sketch.GetSketchSegments() or ():
+            segment = _early_bound(raw, "ISketchSegment")
+            if segment.GetType() != 0:
+                continue
+            line = _early_bound(segment, "ISketchLine")
+            endpoints = (line.GetStartPoint2(), line.GetEndPoint2())
+            codes = tuple(tuple(application.IsSame(actual, expected) for expected in endpoints) for actual in attached)
+            if codes not in (((1, 0), (0, 1)), ((0, 1), (1, 0))) or any(type(code) is not int for row in codes for code in row):
+                continue
+            _assert_relative_witness(adapter, segment, point, circle, stage=stage)
+            matches.append(_segment_identity(adapter, segment, stage=stage, role="attached-measurement-line"))
+        if len(matches) != 1:
+            raise RuntimeError("native attachments do not identify exactly one constrained measurement line")
     except Exception as exc:
-        readback_error = exc
-    detail = f"stage={stage}, count={len(attached)}, types={types}, dangling={dangling!r}, point_IsSame={point_code!r}, point_self={point_self!r}, segment={actual_key!r}, expected_segment={expected_key!r}, readback_error={readback_error!r}"
+        error = exc
     _telemetry.info(
-        f"clamp native attachment: {detail}",
-        operation_stage=stage,
-        attachment_count=len(attached),
-        attached_types=types,
-        dangling=dangling,
-        point_identity_code=point_code,
-        point_self_identity_code=point_self,
-        attached_segment_identity=repr(actual_key),
-        expected_segment_identity=repr(expected_key),
-        attachment_readback_error=repr(readback_error),
+        f"clamp native attachment: stage={stage}, types={types!r}, dangling={dangling!r}, lines={matches!r}, error={error!r}",
+        operation_stage=stage, attachment_count=len(attached), attached_types=types,
+        dangling=dangling, attached_line_identities=repr(matches), attachment_readback_error=repr(error),
     )
-    if readback_error is not None:
-        raise RuntimeError(f"{name}: {readback_error}; {detail}") from readback_error
+    if error is not None:
+        raise RuntimeError(f"{name}: {error}") from error
+    return matches[0]
 
 
 def _measure_relative_axis(adapter: Any, point: Any, circle: Any, name: str) -> None:
-    """Actual Wizard point to actual bore rim, transverse on the Right plane."""
+    """Ordinary native point-pair dimension on a source-constrained measuring line."""
+    import _telemetry
+
+    line = _create_relative_witness(adapter, point, circle, name)
+    straight = _early_bound(line, "ISketchLine")
+    start = _early_bound(straight.GetStartPoint2(), "ISketchPoint")
+    end = _early_bound(straight.GetEndPoint2(), "ISketchPoint")
+    segment = _early_bound(line, "ISketchSegment")
+    sketch = _early_bound(segment.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    # On this Right plane (0, y, 0) is the SAME text point in sketch and model
+    # frames. Do not infer the constructor's frame from a selection-point API.
+    text = (0.0, float(end.Y) + 0.01, 0.0)
+    model_text = _transform_location(adapter, text, transform.Inverse())
+    if any(abs(actual - wanted) > 1e-10 for actual, wanted in zip(model_text, text, strict=True)):
+        raise RuntimeError(f"{name}: text placement is not common to model and Right sketch frames")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     model.ClearSelection2(True)
-    _native_select(adapter, point, "ISketchPoint", append=False)
-    _native_select(adapter, circle, "ISketchSegment", append=True)
-    _require_location_selection(adapter, circle, point=point, stage=f"{name}.point-circle.after-select")
-    _select_bore_rim(adapter, circle)
-    raw = model.AddHorizontalDimension2(0.0, 0.02, 0.02)
+    _native_select(adapter, start, "ISketchPoint", append=False)
+    _native_select(adapter, end, "ISketchPoint", append=True)
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    count, readback_error = None, None
+    types, selected, codes = (), (), ()
+    try:
+        count = manager.GetSelectedObjectCount2(-1)
+        indices = range(1, min(count, 2) + 1) if type(count) is int and count >= 0 else ()
+        types = tuple(manager.GetSelectedObjectType3(index, -1) for index in indices)
+        selected = tuple(manager.GetSelectedObject6(index, -1) for index in indices)
+        codes = tuple(None if actual is None else application.IsSame(actual, expected) for actual, expected in zip(selected, (start, end)))
+    except Exception as exc:
+        readback_error = exc
+    detail = f"stage={name}.point-pair-selection, count={count!r}, types={types!r}, present={tuple(value is not None for value in selected)!r}, identities={codes!r}, error={readback_error!r}"
+    _telemetry.info(f"clamp native local endpoint selection: {detail}", operation_stage=f"{name}.point-pair-selection", selection_count=count, selected_types=types, selected_objects_present=tuple(value is not None for value in selected), selected_identity_codes=codes, selection_readback_error=repr(readback_error))
+    if readback_error is not None or type(count) is not int or count != 2 or types != (11, 11) or len(codes) != 2 or any(type(code) is not int or code != 1 for code in codes):
+        raise RuntimeError(f"{name}: actual local measurement endpoints were not selected: {detail}") from readback_error
+    _telemetry.info(f"clamp native point-pair request: name={name}, text={text!r}, model_text={model_text!r}", operation_stage=f"{name}.point-pair-request", text_sketch_m=text, text_model_m=model_text)
+    raw = model.AddHorizontalDimension2(*text)
+    _telemetry.info(f"clamp native point-pair constructor: name={name}, count={count!r}, types={types!r}, identities={codes!r}, text={text!r}, model_text={model_text!r}, created={raw is not None}", operation_stage=f"{name}.point-pair-constructor", selection_count=count, selected_types=types, selected_identity_codes=codes, text_sketch_m=text, text_model_m=model_text, native_created=raw is not None)
     model.ClearSelection2(True)
     if raw is None:
-        raise RuntimeError(f"{name}: native tap-point to bore-rim dimension failed")
+        raise RuntimeError(f"{name}: native local point-pair dimension failed")
     display = _early_bound(raw, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     dimension.DrivenState = 1
     dimension.Name = name
     display.ShowParenthesis = False
-    circular = [index for index in (1, 2) if int(dimension.GetArcEndCondition(index)) != 0]
-    if len(circular) != 1:
-        raise RuntimeError(f"{name}: relative location does not have one actual circular endpoint")
-    endpoint = circular[0]
-    if int(dimension.SetArcEndCondition(endpoint, 2)) != 0 or int(dimension.GetArcEndCondition(endpoint)) != 2:
-        raise RuntimeError(f"{name}: native near bore-rim endpoint was not retained")
     model.GraphicsRedraw2()
     if int(dimension.DrivenState) != 1 or str(dimension.Name) != name or bool(display.ShowParenthesis):
         raise RuntimeError(f"{name}: measured relative-axis ownership/ink was not retained")
     _assert_relative_attachment(adapter, display, point, circle, name=name, stage=f"{name}.after-create")
     if not math.isclose(float(dimension.SystemValue) * 1000.0, BORE_R, abs_tol=1e-5):
-        raise RuntimeError(f"{name}: native attached point/circle dimension does not measure the bore radius")
+        raise RuntimeError(f"{name}: native attached endpoint dimension does not measure the bore radius")
 
 
 async def _location_profiles(adapter: Any) -> None:
@@ -599,7 +748,8 @@ def _assert_location_profiles(adapter: Any) -> None:
         native_feature = _early_bound(part.FeatureByName(feature), "IFeature")
         sketch = _early_bound(native_feature.GetSpecificFeature2(), "ISketch")
         segments = tuple(sketch.GetSketchSegments() or ())
-        if len(segments) != len(flats) + 1 or sketch.GetConstrainedStatus() != 3:
+        extra = len(_tap_placement_points(adapter)) if feature == "LeverBoreLocationProfile" else 0
+        if len(segments) != len(flats) + 1 + extra or sketch.GetConstrainedStatus() != 3:
             raise RuntimeError(f"{feature}: native linked witness changed after rebuild")
         for source in (source_circle, *(edge for _name, edge in flats)):
             if sum(_has_conversion_source(adapter, segment, source) for segment in segments) != 1:
@@ -613,18 +763,20 @@ def _assert_location_profiles(adapter: Any) -> None:
             radius = float(_early_bound(circle, "ISketchArc").GetRadius()) * 1000.0
             if HEX_AF / 2.0 - radius < WALL_TARGET:
                 raise RuntimeError("LeverBore: actual model has no room for its finished wall requirement")
+            measured_lines = set()
             for name, point in _tap_placement_points(adapter).items():
                 display, dimension = _named_dimension(adapter, feature, name)
                 if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
                     raise RuntimeError(f"{name}: native relative-axis measurement changed")
-                _assert_relative_attachment(adapter, display, point, circle, name=name, stage=f"{name}.after-rebuild")
+                key = _assert_relative_attachment(adapter, display, point, circle, name=name, stage=f"{name}.after-rebuild")
+                if key in measured_lines:
+                    raise RuntimeError(f"{name}: distinct tap witnesses merged into one native line")
+                measured_lines.add(key)
                 if not math.isclose(float(dimension.SystemValue) * 1000.0, radius, abs_tol=1e-5):
                     raise RuntimeError(f"{name}: attached relative-axis measurement changed")
                 tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
                 if int(tolerance.Type) != 2 or not math.isclose(float(tolerance.GetMinValue()) * 1000.0, -RELATIVE_AXIS_BAND, abs_tol=1e-9) or not math.isclose(float(tolerance.GetMaxValue()) * 1000.0, RELATIVE_AXIS_BAND, abs_tol=1e-9):
                     raise RuntimeError(f"{name}: native relative-axis acceptance band changed")
-                if sorted(int(dimension.GetArcEndCondition(index)) for index in (1, 2)) != [0, 2]:
-                    raise RuntimeError(f"{name}: native rim endpoint changed")
 
 
 async def build(adapter) -> dict[str, str]:

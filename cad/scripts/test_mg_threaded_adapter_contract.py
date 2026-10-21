@@ -166,18 +166,23 @@ def test_clamp_location_native_calls_and_projection_properties_match_pinned_type
     for interface, property_name in (
         ("ISketch", "ModelToSketchTransform"),
         ("ISketchPoint", "X"),
+        ("ISketchPoint", "Z"),
+        ("ISketch", "RelationManager"),
+        ("ISketchManager", "AddToDB"),
+        ("ISketchSegment", "ConstructionGeometry"),
+        ("ISketchRelation", "Suppressed"),
         ("ISketchPoint", "Y"),
         ("IMathPoint", "ArrayData"),
         ("IFeature", "Name"),
     ):
         _methods, maps = _native_declaration(interface)
         assert property_name in maps["_prop_map_get_"]
-    rim = next(node for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
-    assert _can_bind(rim, _native_declaration("ISelectionMgr")[0]["SetSelectionPoint2"])
+    creation = next(node for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "CreateLine")
+    assert _can_bind(creation, _native_declaration("ISketchManager")[0]["CreateLine"])
     mutated = copy.deepcopy(tree)
-    rim = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "SetSelectionPoint2")
-    rim.func.attr = "SetSelectionPoint"
-    assert "ISelectionMgr.SetSelectionPoint arguments" in _undeclared_bound_calls(mutated)
+    creation = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "CreateLine")
+    creation.args.append(ast.Constant(0.0))
+    assert "ISketchManager.CreateLine arguments" in _undeclared_bound_calls(mutated)
     mutated = copy.deepcopy(tree)
     identifier = next(node for node in ast.walk(mutated) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "GetID")
     identifier.args.append(ast.Constant(0))
@@ -215,8 +220,6 @@ def _native_return_type(method):
     ("ISelectionMgr", "GetSelectedObjectCount2", 3),
     ("ISelectionMgr", "GetSelectedObject6", 9),
     ("ISelectionMgr", "GetSelectedObjectType3", 3),
-    ("ISelectionMgr", "SetSelectionPoint2", 11),
-    ("ISelectionMgr", "GetSelectionPointInSketchSpace2", 12),
     ("ISketchArc", "GetCenterPoint2", 9),
     ("ISketchArc", "GetRadius", 5),
     ("IMathTransform", "Inverse", 9),
@@ -234,8 +237,6 @@ def _native_return_type(method):
     ("IAnnotation", "GetAttachedEntities3", 12),
     ("IAnnotation", "GetAttachedEntityTypes", 12),
     ("IAnnotation", "IsDangling", 11),
-    ("IDimension", "GetArcEndCondition", 3),
-    ("IDimension", "SetArcEndCondition", 3),
 ))
 def test_clamp_native_methods_have_declared_result_shapes_not_adapter_contracts(interface, member, retval) -> None:
     methods, maps = _native_declaration(interface)
@@ -281,6 +282,16 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
 
 
 @pytest.mark.parametrize("interface, member, arity, retval", (
+    ("ISketchManager", "CreateLine", 6, 9),
+    ("ISketchRelationManager", "AddRelation", 2, 9),
+    ("ISketchRelation", "GetRelationType", 0, 3),
+    ("ISketchRelation", "GetDefinitionEntities2", 0, 12),
+    ("ISketchSegment", "GetRelations", 0, 12),
+    ("ISketchPoint", "GetRelations", 0, 12),
+    ("ISketchPoint", "GetSketch", 0, 9),
+    ("ISketchLine", "GetStartPoint2", 0, 9),
+    ("ISketchLine", "GetEndPoint2", 0, 9),
+    ("IDisplayDimension", "GetAnnotation", 0, 9),
     ("IView", "GetOutline", 0, 12),
     ("IView", "GetNotes", 0, 12),
     ("IView", "GetAnnotationsByType", 1, 12),
@@ -289,7 +300,7 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("INote", "GetAnnotation", 0, 9),
     ("IAnnotation", "GetPosition", 0, 12),
 ))
-def test_bracket_layout_native_method_contracts(interface, member, arity, retval) -> None:
+def test_witness_and_bracket_native_method_contracts(interface, member, arity, retval) -> None:
     methods, maps = _native_declaration(interface)
     assert member in methods
     assert all(member not in values for values in maps.values())
@@ -310,6 +321,16 @@ def test_bracket_layout_native_method_contracts(interface, member, arity, retval
     ("INote", "PropertyLinkedText"),
 ))
 def test_bracket_layout_native_properties_are_not_methods(interface, member) -> None:
+    methods, maps = _native_declaration(interface)
+    assert member not in methods
+    assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
+
+
+@pytest.mark.parametrize("interface, member", (
+    ("ISketchManager", "AddToDB"),
+    ("ISketchSegment", "ConstructionGeometry"),
+))
+def test_witness_native_mutators_are_declared_read_write_properties(interface, member) -> None:
     methods, maps = _native_declaration(interface)
     assert member not in methods
     assert member in maps["_prop_map_get_"] & maps["_prop_map_put_"]
