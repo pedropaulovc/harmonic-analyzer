@@ -1062,8 +1062,11 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
 
 
 def test_the_steps_and_checks_fit_their_column() -> None:
-    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
-        assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
+    for block, width in (
+        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
+        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_LINE_WIDTH),
+    ):
+        assert max(len(line) for line in block.splitlines()) <= width
     steps_bottom = drawing.STEPS_XY[1] - len(
         drawing.ASSEMBLY_STEPS.splitlines()
     ) * drawing.NOTE_LINE_PITCH
@@ -1085,29 +1088,38 @@ def test_the_steps_and_checks_fit_their_column() -> None:
             assert number in drawing.ASSEMBLY_STEPS
 
 
-def test_wire_check_rewrap_clears_r21_panel_without_moving_neighbour_rows(
+def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
     monkeypatch,
 ) -> None:
-    # Native R21 PDF, sheet 4, run 20261021T101437536Z-89db3ab3:
-    # CenturyGothic 13.2286 pt. Glyph advances below are measured PDF char
-    # boxes, not a copy of the wrapping implementation or a post-fix render.
-    # The original first row ends at x=637.604 pt; the panel starts at
-    # x=612.002258 pt and y=607.371826 pt, cutting that row's y600.216..618.300.
+    from _drawing_annotation_extent import boxes_clear
+    from _drawing_layout_check import DrawableRegion
+
+    # Native R22 PDF/layout JSON, run 20261021T114849219Z-97170adcbc744b108a6c2f7a37ddaba5.
+    # The actual five-row note extent overlaps the panel even though each
+    # printed row clears it. Keep this aggregate-box positive control:
+    # acceptance requires the WHOLE note box clear, not a per-row exception.
+    native_extent = (0.0176475, 0.0572536, 0.2187594, 0.0801289)
+    assert not boxes_clear(native_extent, drawing.TITLE_BLOCK, gap=0.0)
+    # A left shift for the existing layout pad would breach the left border.
+    required_shift = native_extent[2] - drawing.TITLE_BLOCK[0] + drawing._PAD
+    assert native_extent[0] - required_shift < drawing.INNER_BORDER[0]
+    # CenturyGothic 13.2286 pt, advances measured from R22 PDF char boxes.
+    # Predict the extent delta using the same native font, not source-copy
+    # wrapping code or a claim that the candidate has already rendered.
     advances = {
-        " ": 3.664459, "'": 2.619370, ",": 3.664474, ".": 3.664459,
-        "1": 7.328949, ":": 3.664391, "A": 9.789551, "B": 7.593353,
-        "C": 10.755066, "D": 9.842468, "E": 7.090820, "F": 6.416138,
-        "G": 11.535583, "H": 9.035492, "I": 2.989777, "K": 7.818237,
-        "L": 6.111862, "M": 12.157562, "N": 9.789551, "O": 11.496124,
-        "P": 7.831635, "R": 8.030090, "S": 6.588104, "T": 5.635620,
-        "U": 8.665070, "V": 9.286850, "W": 12.699966, "Y": 7.831650,
+        " ": 3.664551, "'": 2.619415, ",": 3.664536, ".": 3.664551,
+        "1": 7.329041, ":": 3.664330, "A": 9.789703, "B": 7.593231,
+        "C": 10.754883, "D": 9.842621, "E": 7.090942, "F": 6.416260,
+        "G": 11.535988, "H": 9.035645, "I": 2.989807, "K": 7.818115,
+        "L": 6.111954, "M": 12.157776, "N": 9.789703, "O": 11.496277,
+        "P": 7.831787, "R": 8.030212, "S": 6.588226, "T": 5.635681,
+        "U": 8.665222, "V": 9.287003, "W": 12.700165, "X": 8.056381,
+        "Y": 7.831787,
     }
-    old_wire_rows = drawing._wrapped(
-        notes.ASSEMBLY_CHECKS[-1:], width=drawing.STEPS_LINE_WIDTH
-    ).splitlines()
-    preceding_rows = drawing._wrapped(
-        notes.ASSEMBLY_CHECKS[:-1], width=drawing.STEPS_LINE_WIDTH
-    ).splitlines()
+    old_rows = [
+        *drawing._wrapped(notes.ASSEMBLY_CHECKS[:-1], width=80).splitlines(),
+        *drawing._wrapped(notes.ASSEMBLY_CHECKS[-1:], width=72).splitlines(),
+    ]
     adapter = object()
     calls = []
     monkeypatch.setattr(
@@ -1130,12 +1142,15 @@ def test_wire_check_rewrap_clears_r21_panel_without_moving_neighbour_rows(
         ("note", adapter, *drawing.CHECKS_XY),
     ]
     printed_rows = note.GetText().splitlines()
-    assert printed_rows[:len(preceding_rows)] == preceding_rows
-    wire_rows = printed_rows[len(preceding_rows):]
-    assert " ".join(wire_rows).split() == notes.ASSEMBLY_CHECKS[-1].split()
-    # Same two rows, same insertion point: no encroachment on the steps
-    # above, sheet border below, or finished-view/balloon field to the right.
-    assert len(wire_rows) == len(old_wire_rows) == 2
+    assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
+    assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
+    # Keep all five rows (one/two/two per check), the same insertion point,
+    # and the original steps column. No new pressure above or below the note.
+    assert len(printed_rows) == len(old_rows) == 5
+    assert [i for i, row in enumerate(printed_rows) if row.startswith("CHECK:")] == [0, 1, 3]
+    assert drawing.ASSEMBLY_STEPS == drawing._wrapped(
+        notes.ASSEMBLY_STEPS, width=80, heading="ASSEMBLY SEQUENCE"
+    )
     assert drawing.CHECKS_XY == (
         drawing.STEPS_XY[0],
         drawing.STEPS_XY[1]
@@ -1143,13 +1158,18 @@ def test_wire_check_rewrap_clears_r21_panel_without_moving_neighbour_rows(
         - 2 * drawing._PAD,
     )
     points_per_m = 72 / 0.0254
-    native_left = 51.023
-    native_panel_left = 612.002258
-    old_right = native_left + max(sum(advances[c] for c in row) for row in old_wire_rows)
-    new_right = native_left + max(sum(advances[c] for c in row) for row in wire_rows)
-    assert old_right > native_panel_left  # positive control: the actual defect
-    assert new_right + drawing._PAD * points_per_m < native_panel_left
-    assert new_right / points_per_m < drawing.FINISHED_FIELD[0]
+    old_width = max(sum(advances[c] for c in row) for row in old_rows)
+    new_width = max(sum(advances[c] for c in row) for row in printed_rows)
+    predicted_extent = (
+        native_extent[0], native_extent[1],
+        native_extent[2] + (new_width - old_width) / points_per_m,
+        native_extent[3],
+    )
+    drawing.require_inside(
+        "assembly checks", predicted_extent, DrawableRegion(*drawing.INNER_BORDER)
+    )
+    assert boxes_clear(predicted_extent, drawing.TITLE_BLOCK, gap=drawing._PAD)
+    assert predicted_extent[2] + drawing._PAD < drawing.FINISHED_FIELD[0]
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:

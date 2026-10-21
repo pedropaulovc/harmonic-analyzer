@@ -1231,7 +1231,7 @@ block, not just the numeric value, clear of the border, section markers and
 neighbouring dimensions. Preserve every qualifier word, value, band and
 attachment; final PNG inspection remains required even after audit success.
 
-R21 still passed the native audit with the upper 6.35 extension line touching
+R21 export completed with the upper 6.35 extension line touching
 the left stroke of the upper A cutting-plane label. Clearance above an arrow
 does not prove clearance from its label: inspect the actual glyph ink against
 the dimension's complete extension segments as well.
@@ -1262,11 +1262,15 @@ Check dimension-line/centre-mark crossings as actual segments: horizontal and
 vertical marks have zero-area bounding boxes, which area-overlap helpers can
 correctly ignore even when the native ink crosses.
 
-The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel
-despite native audit success. Wrap that CHECK separately from the other checks,
-preserving every word, its row count and the note insertion point. Use the
-actual native text-run widths and panel bounds, then inspect the rebuilt
-whole sheet; a character-count limit alone is not a physical clearance proof.
+The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel.
+R22 wrapping of only that CHECK cleared the actual glyphs but left a gating
+keep-out for the aggregate note rectangle, whose width came from a preceding
+row. Keep the entire measured CHECK block outside the panel: reflow the widest
+row as well, preserving every word, native font, total row count and insertion
+point. Check both the complete note extent and individual text-run ink against
+the panel, border, preceding steps and finished view in the rebuilt whole
+sheet. A character-count limit alone is not a physical clearance proof; do
+not weaken the audit or exempt this note.
 
 For a long native mounting-hole callout, the existing process-prefix trailing
 newline puts the associative quantity/diameter/extent on its own row; do not
