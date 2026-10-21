@@ -77,7 +77,8 @@ class Span:
         self.telemetry.hit(self.name + ".enter")
         return self
 
-    def __exit__(self, *_):
+    def __exit__(self, exc_type, error, original_tb):
+        self.telemetry.exit_errors.append((self.name, exc_type, error, original_tb))
         self.telemetry.hit(self.name + ".exit")
         return False
 
@@ -92,6 +93,7 @@ class Telemetry:
     def __init__(self):
         self.failures = {}
         self.events = []
+        self.exit_errors = []
         self.render_exception = False
 
     def hit(self, name):
@@ -437,6 +439,29 @@ class OwnedControlSmoke(unittest.TestCase):
             phases = [phase for phase, _, _ in failures]
             for phase in ("attach.span.exit", "disconnect", "watchdog.stop", "runner.observer", "build_session", "telemetry.shutdown"):
                 self.assertIn(phase, phases)
+
+    def test_actual_phase_error_reaches_its_span_and_root_context(self):
+        for phase in ("attach", "disconnect", "body"):
+            with self.subTest(phase=phase), Environment().installed() as env:
+                primary = ProbeError(phase)
+                if phase == "attach":
+                    env.app.attach_error = primary
+                elif phase == "disconnect":
+                    env.adapter.disconnect_error = primary
+                failures = []
+
+                async def body(_adapter):
+                    if phase == "body":
+                        trip(primary)
+
+                self.assertEqual(env.helper.run_owned_diagnostic(body, failures=failures), 1)
+                self.assertIs(failures[0][1], primary)
+                self.assertEqual(failures[0][0], phase)
+                exits = {name: (kind, error, original_tb) for name, kind, error, original_tb in env.telemetry.exit_errors}
+                self.assertIs(exits["build"][1], primary)
+                self.assertIs(exits["sw.attach"][1], primary if phase == "attach" else None)
+                self.assertIs(exits["sw.disconnect"][1], primary if phase == "disconnect" else None)
+                self.assertTrue(any(frame.f_code is trip.__code__ for frame, _ in traceback.walk_tb(failures[0][2])))
 
     def test_connected_body_raises_same_exception_after_failed_disconnect_observer(self):
         with Environment().installed() as env:

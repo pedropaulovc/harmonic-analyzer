@@ -85,9 +85,13 @@ async def connected_probe(adapter, callback, *, failures=None):
                         failures.append(("attach.observer", error, error.__traceback__))
             if entered:
                 try:
-                    # The original cause is already retained; do not give an
-                    # observer the opportunity to suppress or replace it.
-                    await span.__aexit__(None, None, None)
+                    # The cause is retained independently; ignore suppression,
+                    # but let telemetry record the actual failed phase.
+                    if len(failures) != first:
+                        _, error, original_tb = failures[first]
+                        await span.__aexit__(type(error), error, original_tb)
+                    else:
+                        await span.__aexit__(None, None, None)
                 except BaseException as error:
                     failures.append(("attach.span.exit", error, error.__traceback__))
             if len(failures) == first:
@@ -96,6 +100,7 @@ async def connected_probe(adapter, callback, *, failures=None):
                 except BaseException as error:
                     failures.append(("body", error, error.__traceback__))
     finally:
+        disconnect_first = len(failures)
         span = None
         entered = False
         try:
@@ -111,7 +116,11 @@ async def connected_probe(adapter, callback, *, failures=None):
             failures.append(("disconnect", error, error.__traceback__))
         if entered:
             try:
-                await span.__aexit__(None, None, None)
+                if len(failures) != disconnect_first:
+                    _, error, original_tb = failures[disconnect_first]
+                    await span.__aexit__(type(error), error, original_tb)
+                else:
+                    await span.__aexit__(None, None, None)
             except BaseException as error:
                 failures.append(("disconnect.span.exit", error, error.__traceback__))
         try:
@@ -160,9 +169,13 @@ def run_owned_diagnostic(callback, *, failures=None):
                         )
                 except BaseException as error:
                     failures.append(("runner.observer", error, error.__traceback__))
+                if len(failures) != first:
+                    _, error, original_tb = failures[first]
+                    raise error.with_traceback(original_tb)
         except BaseException as error:
             # Body failures were caught BEFORE leaving the context manager.
-            failures.append(("build_session", error, error.__traceback__))
+            if not any(saved is error for _, saved, _ in failures[first:]):
+                failures.append(("build_session", error, error.__traceback__))
     finally:
         try:
             _telemetry.shutdown()
