@@ -2038,6 +2038,147 @@ def test_cone_topology_timings_preserve_results_and_partial_failure(
         assert span.attributes["definition_state_s"] == 1.0
 
 
+@pytest.mark.parametrize(
+    "outcome",
+    ["scaled", "unscaled", "false_create", "bind_error", "scale_error", "invalid_scale"],
+)
+def test_place_view_observation_preserves_native_behavior(capture, monkeypatch, outcome):
+    from solidworks_mcp.adapters.solidworks import drawing
+    from solidworks_mcp.adapters.solidworks.drawing import place_view as imported_alias
+
+    spans, _ = capture
+    calls = []
+    raw_view = object()
+    failure = OSError("native port failed")
+
+    class View:
+        @property
+        def ScaleRatio(self):
+            raise AssertionError("placement must not read the scale back")
+
+        @ScaleRatio.setter
+        def ScaleRatio(self, value):
+            calls.append(("scale", value))
+            if outcome == "scale_error":
+                raise failure
+
+    bound_view = View()
+
+    class Document:
+        def CreateDrawViewFromModelView3(self, *args):
+            calls.append(("create", args))
+            return None if outcome == "false_create" else raw_view
+
+    document = Document()
+
+    def ddoc(adapter):
+        calls.append(("ddoc",))
+        return document
+
+    def bind(view, interface):
+        calls.append(("bind", view, interface))
+        if outcome == "bind_error":
+            raise failure
+        return bound_view
+
+    def doubles(values):
+        calls.append(("double_array", values))
+        return tuple(values)
+
+    class Adapter:
+        def _attempt(self, operation, default=None):
+            try:
+                return operation()
+            except Exception:
+                return default
+
+    monkeypatch.setattr(drawing, "_ddoc", ddoc)
+    monkeypatch.setattr(drawing._sw_type_info, "early_bound_or_flag", bind)
+    monkeypatch.setattr(drawing, "double_array", doubles)
+    monkeypatch.setattr(drawing, "_place_view_context", None)
+    adapter = Adapter()
+    scale = None if outcome == "unscaled" else (1, 2)
+    if outcome == "invalid_scale":
+        scale = ()  # Existing _attempt must still swallow the indexing failure.
+
+    def place():
+        return imported_alias(
+            adapter, "C:/models/part.SLDPRT", "*Front", 0.1, 0.2, scale=scale
+        )
+
+    expected_create = [
+        ("ddoc",),
+        ("create", ("C:/models/part.SLDPRT", "*Front", 0.1, 0.2, 0.0)),
+    ]
+    expected = expected_create.copy()
+    if outcome != "false_create":
+        expected.append(("bind", raw_view, "IView"))
+    if outcome in {"scaled", "scale_error"}:
+        expected.extend([("double_array", [1.0, 2.0]), ("scale", (1.0, 2.0))])
+
+    def invoke():
+        if outcome == "false_create":
+            with pytest.raises(RuntimeError) as raised:
+                place()
+            assert str(raised.value) == (
+                "CreateDrawViewFromModelView3 failed for '*Front' "
+                "(model='C:/models/part.SLDPRT')"
+            )
+        elif outcome == "bind_error":
+            with pytest.raises(OSError) as raised:
+                place()
+            assert raised.value is failure
+        else:
+            assert place() is bound_view
+        assert calls == expected
+        calls.clear()
+
+    # The same pre-imported alias behaves identically before/after installation.
+    invoke()
+    assert spans.get_finished_spans() == ()
+    _telemetry._instrument_loaded_adapter()
+    assert calls == [], "registration must not touch native ports"
+    with _telemetry.span("drawing.build"):
+        invoke()
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    parent = finished["drawing.place_view"]
+    assert parent.parent.span_id == finished["drawing.build"].context.span_id
+    assert parent.attributes["source_file"] == "part.SLDPRT"
+    assert parent.attributes["orientation"] == "*Front"
+    assert parent.attributes["scale_requested"] is (scale is not None)
+    phases = ["create"]
+    if outcome != "false_create":
+        phases.append("bind")
+    if outcome not in {"unscaled", "false_create", "bind_error"}:
+        phases.append("scale")
+    assert {name for name in finished if name.startswith("drawing.place_view.")} == {
+        f"drawing.place_view.{phase}" for phase in phases
+    }
+    for phase in phases:
+        child = finished[f"drawing.place_view.{phase}"]
+        assert child.parent.span_id == parent.context.span_id
+    failed_phase = {"false_create": "create", "bind_error": "bind"}.get(outcome)
+    assert parent.status.status_code.name == ("ERROR" if failed_phase else "OK")
+    if failed_phase:
+        failed = finished[f"drawing.place_view.{failed_phase}"]
+        assert failed.status.status_code.name == "ERROR"
+        assert failed.attributes["error.type"] == (
+            "RuntimeError" if outcome == "false_create" else "OSError"
+        )
+        assert failed.attributes["error.message"] == parent.attributes["error.message"]
+    if "scale" in phases:
+        attempted = finished["drawing.place_view.scale"]
+        assert attempted.status.status_code.name == "OK"
+        assert attempted.attributes["phase_kind"] == "native_scale_attempt"
+    count = len(spans.get_finished_spans())
+    drawing.set_place_view_context(None)
+    invoke()
+    assert len(spans.get_finished_spans()) == count
+    _telemetry._instrument_loaded_adapter()
+    invoke()
+    assert len(spans.get_finished_spans()) > count
+
+
 def test_build_session_instruments_only_an_already_loaded_adapter(capture, monkeypatch):
     """``run_build`` imports the adapter before it opens the session; a process
     that never did must not be made to import the COM stack."""
@@ -2045,6 +2186,7 @@ def test_build_session_instruments_only_an_already_loaded_adapter(capture, monke
     monkeypatch.delitem(sys.modules, _telemetry._ADAPTER_MODULE, raising=False)
     monkeypatch.delitem(sys.modules, _telemetry._INSERT_COMPONENT_MODULE, raising=False)
     monkeypatch.delitem(sys.modules, _telemetry._FEATURES_MODULE, raising=False)
+    monkeypatch.delitem(sys.modules, _telemetry._DRAWING_MODULE, raising=False)
     original_import = builtins.__import__
     attempted_sdk_imports = []
 

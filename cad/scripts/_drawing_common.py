@@ -844,157 +844,165 @@ async def finalize_drawing(
     saved: a readback taken when an annotation was placed says nothing
     about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
     """
-    drawing_model = adapter.currentModel
-    ddoc = _early_bound(
-        drawing_model, "IDrawingDoc"
-    )  # IDrawingDoc view for drawing-only methods (same dispatch)
-    drawing_model.ClearSelection2(True)
-    # The sheet's own build identifier (title block "BUILD $PRP:{BUILD_ID}"):
-    # a DRAWING-document property, not a $PRPSHEET link, so it names the build
-    # that made this sheet even when the part it shows is older.
-    apply_custom_properties(
-        adapter, {DRAWING_BUILD_ID_PROPERTY: _build_id()}, model=drawing_model
-    )
-    sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
-    if not sheet_names:
-        raise RuntimeError("finished drawing has no sheets")
-    if expected_sheet_names is not None and sheet_names != expected_sheet_names:
-        raise RuntimeError(
-            f"drawing sheet contract mismatch: {sheet_names!r} != "
-            f"{expected_sheet_names!r}"
+    with _telemetry.span(
+        "drawing.finalize.setup", phase_kind="mixed_com_validation"
+    ):
+        drawing_model = adapter.currentModel
+        ddoc = _early_bound(
+            drawing_model, "IDrawingDoc"
+        )  # IDrawingDoc view for drawing-only methods (same dispatch)
+        drawing_model.ClearSelection2(True)
+        # The sheet's own build identifier (title block "BUILD $PRP:{BUILD_ID}"):
+        # a DRAWING-document property, not a $PRPSHEET link, so it names the build
+        # that made this sheet even when the part it shows is older.
+        apply_custom_properties(
+            adapter, {DRAWING_BUILD_ID_PROPERTY: _build_id()}, model=drawing_model
         )
-    if sheet_layouts is None:
-        resolved_layouts = {name: layout for name in sheet_names}
-    else:
-        if set(sheet_layouts) != set(sheet_names):
-            missing = sorted(set(sheet_names) - set(sheet_layouts))
-            unknown = sorted(set(sheet_layouts) - set(sheet_names))
+        sheet_names = tuple(adapter._get_attr_or_call(ddoc, "GetSheetNames") or ())
+        if not sheet_names:
+            raise RuntimeError("finished drawing has no sheets")
+        if expected_sheet_names is not None and sheet_names != expected_sheet_names:
+            raise RuntimeError(
+                f"drawing sheet contract mismatch: {sheet_names!r} != "
+                f"{expected_sheet_names!r}"
+            )
+        if sheet_layouts is None:
+            resolved_layouts = {name: layout for name in sheet_names}
+        else:
+            if set(sheet_layouts) != set(sheet_names):
+                missing = sorted(set(sheet_names) - set(sheet_layouts))
+                unknown = sorted(set(sheet_layouts) - set(sheet_names))
+                raise ValueError(
+                    f"sheet layout mapping must cover every sheet exactly; "
+                    f"missing={missing!r}, unknown={unknown!r}"
+                )
+            if any(
+                not isinstance(sheet_layout, DrawingLayout)
+                for sheet_layout in sheet_layouts.values()
+            ):
+                raise TypeError("every sheet layout must be a DrawingLayout")
+            resolved_layouts = dict(sheet_layouts)
+        if sheet_scales is not None and set(sheet_scales) != set(sheet_names):
+            missing = sorted(set(sheet_names) - set(sheet_scales))
+            unknown = sorted(set(sheet_scales) - set(sheet_names))
             raise ValueError(
-                f"sheet layout mapping must cover every sheet exactly; "
+                f"sheet scale mapping must cover every sheet exactly; "
                 f"missing={missing!r}, unknown={unknown!r}"
             )
-        if any(
-            not isinstance(sheet_layout, DrawingLayout)
-            for sheet_layout in sheet_layouts.values()
-        ):
-            raise TypeError("every sheet layout must be a DrawingLayout")
-        resolved_layouts = dict(sheet_layouts)
-    if sheet_scales is not None and set(sheet_scales) != set(sheet_names):
-        missing = sorted(set(sheet_names) - set(sheet_scales))
-        unknown = sorted(set(sheet_scales) - set(sheet_names))
-        raise ValueError(
-            f"sheet scale mapping must cover every sheet exactly; "
-            f"missing={missing!r}, unknown={unknown!r}"
-        )
 
     # Every sheet owns its own $PRPSHEET link. Point each at that sheet's first
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
-    for sheet_name in sheet_names:
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
-        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-        if sheet is None:
-            raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
-        sheet_scale = scale if sheet_scales is None else sheet_scales[sheet_name]
-        # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
-        # the 1:1 the template pinned (each view still carries its own explicit
-        # scale), so re-pin it once here before asserting the contract.
-        if not sheet.SetScale(
-            float(sheet_scale[0]), float(sheet_scale[1]), False, False
-        ):
-            raise RuntimeError(
-                f"failed to set final drawing sheet {sheet_name!r} scale"
-            )
-        assert_asme_b_sheet(
-            adapter,
-            sheet,
-            layout=resolved_layouts[sheet_name],
-            phase=f"before save {sheet_name}",
-            scale=sheet_scale,
-        )
-        properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
-        if len(properties) < 8:
-            raise RuntimeError(
-                f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
-            )
-        if bool(properties[7]):
-            # PasteSheet preserves the source sheet's "same as sheet specified
-            # in Document Properties" flag. In that mode SolidWorks silently
-            # ignores a per-sheet CustomPropertyView assignment and returns the
-            # literal UI label instead of a view name. Clear the mode through
-            # the current ISheet API while preserving every other property.
-            sheet.SetProperties2(
-                int(properties[0]),
-                int(properties[1]),
-                float(properties[2]),
-                float(properties[3]),
-                bool(properties[4]),
-                float(properties[5]),
-                float(properties[6]),
-                False,
-            )
+    with _telemetry.span(
+        "drawing.finalize.sheet_properties",
+        sheet_count=len(sheet_names),
+        phase_kind="mixed_com_validation",
+    ):
+        for sheet_name in sheet_names:
+            if not ddoc.ActivateSheet(sheet_name):
+                raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
             sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-            properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
-            if len(properties) < 8 or bool(properties[7]):
+            if sheet is None:
+                raise RuntimeError(f"drawing sheet {sheet_name!r} has no ISheet")
+            sheet_scale = scale if sheet_scales is None else sheet_scales[sheet_name]
+            # Inserting a model view lets SolidWorks auto-drift the SHEET scale off
+            # the 1:1 the template pinned (each view still carries its own explicit
+            # scale), so re-pin it once here before asserting the contract.
+            if not sheet.SetScale(
+                float(sheet_scale[0]), float(sheet_scale[1]), False, False
+            ):
                 raise RuntimeError(
-                    f"failed to enable explicit property source on {sheet_name!r}"
+                    f"failed to set final drawing sheet {sheet_name!r} scale"
                 )
             assert_asme_b_sheet(
                 adapter,
                 sheet,
                 layout=resolved_layouts[sheet_name],
-                phase=f"explicit property source {sheet_name}",
+                phase=f"before save {sheet_name}",
                 scale=sheet_scale,
             )
-        views = tuple(iter_views(adapter))
-        first_view = views[0] if views else None
-        if first_view is None:
-            raise RuntimeError(
-                f"drawing sheet {sheet_name!r} has no view for property links"
+            properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+            if len(properties) < 8:
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} has incomplete properties: {properties!r}"
+                )
+            if bool(properties[7]):
+                # PasteSheet preserves the source sheet's "same as sheet specified
+                # in Document Properties" flag. In that mode SolidWorks silently
+                # ignores a per-sheet CustomPropertyView assignment and returns the
+                # literal UI label instead of a view name. Clear the mode through
+                # the current ISheet API while preserving every other property.
+                sheet.SetProperties2(
+                    int(properties[0]),
+                    int(properties[1]),
+                    float(properties[2]),
+                    float(properties[3]),
+                    bool(properties[4]),
+                    float(properties[5]),
+                    float(properties[6]),
+                    False,
+                )
+                sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+                properties = list(adapter._get_attr_or_call(sheet, "GetProperties2") or [])
+                if len(properties) < 8 or bool(properties[7]):
+                    raise RuntimeError(
+                        f"failed to enable explicit property source on {sheet_name!r}"
+                    )
+                assert_asme_b_sheet(
+                    adapter,
+                    sheet,
+                    layout=resolved_layouts[sheet_name],
+                    phase=f"explicit property source {sheet_name}",
+                    scale=sheet_scale,
+                )
+            views = tuple(iter_views(adapter))
+            first_view = views[0] if views else None
+            if first_view is None:
+                raise RuntimeError(
+                    f"drawing sheet {sheet_name!r} has no view for property links"
+                )
+            for view in views:
+                orientation = str(
+                    adapter._get_attr_or_call(view, "GetOrientationName") or ""
+                )
+                if not is_pictorial_orientation(orientation):
+                    continue
+                set_high_quality_shaded_with_edges(
+                    adapter,
+                    view,
+                    label=f"{sheet_name} {view_name(adapter, view)!r}",
+                )
+            first_name = view_name(adapter, first_view)
+            sheet.CustomPropertyView = first_name
+            sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
+            linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
+            if linked != first_name:
+                raise RuntimeError(
+                    f"sheet {sheet_name!r} CustomPropertyView did not take: "
+                    f"{linked!r} != {first_name!r}"
+                )
+            linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
+            if linked_model is None:
+                raise RuntimeError(
+                    f"view {first_name!r} has no referenced document to validate"
+                )
+            linked_model = _sw_type_info.early_bound_or_flag(
+                linked_model, "IModelDoc2", "GetCustomInfoValue"
             )
-        for view in views:
-            orientation = str(
-                adapter._get_attr_or_call(view, "GetOrientationName") or ""
+            read_required_properties(
+                linked_model,
+                (
+                    *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                    TITLE_BLOCK_REVISION_PROPERTY,
+                    TITLE_BLOCK_COPYRIGHT_PROPERTY,
+                ),
+                required=(
+                    *TITLE_BLOCK_TOLERANCE_PROPERTIES,
+                    TITLE_BLOCK_REVISION_PROPERTY,
+                    TITLE_BLOCK_COPYRIGHT_PROPERTY,
+                ),
             )
-            if not is_pictorial_orientation(orientation):
-                continue
-            set_high_quality_shaded_with_edges(
-                adapter,
-                view,
-                label=f"{sheet_name} {view_name(adapter, view)!r}",
-            )
-        first_name = view_name(adapter, first_view)
-        sheet.CustomPropertyView = first_name
-        sheet = adapter._get_attr_or_call(ddoc, "GetCurrentSheet")
-        linked = str(adapter._get_attr_or_call(sheet, "CustomPropertyView") or "")
-        if linked != first_name:
-            raise RuntimeError(
-                f"sheet {sheet_name!r} CustomPropertyView did not take: "
-                f"{linked!r} != {first_name!r}"
-            )
-        linked_model = adapter._get_attr_or_call(first_view, "ReferencedDocument")
-        if linked_model is None:
-            raise RuntimeError(
-                f"view {first_name!r} has no referenced document to validate"
-            )
-        linked_model = _sw_type_info.early_bound_or_flag(
-            linked_model, "IModelDoc2", "GetCustomInfoValue"
-        )
-        read_required_properties(
-            linked_model,
-            (
-                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
-                TITLE_BLOCK_REVISION_PROPERTY,
-                TITLE_BLOCK_COPYRIGHT_PROPERTY,
-            ),
-            required=(
-                *TITLE_BLOCK_TOLERANCE_PROPERTIES,
-                TITLE_BLOCK_REVISION_PROPERTY,
-                TITLE_BLOCK_COPYRIGHT_PROPERTY,
-            ),
-        )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With
@@ -1002,23 +1010,32 @@ async def finalize_drawing(
     removed_notes = 0
     # No substrings, no sweep: activating five sheets to match nothing is
     # exactly the cycling a recipe that deletes its own notes is avoiding.
-    for sheet_name in sheet_names if redundant_note_substrings else ():
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(
-                f"failed to activate drawing sheet {sheet_name!r} for note cleanup"
+    with (
+        _telemetry.span(
+            "drawing.finalize.note_cleanup",
+            sheet_count=len(sheet_names),
+            phase_kind="mixed_com_validation",
+        )
+        if redundant_note_substrings
+        else contextlib.nullcontext()
+    ):
+        for sheet_name in sheet_names if redundant_note_substrings else ():
+            if not ddoc.ActivateSheet(sheet_name):
+                raise RuntimeError(
+                    f"failed to activate drawing sheet {sheet_name!r} for note cleanup"
+                )
+            removed_notes += sum(
+                remove_notes_matching(adapter, substring)
+                for substring in redundant_note_substrings
             )
-        removed_notes += sum(
-            remove_notes_matching(adapter, substring)
-            for substring in redundant_note_substrings
-        )
-    if removed_notes != expected_redundant_notes:
-        raise RuntimeError(
-            f"final drawing removed {removed_notes} redundant notes, "
-            f"expected {expected_redundant_notes}: "
-            f"{tuple(redundant_note_substrings)!r}"
-        )
-    if removed_notes:
-        _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
+        if removed_notes != expected_redundant_notes:
+            raise RuntimeError(
+                f"final drawing removed {removed_notes} redundant notes, "
+                f"expected {expected_redundant_notes}: "
+                f"{tuple(redundant_note_substrings)!r}"
+            )
+        if removed_notes:
+            _telemetry.info(f"removed {removed_notes} redundant final drawing notes")
 
     # COM can export before SolidWorks recomputes a changed HLR/HLV view's
     # display geometry: a hidden-lines-visible side view exported as a bare
@@ -1029,10 +1046,15 @@ async def finalize_drawing(
     # views come off each ``ISheet`` by name -- ``ISheet::GetViews`` returns
     # the drawing views alone (unlike ``IDrawingDoc::GetViews``, whose per-sheet
     # rows lead with the sheet's own view) -- so no sheet is activated for this.
-    for sheet_name in sheet_names:
-        sheet = _early_bound(ddoc.Sheet(str(sheet_name)), "ISheet")
-        for raw_view in sheet.GetViews() or ():
-            _early_bound(raw_view, "IView").UpdateViewDisplayGeometry()
+    with _telemetry.span(
+        "drawing.finalize.display_geometry",
+        sheet_count=len(sheet_names),
+        phase_kind="native_update_envelope",
+    ):
+        for sheet_name in sheet_names:
+            sheet = _early_bound(ddoc.Sheet(str(sheet_name)), "ISheet")
+            for raw_view in sheet.GetViews() or ():
+                _early_bound(raw_view, "IView").UpdateViewDisplayGeometry()
 
     if not ddoc.ActivateSheet(sheet_names[0]):
         raise RuntimeError("failed to restore first drawing sheet before export")
@@ -1042,11 +1064,16 @@ async def finalize_drawing(
     # the SLDDRW/PDF that the blind review and the layout audit read.
     rebuild_drawing(adapter, label="finalize_drawing")
     if settled_checks:
-        for settled in settled_checks:
-            settled()
-        # A check may activate the sheet it reads.
-        if not ddoc.ActivateSheet(sheet_names[0]):
-            raise RuntimeError("failed to restore first drawing sheet after the settled checks")
+        with _telemetry.span(
+            "drawing.finalize.settled_checks",
+            check_count=len(settled_checks),
+            phase_kind="mixed_com_validation",
+        ):
+            for settled in settled_checks:
+                settled()
+            # A check may activate the sheet it reads.
+            if not ddoc.ActivateSheet(sheet_names[0]):
+                raise RuntimeError("failed to restore first drawing sheet after the settled checks")
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
@@ -1067,8 +1094,18 @@ async def finalize_drawing(
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
     # The export just computed every view; the precision flag is truthful now.
-    assert_precise_isometric_views(adapter, sheet_names)
-    sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
+    with _telemetry.span(
+        "drawing.finalize.precision_readback",
+        sheet_count=len(sheet_names),
+        phase_kind="mixed_com_validation",
+    ):
+        assert_precise_isometric_views(adapter, sheet_names)
+    with _telemetry.span(
+        "drawing.sanitize_pdf_metadata",
+        expected_pages=len(sheet_names),
+        phase_kind="local_pdf_io",
+    ):
+        sanitize_pdf_metadata(outputs.pdf, title=pdf_title, expected_pages=len(sheet_names))
     render_pdf_png(
         outputs.pdf,
         outputs.png,
@@ -1093,13 +1130,16 @@ async def finalize_drawing(
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the
     # target) then hits "in use by another process".
-    title = str(drawing_model.GetTitle())
-    adapter.swApp.CloseDoc(title)
-    still_open = [
-        p
-        for p in _visible_document_paths(adapter)
-        if Path(p).resolve() == outputs.slddrw.resolve()
-    ]
-    if still_open:
-        raise RuntimeError(f"drawing {title!r} did not close after export")
+    with _telemetry.span(
+        "drawing.finalize.close_verify", phase_kind="native_close_readback"
+    ):
+        title = str(drawing_model.GetTitle())
+        adapter.swApp.CloseDoc(title)
+        still_open = [
+            p
+            for p in _visible_document_paths(adapter)
+            if Path(p).resolve() == outputs.slddrw.resolve()
+        ]
+        if still_open:
+            raise RuntimeError(f"drawing {title!r} did not close after export")
     return artifacts
