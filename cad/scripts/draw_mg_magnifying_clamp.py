@@ -130,7 +130,8 @@ SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
 # Note positions are their text's top-left corners.
 STOCK_NOTE_XY = (0.305, 0.140)
-ISO_NOTE_XY = (0.335, 0.150)
+# Above the iso: R17's real stock-flat leader crosses the lower caption lane.
+ISO_NOTE_XY = (0.335, 0.245)
 SEAT_NOTE_XY = (0.287, 0.116)
 
 _HALF_AF = HEX_AF / 2.0 * _S
