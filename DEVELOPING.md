@@ -882,14 +882,19 @@ process inventories, and real-provider integration:
   stop. An unrelated live process must remain visible to reused-PID coverage.
   Unexpected inventory query shapes are errors, never an empty inventory or a
   fallback to the host provider.
+  `test_owned_process_inventory_rejects_unexpected_queries` and
+  `test_owned_process_inventory_refreshes_job_members_and_liveness` protect that
+  boundary and require fresh native membership/liveness observations.
 - Orphan fixtures record their parent's own PID and wait for an explicit socket
   release; they do not need a CIM lookup or expire during slow test startup.
   Cleanup waits on a handle whose creation time matches the one the spawning
   parent read from its own child handle; only that pinned handle is ever
   terminated, never a PID Windows may have reused.
-- Real-provider process-tree integration remains explicit, including remaining
-  ownership/cancellation integration and some setup. Persistent provider failures
-  remain test failures, not skips or proof that ownership is empty (see
+- `test_real_provider_inventory_attributes_a_fixture_owned_orphan` explicitly
+  exercises the real CIM provider and production orphan attribution. Remaining
+  ownership/cancellation integration and some setup also use real WMI.
+  Persistent provider failures remain test failures, not skips or proof that
+  ownership is empty (see
   [#1617](https://github.com/pedropaulovc/harmonic-analyzer/issues/1617)).
 
 If the final run-record refresh fails, the launcher still writes `.done` with
