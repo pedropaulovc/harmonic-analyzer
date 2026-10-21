@@ -19,9 +19,12 @@ before importing (the ms-measuring-stick ClampedSetting pattern).
 
 Sheet 2, WHEEL GROUP + BOM: the builder-owned MG_MAGNIFIER_EXPLODED
 presentation (mg_magnifier_explode_spec) with only the wheel group shown, the
-BOM (part number, description, vendor SKU, quantity) and one balloon per
-family. Sheet 3, LEVER GROUP: the same explode with only the lever group
-shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
+BOM (part number, description, vendor SKU, quantity) and one native EDGE/Square
+balloon per family, retaining SolidWorks' positions after BOM/owner validation.
+After the final rebuild, every wheel balloon's rendered circle must remain
+wholly in WHEEL_FIELD, clear of the BOM and caption/title-block fields.
+Sheet 3, LEVER GROUP: the same explode with only the lever group shown,
+manually ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
 (mg_magnifier_assembly_steps) and the checks. The instruction column uses
 the left 190 mm; the finished view is centred in the remaining right field.
@@ -54,14 +57,13 @@ import mg_magnifier_assembly_spec as stack
 import mg_magnifier_explode_spec as explode
 import mg_vn_lever_wire_geom
 import mg_vn_lever_wire_spec
-import mg_vn_wheel_axle_front_washer_spec as front_washer
-import mg_vn_wheel_axle_nut_spec as axle_nut
 from _check import check
 from _com import _early_bound
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
+    add_auto_balloons,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -392,8 +394,8 @@ BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items(
 BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
-# One balloon per family (row); each walks its family's lowest-named shown
-# instance for a visible edge, except the two rods.
+# The lever and finished views keep their manual anchors: each walks its
+# family's lowest-named shown instance for a visible edge, except the two rods.
 #
 # MHA-MG-03 is a revolved capsule (a hemispherical dome at each end): no
 # flat face, no end circle. Its only model edges are the two dome-to-cylinder
@@ -425,42 +427,12 @@ BOM_NORMALIZED_ALIASES = {
 #     drawn edge.
 _LEVER_R = LEVER_ROD_DIA / 2.0
 _VROD_R = VROD_DIA / 2.0
-# Machinist review r6 (run 20261016T150215480Z): on the wheel sheet the front
-# washer, nut and locknut explode in a row up and right along the axle, which
-# runs nearly along the rays from the view centre, so walked anchors (washer
-# rim, first nut) left 17's leader through both nuts onto 18's arrowhead.
-# Washer and nuts are Ry(180) in the assembly (local x = -X, y = +Y, z = -Z),
-# so their local z = 0 faces the *Isometric viewer, and a local polar angle
-# phi draws at screen (-cos(phi)/sqrt2, (cos(phi) + 2 sin(phi))/sqrt6): the
-# major-axis ends square to the axle's 30 deg sheet direction are phi 45
-# (up-left) and 225 (down-right). 17 takes the washer rim's up-left end, so its
-# leader passes above the nuts; 18 the locknut's (instance 2, the outermost)
-# down-right flat, clear of everything (the nut's corners sit on its local
-# +-Y meridian, so phi 225 falls on the flat facing 240, at the apothem over
-# cos 15). Ring order then keeps 17 above 18.
-_WASHER_R = front_washer.OD / 2.0
-_NUT_FLAT_R = axle_nut.ACROSS_FLATS / 2.0 / math.cos(math.radians(15.0))
-FRONT_WASHER_BALLOON_POINT_MM = (
-    _WASHER_R * math.cos(math.radians(45.0)),
-    _WASHER_R * math.sin(math.radians(45.0)),
-    0.0,
-)
-LOCKNUT_BALLOON_POINT_MM = (
-    _NUT_FLAT_R * math.cos(math.radians(225.0)),
-    _NUT_FLAT_R * math.sin(math.radians(225.0)),
-    0.0,
-)
-LOCKNUT_INSTANCE = "mg-vn-wheel-axle-nut-2"
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.LEVER_GROUP_STEMS} | {
     "mg-magnifying-lever": BalloonAnchor(
         point_mm=(_LEVER_R, _LEVER_R / math.sqrt(2.0), -_LEVER_R / math.sqrt(2.0))
     ),
     "mg-magnifying-vertical-rod": BalloonAnchor(
         point_mm=(VROD_SHOULDER_X, -_VROD_R, 0.0)
-    ),
-    "mg-vn-wheel-axle-front-washer": BalloonAnchor(point_mm=FRONT_WASHER_BALLOON_POINT_MM),
-    "mg-vn-wheel-axle-nut": BalloonAnchor(
-        point_mm=LOCKNUT_BALLOON_POINT_MM, instance=LOCKNUT_INSTANCE
     ),
     explode.WIRE_STEM: BalloonAnchor(point_mm=WIRE_BALLOON_POINT_MM),
 }
@@ -504,9 +476,12 @@ ASSEMBLY_STEPS = _wrapped(
     notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
+# Source 25539a6ac's native report measured checks at Y62.0..84.4 mm and sequence
+# bottom at Y95.4 mm. Raise only the checks 6 mm: 2 mm above the title
+# block and 5 mm below the sequence, without changing text or line pitch.
 CHECKS_XY = (
     STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
+    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - _PAD / 2,
 )
 if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
     raise AssertionError("the assembly sequence and checks overrun the sheet")
@@ -1092,8 +1067,10 @@ def _fit_ring(
     *,
     label: str,
 ) -> tuple[float, float]:
-    """Scale the view down the ladder until its balloon ring fits ``field``,
-    centre the ring there and prove it inside; return the scale."""
+    """Scale and centre the planned balloon ring in ``field``; return the scale.
+
+    AutoBalloon5's native positions still need the settled rendered-circle check.
+    """
     current = [tuple(float(value) for value in _early_bound(view, "IView").ScaleRatio)]
 
     def outline_at(scale: tuple[float, float]) -> Box:
@@ -1117,6 +1094,35 @@ def _fit_ring(
     ):
         raise RuntimeError(f"{label}: balloon ring {ring!r} leaves its field {field!r}")
     return scale
+
+
+@_telemetry.traced("drawing.mg_wheel_balloon_bounds")
+def _assert_wheel_balloon_bounds(adapter: Any, landings: list[BalloonLanding]) -> None:
+    """Prove native wheel circles stay wholly in WHEEL_FIELD after final rebuild.
+
+    The field reserves the caption/title block below and the BOM to its right.
+    Read the rendered ink, not insertion-time positions or annotation anchors;
+    leave SolidWorks' placement and every native attachment untouched.
+    """
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    for landing in landings:
+        note = _early_bound(landing.note, "INote")
+        item = str(note.GetBomBalloonText(True)).strip()
+        label = f"magnifier {WHEEL_LABEL}: {landing.stem} item {item}"
+        circle = rendered_balloon_circle(note, label=label)
+        x, y, radius = circle
+        bounds = (x - radius, y - radius, x + radius, y + radius)
+        if not (
+            bounds[0] >= WHEEL_FIELD[0]
+            and bounds[1] >= WHEEL_FIELD[1]
+            and bounds[2] <= WHEEL_FIELD[2]
+            and bounds[3] <= WHEEL_FIELD[3]
+        ):
+            raise RuntimeError(
+                f"{label}: rendered circle (x, y, radius)={circle!r}, "
+                f"bounds={bounds!r} leaves WHEEL_FIELD={WHEEL_FIELD!r} "
+                "(sheet metres) after the final rebuild"
+            )
 
 
 def exploded_caption(group: str, scale: tuple[float, float]) -> str:
@@ -1705,17 +1711,20 @@ async def build(adapter: Any) -> dict[str, str]:
     if _bom_items(_early_bound(table, "ITableAnnotation")) != items:
         raise RuntimeError("magnifier BOM items moved when the exploded views were isolated")
 
-    landings = []
-    scales = {}
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    scales = {
+        WHEEL_LABEL: _fit_ring(
+            adapter, wheel, EXPLODED_SCALE_LADDER, WHEEL_FIELD, label=WHEEL_LABEL
+        )
+    }
+    wheel_landings = add_auto_balloons(
+        adapter,
+        wheel,
+        items=balloon_items(items, explode.WHEEL_GROUP_STEMS),
+        label=f"magnifier {WHEEL_LABEL} BOM coverage",
+    )
+    landings = list(wheel_landings)
     for sheet_name, view, ladder, field, stems, label in (
-        (
-            SHEET_NAMES[1],
-            wheel,
-            EXPLODED_SCALE_LADDER,
-            WHEEL_FIELD,
-            explode.WHEEL_GROUP_STEMS,
-            WHEEL_LABEL,
-        ),
         (
             SHEET_NAMES[2],
             lever,
@@ -1801,6 +1810,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             *settled_checks,
             lambda: assert_balloon_landings(adapter, landings),
+            lambda: _assert_wheel_balloon_bounds(adapter, wheel_landings),
         ),
     )
 
