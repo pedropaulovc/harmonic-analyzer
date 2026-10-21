@@ -100,8 +100,8 @@ _CORNER_PER_AF = 1.0 / math.sqrt(3.0)
 
 # swSelectType_e: both return ISketchPoint. A Hole Wizard placement point is
 # external (25) while the separate bore-location witness sketch is active.
-# Type alone is insufficient (25 can also denote an origin); IsSame must still
-# identify the actual expected point. The converted witness segment stays 10.
+# Type alone is insufficient (25 can also denote an origin); _point_identity
+# must prove the actual expected point. The converted witness segment stays 10.
 _SKETCH_POINT_SELECTION_TYPES = (11, 25)  # swSelSKETCHPOINTS, swSelEXTSKETCHPOINTS
 
 # --- Analytic volumes (mm^3) ---------------------------------------------------
