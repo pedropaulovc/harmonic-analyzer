@@ -20,6 +20,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
+from numbers import Real
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -293,12 +294,21 @@ def assert_supplier_view_fits(
     adapter: Any, view: Any, cell: tuple[float, float, float, float], *, label: str
 ) -> None:
     """Read settled native view/dimension/note ink inside its outer cell."""
-    from _layout_audit import display_box
-
     view = _early_bound(view, "IView")
     outline = _box(view.GetOutline(), label=label)
     if not _inside(outline, cell):
         raise RuntimeError(f"{label}: settled supplier view leaves its cell: {outline!r}")
+    assert_supplier_annotations_fit(adapter, view, cell, label=label)
+
+
+@_telemetry.traced("drawing.supplier_annotations_cell", label_param="label")
+def assert_supplier_annotations_fit(
+    adapter: Any, view: Any, cell: tuple[float, float, float, float], *, label: str
+) -> None:
+    """Read settled native dimension/note ink independently of the view outline."""
+    from _layout_audit import display_box
+
+    view = _early_bound(view, "IView")
     display = view.GetFirstDisplayDimension6()
     while display is not None:
         display = _early_bound(display, "IDisplayDimension")
@@ -393,11 +403,40 @@ def _assert_supplier_layout(
             raise RuntimeError(f"{label}: settled caption/footer changed owner/text/space: {text!r}")
 
 
-def _fit_group(draw: Any, members: list[tuple[Any, tuple]]) -> tuple[int, int]:
-    """The largest standard scale at which every member's outline fits its cell.
+def _custom_fit_bounds(raw: Any, *, label: str) -> tuple[float, ...]:
+    """Fail closed on custom geometry while allowing a one-dimensional extent."""
+    try:
+        values = tuple(raw)
+    except TypeError as exc:
+        raise RuntimeError(f"{label}: invalid custom geometry bounds: {raw!r}") from exc
+    if len(values) != 4 or any(
+        not isinstance(value, Real) or isinstance(value, bool) for value in values
+    ):
+        raise RuntimeError(f"{label}: invalid custom geometry bounds: {raw!r}")
+    bounds = tuple(float(value) for value in values)
+    if (
+        not all(map(math.isfinite, bounds))
+        or bounds[0] > bounds[2]
+        or bounds[1] > bounds[3]
+        or (bounds[0] == bounds[2] and bounds[1] == bounds[3])
+    ):
+        raise RuntimeError(f"{label}: invalid custom geometry bounds: {raw!r}")
+    return bounds
+
+
+def _fit_group(
+    draw: Any,
+    members: list[tuple[Any, tuple]],
+    *,
+    read_bounds: Callable[[Any, str], tuple[float, float, float, float]] | None = None,
+) -> tuple[int, int]:
+    """The largest standard scale at which every member's bounds fit its cell.
 
     Native outlines include fixed sheet-space padding, so scaling a 1:1 outline
     can reject a larger view that actually fits; measure each standard scale.
+    A custom bounds reader requires current, refreshed native geometry and must
+    return four finite numeric coordinates, ordered with at least one positive
+    extent; a one-dimensional extent is allowed.
     """
     for scale in _SCALES:
         with _telemetry.span(
@@ -408,7 +447,10 @@ def _fit_group(draw: Any, members: list[tuple[Any, tuple]]) -> tuple[int, int]:
                 view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
             _rebuild(draw, phase="apply view scale")
             bounds = [
-                _box(view.GetOutline(), label=name) for view, (name, _, _) in members
+                _box(view.GetOutline(), label=name)
+                if read_bounds is None
+                else _custom_fit_bounds(read_bounds(view, name), label=name)
+                for view, (name, _, _) in members
             ]
             if any(
                 box[2] - box[0] > cell[2] - cell[0]
@@ -422,7 +464,7 @@ def _fit_group(draw: Any, members: list[tuple[Any, tuple]]) -> tuple[int, int]:
                     raise RuntimeError(
                         f"{name}: invalid native view position {position!r}"
                     )
-                # Center the actual outline, not a presumed model-origin/axis.
+                # Center the actual bounds, not a presumed model-origin/axis.
                 target = [
                     position[0] + center[0] - (box[0] + box[2]) / 2,
                     position[1] + center[1] - (box[1] + box[3]) / 2,
@@ -440,7 +482,11 @@ def _fit_group(draw: Any, members: list[tuple[Any, tuple]]) -> tuple[int, int]:
                     raise RuntimeError(
                         f"{name}: independent view scale did not persist: {ratio!r}"
                     )
-                box = _box(view.GetOutline(), label=name)
+                box = (
+                    _box(view.GetOutline(), label=name)
+                    if read_bounds is None
+                    else _custom_fit_bounds(read_bounds(view, name), label=name)
+                )
                 if (
                     abs((box[0] + box[2]) / 2 - center[0]) > 1e-6
                     or abs((box[1] + box[3]) / 2 - center[1]) > 1e-6

@@ -753,6 +753,122 @@ def test_configured_sheet_refuses_projection_or_native_view_inventory_drift(
     assert not state.finalized
 
 
+@pytest.mark.parametrize(
+    "outline", [(0.0, 0.0, 1.0), (0.0, 0.0, float("nan"), 1.0), (0.0, 0.0, 1.0, 0.0)]
+)
+def test_fit_group_default_rejects_malformed_native_outline(monkeypatch, outline):
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    with pytest.raises(RuntimeError, match="native extent"):
+        purchased._fit_group(_Drawing(), members)
+
+
+class _BoundsView:
+    def __init__(self):
+        self.Position = (0.2, 0.3)
+        self.moves = []
+
+    def GetOutline(self):
+        raise AssertionError("custom bounds must not read GetOutline")
+
+    def SetViewPosition(self, position, _update):
+        self.Position = tuple(position)
+        self.moves.append(self.Position)
+        return True
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        pytest.param((0.0, 0.0, 1.0), id="short"),
+        pytest.param((0.0, 0.0, 1.0, 1.0, 2.0), id="long"),
+        pytest.param((0.0, 0.0, float("nan"), 1.0), id="nan"),
+        pytest.param((0.0, 0.0, 1.0, float("inf")), id="infinity"),
+        pytest.param((1.0, 0.0, 0.0, 1.0), id="inverted-x"),
+        pytest.param((0.0, 1.0, 1.0, 0.0), id="inverted-y"),
+        pytest.param((0.5, 0.5, 0.5, 0.5), id="point-only"),
+        pytest.param((0.0, 0.0, "1.0", 1.0), id="nonnumeric"),
+    ],
+)
+@pytest.mark.parametrize("after_center", [False, True], ids=["candidate", "settled"])
+def test_fit_group_rejects_malformed_custom_bounds_without_outline_fallback(
+    monkeypatch, bounds, after_center
+):
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    view = _BoundsView()
+    reads = []
+
+    def read_bounds(actual_view, name):
+        assert actual_view is view
+        assert name == "*Front"
+        reads.append(view.Position)
+        if after_center and not view.moves:
+            x, y = view.Position
+            return (x, y, x + 0.1, y)
+        return bounds
+
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    with pytest.raises(RuntimeError, match=r"\*Front: invalid custom geometry bounds"):
+        purchased._fit_group(_Drawing(), members, read_bounds=read_bounds)
+    # The candidate must be validated before any positioning. Invalid settled
+    # geometry must stop immediately, without another move or scale attempt.
+    assert len(view.moves) == int(after_center)
+    assert len(reads) == 1 + int(after_center)
+
+
+@pytest.mark.parametrize("height", [0.0, 0.1])
+def test_fit_group_custom_bounds_measures_candidates_and_centered_view(monkeypatch, height):
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    view = _BoundsView()
+    reads = []
+    rebuilds = []
+    draw = SimpleNamespace(EditRebuild3=lambda: rebuilds.append(True) or True)
+
+    def read_bounds(actual_view, name):
+        assert actual_view is view
+        assert name == "*Front"
+        reads.append((view.ScaleRatio, view.Position, len(rebuilds)))
+        ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+        x, y = view.Position
+        # Bounds are offset from the view origin, including for a 1D extent.
+        return (x + 0.1, y + 0.05, x + 0.1 + 0.2 * ratio, y + 0.05 + height * ratio)
+
+    # Give the 5:1 width (1.0) real clearance; its translated left edge can
+    # round just below zero. The 8:1 width (1.6) must still exceed this cell.
+    members = [(view, ("*Front", (0.5, 0.5), (-0.05, 0.0, 1.05, 1.0)))]
+    assert purchased._fit_group(draw, members, read_bounds=read_bounds) == (5, 1)
+    assert [ratio for ratio, _, _ in reads] == [(8.0, 1.0), (5.0, 1.0), (5.0, 1.0)]
+    assert [rebuild for _, _, rebuild in reads] == [1, 2, 3]
+    assert reads[0][1] == reads[1][1] == (0.2, 0.3)
+    assert len(view.moves) == 1
+    assert reads[2][1] == view.moves[0]
+    assert view.Position == pytest.approx((-0.1, 0.45 - 2.5 * height))
+
+
+def test_fit_group_custom_bounds_post_center_error_propagates(monkeypatch):
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    view = _BoundsView()
+    error = RuntimeError("settled construction bounds unavailable")
+    reads = []
+
+    def read_bounds(actual_view, name):
+        assert actual_view is view
+        assert name == "*Front"
+        reads.append(view.Position)
+        if view.moves:
+            raise error
+        x, y = view.Position
+        return (x, y, x + 0.1, y)
+
+    members = [(view, ("*Front", (0.5, 0.5), (0.0, 0.0, 1.0, 1.0)))]
+    with pytest.raises(RuntimeError, match="settled construction bounds unavailable") as caught:
+        purchased._fit_group(_Drawing(), members, read_bounds=read_bounds)
+    assert caught.value is error
+    assert len(reads) == 2
+    assert len(view.moves) == 1
+
+
 def test_scale_fitting_does_not_scale_fixed_native_padding(monkeypatch, tmp_path):
     """A fitting 2:1 view must not be rejected by scaling its fixed sheet padding."""
 
@@ -5479,7 +5595,30 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
 
 
 @pytest.mark.parametrize(
-    "drift", ("missing", "duplicate", "unknown", "view-owner", "feature-membership", "model-dimension", "attachment-owner", "configuration", "orientation"),
+    "drift",
+    (
+        "missing",
+        "duplicate",
+        "unknown",
+        "view-owner",
+        "feature-membership",
+        "model-dimension",
+        "attachment-owner",
+        "point-fallback",
+        "duplicate-member",
+        "mapped-count",
+        "mapped-missing",
+        "mapped-error",
+        "mapped-null",
+        "member-self",
+        "target-self",
+        "ambiguous-member",
+        "unsupported-comparison",
+        "census-error",
+        "capture-error",
+        "configuration",
+        "orientation",
+    ),
 )
 def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_drift(monkeypatch, drift):
     import _supplier_screw_dimensions as screws
@@ -5489,13 +5628,35 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     monkeypatch.setattr(screws, "_binding", lambda _adapter, view: view.binding)
     monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(screws, "iter_views", lambda adapter: adapter.views)
-    attachment_sketch_wrapper = object()
+    captures = []
+
+    def capture(_adapter, _label, _message, **context):
+        captures.append(context)
+        assert context["sheet_png"] is True
+        if drift == "capture-error":
+            raise OSError("forensic destination unavailable")
+        raise context["exception"]
+
+    monkeypatch.setattr(screws._seat_forensics, "capture_com_failure", capture)
+    attachment_sketch_wrapper = SimpleNamespace(
+        GetSketchPoints2=lambda: drawing_points,
+        GetSketchSegments=lambda: (),
+    )
+    # A drawing's own sketch is not proof of mapped source-sketch membership.
+    view_sketch = SimpleNamespace(
+        GetSketchPoints2=lambda: local_view_points,
+        GetSketchSegments=lambda: (),
+    )
     source_sketch = SimpleNamespace(
         GetSketchPoints2=lambda: source_points,
         GetSketchSegments=lambda: (),
     )
     raw_source_display = object()
-    source_display = SimpleNamespace(GetDimension2=lambda _index: case.native)
+    source_annotation = object()
+    source_display = SimpleNamespace(
+        GetDimension2=lambda _index: case.native,
+        GetAnnotation=lambda: source_annotation,
+    )
     source_feature = SimpleNamespace(
         Name="SupplierReference",
         GetTypeName2=lambda: "ProfileFeature",
@@ -5513,15 +5674,39 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         return bind(raw, interface)
 
     monkeypatch.setattr(screws, "_bind", bind_source_display)
-    # Sketch wrapper equality is not the source-entity membership proof.
+    # Source and drawing instances differ; only native view correspondence joins them.
     source_points = (
-        SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
-        SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
+        SimpleNamespace(GetSketch=lambda: source_sketch),
+        SimpleNamespace(GetSketch=lambda: source_sketch),
     )
-    case.annotation.entities = source_points
+    drawing_points = (
+        SimpleNamespace(
+            GetSketch=lambda: attachment_sketch_wrapper,
+            native_identity=object(),
+        ),
+        SimpleNamespace(
+            GetSketch=lambda: attachment_sketch_wrapper,
+            native_identity=object(),
+        ),
+    )
+    # Separate COM wrappers can identify the same native drawing-context point.
+    attachment_points = tuple(
+        SimpleNamespace(
+            GetSketch=lambda: attachment_sketch_wrapper,
+            native_identity=point.native_identity,
+        )
+        for point in drawing_points
+    )
+    local_view_points = tuple(
+        SimpleNamespace(GetSketch=lambda: view_sketch) for _ in range(2)
+    )
+    case.annotation.entities = attachment_points
     model = SimpleNamespace(
         Parameter=lambda _name: case.native,
         FeatureByName=lambda _name: source_feature,
+        Extension=SimpleNamespace(
+            GetCorresponding2=lambda obj: reverse_map.get(id(obj)),
+        ),
     )
     # Native can return a distinct IFeature wrapper for this exact model dimension.
     owner_wrapper = SimpleNamespace(
@@ -5532,10 +5717,27 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     case.view.binding = (case.view.name, "stock.SLDPRT", "Default")
     case.view.ReferencedDocument = model
     case.view.GetOrientationName = lambda: "*Front"
+    correspondence = (
+        (source_feature, owner_wrapper),
+        (source_sketch, attachment_sketch_wrapper),
+        (source_annotation, case.annotation),
+    )
+    forward_map = {id(source): mapped for source, mapped in correspondence}
+    reverse_map = {id(mapped): source for source, mapped in correspondence}
+    # Individual point conversion is deliberately unsupported by this fixture.
+    # The one supported source-sketch conversion must prove native membership.
+    case.view.GetCorresponding = lambda obj: forward_map.get(id(obj))
+    case.view.GetSketch = lambda: view_sketch
     annotations = [case.annotation]
     case.view.GetAnnotations = lambda: annotations
     adapter = SimpleNamespace(
-        views=[case.view], swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+        views=[case.view],
+        swApp=SimpleNamespace(
+            IsSame=lambda left, right: int(
+                getattr(left, "native_identity", left)
+                is getattr(right, "native_identity", right)
+            )
+        ),
     )
     settings = dict(
         dimensions=(("Length", 11.1125, "horizontal"),),
@@ -5547,6 +5749,7 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         precision=3, expected_mm=11.1125, configuration="Default",
     )
     assert set(screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)) == {"Length"}
+    original_census_error = None
     if drift == "missing":
         annotations.clear()
     elif drift == "duplicate":
@@ -5561,18 +5764,210 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         source_display.GetDimension2 = lambda _index: different_dimension
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
-    elif drift == "attachment-owner":
+    elif drift in {"attachment-owner", "capture-error"}:
         # A different native point cannot borrow the same claimed sketch owner.
         case.annotation.entities = (
             SimpleNamespace(GetSketch=lambda: attachment_sketch_wrapper),
-            source_points[1],
+            attachment_points[1],
         )
+    elif drift == "duplicate-member":
+        case.annotation.entities = (attachment_points[0],) * 2
+    elif drift == "mapped-count":
+        attachment_sketch_wrapper.GetSketchPoints2 = lambda: drawing_points[1:]
+    elif drift == "point-fallback":
+        # Equal counts and working point conversions cannot replace sketch membership.
+        foreign_mapped_points = tuple(
+            SimpleNamespace(
+                GetSketch=lambda: attachment_sketch_wrapper,
+                native_identity=object(),
+            )
+            for _ in range(2)
+        )
+        attachment_sketch_wrapper.GetSketchPoints2 = lambda: foreign_mapped_points
+        forward_map.update(
+            (id(source), mapped)
+            for source, mapped in zip(source_points, drawing_points, strict=True)
+        )
+        reverse_map.update(
+            (id(mapped), source)
+            for source, mapped in zip(source_points, drawing_points, strict=True)
+        )
+        reverse_map.update(
+            (id(point), source)
+            for source, point in zip(source_points, attachment_points, strict=True)
+        )
+    elif drift == "mapped-missing":
+        forward_map.pop(id(source_sketch))
+    elif drift == "mapped-error":
+        def unreadable_inventory():
+            raise RuntimeError("mapped sketch inventory unreadable")
+
+        attachment_sketch_wrapper.GetSketchPoints2 = unreadable_inventory
+    elif drift == "mapped-null":
+        attachment_sketch_wrapper.GetSketchPoints2 = lambda: (None, drawing_points[1])
+    elif drift in {
+        "unsupported-comparison",
+        "member-self",
+        "target-self",
+        "ambiguous-member",
+    }:
+        original_comparison = adapter.swApp.IsSame
+
+        def comparison(left, right):
+            if (
+                drift == "unsupported-comparison"
+                and left is attachment_points[0]
+                and right is drawing_points[1]
+            ):
+                return 2  # swObjectUnsupported cannot prove a negative.
+            if drift == "member-self" and left is right is drawing_points[0]:
+                return 2
+            if drift == "target-self" and left is right is attachment_points[0]:
+                return 2
+            if (
+                drift == "ambiguous-member"
+                and left is attachment_points[0]
+                and right is drawing_points[1]
+            ):
+                return 1
+            return original_comparison(left, right)
+
+        adapter.swApp.IsSame = comparison
+    elif drift == "census-error":
+        original_census_error = RuntimeError("supplier correspondence census failed")
+
+        def refuse(*_args, **_kwargs):
+            raise original_census_error
+
+        monkeypatch.setattr(screws, "_attachment_correspondence", refuse)
     elif drift == "configuration":
         case.view.binding = (case.view.name, "stock.SLDPRT", "Other")
     else:
         case.view.GetOrientationName = lambda: "*Top"
-    with pytest.raises(RuntimeError, match="supplier"):
+    with pytest.raises(RuntimeError, match="supplier") as caught:
         screws.assert_supplier_screw(adapter, {"*Front": case.view}, **settings)
+    capture_expected = drift in {
+        "attachment-owner",
+        "point-fallback",
+        "duplicate-member",
+        "mapped-count",
+        "mapped-missing",
+        "mapped-error",
+        "mapped-null",
+        "member-self",
+        "target-self",
+        "ambiguous-member",
+        "unsupported-comparison",
+        "census-error",
+        "capture-error",
+    }
+    assert len(captures) == int(capture_expected)
+    if captures:
+        assert captures[0]["sheet_png"] is True
+        assert captures[0]["exception"] is caught.value
+        context = captures[0]["attachment_context"]
+        census = context["attachment_correspondence"]
+        if original_census_error is not None:
+            assert caught.value is original_census_error
+            assert census == {}
+            assert context["attachment_error"] == {
+                "error_type": "RuntimeError",
+                "message": str(original_census_error),
+            }
+        else:
+            assert len(census["attachments"]) == 2
+            first, second = census["attachments"]
+            assert first["proven"] is False
+            second_expected = drift not in {
+                "point-fallback",
+                "duplicate-member",
+                "mapped-count",
+                "mapped-missing",
+                "mapped-error",
+                "mapped-null",
+            }
+            assert second["proven"] is second_expected
+            assert first["member_proof"] == "mapped_source_sketch"
+            assert first["model_source_entity_is_same"] == [0, 0]
+            assert first["view_source_entity_is_same"] == (
+                [1, 0] if drift == "point-fallback" else [None, None]
+            )
+            if drift == "point-fallback":
+                assert census["sources"][0]["source_member_count"] == 2
+                assert census["sources"][0]["mapped_sketch_member_count"] == 2
+                assert first["mapped_sketch_entity_is_same"] == [0, 0]
+            if drift == "unsupported-comparison":
+                assert first["negative_controls_proven"] is False
+
+
+@pytest.mark.parametrize("outline_fits", [False, True])
+def test_supplier_view_guard_checks_native_outline_before_annotations(monkeypatch, outline_fits):
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
+    cell = (0.0, 0.0, 1.0, 1.0)
+    view = SimpleNamespace(
+        GetOutline=lambda: (0.1, 0.1, 0.9 if outline_fits else 1.1, 0.9)
+    )
+    calls = []
+    adapter = object()
+    monkeypatch.setattr(
+        purchased, "assert_supplier_annotations_fit",
+        lambda adapter, view, cell, *, label: calls.append((adapter, view, cell, label)),
+    )
+    if outline_fits:
+        purchased.assert_supplier_view_fits(adapter, view, cell, label="supplier")
+        assert calls == [(adapter, view, cell, "supplier")]
+    else:
+        with pytest.raises(RuntimeError, match="settled supplier view leaves its cell"):
+            purchased.assert_supplier_view_fits(adapter, view, cell, label="supplier")
+        assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("drift", "message"),
+    [
+        (None, None),
+        ("missing-dimension", "lost its native dimension"),
+        ("owner", "unsound supplier annotation owner/value"),
+        ("hidden-value", "unsound supplier annotation owner/value"),
+        ("unreadable", "unreadable settled native dimension ink"),
+        ("dimension-outside", "supplier dimension leaves its cell/caption space"),
+        ("note-outside", "supplier note leaves its cell"),
+    ],
+)
+def test_supplier_annotations_guard_validates_native_ink_without_outline(monkeypatch, drift, message):
+    case = _supplier_native(monkeypatch)
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    case.display.GetNext5 = lambda: None
+    case.view.GetFirstDisplayDimension6 = lambda: case.display
+    note = SimpleNamespace(
+        GetExtent=lambda: (0.1, 0.1, 0.0, 1.1 if drift == "note-outside" else 0.9, 0.9, 0.0)
+    )
+    note_annotation = SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda: note)
+    case.view.GetAnnotations = lambda: (case.annotation, note_annotation)
+    # No GetOutline: sketch-only views can have unusable outlines while their
+    # native dimensions and notes must still pass the original containment guard.
+    if drift == "missing-dimension":
+        case.display.GetDimension2 = lambda _index: None
+    elif drift == "owner":
+        case.annotation.Owner = object()
+    elif drift == "hidden-value":
+        case.display.ShowDimensionValue = False
+    geometry = {
+        "texts": [
+            {"t": "(7/16)", "pos": (0.5, 0.5, 0.0), "h": 0.01,
+             "w": 2.0 if drift == "dimension-outside" else 0.1, "ang": 0.0, "ref": 2}
+        ]
+    }
+    monkeypatch.setattr(
+        purchased, "annotation_display",
+        lambda *_args: (geometry, {"refused": True} if drift == "unreadable" else {}),
+    )
+    if message is None:
+        purchased.assert_supplier_annotations_fit(adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier")
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            purchased.assert_supplier_annotations_fit(adapter, case.view, (0.0, 0.0, 1.0, 1.0), label="supplier")
 
 
 def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
