@@ -128,8 +128,13 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
     assert bounds.cap_pocket_margin == pytest.approx(
         (cap.POCKET_DIA + cap.POCKET_BAND[1]) / 2.0 - bounds.cap_lateral_shift - stop_radius
     )
+    center_band = printed_band_mm(cap.CENTER_LOCATION_PLACES)
+    center_offset = max(
+        math.hypot(ax - px, ay - py)
+        for ax, ay, px, py in product((-center_band, center_band), repeat=4)
+    )
     assert bounds.cap_aperture_margin == pytest.approx(
-        stop_radius - bounds.cap_lateral_shift
+        stop_radius - bounds.cap_lateral_shift - center_offset
         - (cap.APERTURE_DIA + retention.CAP_APERTURE_BAND[0]) / 2.0
     )
     assert all(getattr(bounds, field) > 0.0 for field in CONTACT_MARGINS)
@@ -142,7 +147,7 @@ def test_fixed_stop_circle_has_both_flange_faces_and_unbroken_block_floor() -> N
 def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> None:
     bounds = retention.capture_bounds()
     pin_tilt = bounds.flange_tilt + math.atan(
-        pin.FLANGE_PERPENDICULARITY / retention.PIN_FLANGE_SQUARENESS_SPAN
+        retention.PIN_FLANGE_PERPENDICULARITY / retention.PIN_FLANGE_SQUARENESS_SPAN
     )
     expected_tilt = (
         pin_tilt
@@ -151,18 +156,29 @@ def test_pin_aperture_and_cap_remain_clear_at_full_pitch_without_a_skid() -> Non
     )
     assert bounds.carrier_tilt == pytest.approx(expected_tilt)
     boss_radius = (pin.COLLAR_DIA + printed_band_mm(pin.COLLAR_PLACES)) / 2.0
+    cap_height_max = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
+    center_offset = 2.0 * math.sqrt(2.0) * printed_band_mm(cap.CENTER_LOCATION_PLACES)
     assert bounds.pin_aperture_clearance == pytest.approx(
-        cap.APERTURE_DIA / 2.0 - boss_radius - bounds.flange_lateral_shift
-        - cap.HEIGHT * math.tan(pin_tilt) - cap.APERTURE_POSITION_DIAMETER / 2.0
+        cap.APERTURE_DIA / 2.0 - boss_radius / math.cos(pin_tilt)
+        - bounds.flange_lateral_shift - cap_height_max * math.tan(pin_tilt)
+        - center_offset
     )
     seat_min = (
         pin.FLANGE_THICK - printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
         + pin.UPPER_BOSS_HEIGHT - printed_band_mm(retention.PIN_UPPER_BOSS_PLACES)
     )
-    cap_height_max = cap.HEIGHT + printed_band_mm(cap.HEIGHT_PLACES)
-    farthest_corner = max(math.hypot(x, y) for x, y in product(
-        (-cap.WIDTH / 2.0, cap.WIDTH / 2.0), (-cap.LENGTH / 2.0, cap.LENGTH / 2.0)
-    )) + bounds.flange_lateral_shift
+    outline_band = printed_band_mm(cap.OUTLINE_PLACES)
+    center_band = printed_band_mm(cap.CENTER_LOCATION_PLACES)
+    farthest_corner = max(
+        math.hypot(cx - px, cy - py)
+        for width, length, px, py in product(
+            (cap.WIDTH - outline_band, cap.WIDTH + outline_band),
+            (cap.LENGTH - outline_band, cap.LENGTH + outline_band),
+            (cap.WIDTH / 2.0 - center_band, cap.WIDTH / 2.0 + center_band),
+            (cap.LENGTH / 2.0 - center_band, cap.LENGTH / 2.0 + center_band),
+        )
+        for cx, cy in product((0.0, width), (0.0, length))
+    ) + bounds.flange_lateral_shift
     assert bounds.cap_running_clearance == pytest.approx(
         seat_min - cap_height_max - farthest_corner * math.tan(expected_tilt)
     )
@@ -486,26 +502,6 @@ def test_authority_geometry_and_report_are_frozen() -> None:
             setattr(value, attribute, replacement)
 
 
-def test_angular_budget_is_backed_by_both_flange_faces_and_all_four_carrier_axes() -> None:
-    flange_controls = {control.key: control for control in pin.GEOMETRIC_CONTROLS}
-    assert set(flange_controls) == {"flange_lower_square", "flange_upper_square"}
-    for control in flange_controls.values():
-        assert control.characteristic == "perpendicularity"
-        assert float(control.tolerance) == retention.PIN_FLANGE_PERPENDICULARITY
-        assert control.datums == ("A",)
-    assert {control.face.normal for control in flange_controls.values()} == {(0.0, 0.0, -1.0), (0.0, 0.0, 1.0)}
-    carrier_controls = {control.key: control for control in carrier.GEOMETRIC_CONTROLS}
-    assert set(carrier_controls) == {f"pin_hole_{hole.lower()}_perpendicularity" for hole in carrier.PIN_HOLES}
-    assert carrier.PART_DATUMS[0].face.normal == (0.0, -1.0, 0.0)
-    assert carrier.PART_DATUMS[0].face.offset_mm == carrier.THICKNESS
-    for hole, (x, y) in carrier.PIN_HOLES.items():
-        control = carrier_controls[f"pin_hole_{hole.lower()}_perpendicularity"]
-        assert control.characteristic == "perpendicularity"
-        assert float(control.tolerance) == retention.CARRIER_HOLE_PERPENDICULARITY
-        assert control.datums == (carrier.BOTTOM_DATUM,)
-        assert control.tolerance_zone == "diametral"
-        assert (control.face.contains_x_mm, control.face.contains_z_mm) == (x, -y)
-        assert control.face.diameter_mm == carrier.PIN_HOLE_DIA
 
 
 @pytest.mark.parametrize("label,z_min,z_max", (("", 0.0, 5.0), ("  ", 0.0, 5.0), ("invalid", 5.0, 0.0), ("invalid", 0.0, math.inf)))

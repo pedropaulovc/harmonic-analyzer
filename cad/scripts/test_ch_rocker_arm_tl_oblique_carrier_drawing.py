@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import inspect
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import _config
+import _drawing_marks
 import build_ch_rocker_arm_tl_oblique_carrier as part
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 import export_features
@@ -175,12 +180,23 @@ def test_cl_dowel_is_a_press_in_its_finished_hole() -> None:
     assert spec.CL_DOWEL_INTERFERENCE == (0.008, 0.028)
 
 
-def test_planar_selectors_use_offset_along_their_normal() -> None:
-    """PlanarFace.offset_mm is n·p (farm jig-r1): the underside at y = -12
-    seen along -Y sits at +12."""
-    seat = requirements_for(drawing)["pin_collar_seat"].faces[0]
-    assert seat.normal == (0.0, -1.0, 0.0)
-    assert seat.offset_mm == spec.THICKNESS
+def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
+    bottom = requirements_for(drawing)["bottom_face"]
+    (face,) = bottom.faces
+    assert face.normal == (0.0, -1.0, 0.0)
+    assert face.offset_mm == spec.THICKNESS
+    feature = _features()["bottom_face"]
+    assert feature["normal"] == [0.0, -1.0, 0.0]
+    assert feature["plane"] == {
+        "frame": "model",
+        "axis": "y",
+        "value": -spec.THICKNESS,
+    }
+    assert feature["height_nominal"] == spec.THICKNESS
+    assert feature["height"] == [
+        spec.THICKNESS - spec.THICKNESS_BAND,
+        spec.THICKNESS + spec.THICKNESS_BAND,
+    ]
 
 
 def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
@@ -584,123 +600,142 @@ def test_tap_callout_leaders_clear_every_station_text() -> None:
             )
 
 
-def test_bottom_datum_and_four_axis_zones_share_the_retention_authority() -> None:
-    from _gtol_controls import validate_part_pmi
-    from _gtol_cylinder import CylinderFace
-    from _gtol_planar import PlanarFace
-    import ch_rocker_arm_tl_oblique_retention_spec as retention
 
-    validate_part_pmi(spec.PART_DATUMS, spec.GEOMETRIC_CONTROLS)
-    (datum,) = spec.PART_DATUMS
-    assert datum.letter == spec.BOTTOM_DATUM == "A"
-    assert datum.face == PlanarFace((0.0, -1.0, 0.0), spec.THICKNESS)
-    assert datum.annotation_name == "HARMONIC_PMI_datum_A"
-    assert part.PART_DATUMS is spec.PART_DATUMS
-    assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
-    assert spec.CARRIER_HOLE_PERPENDICULARITY == retention.CARRIER_HOLE_PERPENDICULARITY
-    assert len(spec.GEOMETRIC_CONTROLS) == len(spec.PIN_HOLES) == 4
-    for (hole, (x, y)), control in zip(
-        spec.PIN_HOLES.items(), spec.GEOMETRIC_CONTROLS, strict=True
-    ):
-        assert control.key == f"pin_hole_{hole.lower()}_perpendicularity"
-        assert control.annotation_name == f"HARMONIC_PMI_{control.key}"
-        assert control.characteristic == "perpendicularity"
-        assert control.tolerance_zone == "diametral"
-        assert control.tolerance == f"{retention.CARRIER_HOLE_PERPENDICULARITY:.2f}" == "0.02"
-        assert control.datums == ("A",)
-        assert control.projected_zone_height_mm is None
-        assert control.face == CylinderFace(
-            spec.PIN_HOLE_DIA, contains_x_mm=x, contains_z_mm=-y
-        )
-    # Import the functional authority; no same-valued local replacement.
-    tree = ast.parse(Path(spec.__file__).read_text(encoding="utf-8"))
-    imports = [
-        node for node in tree.body
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "ch_rocker_arm_tl_oblique_retention_spec"
-    ]
-    assert any(
-        alias.name == "CARRIER_HOLE_PERPENDICULARITY"
-        for node in imports for alias in node.names
-    )
-    assert "CARRIER_HOLE_PERPENDICULARITY" not in export_features._declarations(spec)
-    source = inspect.getsource(part.build)
-    assert "author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)" in source
-    assert source.index("author_part_pmi(") < source.index("save_part_and_images(")
-
-
-def test_orientation_requirements_link_every_new_spec_declaration() -> None:
-    declarations = requirements_for(drawing)
-    seat = declarations["pin_collar_seat"]
-    assert seat.faces == (spec.PART_DATUMS[0].face,)
-    assert seat.fields["datum"][0] == "A"
-    linked = set(seat.fields["datum"][1])
-    for hole, control in zip(spec.PIN_HOLES, spec.GEOMETRIC_CONTROLS, strict=True):
-        requirement = declarations[f"pin_hole_{hole.lower()}"]
-        assert requirement.faces == (control.face,)
-        assert requirement.fields["perpendicularity_dia"][0] == float(control.tolerance)
-        assert requirement.fields["perpendicularity_datums"][0] == list(control.datums)
-        assert requirement.precision["perpendicularity_dia"] == 2
-        for field in ("perpendicularity_dia", "perpendicularity_datums"):
-            assert field in requirement.requirements
-            linked.update(requirement.fields[field][1])
-        feature = _features()[f"pin_hole_{hole.lower()}"]
-        assert feature["perpendicularity_dia"] == 0.02
-        assert feature["perpendicularity_datums"] == ["A"]
-    assert {"BOTTOM_DATUM", "PART_DATUMS", "GEOMETRIC_CONTROLS"} <= linked
+def test_all_four_bore_axes_own_the_bottom_normal_inspection() -> None:
     assert (
-        "ch_rocker_arm_tl_oblique_retention_spec", "CARRIER_HOLE_PERPENDICULARITY"
-    ) in linked
-
-
-def test_native_projection_routes_every_owned_item_to_its_real_feature(monkeypatch) -> None:
-    top, section, adapter = object(), object(), object()
-    captured = {}
-    selected = {}
-
-    def circle(_adapter, view, diameter, label, *, center_x_mm, center_y_mm):
-        assert view is top and diameter == spec.PIN_HOLE_DIA
-        edge = object()
-        selected[(center_x_mm, center_y_mm)] = edge
-        return edge
-
-    def project(_adapter, **kwargs):
-        assert _adapter is adapter
-        captured.update(kwargs)
-
-    monkeypatch.setattr(drawing, "_circle_edge", circle)
-    monkeypatch.setattr(drawing, "_view_mapper", lambda *_: lambda xyz: (xyz[0], -xyz[2]))
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda *_, **__: (0.139, 0.027))
-    monkeypatch.setattr(drawing, "project_part_pmi", project)
-    monkeypatch.setattr(
-        drawing, "assert_frame_datums_defined",
-        lambda views, **_: captured.update(views=views),
+        spec.PIN_AXIS_DEVIATION_MAX
+        == retention.CARRIER_AXIS_DEVIATION_MAX
+        == 0.05
     )
-    drawing._project_carrier_pmi(adapter, top, section)
-    assert captured["datums"] is spec.PART_DATUMS
-    assert captured["controls"] is spec.GEOMETRIC_CONTROLS
-    assert captured["views"] == (top, section)
-    placements = captured["placements"]
-    assert set(placements) == {"datum:A"} | {c.key for c in spec.GEOMETRIC_CONTROLS}
-    assert placements["datum:A"].view is section
-    assert placements["datum:A"].attachment_xy == (0.139, 0.027)
-    for point, control in zip(spec.PIN_HOLES.values(), spec.GEOMETRIC_CONTROLS, strict=True):
-        assert placements[control.key].view is top
-        assert placements[control.key].edge_entity is selected[point]
-    assert set(drawing.PIN_ORIENTATION_FRAME_MODEL_MM) == set(spec.PIN_HOLES)
-    assert "_project_carrier_pmi(adapter, top, section)" in inspect.getsource(drawing._pin_section)
+    assert (
+        spec.PIN_AXIS_MEASUREMENT_SPAN
+        == retention.CARRIER_AXIS_MEASUREMENT_SPAN
+        == 10.5
+    )
+    bottom = _features()["bottom_face"]
+    assert bottom["normal"] == [0.0, -1.0, 0.0]
+    exported = _features()
+    for key, (x, y) in spec.PIN_HOLES.items():
+        name = f"pin_hole_{key.lower()}"
+        feature = exported[name]
+        assert feature["axis"] == bottom["normal"]
+        assert feature["at"] == [x, 0.0, -y]
+        assert feature["dia"] == [10.0, 10.015]
+        assert feature["thru"] is True
+        assert "note" in feature["requirements"]
+        assert feature["note"] == " ".join(
+            (spec.PIN_HOLE_CALLOUT + "\n" + spec.PIN_AXIS_INSPECTION_NOTE).splitlines()
+        )
+        (face,) = requirements_for(drawing)[name].faces
+        assert face.contains_x_mm == x
+        assert face.contains_z_mm == -y
+    assert spec.PIN_AXIS_MEASUREMENT_SPAN <= retention.CARRIER_ENGAGEMENT_MIN
+    # The normal reference is the same physical underside the two pin collars
+    # seat on; no added support, skid or change to the H7/h6 fit is involved.
+    assert spec.PIN_CLEARANCE_MIN == 0.0
+    assert math.isclose(spec.PIN_CLEARANCE_MAX, 0.024)
 
 
-def test_orientation_control_has_owner_approved_rule_five_exception() -> None:
-    from machinist_exceptions import load_exceptions
+def test_native_part_writes_and_guards_the_axis_inspection_property(monkeypatch) -> None:
+    """Exercise the actual property-write call without executing geometry."""
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    call = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "apply_drawing_properties"
+    )
+    written = {}
+    adapter = object()
 
-    exceptions = {
-        exception.id: exception
-        for exception in load_exceptions(_config.CONFIG_DIR, STEM, "part")
-    }
-    assert exceptions["RV-01"].kind == "minor"
-    exception = exceptions["PV-01"]
-    assert exception.kind == "accept"
-    assert "BOTTOM face datum A" in exception.where
-    assert "actual hole-axis tilt" in exception.reason
-    assert "no added flatness frame" in spec.__doc__
+    def capture(actual_adapter, properties):
+        assert actual_adapter is adapter
+        written.update(properties)
+
+    monkeypatch.setattr(_drawing_marks, "apply_custom_properties", capture)
+    eval(
+        compile(ast.Expression(call), part.__file__, "eval"),
+        vars(part),
+        {"adapter": adapter},
+    )
+    assert written["Pin Axis Inspection"] == spec.PIN_AXIS_INSPECTION_NOTE
+    assert "Pin Axis Inspection" in part._SAVED_DRAWING_PROPERTIES
+
+
+def test_drawing_consumes_the_required_axis_inspection_property(
+    monkeypatch, tmp_path
+) -> None:
+    source = tmp_path / "carrier.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    model = MagicMock()
+    model.Extension.GetUserPreferenceInteger.return_value = 1
+    adapter = SimpleNamespace(currentModel=object(), open_model=AsyncMock())
+    read_properties = Mock()
+    add_note = Mock()
+    monkeypatch.setattr(drawing, "check", lambda _label, result: result)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "read_required_properties", read_properties)
+    monkeypatch.setattr(
+        drawing, "new_project_drawing", Mock(return_value=(model, object()))
+    )
+    monkeypatch.setattr(drawing, "place_view", Mock(return_value=object()))
+    monkeypatch.setattr(
+        drawing, "_view_mapper", lambda _adapter, _view: lambda _xyz: (0.0, 0.0)
+    )
+    monkeypatch.setattr(
+        drawing.hidden_sketches, "curate_view_dimensions", Mock(return_value=[])
+    )
+    monkeypatch.setattr(drawing, "_pin_section", Mock(return_value=[]))
+    monkeypatch.setattr(drawing, "add_native_hole_callout", Mock(return_value=object()))
+    monkeypatch.setattr(drawing, "_circle_edge", Mock(return_value=object()))
+    for name in (
+        "stamp_drawing_summary",
+        "set_hidden_lines_removed",
+        "assert_imported_precision",
+        "set_dimension_callouts",
+        "_set_callout_texts",
+        "_strip_thread_class",
+        "_append_callout_below",
+        "import_cosmetic_threads",
+        "_hide_thread_labels",
+    ):
+        monkeypatch.setattr(drawing, name, Mock())
+    monkeypatch.setattr(drawing, "add_property_linked_note", add_note)
+    outputs = {"drawing": "carrier"}
+    monkeypatch.setattr(drawing, "finalize_drawing", AsyncMock(return_value=outputs))
+    assert asyncio.run(drawing.build(adapter)) == outputs
+    assert "Pin Axis Inspection" in read_properties.call_args.kwargs["required"]
+    add_note.assert_any_call(
+        adapter,
+        "Pin Axis Inspection",
+        *drawing.PIN_AXIS_NOTE_XY,
+        char_height=drawing.INSPECTION_NOTE_CHAR_HEIGHT,
+    )
+
+
+def test_axis_inspection_note_and_relocated_b2dx_have_separate_paper_bands() -> None:
+    x, y = (value * 1000.0 for value in drawing.PIN_AXIS_NOTE_XY)
+    height = drawing.INSPECTION_NOTE_CHAR_HEIGHT * 1000.0
+    rows = spec.PIN_AXIS_INSPECTION_NOTE.splitlines()
+    note = (
+        x,
+        y - len(rows) * height * 1.6,
+        x + max(map(len, rows)) * height * 0.68,
+        y + height,
+    )
+    assert height >= 3.5
+    assert not _boxes_overlap(note, _TITLE_BLOCK)
+    assert _BORDER[0] + 3.0 < note[0] < note[2] < _BORDER[2] - 3.0
+    assert note[1] > _top_text("PinSpacing")[1] + 3.0
+    # RiserX1R's horizontal witness span ends at the +X inner riser axis;
+    # the note starts beyond it, rather than crossing a dimension line.
+    assert note[0] > _on_sheet(spec.RISER_SCREWS[1][0], 0.0)[0] + 3.0
+    assert note[3] < _top_text("RiserX2R")[1] - 3.0
+    b2x, b2y = _top_text("B2DX")
+    assert b2y - 10.0 > note[3] + 3.0
+    assert b2y + 10.0 < _on_sheet(0.0, spec.OUTLINE_Y[0])[1] - 3.0
+    assert note[2] + 3.0 < _on_sheet(*spec.PIN_HOLES["B1"])[0]
+    iso_left = drawing.ISO_CENTER[0] * 1000.0 - 30.0
+    assert b2x + 15.0 + 2.0 < iso_left

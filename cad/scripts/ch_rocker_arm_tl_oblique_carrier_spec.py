@@ -61,9 +61,9 @@ pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
   0.008-0.023 unmounted, can open or close the pin spacing by up to 0.023, so
   up to 0.041 on R (``trammel.RADIUS_FROM_BEARING_PLAY``).
 
-Datums. X runs from the HUB spot's axis, which the 260.0 places from the left
-end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from the
-A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
+Position chains. X runs from the HUB spot's axis, which the 260.0 places from
+the left end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from
+the A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
 A2/B2 chain from A1/B1, never from an edge.
 
 Pin-hole chamfer (``PIN_CHAMFER``, jig-r3 interference). Each pivot pin's
@@ -82,11 +82,11 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Flatness remains the general title-block requirement: the plate rests on two
-pin collars, with no added flatness frame. Its BOTTOM face is datum A only
-for the four pin-hole axes' diametral perpendicularity control. That control
-bounds actual hole-axis tilt relative to the plate in the captured pivot's
-rigid upset calculation; it neither relocates the holes nor adds a skid.
+Each pin-hole axis is inspected against the bottom-face normal over the
+functional engagement span, in every azimuth, before assembly. The sheet's
+PIN_AXIS_INSPECTION_NOTE states the direct acceptance; the part process row
+gives its surface-plate, fitted-arbor and indicator setup. This adds no
+flatness or orientation frames and changes none of the reamed fits.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -105,12 +105,9 @@ import math
 
 import _config
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
-from ch_rocker_arm_tl_oblique_retention_spec import CARRIER_HOLE_PERPENDICULARITY
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
-from _gtol_controls import GeometricControl, PartDatum
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
@@ -156,6 +153,10 @@ PIN_HOLE_CALLOUT = (
     f"4X REAM THRU ({PIN_CLEARANCE_MIN:.3f}-{PIN_CLEARANCE_MAX:.3f}\n"
     f"DIAMETRAL CLEARANCE ON\n{PIN_MATE})"
 )
+# Source-visible aliases of the shared retention proof's actual inspection
+# limits, not independent tolerances or extra bore geometry.
+PIN_AXIS_DEVIATION_MAX = retention.CARRIER_AXIS_DEVIATION_MAX
+PIN_AXIS_MEASUREMENT_SPAN = retention.CARRIER_AXIS_MEASUREMENT_SPAN
 # Rule 4: each pin band names what it sets and on which part (jig-r3 review);
 # the error sensitivities stay in the docstring.
 STRAP_NUMBER = "MHA-CH-13"
@@ -163,25 +164,6 @@ SPACING_CALLOUT = f"SETS R{trammel.R_INNER:.0f} ON\n{STRAP_NUMBER}"
 DX_CALLOUT = f"SETS R{trammel.R_OUTER:.0f} ON\n{STRAP_NUMBER}"
 DY_CALLOUT = DX_CALLOUT
 STRAP_DEPTH = trammel.R_OUTER - trammel.R_INNER
-
-# Owner-approved rule-5 exception: actual hole axes must remain square to the
-# collar-side plate face for the positive-capture upset bound. No position
-# frame or basic coordinates: the original +/- position chains remain.
-BOTTOM_DATUM = "A"
-PART_DATUMS = (
-    PartDatum(BOTTOM_DATUM, PlanarFace((0.0, -1.0, 0.0), THICKNESS)),
-)
-GEOMETRIC_CONTROLS = tuple(
-    GeometricControl(
-        key=f"pin_hole_{hole.lower()}_perpendicularity",
-        characteristic="perpendicularity",
-        tolerance=f"{CARRIER_HOLE_PERPENDICULARITY:.2f}",
-        face=CylinderFace(PIN_HOLE_DIA, contains_x_mm=x, contains_z_mm=-y),
-        datums=(BOTTOM_DATUM,),
-        tolerance_zone="diametral",
-    )
-    for hole, (x, y) in PIN_HOLES.items()
-)
 
 # 45° chamfer on each pin hole's underside (collar-side) edge: it clears the
 # pivot pin's collar fillet.  Printed as a native single MIN limit: the title
@@ -409,6 +391,14 @@ CALLOUT_SUFFIXES = {"SpotDia": _SPOT_SUFFIX, "SpotDiaCl": _SPOT_SUFFIX}
 # unlocated in Y).
 CALLOUT_PREFIXES = {"RiserY1": "2X ", "RiserY2": "2X "}
 
+# A source-model property, linked on the drawing and attached to each bore's
+# supported feature-schema note. Detailed shop setup belongs to the process.
+PIN_AXIS_INSPECTION_NOTE = (
+    "4X PIN BORES A1/B1/A2/B2:\n"
+    "AXIS TO BOTTOM-FACE NORMAL:\n"
+    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX DEPARTURE OVER {PIN_AXIS_MEASUREMENT_SPAN:.2f},\n"
+    "ALL AZIMUTHS; CAP CLEARANCE."
+)
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_SCALE = (1, 8)
 ISOMETRIC_VIEW_NOTE = (

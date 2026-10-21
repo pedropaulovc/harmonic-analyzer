@@ -7,9 +7,9 @@ made: one bolts on each rail's HIWIN HGH15CA carriage and carries, in two
 imported as ``trammel``; values read from it are marked ⚙).
 
 Material and stock: 6061-T6 aluminium, 1 x 3 in flat bar, faced to the
-unchanged 24 height. The integral wide wing occupies X -54..-10, Y +/-32;
-the original-width tail occupies X -10..20, Y +/-20. The original bearing
-axis, carriage pattern, nut-bracket pattern and 40-wide bracket grip stay put.
+unchanged 24 height. The integral wide wing follows the shared retention
+footprint; the original tail stays 40 wide. The original bearing axis,
+carriage pattern, nut-bracket pattern and bracket grip stay put.
 Frame origin is the carriage-pattern centre on its top mating plane, +X
 away from the spindle, +Z up. Existing hole stations still read from the
 real -X end and tail -Y side; the four cap receiver taps instead read
@@ -119,7 +119,7 @@ same knobs drive; TL-29's taps are spotted through these holes at assembly
 and the callout names the mate.
 
 The unchanged machined top around the upper bearing seat is the lower
-flange stop, not a new bearing pocket. Four 1/4-20 THRU receiver taps in
+flange stop, not a new bearing pocket. Four 5/16-18 THRU receiver taps in
 the wing take the mechanically locked cap. Constructive assembly presses
 only the ring being fitted, with the pin's narrow boss against the upper
 inner race and its broad flange underside clear of the seal. Cartridge
@@ -160,13 +160,37 @@ WING_WIDTH = 2.0 * retention.BLOCK_WING_HALF_WIDTH
 WING_LENGTH = WING_X1 - BLOCK_X0
 BEARING_AXIS_NAME = "BearingAxis"
 CAP_TAP_REFERENCE = "CapTapReference"
-CAP_TAP_HOLE_SPEC = HoleSpec("tapped", "1/4-20")
+CAP_TAP_HOLE_SPEC = HoleSpec("tapped", "5/16-18")
 CAP_TAP_DRILL_DIA = TAP_DRILL_MM[CAP_TAP_HOLE_SPEC.size]
 CAP_TAP_POINTS = tuple(
     (trammel.PIN_OFFSET + dx, dy) for dx, dy in retention.CAP_BOLT_CENTERS
 )
 CAP_TAP_LOCATION_PLACES = retention.CAP_BOLT_LOCATION_PLACES
-CAP_TAP_CALLOUT = "CAP LOCATING PATTERN\nFROM BEARING AXIS"
+CAP_TAP_CALLOUT = "CAP FASTENER PATTERN\nFROM BEARING AXIS"
+
+# Integral cap bosses enter these cylindrical, flat-bottom milled recesses.
+# Both XY stations are measured directly from the bearing axis.
+CAP_REGISTER_PROFILE = "CapRegisterProfile"
+CAP_REGISTER_FEATURE = "CapRegisterRecesses"
+CAP_REGISTER_CENTERS = retention.CAP_REGISTER_CENTERS
+CAP_REGISTER_POINTS = tuple(
+    (trammel.PIN_OFFSET + dx, dy) for dx, dy in CAP_REGISTER_CENTERS
+)
+CAP_REGISTER_LOCATION_PLACES = retention.CAP_REGISTER_LOCATION_PLACES
+CAP_REGISTER_DIA = retention.BLOCK_REGISTER_DIAMETER
+CAP_REGISTER_DIA_BAND = retention.BLOCK_REGISTER_DIAMETER_BAND
+CAP_REGISTER_DEPTH = retention.BLOCK_REGISTER_DEPTH
+CAP_REGISTER_DEPTH_PLACES = retention.BLOCK_REGISTER_DEPTH_PLACES
+CAP_REGISTER_CALLOUT = "LOCATING RECESS FOR TL-30\nXY FROM BEARING AXIS"
+CAP_REGISTER_DEPTH_CALLOUT = "2X FLAT BOTTOM\nCLEARS TL-30 REGISTER"
+GENERAL_ANGULAR_BAND_DEGREES = retention.GENERAL_ANGULAR_BAND_DEGREES
+# Public cartridge-interface names shared by the integrated boundary checks.
+REGISTER_POINTS = CAP_REGISTER_POINTS
+REGISTER_DIA = CAP_REGISTER_DIA
+REGISTER_DIA_BAND = CAP_REGISTER_DIA_BAND
+REGISTER_DEPTH = CAP_REGISTER_DEPTH
+REGISTER_DEPTH_PLACES = CAP_REGISTER_DEPTH_PLACES
+REGISTER_LOCATION_PLACES = CAP_REGISTER_LOCATION_PLACES
 
 
 def cap_receiver_walls(
@@ -174,20 +198,26 @@ def cap_receiver_walls(
     location_band: float = printed_band_mm(CAP_TAP_LOCATION_PLACES),
     wing_width: float = WING_WIDTH,
     wing_length: float = WING_LENGTH,
+    depth: float = BLOCK_HEIGHT,
 ) -> dict[str, float]:
     """Thread-envelope walls, including the loose bearing-axis edge location.
 
-    The narrow direct tap-to-axis bands govern cap translation. Outside-edge
-    bands are charged separately here, only for the wing's material walls.
+    Direct tap-to-axis bands govern screw clearance; the integral registers,
+    not these threads, bound cap translation. Edge bands govern material walls.
+    The general angular band sweeps each thread axis over the largest block
+    height; a through tap cannot discard its lower-end wall.
     """
     radius = THREAD_MAJOR_MM[CAP_TAP_HOLE_SPEC.size] / 2.0
     edge_band = printed_band_mm(2)
     x_from_end = trammel.PIN_OFFSET - BLOCK_X0
     dx, dy = abs(retention.CAP_BOLT_X_OFFSETS[0]), abs(retention.CAP_BOLT_Y_OFFSETS[0])
+    sweep = (depth + printed_band_mm(2)) * math.tan(
+        math.radians(GENERAL_ANGULAR_BAND_DEGREES)
+    )
     return {
-        "cap thread to spindle end": x_from_end - dx - edge_band - location_band - radius,
-        "cap thread to wing step": wing_length - printed_band_mm(1) - x_from_end - dx - edge_band - location_band - radius,
-        "cap thread to wing side": (wing_width - edge_band) / 2.0 - dy - edge_band - location_band - radius,
+        "cap thread to spindle end": x_from_end - dx - edge_band - location_band - radius - sweep,
+        "cap thread to wing step": wing_length - printed_band_mm(1) - x_from_end - dx - edge_band - location_band - radius - sweep,
+        "cap thread to wing side": (wing_width - edge_band) / 2.0 - dy - edge_band - location_band - radius - sweep,
     }
 
 
@@ -402,6 +432,9 @@ MODEL_KNOBS: dict[str, float] = {
 MODEL_KNOBS["WingSideY"] = WING_WIDTH / 2.0
 MODEL_KNOBS["CapTapX"] = abs(retention.CAP_BOLT_X_OFFSETS[0])
 MODEL_KNOBS["CapTapY"] = abs(retention.CAP_BOLT_Y_OFFSETS[0])
+MODEL_KNOBS["CapRegisterDia"] = CAP_REGISTER_DIA
+MODEL_KNOBS["CapRegisterX"] = abs(CAP_REGISTER_CENTERS[0][0])
+MODEL_KNOBS["CapRegisterY"] = abs(CAP_REGISTER_CENTERS[0][1])
 
 # --- Printed places ----------------------------------------------------------
 # Hole stations three places (hole to hole, the docstring's carriage
@@ -441,6 +474,17 @@ DRAWING_PRECISION[CAP_TAP_REFERENCE] = {
     name: CAP_TAP_LOCATION_PLACES
     for name in ("CapTapLeftX", "CapTapRightX", "CapTapLowerY", "CapTapUpperY")
 }
+DRAWING_PRECISION[CAP_REGISTER_PROFILE] = {
+    "CapRegisterLeftX": CAP_REGISTER_LOCATION_PLACES,
+    "CapRegisterLowerY": CAP_REGISTER_LOCATION_PLACES,
+    "CapRegister1Dia": 2,
+    "CapRegisterRightX": CAP_REGISTER_LOCATION_PLACES,
+    "CapRegisterUpperY": CAP_REGISTER_LOCATION_PLACES,
+    "CapRegister2Dia": 2,
+}
+DRAWING_PRECISION[CAP_REGISTER_FEATURE] = {
+    "CapRegisterDepth": CAP_REGISTER_DEPTH_PLACES,
+}
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     feature: set(names) for feature, names in DRAWING_PRECISION.items()
 }
@@ -474,6 +518,13 @@ DRAWING_VALUES: dict[str, float] = {
     "CapTapRightX": abs(retention.CAP_BOLT_X_OFFSETS[1]),
     "CapTapLowerY": abs(retention.CAP_BOLT_Y_OFFSETS[0]),
     "CapTapUpperY": abs(retention.CAP_BOLT_Y_OFFSETS[1]),
+    "CapRegisterLeftX": abs(CAP_REGISTER_CENTERS[0][0]),
+    "CapRegisterLowerY": abs(CAP_REGISTER_CENTERS[0][1]),
+    "CapRegister1Dia": CAP_REGISTER_DIA,
+    "CapRegisterRightX": abs(CAP_REGISTER_CENTERS[1][0]),
+    "CapRegisterUpperY": abs(CAP_REGISTER_CENTERS[1][1]),
+    "CapRegister2Dia": CAP_REGISTER_DIA,
+    "CapRegisterDepth": CAP_REGISTER_DEPTH,
 }
 if set(DRAWING_VALUES) != set(DRAWING_PRECISION_BY_NAME):
     raise AssertionError("every marked pivot block dimension needs a value")
@@ -674,6 +725,102 @@ if BORE_DEPTH - _band("TopBoreDepth") < trammel.BEARING_WIDTH:
     raise AssertionError("a bearing stands proud of the pivot block face")
 
 
+def cap_register_margins(
+    *,
+    centres: tuple[tuple[float, float], ...] = CAP_REGISTER_CENTERS,
+    diameter: float = CAP_REGISTER_DIA,
+    depth: float = CAP_REGISTER_DEPTH,
+    wing_width: float = WING_WIDTH,
+    wing_length: float = WING_LENGTH,
+) -> dict[str, float]:
+    """Conservative material gaps at the *printed* source bands.
+
+    Direct receiver XY uses .XXX, while the bearing axis to the original
+    edges stays .XX and wing length stays .X. Receiver diameter carries its
+    explicit +.10/0 band; depth is .XXX. Tap walls use the thread major
+    envelope, carriage counterbores their .XX band, and side counterbores
+    their existing .XXX band. Independent source locations add, never RSS.
+    The general angular band sweeps both top-entered axes through the deepest
+    receiver; a full block-height sweep bounds the lower bearing seat.
+    """
+    location = printed_band_mm(CAP_REGISTER_LOCATION_PLACES)
+    axis_x = _band("BoreStationX")
+    axis_y = _band("BoreStationY")
+    radius = (diameter + CAP_REGISTER_DIA_BAND[0]) / 2.0
+    deepest = depth + printed_band_mm(CAP_REGISTER_DEPTH_PLACES)
+    tangent = math.tan(math.radians(GENERAL_ANGULAR_BAND_DEGREES))
+    drift = deepest * tangent
+    bearing_drift = (BLOCK_HEIGHT + _band("BlockHeight")) * tangent
+    hole_drift = drift
+    # The tilted planar floor reaches below its axial depth at the outer rim.
+    floor = BLOCK_HEIGHT - _band("BlockHeight") - deepest - radius * tangent
+    margins: dict[str, float] = {"receiver floor to bottom face": floor}
+    for index, (dx, dy) in enumerate(centres, start=1):
+        prefix = f"register {index}"
+        station_x = BORE_STATION_X + dx
+        margins[f"{prefix} to spindle end"] = (
+            station_x - axis_x - location - radius - drift
+        )
+        margins[f"{prefix} to wing step"] = (
+            wing_length - _band("WingLength") - station_x
+            - axis_x - location - radius - drift
+        )
+        margins[f"{prefix} to wing side"] = (
+            (wing_width - _band("WingWidth")) / 2.0
+            - abs(dy) - axis_y - location - radius - drift
+        )
+        radial = math.hypot(
+            max(0.0, abs(dx) - location), max(0.0, abs(dy) - location)
+        )
+        margins[f"{prefix} to bearing pockets"] = (
+            radial - radius - BORE_DIA_MAX / 2.0 - drift - bearing_drift
+        )
+        margins[f"{prefix} to cap threads"] = min(
+            math.hypot(
+                max(0.0, abs(dx - tx) - 2.0 * location),
+                max(0.0, abs(dy - ty) - 2.0 * location),
+            )
+            - radius - THREAD_MAJOR_MM[CAP_TAP_HOLE_SPEC.size] / 2.0
+            - drift - hole_drift
+            for tx, ty in retention.CAP_BOLT_CENTERS
+        )
+        margins[f"{prefix} to carriage holes"] = min(
+            math.hypot(
+                max(0.0, abs(BORE_X + dx - x) - axis_x - location - _HOLE_BAND),
+                max(0.0, abs(dy - y) - axis_y - location - _HOLE_BAND),
+            )
+            - radius - _CBORE_R_MAX - drift - hole_drift
+            for x, y in BOLT_POINTS
+        )
+        # A bounding box around the largest side counterbore over its entire
+        # Y span also contains the smaller through bore. Its XZ gap is a
+        # lower bound, not an optimistic centre-to-centre cylinder distance.
+        side_radius = (SIDE_CBORE_DIA + _SIDE_CBORE_BAND) / 2.0
+        side_drift = (BLOCK_WIDTH + _band("BlockWidth")) * tangent
+        margins[f"{prefix} to nut-bracket holes"] = min(
+            math.hypot(
+                max(
+                    0.0,
+                    abs(BORE_X + dx - x) - axis_x - location - _SIDE_BAND
+                    - radius - drift - side_radius
+                    - side_drift,
+                ),
+                max(0.0, floor - (z + _SIDE_BAND + side_radius + side_drift)),
+            )
+            for x, z in SIDE_SCREW_HOLES
+        )
+    return margins
+
+
+CAP_REGISTER_MARGINS = cap_register_margins()
+for _wall, _mm in CAP_REGISTER_MARGINS.items():
+    if _mm < WALL_TARGET:
+        raise AssertionError(
+            f"pivot block {_wall} gap {_mm:.3f} under the two-mm target"
+        )
+
+
+
 # --- Sheet callouts -------------------------------------------------------------
 def _min_text(mm: float) -> str:
     """A worst-case minimum at two places, never rounded up."""
@@ -731,6 +878,9 @@ CALLOUTS_BELOW.update({
     for name in DRAWING_PRECISION[CAP_TAP_REFERENCE]
 })
 CALLOUTS_BELOW["WingWidth"] = "SYMMETRIC ABOUT\nBEARING AXIS"
+CALLOUTS_BELOW["CapRegister1Dia"] = CAP_REGISTER_CALLOUT
+CALLOUTS_BELOW["CapRegister2Dia"] = CAP_REGISTER_CALLOUT
+CALLOUTS_BELOW["CapRegisterDepth"] = CAP_REGISTER_DEPTH_CALLOUT
 SURFACE_FINISHES = ()
 # The side screws' callout rows under the native hole callout: the mate the
 # three-place stations serve (rule 4) and the counterbore walls' shortfall.

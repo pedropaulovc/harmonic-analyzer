@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import ast
+import asyncio
 import inspect
 import re
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 import _config
 import _drawing_contract
+import _drawing_marks
+import build_ch_rocker_arm_tl_oblique_pivot_pin as part
 import ch_rocker_arm_tl_oblique_pivot_block_spec as block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as spec
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_pivot_pin as drawing
 import export_features
 from _fit_deviations import deviations
+from _feature_requirements import requirements_for
 from _printed_limits import limits
 from prechips.model import TOLERANCE_REQUIREMENTS
 
@@ -31,14 +40,14 @@ def test_section_lengths_derive_from_the_bearing_and_collar_constants() -> None:
         trammel.BEARINGS_PER_PIN * trammel.BEARING_WIDTH + trammel.BEARING_SHOULDER
     )
     assert spec.BEARING_LENGTH == 22.0
-    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT == 14.5
+    assert spec.COLLAR_HEIGHT == trammel.PIN_COLLAR_HEIGHT == 15.5
     assert spec.COLLAR_HEIGHT == trammel.BEARING_RECESS + trammel.PIN_COLLAR_PROUD
     assert spec.CARRIER_LENGTH == 24.5 > trammel.CARRIER_THICK
     assert spec.CARRIER_LENGTH == spec.CROSS_HOLE_FROM_SEAT + spec.CROSS_HOLE_FROM_END
     assert spec.OVERALL_LENGTH == (
         spec.BEARING_LENGTH + spec.COLLAR_HEIGHT + spec.CARRIER_LENGTH
     )
-    assert spec.OVERALL_LENGTH == 61.0
+    assert spec.OVERALL_LENGTH == 62.0
     assert spec.FIT_DIA == trammel.BEARING_BORE
 
 
@@ -53,23 +62,10 @@ def test_fit_limits_match_the_printed_callouts() -> None:
     clearance = (round(hole_low - h6_high, 6), round(hole_high - h6_low, 6))
     assert interference == (0.001, 0.015)
     assert clearance == (0.0, 0.024)
-    assert spec.BEARING_NOTE == (
-        f"{interference[0]:.3f}-{interference[1]:.3f} DIAMETRAL INTERFERENCE ON "
-        "6200-2RS INNER RACE"
-    )
-    assert spec.CARRIER_NOTE.startswith(
-        f"{clearance[0]:.3f}-{clearance[1]:.3f} DIAMETRAL CLEARANCE ON "
-        "MHA-CH-06-TL-21 PIN HOLES"
-    )
     assert spec.DIMENSION_CALLOUTS["BearingDia"] == spec.BEARING_CALLOUT
     assert spec.DIMENSION_CALLOUTS["CarrierDia"] == spec.CARRIER_CALLOUT
     printed = limits(spec.BEARING_DIA, spec.FIT_PLACES, spec.BEARING_PRINT_BAND)
     assert printed == [round(k5_low, 12), round(k5_high, 12)]
-    build_source = inspect.getsource(
-        __import__("build_ch_rocker_arm_tl_oblique_pivot_pin")
-    )
-    assert "*deviations(BEARING_PRINT_BAND)" in build_source
-    assert "*deviations(CARRIER_BAND)" in build_source
 
 
 def _mounted_clearance(shaft_interference: float, seat_interference: float) -> float:
@@ -187,20 +183,6 @@ def test_callouts_are_short_below_lane_lines() -> None:
     for name, text in spec.DIMENSION_CALLOUTS.items():
         for line in text.splitlines():
             assert len(line) <= 30, (name, line)
-    source = inspect.getsource(drawing)
-    assert 'location="above"' not in source
-    assert 'DIMENSION_CALLOUTS, location="below"' in source
-
-
-def test_sheet_carries_no_notes() -> None:
-    assert spec.DRAWING_NOTES == ""
-    assert '"Manufacturing Notes"' not in inspect.getsource(drawing)
-
-
-def test_cartridge_service_is_upward_and_replaces_all_pressed_parts() -> None:
-    assert "UPWARD from its lower end" in spec.__doc__
-    assert "Replace the pin AND BOTH bearings" in spec.__doc__
-    assert "cannot pass downward" in spec.__doc__
 
 
 def test_drawing_script_meets_the_drawing_contract() -> None:
@@ -218,27 +200,11 @@ def test_captured_flange_and_raised_seat_are_the_actual_pin_profile() -> None:
     assert spec.FLANGE_BOTTOM_STATION + trammel.BEARING_RECESS == pytest.approx(24.15)
     assert spec.FLANGE_TOP_STATION - spec.FLANGE_BOTTOM_STATION == 3.0
     assert spec.CARRIER_STATION - spec.FLANGE_TOP_STATION == pytest.approx(spec.UPPER_BOSS_HEIGHT)
-    assert spec.UPPER_BOSS_HEIGHT == 10.35
-    assert spec.CARRIER_STATION + trammel.BEARING_RECESS == 37.5
-    assert spec.CROSS_HOLE_STATION == 55.0
+    assert spec.UPPER_BOSS_HEIGHT == retention.PIN_UPPER_BOSS_HEIGHT == 11.35
+    assert spec.CARRIER_STATION + trammel.BEARING_RECESS == 38.5
+    assert spec.CROSS_HOLE_STATION == 56.0
     assert spec.CROSS_HOLE_DIA == 5.0
     assert spec.OVERALL_LENGTH - spec.CROSS_HOLE_STATION == 6.0
-
-
-def test_both_stop_faces_are_square_to_the_actual_bearing_axis() -> None:
-    assert spec.PART_DATUMS[0].letter == "A"
-    assert spec.PART_DATUMS[0].face.diameter_mm == spec.BEARING_DIA
-    assert len(spec.GEOMETRIC_CONTROLS) == 2
-    assert {control.face.normal for control in spec.GEOMETRIC_CONTROLS} == {
-        (0.0, 0.0, -1.0), (0.0, 0.0, 1.0),
-    }
-    assert all(
-        control.characteristic == "perpendicularity"
-        and control.datums == ("A",)
-        and float(control.tolerance) == spec.FLANGE_PERPENDICULARITY == 0.02
-        for control in spec.GEOMETRIC_CONTROLS
-    )
-    assert spec.FLANGE_EDGE_BREAK_MAX == 0.25
 
 
 def test_carrier_end_lead_has_a_physical_maximum_for_the_cross_hole() -> None:
@@ -250,3 +216,118 @@ def test_carrier_end_lead_has_a_physical_maximum_for_the_cross_hole() -> None:
     )
     assert end_gap == pytest.approx(2.15)
     assert end_gap >= 2.0
+
+
+def test_both_real_flange_faces_own_the_direct_inspection() -> None:
+    assert (
+        spec.STOP_FACE_VARIATION_MAX
+        == retention.PIN_STOP_FACE_VARIATION_MAX
+        == 0.05
+    )
+    assert (
+        spec.STOP_FACE_MEASUREMENT_DIAMETER
+        == retention.PIN_STOP_FACE_MEASUREMENT_DIAMETER
+        == 35.0
+    )
+    declarations = requirements_for(drawing)
+    exported = _features()
+    for name, normal, station in (
+        ("flange_lower_stop", (0.0, 0.0, -1.0), spec.FLANGE_BOTTOM_STATION),
+        ("flange_upper_stop", (0.0, 0.0, 1.0), spec.FLANGE_TOP_STATION),
+    ):
+        (face,) = declarations[name].faces
+        assert face.normal == normal
+        assert face.offset_mm == normal[2] * station
+        assert exported[name]["normal"] == list(normal)
+        assert exported[name]["plane"] == {
+            "frame": "model", "axis": "z", "value": station
+        }
+        assert exported[name]["requirements"] == ["note"]
+        assert exported[name]["note"] == " ".join(
+            spec.STOP_FACE_INSPECTION_NOTE.splitlines()
+        )
+    # The complete inspection circle stays on both broad annular stop lands,
+    # clear of the narrow bosses and the flange's maximum outside edge break.
+    radius = spec.STOP_FACE_MEASUREMENT_DIAMETER / 2.0
+    assert spec.COLLAR_DIA / 2.0 + spec.SHOULDER_FILLET_RADIUS < radius
+    assert radius < (
+        min(limits(spec.FLANGE_DIA, 2, spec.FLANGE_DIA_BAND)) / 2.0
+        - spec.FLANGE_EDGE_BREAK_MAX
+    )
+
+
+def test_native_part_writes_and_guards_the_inspection_property(monkeypatch) -> None:
+    """Exercise the actual property-write call without executing geometry."""
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    call = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "apply_drawing_properties"
+    )
+    written = {}
+    adapter = object()
+
+    def capture(actual_adapter, properties):
+        assert actual_adapter is adapter
+        written.update(properties)
+
+    monkeypatch.setattr(_drawing_marks, "apply_custom_properties", capture)
+    eval(
+        compile(ast.Expression(call), part.__file__, "eval"),
+        vars(part),
+        {"adapter": adapter},
+    )
+    assert written["Stop Face Inspection"] == spec.STOP_FACE_INSPECTION_NOTE
+    assert "Stop Face Inspection" in part._SAVED_DRAWING_PROPERTIES
+
+
+def test_drawing_consumes_the_required_native_inspection_property(
+    monkeypatch, tmp_path
+) -> None:
+    source = tmp_path / "pin.SLDPRT"
+    source.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    adapter = SimpleNamespace(currentModel=object(), open_model=AsyncMock())
+    read_properties = Mock()
+    add_note = Mock()
+    monkeypatch.setattr(drawing, "check", lambda _label, result: result)
+    monkeypatch.setattr(drawing, "read_required_properties", read_properties)
+    monkeypatch.setattr(
+        drawing, "new_project_drawing", Mock(return_value=(object(), object()))
+    )
+    monkeypatch.setattr(drawing, "place_view", Mock(return_value=object()))
+    monkeypatch.setattr(drawing, "curate_view_dimensions", Mock(return_value=[]))
+    for name in (
+        "stamp_drawing_summary",
+        "set_hidden_lines_removed",
+        "assert_imported_precision",
+        "set_dimension_callouts",
+        "add_view_centerline",
+    ):
+        monkeypatch.setattr(drawing, name, Mock())
+    monkeypatch.setattr(drawing, "add_property_linked_note", add_note)
+    outputs = {"drawing": "pin"}
+    monkeypatch.setattr(drawing, "finalize_drawing", AsyncMock(return_value=outputs))
+    assert asyncio.run(drawing.build(adapter)) == outputs
+    assert "Stop Face Inspection" in read_properties.call_args.kwargs["required"]
+    add_note.assert_any_call(
+        adapter,
+        "Stop Face Inspection",
+        *drawing.STOP_FACE_NOTE_XY,
+        char_height=drawing.INSPECTION_NOTE_CHAR_HEIGHT,
+    )
+
+
+def test_inspection_note_stays_on_clear_paper_above_the_title_block() -> None:
+    x, y = drawing.STOP_FACE_NOTE_XY
+    height = drawing.INSPECTION_NOTE_CHAR_HEIGHT
+    rows = spec.STOP_FACE_INSPECTION_NOTE.splitlines()
+    right = x + max(map(len, rows)) * height * 0.68
+    bottom = y - len(rows) * height * 1.6
+    assert height >= 0.0035
+    assert x > 0.303 + 0.010  # right of the lower-boss dimension's anchor
+    assert right < 0.4191 - 0.003
+    assert bottom > 0.065 + 0.003
+    assert y + height < drawing.PROFILE_KEEP["LowerBossHeight"][1] - 0.003

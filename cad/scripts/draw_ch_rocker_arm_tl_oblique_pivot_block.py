@@ -90,7 +90,7 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 # the original tail's +Y face and carries the nut-bracket hole stations.
 SHEET_SCALE = (3.0, 2.0)
 VIEW_SCALE = (3, 2)
-SHEET_NAMES = ("Bearing and carriage", "Capture wing")
+SHEET_NAMES = ("Bearing and carriage", "Capture wing", "Register recesses")
 CAPTURE_SCALE = (2, 1)
 ISO_SCALE = (1, 2)
 PLAN_CENTER = (0.130, 0.192)
@@ -145,6 +145,33 @@ CAPTURE_KEEP = {
     "CapTapLowerY": (35.0, -12.5, _H),
     "CapTapUpperY": (43.0, 12.5, _H),
 }
+REGISTER_PLAN_CENTER = (0.170, 0.190)
+REGISTER_SECTION_CENTER = (0.285, 0.064)
+REGISTER_CAPTION_XY = (0.285, 0.025)
+REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
+    "CapRegisterLeftX": (BORE_X - 8.0, -41.0, _H),
+    "CapRegisterRightX": (BORE_X + 8.0, -49.0, _H),
+    "CapRegisterLowerY": (35.0, -12.0, _H),
+    "CapRegisterUpperY": (45.0, 12.0, _H),
+    "CapRegister1Dia": (BLOCK_X0 - 17.0, -26.0, _H),
+    "CapRegister2Dia": (BLOCK_X1 + 10.0, 27.0, _H),
+}
+REGISTER_SECTION_KEEP: dict[str, tuple[float, float, float]] = {
+    "CapRegisterDepth": (BORE_X - 19.0, -24.0, _H + 5.0),
+}
+# One straight vertical section through both receivers and the bearing axis.
+# Extending beyond both wing sides makes the cylindrical flat floors visible.
+_REGISTER_FIRST, _REGISTER_SECOND = part_spec.CAP_REGISTER_POINTS
+_REGISTER_DELTA = tuple(
+    b - a for a, b in zip(_REGISTER_FIRST, _REGISTER_SECOND, strict=True)
+)
+REGISTER_CUT_START = tuple(
+    a - 0.25 * d for a, d in zip(_REGISTER_FIRST, _REGISTER_DELTA, strict=True)
+)
+REGISTER_CUT_END = tuple(
+    b + 0.25 * d for b, d in zip(_REGISTER_SECOND, _REGISTER_DELTA, strict=True)
+)
+_OTHER_SHEET_DIMENSIONS = set(CAPTURE_KEEP) | set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # In A-A, the carriage seat is model Z0, not the counterbored top face.
     "SideScrewRowZ": (BLOCK_X1 + 4.0, 0.0, -10.5),
@@ -605,11 +632,73 @@ for _index, (_x, _y) in enumerate(part_spec.CAP_TAP_POINTS, start=1):
             "width_nominal": (abs(_y), ("CAP_TAP_POINTS",)),
             "thru": (True, ("CAP_TAP_HOLE_SPEC",)),
             "note": (
-                "1/4-20 THRU; " + " ".join(part_spec.CAP_TAP_CALLOUT.splitlines()),
+                part_spec.CAP_TAP_HOLE_SPEC.size + " THRU; "
+                + " ".join(part_spec.CAP_TAP_CALLOUT.splitlines()),
                 ("CAP_TAP_HOLE_SPEC", "CAP_TAP_CALLOUT"),
             ),
         },
         precision={"station": part_spec.CAP_TAP_LOCATION_PLACES, "width": part_spec.CAP_TAP_LOCATION_PLACES},
+    )
+
+for _index, ((_x, _y), (_dx, _dy)) in enumerate(
+    zip(part_spec.CAP_REGISTER_POINTS, part_spec.CAP_REGISTER_CENTERS, strict=True),
+    start=1,
+):
+    requirement(
+        f"cap_register_recess_{_index}",
+        kind="hole",
+        faces=(
+            CylinderFace(
+                part_spec.CAP_REGISTER_DIA,
+                contains_x_mm=_x,
+                contains_y_mm=_y,
+                contains_z_mm=_H - part_spec.CAP_REGISTER_DEPTH / 2.0,
+            ),
+            PlanarFace(
+                (0.0, 0.0, 1.0),
+                _H - part_spec.CAP_REGISTER_DEPTH,
+                contains_x_mm=_x,
+            ),
+        ),
+        requirements=("station", "width", "dia", "depth", "note"),
+        fields={
+            "at": ([_x, _y, _H], ("CAP_REGISTER_POINTS", "BLOCK_HEIGHT")),
+            "axis": (_DOWN, ("__frame__",)),
+            "station": (
+                limits(abs(_dx), part_spec.CAP_REGISTER_LOCATION_PLACES),
+                ("CAP_REGISTER_CENTERS", "CAP_REGISTER_LOCATION_PLACES", "BORE_X"),
+            ),
+            "station_nominal": (abs(_dx), ("CAP_REGISTER_CENTERS",)),
+            "width": (
+                limits(abs(_dy), part_spec.CAP_REGISTER_LOCATION_PLACES),
+                ("CAP_REGISTER_CENTERS", "CAP_REGISTER_LOCATION_PLACES"),
+            ),
+            "width_nominal": (abs(_dy), ("CAP_REGISTER_CENTERS",)),
+            "dia": (
+                limits(part_spec.CAP_REGISTER_DIA, 2, part_spec.CAP_REGISTER_DIA_BAND),
+                ("CAP_REGISTER_DIA", "CAP_REGISTER_DIA_BAND"),
+            ),
+            "dia_nominal": (part_spec.CAP_REGISTER_DIA, ("CAP_REGISTER_DIA",)),
+            "depth": (
+                limits(part_spec.CAP_REGISTER_DEPTH, part_spec.CAP_REGISTER_DEPTH_PLACES),
+                ("CAP_REGISTER_DEPTH", "CAP_REGISTER_DEPTH_PLACES"),
+            ),
+            "depth_ref": (part_spec.CAP_REGISTER_DEPTH, ("CAP_REGISTER_DEPTH",)),
+            "thru": (False, ("CAP_REGISTER_DEPTH",)),
+            "note": (
+                " ".join(
+                    (part_spec.CAP_REGISTER_CALLOUT + "\n"
+                     + part_spec.CAP_REGISTER_DEPTH_CALLOUT).splitlines()
+                ),
+                ("CAP_REGISTER_CALLOUT", "CAP_REGISTER_DEPTH_CALLOUT"),
+            ),
+        },
+        precision={
+            "station": part_spec.CAP_REGISTER_LOCATION_PLACES,
+            "width": part_spec.CAP_REGISTER_LOCATION_PLACES,
+            "dia": 2,
+            "depth": part_spec.CAP_REGISTER_DEPTH_PLACES,
+        },
     )
 
 
@@ -905,6 +994,57 @@ def _label_side_view(adapter: Any, plan: Any, on_plan: Any) -> None:
         raise RuntimeError(f"failed to add the {SIDE_VIEW_CAPTION!r} caption")
 
 
+def _register_recess_sheet(adapter: Any) -> None:
+    """Native plan ordinates and a solid-line section through both flat floors."""
+    plan = place_view(
+        adapter, str(SOURCE), "*Front", *REGISTER_PLAN_CENTER, scale=CAPTURE_SCALE
+    )
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", 0.385, 0.230, scale=ISO_SCALE
+    )
+    for view in (plan, iso):
+        set_hidden_lines_removed(adapter, view)
+    on_plan = _view_mapper(adapter, plan)
+    annotations = curate_view_dimensions(
+        adapter, plan,
+        keep={name: on_plan(xyz) for name, xyz in REGISTER_KEEP.items()},
+        view_label="register recess plan",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section = create_section_view(
+        adapter, plan,
+        line_start=on_plan((*REGISTER_CUT_START, _H)),
+        line_end=on_plan((*REGISTER_CUT_END, _H)),
+        view_xy=REGISTER_SECTION_CENTER,
+        section_label="D",
+        scale=CAPTURE_SCALE,
+        partial=False,
+        label="flat-bottom register recess section",
+    )
+    set_hidden_lines_removed(adapter, section)
+    on_section = _view_mapper(adapter, section)
+    annotations += curate_view_dimensions(
+        adapter, section,
+        keep={name: on_section(xyz) for name, xyz in REGISTER_SECTION_KEEP.items()},
+        view_label="register recess section D-D",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    position_section_caption(adapter, section, REGISTER_CAPTION_XY, label="pivot block D")
+    names = set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
+    set_dimension_callouts(
+        adapter, annotations,
+        {name: text for name, text in CALLOUTS_BELOW.items() if name in names},
+    )
+    for annotation in annotations:
+        if dimension_name(adapter, annotation) in ("CapRegister1Dia", "CapRegister2Dia"):
+            set_near_side_diameter(annotation, "pivot block register recess diameter")
+    assert_imported_precision(
+        adapter, annotations,
+        {name: DRAWING_PRECISION_BY_NAME[name] for name in names},
+    )
+    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -974,7 +1114,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(
         adapter, annotations,
-        {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in CAPTURE_KEEP},
+        {name: text for name, text in _hung_clear(CALLOUTS_BELOW).items() if name not in _OTHER_SHEET_DIMENSIONS},
     )
     # Natively the bore's leader runs rim to rim through the centre and across
     # line A (jig-r2); one arrow on the near (left) rim keeps it short and
@@ -987,7 +1127,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(
         adapter, annotations,
-        {name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name not in CAPTURE_KEEP},
+        {name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name not in _OTHER_SHEET_DIMENSIONS},
     )
     _set_screw_hole_callout(
         add_native_hole_callout(
@@ -1048,6 +1188,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="four cap receiver taps",
     )
     add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.195)
+    if not ddoc.ActivateSheet(SHEET_NAMES[2]):
+        raise RuntimeError("cannot activate register-recess sheet")
+    _register_recess_sheet(adapter)
 
     return await finalize_drawing(
         adapter,
@@ -1057,7 +1200,11 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: CAPTURE_SCALE},
+        sheet_scales={
+            SHEET_NAMES[0]: SHEET_SCALE,
+            SHEET_NAMES[1]: CAPTURE_SCALE,
+            SHEET_NAMES[2]: CAPTURE_SCALE,
+        },
     )
 
 

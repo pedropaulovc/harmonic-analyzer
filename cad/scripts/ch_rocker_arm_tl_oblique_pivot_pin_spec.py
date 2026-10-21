@@ -19,11 +19,18 @@ and outer race. This is a fitted acceptance, not a tolerance-stack promise
 or a bearing-preload adjustment. The cap pocket is separately fitted to the
 actual flange thickness and local floor/ceiling variation.
 
-The Ø36 flange is 3 thick; the upper Ø12.7 seat reaches block-local Z37.5.
+The Ø36 flange is 3 thick; the upper Ø12.7 boss is nominally 11.35 from
+flange top to carrier seat, reaching block-local Z38.5.
 The Ø10 h6 carrier journal extends 24.5 above that seat. Its real Ø5 cross
 hole lies 18.5 above the seat and 6 from the end for the removable headed
 clevis pin and split cotter. Both journal fit diameters remain unchanged:
 Ø10 k5 in the bearings and Ø10 h6 in the carrier's Ø10 H7 holes.
+
+Both flange stop faces are inspected relative to the bearing-journal axis
+before pressing the pin into its bearings. Each face's total axial height /
+indicator variation over a full turn at the inspection diameter is limited
+by STOP_FACE_INSPECTION_NOTE; nominally square revolved faces alone do not
+establish this acceptance.
 
 Both ends carry 0.5 x 45 degree leads. The carrier-end lead is 0.5 MAX
 to preserve the cross-hole end ligament. Both seating shoulders are R0.2
@@ -45,9 +52,6 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _fit_deviations import deviations
 from _printed_tolerance import printed_band_mm
-from _gtol_controls import GeometricControl, PartDatum
-from _gtol_cylinder import CylinderFace
-from _gtol_planar import PlanarFace
 
 STOCK_DIA = 38.1  # 1-1/2 in 1144 round
 LENGTH_PLACES = 1
@@ -100,7 +104,10 @@ LOWER_BOSS_HEIGHT = retention.PIN_LOWER_BOSS_HEIGHT
 UPPER_BOSS_HEIGHT = retention.PIN_UPPER_BOSS_HEIGHT
 UPPER_BOSS_PLACES = retention.PIN_UPPER_BOSS_PLACES
 FLANGE_EDGE_BREAK_MAX = retention.PIN_FLANGE_EDGE_BREAK_MAX
-FLANGE_PERPENDICULARITY = retention.PIN_FLANGE_PERPENDICULARITY
+# Local aliases keep the shared functional limits visible to native feature
+# provenance without introducing a second inspection authority.
+STOP_FACE_VARIATION_MAX = retention.PIN_STOP_FACE_VARIATION_MAX
+STOP_FACE_MEASUREMENT_DIAMETER = retention.PIN_STOP_FACE_MEASUREMENT_DIAMETER
 CROSS_HOLE_BAND = retention.PIN_CROSS_HOLE_BAND
 FLANGE_BOTTOM_STATION = BEARING_LENGTH + LOWER_BOSS_HEIGHT
 FLANGE_TOP_STATION = FLANGE_BOTTOM_STATION + FLANGE_THICK
@@ -135,22 +142,6 @@ if not LEAD_CHAMFER < min(BEARING_LENGTH, CARRIER_LENGTH):
     raise AssertionError("a lead chamfer eats a fit section")
 if not SHOULDER_FILLET_RADIUS < BEARING_BORE_CHAMFER_MIN:
     raise AssertionError("the collar fillet fouls the inner race's bore chamfer")
-
-# Owner-approved square stop faces tie the actual bearing-journal axis to
-# the opposing-stop angular bound; no bearing axial restraint is credited.
-PART_DATUMS = (
-    PartDatum("A", CylinderFace(BEARING_DIA, contains_z_mm=BEARING_LENGTH / 2.0)),
-)
-GEOMETRIC_CONTROLS = tuple(
-    GeometricControl(
-        name, "perpendicularity", f"{FLANGE_PERPENDICULARITY:.2f}",
-        PlanarFace(normal, station * normal[2]), ("A",), "linear",
-    )
-    for name, station, normal in (
-        ("flange_lower_square", FLANGE_BOTTOM_STATION, (0.0, 0.0, -1.0)),
-        ("flange_upper_square", FLANGE_TOP_STATION, (0.0, 0.0, 1.0)),
-    )
-)
 
 # --- Print -----------------------------------------------------------------------
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -231,6 +222,14 @@ DIMENSION_CALLOUTS = {
     "FlangeThick": f"EDGE BREAK {FLANGE_EDGE_BREAK_MAX:.2f} MAX\nBOTH STOP FACES",
 }
 
-# Notes never carry dimensions or methods; the fits ride their callouts.
+# This functional acceptance is exported as its own source-model property,
+# not a general manufacturing note or a geometric-control frame. The part's
+# process row supplies the ordinary indicator setup before press assembly.
+STOP_FACE_INSPECTION_NOTE = (
+    f"BOTH FLANGE STOP FACES: {STOP_FACE_VARIATION_MAX:.2f} MAX TOTAL\n"
+    f"HEIGHT/INDICATOR VARIATION ACROSS Ø{STOP_FACE_MEASUREMENT_DIAMETER:.2f},\n"
+    "ALL AZIMUTHS, TO BEARING-JOURNAL AXIS.\n"
+    "CAP/BLOCK STOPS; INSPECT BEFORE PRESS."
+)
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

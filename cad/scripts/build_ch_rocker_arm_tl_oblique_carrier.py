@@ -61,7 +61,6 @@ from _feature_tree import _feature_by_name, name_last_feature
 from _fit_deviations import deviations
 from _holes import SharedCoordinate, wizard_holes
 from _part_checks import report_mass_properties, volume_check
-from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -86,8 +85,6 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     CR_TAP_DRILL,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
     ISOMETRIC_VIEW_NOTE,
     LEVER_HOLES,
     LEVER_SPEC,
@@ -98,6 +95,7 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     PIN_HOLE_BAND,
     PIN_HOLE_DIA,
     PIN_HOLES,
+    PIN_AXIS_INSPECTION_NOTE,
     PLATE_LENGTH,
     PLATE_WIDTH,
     POSITION_BAND,
@@ -128,6 +126,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
+    "Pin Axis Inspection",
 )
 
 AXIS_OVERRUN = 2.0  # the revolve axis centerline's free end above the top face
@@ -780,9 +779,13 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Pin Axis Inspection": PIN_AXIS_INSPECTION_NOTE,
+        },
     )
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts

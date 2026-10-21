@@ -29,6 +29,7 @@ from _sketch import SketchDims, anchor_point_to_origin, blank_reference_sketches
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 import ch_rocker_arm_tl_oblique_pivot_retainer_spec as spec
+from ch_rocker_arm_tl_oblique_pivot_retainer_spec import REFERENCE_SKETCHES
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-retainer"
 MATERIAL = "Plain Carbon Steel"
@@ -77,7 +78,7 @@ async def build(adapter) -> dict[str, str]:
     check("exit supply reference", await adapter.exit_sketch())
     name_last_feature(adapter, spec.SUPPLY_REFERENCE)
     jobs += dims.apply(adapter, spec.SUPPLY_REFERENCE)
-    blank_reference_sketches(adapter, spec.REFERENCE_SKETCHES)
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     check("retainer top plane", await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=spec.THICKNESS)))
     name_last_feature(adapter, spec.TOP_PLANE)
     jobs.append((name_dimensions(adapter, spec.TOP_PLANE, ["RetainerTopOffset"])[0], '"FinishedThickness"'))

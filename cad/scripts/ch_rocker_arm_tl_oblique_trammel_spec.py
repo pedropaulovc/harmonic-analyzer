@@ -34,7 +34,7 @@ Captured pivots retain both supports during both passes. The integral flange
 is trapped between the unchanged block top and a safety-wired cap; a removable
 washer, headed clevis pin and fresh split cotter capture the carrier above.
 The original k5/N6 bearing fits support rotation, not axial safety. The raised
-carrier seat adds 10.5 mm to the former work height, with no skid or rail change.
+carrier seat adds 11.5 mm to the former work height, with no skid or rail change.
 Heights alone do not prove spindle/toolholder clearance: installed-machine
 acceptance needs the actual stepped tooling envelope over both complete sweeps.
 
@@ -398,8 +398,8 @@ PIVOT_BLOCK_HEIGHT = (
 # The raised Ø12.7 seat remains on the upper inner race through its narrow
 # lower boss. The broad Ø36 flange is relieved clear of the seal and its rim
 # is fitted above the block floor, independently of the bearing press fits.
-# The approved +10.5 work-height change leaves the block/carriage unchanged.
-PIN_COLLAR_PROUD = 13.5
+# The raised cartridge leaves block height and the carriage unchanged.
+PIN_COLLAR_PROUD = 14.5
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing

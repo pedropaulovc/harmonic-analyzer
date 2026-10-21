@@ -21,8 +21,8 @@ spec's): pivot block 1's axes, the origin on the block's -Y face at the
 carriage centre, on the bracket's bottom face. +X runs along the rail away
 from the spindle, +Y is the block's +Y, +Z is up. The bracket lies at -Y.
 Envelope X ``leadscrew.NUT_BRACKET_X`` (-9.25 .. 9.25), Y -48 .. 0,
-Z 0 .. 35.3. The origin's X is mid-air (the bracket centres on the block
-screws), so every printed X station runs from the real -X face.
+Z 0 .. ``BRACKET_HEIGHT``. The origin's X is mid-air (the bracket centres
+on the block screws), so every printed X station runs from the real -X face.
 
 Features:
 
@@ -121,12 +121,12 @@ FACE_X = round(leadscrew.NUT_BRACKET_X[0], 9)  # the -X (nut) face, -9.25
 BRACKET_FACE_X = -FACE_X  # origin to the -X face: an unprinted model knob
 BRACKET_LENGTH = round(leadscrew.NUT_BRACKET_X[1] - leadscrew.NUT_BRACKET_X[0], 9)
 BRACKET_DEPTH = round(leadscrew.NUT_BRACKET_DEPTH, 9)  # 48
-BRACKET_HEIGHT = round(leadscrew.NUT_BRACKET_HEIGHT, 9)  # 35.3
+BRACKET_HEIGHT = round(leadscrew.NUT_BRACKET_HEIGHT, 9)
 # The finished length sets each #8 tap's end wall (WORST_WALLS): with the
 # bracket set centred on the taps, each wall takes half the length's band
 # and holds the floor at two places.
 LENGTH_PLACES = 2
-SIZE_PLACES = 1  # 48.0 and 35.3, milled and faced
+SIZE_PLACES = 1  # depth and height, milled and faced
 if abs(BRACKET_LENGTH - leadscrew.NUT_BRACKET_LENGTH) > 1e-9:
     raise AssertionError("the nut bracket envelope no longer spans its length")
 if abs(leadscrew.NUT_FLANGE_X[1] - leadscrew.NUT_BRACKET_X[0]) > 1e-9:
@@ -146,15 +146,16 @@ SCREW_Z = round(leadscrew.NUT_BRACKET_BLOCK_HOLES_Z, 9)  # 22.3
 BLOCK_SCREW_POINTS = tuple((x, 0.0, SCREW_Z) for x in leadscrew.BLOCK_SCREW_X)
 # The X set (TL-00's match-drill step): clamped on TL-22's -Y face, the
 # bracket's centre stands X_SET_MID from TL-22's -X end, within X_SET_BAND.
-# X_SET_MID is the mid-station of TL-22's
-# two side holes, so the bracket centres on them and each tap's end wall
-# takes half the length's band. The set prints at three places and takes the
+# X_SET_MID is the mid-station of TL-22's two side holes. Extending TL-22's
+# -X end changes this datum distance, not the screws, the bracket's physical
+# centre or the leadscrew line. Each tap's end wall still takes half the
+# length's band. The set prints at three places and takes the
 # title block's ±0.13 (Main's ruling (a), 2026-10-17: no bespoke ±0.10; the
 # .X band's 0.8 would need a 19.75 bracket, past FEED_GAP and the 3/4 in
 # stock), which holds each end wall over the floor (_END_WALL below).
-X_SET_MID = sum(pivot_block.SIDE_STATIONS_X) / 2.0  # 50
-X_SET_FAR_END = X_SET_MID + BRACKET_LENGTH / 2.0  # 59.25 at the nominal length
-X_SET_NUT_FACE = X_SET_MID - BRACKET_LENGTH / 2.0  # 40.75 at the nominal length
+X_SET_MID = sum(pivot_block.SIDE_STATIONS_X) / 2.0
+X_SET_FAR_END = X_SET_MID + BRACKET_LENGTH / 2.0
+X_SET_NUT_FACE = X_SET_MID - BRACKET_LENGTH / 2.0
 X_SET_PLACES = 3
 X_SET_BAND = printed_band_mm(X_SET_PLACES)  # ±0.13
 if abs(pivot_block.DATUM_X + X_SET_FAR_END - leadscrew.NUT_BRACKET_X[1]) > 1e-9:

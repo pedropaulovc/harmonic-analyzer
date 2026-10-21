@@ -102,6 +102,12 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     CAP_TAP_HOLE_SPEC,
     CAP_TAP_POINTS,
     CAP_TAP_REFERENCE,
+    CAP_REGISTER_DEPTH,
+    CAP_REGISTER_DIA,
+    CAP_REGISTER_DIA_BAND,
+    CAP_REGISTER_FEATURE,
+    CAP_REGISTER_POINTS,
+    CAP_REGISTER_PROFILE,
     WING_LENGTH,
     WING_WIDTH,
     WING_X1,
@@ -132,6 +138,10 @@ V_SHOULDER_HOLE = math.pi * _R_SHOULDER**2 * SHOULDER
 _FILLET_AREA = (1.0 - math.pi / 4.0) * SEAT_FILLET_RADIUS**2
 _FILLET_INSET = (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * SEAT_FILLET_RADIUS
 V_SEAT_FILLETS = 2.0 * 2.0 * math.pi * (_R_BORE - _FILLET_INSET) * _FILLET_AREA
+V_CAP_REGISTERS = (
+    len(CAP_REGISTER_POINTS) * math.pi * (CAP_REGISTER_DIA / 2.0) ** 2
+    * CAP_REGISTER_DEPTH
+)
 
 
 def _max_limit(adapter: Any, feature: str, dimension_name: str) -> None:
@@ -321,7 +331,7 @@ async def _bore_sketch(
     return dims
 
 
-async def _top_seat_sketch(adapter: Any) -> SketchDims:
+async def _top_seat_sketch(adapter: Any) -> tuple[SketchDims, Any]:
     """The top seat's circle, located from the block's faces, plus the
     construction points every printed station dimensions to (rule 10).
 
@@ -404,9 +414,10 @@ async def _top_seat_sketch(adapter: Any) -> SketchDims:
     await station(f"{row}.end", "horizontal_distance", "HoleColumn2X")
     await station(f"{row}.end", "vertical_distance", "HoleRow1Y")
     await station(f"{upper}.start", "vertical_distance", "HoleRow2Y")
+    bearing_circle = adapter._sketch_entities[circle]
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
-    return dims
+    return dims, bearing_circle
 
 
 async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
@@ -520,6 +531,57 @@ async def _cap_tap_reference(adapter: Any) -> SketchDims:
     return dims
 
 
+async def _cap_register_sketch(adapter: Any, bearing_circle: Any) -> SketchDims:
+    """Two receiver circles dimensioned from the actual bearing-seat circle.
+
+    Retain and re-register the TopBoreProfile circle's native centre, so these
+    XY dimensions reference the physical bearing axis across sketches. No
+    independent origin point or loose outer-edge chain stands in for it.
+    The consumed profile stays hidden; its blind cut makes real planar floors.
+    """
+    label = "cap register recesses"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("TopFace"))
+    at = _xy_mapper(adapter, BLOCK_HEIGHT, label)
+    bearing_ref = adapter._register_sketch_entity("Circle", bearing_circle)
+    centre = f"{bearing_ref}.center"
+    for index, ((x, y), x_name, y_name) in enumerate(
+        zip(
+            CAP_REGISTER_POINTS,
+            ("CapRegisterLeftX", "CapRegisterRightX"),
+            ("CapRegisterLowerY", "CapRegisterUpperY"),
+            strict=True,
+        ),
+        start=1,
+    ):
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = check(
+                f"{label} circle {index}",
+                await adapter.add_circle(*at(x, y), CAP_REGISTER_DIA / 2.0),
+            )
+        finally:
+            manager.AddToDB = previous
+        for kind, name, expression in (
+            ("horizontal_distance", x_name, '"CapRegisterX"'),
+            ("vertical_distance", y_name, '"CapRegisterY"'),
+        ):
+            await dimension_between(
+                adapter, centre, f"{circle}.center", kind, DRAWING_VALUES[name], name
+            )
+            dims.record(name, expression)
+        check(
+            f"{label} diameter {index}",
+            await adapter.add_sketch_dimension(circle, None, "diameter", CAP_REGISTER_DIA),
+        )
+        dims.record(f"CapRegister{index}Dia", '"CapRegisterDia"')
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -611,7 +673,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- Bearing seats: from the top, then the same from the bottom -----------
     # A cut on a plane runs against its normal by default: down from TopFace.
-    top = await _top_seat_sketch(adapter)
+    top, bearing_circle = await _top_seat_sketch(adapter)
     name_last_feature(adapter, "TopBoreProfile")
     drive_jobs += top.apply(adapter, "TopBoreProfile")
     check(
@@ -769,6 +831,24 @@ async def build(adapter) -> dict[str, str]:
     reference = await _cap_tap_reference(adapter)
     name_last_feature(adapter, CAP_TAP_REFERENCE)
     drive_jobs += reference.apply(adapter, CAP_TAP_REFERENCE)
+    registers = await _cap_register_sketch(adapter, bearing_circle)
+    name_last_feature(adapter, CAP_REGISTER_PROFILE)
+    drive_jobs += registers.apply(adapter, CAP_REGISTER_PROFILE)
+    check(
+        "cut flat-bottom cap register recesses",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=CAP_REGISTER_DEPTH)),
+    )
+    name_last_feature(adapter, CAP_REGISTER_FEATURE)
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, CAP_REGISTER_FEATURE, ["CapRegisterDepth"])[0],
+            '"CapRegisterDepth"',
+        )
+    )
+    volume = await volume_check(
+        adapter, "flat-bottom cap register recesses",
+        volume - V_CAP_REGISTERS, 0.01 * V_CAP_REGISTERS,
+    )
     await name_bore_axis(
         adapter, "Right Plane", BORE_X, "Top Plane", 0.0,
         "bearing axis", drive_a='"BoreX"', drive_jobs=drive_jobs,
@@ -797,6 +877,12 @@ async def build(adapter) -> dict[str, str]:
     # their single MAX limit.
     set_dimension_bilateral_tolerance(
         adapter, "TopBoreProfile", "BoreDia", *deviations(BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, CAP_REGISTER_PROFILE, "CapRegister1Dia", *deviations(CAP_REGISTER_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, CAP_REGISTER_PROFILE, "CapRegister2Dia", *deviations(CAP_REGISTER_DIA_BAND)
     )
     _max_limit(adapter, "SeatFillets", "SeatFilletR")
     apply_drawing_precision(adapter, DRAWING_PRECISION)

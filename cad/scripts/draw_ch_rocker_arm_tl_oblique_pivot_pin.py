@@ -9,11 +9,6 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 from _check import check
-from _drawing_edges import scan_view_edges
-from _drawing_gdt import add_feature_control_frame
-from _gear_drawing_entities import visible_circle_edge
-from _gtol_face_read import face_geometry
-from _native_axis_datum import add_native_axis_datum
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -64,6 +59,10 @@ PROFILE_CENTER = (0.185, 0.164)
 ISO_CENTER = (0.355, 0.205)
 ISO_SCALE = (2, 1)
 ISO_NOTE_XY = (0.325, 0.252)
+# Clear paper below the isometric and the lower-boss callout;
+# four source-owned lines stay above the title block's 65 mm keep-out.
+STOP_FACE_NOTE_XY = (0.315, 0.096)
+INSPECTION_NOTE_CHAR_HEIGHT = 0.0035
 _ABOVE = PROFILE_CENTER[1] + part_spec.FLANGE_DIA / 2.0 * _S
 _BELOW = PROFILE_CENTER[1] - part_spec.FLANGE_DIA / 2.0 * _S
 
@@ -270,6 +269,32 @@ requirement(
     precision={"dia": 2, "length": part_spec.FLANGE_THICK_PLACES},
 )
 
+for _stop_name, _normal, _station in (
+    ("flange_lower_stop", (0.0, 0.0, -1.0), part_spec.FLANGE_BOTTOM_STATION),
+    ("flange_upper_stop", (0.0, 0.0, 1.0), part_spec.FLANGE_TOP_STATION),
+):
+    requirement(
+        _stop_name,
+        kind="face",
+        faces=(PlanarFace(_normal, _normal[2] * _station),),
+        requirements=("note",),
+        fields={
+            "normal": (list(_normal), ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "z", "value": _station},
+                ("FLANGE_BOTTOM_STATION", "FLANGE_TOP_STATION"),
+            ),
+            "note": (
+                " ".join(part_spec.STOP_FACE_INSPECTION_NOTE.splitlines()),
+                (
+                    "STOP_FACE_INSPECTION_NOTE",
+                    "STOP_FACE_VARIATION_MAX",
+                    "STOP_FACE_MEASUREMENT_DIAMETER",
+                ),
+            ),
+        },
+    )
+
 requirement(
     "lower_inner_race_boss",
     kind="boss",
@@ -311,46 +336,6 @@ requirement(
 )
 
 
-def _flange_square_frames(adapter: Any, profile: Any, end: Any) -> None:
-    """Both real stop faces, not just the revolve's nominal square geometry."""
-    add_native_axis_datum(
-        adapter, end,
-        entity=visible_circle_edge(adapter, end, part_spec.BEARING_DIA),
-        source_path=SOURCE, radius_m=part_spec.BEARING_DIA / 2000.0,
-        datum="A", label="pin bearing-journal axis", shoulder=True,
-        stability_tolerance_m=0.0001,
-    )
-    rims = scan_view_edges(profile, label="captured flange rims")
-    for control, station, side in zip(
-        part_spec.GEOMETRIC_CONTROLS,
-        (part_spec.FLANGE_BOTTOM_STATION, part_spec.FLANGE_TOP_STATION),
-        (1.0, -1.0),
-        strict=True,
-    ):
-        matches = [
-            item for item in rims.circles
-            if abs(item.circle[2] - station) < 1e-4
-            and abs(item.circle[6] - part_spec.FLANGE_DIA / 2.0) < 1e-4
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(f"{control.key}: expected one flange-face rim")
-        faces = []
-        for face in matches[0].edge.GetTwoAdjacentFaces2() or ():
-            geometry = None if face is None else face_geometry(face)
-            if geometry is not None and control.face.matches(geometry):
-                faces.append(face)
-        if len(faces) != 1:
-            raise RuntimeError(f"{control.key}: rim does not identify one stop face")
-        landing = (_x(station), PROFILE_CENTER[1] + part_spec.FLANGE_DIA * _S / 3.0)
-        add_feature_control_frame(
-            adapter, profile, entity=faces[0], entity_type="FACE",
-            leader_attach_xy=landing,
-            frame_xy=(landing[0] + side * 0.025 - (0.027 if side < 0.0 else 0.0), landing[1] + 0.004),
-            characteristic=control.characteristic, tolerance=control.tolerance,
-            datums=control.datums, label=control.key,
-        )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -362,6 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Finish",
         "Quantity",
         "Isometric View Note",
+        "Stop Face Inspection",
     )
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
@@ -385,8 +371,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Right", *PROFILE_CENTER, scale=VIEW_SCALE
     )
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    end = place_view(adapter, str(SOURCE), "*Back", 0.355, 0.105, scale=(2, 1))
-    for view in (profile, iso, end):
+    for view in (profile, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = curate_view_dimensions(
@@ -405,7 +390,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=CENTERLINE_PICK, label="pivot pin axis"
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    _flange_square_frames(adapter, profile, end)
+    add_property_linked_note(
+        adapter,
+        "Stop Face Inspection",
+        *STOP_FACE_NOTE_XY,
+        char_height=INSPECTION_NOTE_CHAR_HEIGHT,
+    )
 
     return await finalize_drawing(
         adapter,

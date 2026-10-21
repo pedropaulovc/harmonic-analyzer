@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import math
 import re
@@ -14,10 +15,14 @@ import build_ch_rocker_arm_tl_oblique_pivot_block as part
 import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import draw_ch_rocker_arm_tl_oblique_pivot_block as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
 from _paths import CAD_ROOT
+from _gtol_cylinder import CylinderFace
+from _gtol_planar import PlanarFace
+from _printed_tolerance import printed_band_mm
 from machinist_exceptions import load_exceptions
 
 STEM = "ch_rocker_arm_tl_oblique_pivot_block"
@@ -35,6 +40,8 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
         drawing.SECTION_B_KEEP,
         drawing.SIDE_KEEP,
         drawing.CAPTURE_KEEP,
+        drawing.REGISTER_KEEP,
+        drawing.REGISTER_SECTION_KEEP,
     )
     assert set().union(*keeps) == marked
     assert sum(len(keep) for keep in keeps) == len(marked)
@@ -44,7 +51,8 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 
 def test_block_and_seats_read_the_calculator() -> None:
     assert spec.BLOCK_HEIGHT == trammel.PIVOT_BLOCK_HEIGHT == 24.0
-    assert (spec.BLOCK_X0, spec.BLOCK_X1, spec.BLOCK_WIDTH) == (-54.0, 20.0, 40.0)
+    assert spec.BLOCK_X0 == retention.BLOCK_SPINDLE_END
+    assert (spec.BLOCK_X1, spec.BLOCK_WIDTH) == (20.0, 40.0)
     assert spec.BORE_X == trammel.PIN_OFFSET
     assert spec.BORE_DEPTH == trammel.BEARING_RECESS + trammel.BEARING_WIDTH
     assert spec.SHOULDER == trammel.BEARING_SHOULDER
@@ -61,10 +69,12 @@ def test_bearing_seat_is_n6_with_its_matched_fit_callout() -> None:
     assert seat["note"] == ("0.002-0.024 DIAMETRAL INTERFERENCE ON 6200-2RS OUTER RACE")
     assert spec.CALLOUTS_BELOW["BoreDia"] == spec.BORE_CALLOUT
     assert spec.CALLOUTS_ABOVE["BoreDia"] == "2X"
-    # The seat is the one model band, read from the spec's named band.
-    assert model_toleranced_dimensions(part) == {
-        ("TopBoreProfile", "BoreDia"): "*deviations(BORE_BAND)"
-    }
+    bands = model_toleranced_dimensions(part)
+    assert bands[("TopBoreProfile", "BoreDia")] == "*deviations(BORE_BAND)"
+    for index in (1, 2):
+        assert bands[("CAP_REGISTER_PROFILE", f"CapRegister{index}Dia")] == (
+            "*deviations(CAP_REGISTER_DIA_BAND)"
+        )
 
 
 def test_web_hole_keeps_the_abutment_and_clears_a_puller() -> None:
@@ -289,7 +299,7 @@ def test_side_screw_head_sinks_and_spacing_fits_the_float() -> None:
             features[f"side_screw_hole_{i}"]["height_nominal"],
         )
         for i in (1, 2)
-    ) == [(49.0, 9.0), (59.0, 9.0)]
+    ) == sorted((x - spec.DATUM_X, z) for x, z in spec.SIDE_SCREW_HOLES)
     assert "MHA-CH-06-TL-29" in features["side_screw_hole_1"]["note"]
 
 
@@ -369,14 +379,12 @@ def test_carriage_screws_are_one_native_counterbore_at_the_spec_sizes() -> None:
         "CounterBoreDepth": spec.CBORE_DEPTH,
     }
     assert part.SCREW_HOLE_SPEC is hole
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert source.count("wizard_holes(") == 3
 
 
 def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
     features = _features()
     seat = features["top_bearing_seat"]
-    assert seat["station_nominal"] == spec.BORE_X - spec.BLOCK_X0 == 22.0
+    assert seat["station_nominal"] == spec.BORE_X - spec.BLOCK_X0
     assert seat["width_nominal"] == spec.BLOCK_WIDTH / 2.0 == 20.0
     stations = sorted(
         (
@@ -385,7 +393,9 @@ def test_stations_print_from_the_minus_x_end_and_minus_y_side() -> None:
         )
         for i in range(1, 5)
     )
-    assert stations == [(41.0, 7.0), (41.0, 33.0), (67.0, 7.0), (67.0, 33.0)]
+    assert stations == sorted(
+        (x - spec.DATUM_X, y - spec.DATUM_Y) for x, y in spec.BOLT_POINTS
+    )
     assert features["screw_hole_1"]["precision"]["station"] == 3
     # Every printed station is driven from the origin knobs, not a global.
     assert set(part._STATION_DRIVES) <= set(spec.DRAWING_VALUES)
@@ -468,19 +478,22 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
 
 
 def test_integral_wing_retains_the_original_tail_and_interface_holes() -> None:
-    assert (spec.WING_LENGTH, spec.WING_WIDTH, spec.WING_X1) == (44.0, 64.0, -10.0)
+    assert spec.WING_LENGTH == spec.WING_X1 - spec.BLOCK_X0
+    assert spec.WING_WIDTH == 2.0 * retention.BLOCK_WING_HALF_WIDTH
     assert spec.SIDE_UNDER_HEAD == 35.6
     assert spec.BORE_X == -32.0
     assert spec.BOLT_POINTS == ((-13.0, -13.0), (-13.0, 13.0), (13.0, -13.0), (13.0, 13.0))
-    assert part.V_BLOCK == (74.0 * 40.0 + 44.0 * 24.0) * 24.0
+    assert part.V_BLOCK == (
+        spec.BLOCK_LENGTH * spec.BLOCK_WIDTH
+        + spec.WING_LENGTH * (spec.WING_WIDTH - spec.BLOCK_WIDTH)
+    ) * spec.BLOCK_HEIGHT
     assert spec.BEARING_AXIS_NAME == "BearingAxis"
-    assert drawing.SHEET_NAMES == ("Bearing and carriage", "Capture wing")
 
 
 def test_cap_receiver_taps_are_located_from_the_actual_bearing_axis() -> None:
     assert spec.CAP_TAP_POINTS == ((-47.0, -25.0), (-47.0, 25.0), (-17.0, -25.0), (-17.0, 25.0))
     assert spec.CAP_TAP_HOLE_SPEC.kind == "tapped"
-    assert spec.CAP_TAP_HOLE_SPEC.size == "1/4-20"
+    assert spec.CAP_TAP_HOLE_SPEC.size == "5/16-18"
     assert spec.CAP_TAP_HOLE_SPEC.end == "through_all"
     assert spec.CAP_TAP_LOCATION_PLACES == 3
     assert set(spec.DRAWING_PRECISION[spec.CAP_TAP_REFERENCE].values()) == {3}
@@ -491,9 +504,185 @@ def test_cap_receiver_taps_are_located_from_the_actual_bearing_axis() -> None:
         assert tap["width"] == [24.87, 25.13]
         assert tap["thru"] is True
         assert tap["precision"] == {"station": 3, "width": 3}
+        assert spec.CAP_TAP_HOLE_SPEC.size in tap["note"]
 
 
 def test_thread_envelope_walls_reject_an_undersized_wing() -> None:
     assert min(spec.cap_receiver_walls().values()) >= spec.WALL_TARGET
     assert min(spec.cap_receiver_walls(wing_width=56.0).values()) < spec.WALL_FLOOR
     assert min(spec.cap_receiver_walls(wing_length=40.0).values()) < spec.WALL_FLOOR
+    mouth = spec.cap_receiver_walls(depth=0.0)
+    sweep = spec.BLOCK_HEIGHT * math.tan(
+        math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES)
+    )
+    for wall, minimum in spec.cap_receiver_walls().items():
+        assert mouth[wall] - minimum == pytest.approx(sweep)
+
+
+def test_widened_wing_still_fits_the_declared_flat_bar_without_height_growth() -> None:
+    config = _config.parts("ch-rocker-arm-tl-oblique-pivot-block")
+    assert "1 x 3 in" in config["material_specification"]
+    assert spec.WING_WIDTH + printed_band_mm(2) < 3.0 * trammel.INCH
+    assert spec.BLOCK_HEIGHT + printed_band_mm(2) < trammel.INCH
+    assert spec.BLOCK_HEIGHT == trammel.PIVOT_BLOCK_HEIGHT
+    assert spec.BLOCK_WIDTH == 40.0
+
+
+def test_register_receivers_use_the_shared_bearing_relative_contract() -> None:
+    assert tuple(
+        (x - spec.BORE_X, y) for x, y in spec.REGISTER_POINTS
+    ) == retention.CAP_REGISTER_CENTERS
+    assert spec.REGISTER_DIA == retention.BLOCK_REGISTER_DIAMETER
+    assert spec.REGISTER_DIA_BAND == retention.BLOCK_REGISTER_DIAMETER_BAND
+    assert spec.REGISTER_DEPTH == retention.BLOCK_REGISTER_DEPTH
+    assert spec.REGISTER_DEPTH_PLACES == retention.BLOCK_REGISTER_DEPTH_PLACES
+    assert spec.REGISTER_LOCATION_PLACES == retention.CAP_REGISTER_LOCATION_PLACES
+    assert set(spec.DRAWING_PRECISION[spec.CAP_REGISTER_PROFILE]) == set(
+        drawing.REGISTER_KEEP
+    )
+    for name in (
+        "CapRegisterLeftX", "CapRegisterRightX",
+        "CapRegisterLowerY", "CapRegisterUpperY",
+    ):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == spec.REGISTER_LOCATION_PLACES
+    assert spec.DRAWING_VALUES["CapRegisterDepth"] == spec.REGISTER_DEPTH
+    assert spec.DRAWING_PRECISION_BY_NAME["CapRegisterDepth"] == spec.REGISTER_DEPTH_PLACES
+
+
+def test_register_recesses_bind_cylinders_and_actual_flat_floors() -> None:
+    features = _features()
+    selectors = export_features.feature_selectors(STEM)
+    for index, (x, y) in enumerate(spec.REGISTER_POINTS, start=1):
+        name = f"cap_register_recess_{index}"
+        recess = features[name]
+        assert recess["at"] == [x, y, spec.BLOCK_HEIGHT]
+        assert recess["axis"] == [0.0, 0.0, -1.0]
+        assert recess["station"] == pytest.approx([4.87, 5.13])
+        assert recess["width"] == pytest.approx([23.87, 24.13])
+        assert recess["dia"] == pytest.approx([7.20, 7.30])
+        assert recess["depth"] == pytest.approx([1.87, 2.13])
+        assert recess["thru"] is False
+        assert set(recess["requirements"]) == {"station", "width", "dia", "depth", "note"}
+        assert recess["precision"] == {
+            "station": spec.REGISTER_LOCATION_PLACES,
+            "width": spec.REGISTER_LOCATION_PLACES,
+            "dia": 2,
+            "depth": spec.REGISTER_DEPTH_PLACES,
+        }
+        cylinder, floor = selectors[name]
+        assert isinstance(cylinder, CylinderFace)
+        assert (cylinder.contains_x_mm, cylinder.contains_y_mm) == (x, y)
+        assert isinstance(floor, PlanarFace)
+        assert floor.normal == (0.0, 0.0, 1.0)
+        assert floor.offset_mm == spec.BLOCK_HEIGHT - spec.REGISTER_DEPTH
+        assert floor.contains_x_mm == x
+        assert not {"coaxiality_dia", "position_datums", "perpendicularity"} & recess.keys()
+
+
+def test_register_recipe_cuts_the_actual_cylindrical_volume() -> None:
+    expected = (
+        len(spec.REGISTER_POINTS) * math.pi * (spec.REGISTER_DIA / 2.0) ** 2
+        * spec.REGISTER_DEPTH
+    )
+    assert part.V_CAP_REGISTERS == pytest.approx(expected)
+    tree = ast.parse(inspect.getsource(part.build))
+    cuts = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create_cut_extrude"
+    ]
+    receiver_cuts = [
+        node for node in cuts
+        if node.args
+        and isinstance(node.args[0], ast.Call)
+        and any(
+            kw.arg == "depth" and isinstance(kw.value, ast.Name)
+            and kw.value.id == "CAP_REGISTER_DEPTH"
+            for kw in node.args[0].keywords
+        )
+    ]
+    assert len(receiver_cuts) == 1
+    assert {kw.arg for kw in receiver_cuts[0].args[0].keywords} == {"depth"}
+    assert any(
+        isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub)
+        and isinstance(node.right, ast.Name) and node.right.id == "V_CAP_REGISTERS"
+        for node in ast.walk(tree)
+    )
+    sketch = ast.parse(inspect.getsource(part._cap_register_sketch))
+    assert any(
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "dimension_between"
+        and isinstance(node.args[1], ast.Name) and node.args[1].id == "centre"
+        for node in ast.walk(sketch)
+    )
+    assert any(
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "_register_sketch_entity"
+        and len(node.args) == 2 and isinstance(node.args[1], ast.Name)
+        and node.args[1].id == "bearing_circle"
+        for node in ast.walk(sketch)
+    )
+    assert not any(
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id in ("anchor_point_to_origin", "_add_reference_point")
+        for node in ast.walk(sketch)
+    )
+
+
+def test_register_material_gaps_charge_source_bands_without_tightening_body() -> None:
+    margins = spec.cap_register_margins()
+    assert margins == spec.CAP_REGISTER_MARGINS
+    assert min(margins.values()) >= spec.WALL_TARGET
+    assert margins["receiver floor to bottom face"] > 0.0
+    for index in (1, 2):
+        for feature in (
+            "spindle end", "wing step", "wing side", "bearing pockets",
+            "cap threads", "carriage holes", "nut-bracket holes",
+        ):
+            assert margins[f"register {index} to {feature}"] >= spec.WALL_TARGET
+    assert spec.DRAWING_PRECISION_BY_NAME["WingLength"] == 1
+    for name in ("WingWidth", "BlockHeight", "BoreStationX", "BoreStationY"):
+        assert spec.DRAWING_PRECISION_BY_NAME[name] == 2
+    shallow = spec.cap_register_margins(depth=0.0)
+    assert shallow["register 1 to wing side"] > margins["register 1 to wing side"]
+    location = printed_band_mm(spec.REGISTER_LOCATION_PLACES)
+    radius = (spec.REGISTER_DIA + spec.REGISTER_DIA_BAND[0]) / 2.0
+    deepest = spec.REGISTER_DEPTH + printed_band_mm(spec.REGISTER_DEPTH_PLACES)
+    drift = deepest * math.tan(math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES))
+    expected_side = (
+        (spec.WING_WIDTH - printed_band_mm(2)) / 2.0
+        - abs(retention.CAP_REGISTER_CENTERS[0][1]) - printed_band_mm(2)
+        - location - radius - drift
+    )
+    assert margins["register 1 to wing side"] == pytest.approx(expected_side)
+    assert margins["receiver floor to bottom face"] == pytest.approx(
+        spec.BLOCK_HEIGHT - printed_band_mm(2) - deepest
+        - radius * math.tan(math.radians(spec.GENERAL_ANGULAR_BAND_DEGREES))
+    )
+
+
+@pytest.mark.parametrize(
+    "changes,key",
+    [
+        ({"wing_width": 58.0}, "register 1 to wing side"),
+        ({"wing_length": 30.0}, "register 2 to wing step"),
+        ({"diameter": 15.0}, "register 1 to cap threads"),
+        ({"depth": spec.BLOCK_HEIGHT}, "receiver floor to bottom face"),
+        ({"centres": ((0.0, 18.0), (5.0, 24.0))}, "register 1 to bearing pockets"),
+        ({"centres": ((19.0, 13.0), (5.0, 24.0))}, "register 1 to carriage holes"),
+    ],
+)
+def test_register_gap_checks_detect_lost_material(changes: dict, key: str) -> None:
+    assert spec.cap_register_margins(**changes)[key] < spec.WALL_TARGET
+
+
+def test_register_section_passes_through_both_flat_floors() -> None:
+    start, end = drawing.REGISTER_CUT_START, drawing.REGISTER_CUT_END
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    for x, y in spec.REGISTER_POINTS:
+        assert (x - start[0]) * dy - (y - start[1]) * dx == pytest.approx(0.0)
+    assert start[1] < -spec.WING_WIDTH / 2.0
+    assert end[1] > spec.WING_WIDTH / 2.0
+    assert set(drawing.REGISTER_SECTION_KEEP) == {"CapRegisterDepth"}
+    assert spec.CAP_REGISTER_PROFILE not in spec.REFERENCE_SKETCHES

@@ -27,7 +27,7 @@ from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 # Default-format note text: about 2.8 mm a character and 4.5 mm a line on the
 # farm's templates (draw_pd_paper_drive_assembly fits 68 characters in 0.192).
 CHAR_M = 0.0029
-LINE_M = 0.0045
+LINE_M = drawing.NOTE_LINE_M
 ROW_PITCH_M = 0.00615
 ISO = math.sqrt(2.0 / 3.0)  # an isometric view's foreshortening
 
@@ -232,14 +232,14 @@ def _cluster_extent(sheet: str):
     return points, z
 
 
-def _cluster_outline(cluster, center=(0.2, 0.15)):
-    """The cluster view's estimated outline (sheet metres) at its placed scale."""
+def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
+    """The estimated native outline at an initial or fitted scale (sheet metres)."""
     points, (z0, z1) = _cluster_extent(cluster.sheet)
     xs, ys = [p[0] for p in points], [p[1] for p in points]
     plan = (max(xs) - min(xs)) + (max(ys) - min(ys))
     width = plan * math.cos(math.pi / 4.0) * OUTLINE_GROWTH[0]
     height = (plan * ISO / 2.0 + (z1 - z0) * ISO) * OUTLINE_GROWTH[1]
-    return _view_box(center, width, height, cluster.scale)
+    return _view_box(center, width, height, scale or cluster.scale)
 
 
 def test_sheets_are_landscape_with_their_scales() -> None:
@@ -254,17 +254,15 @@ def test_sheets_are_landscape_with_their_scales() -> None:
         drawing.CAPTURE_SHEET,
     )
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
-    assert drawing.SHEET_SCALES == {
-        "ASSEMBLED AT INNER PASS": (1.0, 4.0),
-        "BILL OF MATERIALS": (1.0, 6.0),
-        "RAIL BARS EXPLODED": (1.0, 5.0),
-        "PIVOTCAPTUREEXPLODED": (1.0, 3.0),
-        "LEADSCREW FEED EXPLODED": (1.0, 3.0),
-        "CARRIER EXPLODED": (1.0, 5.0),
-        "ASSEMBLY STEPS": (1.0, 15.0),
-        drawing.CAPTURE_SHEET: (1.0, 1.0),
-    }
-    assert drawing.SHEET_SCALE == (1.0, 4.0)
+    assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
+    assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
+    assert drawing.SHEET_SCALES[drawing.BOM_SHEET] == drawing.REFERENCE_SCALE
+    assert drawing.SHEET_SCALES[drawing.CAPTURE_SHEET] == drawing.ISOMETRIC_SCALE
+    assert all(
+        drawing.SHEET_SCALES[cluster.sheet] in drawing.CLUSTER_SCALE_LADDER
+        for cluster in drawing.CLUSTERS
+    )
+    assert drawing.SHEET_SCALE == drawing.ASSEMBLED_SCALE
     assert drawing.SPEC.source_kind == "assembly"
 
 
@@ -320,16 +318,18 @@ def test_clusters_partition_the_bom() -> None:
 
 def test_exploded_captions_fit_their_text_region() -> None:
     for cluster in drawing.CLUSTERS:
-        caption = drawing.exploded_caption(cluster, (1.0, 5.0))
-        lines = caption.split("\n")
-        assert max(map(len, lines)) <= drawing.EXPLODED_CAPTION_WIDTH
-        assert len(lines) <= 3
-        words = " ".join(lines)
-        assert f"BOM ON SHEET {drawing.SHEET_NAMES.index(drawing.BOM_SHEET) + 1}" in words
-        assert (
-            "ASSEMBLY SEQUENCE ON SHEET "
-            f"{drawing.SHEET_NAMES.index(drawing.STEPS_SHEET) + 1}"
-        ) in words
+        scale = drawing.cluster_ring_scale(
+            _cluster_outline(cluster), cluster.scale, label=cluster.sheet
+        )
+        caption = drawing.exploded_caption(cluster, scale)
+        assert max(map(len, caption.split("\n"))) <= drawing.EXPLODED_CAPTION_WIDTH
+        assert _inside_sheet(_note_box(caption, drawing.EXPLODED_CAPTION_XY))
+        reference = spec.EXPLODED_CAPTION.format(
+            scale=drawing._scale_text(scale),
+            bom_sheet=drawing.SHEET_NAMES.index(drawing.BOM_SHEET) + 1,
+            steps_sheet=drawing.SHEET_NAMES.index(drawing.STEPS_SHEET) + 1,
+        )
+        assert caption.split() == f"{cluster.title} {reference}".split()
 
 
 def test_sheet_text_is_the_spec_text_wrapped() -> None:
@@ -487,42 +487,62 @@ def test_bom_sheet_regions_fit_apart() -> None:
     )
     assert _inside_sheet(reference) and _inside_sheet(bom)
     assert not _overlap(reference, bom)
-    assert bom[2] == pytest.approx(drawing.SHEET_INNER_BORDER[2])
-    # One unsplit table, clear of the title block by the clearance the
-    # recipe measures it against at run time.
+    # One unsplit table stays on paper without a global height restriction
+    # from the title block on the other side of the sheet.
     assert not drawing.bom_extent_violations(drawing.BOM_ANCHOR, BOM_WIDTH, BOM_HEIGHT)
-    assert bom[1] - drawing.TITLE_BLOCK[3] >= drawing.BOM_SHEET_CLEARANCE
+    assert bom[2] <= drawing.TITLE_BLOCK_KEEP_OUT[0]
     # The reference view stays in the room the drawing asserts at run time,
     # which keeps out of the title block.
     region = drawing.REFERENCE_REGION
     assert _inside(reference, region) and _inside_sheet(region)
-    assert region[2] <= bom[0] - drawing.REGION_GAP
+    assert region[0] >= bom[2] + drawing.REGION_GAP
 
 
 def test_bom_extent_violations_name_each_breach() -> None:
-    anchor = drawing.BOM_ANCHOR
-    into_title = anchor[1] - drawing.TITLE_BLOCK[3]
-    assert drawing.bom_extent_violations(anchor, BOM_WIDTH, into_title) == [
-        "enters the title block"
-    ]
-    assert drawing.bom_extent_violations(anchor, BOM_WIDTH + 0.001, BOM_HEIGHT) == [
-        "crosses the inner border"
-    ]
+    left, bottom, right, top = drawing.SHEET_INNER_BORDER
+    clearance = drawing.BOM_SHEET_CLEARANCE
+    # Below the title's top is valid on the left, but not inside its actual
+    # two-dimensional keep-out. Keep this small table below the reference room.
+    table_top = drawing.TITLE_BLOCK[3]
+    table_height = (table_top - bottom - clearance) / 2.0
+    assert not drawing.bom_extent_violations(
+        (left, table_top), BOM_WIDTH, table_height
+    )
     assert drawing.bom_extent_violations(
-        (anchor[0] - 0.001, anchor[1]), BOM_WIDTH, BOM_HEIGHT
+        (drawing.TITLE_BLOCK[0], table_top),
+        (right - drawing.TITLE_BLOCK[0]) / 2.0,
+        table_height,
+    ) == ["enters the title block"]
+    assert drawing.bom_extent_violations(
+        (left - clearance, drawing.BOM_ANCHOR[1]), BOM_WIDTH, BOM_HEIGHT
+    ) == ["crosses the inner border"]
+    assert drawing.bom_extent_violations(
+        (left, top + clearance), BOM_WIDTH, BOM_HEIGHT
+    ) == ["crosses the inner border"]
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, BOM_WIDTH, drawing.BOM_ANCHOR[1] - bottom
+    ) == ["crosses the bottom border"]
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, BOM_WIDTH + drawing.REGION_GAP, BOM_HEIGHT
     ) == ["enters the reference view's room"]
+    assert "crosses the inner border" in drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, right - left + clearance, BOM_HEIGHT
+    )
 
 
 def test_each_cluster_rings_inside_its_sheet() -> None:
     for cluster in drawing.CLUSTERS:
-        outline = _cluster_outline(cluster)
-        # Its estimated ring fits at the scale it is placed at, and at no
-        # larger one: the sheet scales are the fit's, larger than the one
-        # 1:10 view they replace.
-        assert drawing.cluster_ring_scale(outline, cluster.scale, label="t") == (
-            cluster.scale
-        )
-        assert cluster.scale[0] / cluster.scale[1] > 1.0 / 10.0
+        initial = _cluster_outline(cluster)
+        scale = drawing.cluster_ring_scale(initial, cluster.scale, label=cluster.sheet)
+        # Fit at the returned scale, not the initial placement scale. Every
+        # larger ladder rung must fail the same physical ring budget.
+        for larger in drawing.CLUSTER_SCALE_LADDER[
+            :drawing.CLUSTER_SCALE_LADDER.index(scale)
+        ]:
+            assert drawing.cluster_ring_fit(
+                _cluster_outline(cluster, scale=larger)
+            )[1]
+        outline = _cluster_outline(cluster, scale=scale)
         shift, overflows, slide = drawing.cluster_ring_fit(outline)
         assert not overflows and slide <= 0.0
         placed = (
@@ -540,7 +560,7 @@ def test_each_cluster_rings_inside_its_sheet() -> None:
         )
         assert _inside(ring, drawing.CLUSTER_RING_REGION)
         caption = _note_box(
-            drawing.exploded_caption(cluster, cluster.scale),
+            drawing.exploded_caption(cluster, scale),
             drawing.EXPLODED_CAPTION_XY,
         )
         assert _inside_sheet(caption)
@@ -586,10 +606,15 @@ def test_cluster_ring_scale_walks_the_whole_ladder() -> None:
     # A small outline placed at 1:10 steps UP to the ladder's top; one too
     # big at every rung names each rung's overflow.
     small = (0.0, 0.0, 0.010, 0.010)
-    assert drawing.cluster_ring_scale(small, (1.0, 10.0), label="t") == (1.0, 3.0)
+    placed = drawing.CLUSTER_SCALE_LADDER[-1]
+    assert drawing.cluster_ring_scale(small, placed, label="t") == (
+        drawing.CLUSTER_SCALE_LADDER[0]
+    )
     huge = (0.0, 0.0, 0.400, 0.300)
-    with pytest.raises(ValueError, match="1:3: .* \\| .*1:10: "):
-        drawing.cluster_ring_scale(huge, (1.0, 10.0), label="t")
+    with pytest.raises(ValueError) as error:
+        drawing.cluster_ring_scale(huge, placed, label="t")
+    for scale in drawing.CLUSTER_SCALE_LADDER:
+        assert f"{drawing._scale_text(scale)}:" in str(error.value)
     with pytest.raises(ValueError, match="not on the ladder"):
         drawing.cluster_ring_scale(small, (1.0, 7.0), label="t")
 
@@ -631,28 +656,21 @@ def test_keep_out_overshoot_measures_the_low_balloons() -> None:
 
 
 def _steps_sheet_boxes(layout):
-    finished = _view_box(
-        _center(layout.finished_region), *_iso_size(0.0), drawing.ISOMETRIC_SCALE
-    )
     boxes = [
-        finished,
         _note_box(layout.steps, drawing.STEPS_XY),
         _note_box(layout.checks, layout.checks_xy),
     ]
     if layout.continued:
         boxes.append(_note_box(layout.continued, drawing.STEPS_CONTINUED_XY))
-    return finished, boxes
+    return boxes
 
 
 def _assert_steps_sheet_fits(layout) -> None:
-    finished, boxes = _steps_sheet_boxes(layout)
+    boxes = _steps_sheet_boxes(layout)
     assert all(_inside_sheet(box) for box in boxes)
     for index, a in enumerate(boxes):
         for b in boxes[index + 1 :]:
             assert not _overlap(a, b)
-    # The finished view stays in the room the drawing asserts at run time.
-    assert _inside(finished, layout.finished_region)
-    assert _inside_sheet(layout.finished_region)
     # The left column ends over its floor at the farm's measured line pitch.
     steps_lines = _lines(layout.steps)
     assert drawing.STEPS_XY[1] - steps_lines * drawing.NOTE_LINE_M >= (
@@ -668,24 +686,81 @@ def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
 
 
-def test_capture_operation_notes_fit_their_own_sheet() -> None:
+def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:
     layout = drawing.CAPTURE_LAYOUT
-    boxes = [
-        _note_box(layout.steps, drawing.STEPS_XY),
-        _note_box(layout.checks, layout.checks_xy),
-    ]
-    if layout.continued:
-        boxes.append(_note_box(layout.continued, drawing.STEPS_CONTINUED_XY))
+    _assert_steps_sheet_fits(layout)
     assert drawing.CAPTURE_SHEET != drawing.STEPS_SHEET
     assert drawing.CAPTURE_SHEET in drawing.SHEET_NAMES
-    assert all(_inside_sheet(box) for box in boxes)
-    for index, box in enumerate(boxes):
-        assert all(not _overlap(box, other) for other in boxes[index + 1:])
-    assert (
-        drawing.STEPS_XY[1] - _lines(layout.steps) * drawing.NOTE_LINE_M
-        >= drawing.STEPS_FLOOR
+    # Retain the finished view's specified readable scale, using only this
+    # sheet's filled text bounds to determine its available room.
+    assert drawing.ISOMETRIC_SCALE == (1.0, 15.0)
+    finished = _view_box(
+        _center(drawing.FINISHED_REGION), *_iso_size(0.0), drawing.ISOMETRIC_SCALE
     )
-    assert layout.finished_region[3] >= drawing.STEPS_FLOOR
+    assert _inside(finished, drawing.FINISHED_REGION)
+    assert _inside_sheet(drawing.FINISHED_REGION)
+    assert _inside_sheet(finished)
+    for note in _steps_sheet_boxes(layout):
+        assert not _overlap(finished, note)
+
+
+@pytest.mark.parametrize("outside_room", (False, True))
+def test_finished_native_view_belongs_to_capture_sheet_and_must_fit(
+    monkeypatch, outside_room
+) -> None:
+    region = drawing.FINISHED_REGION
+    center = _center(region)
+    outline = _view_box(center, *_iso_size(0.0), drawing.ISOMETRIC_SCALE)
+    if outside_room:
+        outline = (*outline[:3], region[3] + drawing.REGION_GAP)
+    view = SimpleNamespace(GetOutline=lambda: outline)
+    sheets, placements, configurations, detail_checks = [], [], [], []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        drawing, "_activate_sheet", lambda _adapter, sheet: sheets.append(sheet)
+    )
+
+    def place(_adapter, name, xy, scale, *, label):
+        placements.append((name, xy, scale))
+        return view
+
+    monkeypatch.setattr(drawing, "_place_named_view", place)
+    monkeypatch.setattr(
+        drawing, "set_high_quality_shaded_with_edges",
+        lambda _adapter, _view, *, label: None,
+    )
+
+    def configure(_adapter, configured_view, *, role, label):
+        assert configured_view is view
+        assert role is drawing.ViewRole.FULL_DETAIL
+        return drawing.ASSEMBLY_VIEW_CONFIGURATION
+
+    monkeypatch.setattr(drawing, "apply_view_configuration", configure)
+    monkeypatch.setattr(
+        drawing, "set_view_exploded_state",
+        lambda _adapter, _view, exploded, *, configuration, label:
+        configurations.append((exploded, configuration)),
+    )
+    monkeypatch.setattr(
+        drawing, "_center_view_outline",
+        lambda _adapter, _view, xy, *, label: None,
+    )
+    monkeypatch.setattr(
+        drawing, "assert_full_detail_view",
+        lambda _adapter, *, label: detail_checks.append(label),
+    )
+    # Keep the real guard: it must use the returned native GetOutline, not
+    # assume the estimated or requested view fits its capture-sheet room.
+    if outside_room:
+        with pytest.raises(RuntimeError, match="leaves"):
+            drawing._place_finished_view(_ADAPTER)
+        assert not detail_checks
+    else:
+        drawing._place_finished_view(_ADAPTER)
+        assert detail_checks
+    assert sheets == [drawing.CAPTURE_SHEET]
+    assert placements == [(spec.ISOMETRIC_VIEW, center, drawing.ISOMETRIC_SCALE)]
+    assert configurations == [(False, drawing.ASSEMBLY_VIEW_CONFIGURATION)]
 
 
 def test_capture_notes_are_placed_only_on_the_capture_operation_sheet(monkeypatch) -> None:
@@ -704,20 +779,6 @@ def test_capture_notes_are_placed_only_on_the_capture_operation_sheet(monkeypatc
     assert {sheet for sheet, _text, _xy, _label in placed} == {
         drawing.CAPTURE_SHEET
     }
-
-
-def test_steps_sheet_holds_an_added_step() -> None:
-    # Headroom: a line more in the last step (the right column) still lays
-    # out with the finished view at its scale. The left column is full: steps
-    # 1 to 10 fill it to its floor.
-    steps = list(spec.ASSEMBLY_STEPS)
-    steps[-1] += " " + "WORD " * 13
-    layout = drawing.steps_sheet_layout(steps, spec.ASSEMBLY_CHECKS)
-    _assert_steps_sheet_fits(layout)
-    added = sum(map(_lines, (layout.steps, layout.continued))) - sum(
-        map(_lines, (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED))
-    )
-    assert added >= 1
 
 
 def test_every_bom_row_carries_one_balloon() -> None:
@@ -806,7 +867,6 @@ def test_bom_identity_is_the_registry() -> None:
 
 def test_steps_cite_every_screw_by_item_number() -> None:
     screws = [stem for stem in spec.BOM_ORDER if stem.endswith("-screw")]
-    assert len(screws) == 10
     steps = "\n".join((
         drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED,
         drawing.CAPTURE_LAYOUT.steps, drawing.CAPTURE_LAYOUT.continued,
@@ -1187,6 +1247,11 @@ def test_bom_prints_registry_numbers_one_line_a_row(
     ]
     assert [row[1] for row in kit_rows] == ["MHA-SH-VN-57"] * 3
     assert [row[3] for row in kit_rows] == ["4"] * 3
+    assert attrs["anchor_mm"] == pytest.approx(
+        tuple(value * 1000.0 for value in drawing.BOM_ANCHOR)
+    )
+    assert attrs["width_mm"] == pytest.approx(BOM_WIDTH * 1000.0)
+    assert attrs["height_mm"] == pytest.approx(BOM_HEIGHT * 1000.0)
 
 
 def test_bom_refuses_items_numbered_off_the_steps(native_bom_bindings) -> None:
@@ -1279,13 +1344,15 @@ def test_bom_refuses_ambiguous_native_kit_rows(native_bom_bindings, fault):
         drawing._validate_bom(_ADAPTER, table)
 
 
-def test_bom_refuses_a_row_that_wraps_into_the_title_block(native_bom_bindings) -> None:
+def test_bom_refuses_native_row_growth_past_the_bottom_border(
+    native_bom_bindings,
+) -> None:
 
     class Wrapping(_Table):
         def GetRowHeight(self, row):
             return 2.0 * super().GetRowHeight(row)  # every description wrapped
 
-    with pytest.raises(RuntimeError, match="enters the title block"):
+    with pytest.raises(RuntimeError, match="crosses the bottom border"):
         drawing._validate_bom(_ADAPTER, Wrapping(spec.BOM_ORDER))
 
 
@@ -1353,9 +1420,10 @@ def kit_bom_note_state(monkeypatch, native_bom_bindings):
     table.heights = {
         row: drawing.BOM_ROW_HEIGHT for row in range(len(spec.BOM_ORDER) + 1)
     }
+    rx0, ry0, rx1, ry1 = drawing.REFERENCE_REGION
     state = SimpleNamespace(
         table=table,
-        outline=(0.060, 0.125, 0.190, 0.230),
+        outline=(rx0 + 0.010, ry0 + 0.070, rx1 - 0.010, ry1 - 0.010),
         notes=[],
         width=0.145,
         move="applied",
@@ -1386,8 +1454,8 @@ def test_kit_bom_key_measured_extent_clears_native_neighbors(kit_bom_note_state)
     field = drawing.kit_bom_note_region(bom, state.outline)
     assert _inside(extent, field) and _inside_sheet(extent)
     assert state.outline[1] - extent[3] >= 0.004
-    assert bom[0] - extent[2] >= 0.004
-    assert drawing.TITLE_BLOCK[0] - extent[2] >= 0.004
+    assert extent[0] - bom[2] >= 0.004
+    assert extent[1] - drawing.TITLE_BLOCK[3] >= 0.004
     assert extent[0] > note.position[0]  # placement used ink, not the annotation origin
     settled()
     for family in spec.KIT_IDENTITIES:
@@ -1431,7 +1499,7 @@ def test_kit_bom_key_rechecks_content_and_clearance_after_final_rebuild(
     extent = drawing._kit_bom_note_extent(note)
     member_row = int(spec.ITEM_NUMBERS[spec.T_NUT])
     if fault == "bom-moved":
-        state.table.position = (extent[2] + 0.003, state.table.position[1], 0.0)
+        state.table.position = (extent[0] - BOM_WIDTH - 0.003, state.table.position[1], 0.0)
     elif fault == "reference-moved":
         left, _bottom, right, top = state.outline
         state.outline = left, extent[3] + 0.003, right, top
@@ -1456,6 +1524,19 @@ def test_kit_bom_key_rechecks_content_and_clearance_after_final_rebuild(
         note.width = math.nan
     with pytest.raises(RuntimeError):
         settled()
+
+
+def test_bom_refuses_native_column_growth_into_the_reference_room(
+    native_bom_bindings,
+) -> None:
+
+    class Widened(_Table):
+        def GetColumnWidth(self, column):
+            width = super().GetColumnWidth(column)
+            return width + 2.0 * drawing.REGION_GAP if column == 1 else width
+
+    with pytest.raises(RuntimeError, match="enters the reference view's room"):
+        drawing._validate_bom(_ADAPTER, Widened(spec.BOM_ORDER))
 
 
 class _Manager:

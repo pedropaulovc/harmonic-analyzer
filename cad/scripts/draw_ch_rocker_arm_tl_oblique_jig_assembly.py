@@ -1,4 +1,4 @@
-r"""Create the six-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
+r"""Create the eight-sheet oblique-trammel jig fitter package (MHA-CH-06-TL-00).
 
 Sheet 1 shows the jig assembled at the symmetric inner pass in the machine
 frame: the plan (camera down Z) above the operator's elevation, each titled,
@@ -8,21 +8,23 @@ indicates the pivot pins to; the elevation carries the one native dimension,
 the CL dowel's round tip above the riser top as a reference (the builder's
 hidden ``spec.CL_TIP_FEATURE``). Sheet 2 is the BOM: every fabricated and purchased
 family from the part registry, numbered in the spec's BOM order with its full
-description and total quantity, one line a row, beside its collapsed parent
-view. Shared kit members retain three native configuration rows with the same
+description and total quantity, one line a row, on the left of the sheet; its
+unballooned, collapsed parent view sits on the right above the title block.
+Shared kit members retain three native configuration rows with the same
 associative SH-VN-57 Number. A BOM-scoped key identifies their common purchased
 SKU and maps the native items to named configurations and installed counts,
 never kit purchase quantities. Its measured note box stays below the reference
 view and clear of the rebuilt BOM, border and title block. Vendor Numbers have
-their own 56 mm column without changing the table's footprint. Sheets 3 to 5
-each show the builder-owned
-``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail
-bars, leadscrew feed, carrier), at the largest scale whose balloon ring fits
-the sheet, each family ballooned once on one ring, on no other sheet. Sheet 6
-is the assembly order, whose steps cite the fasteners by item number, in two
-columns, the checks, and the finished isometric. Every view is one the
-builder named in the machine frame (``spec.VIEW_AXES``), its mapping proven
-on the sheet before anything is placed by it. Every text,
+their own 56 mm column. Sheets 3 to 6 each show the builder-owned
+``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail bars,
+pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
+ring fits the sheet, each family ballooned once on one ring, on no other sheet.
+Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
+in two columns, and the checks. Sheet 8 carries capture and machine-acceptance
+instructions, with the finished isometric below the right-column checks at
+1:15. Every view is one the builder named in the machine frame
+(``spec.VIEW_AXES``), its mapping proven on the sheet before anything is placed
+by it. Every text,
 pose and reference value comes from
 ``ch_rocker_arm_tl_oblique_jig_assembly_spec`` (and through it the calculator
 ``ch_rocker_arm_tl_oblique_trammel_spec``) or the part registry; this recipe
@@ -131,8 +133,8 @@ class Cluster:
 # review r4). So each sub-assembly explodes on its own sheet: what stands on
 # the table and rides its rails, the feed bolted along rail 1 and onto pivot
 # block 1, and what rides the pins. Each family is shown and ballooned in
-# exactly one, in BOM order. Each placed scale is the ladder scale the offline
-# layout test fits its estimated ring to.
+# exactly one, in BOM order. Each initial scale is fitted to the largest
+# ladder scale that holds the view's measured balloon ring.
 CLUSTERS = (
     Cluster(
         "RAIL BARS EXPLODED",
@@ -218,12 +220,9 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # The jig is about 970 x 435 in plan: 1:4 for the arrangement, 1:15 for the
-# finished isometric and 1:6 for the BOM's collapsed reference, the largest
-# ladder rung its room left of the BOM holds (review bought-tl000-r1: at 1:10
-# it sat small in that room). The finished
-# view sits under the continued steps and the checks; review bought-r15's
-# step 4, 6 and 7 rewrites send step 11 to the right column, which leaves its
-# room about 63 tall, short of the 94 the view needs at 1:8.
+# finished isometric on the capture sheet, and 1:6 for the BOM's collapsed
+# reference in the room right of the table. The steps sheet is text only:
+# its continued steps and checks no longer constrain the finished view.
 ASSEMBLED_SCALE = (1.0, 4.0)
 REFERENCE_SCALE = (1.0, 6.0)
 ISOMETRIC_SCALE = (1.0, 15.0)
@@ -253,8 +252,8 @@ def package_sheet_scales(
     fixed = {
         ASSEMBLED_SHEET: ASSEMBLED_SCALE,
         BOM_SHEET: REFERENCE_SCALE,
-        STEPS_SHEET: ISOMETRIC_SCALE,
-        CAPTURE_SHEET: (1.0, 1.0),
+        STEPS_SHEET: (1.0, 1.0),
+        CAPTURE_SHEET: ISOMETRIC_SCALE,
     }
     return {
         name: cluster_scales[name] if name in cluster_scales else fixed[name]
@@ -327,13 +326,12 @@ CL_TIP_TEXT_MODEL_MM = (
     spec.CL_TIP_LINE[1][1] + 10.0,
 )
 
-# Sheet 2: the BOM right, four columns to the inner border. The captured
-# cartridges add six families: use the available top border rather than
-# shrinking the legible 5.5 mm rows or the default-format text. Reallocate
-# 8 mm of the former 118 mm description column to the Number column: full
-# 18-character vendor Numbers need 52.2 mm at the unchanged default format.
-# Both text columns retain 2 mm horizontal clearance. Native table bounds
-# are checked after rebuilding, including clearance above the title block.
+# Sheet 2: the full-height BOM left, its collapsed reference right. The table
+# can extend below the title block's top because it stays left of that block.
+# Keep legible 5.5 mm rows and default-format text; reallocate 8 mm of the
+# former description column to the Number column: full 18-character vendor
+# Numbers need 52.2 mm at the unchanged default format. Both text columns
+# retain 2 mm horizontal clearance. Native table bounds are checked after rebuild.
 # Table text runs about 2.9 mm a character.
 BOM_CHAR_M = 0.0029
 BOM_CELL_PADDING_M = 0.002  # total horizontal clearance inside each text column
@@ -349,21 +347,21 @@ BOM_DESCRIPTION_MAX_CHARS = int(
 BOM_ROW_HEIGHT = 0.0055
 BOM_SHEET_CLEARANCE = 0.003  # the paper the BOM keeps off the title block
 BOM_ANCHOR = (
-    SHEET_INNER_BORDER[2] - sum(BOM_COLUMN_WIDTHS.values()),
+    SHEET_INNER_BORDER[0],
     SHEET_INNER_BORDER[3] - BOM_SHEET_CLEARANCE,
 )
 REGION_GAP = 0.006  # between a view's room and the text beside it
-# Left of the BOM, over the title block's top, the BOM's parent view: the jig
+# Right of the BOM, over the title block's top, the BOM's parent view: the jig
 # collapsed, unballooned, a reference for the table. Its measured outline is
 # centred in this room and must stay in it.
 REFERENCE_REGION = (
-    SHEET_INNER_BORDER[0],
+    BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values()) + REGION_GAP,
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
-    BOM_ANCHOR[0] - REGION_GAP,
+    SHEET_INNER_BORDER[2],
     SHEET_INNER_BORDER[3],
 )
 
-# Sheets 3-5: one cluster's exploded isometric each, its balloon ring inside
+# Sheets 3-6: one cluster's exploded isometric each, its balloon ring inside
 # the border, over the caption, its low arc clear of the title block.
 BALLOON_MARGIN = 0.024
 # A ring places each balloon's CENTRE margin outside the view outline; its
@@ -392,12 +390,12 @@ TITLE_BLOCK_KEEP_OUT = (
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
 )
 
-# Sheet 6: the assembly sequence in two columns of one width, the heading and
+# Sheet 7: the assembly sequence in two columns of one width, the heading and
 # as many whole steps as fit the left column, which runs down beside the
-# title block; the rest at the top of the right column, the checks under
-# them, the finished isometric under those, over the title block.
-# Default-format note text: 4.525 mm a line (draw_dt_drive_train_assembly's
-# measured pitch) and about 2.9 mm a character.
+# title block; the rest atop the right column, the checks under them.
+# Sheet 8 reuses that text layout for capture and operation, with the finished
+# isometric in its free bottom-right room. Default-format text uses a measured
+# 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
 STEPS_LINE_WIDTH = 68  # characters; 197 mm, either column
 STEPS_HEADING = "ASSEMBLY SEQUENCE"
@@ -606,23 +604,20 @@ def _note_height(text: str) -> float:
 
 @dataclass(frozen=True)
 class StepsLayout:
-    """The steps sheet's text blocks, where the checks go, the finished
-    view's room."""
+    """A text-only two-column instruction layout, with checks below the continuation."""
 
     steps: str  # the heading and the steps the left column holds
     continued: str  # the rest, atop the right column; "" when none
     checks: str
     checks_xy: tuple[float, float]
-    finished_region: tuple[float, float, float, float]
 
 
 def steps_sheet_layout(
     steps: Sequence[str], checks: Sequence[str], *, heading: str = STEPS_HEADING
 ) -> StepsLayout:
-    """Lay the steps sheet out: the heading and the most whole steps whose
-    block ends over ``STEPS_FLOOR`` down the left column, the rest atop the
-    right one, the checks under them, and under those, over the title block,
-    the finished view's room. Raises when the first step alone overruns."""
+    """Lay out the heading and whole steps above ``STEPS_FLOOR`` in the left
+    column, the rest atop the right column, and the checks below them.
+    No view room is reserved: only the capture sheet carries a finished view."""
     for count in range(len(steps), 0, -1):
         left = _wrapped(
             tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading
@@ -636,13 +631,9 @@ def steps_sheet_layout(
     x, top = STEPS_CONTINUED_XY
     if continued:
         top -= _note_height(continued) + REGION_GAP
-    region = (
-        x,
-        TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
-        SHEET_INNER_BORDER[2],
-        top - _note_height(checks_text) - REGION_GAP,
-    )
-    return StepsLayout(left, continued, checks_text, (x, top), region)
+    if top - _note_height(checks_text) < TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE:
+        raise ValueError("instruction checks overrun the right column")
+    return StepsLayout(left, continued, checks_text, (x, top))
 
 
 STEPS_LAYOUT = steps_sheet_layout(spec.ASSEMBLY_STEPS, spec.ASSEMBLY_CHECKS)
@@ -650,12 +641,17 @@ ASSEMBLY_STEPS = STEPS_LAYOUT.steps
 ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
 ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
 CHECKS_XY = STEPS_LAYOUT.checks_xy
-FINISHED_REGION = STEPS_LAYOUT.finished_region
 CAPTURE_LAYOUT = steps_sheet_layout(
     spec.CAPTURE_STEPS, spec.CAPTURE_CHECKS, heading="CAPTURE AND MACHINE ACCEPTANCE"
 )
-if CAPTURE_LAYOUT.finished_region[3] < STEPS_FLOOR:
-    raise AssertionError("capture instructions overrun the second text column")
+# Only this sheet has a finished view. Its room follows the filled right
+# column, keeping the actual native outline clear of its checks and title.
+FINISHED_REGION = (
+    STEPS_CONTINUED_XY[0],
+    TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
+    SHEET_INNER_BORDER[2],
+    CAPTURE_LAYOUT.checks_xy[1] - _note_height(CAPTURE_LAYOUT.checks) - REGION_GAP,
+)
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
@@ -838,23 +834,35 @@ def _bom_columns(header: tuple[str, ...]) -> dict[str, int]:
 def bom_extent_violations(
     anchor: tuple[float, float], width: float, height: float
 ) -> list[str]:
-    """Name every way the top-left-anchored BOM leaves its paper: the inner
-    border, the title block (``BOM_SHEET_CLEARANCE`` clear of it) and the
-    reference view's room left of the table (``REGION_GAP`` clear of it)."""
+    """Name every intersection with the border, title keep-out or reference
+    room. A table left of the title block may extend below its top."""
     left, top = anchor
     right, bottom = left + width, top - height
     tolerance = 1e-9  # floating-point arithmetic, not a paper allowance
-    _border_left, border_bottom, border_right, border_top = SHEET_INNER_BORDER
+    border_left, border_bottom, border_right, border_top = SHEET_INNER_BORDER
     findings = []
-    if left < REFERENCE_REGION[2] + REGION_GAP - tolerance:
+    rx0, ry0, rx1, ry1 = REFERENCE_REGION
+    if (
+        right > rx0 - REGION_GAP + tolerance
+        and left < rx1 - tolerance
+        and bottom < ry1 - tolerance
+        and top > ry0 + tolerance
+    ):
         findings.append("enters the reference view's room")
-    if right > border_right + tolerance or top > border_top + tolerance:
+    if (
+        left < border_left - tolerance
+        or right > border_right + tolerance
+        or top > border_top + tolerance
+    ):
         findings.append("crosses the inner border")
     if bottom < border_bottom + BOM_SHEET_CLEARANCE - tolerance:
         findings.append("crosses the bottom border")
+    tx0, ty0, tx1, ty1 = TITLE_BLOCK_KEEP_OUT
     if (
-        right > TITLE_BLOCK[0]
-        and bottom < TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE - tolerance
+        right > tx0 + tolerance
+        and left < tx1 - tolerance
+        and bottom < ty1 - tolerance
+        and top > ty0 + tolerance
     ):
         findings.append("enters the title block")
     return findings
@@ -1031,11 +1039,11 @@ def kit_bom_note_region(
     bom: tuple[float, float, float, float],
     reference: tuple[float, float, float, float],
 ) -> tuple[float, float, float, float]:
-    """Room below the measured reference, left of the measured BOM/title block."""
+    """Measured room right of the BOM, below the reference and above the title."""
     return (
-        SHEET_INNER_BORDER[0] + REGION_GAP,
-        SHEET_INNER_BORDER[1] + REGION_GAP,
-        min(bom[0], TITLE_BLOCK[0]) - REGION_GAP,
+        max(bom[2], SHEET_INNER_BORDER[0]) + REGION_GAP,
+        max(TITLE_BLOCK[3], SHEET_INNER_BORDER[1]) + REGION_GAP,
+        SHEET_INNER_BORDER[2] - REGION_GAP,
         reference[1] - REGION_GAP,
     )
 
@@ -1103,7 +1111,7 @@ def _place_kit_bom_note(adapter: Any, table: Any, reference: Any) -> Callable[[]
             )
         _telemetry.info(
             f"jig configured-kit BOM key: extent_m={extent!r}; "
-            f"field_m={field!r}; BOM air_mm={(bom[0] - extent[2]) * 1000:.3f}; "
+            f"field_m={field!r}; BOM air_mm={(extent[0] - bom[2]) * 1000:.3f}; "
             f"reference air_mm={(outline[1] - extent[3]) * 1000:.3f}"
         )
 
@@ -1690,8 +1698,8 @@ def _region_center(region: tuple[float, float, float, float]) -> tuple[float, fl
 
 
 def _place_reference_view(adapter: Any) -> Any:
-    """The BOM's parent view: the jig collapsed, centred in its room left of
-    the table, unballooned."""
+    """The BOM's parent view: the jig collapsed, centred right of the table
+    and above the title block, unballooned."""
     _activate_sheet(adapter, BOM_SHEET)
     label = "jig reference"
     center = _region_center(REFERENCE_REGION)
@@ -1709,9 +1717,8 @@ def _place_reference_view(adapter: Any) -> Any:
 
 
 def _place_finished_view(adapter: Any) -> None:
-    """The finished assembly in full detail, centred in its room under the
-    checks."""
-    _activate_sheet(adapter, STEPS_SHEET)
+    """The full-detail finished assembly below the capture sheet's checks."""
+    _activate_sheet(adapter, CAPTURE_SHEET)
     label = "jig finished"
     center = _region_center(FINISHED_REGION)
     finished = _place_named_view(

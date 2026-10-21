@@ -3,11 +3,11 @@ ch-rocker-arm-tl-oblique-pivot-block:
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-22
   material: 6061-T6 aluminium
-  material_specification: 6061-T6 aluminum flat bar, 1 x 3 in, machined to 24 high integral wing and tail
+  material_specification: 6061-T6 aluminum flat bar, 1 x 3 in, machined to 24 high with 66 wide integral wing and original 40 wide tail
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
-  process: "face the block to the unchanged 24 height; mill spindle end X=-54, wide wing through X=-10 at Y=+/-32 and original-width tail through X=20 at Y=+/-20; preserve bearing axis X=-32 and both original bearing seats, 4 web and 25 puller cavity; preserve original carriage counterbores and nut-bracket holes; tap four 1/4-20 through holes at bearing-axis offsets X=+/-15,Y=+/-25, located directly from the actual bearing axis at three places +/-0.13; retain top flange-stop floor with no added bearing pocket; press bearing assembly only on fitted races; destructive cartridge service removes cap, presses pin upward from its lower end, and replaces pin plus both bearings"
+  process: "face the block to the unchanged 24 height; mill the spindle end and 66 wide integral wing to the drawing footprint while retaining the original 40 wide tail and its X=20 end; preserve bearing axis X=-32 and both original bearing seats, 4 web and 25 puller cavity; preserve original carriage counterbores and nut-bracket holes; tap four 5/16-18 through holes at bearing-axis offsets X=+/-15,Y=+/-25, located directly from the actual bearing axis at three places +/-0.13; end-mill two cylindrical flat-bottom register recesses, diameter 7.20 +0.10/0 and depth 2.000 +/-0.13 from the block top, at signed bearing-axis offsets (-5.000,-24.000) and (+5.000,+24.000), each XY location +/-0.13; indicate the actual bearing axis for these locations, not an outside edge; inspect both planar floors and remaining material to the bearing pockets, cap taps, carriage and nut-bracket holes; retain the existing top flange-stop face outside these recesses with no added bearing pocket; press bearing assembly only on fitted races; destructive cartridge service removes cap, presses pin upward from its lower end, and replaces pin plus both bearings"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
@@ -36,6 +36,6 @@ ch-rocker-arm-tl-oblique-pivot-block:
       reason: "MHA-CH-06-TL-29's #8 screw positions on the 24 block set the spacing; at two places the counterbore-to-counterbore wall would fall to 1.29, under the 1.5 floor, so the three-place bands hold the walls the side callout states (owner ruling 2026-10-17, via coordinator, RockerV3 session)"
     - id: "PC-01"
       kind: "accept"
-      where: "Capture wing plan, four 1/4-20 receiver taps located directly from the bearing axis at three places +/-0.13"
+      where: "Capture wing plan, four 5/16-18 receiver taps located directly from the bearing axis at three places +/-0.13"
       finding: "three-place cap-receiver location dimensions"
-      reason: "owner-approved 2026-10-20 positive capture bounds bolt-hole-stop translation without crediting clamp friction; a loose outer-edge stack cannot locate this pattern"
+      reason: "the direct bearing-axis locations preserve screw clearance to the cap; integral registers, not screw friction or thread profiles, set the cap translation bound"

@@ -3,8 +3,10 @@
 Frame: origin at pair midpoint on screw bearing-face plane; X joins the
 screws, Z points toward cap top. Install unchanged at each Y row on each cap.
 The native centreline is a representative hand-formed route, not an elastic
-model or a locking-force calculation. Verify tightening sense and tuck cut
-ends at installation; discard wire on opening the cartridge.
+model or a locking-force calculation. The exterior entry legs flare within
+the counterbores, then narrow before the wire channel; their elevation
+separates them from the straight drilled legs. Verify tightening sense and
+tuck cut ends at installation; discard wire on opening the cartridge.
 """
 from __future__ import annotations
 
@@ -13,22 +15,20 @@ import math
 from ch_rocker_arm_tl_oblique_retention_hardware_spec import (
     WIRE_SKU as SKU, WIRE_SOURCE_URL as SOURCE_URL, WIRE_DIA,
     SCREW_HEAD_DIA, SCREW_HEAD_DIA_MAX, SCREW_WIRE_HEIGHT,
+    SCREW_WIRE_HEIGHT_MIN, SCREW_WIRE_HEIGHT_MAX,
 )
-from ch_rocker_arm_tl_oblique_retention_spec import (
-    CAP_BOLT_X_OFFSETS, CAP_COUNTERBORE_DEPTH, CAP_WIRE_CHANNEL_DEPTH,
-    CAP_WIRE_CHANNEL_WIDTH,
-)
+from ch_rocker_arm_tl_oblique_retention_spec import CAP_BOLT_X_OFFSETS
 
 QUANTITY = 4
 CALLOUT = '.032 STAINLESS SAFETY WIRE; ONE CUT LENGTH PER X PAIR'
 TWIST_RADIUS = 0.52
-BRIDGE_HALF_LENGTH = 8.0
 BRIDGE_TURNS = 4
 OUTER_BEND_RADIUS = SCREW_HEAD_DIA / 2 + 1.2
+# Leave a real approach length between the larger head loops and the twist.
+# Keeping the former fixed 8 mm half-span would put the returning drilled leg
+# within one wire diameter of the other strand at its bridge endpoint.
+BRIDGE_HALF_LENGTH = min(abs(x) for x in CAP_BOLT_X_OFFSETS) - OUTER_BEND_RADIUS - 1.0
 WIRE_AXIS_Z = SCREW_WIRE_HEIGHT
-# Includes the cubic control hull, not merely sampled centreline vertices.
-WIRE_Z_MIN = WIRE_AXIS_Z - 1.15
-WIRE_Z_MAX = WIRE_AXIS_Z + 1.15
 
 
 def _line(a, b):
@@ -37,18 +37,31 @@ def _line(a, b):
 
 
 def _round_path(points, trim=0.7):
-    """Lines and tangent cubic bends; straight bore passages stay straight."""
+    """Lines and circular-arc cubic bends; bore passages stay straight.
+
+    A degree-elevated quadratic corner can have less centreline radius than
+    the wire section. Circular-arc handles and almost-half-edge trims retain
+    room for a real tube while preventing adjacent fillets from overlapping.
+    """
     result = []
     previous = points[0]
     for a, b, c in zip(points, points[1:], points[2:]):
         incoming = math.dist(a, b)
         outgoing = math.dist(b, c)
-        distance = min(trim, incoming / 3, outgoing / 3)
-        p = tuple(bi + (ai-bi)*distance/incoming for ai,bi in zip(a,b))
-        q = tuple(bi + (ci-bi)*distance/outgoing for bi,ci in zip(b,c))
+        enter = tuple((bi-ai)/incoming for ai,bi in zip(a,b))
+        leave = tuple((ci-bi)/outgoing for bi,ci in zip(b,c))
+        turn = math.acos(max(-1.0, min(1.0, sum(u*v for u,v in zip(enter,leave)))))
+        if turn < 1e-9:
+            result.append(_line(previous, b))
+            previous = b
+            continue
+        distance = min(trim, 0.49*incoming, 0.49*outgoing)
+        handle = 4*distance*math.tan(turn/4)/(3*math.tan(turn/2))
+        p = tuple(bi-u*distance for bi,u in zip(b,enter))
+        q = tuple(bi+v*distance for bi,v in zip(b,leave))
         result.append(_line(previous, p))
-        result.append((p, tuple((pi+2*bi)/3 for pi,bi in zip(p,b)),
-                       tuple((qi+2*bi)/3 for qi,bi in zip(q,b)), q))
+        result.append((p, tuple(pi+u*handle for pi,u in zip(p,enter)),
+                       tuple(qi-v*handle for qi,v in zip(q,leave)), q))
         previous = q
     result.append(_line(previous, points[-1]))
     return result
@@ -97,31 +110,69 @@ def installed_wire_segments():
     bridge_b = _helix(-BRIDGE_HALF_LENGTH, BRIDGE_HALF_LENGTH, math.pi, BRIDGE_TURNS)
     # A->B: upper exterior wrap, then a straight diametral passage. Bends
     # remain outside the head; there is no fictitious curved drilled hole.
-    left_points = [bridge_a[0][0], (left+r-0.1,TWIST_RADIUS,WIRE_AXIS_Z+0.7)]
+    # Keep the elevated exterior leg away from the axial drilled return.
+    # The flared bend's control hull stays in the counterbore; the shoulder
+    # brings Y back to the bridge radius before entering the narrow channel.
+    left_points = [
+        bridge_a[0][0],
+        (left+r+0.35,TWIST_RADIUS,WIRE_AXIS_Z+0.7),
+        (left+r-0.1,1.2,WIRE_AXIS_Z+0.7),
+    ]
     left_points.extend(_radial(left,r,angle) for angle in (15,35,60,90,120,150,180))
     left_points.extend([_radial(left,r,0), bridge_b[0][0]])
     left_loop = _round_path(left_points, trim=0.6)
-    tail_x0 = right + r
+    # Start the outward twist after the drilled leg has cleared the head and
+    # separated from its return. The larger head leaves room for a half-turn,
+    # not the former full-turn tail compressed into the same access mouth.
+    tail_x0 = right + r + 0.6
     tail_x1 = right + 9.0
-    tail_a = _helix(tail_x0, tail_x1, -math.pi/2, 1)
-    tail_b = _helix(tail_x0, tail_x1, math.pi/2, 1)
+    tail_a = _helix(tail_x0, tail_x1, math.pi/2, 0.5)
+    tail_b = _helix(tail_x0, tail_x1, -math.pi/2, 0.5)
     # A goes straight through the head and socket. B is outside throughout,
     # vertically separated from A before they enter the twisted tail.
     right_a = _round_path([
         bridge_a[-1][-1], _radial(right,r,180),
         _radial(right,SCREW_HEAD_DIA_MAX/2+WIRE_DIA/2+0.3,0), tail_a[0][0],
     ], trim=0.6)
-    right_b_points = [bridge_b[-1][-1], (right-r+0.1,-TWIST_RADIUS,WIRE_AXIS_Z+0.7)]
-    right_b_points.extend(_radial(right,r,angle,TWIST_RADIUS)
+    right_b_points = [
+        bridge_b[-1][-1],
+        (right-r-0.35,-TWIST_RADIUS,WIRE_AXIS_Z+0.7),
+        (right-r+0.1,-1.2,WIRE_AXIS_Z+0.7),
+    ]
+    right_b_points.extend(_radial(right,r,angle,-TWIST_RADIUS)
                           for angle in (195,215,240,270,300,330,345))
     right_b_points.append(tail_b[0][0])
     right_b = _round_path(right_b_points, trim=0.6)
     # Turn both cut ends inward in the full-width outward access mouth.
     hooks = []
-    for tail in (tail_a, tail_b):
+    for tail, side in ((tail_a, 1), (tail_b, -1)):
         end = tail[-1][-1]
-        hooks.append(_round_path([end, (end[0],1.4,end[2]),
-                                  (end[0]-1.5,1.4,end[2])], trim=0.6))
+        hooks.append(_round_path([end, (end[0],side*1.4,end[2]),
+                                  (end[0]-1.5,side*1.4,end[2])], trim=0.6))
     path_a = bridge_a + right_a + tail_a + hooks[0]
     path_b = bridge_b + right_b + tail_b + hooks[1]
     return tuple(_reverse(path_a) + left_loop + path_b)
+
+
+def swept_wire_z_bounds(segments=None, *, hardware_limits=False):
+    """Conservative full-tube Z bounds above the actual screw head seat.
+
+    The cubic control hull plus the round section bounds every bend, twist
+    and tucked end. Hardware limits add independent NAS head-height and
+    from-top hole-location extrema; the installer forms to each actual hole.
+    These are not a fictitious wire roof above the screw head.
+    """
+    if segments is None:
+        segments = installed_wire_segments()
+    heights = [point[2] for segment in segments for point in segment]
+    low = min(heights) - WIRE_DIA / 2
+    high = max(heights) + WIRE_DIA / 2
+    if hardware_limits:
+        low += SCREW_WIRE_HEIGHT_MIN - WIRE_AXIS_Z
+        high += SCREW_WIRE_HEIGHT_MAX - WIRE_AXIS_Z
+    return low, high
+
+
+# Nominal native solid bounds and independent purchased-hardware-limit bounds.
+WIRE_Z_MIN, WIRE_Z_MAX = swept_wire_z_bounds()
+WIRE_Z_WORST_MIN, WIRE_Z_WORST_MAX = swept_wire_z_bounds(hardware_limits=True)

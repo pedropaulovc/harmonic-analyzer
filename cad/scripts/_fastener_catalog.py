@@ -501,9 +501,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
         "Predrilled Socket Head Cap Screw",
-        "NAS1352N4H12",
+        "NAS1352N5H12",
         material="AISI 304",  # native rendering surrogate; purchased alloy is A286
-        supplier="Hardware Specialty",
+        supplier="CBS Fasteners",
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",

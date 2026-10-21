@@ -32,7 +32,7 @@ def test_installed_thickness_is_calculated_not_the_supply_minimum() -> None:
     expected = spec.CROSS_HOLE_FROM_SEAT + spec.CROSS_HOLE_DIA / 2.0 - hardware.CLEVIS_DIA - spec.CARRIER_THICKNESS - sum(retention.TOP_RUNNING_GAP) / 2.0
     assert spec.THICKNESS == pytest.approx(expected)
     assert spec.THICKNESS == pytest.approx(4.1641)
-    assert spec.THICKNESS < spec.SUPPLY_MIN_THICKNESS < spec.STOCK_THICKNESS == 9.525
+    assert spec.THICKNESS < spec.SUPPLY_MIN_THICKNESS < spec.STOCK_THICKNESS
     assert spec.VOLUME_MM3 == pytest.approx(math.pi / 4.0 * (24.0**2 - 10.2**2) * expected)
     supply_volume = math.pi / 4.0 * (24.0**2 - 10.2**2) * spec.SUPPLY_MIN_THICKNESS
     assert spec.VOLUME_MM3 < supply_volume

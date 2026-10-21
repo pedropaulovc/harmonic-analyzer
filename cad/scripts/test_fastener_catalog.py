@@ -82,7 +82,7 @@ _STOCK_REQUIREMENTS = {
         ("91812A230",), "MHA-CH-06-TL-VN-71", 2,
     ),
     "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": (
-        ("NAS1352N4H12",),
+        ("NAS1352N5H12",),
         "MHA-CH-06-TL-VN-73",
         8,
     ),
@@ -107,7 +107,7 @@ _STOCK_REQUIREMENTS = {
 _SUPPLIERS = {
     "dt-vn-post-mount-screw": "MSC Industrial Supply",
     "ch-rocker-arm-tl-vn-oblique-nut-screw": "Olander",
-    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": "Hardware Specialty",
+    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": "CBS Fasteners",
     "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": "Huyett",
     "ch-rocker-arm-tl-vn-oblique-pivot-cotter": "Huyett",
     "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": "Aircraft Spruce",

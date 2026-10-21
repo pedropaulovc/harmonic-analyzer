@@ -1,4 +1,4 @@
-"""Stock-fastener thread declaration and local recipe contracts (SolidWorks-free)."""
+"""Stock-fastener native properties, thread declarations and local recipes."""
 
 from __future__ import annotations
 
@@ -8,10 +8,12 @@ import importlib
 import re
 from functools import wraps
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
+import _config
+import _custom_properties
 import _stock_fastener
 from _buildgraph import module_deps_of
 from _stock_fastener import THREAD_FEATURE
@@ -155,6 +157,129 @@ def test_unthreaded_supplier_references_use_one_final_save(monkeypatch):
     ))
     assert result is saved
     assert calls == ["nut"]
+
+
+@pytest.mark.parametrize("with_metadata", (False, True))
+def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata):
+    from diagnostics import diag_mcmaster_lib
+
+    written = {}
+    bodies = []
+    saves = []
+    stock = SimpleNamespace(
+        stock_name="Catalog stock", supplier="Catalog supplier", skus=("TEST123",)
+    )
+    metadata = {
+        "Material Specification": "Purchased alloy specification",
+        "Finish": "AS SUPPLIED",
+        "Manufacturing Notes": "REPLACE AFTER REMOVAL.",
+    }
+    properties = MappingProxyType(
+        {
+            **metadata,
+            "Stock Name": "Not the catalog name",
+            "Supplier": "Not the catalog supplier",
+            "Supplier SKUs": "NOT-THE-SKU",
+        }
+    ) if with_metadata else None
+    expected = {
+        **(metadata if with_metadata else {}),
+        "Stock Name": stock.stock_name,
+        "Supplier": stock.supplier,
+        "Supplier SKUs": "TEST123",
+    }
+
+    def add_property(name, field_type, value, replace):
+        assert field_type == _custom_properties._SW_CUSTOM_TEXT
+        assert replace == _custom_properties._SW_PROP_REPLACE
+        written[name] = value
+        return 0
+
+    manager = SimpleNamespace(Add3=add_property)
+    model = SimpleNamespace(
+        ClearSelection2=lambda _all: None,
+        GetBodies2=lambda _kind, _hidden: tuple(bodies),
+        Extension=SimpleNamespace(CustomPropertyManager=lambda _configuration: manager),
+        GetCustomInfoValue=lambda _configuration, name: written.get(name, ""),
+    )
+
+    async def create_part():
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    async def author(_adapter, _truth=None):
+        bodies.append(SimpleNamespace(Name="StockBody"))
+
+    author.__name__ = "build_TEST123"
+    author.__module__ = "diagnostics.diag_build_TEST123"
+    stock_recipe("TEST123", threaded=False)(author)
+    adapter = SimpleNamespace(
+        currentModel=model,
+        create_part=create_part,
+        _attempt=lambda call, default: call(),
+    )
+
+    async def finish(*_args):
+        return None
+
+    async def save(
+        actual_adapter, part_name, *, threaded, save_threaded_part, save_unthreaded_part
+    ):
+        assert actual_adapter is adapter
+        assert not threaded and save_threaded_part is None
+        assert save_unthreaded_part is None
+        assert written == expected
+        saves.append(part_name)
+        return {"part": f"{part_name}.SLDPRT"}
+
+    monkeypatch.setattr(_stock_fastener, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_custom_properties, "_early_bound", lambda value, _type: value)
+    monkeypatch.setattr(_stock_fastener, "fastener", lambda _name: stock)
+    monkeypatch.setattr(_stock_fastener, "_blank_recipe_references", lambda _adapter: None)
+    monkeypatch.setattr(diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *_args: None)
+    monkeypatch.setattr(_stock_fastener, "force_rebuild", finish)
+    monkeypatch.setattr(_stock_fastener, "apply_material", finish)
+    monkeypatch.setattr(_stock_fastener, "report_mass_properties", finish)
+    monkeypatch.setattr(_stock_fastener, "_save_stock_part", save)
+
+    result = asyncio.run(
+        _stock_fastener.build_stock_fastener(
+            adapter,
+            part_name="purchased-part",
+            components=(_stock_fastener.StockComponent(sku="TEST123", author=author),),
+            material="AISI 304",
+            properties=properties,
+        )
+    )
+    assert result == {"part": "purchased-part.SLDPRT"}
+    assert saves == ["purchased-part"]
+    if properties is not None:
+        assert properties["Supplier SKUs"] == "NOT-THE-SKU"
+
+
+@pytest.mark.parametrize("suffix", ("cap_screw", "clevis_pin", "cotter", "lock_wire"))
+def test_retention_stock_builders_forward_registry_drawing_metadata(monkeypatch, suffix):
+    builder = importlib.import_module(f"build_ch_rocker_arm_tl_vn_oblique_pivot_{suffix}")
+    row = _config.parts(builder.PART_NAME)
+    captured = {}
+    adapter = object()
+    artefacts = {"part": f"{builder.PART_NAME}.SLDPRT"}
+
+    async def build_stock(actual_adapter, **kwargs):
+        assert actual_adapter is adapter
+        captured.update(kwargs)
+        return artefacts
+
+    monkeypatch.setattr(builder, "build_stock_fastener", build_stock)
+    assert asyncio.run(builder.build(adapter)) is artefacts
+    assert captured["properties"] == {
+        "Material Specification": row["material_specification"],
+        "Finish": row["finish"],
+        "Manufacturing Notes": row["purchased_note"],
+    }
+    assert all(captured["properties"].values())
+    assert captured["part_name"] == builder.PART_NAME
+    assert captured["material"] == _stock_fastener.fastener(builder.PART_NAME).material
+    assert tuple(component.sku for component in captured["components"]) == tuple(row["supplier_skus"])
 
 
 def _author(sku: str = "TEST123"):

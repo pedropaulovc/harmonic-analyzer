@@ -7,10 +7,26 @@ ch-rocker-arm-tl-oblique-pivot-pin:
   finish: as turned
   quantity: 2
   tolerance_class: machined_block
-  process: "turn both original fit journals, narrow inner-race bosses and integral 36 x 3 flange from one piece; leave the lower boss long, measure the installed upper inner-race face against the block floor, and fit the boss for 0.10-0.15 flange-rim floor clearance without bearing preload; keep the relieved broad underside clear of seal and outer race; drill the real 5 cross hole 18.5 above the carrier seat and 6 from the end; lead-chamfer both ends with carrier-end lead MAX 0.5 to preserve the cross-hole end ligament; limit seating shoulder fillets to R0.2 and flange edge breaks to 0.25; press assembly loads only through the fitted races; destructive service presses upward from the lower pin end and replaces pin plus both bearings"
-  machinist_exceptions:
-    - id: "PC-01"
-      kind: "accept"
-      where: "both integral-flange stop faces, perpendicularity 0.02 to datum A, the bearing-journal axis"
-      finding: "flange-face perpendicularity outside the rule 5 short list"
-      reason: "owner-approved 2026-10-20 positive capture uses both stop faces to bound actual pin tilt independently of bearing axial behavior; the actual journal axis must remain square to those faces"
+  process: >-
+    turn both original fit journals, narrow inner-race bosses and integral
+    36 x 3 flange from one piece; turn the upper boss nominally 11.35 from the
+    flange top to the carrier seat; leave the lower boss long, measure the installed
+    upper inner-race face against the block floor, and fit the boss for 0.10-0.15
+    flange-rim floor clearance without bearing preload; keep the relieved broad
+    underside clear of seal and outer race; drill the real 5 cross hole 18.5 above
+    the carrier seat and 6 from the end; lead-chamfer both ends with carrier-end
+    lead MAX 0.5 to preserve the cross-hole end ligament; limit seating shoulder
+    fillets to R0.2 and flange edge breaks to 0.25. Before press assembly, inspect
+    BOTH broad flange stop faces against the actual bearing-journal axis: hold
+    the bearing journal in a clean collet, indicate its exposed cylindrical land
+    at two separated axial stations to remove setup eccentricity and tilt, and
+    restrain axial float without bending the pin. With an axial dial/test
+    indicator on each stop face at radius 17.50 from that axis (diameter 35.00),
+    rotate through a complete revolution; highest minus lowest reading on EACH
+    face must be at most 0.05 mm, covering every azimuth. Reposition the indicator
+    to reach the opposite face; if the pin is rechucked, re-indicate the journal
+    axis before accepting that face. Include setup repeatability and residual
+    journal alignment error in the 0.05 maximum, not as extra allowances; record
+    both face results before pressing. Press assembly loads only through the
+    fitted races; destructive service presses upward from the lower pin end and
+    replaces pin plus both bearings.

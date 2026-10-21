@@ -95,8 +95,8 @@ historical Number to invent. TL-VN-72 stays retired and is never reissued.
 [`ch_rocker_arm_tl_oblique_retention_spec.py`](../scripts/ch_rocker_arm_tl_oblique_retention_spec.py)
 owns cartridge dimensions and intact-rigid upset bounds; the pure
 [`retention hardware provider`](../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py)
-owns supplier dimensions. Native builders own the model and its PMI; each
-manufactured part's sheet imports those dimensions and their precision.
+owns supplier dimensions. Native builders own the model and its manufacturing
+dimensions; each manufactured part's sheet imports those dimensions and precision.
 The safety path is carrier → top washer and clevis cross-pin → pivot pin's
 integral flange → cap and block floor → block → carriage, **not** bearing
 press-fit pullout. Both ends remain positively retained in both pass pairs;
@@ -110,11 +110,19 @@ requires replacement of the service pin and both bearings in that cartridge,
 not reuse after a through-ball extraction load.
 
 The capture stack raises the carrier/work setup by 10.5 mm. The pivot-pin end
-is nominally 4 mm above the finished work, and the intact-rigid bound at the
-outer grip is about 5.35 mm, not 4.25 mm. These are geometry limits, not force
-or deflection certification. No toolholder/spindle envelope is supplied in
-the repository: accept the actual installed tooling clearance before cutting;
-the retained-pin dimensions do not prove collision freedom.
+is nominally **4 mm above the finished work**. The source-derived intact-rigid
+bound includes both end uplift and tipping across the full carrier/handle
+width; it is not limited to the small travel at a support pin. Cap pocket and
+aperture centres use ordinary coordinates from the same stock corner, while
+cap-bolt coordinates remain relative to the actual pocket axis at the block
+seating face. Neither nominal concentric CAD circles nor a loose stock edge
+replaces those manufacturing limits.
+
+These are geometry limits, not force or deflection certification. No
+toolholder/spindle envelope is supplied in the repository: accept the actual
+installed tooling clearance before cutting, including both complete sweeps,
+the calculated upset, actual formed locks and measurement/runout uncertainty.
+The retained-pin dimensions do not prove collision freedom.
 
 
 ## Drawing package layout

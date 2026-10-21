@@ -38,7 +38,6 @@ from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
-from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _session import run_build
 from _sketch import (
@@ -83,8 +82,7 @@ from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
     FLANGE_TOP_STATION,
     LOWER_BOSS_HEIGHT,
     UPPER_BOSS_HEIGHT,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
+    STOP_FACE_INSPECTION_NOTE,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-pin"
@@ -95,6 +93,7 @@ _SAVED_DRAWING_PROPERTIES = (
     "Finish",
     "Quantity",
     "Isometric View Note",
+    "Stop Face Inspection",
 )
 
 FIT_R = FIT_DIA / 2.0
@@ -490,12 +489,16 @@ async def build(adapter) -> dict[str, str]:
     ):
         _max_limit(adapter, feature, dimension)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            "Stop Face Inspection": STOP_FACE_INSPECTION_NOTE,
+        },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

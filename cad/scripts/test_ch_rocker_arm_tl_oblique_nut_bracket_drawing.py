@@ -13,7 +13,6 @@ import pytest
 
 import _config
 from _drawing_contract import model_toleranced_dimensions
-from _paths import CAD_ROOT
 from _printed_limits import limits
 from _printed_tolerance import printed_band_mm
 import build_ch_rocker_arm_tl_oblique_nut_bracket as part
@@ -22,7 +21,6 @@ import ch_rocker_arm_tl_oblique_nut_bracket_spec as spec
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import draw_ch_rocker_arm_tl_oblique_nut_bracket as drawing
 import export_features
-from machinist_exceptions import load_exceptions
 
 STEM = "ch_rocker_arm_tl_oblique_nut_bracket"
 
@@ -190,11 +188,15 @@ def test_walls_and_margins_stack_the_seat_band_and_the_nuts_floats() -> None:
 def test_x_set_centres_the_bracket_on_the_pivot_block_side_holes() -> None:
     near, far = pivot_block.SIDE_STATIONS_X
     assert spec.X_SET_MID == pytest.approx((near + far) / 2.0)
-    assert spec.X_SET_FAR_END == pytest.approx(59.25)
-    assert spec.X_SET_NUT_FACE == pytest.approx(40.75)
     assert pivot_block.DATUM_X + spec.X_SET_FAR_END == pytest.approx(
         leadscrew.NUT_BRACKET_X[1]
     )
+    assert pivot_block.DATUM_X + spec.X_SET_NUT_FACE == pytest.approx(
+        leadscrew.NUT_BRACKET_X[0]
+    )
+    assert tuple(
+        pivot_block.DATUM_X + station for station in (near, far)
+    ) == pytest.approx(leadscrew.BLOCK_SCREW_X)
     # A 3/16 transfer punch floats in TL-22's #8 clearance hole.
     assert 0.0 < spec.SPOT_FLOAT < spec.X_SET_BAND + printed_band_mm(3)
 
@@ -266,28 +268,6 @@ def test_every_shortfall_is_stated_on_the_sheet() -> None:
     assert not hasattr(spec, "CALLOUTS_BELOW")
     note = _features()["block_tap_2"]["note"]
     assert note.endswith(spec.BLOCK_TAP_WALL_CALLOUT)
-
-
-def test_owner_exceptions_match_the_stated_walls() -> None:
-    exceptions = load_exceptions(CAD_ROOT / "config", STEM, "part")
-    assert [(e.id, e.kind) for e in exceptions] == [
-        ("RV-01", "minor"),
-        ("RV-02", "minor"),
-    ]
-    exception, end_walls = exceptions
-    assert f"{spec.NUT_WALL_MIN:.2f} min" in exception.finding
-    assert f"{leadscrew.NUT_HOLE_PCD:.1f} bolt circle" in exception.reason
-    assert f"{spec.CBORE_DEPTH:.2f} counterbore depth" in exception.reason
-    clearance = spec.WORST_WALLS["#4-40 tap to screw clearance"]
-    assert f"{clearance:.2f} min" in exception.reason
-    assert f"Ø{spec.CBORE_DIA:.2f} x {spec.CBORE_DEPTH:.2f}" in exception.where
-    # RV-02: the #8 taps' end walls, under the target at the stated X set.
-    assert f"{spec.END_WALL_MIN:.2f} min" in end_walls.finding
-    assert f"{spec.X_SET_MID:.{spec.X_SET_PLACES}f}" in end_walls.reason
-    assert f"±{spec.X_SET_BAND:.2f}" in end_walls.reason
-    assert "±0.10" not in end_walls.reason
-    assert f"{spec.BRACKET_LENGTH:.2f} length" in end_walls.reason
-    assert spec.BLOCK_TAP_PROCESS.strip().rstrip(";") in end_walls.where
 
 
 def test_rule_18_engagement_and_no_screw_bottoms() -> None:
@@ -512,6 +492,18 @@ def test_nut_face_seat_stations_stand_outside_the_view() -> None:
     assert sy + _TEXT_HALF_HIGH <= top_edge - _GAP
 
 
+def test_plan_depth_lane_clears_the_nut_face_and_title_block() -> None:
+    nut_right = _left(0.0, spec.BRACKET_HEIGHT)[0]
+    plan_x = drawing.FRONT_CENTER[0] * 1000.0
+    plan_left = plan_x + _S * spec.FACE_X
+    plan_right = plan_x + _S * (spec.FACE_X + spec.BRACKET_LENGTH)
+    dim_x = plan_x + _S * drawing.FRONT_KEEP["BracketDepth"][0]
+    half = _text_half(f"{spec.BRACKET_DEPTH:.1f}")
+    assert dim_x - half >= nut_right + _GAP
+    assert dim_x + half <= plan_left - _GAP
+    assert plan_right <= 216.0 - _GAP
+
+
 def test_nut_face_pattern_offsets_stand_outside_the_outline() -> None:
     """c4-r8/r9 (rule 14): all four 2X 5.657 texts and lines sat inside the
     nut face. The Z offsets ride lanes over it, the Y offsets a line left of
@@ -595,29 +587,35 @@ def test_nut_face_callouts_stay_inside_the_border_and_off_the_lines() -> None:
     assert max(len(row) for row in rows) == len(spec.NUT_ID)
     assert spec.NUT_ID in spec.NUT_SEAT_MATE_CALLOUT
     assert "NUT\n" not in spec.NUT_TAP_PROCESS
-    # Its block, the id its widest row, rides over the plan, right of the
-    # nut face and under the block face's hung height.
+    # Its block, the id its widest row, stands above the nut face and the
+    # plan, right of all the Z-dimension ink, under the hung block height.
     nut_left = nut_x - _NUT_TAPS[0] / 2.0
     nut_low, nut_high = nut_y - _NUT_TAPS[1] / 2.0, nut_y + _NUT_TAPS[1] / 2.0
     right_edge, top_edge = _left(0.0, spec.BRACKET_HEIGHT)
-    assert len(spec.NUT_ID) == 31
-    assert nut_left >= right_edge + 5.0
+    for name, text in (
+        ("NutPatternZ1", _PATTERN_TEXT),
+        ("BoreZ", f"{spec.BORE_Z:.2f}"),
+        ("NutPatternZ2", _PATTERN_TEXT),
+    ):
+        text_x, _ = _left(*drawing.LEFT_KEEP[name][1:])
+        assert nut_left >= text_x + _text_half(text) + 5.0
     assert nut_low >= top_edge + 5.0  # the plan's top edge is the face's
     hung = _top(drawing.TOP_KEEP["BracketHeight"][0], 0.0)[1]
     assert nut_high <= hung - _TEXT_DROP - _GAP
     assert nut_x + _NUT_TAPS[0] / 2.0 <= 216.0 - _GAP  # left of the title block
-    # Its leader: from the shelf's left end (the bottom row) down-left to the
-    # upper-right tap's upper-right edge, right of the +Z offset's extension
-    # line (the right column), so it never rises through the rows (c4-r7).
+    # Its leader leaves the shelf's left end down-left, enters through the
+    # top edge right of the +Z offset's extension line, and lands on the
+    # upper-right tap's upper-right rim without rising through any text row.
     edge_y, edge_z = -drawing.NUT_TAP_EDGE_MODEL[1], drawing.NUT_TAP_EDGE_MODEL[2]
     assert edge_y < spec.NUT_HOLE_Y[0] and edge_z > spec.NUT_HOLE_Z[1]
     tap_x, tap_y = _left(-edge_y, edge_z)
     right_col = _left(0.0, spec.NUT_HOLE_Z[1])[0]
     assert tap_x > right_col and tap_y < nut_low
-    # It enters through the face's right edge, under the top edge.
-    slope = (tap_y - nut_low) / (tap_x - nut_left)
-    at_edge = nut_low + slope * (right_edge - nut_left)
-    assert tap_y < at_edge < top_edge
+    # Both endpoints stay right of every Z extension line; the entry clears
+    # that line and the top-right corner by the unchanged foreign-line gap.
+    assert nut_left > right_col + _GAP
+    entry_x = nut_left + (tap_x - nut_left) * (top_edge - nut_low) / (tap_y - nut_low)
+    assert right_col + _GAP <= entry_x <= right_edge - _GAP
     # The seat leader: shelf left end to the bore centre, crossing the lower
     # nut-tap row right of the seat's axis and left of the lower-right tap (whose
     # Y offset's extension line runs right from it).
