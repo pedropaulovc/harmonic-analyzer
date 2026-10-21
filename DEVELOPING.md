@@ -1694,9 +1694,9 @@ retains F2/S12; the readiness/mode slice adds no SOURCE observations.
 At `aa50824dc`, native mode readback changed from sheet-format to sheet mode,
 and both views passed their insertion preconditions. C00–C03 and cleanup passed.
 C04 was refused before its candidate: C01–C03 had consumed 51.19 seconds against
-the unvalidated 50-second fundamental-stage allocation. No export ran, so the
-earlier missing target ink remains unresolved. Original source/token identities
-and empty-document cleanup were preserved.
+the unvalidated 50-second fundamental-stage allocation. No export ran; that
+attempt did not resolve the earlier missing target ink. Original source/token
+identities and empty-document cleanup were preserved.
 
 Normal stages now share the existing 410-second allowance from receipt creation,
 rather than each having an independent estimated ceiling. The overall
@@ -1707,11 +1707,28 @@ reporting and restoration time still counts. These cooperative bounds cannot
 interrupt a synchronous COM call. The full workload may still exceed 410 seconds;
 that remains a failed experiment, not permission to retry or drop controls.
 
-The actual-function inert smoke and 491 focused tests pass. Its replacement
-receiver has an explicit stable-title fixture policy, not proof of native saved
-drawing title behavior; a title-drift negative preserves the ownership refusal.
-All 29 native controls, setter effects/restoration, normal drawing and the
-complete 32-output package remain required. No performance gain is established.
+At `42047ee8d`, C00–C12 completed, including the visual and save/reopen controls.
+The exact PDF-derived pages show the intended hide, restore and persisted states;
+the sentinel remains unchanged. C13 stopped before its candidate because the
+saved/reopened fixture drawing's title changed. Probe cleanup hit the same
+ownership guard. The exact rejected title was not recorded, so its spelling and
+cause are not established. This was not a deadline failure.
+
+The admitted fixture drawing now treats `GetTitle()` as a mutable UI hint in
+both unsaved and saved generations. Fresh native identity, admitted path/type,
+complete inventory correspondence and title uniqueness must all pass before any
+hint is committed or used for activation/close. Parts and assemblies retain their
+strict title policy, as does frozen post-close survivor reconciliation. Saved
+activation now incurs the existing inventory-validation reads; their time remains
+charged to the shared budget. Failure notes retain already-read expected/fresh
+metadata without additional diagnostic COM calls.
+
+The actual-function inert smoke and 665 focused tests pass, including changed
+saved hints through activation, E5 export and cleanup, with identity/path/type
+drift still refusing. The obsolete saved-title-immutability-only test was removed.
+All 29 native controls, setter effects/restoration, normal drawing and the complete
+32-output package remain required. Earlier partial coverage does not certify final
+preservation or cleanup. No performance gain is established.
 
 Before existing `NewDocument(template, 0, 0.0, 0.0)` and acquisition-ledger/type-2
 admission, require the explicit input's nonempty, fully-qualified, worker-visible

@@ -1197,7 +1197,6 @@ class NativeProbe:
             and owned.native is not None
             and type(owned.kind) is int
             and owned.kind == 3
-            and owned.path is None
         )
 
     def staged_title_refresh(
@@ -1213,28 +1212,39 @@ class NativeProbe:
         unknown_pending_title: bool = False,
     ) -> dict[str, Any] | None:
         """Validate metadata after unique native matching, without changing it."""
-        if owned.state is AcquisitionState.ADMITTED:
+        try:
+            if owned.state is AcquisitionState.ADMITTED:
+                require(
+                    kind == owned.kind
+                    and (
+                        normalized(path) == normalized(owned.path)
+                        if owned.path is not None
+                        else path == ""
+                    ),
+                    verdict,
+                    f"owned {context} path/type changed: {label}",
+                )
+            if title == owned.title or (
+                unknown_pending_title
+                and owned.state is AcquisitionState.PENDING
+                and owned.title is None
+            ):
+                return None
             require(
-                kind == owned.kind
-                and (
-                    normalized(path) == normalized(owned.path)
-                    if owned.path is not None
-                    else path == ""
-                ),
+                self.refreshable_drawing(label, owned) and kind == 3,
                 verdict,
-                f"owned {context} path/type changed: {label}",
+                f"owned {context} title changed: {label}",
             )
-        if title == owned.title or (
-            unknown_pending_title
-            and owned.state is AcquisitionState.PENDING
-            and owned.title is None
-        ):
-            return None
-        require(
-            self.refreshable_drawing(label, owned) and kind == 3 and path == "",
-            verdict,
-            f"owned {context} title changed: {label}",
-        )
+        except ProbeFailure as error:
+            error.add_note(
+                f"owned metadata: context={context!r}; document={label!r}; "
+                f"generation={owned.generation!r}; state={owned.state!r}; "
+                f"native_is_same=1; expected_title={owned.title!r}; "
+                f"fresh_title={title!r}; "
+                f"expected_path={(str(owned.path) if owned.path is not None else None)!r}; "
+                f"fresh_path={path!r}; expected_kind={owned.kind!r}; fresh_kind={kind!r}"
+            )
+            raise
         return {
             "event": "title_refresh",
             "context": context,
@@ -1287,11 +1297,19 @@ class NativeProbe:
             )
             if event is not None:
                 staged.append(event)
-            require(
-                title.casefold() not in titles,
-                Verdict.PRESERVATION,
-                "ambiguous inventory title; no foreign close permitted",
-            )
+            if title.casefold() in titles:
+                error = ProbeFailure(
+                    Verdict.PRESERVATION,
+                    "ambiguous inventory title; no foreign close permitted",
+                )
+                error.add_note(
+                    f"owned title collision: context={context!r}; document={label!r}; "
+                    f"generation={owned.generation!r}; native_is_same=1; "
+                    f"fresh_title={title!r}; fresh_path={path!r}; fresh_kind={kind!r}; "
+                    f"collision_key={title.casefold()!r}; "
+                    f"known_casefold_titles={sorted(titles)!r}"
+                )
+                raise error
             titles.add(title.casefold())
             found[label] = model
         require(
@@ -1773,14 +1791,25 @@ class NativeProbe:
             )
             if event is not None:
                 staged.append(event)
-            require(
-                all(
-                    row["title"].casefold() != title.casefold()
-                    for row in frozen.values()
-                ),
-                Verdict.RESTORATION,
-                "ambiguous discard title; no foreign close permitted",
-            )
+            if any(
+                row["title"].casefold() == title.casefold() for row in frozen.values()
+            ):
+                collisions = {
+                    label: row
+                    for label, row in frozen.items()
+                    if row["title"].casefold() == title.casefold()
+                }
+                error = ProbeFailure(
+                    Verdict.RESTORATION,
+                    "ambiguous discard title; no foreign close permitted",
+                )
+                error.add_note(
+                    f"owned title collision: context='discard'; document={key!r}; "
+                    f"generation={owned.generation!r}; native_is_same=1; "
+                    f"fresh_title={title!r}; fresh_path={path!r}; fresh_kind={kind!r}; "
+                    f"collision_key={title.casefold()!r}; conflicting_frozen={collisions!r}"
+                )
+                raise error
             frozen[key] = {
                 "title": title,
                 "path": path,
