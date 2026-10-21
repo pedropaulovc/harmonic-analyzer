@@ -1389,8 +1389,8 @@ def _place_exploded_sheet(
         label="channel",
     )
     _validate_bom(adapter, table)
-    # TODO(#1667): Restore after deterministic farm balloon placement;
-    # balloons intentionally omitted meanwhile.
+    # TODO(#1667): Restore this disabled group only after the linked fix is
+    # validated; remove MB-1667-CH and this TODO with restoration.
     # items = _validate_bom(adapter, table)
     # landings = add_component_bom_balloons(
     #     adapter,

@@ -615,7 +615,12 @@ def test_step_9_spot_through_is_declared_on_the_assembly() -> None:
 
     name = "fr_frame_assembly"
     assert DRAWINGS_BY_NAME[name].source_kind == "assembly"
-    (entry,) = load_exceptions(CAD_ROOT / "config", name, "assembly")
+    entries = {
+        entry.id: entry
+        for entry in load_exceptions(CAD_ROOT / "config", name, "assembly")
+    }
+    entry = entries["RV-01"]
+    assert entries["MB-1667-FR"].kind == "accept"
     assert (entry.id, entry.kind) == ("RV-01", "accept")
     assert re.search(r"\brule 19\b", entry.finding)
     assert re.search(r"\bstep 9\b", entry.where)
