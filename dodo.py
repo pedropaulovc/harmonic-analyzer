@@ -3216,15 +3216,16 @@ def task_verify():
     }
 
 
-# Review inputs are deliberately independent of the draw recipe and registry.
-# The CLI receives its PDF, package name and kind explicitly; only the PDF's
-# bytes, the package's exceptions and the review implementation/rubric matter.
-# Keep the non-inert local-import closure pinned in test_machinist_review_leaf.
+# Review inputs are independent of the draw recipe and registry. The CLI
+# receives its PDF, package name and kind explicitly and forces a full review.
+# Track the review/diff implementation and identity maps as well as its rubric.
+# Keep the non-inert local and dynamic import closure pinned in the leaf tests.
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
+    "_drawing_diff.py",
 )
 
 
@@ -3257,6 +3258,11 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
                 for name in _MACHINIST_REVIEW_MODULES
                 if name not in RECIPE_SKIP_MODULES
             ),
+            # _drawing_diff loads this sibling tool dynamically; its pairing
+            # composes both current and sealed historical identity maps.
+            SCRIPTS_DIR.parent / "comparisons" / "tools" / "release_diff.py",
+            CONFIG_DIR / "current-identity-map.json",
+            CONFIG_DIR / "identity-migration-map.json",
             *prompts,
             SCRIPTS_DIR.parent / "docs" / "drawing-guidelines.md",
             *([exceptions] if exceptions.is_file() else []),
@@ -3301,7 +3307,7 @@ def _machinist_review_command(stem: str, profile: ReviewProfile) -> list[str]:
     return [
         sys.executable, str(SCRIPTS_DIR / "machinist_review.py"),
         "--pdf", str(spec.outputs["pdf"]), "--name", stem,
-        "--kind", spec.source_kind, "--runs", "3",
+        "--kind", spec.source_kind, "--force", "--runs", "3",
         "--report-dir", str(_machinist_review_dir(stem)),
         "--reviewer", profile.backend, "--model", profile.model,
         "--effort", profile.effort,

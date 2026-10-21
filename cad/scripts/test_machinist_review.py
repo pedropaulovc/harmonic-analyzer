@@ -3129,17 +3129,17 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
 
 
 def test_main_distinguishes_missing_and_unknown_names(capsys) -> None:
-    assert mr.main([]) == 2
+    assert mr.main(["--force"]) == 2
     assert capsys.readouterr().err == (
-        "no drawing names given; use --all, --png or a name\n"
+        "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex"]) == 2
+    assert mr.main(["--reviewer", "codex", "--force"]) == 2
     assert capsys.readouterr().err == (
-        "no drawing names given; use --all, --png or a name\n"
+        "no drawing names given; use --all, --pdf or a name\n"
     )
 
-    assert mr.main(["--reviewer", "codex", "not-a-drawing"]) == 2
+    assert mr.main(["--reviewer", "codex", "not-a-drawing", "--force"]) == 2
     assert capsys.readouterr().err == "unknown drawing names: ['not-a-drawing']\n"
 
 
@@ -3998,7 +3998,7 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=reviewer, report_dir=directory, retries=0,
+        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True,
         claude="claude-test", codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
@@ -4068,7 +4068,7 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
         retries=1, claude="claude-test", codex="codex-test",
     )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
@@ -4098,7 +4098,7 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=2,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
@@ -4128,7 +4128,7 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=3,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
@@ -4157,7 +4157,7 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
@@ -4184,7 +4184,7 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, claude="claude-test",
+        retries=0, claude="claude-test", force=True,
     )
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
@@ -4213,7 +4213,7 @@ def test_aggregate_error_is_retained_and_never_passes(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=directory, retries=1, claude="claude-test",
+        report_dir=directory, retries=1, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
@@ -4246,7 +4246,7 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test",
+        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
     )
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
@@ -4256,23 +4256,19 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
     assert "Return one verdict for the package as a whole." not in prompts[0]
 
 
-@pytest.mark.parametrize("mode", ["png", "pdf", "pdf_dir"])
+@pytest.mark.parametrize("mode", ["pdf", "pdf_dir"])
 def test_main_uses_aggregate_contract_for_each_input_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str,
 ) -> None:
-    source = _png_source(tmp_path / "sheet.png")
     name = "sample"
-    args = ["--png", str(source)]
     if mode == "pdf":
         source = _pdf_source(tmp_path / "sheet.pdf", [(100, 100)])
         args = ["--pdf", str(source), "--name", name, "--kind", "assembly"]
-    elif mode == "pdf_dir":
+    else:
         name = next(iter(mr.DRAWINGS_BY_NAME))
         expected = mr.DRAWINGS_BY_NAME[name].outputs["pdf"]
         source = _pdf_source(tmp_path / expected.name, [(100, 100)])
         args = [name, "--pdf-dir", str(tmp_path)]
-    else:
-        name = mr._package_for_pngs([source], "part").name
 
     def reply(command: list[str], **kwargs: Any):
         return _session_reply(command, kwargs, _clean_verdict())
@@ -4280,7 +4276,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     monkeypatch.setattr(mr.shutil, "which", lambda reviewer: f"{reviewer}-test")
     directory = tmp_path / "reports"
-    assert mr.main([*args, "--report-dir", str(directory)]) == 0
+    assert mr.main([*args, "--force", "--report-dir", str(directory)]) == 0
     data = json.loads((directory / f"{name}.aggregate.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "SHIP" and len(data["runs"]) == 3
     assert data["judge"]["skipped"]
@@ -4290,6 +4286,7 @@ def test_main_uses_aggregate_contract_for_each_input_mode(
     ["--runs", "0"], ["--pdf", "sheet.pdf"], ["--name", "sample"],
     ["--pdf", "sheet.pdf", "--name", "../sample"],
     ["--pdf", "sheet.pdf", "--name", "sample", "--png", "sheet.png"],
+    ["--png", "sheet.png"], ["--png", "sheet.png", "--force"],
 ])
 def test_cli_rejects_invalid_ensemble_inputs(args: list[str]) -> None:
     with pytest.raises(SystemExit) as exc:
@@ -4307,7 +4304,7 @@ def test_missing_source_still_writes_an_error_aggregate(
     directory = tmp_path / "reports"
     aggregate = mr.aggregate_package(
         mr.ReviewPackage("missing", "part", (tmp_path / "missing.pdf",)),
-        report_dir=directory, runs=1,
+        report_dir=directory, runs=1, force=True,
     )
     assert aggregate["verdict"] == "ERROR"
     assert "source snapshot failed" in aggregate["error"]

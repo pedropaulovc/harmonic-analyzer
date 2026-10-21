@@ -135,9 +135,10 @@ exemption and accepts no other specification, geometry or numeric shortfall.
 
 `uv run cad/scripts/machinist_review.py <name>... --before-pdf-dir <baseline>`
 compares baseline PDFs with the current registered PDFs (`--pdf-dir <after>`
-selects another output directory). For an explicit package, use `--before-pdf`
-and `--pdf`; repeat each in matching sheet-document order. PNG CLI input is not
-supported. Both PDF versions are required unless `--force` requests an
+selects another output directory). For an explicit package, use `--name <stem>`
+with `--before-pdf` and `--pdf`; repeat each PDF option in matching
+sheet-document order. PNG CLI input is not supported. Both PDF versions are
+required unless `--force` requests an
 unconditional review of the after PDFs.
 
 Before starting independent reviews, the findings judge inspects the repository

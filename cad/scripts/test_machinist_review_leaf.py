@@ -116,6 +116,46 @@ def test_declared_review_modules_equal_the_real_import_closure(dodo):
     )
 
 
+def test_review_dependencies_cover_runtime_pairing_code_and_data(dodo, monkeypatch):
+    import _drawing_diff
+
+    loaded = set()
+    read = set()
+    spec_from_file_location = importlib.util.spec_from_file_location
+    read_text = Path.read_text
+
+    def load_spec(name, location=None, *args, **kwargs):
+        if location is not None and Path(location).resolve().is_relative_to(REPO_ROOT):
+            loaded.add(Path(location).resolve())
+        return spec_from_file_location(name, location, *args, **kwargs)
+
+    def read_input(path, *args, **kwargs):
+        if path.resolve().is_relative_to(REPO_ROOT):
+            read.add(path.resolve())
+        return read_text(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(importlib.util, "spec_from_file_location", load_spec)
+        patch.setattr(Path, "read_text", read_input)
+        assert _drawing_diff._drawing_pairs({}, {}) == {}
+    pairing = (
+        dodo.SCRIPTS_DIR.parent / "comparisons" / "tools" / "release_diff.py"
+    ).resolve()
+    assert pairing in loaded
+    assert {
+        (dodo.CONFIG_DIR / "current-identity-map.json").resolve(),
+        (dodo.CONFIG_DIR / "identity-migration-map.json").resolve(),
+    } <= read
+    dependencies = {
+        Path(path) for path in dodo._machinist_review_file_deps("pd_platen_guide")
+    }
+    for path in loaded:
+        assert {
+            path.parent / name for name in _local_import_closure(path)
+        } <= dependencies
+    assert read <= dependencies
+
+
 def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
     stem = "pd_platen_guide"
     command = dodo._machinist_review_command(stem, dodo._machinist_review_profile())
@@ -127,6 +167,7 @@ def test_explicit_pdf_command_cannot_select_a_registry_package(dodo):
         stem,
         "--kind",
         "part",
+        "--force",
         "--runs",
         "3",
         "--report-dir",
@@ -154,6 +195,9 @@ def inputs(dodo, tmp_path, monkeypatch):
     prompts.mkdir(parents=True)
     for name in dodo._MACHINIST_REVIEW_MODULES:
         (scripts / name).write_text("# review code\n", encoding="utf-8")
+    pairing = root / "cad" / "comparisons" / "tools" / "release_diff.py"
+    pairing.parent.mkdir(parents=True)
+    pairing.write_text("# release identity pairing\n", encoding="utf-8")
     for name in (
         "machinist_review_part.md",
         "machinist_review_assembly.md",
@@ -162,6 +206,8 @@ def inputs(dodo, tmp_path, monkeypatch):
         "machinist_review_schema.json",
         "machinist_review_judge.md",
         "machinist_review_judge_schema.json",
+        "machinist_review_precheck.md",
+        "machinist_review_precheck_schema.json",
     ):
         (prompts / name).write_text("{}", encoding="utf-8")
     guidelines = root / "cad" / "docs" / "drawing-guidelines.md"
@@ -170,6 +216,8 @@ def inputs(dodo, tmp_path, monkeypatch):
     config = root / "cad" / "config"
     (config / "parts").mkdir(parents=True)
     (config / "assemblies").mkdir()
+    for name in ("current-identity-map.json", "identity-migration-map.json"):
+        (config / name).write_text("{}", encoding="utf-8")
     exception = config / "parts" / "probe.yaml"
     exception.write_text("probe: {}\n", encoding="utf-8")
     pdf = root / "cad" / "out" / "pdf" / "probe.pdf"
@@ -231,6 +279,24 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "cad/scripts/_drawing_diff.py",
+        "cad/comparisons/tools/release_diff.py",
+        "cad/config/current-identity-map.json",
+        "cad/config/identity-migration-map.json",
+    ],
+)
+def test_diff_pairing_dependencies_invalidate_review_cache(inputs, relative_path):
+    dodo = inputs.module
+    path = inputs.root / relative_path
+    assert str(path.resolve()) in dodo._machinist_review_file_deps("probe")
+    initial = _review_key(dodo)
+    path.write_bytes(path.read_bytes() + b"\nchanged diff dependency\n")
+    assert _review_key(dodo) != initial
 
 
 def test_key_tracks_only_selected_kind_severity_contract(inputs):
@@ -490,7 +556,7 @@ def test_standalone_cli_ignores_registered_selector(
 ):
     monkeypatch.setenv("HARMONIC_MACHINIST_REVIEWER", "invalid-for-registered-gate")
     assert review_sessions.module.main([
-        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part",
+        "--pdf", str(inputs.pdf), "--name", "probe", "--kind", "part", "--force",
         "--report-dir", str(tmp_path / "standalone"), *flags,
     ]) == 0
     assert sorted(review_sessions.seen) == sorted([
