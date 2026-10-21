@@ -19,6 +19,9 @@ centre, hex axis +Y, corners on +/-X, flats square to +/-Z.
   thread ending at the bore, drill to the bore axis.
 * ``RodTap``: blind Hole Wizard #4-40 from the bottom face on the hex axis
   (``mg_rod_clamp_joint.ROD_TAP_SPEC``).
+* ``REFERENCE_SKETCHES`` names the three actual-source location witnesses;
+  those names drive their creation and the part saves all three hidden. The
+  drawing imports their dimensions through ``_drawing_hidden_sketches``.
 
 Run (SolidWorks already open)::
 
@@ -89,6 +92,11 @@ from mg_rod_clamp_joint import ROD_TAP_DRILL_DEPTH, ROD_TAP_SPEC
 
 PART_NAME = "mg-magnifying-clamp"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
+REFERENCE_SKETCHES = (
+    "ThumbTapLocationProfile",
+    "RodTapLocationProfile",
+    "LeverBoreLocationProfile",
+)
 
 HEX_CORNER_RADIUS = HEX_AC / 2.0
 BORE_R = LEVER_BORE_DIA / 2.0
@@ -395,12 +403,16 @@ def _location_sources(adapter: Any) -> dict[str, tuple[str, Any, str, tuple[tupl
     })
     a, r = HEX_AF / 2.0, HEX_CORNER_RADIUS
     sources = {}
-    for prefix, key, y in (("ThumbTap", "top", BLOCK_HEIGHT), ("RodTap", "bottom", 0.0)):
+    thumb_profile, rod_profile, bore_profile = REFERENCE_SKETCHES
+    for profile, prefix, key, y in (
+        (thumb_profile, "ThumbTap", "top", BLOCK_HEIGHT),
+        (rod_profile, "RodTap", "bottom", 0.0),
+    ):
         # One ordinary stock-flat location plus direct bore-rim location
         # controls both entry coordinates without a derived stock midplane.
         diagonal = _stock_edge(faces[key], ((r, y, 0.0), (r / 2.0, y, a)))
         circle = _tap_entry_circle(faces[key], y)
-        sources[f"{prefix}LocationProfile"] = ("Top", circle, "IEntity", ((f"{prefix}FromDiagonalFlat", diagonal),))
+        sources[profile] = ("Top", circle, "IEntity", ((f"{prefix}FromDiagonalFlat", diagonal),))
     part = _early_bound(adapter.currentModel, "IPartDoc")
     feature = part.FeatureByName("LeverBoreProfile")
     if feature is None:
@@ -410,7 +422,7 @@ def _location_sources(adapter: Any) -> dict[str, tuple[str, Any, str, tuple[tupl
     if len(segments) != 1 or int(_early_bound(segments[0], "ISketchSegment").GetType()) != 1:
         raise RuntimeError("clamp location: bore-producing sketch is not one actual circle")
     flat = _stock_edge(faces["zflat"], ((r / 2.0, 0.0, a), (r / 2.0, BLOCK_HEIGHT, a)))
-    sources["LeverBoreLocationProfile"] = ("Right", segments[0], "ISketchSegment", (("LeverBoreFromZFlat", flat),))
+    sources[bore_profile] = ("Right", segments[0], "ISketchSegment", (("LeverBoreFromZFlat", flat),))
     return sources
 
 
