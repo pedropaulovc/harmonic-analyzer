@@ -122,6 +122,30 @@ empty, so ordinary builds do not run the stale tracked plans. Before enrolling
 a migrated part, follow the binding and validation loop in
 [`cad/process/README.md`](cad/process/README.md).
 
+## Graph preparation timing
+
+`_buildgraph.py` shares one syntax-fact extraction across dependency consumers.
+[PR #1782](https://github.com/pedropaulovc/harmonic-analyzer/pull/1782)
+measured the real `job_runner.py graph` CLI for
+`drawing:mg_magnifier_assembly` in two alternating baseline/candidate pairs.
+Both variants used the same graph inputs and environment apart from the
+shared-syntax implementation. An unmeasured primer warmed each variant's
+Python bytecode; each measured pair used a fresh private syntax store followed
+immediately by a run reusing that store.
+
+| Median metric | Baseline cold | Shared facts cold | Baseline warm | Shared facts warm |
+|---|---:|---:|---:|---:|
+| Wall time (s) | 31.973 | 26.471 | 12.374 | 11.361 |
+| Interpreter CPU (s) | 30.609 | 25.719 | 11.047 | 10.742 |
+| OS peak working set (bytes) | 422,981,632 | 395,575,296 | 370,948,096 | 372,301,824 |
+
+The wall-time medians were 17.2% lower cold and 8.2% lower warm, with only two
+observations per condition. These local graph measurements do not establish
+a stable warm-cache speedup or a 20% full-build improvement. The graph command
+does not execute task actions or native operations. Static comparison preserved
+all 579 task definitions and singleton-selector reachability, plus the selected
+21-task export; native/action correctness remains a separate gate.
+
 ## Local pytest timing
 
 Run the CAD and pipeline suite serially for comparable timings:
