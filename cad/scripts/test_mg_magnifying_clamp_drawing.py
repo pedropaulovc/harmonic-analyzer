@@ -2679,8 +2679,38 @@ def _flat_group_fixture(monkeypatch):
     for name, point in points.items():
         part._measure_tap_from_flat(fixture.adapter, point, fixture.circle, fixture.flat, name)
     dimensions = fixture.install_rebuild(monkeypatch, points)
-    # Drawing proxies are distinct from model displays. Their native names and
-    # attachments identify the same sources; equal values alone are not enough.
+    # The view's sketch deliberately has the SAME feature name, but a distinct
+    # native identity. Part inventory lookup on these drawing objects must fail.
+    fixture.drawing_sketch = _NativeSketch("drawing-right", fixture.sketch.feature_name)
+    fixture.view_owners = [
+        (fixture.sketch, fixture.drawing_sketch),
+        (fixture.tap.GetSketch(), _NativeSketch("drawing-top", fixture.tap.GetSketch().feature_name)),
+    ]
+    fixture.correspondence, fixture.mapping_calls, fixture.view_mapping_calls = {}, [], []
+
+    def corresponding_model(entity):
+        fixture.mapping_calls.append(entity)
+        return fixture.correspondence.get(id(entity))
+
+    def corresponding_view(owner):
+        fixture.view_mapping_calls.append(owner)
+        return next((view_owner for model_owner, view_owner in fixture.view_owners if _native_same(owner, model_owner) == 1), None)
+
+    def import_entity(source):
+        if isinstance(source, _WitnessPoint):
+            proxy = _point_proxy(source)
+            proxy.owner = fixture.drawing_sketch
+            proxy.X += 0.125  # Drawing coordinates are not model identity.
+        else:
+            proxy = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=source.GetType(), identifiers=source.GetID())
+            proxy.owner_sketch = fixture.drawing_sketch
+            proxy.GetSketch = lambda: fixture.drawing_sketch
+        fixture.correspondence[id(proxy)] = source
+        return proxy
+
+    fixture.import_entity = import_entity
+    fixture.model.Extension = SimpleNamespace(GetCorresponding2=corresponding_model)
+    view = SimpleNamespace(ReferencedDocument=fixture.model, GetCorresponding=corresponding_view)
     annotations = []
     for name, source_display in dimensions.items():
         source_dimension = source_display.GetDimension2(0)
@@ -2689,8 +2719,9 @@ def _flat_group_fixture(monkeypatch):
             SystemValue=source_dimension.SystemValue, Tolerance=SimpleNamespace(Type=0),
         )
         text = {}
+        attached = tuple(import_entity(entity) for entity in source_display.GetAnnotation().GetAttachedEntities3())
         annotation = SimpleNamespace(
-            GetAttachedEntities3=source_display.GetAnnotation().GetAttachedEntities3,
+            GetAttachedEntities3=lambda value=attached: value,
             GetAttachedEntityTypes=source_display.GetAnnotation().GetAttachedEntityTypes,
             IsDangling=lambda: False, Visible=1,
         )
@@ -2706,7 +2737,7 @@ def _flat_group_fixture(monkeypatch):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_named_dimension", part._named_dimension)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetDimension2(0).Name)
-    return fixture, SimpleNamespace(ReferencedDocument=fixture.model), annotations[::-1]
+    return fixture, view, annotations[::-1]
 
 
 def test_grouping_retains_three_distinct_source_measurements_and_one_real_visible_dimension(monkeypatch) -> None:
@@ -2723,6 +2754,10 @@ def test_grouping_retains_three_distinct_source_measurements_and_one_real_visibl
     assert all(a.GetSpecificAnnotation().GetDimension2(0).SystemValue == pytest.approx(0.00635) for a in annotations)
     assert len(spec.DRAWING_PRECISION_BY_NAME) == 9 and len(spec.VISIBLE_DIMENSIONS) == 7
     assert spec.DIMENSION_GROUPS == {"LeverBoreFromZFlat": spec.Z_FLAT_DIMENSIONS}
+    # Two complete readbacks, three annotations each, two attachments each.
+    assert len(fixture.mapping_calls) == 12
+    assert len(fixture.view_mapping_calls) == 6  # Shared owner round-trips once.
+    assert all(entity.GetSketch() is fixture.drawing_sketch for entity in fixture.mapping_calls)
     fields = fixture.events[-1][1]
     assert fields["source_dimension_count"] == 3 and fields["visible_dimension_count"] == 1
     drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
@@ -2755,14 +2790,17 @@ def test_grouping_refuses_unproved_native_members_before_hiding_any_dimension(mo
         display.GetPrimaryPrecision2 = lambda: 3
     elif failure == "wrong-point-same-coordinates":
         # The other tap is nominally coincident, but is a DIFFERENT source.
-        annotation.GetAttachedEntities3 = lambda: (fixture.flat, fixture.lines[1].GetStartPoint2())
+        flat, _point = annotation.GetAttachedEntities3()
+        annotation.GetAttachedEntities3 = lambda: (flat, fixture.import_entity(fixture.lines[1].GetStartPoint2()))
     elif failure == "wrong-flat-same-coordinates":
         other_flat = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=0, identifiers=(99, 2))
         other_flat.owner_sketch = fixture.sketch
         other_flat.GetSketch = lambda: fixture.sketch
         other_flat.GetStartPoint2 = fixture.flat.GetStartPoint2
         other_flat.GetEndPoint2 = fixture.flat.GetEndPoint2
-        annotation.GetAttachedEntities3 = lambda: (other_flat, fixture.lines[0].GetStartPoint2())
+        _flat, point = annotation.GetAttachedEntities3()
+        imported_flat = fixture.import_entity(other_flat)
+        annotation.GetAttachedEntities3 = lambda: (imported_flat, point)
     elif failure == "wrong-source-association":
         fixture.lines[0].GetStartPoint2().relations.clear()
     elif failure == "dangling":
@@ -2773,7 +2811,7 @@ def test_grouping_refuses_unproved_native_members_before_hiding_any_dimension(mo
     assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in original_annotations)
 
 
-def test_grouping_accepts_documented_point_and_flat_keys_across_distinct_dispatches(monkeypatch) -> None:
+def test_grouping_accepts_documented_model_keys_after_mapping_distinct_dispatches(monkeypatch) -> None:
     fixture, view, annotations = _flat_group_fixture(monkeypatch)
     proxy_flat = _native_sketch_segment(owner=fixture.sketch.feature_name, kind=0, identifiers=fixture.flat.GetID())
     proxy_flat.owner_sketch = fixture.sketch
@@ -2781,11 +2819,138 @@ def test_grouping_accepts_documented_point_and_flat_keys_across_distinct_dispatc
     assert _native_same(proxy_flat, fixture.flat) == 0
     for annotation in annotations:
         flat, point = annotation.GetAttachedEntities3()
-        assert flat is fixture.flat
-        proxy_point = _point_proxy(point)
-        annotation.GetAttachedEntities3 = lambda flat=proxy_flat, point=proxy_point: (point, flat)
+        model_point = fixture.correspondence[id(point)]
+        proxy_point = _point_proxy(model_point)
+        assert _native_same(proxy_point, model_point) == 0
+        fixture.correspondence[id(point)] = proxy_point
+        fixture.correspondence[id(flat)] = proxy_flat
+        # Neither drawing coordinates nor drawing IDs are compared with model
+        # IDs. The actual correspondence supplies independently validated keys.
+        point.identifiers = (9001, 9002)
+        flat.GetID = lambda: (9003, 9004)
+        annotation.GetAttachedEntities3 = lambda flat=flat, point=point: (point, flat)
         annotation.GetAttachedEntityTypes = lambda: (11, 10)
     drawing._group_flat_locations(fixture.adapter, view, annotations)
+
+
+def test_view_attachment_is_not_a_part_object_even_with_same_name_and_ids(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    annotation = annotations[0]
+    _flat, point = annotation.GetAttachedEntities3()
+    model_point = fixture.correspondence[id(point)]
+    assert point.GetID() == model_point.GetID()
+    assert point.GetSketch().feature_name == model_point.GetSketch().feature_name
+    assert _native_same(point.GetSketch(), model_point.GetSketch()) == 0
+    with pytest.raises(RuntimeError):
+        part._point_flat_attachment(fixture.adapter, annotation.GetSpecificAnnotation(), fixture.flat, stage="unmapped-view")
+    assert not fixture.mapping_calls
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+
+
+@pytest.mark.parametrize("failure", (
+    "missing-point", "missing-flat", "wrong-point-type", "wrong-flat-type",
+    "ambiguous-point", "unavailable-point-capability", "null-point-capability",
+    "invalid-point-id", "reversed-point-id", "wrong-flat-id", "wrong-flat-kind",
+    "known-other-owner", "unknown-owner", "wrong-view", "missing-view-owner",
+    "unknown-view-identity", "drawing-owner-self", "mapped-owner-self",
+    "drawing-point-self", "wrong-drawing-type", "mapping-error",
+))
+def test_grouping_rejects_unproved_drawing_model_correspondence(monkeypatch, failure) -> None:
+    import ast
+
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "ThumbTapFromZFlat")
+    flat, point = annotation.GetAttachedEntities3()
+    mapped = _point_proxy(fixture.correspondence[id(point)])
+    fixture.correspondence[id(point)] = mapped
+    if failure == "missing-point":
+        fixture.correspondence[id(point)] = None
+    elif failure == "missing-flat":
+        fixture.correspondence[id(flat)] = None
+    elif failure == "wrong-point-type":
+        fixture.correspondence[id(point)] = fixture.flat
+    elif failure == "wrong-flat-type":
+        fixture.correspondence[id(flat)] = mapped
+    elif failure == "ambiguous-point":
+        mapped._oleobj_.capabilities[_WitnessDispatch.segment_iid] = True
+    elif failure == "unavailable-point-capability":
+        mapped._oleobj_.capabilities[_WitnessDispatch.point_iid] = _WitnessComError(-2147418111)
+    elif failure == "null-point-capability":
+        mapped._oleobj_.capabilities[_WitnessDispatch.point_iid] = None
+    elif failure == "invalid-point-id":
+        mapped.identifiers = (1,)
+    elif failure == "reversed-point-id":
+        mapped.identifiers = mapped.identifiers[::-1]
+    elif failure in ("wrong-flat-id", "wrong-flat-kind"):
+        other = _native_sketch_segment(kind=1 if failure == "wrong-flat-kind" else 0, identifiers=fixture.flat.GetID() if failure == "wrong-flat-kind" else (99, 2))
+        other.GetSketch = lambda: fixture.sketch
+        fixture.correspondence[id(flat)] = other
+    elif failure == "known-other-owner":
+        mapped.owner = fixture.tap.GetSketch()
+        point.owner = fixture.view_owners[1][1]
+    elif failure == "unknown-owner":
+        mapped.owner = _NativeSketch("unknown-model-owner", fixture.sketch.feature_name)
+        # Even a successful view round-trip cannot substitute for part inventory.
+        view.GetCorresponding = lambda _owner: fixture.drawing_sketch
+    elif failure == "wrong-view":
+        point.owner = _NativeSketch("another-drawing-view", fixture.sketch.feature_name)
+    elif failure == "missing-view-owner":
+        view.GetCorresponding = lambda _owner: None
+    elif failure == "unknown-view-identity":
+        view_owner = _NativeSketch(fixture.drawing_sketch.token, fixture.sketch.feature_name)
+        view.GetCorresponding = lambda _owner: view_owner
+        fixture.adapter.swApp.IsSame = lambda left, right: 2 if left is fixture.drawing_sketch and right is view_owner else _native_same(left, right)
+    elif failure in ("drawing-owner-self", "mapped-owner-self", "drawing-point-self"):
+        if failure == "mapped-owner-self":
+            mapped.owner = _NativeSketch(fixture.sketch.token, fixture.sketch.feature_name)
+            broken = mapped.owner
+        else:
+            broken = point if failure == "drawing-point-self" else fixture.drawing_sketch
+        fixture.adapter.swApp.IsSame = lambda left, right: 0 if left is broken and right is broken else _native_same(left, right)
+    elif failure == "wrong-drawing-type":
+        point._oleobj_ = _WitnessDispatch("ISketchSegment")
+    else:
+        original = fixture.model.Extension.GetCorresponding2
+
+        def unavailable(entity):
+            if entity is point:
+                raise _WitnessComError(-2147418111)
+            return original(entity)
+
+        fixture.model.Extension.GetCorresponding2 = unavailable
+    with pytest.raises(RuntimeError) as refused:
+        drawing._group_flat_locations(fixture.adapter, view, annotations)
+    assert all(a.Visible == 1 for a in annotations)
+    assert all(a.GetSpecificAnnotation().GetText(1) == "" for a in annotations)
+    records = [fields for _message, fields in fixture.events if fields.get("operation_stage", "").endswith(".drawing-import") and "attachment_correspondence" in fields]
+    assert records
+    mapping = ast.literal_eval(records[-1]["attachment_correspondence"])
+    assert mapping and mapping[0]["role"] == "point"
+    if failure in ("reversed-point-id", "known-other-owner"):
+        # These are valid model objects, but NOT this dimension's source point.
+        assert "imported native point identity differs" in str(refused.value)
+    else:
+        assert records[-1]["attachment_readback_error"] != "None"
+    if failure == "unavailable-point-capability":
+        queries = mapping[0]["contexts"]["model"]["queries"]
+        assert len(queries) == 2
+        assert queries[0]["hresult"] == -2147418111 and queries[0]["supported"] is None
+        assert queries[1]["supported"] is False
+    if failure == "wrong-view":
+        assert mapping[0]["view_owner_self"] == 1 and mapping[0]["view_owner_match"] == 0
+    if failure == "mapping-error":
+        assert mapping[0]["mapped_present"] is None
+        assert any(fields.get("operation_stage") == "ThumbTapFromZFlat.drawing-import.correspondence-before" for _message, fields in fixture.events)
+
+
+def test_group_correspondence_is_read_again_after_rebuild_without_cached_keys(monkeypatch) -> None:
+    fixture, view, annotations = _flat_group_fixture(monkeypatch)
+    drawing._group_flat_locations(fixture.adapter, view, annotations)
+    annotation = next(a for a in annotations if drawing.dimension_name(fixture.adapter, a) == "ThumbTapFromZFlat")
+    _flat, point = annotation.GetAttachedEntities3()
+    fixture.correspondence[id(point)] = fixture.lines[1].GetStartPoint2()
+    with pytest.raises(RuntimeError, match="imported native point identity differs"):
+        drawing._assert_grouped_flat_locations(fixture.adapter, view, annotations)
 
 
 @pytest.mark.parametrize("failure", ("hide-refused", "unknown-visible", "prefix-lost", "source-constraint-lost"))

@@ -516,26 +516,115 @@ def _show_mouth_thread(adapter: Any, section: Any) -> None:
         raise RuntimeError("thread-mouth section requires its one native through thread")
     set_hidden_lines_removed(adapter, section)
     rebuild_drawing(adapter, label="regenerate native thread-mouth cosmetic thread")
-    threads = tuple(_early_bound(section, "IView").GetCThreads() or ())
+    view = _early_bound(section, "IView")
+    threads = tuple(view.GetCThreads() or ())
     if len(threads) != 1:
         raise RuntimeError("thread-mouth section has no unique native cosmetic thread")
     thread = _early_bound(threads[0], "ICThread")
-    annotation = _early_bound(thread.GetAnnotation(), "IAnnotation")
-    if int(annotation.Visible) != 1 or annotation.IsDangling():
-        raise RuntimeError("thread-mouth native cosmetic thread is hidden or dangling")
-    data = _early_bound(thread.GetDisplayData(), "IDisplayData")
-    if data is None or int(data.GetLineCount()) < 2:
-        raise RuntimeError("native through-thread has no longitudinal section ink")
+    unavailable = object()
+    errors = []
+
+    def collect(scope: str, member: str, read: Any, *, required: bool) -> Any:
+        try:
+            value = read()
+        except Exception as error:
+            detail = f"{scope}: {member}: {error!r}"
+            _telemetry.info(f"thread-mouth {scope}: member={member}, error={error!r}")
+            if required:
+                errors.append(detail)
+            return unavailable
+        _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={value!r}")
+        return value
+
+    def collect_display(data: Any, scope: str, *, required: bool) -> dict[str, list[Any]]:
+        rows = {"line": [], "polyline": [], "arc": []}
+        for family, count_member, count_read, item_member, item_read in (
+            ("line", "GetLineCount", lambda: data.GetLineCount(), "GetLineAtIndex2", lambda i: data.GetLineAtIndex2(i)),
+            ("polyline", "GetPolyLineCount", lambda: data.GetPolyLineCount(), "GetPolylineAtIndex2", lambda i: data.GetPolylineAtIndex2(i)),
+            ("arc", "GetArcCount", lambda: data.GetArcCount(), "GetArcAtIndex2", lambda i: data.GetArcAtIndex2(i)),
+        ):
+            count = collect(scope, f"IDisplayData.{count_member}", lambda: int(count_read()), required=required)
+            if count is unavailable:
+                continue  # Only this count's dependent index reads are unavailable.
+            if count < 0:
+                detail = f"{scope}: {count_member}: invalid negative count {count}"
+                _telemetry.info(f"thread-mouth {detail}")
+                if required:
+                    errors.append(detail)
+                continue
+            for index in range(count):
+                raw = collect(scope, f"IDisplayData.{item_member}({index})", lambda: item_read(index), required=required)
+                if raw is not unavailable:
+                    rows[family].append(raw)
+        return rows
+
+    # Finish every independent reader before deciding acceptance. In particular
+    # a failed view getter, count or primitive must not hide other families.
+    collect("view diagnostic", "IView.GetDisplayMode2", lambda: view.GetDisplayMode2(), required=True)
+    collect("view diagnostic", "IView.GetCThreadQuality", lambda: view.GetCThreadQuality(), required=True)
+    annotation = collect("native ink", "ICThread.GetAnnotation", lambda: _early_bound(thread.GetAnnotation(), "IAnnotation"), required=True)
+    visible = dangling = unavailable
+    if annotation is not unavailable and annotation is not None:
+        visible = collect("native ink", "IAnnotation.Visible", lambda: int(annotation.Visible), required=True)
+        dangling = collect("native ink", "IAnnotation.IsDangling", lambda: annotation.IsDangling(), required=True)
+
+    # Import already activates this view, and HLR regenerates precision threads.
+    # Neither display-data API documents another activation prerequisite.
+    data = collect("native ink", "ICThread.GetDisplayData", lambda: _early_bound(thread.GetDisplayData(), "IDisplayData"), required=True)
+    primary = {"line": [], "polyline": [], "arc": []}
+    if data is not unavailable:
+        _telemetry.info(f"thread-mouth native ink: dataPresent={data is not None}")
+        if data is not None:
+            primary = collect_display(data, "native ink", required=True)
+    # This same-thread counterpart is independent diagnostic evidence only;
+    # neither its ink nor a successful read can rescue primary errors/absence.
+    if annotation is not unavailable and annotation is not None:
+        other = collect("annotation diagnostic", "IAnnotation.GetDisplayData", lambda: _early_bound(annotation.GetDisplayData(), "IDisplayData"), required=False)
+        if other is not unavailable:
+            _telemetry.info(f"thread-mouth annotation diagnostic: dataPresent={other is not None}")
+            if other is not None:
+                collect_display(other, "annotation diagnostic", required=False)
+    if errors:
+        raise RuntimeError(f"thread-mouth native ink read failed: {'; '.join(errors)}")
+    if visible != 1 or dangling is not False:
+        raise RuntimeError("thread-mouth native cosmetic thread is hidden, dangling or unreadable")
+    if data is None:
+        raise RuntimeError("native through-thread has no display-data object")
     profile = _mouth_profile_box(adapter, section)
-    lines = [tuple(float(v) for v in data.GetLineAtIndex2(i)) for i in range(int(data.GetLineCount()))]
-    if any(len(row) != 10 or not all(math.isfinite(v) for v in row) for row in lines):
-        raise RuntimeError("native through-thread has unreadable section ink")
-    longitudinal = [row for row in lines if abs(row[5] - row[8]) < 1e-7 and abs(row[4] - row[7]) > (profile[2] - profile[0]) / 2.0]
+    segments = []
+    for raw in primary["line"]:
+        row = tuple(float(v) for v in raw or ())
+        if len(row) != 10 or not all(math.isfinite(v) for v in row):
+            raise RuntimeError("native through-thread has unreadable section line")
+        segments.append((row[4], row[5], row[7], row[8]))
+    for raw in primary["polyline"]:
+        row = tuple(float(v) for v in raw or ())
+        if len(row) < 7 or not all(math.isfinite(v) for v in row) or row[0] not in (0.0, 1.0):
+            raise RuntimeError("native through-thread has unreadable section polyline")
+        if row[0] == 1.0:
+            continue  # SDK arc/circle type: never turn its chord into a flank.
+        count = int(row[6])
+        if row[1] != 0.0 or row[6] != count or count < 2 or len(row) != 7 + 3 * count:
+            raise RuntimeError("native through-thread has malformed straight-polyline points")
+        points = [row[offset:offset + 3] for offset in range(7, len(row), 3)]
+        segments.extend((a[0], a[1], b[0], b[1]) for a, b in zip(points, points[1:]))
+    # A native polyline may subdivide a straight flank. Join only touching,
+    # collinear segments; never bridge a gap or take a curved path's endpoints.
+    horizontal = sorted(((y0 + y1) / 2.0, min(x0, x1), max(x0, x1))
+                        for x0, y0, x1, y1 in segments if abs(y0 - y1) < 1e-7)
+    runs = []
+    for y, xmin, xmax in horizontal:
+        if runs and abs(y - runs[-1][0]) < 1e-7 and xmin <= runs[-1][2] + 1e-7:
+            runs[-1] = (runs[-1][0], runs[-1][1], max(runs[-1][2], xmax))
+        else:
+            runs.append((y, xmin, xmax))
+    longitudinal = [run for run in runs if run[2] - run[1] > (profile[2] - profile[0]) / 2.0]
+    _telemetry.info(f"thread-mouth native ink: profile={profile}, longitudinal_runs={longitudinal}")
     centre_y = (profile[1] + profile[3]) / 2.0
-    if not any(row[5] < centre_y - 1e-7 for row in longitudinal) or not any(row[5] > centre_y + 1e-7 for row in longitudinal):
+    if not any(y < centre_y - 1e-7 for y, _, _ in longitudinal) or not any(y > centre_y + 1e-7 for y, _, _ in longitudinal):
         raise RuntimeError("native thread does not show both longitudinal flanks")
-    for row in longitudinal:
-        require_inside("native section thread", (min(row[4], row[7]), min(row[5], row[8]), max(row[4], row[7]), max(row[5], row[8])), DrawableRegion(*profile))
+    for y, xmin, xmax in longitudinal:
+        require_inside("native section thread", (xmin, y, xmax, y), DrawableRegion(*profile))
 
 
 def _layout_linear_annotations(adapter: Any, front: Any, bottom: Any, annotations: list[Any]) -> None:
