@@ -1339,12 +1339,16 @@ def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
     x, y = sheet.PIVOT_SEAT_Y_TEXT_XY
     top = y if anchor_is_top else y + height / 2.0
     box = (x - width / 2.0, top - height, x + width / 2.0, top)
-    assert box[0] >= sheet.HOLE_TOP_KEEP["PivotSeatY"][0]
-    # Deliberately inboard on blank printed pocket floor: reject nearby ink,
-    # not the whole plan outline, which is not an occupied rectangular box.
-    assert _R2B_HOLE_PLAN[0] < box[0] < box[2] < _R2B_HOLE_PLAN[2]
-    assert _R2B_HOLE_PLAN[1] < box[1] < box[3] < _R2B_HOLE_PLAN[3]
+    # Keep both the native value and its ABOVE note flag outside the plan.
+    # The flag occupies the printable row immediately above the value.
+    flagged_box = (box[0], box[1], box[2], box[3] + 0.006)
+    assert flagged_box[2] + 0.0035 < _R2B_HOLE_PLAN[0]
+    assert sheet.box_gap(flagged_box, _R2B_HOLE_PLAN) >= 0.0035
     neighbors = {
+        "hole table lower-right corner": (0.160, 0.162, 0.163, 0.166),
+        "origin note": (0.165, 0.174, 0.205, 0.187),
+        "datum X axis": _R2B_DATUM_X_AXIS,
+        "spotface note top": (0.169, 0.128, 0.217, 0.145),
         "spring centre mark": (0.2708043, 0.1749896, 0.2726196, 0.1768049),
         "pedestal centre mark": (0.2638448, 0.170928, 0.2659583, 0.1730415),
         "centre mark 391": (0.2925969, 0.1786569, 0.2951231, 0.1811831),
@@ -1362,7 +1366,7 @@ def test_pivot_y_offset_text_replays_clearance_from_native_neighboring_ink(
         ),
     }
     for label, neighbor in neighbors.items():
-        assert sheet.box_gap(box, neighbor) >= 0.0035, label
+        assert sheet.box_gap(flagged_box, neighbor) >= 0.0035, label
 
 
 def _pivot_y_placement_fakes(monkeypatch, failure=None):

@@ -370,11 +370,11 @@ HOLE_TOP_KEEP = {
     # reference sketch supplies real centre-to-centre extension origins;
     # place X below the plan, left of both witnesses and the datum X letter.
     "PivotSeatX": (0.2427, 0.1320),
-    # Keep the short native line between the holes; offset only its text
-    # onto the blank pocket floor, clear of the nearby marks and leaders.
+    # Keep the short native line between the holes so its witnesses avoid A1;
+    # offset its associated text outside the plan into the lower-left lane.
     "PivotSeatY": (0.2616, 0.1705),
 }
-PIVOT_SEAT_Y_TEXT_XY = (0.2735, 0.1850)
+PIVOT_SEAT_Y_TEXT_XY = (0.1890, 0.1540)
 # ABOVE accepts one printable row; both native offsets cite numbered note 1.
 PIVOT_SEAT_FLAG = "SEE NOTE 1"
 PIVOT_SEAT_CALLOUTS = dict.fromkeys(PIVOT_SEAT_DIMENSIONS, PIVOT_SEAT_FLAG)
@@ -710,7 +710,7 @@ def _serial_edge(view: Any) -> Any:
 
 
 def _place_pivot_seat_y(adapter: Any, annotations: list[Any]) -> None:
-    """Keep the native Y line between its holes and offset only its text."""
+    """Keep native between-hole witnesses; place their text outside the plan."""
     name = "PivotSeatY"
     matches = []
     for raw in annotations:
