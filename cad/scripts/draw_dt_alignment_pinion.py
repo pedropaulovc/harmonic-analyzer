@@ -77,8 +77,8 @@ SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
 # The actual 1:1 trial struck the border and tooth note. At 1:2 the complete
-# pictorial fits the upper-right field; its view-local fine visible edges keep
-# the brass shading readable without hiding any tooth or changing the part.
+# pictorial fits the upper-right field. Request fine edges on that view only;
+# native PDF inspection must prove readable shading and unchanged orthographics.
 ISO_SCALE = (1, 2)
 # The side view is the lathe view at the sheet scale; the end view projects
 # to its left (third angle) at 2:1 so the teeth and bore read, and says so
@@ -259,12 +259,12 @@ def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
         )
 
 
-def _set_isometric_edge_weight(view: Any) -> Any:
+def _set_isometric_edge_weight(view: Any) -> None:
     """Use fine visible edges only on this dense, full-tooth pictorial.
 
     The failed PDF overlaid 994 0.35 mm strokes on readable brass shading.
-    IDrawingComponent's component line-font override is view-local, unlike
-    drawing-document line defaults or source-model appearance changes.
+    Request the component override through this view; native PDF inspection must
+    also prove it affects the pictorial, not the manufacturing views.
     """
     bound = _early_bound(view, "IView")
     raw_component = bound.RootDrawingComponent2(False)
@@ -275,11 +275,17 @@ def _set_isometric_edge_weight(view: Any) -> Any:
     # swDrawingComponentLineFontVisible=1; swLW_CUSTOM=10. The documented
     # thickness unit is metres (the SDK example uses 0.0003 for 0.3 mm).
     component.SetLineThickness(1, 10, 0.0001)
-    _assert_isometric_edge_weight(component)
-    return component
+    _assert_isometric_edge_weight(view)
 
 
-def _assert_isometric_edge_weight(component: Any) -> None:
+def _assert_isometric_edge_weight(view: Any) -> None:
+    # Reacquire after settling: rebuilding/display regeneration may replace the
+    # drawing component that was present when the override was authored.
+    bound = _early_bound(view, "IView")
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment isometric lost its drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
     weight, thickness = component.GetLineThickness(1)
     if (
         bool(component.UseDocumentDefaults)
@@ -417,9 +423,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
-    iso_component = _set_isometric_edge_weight(iso)
-    rebuild_drawing(adapter, label="isometric fine visible edges")
-    _assert_isometric_edge_weight(iso_component)
+    _set_isometric_edge_weight(iso)
 
     return await finalize_drawing(
         adapter,
@@ -427,7 +431,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        settled_checks=(lambda: _assert_isometric_edge_weight(iso_component),),
+        settled_checks=(lambda: _assert_isometric_edge_weight(iso),),
     )
 
 
