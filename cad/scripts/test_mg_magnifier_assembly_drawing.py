@@ -795,19 +795,27 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    # Combined 0fb89 native note extents, relative to their insertion points.
-    # The estimated line pitch must not push CHECK back into the title block.
-    sequence_bottom = drawing.STEPS_XY[1] - (0.258 - 0.0953983)
-    checks_top = drawing.CHECKS_XY[1] + (0.0846455 - 0.0844)
-    checks_native_bottom = drawing.CHECKS_XY[1] - (0.0844 - 0.0618495)
-    sequence_top = drawing.STEPS_XY[1] + (0.2584113 - 0.258)
-    assert sequence_bottom - checks_top >= drawing._PAD
-    assert sequence_top <= drawing.INNER_BORDER[3] - drawing._PAD
-    # Matched PDF ink sets the actual separation limit, not nominal font size.
-    sequence_ink_bottom = drawing.STEPS_XY[1] - (0.258 - 0.0960089)
-    checks_ink_top = drawing.CHECKS_XY[1] + (0.0843736 - 0.0844)
-    assert sequence_ink_bottom - checks_ink_top >= min(0.0038733, 0.0038734)
-    assert checks_native_bottom >= drawing.TITLE_BLOCK[3] + drawing._PAD
+    # Measured 0fb89 and 86bc envelopes/ink, translated from their insertions.
+    # Preserve 4 mm native padding on every known seat, not just PDF air.
+    for (
+        steps_y, checks_y, steps_bottom, steps_top, checks_bottom, checks_top,
+        steps_ink_bottom, checks_ink_top,
+    ) in (
+        (0.258, 0.0844, 0.0953983, 0.2584113, 0.0618495, 0.0846455,
+         0.0960089, 0.0843736),
+        (0.2595, 0.0926, 0.0968088, 0.2597953, 0.0701210, 0.0929963,
+         0.0975090, 0.0925736),
+    ):
+        steps_dy = drawing.STEPS_XY[1] - steps_y
+        checks_dy = drawing.CHECKS_XY[1] - checks_y
+        assert steps_bottom + steps_dy - (checks_top + checks_dy) >= drawing._PAD
+        assert steps_top + steps_dy <= drawing.INNER_BORDER[3] - drawing._PAD
+        assert checks_bottom + checks_dy >= drawing.TITLE_BLOCK[3] + drawing._PAD
+        # Matched PDF ink sets separation, rather than nominal font size.
+        assert (
+            steps_ink_bottom + steps_dy - (checks_ink_top + checks_dy)
+            >= min(0.0038733, 0.0038734)
+        )
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
