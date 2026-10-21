@@ -52,6 +52,26 @@ class RecordingBudget:
         yield
 
 
+def recording_checkpoint(records=None):
+    """Direct-admission port only; these receipts are not persistence proof."""
+    publication = {
+        "status": "inactive",
+        "attempts": 0,
+        "last_success": None,
+        "errors": [],
+    }
+
+    def publish(evidence, phase):
+        assert publication["status"] != "unavailable"
+        publication["attempts"] += 1
+        if records is not None:
+            records.append((phase, copy.deepcopy(evidence)))
+        publication["status"] = "published"
+        publication["last_success"] = {"phase": phase}
+
+    return {"publication": publication, "publish": publish}
+
+
 class Feature:
     """IFeature: Name is a property; all graph/identity/type access is a method."""
 
@@ -531,12 +551,17 @@ class AttemptAdapter:
             return default
 
 
-def test_capture_forwards_identical_result_rows_components_and_void_done():
+def test_capture_forwards_identical_result_rows_components_and_void_done(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     components = [NativeContactComponent("left"), NativeContactComponent("right")]
     rows = [NativeInterference(components, 1.234567890123e-9)]
     manager = NativeManager(rows)
     entry = {}
-    capture = dirty.Capture(manager, RecordingBudget(), entry)
+    capture = dirty.Capture(
+        manager, RecordingBudget(), entry, component_limit=len(expected)
+    )
     assert entry["settings"] == {}
     capture.observe_settings()
     assert entry["settings"] == SETTINGS
@@ -553,7 +578,10 @@ def test_capture_forwards_identical_result_rows_components_and_void_done():
     assert entry["rows"][0]["volume_m3"] == rows[0].volume
 
 
-def test_scoped_capture_keeps_real_factory_settings_and_real_policy_reads():
+def test_scoped_capture_keeps_real_factory_settings_and_real_policy_reads(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     components = [NativeContactComponent("left"), NativeContactComponent("right")]
     row = NativeInterference(components, 1e-9)
     manager = NativeManager([row])
@@ -566,7 +594,9 @@ def test_scoped_capture_keeps_real_factory_settings_and_real_policy_reads():
     adapter = AttemptAdapter(model)
     original = _assembly.configured_interference_manager
     ledger = []
-    with dirty.scoped_capture(adapter, RecordingBudget(), ledger, "initial"):
+    with dirty.scoped_capture(
+        adapter, RecordingBudget(), ledger, "initial", component_limit=len(expected)
+    ):
         _assembly.check_no_interference(
             adapter, allowed_pairs={frozenset({"left", "right"}): 2.0}
         )
@@ -594,7 +624,10 @@ def test_scoped_capture_keeps_real_factory_settings_and_real_policy_reads():
         "getter",
     ],
 )
-def test_capture_records_unavailable_native_metadata_without_replacing_result(fault):
+def test_capture_records_unavailable_native_metadata_without_replacing_result(
+    monkeypatch, tmp_path, fault
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     components = [NativeContactComponent("left"), NativeContactComponent("right")]
     row = NativeInterference(components, 1e-9)
     if fault == "missing-name":
@@ -616,7 +649,9 @@ def test_capture_records_unavailable_native_metadata_without_replacing_result(fa
     result = [row]
     manager = NativeManager(result)
     entry = {}
-    capture = dirty.Capture(manager, RecordingBudget(), entry)
+    capture = dirty.Capture(
+        manager, RecordingBudget(), entry, component_limit=len(expected)
+    )
     capture.observe_settings()
     assert capture.GetInterferences() is result
     assert entry["errors"], (
@@ -626,11 +661,16 @@ def test_capture_records_unavailable_native_metadata_without_replacing_result(fa
     assert capture.Done() is None
 
 
-def test_capture_refuses_one_shot_results_without_consuming_or_substituting_them():
+def test_capture_refuses_one_shot_results_without_consuming_or_substituting_them(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     result = iter([NativeInterference([], 0.0)])
     manager = NativeManager(result)
     entry = {}
-    capture = dirty.Capture(manager, RecordingBudget(), entry)
+    capture = dirty.Capture(
+        manager, RecordingBudget(), entry, component_limit=len(expected)
+    )
     capture.observe_settings()
     assert capture.GetInterferences() is result
     assert entry["errors"]
@@ -638,12 +678,17 @@ def test_capture_refuses_one_shot_results_without_consuming_or_substituting_them
     capture.Done()
 
 
-def test_compute_exception_is_recorded_before_attempt_swallows_it():
+def test_compute_exception_is_recorded_before_attempt_swallows_it(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     manager = NativeManager([])
     primary = RuntimeError("native compute failed")
     manager.compute_error = primary
     entry = {}
-    capture = dirty.Capture(manager, RecordingBudget(), entry)
+    capture = dirty.Capture(
+        manager, RecordingBudget(), entry, component_limit=len(expected)
+    )
     capture.observe_settings()
     adapter = AttemptAdapter()
     assert (
@@ -656,7 +701,10 @@ def test_compute_exception_is_recorded_before_attempt_swallows_it():
     capture.Done()
 
 
-def test_secondary_release_failure_does_not_mask_primary_and_restores_factory():
+def test_secondary_release_failure_does_not_mask_primary_and_restores_factory(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     primary = ValueError("original consumer getter failure")
     row = NativeInterference([], 0.0)
     row.error = primary
@@ -671,7 +719,9 @@ def test_secondary_release_failure_does_not_mask_primary_and_restores_factory():
     original = _assembly.configured_interference_manager
     ledger = []
     with pytest.raises(ValueError) as caught:
-        with dirty.scoped_capture(adapter, RecordingBudget(), ledger, "sweep"):
+        with dirty.scoped_capture(
+            adapter, RecordingBudget(), ledger, "sweep", component_limit=len(expected)
+        ):
             _assembly.check_no_interference(adapter)
     assert caught.value is primary
     assert _assembly.configured_interference_manager is original
@@ -717,6 +767,7 @@ class NativePart(EquationModel):
         super().__init__(Equations([]))
         self.path = path
         self.feature = Feature(1, "native boss", "Boss")
+        self.first_feature_calls = 0
 
     def GetType(self):
         return 1
@@ -728,6 +779,7 @@ class NativePart(EquationModel):
         return self.path.name
 
     def FirstFeature(self):
+        self.first_feature_calls += 1
         return self.feature
 
 
@@ -767,6 +819,8 @@ class NativeComponent(NativeContactComponent):
         self.transform_reads = 0
         self.array_reads = 0
         self.transform_override = None
+        self.first_feature_calls = 0
+        self.external_calls = []
 
     def GetPathName(self):
         return str(self.part.path)
@@ -785,12 +839,15 @@ class NativeComponent(NativeContactComponent):
         return (self.bodies, self.body_info)
 
     def ListExternalFileReferencesCount(self):
+        self.external_calls.append("count")
         return self.external_count
 
     def ListExternalFileReferences2(self):
+        self.external_calls.append("list")
         return self.external_rows
 
     def FirstFeature(self):
+        self.first_feature_calls += 1
         return self.part.FirstFeature()
 
     def IsFixed(self):
@@ -867,6 +924,7 @@ class NativeRoot(EquationModel):
         self.saved_status = 0
         self.selected = []
         self.created_features = {}
+        self.first_feature_calls = 0
         root = self
 
         class Extension:
@@ -941,6 +999,7 @@ class NativeRoot(EquationModel):
         return self.path.name
 
     def FirstFeature(self):
+        self.first_feature_calls += 1
         return self.first
 
     def GetComponents(self, top_level_only):
@@ -1061,6 +1120,8 @@ class NativeApp:
     def CloseDoc(self, title):
         root = self.adapter.currentModel
         assert root is not None and title == root.GetTitle()
+        if self.adapter.before_close_hook:
+            self.adapter.before_close_hook(root)
         self.adapter.events.append(("close", root.generation))
         self.adapter.currentModel = None
         self.adapter.resident_docs.clear()
@@ -1089,6 +1150,7 @@ class NativeAdapter(AttemptAdapter, sdk_assembly.SolidWorksAssemblyMixin):
         self.swApp = NativeApp(self)
         self.open_hook = None
         self.close_hook = None
+        self.before_close_hook = None
 
     def _handle_com_operation(self, operation, callback):
         from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
@@ -1245,6 +1307,7 @@ def test_actual_admission_accepts_full_native_inventory_and_all_configured_solid
         RecordingBudget(),
         "DRIVE_carriage_slide",
         adapter.sweep,
+        checkpoint=recording_checkpoint(),
     )
     assert set(evidence["instances"]) == set(expected)
     assert evidence["root_features"]["terminations"]
@@ -1308,7 +1371,12 @@ def test_actual_admission_does_not_turn_unknown_native_availability_into_clean(
         component.part.feature.sub = Feature(2, "hidden child", "Sensor")
     with pytest.raises(dirty.Inconclusive):
         dirty.admit(
-            adapter, expected, RecordingBudget(), "DRIVE_carriage_slide", adapter.sweep
+            adapter,
+            expected,
+            RecordingBudget(),
+            "DRIVE_carriage_slide",
+            adapter.sweep,
+            checkpoint=recording_checkpoint(),
         )
 
 
@@ -1332,6 +1400,12 @@ def assert_full_pair(adapter, expected, evidence, outer_report):
     assert evidence["status"] == "complete-parent-decision-required", evidence
     assert not evidence["errors"]
     assert not outer_report.failed
+    assert evidence["census_publication"] == {
+        "status": "inactive",
+        "attempts": 0,
+        "last_success": None,
+        "errors": [],
+    }
     assert [row["variant"] for row in evidence["trajectories"]] == ["B", "A"]
     assert len(adapter.roots) == 2
     b_root, a_root = adapter.roots
@@ -1366,6 +1440,51 @@ def assert_full_pair(adapter, expected, evidence, outer_report):
         assert row["cleanup"]["confirmed"] is True
         assert row["cleanup"]["after"] == []
         assert row["admission"]["admitted"] is True
+        admission = row["admission"]
+        census = admission["census"]
+        assert (
+            census["authentication_status"] == census["children_status"] == "complete"
+        )
+        assert (
+            census["identity_seen_count"]
+            == census["authenticated_instance_count"]
+            == len(expected)
+        )
+        assert (
+            census["expected_scope_count"]
+            == census["discovered_scope_count"]
+            == len(adapter.parts)
+        )
+        assert census["completed_graph_count"] == len(adapter.parts)
+        assert census["unknown_categories"] == []
+        assert (
+            census["root_graph_status"]
+            == census["root_category_scan_status"]
+            == census["root_validation_status"]
+            == "complete"
+        )
+        assert root.first_feature_calls == root.manager_reads == 1
+        assert sum(
+            component.first_feature_calls for component in root.components.values()
+        ) == len(adapter.parts)
+        for part in {
+            component.part.path: component.part
+            for component in root.components.values()
+        }.values():
+            assert part.first_feature_calls == part.manager_reads == 1
+            assert part.feature.calls.count("GetID") == 1
+        for component in root.components.values():
+            assert component.body_calls == [-1]
+            assert component.body.reads.count("Check3") == 1
+            assert component.external_calls == ["count", "list"]
+        for child in admission["child_inventories"].values():
+            assert (
+                child["graph_status"]
+                == child["category_scan_status"]
+                == child["validation_status"]
+                == "complete"
+            )
+            assert child["category_records_scanned"] == len(child["features"]["nodes"])
         assert not row["validation_errors"]
         assert len(row["interferences"]) == 11
         assert (
@@ -1467,6 +1586,14 @@ def test_run_executes_both_real_consumers_exact_work_and_independent_cleanup(
     monkeypatch, tmp_path
 ):
     adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    writes = []
+    original_write = dirty._write_json
+
+    def record_write(path, value):
+        writes.append(path)
+        return original_write(path, value)
+
+    monkeypatch.setattr(dirty, "_write_json", record_write)
     outer_report = verify.Report()
     evidence = asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, outer_report))
     assert_full_pair(adapter, expected, evidence, outer_report)
@@ -1475,6 +1602,9 @@ def test_run_executes_both_real_consumers_exact_work_and_independent_cleanup(
     assert persisted_budget["submission"] == 1
     assert persisted_budget["hard_deadline"] is False
     assert not dirty.FAILURE_PATH.exists()
+    assert writes.count(dirty.REPORT_PATH) == 1
+    assert writes.count(dirty.FAILURE_PATH) == 0
+    assert not dirty.FAILURE_PATH.with_suffix(".json.tmp").exists()
 
     # Delete an observation only after the complete real consumer ran. Full
     # pose/gate/count evidence cannot substitute for the SDK prepare Edit.
@@ -1629,14 +1759,35 @@ def test_actual_run_refuses_existing_submission_without_touching_prior_evidence_
         )
     for path, payload in previous.items():
         path.write_bytes(payload)
+    existing_files = set(tmp_path.iterdir())
+    writes = []
+    original_write = dirty._write_json
+
+    def record_write(path, value):
+        writes.append(path)
+        return original_write(path, value)
+
+    monkeypatch.setattr(dirty, "_write_json", record_write)
     discovery = []
     original_provenance = dirty._provenance
+    original_inputs = dirty._input_paths
+    original_hash = dirty._hash_inputs
 
     def record_provenance():
         discovery.append("provenance")
         return original_provenance()
 
+    def record_inputs(name):
+        discovery.append("inputs")
+        return original_inputs(name)
+
+    def record_hash(paths):
+        discovery.append("hash")
+        return original_hash(paths)
+
     monkeypatch.setattr(dirty, "_provenance", record_provenance)
+    monkeypatch.setattr(dirty, "_input_paths", record_inputs)
+    monkeypatch.setattr(dirty, "_hash_inputs", record_hash)
     outer_report = verify.Report()
     outer_report.passed.append("previous-pass")
     outer_report.failed.append(("previous-failure", "previous-reason"))
@@ -1648,6 +1799,10 @@ def test_actual_run_refuses_existing_submission_without_touching_prior_evidence_
         assert not dirty.REPORT_PATH.exists()
         assert not dirty.FAILURE_PATH.exists()
     assert discovery == []
+    assert writes == []
+    assert set(tmp_path.iterdir()) == existing_files
+    assert not dirty.FAILURE_PATH.with_suffix(".json.tmp").exists()
+    assert not dirty.REPORT_PATH.with_suffix(".json.tmp").exists()
     assert adapter.events == []
     assert adapter.roots == []
     assert adapter.currentModel is prior_document
@@ -1871,7 +2026,10 @@ def test_actual_run_primary_exception_survives_secondary_cleanup_unavailability(
     assert len(adapter.roots) == 1
 
 
-def test_capture_canonicalization_preserves_raw_rows_multiplicity_and_configuration():
+def test_capture_canonicalization_preserves_raw_rows_multiplicity_and_configuration(
+    monkeypatch, tmp_path
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
     left = NativeContactComponent("left", "A")
     right = NativeContactComponent("right", "B")
     rows = [
@@ -1881,7 +2039,9 @@ def test_capture_canonicalization_preserves_raw_rows_multiplicity_and_configurat
     ]
     manager = NativeManager(rows)
     entry = {}
-    capture = dirty.Capture(manager, RecordingBudget(), entry)
+    capture = dirty.Capture(
+        manager, RecordingBudget(), entry, component_limit=len(expected)
+    )
     capture.observe_settings()
     assert capture.manager is manager
     assert capture.GetInterferences() is rows
@@ -2017,8 +2177,10 @@ def test_hidden_input_children_outside_cad_out_are_enumerated_and_discarded(
 
 @pytest.mark.parametrize("secondary_release_error", [False, True])
 def test_acquired_manager_setting_base_exception_releases_once_and_preserves_primary(
-    secondary_release_error,
+    monkeypatch, tmp_path, secondary_release_error
 ):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+
     class SettingsAbort(BaseException):
         pass
 
@@ -2042,7 +2204,9 @@ def test_acquired_manager_setting_base_exception_releases_once_and_preserves_pri
     original = _assembly.configured_interference_manager
     ledger = []
     with pytest.raises(SettingsAbort) as caught:
-        with dirty.scoped_capture(adapter, RecordingBudget(), ledger, "initial"):
+        with dirty.scoped_capture(
+            adapter, RecordingBudget(), ledger, "initial", component_limit=len(expected)
+        ):
             _assembly.check_no_interference(adapter)
     assert caught.value is primary
     assert _assembly.configured_interference_manager is original
@@ -2146,6 +2310,7 @@ def test_real_admission_comparison_uses_semantics_not_native_enumeration_identit
         RecordingBudget(),
         "DRIVE_carriage_slide",
         adapter.sweep,
+        checkpoint=recording_checkpoint(),
     )
     relevant = {
         str(path.resolve())
@@ -2161,6 +2326,7 @@ def test_real_admission_comparison_uses_semantics_not_native_enumeration_identit
         RecordingBudget(),
         "DRIVE_carriage_slide",
         adapter.sweep,
+        checkpoint=recording_checkpoint(),
     )
     assert admission_b["admitted"] is admission_a["admitted"] is True
     assert original is not reference
@@ -2224,3 +2390,1628 @@ def test_real_admission_comparison_uses_semantics_not_native_enumeration_identit
             "admission inventories differ"
         ], change
     assert dirty._cleanup(adapter, relevant, RecordingBudget())["confirmed"] is True
+
+
+def native_scope_representatives(root):
+    """Choose fixture receivers without performing any extra native reads."""
+    scopes = {}
+    for component in root.components.values():
+        scopes.setdefault(
+            (str(component.part.path.resolve()), component.configuration), component
+        )
+    return list(scopes.values())
+
+
+def assert_refused_prepared_start(root, row):
+    assert row["admission"] is None
+    assert "admission_progress" not in row
+    assert row["boundaries"] == []
+    assert row["counts"] == {
+        "writes": 0,
+        "visits": 0,
+        "reads": 0,
+        "suppressions": 0,
+        "coincidences": 0,
+    }
+    assert root.writes == root.consumer_reads == []
+    assert root.suppressions == root.coincidents == []
+    assert root.forces == [("static", 0), ("prepare", 0)]
+    assert root.edits == [("prepare", 0)]
+    assert root.tools_calls == len(root.managers) == 1
+    assert root.managers[0].compute_calls == root.managers[0].done_calls == 1
+    assert [item["rebuild_members"] for item in row["prepare_attempts"]] == [
+        ["EditRebuild3"],
+        ["ForceRebuild3"],
+    ]
+    assert all(item["recognized_pinned_form"] for item in row["prepare_attempts"])
+    assert row["cleanup"]["confirmed"] is True
+
+
+def assert_precleanup_checkpoint(snapshot, variant, trajectories, boundaries):
+    assert snapshot["status"] == "inconclusive"
+    assert snapshot["qualification_status"] == "not-established"
+    publication = snapshot["census_publication"]
+    assert publication["status"] == "published"
+    assert snapshot["census_checkpoint"] == publication["last_success"]
+    assert snapshot["census_checkpoint"] == {
+        "attempt": publication["attempts"],
+        "phase": snapshot["census_checkpoint"]["phase"],
+        "trajectory": variant,
+        "trajectory_count": trajectories,
+        "boundary_count": boundaries,
+        "capture_stage": "before-consumer-cleanup",
+    }
+    assert len(snapshot["trajectories"]) == trajectories
+    assert sum(len(row["boundaries"]) for row in snapshot["trajectories"]) == boundaries
+    assert snapshot["cleanup"] is None or snapshot["cleanup"]["confirmed"] is False
+    row = snapshot["trajectories"][-1]
+    assert row["variant"] == variant
+    assert row["admission"] is None
+    assert row["admission_progress"]["admitted"] is False
+    return row["admission_progress"]
+
+
+def test_actual_run_aggregates_all_unknown_scopes_descendants_and_root_once(
+    monkeypatch, tmp_path, caplog
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    snapshots = []
+    original_write = dirty._write_json
+
+    def record_write(path, value):
+        original_write(path, value)
+        if path == dirty.FAILURE_PATH:
+            snapshots.append(json.loads(path.read_text(encoding="utf-8")))
+
+    def inject(root):
+        first, second, *_rest = native_scope_representatives(root)
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        first.part.feature.sub = Feature(2, "annotation view", "AnnotationViewFeat")
+        repeated = Feature(2, "annotation view", "AnnotationViewFeat")
+        repeated.sub = Feature(3, "hidden sensor", "Sensor")
+        first.part.feature.next = repeated
+        second.part.feature.kind = "MacroFeature"
+        notes = Feature(8000, "root notes", "NotesAreaFtrFolder")
+        notes.sub = Feature(8001, "root descendant", "Sensor")
+        root.extra_features[-1].next = notes
+
+    adapter.open_hook = inject
+    monkeypatch.setattr(dirty, "_write_json", record_write)
+    report = verify.Report()
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert final["status"] == "inconclusive"
+    assert final["qualification_status"] == "not-established"
+    assert len(adapter.roots) == len(final["trajectories"]) == 1
+    root = adapter.roots[0]
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(root, row)
+    admission = row["admission_failure"]["evidence"]
+    census = admission["census"]
+    assert census["authentication_status"] == census["children_status"] == "complete"
+    assert (
+        census["identity_seen_count"]
+        == census["authenticated_instance_count"]
+        == len(expected)
+    )
+    assert (
+        census["expected_scope_count"]
+        == census["discovered_scope_count"]
+        == len(adapter.parts)
+    )
+    assert census["completed_graph_count"] == len(adapter.parts)
+    assert (
+        census["root_graph_status"]
+        == census["root_category_scan_status"]
+        == census["root_validation_status"]
+        == "complete"
+    )
+    unknowns = census["unknown_categories"]
+    assert len(unknowns) == 6
+    assert len({record["scope"] for record in unknowns}) == 3
+    first, second, *_rest = native_scope_representatives(root)
+    scope = admission["instances"][first.name]["child_inventory"]
+    second_scope = admission["instances"][second.name]["child_inventory"]
+    assert unknowns == [
+        {
+            "scope": record_scope,
+            "id": identity,
+            "name": name,
+            "type": kind,
+            "context": context,
+        }
+        for record_scope, identity, name, kind, context in [
+            (scope, 1, "native boss", "NotesAreaFtrFolder", "child"),
+            (scope, 2, "annotation view", "AnnotationViewFeat", "child"),
+            (scope, 3, "hidden sensor", "Sensor", "child"),
+            (second_scope, 1, "native boss", "MacroFeature", "child"),
+            ("root", 8000, "root notes", "NotesAreaFtrFolder", "root"),
+            ("root", 8001, "root descendant", "Sensor", "root"),
+        ]
+    ]
+    graph = admission["child_inventories"][scope]["features"]
+    assert [edge["id"] for edge in graph["occurrences"]] == [1, 2, 2, 3]
+    assert [edge["parent"] for edge in graph["occurrences"]] == [None, 1, None, 2]
+    assert graph["terminations"]
+    root_edge = next(
+        edge for edge in admission["root_features"]["occurrences"] if edge["id"] == 8001
+    )
+    assert root_edge["parent"] == 8000
+    for child in admission["child_inventories"].values():
+        assert (
+            child["graph_status"]
+            == child["category_scan_status"]
+            == child["validation_status"]
+            == "complete"
+        )
+    assert root.first_feature_calls == root.manager_reads == 1
+    assert sum(
+        component.first_feature_calls for component in root.components.values()
+    ) == len(adapter.parts)
+    assert all(component.body_calls == [-1] for component in root.components.values())
+    assert all(
+        component.external_calls == ["count", "list"]
+        for component in root.components.values()
+    )
+    assert all(
+        component.part.manager_reads == 1 for component in root.components.values()
+    )
+    assert len(snapshots) == len(adapter.parts) + 3
+    assert [snapshot["census_checkpoint"]["phase"] for snapshot in snapshots] == (
+        ["child-graph-scanned"] * len(adapter.parts)
+        + ["children-complete", "root-graph-scanned", "admission-aborted"]
+    )
+    early = assert_precleanup_checkpoint(snapshots[-1], "B", 1, 0)
+    assert early["census"]["unknown_categories"] == unknowns
+    assert json.loads(dirty.FAILURE_PATH.read_text(encoding="utf-8")) == snapshots[-1]
+    assert final["cleanup"]["confirmed"] is True
+    assert report.failed
+    assert "NotesAreaFtrFolder" in row["admission_failure"]["error"]["message"]
+    assert (
+        len(
+            [
+                record
+                for record in caplog.records
+                if record.message.startswith("dirty-Edit diagnostic rejected [")
+            ]
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize("fault", ["unknown", "native"])
+def test_actual_run_a_only_refusal_retains_completed_b_and_real_progress(
+    monkeypatch, tmp_path, fault
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    early = []
+
+    def inject(root):
+        if root.generation == 1:
+            first = native_scope_representatives(root)[0]
+            if fault == "unknown":
+                first.part.feature.kind = "AnnotationViewFeat"
+            else:
+                first.part.feature.error = RuntimeError("A native next unavailable")
+
+    def before_close(root):
+        if root.generation == 1:
+            assert adapter.currentModel is root
+            assert root in adapter.resident_docs
+            early.append(dirty.FAILURE_PATH.read_bytes())
+
+    adapter.open_hook = inject
+    adapter.before_close_hook = before_close
+    report = verify.Report()
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert final["status"] == "inconclusive"
+    assert final["qualification_status"] == "not-established"
+    assert [row["variant"] for row in final["trajectories"]] == ["B", "A"]
+    b, a = final["trajectories"]
+    b_root, a_root = adapter.roots
+    assert b["admission"]["admitted"] is True
+    assert b["complete"] is True
+    assert [item["key"] for item in b["boundaries"]] == EXPECTED_KEYS
+    assert b["counts"] == {
+        "writes": 15,
+        "visits": 14,
+        "reads": 28,
+        "suppressions": 2,
+        "coincidences": 2,
+    }
+    assert len(b_root.writes) == 15
+    assert len(b_root.consumer_reads) == 28
+    assert b_root.tools_calls == len(b_root.managers) == 11
+    assert all(
+        manager.compute_calls == manager.done_calls == 1 for manager in b_root.managers
+    )
+    assert b_root.forces == [("static", 0), ("prepare", 0)]
+    assert len(b_root.edits) == 19
+    assert len(b["prepare_attempts"]) == len(b["remate_attempts"]) == 2
+    assert all(
+        item["recognized_pinned_form"]
+        for item in b["prepare_attempts"] + b["remate_attempts"]
+    )
+    assert b["gates"] == {
+        "passed": [f"{verify.SWEEP_OWNER}:{suffix}" for suffix in GATE_SUFFIXES],
+        "failed": [],
+    }
+    assert b["cleanup"]["confirmed"] is True
+    assert_refused_prepared_start(a_root, a)
+    assert len(early) == 1
+    checkpoint = json.loads(early[0])
+    admission = assert_precleanup_checkpoint(checkpoint, "A", 2, 16)
+    assert checkpoint["trajectories"][0]["counts"] == b["counts"]
+    assert checkpoint["trajectories"][0]["boundaries"] == b["boundaries"]
+    assert admission["admitted"] is False
+    assert dirty.FAILURE_PATH.read_bytes() == early[0]
+    assert final["cleanup"]["confirmed"] is True
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    assert report.failed
+    if fault == "native":
+        assert "A native next unavailable" in a["admission_failure"]["error"]["message"]
+        assert a_root.first_feature_calls == 0
+        assert (
+            sum(
+                component.first_feature_calls
+                for component in a_root.components.values()
+            )
+            == 1
+        )
+    else:
+        assert len(admission["census"]["unknown_categories"]) == 1
+        assert admission["census"]["authenticated_instance_count"] == len(expected)
+
+
+@pytest.mark.parametrize(
+    ("fault", "reason", "inserted", "identity_obtained"),
+    [
+        ("identity", "unexpected root component", False, True),
+        ("path", "resolved file differs", False, True),
+        ("configuration", "active child configuration", True, True),
+        ("suppressed", "unresolved/suppressed/error", False, False),
+        ("nested", "nested/malformed child", True, True),
+        ("model-path", "component/model document path", True, True),
+        ("body", "solid", True, True),
+        ("external", "external references", True, True),
+        ("equation", "equation", True, True),
+    ],
+)
+def test_actual_run_later_unsafe_input_stops_before_any_later_scope(
+    monkeypatch, tmp_path, fault, reason, inserted, identity_obtained
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    selected = {}
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        selected.update(first=first, target=target, later=later)
+        selected["target_name"] = target.name
+        selected["before"] = list(root.components.values()).index(target)
+        if fault == "identity":
+            target.name = "foreign-identity"
+        elif fault == "path":
+            target.GetPathName = lambda: str(first.part.path)
+        elif fault == "configuration":
+            target.configuration = "unseen-config"
+        elif fault == "suppressed":
+            target.suppression = 0
+        elif fault == "nested":
+            target.children = [object()]
+        elif fault == "model-path":
+            target.part.GetPathName = lambda: str(first.part.path)
+        elif fault == "body":
+            target.body.kind = 1
+        elif fault == "external":
+            target.external_count = 1
+        else:
+            target.part.manager = Equations(['"width" = unsupported(1)'])
+
+    adapter.open_hook = inject
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert len(adapter.roots) == 1
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    failure = row["admission_failure"]
+    assert reason in failure["error"]["message"]
+    admission = failure["evidence"]
+    census = admission["census"]
+    before = selected["before"]
+    authenticated = before + (fault == "equation")
+    assert census["identity_seen_count"] == before + identity_obtained
+    assert census["authenticated_instance_count"] == authenticated
+    assert len(admission["instances"]) == before + inserted
+    assert (selected["target_name"] in admission["instances"]) is inserted
+    assert census["authentication_status"] == census["children_status"] == "incomplete"
+    assert census["expected_scope_count"] is None
+    assert census["discovered_scope_count"] == (2 if fault == "equation" else 1)
+    assert census["completed_graph_count"] == (2 if fault == "equation" else 1)
+    assert len(census["unknown_categories"]) == 1
+    assert selected["later"].body_calls == []
+    assert selected["later"].external_calls == []
+    assert selected["later"].part.first_feature_calls == 0
+    assert selected["later"].part.manager_reads == 0
+    assert adapter.roots[0].first_feature_calls == 0
+    if fault == "equation":
+        scope = admission["instances"][selected["target_name"]]["child_inventory"]
+        child = admission["child_inventories"][scope]
+        assert child["graph_status"] == child["category_scan_status"] == "complete"
+        assert child["validation_status"] == "incomplete"
+    else:
+        assert selected["target"].first_feature_calls == 0
+    assert final["census_publication"]["status"] == "published"
+    assert final["cleanup"]["confirmed"] is True
+
+
+@pytest.mark.parametrize(
+    "fault", ["native", "malformed", "cycle", "depth", "global-cap"]
+)
+def test_actual_run_partial_walker_keeps_scoped_raw_graph_and_global_limits(
+    monkeypatch, tmp_path, fault
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    selected = {}
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        selected.update(first=first, target=target, later=later)
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        if fault == "global-cap":
+            first.part.feature = chain(
+                [Feature(index, f"earlier {index}", "Boss") for index in range(2500)]
+            )
+            first.part.feature.kind = "NotesAreaFtrFolder"
+            target.part.feature = chain(
+                [Feature(index, f"later {index}", "Boss") for index in range(2500)]
+            )
+        elif fault == "native":
+            target.part.feature.error = RuntimeError("later native next unavailable")
+        elif fault == "malformed":
+            target.part.feature.next = Feature(None, "unresolved identity", "Boss")
+        elif fault == "cycle":
+            target.part.feature.next = target.part.feature
+        else:
+            current = target.part.feature
+            for index in range(2, 35):
+                current.sub = Feature(index, f"deep {index}", "Boss")
+                current = current.sub
+
+    adapter.open_hook = inject
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    admission = row["admission_failure"]["evidence"]
+    census = admission["census"]
+    first, target, later = (selected[key] for key in ("first", "target", "later"))
+    earlier_scope = admission["instances"][first.name]["child_inventory"]
+    scope = admission["instances"][target.name]["child_inventory"]
+    earlier = admission["child_inventories"][earlier_scope]
+    child = admission["child_inventories"][scope]
+    assert (
+        earlier["graph_status"]
+        == earlier["category_scan_status"]
+        == earlier["validation_status"]
+        == "complete"
+    )
+    assert (
+        child["graph_status"]
+        == child["category_scan_status"]
+        == child["validation_status"]
+        == "incomplete"
+    )
+    assert "features" not in child
+    partial = admission["failed_step_evidence"]
+    assert partial["scope"] == scope
+    assert census["failed_scope"] == {
+        "scope": scope,
+        "path": str(target.part.path.resolve()),
+        "configuration": target.configuration,
+        "instance": target.name,
+        "graph_status": "incomplete",
+        "category_scan_status": "incomplete",
+        "validation_status": "incomplete",
+    }
+    assert census["completed_graph_count"] == 1
+    assert census["expected_scope_count"] is None
+    assert census["discovered_scope_count"] == 2
+    assert target.first_feature_calls == target.part.first_feature_calls == 1
+    assert target.part.manager_reads == 0
+    assert later.part.first_feature_calls == 0
+    assert later.body_calls == []
+    assert adapter.roots[0].first_feature_calls == 0
+    if fault == "global-cap":
+        assert len(earlier["features"]["occurrences"]) == 2500
+        assert len(partial["occurrences"]) == 2499
+        assert admission["feature_occurrences"] == 5000
+        assert target.part.feature.calls.count("GetID") == 1
+        assert (
+            "global feature occurrence cap"
+            in row["admission_failure"]["error"]["message"]
+        )
+    elif fault == "depth":
+        assert len(partial["occurrences"]) == 32
+        assert max(edge["depth"] for edge in partial["occurrences"]) == 31
+        assert "depth cap" in row["admission_failure"]["error"]["message"]
+    else:
+        assert len(partial["nodes"]) == len(partial["occurrences"]) == 1
+        assert partial["nodes"]["1"]["name"] == target.part.feature.name
+    assert final["cleanup"]["confirmed"] is True
+
+
+def test_actual_run_budget_stop_during_plain_scan_does_not_erase_completed_graph(
+    monkeypatch, tmp_path
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    original_budget = dirty.Budget
+    primary = dirty.Inconclusive("native planning budget exhausted mid plain scan")
+    selected = {}
+
+    class ScanStopBudget(original_budget):
+        def __init__(self, path):
+            self.category_checks = 0
+            super().__init__(path, clock=lambda: 100.0)
+
+        def check(self, label, cleanup=False):
+            if label == "admission.child_category":
+                self.category_checks += 1
+                if self.category_checks == 3:
+                    self.stopped = label
+                    raise primary
+            return super().check(label, cleanup=cleanup)
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        target.part.feature.next = Feature(2, "second category", "Sensor")
+        target.part.feature.next.next = Feature(3, "third category", "MacroFeature")
+        selected.update(target=target, later=later)
+
+    monkeypatch.setattr(dirty, "Budget", ScanStopBudget)
+    adapter.open_hook = inject
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    failure = final["trajectories"][0]["admission_failure"]
+    assert failure["error"]["message"] == str(primary)
+    admission = failure["evidence"]
+    census = admission["census"]
+    target = selected["target"]
+    scope = admission["instances"][target.name]["child_inventory"]
+    child = admission["child_inventories"][scope]
+    assert child["graph_status"] == "complete"
+    assert child["category_scan_status"] == child["validation_status"] == "incomplete"
+    assert child["category_records_scanned"] == 1
+    assert len(child["features"]["nodes"]) == 3
+    assert census["failed_scope"]["scope"] == scope
+    assert census["failed_scope"]["graph_status"] == "complete"
+    assert census["failed_scope"]["category_scan_status"] == "incomplete"
+    assert census["completed_graph_count"] == 2
+    assert census["children_status"] == "incomplete"
+    assert census["expected_scope_count"] is None
+    assert target.part.manager_reads == 0
+    assert selected["later"].part.first_feature_calls == 0
+    assert adapter.roots[0].first_feature_calls == 0
+    assert final["cleanup"]["confirmed"] is True
+
+
+def test_actual_run_last_alias_checkpoint_finishes_children_before_first_root_interrupt(
+    monkeypatch, tmp_path
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    child_bytes = []
+    primary = RuntimeError("first root native read interrupted")
+
+    def inject(root):
+        first = native_scope_representatives(root)[0]
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        ordered = list(root.components.values())
+        last = next(
+            component
+            for index, component in enumerate(ordered)
+            if any(prior.part is component.part for prior in ordered[:index])
+        )
+        root.components.pop(last.name)
+        root.components[last.name] = last
+        original_first = root.FirstFeature
+
+        def interrupt_first_root():
+            payload = dirty.FAILURE_PATH.read_bytes()
+            snapshot = json.loads(payload)
+            admission = assert_precleanup_checkpoint(snapshot, "B", 1, 0)
+            assert snapshot["census_checkpoint"]["phase"] == "children-complete"
+            census = admission["census"]
+            assert (
+                census["authentication_status"]
+                == census["children_status"]
+                == "complete"
+            )
+            assert census["authenticated_instance_count"] == len(expected)
+            assert (
+                census["expected_scope_count"]
+                == census["completed_graph_count"]
+                == len(adapter.parts)
+            )
+            assert census["root_graph_status"] == "collecting"
+            assert last.body_calls == [-1]
+            assert last.first_feature_calls == 0
+            child_bytes.append(payload)
+            original_first()
+            raise primary
+
+        root.FirstFeature = interrupt_first_root
+
+    adapter.open_hook = inject
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    assert len(child_bytes) == 1
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    failure = final["trajectories"][0]["admission_failure"]
+    assert str(primary) in failure["error"]["message"]
+    census = failure["evidence"]["census"]
+    assert census["children_status"] == "complete"
+    assert census["expected_scope_count"] == len(adapter.parts)
+    assert census["root_graph_status"] == "incomplete"
+    assert census["failed_scope"] == {
+        "scope": "root",
+        "graph_status": "incomplete",
+        "category_scan_status": "incomplete",
+        "validation_status": "incomplete",
+    }
+    assert failure["evidence"]["failed_step_evidence"]["scope"] == "root"
+    assert adapter.roots[0].first_feature_calls == 1
+
+
+@pytest.mark.parametrize("fault", ["missing-reference", "unsafe-root-equation"])
+def test_actual_run_root_validation_stays_hard_after_complete_unknown_category_scan(
+    monkeypatch, tmp_path, fault
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+
+    def inject(root):
+        root.extra_features[-1].next = Feature(8000, "root notes", "AnnotationViewFeat")
+        if fault == "missing-reference":
+            removed = next(
+                feature
+                for feature in root.extra_features
+                if feature.kind == "Reference"
+            )
+            root.first = chain(
+                [feature for feature in root.extra_features if feature is not removed]
+            )
+            root.extra_features[-1].next = Feature(
+                8000, "root notes", "AnnotationViewFeat"
+            )
+        else:
+            root.manager = Equations(['"unsafe" = unsupported(1)'])
+
+    adapter.open_hook = inject
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    admission = row["admission_failure"]["evidence"]
+    census = admission["census"]
+    assert census["authenticated_instance_count"] == len(expected)
+    assert census["children_status"] == "complete"
+    assert (
+        census["root_graph_status"] == census["root_category_scan_status"] == "complete"
+    )
+    assert census["root_validation_status"] == "incomplete"
+    assert census["root_category_records_scanned"] == len(
+        admission["root_features"]["nodes"]
+    )
+    assert len(census["unknown_categories"]) == 1
+    assert "unknown" not in row["admission_failure"]["error"]["message"]
+    assert adapter.roots[0].first_feature_calls == 1
+
+
+def test_actual_run_cancellation_persists_partial_graph_before_first_original_close(
+    monkeypatch, tmp_path
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+
+    class NativeAbort(BaseException):
+        pass
+
+    primary = NativeAbort("native enumeration cancelled")
+    selected = {}
+    early = []
+    writes = []
+    original_write = dirty._write_json
+    original_close = type(adapter.swApp).CloseDoc
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        target.part.feature.error = primary
+        selected.update(first=first, target=target, later=later)
+
+    def before_close(root):
+        assert type(adapter.swApp).CloseDoc is original_close
+        assert adapter.currentModel is root
+        assert root in adapter.resident_docs
+        assert selected["target"].part in adapter.resident_docs
+        assert ("close", root.generation) not in adapter.events
+        payload = dirty.FAILURE_PATH.read_bytes()
+        snapshot = json.loads(payload)
+        admission = assert_precleanup_checkpoint(snapshot, "B", 1, 0)
+        first_scope = admission["instances"][selected["first"].name]["child_inventory"]
+        target_scope = admission["instances"][selected["target"].name][
+            "child_inventory"
+        ]
+        assert (
+            admission["child_inventories"][first_scope]["validation_status"]
+            == "complete"
+        )
+        assert (
+            admission["child_inventories"][target_scope]["graph_status"] == "incomplete"
+        )
+        assert admission["failed_step_evidence"]["scope"] == target_scope
+        assert len(admission["failed_step_evidence"]["occurrences"]) == 1
+        assert admission["census"]["completed_graph_count"] == 1
+        assert admission["census"]["failed_scope"]["scope"] == target_scope
+        assert admission["census"]["stopped"]["type"] == "NativeAbort"
+        assert selected["later"].part.first_feature_calls == 0
+        early.append(payload)
+
+    def prevent_final_report(path, value):
+        writes.append(path)
+        if path == dirty.REPORT_PATH:
+            raise OSError("final REPORT deliberately unavailable")
+        return original_write(path, value)
+
+    adapter.open_hook = inject
+    adapter.before_close_hook = before_close
+    monkeypatch.setattr(dirty, "_write_json", prevent_final_report)
+    report = verify.Report()
+    with pytest.raises(NativeAbort) as caught:
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    assert caught.value is primary
+    assert len(early) == 1
+    assert writes.count(dirty.FAILURE_PATH) == writes.count(dirty.REPORT_PATH) == 1
+    assert dirty.FAILURE_PATH.read_bytes() == early[0]
+    assert not dirty.REPORT_PATH.exists()
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    assert adapter.events.count(("close", 0)) == 1
+    assert report.failed
+    assert primary.evidence["census"]["stopped"]["type"] == "NativeAbort"
+
+
+@pytest.mark.parametrize(
+    ("failure_number", "failure_kind", "stale"),
+    [
+        (1, "io", False),
+        (1, "size", False),
+        (1, "io", True),
+        (1, "size", True),
+        (2, "io", False),
+        (2, "size", False),
+    ],
+)
+def test_actual_run_checkpoint_writer_failure_is_terminal_and_preserves_last_bytes(
+    monkeypatch, tmp_path, failure_number, failure_kind, stale
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    previous = b"stale prior-run failure; not a current checkpoint\r\n"
+    if stale:
+        dirty.FAILURE_PATH.write_bytes(previous)
+    initial_files = set(tmp_path.iterdir())
+    selected = {}
+    failure_attempts = []
+    report_attempts = []
+    last_good = []
+    original_write = dirty._write_json
+    original_replace = Path.replace
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        first.part.feature.kind = "NotesAreaFtrFolder"
+        selected.update(first=first, target=target, later=later)
+
+    def fail_replace(path, target):
+        if path == dirty.FAILURE_PATH.with_suffix(".json.tmp"):
+            raise OSError("checkpoint atomic replacement denied")
+        return original_replace(path, target)
+
+    def fail_one_checkpoint(path, value):
+        if path == dirty.REPORT_PATH:
+            report_attempts.append(copy.deepcopy(value))
+        if path != dirty.FAILURE_PATH:
+            return original_write(path, value)
+        failure_attempts.append(copy.deepcopy(value))
+        if len(failure_attempts) == failure_number:
+            with monkeypatch.context() as limited:
+                if failure_kind == "size":
+                    # Exercise the unchanged real serialization/size rejection,
+                    # scaled to a tiny bound rather than allocating 64 MiB.
+                    limited.setattr(dirty, "_MAX_REPORT_BYTES", 1)
+                else:
+                    limited.setattr(Path, "replace", fail_replace)
+                return original_write(path, value)
+        original_write(path, value)
+        last_good.append(path.read_bytes())
+
+    adapter.open_hook = inject
+    monkeypatch.setattr(dirty, "_write_json", fail_one_checkpoint)
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    assert len(failure_attempts) == failure_number
+    assert len(report_attempts) == 1
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    publication = final["census_publication"]
+    assert publication["status"] == "unavailable"
+    assert publication["attempts"] == failure_number
+    assert len(publication["errors"]) == 1
+    message = publication["errors"][0]["message"]
+    assert (
+        "64 MiB" if failure_kind == "size" else "atomic replacement denied"
+    ) in message
+    assert final["status"] == "inconclusive"
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    assert message in json.dumps(row["admission_failure"])
+    assert selected["first"].part.first_feature_calls == 1
+    assert selected["target"].part.first_feature_calls == (failure_number == 2)
+    stopped_part = selected["first" if failure_number == 1 else "target"].part
+    assert stopped_part.manager_reads == 0
+    assert selected["later"].body_calls == []
+    assert selected["later"].part.first_feature_calls == 0
+    assert adapter.roots[0].first_feature_calls == 0
+    assert len(adapter.roots) == 1
+    if failure_number == 2:
+        assert len(last_good) == 1
+        assert dirty.FAILURE_PATH.read_bytes() == last_good[0]
+        checkpoint = json.loads(last_good[0])
+        assert_precleanup_checkpoint(checkpoint, "B", 1, 0)
+        assert checkpoint["census_checkpoint"]["attempt"] == 1
+        assert publication["last_success"] == checkpoint["census_checkpoint"]
+    else:
+        assert last_good == []
+        assert publication["last_success"] is None
+        if stale:
+            assert dirty.FAILURE_PATH.read_bytes() == previous
+        else:
+            assert not dirty.FAILURE_PATH.exists()
+    added = set(tmp_path.iterdir()) - initial_files
+    assert added <= {
+        dirty.BUDGET_PATH,
+        dirty.REPORT_PATH,
+        dirty.FAILURE_PATH,
+        dirty.FAILURE_PATH.with_suffix(".json.tmp"),
+    }, "no alternate receipt, spill, manifest or fallback artifact is permitted"
+    assert not dirty.REPORT_PATH.with_suffix(".json.tmp").exists()
+
+
+@pytest.mark.parametrize("earlier_checkpoint", [False, True])
+def test_actual_run_native_cancellation_survives_failing_checkpoint_sink(
+    monkeypatch, tmp_path, earlier_checkpoint
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+
+    class NativeAbort(BaseException):
+        pass
+
+    primary = NativeAbort("original native cancellation")
+    attempts = []
+    last_good = []
+    report_attempts = []
+    original_write = dirty._write_json
+
+    def inject(root):
+        first, target, *_rest = native_scope_representatives(root)
+        if earlier_checkpoint:
+            first.part.feature.kind = "NotesAreaFtrFolder"
+        target.part.feature.error = primary
+
+    def fail_abort_checkpoint(path, value):
+        if path == dirty.REPORT_PATH:
+            report_attempts.append(copy.deepcopy(value))
+        if path == dirty.FAILURE_PATH:
+            attempts.append(copy.deepcopy(value))
+            if value["census_checkpoint"]["phase"] == "admission-aborted":
+                raise OSError("secondary checkpoint sink unavailable")
+            original_write(path, value)
+            last_good.append(path.read_bytes())
+            return
+        return original_write(path, value)
+
+    adapter.open_hook = inject
+    monkeypatch.setattr(dirty, "_write_json", fail_abort_checkpoint)
+    with pytest.raises(NativeAbort) as caught:
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    assert caught.value is primary
+    assert len(attempts) == 1 + earlier_checkpoint
+    assert len(report_attempts) == 1
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    publication = final["census_publication"]
+    assert publication["status"] == "unavailable"
+    assert publication["attempts"] == 1 + earlier_checkpoint
+    assert "secondary checkpoint sink unavailable" in json.dumps(publication["errors"])
+    failure = final["trajectories"][0]["admission_failure"]
+    assert failure["error"]["type"] == "NativeAbort"
+    assert failure["error"]["message"] == str(primary)
+    assert failure["evidence"]["census"]["stopped"]["message"] == str(primary)
+    assert "secondary checkpoint sink unavailable" in json.dumps(
+        failure["evidence"]["census"]["persistence_errors"]
+    )
+    assert final["errors"][0]["type"] == "NativeAbort"
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    if earlier_checkpoint:
+        assert len(last_good) == 1
+        assert dirty.FAILURE_PATH.read_bytes() == last_good[0]
+    else:
+        assert last_good == []
+        assert not dirty.FAILURE_PATH.exists()
+
+
+@pytest.mark.parametrize("earlier_checkpoint", [False, True])
+@pytest.mark.parametrize(
+    "permission", ["reserve", "exhausted", "nonfinite", "snapshot-error"]
+)
+def test_actual_run_budget_stop_uses_one_existing_allowance_snapshot_without_retry(
+    monkeypatch, tmp_path, permission, earlier_checkpoint
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    original_budget = dirty.Budget
+    original_write = dirty._write_json
+    primary = dirty.Inconclusive("native planning budget exhausted before held scan")
+    now = [17.0]
+    budgets = []
+    failure_bytes = []
+    writes_after_stop = []
+    report_attempts = []
+    selected = {}
+
+    class ExistingAllowanceBudget(original_budget):
+        def __init__(self, path):
+            self.saving = False
+            self.category_checks = 0
+            self.permission_snapshots = 0
+            self.ordinary_after_stop = []
+            super().__init__(path, clock=lambda: now[0])
+            budgets.append(self)
+
+        def save(self):
+            self.saving = True
+            try:
+                return super().save()
+            finally:
+                self.saving = False
+
+        def snapshot(self):
+            snapshot = super().snapshot()
+            if self.stopped and not self.saving and adapter.currentModel is not None:
+                self.permission_snapshots += 1
+                if permission == "snapshot-error":
+                    raise RuntimeError("existing allowance snapshot unavailable")
+                if permission == "nonfinite":
+                    snapshot["elapsed_conservative_seat_work_s"] = float("nan")
+            return snapshot
+
+        def check(self, label, cleanup=False):
+            if self.stopped and not cleanup:
+                self.ordinary_after_stop.append(label)
+                raise primary
+            if label == "admission.child_category":
+                self.category_checks += 1
+                if self.category_checks == 2:
+                    now[0] += 3600.0 if permission == "exhausted" else 3001.0
+                    self.stopped = label
+                    raise primary
+            return super().check(label, cleanup=cleanup)
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        if earlier_checkpoint:
+            first.part.feature.kind = "NotesAreaFtrFolder"
+        selected.update(target=target, later=later)
+
+    def record_write(path, value):
+        if path == dirty.REPORT_PATH:
+            report_attempts.append(path)
+        if path == dirty.FAILURE_PATH and budgets[0].stopped:
+            writes_after_stop.append(path)
+        original_write(path, value)
+        if path == dirty.FAILURE_PATH:
+            failure_bytes.append(path.read_bytes())
+
+    adapter.open_hook = inject
+    monkeypatch.setattr(dirty, "Budget", ExistingAllowanceBudget)
+    monkeypatch.setattr(dirty, "_write_json", record_write)
+    with pytest.raises(dirty.Inconclusive):
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, verify.Report()))
+    assert len(budgets) == 1
+    budget = budgets[0]
+    permitted = permission == "reserve"
+    assert budget.permission_snapshots == 1
+    denied_gate = "original.gate:pass-sweep-interference-free"
+    assert budget.ordinary_after_stop == [denied_gate]
+    assert denied_gate not in budget.phases
+    assert budget.started == 17.0
+    assert now[0] == 17.0 + (3600.0 if permission == "exhausted" else 3001.0)
+    assert budget.stopped == "admission.child_category"
+    assert len(writes_after_stop) == int(permitted)
+    expected_attempts = int(earlier_checkpoint) + int(permitted)
+    assert len(failure_bytes) == expected_attempts
+    assert len(report_attempts) == 1
+    if failure_bytes:
+        assert dirty.FAILURE_PATH.read_bytes() == failure_bytes[-1]
+    else:
+        assert not dirty.FAILURE_PATH.exists()
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert len(adapter.roots) == len(final["trajectories"]) == 1
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    assert row["gates"] == {
+        "passed": [f"{verify.SWEEP_OWNER}:{suffix}" for suffix in GATE_SUFFIXES[:-1]],
+        "failed": [],
+    }
+    publication = final["census_publication"]
+    assert publication["status"] == ("published" if permitted else "unavailable")
+    assert publication["attempts"] == expected_attempts
+    failure = final["trajectories"][0]["admission_failure"]
+    assert failure["error"]["message"] == str(primary)
+    assert failure["evidence"]["census"]["stopped"]["message"] == str(primary)
+    assert selected["target"].part.first_feature_calls == 1
+    assert selected["target"].part.manager_reads == 0
+    assert selected["later"].body_calls == []
+    assert selected["later"].part.first_feature_calls == 0
+    assert adapter.roots[0].first_feature_calls == 0
+    assert final["cleanup"]["confirmed"] is True
+    assert final["budget"]["submission"] == 1
+    assert final["budget"]["elapsed_conservative_seat_work_s"] == now[0] - 17.0
+    if permitted:
+        checkpoint = json.loads(failure_bytes[-1])
+        assert_precleanup_checkpoint(checkpoint, "B", 1, 0)
+        assert checkpoint["census_checkpoint"]["phase"] == "admission-aborted"
+        assert checkpoint["census_publication"]["attempts"] == expected_attempts
+    elif earlier_checkpoint:
+        assert (
+            publication["last_success"]
+            == json.loads(failure_bytes[0])["census_checkpoint"]
+        )
+    else:
+        assert publication["last_success"] is None
+
+
+@pytest.mark.parametrize("interruption", ["ordinary", "cancellation"])
+def test_actual_run_last_authenticated_scope_equation_interrupt_keeps_complete_child_census(
+    monkeypatch, tmp_path, interruption
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+
+    class EquationAbort(BaseException):
+        pass
+
+    primary = (
+        EquationAbort("last configured equation cancelled")
+        if interruption == "cancellation"
+        else RuntimeError("last configured equation unavailable")
+    )
+    selected = {}
+
+    def inject(root):
+        ordered = list(root.components.values())
+        last = next(
+            component
+            for index, component in enumerate(ordered)
+            if any(prior.part is component.part for prior in ordered[:index])
+        )
+        root.components.pop(last.name)
+        root.components[last.name] = last
+        configured = NativePart(last.part.path)
+        configured.ConfigurationManager.ActiveConfiguration.Name = "LastConfigured"
+        configured.manager = Equations(['"width" = 1mm', '"height" = 2mm'])
+        original_equation = configured.manager.Equation
+
+        def interrupt_second_row(index):
+            if index == 1:
+                configured.manager.reads.append(("Equation", index))
+                raise primary
+            return original_equation(index)
+
+        configured.manager.Equation = interrupt_second_row
+        last.part = configured
+        last.configuration = "LastConfigured"
+        selected.update(last=last, configured=configured)
+
+    adapter.open_hook = inject
+    report = verify.Report()
+    if interruption == "cancellation":
+        with pytest.raises(EquationAbort) as caught:
+            asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+        assert caught.value is primary
+    else:
+        with pytest.raises(dirty.Inconclusive):
+            asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    admission = row["admission_failure"]["evidence"]
+    census = admission["census"]
+    assert (
+        census["identity_seen_count"]
+        == census["authenticated_instance_count"]
+        == len(expected)
+    )
+    assert census["authentication_status"] == census["children_status"] == "complete"
+    assert (
+        census["expected_scope_count"]
+        == census["discovered_scope_count"]
+        == len(adapter.parts) + 1
+    )
+    assert census["completed_graph_count"] == len(adapter.parts) + 1
+    last = selected["last"]
+    scope = admission["instances"][last.name]["child_inventory"]
+    child = admission["child_inventories"][scope]
+    assert child["graph_status"] == child["category_scan_status"] == "complete"
+    assert child["validation_status"] == "incomplete"
+    assert census["failed_scope"] == {
+        "scope": scope,
+        "path": str(last.part.path.resolve()),
+        "configuration": "LastConfigured",
+        "instance": last.name,
+        "graph_status": "complete",
+        "category_scan_status": "complete",
+        "validation_status": "incomplete",
+    }
+    partial = admission["failed_step_evidence"]
+    assert partial["configuration"] == "LastConfigured"
+    assert partial["count"] == 2
+    assert partial["entries"] == [
+        {
+            "index": 0,
+            "text": '"width" = 1mm',
+            "global": True,
+            "lhs": "width",
+            "references": [],
+        }
+    ]
+    assert selected["configured"].manager.reads == [
+        ("GetCount",),
+        ("Equation", 0),
+        ("GlobalVariable", 0),
+        ("Equation", 1),
+    ]
+    assert selected["configured"].first_feature_calls == 1
+    assert adapter.roots[0].first_feature_calls == 0
+    assert str(primary) in row["admission_failure"]["error"]["message"]
+    checkpoint = json.loads(dirty.FAILURE_PATH.read_text(encoding="utf-8"))
+    held = assert_precleanup_checkpoint(checkpoint, "B", 1, 0)
+    assert held["census"]["children_status"] == "complete"
+    assert held["failed_step_evidence"] == partial
+    assert report.failed
+
+
+@pytest.mark.parametrize("earlier_checkpoint", [False, True])
+def test_actual_run_cancellation_survives_snapshot_failure_persisting_through_finalization(
+    monkeypatch, tmp_path, earlier_checkpoint
+):
+    adapter, _expected, _paths = install_native_case(monkeypatch, tmp_path)
+    original_budget = dirty.Budget
+    original_write = dirty._write_json
+    budgets = []
+    selected = {}
+    writes = []
+    last_good = []
+    close_observations = []
+
+    class NativeAbort(BaseException):
+        pass
+
+    primary = NativeAbort("native graph cancelled before persistent snapshot failure")
+    snapshot_error = RuntimeError("all subsequent budget snapshots unavailable")
+
+    class PersistentSnapshotBudget(original_budget):
+        def __init__(self, path):
+            self.saving = False
+            self.snapshots_unavailable = False
+            self.failed_direct_snapshots = []
+            super().__init__(path, clock=lambda: 100.0)
+            budgets.append(self)
+
+        def save(self):
+            self.saving = True
+            try:
+                return super().save()
+            finally:
+                self.saving = False
+
+        def snapshot(self):
+            if self.snapshots_unavailable:
+                if not self.saving:
+                    self.failed_direct_snapshots.append(adapter.currentModel is None)
+                raise snapshot_error
+            return super().snapshot()
+
+    def inject(root):
+        first, target, later, *_rest = native_scope_representatives(root)
+        if earlier_checkpoint:
+            first.part.feature.kind = "NotesAreaFtrFolder"
+        original_next = target.part.feature.GetNextFeature
+
+        def cancel_after_native_next():
+            original_next()
+            budgets[0].snapshots_unavailable = True
+            raise primary
+
+        target.part.feature.GetNextFeature = cancel_after_native_next
+        selected.update(first=first, target=target, later=later)
+
+    def before_close(root):
+        assert adapter.currentModel is root
+        assert root in adapter.resident_docs
+        assert budgets[0].snapshots_unavailable is True
+        if earlier_checkpoint:
+            assert dirty.FAILURE_PATH.read_bytes() == last_good[0]
+        else:
+            assert not dirty.FAILURE_PATH.exists()
+        close_observations.append(root.generation)
+
+    def record_write(path, value):
+        writes.append(path)
+        if path == dirty.FAILURE_PATH:
+            assert budgets[0].snapshots_unavailable is False
+        original_write(path, value)
+        if path == dirty.FAILURE_PATH:
+            last_good.append(path.read_bytes())
+
+    adapter.open_hook = inject
+    adapter.before_close_hook = before_close
+    monkeypatch.setattr(dirty, "Budget", PersistentSnapshotBudget)
+    monkeypatch.setattr(dirty, "_write_json", record_write)
+    report = verify.Report()
+    with pytest.raises(NativeAbort) as caught:
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    assert caught.value is primary
+    assert len(budgets) == 1
+    budget = budgets[0]
+    assert budget.snapshots_unavailable is True
+    # One denied publication snapshot while resident, then exactly one final
+    # direct snapshot after discard. Persisting saves also fail, never recover.
+    assert budget.failed_direct_snapshots == [False, True]
+    assert budget.clock() == budget.started == 100.0
+    assert budget.persistence_errors
+    assert all(
+        error["message"] == str(snapshot_error) for error in budget.persistence_errors
+    )
+    assert writes.count(dirty.REPORT_PATH) == 1
+    assert writes.count(dirty.FAILURE_PATH) == int(earlier_checkpoint)
+    assert close_observations == [0]
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert final["status"] == "inconclusive"
+    assert final["qualification_status"] == "not-established"
+    assert final["budget"] is None
+    assert final["errors"][0]["type"] == "NativeAbort"
+    assert final["errors"][0]["message"] == str(primary)
+    assert [
+        error
+        for error in final["errors"]
+        if error["phase"] == "secondary.final_budget_snapshot"
+    ] == [
+        {
+            "phase": "secondary.final_budget_snapshot",
+            "type": "RuntimeError",
+            "message": str(snapshot_error),
+        }
+    ]
+    assert any(
+        error["phase"] == "budget.persist" and error["message"] == str(snapshot_error)
+        for error in final["errors"]
+    )
+    publication = final["census_publication"]
+    assert publication["status"] == "unavailable"
+    assert publication["attempts"] == int(earlier_checkpoint)
+    assert len(publication["errors"]) == 1
+    assert publication["errors"][0]["message"] == str(snapshot_error)
+    row = final["trajectories"][0]
+    assert_refused_prepared_start(adapter.roots[0], row)
+    assert row["admission_failure"]["error"]["type"] == "NativeAbort"
+    admission = row["admission_failure"]["evidence"]
+    assert admission["census"]["stopped"]["message"] == str(primary)
+    assert str(snapshot_error) in json.dumps(admission["census"]["persistence_errors"])
+    assert admission["census"]["completed_graph_count"] == 1
+    target = selected["target"]
+    scope = admission["instances"][target.name]["child_inventory"]
+    assert admission["failed_step_evidence"]["scope"] == scope
+    assert admission["child_inventories"][scope]["graph_status"] == "incomplete"
+    assert target.part.feature.calls.count("GetNextFeature") == 1
+    assert selected["later"].body_calls == []
+    assert selected["later"].part.first_feature_calls == 0
+    assert adapter.roots[0].first_feature_calls == 0
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    assert final["cleanup"]["confirmed"] is True
+    assert report.failed
+    if earlier_checkpoint:
+        assert len(last_good) == 1
+        assert dirty.FAILURE_PATH.read_bytes() == last_good[0]
+        checkpoint = json.loads(last_good[0])
+        assert_precleanup_checkpoint(checkpoint, "B", 1, 0)
+        assert publication["last_success"] == checkpoint["census_checkpoint"]
+    else:
+        assert last_good == []
+        assert not dirty.FAILURE_PATH.exists()
+        assert publication["last_success"] is None
+
+
+def test_actual_run_final_snapshot_failure_after_complete_pair_becomes_primary(
+    monkeypatch, tmp_path
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    original_budget = dirty.Budget
+    original_hash = dirty._hash_inputs
+    original_write = dirty._write_json
+    primary = RuntimeError("final budget snapshot unavailable after complete pair")
+    budgets = []
+    snapshots_after_a_discard = []
+    writes = []
+
+    class FinalSnapshotBudget(original_budget):
+        def __init__(self, path):
+            self.saving = False
+            self.snapshots_unavailable = False
+            self.failed_direct_snapshots = 0
+            super().__init__(path, clock=lambda: 100.0)
+            budgets.append(self)
+
+        def save(self):
+            self.saving = True
+            try:
+                return super().save()
+            finally:
+                self.saving = False
+
+        def snapshot(self):
+            if self.snapshots_unavailable:
+                if not self.saving:
+                    self.failed_direct_snapshots += 1
+                raise primary
+            return super().snapshot()
+
+    def fail_snapshots_after_final_hash(paths):
+        files = original_hash(paths)
+        if len(adapter.roots) == 2 and adapter.currentModel is None:
+            snapshots_after_a_discard.append(files)
+            if len(snapshots_after_a_discard) == 2:
+                # The original after-A hash is first; the original final-cleanup
+                # hash follows both validation and the real A/B comparison.
+                assert not dirty.FAILURE_PATH.exists()
+                assert writes.count(dirty.FAILURE_PATH) == 0
+                budgets[0].snapshots_unavailable = True
+        return files
+
+    def record_write(path, value):
+        writes.append(path)
+        return original_write(path, value)
+
+    monkeypatch.setattr(dirty, "Budget", FinalSnapshotBudget)
+    monkeypatch.setattr(dirty, "_hash_inputs", fail_snapshots_after_final_hash)
+    monkeypatch.setattr(dirty, "_write_json", record_write)
+    report = verify.Report()
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    assert caught.value is primary
+    assert len(budgets) == 1
+    assert budgets[0].snapshots_unavailable is True
+    assert budgets[0].failed_direct_snapshots == 1
+    assert budgets[0].clock() == budgets[0].started == 100.0
+    assert len(snapshots_after_a_discard) == 2
+    assert snapshots_after_a_discard[0] == snapshots_after_a_discard[1]
+    assert writes.count(dirty.REPORT_PATH) == writes.count(dirty.FAILURE_PATH) == 1
+    final = json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8"))
+    assert json.loads(dirty.FAILURE_PATH.read_text(encoding="utf-8")) == final
+    assert final["status"] == "inconclusive"
+    assert final["qualification_status"] == "not-established"
+    assert final["budget"] is None
+    assert final["census_publication"] == {
+        "status": "inactive",
+        "attempts": 0,
+        "last_success": None,
+        "errors": [],
+    }
+    assert not any(error["phase"] == "primary" for error in final["errors"])
+    assert [
+        error
+        for error in final["errors"]
+        if error["phase"] == "secondary.final_budget_snapshot"
+    ] == [
+        {
+            "phase": "secondary.final_budget_snapshot",
+            "type": "RuntimeError",
+            "message": str(primary),
+        }
+    ]
+    assert any(
+        error["phase"] == "budget.persist" and error["message"] == str(primary)
+        for error in final["errors"]
+    )
+    assert len(adapter.roots) == 2
+    assert [row["variant"] for row in final["trajectories"]] == ["B", "A"]
+    for root, row in zip(adapter.roots, final["trajectories"], strict=True):
+        assert row["complete"] is True
+        assert row["admission"]["admitted"] is True
+        assert row["errors"] == row["validation_errors"] == []
+        assert [boundary["key"] for boundary in row["boundaries"]] == EXPECTED_KEYS
+        assert all(
+            set(boundary["instances"]) == set(expected)
+            for boundary in row["boundaries"]
+        )
+        assert row["counts"] == {
+            "writes": 15,
+            "visits": 14,
+            "reads": 28,
+            "suppressions": 2,
+            "coincidences": 2,
+        }
+        assert len(root.writes) == 15
+        assert len(root.consumer_reads) == 28
+        assert root.tools_calls == len(root.managers) == 11
+        assert all(
+            manager.compute_calls == manager.done_calls == 1
+            for manager in root.managers
+        )
+        assert len(root.edits) == 19
+        assert len(root.forces) == (18 if row["variant"] == "A" else 2)
+        assert len(row["prepare_attempts"]) == len(row["remate_attempts"]) == 2
+        assert all(
+            attempt["recognized_pinned_form"]
+            for attempt in row["prepare_attempts"] + row["remate_attempts"]
+        )
+        assert row["gates"] == {
+            "passed": [f"{verify.SWEEP_OWNER}:{suffix}" for suffix in GATE_SUFFIXES],
+            "failed": [],
+        }
+        assert row["cleanup"]["confirmed"] is True
+    assert not final["comparison"]["unclassified_differences"]
+    assert final["cleanup"]["confirmed"] is True
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    assert report.failed
+    assert not dirty.REPORT_PATH.with_suffix(".json.tmp").exists()
+    assert not dirty.FAILURE_PATH.with_suffix(".json.tmp").exists()
+
+
+@pytest.mark.parametrize("oversize", [False, True])
+def test_capture_bounds_raw_component_multiplicity_by_expected_inventory(
+    monkeypatch, tmp_path, oversize
+):
+    _adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    component_limit = len(expected)
+    components = [NativeContactComponent(name) for name in list(expected)[:-1]]
+    components.append(components[0])
+    if oversize:
+        components.append(components[0])
+    assert len(components) == component_limit + int(oversize)
+    identities = [[component.name, component.configuration] for component in components]
+    row = NativeInterference(components, 1.234567890123e-9)
+    result = (row,)
+    manager = NativeManager(result)
+    budget = RecordingBudget()
+    entry = {}
+    capture = dirty.Capture(manager, budget, entry, component_limit=component_limit)
+    capture.observe_settings()
+    returned = capture.GetInterferences()
+    assert returned is result
+    assert returned[0] is row
+    assert row.components is components
+    assert capture.manager is manager
+    assert manager.compute_calls == entry["compute_calls"] == 1
+    assert entry["settings"] == SETTINGS
+    assert entry["row_count"] == len(entry["rows"]) == 1
+    recorded = entry["rows"][0]
+    assert recorded["ordinal"] == 0
+    if oversize:
+        assert len(entry["errors"]) == 1
+        assert recorded["error"] is entry["errors"][0]
+        assert recorded["error"]["phase"] == "row:0"
+        assert (
+            "component multiplicity exceeds jig inventory"
+            in (recorded["error"]["message"])
+        )
+        assert entry["canonical"] == []
+        assert "components" not in recorded
+        assert "raw_volume" not in recorded
+        assert "volume_m3" not in recorded
+        assert row.reads == ["Components"]
+        assert all(component.reads == [] for component in components)
+        assert budget.checks.count(("interference.component_metadata", False)) == 0
+    else:
+        assert entry["errors"] == []
+        assert recorded["components"] == identities
+        assert recorded["components"].count(identities[0]) == 2
+        assert recorded["raw_volume"] == recorded["volume_m3"] == row.volume
+        assert row.reads == ["Components", "Volume"]
+        assert entry["canonical"] == [
+            {
+                "components": sorted(identities),
+                "multiplicity": 1,
+                "volumes_m3": [row.volume],
+                "total_m3": row.volume,
+            }
+        ]
+        for receiver in components[: component_limit - 1]:
+            occurrences = sum(component is receiver for component in components)
+            assert receiver.reads == ["Name2", "ReferencedConfiguration"] * occurrences
+        assert (
+            budget.checks.count(("interference.component_metadata", False))
+            == component_limit
+        )
+    assert capture.Done() is None
+    assert manager.compute_calls == manager.done_calls == 1
+    assert entry["done"] == [{"success": True, "result": None}]
+
+
+@pytest.mark.parametrize("oversize", [False, True])
+def test_actual_run_static_capture_uses_expected_limit_before_native_admission(
+    monkeypatch, tmp_path, oversize
+):
+    adapter, expected, _paths = install_native_case(monkeypatch, tmp_path)
+    component_limit = len(expected)
+    original_manager = NativeRoot.InterferenceDetectionManager.fget
+    original_factory = _assembly.configured_interference_manager
+    wide = {}
+
+    class WideStaticRoot(NativeRoot):
+        @property
+        def InterferenceDetectionManager(self):
+            manager = original_manager(self)
+            if self.phase == "static" and not wide:
+                assert self.prepared_feature is None
+                assert self.first_feature_calls == 0
+                assert all(
+                    component.body_calls == [] for component in self.components.values()
+                )
+                assert self.writes == []
+                assert not dirty.FAILURE_PATH.exists()
+                components = [
+                    NativeContactComponent(name, self.components[name].configuration)
+                    for name in list(expected)[:-1]
+                ]
+                components.append(components[0])
+                if oversize:
+                    components.append(components[0])
+                row = NativeInterference(components, 1e-9)
+                wide.update(
+                    manager=manager,
+                    result=manager.result,
+                    original_rows=tuple(manager.result),
+                    components=components,
+                    row=row,
+                )
+                manager.result.append(row)
+            return manager
+
+    def inject(root):
+        if root.generation == 0:
+            root.__class__ = WideStaticRoot
+
+    adapter.open_hook = inject
+    report = verify.Report()
+    evidence = asyncio.run(dirty.run(adapter, verify.SWEEP_OWNER, report))
+    assert evidence["status"] == "failed-consumer"
+    assert evidence["qualification_status"] == "not-established"
+    assert evidence["census_publication"] == {
+        "status": "inactive",
+        "attempts": 0,
+        "last_success": None,
+        "errors": [],
+    }
+    assert [row["variant"] for row in evidence["trajectories"]] == ["B", "A"]
+    assert len(adapter.roots) == 2
+    assert sum(len(row["boundaries"]) for row in evidence["trajectories"]) == 32
+    for root, row in zip(adapter.roots, evidence["trajectories"], strict=True):
+        assert row["admission"]["admitted"] is True
+        assert [boundary["key"] for boundary in row["boundaries"]] == EXPECTED_KEYS
+        assert all(
+            set(boundary["instances"]) == set(expected)
+            for boundary in row["boundaries"]
+        )
+        assert row["counts"] == {
+            "writes": 15,
+            "visits": 14,
+            "reads": 28,
+            "suppressions": 2,
+            "coincidences": 2,
+        }
+        assert len(root.writes) == 15
+        assert len(root.consumer_reads) == 28
+        assert len(root.suppressions) == len(root.coincidents) == 2
+        assert root.forces[:2] == [("static", 0), ("prepare", 0)]
+        assert len(root.forces) == (18 if row["variant"] == "A" else 2)
+        assert len(root.edits) == 19
+        assert root.tools_calls == len(root.managers) == 11
+        assert len(row["interferences"]) == 11
+        assert all(
+            manager.compute_calls == manager.done_calls == 1
+            for manager in root.managers
+        )
+        assert all(entry["checked_outside_attempt"] for entry in row["interferences"])
+        assert len(row["prepare_attempts"]) == len(row["remate_attempts"]) == 2
+        assert all(
+            attempt["recognized_pinned_form"]
+            for attempt in row["prepare_attempts"] + row["remate_attempts"]
+        )
+        aggregate = row["original_aggregate_timings"]
+        assert aggregate["jig.drive_write_attempts"] == 15
+        assert aggregate["jig.transform_readback_attempts"] == 28
+        assert aggregate["jig.edit_rebuild_attempts"] == 16
+        assert aggregate["jig.force_rebuild_attempts"] == (
+            16 if row["variant"] == "A" else 0
+        )
+        assert row["cleanup"]["confirmed"] is True
+    b, a = evidence["trajectories"]
+    assert b["gates"]["passed"] == [
+        f"{verify.SWEEP_OWNER}:{suffix}"
+        for suffix in GATE_SUFFIXES
+        if suffix != "interference-free"
+    ]
+    assert len(b["gates"]["failed"]) == 1
+    assert b["gates"]["failed"][0][0] == (f"{verify.SWEEP_OWNER}:interference-free")
+    assert "1 interference(s):" in b["gates"]["failed"][0][1]
+    assert a["gates"] == {
+        "passed": [f"{verify.SWEEP_OWNER}:{suffix}" for suffix in GATE_SUFFIXES],
+        "failed": [],
+    }
+    static = next(
+        entry for entry in b["interferences"] if entry["label"] == "initial/static"
+    )
+    manager = wide["manager"]
+    components = wide["components"]
+    native_row = wide["row"]
+    original_rows = wide["original_rows"]
+    assert len(components) == component_limit + int(oversize)
+    assert manager.result is wide["result"]
+    assert manager.result[-1] is native_row
+    assert all(
+        actual is original
+        for actual, original in zip(manager.result[:-1], original_rows, strict=True)
+    )
+    assert manager.compute_calls == manager.done_calls == static["compute_calls"] == 1
+    assert static["settings"] == SETTINGS
+    assert static["row_count"] == len(original_rows) + 1
+    assert static["done"] == [{"success": True, "result": None}]
+    recorded = static["rows"][-1]
+    assert recorded["ordinal"] == len(original_rows)
+    identities = [[component.name, component.configuration] for component in components]
+    if oversize:
+        assert len(static["errors"]) == 1
+        assert recorded["error"] == static["errors"][0]
+        assert (
+            "component multiplicity exceeds jig inventory"
+            in (recorded["error"]["message"])
+        )
+        assert "components" not in recorded
+        assert "raw_volume" not in recorded
+        assert "volume_m3" not in recorded
+        assert native_row.reads == ["Components", "Components", "Volume"]
+    else:
+        assert static["errors"] == []
+        assert recorded["components"] == identities
+        assert recorded["components"].count(identities[0]) == 2
+        assert recorded["raw_volume"] == recorded["volume_m3"] == native_row.volume
+        assert native_row.reads == ["Components", "Volume", "Components", "Volume"]
+        assert any(
+            entry["components"] == sorted(identities) for entry in static["canonical"]
+        )
+    # The unchanged original consumer reads the same metadata even when the
+    # observer refuses the oversized array; only the duplicate decode is bounded.
+    reads_per_occurrence = 1 if oversize else 2
+    for receiver in components[: component_limit - 1]:
+        occurrences = sum(component is receiver for component in components)
+        assert receiver.reads == ["Name2", "ReferencedConfiguration"] * (
+            reads_per_occurrence * occurrences
+        )
+    assert _assembly.configured_interference_manager is original_factory
+    assert adapter.events.index(("close", 0)) < adapter.events.index(("open", 1))
+    assert evidence["cleanup"]["confirmed"] is True
+    assert adapter.currentModel is None and adapter.resident_docs == []
+    assert report.failed
+    assert json.loads(dirty.REPORT_PATH.read_text(encoding="utf-8")) == evidence
+    assert json.loads(dirty.FAILURE_PATH.read_text(encoding="utf-8")) == evidence

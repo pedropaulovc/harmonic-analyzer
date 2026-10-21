@@ -1757,14 +1757,39 @@ unrelated documents. A survivor makes the pair inconclusive; it does not authori
 another close or retry.
 
 Admission requires the supported rigid-body, configuration, body-health,
-feature and equation contracts. Unknown native evidence, missing observations,
-changed source bytes, cleanup failures or unclassified transform/contact
-differences refuse completion. The diagnostic does not repair or save the
-assembly, introduce a numerical parity waiver, or retry a failed pair.
+feature and equation contracts. Its read-only census reuses one feature walk
+per authenticated file/configuration. Only unknown feature-category refusals
+are deferred while safe scopes are collected; malformed/native failures,
+equation failures and traversal caps still stop collection immediately.
+Authentication, graph completion, category scanning and validation have separate
+progress states: a collected graph is not admission, and a partial identity set
+does not establish the configured-scope denominator. Unsupported categories
+remain unsupported after collection.
 
-Reports are `cad/out/reports/jig-dirty-edit.json` and
-`jig-dirty-edit-budget.json`, alongside the existing soundness stamp. A failed
-pair also retains evidence under `reports/failures/`. The cooperative planning
+The same-call interference observer freezes its component-array bound from the
+existing pinned expected-instance closure before the initial static gate. That
+is a source-closure bound, not native authentication before R1; later exact native
+admission is still mandatory. Duplicate identities, original result objects,
+consumer policy, calculating calls and `Done` remain unchanged. No bound is
+widened after a failure.
+
+Unknown native evidence, missing observations, changed source bytes, cleanup
+failures or unclassified transform/contact differences refuse completion. The
+diagnostic does not repair or save the assembly, introduce a numerical parity
+waiver, or retry a failed pair.
+
+Declared reports are `cad/out/reports/jig-dirty-edit.json` and
+`cad/out/reports/jig-dirty-edit-budget.json`, alongside the existing soundness
+stamp. After an unknown category or admission failure is latched, the diagnostic
+attempts bounded atomic raw-census checkpoints at
+`cad/out/reports/failures/jig-dirty-edit.json` before original consumer cleanup,
+using only the remaining existing allowance. An unavailable first checkpoint
+does not produce an omission receipt; a later publication failure preserves the
+last good checkpoint. Publication failure stops collection without a retry or
+final overwrite of that checkpoint, while the final report is attempted
+separately. Primary failures remain primary. These files use the existing
+forensics/publication path; cancellation-time remote publication is not
+guaranteed. The cooperative planning
 budget is 60 minutes from the existing process/seat start, including setup,
 hashing and observations, with ten minutes reserved for cleanup. An existing
 budget ledger is refused before native work or report ownership: prior report,
@@ -1773,16 +1798,31 @@ This does not preempt an in-flight COM call or replace the farm timeout.
 `complete-parent-decision-required` records a complete diagnostic pair, not
 approval to change production rebuilding.
 
-The actual-function inert smoke passed both trajectories, report round-trip,
-cleanup and real diagnostic telemetry (two trajectories, 32 boundaries), with
-no refused host action during execution or explicit cleanup. It uses temporary
-ordinary JSONL streams and inert host-capability ports; it does not prove native
-COM, Windows append semantics, network export or performance. The 130 focused
-regressions pass, including resident-document isolation and prior-evidence
-preservation. The first native qualification was cancelled after review findings;
-before cancellation acknowledgment, admission rejected `NotesAreaFtrFolder`.
-That feature remains unsupported. Native qualification and a later observer-free
-acceptance run remain required before any production cutover or speedup claim.
+The current offline proof is **177 passing focused tests** plus an actual-function
+contained smoke. The positive pair completed both original trajectories and
+32 boundaries. Its separate A-only refusal case completed B, collected all
+injected unsupported categories across child and root scopes, read the raw
+checkpoint before the first A close, retained zero A pose work and preserved
+checkpoint bytes through final report/cleanup. Native-result preservation,
+exact interference-boundary multiplicity and original consumer policy rejection
+are also covered; no failed consumer is relabelled healthy.
+
+The smoke exercises real diagnostic/consumer functions and span/log recording,
+with host-action positive controls, zero actual-run refusals and temporary-tree
+cleanup. It uses ordinary temporary JSONL streams and inert host-capability
+ports; native COM, Windows append semantics, network export and performance are
+not proved. Only that out-of-tree smoke uses Python `-X no_debug_ranges` to
+disable optional fine-grained traceback caret/column decoration; exception
+types, causes, messages, ordinary frames and telemetry recording remain real,
+and the host-action tripwire remains unchanged.
+
+The earlier native qualification was cancelled after review findings; before
+cancellation acknowledgment, execution `20261021T112629Z-1-f87c11e9` rejected
+`NotesAreaFtrFolder`. It published log/telemetry evidence, not a complete native
+census or an A/B qualification. That feature remains unsupported. This historical
+failure and the earlier offline test totals are not current native proof.
+Native qualification and a later observer-free acceptance run remain required
+before any production cutover or speedup claim.
 
 ### Backend: Azure Blob over HTTPS (443)
 

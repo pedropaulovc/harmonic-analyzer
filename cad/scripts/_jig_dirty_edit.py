@@ -323,15 +323,17 @@ def traverse_features(
     try:
         budget.check(f"admission.first_feature.{scope}")
         chain(receiver.FirstFeature(), None, None, 0, frozenset(), "root")
-    except Exception as error:
+    except BaseException as error:
         failure = (
             error
-            if isinstance(error, Inconclusive)
+            if not isinstance(error, Exception) or isinstance(error, Inconclusive)
             else Inconclusive(
                 f"{scope}: feature traversal unavailable: {type(error).__name__}: {error}"
             )
         )
         failure.evidence = graph
+        if failure is error:
+            raise
         raise failure from error
     return graph
 
@@ -612,15 +614,17 @@ def parse_equations(
             _active_configuration(model, budget) == active,
             "child configuration changed during equation admission",
         )
-    except Exception as error:
+    except BaseException as error:
         failure = (
             error
-            if isinstance(error, Inconclusive)
+            if not isinstance(error, Exception) or isinstance(error, Inconclusive)
             else Inconclusive(
                 f"equation admission unavailable: {type(error).__name__}: {error}"
             )
         )
         failure.evidence = evidence
+        if failure is error:
+            raise
         raise failure from error
     return evidence
 
@@ -746,7 +750,7 @@ def _external_references(
 def _root_inventory(
     graph: dict, instances: dict, prepared_mate: str, sweep: dict, budget: Any
 ) -> dict:
-    """Exact categories/counts and stable known names, not guessed SW auto names."""
+    """Exact structure/counts; admit separately certifies all root categories."""
     counts: Counter = Counter()
     references = {}
     mates = {}
@@ -754,12 +758,8 @@ def _root_inventory(
     planes = []
     profiles = []
     for node in graph["nodes"].values():
-        budget.check("admission.root_category")
+        budget.check("admission.root_structure")
         kind = node["type"]
-        _require(
-            kind in ROOT_TYPES,
-            f"unknown/ineligible root feature {node['name']!r}: {kind}",
-        )
         counts[kind] += 1
         if kind == "Reference":
             instance = node["instance"]
@@ -907,22 +907,94 @@ def admit(
     budget: Any,
     prepared_mate: str,
     sweep: dict,
+    *,
+    checkpoint: dict | None,
 ) -> dict:
-    """Establish R1--R4 once after unchanged static/prepare full rebuilds.
+    """Establish R1--R4 once, retaining a bounded census before category refusal.
 
-    ``expected`` is the orchestrator's already-hashed exact instance->part-file
-    map. No hashing, opening, configuration activation, solve or close occurs
-    here. A failure attaches partial plain ``evidence`` to Inconclusive; callers
-    must serialize data, not retain exceptions/tracebacks across document close.
+    Unknown categories never pass admission. Only their refusal is deferred;
+    every identity/configuration/body/reference/equation/structure hard stop
+    remains in order. The owned sink publishes plain failure evidence before
+    the original consumer's cleanup, never another native walk or interface.
     """
+    census = {
+        "authentication_status": "collecting",
+        "children_status": "collecting",
+        "root_graph_status": "collecting",
+        "root_category_scan_status": "collecting",
+        "root_validation_status": "collecting",
+        "identity_seen_count": 0,
+        "authenticated_instance_count": 0,
+        "discovered_scope_count": 0,
+        "completed_graph_count": 0,
+        "expected_scope_count": None,
+        "unknown_categories": [],
+        "root_category_records_scanned": 0,
+        "phase": "start",
+        "failed_scope": None,
+        "stopped": None,
+        "persistence_errors": [],
+    }
     evidence: dict = {
         "admitted": False,
         "instances": {},
         "root_features": {},
         "child_inventories": {},
+        "census": census,
     }
     state = {"occurrences": 0}
+    authenticated_names = set()
+    authenticated_scopes = set()
+    scanned_scopes = set()
+    current_scope = {"scope": "root"}
+    current_child = None
+    child_types = CHILD_SOLID_TYPES | CHILD_REFERENCE_TYPES | ADMIN_TYPES
+    owned_checkpoint = False
+
+    def publish(phase, primary=None):
+        # A sink failure is terminal BEFORE it can reach this outer handler.
+        if not owned_checkpoint or checkpoint["publication"]["status"] == "unavailable":
+            return
+        evidence["feature_occurrences"] = state["occurrences"]
+        try:
+            checkpoint["publish"](evidence, phase)
+        except BaseException as error:
+            if primary is None:
+                raise
+            census["persistence_errors"].append(
+                _error("admission.secondary_checkpoint", error)
+            )
+
+    def update_children_status():
+        if (
+            census["authentication_status"] == "complete"
+            and len(scanned_scopes) == census["expected_scope_count"]
+        ):
+            census["children_status"] = "complete"
+
+    def authenticate(name, scope):
+        authenticated_names.add(name)
+        authenticated_scopes.add(scope)
+        census["authenticated_instance_count"] = len(authenticated_names)
+        census["discovered_scope_count"] = len(authenticated_scopes)
+        if len(authenticated_names) == len(expected_names):
+            _require(
+                authenticated_names == expected_names,
+                "authenticated instance inventory differs from pinned jig",
+            )
+            census["authentication_status"] = "complete"
+            census["expected_scope_count"] = len(authenticated_scopes)
+        update_children_status()
+
     try:
+        _require(
+            type(checkpoint) is dict
+            and type(checkpoint.get("publication")) is dict
+            and checkpoint["publication"].get("status") in {"inactive", "published"}
+            and callable(checkpoint.get("publish")),
+            "owned admission checkpoint is unavailable",
+        )
+        owned_checkpoint = True
         with budget.unit("admission"):
             budget.check("admission.start")
             root = _bound(adapter.currentModel, "IModelDoc2")
@@ -970,10 +1042,21 @@ def admit(
                 "root component count differs from pinned inventory",
             )
             for raw_component in raw_components:
+                census["phase"] = "authenticate-instance"
+                current_child = None
+                current_scope = None
                 budget.check("admission.instance")
                 component = _bound(raw_component, "IComponent2")
                 identity = _component_identity(component, budget)
+                census["identity_seen_count"] += 1
                 name = identity["name"]
+                scope = json.dumps([identity["path"], identity["configuration"]])
+                current_scope = {
+                    "scope": scope,
+                    "path": identity["path"],
+                    "configuration": identity["configuration"],
+                    "instance": name,
+                }
                 _require(
                     name in expected_names and name not in evidence["instances"],
                     f"additional/duplicate/unexpected root component {name!r}",
@@ -1012,7 +1095,6 @@ def admit(
                 _configured_bodies(component, budget, row["configured_bodies"])
                 row["external_references"] = {}
                 _external_references(component, budget, row["external_references"])
-                scope = json.dumps([identity["path"], identity["configuration"]])
                 row["child_inventory"] = scope
                 if scope not in evidence["child_inventories"]:
                     with budget.unit(f"admission.child.{name}"):
@@ -1024,32 +1106,81 @@ def admit(
                         child = {
                             "path": identity["path"],
                             "configuration": identity["configuration"],
+                            "graph_status": "collecting",
+                            "category_scan_status": "collecting",
+                            "validation_status": "collecting",
+                            "category_records_scanned": 0,
                         }
+                        current_child = child
                         evidence["child_inventories"][scope] = child
+                        authenticate(name, scope)
+                        census["phase"] = "child-graph"
                         features = traverse_features(component, scope, budget, state)
                         child["features"] = features
+                        child["graph_status"] = "complete"
+                        census["completed_graph_count"] += 1
+                        census["phase"] = "child-category-scan"
                         for node in features["nodes"].values():
                             budget.check("admission.child_category")
-                            _require(
-                                node["type"]
-                                in CHILD_SOLID_TYPES
-                                | CHILD_REFERENCE_TYPES
-                                | ADMIN_TYPES,
-                                f"{name}: unknown/ineligible child feature {node['name']!r}: {node['type']}",
-                            )
+                            if node["type"] not in child_types:
+                                census["unknown_categories"].append(
+                                    {
+                                        "scope": scope,
+                                        "id": node["id"],
+                                        "name": node["name"],
+                                        "type": node["type"],
+                                        "context": "child",
+                                    }
+                                )
+                            child["category_records_scanned"] += 1
+                        child["category_scan_status"] = "complete"
+                        scanned_scopes.add(scope)
+                        update_children_status()
+                        if census["unknown_categories"]:
+                            publish("child-graph-scanned")
+                        census["phase"] = "child-equations"
                         child["equations"] = parse_equations(
                             child_model,
                             budget,
                             referenced_configuration=identity["configuration"],
                             features=features,
                         )
+                        child["validation_status"] = "complete"
+                else:
+                    authenticate(name, scope)
             _require(
                 set(evidence["instances"]) == expected_names,
                 "missing root instance identities",
             )
+            census["children_status"] = "complete"
+            census["phase"] = "children-complete"
+            if census["unknown_categories"]:
+                publish("children-complete")
+            current_child = None
+            current_scope = {"scope": "root"}
             with budget.unit("admission.root_graph"):
+                census["phase"] = "root-graph"
                 graph = traverse_features(root, "root", budget, state)
                 evidence["root_features"] = graph
+                census["root_graph_status"] = "complete"
+                census["phase"] = "root-category-scan"
+                for node in graph["nodes"].values():
+                    budget.check("admission.root_category")
+                    if node["type"] not in ROOT_TYPES:
+                        census["unknown_categories"].append(
+                            {
+                                "scope": "root",
+                                "id": node["id"],
+                                "name": node["name"],
+                                "type": node["type"],
+                                "context": "root",
+                            }
+                        )
+                    census["root_category_records_scanned"] += 1
+                census["root_category_scan_status"] = "complete"
+                if census["unknown_categories"]:
+                    publish("root-graph-scanned")
+                census["phase"] = "root-structure"
                 evidence["root_inventory"] = _root_inventory(
                     graph,
                     evidence["instances"],
@@ -1057,6 +1188,7 @@ def admit(
                     sweep,
                     budget,
                 )
+                census["phase"] = "root-equations"
                 equations = parse_equations(
                     root,
                     budget,
@@ -1065,23 +1197,87 @@ def admit(
                 )
                 evidence["root_equations"] = equations
                 _require(equations["count"] == 0, "root contains equations")
+            census["phase"] = "root-configuration-stability"
             _require(
                 _active_configuration(root, budget) == root_configuration,
                 "root configuration changed during admission",
             )
+            census["root_validation_status"] = "complete"
+            census["phase"] = "category-certification"
+            unknown = census["unknown_categories"]
+            if unknown:
+                first = unknown[0]
+                raise Inconclusive(
+                    f"{len(unknown)} unknown/ineligible feature categories in "
+                    f"{len({item['scope'] for item in unknown})} scopes; first "
+                    f"{first['scope']}: {first['name']!r}:{first['type']}"
+                )
             evidence["feature_occurrences"] = state["occurrences"]
             evidence["admitted"] = True
-    except Exception as error:
+            census["phase"] = "complete"
+    except BaseException as error:
         evidence["admitted"] = False
         evidence["feature_occurrences"] = state["occurrences"]
-        if isinstance(error, Inconclusive) and hasattr(error, "evidence"):
-            evidence["failed_step_evidence"] = error.evidence
+        partial = getattr(error, "evidence", None)
+        if type(partial) is dict:
+            evidence["failed_step_evidence"] = partial
+        for key in (
+            "authentication_status",
+            "children_status",
+            "root_graph_status",
+            "root_category_scan_status",
+            "root_validation_status",
+        ):
+            if census[key] == "collecting":
+                census[key] = "incomplete"
+        if current_child is not None:
+            for key in ("graph_status", "category_scan_status", "validation_status"):
+                if current_child[key] == "collecting":
+                    current_child[key] = "incomplete"
+            current_scope = {
+                **current_scope,
+                **{
+                    key: current_child[key]
+                    for key in (
+                        "graph_status",
+                        "category_scan_status",
+                        "validation_status",
+                    )
+                },
+            }
+        elif current_scope is not None and current_scope["scope"] == "root":
+            current_scope = {
+                "scope": "root",
+                "graph_status": census["root_graph_status"],
+                "category_scan_status": census["root_category_scan_status"],
+                "validation_status": census["root_validation_status"],
+            }
+        elif current_scope is not None:
+            known_child = evidence["child_inventories"].get(current_scope["scope"], {})
+            current_scope = {
+                **current_scope,
+                **{
+                    key: known_child.get(key, "incomplete")
+                    for key in (
+                        "graph_status",
+                        "category_scan_status",
+                        "validation_status",
+                    )
+                },
+            }
+        census["failed_scope"] = (
+            None if census["phase"] == "category-certification" else current_scope
+        )
         failure = (
             error
-            if isinstance(error, Inconclusive)
+            if not isinstance(error, Exception) or isinstance(error, Inconclusive)
             else Inconclusive(f"admission unavailable: {type(error).__name__}: {error}")
         )
+        census["stopped"] = _error(f"admission.{census['phase']}", failure)
         failure.evidence = evidence
+        publish("admission-aborted", primary=failure)
+        if failure is error:
+            raise
         raise failure from error
     return evidence
 
@@ -1243,10 +1439,11 @@ def _capture_errors(ledger):
 class Capture:
     """Forward one original native manager; strictly observe the SAME result."""
 
-    def __init__(self, manager, budget, entry):
+    def __init__(self, manager, budget, entry, *, component_limit):
         self.manager = manager
         self.budget = budget
         self.entry = entry
+        self._component_limit = component_limit
         self.done = False
         entry.update(
             {
@@ -1317,7 +1514,7 @@ class Capture:
                             "missing/malformed interference component array",
                         )
                         _require(
-                            len(components) <= 82,
+                            len(components) <= self._component_limit,
                             "interference component multiplicity exceeds jig inventory",
                         )
                         identities = []
@@ -1396,7 +1593,11 @@ class Capture:
 
 
 @contextlib.contextmanager
-def scoped_capture(adapter, budget, ledger, label):
+def scoped_capture(adapter, budget, ledger, label, *, component_limit):
+    _require(
+        type(component_limit) is int and component_limit > 0,
+        "interference capture requires a positive expected-inventory limit",
+    )
     original = _assembly.configured_interference_manager
     captures = []
 
@@ -1418,7 +1619,7 @@ def scoped_capture(adapter, budget, ledger, label):
                 }
             )
             raise
-        capture = Capture(manager, budget, entry)
+        capture = Capture(manager, budget, entry, component_limit=component_limit)
         captures.append(capture)
         capture.observe_settings()
         return capture
@@ -1618,7 +1819,7 @@ def _boundary_keys(sweep):
 
 
 class _Diagnostic:
-    def __init__(self, adapter, variant, expected, budget, row):
+    def __init__(self, adapter, variant, expected, budget, row, checkpoint=None):
         self.adapter, self.variant, self.expected, self.budget = (
             adapter,
             variant,
@@ -1626,6 +1827,7 @@ class _Diagnostic:
             budget,
         )
         self.row = row
+        self.checkpoint = checkpoint
         self.current_label = "initial/static"
         self.keys = []
         self.drive_started = None
@@ -1828,7 +2030,12 @@ class _Diagnostic:
         try:
             with self.budget.unit("diagnostic.admission"):
                 self.row["admission"] = admit(
-                    self.adapter, self.expected, self.budget, mate, sweep
+                    self.adapter,
+                    self.expected,
+                    self.budget,
+                    mate,
+                    sweep,
+                    checkpoint=self.checkpoint,
                 )
         except BaseException as exc:
             self.row["admission_failure"] = {
@@ -1836,6 +2043,8 @@ class _Diagnostic:
                 "evidence": getattr(exc, "evidence", None),
             }
             raise
+        finally:
+            self.row.pop("admission_progress", None)
 
     def before_drive(self, key):
         self.check("pose.mutation+solve")
@@ -2404,10 +2613,19 @@ async def run(adapter, name, outer_report):
     # Claim this submission before any path can publish or replace its evidence.
     # Refusing an existing ledger must not enter reporting or native cleanup.
     submission_budget = Budget(BUDGET_PATH)
+    publication = {
+        "status": "inactive",
+        "attempts": 0,
+        "last_success": None,
+        "errors": [],
+    }
 
     evidence = {
         "schema": "jig-dirty-edit-v2",
         "status": "inconclusive",
+        "qualification_status": "not-established",
+        "census_publication": publication,
+        "census_checkpoint": None,
         "disposition": "parent decision required; no production cutover authorized",
         "provenance": None,
         "input_snapshots": [],
@@ -2426,10 +2644,68 @@ async def run(adapter, name, outer_report):
     original_annotate = _telemetry.annotate
     current = None
     rejection = ""
+
+    def publish_census(admission, phase):
+        # This sole sink owns FAILURE_PATH once admission needs an early receipt.
+        # Permission uses one existing snapshot, not cleanup=True's bypass alone.
+        try:
+            _require(
+                publication["status"] != "unavailable",
+                "admission checkpoint publication is terminally unavailable",
+            )
+            _require(
+                current is not None, "admission checkpoint has no owned trajectory"
+            )
+            current.row["admission_progress"] = admission
+            snapshot = budget.snapshot()
+            limit = snapshot["nominal_limit_s"]
+            elapsed = snapshot["elapsed_conservative_seat_work_s"]
+            _require(
+                type(limit) in (int, float)
+                and type(elapsed) in (int, float)
+                and math.isfinite(limit)
+                and math.isfinite(elapsed)
+                and limit - elapsed > 0,
+                "admission checkpoint has no remaining nominal/cleanup allowance",
+            )
+            with budget.offline():
+                with budget.unit("diagnostic.census_checkpoint", cleanup=True):
+                    publication["attempts"] += 1
+                    capture = {
+                        "attempt": publication["attempts"],
+                        "phase": phase,
+                        "trajectory": current.variant,
+                        "trajectory_count": len(evidence["trajectories"]),
+                        "boundary_count": sum(
+                            len(row["boundaries"]) for row in evidence["trajectories"]
+                        ),
+                        "capture_stage": "before-consumer-cleanup",
+                    }
+                    evidence["census_checkpoint"] = capture
+                    payload = {
+                        **evidence,
+                        "budget": snapshot,
+                        "census_publication": {
+                            **publication,
+                            "status": "published",
+                            "last_success": capture,
+                        },
+                    }
+                    _write_json(FAILURE_PATH, payload)
+                    publication["status"] = "published"
+                    publication["last_success"] = capture
+        except BaseException as error:
+            publication["status"] = "unavailable"
+            publication["errors"].append(_error("admission.checkpoint", error))
+            raise
+
+    checkpoint = {"publication": publication, "publish": publish_census}
     try:
         offline_started = time.perf_counter()
         evidence["provenance"] = _provenance()
         expected, paths = _input_paths(name)
+        # The initial static gate precedes R1; freeze the source-closure bound.
+        component_limit = len(expected)
         relevant = {
             str(path.resolve())
             for path in paths
@@ -2447,7 +2723,11 @@ async def run(adapter, name, outer_report):
             first = len(current.row["interferences"])
             try:
                 with scoped_capture(
-                    adapter, budget, current.row["interferences"], label
+                    adapter,
+                    budget,
+                    current.row["interferences"],
+                    label,
+                    component_limit=component_limit,
                 ):
                     with budget.unit("original.interference_gate"):
                         return original_interference(*args, **kwargs)
@@ -2481,7 +2761,9 @@ async def run(adapter, name, outer_report):
                 )
             row = {"residents_before": residents}
             evidence["trajectories"].append(row)
-            current = _Diagnostic(adapter, variant, expected, budget, row)
+            current = _Diagnostic(
+                adapter, variant, expected, budget, row, checkpoint=checkpoint
+            )
             report = verify.Report()
             trajectory_error = None
             try:
@@ -2587,7 +2869,16 @@ async def run(adapter, name, outer_report):
                 evidence["errors"].append(_error("secondary.final_hash", exc))
                 evidence["status"] = "inconclusive"
             budget._persist()
-            evidence["budget"] = budget.snapshot()
+            try:
+                evidence["budget"] = budget.snapshot()
+            except BaseException as exc:
+                evidence["budget"] = None
+                evidence["errors"].append(
+                    _error("secondary.final_budget_snapshot", exc)
+                )
+                evidence["status"] = "inconclusive"
+                if primary is None:
+                    primary = exc
             if budget.persistence_errors:
                 evidence["errors"].extend(budget.persistence_errors)
                 evidence["status"] = "inconclusive"
@@ -2622,7 +2913,10 @@ async def run(adapter, name, outer_report):
         # prefix or claim an unobserved upload.
         try:
             _write_json(REPORT_PATH, evidence)
-            if evidence["status"] != "complete-parent-decision-required":
+            if (
+                evidence["status"] != "complete-parent-decision-required"
+                and publication["status"] == "inactive"
+            ):
                 _write_json(FAILURE_PATH, evidence)
         except BaseException as exc:
             evidence["errors"].append(_error("secondary.report_write", exc))
