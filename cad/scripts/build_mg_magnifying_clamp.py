@@ -470,6 +470,8 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
     even when its actual entities and geometric alignment match the request.
     """
     import _telemetry
+    import pythoncom
+    from solidworks_mcp.adapters._generated.sldworks_2026 import ISketchPoint, ISketchSegment
 
     application = _early_bound(adapter.swApp, "ISldWorks")
     matches, rows, definitions = 0, [], []
@@ -512,9 +514,37 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
                 fields = {"present": entity is not None, "interface": None}
                 row["definition_fields"].append(fields)
                 if entity is not None:
-                    # Native IDispatch type information, not a Python wrapper's
-                    # class or a speculative ISketchPoint/ISketchSegment cast.
-                    fields["interface"] = capture(f"definition[{index}].type", lambda: entity._oleobj_.GetTypeInfo().GetDocumentation(-1)[0], mandatory=True)
+                    # Query actual native capabilities; generated wrapper creation
+                    # can fall through after failed QI and is not capability proof.
+                    # IUnknown is a valid base for every COM interface. We never
+                    # invoke methods on these capability-only returned pointers.
+                    queries = []
+                    fields["query_interfaces"] = queries
+                    for interface, cls in (("ISketchPoint", ISketchPoint), ("ISketchSegment", ISketchSegment)):
+                        query = {"interface": interface, "iid": str(cls.CLSID), "hresult": None, "supported": None}
+                        queries.append(query)
+
+                        def query_support():
+                            try:
+                                result = entity._oleobj_.QueryInterface(cls.CLSID, pythoncom.IID_IUnknown)
+                            except pythoncom.com_error as exc:
+                                query["hresult"] = exc.hresult
+                                if exc.hresult == -2147467262:  # E_NOINTERFACE, not arbitrary failure.
+                                    return False
+                                raise
+                            if result is None:
+                                raise RuntimeError("native QueryInterface returned no interface pointer")
+                            query["hresult"] = 0  # S_OK; pywin32 raises on failure.
+                            return True
+
+                        query["supported"] = capture(f"definition[{index}].QI({interface})", query_support, mandatory=True)
+                    supported = [query["interface"] for query in queries if query["supported"] is True]
+                    if len(supported) == 1 and all(type(query["supported"]) is bool for query in queries):
+                        fields["interface"] = supported[0]
+                    else:
+                        detail = f"definition[{index}]: ambiguous, unsupported or unavailable native interfaces"
+                        row["readback_errors"].append(detail)
+                        row["mandatory_readback_errors"].append(detail)
                 row["definition_interfaces"].append(fields["interface"])
                 if fields["interface"] == "ISketchPoint":
                     point = capture(f"definition[{index}].diagnostic-binding", lambda: _early_bound(entity, "ISketchPoint"))
@@ -531,7 +561,7 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
             if row["mandatory_readback_errors"] or len(entities) != len(points) + (segment is not None) or any(value is None for value in entities):
                 continue
             actual_points = [entity for entity, interface in zip(entities, interfaces, strict=True) if interface == "ISketchPoint"]
-            actual_segments = [entity for entity, interface in zip(entities, interfaces, strict=True) if interface in ("ISketchSegment", "ISketchLine", "ISketchArc")]
+            actual_segments = [entity for entity, interface in zip(entities, interfaces, strict=True) if interface == "ISketchSegment"]
             if len(actual_points) != len(points) or len(actual_segments) != (segment is not None):
                 continue
             if kind in (25, 26) and len(actual_points) == 2:
