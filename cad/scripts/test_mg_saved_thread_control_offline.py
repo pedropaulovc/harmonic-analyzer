@@ -627,6 +627,29 @@ class OwnedControlSmoke(unittest.TestCase):
             self.assertTrue(any(frame["function"] == "GetSaveFlag" for frame in capture["primary_traceback"]["frames"]))
             self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["closures"]))
 
+    def test_interrupt_is_retained_before_secondary_cleanup_failure(self):
+        for exception_type in (SystemExit, KeyboardInterrupt):
+            with self.subTest(exception_type=exception_type.__name__), Environment().installed() as env:
+                primary = exception_type("original interrupt")
+
+                def interrupt_diagnostic():
+                    env.app.documents[0].dirty = ProbeError("secondary cleanup failure")
+                    raise primary
+
+                env.after_diagnostic = interrupt_diagnostic
+                code, report, captures = env.run_driver()
+                self.assertEqual(code, 1)
+                self.assertEqual(report["runner_exit_code"], 1)
+                self.assertEqual(env.app.close_calls, [])
+                self.assertEqual(len(captures), 1)
+                capture = captures[0]
+                self.assertEqual(capture["primary_failure"]["type"], exception_type.__name__)
+                self.assertEqual(capture["primary_failure"]["operation"], "collect")
+                self.assertEqual(capture["primary_failure"]["message"], "original interrupt")
+                self.assertTrue(any(frame["function"] == "interrupt_diagnostic" for frame in capture["primary_traceback"]["frames"]))
+                self.assertTrue(any(row["type"] == "ProbeError" for row in capture["errors"]))
+                self.assertTrue(all(row["status"] == "stranded_owned" for row in capture["closures"]))
+
     def test_dirty_or_unknown_saveflag_never_closes(self):
         for value in (True, None, 0):
             with self.subTest(value=value), Environment().installed() as env:

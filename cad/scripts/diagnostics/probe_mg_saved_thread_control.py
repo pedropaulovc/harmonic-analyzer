@@ -495,8 +495,9 @@ def main():
                     adapter, section, feature_name="BracketMountingTaps"
                 )
                 report["collection_completed"] = True
-            except Exception as error:
+            except BaseException as error:
                 failure("collect", error)
+                raise
             finally:
                 # CloseDoc also closes non-active hidden documents. Therefore
                 # EVERY live document must be an exact retained owned control,
