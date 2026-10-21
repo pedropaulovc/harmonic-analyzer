@@ -1051,6 +1051,398 @@ def test_a_circle_the_seat_moved_raises(monkeypatch) -> None:
         drawing.cropped_tip_view(seat)
 
 
+# The supplier diagram lives in a rotated, translated MODEL sketch.  The
+# drawing view's own sketch below remains a separate sheet-to-crop frame.
+class _SupplierSourceTransform:
+    def __init__(self, seat) -> None:
+        self.seat = seat
+
+    def __call__(self, xyz):
+        x, y, z = xyz
+        return (y + 0.043, 0.031 - x, z - 0.057)
+
+    def Inverse(self):
+        self.seat.log.append(("inverse-source-frame",))
+
+        def sketch_to_model(xyz):
+            self.seat.log.append(("sketch-to-model", tuple(xyz)))
+            x, y, z = xyz
+            return (0.031 - y, -0.043 + x, 0.057 + z)
+
+        return sketch_to_model
+
+
+class _SupplierView:
+    INITIAL_ANGLE = 0.37
+    TRANSFORMS = {"ReferencedConfiguration", "UseSheetScale", "ScaleRatio", "Angle", "Position"}
+
+    def __init__(self, seat, center, scale, source_angle) -> None:
+        self.name = "MSC source"
+        self.ReferencedConfiguration = "Default"
+        self.UseSheetScale = 1
+        self.ScaleRatio = (0.5, 1.0)
+        self.Angle = self.INITIAL_ANGLE
+        self.Position = (center[0] + 0.007, center[1] - 0.009)
+        self.expected_scale = scale
+        self.source_angle = source_angle
+        self.sheet_signs = (1.0, 1.0)
+        self.projection_factor = 1.0
+        self.cropped = False
+        self.source_sketch = SimpleNamespace(
+            ModelToSketchTransform=_SupplierSourceTransform(seat),
+        )
+        feature = SimpleNamespace(GetSpecificFeature2=self._source_sketch)
+        self.ReferencedDocument = SimpleNamespace(
+            FeatureByName=lambda name: self._source_feature(name, feature),
+        )
+        self.seat = seat
+
+    def __setattr__(self, name, value) -> None:
+        if name in self.TRANSFORMS and "seat" in self.__dict__:
+            assert not self.seat.annotated, f"{name} changed after dimension import"
+            if name == "ScaleRatio":
+                _require_double_array(value, "ScaleRatio")
+            self.seat.log.append((name, value))
+            self.seat.dirty = True
+            self.seat.display_dirty = True
+        object.__setattr__(self, name, value)
+
+    def _source_feature(self, name, feature):
+        assert name == drawing.SUPPLIER_STOCK_FEATURE
+        self.seat.log.append(("source-feature", name))
+        return feature
+
+    def _source_sketch(self):
+        self.seat.log.append(("source-sketch",))
+        return self.source_sketch
+
+    def sheet_point(self, xyz):
+        x, y, _z = xyz
+        angle = self.Angle - self.INITIAL_ANGLE + self.source_angle - math.pi / 2.0
+        c, s = math.cos(angle), math.sin(angle)
+        ratio = self.ScaleRatio[0] / self.ScaleRatio[1] * self.projection_factor
+        return (
+            self.Position[0] + ratio * self.sheet_signs[0] * (c * x - s * y),
+            self.Position[1] + ratio * self.sheet_signs[1] * (s * x + c * y),
+            0.0,
+        )
+
+    @property
+    def ModelToViewTransform(self):
+        assert self.seat.revealed
+        assert self.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
+        assert self.UseSheetScale == 0
+        assert tuple(self.ScaleRatio) == self.expected_scale
+        assert not self.seat.dirty, "projection used an unrebuilt view transform"
+        assert not self.seat.display_dirty, "projection used unrefreshed view display geometry"
+        self.seat.log.append(("project-frame", self.Angle, self.Position))
+        return self.sheet_point
+
+    def SetViewPosition(self, position, move_children):
+        _require_double_array(position, "SetViewPosition")
+        self.seat.log.append(("move", tuple(position), move_children))
+        self.Position = tuple(position)
+        return True
+
+    def UpdateViewDisplayGeometry(self):
+        assert not self.seat.dirty
+        self.seat.display_dirty = False
+        self.seat.log.append(("update",))
+
+    def GetOutline(self):
+        return (0.123, -0.087, 0.155, 0.128)
+
+    def GetSketch(self):
+        self.seat.log.append(("crop-sketch",))
+        return _Sketch()
+
+    def Crop2(self, jagged, no_outline, intensity):
+        self.seat.log.append(("crop2", jagged, no_outline, intensity))
+        self.cropped = True
+        return 1
+
+    def IsCropped(self):
+        return self.cropped
+
+
+class _SupplierSeat(_Seat):
+    def __init__(self) -> None:
+        super().__init__()
+        self.revealed = False
+        self.annotated = False
+        self.dirty = False
+        self.display_dirty = False
+
+    def EditRebuild3(self):
+        self.log.append(("rebuild",))
+        # A rebuild settles edits, but repaint-dependent geometry can still lag.
+        self.dirty = False
+        return True
+
+
+_SUPPLIER_FRAME_CASES = (
+    (False, drawing.STOCK_CENTER, drawing.STOCK_SCALE, drawing.STOCK_KEEP, 0.0477901),
+    (True, drawing.STOCK_HEAD_CENTER, drawing.STOCK_HEAD_SCALE, drawing.STOCK_HEAD_KEEP, -0.0030099),
+)
+
+
+def _supplier_seat(monkeypatch, center, scale, *, source_angle=math.pi / 2.0):
+    import _drawing_projection as projection
+
+    seat = _SupplierSeat()
+    stock = _SupplierView(seat, center, scale, source_angle)
+
+    def place(adapter, source, orientation, x, y):
+        assert adapter is seat and source == str(drawing.SOURCE)
+        assert orientation == "*Front" and (x, y) == center
+        seat.log.append(("place",))
+        return stock
+
+    def reveal(adapter, view, features, *, view_label):
+        assert adapter is seat and view is stock
+        assert stock.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
+        assert features == (drawing.SUPPLIER_STOCK_FEATURE,)
+        seat.revealed = True
+        seat.log.append(("reveal",))
+        return features
+
+    def invoke(obj, _interface, member, *args):
+        value = getattr(obj, member)
+        return value if member in ("ModelToViewTransform", "ArrayData") else value(*args)
+
+    strict_frame = drawing._assert_supplier_profile_frame
+
+    def verify(*args, **kwargs):
+        strict_frame(*args, **kwargs)
+        seat.log.append(("verified-frame",))
+
+    def import_dimensions(adapter, view, *, keep, view_label, dimensions_by_feature):
+        assert adapter is seat and view is stock
+        assert dimensions_by_feature == drawing.SUPPLIER_STOCK_DIMENSIONS
+        assert any(entry[0] == "verified-frame" for entry in seat.log)
+        seat.log.append(("import", tuple(keep)))
+        seat.annotated = True
+        return [
+            SimpleNamespace(
+                name=name, GetSpecificAnnotation=lambda name=name: SimpleNamespace(name=name),
+            )
+            for name in keep
+        ]
+
+    def reposition(adapter, annotations, *, reposition):
+        assert adapter is seat
+        assert {annotation.name for annotation in annotations} == set(reposition)
+        seat.log.append(("reposition", tuple(reposition.items())))
+        return annotations
+
+    def reference(adapter, display, **contract):
+        assert adapter is seat and display.name == contract["label"]
+        seat.log.append(("reference", display.name))
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing, "double_array", lambda values: _DoubleArray(values))
+    monkeypatch.setattr(projection, "double_array", lambda values: _DoubleArray(values))
+    monkeypatch.setattr(projection, "_com_invoke", invoke)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing.hidden_sketches, "_show_hidden_owners", reveal)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", import_dimensions)
+    monkeypatch.setattr(drawing, "curate_dimensions", reposition)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", reference)
+    monkeypatch.setattr(drawing, "_assert_supplier_profile_frame", verify)
+    return seat, stock
+
+
+@pytest.mark.parametrize("crop_head,center,scale,keep,semantic_x", _SUPPLIER_FRAME_CASES)
+def test_supplier_profile_points_use_the_source_sketch_inverse(
+    monkeypatch, crop_head, center, scale, keep, semantic_x,
+) -> None:
+    seat, stock = _supplier_seat(monkeypatch, center, scale)
+    points = drawing._supplier_profile_model_points(
+        seat, stock, crop_head=crop_head, label="source mapping",
+    )
+    expected = (
+        (0.031, -0.043, 0.057),
+        (0.031, -0.042, 0.057),
+        (0.030, -0.043, 0.057),
+        (0.031, -0.043 + semantic_x, 0.057),
+    )
+    assert len(points) == 4
+    for actual, target in zip(points, expected, strict=True):
+        assert actual == pytest.approx(target, rel=0.0, abs=1e-12)
+    assert [entry[1] for entry in seat.log if entry[0] == "sketch-to-model"] == [
+        (0.0, 0.0, 0.0), (0.001, 0.0, 0.0), (0.0, 0.001, 0.0),
+        pytest.approx((semantic_x, 0.0, 0.0), rel=0.0, abs=1e-12),
+    ]
+    kinds = [entry[0] for entry in seat.log]
+    assert kinds[:3] == ["source-feature", "source-sketch", "inverse-source-frame"]
+    assert "crop-sketch" not in kinds
+
+
+@pytest.mark.parametrize("crop_head,center,scale,keep,semantic_x", _SUPPLIER_FRAME_CASES)
+@pytest.mark.parametrize("source_angle", [math.pi / 2.0, 0.61], ids=["vertical", "oblique"])
+def test_supplier_stock_view_settles_the_measured_frame_before_annotations(
+    monkeypatch, crop_head, center, scale, keep, semantic_x, source_angle,
+) -> None:
+    seat, stock = _supplier_seat(monkeypatch, center, scale, source_angle=source_angle)
+    result = drawing._supplier_stock_view(
+        seat, center=center, scale=scale, keep=keep, label="MSC source", crop_head=crop_head,
+    )
+    assert result is stock
+    assert stock.Angle == pytest.approx(stock.INITIAL_ANGLE - source_angle, abs=1e-12)
+    assert stock.sheet_point((0.031, -0.043 + semantic_x, 0.057))[:2] == pytest.approx(
+        center, rel=0.0, abs=1e-12,
+    )
+    assert tuple(stock.ScaleRatio) == scale and stock.UseSheetScale == 0
+    assert stock.IsCropped() is crop_head
+    kinds = [entry[0] for entry in seat.log]
+    first_measure = kinds.index("source-feature")
+    assert kinds[:first_measure] == [
+        "place", "ReferencedConfiguration", "reveal", "rebuild",
+        "UseSheetScale", "ScaleRatio", "rebuild", "update",
+    ]
+    angle = kinds.index("Angle")
+    move = kinds.index("move")
+    verified = kinds.index("verified-frame")
+    imported = kinds.index("import")
+    assert first_measure < kinds.index("project-frame") < angle < move < verified < imported
+    assert "rebuild" in kinds[angle + 1:move]
+    assert "update" in kinds[angle + 1:move]
+    assert "rebuild" in kinds[move + 1:verified]
+    assert "update" in kinds[move + 1:verified]
+    assert kinds.count("source-feature") == kinds.count("inverse-source-frame") == 2
+    assert not (stock.TRANSFORMS | {"move"}).intersection(kinds[imported + 1:])
+    assert kinds[imported + 1:] == ["reposition"] + ["reference"] * len(keep)
+    if crop_head:
+        assert verified < kinds.index("crop-sketch") < kinds.index("circle") < kinds.index("crop2") < imported
+        circle = next(entry for entry in seat.log if entry[0] == "circle")
+        cx, cy, _cz, px, py, _pz = (value / 1000.0 for value in circle[2])
+        assert (cx, cy) == pytest.approx(center, rel=0.0, abs=1e-12)
+        assert math.dist((cx, cy), (px, py)) == pytest.approx(
+            drawing.STOCK_HEAD_RADIUS_MM * scale[0] / scale[1] / 1000.0,
+        )
+        assert next(entry for entry in seat.log if entry[0] == "crop2") == (
+            "crop2", False, True, 5,
+        )
+    else:
+        assert not {"crop-sketch", "circle", "crop2"}.intersection(kinds)
+
+
+@pytest.mark.parametrize("crop_head,center,scale,keep,semantic_x", _SUPPLIER_FRAME_CASES)
+@pytest.mark.parametrize(
+    "fault", ["none", "rotated", "axial-mirror", "radial-mirror", "scale", "center-x", "center-y"],
+)
+def test_supplier_final_frame_reader_reprojects_and_rejects_native_drift(
+    monkeypatch, crop_head, center, scale, keep, semantic_x, fault,
+) -> None:
+    seat, stock = _supplier_seat(monkeypatch, center, scale)
+    drawing._supplier_stock_view(
+        seat, center=center, scale=scale, keep=keep, label="MSC source", crop_head=crop_head,
+    )
+    # Simulate a settled native transform changing behind the recorded view
+    # properties. Keep the semantic center exact for the axis-only faults.
+    if fault == "rotated":
+        object.__setattr__(stock, "Angle", stock.Angle + 0.013)
+    elif fault == "axial-mirror":
+        stock.sheet_signs = (-1.0, 1.0)
+    elif fault == "radial-mirror":
+        stock.sheet_signs = (1.0, -1.0)
+    elif fault == "scale":
+        stock.projection_factor = 1.02
+    if fault in {"rotated", "axial-mirror", "radial-mirror", "scale"}:
+        actual = stock.sheet_point((0.031, -0.043 + semantic_x, 0.057))
+        object.__setattr__(stock, "Position", tuple(
+            stock.Position[index] + center[index] - actual[index] for index in range(2)
+        ))
+    elif fault in {"center-x", "center-y"}:
+        index = 0 if fault == "center-x" else 1
+        shifted = list(stock.Position)
+        shifted[index] += 2e-8  # Strict reader tolerance is 1e-8 metres.
+        object.__setattr__(stock, "Position", tuple(shifted))
+    assert tuple(stock.ScaleRatio) == scale and stock.UseSheetScale == 0
+    seat.log.clear()
+    seat.display_dirty = True
+    if fault == "none":
+        drawing._assert_supplier_profile_frame(
+            seat, stock, center, scale, crop_head=crop_head, label="settled source",
+        )
+    else:
+        reason = "center moved" if fault.startswith("center-") else "axes lost"
+        with pytest.raises(RuntimeError, match=reason):
+            drawing._assert_supplier_profile_frame(
+                seat, stock, center, scale, crop_head=crop_head, label="settled source",
+            )
+    kinds = [entry[0] for entry in seat.log]
+    assert kinds.count("source-feature") == kinds.count("inverse-source-frame") == 1
+    assert kinds.count("sketch-to-model") == 4
+    assert kinds.count("project-frame") == 1
+    assert kinds.count("update") == 1
+    assert kinds.index("update") < kinds.index("project-frame")
+    assert not (stock.TRANSFORMS | {"move", "crop-sketch", "import"}).intersection(kinds)
+
+
+@pytest.mark.parametrize(
+    "failure,reason",
+    [
+        ("missing", "cannot create supplier source point"),
+        ("zeros", "point marshaling changed"),
+        ("short", "point marshaling changed"),
+        ("unmapped", "cannot map supplier source point"),
+        ("nonfinite", "source model point is invalid"),
+    ],
+)
+def test_supplier_profile_mapping_rejects_bad_native_math_points(
+    monkeypatch, failure, reason,
+) -> None:
+    seat, stock = _supplier_seat(monkeypatch, drawing.STOCK_CENTER, drawing.STOCK_SCALE)
+
+    def create(values):
+        point = _Utility().CreatePoint(values)
+        if failure == "missing":
+            return None
+        if failure == "zeros":
+            return _Point((0.0, 0.0, 0.0))
+        if failure == "short":
+            return _Point(point.ArrayData[:2])
+        return SimpleNamespace(
+            ArrayData=point.ArrayData,
+            MultiplyTransform=lambda _transform: (
+                None if failure == "unmapped" else _Point((math.nan, 0.0, 0.0))
+            ),
+        )
+
+    monkeypatch.setattr(seat, "GetMathUtility", lambda: SimpleNamespace(CreatePoint=create))
+    with pytest.raises(RuntimeError, match=reason):
+        drawing._supplier_profile_model_points(
+            seat, stock, crop_head=False, label="bad source math",
+        )
+    assert not {"project-frame", "crop-sketch", "import"}.intersection(
+        entry[0] for entry in seat.log
+    )
+
+
+def test_full_supplier_profile_fits_its_fixed_cell_only_when_horizontal() -> None:
+    assert drawing.STOCK_SCALE == (2.0, 1.0)
+    points = drawing.SUPPLIER_PROFILE_MM
+    xmin = min(point[0] for point in points) / 1000.0
+    xmax = max(point[0] for point in points) / 1000.0
+    ymin = min(point[1] for point in points) / 1000.0
+    ymax = max(point[1] for point in points) / 1000.0
+    ratio = drawing.STOCK_SCALE[0] / drawing.STOCK_SCALE[1]
+    cx, cy = drawing.STOCK_CENTER
+    semantic_x = (xmin + xmax) / 2.0
+    horizontal = (
+        cx + ratio * (xmin - semantic_x), cy + ratio * ymin,
+        cx + ratio * (xmax - semantic_x), cy + ratio * ymax,
+    )
+    left, bottom, right, top = drawing.STOCK_VIEW_CELL
+    assert left <= horizontal[0] < horizontal[2] <= right
+    assert bottom <= horizontal[1] < horizontal[3] <= top
+    assert ratio * (xmax - xmin) > top - bottom
+
+
 @pytest.mark.parametrize("newline", ["\n", "\r\n"])
 def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
     monkeypatch, newline,
@@ -1060,6 +1452,13 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     monkeypatch.setattr(drawing, "assert_supplier_view_fits", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    frames = []
+    monkeypatch.setattr(
+        drawing, "_assert_supplier_profile_frame",
+        lambda _adapter, view, center, scale, *, crop_head, label: frames.append(
+            (view.Name, center, scale, crop_head)
+        ),
+    )
     template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
     monkeypatch.setattr(
         drawing, "sheet_drawable_region",
@@ -1122,6 +1521,10 @@ def test_final_supplier_labels_accept_native_line_endings_but_not_changed_text(
     )
     notes = [(note, text, (0.02, 0.20, 0.18, 0.25))]
     drawing._verify_supplier_stock(adapter, "stock", "head", notes)
+    assert frames == [
+        ("stock", drawing.STOCK_CENTER, drawing.STOCK_SCALE, False),
+        ("head", drawing.STOCK_HEAD_CENTER, drawing.STOCK_HEAD_SCALE, True),
+    ]
     state.text = state.text.replace("NO SOLID GEOMETRY", "SOLID GEOMETRY")
     with pytest.raises(RuntimeError, match="source label changed"):
         drawing._verify_supplier_stock(adapter, "stock", "head", notes)

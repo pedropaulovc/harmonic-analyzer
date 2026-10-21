@@ -1504,6 +1504,18 @@ strip gauges from compressed-height/deflection/shaft application gauges.
 Neither diagram asserts an unmodelled loaded shape or a force derived from
 the installed stand-in.
 
+Creating these diagram configurations rebuilds each original member before
+recording its preservation baseline. The native guard requires identical
+solid/sheet-body counts and face counts and compares all twelve mass-property
+values with unchanged tolerances through an order-independent, one-to-one body
+correspondence. Ambiguous non-equivalent correspondences fail closed; failures
+retain both complete native record sets. Feature suppression is resolved afresh
+by unique name/type after configuration changes, not through retained COM
+proxies. Cleanup is restricted to the construction insertion's owned features,
+never automatic configuration-comment folders. Body-Delete ownership retains
+both known names until rename readback succeeds, so a committed rename followed
+by a transient read failure still permits original-member restoration.
+
 For example, `uv run python build.py drawing:sm_vn_knife_mount_dowel` writes
 `cad/out/slddrw/sm-vn-knife-mount-dowel.SLDDRW`,
 `cad/out/pdf/sm-vn-knife-mount-dowel.pdf` and

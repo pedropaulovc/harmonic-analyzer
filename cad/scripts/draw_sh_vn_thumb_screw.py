@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Mapping, Sequence
+from math import dist, isfinite
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_views
@@ -11,12 +13,14 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name, iter_view
 import _config
 import _telemetry
 from _com import _early_bound
+from _drawing_common import rebuild_drawing
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import (
+    assert_supplier_view_fits,
     build_purchased_fastener_drawing,
     fastener_view_cells,
     view_band_bottom,
@@ -33,9 +37,66 @@ import sh_vn_thumb_screw_spec as supplier
 SPEC = DRAWINGS_BY_NAME["sh_vn_thumb_screw"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#4-40 x 7/16 RAISED KNURLED-HEAD THUMB SCREW"
-# Only Front carries dimensions. Reserve its lanes before scale selection;
-# Top/Right/Isometric keep their complete geometry cells.
-SUPPLIER_MARGINS = {"*Front": (0.034, 0.014, 0.045, 0.023)}
+# Keep the lane plan and pre-fit budget together. The old 14 mm bottom
+# reserve left only 4 mm beyond its 10 mm thread-length lane; native ink
+# crossed the 77 mm cell floor by 7.5895 mm on abe9bb7a3bd8.
+_SUPPLIER_LANES = {
+    "head_height": ("top", 0.009),
+    "collar_height": ("top", 0.020),
+    "thread_length": ("bottom", 0.010),
+    "head_diameter": ("left", 0.020),
+    "collar_diameter": ("right", 0.027),
+    "thread_diameter": ("right", 0.012),
+}
+# Sheet-space text/arrow room beyond each line, independent of view scale.
+_SUPPLIER_TEXT_ROOM = {"left": 0.014, "bottom": 0.014, "right": 0.018, "top": 0.014}
+_POSITION_TOLERANCE_M = 1e-5  # Same 10 um as imported-dimension placement readback.
+SUPPLIER_MARGINS = {
+    "*Front": tuple(
+        max(offset for side, offset in _SUPPLIER_LANES.values() if side == edge)
+        + _SUPPLIER_TEXT_ROOM[edge]
+        for edge in ("left", "bottom", "right", "top")
+    )
+}
+
+
+def _supplier_positions(
+    outline: Sequence[float], axis: Sequence[tuple[float, float]]
+) -> dict[str, tuple[float, float]]:
+    """Route against the actual fitted outline, not a nominal scaled radius."""
+    if (
+        len(outline) != 4
+        or len(axis) != 4
+        or not all(isfinite(value) for value in outline)
+        or not all(len(point) == 2 and all(map(isfinite, point)) for point in axis)
+        or outline[0] >= outline[2]
+        or outline[1] >= outline[3]
+    ):
+        raise RuntimeError("thumb supplier layout has no finite fitted geometry")
+    if max(point[1] for point in axis) - min(point[1] for point in axis) > 1e-7:
+        raise RuntimeError("thumb Front view does not project its axis horizontally")
+    center_y = axis[0][1]
+    centers = {
+        "head_height": ((axis[0][0] + axis[1][0]) / 2.0, center_y),
+        "collar_height": ((axis[1][0] + axis[2][0]) / 2.0, center_y),
+        "thread_length": ((axis[2][0] + axis[3][0]) / 2.0, center_y),
+        "head_diameter": (0.0, center_y),
+        "collar_diameter": (0.0, center_y + 0.013),
+        "thread_diameter": (0.0, center_y - 0.014),
+    }
+    positions = {}
+    for name, (side, offset) in _SUPPLIER_LANES.items():
+        x, y = centers[name]
+        if side == "left":
+            x = outline[0] - offset
+        elif side == "right":
+            x = outline[2] + offset
+        elif side == "bottom":
+            y = outline[1] - offset
+        else:
+            y = outline[3] + offset
+        positions[_supplier_name(name)] = (x, y)
+    return positions
 
 
 def _station_circle(edges: Any, station_mm: float, *, label: str) -> Any:
@@ -108,9 +169,8 @@ def _assert_reference_diameter(display: Any, name: str) -> None:
         raise RuntimeError(f"{name}: supplier envelope changed native source owner")
 
 
-@_telemetry.traced("drawing.thumb_supplier_settled")
-def _assert_supplier_dimensions(adapter: Any) -> None:
-    """Prove all six native references after the finalizer's last rebuild."""
+def _supplier_displays(adapter: Any) -> dict[str, Any]:
+    """Reacquire the sheet's exact native display-dimension inventory."""
     views = list(iter_views(adapter))
     fronts = [view for view in views if view.GetOrientationName() == "*Front"]
     if len(fronts) != 1:
@@ -127,6 +187,53 @@ def _assert_supplier_dimensions(adapter: Any) -> None:
                 raise RuntimeError("thumb supplier references duplicated or changed owner")
             found[name] = display
             display = display.GetNext5()
+    return found
+
+
+def _assert_supplier_positions(
+    found: Mapping[str, Any], positions: Mapping[str, tuple[float, float]]
+) -> None:
+    if set(found) != set(positions):
+        raise RuntimeError("thumb sheet lost or added a supplier dimension")
+    for name, display in found.items():
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        actual = tuple(float(value) for value in annotation.GetPosition())
+        if (
+            display.OffsetText
+            or len(actual) != 3
+            or not all(map(isfinite, actual))
+            or dist(actual[:2], positions[name]) > _POSITION_TOLERANCE_M
+        ):
+            raise RuntimeError(f"{name}: settled thumb supplier dimension left its lane")
+
+
+def _place_supplier_dimensions(
+    adapter: Any, positions: Mapping[str, tuple[float, float]]
+) -> None:
+    """Place complete native lines only after all formatting/import side effects."""
+    rebuild_drawing(adapter, label="thumb supplier formatting and import settled")
+    found = _supplier_displays(adapter)
+    if set(found) != set(positions):
+        raise RuntimeError("thumb sheet lost or added a supplier dimension")
+    for name, display in found.items():
+        # SetPosition2 moves only the text while OffsetText is true. Turn it
+        # off explicitly so the dimension line and witnesses follow the lane.
+        display.OffsetText = False
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        x, y = positions[name]
+        if not annotation.SetPosition2(x, y, 0.0):
+            raise RuntimeError(f"{name}: failed to place thumb supplier dimension")
+    rebuild_drawing(adapter, label="thumb supplier complete native lanes")
+    _assert_supplier_positions(_supplier_displays(adapter), positions)
+
+
+@_telemetry.traced("drawing.thumb_supplier_settled")
+def _assert_supplier_dimensions(
+    adapter: Any, positions: Mapping[str, tuple[float, float]]
+) -> None:
+    """Prove all six native references after the finalizer's last rebuild."""
+    found = _supplier_displays(adapter)
+    _assert_supplier_positions(found, positions)
     axial = {
         "head_height": (supplier.HEAD_H, (0.0, supplier.HEAD_H)),
         "collar_height": (
@@ -168,7 +275,9 @@ def _assert_supplier_dimensions(adapter: Any) -> None:
 
 
 @_telemetry.traced("drawing.thumb_supplier_dimensions")
-def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> None:
+def supplier_dimensions(
+    adapter: Any, views_by_orientation: dict[str, Any]
+) -> dict[str, tuple[float, float]]:
     """Three physical spans and three model-owned nominal diameter references."""
     view = _early_bound(views_by_orientation["*Front"], "IView")
     view.UpdateViewDisplayGeometry()
@@ -179,20 +288,16 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
         [(x / 1000.0, 0.0, 0.0) for x in stations],
         label="thumb supplier axial stations",
     )
-    if max(point[1] for point in axis) - min(point[1] for point in axis) > 1e-7:
-        raise RuntimeError("thumb Front view does not project its axis horizontally")
-    center_y = axis[0][1]
-    ratio = tuple(float(value) for value in view.ScaleRatio)
-    radius = supplier.HEAD_DIA / 2000.0 * ratio[0] / ratio[1]
-    left, right = min(point[0] for point in axis), max(point[0] for point in axis)
-    # Explicit lanes inside the actual note-dependent Front cell. Geometry
-    # was fitted with these margins already reserved; never shrink it here.
+    outline = tuple(float(value) for value in view.GetOutline())
+    positions = _supplier_positions(outline, axis)
+    # Use exactly the geometry bounds the pre-fit pass reserved, including
+    # native sheet-space padding, rather than reconstructing a nominal radius.
     margin_left, margin_bottom, margin_right, margin_top = SUPPLIER_MARGINS["*Front"]
-    outline = (
-        left - margin_left,
-        center_y - radius - margin_bottom,
-        right + margin_right,
-        center_y + radius + margin_top,
+    envelope = (
+        outline[0] - margin_left,
+        outline[1] - margin_bottom,
+        outline[2] + margin_right,
+        outline[3] + margin_top,
     )
     notes = str(_config.parts(SPEC.source.stem).get("installation_notes", ""))
     cell = next(
@@ -203,23 +308,23 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
         if name == "*Front"
     )
     if (
-        outline[0] < cell[0]
-        or outline[1] < cell[1]
-        or outline[2] > cell[2]
-        or outline[3] > cell[3]
+        envelope[0] < cell[0]
+        or envelope[1] < cell[1]
+        or envelope[2] > cell[2]
+        or envelope[3] > cell[3]
     ):
         raise RuntimeError(
-            f"thumb supplier annotation lanes leave the actual Front cell: {outline!r} vs {cell!r}"
+            f"thumb supplier annotation lanes leave the actual Front cell: {envelope!r} vs {cell!r}"
         )
     edges = scan_view_edges(view, label="thumb supplier finished-face rims")
     rims = [
         _station_circle(edges, station, label=f"thumb station {station:g}")
         for station in stations
     ]
-    for name, start, end, value, y in (
-        ("head_height", 0, 1, supplier.HEAD_H, center_y + radius + 0.009),
-        ("collar_height", 1, 2, supplier.COLLAR_H, center_y + radius + 0.020),
-        ("thread_length", 2, 3, supplier.SHANK_LEN, center_y - radius - 0.010),
+    for name, start, end, value in (
+        ("head_height", 0, 1, supplier.HEAD_H),
+        ("collar_height", 1, 2, supplier.COLLAR_H),
+        ("thread_length", 2, 3, supplier.SHANK_LEN),
     ):
         entities = (rims[start], rims[end])
         display = add_edge_dimension(
@@ -227,7 +332,7 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
             view,
             p0=axis[start],
             p1=axis[end],
-            text_xy=((axis[start][0] + axis[end][0]) / 2.0, y),
+            text_xy=positions[_supplier_name(name)],
             label=name,
             orientation="horizontal",
             entities=entities,
@@ -245,9 +350,8 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
             precision=supplier.SUPPLIER_PRECISION[name],
         )
     locations = {
-        "head_diameter": (left - 0.020, center_y),
-        "collar_diameter": (right + 0.027, center_y + 0.013),
-        "thread_diameter": (right + 0.012, center_y - 0.014),
+        name: positions[_supplier_name(name)]
+        for name in ("head_diameter", "collar_diameter", "thread_diameter")
     }
     annotations = curate_view_dimensions(
         adapter,
@@ -280,14 +384,21 @@ def supplier_dimensions(adapter: Any, views_by_orientation: dict[str, Any]) -> N
             presentation="diameter",
             callout=supplier.SUPPLIER_THREAD if name == "thread_diameter" else None,
         )
+    # Formatting and the import/delete rebuild can displace an earlier
+    # AddHorizontalDimension2 drop. Re-seat all six complete native lines,
+    # never the fitted view, then measure actual text/line/arrow ink.
+    _place_supplier_dimensions(adapter, positions)
+    view.UpdateViewDisplayGeometry()
+    assert_supplier_view_fits(adapter, view, cell, label=f"{SPEC.artifact_stem} *Front")
+    return positions
 
 
 async def build(adapter: Any) -> dict[str, str]:
     checks = []
 
     def annotate(current_adapter: Any, views: dict[str, Any]) -> None:
-        supplier_dimensions(current_adapter, views)
-        checks.append(lambda: _assert_supplier_dimensions(current_adapter))
+        positions = supplier_dimensions(current_adapter, views)
+        checks.append(lambda: _assert_supplier_dimensions(current_adapter, positions))
 
     return await build_purchased_fastener_drawing(
         adapter,

@@ -30,6 +30,15 @@ warm-c486, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). 
 "ENGAGEMENT 0.90D MIN", on the cut-length callout's last line, never in a
 note; the spec's asserts still guard its value.
 
+The separate supplier maximum-limit sheet is a construction-only source
+diagram, not a correction of the installed MSC solid (deferred in issue 1806).
+Its coordinates belong to the source model sketch, not model XYZ or the
+drawing crop sketch. Map them through the inverse model-to-sketch transform,
+then measure and turn the projected axial direction onto sheet +X before
+centering, cropping or importing dimensions. This keeps the fixed 2:1 full
+profile horizontal in its reserved cell and the 6:1 head on the same frame;
+the final settled check proves both frames again without moving annotations.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_dt_vn_post_mount_screw.py dt-vn-post-mount-screw
@@ -70,7 +79,7 @@ from _drawing_dimensions import (
 )
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
 from _drawing_sheets import create_blank_drawing_sheets
@@ -288,8 +297,90 @@ def assert_supplier_profile_state(
         raise RuntimeError(f"{row.name}: native dimension left its source-diagram vertices")
 
 
+def _supplier_profile_model_points(adapter, view, *, crop_head, label):
+    """Map source-sketch origin, axes and semantic center into model metres."""
+    referenced = _early_bound(view, "IView").ReferencedDocument
+    if referenced is None:
+        raise RuntimeError(f"{label}: supplier view has no referenced source model")
+    source = _early_bound(referenced, "IPartDoc").FeatureByName(SUPPLIER_STOCK_FEATURE)
+    if source is None:
+        raise RuntimeError(f"{label}: supplier source profile is missing")
+    sketch = _early_bound(
+        _early_bound(source, "IFeature").GetSpecificFeature2(), "ISketch",
+    )
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
+    if transform is None:
+        raise RuntimeError(f"{label}: source sketch-to-model transform is unavailable")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    head_height = next(
+        row.expected_mm for row in SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierHeadHeight"
+    )
+    stock_length = next(
+        row.expected_mm for row in SUPPLIER_PROFILE_DIMENSIONS
+        if row.name == "SupplierStockLength"
+    )
+    center_x = -head_height / 2.0 if crop_head else (stock_length - head_height) / 2.0
+    coordinates_mm = (
+        (0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
+        (center_x, 0.0, 0.0),
+    )
+    model_points = []
+    for coordinates in coordinates_mm:
+        metres = tuple(value / 1000.0 for value in coordinates)
+        raw = utility.CreatePoint(double_array(list(metres)))
+        if raw is None:
+            raise RuntimeError(f"{label}: cannot create supplier source point")
+        point = _early_bound(raw, "IMathPoint")
+        created = tuple(float(value) for value in point.ArrayData)
+        if len(created) != 3 or any(
+            not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-12)
+            for actual, expected in zip(created, metres, strict=True)
+        ):
+            raise RuntimeError(f"{label}: supplier source point marshaling changed")
+        mapped = point.MultiplyTransform(transform)
+        if mapped is None:
+            raise RuntimeError(f"{label}: cannot map supplier source point to model")
+        coordinates = tuple(
+            float(value) for value in _early_bound(mapped, "IMathPoint").ArrayData
+        )
+        if len(coordinates) != 3 or not all(math.isfinite(value) for value in coordinates):
+            raise RuntimeError(f"{label}: supplier source model point is invalid")
+        model_points.append(coordinates)
+    return model_points
+
+
+def _assert_supplier_profile_frame(
+    adapter, view, center, scale, *, crop_head, label,
+):
+    """Refresh native view geometry, then prove source axes and semantic center."""
+    points = _supplier_profile_model_points(
+        adapter, view, crop_head=crop_head, label=label,
+    )
+    # Rebuild does not guarantee Windows has repainted a moved view. Refresh
+    # before reading ModelToViewTransform, including the first post-move proof.
+    _early_bound(view, "IView").UpdateViewDisplayGeometry()
+    origin, axial, radial, actual_center = model_points_in_view(
+        adapter, view, points, label=label,
+    )
+    east = tuple(axial[index] - origin[index] for index in range(2))
+    up = tuple(radial[index] - origin[index] for index in range(2))
+    millimetre = scale[0] / scale[1] / 1000.0
+    for actual, expected in ((east, (millimetre, 0.0)), (up, (0.0, millimetre))):
+        if any(
+            not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-8)
+            for value, target in zip(actual, expected, strict=True)
+        ):
+            raise RuntimeError(f"{label}: supplier source axes lost their horizontal frame")
+    if any(
+        not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-8)
+        for value, target in zip(actual_center, center, strict=True)
+    ):
+        raise RuntimeError(f"{label}: supplier source center moved from {center!r}")
+
+
 def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False):
-    """Reveal the zero-body source sketch before scale, projection or import."""
+    """Reveal, orient and center the source sketch before crop or annotations."""
     stock = _early_bound(
         place_view(adapter, str(SOURCE), "*Front", *center), "IView",
     )
@@ -315,17 +406,22 @@ def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False
         raise RuntimeError(f"{label}: cannot rebuild scaled supplier profile")
     stock.UpdateViewDisplayGeometry()
     _box(stock.GetOutline(), label=f"{label} revealed source profile")
-    head_height = next(
-        row.expected_mm for row in SUPPLIER_PROFILE_DIMENSIONS
-        if row.name == "SupplierHeadHeight"
+    points = _supplier_profile_model_points(
+        adapter, stock, crop_head=crop_head, label=label,
     )
-    stock_length = next(
-        row.expected_mm for row in SUPPLIER_PROFILE_DIMENSIONS
-        if row.name == "SupplierStockLength"
+    origin, axial, _radial, _source_center = model_points_in_view(
+        adapter, stock, points, label=label,
     )
-    x_mm = -head_height / 2.0 if crop_head else (stock_length - head_height) / 2.0
-    reference = (x_mm / 1000.0, 0.0, 0.0)
-    projected = model_point_in_view(adapter, stock, reference, label=label)
+    dx, dy = axial[0] - origin[0], axial[1] - origin[1]
+    if not all(math.isfinite(value) for value in (dx, dy)) or math.hypot(dx, dy) < 1e-9:
+        raise RuntimeError(f"{label}: supplier source axis has no sheet projection")
+    # The named Front need not share the source sketch's local axial frame.
+    # Turn its measured direction, not an assumed model axis or quarter-turn.
+    stock.Angle = float(stock.Angle) - math.atan2(dy, dx)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: cannot rebuild horizontal supplier profile")
+    stock.UpdateViewDisplayGeometry()
+    projected = model_points_in_view(adapter, stock, points, label=label)[3]
     position = tuple(float(value) for value in stock.Position)
     if not stock.SetViewPosition(double_array([
         position[index] + center[index] - projected[index] for index in range(2)
@@ -333,6 +429,9 @@ def _supplier_stock_view(adapter, *, center, scale, keep, label, crop_head=False
         raise RuntimeError(f"{label}: cannot position complete source profile")
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError(f"{label}: cannot rebuild positioned source profile")
+    _assert_supplier_profile_frame(
+        adapter, stock, center, scale, crop_head=crop_head, label=label,
+    )
     if crop_head:
         _activate(adapter, stock, label=label)
         _sketch_circle(
@@ -398,9 +497,9 @@ def _verify_supplier_stock(adapter, full_name, head_name, notes) -> None:
     border = (region.xmin, region.ymin, region.xmax, region.ymax)
     rows = {row.name: row for row in SUPPLIER_REFERENCE_DIMENSIONS}
     found = []
-    for view, keep, scale, cropped, cell in (
-        (views[full_name], STOCK_KEEP, STOCK_SCALE, False, STOCK_VIEW_CELL),
-        (views[head_name], STOCK_HEAD_KEEP, STOCK_HEAD_SCALE, True, STOCK_HEAD_CELL),
+    for view, keep, scale, center, cropped, cell in (
+        (views[full_name], STOCK_KEEP, STOCK_SCALE, STOCK_CENTER, False, STOCK_VIEW_CELL),
+        (views[head_name], STOCK_HEAD_KEEP, STOCK_HEAD_SCALE, STOCK_HEAD_CENTER, True, STOCK_HEAD_CELL),
     ):
         if not _inside(cell, border):
             raise RuntimeError("source annotation cell leaves the actual sheet border")
@@ -413,6 +512,9 @@ def _verify_supplier_stock(adapter, full_name, head_name, notes) -> None:
             or bool(view.IsCropped()) != cropped
         ):
             raise RuntimeError("supplier envelope view lost source configuration/scale/crop")
+        _assert_supplier_profile_frame(
+            adapter, view, center, scale, crop_head=cropped, label="MSC source envelope",
+        )
         annotations = [
             _early_bound(raw, "IAnnotation") for raw in (view.GetAnnotations() or ())
             if dimension_name(adapter, _early_bound(raw, "IAnnotation"))
