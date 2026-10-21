@@ -147,25 +147,33 @@ def _elev_y(center: tuple[float, float], model_y_mm: float) -> float:
 _BORE_SHEET_Y = _elev_y(RIGHT_CENTER, LEVER_BORE_Y)
 _RIGHT_LEFT_X = RIGHT_CENTER[0] - _HALF_AF
 
-# The front view: both heights to the left; the Ø callout up and to the right.
+# The front view: both heights to the left; the bore callout in its right-hand lane.
 RIGHT_KEEP = {
-    "Height": (0.032, 0.155),
+    "Height": (0.036, 0.1555),
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
-    "LeverBoreDiaDim": (0.150, _BORE_SHEET_Y + 0.037),
+    "LeverBoreDiaDim": (0.150, 0.145),
 }
 # The top view: the flats (Z, sheet horizontal) above it, between its upper
 # vertices.
 TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
 RIGHT_LOCATION_KEEP = {
-    "LeverBoreFromZFlat": (RIGHT_CENTER[0] - _HALF_AF / 2.0, 0.174),
-    "ThumbTapToBoreRim": (0.092, 0.185),
-    "RodTapToBoreRim": (0.092, 0.072),
+    # The width above A clears its real arrow/text ink without reaching the
+    # top hex. The rim dimensions hang right of the front, not over A-A.
+    "LeverBoreFromZFlat": (RIGHT_CENTER[0] - _HALF_AF / 2.0, 0.188),
+    "ThumbTapToBoreRim": (0.150, 0.185),
+    "RodTapToBoreRim": (0.150, 0.083),
 }
 TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
 BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 
+# Only the drawing's native below-text wraps; the model's functional contract
+# and every word stay intact. The extra row clears the 19.95 top witness.
+HEIGHT_DRAWING_CALLOUT = HEIGHT_CALLOUT.replace(
+    "FULL THREAD ENGAGEMENT", "FULL THREAD\nENGAGEMENT"
+)
+
 DIMENSION_CALLOUTS = {
-    "Height": HEIGHT_CALLOUT,
+    "Height": HEIGHT_DRAWING_CALLOUT,
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
     "ThumbTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
     "RodTapToBoreRim": "TAP ENTRY AXIS\nTO BORE RIM",
@@ -707,7 +715,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     height_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "Height")
     height_display = _early_bound(_early_bound(height_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
-    if str(height_display.GetText(4) or "") != HEIGHT_CALLOUT:
+    if str(height_display.GetText(4) or "") != HEIGHT_DRAWING_CALLOUT:
         raise RuntimeError("Height: thumb-screw engagement reason did not remain attached")
     # The flats are the bar's as supplied: a stock reference.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
